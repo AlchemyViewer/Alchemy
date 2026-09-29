@@ -71,6 +71,8 @@ namespace tut
 {
     struct alscriptstudiowords_data
     {
+        // The viewer the units ask, attached first and let go of last.
+        al_studio_test::StudioViewer viewer;
         al_studio_test::StudioWindow window;
         std::vector<std::string>     extra;
         LLSD                         lsl  = lslKeywords();
@@ -78,7 +80,7 @@ namespace tut
 
         alscriptstudiowords_data()
         {
-            Words::Sources& sources   = Words::sources();
+            auto& sources = viewer.slots;
             sources.keywords          = [this](bool lua) { return lua ? slua : lsl; };
             sources.preprocessorWords = [this] { return extra; };
             sources.lslHelpUrl        = [] { return std::string("https://wiki.example/[LSL_STRING]"); };
@@ -86,7 +88,6 @@ namespace tut
         }
         ~alscriptstudiowords_data()
         {
-            Words::sources() = Words::Sources();
             Words::forget();
         }
         ALCodeEditor& editor(const std::string& text, bool lua)
@@ -148,7 +149,7 @@ namespace tut
         ensure("kept", Words::word(false, "llSay") != nullptr && !Words::word(false, "llShout"));
         Words::forget();
         ensure("built again", !Words::word(false, "llSay") && Words::word(false, "llShout") != nullptr);
-        Words::sources().keywords = [](bool) { return LLSD("not a map"); };
+        viewer.slots.keywords = [](bool) { return LLSD("not a map"); };
         Words::forget();
         ensure("definitions that are not: no words", Words::vocabulary(false).empty() && !Words::word(false, "llShout"));
     }
@@ -336,11 +337,11 @@ namespace tut
         set_test_name("a language's tables are made once and shared by every editor of it; new definitions are read once however many ask; new preprocessor words make new tables");
         S32         asked   = 0;
         std::string version = "one";
-        Words::sources().keywords = [this, &asked](bool lua) {
+        viewer.slots.keywords = [this, &asked](bool lua) {
             ++asked;
             return lua ? slua : lsl;
         };
-        Words::sources().definitionsVersion = [&version] { return version; };
+        viewer.slots.definitionsVersion = [&version] { return version; };
         Words::forget();
         ALCodeEditor& a = editor("default {}", false);
         ALCodeEditor& b = editor("default {}", false);
@@ -397,7 +398,7 @@ namespace tut
         ensure_equals("only functions, and those with categories", found.size(), size_t(1));
         ensure_equals("by the first", found["llSay"], std::string("avatar_communication"));
 
-        Words::sources().definitionsYaml = [] { return std::string("functions:\n  llSay:\n    categories:\n      - avatar_communication\n"); };
+        viewer.slots.definitionsYaml = [] { return std::string("functions:\n  llSay:\n    categories:\n      - avatar_communication\n"); };
         lsl["constants"]["PRIM_POSITION"] = LLSD().with("type", "integer").with("value", "6");
         Words::forget();
         ensure_equals("LSL, in words", Words::word(false, "llSay")->group, std::string("Avatar communication"));
@@ -407,5 +408,20 @@ namespace tut
         ensure("one without a family none", Words::word(false, "PI")->group.empty());
         ensure_equals("SLua's ll function as its twin", Words::word(true, "ll.Say")->group, std::string("Avatar communication"));
         ensure_equals("another SLua function by library", Words::word(true, "math.pi")->group, std::string("math"));
+    }
+
+    template<> template<>
+    void alscriptstudiowords_object::test<14>()
+    {
+        set_test_name("the units ask the viewer attached; what it leaves unsaid is a viewer with nothing's answer");
+        ALScriptStudioViewer& asked = ALScriptStudioViewer::get();
+        ensure("the test's is the one asked", &asked == &viewer);
+        ensure("its words", asked.lslHelpUrl() == "https://wiki.example/[LSL_STRING]");
+        ensure("no definitions as YAML, no version", asked.definitionsYaml().empty() && asked.definitionsVersion().empty());
+        ensure("no preprocessor, no transform", !asked.preprocessing() && !asked.transformOn(ALPreprocessor::Transform::Switch));
+        ALPreprocessor::Include found;
+        ensure("no include", asked.lookUp(ALScriptPreprocessor::Request(), ALPreprocessor::Ask(), found) == ALPreprocessor::Found::No);
+        viewer.slots.lslHelpUrl = nullptr;
+        ensure_equals("the wiki as nothing says it", asked.lslHelpUrl(), std::string("[LSL_STRING]"));
     }
 }

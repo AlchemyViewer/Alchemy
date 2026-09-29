@@ -74,25 +74,9 @@ public:
     };
     typedef ALScriptSnippets::Snippet Snippet;
 
-    // Where the words come from: the grid's definitions of a language;
-    // the preprocessor's own words while its transforms are on, which the
-    // definitions do not list; and the LSL wiki's address for a page, with
-    // [LSL_STRING] for its name. The viewer sets them once; a test sets
-    // its own.
-    struct Sources
-    {
-        std::function<LLSD(bool lua)>             keywords;
-        std::function<std::vector<std::string>()> preprocessorWords;
-        std::function<std::string()>              lslHelpUrl;
-        // Which definitions keywords() gives: the vocabulary is built again
-        // on the first ask after it moves, once for every window.
-        std::function<std::string()>              definitionsVersion;
-        // The LSL definitions as YAML, which say each function's
-        // categories where the keywords do not; nothing to group by
-        // categories without them.
-        std::function<std::string()>              definitionsYaml;
-    };
-    static Sources& sources();
+    // Where the words come from -- the grid's definitions, the
+    // preprocessor's words, the LSL wiki -- is the viewer's to say
+    // (ALScriptStudioViewer).
 
     // The words of a language, sorted, built on the first ask after the
     // definitions change; and built again on the next ask.

@@ -134,27 +134,9 @@ public:
     typedef ALScriptStudioDoc      Doc;
     typedef ALScriptStudioDoc::FixPick FixPick;
 
-    // What checking reads of the viewer's that is no window's: whether the
-    // preprocessor runs and each of its transforms is on, its expansion of
-    // a script and a script's `.luaurc`, an include or a module looked up
-    // by name, and the modules index. The viewer sets them once; a test
-    // sets its own.
-    struct Sources
-    {
-        std::function<bool()>                          preprocessing;
-        std::function<bool(ALPreprocessor::Transform)> transformOn;
-        std::function<void(ALScriptPreprocessor::Request, std::function<void(const ALPreprocessor::Result&)>)> expand;
-        std::function<bool(const ALScriptPreprocessor::Request&, ALLuauConfig&, const ALLuauConfig*)>          configOf;
-        std::function<void(const ALScriptPreprocessor::Request&, std::function<void()>)>                        fetchConfig;
-        std::function<ALPreprocessor::Found(const ALScriptPreprocessor::Request&, const ALPreprocessor::Ask&, ALPreprocessor::Include&)>
-            lookUp;
-        std::function<std::vector<ALScriptModules::Module>(const ALScriptPreprocessor::Request&,
-                                                           std::function<std::vector<ALScriptModules::Open>()>,
-                                                           const std::vector<std::string>&, std::function<void()>)>
-                                                                                          modules;
-        std::function<void(const ALScriptPreprocessor::Request&, std::function<void()>)> fetchNearby;
-    };
-    static Sources& sources();
+    // What checking reads of the viewer's that is no window's -- the
+    // preprocessor, its settings, its expansions, the .luaurc, includes
+    // and modules -- is the viewer's to say (ALScriptStudioViewer).
 
     // What checking asks of the window itself, beyond what it is given.
     class Window

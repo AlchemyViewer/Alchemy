@@ -263,6 +263,8 @@ namespace tut
 {
     struct alscriptlookup_data
     {
+        // The viewer the units ask, attached first and let go of last.
+        al_studio_test::StudioViewer viewer;
         al_studio_test::StudioWindow                      window;
         al_studio_test::FakeServices                      services;
         FakeLookupWindow                                  studio;
@@ -278,7 +280,7 @@ namespace tut
 
         alscriptlookup_data()
         {
-            ALScriptStudioWords::Sources& sources = ALScriptStudioWords::sources();
+            auto& sources = viewer.slots;
             sources.keywords                      = [](bool lua) {
                 LLSD keywords;
                 keywords["functions"][lua ? "ll.Say" : "llSay"] = LLSD().with("return", "");
@@ -289,7 +291,6 @@ namespace tut
         }
         ~alscriptlookup_data()
         {
-            ALScriptStudioWords::sources() = ALScriptStudioWords::Sources();
             ALScriptStudioWords::forget();
             gFocusMgr.setKeyboardFocus(nullptr);
         }

@@ -32,6 +32,7 @@
 #include "aldiffview.h"
 #include "aldiskincludes.h"
 #include "alscriptlexicon.h"
+#include "alscriptstudioviewer.h"
 #include "alserialworker.h"
 #include "alfilewrite.h"
 #include "fsyspath.h"
@@ -139,15 +140,27 @@ namespace
 
 namespace
 {
-    // Where the studio's words come from, in the viewer: the grid's
-    // definitions, the preprocessor's words while its transforms are on,
-    // and the LSL wiki.
-    const bool WORD_SOURCES = [] {
-        ALScriptStudioWords::Sources& sources = ALScriptStudioWords::sources();
-        sources.keywords = [](bool lua) {
+    // What Script Studio's units ask of the viewer, answered by the viewer:
+    // the grid's definitions, the preprocessor's words while its transforms
+    // are on and the LSL wiki; the preprocessor, its settings and the
+    // modules index.
+    class StudioViewer final : public ALScriptStudioViewer
+    {
+    public:
+        LLSD keywords(bool lua) override
+        {
             return lua ? LLSyntaxDefCache::instance().getLuaKeywords() : LLSyntaxDefCache::instance().getLSLKeywords();
-        };
-        sources.preprocessorWords = [] {
+        }
+        std::string definitionsVersion() override { return LLSyntaxDefCache::instance().getSyntaxID().asString(); }
+        std::string definitionsYaml() override
+        {
+            llifstream        in(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "syntax_default", "lsl_definitions.yaml"), std::ios::binary);
+            std::stringstream text;
+            text << in.rdbuf();
+            return text.str();
+        }
+        std::vector<std::string> preprocessorWords() override
+        {
             std::vector<std::string> words;
             if (gSavedSettings.getBOOL("ALScriptPreprocSwitch"))
             {
@@ -163,49 +176,42 @@ namespace
                 words.insert(words.end(), { "break", "continue" });
             }
             return words;
-        };
-        sources.lslHelpUrl = [] { return gSavedSettings.getString("LSLHelpURL"); };
-        sources.definitionsVersion = [] { return LLSyntaxDefCache::instance().getSyntaxID().asString(); };
-        sources.definitionsYaml    = [] {
-            llifstream        in(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "syntax_default", "lsl_definitions.yaml"), std::ios::binary);
-            std::stringstream text;
-            text << in.rdbuf();
-            return text.str();
-        };
-        return true;
-    }();
+        }
+        std::string lslHelpUrl() override { return gSavedSettings.getString("LSLHelpURL"); }
 
-    // What checking reads of the viewer's: the preprocessor, its settings,
-    // and the modules index.
-    const bool CHECKING_SOURCES = [] {
-        ALScriptStudioChecking::Sources& sources = ALScriptStudioChecking::sources();
-        sources.preprocessing                    = [] { return ALScriptPreprocessor::enabled(); };
-        sources.transformOn                      = [](ALPreprocessor::Transform transform) {
+        bool preprocessing() override { return ALScriptPreprocessor::enabled(); }
+        bool transformOn(ALPreprocessor::Transform transform) override
+        {
             static LLCachedControl<bool> switches(gSavedSettings, "ALScriptPreprocSwitch", false);
             static LLCachedControl<bool> extensions(gSavedSettings, "ALScriptPreprocExtensions", false);
             return transform == ALPreprocessor::Transform::Switch ? switches() : extensions();
-        };
-        sources.expand = [](ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> answer) {
+        }
+        void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> answer) override
+        {
             ALScriptPreprocessor::instance().expand(request, std::move(answer));
-        };
-        sources.configOf = [](const ALScriptPreprocessor::Request& request, ALLuauConfig& config, const ALLuauConfig* base) {
+        }
+        bool configOf(const ALScriptPreprocessor::Request& request, ALLuauConfig& config, const ALLuauConfig* base) override
+        {
             return ALScriptPreprocessor::instance().configOf(request, config, base);
-        };
-        sources.fetchConfig = [](const ALScriptPreprocessor::Request& request, std::function<void()> fetched) {
+        }
+        void fetchConfig(const ALScriptPreprocessor::Request& request, std::function<void()> fetched) override
+        {
             ALScriptPreprocessor::instance().fetchConfig(request, std::move(fetched));
-        };
-        sources.lookUp = [](const ALScriptPreprocessor::Request& request, const ALPreprocessor::Ask& ask, ALPreprocessor::Include& found) {
+        }
+        ALPreprocessor::Found lookUp(const ALScriptPreprocessor::Request& request, const ALPreprocessor::Ask& ask, ALPreprocessor::Include& found) override
+        {
             return ALScriptPreprocessor::instance().lookUp(request, ask, found);
-        };
-        sources.modules = [](const ALScriptPreprocessor::Request& request, std::function<std::vector<ALScriptModules::Open>()> open,
-                             const std::vector<std::string>& names, std::function<void()> ready) {
+        }
+        std::vector<ALScriptModules::Module> modules(const ALScriptPreprocessor::Request& request, std::function<std::vector<ALScriptModules::Open>()> open,
+                                                     const std::vector<std::string>& names, std::function<void()> ready) override
+        {
             return ALScriptModules::instance().giving(request, open, names, std::move(ready));
-        };
-        sources.fetchNearby = [](const ALScriptPreprocessor::Request& request, std::function<void()> fetched) {
+        }
+        void fetchNearby(const ALScriptPreprocessor::Request& request, std::function<void()> fetched) override
+        {
             ALScriptModules::instance().fetchNearby(request, std::move(fetched));
-        };
-        return true;
-    }();
+        }
+    };
 
     // How long a tab to be restored waits for its object or its item to be
     // in hand after the window is built: long enough for what is near to
@@ -300,6 +306,12 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::lastWorkedIn()
 {
     ALFloaterScriptStudio* window = ALViewType::as<ALFloaterScriptStudio>(sLastWorkedIn.get());
     return window && window->getVisible() ? window : nullptr;
+}
+
+void ALScriptStudio::attachViewer()
+{
+    static StudioViewer viewer;
+    ALScriptStudioViewer::use(&viewer);
 }
 
 LLFloater* ALScriptStudio::build(const LLSD& key)
@@ -5640,15 +5652,13 @@ void ALFloaterScriptStudio::read(const ALScriptRef& ref, std::function<void(std:
 
 bool ALFloaterScriptStudio::preprocessing() const
 {
-    const ALScriptStudioChecking::Sources& sources = ALScriptStudioChecking::sources();
-    return sources.preprocessing && sources.preprocessing();
+    return ALScriptStudioViewer::get().preprocessing();
 }
 
 bool ALFloaterScriptStudio::luauConfig(const ALScriptPreprocessor::Request& root, ALLuauConfig& config) const
 {
-    const ALScriptStudioChecking::Sources& sources = ALScriptStudioChecking::sources();
-    const ALLuauConfig                     base    = ALScriptLints::luauBase();
-    return sources.configOf && sources.configOf(root, config, &base);
+    const ALLuauConfig base = ALScriptLints::luauBase();
+    return ALScriptStudioViewer::get().configOf(root, config, &base);
 }
 
 void ALFloaterScriptStudio::scriptChecked(const ALScriptObjectCheck::Script& script)

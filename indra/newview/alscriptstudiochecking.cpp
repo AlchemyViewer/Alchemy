@@ -34,6 +34,7 @@
 #include "alscriptstudioplaces.h"
 #include "alscriptstudiosaves.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudioviewer.h"
 #include "alscriptstudioweighing.h"
 #include "alscriptstudiowords.h"
 #include "lldir.h"
@@ -106,18 +107,11 @@ using ALScriptPlaces::declaredOf;
 using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::rangeOf;
 
-// static
-ALScriptStudioChecking::Sources& ALScriptStudioChecking::sources()
-{
-    static Sources sources;
-    return sources;
-}
-
 ALScriptStudioChecking::ALScriptStudioChecking(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptStudioSaves& saves, ALScriptStudioWeighing& weighing, Window& window) : mServices(services), mAnalysis(analysis), mSaves(saves), mWeighing(weighing), mWindow(window) {}
 
 bool ALScriptStudioChecking::preprocessed(const Doc& doc) const
 {
-    return doc.loaded && !doc.notecard && (doc.envelope.has_value() || (sources().preprocessing && sources().preprocessing()));
+    return doc.loaded && !doc.notecard && (doc.envelope.has_value() || ALScriptStudioViewer::get().preprocessing());
 }
 
 ALScriptPreprocessor::Request ALScriptStudioChecking::preprocessRequest(const Doc& doc, bool with_source) const
@@ -174,7 +168,7 @@ void ALScriptStudioChecking::expandFor(Doc& doc, ALScriptAnalysis::Kind kind, co
     // its own.
     ALScriptPreprocessor::Request asked = preprocessRequest(doc);
     asked.apart                         = true;
-    sources().expand(asked, [this, alive, id, version](const ALPreprocessor::Result& result) {
+    ALScriptStudioViewer::get().expand(asked, [this, alive, id, version](const ALPreprocessor::Result& result) {
         if (alive.lock())
         {
             expandedAnswer(id, version, result);
@@ -329,7 +323,7 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
         // file overrides key by key; that choice alone where there is none.
         const ALLuauConfig                  base  = ALScriptLints::luauBase();
         const ALScriptPreprocessor::Request root  = preprocessRequest(doc, /*with_source*/ false);
-        const bool                          found = sources().configOf(root, request.config, &base);
+        const bool                          found = ALScriptStudioViewer::get().configOf(root, request.config, &base);
         if (!found)
         {
             request.config = base;
@@ -339,7 +333,7 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
             doc.check->configAsked          = true;
             const std::weak_ptr<bool> alive = mAlive;
             const std::string         id    = doc.id;
-            sources().fetchConfig(root, [this, alive, id]() {
+            ALScriptStudioViewer::get().fetchConfig(root, [this, alive, id]() {
                 if (Doc* asked = alive.lock() ? mServices.findDoc(id) : nullptr)
                 {
                     schedule(*asked, true);
@@ -1185,7 +1179,7 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
     // script checked again once what it finds is new.
     const std::weak_ptr<bool>                  waiting = mAlive;
     const std::string                          waiter  = doc.id;
-    const std::vector<ALScriptModules::Module> modules = sources().modules(request, open, names, [this, waiting, waiter]() {
+    const std::vector<ALScriptModules::Module> modules = ALScriptStudioViewer::get().modules(request, open, names, [this, waiting, waiter]() {
         if (Doc* asked = waiting.lock() ? mServices.findDoc(waiter) : nullptr)
         {
             schedule(*asked, true);
@@ -1209,7 +1203,7 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
             ask.name    = name;
             ask.require = true;
             ALPreprocessor::Include     found;
-            const ALPreprocessor::Found named = sources().lookUp(request, ask, found);
+            const ALPreprocessor::Found named = ALScriptStudioViewer::get().lookUp(request, ask, found);
             if (named != ALPreprocessor::Found::No && !found.path.empty() && ALScriptModules::identity(found.path) != self)
             {
                 offer(problem, name, false);
@@ -1256,7 +1250,7 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
     {
         const std::weak_ptr<bool> alive = mAlive;
         const std::string         id    = doc.id;
-        sources().fetchNearby(request, [this, alive, id]() {
+        ALScriptStudioViewer::get().fetchNearby(request, [this, alive, id]() {
             if (Doc* asked = alive.lock() ? mServices.findDoc(id) : nullptr)
             {
                 schedule(*asked, true);
@@ -1270,7 +1264,7 @@ void ALScriptStudioChecking::explainTransformWords(Doc& doc)
     // A parse error on one of the preprocessor's words, with its transform
     // off, is the transform's to explain (ALPreprocessor::transformAt).
     using Transform                     = ALPreprocessor::Transform;
-    const bool            preprocessing = sources().preprocessing && sources().preprocessing();
+    const bool            preprocessing = ALScriptStudioViewer::get().preprocessing();
     const ALTextDocument& text          = doc.editor->document();
     const auto            line          = [&text](S32 index) { return std::string_view(text.line(index)); };
     for (ALScriptProblem& problem : doc.check->analysis)
@@ -1284,7 +1278,7 @@ void ALScriptStudioChecking::explainTransformWords(Doc& doc)
         // `inline` and `const` are taken off whenever the preprocessor
         // runs, whether the extensions are on or not.
         const bool      marker    = transform == Transform::Extensions && (word == "inline" || word == "const");
-        const bool      on        = preprocessing && transform != Transform::None && (marker || sources().transformOn(transform));
+        const bool      on        = preprocessing && transform != Transform::None && (marker || ALScriptStudioViewer::get().transformOn(transform));
         if (transform == Transform::None || on)
         {
             continue;

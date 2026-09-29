@@ -136,6 +136,8 @@ namespace tut
 {
     struct alscriptstudiocaret_data
     {
+        // The viewer the units ask, attached first and let go of last.
+        al_studio_test::StudioViewer viewer;
         al_studio_test::StudioWindow                      window;
         al_studio_test::FakeServices                      services;
         FakeCaretWindow                                   studio;
@@ -145,7 +147,7 @@ namespace tut
 
         alscriptstudiocaret_data()
         {
-            ALScriptStudioWords::Sources& sources = ALScriptStudioWords::sources();
+            auto& sources = viewer.slots;
             sources.keywords                      = [](bool) {
                 LLSD keywords;
                 keywords["functions"]["llSay"] = LLSD().with("return", "");
@@ -155,7 +157,6 @@ namespace tut
         }
         ~alscriptstudiocaret_data()
         {
-            ALScriptStudioWords::sources() = ALScriptStudioWords::Sources();
             ALScriptStudioWords::forget();
             gFocusMgr.setKeyboardFocus(nullptr);
         }

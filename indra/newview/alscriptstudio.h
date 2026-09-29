@@ -40,6 +40,11 @@ struct ALScriptRef;
 // Defined in the window's source, beside what they reach.
 namespace ALScriptStudio
 {
+    // The viewer's answers to what the studio's units ask of it -- the
+    // grid's definitions, the preprocessor -- given them once, at startup
+    // (ALScriptStudioViewer).
+    void attachViewer();
+
     // The window, as the floater registry builds it.
     LLFloater* build(const LLSD& key);
 

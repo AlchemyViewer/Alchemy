@@ -30,6 +30,7 @@
 
 #include "alscriptlexicon.h"
 #include "alscriptstudiodoc.h"
+#include "alscriptstudioviewer.h"
 #include "lluistring.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -59,13 +60,6 @@ namespace
 }
 
 // static
-ALScriptStudioWords::Sources& ALScriptStudioWords::sources()
-{
-    static Sources sources;
-    return sources;
-}
-
-// static
 void ALScriptStudioWords::forget()
 {
     sVocabularyBuilt[0] = sVocabularyBuilt[1] = false;
@@ -75,7 +69,7 @@ void ALScriptStudioWords::forget()
 const std::vector<ALScriptStudioWords::Vocab>& ALScriptStudioWords::vocabulary(bool lua)
 {
     std::vector<Vocab>& out     = sVocabulary[lua ? 1 : 0];
-    const std::string   version = sources().definitionsVersion ? sources().definitionsVersion() : std::string();
+    const std::string   version = ALScriptStudioViewer::get().definitionsVersion();
     if (sVocabularyBuilt[lua ? 1 : 0] && sVocabularyVersion[lua ? 1 : 0] == version)
     {
         return out;
@@ -84,7 +78,7 @@ const std::vector<ALScriptStudioWords::Vocab>& ALScriptStudioWords::vocabulary(b
     sVocabularyVersion[lua ? 1 : 0] = version;
     ++sVocabularyBuilds[lua ? 1 : 0];
     out.clear();
-    const LLSD keywords = sources().keywords ? sources().keywords(lua) : LLSD();
+    const LLSD keywords = ALScriptStudioViewer::get().keywords(lua);
     if (!keywords.isMap())
     {
         return out;
@@ -127,9 +121,9 @@ const std::vector<ALScriptStudioWords::Vocab>& ALScriptStudioWords::vocabulary(b
     };
     // What the offline reference files each by (Vocab::group).
     Categories categories;
-    if (sources().definitionsYaml)
+    if (const std::string yaml = ALScriptStudioViewer::get().definitionsYaml(); !yaml.empty())
     {
-        readCategories(sources().definitionsYaml(), categories);
+        readCategories(yaml, categories);
     }
     auto inWords = [](std::string category) {
         std::replace(category.begin(), category.end(), '_', ' ');
@@ -315,7 +309,7 @@ std::shared_ptr<const ALSyntaxWords> ALScriptStudioWords::tables(bool lua)
     // while their transforms are on: Firestorm's switch and case, the
     // extensions' break and continue, and inline and const, which it takes
     // off whenever it runs.
-    const std::vector<std::string> extra = !lua && sources().preprocessorWords ? sources().preprocessorWords() : std::vector<std::string>();
+    const std::vector<std::string> extra = !lua ? ALScriptStudioViewer::get().preprocessorWords() : std::vector<std::string>();
     Tables&                        kept  = sTables[lua ? 1 : 0];
     if (kept.words && kept.builds == sVocabularyBuilds[lua ? 1 : 0] && kept.extra == extra)
     {
@@ -508,7 +502,7 @@ std::string ALScriptStudioWords::helpUrl(bool lua, const std::string& word)
         {
             page.erase(2, 1);
         }
-        LLUIString url(sources().lslHelpUrl ? sources().lslHelpUrl() : std::string("[LSL_STRING]"));
+        LLUIString url(ALScriptStudioViewer::get().lslHelpUrl());
         url.setArg("[LSL_STRING]", page.empty() ? std::string("LSL_Portal") : page);
         return url.getString();
     }

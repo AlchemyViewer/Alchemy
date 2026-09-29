@@ -32,6 +32,7 @@
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiotabs.h"
+#include "alscriptstudioviewer.h"
 #include "alscriptstudiowords.h"
 #include "llinventorytype.h"
 
@@ -106,9 +107,9 @@ bool ALScriptLookup::reserved(bool lua, const std::string& name)
     {
         return true;
     }
-    if (!lua && ALScriptStudioWords::sources().preprocessorWords)
+    if (!lua)
     {
-        const std::vector<std::string> words = ALScriptStudioWords::sources().preprocessorWords();
+        const std::vector<std::string> words = ALScriptStudioViewer::get().preprocessorWords();
         if (std::find(words.begin(), words.end(), name) != words.end())
         {
             return true;

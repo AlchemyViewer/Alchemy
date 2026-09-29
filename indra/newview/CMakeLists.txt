@@ -216,6 +216,7 @@ if(AL_BUILD_VIEWER)
     alrecovery.cpp
     alrecoverykeeper.cpp
     alscriptstudiosaving.cpp
+    alscriptstudioviewer.cpp
     alscriptstudiovim.cpp
     alscriptstudiovimrc.cpp
     alscriptstudioweighing.cpp
@@ -1065,6 +1066,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiosaves.h
     alscriptstudioservices.h
     alscriptstudiotabs.h
+    alscriptstudioviewer.h
     alscripttheme.h
     alscripttypes.h
     alscriptweightspane.h
@@ -2455,6 +2457,7 @@ if(AL_BUILD_TESTS)
     alscriptstudioorphans.cpp
     alscriptstudioplaces.cpp
     alscriptstudiorecovery.cpp
+    alscriptstudioviewer.cpp
     alscriptstudioweighing.cpp
     alscriptstudiowords.cpp
     alscriptweightspane.cpp

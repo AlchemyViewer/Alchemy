@@ -39,6 +39,7 @@
 #include "../alscriptstudiosaves.h"
 #include "../alscriptstudioservices.h"
 #include "../alscriptstudiotabs.h"
+#include "../alscriptstudioviewer.h"
 #include "../alscriptstudioweighing.h"
 
 #include "alcodeeditor.h"
@@ -75,6 +76,86 @@ const std::string& rlvGetAnonym(const LLAvatarName& av_name)
 
 namespace al_studio_test
 {
+    // A viewer of the test's for the studio's units (ALScriptStudioViewer):
+    // each answer the slot of its name gives, where a test filled it, else
+    // as a viewer with nothing answers. Attached while it lives.
+    struct StudioViewer final : ALScriptStudioViewer
+    {
+        struct Slots
+        {
+            std::function<LLSD(bool lua)>                  keywords;
+            std::function<std::string()>                   definitionsVersion;
+            std::function<std::string()>                   definitionsYaml;
+            std::function<std::vector<std::string>()>      preprocessorWords;
+            std::function<std::string()>                   lslHelpUrl;
+            std::function<bool()>                          preprocessing;
+            std::function<bool(ALPreprocessor::Transform)> transformOn;
+            std::function<void(ALScriptPreprocessor::Request, std::function<void(const ALPreprocessor::Result&)>)> expand;
+            std::function<bool(const ALScriptPreprocessor::Request&, ALLuauConfig&, const ALLuauConfig*)>          configOf;
+            std::function<void(const ALScriptPreprocessor::Request&, std::function<void()>)>                        fetchConfig;
+            std::function<ALPreprocessor::Found(const ALScriptPreprocessor::Request&, const ALPreprocessor::Ask&, ALPreprocessor::Include&)>
+                lookUp;
+            std::function<std::vector<ALScriptModules::Module>(const ALScriptPreprocessor::Request&, std::function<std::vector<ALScriptModules::Open>()>,
+                                                               const std::vector<std::string>&, std::function<void()>)>
+                                                                                              modules;
+            std::function<void(const ALScriptPreprocessor::Request&, std::function<void()>)> fetchNearby;
+        };
+        Slots slots;
+
+        StudioViewer() { ALScriptStudioViewer::use(this); }
+        ~StudioViewer() override { ALScriptStudioViewer::use(nullptr); }
+        StudioViewer(const StudioViewer&)            = delete;
+        StudioViewer& operator=(const StudioViewer&) = delete;
+
+        LLSD        keywords(bool lua) override { return slots.keywords ? slots.keywords(lua) : ALScriptStudioViewer::keywords(lua); }
+        std::string definitionsVersion() override { return slots.definitionsVersion ? slots.definitionsVersion() : ALScriptStudioViewer::definitionsVersion(); }
+        std::string definitionsYaml() override { return slots.definitionsYaml ? slots.definitionsYaml() : ALScriptStudioViewer::definitionsYaml(); }
+        std::vector<std::string> preprocessorWords() override
+        {
+            return slots.preprocessorWords ? slots.preprocessorWords() : ALScriptStudioViewer::preprocessorWords();
+        }
+        std::string lslHelpUrl() override { return slots.lslHelpUrl ? slots.lslHelpUrl() : ALScriptStudioViewer::lslHelpUrl(); }
+        bool        preprocessing() override { return slots.preprocessing ? slots.preprocessing() : ALScriptStudioViewer::preprocessing(); }
+        bool        transformOn(ALPreprocessor::Transform transform) override
+        {
+            return slots.transformOn ? slots.transformOn(transform) : ALScriptStudioViewer::transformOn(transform);
+        }
+        void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> answer) override
+        {
+            if (slots.expand)
+            {
+                slots.expand(std::move(request), std::move(answer));
+            }
+        }
+        bool configOf(const ALScriptPreprocessor::Request& request, ALLuauConfig& config, const ALLuauConfig* base) override
+        {
+            return slots.configOf ? slots.configOf(request, config, base) : ALScriptStudioViewer::configOf(request, config, base);
+        }
+        void fetchConfig(const ALScriptPreprocessor::Request& request, std::function<void()> fetched) override
+        {
+            if (slots.fetchConfig)
+            {
+                slots.fetchConfig(request, std::move(fetched));
+            }
+        }
+        ALPreprocessor::Found lookUp(const ALScriptPreprocessor::Request& request, const ALPreprocessor::Ask& ask, ALPreprocessor::Include& found) override
+        {
+            return slots.lookUp ? slots.lookUp(request, ask, found) : ALScriptStudioViewer::lookUp(request, ask, found);
+        }
+        std::vector<ALScriptModules::Module> modules(const ALScriptPreprocessor::Request& request, std::function<std::vector<ALScriptModules::Open>()> open,
+                                                     const std::vector<std::string>& names, std::function<void()> ready) override
+        {
+            return slots.modules ? slots.modules(request, std::move(open), names, std::move(ready)) : ALScriptStudioViewer::modules(request, open, names, ready);
+        }
+        void fetchNearby(const ALScriptPreprocessor::Request& request, std::function<void()> fetched) override
+        {
+            if (slots.fetchNearby)
+            {
+                slots.fetchNearby(request, std::move(fetched));
+            }
+        }
+    };
+
     // The window's services, faked: the tabs a test makes, the window's
     // words where it has them, and a record of everything a unit said or
     // asked to go to.

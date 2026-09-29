@@ -245,6 +245,8 @@ namespace tut
 
     struct alscriptstudiochecking_data
     {
+        // The viewer the units ask, attached first and let go of last.
+        al_studio_test::StudioViewer viewer;
         al_studio_test::StudioWindow                    window;
         al_studio_test::FakeServices                    services;
         FakeCheckingWindow                              studio;
@@ -261,7 +263,7 @@ namespace tut
 
         alscriptstudiochecking_data()
         {
-            ALScriptStudioChecking::Sources& sources = ALScriptStudioChecking::sources();
+            auto& sources = viewer.slots;
             sources.preprocessing                    = [this] { return preprocessing; };
             sources.transformOn = [this](ALPreprocessor::Transform transform) {
                 return transform == ALPreprocessor::Transform::Switch && switches;
@@ -287,7 +289,6 @@ namespace tut
         }
         ~alscriptstudiochecking_data()
         {
-            ALScriptStudioChecking::sources() = ALScriptStudioChecking::Sources();
             gFocusMgr.setKeyboardFocus(nullptr);
         }
         ALScriptStudioChecking& make()

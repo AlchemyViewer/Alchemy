@@ -74,11 +74,13 @@ namespace tut
 {
     struct alscriptinspectorpane_data
     {
+        // The viewer the units ask, attached first and let go of last.
+        al_studio_test::StudioViewer viewer;
         al_studio_test::StudioWindowOf<FakeInspectorWindow> window;
 
         alscriptinspectorpane_data()
         {
-            ALScriptStudioWords::Sources& sources = ALScriptStudioWords::sources();
+            auto& sources = viewer.slots;
             sources.keywords                      = [](bool) {
                 LLSD keywords;
                 keywords["functions"]["llSay"] = LLSD().with("return", "").with("tooltip", "Says it.");
@@ -89,7 +91,6 @@ namespace tut
         }
         ~alscriptinspectorpane_data()
         {
-            ALScriptStudioWords::sources() = ALScriptStudioWords::Sources();
             ALScriptStudioWords::forget();
             gFocusMgr.setKeyboardFocus(nullptr);
         }
