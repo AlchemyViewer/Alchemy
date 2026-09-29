@@ -2615,4 +2615,16 @@ namespace tut
         keys("/\\%#x<CR>");
         ensure("at the caret", e.caret() == ALTextPos(2, 6));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<85>()
+    {
+        set_test_name("a macro longer than any mapping plays through a mapping at every place it comes");
+        ALCodeEditor& e = make("l0\nl1\nl2\nl3\nl4\nl5\nl6\nl7\n");
+        ex("nnoremap ,d dd");
+        keys("qa,djq");
+        ensure_equals("recorded as typed", vim->registerText('a'), std::string(",dj"));
+        keys("3@a");
+        ensure_equals("played through the mapping each time", flat(e.text()), std::string("l1|l3|l5|l7|"));
+    }
 }

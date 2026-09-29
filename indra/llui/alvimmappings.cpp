@@ -29,6 +29,7 @@
 #include "alsaid.h"
 #include "llstring.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstring>
 
@@ -632,6 +633,19 @@ bool ALVimMappings::starts(U8 mode, const ALVimInput& key) const
         }
     }
     return false;
+}
+
+size_t ALVimMappings::longest(U8 mode) const
+{
+    size_t most = 0;
+    for (const Mapping& each : mMappings)
+    {
+        if (each.modes & mode)
+        {
+            most = std::max(most, each.from.size());
+        }
+    }
+    return most;
 }
 
 void ALVimMappings::forgetVimrc()

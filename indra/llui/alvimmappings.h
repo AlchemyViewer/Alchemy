@@ -142,6 +142,9 @@ public:
     Match match(U8 mode, const std::vector<ALVimInput>& keys, bool more_may_come) const;
     // Whether a mapping in the mode starts with this key.
     bool  starts(U8 mode, const ALVimInput& key) const;
+    // The most keys any mapping in the mode is made of: as many as a
+    // match need look at. None where the mode has none.
+    size_t longest(U8 mode) const;
     bool  empty() const { return mMappings.empty(); }
     const std::vector<Mapping>& mappings() const { return mMappings; }
 

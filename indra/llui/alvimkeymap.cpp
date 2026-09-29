@@ -703,12 +703,15 @@ void ALVimKeymap::drain(ALTextView& view, std::deque<Held>& queue, bool final, b
     while (!queue.empty())
     {
         // The keys at the front that may be mapped, in the mode as it is
-        // now: each key fed may change it.
+        // now -- each key fed may change it -- and no more of them than the
+        // longest mapping in it: a macro's keys, played, would otherwise be
+        // copied whole for every one of them fed.
         const U8           mode = mapMode();
+        const size_t       most = mode != 0 ? mShared->mappings.longest(mode) : 0;
         std::vector<Input> front;
         for (const Held& held : queue)
         {
-            if (!held.remap)
+            if (!held.remap || front.size() >= most)
             {
                 break;
             }
