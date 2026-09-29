@@ -26,6 +26,7 @@
 
 #include "alscriptnavigation.h"
 
+#include "alcodeeditor.h"
 #include "alpanelist.h"
 #include "alscriptstudioservices.h"
 #include "llsdutil.h"

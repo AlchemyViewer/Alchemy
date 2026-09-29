@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alscriptstudiodoc.h"
+#include "alscripttempfiles.h"
 #include "alscripttypes.h"
 
 #include <memory>

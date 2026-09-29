@@ -60,6 +60,7 @@
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
 #include "alrecoverystore.h"
+#include "alscripttempfiles.h"
 #include "alscripttypes.h"
 #include "alsourcemap.h"
 #include "alstudiofloater.h"

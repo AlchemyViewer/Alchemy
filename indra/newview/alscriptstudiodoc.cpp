@@ -26,6 +26,8 @@
 
 #include "alscriptstudiodoc.h"
 
+#include "alcodeeditor.h"
+#include "aldiffview.h"
 #include "alnotecardembedded.h"
 #include "alscriptexternaleditor.h"
 #include "alscriptfixes.h"

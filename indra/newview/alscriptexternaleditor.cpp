@@ -26,6 +26,7 @@
 
 #include "alscriptexternaleditor.h"
 
+#include "alcodeeditor.h"
 #include "alfilewrite.h"
 #include "alscriptstudiofileio.h"
 #include "alscriptstudioservices.h"

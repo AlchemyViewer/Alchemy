@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alcodeeditor.h"
 #include "alfindings.h"
 #include "alscriptanalysis.h"
 #include "alscriptstudiodoc.h"

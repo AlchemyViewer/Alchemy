@@ -24,8 +24,10 @@
 
 #pragma once
 
+#include "alcodeeditor.h"
 #include "alscriptanalysis.h"
 #include "alscriptstudiodoc.h"
+#include "alscriptweight.h"
 
 #include <functional>
 #include <memory>

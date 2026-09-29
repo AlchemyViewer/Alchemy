@@ -26,6 +26,7 @@
 
 #include "alscriptstudioorphans.h"
 
+#include "alcodeeditor.h"
 #include "alrecoverystore.h"
 #include "alscriptexternaleditor.h"
 #include "alscriptstudiorecovery.h"

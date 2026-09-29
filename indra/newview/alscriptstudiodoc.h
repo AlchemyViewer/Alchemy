@@ -24,22 +24,18 @@
 
 #pragma once
 
-#include "alcodeeditor.h"
-#include "aldiffview.h"
 #include "alfindings.h"
+#include "alluauservice.h"
 #include "alpreprocessor.h"
-#include "alscriptanalysis.h"
+#include "alrecoverystore.h"
 #include "alscriptenvelope.h"
 #include "alscriptproblem.h"
-#include "alrecoverystore.h"
 #include "alscriptsaveflow.h"
 #include "alscriptsymbol.h"
-#include "alscripttempfiles.h"
-#include "alscriptweight.h"
 #include "alscripttypes.h"
 #include "alsourcemap.h"
 #include "alstringmatch.h"
-#include "alwatchedfile.h"
+#include "altextdocument.h"
 #include "llstl.h"
 
 #include <boost/signals2.hpp>
@@ -53,8 +49,11 @@
 #include <string_view>
 #include <vector>
 
+class ALCodeEditor;
+class ALDiffView;
 class ALNotecardEmbedded;
 class ALScriptStudioServices;
+class ALWatchedFile;
 
 // One tab of the studio: a script, a notecard or a file, and the views
 // of it the pane can show -- its source, and what the preprocessor made

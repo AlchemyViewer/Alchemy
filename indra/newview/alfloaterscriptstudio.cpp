@@ -29,6 +29,7 @@
 #include "alscriptstudioaccount.h"
 
 #include "alcodeeditor.h"
+#include "aldiffview.h"
 #include "aldiskincludes.h"
 #include "alserialworker.h"
 #include "alfilewrite.h"

@@ -28,6 +28,8 @@
 
 #include "../lllogchat.h"
 #include "alscriptstudio_fixture.h"
+#include "alscripttempfiles.h"
+#include "alwatchedfile.h"
 
 #include "fsyspath.h"
 

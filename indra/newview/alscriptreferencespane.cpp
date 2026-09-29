@@ -26,6 +26,7 @@
 
 #include "alscriptreferencespane.h"
 
+#include "alcodeeditor.h"
 #include "alpanefolds.h"
 #include "alpanelist.h"
 #include "alscriptstudioplaces.h"

@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alkeymap.h"
 #include "alscriptanalysis.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioplaces.h"
