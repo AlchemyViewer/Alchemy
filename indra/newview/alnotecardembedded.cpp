@@ -222,7 +222,13 @@ bool ALNotecardEmbedded::drop(S32 x, S32 y, bool dropping, EDragAndDropType type
             at = mDropEnd;
         }
         const std::string placeholder = ALNotecardItems::charOf(index);
-        mView.replaceAll({ { ALTextRange(at, at), placeholder } });
+        if (!mView.replaceAll({ { ALTextRange(at, at), placeholder } }))
+        {
+            // No room left in the text for it.
+            mItems.pop_back();
+            *accept = ACCEPT_NO;
+            return true;
+        }
         mDropEnd   = ALTextPos(at.line, at.column + static_cast<S32>(placeholder.size()));
         mDropFrame = mWorld.frame();
     }

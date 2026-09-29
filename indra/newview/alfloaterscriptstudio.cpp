@@ -2063,6 +2063,14 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
         mSearchPane->typedIn(*raw);
         mRecovery.schedule(*raw);
     });
+    // Typing stopped short, a notecard being full: said why. The editor
+    // goes with the tab, and the connection with it.
+    doc.editor->onFull([this, raw]() {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"]  = raw->name;
+        args["[LIMIT]"] = std::to_string(static_cast<S32>(LLNotecard::MAX_SIZE));
+        setStatus(alSaid("NotecardFull", "[NAME] is full: a notecard holds at most [LIMIT] bytes", args), true);
+    });
     doc.placedEdits = doc.editor->document().onChanged([this, raw](const ALTextDocument::Edit& edit) {
         LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("studio places slid");
         mChecking.slideProblems(*raw, edit);
@@ -2273,6 +2281,9 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         takeCarriedText(doc);
         items.place();
         doc.editor->setReadOnly(!answer.modifiable);
+        // No more than a notecard is read back with; the text as it came,
+        // over or not, is what it is.
+        doc.editor->setMaxBytes(LLNotecard::MAX_SIZE);
         items.wire();
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
