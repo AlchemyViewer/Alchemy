@@ -618,7 +618,7 @@ void ALScriptStudioChecking::actionsAnswered(Doc& doc, const ALScriptAnalysis::R
         one.refactor = true;
         for (const ALScriptEdit& edit : action.edits)
         {
-            one.edits.emplace_back(ALTextRange(ALTextPos(edit.line, edit.column), ALTextPos(edit.endLine, edit.endColumn)), edit.text);
+            one.edits.emplace_back(ALScriptPlaces::rangeOf(edit), edit.text);
         }
         one.value["doc"]    = doc.id;
         one.value["action"] = static_cast<S32>(i);
@@ -1428,7 +1428,7 @@ bool ALScriptStudioChecking::applyFix(Doc& doc, const ALScriptFix& fix, U32 vers
     std::vector<std::pair<ALTextRange, std::string>> edits;
     for (const ALScriptEdit& edit : fix.edits)
     {
-        const ALTextRange range(ALTextPos(edit.line, edit.column), ALTextPos(edit.endLine, edit.endColumn));
+        const ALTextRange range = ALScriptPlaces::rangeOf(edit);
         if (text.clamp(range.begin) != range.begin || text.clamp(range.end) != range.end)
         {
             mServices.setStatus(mServices.words("FixStale"), true);
@@ -1515,7 +1515,7 @@ bool ALScriptStudioChecking::fixAll(Doc& doc, const FixPick& pick)
     {
         for (const ALScriptEdit& edit : fix->edits)
         {
-            edits.emplace_back(ALTextRange(ALTextPos(edit.line, edit.column), ALTextPos(edit.endLine, edit.endColumn)), edit.text);
+            edits.emplace_back(ALScriptPlaces::rangeOf(edit), edit.text);
         }
     }
     // Every one of them one step to undo: they were made over one check,
@@ -1551,7 +1551,7 @@ void ALScriptStudioChecking::fixesOn(Doc& doc, S32 line, std::vector<ALCodeEdito
             one.suppress  = fix.kind == ALScriptFix::Kind::Suppress;
             for (const ALScriptEdit& edit : fix.edits)
             {
-                one.edits.emplace_back(ALTextRange(ALTextPos(edit.line, edit.column), ALTextPos(edit.endLine, edit.endColumn)), edit.text);
+                one.edits.emplace_back(ALScriptPlaces::rangeOf(edit), edit.text);
             }
             // The problem by what the pane's rows carry, and the fix by its
             // place among the problem's.

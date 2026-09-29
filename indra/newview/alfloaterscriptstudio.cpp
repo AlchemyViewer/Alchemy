@@ -2833,7 +2833,7 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
         {
             if (entry.kind == ALScriptSymbolKind::Function || entry.kind == ALScriptSymbolKind::Event)
             {
-                out.emplace_back(ALTextPos(entry.span.line, entry.span.column), ALTextPos(entry.span.endLine, entry.span.endColumn));
+                out.push_back(ALScriptPlaces::rangeOf(entry.span));
             }
         }
     });

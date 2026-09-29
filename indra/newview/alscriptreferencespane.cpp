@@ -359,7 +359,7 @@ void ALScriptReferencesPane::slide(Doc& doc, const std::string& path, const ALTe
     bool         changed = false;
     const auto   mine    = [&](const std::string& file) { return file.empty() ? doc.id == mFound.from : file == path; };
     const auto   slide   = [&](ALScriptSpan& span) {
-        ALTextRange       range(ALTextPos(span.line, span.column), ALTextPos(span.endLine, span.endColumn));
+        ALTextRange       range = ALScriptPlaces::rangeOf(span);
         const ALTextRange was = range;
         if (!edit.slide(range))
         {

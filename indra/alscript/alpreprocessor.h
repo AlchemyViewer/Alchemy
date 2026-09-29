@@ -320,12 +320,8 @@ public:
     // and its end past the `)`, and the name. A script that goes up
     // without a run goes up with each of these as written, and the grid
     // has no `require` for them to call.
-    struct Required
+    struct Required : ALScriptSpan
     {
-        S32         line      = 0;
-        S32         column    = 0;
-        S32         endLine   = 0;
-        S32         endColumn = 0;
         std::string name;
     };
     static std::vector<Required> requiresIn(std::string_view text);

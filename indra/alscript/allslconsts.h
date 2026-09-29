@@ -60,14 +60,7 @@ public:
     // A const global's value as the literal it comes to, where the text's
     // is not one LSL takes there: the stretch of the text to replace,
     // zero-based and its end past its last character, and what with.
-    struct Value
-    {
-        S32         line      = 0;
-        S32         column    = 0;
-        S32         endLine   = 0;
-        S32         endColumn = 0;
-        std::string text;
-    };
+    using Value = ALScriptEdit;
 
     struct Result
     {

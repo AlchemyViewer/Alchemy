@@ -39,7 +39,13 @@
 // name is declared.
 namespace ALScriptPlaces
 {
+    // A span of a script -- a problem's, an edit's, a symbol's -- as a range
+    // of its text: the one way one becomes the other.
     ALTextRange rangeOf(const ALScriptSpan& span);
+    // Whether a span holds a place, its ends included; and whether it holds
+    // the whole of another.
+    bool        holds(const ALScriptSpan& span, const ALTextPos& pos);
+    bool        within(const ALScriptSpan& inner, const ALScriptSpan& outer);
     std::string lineOf(const std::string& text, S32 line);
     std::string lineOf(const ALTextDocument& text, S32 line);
     // A text's lines, found once, for the many places a name has in one

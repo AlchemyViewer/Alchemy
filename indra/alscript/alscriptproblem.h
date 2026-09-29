@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alscriptspan.h"
 #include "stdtypes.h"
 
 #include <optional>
@@ -35,13 +36,21 @@
 // endColumn) with `text` in its place -- an empty stretch an insertion, an
 // empty text a deletion -- in the places of the text the problem it fixes
 // is about.
-struct ALScriptEdit
+struct ALScriptEdit : ALScriptSpan
 {
-    S32         line      = 0;
-    S32         column    = 0;
-    S32         endLine   = 0;
-    S32         endColumn = 0;
     std::string text;
+
+    ALScriptEdit() = default;
+    ALScriptEdit(S32 line, S32 column, S32 end_line, S32 end_column, std::string with)
+    :   ALScriptSpan{ line, column, end_line, end_column },
+        text(std::move(with))
+    {
+    }
+    ALScriptEdit(const ALScriptSpan& span, std::string with)
+    :   ALScriptSpan(span),
+        text(std::move(with))
+    {
+    }
 };
 
 // What would put a problem right, as the edits that would do it: offered
@@ -79,11 +88,11 @@ struct ALScriptFix
     bool removes = false;
 };
 
-// What the LSL and SLua analyzers report: a range in the script, how bad it
-// is, which pass said it, and the words. Lines and columns are zero-based
+// What the LSL and SLua analyzers report: a range in the script (the span
+// it is), how bad it is, which pass said it, and the words. Lines and columns are zero-based
 // and a column counts bytes of UTF-8 -- the one convention every boundary
 // converts to.
-struct ALScriptProblem
+struct ALScriptProblem : ALScriptSpan
 {
     enum class Severity : U8
     {
@@ -105,10 +114,6 @@ struct ALScriptProblem
 
     Severity    severity = Severity::Error;
     Source      source = Source::Parser;
-    S32         line = 0;
-    S32         column = 0;
-    S32         endLine = 0;
-    S32         endColumn = 0;
     // The analyzer's own name for the kind of problem, where it has one: a
     // Luau lint's name, an LSL error number. Empty for a type error, which
     // has only its words.

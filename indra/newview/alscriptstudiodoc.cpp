@@ -35,6 +35,7 @@
 #include "alscriptstudiocaret.h"
 #include "alscriptstudiochecking.h"
 #include "alscriptstudioorphans.h"
+#include "alscriptstudioplaces.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudioweighing.h"
@@ -295,7 +296,7 @@ std::optional<ALScriptStudioDoc::Named> ALScriptStudioDoc::namedIn(const ALTextD
     }
     for (const ALPreprocessor::Required& call : calls)
     {
-        const ALTextRange stretch(ALTextPos(call.line, call.column), ALTextPos(call.endLine, call.endColumn));
+        const ALTextRange stretch = ALScriptPlaces::rangeOf(call);
         if (!(at < stretch.begin) && !(stretch.end < at))
         {
             Named named;
@@ -396,8 +397,8 @@ std::vector<const ALScriptFix*> ALScriptStudioDoc::pickFixes(const FixPick& pick
         }
     }
     // One step of edits that never meet: of two that would, the first.
-    const auto begin_of = [](const ALScriptEdit& edit) { return ALTextPos(edit.line, edit.column); };
-    const auto end_of   = [](const ALScriptEdit& edit) { return ALTextPos(edit.endLine, edit.endColumn); };
+    const auto begin_of = [](const ALScriptEdit& edit) { return ALScriptPlaces::rangeOf(edit).begin; };
+    const auto end_of   = [](const ALScriptEdit& edit) { return ALScriptPlaces::rangeOf(edit).end; };
     std::vector<const ALScriptFix*> kept;
     std::vector<ALTextRange>        claimed;
     for (const ALScriptFix* fix : taken)

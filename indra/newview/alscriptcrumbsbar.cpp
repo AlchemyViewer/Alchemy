@@ -42,23 +42,10 @@ using ALScriptPlaces::NONE;
 using ALScriptPlaces::outlineEntryOf;
 using ALScriptPlaces::outlineValue;
 using ALScriptPlaces::rangeOf;
+using ALScriptPlaces::within;
 
 namespace
 {
-    // Whether a span holds a position, its ends included.
-    bool holds(const ALScriptSpan& span, const ALTextPos& pos)
-    {
-        const ALTextPos begin(span.line, span.column);
-        const ALTextPos end(span.endLine, span.endColumn);
-        return begin <= pos && pos <= end;
-    }
-
-    // Whether a span lies within another.
-    bool within(const ALScriptSpan& inner, const ALScriptSpan& outer)
-    {
-        return holds(outer, ALTextPos(inner.line, inner.column)) && holds(outer, ALTextPos(inner.endLine, inner.endColumn));
-    }
-
     // Which of the trailer's pieces go first where the strip is narrow:
     // the indentation, which the Format menu also says; which view is in
     // front, which the toolbar also shows; what the code weighs, and

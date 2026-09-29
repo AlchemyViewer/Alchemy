@@ -107,21 +107,16 @@ namespace ALScriptPlaces
         return mText->substr(begin, end - begin);
     }
 
-    namespace
+    bool holds(const ALScriptSpan& span, const ALTextPos& pos)
     {
-        // Whether a span holds a position, its ends included.
-        bool holds(const ALScriptSpan& span, const ALTextPos& pos)
-        {
-            const ALTextPos begin(span.line, span.column);
-            const ALTextPos end(span.endLine, span.endColumn);
-            return begin <= pos && pos <= end;
-        }
+        const ALTextRange range = rangeOf(span);
+        return range.begin <= pos && pos <= range.end;
+    }
 
-        // Whether a span lies within another.
-        bool within(const ALScriptSpan& inner, const ALScriptSpan& outer)
-        {
-            return holds(outer, ALTextPos(inner.line, inner.column)) && holds(outer, ALTextPos(inner.endLine, inner.endColumn));
-        }
+    bool within(const ALScriptSpan& inner, const ALScriptSpan& outer)
+    {
+        const ALTextRange range = rangeOf(inner);
+        return holds(outer, range.begin) && holds(outer, range.end);
     }
 
     std::vector<size_t> pathAt(const std::vector<ALScriptOutlineEntry>& outline, const ALTextPos& at)
