@@ -558,6 +558,19 @@ namespace tut
                 said += "\n  " + each.name + " on " + each.against + ": " + std::to_string(each.contrast);
             }
             ensure(std::string(skin) + "'s script colours read:" + said, said.empty());
+            // And the studios' parts told apart by what they are: a divider
+            // from the panes it divides, a tab not chosen from the chosen
+            // one, the notice and the strips from the panes.
+            const auto apart = [&](const char* a, const char* b, F32 least) {
+                const LLColor4* x = sheet.find(a);
+                const LLColor4* y = sheet.find(b);
+                ensure(std::string(skin) + " has " + a + " and " + b, x && y);
+                ensure(std::string(skin) + ": " + a + " apart from " + b, ALSurface::contrast(*x, *y) >= least);
+            };
+            apart("StudioDividerColor", "StudioPaneColor", 1.3f);
+            apart("StudioTabColor", "PanelDefaultBackgroundColor", 1.08f);
+            apart("StudioNoticeColor", "StudioPaneColor", 1.08f);
+            apart("StudioStripColor", "StudioPaneColor", 1.05f);
         }
 #else
         skip("no LLUI_TEST_APP_DIR");

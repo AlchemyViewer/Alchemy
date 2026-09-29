@@ -1166,4 +1166,18 @@
 	<color
      name="NameTagBeyondShoutDistanceColor"
      reference="AlDangerRed" />
+  <!-- The studios' panes, notice, dividers and tabs apart: this skin's
+       greys are one. -->
+  <color
+    name="StudioPaneColor"
+    value="0.137 0.137 0.137 1" />
+  <color
+    name="StudioNoticeColor"
+    value="0.216 0.216 0.216 1" />
+  <color
+    name="StudioDividerColor"
+    value="0.27 0.27 0.27 1" />
+  <color
+    name="StudioTabColor"
+    value="0.137 0.137 0.137 1" />
 </colors>

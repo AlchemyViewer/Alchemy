@@ -564,7 +564,7 @@ void ALTabStrip::reshape(S32 width, S32 height, bool called_from_parent)
 void ALTabStrip::draw()
 {
     static const LLUIColor shown = LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor", LLColor4::grey4);
-    static const LLUIColor rest = LLUIColorTable::instance().getColor("DkGray", LLColor4::grey3);
+    static const LLUIColor rest = LLUIColorTable::instance().getColor("StudioTabColor", LLColor4::grey3);
     const LLUIColor& edge = ALSurface::well();
     const LLUIColor& ink = ALSurface::text();
     const LLUIColor& quiet = ALSurface::quiet();

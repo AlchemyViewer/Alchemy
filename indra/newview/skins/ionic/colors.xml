@@ -1196,4 +1196,12 @@
   <color
     name="ScriptInvalid"
     value="0.886 0.525 0.525 1" />
+  <!-- The studios' strips in the editor's own green, and a tab not chosen
+       apart from the chosen one's panel. -->
+  <color
+    name="StudioStripColor"
+    value="0.145 0.17 0.156 1" />
+  <color
+    name="StudioTabColor"
+    value="0.1 0.1 0.1 1" />
 </colors>

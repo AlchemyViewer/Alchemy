@@ -1238,6 +1238,26 @@
     name="SyntaxPath"
     reference="SyntaxString" />
 
+  <!-- The studios' windows by what each part is rather than which grey:
+       the panes beside and under the editor, the strips over and under it,
+       the notice over it, the dividers a pane is dragged by, and a tab
+       not chosen, behind the chosen one's panel colour. A skin
+       whose greys are one gives them apart here. -->
+  <color
+    name="StudioPaneColor"
+    reference="DkGray2" />
+  <color
+    name="StudioStripColor"
+    reference="MouseGray" />
+  <color
+    name="StudioNoticeColor"
+    reference="DkGray" />
+  <color
+    name="StudioDividerColor"
+    reference="DkGray0" />
+  <color
+    name="StudioTabColor"
+    reference="DkGray" />
   <!-- Script Studio's editors: the legacy script colours for the text,
        and every token kind under the Script prefix, which a theme sets as
        one. The defaults are the legacy editor's, so a person's changes to

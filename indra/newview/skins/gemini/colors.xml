@@ -1292,4 +1292,8 @@
   <color
     name="ScriptInvalid"
     value="0.844 0.347 0.347 1" />
+  <!-- A studio's tab not chosen, apart from the chosen one's panel. -->
+  <color
+    name="StudioTabColor"
+    value="0.09 0.09 0.09 1" />
 </colors>
