@@ -130,6 +130,9 @@ public:
     // took up let go of, its own from here. A write that fails is said once,
     // not at every pause in typing. False where it could not be kept.
     bool keep(Doc& doc, Entry::State state = Entry::State::Unsaved);
+    // The tab kept under another key from here on -- a file saved under a
+    // new path -- what the old one kept let go of, and written afresh.
+    static void rekey(Doc& doc, const std::string& key);
     // keep for each of several tabs at once, the unsaved texts written on
     // the writer's thread, each forced out to the disk there, and waited
     // on once for the lot: what the viewer going asks. False where any

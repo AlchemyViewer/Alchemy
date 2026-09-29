@@ -170,6 +170,17 @@ bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
     return true;
 }
 
+// static
+void ALScriptStudioRecovery::rekey(Doc& doc, const std::string& key)
+{
+    if (ALRecoveryStore* kept = ALRecovery::store(); kept && !doc.recoveryKey.empty())
+    {
+        kept->forget(doc.recoveryKey);
+    }
+    doc.recoveryKey             = key;
+    doc.recovery->written.valid = false;
+}
+
 bool ALScriptStudioRecovery::keepAll(const std::vector<Doc*>& docs, Entry::State state)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;

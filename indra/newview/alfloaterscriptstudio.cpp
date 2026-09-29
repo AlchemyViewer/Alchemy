@@ -4453,14 +4453,9 @@ void ALFloaterScriptStudio::fileWritten(const std::string& path)
 void ALFloaterScriptStudio::becomeFile(Doc& doc, const std::string& path)
 {
     mProblemsPane->forget(doc.id);
-    if (ALRecoveryStore* store = ALRecovery::store(); store && !doc.recoveryKey.empty())
-    {
-        store->forget(doc.recoveryKey);
-    }
-    doc.recoveryKey           = ALRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path);
-    doc.recovery->written.valid = false;
-    doc.file                  = path;
-    doc.name        = gDirUtilp->getBaseFileName(path);
+    ALScriptStudioRecovery::rekey(doc, ALRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path));
+    doc.file = path;
+    doc.name = gDirUtilp->getBaseFileName(path);
     rekeyDoc(doc, "disk:" + path);
     if (const FileLanguage said = ALScriptStudioFiles::languageOf(path, false); said.said)
     {

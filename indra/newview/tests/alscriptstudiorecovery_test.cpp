@@ -642,4 +642,19 @@ namespace tut
         ensure("the window cannot have it: the studio keeps it", taken.size() == 2 && studio().orphans.size() == 2);
         ALRecovery::takeWindowsTo(nullptr);
     }
+
+    template<> template<>
+    void alscriptstudiorecovery_object::test<14>()
+    {
+        set_test_name("a tab kept under another key from here on: what the old one kept let go of, and written afresh under the new");
+        ALScriptStudioRecovery& r = make();
+        Doc&                    a = tab("a", "one\n");
+        type(a, "x");
+        ensure("kept", r.keep(a) && keptFor(a.recoveryKey) == 1);
+        const std::string was = a.recoveryKey;
+        ALScriptStudioRecovery::rekey(a, ALRecoveryStore::keyOf(LLUUID::null, LLUUID::null, "/somewhere/a.lsl"));
+        store->flush();
+        ensure("the old let go of", a.recoveryKey != was && keptFor(was) == 0);
+        ensure("written afresh, though nothing moved", r.keep(a) && keptFor(a.recoveryKey) == 1);
+    }
 }
