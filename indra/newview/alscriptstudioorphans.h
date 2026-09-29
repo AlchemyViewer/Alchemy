@@ -32,6 +32,7 @@
 #include <string>
 
 class ALScriptStudioServices;
+class ALScriptStudioTabs;
 struct ALRecoveryEntry;
 
 // A tab's part of where it stands with what holds it: what it is
@@ -123,7 +124,7 @@ public:
     static void loadFailed(Doc& doc);
     static void loadWentThrough(Doc& doc) { doc.orphan->reattachTries = 0; }
 
-    // What the orphans ask of the window beyond its services.
+    // What the orphans ask of the window beyond its services and its tabs.
     class Window
     {
     public:
@@ -135,9 +136,8 @@ public:
         // loaded again, the answer going where every load's goes.
         virtual void keepForRecovery(Doc& doc)         = 0;
         virtual void loadScript(const ALScriptRef& ref) = 0;
-        // The notice, and the toolbar, which says what can be done.
-        virtual ALScriptNoticeBar* noticeBar()  = 0;
-        virtual void               refreshToolbar() = 0;
+        // The notice.
+        virtual ALScriptNoticeBar* noticeBar() = 0;
         // The notice's actions: a copy in the inventory or on disk; a save
         // again; a text kept from an earlier session taken up, or thrown
         // away.
@@ -149,8 +149,6 @@ public:
         virtual void saveAgain(Doc& doc)                                                     = 0;
         virtual void takeUpRecovery(Doc& doc, const ALRecoveryEntry& entry)            = 0;
         virtual void discardRecovery(const ALRecoveryEntry& entry)                     = 0;
-        // What the tab carries put in over its text, as one step to undo.
-        virtual void takeCarriedText(Doc& doc)                                               = 0;
         // Two texts compared in the tab's place, each with what it is; and
         // the tab's source back in front where it shows a comparison.
         virtual void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
@@ -161,7 +159,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioOrphans(ALScriptStudioServices& services, Window& window);
+    ALScriptStudioOrphans(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window);
 
     // Every tab looked at again: what it is called and where, what it is
     // now -- an object out of sight a moment not yet gone -- said where it
@@ -183,5 +181,6 @@ public:
 
 private:
     ALScriptStudioServices& mServices;
+    ALScriptStudioTabs&     mTabs;
     Window&                 mWindow;
 };

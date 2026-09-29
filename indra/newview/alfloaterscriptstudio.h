@@ -35,6 +35,7 @@
 #include "alscriptstudioservices.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudiosaving.h"
+#include "alscriptstudiotabs.h"
 #include "alscriptstudiovim.h"
 #include "alscriptexternaleditor.h"
 #include "alscriptstudiofiles.h"
@@ -116,7 +117,7 @@ class LLViewerObject;
 // a script the preprocessor wrapped shown as the code the server compiled
 // with the author's source in a tab beside it. Its regions fold and come
 // out as any studio's do.
-class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window,
+class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptStudioTabs, public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window,
                                     public ALScriptSearchPane::Window, public ALScriptExplorerPane::Window, public ALScriptStudioRecovery::Window,
                                     public ALScriptStudioSaving::Window, public ALScriptStudioVim::Window,
                                     public ALScriptExternalEditor::Window, public ALScriptStudioFiles::Window,
@@ -828,7 +829,6 @@ private:
     Doc* openFileTab(const std::string& path, bool lua) override;
     bool scriptInHand(const ALScriptRef& ref) const override;
     void activate(Doc& doc) override;
-    void tabsChanged() override;
     void pick(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,
               std::function<void(const std::string& value)> chosen, std::function<void(const std::string& value)> dropped) override;
     // What a tab needs from the moment it is made: its text's changes
@@ -1191,23 +1191,23 @@ private:
     // is on, by the item's name.
     ALScriptStudioCommands             mCommands;
     // What is unsaved in the tabs, kept against the viewer going.
-    ALScriptStudioRecovery             mRecovery{ *this, *this };
+    ALScriptStudioRecovery             mRecovery{ *this, *this, *this };
     // Saving and compiling the tabs.
-    ALScriptStudioSaving               mSaving{ *this, *this };
+    ALScriptStudioSaving               mSaving{ *this, *this, *this };
     // The window's side of vim, over its editors.
-    ALScriptStudioVim                  mVim{ *this, mCommands, *this };
+    ALScriptStudioVim                  mVim{ *this, *this, mCommands, *this };
     // Its tabs held open in an editor outside.
-    ALScriptExternalEditor             mExternal{ *this, *this };
+    ALScriptExternalEditor             mExternal{ *this, *this, *this };
     // Its files on disk, and the recent lists.
-    ALScriptStudioFiles                mFiles{ *this, *this };
+    ALScriptStudioFiles                mFiles{ *this, *this, *this };
     // What its scripts weigh.
     ALScriptStudioWeighing             mWeighing{ *this, *this };
     // Its tabs whose script is gone or out of reach, and the notice.
-    ALScriptStudioOrphans              mOrphans{ *this, *this };
+    ALScriptStudioOrphans              mOrphans{ *this, *this, *this };
     // The places gone from, and the previews a list opens as it is walked.
-    ALScriptNavigation                 mNavigation{ *this, *this };
+    ALScriptNavigation                 mNavigation{ *this, *this, *this };
     // Its names looked up across the object's scripts, and renamed.
-    ALScriptLookup                     mLookup{ *this, *this };
+    ALScriptLookup                     mLookup{ *this, *this, *this };
     // Every script of an object checked, and what it is called while it is.
     ALScriptObjectCheck                mObjectCheck{ *this, *this };
     // Recompiles from the Explorer.

@@ -36,6 +36,7 @@
 #include <vector>
 
 class ALScriptStudioServices;
+class ALScriptStudioTabs;
 
 // A Script Studio window's saves, from the moment one is asked for to the
 // compiler's answer. Where a save stands and where it goes next is the
@@ -65,7 +66,7 @@ public:
         std::string program;
     };
 
-    // What saving asks of the window beyond its services.
+    // What saving asks of the window beyond its services and its tabs.
     class Window
     {
     public:
@@ -142,12 +143,6 @@ public:
         // A kept text loaded under its item, what it holds carried over:
         // tried now, and a few more times after if it fails.
         virtual void retryLoad(Doc& doc) = 0;
-        // The notice over the editor, the toolbar, the strip under the
-        // editor and the tabs said again.
-        virtual void refreshNotice()          = 0;
-        virtual void refreshToolbar()         = 0;
-        virtual void refreshTrailer(Doc& doc) = 0;
-        virtual void fillTabs()               = 0;
         // Written to the recovery store as it stands: saved, what is kept
         // of it against a crash forgotten.
         virtual void keepForRecovery(Doc& doc) = 0;
@@ -162,9 +157,6 @@ public:
         virtual bool quittingOnUs() const = 0;
         // A close waiting on a save that stopped, waited on no longer.
         virtual void stopClosing() = 0;
-        // A tab a save has done with, let go of as it stands: saved to be
-        // closed, or the tab a copy saved was made of.
-        virtual void letGoOf(Doc& doc) = 0;
         // A window's close that waits on its tabs' saves, gone on with;
         // nothing where the window is not closing.
         virtual void continueClosing() = 0;
@@ -173,7 +165,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioSaving(ALScriptStudioServices& services, Window& window);
+    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window);
 
     // --- saving ------------------------------------------------------------------------
 
@@ -248,6 +240,7 @@ private:
     static S32 checkerErrors(const Doc& doc);
 
     ALScriptStudioServices& mServices;
+    ALScriptStudioTabs&     mTabs;
     Window&                 mWindow;
     // Held while this is, for what answers later to know it still is.
     std::shared_ptr<bool>   mAlive = std::make_shared<bool>(true);

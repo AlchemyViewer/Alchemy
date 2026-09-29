@@ -42,6 +42,7 @@
 #include <vector>
 
 class ALScriptStudioServices;
+class ALScriptStudioTabs;
 
 // The name being looked up across the object's scripts: what
 // was asked, the script that declares it (this one, or the
@@ -110,7 +111,7 @@ public:
     // language, SLua's by the item's subtype or its runtime.
     static std::vector<Candidate> folderCandidates(const std::vector<const LLInventoryItem*>& items, const LLUUID& own, bool lua);
 
-    // What the lookups ask of the window beyond its services.
+    // What the lookups ask of the window beyond its services and its tabs.
     class Window
     {
     public:
@@ -142,15 +143,12 @@ public:
         // by their order in what was found.
         virtual void previewRename(Doc& doc, const Found& found, const std::string& new_name, const std::string& said,
                                    std::function<void(const std::vector<size_t>& kept)> apply) = 0;
-        // A file on disk opened in a tab here; a tab brought forward.
-        virtual Doc* openFileTab(const std::string& path, bool lua) = 0;
-        virtual void activate(Doc& doc)                             = 0;
 
     protected:
         ~Window() = default;
     };
 
-    ALScriptLookup(ALScriptStudioServices& services, Window& window);
+    ALScriptLookup(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window);
 
     // A place added, once: by its file and where it starts.
     static void addPlace(Doc::Lookup& lookup, Doc::Place place);
@@ -228,6 +226,7 @@ private:
     Doc* lookingIn(const std::string& id, U32 generation);
 
     ALScriptStudioServices& mServices;
+    ALScriptStudioTabs&     mTabs;
     Window&                 mWindow;
     // Which lookup the answers arriving belong to.
     U32                     mGeneration = 0;

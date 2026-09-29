@@ -42,7 +42,7 @@ namespace
     typedef std::vector<std::string> Names;
 
     // The window, faked: a record of what navigation asked of it.
-    struct FakeNavWindow : public ALScriptNavigation::Window
+    struct FakeNavWindow : public ALScriptNavigation::Window, public al_studio_test::QuietTabs
     {
         void showPlace(Doc& doc, Doc::View view, const ALTextPos& at) override
         {
@@ -95,7 +95,7 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit              = std::make_unique<ALScriptNavigation>(services, studio);
+            unit              = std::make_unique<ALScriptNavigation>(services, studio, studio);
             studio.navigation = unit.get();
             return *unit;
         }

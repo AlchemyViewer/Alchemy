@@ -32,6 +32,7 @@
 #include <vector>
 
 class ALScriptStudioServices;
+class ALScriptStudioTabs;
 class LLMenuGL;
 class LLSD;
 
@@ -68,19 +69,12 @@ public:
         std::string name;
     };
 
-    // What the files ask of the window beyond its services.
+    // What the files ask of the window beyond its services and its tabs.
     class Window
     {
     public:
-        // A file on disk opened in a tab, here or where another window has
-        // it; a tab brought to the front; its text put back as it was last
-        // saved; its carriedText taken as one step to undo; and checked
-        // again.
-        virtual Doc* openFileTab(const std::string& path, bool lua) = 0;
-        virtual void activate(Doc& doc)                              = 0;
-        virtual void revert(Doc& doc)                                = 0;
-        virtual void takeCarriedText(Doc& doc)                       = 0;
-        virtual void scheduleAnalysis(Doc& doc, bool now)            = 0;
+        // A tab checked again.
+        virtual void scheduleAnalysis(Doc& doc, bool now) = 0;
         // The viewer's pickers, which answer later: files to open or load,
         // several or one; where to save one, its name to start from.
         virtual void pickFilesToOpen(bool several, std::function<void(const std::vector<std::string>& files)> chosen)            = 0;
@@ -113,7 +107,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioFiles(ALScriptStudioServices& services, Window& window);
+    ALScriptStudioFiles(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window);
 
     // A tab's file watched for changes made to it outside, whoever makes
     // them: an editor the studio started, or anything else. Taken where
@@ -158,6 +152,7 @@ public:
 
 private:
     ALScriptStudioServices&  mServices;
+    ALScriptStudioTabs&      mTabs;
     Window&                  mWindow;
     std::vector<std::string> mRecentFiles;
     std::vector<Recent>      mRecentScripts;

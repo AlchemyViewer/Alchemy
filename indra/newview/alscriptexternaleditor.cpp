@@ -30,6 +30,7 @@
 #include "alfilewrite.h"
 #include "alscriptstudiofileio.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudiotabs.h"
 #include "llcallbacklist.h"
 #include "llfile.h"
 #include "lllogchat.h"
@@ -47,8 +48,8 @@ namespace
     }
 }
 
-ALScriptExternalEditor::ALScriptExternalEditor(ALScriptStudioServices& services, Window& window)
-    : mServices(services), mWindow(window)
+ALScriptExternalEditor::ALScriptExternalEditor(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window)
+    : mServices(services), mTabs(tabs), mWindow(window)
 {
 }
 
@@ -196,7 +197,7 @@ void ALScriptExternalEditor::take(Doc& doc, std::string text)
         // over whatever a check finds, since the editor outside is where
         // the author is looking.
         doc.carriedText = text;
-        mWindow.takeCarriedText(doc);
+        mTabs.takeCarriedText(doc);
     }
     if (!doc.editor->isDirty() && doc.assetId.notNull())
     {

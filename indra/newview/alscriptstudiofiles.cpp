@@ -30,6 +30,7 @@
 #include "alfilewrite.h"
 #include "alscriptstudiofileio.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudiotabs.h"
 #include "lldir.h"
 #include "llfile.h"
 #include "llmenugl.h"
@@ -48,7 +49,7 @@ namespace
     constexpr size_t MOST_RECENT = 10;
 }
 
-ALScriptStudioFiles::ALScriptStudioFiles(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
+ALScriptStudioFiles::ALScriptStudioFiles(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window) : mServices(services), mTabs(tabs), mWindow(window)
 {
 }
 
@@ -139,7 +140,7 @@ void ALScriptStudioFiles::changedOutside(const std::string& id, const std::strin
             if (reload)
             {
                 // What is on disk, as one step to undo, and clean.
-                mWindow.revert(*asked);
+                mTabs.revert(*asked);
             }
         });
         return;
@@ -150,7 +151,7 @@ void ALScriptStudioFiles::changedOutside(const std::string& id, const std::strin
     }
     // Taken as one step to undo, and clean, since it is what the file is.
     doc.carriedText = text;
-    mWindow.takeCarriedText(doc);
+    mTabs.takeCarriedText(doc);
     mWindow.fileSettled(doc);
     mServices.report(mServices.words("FileReloaded", args), false, &doc);
 }
@@ -188,7 +189,7 @@ void ALScriptStudioFiles::openFromDisk()
         {
             for (const std::string& file : files)
             {
-                mWindow.openFileTab(file, false);
+                mTabs.openFileTab(file, false);
             }
         }
     });
@@ -237,7 +238,7 @@ void ALScriptStudioFiles::chosenToLoad(const std::string& id, const std::vector<
         return;
     }
     // In place of the text, or where the caret is, as one step to undo.
-    mWindow.activate(doc);
+    mTabs.activate(doc);
     if (!insert)
     {
         doc.editor->selectAll();
@@ -460,7 +461,7 @@ void ALScriptStudioFiles::fillMenu()
         item->setClickCallback([this, alive, path](LLUICtrl*, const LLSD&) {
             if (alive.lock())
             {
-                mWindow.openFileTab(path, false);
+                mTabs.openFileTab(path, false);
             }
         });
         menu->addChild(item);

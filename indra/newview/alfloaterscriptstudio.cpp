@@ -6356,12 +6356,6 @@ void ALFloaterScriptStudio::activate(Doc& doc)
     }
 }
 
-void ALFloaterScriptStudio::tabsChanged()
-{
-    fillTabs();
-    refreshToolbar();
-}
-
 void ALFloaterScriptStudio::pick(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,
                                  std::function<void(const std::string& value)> chosen, std::function<void(const std::string& value)> dropped)
 {

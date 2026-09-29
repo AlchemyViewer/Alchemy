@@ -1058,6 +1058,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudioweighing.h
     alscriptstudiowords.h
     alscriptstudioservices.h
+    alscriptstudiotabs.h
     alscripttypes.h
     alscriptweightspane.h
     alscriptworkspace.h

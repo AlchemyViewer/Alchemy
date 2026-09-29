@@ -44,7 +44,7 @@ namespace
     typedef ALScriptStudioDoc             Doc;
 
     // The window, faked: a record of what recovery asked of it.
-    struct FakeRecoveryWindow : public ALScriptStudioRecovery::Window
+    struct FakeRecoveryWindow : public ALScriptStudioRecovery::Window, public al_studio_test::QuietTabs
     {
         bool recoverElsewhere(const Entry& entry) override
         {
@@ -80,7 +80,7 @@ namespace
             doc.carriedText.reset();
         }
         void refreshNotice() override { ++notices; }
-        void tabsChanged() override { ++tabs; }
+        void fillTabs() override { ++tabs; }
         void pick(std::vector<ALQuickOpen::Candidate> offered, const std::string&, const std::string&, std::function<void(const std::string&)> choose,
                   std::function<void(const std::string&)> drop) override
         {
@@ -134,7 +134,7 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            recovery          = std::make_unique<ALScriptStudioRecovery>(services(), studio());
+            recovery          = std::make_unique<ALScriptStudioRecovery>(services(), studio(), studio());
             studio().recovery = recovery.get();
             folder = fsyspath(std::filesystem::temp_directory_path() / fsyspath("alscriptstudiorecovery_" + LLUUID::generateNewID().asString())).string();
             std::filesystem::create_directories(fsyspath(folder));

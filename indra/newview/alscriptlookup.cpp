@@ -28,6 +28,7 @@
 
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudiotabs.h"
 #include "alscriptstudiowords.h"
 #include "llinventorytype.h"
 
@@ -41,7 +42,7 @@ using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;
 
-ALScriptLookup::ALScriptLookup(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window) {}
+ALScriptLookup::ALScriptLookup(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window) : mServices(services), mTabs(tabs), mWindow(window) {}
 
 // static
 std::vector<ALScriptLookup::Candidate> ALScriptLookup::folderCandidates(const std::vector<const LLInventoryItem*>& items, const LLUUID& own, bool lua)
@@ -888,7 +889,7 @@ void ALScriptLookup::renameTo(const std::string& id, U32 generation, const std::
                 stale += rename_open(*open, file, places) ? 0 : 1;
                 continue;
             }
-            mWindow.openFileTab(path, doc.language.lua);
+            mTabs.openFileTab(path, doc.language.lua);
             Doc* other = mServices.findDoc(file);
             if (!other)
             {
@@ -958,7 +959,7 @@ void ALScriptLookup::renameTo(const std::string& id, U32 generation, const std::
         beyond = mServices.sentences(beyond, missed);
     }
     mServices.report(mServices.sentences(mServices.sentence(said), beyond), stale > 0 || !passedOver(doc).empty());
-    mWindow.activate(doc);
+    mTabs.activate(doc);
     doc.editor->setFocus(true);
 }
 

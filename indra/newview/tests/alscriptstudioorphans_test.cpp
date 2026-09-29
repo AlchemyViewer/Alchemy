@@ -51,7 +51,7 @@ namespace
 
     // The orphans' window, faked: what is in reach as a test says, and a
     // record of what was asked.
-    struct FakeOrphansWindow : public Orphans::Window
+    struct FakeOrphansWindow : public Orphans::Window, public al_studio_test::QuietTabs
     {
         Reach reach(const Doc& doc) override { return reaches.count(doc.id) ? reaches[doc.id] : Reach(); }
         void  refreshPlace(Doc& doc) override { placed.push_back(doc.id); }
@@ -119,7 +119,7 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<Orphans>(services(), studio);
+            unit = std::make_unique<Orphans>(services(), studio, studio);
             return *unit;
         }
         // A tab of a script in an object, or in the inventory, loaded and

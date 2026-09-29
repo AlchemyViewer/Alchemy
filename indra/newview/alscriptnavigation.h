@@ -34,6 +34,7 @@
 
 class ALPaneList;
 class ALScriptStudioServices;
+class ALScriptStudioTabs;
 class LLUICtrl;
 
 // The places jumped from, to go back to and forward again: a place in a
@@ -77,7 +78,7 @@ public:
     typedef ALScriptStudioDoc Doc;
     typedef ALNavHistory::Place Place;
 
-    // What navigation asks of the window beyond its services.
+    // What navigation asks of the window beyond its services and its tabs.
     class Window
     {
     public:
@@ -93,17 +94,14 @@ public:
         // Whether a tab is being worked from -- a pane listing its problems,
         // the places a name was looked up from it -- which holds a preview.
         virtual bool workedFrom(const Doc& doc) const = 0;
-        // A tab let go of as it stands; the tabs' strip filled again; and
-        // the keyboard given to the view a tab shows.
-        virtual void letGoOf(Doc& doc)   = 0;
-        virtual void fillTabs()          = 0;
-        virtual void focusDoc(Doc& doc)  = 0;
+        // The keyboard given to the view a tab shows.
+        virtual void focusDoc(Doc& doc) = 0;
 
     protected:
         ~Window() = default;
     };
 
-    ALScriptNavigation(ALScriptStudioServices& services, Window& window);
+    ALScriptNavigation(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window);
 
     // A jump from where the caret is in the tab in front; `walking`, a walk
     // down a pane's list, which is one jump until the editor has the
@@ -138,6 +136,7 @@ public:
 
 private:
     ALScriptStudioServices& mServices;
+    ALScriptStudioTabs&     mTabs;
     Window&                 mWindow;
     ALNavHistory            mHistory;
     bool                    mWalking = false;

@@ -32,6 +32,7 @@
 #include "alnotecardembedded.h"
 #include "alscriptstudioorphans.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudiotabs.h"
 #include "lldir.h"
 #include "llfile.h"
 #include "llnotificationsutil.h"
@@ -79,7 +80,7 @@ namespace
     }
 }
 
-ALScriptStudioRecovery::ALScriptStudioRecovery(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window) {}
+ALScriptStudioRecovery::ALScriptStudioRecovery(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window) : mServices(services), mTabs(tabs), mWindow(window) {}
 
 // --- the store -----------------------------------------------------------------------
 
@@ -428,7 +429,7 @@ void ALScriptStudioRecovery::takeUp(Doc& doc, const Entry& listed)
         doc.items->take(std::move(*doc.carriedEmbedded));
     }
     doc.carriedEmbedded.reset();
-    mWindow.takeCarriedText(doc);
+    mTabs.takeCarriedText(doc);
     // After, since putting the text in opens the editor to take it.
     doc.editor->setReadOnly(!doc.modifiable);
     if (doc.items)
@@ -436,7 +437,7 @@ void ALScriptStudioRecovery::takeUp(Doc& doc, const Entry& listed)
         doc.items->place();
     }
     keep(doc);
-    mWindow.refreshNotice();
+    mTabs.refreshNotice();
 }
 
 bool ALScriptStudioRecovery::restoreHistory(Doc& doc, const Entry& entry)
@@ -482,7 +483,8 @@ bool ALScriptStudioRecovery::restoreHistory(Doc& doc, const Entry& entry)
         // The text came in whole, which takes the items' buttons with it.
         doc.items->place();
     }
-    mWindow.tabsChanged();
+    mTabs.fillTabs();
+    mTabs.refreshToolbar();
     schedule(doc);
     return true;
 }
@@ -515,11 +517,11 @@ void ALScriptStudioRecovery::recover(const Entry& listed)
         Doc* doc = mServices.findDoc("disk:" + entry.file);
         if (!doc && LLFile::isfile(entry.file))
         {
-            doc = mWindow.openFileTab(entry.file, entry.lua);
+            doc = mTabs.openFileTab(entry.file, entry.lua);
         }
         if (doc)
         {
-            mWindow.activate(*doc);
+            mTabs.activate(*doc);
             takeUp(*doc, entry);
         }
         else
@@ -547,7 +549,7 @@ void ALScriptStudioRecovery::recover(const Entry& listed)
             return;
         }
     }
-    mWindow.activate(*doc);
+    mTabs.activate(*doc);
     takeUp(*doc, entry);
 }
 
@@ -627,6 +629,6 @@ void ALScriptStudioRecovery::show()
                     doc->recoverable.reset();
                 }
             }
-            mWindow.refreshNotice();
+            mTabs.refreshNotice();
         });
 }

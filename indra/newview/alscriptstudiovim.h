@@ -37,6 +37,7 @@
 
 class ALScriptStudioCommands;
 class ALScriptStudioServices;
+class ALScriptStudioTabs;
 class ALTextView;
 
 // A Script Studio window's side of the vim mode its editors may have: the
@@ -50,16 +51,14 @@ class ALScriptStudioVim
 public:
     typedef ALScriptStudioDoc Doc;
 
-    // What vim asks of the window beyond its services and its commands.
+    // What vim asks of the window beyond its services, its tabs and its commands.
     class Window
     {
     public:
-        // A tab closed: asked about first where it is unsaved; let go of as
-        // it stands, nothing asked; or saved, and closed once the save
-        // comes back. Several at once, the unsaved asked about in one
-        // question.
+        // A tab closed: asked about first where it is unsaved; or saved,
+        // and closed once the save comes back. Several at once, the unsaved
+        // asked about in one question.
         virtual void closeDocument(std::string_view id)             = 0;
-        virtual void letGoOf(Doc& doc)                              = 0;
         virtual void saveToClose(const std::string& id)             = 0;
         virtual void closeMany(const std::vector<std::string>& ids) = 0;
         // The selection formatted, or the whole text.
@@ -72,18 +71,11 @@ public:
         virtual void pickLine(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,
                               S32 rows, std::function<void(const std::string& line)> chosen,
                               std::function<void(const std::string& line)> shifted, std::function<void()> cancelled) = 0;
-        // The strip under the editor said again.
-        virtual void refreshTrailer(Doc& doc) = 0;
-        // A tab brought to the front; and the tabs put in this order, by id.
-        virtual void activate(Doc& doc)                                  = 0;
+        // The tabs put in this order, by id.
         virtual void reorderTabs(const std::vector<std::string>& order) = 0;
-        // A tab's text put back as it was last saved or loaded, what it
-        // held set aside first, nothing asked; and whether it can be.
-        virtual void revert(Doc& doc)                  = 0;
+        // Whether a tab's text can be put back as it was last saved or
+        // loaded.
         virtual bool revertible(const Doc& doc) const = 0;
-        // A file on disk opened in a tab where it is, read as the language
-        // its extension says, else `lua`; null where it could not be.
-        virtual Doc* openFileTab(const std::string& path, bool lua) = 0;
         // A file's text read whole, its line endings as an editor here
         // keeps them; and a text written to one whole. False where it
         // could not be.
@@ -116,7 +108,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioVim(ALScriptStudioServices& services, ALScriptStudioCommands& commands, Window& window);
+    ALScriptStudioVim(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioCommands& commands, Window& window);
 
     // A keymap put over one of the window's editors: sharing its history
     // and options with the rest, and asking this what it leaves.
@@ -205,6 +197,7 @@ private:
     void say(ALTextView& view, const std::string& message, bool error = false);
 
     ALScriptStudioServices&              mServices;
+    ALScriptStudioTabs&                  mTabs;
     ALScriptStudioCommands&              mCommands;
     Window&                              mWindow;
     std::shared_ptr<ALVimKeymap::Shared> mShared = std::make_shared<ALVimKeymap::Shared>();

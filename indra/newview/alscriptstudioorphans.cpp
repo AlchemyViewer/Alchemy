@@ -31,6 +31,7 @@
 #include "alscriptexternaleditor.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudiotabs.h"
 #include "lltimer.h"
 
 #include <algorithm>
@@ -91,7 +92,7 @@ namespace
     }
 }
 
-ALScriptStudioOrphans::ALScriptStudioOrphans(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
+ALScriptStudioOrphans::ALScriptStudioOrphans(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window) : mServices(services), mTabs(tabs), mWindow(window)
 {
 }
 
@@ -292,7 +293,7 @@ F64 ALScriptStudioOrphans::check()
     if (changed)
     {
         refreshNotice();
-        mWindow.refreshToolbar();
+        mTabs.refreshToolbar();
     }
     return due;
 }
@@ -460,7 +461,7 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
         doc->carriedText = *doc->compiledDiffers;
         doc->compiledDiffers.reset();
         mWindow.endCompare(*doc);
-        mWindow.takeCarriedText(*doc);
+        mTabs.takeCarriedText(*doc);
         mServices.report(mServices.words("CompiledTaken", args), false, doc);
     }
     else if (action == "discard_left" && doc->recoverable)

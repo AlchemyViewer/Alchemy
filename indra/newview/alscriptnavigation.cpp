@@ -29,6 +29,7 @@
 #include "alcodeeditor.h"
 #include "alpanelist.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudiotabs.h"
 #include "llsdutil.h"
 #include "llscrolllistitem.h"
 #include "lltimer.h"
@@ -89,7 +90,7 @@ void ALNavHistory::rekey(const std::string& was, const std::string& id)
 
 // --- jumps --------------------------------------------------------------------------------
 
-ALScriptNavigation::ALScriptNavigation(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
+ALScriptNavigation::ALScriptNavigation(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window) : mServices(services), mTabs(tabs), mWindow(window)
 {
 }
 
@@ -185,7 +186,7 @@ void ALScriptNavigation::closePreview()
             return;
         }
         // Nothing held there: the next look takes its place.
-        mWindow.letGoOf(*doc);
+        mTabs.letGoOf(*doc);
         return;
     }
 }
@@ -195,7 +196,7 @@ void ALScriptNavigation::holdPreview(Doc& doc)
     if (doc.preview)
     {
         doc.preview = false;
-        mWindow.fillTabs();
+        mTabs.fillTabs();
     }
 }
 

@@ -31,12 +31,13 @@
 #include "alscriptstudiochecking.h"
 #include "alscriptstudioorphans.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudiotabs.h"
 #include "alscriptstudioweighing.h"
 #include "lldate.h"
 
 #include <algorithm>
 
-ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
+ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window) : mServices(services), mTabs(tabs), mWindow(window)
 {
 }
 
@@ -108,7 +109,7 @@ void ALScriptStudioSaving::compareCompiled(Doc& doc, U32 version, const ALPrepro
         !ALScriptEnvelope::compiledFrom(result.text, doc.envelope->expanded, doc.language.lua))
     {
         doc.compiledDiffers = doc.envelope->expanded;
-        mWindow.refreshNotice();
+        mTabs.refreshNotice();
     }
 }
 
@@ -284,7 +285,7 @@ void ALScriptStudioSaving::save(Doc& doc)
         doc.offer.reset();
         if (&doc == mServices.frontDoc())
         {
-            mWindow.refreshNotice();
+            mTabs.refreshNotice();
         }
     }
     // Where it cannot go -- its object out of sight, the item gone, the
@@ -311,7 +312,7 @@ void ALScriptStudioSaving::save(Doc& doc)
             stopped(doc);
             if (&doc == mServices.frontDoc())
             {
-                mWindow.refreshNotice();
+                mTabs.refreshNotice();
             }
             return;
         case ALScriptSaveFlow::Start::Detached:
@@ -418,7 +419,7 @@ void ALScriptStudioSaving::save(Doc& doc)
             }
             doc.save.sent(at, std::nullopt, std::move(sent), request);
             mServices.setStatus(mServices.words("Saving", args));
-            mWindow.refreshToolbar();
+            mTabs.refreshToolbar();
             return;
         }
         case ALScriptSaveFlow::Route::Check:
@@ -505,7 +506,7 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
         stopped(doc);
         if (&doc == mServices.frontDoc())
         {
-            mWindow.refreshTrailer(doc);
+            mTabs.refreshTrailer(doc);
         }
         return;
     }
@@ -547,7 +548,7 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
     mServices.setStatus(mServices.words("Saving", args));
-    mWindow.refreshToolbar();
+    mTabs.refreshToolbar();
 }
 
 void ALScriptStudioSaving::saveAll()
@@ -596,7 +597,7 @@ void ALScriptStudioSaving::savedElsewhere(const ALScriptSaved& saved)
         case ALScriptSaved::Heard::Same:
             // What is here is what went up.
             doc.editor->resetDirty();
-            mWindow.refreshToolbar();
+            mTabs.refreshToolbar();
             return;
         case ALScriptSaved::Heard::Keep:
             // A save of the text this tab last had -- a recompile, a queue
@@ -635,7 +636,7 @@ void ALScriptStudioSaving::takeSaved(Doc& doc)
     doc.savedThere.reset();
     mWindow.takeCarried(doc);
     doc.editor->resetDirty();
-    mWindow.refreshToolbar();
+    mTabs.refreshToolbar();
 }
 
 void ALScriptStudioSaving::keepSaved(Doc& doc)
@@ -678,7 +679,7 @@ void ALScriptStudioSaving::compiled(const ALScriptCompileResult& result)
         }
         mServices.report(mServices.words("CopiedTo", copied));
         from.editor->resetDirty();
-        mWindow.letGoOf(from);
+        mTabs.letGoOf(from);
     }
 }
 
@@ -713,7 +714,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
         {
             stopped(doc);
         }
-        mWindow.refreshToolbar();
+        mTabs.refreshToolbar();
         return;
     }
     // The text is the server's now, compiled or not -- when it was this
@@ -739,7 +740,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
             doc.experienceKnown = true;
         }
         // Nothing picked waits on a save any more.
-        mWindow.fillTabs();
+        mTabs.fillTabs();
         mWindow.keepSavedWeights(doc);
     }
     if (result.newAssetId.notNull())
@@ -761,15 +762,15 @@ void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
             doc.save.forgetSentItems();
         }
         mServices.report(mServices.words("SavedNotecard", args), false, &doc);
-        mWindow.refreshToolbar();
-        mWindow.fillTabs();
+        mTabs.refreshToolbar();
+        mTabs.fillTabs();
         if (sendQueuedSave(doc))
         {
             return;
         }
         if (doc.save.closeAfter())
         {
-            mWindow.letGoOf(doc);
+            mTabs.letGoOf(doc);
             mWindow.continueClosing();
         }
         return;
@@ -850,16 +851,16 @@ void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
     }
     if (&doc == mServices.frontDoc())
     {
-        mWindow.refreshToolbar();
+        mTabs.refreshToolbar();
     }
-    mWindow.fillTabs();
+    mTabs.fillTabs();
     if (sendQueuedSave(doc))
     {
         return;
     }
     if (doc.save.closeAfter())
     {
-        mWindow.letGoOf(doc);
+        mTabs.letGoOf(doc);
         mWindow.continueClosing();
     }
 }

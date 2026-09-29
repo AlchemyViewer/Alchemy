@@ -29,6 +29,7 @@
 
 #include "../alscriptstudiodoc.h"
 #include "../alscriptstudioservices.h"
+#include "../alscriptstudiotabs.h"
 
 #include "alcodeeditor.h"
 #include "aldockpanel.h"
@@ -208,6 +209,22 @@ namespace al_studio_test
     private:
         const LLPanel* mStrings = nullptr;
     };
+    // The window's tabs with nothing opened or put back, asked of and
+    // saying nothing: what a unit's test's fake of its window starts from,
+    // overriding what the test watches.
+    struct QuietTabs : public ALScriptStudioTabs
+    {
+        ALScriptStudioDoc* openFileTab(const std::string&, bool) override { return nullptr; }
+        void               activate(ALScriptStudioDoc&) override {}
+        void               letGoOf(ALScriptStudioDoc&) override {}
+        void               revert(ALScriptStudioDoc&) override {}
+        void               takeCarriedText(ALScriptStudioDoc&) override {}
+        void               fillTabs() override {}
+        void               refreshToolbar() override {}
+        void               refreshNotice() override {}
+        void               refreshTrailer(ALScriptStudioDoc&) override {}
+    };
+
     // A pane's window with nothing to fake: the services alone.
     struct NoPane
     {

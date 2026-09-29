@@ -51,7 +51,7 @@ namespace
     typedef std::function<void(const std::vector<std::string>&)> Chosen;
 
     // The window, faked: a record of what the files asked of it.
-    struct FakeFilesWindow : public ALScriptStudioFiles::Window
+    struct FakeFilesWindow : public ALScriptStudioFiles::Window, public al_studio_test::QuietTabs
     {
         Doc* openFileTab(const std::string& path, bool) override
         {
@@ -145,7 +145,7 @@ namespace tut
             const fsyspath    made = std::filesystem::temp_directory_path() / fsyspath(name);
             folder              = made.string();
             std::filesystem::create_directories(made);
-            unit = std::make_unique<ALScriptStudioFiles>(services, studio);
+            unit = std::make_unique<ALScriptStudioFiles>(services, studio, studio);
             return *unit;
         }
         std::string in(const std::string& name) const { return fsyspath(fsyspath(folder) / fsyspath(name)).string(); }
@@ -238,7 +238,7 @@ namespace tut
 
         LLSD state;
         unit.writeState(state);
-        ALScriptStudioFiles again(services, studio);
+        ALScriptStudioFiles again(services, studio, studio);
         again.readState(state);
         ensure("read back as written", again.recentFiles() == unit.recentFiles() && again.recentScripts().size() == 2 &&
                                            again.recentScripts()[1].ref == b.ref && again.recentScripts()[1].name == "b");
