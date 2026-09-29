@@ -182,6 +182,7 @@ if(AL_BUILD_VIEWER)
     alscriptincluderesolver.cpp
     alscriptinventoryindex.cpp
     alscriptkeymap.cpp
+    alscriptkeypresets.cpp
     alpanelscriptkeymap.cpp
     alscriptlookup.cpp
     alscriptobjectcheck.cpp
@@ -1017,6 +1018,7 @@ if(AL_BUILD_VIEWER)
     alscriptinventoryindex.h
     alscriptjobqueue.h
     alscriptkeymap.h
+    alscriptkeypresets.h
     alpanelscriptkeymap.h
     alscriptlookup.h
     alscriptobjectcheck.h
@@ -2587,6 +2589,7 @@ if(AL_BUILD_TESTS)
     alscriptkeymap
     UNIT
     PROJECT ${test_project}
+    SOURCES alscriptkeypresets.cpp
     LIBRARIES llui ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )

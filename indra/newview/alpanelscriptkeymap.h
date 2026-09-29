@@ -30,6 +30,7 @@
 #include <string>
 #include <vector>
 
+class LLComboBox;
 class LLLineEditor;
 class LLScrollListCtrl;
 class LLTextBox;
@@ -40,8 +41,9 @@ class LLTextBox;
 // takes any key, the viewer's menus' among them -- or put back. Keys given
 // to one command are taken from whatever had them, which the popover says
 // before and the panel after, and a key the viewer's menus have is said to
-// be the studio's while it has the keyboard. A tab of the studio's
-// preferences.
+// be the studio's while it has the keyboard. Another editor's keys can be
+// chosen whole to start from (ALScriptKeyPresets), a person's own changes
+// staying over them. A tab of the studio's preferences.
 class ALPanelScriptKeymap final : public LLPanel
 {
 public:
@@ -52,11 +54,14 @@ public:
 
     bool postBuild() override;
     // The list read from the keymap again: the setting changed under it.
-    void refresh() override { fill(); }
+    void refresh() override;
 
 
 private:
     void fill();
+    // The presets this platform offers, the one in force chosen.
+    void fillPresets();
+    void onPreset();
     void onChange();
     void onAdd();
     void onClear();
@@ -84,6 +89,7 @@ private:
     // The keys pressed, given to the command being edited.
     void setKeys(const ALKeyChord& chord);
 
+    LLComboBox*       mPreset  = nullptr;
     LLLineEditor*     mFilter  = nullptr;
     LLScrollListCtrl* mList    = nullptr;
     LLTextBox*        mSaid    = nullptr;

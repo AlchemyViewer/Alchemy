@@ -10,6 +10,13 @@
  name="keys_panel"
  width="480">
     <panel.string name="NoKeys">(none)</panel.string>
+    <panel.string name="preset_studio">Script Studio</panel.string>
+    <panel.string name="preset_vscode">Visual Studio Code</panel.string>
+    <panel.string name="preset_visual_studio">Visual Studio</panel.string>
+    <panel.string name="preset_jetbrains">JetBrains (IntelliJ, Rider, CLion)</panel.string>
+    <panel.string name="preset_xcode">Xcode</panel.string>
+    <panel.string name="PresetChosen">Keys now match [NAME].</panel.string>
+    <panel.string name="PresetChosenOwn">Keys now match [NAME]. Your own changes still apply on top; Reset All removes them.</panel.string>
     <panel.string name="Changed">changed</panel.string>
     <panel.string name="KeyTaken">[KEYS] is now assigned to [WHAT] and was removed from [WHOSE].</panel.string>
     <panel.string name="CaptureTitle">Keys for [WHAT]</panel.string>
@@ -99,6 +106,26 @@
     <panel.string name="cmd_select_next_occurrence">Select next occurrence</panel.string>
     <panel.string name="cmd_change_all_occurrences">Change all occurrences</panel.string>
     <panel.string name="cmd_previous_misspelling">Previous misspelling</panel.string>
+    <text
+     follows="left|top"
+     height="22"
+     layout="topleft"
+     left="8"
+     name="preset_label"
+     top="8"
+     valign="center"
+     width="80">
+        Keys like:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="22"
+     layout="topleft"
+     left_pad="4"
+     name="preset"
+     tool_tip="Use the standard keys of another editor. Keys you have changed yourself still apply on top."
+     top_delta="0"
+     width="260" />
     <line_editor
      follows="left|top|right"
      height="22"
@@ -107,11 +134,11 @@
      left="8"
      name="filter"
      tool_tip="Show only commands whose name or keys contain this text"
-     top="8"
+     top_pad="6"
      width="464" />
     <scroll_list
      follows="all"
-     height="350"
+     height="322"
      layout="topleft"
      left="8"
      name="keys"
@@ -164,21 +191,21 @@
     <button
      follows="left|bottom"
      height="22"
-     label="Standard"
+     label="Reset"
      layout="topleft"
      left_pad="4"
      name="restore"
-     tool_tip="Restore the selected command's standard keys"
+     tool_tip="Put back the selected command's keys as the chosen keymap has them"
      top_delta="0"
      width="80" />
     <button
      follows="right|bottom"
      height="22"
-     label="All Standard"
+     label="Reset All"
      layout="topleft"
      name="restore_all"
      right="-8"
-     tool_tip="Restore standard keys for every command"
+     tool_tip="Put back every command's keys as the chosen keymap has them, removing your own changes"
      top_delta="0"
      width="100" />
 </panel>

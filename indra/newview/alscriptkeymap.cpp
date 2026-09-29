@@ -26,15 +26,22 @@
 
 #include "alscriptkeymap.h"
 
+#include "alscriptkeypresets.h"
 #include "llkeyboard.h"
+#include "llstl.h"
 #include "lluictrlfactory.h"
 #include "llviewercontrol.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <algorithm>
 
 namespace
 {
     const char* const SETTING = "ALScriptStudioKeymap";
+    // The editor whose keys are put over the standard, and the person's
+    // over them (ALScriptKeyPresets).
+    const char* const PRESET_SETTING = "ALScriptStudioKeymapPreset";
     // A menu item's key is kept under its name after this, beside the
     // editor's commands, which have no such prefix.
     const std::string MENU_PREFIX = "menu:";
@@ -99,17 +106,23 @@ namespace
     }
 
     ALKeymap build(const LLSD& bound);
+    LLSD     effectiveOf(const std::string& preset, const LLSD& bound);
 
-    // The setting, and the keymap it makes, read again only once the
-    // setting has changed -- by a key given here, or by anything else that
-    // sets it. Every editor is given the keymap, and the menus ask each of
-    // their commands for its keys at every key pressed.
+    // The settings, and the keymap they make, read again only once one has
+    // changed -- by a key given here, or by anything else that sets it.
+    // Every editor is given the keymap, and the menus ask each of their
+    // commands for its keys at every key pressed. `bound` is the person's
+    // own; `effective` the standard's changed by the preset's and then the
+    // person's, each over the one before (effectiveOf).
     struct Built
     {
         LLSD                               bound;
+        std::string                        preset = ALScriptKeyPresets::STANDARD;
+        LLSD                               effective;
         ALKeymap                           map;
         bool                               stale = true;
         boost::signals2::scoped_connection listening;
+        boost::signals2::scoped_connection listeningPreset;
     };
     Built& built()
     {
@@ -121,11 +134,22 @@ namespace
                 one.listening = control->getSignal()->connect([](LLControlVariable*, const LLSD&, const LLSD&) { built().stale = true; });
             }
         }
+        if (!one.listeningPreset.connected())
+        {
+            if (LLControlVariable* control = gSavedSettings.getControl(PRESET_SETTING))
+            {
+                one.listeningPreset = control->getSignal()->connect([](LLControlVariable*, const LLSD&, const LLSD&) { built().stale = true; });
+            }
+        }
         if (one.stale)
         {
             one.bound = gSavedSettings.getLLSD(SETTING);
-            one.map   = build(one.bound);
-            one.stale = false;
+            // One this platform does not offer, or none: the standard.
+            const std::string preset = gSavedSettings.controlExists(PRESET_SETTING) ? gSavedSettings.getString(PRESET_SETTING) : std::string();
+            one.preset    = ALScriptKeyPresets::find(preset) ? preset : std::string(ALScriptKeyPresets::STANDARD);
+            one.effective = effectiveOf(one.preset, one.bound);
+            one.map       = build(one.effective);
+            one.stale     = false;
         }
         return one;
     }
@@ -152,6 +176,209 @@ namespace
     {
         gSavedSettings.setLLSD(SETTING, map);
         built().stale = true;
+    }
+
+    // A command's name in a layer: an editor's own, a menu item's under
+    // MENU_PREFIX.
+    std::string layerName(const ALScriptKeymap::Owner& owner)
+    {
+        return owner.menu.empty() ? std::string(alEditorCommandName(owner.command)) : MENU_PREFIX + owner.menu;
+    }
+
+    ALScriptKeymap::Owner ownerNamed(const std::string& name)
+    {
+        ALScriptKeymap::Owner owner;
+        if (name.compare(0, MENU_PREFIX.size(), MENU_PREFIX) == 0)
+        {
+            owner.menu = name.substr(MENU_PREFIX.size());
+        }
+        else if (const std::optional<ALEditorCommand> command = alEditorCommandFromName(name))
+        {
+            owner.command = *command;
+        }
+        return owner;
+    }
+
+    // A command's keys in a layer: its own there, else the standard's.
+    ALScriptKeymap::keys_t keysIn(const LLSD& layer, ALEditorCommand command)
+    {
+        const char* const name = alEditorCommandName(command);
+        if (layer.isMap() && layer.has(name))
+        {
+            return keysFrom(layer[name]);
+        }
+        static const ALKeymap standard = ALKeymap::standard();
+        return ALScriptKeymap::keysOf(standard, command);
+    }
+
+    ALScriptKeymap::chords_t chordsIn(const LLSD& layer, std::string_view item)
+    {
+        const std::string name = MENU_PREFIX + std::string(item);
+        if (layer.isMap() && layer.has(name))
+        {
+            return chordsFrom(layer[name]);
+        }
+        ALScriptKeymap::chords_t keys;
+        for (const ALScriptKeymap::MenuCommand& one : ALScriptKeymap::menuCommands())
+        {
+            if (item == one.id && !one.chord().none())
+            {
+                keys.push_back(one.chord());
+            }
+        }
+        return keys;
+    }
+
+    // What giving `chord` to `keeping` takes, in a layer: each command
+    // that loses keys to it, with the keys it keeps, as the layer keeps
+    // them. The editors' command that hears its first key -- the key
+    // pressed, or the first of two -- since the editor has a key before
+    // the studio would wait; and the menus' commands with the same keys,
+    // with keys whose first is the key given (it runs a command of its
+    // own now, and the studio would never wait for a second), or with the
+    // first of the two given as a key of its own.
+    struct Taken
+    {
+        ALScriptKeymap::Owner owner;
+        LLSD                  rest;
+    };
+    std::vector<Taken> takesIn(const LLSD& layer, const ALScriptKeymap::Owner& keeping, const ALKeyChord& chord)
+    {
+        std::vector<Taken> taken;
+        const KEY          first_key  = alKeyAsBound(chord.twoKeys() ? chord.leadKey : chord.key);
+        const MASK         first_mask = chord.twoKeys() ? chord.leadMask : chord.mask;
+        for (U8 i = 1; i < static_cast<U8>(ALEditorCommand::COUNT); ++i)
+        {
+            const ALEditorCommand command = static_cast<ALEditorCommand>(i);
+            if (command == keeping.command)
+            {
+                continue;
+            }
+            const ALScriptKeymap::keys_t had = keysIn(layer, command);
+            ALScriptKeymap::keys_t       rest;
+            for (const auto& [key, mask] : had)
+            {
+                if (alKeyAsBound(key) != first_key || mask != first_mask)
+                {
+                    rest.emplace_back(key, mask);
+                }
+            }
+            if (rest.size() != had.size())
+            {
+                Taken one;
+                one.owner.command = command;
+                one.rest          = keysTo(rest);
+                taken.push_back(one);
+            }
+        }
+        for (const std::string& id : ALScriptKeymap::menuIds())
+        {
+            if (keeping.menu == id)
+            {
+                continue;
+            }
+            const ALScriptKeymap::chords_t had = chordsIn(layer, id);
+            ALScriptKeymap::chords_t       rest;
+            for (const ALKeyChord& one : had)
+            {
+                const bool same     = one == chord;
+                const bool led      = !chord.twoKeys() && one.ledBy(chord.key, chord.mask);
+                const bool leads_it = chord.twoKeys() && !one.twoKeys() && one.key == chord.leadKey && one.mask == chord.leadMask;
+                if (!same && !led && !leads_it)
+                {
+                    rest.push_back(one);
+                }
+            }
+            if (rest.size() != had.size())
+            {
+                Taken one;
+                one.owner.menu = id;
+                one.rest       = chordsTo(rest);
+                taken.push_back(one);
+            }
+        }
+        return taken;
+    }
+
+    // A command given keys in a layer, taken from whatever else in it had
+    // them.
+    void giveIn(LLSD& layer, const ALScriptKeymap::Owner& owner, const ALScriptKeymap::chords_t& chords, const LLSD& list)
+    {
+        for (const ALKeyChord& chord : chords)
+        {
+            for (const Taken& one : takesIn(layer, owner, chord))
+            {
+                layer[layerName(one.owner)] = one.rest;
+            }
+        }
+        layer[layerName(owner)] = list;
+    }
+
+    ALScriptKeymap::chords_t chordsOf(const ALScriptKeymap::Owner& owner, const LLSD& list)
+    {
+        if (!owner.menu.empty())
+        {
+            return chordsFrom(list);
+        }
+        ALScriptKeymap::chords_t chords;
+        for (const auto& [key, mask] : keysFrom(list))
+        {
+            chords.push_back(ALKeyChord{ key, mask });
+        }
+        return chords;
+    }
+
+    // The preset's keys over the standard, each binding in its turn taking
+    // its keys from whatever had them; made once for each preset.
+    const LLSD& presetLayer(const std::string& id)
+    {
+        static boost::unordered_flat_map<std::string, LLSD, ll::string_hash, std::equal_to<>> made;
+        if (const auto found = made.find(id); found != made.end())
+        {
+            return found->second;
+        }
+        LLSD layer = LLSD::emptyMap();
+        if (const ALScriptKeyPresets::Preset* preset = ALScriptKeyPresets::find(id))
+        {
+            for (const ALScriptKeyPresets::Binding& binding : preset->bindings)
+            {
+                ALScriptKeymap::Owner owner;
+                if (const std::optional<ALEditorCommand> command = alEditorCommandFromName(binding.id))
+                {
+                    owner.command = *command;
+                    ALScriptKeymap::keys_t keys;
+                    for (const ALKeyChord& chord : binding.keys)
+                    {
+                        keys.emplace_back(chord.key, chord.mask);
+                    }
+                    giveIn(layer, owner, binding.keys, keysTo(keys));
+                }
+                else
+                {
+                    owner.menu = binding.id;
+                    giveIn(layer, owner, binding.keys, chordsTo(binding.keys));
+                }
+            }
+        }
+        return made.emplace(id, layer).first->second;
+    }
+
+    LLSD effectiveOf(const std::string& preset, const LLSD& bound)
+    {
+        LLSD layer = presetLayer(preset);
+        if (bound.isMap())
+        {
+            for (LLSD::map_const_iterator it = bound.beginMap(); it != bound.endMap(); ++it)
+            {
+                const ALScriptKeymap::Owner owner = ownerNamed(it->first);
+                if (owner.command == ALEditorCommand::None && owner.menu.empty())
+                {
+                    continue;
+                }
+                giveIn(layer, owner, chordsOf(owner, it->second), it->second);
+            }
+        }
+        return layer;
     }
 
     ALKeymap build(const LLSD& bound)
@@ -431,24 +658,7 @@ namespace ALScriptKeymap
         return std::find(all.begin(), all.end(), item) != all.end();
     }
 
-    chords_t menuKeys(std::string_view item)
-    {
-        const LLSD&       bound = rebound();
-        const std::string name  = MENU_PREFIX + std::string(item);
-        if (bound.isMap() && bound.has(name))
-        {
-            return chordsFrom(bound[name]);
-        }
-        chords_t keys;
-        for (const MenuCommand& one : menuCommands())
-        {
-            if (item == one.id && !one.chord().none())
-            {
-                keys.push_back(one.chord());
-            }
-        }
-        return keys;
-    }
+    chords_t menuKeys(std::string_view item) { return chordsIn(built().effective, item); }
 
     ALKeyChord menuKey(std::string_view item)
     {
@@ -486,62 +696,40 @@ namespace ALScriptKeymap
 
     std::vector<Owner> takeKeys(const Owner& keeping, const ALKeyChord& chord, bool apply)
     {
-        std::vector<Owner> from;
-        const KEY          first_key  = chord.twoKeys() ? chord.leadKey : chord.key;
-        const MASK         first_mask = chord.twoKeys() ? chord.leadMask : chord.mask;
-        // An editor's command: the key goes from its keys, the rest kept.
-        const ALKeymap        map   = current();
-        const ALEditorCommand other = map.lookup(first_key, first_mask);
-        if (other != ALEditorCommand::None && other != keeping.command)
+        std::vector<Owner>       from;
+        const std::vector<Taken> taken = takesIn(built().effective, keeping, chord);
+        LLSD                     bound = rebound();
+        if (!bound.isMap())
         {
-            if (apply)
-            {
-                keys_t rest;
-                for (const auto& bound : keysOf(map, other))
-                {
-                    if (bound.first != first_key || bound.second != first_mask)
-                    {
-                        rest.push_back(bound);
-                    }
-                }
-                rebind(other, rest);
-            }
-            Owner was;
-            was.command = other;
-            from.push_back(was);
+            bound = LLSD::emptyMap();
         }
-        // A menu's.
-        for (const std::string& id : menuIds())
+        for (const Taken& one : taken)
         {
-            if (keeping.menu == id)
-            {
-                continue;
-            }
-            const chords_t had = menuKeys(id);
-            chords_t       rest;
-            for (const ALKeyChord& one : had)
-            {
-                const bool same     = one == chord;
-                const bool led      = !chord.twoKeys() && one.ledBy(chord.key, chord.mask);
-                const bool leads_it = chord.twoKeys() && !one.twoKeys() && one.key == chord.leadKey && one.mask == chord.leadMask;
-                if (!same && !led && !leads_it)
-                {
-                    rest.push_back(one);
-                }
-            }
-            if (rest.size() == had.size())
-            {
-                continue;
-            }
-            if (apply)
-            {
-                rebindMenu(id, rest);
-            }
-            Owner was;
-            was.menu = id;
-            from.push_back(was);
+            bound[layerName(one.owner)] = one.rest;
+            from.push_back(one.owner);
+        }
+        if (apply && !taken.empty())
+        {
+            store(bound);
         }
         return from;
+    }
+
+    const std::string& preset() { return built().preset; }
+
+    void setPreset(const std::string& id)
+    {
+        if (gSavedSettings.controlExists(PRESET_SETTING))
+        {
+            gSavedSettings.setString(PRESET_SETTING, ALScriptKeyPresets::find(id) ? id : std::string(ALScriptKeyPresets::STANDARD));
+        }
+        built().stale = true;
+    }
+
+    bool anyRebound()
+    {
+        const LLSD& bound = rebound();
+        return bound.isMap() && bound.size() > 0;
     }
 
     std::vector<MenuItem> menuItemsIn(const LLXMLNodePtr& root)

@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../alscriptkeymap.h"
+#include "../alscriptkeypresets.h"
 
 #include "llcontrol.h"
 #include "llkeyboard.h"
@@ -61,6 +62,11 @@ namespace tut
             {
                 gSavedSettings.declareLLSD("ALScriptStudioKeymap", LLSD::emptyMap(), "a person's keys", LLControlVariable::PERSIST_NO);
             }
+            if (!gSavedSettings.controlExists("ALScriptStudioKeymapPreset"))
+            {
+                gSavedSettings.declareString("ALScriptStudioKeymapPreset", "studio", "another editor's keys", LLControlVariable::PERSIST_NO);
+            }
+            ALScriptKeymap::setPreset(ALScriptKeyPresets::STANDARD);
             ALScriptKeymap::restoreAll();
         }
 
@@ -231,5 +237,109 @@ namespace tut
 #else
         ensure("back on Alt-Left", has("back", ALKeyChord{ KEY_LEFT, MASK_ALT }) && has("forward", ALKeyChord{ KEY_RIGHT, MASK_ALT }));
 #endif
+    }
+
+    template<> template<>
+    void alscriptkeymap_object::test<7>()
+    {
+        set_test_name("every preset names the studio's commands, each once, an editor's command with keys of one key each");
+        ensure("the studio's own first, changing nothing", ALScriptKeyPresets::all().front().id == ALScriptKeyPresets::STANDARD &&
+                                                           ALScriptKeyPresets::all().front().bindings.empty());
+        ensure("four", ALScriptKeyPresets::all().size() == 4);
+        for (const ALScriptKeyPresets::Preset& preset : ALScriptKeyPresets::all())
+        {
+            std::set<std::string> named;
+            for (const ALScriptKeyPresets::Binding& binding : preset.bindings)
+            {
+                const std::string what = preset.id + ": " + binding.id;
+                ensure("once: " + what, named.insert(binding.id).second);
+                ensure("keys: " + what, !binding.keys.empty());
+                const bool editor = alEditorCommandFromName(binding.id).has_value();
+                ensure("a command: " + what, editor || ALScriptKeymap::isMenuCommand(binding.id));
+                for (const ALKeyChord& chord : binding.keys)
+                {
+                    ensure("one key at a time for an editor's: " + what, !editor || !chord.twoKeys());
+                }
+            }
+        }
+    }
+
+    template<> template<>
+    void alscriptkeymap_object::test<8>()
+    {
+        set_test_name("with each preset in force, every key it gives is its command's, and no key is two commands'");
+        for (const ALScriptKeyPresets::Preset& preset : ALScriptKeyPresets::all())
+        {
+            ALScriptKeymap::setPreset(preset.id);
+            ensure_equals("in force", ALScriptKeymap::preset(), preset.id);
+            const ALKeymap& map = ALScriptKeymap::current();
+            for (const ALScriptKeyPresets::Binding& binding : preset.bindings)
+            {
+                const std::string what = preset.id + ": " + binding.id;
+                if (const std::optional<ALEditorCommand> command = alEditorCommandFromName(binding.id))
+                {
+                    for (const ALKeyChord& chord : binding.keys)
+                    {
+                        ensure("the editor's key: " + what + " " + chord.describe(), map.lookup(chord.key, chord.mask) == *command);
+                    }
+                }
+                else
+                {
+                    ensure("the menu's keys: " + what + " " + ALScriptKeymap::describe(ALScriptKeymap::menuKeys(binding.id)),
+                           ALScriptKeymap::menuKeys(binding.id) == binding.keys);
+                }
+            }
+            // No menu's key the first key of an editor's command, nor
+            // another menu's, nor the first of another's two.
+            for (const std::string& id : ALScriptKeymap::menuIds())
+            {
+                for (const ALKeyChord& chord : ALScriptKeymap::menuKeys(id))
+                {
+                    const std::string what = preset.id + ": " + id + " " + chord.describe();
+                    const KEY         first_key  = chord.twoKeys() ? chord.leadKey : chord.key;
+                    const MASK        first_mask = chord.twoKeys() ? chord.leadMask : chord.mask;
+                    ensure("not an editor's key: " + what, map.lookup(first_key, first_mask) == ALEditorCommand::None);
+                    for (const std::string& other : ALScriptKeymap::menuIds())
+                    {
+                        if (other == id)
+                        {
+                            continue;
+                        }
+                        for (const ALKeyChord& theirs : ALScriptKeymap::menuKeys(other))
+                        {
+                            const bool clash = theirs == chord || (!chord.twoKeys() && theirs.ledBy(chord.key, chord.mask)) ||
+                                               (chord.twoKeys() && !theirs.twoKeys() && theirs.key == chord.leadKey && theirs.mask == chord.leadMask);
+                            ensure("not " + other + "'s too: " + what, !clash);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    template<> template<>
+    void alscriptkeymap_object::test<9>()
+    {
+        set_test_name("a person's own keys stay over another preset and win; restoring one goes back to the preset's, and all keeps the preset");
+#if LL_DARWIN
+        const std::string other_preset = "xcode";
+#else
+        const std::string other_preset = "visual_studio";
+#endif
+        ALScriptKeymap::setPreset("jetbrains");
+        ensure("JetBrains' Control-D duplicates", ALScriptKeymap::current().lookup('D', MASK_CONTROL) == C::DuplicateLine);
+        ALScriptKeymap::takeKeys(ALScriptKeymap::Owner{ C::JoinLines, "" }, ALKeyChord{ 'D', MASK_CONTROL }, true);
+        ALScriptKeymap::rebind(C::JoinLines, { { 'D', MASK_CONTROL } });
+        ensure("taken", ALScriptKeymap::current().lookup('D', MASK_CONTROL) == C::JoinLines && ALScriptKeymap::isRebound(C::JoinLines));
+        ALScriptKeymap::setPreset(other_preset);
+        ensure("kept over another preset", ALScriptKeymap::current().lookup('D', MASK_CONTROL) == C::JoinLines);
+        ensure("and the person's still", ALScriptKeymap::anyRebound());
+        ALScriptKeymap::restore(C::JoinLines);
+        ALScriptKeymap::restore(C::DuplicateLine);
+        ensure("restored: the preset's own", ALScriptKeymap::current().lookup('D', MASK_CONTROL) == C::DuplicateLine);
+        ALScriptKeymap::restoreAll();
+        ensure("all restored, the preset kept", ALScriptKeymap::preset() == other_preset && !ALScriptKeymap::anyRebound());
+        ALScriptKeymap::setPreset("nothing of the kind");
+        ensure("one not offered: the standard", ALScriptKeymap::preset() == ALScriptKeyPresets::STANDARD);
     }
 }

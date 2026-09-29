@@ -475,6 +475,17 @@
             <key>Value</key>
             <map />
         </map>
+        <key>ALScriptStudioKeymapPreset</key>
+        <map>
+            <key>Comment</key>
+            <string>The editor whose keys Script Studio takes over its own: studio, vscode, visual_studio, jetbrains or xcode. A person's own keys stay over them.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>studio</string>
+        </map>
         <key>ALScriptStudioTabWidth</key>
         <map>
             <key>Comment</key>

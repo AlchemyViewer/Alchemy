@@ -34,11 +34,15 @@
 #include <vector>
 
 // The keymap every editor of the studio is given: the standard one, with
-// the commands a person rebound as the setting says. A rebound command
-// has only the keys the setting gives it; a command the setting does not
-// name keeps the standard's. The studio's own menu commands -- saving,
-// going to a line, the panes -- are rebound in the same setting, each to
-// keys of one key or two in turn; the menu shows the first.
+// another editor's keys over it where a person chose one
+// (ALScriptKeyPresets), and the commands a person rebound over those, as
+// the setting says. A rebound command has only the keys the setting gives
+// it; a command the setting does not name keeps the preset's, or the
+// standard's. Keys given to a command are taken from whatever had them,
+// the preset's from the standard's and the person's from both, so that no
+// key is two commands'. The studio's own menu commands -- saving, going
+// to a line, the panes -- are rebound in the same setting, each to keys
+// of one key or two in turn; the menu shows the first.
 namespace ALScriptKeymap
 {
     typedef std::vector<std::pair<KEY, MASK>> keys_t;
@@ -55,13 +59,14 @@ namespace ALScriptKeymap
     const std::vector<std::string>& menuIds();
     // Whether an item is one of them.
     bool                 isMenuCommand(std::string_view item);
-    // Its keys, each one or two in turn: the person's, else the
-    // standard's; none for none. The first is the one the menu shows.
+    // Its keys, each one or two in turn: the person's, else the preset's,
+    // else the standard's; none for none. The first is the one the menu
+    // shows.
     chords_t             menuKeys(std::string_view item);
     ALKeyChord           menuKey(std::string_view item);
     bool                 isMenuRebound(std::string_view item);
-    // The item's keys from now on, none for none; and the standard's
-    // again.
+    // The item's keys from now on, none for none; and the preset's, or
+    // the standard's, again.
     void                 rebindMenu(std::string_view item, const chords_t& keys);
     void                 restoreMenu(std::string_view item);
 
@@ -99,9 +104,18 @@ namespace ALScriptKeymap
     bool     isRebound(ALEditorCommand command);
     // The command's keys from now on, in the setting; none unbinds it.
     void     rebind(ALEditorCommand command, const keys_t& keys);
-    // Back to the standard, for one command or for all, the menus' too.
+    // Back to the preset's keys, or the standard's, for one command or for
+    // all, the menus' too: the person's own taken out.
     void     restore(ALEditorCommand command);
     void     restoreAll();
+    // Whether the person has keys of their own for anything.
+    bool     anyRebound();
+
+    // The editor whose keys are over the standard's (ALScriptKeyPresets),
+    // by its id; the person's own stay over it, taking its keys where they
+    // have them.
+    const std::string& preset();
+    void               setPreset(const std::string& id);
     // The keys as a person reads them: "Ctrl+Shift+K", or the several
     // joined.
     std::string describe(const keys_t& keys);
