@@ -169,6 +169,7 @@ target_sources(
     altextgotoline.cpp
     altextindent.cpp
     altextlayout.cpp
+    altextruler.cpp
     altextsearch.cpp
     altextspelling.cpp
     altextview.cpp
@@ -392,6 +393,7 @@ target_sources(
         altextgotoline.h
         altextindent.h
         altextlayout.h
+        altextruler.h
         altextsearch.h
         altextspelling.h
         altextview.h

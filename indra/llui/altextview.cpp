@@ -30,6 +30,7 @@
 
 #include "altextchars.h"
 #include "altextfeatures.h"
+#include "altextruler.h"
 #include "alsurface.h"
 #include "alviewtype.h"
 #include "llclipboard.h"
@@ -66,22 +67,12 @@ namespace
     const S32 WHEEL_ROWS            = 3;
     // Room past the widest line before a horizontal scrollbar is needed,
     // and what the caret keeps between itself and an edge.
-    // The bars: the ruler's width down the right, the bottom thumb's
-    // height, the least a thumb may be, how long the bars stay in sight
-    // once the mouse has left and the text has settled, and how long
-    // they take to go.
-    const S32 RULER_W   = 12;
-    const S32 HBAR_H    = 8;
-    const S32 THUMB_MIN = 24;
-    const F32 BAR_HOLD  = 1.0f;
-    const F32 BAR_FADE  = 0.5f;
-
-    // The map: a line's height and a character's width in it, and the
-    // find bar's width.
-    const S32 MAP_LINE_H     = 2;
-    const S32 MAP_CHAR_W     = 1;
-    const S32 MAP_PAD        = 2;
-    const S32 MAP_MARK_W     = 3;
+    // The bars: the bottom thumb's height, how long the bars stay in
+    // sight once the mouse has left and the text has settled, and how
+    // long they take to go; and the find bar's width.
+    const S32 HBAR_H         = 8;
+    const F32 BAR_HOLD       = 1.0f;
+    const F32 BAR_FADE       = 0.5f;
     const S32 FIND_BAR_WIDTH = 460;
 
     const S32 H_MARGIN              = 16;
@@ -314,6 +305,16 @@ ALTextView::ALTextView(const Params& p)
     mVPad(p.v_pad),
     mContextMenuFile(p.context_menu.isProvided() ? p.context_menu() : std::string())
 {
+    // The bar down the side, before anything else the view holds, so that
+    // all of that is drawn over it.
+    ALTextRuler::Params ruler;
+    ruler.name          = "ruler";
+    ruler.view          = this;
+    ruler.visible       = false;
+    ruler.follows.flags = FOLLOWS_NONE;
+    mRuler              = LLUICtrlFactory::create<ALTextRuler>(ruler);
+    addChild(mRuler);
+
     const S32 tab_width = p.tab_width;
     mTabWidth           = llmax(1, tab_width);
     mIndentDefaults     = { mTabWidth, mSoftTabs };
@@ -586,6 +587,17 @@ LLRect ALTextView::bodyRect() const
     return rect;
 }
 
+LLView* ALTextView::overlayAt(S32 x, S32 y)
+{
+    LLView* over = childFromPoint(x, y);
+    return over == mRuler ? nullptr : over;
+}
+
+bool ALTextView::rulerAt(S32 x, S32 y)
+{
+    return childFromPoint(x, y) == mRuler;
+}
+
 LLRect ALTextView::textRect() const
 {
     LLRect rect = bodyRect();
@@ -599,7 +611,7 @@ LLRect ALTextView::textRect() const
     }
     else if (mNeedV)
     {
-        rect.mRight -= RULER_W;
+        rect.mRight -= ALTextRuler::WIDTH;
     }
     return rect;
 }
@@ -684,6 +696,17 @@ void ALTextView::syncScrollbar()
     mAnchorOffset  = mScrollY - mLayout.lineTop(mAnchorLine);
     mAnchorHeights = mLayout.heightsRevision();
     mScrollAsked   = false;
+    placeRuler();
+}
+
+void ALTextView::placeRuler()
+{
+    const LLRect where = mScrollMap ? mapRect() : rulerRect();
+    if (where.notEmpty() && where != mRuler->getRect())
+    {
+        mRuler->setShape(where);
+    }
+    mRuler->setVisible(where.notEmpty());
 }
 
 void ALTextView::setScrollY(S32 y)
@@ -3363,7 +3386,7 @@ LLRect ALTextView::rulerRect() const
         return LLRect();
     }
     const LLRect local = bodyRect();
-    return LLRect(local.mRight - RULER_W, local.mTop, local.mRight, local.mBottom);
+    return LLRect(local.mRight - ALTextRuler::WIDTH, local.mTop, local.mRight, local.mBottom);
 }
 
 LLRect ALTextView::hBarRect() const
@@ -3376,24 +3399,12 @@ LLRect ALTextView::hBarRect() const
     return LLRect(text.mLeft, text.mBottom + HBAR_H, text.mRight, text.mBottom);
 }
 
-LLRect ALTextView::vThumb(const LLRect& track)
-{
-    const S32 total   = llmax(1, mLayout.totalHeight());
-    const S32 page    = llmax(1, textRect().getHeight());
-    const S32 track_h = llmax(1, track.getHeight());
-    const S32 thumb_h = llclamp(track_h * page / total, llmin(THUMB_MIN, track_h), track_h);
-    const S32 range   = llmax(1, total - page);
-    const S32 travel  = track_h - thumb_h;
-    const S32 top     = track.mTop - static_cast<S32>(static_cast<F32>(mScrollY) / static_cast<F32>(range) * static_cast<F32>(travel));
-    return LLRect(track.mLeft + 2, top, track.mRight - 2, top - thumb_h);
-}
-
 LLRect ALTextView::hThumb(const LLRect& track)
 {
     const S32 content = llmax(1, static_cast<S32>(ceilf(mLayout.contentWidth())) + H_MARGIN);
     const S32 width   = llmax(1, textRect().getWidth());
     const S32 track_w = llmax(1, track.getWidth());
-    const S32 thumb_w = llclamp(track_w * width / content, llmin(THUMB_MIN, track_w), track_w);
+    const S32 thumb_w = llclamp(track_w * width / content, llmin(ALTextRuler::THUMB_MIN, track_w), track_w);
     const S32 range   = llmax(1, content - width);
     const S32 travel  = track_w - thumb_w;
     const S32 left    = track.mLeft + static_cast<S32>(mScrollX / static_cast<F32>(range) * static_cast<F32>(travel));
@@ -3408,21 +3419,6 @@ F32 ALTextView::barAlpha() const
         return 1.f;
     }
     return llclamp(1.f - (since - BAR_HOLD) / BAR_FADE, 0.f, 1.f);
-}
-
-void ALTextView::scrollToRulerY(S32 y, S32 offset)
-{
-    const LLRect track = rulerRect();
-    if (track.isEmpty())
-    {
-        return;
-    }
-    const LLRect thumb  = vThumb(track);
-    const S32    travel = llmax(1, track.getHeight() - thumb.getHeight());
-    const S32    total  = llmax(1, mLayout.totalHeight());
-    const S32    page   = llmax(1, textRect().getHeight());
-    const S32    top    = y - offset;
-    setScrollY(static_cast<S32>(static_cast<F32>(track.mTop - top) / static_cast<F32>(travel) * static_cast<F32>(llmax(0, total - page))));
 }
 
 void ALTextView::scrollToBarX(S32 x, S32 offset)
@@ -3442,99 +3438,13 @@ void ALTextView::scrollToBarX(S32 x, S32 offset)
 
 void ALTextView::drawBars(F32 alpha)
 {
-    const LLColor4& ink   = textColor();
-    const F32       shown = barAlpha() * alpha;
-    // The ruler down the right: the caret and the marks always, the
-    // thumb while wanted.
-    const LLRect ruler = rulerRect();
-    if (ruler.notEmpty())
-    {
-        gl_rect_2d(ruler, ink % (0.04f * alpha));
-        const S32 total   = llmax(1, mLayout.totalHeight());
-        const S32 track_h = llmax(1, ruler.getHeight());
-        const auto yOf    = [&](S32 line) { return ruler.mTop - static_cast<S32>(static_cast<F32>(mLayout.lineTop(line)) / static_cast<F32>(total) * static_cast<F32>(track_h)); };
-        const S32 middle  = ruler.mLeft + RULER_W / 2;
-        // The lines with a mark, found again only where the text or the
-        // marks have changed; their colours asked every frame, which a
-        // change of theme may change.
-        const U32 marks_revision = mFeatures ? mFeatures->marksRevision() : 0;
-        if (mRulerMarksVersion != mDocument.version() || mRulerMarksRevision != marks_revision || !mRulerMarksValid)
-        {
-            mRulerMarkLines.clear();
-            LLColor4  unused;
-            const S32 count = mFeatures ? mDocument.lineCount() : 0;
-            for (S32 line = 0; line < count; ++line)
-            {
-                if (mFeatures->mapMark(line, unused))
-                {
-                    mRulerMarkLines.push_back(line);
-                }
-            }
-            mRulerMarksVersion  = mDocument.version();
-            mRulerMarksRevision = marks_revision;
-            mRulerMarksValid    = true;
-        }
-        LLColor4 mark;
-        for (const S32 line : mRulerMarkLines)
-        {
-            if (mFeatures->mapMark(line, mark))
-            {
-                const S32 y = yOf(line);
-                gl_rect_2d(middle, y, ruler.mRight - 2, y - 2, mark % alpha);
-            }
-        }
-        // The matches by the pixel rows they fall on, found again only as
-        // they, the track or the text's height change, and drawn as runs:
-        // a letter found over a long text is tens of thousands of matches
-        // and a few hundred rows.
-        const std::vector<ALTextRange>& matches = mFind.matches();
-        if (!matches.empty())
-        {
-            if (!mRulerRowsValid || mRulerRowsGeneration != mFind.generation() || mRulerRowsTop != ruler.mTop || mRulerRowsHeight != track_h ||
-                mRulerRowsTotal != total)
-            {
-                mRulerRows.assign(static_cast<size_t>(track_h) + 2, 0);
-                for (const ALTextRange& match : matches)
-                {
-                    const S32 row = llclamp(ruler.mTop - yOf(match.begin.line), 0, track_h);
-                    mRulerRows[static_cast<size_t>(row)]     = 1;
-                    mRulerRows[static_cast<size_t>(row) + 1] = 1;
-                }
-                mRulerRowsValid      = true;
-                mRulerRowsGeneration = mFind.generation();
-                mRulerRowsTop        = ruler.mTop;
-                mRulerRowsHeight     = track_h;
-                mRulerRowsTotal      = total;
-            }
-            const LLColor4 found = mFindMatchColor.get() % alpha;
-            for (size_t row = 0; row < mRulerRows.size();)
-            {
-                if (!mRulerRows[row])
-                {
-                    ++row;
-                    continue;
-                }
-                size_t end = row;
-                while (end < mRulerRows.size() && mRulerRows[end])
-                {
-                    ++end;
-                }
-                gl_rect_2d(ruler.mLeft + 2, ruler.mTop - static_cast<S32>(row), middle, ruler.mTop - static_cast<S32>(end), found);
-                row = end;
-            }
-        }
-        // The blip: where the caret is.
-        const S32 caret_y = yOf(mCaret.line);
-        gl_rect_2d(ruler.mLeft + 2, caret_y, ruler.mRight - 2, caret_y - 2, mCursorColor.get() % alpha);
-        if (shown > 0.f)
-        {
-            gl_rect_2d(vThumb(ruler), ink % (0.35f * shown));
-        }
-    }
-    const LLRect bar = hBarRect();
+    // The thumb along the bottom, while wanted; the ruler down the side is
+    // its own view (ALTextRuler).
+    const F32    shown = barAlpha() * alpha;
+    const LLRect bar   = hBarRect();
     if (bar.notEmpty() && shown > 0.f)
     {
-        gl_rect_2d(hThumb(bar), ink % (0.35f * shown));
+        gl_rect_2d(hThumb(bar), textColor() % (0.35f * shown));
     }
 }
 
@@ -3575,311 +3485,6 @@ LLRect ALTextView::mapRect() const
 S32 ALTextView::leftEdge() const
 {
     return getLocalRect().mLeft + (mScrollMap && mScrollMapLeft ? mScrollMapWidth : 0);
-}
-
-S32 ALTextView::mapScroll(const LLRect& map)
-{
-    // The lines the map shows, and how far its window is down them: as
-    // far, in proportion, as the text is scrolled. The lines found again
-    // only where which are hidden may have changed.
-    const S32 count = mDocument.lineCount();
-    if (!mMapLinesValid || mMapLinesRevision != mLayout.hiddenRevision() || mMapLinesCount != count)
-    {
-        mMapLines.clear();
-        for (S32 line = 0; line < count; ++line)
-        {
-            if (!mLayout.hidden(line))
-            {
-                mMapLines.push_back(line);
-            }
-        }
-        mMapLinesRevision = mLayout.hiddenRevision();
-        mMapLinesCount    = count;
-        mMapLinesValid    = true;
-    }
-    const S32 doc_h = static_cast<S32>(mMapLines.size()) * MAP_LINE_H;
-    const S32 map_h = map.getHeight() - 2 * MAP_PAD;
-    if (doc_h <= map_h)
-    {
-        return 0;
-    }
-    const S32 total = mLayout.totalHeight();
-    const S32 page  = llmax(1, textRect().getHeight());
-    const F32 how   = total > page ? static_cast<F32>(mScrollY) / static_cast<F32>(total - page) : 0.f;
-    return static_cast<S32>(llclamp(how, 0.f, 1.f) * static_cast<F32>(doc_h - map_h));
-}
-
-S32 ALTextView::mapLineAt(S32 y)
-{
-    const LLRect map = mapRect();
-    if (map.isEmpty() || mDocument.lineCount() == 0)
-    {
-        return -1;
-    }
-    const S32 scroll  = mapScroll(map);
-    const S32 ordinal = llclamp((map.mTop - MAP_PAD - y + scroll) / MAP_LINE_H, 0, static_cast<S32>(mMapLines.size()) - 1);
-    return mMapLines.empty() ? -1 : mMapLines[ordinal];
-}
-
-void ALTextView::drawMapPreview(F32 alpha)
-{
-    const LLRect map  = mapRect();
-    const S32    line = mapLineAt(mMapHoverY);
-    if (map.isEmpty() || line < 0 || !mFont)
-    {
-        return;
-    }
-    // Seven lines around the one under the mouse, in a box beside the
-    // map, on the view's ground a shade towards its ink, the line under
-    // the mouse washed as the caret's line is; kept on screen.
-    const S32 PAD    = 6;
-    const S32 GUTTER = 8;
-    const S32 count  = mDocument.lineCount();
-    const S32 first  = llmax(0, line - 3);
-    const S32 last   = llmin(count - 1, line + 3);
-    const S32 row_h  = mLayout.rowHeight();
-    const S32 rows   = last - first + 1;
-    const LLRect local = getLocalRect();
-    const S32    width = llmin(560, llmax(160, local.getWidth() - map.getWidth() - 3 * PAD));
-    const S32    height = rows * row_h + 2 * PAD;
-    S32          top    = llmin(local.mTop - PAD, mMapHoverY + height / 2);
-    top                 = llmax(top, local.mBottom + PAD + height);
-    const S32    right  = map.mLeft - PAD;
-    const LLRect box(right - width, top, right, top - height);
-    const LLColor4& bg    = backgroundColor();
-    const LLColor4& ink   = textColor();
-    const LLColor4  faint = ALSurface::shade(bg, ink, 0.45f) % alpha;
-    const LLColor4  wash  = ALSurface::shade(bg, ink, 0.14f) % alpha;
-    ALSurface::draw(box, bg, ink, alpha);
-    LLLocalClipRect clip(LLRect(box.mLeft + 1, box.mTop - 1, box.mRight - 1, box.mBottom + 1));
-    // The numbers take the room the widest needs.
-    const std::string widest  = std::to_string(last + 1);
-    const S32         numbers = static_cast<S32>(mFont->getWidth(widest)) + GUTTER;
-    S32               y       = box.mTop - PAD;
-    for (S32 l = first; l <= last; ++l, y -= row_h)
-    {
-        if (l == line)
-        {
-            gl_rect_2d(LLRect(box.mLeft + 1, y, box.mRight - 1, y - row_h), wash, true);
-        }
-        const S32 baseline = y - row_h + static_cast<S32>(mFont->getDescenderHeight()) + 1;
-        mFont->renderUTF8(std::to_string(l + 1), 0, static_cast<F32>(box.mLeft + PAD + numbers - GUTTER), static_cast<F32>(baseline),
-                          faint, LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
-        // The line in its colours, token by token, tabs as spaces.
-        const std::string&                text   = mDocument.line(l);
-        const std::vector<ALSyntaxToken>& tokens = mHighlighter.tokens(l);
-        F32                               x      = static_cast<F32>(box.mLeft + PAD + numbers);
-        const F32                         limit  = static_cast<F32>(box.mRight - PAD);
-        // The tabs to the view's own stops, counted along the whole line.
-        S32                               column = 0;
-        auto                              run    = [&](S32 begin, S32 end, const LLColor4& color) {
-            if (begin >= end || x >= limit)
-            {
-                return;
-            }
-            const std::string piece = alExpandTabs(std::string_view(text).substr(static_cast<size_t>(begin), static_cast<size_t>(end - begin)), column, mTabWidth);
-            F32 right_x = x;
-            mFont->renderUTF8(piece, 0, x, static_cast<F32>(baseline), color % alpha, LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL,
-                              LLFontGL::NO_SHADOW, S32_MAX, static_cast<S32>(limit - x), &right_x, false);
-            x = right_x;
-        };
-        S32 at = 0;
-        for (const ALSyntaxToken& token : tokens)
-        {
-            run(at, token.begin, ink);
-            run(token.begin, token.end, token.kind == ALSyntaxKind::Text ? ink : colorForKind(token.kind));
-            at = token.end;
-        }
-        run(at, static_cast<S32>(text.size()), ink);
-    }
-}
-
-void ALTextView::scrollToMapY(S32 y)
-{
-    const S32 line = mapLineAt(y);
-    if (line < 0)
-    {
-        return;
-    }
-    const S32 page = llmax(1, textRect().getHeight());
-    setScrollY(mLayout.lineTop(line) - page / 2);
-}
-
-void ALTextView::readMapRuns(S32 line, S32 columns, std::vector<MapRun>& out)
-{
-    // Each run of glyphs of one kind, by column, as far as the map is
-    // wide; spaces and tabs part runs.
-    const std::string&                text   = mDocument.line(line);
-    const std::vector<ALSyntaxToken>& tokens = mHighlighter.tokens(line);
-    size_t                            t      = 0;
-    S32                               col    = 0;
-    S32                               from   = -1;
-    ALSyntaxKind                      kind   = ALSyntaxKind::Text;
-    const auto                        end    = [&](S32 to) {
-        if (from >= 0)
-        {
-            const S32 x0 = llmin(columns, from);
-            const S32 x1 = llmin(columns, to);
-            if (x1 > x0)
-            {
-                out.push_back(MapRun{ x0, x1, kind });
-            }
-            from = -1;
-        }
-    };
-    for (size_t i = 0; i < text.size(); ++i)
-    {
-        const unsigned char c = static_cast<unsigned char>(text[i]);
-        if ((c & 0xC0) == 0x80)
-        {
-            continue;  // the rest of a character
-        }
-        while (t < tokens.size() && tokens[t].end <= static_cast<S32>(i))
-        {
-            ++t;
-        }
-        const ALSyntaxKind here = t < tokens.size() && tokens[t].begin <= static_cast<S32>(i) ? tokens[t].kind : ALSyntaxKind::Text;
-        if (c == '\t')
-        {
-            end(col);
-            col = alNextTabStop(col, mTabWidth);
-        }
-        else if (c == ' ')
-        {
-            end(col);
-            ++col;
-        }
-        else
-        {
-            if (from >= 0 && here != kind)
-            {
-                end(col);
-            }
-            if (from < 0)
-            {
-                from = col;
-                kind = here;
-            }
-            ++col;
-        }
-        if (col > columns)
-        {
-            break;
-        }
-    }
-    end(col);
-}
-
-void ALTextView::drawMap(F32 alpha)
-{
-    const LLRect map = mapRect();
-    if (map.isEmpty())
-    {
-        return;
-    }
-    const LLColor4& bg   = backgroundColor();
-    const LLColor4& ink  = textColor();
-    LLColor4        base = bg;
-    for (S32 i = 0; i < 3; ++i)
-    {
-        base.mV[i] = bg.mV[i] + (ink.mV[i] - bg.mV[i]) * 0.05f;
-    }
-    gl_rect_2d(map, base % alpha);
-
-    const S32 scroll = mapScroll(map);
-    const S32 rows   = static_cast<S32>(mMapLines.size());
-    if (rows == 0)
-    {
-        return;
-    }
-    const S32 map_h  = map.getHeight() - 2 * MAP_PAD;
-    const S32 first  = scroll / MAP_LINE_H;
-    const S32 last   = llmin(rows - 1, (scroll + map_h) / MAP_LINE_H);
-    const S32 inner_left  = map.mLeft + MAP_PAD + (mScrollMapLeft ? MAP_MARK_W : 0);
-    const S32 inner_right = map.mRight - MAP_PAD - (mScrollMapLeft ? 0 : MAP_MARK_W);
-    const S32 mark_left   = mScrollMapLeft ? map.mLeft + 1 : map.mRight - MAP_MARK_W;
-    LLLocalClipRect clip(map);
-    // Each line's runs of text, read again only where something they are
-    // read from has moved.
-    const S32 columns = llmax(0, (inner_right - inner_left) / MAP_CHAR_W);
-    MapRuns&  runs    = mMapRuns;
-    bool      fresh   = runs.version == mDocument.version() && runs.grammar == mHighlighter.grammar().get() && runs.tabWidth == mTabWidth &&
-                 runs.columns == columns && runs.first == first && runs.last == last && runs.hidden == mLayout.hiddenRevision();
-    for (S32 o = first; fresh && o <= last; ++o)
-    {
-        fresh = runs.revisions[static_cast<size_t>(o - first)] == mHighlighter.revision(mMapLines[o]);
-    }
-    if (!fresh)
-    {
-        runs.version  = mDocument.version();
-        runs.grammar  = mHighlighter.grammar().get();
-        runs.tabWidth = mTabWidth;
-        runs.columns  = columns;
-        runs.first    = first;
-        runs.last     = last;
-        runs.hidden   = mLayout.hiddenRevision();
-        runs.starts.clear();
-        runs.revisions.clear();
-        runs.runs.clear();
-        for (S32 o = first; o <= last; ++o)
-        {
-            const S32 line = mMapLines[o];
-            runs.starts.push_back(runs.runs.size());
-            runs.revisions.push_back(mHighlighter.revision(line));
-            readMapRuns(line, columns, runs.runs);
-        }
-        runs.starts.push_back(runs.runs.size());
-    }
-    // Every run, mark and tick in one batch, which is one draw: a rectangle
-    // drawn apiece is a draw apiece, and the map has thousands.
-    gGL.getTextureSlot(0)->unbind();
-    gGL.begin(LLRender::TRIANGLES);
-    for (S32 o = first; o <= last; ++o)
-    {
-        const S32 line   = mMapLines[o];
-        const S32 top    = map.mTop - MAP_PAD - (o * MAP_LINE_H - scroll);
-        const S32 bottom = top - MAP_LINE_H;
-        // Each run of glyphs, a rectangle in its kind's ink.
-        const size_t from = runs.starts[static_cast<size_t>(o - first)];
-        const size_t to   = runs.starts[static_cast<size_t>(o - first) + 1];
-        for (size_t r = from; r < to; ++r)
-        {
-            const MapRun&   run      = runs.runs[r];
-            const bool      plain    = run.kind == ALSyntaxKind::Text;
-            const LLColor4& kind_ink = plain ? ink : colorForKind(run.kind);
-            gl_rect_2d_in_batch(inner_left + run.from * MAP_CHAR_W, top, inner_left + run.to * MAP_CHAR_W, bottom, kind_ink % (alpha * (plain ? 0.45f : 0.7f)));
-        }
-        // A mark beside the line, and a match in it.
-        LLColor4 mark;
-        if (mFeatures && mFeatures->mapMark(line, mark))
-        {
-            gl_rect_2d_in_batch(mark_left, top, mark_left + MAP_MARK_W, bottom - 1, mark % alpha);
-        }
-        const std::vector<ALTextRange>& matches = mFind.matches();
-        if (!matches.empty())
-        {
-            auto found = std::lower_bound(matches.begin(), matches.end(), line, [](const ALTextRange& m, S32 l) { return m.end.line < l; });
-            if (found != matches.end() && found->begin.line <= line)
-            {
-                const S32 tick_left = mScrollMapLeft ? map.mRight - MAP_MARK_W : map.mLeft + 1;
-                gl_rect_2d_in_batch(tick_left, top, tick_left + MAP_MARK_W, bottom - 1, mFindMatchColor.get() % alpha);
-            }
-        }
-        if (line == mCaret.line)
-        {
-            gl_rect_2d_in_batch(inner_left, top, inner_right, top - 1, mCursorColor.get() % (alpha * 0.6f));
-        }
-    }
-    gGL.end();
-    // The rows on screen, as a window over the map.
-    const S32 page        = llmax(1, textRect().getHeight());
-    const S32 top_line    = mLayout.lineAtY(mScrollY);
-    const S32 bottom_line = mLayout.lineAtY(mScrollY + page - 1);
-    const auto ordinal    = [&](S32 line) { return static_cast<S32>(std::lower_bound(mMapLines.begin(), mMapLines.end(), line) - mMapLines.begin()); };
-    const S32 y0 = map.mTop - MAP_PAD - (ordinal(top_line) * MAP_LINE_H - scroll);
-    const S32 y1 = map.mTop - MAP_PAD - ((ordinal(bottom_line) + 1) * MAP_LINE_H - scroll);
-    gl_rect_2d(map.mLeft, y0, map.mRight, y1, ink % (alpha * 0.12f));
-    gl_rect_2d(map.mLeft, y0, map.mRight, y1, ink % (alpha * 0.3f), false);
 }
 
 // --- drawing -------------------------------------------------------------------
@@ -4513,10 +4118,6 @@ void ALTextView::draw()
                               LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, text.getWidth(), nullptr, true);
         }
     }
-    if (mScrollMap)
-    {
-        drawMap(alpha);
-    }
     drawBars(alpha);
     if (mModal)
     {
@@ -4527,9 +4128,14 @@ void ALTextView::draw()
         placeFindBar();
     }
     LLUICtrl::draw();
-    if (mMapHoverY >= 0 && !mDraggingMap)
+    // The map's preview over everything the view holds, the find bar and
+    // a list or a card too.
+    if (mRuler->getVisible())
     {
-        drawMapPreview(alpha);
+        LLUI::pushMatrix();
+        LLUI::translate(static_cast<F32>(mRuler->getRect().mLeft), static_cast<F32>(mRuler->getRect().mBottom));
+        mRuler->drawPreview(alpha);
+        LLUI::popMatrix();
     }
 }
 
@@ -4788,29 +4394,13 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
     {
         setFocus(true);
     }
-    if (mScrollMap && mapRect().pointInRect(x, y))
-    {
-        // The map: the view goes where it is pressed, and follows a drag.
-        mDraggingMap = true;
-        gFocusMgr.setMouseCapture(this);
-        scrollToMapY(y);
-        return true;
-    }
-    // A bar: its thumb taken hold of where it was pressed, or brought to
-    // where the track was.
-    if (const LLRect ruler = rulerRect(); ruler.notEmpty() && ruler.pointInRect(x, y))
-    {
-        const LLRect thumb = vThumb(ruler);
-        mBarDrag           = BarDrag::Vertical;
-        mBarDragOffset     = thumb.pointInRect(x, y) ? y - thumb.mTop : -thumb.getHeight() / 2;
-        gFocusMgr.setMouseCapture(this);
-        scrollToRulerY(y, mBarDragOffset);
-        return true;
-    }
+    // The bar along the bottom: its thumb taken hold of where it was
+    // pressed, or brought to where the track was. The ruler down the side
+    // has had its press, as a child of the view.
     if (const LLRect bar = hBarRect(); bar.notEmpty() && bar.pointInRect(x, y) && barAlpha() > 0.f)
     {
         const LLRect thumb = hThumb(bar);
-        mBarDrag           = BarDrag::Horizontal;
+        mDraggingBar       = true;
         mBarDragOffset     = thumb.pointInRect(x, y) ? x - thumb.mLeft : thumb.getWidth() / 2;
         gFocusMgr.setMouseCapture(this);
         scrollToBarX(x, mBarDragOffset);
@@ -4870,7 +4460,7 @@ bool ALTextView::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
     // What is selected here is the primary selection by now, though the
     // frame that offers it has not come.
     publishPrimary();
-    if (mReadOnly || mSelecting || mBarDrag != BarDrag::None || mDraggingMap || !on_text || !LLClipboard::instance().isTextAvailable(true))
+    if (mReadOnly || mSelecting || mDraggingBar || mRuler->dragging() || !on_text || !LLClipboard::instance().isTextAvailable(true))
     {
         return LLUICtrl::handleMiddleMouseDown(x, y, mask);
     }
@@ -4951,22 +4541,9 @@ bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
         }
         return true;
     };
-    if (mBarDrag != BarDrag::None && hasMouseCapture())
+    if (mDraggingBar && hasMouseCapture())
     {
-        arrow();
-        if (mBarDrag == BarDrag::Vertical)
-        {
-            scrollToRulerY(y, mBarDragOffset);
-        }
-        else
-        {
-            scrollToBarX(x, mBarDragOffset);
-        }
-        return true;
-    }
-    if (mDraggingMap && hasMouseCapture())
-    {
-        scrollToMapY(y);
+        scrollToBarX(x, mBarDragOffset);
         return arrow();
     }
     if (mSelecting && hasMouseCapture())
@@ -4976,20 +4553,15 @@ bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
     }
     // On something over the text, it has the mouse: its buttons light and
     // its cursor shows, not the text's.
-    if (overlayAt(x, y))
+    // And on the ruler or the map, which says what the mouse is there.
+    if (overlayAt(x, y) || rulerAt(x, y))
     {
-        mMapHoverY = -1;
         mHoverLink = -1;
         mHoverAtom = -1;
         return LLUICtrl::handleHover(x, y, mask);
     }
-    // Resting on the map previews the lines there, as long as it rests.
-    const LLRect map = mapRect();
-    mMapHoverY       = mScrollMap && mScrollMapPreview && map.notEmpty() && map.pointInRect(x, y) ? y : -1;
-    const LLRect ruler = rulerRect();
-    const LLRect bar   = hBarRect();
-    if ((mScrollMap && map.notEmpty() && map.pointInRect(x, y)) || (ruler.notEmpty() && ruler.pointInRect(x, y)) ||
-        (bar.notEmpty() && bar.pointInRect(x, y) && barAlpha() > 0.f))
+    const LLRect bar = hBarRect();
+    if (bar.notEmpty() && bar.pointInRect(x, y) && barAlpha() > 0.f)
     {
         mHoverLink = -1;
         mHoverAtom = -1;
@@ -5014,7 +4586,6 @@ bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
 
 void ALTextView::onMouseLeave(S32 x, S32 y, MASK mask)
 {
-    mMapHoverY = -1;
     mHoverLink = -1;
     mHoverAtom = -1;
     LLUICtrl::onMouseLeave(x, y, mask);
@@ -5022,15 +4593,9 @@ void ALTextView::onMouseLeave(S32 x, S32 y, MASK mask)
 
 bool ALTextView::handleMouseUp(S32 x, S32 y, MASK mask)
 {
-    if (mBarDrag != BarDrag::None)
+    if (mDraggingBar)
     {
-        mBarDrag = BarDrag::None;
-        gFocusMgr.setMouseCapture(nullptr);
-        return true;
-    }
-    if (mDraggingMap)
-    {
-        mDraggingMap = false;
+        mDraggingBar = false;
         gFocusMgr.setMouseCapture(nullptr);
         return true;
     }
@@ -5153,8 +4718,7 @@ bool ALTextView::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 void ALTextView::onMouseCaptureLost()
 {
     mSelecting   = false;
-    mDraggingMap = false;
-    mBarDrag     = BarDrag::None;
+    mDraggingBar = false;
 }
 
 bool ALTextView::handleToolTip(S32 x, S32 y, MASK mask)
@@ -5163,9 +4727,9 @@ bool ALTextView::handleToolTip(S32 x, S32 y, MASK mask)
     {
         return LLUICtrl::handleToolTip(x, y, mask);
     }
-    // The map has its preview drawn as the mouse moves; no tip there.
-    const LLRect map = mapRect();
-    if (mScrollMap && mScrollMapPreview && map.notEmpty() && map.pointInRect(x, y))
+    // No tip on the ruler, nor on the map, which previews its lines as
+    // the mouse moves over it.
+    if (rulerAt(x, y))
     {
         return true;
     }

@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../alfindbar.h"
+#include "../altextruler.h"
 #include "../altextview.h"
 #include "../llclipboard.h"
 
@@ -494,6 +495,7 @@ namespace tut
         ensure("the press is taken", v.handleMouseDown(394, 10, MASK_NONE));
         ensure("and scrolls the text down", v.scrollY() > 0);
         v.handleMouseUp(394, 10, MASK_NONE);
+        ensure("and lets the mouse go", gFocusMgr.getMouseCapture() == nullptr);
         v.setText("short\n");
         ensure("no ruler for a short text", v.textRect().getWidth() > width);
     }
@@ -1870,5 +1872,59 @@ namespace tut
         v.layout().setHidden(1, 1, true);
         v.setCaret(ALTextPos(1, 1));
         ensure("the caret's line shown again", !v.layout().hidden(1) && v.caret() == ALTextPos(1, 1));
+    }
+
+    template<> template<>
+    void altextview_object::test<59>()
+    {
+        set_test_name("the ruler is a child view at the right edge, shown while the text is taller than the view; the map takes its place, "
+                      "at the right or the left, shown always");
+        std::string tall;
+        for (S32 i = 0; i < 100; ++i)
+        {
+            tall += llformat("line %d\n", i);
+        }
+        ALTextView&  v     = make("short\n", 400, 200);
+        ALTextRuler* ruler = v.findChild<ALTextRuler>("ruler");
+        ensure("the view has one", ruler && ruler->getParent() == &v);
+        ensure("hidden for a short text", !ruler->getVisible());
+        v.setText(tall);
+        ensure("shown for a tall one", ruler->getVisible());
+        ensure("down the right edge, the text short of it", ruler->getRect() == LLRect(400 - ALTextRuler::WIDTH, 200, 400, 0) &&
+                                                             v.textRect().mRight <= ruler->getRect().mLeft);
+        v.setScrollMap(true);
+        v.setScrollMapWidth(80);
+        ensure("the map on the right", ruler->getVisible() && ruler->getRect() == LLRect(320, 200, 400, 0));
+        v.setScrollMapOnLeft(true);
+        ensure("and on the left, the text past it", ruler->getRect() == LLRect(0, 200, 80, 0) && v.textRect().mLeft >= 80);
+        v.setText("short\n");
+        ensure("the map shown for a short text too", ruler->getVisible());
+        v.setScrollMap(false);
+        ensure("and the ruler hidden again", !ruler->getVisible());
+    }
+
+    template<> template<>
+    void altextview_object::test<60>()
+    {
+        set_test_name("a press on the map takes the view there and a drag follows, holding the mouse until it is let go; no tip on it");
+        std::string tall;
+        for (S32 i = 0; i < 300; ++i)
+        {
+            tall += llformat("line %d\n", i);
+        }
+        ALTextView& v = make(tall.c_str(), 400, 200);
+        v.setScrollMap(true);
+        v.setScrollMapWidth(80);
+        ALTextRuler* ruler = v.findChild<ALTextRuler>("ruler");
+        ensure("the press is taken", v.handleMouseDown(360, 100, MASK_NONE));
+        ensure("by the map, which holds the mouse", gFocusMgr.getMouseCapture() == ruler && ruler->dragging());
+        const S32 pressed = v.scrollY();
+        ensure("the text scrolled to the press", pressed > 0);
+        // The drag goes to what holds the mouse, in its own coordinates.
+        ruler->handleHover(40, 20, MASK_NONE);
+        ensure("a drag down the map follows", v.scrollY() > pressed);
+        ruler->handleMouseUp(40, 20, MASK_NONE);
+        ensure("let go", gFocusMgr.getMouseCapture() == nullptr && !ruler->dragging());
+        ensure("no tip on the map", v.handleToolTip(360, 100, MASK_NONE));
     }
 }

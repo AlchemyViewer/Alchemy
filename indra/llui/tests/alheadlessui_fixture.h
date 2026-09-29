@@ -133,6 +133,21 @@ namespace ll_test
             fvp.follows.flags = FOLLOWS_ALL;
             gFloaterView = LLUICtrlFactory::create<LLFloaterView>(fvp);
 
+            // A root for the views drawn here, and the whole of it to be
+            // drawn, as the window has them: a view draws its children by
+            // where they are on the root and whether that is being drawn,
+            // so without them a view with a child in sight -- a text's
+            // ruler -- could not be drawn at all. The rect stays whole:
+            // marked dirty, it only grows.
+            LLView::Params rvp;
+            rvp.name = "test_root_view";
+            rvp.rect = fvp.rect;
+            rvp.mouse_opaque = false;
+            rvp.follows.flags = FOLLOWS_ALL;
+            LLUI::getInstance()->setRootView(LLUICtrlFactory::create<LLView>(rvp));
+            LLView::sDirtyRect = rvp.rect;
+            LLView::sIsRectDirty = true;
+
             mOk = true;
         }
 
