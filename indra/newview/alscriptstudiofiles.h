@@ -145,6 +145,10 @@ public:
     void noteFile(const std::string& path);
     void noteScript(const Doc& doc);
     void clearRecent();
+    // What cannot be had any more, let go of: a script `gone` says of, and
+    // a file no longer on disk; the window told where anything went.
+    // Whether anything did.
+    bool pruneRecent(const std::function<bool(const ALScriptRef&)>& gone);
     void fillMenu();
     const std::vector<std::string>& recentFiles() const { return mRecentFiles; }
     const std::vector<Recent>&      recentScripts() const { return mRecentScripts; }

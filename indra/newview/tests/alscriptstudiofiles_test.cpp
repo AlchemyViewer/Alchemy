@@ -422,4 +422,27 @@ namespace tut
         ensure_equals("as an editor keeps it", text, std::string("default\n{\n}\n"));
         ensure("and where it was asked to be", std::filesystem::exists(fsyspath(path)));
     }
+
+    template<> template<>
+    void alscriptstudiofiles_object::test<9>()
+    {
+        set_test_name("what was opened lately and cannot be had any more is let go of: a script said gone, a file no longer on disk");
+        ALScriptStudioFiles& unit = make();
+        ensure("written", ALFileWrite::temp(in("here.lsl"), "x"));
+        unit.noteFile(in("here.lsl"));
+        unit.noteFile(in("gone.lsl"));
+        Doc& a = scriptTab("a", "x");
+        Doc& b = scriptTab("b", "y");
+        unit.noteScript(a);
+        unit.noteScript(b);
+        const S32 told = studio.recentTold;
+        ensure("the file no longer there let go of", unit.pruneRecent([](const ALScriptRef&) { return false; }) &&
+                                                          unit.recentFiles() == Names{ in("here.lsl") } && unit.recentScripts().size() == 2 &&
+                                                          studio.recentTold == told + 1);
+        ensure("nothing more gone, nothing done", !unit.pruneRecent([](const ALScriptRef&) { return false; }) && studio.recentTold == told + 1);
+        const ALScriptRef lost = b.ref;
+        ensure("pruned", unit.pruneRecent([lost](const ALScriptRef& ref) { return ref == lost; }));
+        ensure("the gone script let go of", unit.recentScripts().size() == 1 && unit.recentScripts()[0].ref == a.ref);
+        ensure("the file still there kept", unit.recentFiles() == Names{ in("here.lsl") });
+    }
 }

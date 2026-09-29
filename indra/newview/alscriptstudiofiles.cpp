@@ -30,6 +30,7 @@
 #include "alscriptstudiofileio.h"
 #include "alscriptstudioservices.h"
 #include "lldir.h"
+#include "llfile.h"
 #include "llmenugl.h"
 #include "llsd.h"
 #include "lluictrlfactory.h"
@@ -358,6 +359,23 @@ void ALScriptStudioFiles::noteScript(const Doc& doc)
     }
     fillMenu();
     mWindow.recentChanged();
+}
+
+bool ALScriptStudioFiles::pruneRecent(const std::function<bool(const ALScriptRef&)>& gone)
+{
+    const size_t scripts = mRecentScripts.size();
+    const size_t files   = mRecentFiles.size();
+    mRecentScripts.erase(std::remove_if(mRecentScripts.begin(), mRecentScripts.end(), [&gone](const Recent& one) { return gone(one.ref); }),
+                         mRecentScripts.end());
+    mRecentFiles.erase(std::remove_if(mRecentFiles.begin(), mRecentFiles.end(), [](const std::string& path) { return !LLFile::isfile(path); }),
+                       mRecentFiles.end());
+    const bool pruned = mRecentScripts.size() != scripts || mRecentFiles.size() != files;
+    if (pruned)
+    {
+        fillMenu();
+        mWindow.recentChanged();
+    }
+    return pruned;
 }
 
 void ALScriptStudioFiles::clearRecent()

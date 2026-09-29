@@ -78,6 +78,7 @@
 #include "llfloaterreg.h"
 #include "llinventoryfunctions.h"
 #include "llinventorymodel.h"
+#include "llinventorymodelbackgroundfetch.h"
 #include "lllayoutstack.h"
 #include "lllineeditor.h"
 #include "llmenugl.h"
@@ -4723,7 +4724,12 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteScripts(std::v
             }
         }
     }
-    // Then what was opened lately and is not open now.
+    // Then what was opened lately and is not open now -- what is gone since
+    // let go of first: an inventory item the inventory, fetched whole, no
+    // longer has (fetched in part, a missing one may be on its way), and a
+    // file no longer on disk.
+    const bool fetched = gInventory.isInventoryUsable() && LLInventoryModelBackgroundFetch::instance().isEverythingFetched();
+    mFiles.pruneRecent([fetched](const ALScriptRef& ref) { return fetched && ref.inInventory() && !gInventory.getItem(ref.item); });
     for (const ALScriptStudioFiles::Recent& recent : mFiles.recentScripts())
     {
         if (!listed.insert(recent.ref.id()).second)
