@@ -4475,6 +4475,17 @@ void ALTextView::draw()
         gl_rect_2d(getLocalRect(), backgroundColor() % alpha);
     }
     const LLRect text = textRect();
+    // A tint behind each line that has one, under everything else.
+    if (!mLineTints.empty())
+    {
+        const S32 row_h = layout().rowHeight();
+        forEachVisibleRow(text, [&](S32 line, S32, S32 screen_top) {
+            if (line < static_cast<S32>(mLineTints.size()) && mLineTints[static_cast<size_t>(line)].mV[VALPHA] > 0.f)
+            {
+                gl_rect_2d(text.mLeft, screen_top, text.mRight, screen_top - row_h, mLineTints[static_cast<size_t>(line)] % alpha);
+            }
+        });
+    }
     drawBeforeRows(text);
     placeAtomViews();
     {

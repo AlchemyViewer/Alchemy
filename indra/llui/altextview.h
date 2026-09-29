@@ -446,6 +446,11 @@ public:
     void                      addStyle(Style style);
     void                      clearStyles() { setStyles({}); }
     const std::vector<Style>& styles() const { return mStyles.items(); }
+    // A tint behind each line, the width of the text, none where its
+    // alpha is 0: each one a line, from the first, under everything else.
+    // For a text shown rather than edited -- a side of a diff.
+    void                         setLineTints(std::vector<LLColor4> tints) { mLineTints = std::move(tints); }
+    const std::vector<LLColor4>& lineTints() const { return mLineTints; }
 
     // --- atoms ---------------------------------------------------------------
 
@@ -1256,6 +1261,7 @@ private:
     };
     ALAnchoredRanges<Atom, AtomRange>  mAtoms;
     ALAnchoredRanges<Style>            mStyles;
+    std::vector<LLColor4>              mLineTints;
     LLUIColor                          mLinkColor;
     link_signal_t                      mLinkClicked;
     drop_handler_t                     mDropHandler;

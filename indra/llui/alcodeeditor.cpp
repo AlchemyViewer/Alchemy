@@ -250,7 +250,7 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     hideCard();
     // Numbers and tints were for the text they were given with.
     mLineNumbers.clear();
-    mLineTints.clear();
+    setLineTints({});
     // Each run of lines an edit replaced -- one, or a batch's several.
     const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
     const S32                                         lines = document().lineCount();
@@ -1438,17 +1438,6 @@ void ALCodeEditor::drawBeforeRows(const LLRect& text)
     {
         mBrackets.matched = false;
         mBrackets.caret   = ALTextPos(-1, -1);
-    }
-    // A tint behind each line that has one, under everything else.
-    if (!mLineTints.empty())
-    {
-        const S32 row_h = layout().rowHeight();
-        forEachVisibleRow(text, [&](S32 line, S32, S32 screen_top) {
-            if (line < static_cast<S32>(mLineTints.size()) && mLineTints[static_cast<size_t>(line)].mV[VALPHA] > 0.f)
-            {
-                gl_rect_2d(text.mLeft, screen_top, text.mRight, screen_top - row_h, mLineTints[static_cast<size_t>(line)] % alpha);
-            }
-        });
     }
     if (mHighlightCurrentLine && keyboardOnText() && !hasSelection())
     {

@@ -312,9 +312,9 @@ public:
     bool getShowLineNumbers() const { return mShowLineNumbers; }
     // For a text shown rather than edited -- a side of a diff -- the
     // number each line shows in the gutter, where its lines are not the
-    // ones counted: none, for a line of 0, which a diff pads with. And a
-    // tint behind each line, the width of the text, none where its alpha
-    // is 0. Each one a line, from the first; an edit clears both.
+    // ones counted: none, for a line of 0, which a diff pads with. Each
+    // one a line, from the first; an edit clears them, and the lines'
+    // tints (ALTextView::setLineTints).
     void                         setLineNumbers(std::vector<S32> numbers) { mLineNumbers = std::move(numbers); }
     // For a text that is part of a larger one -- a script's code under
     // its envelope, which a runtime error's line counts -- the lines
@@ -322,9 +322,7 @@ public:
     // counted from 0, as a script reads a notecard's.
     void                         setLineNumberBase(S32 base) { mLineNumberBase = llmax(-1, base); }
     S32                          lineNumberBase() const override { return mLineNumberBase; }
-    void                         setLineTints(std::vector<LLColor4> tints) { mLineTints = std::move(tints); }
     const std::vector<S32>&      lineNumbers() const { return mLineNumbers; }
-    const std::vector<LLColor4>& lineTints() const { return mLineTints; }
     // Whether a line was changed since the text was last saved: the
     // gutter bars it, and a save clears them all.
     bool lineChanged(S32 line) const;
@@ -853,7 +851,6 @@ private:
     bool mShowLineNumbers      = true;
     std::vector<S32>      mLineNumbers;
     S32                   mLineNumberBase = 0;
-    std::vector<LLColor4> mLineTints;
     bool mShowFoldMarkers      = true;
     bool mHighlightCurrentLine = true;
     bool mMatchBrackets        = true;
