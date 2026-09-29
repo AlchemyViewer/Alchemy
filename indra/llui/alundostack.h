@@ -156,6 +156,20 @@ public:
         return closeGroup([](Step&) { return false; });
     }
     bool inGroup() const { return mGroupDepth > 0; }
+    // Whether the last group to close made the newest step and left it
+    // there; and a group that goes on filling that step, as though it had
+    // never closed -- for a caller that closed its group to wait, and
+    // comes back knowing nothing has been noted since.
+    bool closedWithStep() const { return mClosedWithStep; }
+    void resumeGroup()
+    {
+        const bool outermost = mGroupDepth == 0;
+        beginGroup();
+        if (outermost && !mUndo.empty())
+        {
+            mGroupStep = true;
+        }
+    }
 
     // What the last change was called, said once: the first label after a
     // change names it, and later ones are about something else.
@@ -294,10 +308,12 @@ private:
         const bool made = mGroupStep;
         breakRun();
         mGroupLabel.clear();
-        if (made && !mUndo.empty() && nothing(mUndo.back()))
+        mClosedWithStep = made && !mUndo.empty();
+        if (mClosedWithStep && nothing(mUndo.back()))
         {
             mUndo.pop_back();
-            mLabelPending = false;
+            mLabelPending   = false;
+            mClosedWithStep = false;
         }
         return forgetOverDepth();
     }
@@ -321,5 +337,6 @@ private:
     // called.
     S32                 mGroupDepth = 0;
     bool                mGroupStep  = false;
+    bool                mClosedWithStep = false;
     std::string         mGroupLabel;
 };

@@ -289,6 +289,7 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
     }
     ++mRevision;
     mSettling               = true;
+    mResumeStep             = 0;
     const ALTextPos& before = before_in.end;
     // A change after an undo throws the redo steps away; the saved text,
     // if it was among them, can no longer be reached by stepping.
@@ -405,18 +406,37 @@ void ALTextUndo::beginGroup()
 
 void ALTextUndo::endGroup()
 {
+    const bool open = mSteps.inGroup();
     mSteps.endGroup();
+    if (open && !mSteps.inGroup())
+    {
+        mResumeStep = mSteps.closedWithStep() && !mSteps.undone().empty() ? mSteps.undone().back().serial : 0;
+    }
     forgetOverBudget();
+}
+
+void ALTextUndo::resumeGroup(U64 step)
+{
+    if (step != 0 && step == mResumeStep && !mSteps.inGroup() && !mSteps.undone().empty() && mSteps.undone().back().serial == step)
+    {
+        mSteps.resumeGroup();
+    }
+    else
+    {
+        mSteps.beginGroup();
+    }
 }
 
 void ALTextUndo::closeGroups()
 {
     mSteps.closeGroups();
+    mResumeStep = 0;
     forgetOverBudget();
 }
 
 std::optional<ALTextRange> ALTextUndo::undo()
 {
+    mResumeStep = 0;
     std::optional<Step> step = mSteps.takeUndo();
     if (!step)
     {
@@ -437,6 +457,7 @@ std::optional<ALTextRange> ALTextUndo::undo()
 
 std::optional<ALTextRange> ALTextUndo::redo()
 {
+    mResumeStep = 0;
     std::optional<Step> step = mSteps.takeRedo();
     if (!step)
     {
@@ -456,6 +477,7 @@ std::optional<ALTextRange> ALTextUndo::redo()
 
 void ALTextUndo::clear()
 {
+    mResumeStep = 0;
     ++mRevision;
     mSteps.clear();
     mUndoneBytes  = 0;
@@ -467,6 +489,7 @@ void ALTextUndo::clear()
 void ALTextUndo::markSaved()
 {
     ++mRevision;
+    mResumeStep = 0;
     mSavedInForce = mSteps.inForce();
     mSteps.breakRun();
 }
@@ -693,6 +716,7 @@ std::optional<ALTextUndo::History> ALTextUndo::historyFrom(const LLSD& sd, std::
 
 void ALTextUndo::restore(History history)
 {
+    mResumeStep = 0;
     // Numbered afresh: a save point taken before this is of another
     // journal.
     for (Step& step : history.undo)
@@ -760,6 +784,7 @@ std::optional<std::string> ALTextUndo::savedText() const
 void ALTextUndo::markNeverSaved()
 {
     ++mRevision;
+    mResumeStep = 0;
     mSavedInForce = NOWHERE;
     mSteps.breakRun();
 }
@@ -772,6 +797,7 @@ bool ALTextUndo::isPristine() const
 ALTextUndo::SavePoint ALTextUndo::savePoint()
 {
     mSteps.breakRun();
+    mResumeStep = 0;
     SavePoint point;
     point.serial = mSteps.undone().empty() ? 0 : mSteps.undone().back().serial;
     point.era    = mEra;
@@ -781,6 +807,7 @@ ALTextUndo::SavePoint ALTextUndo::savePoint()
 void ALTextUndo::markSaved(const SavePoint& point)
 {
     ++mRevision;
+    mResumeStep = 0;
     if (point.serial == 0)
     {
         // The text before any step: reachable while the bottom of the

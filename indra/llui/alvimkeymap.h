@@ -421,6 +421,11 @@ private:
         // Whether the ones still to come are lit: once, when the asking
         // starts, then let go of as it passes them.
         bool                                             lit = false;
+        // The step to undo that every edit said yes to goes into, as the
+        // :s is one step: gone on with at each answer, the group closed
+        // while the question waits, so that nothing made meanwhile -- a
+        // format on save -- joins it (ALTextUndo::resumeGroup).
+        U64                                              undoStep = 0;
         // While a :g runs its command over the lines, an asking :s puts
         // its edits here and asks nothing; the asking starts, over the
         // lot in order, once the :g is through.

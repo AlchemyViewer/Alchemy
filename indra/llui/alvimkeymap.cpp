@@ -5161,7 +5161,12 @@ void ALVimKeymap::applyConfirmed(ALTextView& view, size_t index)
 {
     const ALTextRange r = mConfirming.edits[index].first.normalised();
     const std::string t = mConfirming.edits[index].second;
-    if (!view.replaceAll({ { r, t } }))
+    ALTextUndo&       journal = view.undoJournal();
+    journal.resumeGroup(mConfirming.undoStep);
+    const bool made = view.replaceAll({ { r, t } });
+    journal.endGroup();
+    mConfirming.undoStep = journal.groupStep();
+    if (!made)
     {
         return;
     }
@@ -5204,7 +5209,12 @@ void ALVimKeymap::applyRest(ALTextView& view)
         ++made;
         shift += static_cast<S32>(std::count(text.begin(), text.end(), '\n')) - (range.end.line - range.begin.line);
     }
-    if (!view.replaceAll(std::move(rest)))
+    ALTextUndo& journal = view.undoJournal();
+    journal.resumeGroup(mConfirming.undoStep);
+    const bool done = view.replaceAll(std::move(rest));
+    journal.endGroup();
+    mConfirming.undoStep = journal.groupStep();
+    if (!done)
     {
         return;
     }
@@ -5262,7 +5272,6 @@ void ALVimKeymap::endConfirming(ALTextView& view)
 {
     const ALTextDocument& d = view.document();
     mMode                   = Mode::Normal;
-    view.undoJournal().endGroup();
     if (mConfirming.lastLine >= 0)
     {
         const S32 line = llclamp(mConfirming.lastLine, 0, d.lineCount() - 1);
@@ -6776,10 +6785,13 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     }
     if (!mConfirming.edits.empty() && !mMessageError)
     {
-        // The group stays open for the asking to close.
+        // The group closed while the asking waits; what is said yes to goes
+        // on with the step the :g made, where it made one.
         std::sort(mConfirming.edits.begin(), mConfirming.edits.end(),
                   [](const std::pair<ALTextRange, std::string>& a, const std::pair<ALTextRange, std::string>& b) { return a.first.begin < b.first.begin; });
-        mMode = Mode::Confirm;
+        view.undoJournal().endGroup();
+        mConfirming.undoStep = view.undoJournal().groupStep();
+        mMode                = Mode::Confirm;
         askNext(view);
         return false;
     }
@@ -7021,8 +7033,6 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
         mConfirming       = Confirming();
         mConfirming.edits = std::move(edits);
         mMode             = Mode::Confirm;
-        // Everything said yes to is one step to undo, as the :s is.
-        view.undoJournal().beginGroup();
         askNext(view);
         return false;
     }

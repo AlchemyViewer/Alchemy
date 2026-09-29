@@ -2659,4 +2659,28 @@ namespace tut
         keys("yy");
         ensure_equals("each where its match went", flat(e.text()), std::string("y|y|zy|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<88>()
+    {
+        set_test_name(":s asking is one step to undo, the answers after something made meanwhile a step apart from it");
+        ALCodeEditor& e = make("x\nx\nx\n");
+        keys(":%s/x/y/c<CR>");
+        keys("yna");
+        ensure_equals("said yes, no, then all", flat(e.text()), std::string("y|x|y|"));
+        e.undo();
+        ensure_equals("one step", flat(e.text()), std::string("x|x|x|"));
+
+        e.setCaret(ALTextPos(0, 0));
+        keys(":%s/x/y/c<CR>");
+        keys("y");
+        e.replaceAll({ { ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), "z" } });
+        keys("yy");
+        e.undo();
+        ensure_equals("the answers after it", flat(e.text()), std::string("y|x|zx|"));
+        e.undo();
+        ensure_equals("what was made meanwhile, apart", flat(e.text()), std::string("y|x|x|"));
+        e.undo();
+        ensure_equals("the answer before it", flat(e.text()), std::string("x|x|x|"));
+    }
 }

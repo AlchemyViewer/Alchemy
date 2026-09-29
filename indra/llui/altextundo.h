@@ -124,6 +124,14 @@ public:
     // Everything recorded until endGroup() is one step.
     void beginGroup();
     void endGroup();
+    // The step the last group made, by its serial, while a group may still
+    // go on with it: nothing recorded, stepped back or forward, cleared or
+    // saved since it closed. None, 0, otherwise. And a group that goes on
+    // with that step where it still may -- an asking :s, which closes its
+    // group while it waits for each answer, so that nothing made meanwhile
+    // joins it -- else one of its own.
+    U64  groupStep() const { return mResumeStep; }
+    void resumeGroup(U64 step);
     // Every group still open closed at once: what is left of whoever opened
     // them -- a modal keymap in its insert mode -- is gone.
     void closeGroups();
@@ -254,4 +262,5 @@ private:
     // summed at each.
     size_t            mUndoneBytes  = 0;
     U32               mRevision     = 0;
+    U64               mResumeStep   = 0;
 };

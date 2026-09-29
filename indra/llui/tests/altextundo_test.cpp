@@ -715,4 +715,66 @@ namespace tut
         std::optional<ALTextUndo::History> read = ALTextUndo::historyFrom(undo.asLLSD(), doc.text());
         ensure("and it is a history of the text", read.has_value());
     }
+
+    template<> template<>
+    void altextundo_object::test<23>()
+    {
+        set_test_name("a group closed to wait goes on with its step where nothing came between; not after a change, a save, an undo or another's group");
+        doc.setText("abc");
+        // One group, closed, then gone on with: one step.
+        undo.beginGroup();
+        type(ALTextPos(0, 0), "1");
+        undo.endGroup();
+        const U64 step = undo.groupStep();
+        ensure("the group's step", step != 0);
+        undo.resumeGroup(step);
+        type(ALTextPos(0, 1), "2");
+        undo.endGroup();
+        ensure_equals("still that step", undo.groupStep(), step);
+        undo.undo();
+        ensure_equals("both undone as one", doc.text(), std::string("abc"));
+        undo.redo();
+        ensure("undone and redone, nothing to go on with", undo.groupStep() == 0);
+
+        // A change between: a step of its own, and the next group's own.
+        undo.beginGroup();
+        type(ALTextPos(0, 0), "x");
+        undo.endGroup();
+        const U64 before = undo.groupStep();
+        type(ALTextPos(0, 6), "y", 10.0);
+        ensure("a change after it", undo.groupStep() == 0);
+        undo.resumeGroup(before);
+        type(ALTextPos(0, 0), "z");
+        undo.endGroup();
+        ensure("a step of its own", undo.groupStep() != before);
+        undo.undo();
+        ensure_equals("only the last", doc.text(), std::string("x12abcy"));
+
+        // Saved between: another step.
+        undo.beginGroup();
+        type(ALTextPos(0, 0), "s");
+        undo.endGroup();
+        const U64 saved = undo.groupStep();
+        undo.savePoint();
+        ensure("a save", undo.groupStep() == 0);
+        undo.resumeGroup(saved);
+        type(ALTextPos(0, 0), "t");
+        undo.endGroup();
+        undo.undo();
+        ensure_equals("the save kept apart", doc.text(), std::string("sx12abcy"));
+
+        // Another group's step between.
+        undo.beginGroup();
+        type(ALTextPos(0, 0), "p");
+        undo.endGroup();
+        const U64 mine = undo.groupStep();
+        undo.beginGroup();
+        type(ALTextPos(0, 0), "q");
+        undo.endGroup();
+        undo.resumeGroup(mine);
+        type(ALTextPos(0, 0), "r");
+        undo.endGroup();
+        undo.undo();
+        ensure_equals("not the other's", doc.text(), std::string("qpsx12abcy"));
+    }
 }
