@@ -418,6 +418,9 @@ private:
         S32                                              made    = 0;
         S32                                              lines   = 0;
         S32                                              lastLine = -1;
+        // Whether the ones still to come are lit: once, when the asking
+        // starts, then let go of as it passes them.
+        bool                                             lit = false;
         // While a :g runs its command over the lines, an asking :s puts
         // its edits here and asks nothing; the asking starts, over the
         // lot in order, once the :g is through.
@@ -585,7 +588,12 @@ private:
     // A plain view's bracket index (bracketsOf).
     mutable std::unique_ptr<ALBracketIndex> mPlainBrackets;
     boost::signals2::scoped_connection mMarksSlide;
-    void                      slideMarks(const ALTextDocument::Edit& edit);
+    // Everything held at a place in the text, moved with each edit made to
+    // it, whoever makes it: the marks and the last visual area, the visual
+    // area being made, the last match gone to, the lines a block insert
+    // goes onto, and the :s edits still to be asked about -- those an edit
+    // cut through let go.
+    void                      slideHeld(const ALTextDocument::Edit& edit);
     void                      followDocument(ALTextView& view);
 
     // The column j and k want, as vim's curswant: where the caret was
@@ -617,8 +625,6 @@ private:
     S32         mBlockLast         = 0;
     S32         mBlockColumn       = 0;
     bool        mBlockAppend       = false;
-    // The char an insert began after, for a replace's backspace.
-    ALTextPos   mInsertStart;
 
     // The : or / line being typed, and which; the lines entered before,
     // : and search apart, oldest first, for Up and Down on the line,

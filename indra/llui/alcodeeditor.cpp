@@ -477,6 +477,16 @@ void ALCodeEditor::setHighlights(Highlight layer, std::vector<ALTextRange> range
     mHighlights[static_cast<size_t>(layer)].assign(std::move(ranges));
 }
 
+void ALCodeEditor::clearHighlightsBefore(Highlight layer, const ALTextPos& pos)
+{
+    auto&      lit  = mHighlights[static_cast<size_t>(layer)];
+    const auto past = std::lower_bound(lit.begin(), lit.end(), pos, [](const ALTextRange& range, const ALTextPos& p) { return range.begin < p; });
+    for (auto it = past; it != lit.begin();)
+    {
+        it = lit.erase(--it);
+    }
+}
+
 void ALCodeEditor::clearHighlights()
 {
     for (auto& layer : mHighlights)

@@ -256,6 +256,9 @@ public:
     void                            setHighlights(Highlight layer, std::vector<ALTextRange> ranges);
     void                            clearHighlights(Highlight layer) { mHighlights[static_cast<size_t>(layer)].clear(); }
     void                            clearHighlights();
+    // Those of a layer that begin before a place let go, the rest left lit
+    // as they are: what an asking :s has been through.
+    void                            clearHighlightsBefore(Highlight layer, const ALTextPos& pos);
     const std::vector<ALTextRange>& highlights(Highlight layer) const { return mHighlights[static_cast<size_t>(layer)].items(); }
     // Every layer's, in the layers' order.
     std::vector<ALTextRange>        highlights() const;

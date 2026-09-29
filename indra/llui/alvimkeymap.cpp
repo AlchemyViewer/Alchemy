@@ -990,13 +990,13 @@ void ALVimKeymap::followDocument(ALTextView& view)
     // Another text: the marks were the old one's.
     mMarksIn = doc;
     mMarks.clear();
-    mMarksSlide = view.document().onChanged([this](const ALTextDocument::Edit& edit) { slideMarks(edit); });
+    mMarksSlide = view.document().onChanged([this](const ALTextDocument::Edit& edit) { slideHeld(edit); });
 }
 
-void ALVimKeymap::slideMarks(const ALTextDocument::Edit& edit)
+void ALVimKeymap::slideHeld(const ALTextDocument::Edit& edit)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    // A mark past the edit moves with the text; one inside what was
+    // A place past the edit moves with the text; one inside what was
     // taken out lands where that began.
     auto slide = [&edit](ALTextPos& pos) { pos = edit.placed(pos); };
     for (auto& [name, pos] : mMarks)
@@ -1005,6 +1005,37 @@ void ALVimKeymap::slideMarks(const ALTextDocument::Edit& edit)
     }
     slide(mVisualLastAnchor);
     slide(mVisualLastCaret);
+    slide(mVisualAnchor);
+    slide(mVisualCaret);
+    // A match an edit took some of is no match any longer.
+    if (!mLastMatch.empty() && !edit.slide(mLastMatch))
+    {
+        mLastMatch = ALTextRange();
+    }
+    if (mBlockInsert)
+    {
+        mBlockFirst = edit.placed(ALTextPos(mBlockFirst, 0)).line;
+        mBlockLast  = edit.placed(ALTextPos(mBlockLast, 0)).line;
+    }
+    // The edits still to ask about, those already asked about being done
+    // with: moved along, or let go where the text they would replace was
+    // changed under them.
+    auto&  edits = mConfirming.edits;
+    size_t kept  = mConfirming.at;
+    for (size_t k = mConfirming.at; k < edits.size(); ++k)
+    {
+        ALTextRange range = edits[k].first.normalised();
+        if (edit.slide(range))
+        {
+            edits[k].first = range;
+            if (kept != k)
+            {
+                edits[kept] = std::move(edits[k]);
+            }
+            ++kept;
+        }
+    }
+    edits.resize(kept);
 }
 
 ALBracketIndex& ALVimKeymap::bracketsOf(ALTextView& view) const
@@ -3994,7 +4025,6 @@ void ALVimKeymap::enterInsert(ALTextView& view, S32 count, bool grouped)
     mWantColumn  = -1;
     mTyped.clear();
     mInsertRegister = false;
-    mInsertStart = view.caret();
     mCount       = 0;
     mRegister    = 0;
     mOperator    = 0;
@@ -5101,16 +5131,28 @@ void ALVimKeymap::askNext(ALTextView& view)
         return;
     }
     // The match shown as the selection, so that the question is plainly
-    // about it; the ones still to come lit, as vim lights them.
-    view.setSelection(mConfirming.edits[mConfirming.at].first);
+    // about it; the ones still to come lit, as vim lights them: all of them
+    // when the asking starts, and from then on those it has passed let go,
+    // the lit ones sliding with the text as the edits go in.
+    const ALTextRange asked = mConfirming.edits[mConfirming.at].first;
+    view.setSelection(asked);
     if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
     {
-        std::vector<ALTextRange> left;
-        for (size_t k = mConfirming.at; k < mConfirming.edits.size(); ++k)
+        if (!mConfirming.lit)
         {
-            left.push_back(mConfirming.edits[k].first);
+            std::vector<ALTextRange> left;
+            left.reserve(mConfirming.edits.size() - mConfirming.at);
+            for (size_t k = mConfirming.at; k < mConfirming.edits.size(); ++k)
+            {
+                left.push_back(mConfirming.edits[k].first);
+            }
+            editor->setHighlights(ALCodeEditor::Highlight::Confirm, std::move(left));
+            mConfirming.lit = true;
         }
-        editor->setHighlights(ALCodeEditor::Highlight::Confirm, std::move(left));
+        else
+        {
+            editor->clearHighlightsBefore(ALCodeEditor::Highlight::Confirm, asked.normalised().begin);
+        }
     }
     bump();
 }
@@ -5123,34 +5165,13 @@ void ALVimKeymap::applyConfirmed(ALTextView& view, size_t index)
     {
         return;
     }
+    // The ones after it moved along as it went in (slideHeld).
     if (r.begin.line != mConfirming.lastLine)
     {
         ++mConfirming.lines;
     }
     mConfirming.lastLine = r.begin.line;
     ++mConfirming.made;
-    // Where the replaced stretch now ends, and how the ones after move.
-    const S32       t_lines = static_cast<S32>(std::count(t.begin(), t.end(), '\n'));
-    const size_t    last_nl = t.rfind('\n');
-    const S32       t_last  = static_cast<S32>(last_nl == std::string::npos ? t.size() : t.size() - last_nl - 1);
-    const ALTextPos new_end = t_lines == 0 ? ALTextPos(r.begin.line, r.begin.column + t_last) : ALTextPos(r.begin.line + t_lines, t_last);
-    const S32       delta_lines = new_end.line - r.end.line;
-    auto            moved       = [&](ALTextPos p) {
-        if (p.line == r.end.line && !(p < r.end))
-        {
-            return ALTextPos(new_end.line, p.column + new_end.column - r.end.column);
-        }
-        if (p.line > r.end.line)
-        {
-            return ALTextPos(p.line + delta_lines, p.column);
-        }
-        return p;
-    };
-    for (size_t k = index + 1; k < mConfirming.edits.size(); ++k)
-    {
-        ALTextRange& f = mConfirming.edits[k].first;
-        f              = ALTextRange(moved(f.begin), moved(f.end));
-    }
 }
 
 void ALVimKeymap::applyRest(ALTextView& view)

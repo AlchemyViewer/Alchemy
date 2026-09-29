@@ -2640,4 +2640,23 @@ namespace tut
         ex("sort i u");
         ensure_equals("case aside, the first of each kept", flat(e.text()), std::string("-3 y|B|x10|x2|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<87>()
+    {
+        set_test_name("what vim holds at places moves with an edit made from outside: the visual area being made, the :s edits still to ask about");
+        ALCodeEditor& e = make("a\nb\nc\n");
+        keys("jVj");
+        e.replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "top\n" } });
+        keys("d");
+        ensure_equals("the lines it was over deleted", flat(e.text()), std::string("top|a|"));
+
+        e.setText("x\nx\nx\n");
+        e.setCaret(ALTextPos(0, 0));
+        keys(":%s/x/y/c<CR>");
+        keys("y");
+        e.replaceAll({ { ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), "z" } });
+        keys("yy");
+        ensure_equals("each where its match went", flat(e.text()), std::string("y|y|zy|"));
+    }
 }
