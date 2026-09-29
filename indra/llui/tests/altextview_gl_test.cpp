@@ -29,6 +29,7 @@
 #include "../../llrender/tests/llheadlessgl_fixture.h"
 
 #include "../alcodeeditor.h"
+#include "../altextruler.h"
 #include "../altextview.h"
 #include "../llui.h"
 #include "../llfocusmgr.h"
@@ -395,5 +396,71 @@ namespace tut
         ensure("a handful of draws: " + std::to_string(capture.size()), capture.size() <= 25);
         gFocusMgr.setKeyboardFocus(nullptr);
         editor->die();
+    }
+
+    // The preview of the lines under the mouse on the map is drawn over the
+    // text beside the map: to its left where the map is on the right, to its
+    // right where it is on the left -- not off the view past it.
+    template<> template<>
+    void altextview_gl_object::test<6>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::string text;
+        for (S32 i = 0; i < 200; ++i)
+        {
+            text += "word word word word\n";
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name           = "view";
+        p.rect           = LLRect(0, H, W, 0);
+        p.default_text   = text;
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        view->setScrollMap(true);
+        view->setScrollMapWidth(60);
+        view->setBackgroundColor(LLColor4(0.1f, 0.1f, 0.12f, 1.f));
+        view->setTextColor(LLColor4(0.9f, 0.9f, 0.9f, 1.f));
+        ALTextRuler* map = view->findChild<ALTextRuler>("ruler");
+        // Every pixel of the view, as it draws.
+        const auto drawn = [&]() {
+            gl().clearFramebuffer();
+            glEnable(GL_BLEND);
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
+            view->draw();
+            gGL.flush();
+            glDisable(GL_BLEND);
+            glFinish();
+            return ll_test::readFramebufferRGBA(W, H);
+        };
+        // How many pixels between two columns differ between two frames.
+        const auto changed = [&](const std::vector<U8>& a, const std::vector<U8>& b, S32 from, S32 to) {
+            S32 count = 0;
+            for (S32 y = 0; y < H; ++y)
+            {
+                for (S32 x = from; x < to; ++x)
+                {
+                    const size_t at = (static_cast<size_t>(y) * W + x) * 4;
+                    count += a[at] != b[at] || a[at + 1] != b[at + 1] || a[at + 2] != b[at + 2];
+                }
+            }
+            return count;
+        };
+        for (const bool left : { false, true })
+        {
+            view->setScrollMapOnLeft(left);
+            map->onMouseLeave(0, 0, MASK_NONE);
+            const std::vector<U8> plain = drawn();
+            map->handleHover(30, H / 2, MASK_NONE);
+            const std::vector<U8> shown = drawn();
+            const S32 text_from = left ? 60 : 0;
+            const S32 text_to   = left ? W : W - 60;
+            ensure(std::string("the preview over the text, the map on the ") + (left ? "left" : "right"),
+                   changed(plain, shown, text_from, text_to) > 1000);
+        }
+        view->die();
     }
 }

@@ -264,8 +264,10 @@ void ALTextRuler::drawPreview(F32 alpha)
     const S32    height = rows * row_h + 2 * PAD;
     S32          top    = llmin(local.mTop - PAD, mHoverY + height / 2);
     top                 = llmax(top, local.mBottom + PAD + height);
-    const S32    right  = map.mLeft - PAD;
-    const LLRect box(right - width, top, right, top - height);
+    // Over the text: to the map's left where it is on the right, to its
+    // right where it is on the left.
+    const S32    left   = mView.scrollMapOnLeft() ? map.mRight + PAD : map.mLeft - PAD - width;
+    const LLRect box(left, top, left + width, top - height);
     const LLColor4& bg    = mView.backgroundColor();
     const LLColor4& ink   = mView.textColor();
     const LLColor4  faint = ALSurface::shade(bg, ink, 0.45f) % alpha;
