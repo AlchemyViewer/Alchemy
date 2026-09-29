@@ -192,23 +192,43 @@ namespace
     // no more than this.
     constexpr S32 MAX_COUNT = 100000;
     S32 countOr(S32 count, S32 fallback = 1) { return count > 0 ? count : fallback; }
-    // Keys pending, and an operator, that are two typed: gr, and gc.
-    constexpr llwchar PENDING_GR       = 0xE000;
-    constexpr llwchar COMMENT_OPERATOR = 0xE001;
-    // Surround's: ys, an operator; the character a ys stretch waits for;
-    // ds and cs waiting for the pair to take away or change, and cs for
-    // the pair it becomes.
-    constexpr llwchar SURROUND_OPERATOR  = 0xE002;
-    constexpr llwchar SURROUND_WITH      = 0xE003;
-    constexpr llwchar DELETE_SURROUND    = 0xE004;
-    constexpr llwchar CHANGE_SURROUND    = 0xE005;
-    constexpr llwchar CHANGE_SURROUND_TO = 0xE006;
-    // Control-W, waiting for the window command after it.
-    constexpr llwchar WINDOW_PREFIX      = 0xE007;
+    // What two keys typed together make -- a motion, an operator, keys
+    // waiting for another -- as command() and motion() take them, beside
+    // the characters: past the last codepoint, so that no key typed and no
+    // register played can be one.
+    enum Composite : llwchar
+    {
+        // gg, ge, gE, gj, gk and g_: motions.
+        GO_TOP = 0x110000,
+        WORD_END_BACK,
+        BIG_WORD_END_BACK,
+        DISPLAY_DOWN,
+        DISPLAY_UP,
+        LAST_NON_BLANK,
+        // gr pending, and gc: an operator.
+        PENDING_GR,
+        COMMENT_OPERATOR,
+        // Surround's: ys, an operator; the character a ys stretch waits
+        // for; ds and cs waiting for the pair to take away or change, and
+        // cs for the pair it becomes.
+        SURROUND_OPERATOR,
+        SURROUND_WITH,
+        DELETE_SURROUND,
+        CHANGE_SURROUND,
+        CHANGE_SURROUND_TO,
+        // Control-W, waiting for the window command after it.
+        WINDOW_PREFIX,
+    };
     std::string shownKey(llwchar key)
     {
         switch (key)
         {
+            case GO_TOP:             return "gg";
+            case WORD_END_BACK:      return "ge";
+            case BIG_WORD_END_BACK:  return "gE";
+            case DISPLAY_DOWN:       return "gj";
+            case DISPLAY_UP:         return "gk";
+            case LAST_NON_BLANK:     return "g_";
             case PENDING_GR:         return "gr";
             case COMMENT_OPERATOR:   return "gc";
             case SURROUND_OPERATOR:
@@ -1501,7 +1521,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 switch (ch)
                 {
                     case 'g':
-                        return command(view, 0x01);  // gg, as a motion the table knows
+                        return command(view, GO_TOP);
                     case 'c':
                         // Comments: an operator over lines, gcc a line, gc
                         // a visual selection's lines.
@@ -1527,7 +1547,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                         mPending = PENDING_GR;
                         return true;
                     case '_':
-                        return command(view, 0x06);
+                        return command(view, LAST_NON_BLANK);
                     case ';':
                     case ',':
                     {
@@ -1743,12 +1763,12 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                     case 'E':
                         // The end of the previous word: a motion the
                         // table knows, so an operator takes it too.
-                        return command(view, ch == 'e' ? 0x02 : 0x03);
+                        return command(view, ch == 'e' ? WORD_END_BACK : BIG_WORD_END_BACK);
                     case 'j':
                     case 'k':
                         // A row of the display down or up, through a
                         // wrapped line.
-                        return command(view, ch == 'j' ? 0x04 : 0x05);
+                        return command(view, ch == 'j' ? DISPLAY_DOWN : DISPLAY_UP);
                     default:
                         clearPending();
                         return true;
@@ -2684,7 +2704,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
     if (m.ok)
     {
         const ALTextPos from = cursor(view);
-        const bool      jump = ch == 'G' || ch == 0x01 || ch == '%' || ch == '(' || ch == ')' || ch == '{' || ch == '}' || ch == 'H' ||
+        const bool      jump = ch == 'G' || ch == GO_TOP || ch == '%' || ch == '(' || ch == ')' || ch == '{' || ch == '}' || ch == 'H' ||
                           ch == 'M' || ch == 'L';
         if (jump && m.to != from)
         {
@@ -2726,7 +2746,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
         case 'k':
         case '+':
         case '-':
-        case 0x01:  // gg
+        case GO_TOP:
         case 'G':
         {
             S32 line = from.line;
@@ -2738,7 +2758,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             {
                 line = llmax(0, from.line - count);
             }
-            else if (ch == 0x01)
+            else if (ch == GO_TOP)
             {
                 line = llclamp(mCount > 0 || count > 1 ? count - 1 - view.lineNumberBase() : 0, 0, d.lineCount() - 1);
             }
@@ -2747,7 +2767,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                 line = llclamp(mCount > 0 ? count - 1 - view.lineNumberBase() : d.lineCount() - 1, 0, d.lineCount() - 1);
             }
             m.linewise = true;
-            m.moved    = line != from.line || ch == 0x01 || ch == 'G';
+            m.moved    = line != from.line || ch == GO_TOP || ch == 'G';
             if (ch == 'j' || ch == 'k')
             {
                 // The column kept, by where it is drawn: the one wanted
@@ -2767,8 +2787,8 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             return m;
         }
-        case 0x04:  // gj
-        case 0x05:  // gk
+        case DISPLAY_DOWN:
+        case DISPLAY_UP:
         {
             // A row of the display at a time, by the layout's rows, at
             // the x the caret is drawn at.
@@ -2778,7 +2798,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             S32           line   = from.line;
             for (S32 n = 0; n < count; ++n)
             {
-                if (ch == 0x04)
+                if (ch == DISPLAY_DOWN)
                 {
                     if (row + 1 < layout.rowCount(line))
                     {
@@ -2904,7 +2924,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             m.moved     = m.to != from;
             return m;
         }
-        case 0x06:  // g_
+        case LAST_NON_BLANK:
         {
             // The last character on the line that is not a blank, the count
             // lines on; inclusive, as $ is.
@@ -2915,13 +2935,13 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             m.inclusive             = true;
             return m;
         }
-        case 0x02:  // ge
-        case 0x03:  // gE
+        case WORD_END_BACK:
+        case BIG_WORD_END_BACK:
         {
             // The end of the previous word, taken with it: out of the
             // word the caret is in, back over the blanks, onto the last
             // character of the one before.
-            const bool big = ch == 0x03;
+            const bool big = ch == BIG_WORD_END_BACK;
             for (S32 n = 0; n < count; ++n)
             {
                 const S32 cls = classOf(at(d, m.to), big);

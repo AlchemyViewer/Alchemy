@@ -2722,4 +2722,17 @@ namespace tut
         ensure("a line of blanks too", e.document().line(1).size() > 2);
         ensure("an empty one not", e.document().line(2).empty());
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<91>()
+    {
+        set_test_name("a register holding what gg and gc once stood for plays them as characters, not as the commands");
+        ALCodeEditor& e = make("\x01\xee\x80\x81j\none\ntwo\n");
+        keys("\"ay$");
+        ensure_equals("yanked as it is", vim->registerText('a'), std::string("\x01\xee\x80\x81j"));
+        keys("j");
+        keys("@a");
+        ensure_equals("not gg, nor gc: j alone moved", e.caret().line, 2);
+        ensure_equals("nothing commented", flat(e.text()), std::string("\x01\xee\x80\x81j|one|two|"));
+    }
 }
