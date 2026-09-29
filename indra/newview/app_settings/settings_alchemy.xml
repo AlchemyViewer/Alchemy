@@ -1919,7 +1919,7 @@
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>-3.0</real>
+            <real>-2.0</real>
         </map>
         <key>AlchemyExposureMaxEV</key>
         <map>
@@ -1930,7 +1930,7 @@
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>4.0</real>
+            <real>2.0</real>
         </map>
         <key>AlchemyExposureLowPercent</key>
         <map>
