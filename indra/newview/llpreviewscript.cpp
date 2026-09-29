@@ -28,6 +28,7 @@
 
 #include "llpreviewscript.h"
 
+#include "alsaid.h"
 #include "alscriptmessages.h"
 #include "alscriptworkspace.h"
 #include "llassetstorage.h"
@@ -1024,6 +1025,12 @@ bool LLScriptEdCore::handleSaveChangesDialog(const LLSD& notification, const LLS
         break;
 
     case 1:  // "No"
+        // Thrown away, and set aside a while all the same, in case that
+        // was a mistake.
+        if (mContainer)
+        {
+            mContainer->keepThrownAway();
+        }
         mForceClose = true;
         // This will close immediately because mForceClose is true, so we won't
         // infinite loop with these dialogs. JC
@@ -1660,6 +1667,15 @@ LLScriptEdContainer::LLScriptEdContainer(const LLSD& key) :
 ,   mScriptEd(nullptr)
 ,   mLiveFile(nullptr)
 ,   mLiveLogFile(nullptr)
+,   mKeeper(ALRecoveryKeeper::Holder{
+          [this]() { return recoveryEntry(); },
+          [this]() { return mScriptEd && mScriptEd->mEditor && mScriptEd->mEditor->getEnabled() && mScriptEd->hasChanged(); },
+          [this]() {
+              LLSD row;
+              row["columns"][0]["value"] = alSaid("RecoveryWriteFailedEditor", "Your unsaved changes could not be kept in case the viewer closes.");
+              row["columns"][0]["font"]  = "SANSSERIF_SMALL";
+              mScriptEd->mErrorList->addElement(row);
+          } })
 {
 }
 
@@ -1677,17 +1693,159 @@ LLScriptEdContainer::~LLScriptEdContainer()
     }
 }
 
-// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
-void LLScriptEdContainer::onBackupTimer()
+void LLScriptEdContainer::draw()
 {
-    if ( (mScriptEd) && (mScriptEd->hasChanged()) )
+    // The legacy editor counts no versions of its text: what it is now, by
+    // a hash, looked at a second at most, which a script's size allows.
+    if (const F64 now = LLTimer::getTotalSeconds(); now >= mKeptLooked + 1.0)
     {
-        if (mBackupFilename.empty())
-            mBackupFilename = getBackupFileName();
-        mScriptEd->writeToFile(mBackupFilename);
+        mKeptLooked       = now;
+        const bool unsaved = mScriptEd && mScriptEd->mEditor && mScriptEd->hasChanged();
+        mKeeper.pump(unsaved ? std::hash<std::string>()(mScriptEd->mEditor->getText()) : 0, now);
+    }
+    LLPreview::draw();
+}
+
+ALRecoveryEntry LLScriptEdContainer::recoveryEntry() const
+{
+    ALRecoveryEntry entry;
+    entry.object = mObjectUUID;
+    entry.item   = mItemUUID;
+    if (!mScriptEd || !mScriptEd->mEditor)
+    {
+        return entry;
+    }
+    entry.name = mScriptEd->mScriptName;
+    if (const LLInventoryItem* item = getItem(); entry.name.empty() && item)
+    {
+        entry.name = item->getName();
+    }
+    entry.lua           = mScriptEd->isLuauLanguage();
+    entry.compileTarget = mScriptEd->mCompileTarget ? mScriptEd->mCompileTarget->getValue().asString() : std::string();
+    entry.baseAsset     = mScriptEd->getAssetID();
+    entry.text          = mScriptEd->mEditor->getText();
+    if (mObjectUUID.notNull())
+    {
+        if (LLViewerObject* object = gObjectList.findObject(mObjectUUID); object && object->getRegion())
+        {
+            entry.region = object->getRegion()->getName();
+        }
+    }
+    return entry;
+}
+
+void LLScriptEdContainer::keptLoaded()
+{
+    mKeeper.setItem(mObjectUUID, mItemUUID);
+    if (mPendingRecovery)
+    {
+        const ALRecoveryEntry entry = std::move(*mPendingRecovery);
+        mPendingRecovery.reset();
+        takeUp(entry);
+        return;
+    }
+    // Offered where it can be taken up: the script may be changed.
+    const std::optional<ALRecoveryEntry> left = mScriptEd->mEditor->getEnabled() ? mKeeper.left() : std::nullopt;
+    if (!left)
+    {
+        return;
+    }
+    LLSD args;
+    args["NAME"]                     = left->name.empty() ? mScriptEd->mScriptName : left->name;
+    args["WHEN"]                     = left->whenSaid();
+    const ALRecoveryEntry     entry  = *left;
+    const LLHandle<LLFloater> handle = getHandle();
+    LLNotificationsUtil::add("RecoveredForEditor", args, LLSD(), [handle, entry](const LLSD& notification, const LLSD& response) {
+        LLScriptEdContainer* self   = ALViewType::as<LLScriptEdContainer>(handle.get());
+        const S32            option = LLNotificationsUtil::getSelectedOption(notification, response);
+        if (!self)
+        {
+            return;
+        }
+        if (option == 0)
+        {
+            self->takeUp(entry);
+        }
+        else if (option == 1)
+        {
+            self->mKeeper.turnDown(entry);
+        }
+    });
+}
+
+void LLScriptEdContainer::keptSaved()
+{
+    if (mScriptEd && !mScriptEd->hasChanged())
+    {
+        mKeeper.forget();
     }
 }
-// [/SL:KB]
+
+void LLScriptEdContainer::keepThrownAway()
+{
+    mKeeper.setAside();
+}
+
+void LLScriptEdContainer::takeUp(const ALRecoveryEntry& entry)
+{
+    if (!mScriptEd || !mScriptEd->mEditor || !mScriptEd->mEditor->getEnabled())
+    {
+        return;
+    }
+    // Over the script as one change, which Undo takes back, to be saved.
+    LLScriptEditor* editor = mScriptEd->mEditor;
+    editor->selectAll();
+    editor->insertText(entry.text);
+    mScriptEd->enableSave(true);
+    mKeeper.took(entry, std::hash<std::string>()(editor->getText()));
+}
+
+// static
+bool LLScriptEdContainer::recover(const ALRecoveryEntry& entry)
+{
+    // The script as its editor opens it: in the inventory, or in an object
+    // in sight whose contents say it is there.
+    LLScriptEdContainer* editor = nullptr;
+    if (entry.object.isNull())
+    {
+        if (!gInventory.getItem(entry.item))
+        {
+            return false;
+        }
+        editor = LLFloaterReg::showTypedInstance<LLPreviewLSL>("preview_script", LLSD(entry.item), TAKE_FOCUS_YES);
+    }
+    else
+    {
+        LLViewerObject* object = gObjectList.findObject(entry.object);
+        if (!object || !object->getInventoryItem(entry.item))
+        {
+            return false;
+        }
+        LLSD key;
+        key["taskid"] = entry.object;
+        key["itemid"] = entry.item;
+        LLLiveLSLEditor* live = LLFloaterReg::showTypedInstance<LLLiveLSLEditor>("preview_scriptedit", key, TAKE_FOCUS_YES);
+        if (live)
+        {
+            live->setObjectID(entry.object);
+        }
+        editor = live;
+    }
+    if (!editor)
+    {
+        return false;
+    }
+    if (editor->mAssetStatus == PREVIEW_ASSET_LOADED)
+    {
+        editor->takeUp(entry);
+    }
+    else
+    {
+        // Taken up once it has loaded.
+        editor->mPendingRecovery = entry;
+    }
+    return true;
+}
 
 std::string LLScriptEdContainer::getTmpFileName(const std::string& script_name) const
 {
@@ -1907,7 +2065,7 @@ void LLPreviewLSL::draw()
         getChild<LLUICtrl>("path_txt")->setValue(item_path);
         getChild<LLUICtrl>("path_txt")->setToolTip(item_path);
     }
-    LLPreview::draw();
+    LLScriptEdContainer::draw();
 }
 // virtual
 void LLPreviewLSL::callbackLSLCompileSucceeded()
@@ -1924,13 +2082,8 @@ void LLPreviewLSL::callbackLSLCompileSucceeded()
         logErrorsToFile(success_msg);
     }
 
-// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
-    // Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
-    if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
-    {
-        removeBackupFile();
-    }
-// [/SL:KB]
+    // Saved: nothing to keep against the viewer going.
+    keptSaved();
 
     closeIfNeeded();
 }
@@ -1959,13 +2112,8 @@ void LLPreviewLSL::callbackLSLCompileFailed(const LLSD& compile_errors)
 
     mScriptEd->selectFirstError();
 
-// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
-    // Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
-    if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
-    {
-        removeBackupFile();
-    }
-// [/SL:KB]
+    // Saved: nothing to keep against the viewer going.
+    keptSaved();
 
     closeIfNeeded();
 }
@@ -2266,13 +2414,8 @@ void LLPreviewLSL::onLoadComplete(const LLUUID& asset_uuid, LLAssetType::EType t
             preview->mScriptEd->mEditor->setLuauLanguage(is_lua);
             preview->mScriptEd->processKeywords(is_lua);
 
-// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
-            // Start the timer which will perform regular backup saves
-            if (!preview->isBackupRunning())
-            {
-                preview->startBackupTimer(60.0f);
-            }
-// [/SL:KB]
+            // What is typed kept against the viewer going from here.
+            preview->keptLoaded();
         }
         else
         {
@@ -2382,13 +2525,8 @@ void LLLiveLSLEditor::callbackLSLCompileSucceeded(const LLUUID& task_id,
         logErrorsToFile(success_msg);
     }
 
-// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
-    // Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
-    if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
-    {
-        removeBackupFile();
-    }
-// [/SL:KB]
+    // Saved: nothing to keep against the viewer going.
+    keptSaved();
 
     mRunningCheckbox->set(is_script_running);
     mIsSaving = false;
@@ -2421,13 +2559,8 @@ void LLLiveLSLEditor::callbackLSLCompileFailed(const LLSD& compile_errors)
     mScriptEd->selectFirstError();
     mIsSaving = false;
 
-// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
-    // Script was successfully saved so delete our backup copy if we have one and the editor is still pristine
-    if ( (!mScriptEd->hasChanged()) && (hasBackupFile()) )
-    {
-        removeBackupFile();
-    }
-// [/SL:KB]
+    // Saved: nothing to keep against the viewer going.
+    keptSaved();
 
     closeIfNeeded();
 }
@@ -2544,13 +2677,8 @@ void LLLiveLSLEditor::onLoadComplete(const LLUUID& asset_id,
             instance->mAssetStatus = PREVIEW_ASSET_LOADED;
             instance->mScriptEd->setAssetID(asset_id);
 
-// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
-            // Start the timer which will perform regular backup saves
-            if (!instance->isBackupRunning())
-            {
-                instance->startBackupTimer(60.0f);
-            }
-// [/SL:KB]
+            // What is typed kept against the viewer going from here.
+            instance->keptLoaded();
         }
         else
         {
@@ -2718,7 +2846,7 @@ void LLLiveLSLEditor::draw()
         mHaveRunningInfo = false;
     }
 
-    LLPreview::draw();
+    LLScriptEdContainer::draw();
 }
 
 

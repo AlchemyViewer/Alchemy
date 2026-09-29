@@ -1946,6 +1946,28 @@ You kept unsaved changes to [COUNT] scripts and notecards for next time: [NAMES]
 
   <notification
    icon="alertmodal.tga"
+   name="RecoveredForEditor"
+   type="alertmodal">
+Unsaved changes to [NAME] were kept on [WHEN], when the viewer closed before they were saved. Put them back in the editor, over the saved script?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Restore"
+       text="Put Them Back"/>
+      <button
+       index="1"
+       name="Discard"
+       text="Discard Them"/>
+      <button
+       index="2"
+       name="Later"
+       text="Later"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="RecoveredUnsavedOne"
    type="alertmodal">
 Unsaved changes to [NAMES] were kept when the viewer last closed. Open them to review and save, or discard them. Until then, they are in Script Studio's File &gt; Recover Unsaved Changes.

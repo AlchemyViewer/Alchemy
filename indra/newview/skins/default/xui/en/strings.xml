@@ -963,6 +963,10 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="NotecardCopyRefused">[NAME] could not be copied: [ERROR]</string>
 	<string name="NotecardFull">[NAME] is full: a notecard holds at most [LIMIT] bytes</string>
 
+	<!-- A legacy script editor's unsaved text not kept in the recovery store
+	     (llpreviewscript.cpp) -->
+	<string name="RecoveryWriteFailedEditor">Your unsaved changes could not be kept in case the viewer closes.</string>
+
 	<!-- ToolTips for notecards -->
 	<string name="TooltipNotecardNotAllowedTypeDrop">
 Items of this type can't be attached

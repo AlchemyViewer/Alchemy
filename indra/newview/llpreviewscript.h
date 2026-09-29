@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include "alrecoverykeeper.h"
 #include "alscripttempfiles.h"
 #include "alscriptworkspace.h"
 #include "llpreview.h"
@@ -242,11 +243,28 @@ public:
 
     LLScriptEdCore* getScriptEdCore() const { return mScriptEd; }
 
+    // What is typed kept against the viewer going, asked after a second
+    // at most, before the window is drawn.
+    void draw() override;
+
+    // A text a legacy script editor kept, taken up where it belongs: the
+    // editor for its script, opened, the text put in as it loads -- where
+    // the script can be had; false where it cannot, and whoever asked
+    // keeps it some other way.
+    static bool recover(const ALRecoveryEntry& entry);
+
 protected:
     std::string     getTmpFileName(const std::string& script_name) const;
-// [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
-    /*virtual*/ void onBackupTimer() override;
-// [/SL:KB]
+    // The script loaded: what is typed kept under its key from here, and
+    // a kept text taken up where one waits, or what an earlier session
+    // left offered. Saved: nothing to keep. Thrown away -- Don't Save --
+    // set aside a while all the same.
+    void keptLoaded();
+    void keptSaved();
+    void keepThrownAway();
+    // A kept text put over the script, as a change to save.
+    void            takeUp(const ALRecoveryEntry& entry);
+    ALRecoveryEntry recoveryEntry() const;
     std::string     getUniqueHash() const;
     std::string     getErrorLogFileName(const std::string& script_path);
     bool            onExternalChange(const std::string& filename);
@@ -256,6 +274,11 @@ protected:
 
     LLScriptEdCore*     mScriptEd;
     LLLiveLSLFile*      mLiveFile = nullptr;
+    // What is typed kept in the recovery store (ALRecoveryKeeper), when it
+    // was last looked at, and a kept text to take up once loaded.
+    ALRecoveryKeeper                mKeeper;
+    F64                             mKeptLooked = 0.0;
+    std::optional<ALRecoveryEntry>  mPendingRecovery;
     LLLiveLSLFile*      mLiveLogFile = nullptr;
 
     std::weak_ptr<LLScriptEditorWSServer> mWebSocketServer;
