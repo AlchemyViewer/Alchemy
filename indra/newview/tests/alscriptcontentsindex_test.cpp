@@ -49,6 +49,8 @@ namespace tut
         std::vector<std::pair<LLUUID, std::function<void(const Index::Contents&)>>>       pending;
         std::vector<std::pair<LLUUID, bool>>                                             asked;
         std::vector<ALScriptRef>                                                         askedRunning;
+        // Each prim's serial as its object has it, which an answer carries.
+        std::map<LLUUID, S32>                                                            serials;
         Index                                                                            index;
 
         alscriptcontentsindex_data() : index(world()) {}
@@ -70,6 +72,7 @@ namespace tut
                 return std::vector<LLUUID>();
             };
             out.current = [this](const LLUUID& prim) { return current.contains(prim); };
+            out.serial  = [this](const LLUUID& prim) { return serials.contains(prim) ? serials[prim] : -1; };
             out.ask     = [this](const LLUUID& prim, bool from_region, std::function<void(const Index::Contents&)> told) {
                 asked.emplace_back(prim, from_region);
                 pending.emplace_back(prim, std::move(told));
@@ -113,6 +116,7 @@ namespace tut
                 contents.prim    = prim;
                 contents.fetched = fetched;
                 contents.name    = name;
+                contents.serial  = fetched && serials.contains(prim) ? serials[prim] : -1;
                 U32 n            = 500 + static_cast<U32>(prim.mData[0]) * 20;
                 for (const std::string& one : names)
                 {
@@ -264,5 +268,52 @@ namespace tut
             }
         });
         ensure_equals("each told once", told, 2);
+    }
+
+    template<> template<>
+    void alscriptcontentsindex_object::test<5>()
+    {
+        set_test_name("what a prim holds asked again as the studio draws once it changed -- its serial moved, or its object's copy was let "
+                      "go of -- looking once a second, and a prim at most every few seconds");
+        const LLUUID chair = object(40);
+        current.insert(chair);
+        serials[chair] = 3;
+        index.ask(chair);
+        answer(chair, { "sit.lsl" });
+        index.refresh(10.0);
+        ensure("unchanged: not asked", pending.empty());
+
+        // A script added from the build tools.
+        serials[chair] = 4;
+        index.refresh(10.5);
+        ensure("not looked at again within the second", pending.empty());
+        index.refresh(11.0);
+        ensure("its serial moved: asked", pending.size() == 1 && asked.back().first == chair);
+        answer(chair, { "sit.lsl", "new.lsl" });
+        ensure_equals("what it holds now", names(chair), std::string("sit.lsl new.lsl"));
+        index.refresh(12.0);
+        ensure("heard at its serial: not asked", pending.empty());
+
+        // Its object's copy let go of, and no answer coming.
+        current.erase(chair);
+        index.refresh(13.0);
+        ensure("not asked again so soon", pending.empty());
+        index.refresh(16.0);
+        ensure("asked", pending.size() == 1);
+        index.refresh(17.0);
+        ensure("not while it is asked", pending.size() == 1);
+        answer(chair, {}, false);
+        ensure_equals("no answer keeps what was known", names(chair), std::string("sit.lsl new.lsl"));
+        index.refresh(18.0);
+        ensure("not asked again at once", pending.empty());
+        index.refresh(21.0);
+        ensure("asked again a while after", pending.size() == 1);
+        answer(chair, { "sit.lsl" });
+
+        // Asked for directly, a prim that changed is asked though known.
+        current.insert(chair);
+        ensure("current: not asked", !index.ask(chair));
+        serials[chair] = 5;
+        ensure("its serial moved: asked", index.ask(chair));
     }
 }

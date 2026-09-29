@@ -133,11 +133,11 @@ struct ALScriptWorkspace::ContentsListener final : public LLVOInventoryListener
 
     ~ContentsListener() override { letGo(); }
 
-    void inventoryChanged(LLViewerObject* from, LLInventoryObject::object_list_t* inventory, S32, void*) override
+    void inventoryChanged(LLViewerObject* from, LLInventoryObject::object_list_t* inventory, S32 serial, void*) override
     {
         if (!done)
         {
-            answer(from, inventory);
+            answer(from, inventory, serial);
         }
     }
 
@@ -146,7 +146,7 @@ struct ALScriptWorkspace::ContentsListener final : public LLVOInventoryListener
     {
         if (!done)
         {
-            answer(gObjectList.findObject(prim), nullptr);
+            answer(gObjectList.findObject(prim), nullptr, -1);
         }
     }
 
@@ -168,12 +168,13 @@ private:
         mAsked = nullptr;
     }
 
-    void answer(LLViewerObject* from, LLInventoryObject::object_list_t* inventory)
+    void answer(LLViewerObject* from, LLInventoryObject::object_list_t* inventory, S32 serial)
     {
         done = true;
         ALScriptContents contents;
         contents.prim    = prim;
         contents.fetched = inventory != nullptr;
+        contents.serial  = inventory ? serial : -1;
         if (from)
         {
             if (LLNameValue* name = from->getNVPair("Name"))
@@ -287,6 +288,10 @@ ALScriptWorkspace::ALScriptWorkspace()
     world.current = [](const LLUUID& prim) {
         LLViewerObject* in_world = gObjectList.findObject(prim);
         return in_world && !in_world->isInventoryDirty();
+    };
+    world.serial = [](const LLUUID& prim) {
+        const LLViewerObject* in_world = gObjectList.findObject(prim);
+        return in_world ? static_cast<S32>(in_world->getInventorySerial()) : -1;
     };
     world.ask = [this](const LLUUID& prim, bool from_region, std::function<void(const ALScriptContents&)> told) {
         listContents(prim, std::move(told), from_region);

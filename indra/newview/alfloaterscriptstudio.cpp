@@ -1412,6 +1412,8 @@ void ALFloaterScriptStudio::draw()
         sLastWorkedIn = getHandle();
     }
     mChecking.pump(LLTimer::getTotalSeconds());
+    // What the prims hold asked again where it changed, for every window.
+    ALScriptWorkspace::instance().contentsIndex().refresh(LLTimer::getTotalSeconds());
     // The trailer says a check is out once it has been a while, and stops
     // once it is answered.
     if (Doc* front = active(); front && front->checkRunning(LLTimer::getTotalSeconds()) != mTrailerChecking)
@@ -2204,6 +2206,19 @@ void ALFloaterScriptStudio::loaded(const ALScriptLoaded& answer)
     if (answer.error.empty())
     {
         ALScriptStudioOrphans::loadWentThrough(doc);
+        // A script loaded from its prim is in it, whatever the prim was last
+        // heard to hold -- one just added from the build tools, say: what
+        // it holds is asked again rather than the tab taken for gone.
+        if (!doc.ref.inInventory() && !doc.ref.isNull() && doc.file.empty())
+        {
+            ALScriptContentsIndex& index = ALScriptWorkspace::instance().contentsIndex();
+            const std::vector<ALScriptContents::Item>& items = index.items(doc.ref.object);
+            if (index.fetched(doc.ref.object) &&
+                std::none_of(items.begin(), items.end(), [&doc](const ALScriptContents::Item& item) { return item.id == doc.ref.item; }))
+            {
+                index.ask(doc.ref.object, true);
+            }
+        }
     }
     if (!answer.error.empty())
     {
@@ -6651,9 +6666,10 @@ ALScriptStudioOrphans::Reach ALFloaterScriptStudio::reach(const Doc& doc)
     LLViewerObject* object = gObjectList.findObject(doc.ref.object);
     reach.objectThere      = object && !object->isDead();
     // Whether its prim holds the item, where the region has said what the
-    // prim holds.
+    // prim holds and is not being asked again: a script added since is
+    // not gone meanwhile.
     const ALScriptContentsIndex& index = ALScriptWorkspace::instance().contentsIndex();
-    if (index.fetched(doc.ref.object))
+    if (index.fetched(doc.ref.object) && !index.asking(doc.ref.object))
     {
         const std::vector<ALScriptContents::Item>& items = index.items(doc.ref.object);
         reach.heldByPrim =

@@ -53,13 +53,22 @@ bool ALScriptContentsIndex::fetched(const LLUUID& prim) const
     return known && known->fetched;
 }
 
+bool ALScriptContentsIndex::current(const LLUUID& id, const Prim& known) const
+{
+    if (mWorld.current && !mWorld.current(id))
+    {
+        return false;
+    }
+    return !mWorld.serial || known.serial < 0 || mWorld.serial(id) == known.serial;
+}
+
 bool ALScriptContentsIndex::ask(const LLUUID& prim, bool refetch, bool from_region)
 {
     if (prim.isNull() || !mWorld.ask)
     {
         return false;
     }
-    if (!refetch && !from_region && fetched(prim) && mWorld.current && mWorld.current(prim))
+    if (const Prim* known = this->prim(prim); !refetch && !from_region && known && known->fetched && current(prim, *known))
     {
         return false;
     }
@@ -78,6 +87,34 @@ bool ALScriptContentsIndex::ask(const LLUUID& prim, bool refetch, bool from_regi
     return true;
 }
 
+void ALScriptContentsIndex::refresh(F64 now)
+{
+    // How often it looks, and how long a prim asked again is left before
+    // it is asked again, answered or not.
+    constexpr F64 LOOK_EVERY  = 1.0;
+    constexpr F64 ASK_AT_MOST = 5.0;
+    if (now < mNextRefresh)
+    {
+        return;
+    }
+    mNextRefresh = now + LOOK_EVERY;
+    // Gathered first: a world that answers on the spot answers into the
+    // map being walked.
+    std::vector<LLUUID> changed;
+    for (auto& [id, known] : mPrims)
+    {
+        if (known.fetched && !mAsking.contains(id) && now >= known.refreshed + ASK_AT_MOST && !current(id, known))
+        {
+            known.refreshed = now;
+            changed.push_back(id);
+        }
+    }
+    for (const LLUUID& id : changed)
+    {
+        ask(id, true);
+    }
+}
+
 void ALScriptContentsIndex::heard(const Contents& contents)
 {
     mAsking.erase(contents.prim);
@@ -88,6 +125,7 @@ void ALScriptContentsIndex::heard(const Contents& contents)
     {
         prim.fetched = contents.fetched;
         prim.items   = contents.items;
+        prim.serial  = contents.serial;
     }
     if (!contents.name.empty())
     {

@@ -63,6 +63,9 @@ public:
         // Whether the object's copy of what a prim holds is current: in
         // sight, and not changed since it was last asked.
         std::function<bool(const LLUUID& prim)> current;
+        // The serial of what a prim holds as the object last heard it,
+        // which moves as the contents change; -1 where it is not in sight.
+        std::function<S32(const LLUUID& prim)> serial;
         // A prim asked what it holds, of the region itself where
         // `from_region`; `told` once, answered or not.
         std::function<void(const LLUUID& prim, bool from_region, std::function<void(const Contents&)> told)> ask;
@@ -82,6 +85,10 @@ public:
         std::vector<Item> items;
         // What its answer said it is called; empty where none said.
         std::string       name;
+        // The serial the answer was of; -1 where it did not say.
+        S32               serial = -1;
+        // When it was last asked again for having changed.
+        F64               refreshed = 0.0;
     };
     // What is known of a prim, or nothing where it was never answered.
     const Prim* prim(const LLUUID& id) const;
@@ -96,6 +103,13 @@ public:
     bool ask(const LLUUID& prim, bool refetch = false, bool from_region = false);
     // Asked and not answered yet.
     bool asking(const LLUUID& prim) const { return mAsking.contains(prim); }
+    // Each prim whose contents are known asked again where the world's copy
+    // of them changed since -- a script dropped in or deleted from the
+    // build tools, or by a script -- at `now`, looking once a second, and
+    // asking a prim again at most every few seconds, so that one that does
+    // not answer is not asked every time. The studio's windows call it as
+    // they draw.
+    void refresh(F64 now);
 
     // Every answer, with what it said: heard after the index took it in.
     typedef boost::signals2::signal<void(const Contents&)> heard_signal_t;
@@ -136,6 +150,8 @@ public:
     void forget(const LLUUID& prim);
 
 private:
+    // Whether what is known of a prim is what the world holds now.
+    bool current(const LLUUID& id, const Prim& known) const;
     void heard(const Contents& contents);
     // The waits of ensureListed() that this answer ends, told.
     void settle();
@@ -156,6 +172,8 @@ private:
     std::map<std::pair<LLUUID, LLUUID>, bool> mRunning;
     std::vector<std::shared_ptr<Wait>>        mWaits;
     heard_signal_t                            mHeard;
+    // When refresh() looks again.
+    F64                                       mNextRefresh = 0.0;
     // Let go of as the index is, so that an answer after it does nothing.
     std::shared_ptr<bool>                     mAlive = std::make_shared<bool>(true);
 };

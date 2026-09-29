@@ -314,6 +314,9 @@ struct ALScriptContents
     // listed as holding nothing where RLVa keeps its contents unseen.
     bool              fetched = false;
     std::vector<Item> items;
+    // The serial of the contents this is, which moves as they change
+    // (LLViewerObject::getInventorySerial); -1 where it is not known.
+    S32               serial = -1;
 };
 
 // A new script or notecard in a prim's contents, or why there is none.
