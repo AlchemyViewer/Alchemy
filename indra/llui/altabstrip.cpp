@@ -943,7 +943,7 @@ bool ALTabStrip::handleToolTip(S32 x, S32 y, MASK mask)
 {
     if (listRect().pointInRect(x, y))
     {
-        LLToolTipMgr::instance().show(alSaid("TabStripList", "Every tab, to pick one from"));
+        LLToolTipMgr::instance().show(alSaid("TabStripList", "All tabs"));
         return true;
     }
     const S32 which = at(x, y);

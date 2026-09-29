@@ -367,41 +367,41 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="CodeStringHead">string</string>
 	<string name="CodeFixLink">Fix: [TITLE]</string>
 	<string name="CodeFixNone">Nothing to fix or refactor here</string>
-	<string name="CodeInlayWrite">Ctrl-double-click to write '[TEXT]' in</string>
-	<string name="CodeInlayWriteMac">Command-double-click to write '[TEXT]' in</string>
+	<string name="CodeInlayWrite">Ctrl-double-click to insert '[TEXT]'</string>
+	<string name="CodeInlayWriteMac">Command-double-click to insert '[TEXT]'</string>
 	<string name="CodeDeprecated">(deprecated)</string>
 	<string name="CodeStringBytesA">[COUNT] byte</string>
 	<string name="CodeStringBytesB">[COUNT] bytes</string>
 	<string name="CodeStringCharactersA">[COUNT] character</string>
 	<string name="CodeStringCharactersB">[COUNT] characters</string>
-	<string name="CodeStringWritten">[COUNT] as written</string>
+	<string name="CodeStringWritten">[COUNT] in source</string>
 
 	<!-- The find bar over an editor's top right corner (alfindbar.cpp):
 	     its tips, its fields' labels and what its count says. -->
-	<string name="FindBarReplaceToo">Replace as well</string>
+	<string name="FindBarReplaceToo">Toggle replace</string>
 	<string name="FindBarFind">Find</string>
 	<string name="FindBarCase">Match case</string>
 	<string name="FindBarWord">Match whole words</string>
 	<string name="FindBarPattern">Match a regular expression</string>
-	<string name="FindBarPrevious">The one before (shift-return)</string>
-	<string name="FindBarNext">The next (return)</string>
-	<string name="FindBarInSelection">In the selection only</string>
+	<string name="FindBarPrevious">Previous match (shift-return)</string>
+	<string name="FindBarNext">Next match (return)</string>
+	<string name="FindBarInSelection">Find in selection</string>
 	<string name="FindBarClose">Close (escape)</string>
 	<string name="FindBarReplace">Replace</string>
 	<string name="FindBarKeepCase">Keep each match's case: HELLO, Hello or hello</string>
-	<string name="FindBarReplaceOne">Replace this one and find the next</string>
-	<string name="FindBarReplaceAll">Replace every one, as one step to undo</string>
-	<string name="FindBarBadPattern">Not a pattern</string>
+	<string name="FindBarReplaceOne">Replace this match and find the next</string>
+	<string name="FindBarReplaceAll">Replace all matches as one undo step</string>
+	<string name="FindBarBadPattern">Invalid regular expression</string>
 	<string name="FindBarNone">No results</string>
 	<string name="FindBarOf">[CURRENT] of [TOTAL]</string>
 	<string name="ScriptWordSleep">The script sleeps [SECONDS] s after this</string>
-	<string name="ScriptWordGodMode">Only a god may call this</string>
-	<string name="FindBarWrappedToTop">Went round the end, on from the top</string>
-	<string name="FindBarWrappedToBottom">Went round the start, back from the bottom</string>
+	<string name="ScriptWordGodMode">Requires god mode</string>
+	<string name="FindBarWrappedToTop">Reached the end; continued from the top</string>
+	<string name="FindBarWrappedToBottom">Reached the start; continued from the bottom</string>
 
 	<!-- The row of tabs over an editor (altabstrip.cpp): the button that
 	     lists them all once they run past it. -->
-	<string name="TabStripList">Every tab, to pick one from</string>
+	<string name="TabStripList">All tabs</string>
 	<string name="QuickOpenNone">Nothing matches</string>
 
 	<!-- The vim keymap's words, in the band under the editor's text
@@ -474,7 +474,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimLetOnly">Only mapleader and maplocalleader are set with :let</string>
 	<string name="VimrcLine">line [NUMBER]: [ERROR]</string>
 	<string name="VimrcTooLarge">The vimrc is too large to read.</string>
-	<string name="VimrcNotNotecard">The vimrc's item is not a notecard that can be read.</string>
+	<string name="VimrcNotNotecard">The vimrc item is not a readable notecard.</string>
 
 	<!-- Script Studio's own words about a script, from the alscript
 	     library: each problem carries a key and the words it is about,
@@ -852,22 +852,22 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="WorkspaceAssetUnreadable">the asset could not be read</string>
 	<string name="WorkspaceNotecardUnreadable">the notecard could not be read</string>
 	<string name="WorkspaceNotecardUnwritable">the notecard could not be written</string>
-	<string name="WorkspaceNotecardTooLarge">the notecard's text is [SIZE] bytes, and a notecard may hold at most [LIMIT]: past that, no viewer could open it again</string>
+	<string name="WorkspaceNotecardTooLarge">the notecard text is [SIZE] bytes and the limit is [LIMIT] bytes; a larger notecard cannot be opened again</string>
 	<string name="WorkspaceUploadFailed">the upload failed</string>
-	<string name="WorkspaceScriptTooLarge">the script is [SIZE] bytes, and a script may be at most [LIMIT]</string>
-	<string name="WorkspaceNoRegion">no region</string>
+	<string name="WorkspaceScriptTooLarge">the script is [SIZE] bytes and the limit is [LIMIT] bytes</string>
+	<string name="WorkspaceNoRegion">not connected to a region</string>
 	<string name="WorkspaceRegionCannotUpdateScripts">the region cannot update scripts</string>
 	<string name="WorkspaceTransferFolder">Passed between objects</string>
 	<string name="WorkspaceTransferNoFolder">no folder could be made in the trash for what passes between the objects</string>
-	<string name="WorkspaceExperienceUnknown">the region did not say what experience the script runs under, and a save that did not say it would take it away</string>
+	<string name="WorkspaceExperienceUnknown">the region did not say which experience the script uses, and saving without it would remove the script from that experience</string>
 	<string name="WorkspaceRegionCannotUpdateNotecards">the region cannot update notecards</string>
 	<string name="WorkspaceRegionCannotMakeNotecard">the region cannot make a notecard in an object</string>
 	<string name="WorkspaceNameNeeded">a name is needed</string>
-	<string name="WorkspaceObjectNotModifiable">the object may not be changed</string>
-	<string name="WorkspaceNoTrash">no trash folder</string>
+	<string name="WorkspaceObjectNotModifiable">you do not have permission to modify the object</string>
+	<string name="WorkspaceNoTrash">no Trash folder</string>
 	<string name="WorkspaceNothingToDo">nothing to do</string>
 	<string name="WorkspaceQueueCannotOpen">the queue could not be opened</string>
-	<string name="WorkspaceQueueWouldNotStart">the queue would not start</string>
+	<string name="WorkspaceQueueWouldNotStart">the queue could not start</string>
 	<string name="AnalysisNoLuauDefinitions">No Luau definitions at [PATH]</string>
 	<string name="AnalysisNoLSLBuiltins">No LSL builtins</string>
 
@@ -4650,7 +4650,7 @@ Try enclosing path to the editor with double quotes.
  <string name="ExternalEditorCommandParseError">Error parsing the external editor command.</string>
  <string name="ExternalEditorFailedToRun">External editor failed to run.</string>
  <string name="ExternalEditorFailedToStart">Failed to start the WebSocket server. Ensure the ExternalWebsocketSyncEnable setting is on.</string>
- <string name="VSCodeLaunchFailed">Failed to launch VS Code. Ensure the 'code' command is available on your PATH.</string>
+ <string name="VSCodeLaunchFailed">Could not start VS Code. Make sure the 'code' command is on your PATH.</string>
 
  <!--  Machine translation of chat messahes -->
  <string name="TranslationFailed">Translation failed: [REASON]</string>

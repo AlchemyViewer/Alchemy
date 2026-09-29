@@ -25,25 +25,25 @@
     <floater.string name="ThemeOwn">(yours)</floater.string>
     <floater.string name="PlaceInventory">Inventory</floater.string>
     <floater.string name="PlaceObject">The script's object</floater.string>
-    <floater.string name="PlaceDisk">The folder on disk</floater.string>
-    <floater.string name="OrderWorldOff">The places an #include or require is looked for, the first that has it winning; a place unticked is not looked in. The object and inventory are greyed while includes are not taken from them: tick the box above to let them in</floater.string>
+    <floater.string name="PlaceDisk">The folders on disk</floater.string>
+    <floater.string name="OrderWorldOff">Include search order; unticked places are skipped. To use the greyed places, tick the box above</floater.string>
     <floater.string name="ThemeNewName">My Theme</floater.string>
-    <floater.string name="VimrcFromFile">Without a notecard, the vimrc is the file [PATH]. It takes :map and its kin, let mapleader and :set.</floater.string>
-    <floater.string name="VimrcFromNotecard">The notecard is the vimrc. It takes :map and its kin, let mapleader and :set.</floater.string>
+    <floater.string name="VimrcFromFile">With no notecard, the vimrc is the file [PATH]. It supports :map and related commands, let mapleader and :set.</floater.string>
+    <floater.string name="VimrcFromNotecard">The notecard is the vimrc. It supports :map and related commands, let mapleader and :set.</floater.string>
     <floater.string name="VimrcUnknownNotecard">(a notecard not in inventory yet)</floater.string>
     <floater.string name="VimrcOnlyNotecards">Only a notecard in your inventory can be the vimrc</floater.string>
     <floater.string name="HeadingEditor">Editor</floater.string>
     <floater.string name="HeadingSyntax">Syntax</floater.string>
-    <floater.string name="NoFolder">No folders: Add... one to look in.</floater.string>
+    <floater.string name="NoFolder">No folders. Use Add... to add one.</floater.string>
     <floater.string name="SnippetUnnamed">(no name)</floater.string>
     <floater.string name="SnippetNewName">New snippet</floater.string>
     <floater.string name="SnippetCopyName">[NAME] (copy)</floater.string>
-    <floater.string name="SnippetBuiltin">The viewer's own; Copy it to make one to change.</floater.string>
+    <floater.string name="SnippetBuiltin">Built into the viewer. Copy it to make a version you can change.</floater.string>
     <floater.string name="LintLSL20001">A declaration that hides one in an outer scope</floater.string>
     <floater.string name="LintLSL20002">An assignment used as a condition</floater.string>
-    <floater.string name="LintLSL20003">Changing to the state already current</floater.string>
+    <floater.string name="LintLSL20003">Changing to the current state</floater.string>
     <floater.string name="LintLSL20004">Changing state in a function returning a list or a string</floater.string>
-    <floater.string name="LintLSL20005">Changing state from a function through an if</floater.string>
+    <floater.string name="LintLSL20005">Changing state inside an if in a function</floater.string>
     <floater.string name="LintLSL20007">An empty if statement</floater.string>
     <floater.string name="LintLSL20009">A variable, function or label declared but never used</floater.string>
     <floater.string name="LintLSL20011">== between lists, which compares only their lengths</floater.string>
@@ -56,7 +56,7 @@
     <floater.string name="LintLSL20018">== used as a statement</floater.string>
     <floater.string name="LintLSL20019">A deprecated function or constant</floater.string>
     <floater.string name="LintLSL20020">A deprecated function or constant with a replacement</floater.string>
-    <floater.string name="LintLuauUnknownGlobal">An unknown global (the type checker says so too)</floater.string>
+    <floater.string name="LintLuauUnknownGlobal">An unknown global (the type checker also reports it)</floater.string>
     <floater.string name="LintLuauDeprecatedGlobal">A deprecated global</floater.string>
     <floater.string name="LintLuauGlobalUsedAsLocal">A global used only inside one function</floater.string>
     <floater.string name="LintLuauLocalShadow">A local that hides another name</floater.string>
@@ -66,7 +66,7 @@
     <floater.string name="LintLuauFunctionUnused">A local function never used</floater.string>
     <floater.string name="LintLuauImportUnused">A require never used</floater.string>
     <floater.string name="LintLuauBuiltinGlobalWrite">An assignment to a builtin global</floater.string>
-    <floater.string name="LintLuauPlaceholderRead">The placeholder _ read</floater.string>
+    <floater.string name="LintLuauPlaceholderRead">Reading the placeholder _</floater.string>
     <floater.string name="LintLuauUnreachableCode">Code that can never run</floater.string>
     <floater.string name="LintLuauUnknownType">An unknown type name in a type check</floater.string>
     <floater.string name="LintLuauForRange">A numeric for loop that never runs, or runs oddly</floater.string>
@@ -83,12 +83,12 @@
     <floater.string name="LintLuauMisleadingAndOr">a and b or c, where b may be false or nil</floater.string>
     <floater.string name="LintLuauCommentDirective">An unknown --! comment directive</floater.string>
     <floater.string name="LintLuauIntegerParsing">An integer literal too big to be exact</floater.string>
-    <floater.string name="LintLuauComparisonPrecedence">not a == b, and comparisons like it</floater.string>
+    <floater.string name="LintLuauComparisonPrecedence">not a == b, and similar comparisons</floater.string>
     <floater.string name="LintLuauRedundantNativeAttribute">A redundant @native attribute</floater.string>
     <floater.string name="LintLuauName">[DESCRIPTION]
 
 In a .luaurc: [NAME]</floater.string>
-    <floater.string name="PreviewLSL">// Every kind of token, to see the colors by
+    <floater.string name="PreviewLSL">// Every kind of token, to preview the colors
 #define GREETING "Hello"
 integer count = 0;
 string  name  = "Avatar\n";
@@ -112,7 +112,7 @@ default
     }
 }</floater.string>
     <floater.string name="PreviewSLua">--!strict
--- Every kind of token, to see the colors by
+-- Every kind of token, to preview the colors
 local count: number = 0
 local name = "Avatar\n"
 
@@ -164,7 +164,7 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="theme"
-             tool_tip="A set of colors for every part of the editor; Custom is whatever the swatches say"
+             tool_tip="A set of colors for the editor. Custom uses the colors set in the swatches"
              top_delta="-3"
              width="220" />
             <button
@@ -174,7 +174,7 @@ end</floater.string>
              layout="topleft"
              left_pad="6"
              name="save_theme"
-             tool_tip="The colors as they stand, kept as a theme of your own"
+             tool_tip="Save the current colors as your own theme"
              top_delta="0"
              width="90" />
             <button
@@ -184,7 +184,7 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="restore_skin"
-             tool_tip="Every color back to what the skin declares"
+             tool_tip="Reset every color to the skin's colors"
              top_delta="0"
              width="100" />
             <text
@@ -205,7 +205,7 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="font"
-             tool_tip="The editors' font, shown in itself; click to pick the face, the size and the style against a sample"
+             tool_tip="The editor font, shown in itself. Click to choose the face, size and style, with a sample"
              top_delta="-3"
              width="320" />
             <text
@@ -300,7 +300,7 @@ end</floater.string>
                      syntax_color_prefix="Script"
                      text_color="ScriptText"
                      text_readonly_color="ScriptText"
-                     tool_tip="How the editors will look; type here freely, nothing is kept"
+                     tool_tip="How the editor will look. You can type here; nothing is saved"
                      top="0"
                      width="518" />
                 </layout_panel>
@@ -347,7 +347,7 @@ end</floater.string>
              max_val="16"
              min_val="1"
              name="tab_width"
-             tool_tip="How many columns apart the tab stops are, and how far a level of indentation goes"
+             tool_tip="Columns between tab stops, and the width of one indentation level"
              top_delta="-2"
              width="60" />
             <check_box
@@ -358,7 +358,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="insert_spaces"
-             tool_tip="Tab, a new line and the formatter put spaces to the next stop in; off, a tab character. For a script that does not say its own, where scripts are read for it."
+             tool_tip="On, Tab, new lines and the formatter use spaces; off, tabs. For scripts with undetected indentation."
              top_pad="6"
              width="370" />
             <check_box
@@ -369,7 +369,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="detect_indentation"
-             tool_tip="Tabs or spaces, and how many a level, read from each script's own lines as it opens; the two above are for a script that does not say. The strip under the editor shows what a script is indented by, and changes it for that script alone."
+             tool_tip="Reads each script's tabs or spaces and indent width on open. The status bar shows and changes it."
              top_pad="4"
              width="370" />
             <check_box
@@ -380,7 +380,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="reindent_on_paste"
-             tool_tip="Lines pasted into a line's indentation go to that line's level, or where the line above says, each as far in from the first as it was. One Undo leaves them as they were copied."
+             tool_tip="Pasted lines take the indentation where they land, keeping relative indents. One Undo restores them."
              top_pad="4"
              width="370" />
             <check_box
@@ -391,7 +391,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="auto_close"
-             tool_tip="An opening bracket or quote gets its closer, typed over when it is reached; a selection is wrapped in the pair; one Backspace between an empty pair takes both"
+             tool_tip="An opening bracket or quote adds its closer, or wraps a selection. Backspace deletes an empty pair"
              top_pad="4"
              width="370" />
             <text
@@ -413,7 +413,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="auto_complete"
-             tool_tip="The list of what could go here opens on its own; off, it opens only when asked for (Control-Space)"
+             tool_tip="The completion list opens as you type; off, only when you press Control-Space"
              top_pad="6"
              width="370" />
             <text
@@ -438,18 +438,18 @@ end</floater.string>
              max_val="5"
              min_val="1"
              name="complete_after"
-             tool_tip="How many letters of a name are typed before the list opens on its own"
+             tool_tip="How many letters of a name to type before the completion list opens"
              top_delta="-2"
              width="60" />
             <check_box
              control_name="ALScriptStudioAcceptOnEnter"
              follows="left|top"
              height="20"
-             label="Return takes the chosen completion (Tab always does)"
+             label="Return accepts the selected completion (Tab always does)"
              layout="topleft"
              left="32"
              name="accept_on_enter"
-             tool_tip="Off, Return starts a new line and closes the list, and only Tab takes a completion"
+             tool_tip="Off, Return starts a new line and closes the list; only Tab accepts a completion"
              top_pad="6"
              width="350" />
             <text
@@ -485,7 +485,7 @@ end</floater.string>
              max_val="10"
              min_val="0"
              name="blank_lines"
-             tool_tip="How many blank lines in a row formatting leaves; more are taken out"
+             tool_tip="The most blank lines in a row that formatting keeps; extra ones are removed"
              top_delta="-2"
              width="60" />
             <check_box
@@ -496,7 +496,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="format_spacing"
-             tool_tip="Formatting puts one space around operators and after commas; off, it indents and leaves the rest of each line as written"
+             tool_tip="Formatting puts one space around operators and after commas; off, it only fixes indentation"
              top_pad="6"
              width="370" />
 
@@ -520,7 +520,7 @@ end</floater.string>
              layout="topleft"
              left="412"
              name="studio_enabled"
-             tool_tip="A script opened from inventory, an object's contents or the build tool opens here; off, the old script editor opens it, for one more release"
+             tool_tip="Scripts from inventory, objects and the build tool open here; off, the old editor (one more release)"
              top_pad="6"
              width="370" />
             <check_box
@@ -531,7 +531,7 @@ end</floater.string>
              layout="topleft"
              left="412"
              name="restore_tabs"
-             tool_tip="When the window opens, the tabs it had open last time come back; off, it opens with what you opened it for"
+             tool_tip="Reopen last session's tabs when the window opens; off, open only what you asked for"
              top_pad="2"
              width="370" />
             <text
@@ -562,7 +562,7 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="caret_style"
-             tool_tip="How the caret is drawn; vim's normal mode draws a block whatever this says"
+             tool_tip="How the caret is drawn. Vim normal mode always draws a block"
              top_delta="-3"
              width="140">
                 <combo_box.item label="Line" name="line" value="line" />
@@ -577,7 +577,7 @@ end</floater.string>
              layout="topleft"
              left="412"
              name="caret_blink"
-             tool_tip="Off, the caret stays lit"
+             tool_tip="Off, the caret stays solid"
              top_pad="6"
              width="370" />
             <text
@@ -610,7 +610,7 @@ end</floater.string>
              name="hover_delay_label"
              top_pad="6"
              width="210">
-                After resting this long (seconds):
+                Delay (seconds):
             </text>
             <spinner
              control_name="ALScriptStudioHoverDelay"
@@ -646,7 +646,7 @@ end</floater.string>
              layout="topleft"
              left="412"
              name="vim_clipboard"
-             tool_tip="As vim's clipboard=unnamed: y, d, x and p with no register named go by the clipboard other programs share; off, they stay in the editor, and only &quot;+ and &quot;* reach the clipboard. A named register, &quot;a, never does."
+             tool_tip="y, d, x and p with no register use the system clipboard (clipboard=unnamed). Off, only &quot;+ and &quot;* do."
              top_pad="6"
              width="370" />
             <text
@@ -657,7 +657,7 @@ end</floater.string>
              name="vimrc_label"
              top_pad="10"
              width="370">
-                Your vimrc, as a notecard:
+                Vimrc notecard:
             </text>
             <line_editor
              enabled="false"
@@ -668,7 +668,7 @@ end</floater.string>
              left="412"
              max_length_bytes="255"
              name="vimrc_notecard"
-             tool_tip="Drag a notecard from your inventory here to use it as your vimrc wherever you log in. It is kept on this computer, and fetched again only when it has been changed"
+             tool_tip="Drop an inventory notecard here to use as your vimrc wherever you log in. Cached until it changes"
              top_pad="4"
              width="230" />
             <button
@@ -678,7 +678,7 @@ end</floater.string>
              layout="topleft"
              left_pad="6"
              name="vimrc_edit"
-             tool_tip="Open the vimrc in Script Studio: the notecard, or else the file, made where there is none yet"
+             tool_tip="Open the vimrc in Script Studio: the notecard, or else the file (created if missing)"
              top_delta="0"
              width="64" />
             <button
@@ -688,7 +688,7 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="vimrc_clear"
-             tool_tip="Stop using the notecard: the vimrc file in the settings folder is read again"
+             tool_tip="Stop using the notecard and read the vimrc file in the settings folder again"
              top_delta="0"
              width="64" />
             <text
@@ -729,7 +729,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preflight"
-             tool_tip="The analyzers look a script over before every save, and errors they find hold it until it is asked for again. Off, it goes up whatever they found, and how many errors they found is said: they are not the region's compiler, and what they call an error may compile"
+             tool_tip="On, checker errors hold a save until you save again. Off, it saves and reports the error count"
              top_pad="6"
              width="370" />
             <check_box
@@ -740,7 +740,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="fix_on_save"
-             tool_tip="The fixes that change nothing a script does are made before it is saved, as one step to undo: an SLua local nothing uses renamed to start with an underscore (count to _count), which is how SLua says a name is unused on purpose, or a misspelt directive corrected. Nothing is taken out: a function nothing calls, or code that can never run, is left for Fix All"
+             tool_tip="Before saving, applies fixes that do not change behavior, as one undo step. Removes nothing"
              top_pad="4"
              width="370" />
             <check_box
@@ -751,18 +751,18 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="format_on_save"
-             tool_tip="The formatter runs over the whole script before it is saved, as one step to undo"
+             tool_tip="Formats the whole script before saving, as one undo step"
              top_pad="4"
              width="370" />
             <check_box
              control_name="ALScriptTrimOnSave"
              follows="left|top"
              height="20"
-             label="Take the blanks off the ends of lines when saving"
+             label="Trim trailing spaces when saving"
              layout="topleft"
              left="12"
              name="trim_on_save"
-             tool_tip="Spaces and tabs at the end of every line go before the script is saved, as one step to undo"
+             tool_tip="Removes spaces and tabs at the ends of lines before saving, as one undo step"
              top_pad="4"
              width="370" />
             <text
@@ -783,7 +783,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="external_editor"
-             tool_tip="The command Edit in External Editor runs: the program, then &quot;%s&quot; where the script's file goes. Empty, the system's editor for text"
+             tool_tip="Command for Edit in External Editor: the program, then &quot;%s&quot; for the file. Empty: system editor"
              top_pad="6"
              width="290" />
             <button
@@ -793,7 +793,7 @@ end</floater.string>
              layout="topleft"
              left_pad="6"
              name="external_browse"
-             tool_tip="Choose the program; the command is made from it"
+             tool_tip="Choose the program to build the command from"
              top_delta="0"
              width="74" />
             <button
@@ -803,7 +803,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="scripting_settings"
-             tool_tip="VS Code integration and syncing over a WebSocket, in the viewer's scripting settings"
+             tool_tip="Opens the viewer's scripting settings: VS Code integration and WebSocket sync"
              top_pad="6"
              width="180" />
             <text
@@ -829,7 +829,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preproc_world"
-             tool_tip="An #include or a require may name a script or a notecard in the object the script is in, or anywhere in your inventory. Off, a script opened from somebody else's object cannot pull your own scripts into itself, and only the folders on disk below are looked in"
+             tool_tip="#include and require may use items in the script's object or your inventory; off, only disk folders"
              top_pad="6"
              visible="false"
              width="370" />
@@ -841,7 +841,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preproc_disk"
-             tool_tip="An #include (--#include in SLua) or a require may name a file in the folders below, looked for from the top; a .luaurc at the top of each gives a script in the world its aliases and settings, an earlier folder's over a later one's. Nothing else on the disk is read, but where a .lslrc or .luaurc on disk points -- and only within its own folder or one below: to reach further, add that folder here. Off, nothing on the disk is read at all"
+             tool_tip="#include (--#include in SLua) and require may read files in the folders below; off, nothing on disk"
              top_delta="0"
              width="370" />
             <pane_list
@@ -853,7 +853,7 @@ end</floater.string>
              left="32"
              multi_select="false"
              name="include_folders"
-             tool_tip="The folders on disk an #include or a require is read from, looked in from the top"
+             tool_tip="Folders searched for includes, top first"
              top_pad="4"
              width="260">
                 <pane_list.columns dynamic_width="true" name="folder" />
@@ -865,7 +865,7 @@ end</floater.string>
              layout="topleft"
              left_pad="6"
              name="add_folder"
-             tool_tip="Another folder to look in"
+             tool_tip="Add a folder to search"
              top_delta="0"
              width="70" />
             <button
@@ -875,7 +875,7 @@ end</floater.string>
              layout="topleft"
              left_delta="0"
              name="remove_folder"
-             tool_tip="Look in the chosen folder no more"
+             tool_tip="Stop searching the selected folder"
              top_pad="4"
              width="70" />
             <text
@@ -887,7 +887,7 @@ end</floater.string>
              top_pad="12"
              visible="false"
              width="370">
-                Where an include is looked for, first to last:
+                Include search order, first to last:
             </text>
             <scroll_list
              column_padding="0"
@@ -898,7 +898,7 @@ end</floater.string>
              left="12"
              multi_select="false"
              name="include_order"
-             tool_tip="The places an #include or require is looked for, the first that has it winning; a place unticked is not looked in"
+             tool_tip="Include search order, first match wins; unticked places are skipped"
              top_pad="4"
              visible="false"
              width="220">
@@ -912,7 +912,7 @@ end</floater.string>
              layout="topleft"
              left_pad="6"
              name="order_up"
-             tool_tip="Look in the chosen place sooner"
+             tool_tip="Search the selected place earlier"
              top_delta="0"
              visible="false"
              width="70" />
@@ -923,7 +923,7 @@ end</floater.string>
              layout="topleft"
              left_delta="0"
              name="order_down"
-             tool_tip="Look in the chosen place later"
+             tool_tip="Search the selected place later"
              top_pad="4"
              visible="false"
              width="70" />
@@ -948,7 +948,7 @@ end</floater.string>
              layout="topleft"
              left="412"
              name="preproc_enabled"
-             tool_tip="Every script goes through the preprocessor when saved, with its source kept in the envelope Firestorm's uses; a script already in that envelope always does, whatever this says"
+             tool_tip="Preprocess all scripts on save, keeping the source in Firestorm's envelope. Off: only enveloped ones"
              top_pad="6"
              width="370" />
             <check_box
@@ -959,7 +959,7 @@ end</floater.string>
              layout="topleft"
              left="412"
              name="preproc_switch"
-             tool_tip="LSL gains a switch statement, turned into jumps before compiling"
+             tool_tip="Adds a switch statement to LSL, converted to jumps before compiling"
              top_pad="4"
              width="370" />
             <check_box
@@ -970,7 +970,7 @@ end</floater.string>
              layout="topleft"
              left="412"
              name="preproc_lazy"
-             tool_tip="Writing list[i] in LSL reads an element, as Firestorm's preprocessor allows"
+             tool_tip="Lets LSL read a list element with list[i], as Firestorm's preprocessor allows"
              top_pad="4"
              width="370" />
             <check_box
@@ -981,18 +981,18 @@ end</floater.string>
              layout="topleft"
              left="412"
              name="preproc_extensions"
-             tool_tip="LSL gains break and continue in loops, the &amp;= |= ^= &lt;&lt;= &gt;&gt;= assignments and inline functions, written out before compiling"
+             tool_tip="Adds break, continue, &amp;= |= ^= &lt;&lt;= &gt;&gt;= and inline functions to LSL, converted before compiling"
              top_pad="4"
              width="370" />
             <check_box
              control_name="ALScriptPreprocCompress"
              follows="left|top"
              height="20"
-             label="Compress the output"
+             label="Compress the preprocessed code"
              layout="topleft"
              left="412"
              name="preproc_compress"
-             tool_tip="What is compiled has its comments and spare spaces taken out, which makes for a smaller asset"
+             tool_tip="Removes comments and extra spaces from the preprocessed code, for a smaller asset"
              top_pad="4"
              width="370" />
             <check_box
@@ -1003,7 +1003,7 @@ end</floater.string>
              layout="topleft"
              left="412"
              name="preproc_optimize"
-             tool_tip="Constants folded, unused code dropped, and every change reported among the problems; the compile target chooses the arithmetic"
+             tool_tip="Folds constants, removes unused code, lists each change in Problems. Math follows the compile target"
              top_pad="4"
              width="370" />
             <check_box
@@ -1014,7 +1014,7 @@ end</floater.string>
              layout="topleft"
              left="432"
              name="preproc_shrink"
-             tool_tip="Global names made as short as they can be in what is compiled; the source keeps the real ones"
+             tool_tip="Shortens global names in the preprocessed code; your source keeps the real names"
              top_pad="4"
              width="350" />
             <check_box
@@ -1025,7 +1025,7 @@ end</floater.string>
              layout="topleft"
              left="432"
              name="preproc_addstrings"
-             tool_tip="Adjacent string constants joined into one, which LSL does not do on its own"
+             tool_tip="Joins adjacent string constants into one, which LSL does not do itself"
              top_pad="4"
              width="350" />
             <check_box
@@ -1036,7 +1036,7 @@ end</floater.string>
              layout="topleft"
              left="432"
              name="preproc_inline"
-             tool_tip="A user function called from one place is put in that place and the function dropped"
+             tool_tip="Replaces a function called from only one place with its body, and removes the function"
              top_pad="4"
              width="350" />
             <text
@@ -1047,7 +1047,7 @@ end</floater.string>
              name="defines_label"
              top_pad="14"
              width="380">
-                Defined for every script, one to a line (NAME or NAME=value):
+                Macros for every script, one per line (NAME or NAME=value):
             </text>
             <text_editor
              commit_on_focus_lost="true"
@@ -1057,7 +1057,7 @@ end</floater.string>
              left="412"
              max_length="4096"
              name="preproc_defines"
-             tool_tip="Macros the preprocessor defines before every script: DEBUG alone is 1, and VERSION=2 is 2; a script's own #define or #undef has the last word"
+             tool_tip="Macros defined before every script: DEBUG is 1, VERSION=2 is 2. A script's #define or #undef wins"
              top_pad="4"
              width="380"
              word_wrap="false" />
@@ -1090,7 +1090,7 @@ end</floater.string>
              left="12"
              multi_select="false"
              name="lints_lsl"
-             tool_tip="What the LSL checker warns of: tick On to be told, Error to have it count as an error, which holds a save where the checkers' errors hold one"
+             tool_tip="Warnings from the LSL checker. On reports one; Error counts it as an error, which can hold a save"
              top_pad="6"
              width="384">
                 <scroll_list.columns label="On" name="on" type="checkbox" width="30" />
@@ -1104,7 +1104,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="lints_defaults"
-             tool_tip="Every lint on, as a warning, and SLua checked nonstrict, as the grid compiles, by the old type solver"
+             tool_tip="Every lint on as a warning; SLua checked nonstrict by the old type solver, as the grid compiles"
              top_pad="8"
              width="100" />
 
@@ -1137,10 +1137,10 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="luau_mode"
-             tool_tip="How strictly a script is type checked where neither a --!strict comment nor a .luaurc says. As the solver suits: nonstrict with the old solver, as the grid compiles, and strict with the new, whose nonstrict reports only a checked function called wrongly"
+             tool_tip="Where no --! comment or .luaurc sets it. Solver's default: old solver nonstrict, new strict"
              top_delta="-3"
              width="210">
-                <combo_box.item label="As the solver suits" name="auto" value="auto" />
+                <combo_box.item label="Solver's default" name="auto" value="auto" />
                 <combo_box.item label="Nonstrict, as the grid compiles" name="nonstrict" value="nonstrict" />
                 <combo_box.item label="Strict" name="strict" value="strict" />
                 <combo_box.item label="No checking" name="nocheck" value="nocheck" />
@@ -1162,7 +1162,7 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="luau_solver"
-             tool_tip="Which of Luau's two type solvers checks SLua scripts. The new one works out more of what a script's types are, and finds some mistakes the old one misses and misses some it finds; it can take longer, and some of its messages are shown in English whatever the viewer's language. Its nonstrict finds little, so a script left to the solver is checked strict by it"
+             tool_tip="Luau type solver for SLua. New finds different mistakes, may be slower; some messages English only"
              top_delta="-3"
              width="210">
                 <combo_box.item label="Old" name="old" value="old" />
@@ -1177,7 +1177,7 @@ end</floater.string>
              left="408"
              multi_select="false"
              name="lints_luau"
-             tool_tip="What the SLua linter warns of: tick On to be told, Error to have it count as an error, which holds a save where the checkers' errors hold one"
+             tool_tip="Lint rules for SLua. On reports one; Error counts it as an error, which can hold a save"
              top_pad="6"
              width="384">
                 <scroll_list.columns label="On" name="on" type="checkbox" width="30" />
@@ -1193,7 +1193,7 @@ end</floater.string>
              top_pad="6"
              width="384"
              wrap="true">
-                A .luaurc beside a script overrides these for that script, lint by lint and its mode.
+                A .luaurc next to a script overrides these for that script: each lint and the type checking mode.
             </text>
         </panel>
         <panel
@@ -1219,7 +1219,7 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="snippet_language"
-             tool_tip="Whose snippets are shown: LSL's or SLua's"
+             tool_tip="Show LSL or SLua snippets"
              top_delta="-3"
              width="100">
                 <combo_box.item label="LSL" name="lsl" value="lsl" />
@@ -1234,7 +1234,7 @@ end</floater.string>
              left="12"
              multi_select="false"
              name="snippet_list"
-             tool_tip="Your snippets, then the viewer's, which are copied to be changed"
+             tool_tip="Your snippets, then the viewer's built-in ones (copy one to change it)"
              top_pad="8"
              width="280">
                 <scroll_list.columns dynamic_width="true" label="Snippet" name="name" />
@@ -1247,7 +1247,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="snippet_new"
-             tool_tip="A snippet of your own, to fill in"
+             tool_tip="Create a new snippet"
              top_pad="8"
              width="70" />
             <button
@@ -1257,7 +1257,7 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="snippet_copy"
-             tool_tip="A copy of the chosen snippet among your own, the viewer's too, to change"
+             tool_tip="Copy the selected snippet, built-in or yours, into your snippets to change it"
              top_delta="0"
              width="70" />
             <button
@@ -1267,7 +1267,7 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="snippet_delete"
-             tool_tip="The chosen snippet of your own taken away"
+             tool_tip="Delete the selected snippet (your own only)"
              top_delta="0"
              width="70" />
 
@@ -1288,7 +1288,7 @@ end</floater.string>
              left_pad="4"
              max_length_bytes="120"
              name="snippet_name"
-             tool_tip="What the Insert menu and the completion list call it"
+             tool_tip="The name shown in the Insert menu and the completion list"
              top_delta="-3"
              width="426" />
             <text
@@ -1308,7 +1308,7 @@ end</floater.string>
              left_pad="4"
              max_length_bytes="60"
              name="snippet_prefix"
-             tool_tip="What is typed for completion to offer it"
+             tool_tip="What to type for completion to offer this snippet"
              top_delta="-3"
              width="160" />
             <text
@@ -1328,7 +1328,7 @@ end</floater.string>
              left_pad="4"
              max_length_bytes="240"
              name="snippet_detail"
-             tool_tip="A line about it, shown beside it"
+             tool_tip="A short description shown beside the name"
              top_delta="-3"
              width="426" />
             <code_editor
@@ -1358,7 +1358,7 @@ end</floater.string>
                      left="306"
                      name="snippet_body"
                      syntax="lsl"
-                     tool_tip="What the snippet puts in"
+                     tool_tip="The text the snippet inserts"
                      top_pad="8"
                      width="486" />
             <text
@@ -1370,7 +1370,7 @@ end</floater.string>
              top_pad="6"
              width="370"
              wrap="true">
-                ${1:text}, ${2} and $1 are the places Tab goes through, in order; $0 is where the caret ends.
+                ${1:text}, ${2} and $1 are Tab stops, in order; $0 is where the caret ends.
             </text>
             <button
              follows="right|bottom"
@@ -1379,7 +1379,7 @@ end</floater.string>
              layout="topleft"
              left_pad="6"
              name="snippet_xml"
-             tool_tip="Your snippets file, opened in the studio as the XML it is"
+             tool_tip="Open your snippets file as XML in Script Studio"
              top_delta="4"
              width="110" />
         </panel>
@@ -1398,7 +1398,7 @@ end</floater.string>
              name="templates_note"
              top="12"
              width="780">
-                What a script made in the studio's explorer starts with, to be saved; empty, the grid's own.
+                The text a new script made in the Explorer starts with. If empty, the grid's default.
             </text>
             <text
              follows="left|top"
@@ -1447,7 +1447,7 @@ end</floater.string>
                      left="12"
                      name="template_lsl"
                      syntax="lsl"
-                     tool_tip="What a new LSL script starts with; empty, the grid's own"
+                     tool_tip="The text a new LSL script starts with; if empty, the grid's default"
                      top_pad="4"
                      width="380" />
             <code_editor
@@ -1477,7 +1477,7 @@ end</floater.string>
                      left="412"
                      name="template_slua"
                      syntax="slua"
-                     tool_tip="What a new SLua script starts with; empty, the grid's own"
+                     tool_tip="The text a new SLua script starts with; if empty, the grid's default"
                      top_delta="0"
                      width="380" />
         </panel>
@@ -1498,7 +1498,7 @@ end</floater.string>
      layout="topleft"
      name="ok"
      right="-8"
-     tool_tip="Keep what was changed"
+     tool_tip="Keep your changes"
      top_pad="6"
      width="90" />
     <button
@@ -1508,7 +1508,7 @@ end</floater.string>
      layout="topleft"
      name="cancel"
      right="-104"
-     tool_tip="Every color and setting back to what it was when this window opened"
+     tool_tip="Restore every color and setting to how it was when this window opened"
      top_delta="0"
      width="90" />
 </floater>

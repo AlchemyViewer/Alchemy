@@ -3213,7 +3213,7 @@ std::string ALCodeEditor::stringSize(const ALTextRange& literal) const
     {
         LLStringUtil::format_map_t args;
         args["[COUNT]"] = std::to_string(static_cast<S32>(written.size()));
-        says += ", " + alSaid("CodeStringWritten", "[COUNT] as written", args);
+        says += ", " + alSaid("CodeStringWritten", "[COUNT] in source", args);
     }
     return says;
 }
@@ -4671,9 +4671,9 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
         LLStringUtil::format_map_t args;
         args["[TEXT]"] = mInlays[static_cast<size_t>(inlay)].insert;
 #if LL_DARWIN
-        LLToolTipMgr::instance().show(alSaid("CodeInlayWriteMac", "Command-double-click to write '[TEXT]' in", args));
+        LLToolTipMgr::instance().show(alSaid("CodeInlayWriteMac", "Command-double-click to insert '[TEXT]'", args));
 #else
-        LLToolTipMgr::instance().show(alSaid("CodeInlayWrite", "Ctrl-double-click to write '[TEXT]' in", args));
+        LLToolTipMgr::instance().show(alSaid("CodeInlayWrite", "Ctrl-double-click to insert '[TEXT]'", args));
 #endif
         return true;
     }

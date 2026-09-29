@@ -11,46 +11,46 @@
  width="480">
     <panel.string name="NoKeys">(none)</panel.string>
     <panel.string name="Changed">changed</panel.string>
-    <panel.string name="KeyTaken">[KEYS] was [WHOSE]'s; it is [WHAT]'s now.</panel.string>
+    <panel.string name="KeyTaken">[KEYS] is now assigned to [WHAT] and was removed from [WHOSE].</panel.string>
     <panel.string name="CaptureTitle">Keys for [WHAT]</panel.string>
-    <panel.string name="CapturePrompt">Press a key. Return gives it; Escape keeps what was.</panel.string>
-    <panel.string name="CapturePromptTwo">Press a key, or two in turn (Ctrl+K, then S). Return gives them; Escape keeps what was.</panel.string>
+    <panel.string name="CapturePrompt">Press a key. Press Return to set it, or Escape to cancel.</panel.string>
+    <panel.string name="CapturePromptTwo">Press a key, or two keys in sequence (Ctrl+K, then S). Press Return to set them, or Escape to cancel.</panel.string>
     <panel.string name="CaptureNothing">Waiting for a key...</panel.string>
     <panel.string name="CaptureSet">Set</panel.string>
     <panel.string name="CaptureCancel">Cancel</panel.string>
-    <panel.string name="CaptureTakes">Now [WHOSE]'s, which will lose it.</panel.string>
-    <panel.string name="CaptureShadows">The viewer's menus have [KEYS] for [ITEM]; in the studio it will be the studio's.</panel.string>
+    <panel.string name="CaptureTakes">Already used by [WHOSE], which will lose it.</panel.string>
+    <panel.string name="CaptureShadows">The viewer menus use [KEYS] for [ITEM]; in Script Studio, this command takes priority.</panel.string>
     <panel.string name="cmd_move_left">Move left</panel.string>
     <panel.string name="cmd_move_right">Move right</panel.string>
     <panel.string name="cmd_move_up">Move up</panel.string>
     <panel.string name="cmd_move_down">Move down</panel.string>
-    <panel.string name="cmd_move_word_left">Move a word left</panel.string>
-    <panel.string name="cmd_move_word_right">Move a word right</panel.string>
-    <panel.string name="cmd_move_line_start">Move to the line's start</panel.string>
-    <panel.string name="cmd_move_line_end">Move to the line's end</panel.string>
+    <panel.string name="cmd_move_word_left">Move left one word</panel.string>
+    <panel.string name="cmd_move_word_right">Move right one word</panel.string>
+    <panel.string name="cmd_move_line_start">Move to start of line</panel.string>
+    <panel.string name="cmd_move_line_end">Move to end of line</panel.string>
     <panel.string name="cmd_move_doc_start">Move to the top</panel.string>
-    <panel.string name="cmd_move_doc_end">Move to the end</panel.string>
-    <panel.string name="cmd_move_page_up">Move a page up</panel.string>
-    <panel.string name="cmd_move_page_down">Move a page down</panel.string>
+    <panel.string name="cmd_move_doc_end">Move to the bottom</panel.string>
+    <panel.string name="cmd_move_page_up">Move up one page</panel.string>
+    <panel.string name="cmd_move_page_down">Move down one page</panel.string>
     <panel.string name="cmd_select_left">Select left</panel.string>
     <panel.string name="cmd_select_right">Select right</panel.string>
     <panel.string name="cmd_select_up">Select up</panel.string>
     <panel.string name="cmd_select_down">Select down</panel.string>
-    <panel.string name="cmd_select_word_left">Select a word left</panel.string>
-    <panel.string name="cmd_select_word_right">Select a word right</panel.string>
-    <panel.string name="cmd_select_line_start">Select to the line's start</panel.string>
-    <panel.string name="cmd_select_line_end">Select to the line's end</panel.string>
+    <panel.string name="cmd_select_word_left">Select left one word</panel.string>
+    <panel.string name="cmd_select_word_right">Select right one word</panel.string>
+    <panel.string name="cmd_select_line_start">Select to start of line</panel.string>
+    <panel.string name="cmd_select_line_end">Select to end of line</panel.string>
     <panel.string name="cmd_select_doc_start">Select to the top</panel.string>
-    <panel.string name="cmd_select_doc_end">Select to the end</panel.string>
-    <panel.string name="cmd_select_page_up">Select a page up</panel.string>
-    <panel.string name="cmd_select_page_down">Select a page down</panel.string>
+    <panel.string name="cmd_select_doc_end">Select to the bottom</panel.string>
+    <panel.string name="cmd_select_page_up">Select up one page</panel.string>
+    <panel.string name="cmd_select_page_down">Select down one page</panel.string>
     <panel.string name="cmd_select_all">Select all</panel.string>
     <panel.string name="cmd_delete_left">Delete left</panel.string>
     <panel.string name="cmd_delete_right">Delete right</panel.string>
-    <panel.string name="cmd_delete_word_left">Delete the word left</panel.string>
-    <panel.string name="cmd_delete_word_right">Delete the word right</panel.string>
-    <panel.string name="cmd_delete_to_line_start">Delete to the line's start</panel.string>
-    <panel.string name="cmd_delete_to_line_end">Delete to the line's end</panel.string>
+    <panel.string name="cmd_delete_word_left">Delete left one word</panel.string>
+    <panel.string name="cmd_delete_word_right">Delete right one word</panel.string>
+    <panel.string name="cmd_delete_to_line_start">Delete to start of line</panel.string>
+    <panel.string name="cmd_delete_to_line_end">Delete to end of line</panel.string>
     <panel.string name="cmd_new_line">New line</panel.string>
     <panel.string name="cmd_indent">Indent</panel.string>
     <panel.string name="cmd_unindent">Unindent</panel.string>
@@ -70,7 +70,7 @@
     <panel.string name="cmd_fold_all">Fold all</panel.string>
     <panel.string name="cmd_unfold_all">Unfold all</panel.string>
     <panel.string name="cmd_complete">Complete</panel.string>
-    <panel.string name="cmd_signature_help">Parameter Info</panel.string>
+    <panel.string name="cmd_signature_help">Parameter info</panel.string>
     <panel.string name="cmd_go_to_definition">Go to definition</panel.string>
     <panel.string name="cmd_find_references">Find references</panel.string>
     <panel.string name="cmd_rename">Rename symbol</panel.string>
@@ -81,7 +81,7 @@
     <panel.string name="cmd_quick_fix">Quick fix</panel.string>
     <panel.string name="cmd_next_misspelling">Next misspelling</panel.string>
     <panel.string name="cmd_join_lines">Join lines</panel.string>
-    <panel.string name="cmd_previous_change">Last edit location</panel.string>
+    <panel.string name="cmd_previous_change">Previous edit location</panel.string>
     <panel.string name="cmd_next_change">Next edit location</panel.string>
     <panel.string name="cmd_next_function">Next function</panel.string>
     <panel.string name="cmd_previous_function">Previous function</panel.string>
@@ -90,14 +90,14 @@
     <panel.string name="cmd_insert_line_below">Insert a line below</panel.string>
     <panel.string name="cmd_insert_line_above">Insert a line above</panel.string>
     <panel.string name="cmd_select_line">Select the line</panel.string>
-    <panel.string name="cmd_move_subword_left">Move a name's part left</panel.string>
-    <panel.string name="cmd_move_subword_right">Move a name's part right</panel.string>
-    <panel.string name="cmd_select_subword_left">Select a name's part left</panel.string>
-    <panel.string name="cmd_select_subword_right">Select a name's part right</panel.string>
+    <panel.string name="cmd_move_subword_left">Move left one word part</panel.string>
+    <panel.string name="cmd_move_subword_right">Move right one word part</panel.string>
+    <panel.string name="cmd_select_subword_left">Select left one word part</panel.string>
+    <panel.string name="cmd_select_subword_right">Select right one word part</panel.string>
     <panel.string name="cmd_expand_selection">Expand the selection</panel.string>
     <panel.string name="cmd_shrink_selection">Shrink the selection</panel.string>
-    <panel.string name="cmd_select_next_occurrence">Take the next place it stands too</panel.string>
-    <panel.string name="cmd_change_all_occurrences">Change every place it stands</panel.string>
+    <panel.string name="cmd_select_next_occurrence">Select next occurrence</panel.string>
+    <panel.string name="cmd_change_all_occurrences">Change all occurrences</panel.string>
     <panel.string name="cmd_previous_misspelling">Previous misspelling</panel.string>
     <line_editor
      follows="left|top|right"
@@ -106,7 +106,7 @@
      layout="topleft"
      left="8"
      name="filter"
-     tool_tip="Only the commands whose names or keys carry this"
+     tool_tip="Show only commands whose name or keys contain this text"
      top="8"
      width="464" />
     <scroll_list
@@ -115,7 +115,7 @@
      layout="topleft"
      left="8"
      name="keys"
-     tool_tip="Every command of the editor and of the studio's menus, and its keys; double-click one to press a new key for it"
+     tool_tip="Editor and menu commands with their keys; double-click one to set new keys"
      top_pad="4"
      width="464">
         <scroll_list.columns dynamic_width="true" label="Command" name="command" />
@@ -138,7 +138,7 @@
      layout="topleft"
      left="8"
      name="change"
-     tool_tip="Press keys to answer for the chosen command, in place of its keys; whatever answered to them before lets them go"
+     tool_tip="Replace the selected command's keys; other commands using the new keys lose them"
      top_pad="4"
      width="80" />
     <button
@@ -148,7 +148,7 @@
      layout="topleft"
      left_pad="4"
      name="add"
-     tool_tip="Press another key to answer for the chosen command, beside its keys"
+     tool_tip="Add another key to the selected command, keeping its current keys"
      top_delta="0"
      width="80" />
     <button
@@ -158,7 +158,7 @@
      layout="topleft"
      left_pad="4"
      name="clear"
-     tool_tip="No key for the chosen command"
+     tool_tip="Remove all keys from the selected command"
      top_delta="0"
      width="80" />
     <button
@@ -168,7 +168,7 @@
      layout="topleft"
      left_pad="4"
      name="restore"
-     tool_tip="The chosen command's standard keys again"
+     tool_tip="Restore the selected command's standard keys"
      top_delta="0"
      width="80" />
     <button
@@ -178,7 +178,7 @@
      layout="topleft"
      name="restore_all"
      right="-8"
-     tool_tip="Every command's standard keys again"
+     tool_tip="Restore standard keys for every command"
      top_delta="0"
      width="100" />
 </panel>

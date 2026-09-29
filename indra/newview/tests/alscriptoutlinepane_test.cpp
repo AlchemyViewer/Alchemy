@@ -230,7 +230,7 @@ namespace tut
         ensure_equals("each with the letters", rows(), std::string("touch_start, state_entry"));
         filter->setText(std::string("zz"));
         outline->show(doc);
-        ensure_equals("none", comment(), std::string("No symbol has those letters in its name."));
+        ensure_equals("none", comment(), std::string("No symbol names match what you typed."));
         filter->setText(std::string());
 
         outline->setSortOrder("name");

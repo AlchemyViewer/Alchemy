@@ -215,7 +215,7 @@ ALFindBar::ALFindBar(const Params& p)
     mBgColor(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black)),
     mInkColor(LLColor4::white)
 {
-    mExpand = flat("expand", ">", false, alSaid("FindBarReplaceToo", "Replace as well"));
+    mExpand = flat("expand", ">", false, alSaid("FindBarReplaceToo", "Toggle replace"));
     mExpand->setCommitCallback([this](LLUICtrl*, const LLSD&) { setReplaceShown(!mReplaceShown); });
 
     mFind = field("find", alSaid("FindBarFind", "Find"), 3 * SMALL_W + 6);
@@ -255,9 +255,9 @@ ALFindBar::ALFindBar(const Params& p)
     mCount = LLUICtrlFactory::create<LLTextBox>(tp);
     addChild(mCount);
 
-    mPrev        = flat("previous", "\xE2\x86\x91", false, alSaid("FindBarPrevious", "The one before (shift-return)"));
-    mNextButton  = flat("next", "\xE2\x86\x93", false, alSaid("FindBarNext", "The next (return)"));
-    mSelection   = flat("in_selection", "\xE2\x89\xA1", true, alSaid("FindBarInSelection", "In the selection only"));
+    mPrev        = flat("previous", "\xE2\x86\x91", false, alSaid("FindBarPrevious", "Previous match (shift-return)"));
+    mNextButton  = flat("next", "\xE2\x86\x93", false, alSaid("FindBarNext", "Next match (return)"));
+    mSelection   = flat("in_selection", "\xE2\x89\xA1", true, alSaid("FindBarInSelection", "Find in selection"));
     mCloseButton = flat("close", "\xC3\x97", false, alSaid("FindBarClose", "Close (escape)"));
     mPrev->setCommitCallback([this](LLUICtrl*, const LLSD&) { mPrevious(); });
     mNextButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mNext(); });
@@ -269,8 +269,8 @@ ALFindBar::ALFindBar(const Params& p)
     mReplaceField->setCommitCallback([this](LLUICtrl*, const LLSD&) { mReplace(); });
     mPreserveCase = flat("preserve_case", "AB", true, alSaid("FindBarKeepCase", "Keep each match's case: HELLO, Hello or hello"));
     // Glyphs standing in for the icons: one replaced and on, all replaced.
-    mReplaceOne   = flat("replace_one", "\xE2\x86\xA6", false, alSaid("FindBarReplaceOne", "Replace this one and find the next"));
-    mReplaceEvery = flat("replace_all", "\xE2\x87\x89", false, alSaid("FindBarReplaceAll", "Replace every one, as one step to undo"));
+    mReplaceOne   = flat("replace_one", "\xE2\x86\xA6", false, alSaid("FindBarReplaceOne", "Replace this match and find the next"));
+    mReplaceEvery = flat("replace_all", "\xE2\x87\x89", false, alSaid("FindBarReplaceAll", "Replace all matches as one undo step"));
     mReplaceOne->setCommitCallback([this](LLUICtrl*, const LLSD&) { mReplace(); });
     mReplaceEvery->setCommitCallback([this](LLUICtrl*, const LLSD&) { mReplaceAll(); });
     mReplaceEvery->setKey(KEY_RETURN, REPLACE_ALL_MASK);
@@ -382,7 +382,7 @@ void ALFindBar::setCount(S32 current, S32 total, const std::string& error, bool 
     std::string said;
     if (!error.empty())
     {
-        said = alSaid("FindBarBadPattern", "Not a pattern");
+        said = alSaid("FindBarBadPattern", "Invalid regular expression");
     }
     else if (total == 0)
     {
@@ -403,8 +403,8 @@ void ALFindBar::setCount(S32 current, S32 total, const std::string& error, bool 
         // Round the text's end: a turning arrow before the count, and in
         // words in its tip.
         said = (wrapped > 0 ? "\xE2\x86\xBB " : "\xE2\x86\xBA ") + said;
-        tip  = wrapped > 0 ? alSaid("FindBarWrappedToTop", "Went round the end, on from the top")
-                           : alSaid("FindBarWrappedToBottom", "Went round the start, back from the bottom");
+        tip  = wrapped > 0 ? alSaid("FindBarWrappedToTop", "Reached the end; continued from the top")
+                           : alSaid("FindBarWrappedToBottom", "Reached the start; continued from the bottom");
     }
     mCount->setText(said);
     mCount->setToolTip(tip);

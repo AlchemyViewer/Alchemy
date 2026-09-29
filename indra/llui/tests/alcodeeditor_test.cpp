@@ -662,7 +662,7 @@ namespace tut
         ALCodeEditor& f = make("default { state_entry() { llSay(0, \"a\\tb\"); } }\n");
         const ALTextRange escaped = f.stringAt(ALTextPos(0, 36));
         ensure_equals("the whole literal", f.document().text(escaped), std::string("\"a\\tb\""));
-        ensure_equals("the tab counted once, and the source said", f.stringSize(escaped), std::string("3 bytes, 6 as written"));
+        ensure_equals("the tab counted once, and the source said", f.stringSize(escaped), std::string("3 bytes, 6 in source"));
 
         // And the card comes up on the comma, where no word is.
         const LLRect text = f.textRect();

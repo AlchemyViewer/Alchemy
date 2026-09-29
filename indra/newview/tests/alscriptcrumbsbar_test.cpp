@@ -224,8 +224,8 @@ namespace tut
         ensure_equals("kept", doc.caret.crumbPath.size(), size_t(2));
         ensure_equals("the script's step", jump()->path()[0].value, std::string("top"));
         ensure_equals("said", jump()->path()[0].toolTip,
-                      std::string("Script a: press to go to the top; its arrow lists what the script declares"));
-        ensure_equals("a symbol's", jump()->path()[2].toolTip, std::string("Go to state_entry; its arrow lists what is beside it"));
+                      std::string("Script a: click to go to the top; the arrow lists the script's declarations"));
+        ensure_equals("a symbol's", jump()->path()[2].toolTip, std::string("Go to state_entry; the arrow lists other items at this level"));
 
         doc.editor->setCaret(ALTextPos(4, 0));
         place(crumbs, doc);
@@ -285,7 +285,7 @@ namespace tut
         ensure("where narrow: the indentation first, then the selection, the counts and read only last, the place never",
                part("Tab")->drop > part("2 lines")->drop && part("2 lines")->drop > part("2 errors")->drop && part("2 errors")->drop > 0 &&
                    part("Read")->drop > 0 && part("Ln")->drop == 0);
-        ensure_equals("read only, said", part("Read")->toolTip, std::string("You may read this script and not change it"));
+        ensure_equals("read only, said", part("Read")->toolTip, std::string("You can view this script but not change it"));
         ensure("the problems pressable", part("2 errors")->value == "problems" && part("1 warning")->toolTip == "problems tip");
         doc.editor->setSelection(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 2)));
         crumbs->showTrailer(doc);
@@ -306,7 +306,7 @@ namespace tut
     template<> template<>
     void alscriptcrumbsbar_object::test<3>()
     {
-        set_test_name("what it weighs, coloured near and past its limit; what a save would send, past half; the view, pressable");
+        set_test_name("its code size, coloured near and past its limit; what a save would send, past half; the view, pressable");
         ALScriptCrumbsBar* crumbs = bar();
         Doc&               doc    = tab("a");
         const LLColor4     error  = doc.editor->markColor(ALCodeEditor::Mark::Error);
@@ -319,12 +319,12 @@ namespace tut
         crumbs->showTrailer(doc);
         const Part* weighed = part("LSL (Mono)");
         ensure("weighed", weighed && weighed->text == "LSL (Mono) 40.0 of 64 KB used" && !weighed->color);
-        ensure("before the optimizer", weighed->toolTip.find("Weighed before the preprocessor") != std::string::npos);
+        ensure("before the optimizer", weighed->toolTip.find("Measured before the preprocessor") != std::string::npos);
         doc.weighing.exact = true;
         doc.weighing.sent  = true;
         doc.weighing.weight->total = 60000;
         crumbs->showTrailer(doc);
-        ensure("as sent", part("LSL (Mono)")->toolTip.find("as a save sends it") != std::string::npos);
+        ensure("as sent", part("LSL (Mono)")->toolTip.find("as it is saved") != std::string::npos);
         ensure("near: the warning's", part("LSL (Mono)")->color == warn);
         doc.weighing.weight->total = 70000;
         crumbs->showTrailer(doc);
@@ -341,18 +341,18 @@ namespace tut
         doc.weighing.assetBytes = LIMIT / 2 + 1;
         crumbs->showTrailer(doc);
         ensure("past half", part(std::to_string((LIMIT / 2 + 1 + 1023) / 1024) + " KB") != nullptr);
-        ensure("said", parts().back().toolTip.find("What saving this script sends") != std::string::npos && !parts().back().color);
+        ensure("said", parts().back().toolTip.find("Save size") != std::string::npos && !parts().back().color);
         doc.weighing.assetBytes = LIMIT * 9 / 10 + 1;
         crumbs->showTrailer(doc);
         ensure("near: the warning's", parts().back().color == warn);
         doc.weighing.assetBytes = LIMIT + 1;
         crumbs->showTrailer(doc);
         ensure("over: the error's", parts().back().color == error);
-        ensure("and by how much", parts().back().toolTip.find("1 more than") != std::string::npos);
+        ensure("and by how much", parts().back().toolTip.find("1 over the") != std::string::npos);
         doc.notecard            = true;
         doc.weighing.assetBytes = static_cast<size_t>(LLNotecard::MAX_SIZE) / 2 + 1;
         crumbs->showTrailer(doc);
-        ensure("a notecard's by its own limit", parts().back().toolTip.find("The notecard's text") != std::string::npos);
+        ensure("a notecard's by its own limit", parts().back().toolTip.find("Notecard text") != std::string::npos);
         doc.notecard            = false;
         doc.weighing.assetBytes = 0;
 
@@ -430,16 +430,16 @@ namespace tut
         Doc&               doc    = tab("a");
         crumbs->showTrailer(doc);
         ensure("tabs, by default", part("Tab Size: 4") && part("Tab Size")->value == "indent");
-        ensure("the default's tip", part("Tab Size")->toolTip.find("default in Preferences") != std::string::npos);
+        ensure("the default's tip", part("Tab Size")->toolTip.find("Default indentation from Preferences") != std::string::npos);
         ensure("checked as it is", crumbs->indentChecked("tabs") && crumbs->indentChecked("width_4") && !crumbs->indentChecked("spaces"));
         ensure("nothing chosen to forget", !crumbs->indentEnabled("read"));
         doc.editor->setReadsIndentation(true);
         doc.editor->setText("a\n  b\n");
         crumbs->showTrailer(doc);
-        ensure("read from the script", part("Spaces: 2") && part("Spaces")->toolTip.find("read from its own lines") != std::string::npos);
+        ensure("read from the script", part("Spaces: 2") && part("Spaces")->toolTip.find("detected from this script's lines") != std::string::npos);
 
         crumbs->indentAct("width_4");
-        ensure("a width chosen", part("Spaces: 4") && part("Spaces")->toolTip.find("as chosen for it") != std::string::npos);
+        ensure("a width chosen", part("Spaces: 4") && part("Spaces")->toolTip.find("set for this script") != std::string::npos);
         ensure("and checked", crumbs->indentChecked("width_4") && !crumbs->indentChecked("width_2"));
         ensure("the text untouched", doc.editor->text() == "a\n  b\n");
         crumbs->indentAct("tabs");

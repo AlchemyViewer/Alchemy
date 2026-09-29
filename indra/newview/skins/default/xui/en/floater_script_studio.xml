@@ -15,39 +15,39 @@
     <floater.string name="Untitled">Script</floater.string>
     <floater.string name="Loading">Loading...</floater.string>
     <floater.string name="Loaded">[NAME] loaded.</floater.string>
-    <floater.string name="LoadedReadOnly">[NAME] loaded; it may be read and not changed.</floater.string>
+    <floater.string name="LoadedReadOnly">[NAME] loaded as read-only.</floater.string>
     <floater.string name="Saving">Saving [NAME]...</floater.string>
     <floater.string name="Compiled">[NAME] compiled.</floater.string>
     <floater.string name="CompileFailedA">[NAME] did not compile: 1 problem.</floater.string>
     <floater.string name="CompileFailedB">[NAME] did not compile: [COUNT] problems.</floater.string>
-    <floater.string name="SaveFailed">[NAME] was not saved: [ERROR]</floater.string>
-    <floater.string name="SaveExperienceUnknown">[NAME] was not saved: the region would not say what experience it runs under, and a save that did not say would take it away. Pick it, or No experience, in the Experience box above the text, and save again.</floater.string>
-    <floater.string name="SavedToFile">Written to [PATH]</floater.string>
-    <floater.string name="FileReloaded">[NAME] changed on disk and was read again.</floater.string>
-    <floater.string name="Reverted">[NAME] was read again from disk.</floater.string>
-    <floater.string name="FileChangedOutside">[NAME] changed on disk while it was being edited here; saving will overwrite it.</floater.string>
+    <floater.string name="SaveFailed">Could not save [NAME]: [ERROR]</floater.string>
+    <floater.string name="SaveExperienceUnknown">Could not save [NAME]: the region did not report the script's experience, and saving without it would clear the experience. Choose it, or No experience, in the Experience box at the right end of the bar below the editor, then save again.</floater.string>
+    <floater.string name="SavedToFile">Saved to [PATH]</floater.string>
+    <floater.string name="FileReloaded">[NAME] changed on disk and was reloaded.</floater.string>
+    <floater.string name="Reverted">[NAME] reverted to the version on disk.</floater.string>
+    <floater.string name="FileChangedOutside">[NAME] changed on disk while you were editing it; saving will overwrite the file.</floater.string>
     <floater.string name="SaveToFileFailed">Could not write [PATH]</floater.string>
     <floater.string name="LoadFromFileFailed">Could not read [FILE]</floater.string>
     <floater.string name="FileTooLarge">[FILE] is too large to open here.</floater.string>
-    <floater.string name="RevertOutOfReach">[NAME] cannot be read again: what it came from is out of reach.</floater.string>
-    <floater.string name="RevertFailed">[NAME] could not be read again, and is as it was: [ERROR]</floater.string>
+    <floater.string name="RevertOutOfReach">Cannot revert [NAME]: its source is gone or cannot be reached.</floater.string>
+    <floater.string name="RevertFailed">Could not revert [NAME] (the tab is unchanged): [ERROR]</floater.string>
     <floater.string name="NoProblems">No problems.</floater.string>
     <floater.string name="NoScriptOpenHeadline">No script open</floater.string>
-    <floater.string name="NoScriptOpenSentence">Go to any script you have by its name, choose one in the Explorer, or start a new one.</floater.string>
+    <floater.string name="NoScriptOpenSentence">Open any of your scripts by name, choose one in the Explorer, or start a new one.</floater.string>
     <floater.string name="NoScriptOpenGoTo">Go to Script ([KEYS])</floater.string>
     <floater.string name="NoScriptOpenGoToNoKeys">Go to Script...</floater.string>
     <floater.string name="NoScriptOpenNew">New Script...</floater.string>
     <floater.string name="NoScriptOpenFile">Open a file from your computer...</floater.string>
-    <floater.string name="NoReferences">Nothing looked up yet. Put the caret on a name and press Find References.</floater.string>
+    <floater.string name="NoReferences">Nothing to show yet. Put the caret on a name and choose Find References.</floater.string>
     <floater.string name="NoOutline">Nothing in this script to outline yet.</floater.string>
     <floater.string name="NoOutlineYet">Still loading.</floater.string>
-    <floater.string name="NoExplorerSelection">Nothing selected. Select an object in the world to see what it holds.</floater.string>
-    <floater.string name="ExplorerNoMatch">Nothing listed has those letters in its name.</floater.string>
-    <floater.string name="NoOutput">Nothing yet. Compiling, running and the preprocessor say what they are doing here.</floater.string>
+    <floater.string name="NoExplorerSelection">Nothing selected. Select an object in the world to see its contents.</floater.string>
+    <floater.string name="ExplorerNoMatch">No listed item has that text in its name.</floater.string>
+    <floater.string name="NoOutput">No output yet. Messages from compiling, running and the preprocessor appear here.</floater.string>
     <floater.string name="PaneExplorer">Explorer</floater.string>
-    <floater.string name="PaneBottom">Problems, references, output and search</floater.string>
+    <floater.string name="PaneBottom">Problems, References, Output, Search and Memory</floater.string>
     <floater.string name="NoReference">Nothing at the caret to look up.</floater.string>
-    <floater.string name="NoWikiPage">[NAME] is the script's own; the wiki has no page for it.</floater.string>
+    <floater.string name="NoWikiPage">[NAME] is defined in this script, so the wiki has no page for it.</floater.string>
     <floater.string name="ReferenceTitle">Reference</floater.string>
     <floater.string name="ReferencePlaceholder">A function, event or constant by name</floater.string>
     <floater.string name="SnippetDetail">snippet</floater.string>
@@ -58,22 +58,22 @@
     <floater.string name="InsertEventPlaceholder">An event by name</floater.string>
     <floater.string name="InsertConstantPlaceholder">A constant by name</floater.string>
     <floater.string name="Formatted">[NAME] formatted.</floater.string>
-    <floater.string name="FormattedSelection">The selection in [NAME] formatted.</floater.string>
-    <floater.string name="FormattedAlready">[NAME] was formatted already.</floater.string>
-    <floater.string name="FormatFailed">[NAME] was left as it was: the formatter could not keep its lines.</floater.string>
+    <floater.string name="FormattedSelection">Formatted the selection in [NAME].</floater.string>
+    <floater.string name="FormattedAlready">[NAME] is already formatted.</floater.string>
+    <floater.string name="FormatFailed">Could not format [NAME]: the formatter could not keep the same number of lines.</floater.string>
     <floater.string name="SearchFind">Find</floater.string>
     <floater.string name="SearchPlaceholder">words</floater.string>
-    <floater.string name="SearchQueryTip">What to look for; return runs the search</floater.string>
+    <floater.string name="SearchQueryTip">What to find; press Return to search</floater.string>
     <floater.string name="SearchAs">as</floater.string>
-    <floater.string name="SearchHowTip">How the words have to match: anywhere in the text, as a whole word, or as a regular expression</floater.string>
+    <floater.string name="SearchHowTip">Match the text anywhere, as a whole word, or as a regular expression</floater.string>
     <floater.string name="SearchText">text</floater.string>
     <floater.string name="SearchWord">a whole word</floater.string>
     <floater.string name="SearchPattern">a pattern</floater.string>
-    <floater.string name="SearchCaseTip">Whether capitals matter</floater.string>
+    <floater.string name="SearchCaseTip">Whether upper and lower case must match</floater.string>
     <floater.string name="SearchAnyCase">ignoring case</floater.string>
     <floater.string name="SearchThisCase">matching case</floater.string>
     <floater.string name="SearchIn">in</floater.string>
-    <floater.string name="SearchScopeTip">Where to look: the scripts and notecards open, the contents of this script's object, of every object the explorer lists, or every script and notecard in your inventory</floater.string>
+    <floater.string name="SearchScopeTip">Search open scripts and notecards, this object, objects in the Explorer, or your inventory</floater.string>
     <floater.string name="SearchOpen">open scripts</floater.string>
     <floater.string name="SearchThisObject">this object</floater.string>
     <floater.string name="SearchListed">every object listed</floater.string>
@@ -81,61 +81,61 @@
     <floater.string name="SearchInventoryWhere">Inventory</floater.string>
     <floater.string name="SearchAlone">alone</floater.string>
     <floater.string name="SearchWithIncludes">and what they include</floater.string>
-    <floater.string name="RunningTip">Whether the script runs in its object; a save keeps whatever this says</floater.string>
-    <floater.string name="RunningAsking">Asking the region whether the script runs. A save meanwhile asks first, and keeps whatever it says</floater.string>
-    <floater.string name="RunningPublic">Public objects cannot run scripts: this one is released to the public, with no owner</floater.string>
+    <floater.string name="RunningTip">Whether the script runs in its object; saving keeps this setting</floater.string>
+    <floater.string name="RunningAsking">Asking the region whether the script is running. A save now waits for the answer and keeps it</floater.string>
+    <floater.string name="RunningPublic">Public objects cannot run scripts: this object is public and has no owner</floater.string>
     <floater.string name="RunningStarting">Starting [NAME]...</floater.string>
     <floater.string name="RunningStopping">Stopping [NAME]...</floater.string>
     <floater.string name="RunningStarted">[NAME] is running.</floater.string>
     <floater.string name="RunningStopped">[NAME] is stopped.</floater.string>
-    <floater.string name="RunningNotStarted">[NAME] did not start: its region still says it is stopped.</floater.string>
-    <floater.string name="RunningNotStopped">[NAME] did not stop: its region still says it runs.</floater.string>
-    <floater.string name="ResetSent">[NAME] reset: its state forgotten, and state_entry run again.</floater.string>
-    <floater.string name="SearchIncludesTip">What an #include or a require brings in, searched too: each file once, as its own, as it is on disk or was last fetched. Replace All leaves those alone, since they are every script's that includes them.</floater.string>
+    <floater.string name="RunningNotStarted">[NAME] did not start: the region says it is still stopped.</floater.string>
+    <floater.string name="RunningNotStopped">[NAME] did not stop: the region says it is still running.</floater.string>
+    <floater.string name="ResetSent">[NAME] was reset: its state is cleared and state_entry runs again.</floater.string>
+    <floater.string name="SearchIncludesTip">Also search files brought in by #include or require. Replace All does not change them.</floater.string>
     <floater.string name="SearchIncluded">Included</floater.string>
-    <floater.string name="SearchCountTip">How many places were found, in how many scripts</floater.string>
+    <floater.string name="SearchCountTip">How many matches were found, in how many files</floater.string>
     <floater.string name="SearchCounting">[HITS] in [FILES], fetching...</floater.string>
     <floater.string name="SearchCount">[HITS] in [FILES]</floater.string>
     <floater.string name="SearchPassedOver">[SAID], but [MISSED]</floater.string>
     <floater.string name="SearchBoth">[FIRST] and [SECOND]</floater.string>
-    <floater.string name="SearchUnlistedA">1 prim did not say what it holds</floater.string>
-    <floater.string name="SearchUnlistedB">[COUNT] prims did not say what they hold</floater.string>
+    <floater.string name="SearchUnlistedA">1 prim did not list its contents</floater.string>
+    <floater.string name="SearchUnlistedB">[COUNT] prims did not list their contents</floater.string>
     <floater.string name="SearchUnreadA">1 script could not be read</floater.string>
     <floater.string name="SearchUnreadB">[COUNT] scripts could not be read</floater.string>
-    <floater.string name="SearchCountCapped">[HITS] in [FILES], the first [SHOWN] listed</floater.string>
+    <floater.string name="SearchCountCapped">[HITS] in [FILES], showing the first [SHOWN]</floater.string>
     <floater.string name="MatchesA">1 match</floater.string>
     <floater.string name="MatchesB">[COUNT] matches</floater.string>
     <floater.string name="FilesA">1 file</floater.string>
     <floater.string name="FilesB">[COUNT] files</floater.string>
-    <floater.string name="PlacesA">1 place</floater.string>
-    <floater.string name="PlacesB">[COUNT] places</floater.string>
+    <floater.string name="PlacesA">1 occurrence</floater.string>
+    <floater.string name="PlacesB">[COUNT] occurrences</floater.string>
     <floater.string name="FixesA">1 fix</floater.string>
     <floater.string name="FixesB">[COUNT] fixes</floater.string>
     <floater.string name="FixesMadeA">Made 1 fix.</floater.string>
     <floater.string name="FixesMadeB">Made [COUNT] fixes.</floater.string>
-    <floater.string name="FixNone">Nothing here has a fix to make.</floater.string>
-    <floater.string name="FixNoneSafe">Nothing here has a fix that is safe to make without a look.</floater.string>
-    <floater.string name="FixesLeftA">1 fix that may change what the script does, or guesses at what was meant, is left for you to choose in Problems.</floater.string>
-    <floater.string name="FixesLeftB">[COUNT] fixes that may change what the script does, or guess at what was meant, are left for you to choose in Problems.</floater.string>
-    <floater.string name="FixChecking">Checking [NAME] for what to fix...</floater.string>
+    <floater.string name="FixNone">No fixes to make.</floater.string>
+    <floater.string name="FixNoneSafe">No fix is safe to make without review.</floater.string>
+    <floater.string name="FixesLeftA">1 fix may change what the script does or guess what you meant, so it is left for you to apply in Problems.</floater.string>
+    <floater.string name="FixesLeftB">[COUNT] fixes may change what the script does or guess what you meant, so they are left for you to apply in Problems.</floater.string>
+    <floater.string name="FixChecking">Checking [NAME] for fixes...</floater.string>
     <floater.string name="FilterFixable">Fixable</floater.string>
     <floater.string name="FilterFixableCount">Fixable ([COUNT])</floater.string>
-    <floater.string name="FixStale">The script changed since it was checked; the fixes are offered again once it has been checked.</floater.string>
+    <floater.string name="FixStale">The script changed since it was checked. Fixes will be offered again after the next check.</floater.string>
     <floater.string name="ProblemFixTip">Fix: [TITLE]</floater.string>
     <floater.string name="ScriptsA">1 script</floater.string>
     <floater.string name="ScriptsB">[COUNT] scripts</floater.string>
     <floater.string name="SearchReplaced">[PLACES] replaced in [SCRIPTS]</floater.string>
-    <floater.string name="SearchReplacedOpened">[SCRIPTS] opened with the change unsaved</floater.string>
-    <floater.string name="SearchReplacedLeft">[SCRIPTS] left alone, changed since the search</floater.string>
+    <floater.string name="SearchReplacedOpened">[SCRIPTS] opened with unsaved changes</floater.string>
+    <floater.string name="SearchReplacedLeft">[SCRIPTS] skipped (changed since the search)</floater.string>
     <floater.string name="SearchReplaceNothing">Nothing to replace.</floater.string>
-    <floater.string name="SearchNoObject">no object chosen</floater.string>
-    <floater.string name="SearchNoObjectTip">Open a script of an object, or choose an object in the explorer, to search what it holds</floater.string>
+    <floater.string name="SearchNoObject">no object selected</floater.string>
+    <floater.string name="SearchNoObjectTip">Open a script from an object, or select an object in the Explorer, to search its contents</floater.string>
     <floater.string name="SearchObjectTip">[OBJECT]: [HITS] in [FILES]</floater.string>
     <floater.string name="OutputCopiedA">1 line copied.</floater.string>
     <floater.string name="OutputCopiedB">[COUNT] lines copied.</floater.string>
     <floater.string name="OutputNothingToCopy">Nothing shown to copy.</floater.string>
     <floater.string name="SearchNone">nothing found</floater.string>
-    <floater.string name="SearchBadPattern">the pattern does not parse</floater.string>
+    <floater.string name="SearchBadPattern">the pattern is not valid</floater.string>
     <floater.string name="PaneInspector">Inspector</floater.string>
     <floater.string name="KindObject">object</floater.string>
     <floater.string name="KindLinkset">linkset</floater.string>
@@ -146,25 +146,25 @@
     <floater.string name="ObjectUnnamed">(unnamed)</floater.string>
     <floater.string name="ObjectNameComing">…</floater.string>
     <floater.string name="ExplorerEmptyPrims">[COUNT] empty prims</floater.string>
-    <floater.string name="StateUnknown">asking...</floater.string>
-    <floater.string name="TransferGoing">Putting into [NAME], by way of your inventory...</floater.string>
-    <floater.string name="TransferDoneA">1 item put into [NAME], by way of your inventory; what was copied on the way is in your trash, in Passed between objects.</floater.string>
-    <floater.string name="TransferDoneB">[COUNT] items put into [NAME], by way of your inventory; what was copied on the way is in your trash, in Passed between objects.</floater.string>
-    <floater.string name="TransferNone">Nothing was put into [NAME].</floater.string>
-    <floater.string name="TransferFailed">Nothing was put into [NAME]: [ERROR].</floater.string>
-    <floater.string name="TransferRefused">Not taken: [REFUSED].</floater.string>
-    <floater.string name="TransferLost">Never came through: [LOST]; look in your trash, in Passed between objects.</floater.string>
-    <floater.string name="TransferStranded">Came through but not taken by [NAME]: [STRANDED]; it is in your trash, in Passed between objects.</floater.string>
-    <floater.string name="DropNotYours">You may not change what [NAME] holds.</floater.string>
-    <floater.string name="DropFromNotecard">What a notecard holds cannot be put into an object.</floater.string>
-    <floater.string name="DropNotTransferable">This may not be given to [NAME].</floater.string>
-    <floater.string name="DropRefused">[NAME] will not take this.</floater.string>
+    <floater.string name="StateUnknown">loading...</floater.string>
+    <floater.string name="TransferGoing">Moving items into [NAME] through your inventory...</floater.string>
+    <floater.string name="TransferDoneA">Moved 1 item into [NAME] through your inventory; the copies made on the way are in Trash &gt; Passed between objects.</floater.string>
+    <floater.string name="TransferDoneB">Moved [COUNT] items into [NAME] through your inventory; the copies made on the way are in Trash &gt; Passed between objects.</floater.string>
+    <floater.string name="TransferNone">Nothing was moved into [NAME].</floater.string>
+    <floater.string name="TransferFailed">Could not move items into [NAME]: [ERROR].</floater.string>
+    <floater.string name="TransferRefused">Could not move: [REFUSED].</floater.string>
+    <floater.string name="TransferLost">Did not arrive: [LOST]; look in Trash &gt; Passed between objects.</floater.string>
+    <floater.string name="TransferStranded">Arrived but not accepted by [NAME]: [STRANDED]; look in Trash &gt; Passed between objects.</floater.string>
+    <floater.string name="DropNotYours">You cannot change the contents of [NAME].</floater.string>
+    <floater.string name="DropFromNotecard">Items from a notecard cannot be put into an object.</floater.string>
+    <floater.string name="DropNotTransferable">This item cannot be given to [NAME].</floater.string>
+    <floater.string name="DropRefused">[NAME] cannot accept this.</floater.string>
     <floater.string name="ExperienceNone">No experience</floater.string>
     <floater.string name="ExperienceLoading">loading...</floater.string>
-    <floater.string name="ExperienceAsking">Experience: asking...</floater.string>
-    <floater.string name="ExperienceUnknown">Experience: not known</floater.string>
-    <floater.string name="ExperienceSetOnSave">[NAME] runs under [EXPERIENCE] once it is saved.</floater.string>
-    <floater.string name="ExperienceClearedOnSave">[NAME] runs under no experience once it is saved.</floater.string>
+    <floater.string name="ExperienceAsking">Experience: loading...</floater.string>
+    <floater.string name="ExperienceUnknown">Experience: unknown</floater.string>
+    <floater.string name="ExperienceSetOnSave">[NAME] will use [EXPERIENCE] after it is saved.</floater.string>
+    <floater.string name="ExperienceClearedOnSave">[NAME] will use no experience after it is saved.</floater.string>
     <floater.string name="ArrowOpen">&#9662; </floater.string>
     <floater.string name="ArrowFolded">&#9656; </floater.string>
     <floater.string name="NewKindScript">script</floater.string>
@@ -174,62 +174,62 @@
     <floater.string name="TemplatesTitle">New Script</floater.string>
     <floater.string name="TemplatesPlaceholder">Start from...</floater.string>
     <floater.string name="TemplateOwn">Your template</floater.string>
-    <floater.string name="TemplateOwnDetail">As the preferences' Templates tab has it</floater.string>
-    <floater.string name="TemplateGrid">The grid's own</floater.string>
-    <floater.string name="TemplateGridDetail">What a new script holds when made anywhere else</floater.string>
+    <floater.string name="TemplateOwnDetail">From the Templates tab of Script Studio Preferences</floater.string>
+    <floater.string name="TemplateGrid">Grid default</floater.string>
+    <floater.string name="TemplateGridDetail">Same as a new script made anywhere else</floater.string>
     <floater.string name="NewNotecardName">New Note</floater.string>
-    <floater.string name="CreateFailed">[NAME] was not made: [ERROR]</floater.string>
+    <floater.string name="CreateFailed">Could not create [NAME]: [ERROR]</floater.string>
     <floater.string name="Recompiling">Recompiling [NAME]...</floater.string>
     <floater.string name="SavedNotecard">[NAME] saved.</floater.string>
     <floater.string name="Preflight">Checking [NAME] before saving...</floater.string>
-    <floater.string name="PreflightErrorsA">The analyzers found 1 error in [NAME]; save again to compile anyway.</floater.string>
-    <floater.string name="PreflightErrorsB">The analyzers found [COUNT] errors in [NAME]; save again to compile anyway.</floater.string>
-    <floater.string name="SentWithErrorsA">[NAME] was sent with 1 error the analyzers found; the region's compile has the last word.</floater.string>
-    <floater.string name="SentWithErrorsB">[NAME] was sent with [COUNT] errors the analyzers found; the region's compile has the last word.</floater.string>
+    <floater.string name="PreflightErrorsA">The checkers found 1 error in [NAME]. Save again to compile anyway.</floater.string>
+    <floater.string name="PreflightErrorsB">The checkers found [COUNT] errors in [NAME]. Save again to compile anyway.</floater.string>
+    <floater.string name="SentWithErrorsA">Sent [NAME] to the region with 1 error found by the checkers; the region's compile result is final.</floater.string>
+    <floater.string name="SentWithErrorsB">Sent [NAME] to the region with [COUNT] errors found by the checkers; the region's compile result is final.</floater.string>
     <floater.string name="VimNormal">vim</floater.string>
     <floater.string name="HoverExpected">Expected here: [TYPE]</floater.string>
     <floater.string name="InspectDeclared">Declared on line [LINE].</floater.string>
     <floater.string name="InspectDeclaredTip">Go to the declaration</floater.string>
     <floater.string name="InspectDeclaredIn">Declared in [FILE] on line [LINE].</floater.string>
     <floater.string name="InspectProblem">Problem: [MESSAGE]</floater.string>
-    <floater.string name="NothingKnown">Nothing is known about [NAME] here.</floater.string>
+    <floater.string name="NothingKnown">No information about [NAME] here.</floater.string>
     <floater.string name="NoProblemsHere">There are no problems in [NAME].</floater.string>
-    <floater.string name="NothingKnownBroken">Nothing can be found out about [NAME] until the syntax errors in Problems are fixed.</floater.string>
+    <floater.string name="NothingKnownBroken">No information about [NAME] until the syntax errors in Problems are fixed.</floater.string>
     <floater.string name="NoDefinition">[NAME] is not defined in this script.</floater.string>
-    <floater.string name="IncludeNotFoundHere">[NAME] was not found: no run of the preprocessor has found it, and it is not in the include folders.</floater.string>
-    <floater.string name="ModuleNotFoundHere">The module [NAME] was not found: no run of the preprocessor has found it, and it is not in the include folders.</floater.string>
-    <floater.string name="ReferencesFoundA">1 place where [NAME] stands.</floater.string>
-    <floater.string name="ReferencesFoundB">[COUNT] places where [NAME] stands.</floater.string>
-    <floater.string name="LookingAcrossA">Looking for [NAME] across 1 other script of the object...</floater.string>
-    <floater.string name="LookingAcrossB">Looking for [NAME] across [COUNT] other scripts of the object...</floater.string>
-    <floater.string name="ReferencesUnlistedA">1 more place, not listed</floater.string>
-    <floater.string name="ReferencesUnlistedB">[COUNT] more places, not listed</floater.string>
-    <floater.string name="ReferencesFoundAcrossA">1 place where [NAME] stands, in [FILES] scripts.</floater.string>
-    <floater.string name="ReferencesFoundAcrossB">[COUNT] places where [NAME] stands, in [FILES] scripts.</floater.string>
+    <floater.string name="IncludeNotFoundHere">Could not find [NAME]: no preprocessor run has found it, and it is not in the include folders.</floater.string>
+    <floater.string name="ModuleNotFoundHere">Could not find the module [NAME]: no preprocessor run has found it, and it is not in the include folders.</floater.string>
+    <floater.string name="ReferencesFoundA">1 occurrence of [NAME].</floater.string>
+    <floater.string name="ReferencesFoundB">[COUNT] occurrences of [NAME].</floater.string>
+    <floater.string name="LookingAcrossA">Looking for [NAME] in 1 other script in the object...</floater.string>
+    <floater.string name="LookingAcrossB">Looking for [NAME] in [COUNT] other scripts in the object...</floater.string>
+    <floater.string name="ReferencesUnlistedA">1 more occurrence, not listed</floater.string>
+    <floater.string name="ReferencesUnlistedB">[COUNT] more occurrences, not listed</floater.string>
+    <floater.string name="ReferencesFoundAcrossA">1 occurrence of [NAME] in [FILES] scripts.</floater.string>
+    <floater.string name="ReferencesFoundAcrossB">[COUNT] occurrences of [NAME] in [FILES] scripts.</floater.string>
     <floater.string name="LevelError">Error</floater.string>
     <floater.string name="LevelWarning">Warning</floater.string>
     <floater.string name="LevelNote">Note</floater.string>
-    <floater.string name="NotRenamable">[NAME] is not this script's to rename.</floater.string>
-    <floater.string name="RenameBadName">&quot;[NAME]&quot; is not a name.</floater.string>
-    <floater.string name="DeleteItemAsk">Delete &quot;[NAME]&quot; from the object? An item taken out of an object is gone for good.</floater.string>
-    <floater.string name="DeleteItemsAsk">Delete [COUNT] items from their objects? An item taken out of an object is gone for good.</floater.string>
-    <floater.string name="RenameStale">The script changed before the rename; ask again.</floater.string>
-    <floater.string name="RenamedHere">[PLACES] renamed to [NAME]</floater.string>
-    <floater.string name="RenamedIn">[PLACES] renamed to [NAME] in [SCRIPTS]</floater.string>
-    <floater.string name="RenamedOpened">[SCRIPTS] opened with the change unsaved</floater.string>
-    <floater.string name="RenamedLeft">[SCRIPTS] left alone, changed since read or on disk</floater.string>
-    <floater.string name="RenameMissedA">In [NAME], 1 place no longer read as it did, and was not renamed.</floater.string>
-    <floater.string name="RenameMissedB">In [NAME], [COUNT] places no longer read as they did, and were not renamed.</floater.string>
-    <floater.string name="ReplaceMissedA">In [NAME], 1 place no longer read as it did when searched, and was not replaced.</floater.string>
-    <floater.string name="ReplaceMissedB">In [NAME], [COUNT] places no longer read as they did when searched, and were not replaced.</floater.string>
-    <floater.string name="RenameReserved">[NAME] is a word of the language's own, and cannot be a name of the script's.</floater.string>
-    <floater.string name="RenameClash">Rename to [NEW]; [NEW] is a name in [SCRIPT] already, so the two may clash.</floater.string>
-    <floater.string name="RenameUnreached">Scripts of other objects that include [NAMES] are not changed.</floater.string>
-    <floater.string name="LookupUnlistedA">1 prim of the object did not say what it holds, so its scripts were not looked through.</floater.string>
-    <floater.string name="LookupUnlistedB">[COUNT] prims of the object did not say what they hold, so their scripts were not looked through.</floater.string>
-    <floater.string name="LookupUnreadA">[NAMES] could not be read, so it was not looked through.</floater.string>
-    <floater.string name="LookupUnreadB">[COUNT] scripts could not be read, so they were not looked through: [NAMES].</floater.string>
-    <floater.string name="RenamePreviewHint">Shift+Return shows each place first.</floater.string>
+    <floater.string name="NotRenamable">[NAME] cannot be renamed here.</floater.string>
+    <floater.string name="RenameBadName">"[NAME]" is not a valid name.</floater.string>
+    <floater.string name="DeleteItemAsk">Delete "[NAME]" from the object? This cannot be undone.</floater.string>
+    <floater.string name="DeleteItemsAsk">Delete [COUNT] items from their objects? This cannot be undone.</floater.string>
+    <floater.string name="RenameStale">The script changed before the rename. Try again.</floater.string>
+    <floater.string name="RenamedHere">Renamed [PLACES] to [NAME]</floater.string>
+    <floater.string name="RenamedIn">Renamed [PLACES] to [NAME] in [SCRIPTS]</floater.string>
+    <floater.string name="RenamedOpened">[SCRIPTS] opened with unsaved changes</floater.string>
+    <floater.string name="RenamedLeft">[SCRIPTS] skipped: changed since last read, or cannot be edited</floater.string>
+    <floater.string name="RenameMissedA">In [NAME], 1 occurrence had changed and was not renamed.</floater.string>
+    <floater.string name="RenameMissedB">In [NAME], [COUNT] occurrences had changed and were not renamed.</floater.string>
+    <floater.string name="ReplaceMissedA">In [NAME], 1 match had changed since the search and was not replaced.</floater.string>
+    <floater.string name="ReplaceMissedB">In [NAME], [COUNT] matches had changed since the search and were not replaced.</floater.string>
+    <floater.string name="RenameReserved">[NAME] is a reserved word and cannot be used as a name.</floater.string>
+    <floater.string name="RenameClash">Rename to [NEW]; [NEW] is already used in [SCRIPT] and may clash.</floater.string>
+    <floater.string name="RenameUnreached">Scripts in other objects that include [NAMES] are not changed.</floater.string>
+    <floater.string name="LookupUnlistedA">1 prim in the object did not list its contents, so its scripts were not searched.</floater.string>
+    <floater.string name="LookupUnlistedB">[COUNT] prims in the object did not list their contents, so their scripts were not searched.</floater.string>
+    <floater.string name="LookupUnreadA">Could not read [NAMES], so it was not searched.</floater.string>
+    <floater.string name="LookupUnreadB">Could not read [COUNT] scripts, so they were not searched: [NAMES].</floater.string>
+    <floater.string name="RenamePreviewHint">Press Shift+Return to preview each change first.</floater.string>
     <floater.string name="CaretPosition">Ln [LINE], Col [COL]</floater.string>
     <floater.string name="SelectedLinesA">1 line selected</floater.string>
     <floater.string name="SelectedLinesB">[COUNT] lines selected</floater.string>
@@ -239,19 +239,19 @@
     <floater.string name="ProblemErrorsB">[COUNT] errors</floater.string>
     <floater.string name="ProblemWarningsA">1 warning</floater.string>
     <floater.string name="ProblemWarningsB">[COUNT] warnings</floater.string>
-    <floater.string name="CrumbRootTip">[NAME]: press to go to the top; its arrow lists what the script declares</floater.string>
-    <floater.string name="CrumbTip">Go to [NAME]; its arrow lists what is beside it</floater.string>
+    <floater.string name="CrumbRootTip">[NAME]: click to go to the top; the arrow lists the script's declarations</floater.string>
+    <floater.string name="CrumbTip">Go to [NAME]; the arrow lists other items at this level</floater.string>
     <floater.string name="GoToSymbolTitle">Go to Symbol</floater.string>
-    <floater.string name="AllTabsTitle">Open Tabs</floater.string>
+    <floater.string name="AllTabsTitle">All Tabs</floater.string>
     <floater.string name="QuickOpenTitle">Go to</floater.string>
-    <floater.string name="QuickOpenPlaceholder">A script by name, or &gt; and a command: format, fold, vim, preprocess...</floater.string>
-    <floater.string name="QuickOpenRecent">Opened lately</floater.string>
-    <floater.string name="AllTabsPlaceholder">A script or a notecard by name</floater.string>
+    <floater.string name="QuickOpenPlaceholder">Type a script name, or &gt; and a command: format, fold, vim, preprocess...</floater.string>
+    <floater.string name="QuickOpenRecent">Recently opened</floater.string>
+    <floater.string name="AllTabsPlaceholder">Type a script or notecard name</floater.string>
     <floater.string name="TabUnsaved">unsaved</floater.string>
-    <floater.string name="GoToSymbolPlaceholder">Type a symbol's name</floater.string>
+    <floater.string name="GoToSymbolPlaceholder">Type a symbol name</floater.string>
     <floater.string name="GoToLineTitle">Go to Line</floater.string>
-    <floater.string name="VimHistoryTitle">[KIND] lines entered</floater.string>
-    <floater.string name="VimHistoryPlaceholder">Type to find a line; Return runs it, Shift-Return puts it up to edit</floater.string>
+    <floater.string name="VimHistoryTitle">[KIND] history</floater.string>
+    <floater.string name="VimHistoryPlaceholder">Type to find a line; Return runs it, Shift-Return opens it for editing</floater.string>
     <floater.string name="VimNoAlternate">E23: No alternate file</floater.string>
     <floater.string name="VimNoSuchTab">E86: Buffer [NUMBER] does not exist</floater.string>
     <floater.string name="VimTabsMatch">E93: More than one match for [NAME]</floater.string>
@@ -260,12 +260,12 @@
     <floater.string name="VimArgumentRequired">E471: Argument required</floater.string>
     <floater.string name="VimNotSaved">E37: No write since last change (add ! to override)</floater.string>
     <floater.string name="VimNoFile">E484: Can't open file [FILE]</floater.string>
-    <floater.string name="VimrcNotTaken">[WHENCE]: these lines of the vimrc were not taken</floater.string>
-    <floater.string name="VimrcNotMade">The vimrc could not be made at [FILE].</floater.string>
-    <floater.string name="VimrcNewFile">" Script Studio's vimrc, read when vim is turned on and again whenever it is saved.
-" Taken: the :map family (nnoremap, inoremap jk &lt;Esc&gt;, ...), let mapleader,
-" and :set of the options vim here knows. Nothing else runs.
-" A notecard dropped on the box in Script Studio Preferences, Editor, takes its place.
+    <floater.string name="VimrcNotTaken">[WHENCE]: these vimrc lines were ignored</floater.string>
+    <floater.string name="VimrcNotMade">Could not create the vimrc at [FILE].</floater.string>
+    <floater.string name="VimrcNewFile">" Script Studio's vimrc. It is read when vim is turned on, and again each time it is saved.
+" Supported: the :map family (nnoremap, inoremap jk &lt;Esc&gt;, ...), let mapleader,
+" and :set for the options Script Studio's vim supports. Nothing else runs.
+" A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is used instead of this file.
 
 </floater.string>
     <floater.string name="VimNoFileName">E32: No file name</floater.string>
@@ -276,7 +276,7 @@
     <floater.string name="VimNoErrors">E42: No Errors</floater.string>
     <floater.string name="VimNotInPath">E447: Can't find file "[NAME]" in path</floater.string>
     <floater.string name="VimSuggestTitle">Change "[WORD]" to</floater.string>
-    <floater.string name="VimSuggestPlaceholder">Type to find a spelling; Return puts it in</floater.string>
+    <floater.string name="VimSuggestPlaceholder">Type to filter; Return uses the selected spelling</floater.string>
     <floater.string name="VimFileInfo">"[NAME]" [STATE][LINES] lines --[PERCENT]%--</floater.string>
     <floater.string name="VimStateModified">[Modified]</floater.string>
     <floater.string name="VimStateReadOnly">[readonly]</floater.string>
@@ -284,14 +284,14 @@
     <floater.string name="GoToLineHint">Type a line number to go to (from 1 to [COUNT]).</floater.string>
     <floater.string name="GoToLineGo">Go to line [LINE].</floater.string>
     <floater.string name="GoToLineGoColumn">Go to line [LINE], column [COL].</floater.string>
-    <floater.string name="GoToLineNone">There is no line [LINE]; the script has [COUNT].</floater.string>
+    <floater.string name="GoToLineNone">There is no line [LINE]. The last line is [COUNT].</floater.string>
     <floater.string name="RenameTitle">Rename</floater.string>
-    <floater.string name="RenamePlaceholder">The new name</floater.string>
+    <floater.string name="RenamePlaceholder">New name</floater.string>
     <floater.string name="RenameHint">Type the new name for [NAME].</floater.string>
-    <floater.string name="RenameSame">[NAME] is its name already.</floater.string>
-    <floater.string name="RenameToA">Rename 1 place of [NAME] to [NEW].</floater.string>
-    <floater.string name="RenameToB">Rename [COUNT] places of [NAME] to [NEW].</floater.string>
-    <floater.string name="RenameToAcross">Rename [COUNT] places of [NAME] to [NEW] across [FILES] scripts; any not open opens with the change unsaved.</floater.string>
+    <floater.string name="RenameSame">The name is already [NAME].</floater.string>
+    <floater.string name="RenameToA">Rename 1 occurrence of [NAME] to [NEW].</floater.string>
+    <floater.string name="RenameToB">Rename [COUNT] occurrences of [NAME] to [NEW].</floater.string>
+    <floater.string name="RenameToAcross">Rename [COUNT] occurrences of [NAME] to [NEW] in [FILES] scripts. Scripts that are not open will open with the change unsaved.</floater.string>
     <floater.string name="KindKeyword">keyword</floater.string>
     <floater.string name="KindVariable">variable</floater.string>
     <floater.string name="KindParameter">parameter</floater.string>
@@ -309,8 +309,8 @@
     <floater.string name="KindSaidTo">said to you</floater.string>
     <floater.string name="KindInstant">IM</floater.string>
     <floater.string name="OriginRuntime">Runtime</floater.string>
-    <floater.string name="OriginAny">Every source</floater.string>
-    <floater.string name="ProblemsAllHiddenA">The filters hide the 1 problem there is.</floater.string>
+    <floater.string name="OriginAny">All sources</floater.string>
+    <floater.string name="ProblemsAllHiddenA">The filters hide the only problem.</floater.string>
     <floater.string name="ProblemsAllHiddenB">The filters hide all [COUNT] problems.</floater.string>
     <floater.string name="ProblemsUnlistedA">1 more not listed</floater.string>
     <floater.string name="ProblemsUnlistedB">[COUNT] more not listed</floater.string>
@@ -321,17 +321,17 @@
     <floater.string name="ProblemNotesA">1 note</floater.string>
     <floater.string name="ProblemNotesB">[COUNT] notes</floater.string>
     <floater.string name="ProblemsIncluded">[FILE]</floater.string>
-    <floater.string name="ProblemsIncludedBy">[FILE], as [NAME] includes it</floater.string>
+    <floater.string name="ProblemsIncludedBy">[FILE], included by [NAME]</floater.string>
     <floater.string name="ProblemsChecked">[NAME] in [OBJECT] (not open)</floater.string>
-    <floater.string name="CheckNoObject">Open one of an object's scripts, or choose the object in the explorer, to check every script in it.</floater.string>
+    <floater.string name="CheckNoObject">To check every script in an object, open one of its scripts or select the object in the Explorer.</floater.string>
     <floater.string name="CheckingObject">Checking every script in [OBJECT]...</floater.string>
-    <floater.string name="CheckObjectAway">[OBJECT] is not in sight, so its scripts could not be checked.</floater.string>
+    <floater.string name="CheckObjectAway">Could not check the scripts in [OBJECT]: the object is out of range or no longer exists.</floater.string>
     <floater.string name="CheckedObjectA">Checked 1 script in [OBJECT]</floater.string>
     <floater.string name="CheckedObjectB">Checked [COUNT] scripts in [OBJECT]</floater.string>
-    <floater.string name="CheckedClean">nothing found wrong</floater.string>
-    <floater.string name="CheckedOpenA">1 open in a tab is checked there.</floater.string>
-    <floater.string name="CheckedOpenB">[COUNT] open in tabs are checked there.</floater.string>
-    <floater.string name="NoProblemsOpen">No problems in the scripts open.</floater.string>
+    <floater.string name="CheckedClean">no problems</floater.string>
+    <floater.string name="CheckedOpenA">1 script is open in a tab and is checked there.</floater.string>
+    <floater.string name="CheckedOpenB">[COUNT] scripts are open in tabs and are checked there.</floater.string>
+    <floater.string name="NoProblemsOpen">No problems in the open scripts.</floater.string>
     <floater.string name="NoProblemsIn">No problems in [NAME].</floater.string>
     <floater.string name="RepeatedTimes">([COUNT] times)</floater.string>
     <floater.string name="FilterErrors">Errors</floater.string>
@@ -352,17 +352,17 @@
     <floater.string name="TrailerLineTipNoKeys">Go to a line</floater.string>
     <floater.string name="TrailerProblemsTip">Show the problems ([KEYS])</floater.string>
     <floater.string name="TrailerChecking">Checking…</floater.string>
-    <floater.string name="TrailerCheckingTip">The analyzers are checking the script as it stands. The problems listed are of the text before.</floater.string>
+    <floater.string name="TrailerCheckingTip">Checking your latest changes. The problems shown are from the previous check.</floater.string>
     <floater.string name="TrailerProblemsTipNoKeys">Show the problems</floater.string>
     <floater.string name="TrailerSource">Source</floater.string>
     <floater.string name="TrailerExpanded">Preprocessed</floater.string>
-    <floater.string name="TrailerSourceTip">The script as written. Press for what the preprocessor makes of it, as the server compiles it ([KEYS])</floater.string>
-    <floater.string name="TrailerSourceTipNoKeys">The script as written. Press for what the preprocessor makes of it, as the server compiles it</floater.string>
-    <floater.string name="TrailerExpandedTip">What the preprocessor made of the script, as the server compiles it; read-only. Press for the source ([KEYS])</floater.string>
-    <floater.string name="TrailerExpandedTipNoKeys">What the preprocessor made of the script, as the server compiles it; read-only. Press for the source</floater.string>
+    <floater.string name="TrailerSourceTip">Showing the source. Click for the Preprocessed view, the code the server compiles ([KEYS])</floater.string>
+    <floater.string name="TrailerSourceTipNoKeys">Showing the source. Click for the Preprocessed view, the code the server compiles</floater.string>
+    <floater.string name="TrailerExpandedTip">Showing the preprocessed code the server compiles; read-only. Click for the source ([KEYS])</floater.string>
+    <floater.string name="TrailerExpandedTipNoKeys">Showing the preprocessed code the server compiles; read-only. Click for the source</floater.string>
     <floater.string name="ReferenceDeclaration">declaration</floater.string>
     <floater.string name="ReferenceDeclarationTip">Where [NAME] is declared</floater.string>
-    <floater.string name="OutlineNoMatch">No symbol has those letters in its name.</floater.string>
+    <floater.string name="OutlineNoMatch">No symbol names match what you typed.</floater.string>
     <floater.string name="OutputAllObjects">All objects</floater.string>
     <floater.string name="OutputOpenScripts">Scripts open here</floater.string>
     <floater.string name="OutputMyObjects">My objects</floater.string>
@@ -374,141 +374,141 @@
     <floater.string name="TabInventoryTip">A script in your inventory</floater.string>
     <floater.string name="TabObjectTip">A script in an object's contents</floater.string>
     <floater.string name="TabNotecardTip">A notecard, as plain text</floater.string>
-    <floater.string name="TabReadOnlyTip">Read-only: you may read it and not change it</floater.string>
+    <floater.string name="TabReadOnlyTip">Read-only: you can view it but not change it</floater.string>
     <floater.string name="TrailerReadOnly">Read-only</floater.string>
-    <floater.string name="ReadAsSLua">[NAME] is read as SLua now, and compiles as SLua when it is saved</floater.string>
-    <floater.string name="ReadAsLSL">[NAME] is read as LSL now, and compiles as LSL when it is saved</floater.string>
-    <floater.string name="ScriptItemDropName">Put its name in here: [TEXT]. With Shift, its key</floater.string>
-    <floater.string name="ScriptItemDropKey">Put its key in here: [TEXT]</floater.string>
-    <floater.string name="ScriptItemDropNoKey">Its key is not yours to see: it is not full permissions. Without Shift, its name goes in</floater.string>
-    <floater.string name="ScriptItemDropReadOnly">This script may not be changed</floater.string>
+    <floater.string name="ReadAsSLua">[NAME] is now treated as SLua and will compile as SLua when saved</floater.string>
+    <floater.string name="ReadAsLSL">[NAME] is now treated as LSL and will compile as LSL when saved</floater.string>
+    <floater.string name="ScriptItemDropName">Insert its name: [TEXT]. Hold Shift to insert its key</floater.string>
+    <floater.string name="ScriptItemDropKey">Insert its key: [TEXT]</floater.string>
+    <floater.string name="ScriptItemDropNoKey">Cannot insert its key: the item is not full permissions. Release Shift to insert its name</floater.string>
+    <floater.string name="ScriptItemDropReadOnly">This script is read-only</floater.string>
     <floater.string name="TrailerIndentSpaces">Spaces: [WIDTH]</floater.string>
     <floater.string name="TrailerIndentTabs">Tab Size: [WIDTH]</floater.string>
-    <floater.string name="TrailerIndentTipText">How this script is indented, read from its own lines. Press to indent it otherwise, or to convert it</floater.string>
-    <floater.string name="TrailerIndentTipDefaults">How this script is indented: the default in Preferences, since the script does not say. Press to indent it otherwise, or to convert it</floater.string>
-    <floater.string name="TrailerIndentTipChosen">How this script is indented, as chosen for it. Press to indent it otherwise, or to convert it</floater.string>
-    <floater.string name="IndentReadAgain">Read from the Script Again</floater.string>
-    <floater.string name="IndentToDefault">Back to the Default</floater.string>
-    <floater.string name="TrailerReadOnlyTip">You may read this script and not change it</floater.string>
+    <floater.string name="TrailerIndentTipText">Indentation detected from this script's lines. Click to change or convert it</floater.string>
+    <floater.string name="TrailerIndentTipDefaults">Default indentation from Preferences; none detected in the script. Click to change or convert it</floater.string>
+    <floater.string name="TrailerIndentTipChosen">Indentation set for this script. Click to change or convert it</floater.string>
+    <floater.string name="IndentReadAgain">Detect Indentation from Script</floater.string>
+    <floater.string name="IndentToDefault">Use Default Indentation</floater.string>
+    <floater.string name="TrailerReadOnlyTip">You can view this script but not change it</floater.string>
     <floater.string name="OriginPreprocessor">Preprocessor</floater.string>
     <floater.string name="OriginOptimizer">Optimizer</floater.string>
     <floater.string name="Preprocessing">Preprocessing [NAME]...</floater.string>
     <floater.string name="Preprocessed">Preprocessed [NAME].</floater.string>
     <floater.string name="PreprocessedPendingA">Preprocessed [NAME]; 1 include could not be fetched: [FILES].</floater.string>
     <floater.string name="PreprocessedPendingB">Preprocessed [NAME]; [COUNT] includes could not be fetched: [FILES].</floater.string>
-    <floater.string name="PreprocessMissingDiskRoute">Includes from the object or the inventory are off; they come from folders on disk: turn on Build &gt; Include from Disk, and add the folder with Build &gt; Add Include Folder...</floater.string>
-    <floater.string name="SavingWithoutA">[NAME] is going up without 1 include: [FILES]. What it holds is not in the upload.</floater.string>
-    <floater.string name="SavingWithoutB">[NAME] is going up without [COUNT] includes: [FILES]. What they hold is not in the upload.</floater.string>
-    <floater.string name="SavingWithErrorsA">[NAME] is going up with 1 error the preprocessor found, so that nothing is lost: the Problems pane shows it.</floater.string>
-    <floater.string name="SavingWithErrorsB">[NAME] is going up with [COUNT] errors the preprocessor found, so that nothing is lost: the Problems pane shows them.</floater.string>
+    <floater.string name="PreprocessMissingDiskRoute">Includes come only from folders on disk, not from objects or inventory. Turn on Build &gt; Include from Disk and add the folder with Build &gt; Add Include Folder...</floater.string>
+    <floater.string name="SavingWithoutA">Saving [NAME] without 1 include: [FILES]. Its contents are not in the upload.</floater.string>
+    <floater.string name="SavingWithoutB">Saving [NAME] without [COUNT] includes: [FILES]. Their contents are not in the upload.</floater.string>
+    <floater.string name="SavingWithErrorsA">Saving [NAME] with 1 preprocessor error so that no work is lost. See Problems for details.</floater.string>
+    <floater.string name="SavingWithErrorsB">Saving [NAME] with [COUNT] preprocessor errors so that no work is lost. See Problems for details.</floater.string>
     <floater.string name="SaveAnyway">Save anyway</floater.string>
-    <floater.string name="RecoveryWriteFailed">[NAME] could not be kept on this computer against a crash: the recovery folder could not be written.</floater.string>
-    <floater.string name="RecoveryReadFailed">The kept changes to [NAME] could not be read: the file in the recovery folder is gone or damaged.</floater.string>
-    <floater.string name="KeepFailed">Not everything unsaved could be kept for next time, so the viewer is not quitting: save or export what is open, or quit again and choose Don't Save.</floater.string>
+    <floater.string name="RecoveryWriteFailed">Could not save a crash-recovery copy of [NAME]: cannot write to the recovery folder.</floater.string>
+    <floater.string name="RecoveryReadFailed">Could not read the crash-recovery copy of [NAME]: its file in the recovery folder is missing or damaged.</floater.string>
+    <floater.string name="KeepFailed">Could not keep all unsaved changes for next time, so the viewer did not quit. Save or export open tabs, or quit again and choose Don't Save.</floater.string>
     <floater.string name="OfflineKeptA">Disconnected: 1 unsaved script or notecard is kept on this computer and offered at your next login.</floater.string>
     <floater.string name="OfflineKeptB">Disconnected: [COUNT] unsaved scripts and notecards are kept on this computer and offered at your next login.</floater.string>
     <floater.string name="OrphanAwayKept">The object holding [NAME] is not in sight; its unsaved changes are kept.</floater.string>
-    <floater.string name="OrphanRemovedKept">[NAME] is not where it was any more; its tab stays, with its unsaved changes kept on this computer.</floater.string>
+    <floater.string name="OrphanRemovedKept">[NAME] was removed; its tab stays open, and its unsaved changes are kept on this computer.</floater.string>
     <floater.string name="OrphanBack">[NAME] can be saved again.</floater.string>
-    <floater.string name="OrphanLockedKept">[NAME] may no longer be changed by you; its kept changes are in its tab on their own, to save as a copy or export.</floater.string>
-    <floater.string name="ItemRemovedClosed">[NAME] was taken out of its object; its tab, with nothing unsaved in it, closed.</floater.string>
-    <floater.string name="NoticeRecoverable">Unsaved changes to this from an earlier session were kept, from [WHEN].</floater.string>
-    <floater.string name="NoticeRecoverableStale">Unsaved changes to this from an earlier session were kept, from [WHEN] -- before it was last saved.</floater.string>
-    <floater.string name="NoticeAway">The object holding this is not in sight -- deleted, returned, or out of range. Saving waits for it; what is here is kept meanwhile.</floater.string>
-    <floater.string name="NoticeRemoved">This is not in its object any more. What is here is kept; save a copy to keep it for good.</floater.string>
-    <floater.string name="NoticeRemovedInventory">This is gone from your inventory. What is here is kept; save a copy to keep it for good.</floater.string>
-    <floater.string name="NoticeOffline">Disconnected: nothing can be saved. What is here is kept on this computer and offered at your next login.</floater.string>
-    <floater.string name="NoticeTrashed">This is in your Trash: saving still works there, until the Trash is emptied.</floater.string>
-    <floater.string name="NoticeFileGone">[FILE] is not on disk any more; saving writes it again.</floater.string>
-    <floater.string name="NoticeLocked">You may no longer change this. What is here is kept; save a copy to keep it for good.</floater.string>
-    <floater.string name="NoticeUnloaded">This could not be loaded ([ERROR]). What is here is kept; try again, or save a copy to keep it for good.</floater.string>
+    <floater.string name="OrphanLockedKept">You can no longer modify [NAME]. Its unsaved changes are in its tab: save a copy, or export them.</floater.string>
+    <floater.string name="ItemRemovedClosed">[NAME] was removed from its object; its tab had no unsaved changes and was closed.</floater.string>
+    <floater.string name="NoticeRecoverable">Found unsaved changes to this from an earlier session ([WHEN]).</floater.string>
+    <floater.string name="NoticeRecoverableStale">Found unsaved changes to this from an earlier session ([WHEN]), made before its last save.</floater.string>
+    <floater.string name="NoticeAway">The object containing this is not in sight: deleted, returned, or out of range. Saving waits until it is back; the text in this tab is kept.</floater.string>
+    <floater.string name="NoticeRemoved">This is no longer in its object. The text in this tab is kept; save a copy to keep it permanently.</floater.string>
+    <floater.string name="NoticeRemovedInventory">This is no longer in your inventory. The text in this tab is kept; save a copy to keep it permanently.</floater.string>
+    <floater.string name="NoticeOffline">Disconnected: nothing can be saved. The text in this tab is kept on this computer and offered at your next login.</floater.string>
+    <floater.string name="NoticeTrashed">This is in your Trash. You can still save it until the Trash is emptied.</floater.string>
+    <floater.string name="NoticeFileGone">[FILE] no longer exists on disk; saving creates it again.</floater.string>
+    <floater.string name="NoticeLocked">You can no longer modify this. The text in this tab is kept; save a copy to keep it permanently.</floater.string>
+    <floater.string name="NoticeUnloaded">This could not be loaded ([ERROR]). The text in this tab is kept; try again, or save a copy to keep it permanently.</floater.string>
     <floater.string name="NoticeRestore">Restore Them</floater.string>
-    <floater.string name="NoticeRestoreTip">The kept changes put in, as one step to undo</floater.string>
+    <floater.string name="NoticeRestoreTip">Restore the unsaved changes as one undo step</floater.string>
     <floater.string name="NoticeDiscard">Discard</floater.string>
-    <floater.string name="NoticeCompiledDiffers">The compiled part of this script is not what its source makes: it was changed outside the preprocessor, or what the script includes has changed. Saving replaces it.</floater.string>
+    <floater.string name="NoticeCompiledDiffers">This script's saved preprocessed code does not match its source: it was edited directly, or an include changed. Saving replaces it.</floater.string>
     <floater.string name="NoticeKeepSource">Keep Source</floater.string>
-    <floater.string name="NoticeTakeCompiled">Use Compiled Text</floater.string>
+    <floater.string name="NoticeTakeCompiled">Use Preprocessed Code</floater.string>
     <floater.string name="NoticeCompare">Compare</floater.string>
-    <floater.string name="NoticeCompareTip">The two texts side by side, the changes marked; Escape goes back</floater.string>
+    <floater.string name="NoticeCompareTip">Show both texts side by side, with changes marked; Escape closes the comparison</floater.string>
     <floater.string name="CompareNow">This tab now</floater.string>
     <floater.string name="CompareSaved">As last saved</floater.string>
-    <floater.string name="CompareNothingSaved">There is no saved text to compare with: a change made after an undo went past it.</floater.string>
-    <floater.string name="CompareKept">Kept, [WHEN]</floater.string>
-    <floater.string name="CompareCompiled">The compiled part, as saved</floater.string>
-    <floater.string name="CompareMade">What the source makes now</floater.string>
-    <floater.string name="NoticeKeepSourceTip">Keep the source as it is; saving makes the compiled part from it again</floater.string>
-    <floater.string name="NoticeTakeCompiledTip">Make the compiled text the source, as one step to undo</floater.string>
-    <floater.string name="NoticeDiscardTip">Let the kept changes go; File > Recover Unsaved Changes still has them for a week</floater.string>
+    <floater.string name="CompareNothingSaved">There is no saved text to compare with: you undid past the last save, then made a change.</floater.string>
+    <floater.string name="CompareKept">Unsaved changes, [WHEN]</floater.string>
+    <floater.string name="CompareCompiled">Preprocessed code, as saved</floater.string>
+    <floater.string name="CompareMade">Preprocessed from the current source</floater.string>
+    <floater.string name="NoticeKeepSourceTip">Keep the source; the next save rebuilds the preprocessed code from it</floater.string>
+    <floater.string name="NoticeTakeCompiledTip">Replace the source with the preprocessed code, as one undo step</floater.string>
+    <floater.string name="NoticeDiscardTip">Discard the unsaved changes; File &gt; Recover Unsaved Changes keeps them for a week</floater.string>
     <floater.string name="NoticeCopy">Save a Copy</floater.string>
-    <floater.string name="NoticeCopyTip">A new item in your inventory with what is here, saved; this tab closes once it is</floater.string>
+    <floater.string name="NoticeCopyTip">Save this tab's text as a new inventory item; this tab then closes</floater.string>
     <floater.string name="NoticeExport">Export...</floater.string>
-    <floater.string name="NoticeExportTip">What is here, written to a file on this computer</floater.string>
+    <floater.string name="NoticeExportTip">Save this tab's text to a file on this computer</floater.string>
     <floater.string name="NoticeSaveAgain">Save It Again</floater.string>
-    <floater.string name="NoticeSaveAgainTip">Write the file again where it was</floater.string>
+    <floater.string name="NoticeSaveAgainTip">Save the file again at its original location</floater.string>
     <floater.string name="NoticeTryAgain">Try Again</floater.string>
-    <floater.string name="NoticeTryAgainTip">Load the script again, with what is here put back over it</floater.string>
+    <floater.string name="NoticeTryAgainTip">Reload the script, then put this tab's text back over it</floater.string>
     <floater.string name="NoticeSaveAnyway">Save Anyway</floater.string>
-    <floater.string name="NoticeSaveAnywayTip">Save what is here as it stands, over what stopped the save</floater.string>
+    <floater.string name="NoticeSaveAnywayTip">Save this tab's text anyway, ignoring what stopped the save</floater.string>
     <floater.string name="NoticeRetrySave">Try Again</floater.string>
     <floater.string name="NoticeRetrySaveTip">Save it again</floater.string>
     <floater.string name="NoticeReload">Reload</floater.string>
-    <floater.string name="NoticeReloadTip">Load it again as it is saved now; what was typed here is kept in File > Recover Unsaved Changes</floater.string>
+    <floater.string name="NoticeReloadTip">Reload the saved version; your changes stay in File &gt; Recover Unsaved Changes</floater.string>
     <floater.string name="NoticeTakeExternal">Take the External Editor's</floater.string>
-    <floater.string name="NoticeTakeExternalTip">What the external editor saved put in and saved; what was typed here is a step back in the undo</floater.string>
-    <floater.string name="NoticeKeepHere">Keep What Is Here</floater.string>
-    <floater.string name="NoticeKeepHereTip">The external editor's save not sent</floater.string>
+    <floater.string name="NoticeTakeExternalTip">Use and save the external editor's version; undo restores your changes</floater.string>
+    <floater.string name="NoticeKeepHere">Keep This Version</floater.string>
+    <floater.string name="NoticeKeepHereTip">Ignore the external editor's save; the next save overwrites its file</floater.string>
     <floater.string name="NoticeTakeSaved">Take Theirs</floater.string>
-    <floater.string name="NoticeTakeSavedTip">What was saved elsewhere put in; what was typed here is a step back in the undo</floater.string>
+    <floater.string name="NoticeTakeSavedTip">Use the version saved elsewhere; undo restores your changes</floater.string>
     <floater.string name="NoticeKeepSaved">Keep Mine</floater.string>
-    <floater.string name="NoticeKeepSavedTip">What was typed here kept; saving replaces what was saved elsewhere</floater.string>
+    <floater.string name="NoticeKeepSavedTip">Keep your changes; saving replaces the version saved elsewhere</floater.string>
     <floater.string name="SaveBlockedAway">[NAME] cannot be saved while its object is not in sight; save a copy, or export it.</floater.string>
-    <floater.string name="SaveBlockedRemoved">[NAME] is not where it was any more; save a copy, or export it.</floater.string>
+    <floater.string name="SaveBlockedRemoved">[NAME] was removed and cannot be saved; save a copy, or export it.</floater.string>
     <floater.string name="SaveBlockedOffline">Disconnected: [NAME] cannot be saved; it is kept for your next login.</floater.string>
-    <floater.string name="SaveBlockedLocked">[NAME] may no longer be changed by you; save a copy, or export it.</floater.string>
-    <floater.string name="SaveBlockedUnloaded">[NAME] could not be loaded, and is not saved over what it holds unseen; try again, or save a copy.</floater.string>
-    <floater.string name="SaveWaitsForLoad">[NAME]'s script is being loaded under what is here first; save again once it is in.</floater.string>
+    <floater.string name="SaveBlockedLocked">You can no longer modify [NAME]; save a copy, or export it.</floater.string>
+    <floater.string name="SaveBlockedUnloaded">[NAME] could not be loaded; saving now could overwrite text you have not seen. Try again, or save a copy.</floater.string>
+    <floater.string name="SaveWaitsForLoad">Loading [NAME] first, then putting this tab's text back over it; save again once it has loaded.</floater.string>
     <floater.string name="PopOutWhileSaving">[NAME] is being saved; move it once the save is done.</floater.string>
     <floater.string name="MoveToWindow">Move to [WINDOW]</floater.string>
     <floater.string name="CopyingTo">Saving a copy of [NAME] to your inventory...</floater.string>
-    <floater.string name="CopiedTo">A copy of [NAME] is saved in your inventory; the tab it came from closed.</floater.string>
-    <floater.string name="CopiedToKeptOpen">A copy of [NAME] is saved in your inventory; the tab it came from stays open, since it changed while the copy was made.</floater.string>
+    <floater.string name="CopiedTo">Saved a copy of [NAME] to your inventory; the original tab was closed.</floater.string>
+    <floater.string name="CopiedToKeptOpen">Saved a copy of [NAME] to your inventory; the original tab stays open because it changed while the copy was being saved.</floater.string>
     <floater.string name="RecoverTitle">Unsaved Changes</floater.string>
-    <floater.string name="RecoverPlaceholder">Return opens one with its changes; Shift-Return discards it</floater.string>
+    <floater.string name="RecoverPlaceholder">Return opens the selected entry with its changes; Shift-Return discards it</floater.string>
     <floater.string name="RecoverUnsaved">unsaved when the viewer stopped</floater.string>
-    <floater.string name="RecoverKept">kept at quit</floater.string>
+    <floater.string name="RecoverKept">kept for next time</floater.string>
     <floater.string name="RecoverDiscarded">discarded</floater.string>
-    <floater.string name="RecoverNone">Nothing unsaved is kept from before, and nothing was discarded lately.</floater.string>
-    <floater.string name="RecoveryReopenedA">1 script kept from last time opened again, with its unsaved changes.</floater.string>
-    <floater.string name="RecoveryReopenedB">[COUNT] scripts kept from last time opened again, with their unsaved changes.</floater.string>
-    <floater.string name="RecoveryRestored">[NAME]'s kept changes put in; undo takes them out again.</floater.string>
-    <floater.string name="CompiledTaken">[NAME]'s compiled text is its source now; undo takes it out again.</floater.string>
-    <floater.string name="RecoveryStale">[NAME] was saved since its kept changes were made: saving them replaces what was saved then, and Revert to Saved brings that back.</floater.string>
-    <floater.string name="RecoveryDiscarded">[NAME]'s kept changes let go of; File > Recover Unsaved Changes still has them for a week.</floater.string>
-    <floater.string name="RecoveryGone">[NAME]'s kept changes let go of for good.</floater.string>
+    <floater.string name="RecoverNone">No unsaved changes from earlier sessions, and nothing discarded recently.</floater.string>
+    <floater.string name="RecoveryReopenedA">Reopened 1 script kept from last time, with its unsaved changes.</floater.string>
+    <floater.string name="RecoveryReopenedB">Reopened [COUNT] scripts kept from last time, with their unsaved changes.</floater.string>
+    <floater.string name="RecoveryRestored">Restored the unsaved changes to [NAME]; undo removes them.</floater.string>
+    <floater.string name="CompiledTaken">[NAME] now uses its preprocessed code as the source; undo reverses this.</floater.string>
+    <floater.string name="RecoveryStale">[NAME] was saved after these changes were made: saving them replaces that version, and Revert to Saved brings it back.</floater.string>
+    <floater.string name="RecoveryDiscarded">Discarded the unsaved changes to [NAME]; File &gt; Recover Unsaved Changes keeps them for a week.</floater.string>
+    <floater.string name="RecoveryGone">Deleted the discarded changes to [NAME] permanently.</floater.string>
     <floater.string name="ActionRetry">Try again</floater.string>
     <floater.string name="ActionRetryTip">Save [NAME] again</floater.string>
     <floater.string name="ActionCopy">Save a copy to inventory</floater.string>
-    <floater.string name="ActionCopyTip">A new item in your inventory with what [NAME] holds, saved</floater.string>
-    <floater.string name="ExternalConflict">[NAME] was saved in the external editor while it had changes here not in that copy; nothing was replaced. Take one or the other:</floater.string>
-    <floater.string name="ExternalKept">Kept what is here in [NAME]; the external editor's save was not sent, and its copy is written from here at the next save.</floater.string>
+    <floater.string name="ActionCopyTip">Save the text of [NAME] as a new item in your inventory</floater.string>
+    <floater.string name="ExternalConflict">[NAME] was saved in the external editor, but this tab has changes that copy does not have. Nothing was replaced; choose one:</floater.string>
+    <floater.string name="ExternalKept">Kept this tab's version of [NAME]; the external editor's save was ignored, and the next save overwrites its file.</floater.string>
     <floater.string name="ActionTakeExternal">Take the external editor's</floater.string>
-    <floater.string name="ActionTakeExternalTip">What the external editor saved put in [NAME] and saved; what was typed here is a step back in the undo</floater.string>
-    <floater.string name="ActionKeepHere">Keep what is here</floater.string>
-    <floater.string name="ActionKeepHereTip">The external editor's save of [NAME] not sent</floater.string>
+    <floater.string name="ActionTakeExternalTip">Use and save the external editor's version of [NAME]; undo restores your changes</floater.string>
+    <floater.string name="ActionKeepHere">Keep this version</floater.string>
+    <floater.string name="ActionKeepHereTip">Ignore the external editor's save of [NAME]; the next save overwrites its file</floater.string>
     <floater.string name="ActionTakeSaved">Take theirs</floater.string>
-    <floater.string name="ActionTakeSavedTip">What was saved elsewhere put in [NAME]; what was typed here is a step back in the undo</floater.string>
+    <floater.string name="ActionTakeSavedTip">Use the version of [NAME] saved elsewhere; undo restores your changes</floater.string>
     <floater.string name="ActionKeepSaved">Keep mine</floater.string>
-    <floater.string name="ActionKeepSavedTip">What was typed here kept; saving [NAME] replaces what was saved elsewhere</floater.string>
+    <floater.string name="ActionKeepSavedTip">Keep your changes; saving [NAME] replaces the version saved elsewhere</floater.string>
     <floater.string name="ActionCompareSaved">Compare</floater.string>
-    <floater.string name="ActionCompareSavedTip">What was saved elsewhere beside what is here</floater.string>
-    <floater.string name="SavedElsewhereConflict">[NAME] was saved by [WHO] while it had changes here.</floater.string>
-    <floater.string name="SavedElsewhereKept">Kept what is here in [NAME]; saving it replaces what was saved elsewhere.</floater.string>
+    <floater.string name="ActionCompareSavedTip">Compare the version saved elsewhere with this tab</floater.string>
+    <floater.string name="SavedElsewhereConflict">[NAME] was saved by [WHO] while this tab had unsaved changes.</floater.string>
+    <floater.string name="SavedElsewhereKept">Kept your changes to [NAME]; saving replaces the version saved elsewhere.</floater.string>
     <floater.string name="SavedByBridge">VS Code</floater.string>
     <floater.string name="PrimLinked">[LINK]. [NAME]</floater.string>
     <floater.string name="LinkCompletion">link [LINK]</floater.string>
-    <floater.string name="KindAwayIn">away, in [REGION]</floater.string>
+    <floater.string name="KindAwayIn">last seen in [REGION]</floater.string>
     <floater.string name="KeysCopiedA">Copied [KEYS]</floater.string>
-    <floater.string name="KeysCopiedB">Copied [COUNT] keys, one a line</floater.string>
+    <floater.string name="KeysCopiedB">Copied [COUNT] keys, one per line</floater.string>
     <floater.string name="NoModifyMark">no modify</floater.string>
     <floater.string name="NoCopyMark">no copy</floater.string>
     <floater.string name="ScriptInObject">[NAME] in [OBJECT]</floater.string>
@@ -522,57 +522,57 @@
     <floater.string name="RecompiledForLuau">for LSL (Luau)</floater.string>
     <floater.string name="RecompiledCompiledA">1 compiled</floater.string>
     <floater.string name="RecompiledCompiledB">[COUNT] compiled</floater.string>
-    <floater.string name="RecompiledFailedA">1 did not compile, its problems in Problems</floater.string>
-    <floater.string name="RecompiledFailedB">[COUNT] did not compile, their problems in Problems</floater.string>
-    <floater.string name="RecompiledNotSentA">1 did not go up</floater.string>
-    <floater.string name="RecompiledNotSentB">[COUNT] did not go up</floater.string>
-    <floater.string name="RecompiledSkippedA">1 left alone, a save of it on its way</floater.string>
-    <floater.string name="RecompiledSkippedB">[COUNT] left alone, a save of each on its way</floater.string>
-    <floater.string name="RecompileSkippedSaving">[NAME] was not recompiled: a save of it is on its way, which a recompile would land over.</floater.string>
-    <floater.string name="RecompileUnsaved">[NAME] has changes not saved here; what recompiles is the server's text, without them.</floater.string>
+    <floater.string name="RecompiledFailedA">1 failed (see Problems)</floater.string>
+    <floater.string name="RecompiledFailedB">[COUNT] failed (see Problems)</floater.string>
+    <floater.string name="RecompiledNotSentA">1 could not be sent</floater.string>
+    <floater.string name="RecompiledNotSentB">[COUNT] could not be sent</floater.string>
+    <floater.string name="RecompiledSkippedA">1 skipped (a save is in progress)</floater.string>
+    <floater.string name="RecompiledSkippedB">[COUNT] skipped (saves in progress)</floater.string>
+    <floater.string name="RecompileSkippedSaving">[NAME] was not recompiled: a save is in progress, and recompiling could overwrite it.</floater.string>
+    <floater.string name="RecompileUnsaved">[NAME] has unsaved changes; the recompile uses the version saved on the server, without them.</floater.string>
     <floater.string name="SavedByEditor">another editor</floater.string>
     <floater.string name="SavedByQueue">a recompile</floater.string>
     <floater.string name="CompareSavedThere">Saved elsewhere</floater.string>
     <floater.string name="SaveAskingWorld">Checking whether [NAME] was saved elsewhere...</floater.string>
-    <floater.string name="SaveWorldMoved">[NAME] was saved elsewhere since it was opened here -- by a co-owner, or in another viewer -- and saving would replace that.</floater.string>
+    <floater.string name="SaveWorldMoved">[NAME] was saved elsewhere (by a co-owner or in another viewer) after you opened it here. Saving would replace that version.</floater.string>
     <floater.string name="ActionReloadWorld">Reload</floater.string>
-    <floater.string name="ActionReloadWorldTip">[NAME] loaded again as it is saved now; what was typed here is kept in File > Recover Unsaved Changes</floater.string>
+    <floater.string name="ActionReloadWorldTip">Reload the saved [NAME]; your unsaved changes are kept in File &gt; Recover Unsaved Changes</floater.string>
     <floater.string name="ActionCompareWorld">Compare</floater.string>
-    <floater.string name="ActionCompareWorldTip">[NAME] as it is saved now beside what is here</floater.string>
-    <floater.string name="CompareWorld">Saved now</floater.string>
+    <floater.string name="ActionCompareWorldTip">Compare the saved [NAME] with the text in this tab</floater.string>
+    <floater.string name="CompareWorld">Currently saved</floater.string>
     <floater.string name="ActionExport">Export to a file</floater.string>
-    <floater.string name="ActionExportTip">What [NAME] holds, written to a file on this computer</floater.string>
-    <floater.string name="SaveAnywayTip">Save [NAME] as it stands, over what was found</floater.string>
+    <floater.string name="ActionExportTip">Save a copy of [NAME] to a file on this computer</floater.string>
+    <floater.string name="SaveAnywayTip">Save [NAME] as it is now, despite the warning</floater.string>
     <floater.string name="ExternalWriteFailed">[FILE] could not be written.</floater.string>
-    <floater.string name="ExternalOpened">[NAME] is open in the external editor; its saves are saved from here.</floater.string>
-    <floater.string name="ExternalOpenedVSCode">[NAME] is open in VS Code; its saves are saved from here.</floater.string>
-    <floater.string name="IncludeGone">[FILE] is not there any more.</floater.string>
+    <floater.string name="ExternalOpened">[NAME] is open in the external editor; when you save it there, Script Studio saves it too.</floater.string>
+    <floater.string name="ExternalOpenedVSCode">[NAME] is open in VS Code; when you save it there, Script Studio saves it too.</floater.string>
+    <floater.string name="IncludeGone">[FILE] no longer exists.</floater.string>
     <floater.string name="FileOpenElsewhere">[FILE] is open in another tab.</floater.string>
     <floater.string name="NoRecentFiles">No Recent Files</floater.string>
     <floater.string name="OutputSourceVim">vim</floater.string>
-    <floater.string name="EmbeddedItemOpenTip">[NAME], carried in the notecard: press to open it</floater.string>
-    <floater.string name="EmbeddedItemPlayTip">[NAME], carried in the notecard: press to play it and take a copy</floater.string>
-    <floater.string name="EmbeddedItemCopyTip">[NAME], carried in the notecard: press to take a copy</floater.string>
-    <floater.string name="NotecardReadOnlyDrop">This notecard can't be changed</floater.string>
-    <floater.string name="NotecardDropNoCopy">You can't copy this item, so the notecard can't carry it</floater.string>
-    <floater.string name="NotecardCopyUnsaved">Save the notecard first; [NAME] can only be copied out of a saved notecard</floater.string>
-    <floater.string name="NotecardCopyFailed">[NAME] could not be copied: no region to ask</floater.string>
+    <floater.string name="EmbeddedItemOpenTip">[NAME], embedded in the notecard: click to open it</floater.string>
+    <floater.string name="EmbeddedItemPlayTip">[NAME], embedded in the notecard: click to play it and copy it to your inventory</floater.string>
+    <floater.string name="EmbeddedItemCopyTip">[NAME], embedded in the notecard: click to copy it to your inventory</floater.string>
+    <floater.string name="NotecardReadOnlyDrop">This notecard cannot be changed</floater.string>
+    <floater.string name="NotecardDropNoCopy">You cannot copy this item, so it cannot be added to the notecard</floater.string>
+    <floater.string name="NotecardCopyUnsaved">Save the notecard first: [NAME] can only be copied from a saved notecard</floater.string>
+    <floater.string name="NotecardCopyFailed">[NAME] could not be copied: not connected to a region</floater.string>
     <floater.string name="NotecardCopyRefused">[NAME] could not be copied: [ERROR]</floater.string>
-    <floater.string name="PreprocHintSwitch">([WORD] is Firestorm's: turn on Build > Preprocess on Save and Build > Firestorm > Switch Statements)</floater.string>
-    <floater.string name="RequireNotPreprocessed">require("[NAME]") goes up as written, and the grid has no require: turn on Build > Preprocess on Save to put the module in its place</floater.string>
+    <floater.string name="PreprocHintSwitch">([WORD] is a Firestorm extension: turn on Build &gt; Preprocess on Save and Build &gt; Firestorm &gt; Switch Statements)</floater.string>
+    <floater.string name="RequireNotPreprocessed">require("[NAME]") is saved as written, but the grid does not support require: turn on Build &gt; Preprocess on Save to include the module</floater.string>
     <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Build > Preprocess on Save and Build > Extensions)</floater.string>
-    <floater.string name="PreprocHintConst">([WORD] marks what never changes, and lets a global's value be worked out from others: turn on Build > Preprocess on Save)</floater.string>
-    <floater.string name="PreprocHintInline">([WORD] marks a function to be put where it is called: turn on Build > Preprocess on Save)</floater.string>
+    <floater.string name="PreprocHintConst">([WORD] declares a constant, and lets a global be computed from other globals: turn on Build &gt; Preprocess on Save)</floater.string>
+    <floater.string name="PreprocHintInline">([WORD] marks a function to be inlined at each call: turn on Build &gt; Preprocess on Save)</floater.string>
     <floater.string name="ClearRecentFiles">Clear Menu</floater.string>
     <floater.string name="OriginCompiler">Compiler</floater.string>
     <floater.string name="CompilerAsSaved">(as of the last save)</floater.string>
-    <floater.string name="UpdatingDefinitions">Asking the region for its language definitions again; every script is checked again once they are in.</floater.string>
+    <floater.string name="UpdatingDefinitions">Requesting the language definitions from the region again. All scripts will be checked again when they arrive.</floater.string>
     <floater.string name="OriginParser">Parser</floater.string>
     <floater.string name="OriginTypes">Types</floater.string>
     <floater.string name="OriginLint">Lint</floater.string>
     <floater.string name="OriginDefinitions">Definitions</floater.string>
-    <floater.string name="InGeneratedCode">Code the preprocessor made</floater.string>
-    <floater.string name="NoGeneratedView">That is in code the preprocessor made, which the Preprocessed view shows once the script has been expanded.</floater.string>
+    <floater.string name="InGeneratedCode">Generated by the preprocessor</floater.string>
+    <floater.string name="NoGeneratedView">That is in code generated by the preprocessor. The Preprocessed view shows it after the script is preprocessed.</floater.string>
     <floater.string name="MenuUndo">Undo</floater.string>
     <floater.string name="MenuUndoWhat">Undo [WHAT]</floater.string>
     <floater.string name="MenuRedo">Redo</floater.string>
@@ -586,35 +586,35 @@
     <floater.string name="UndoWhatFix">Fix</floater.string>
     <floater.string name="TrailerWeight">[TARGET] [SIZE] of [LIMIT] KB used</floater.string>
     <floater.string name="TrailerWeightEstimate">[TARGET] ~[SIZE] of [LIMIT] KB used</floater.string>
-    <floater.string name="TrailerWeightTip">What the script's code weighs for [TARGET]: [BYTES] of the [MAX] bytes it runs a script in. What it allocates as it runs is not in this.</floater.string>
-    <floater.string name="TrailerWeightEstimateTip">About what the script's code weighs for [TARGET]: [BYTES] of the [MAX] bytes it runs a script in, estimated from the code its compiler makes. What it allocates as it runs is not in this.</floater.string>
-    <floater.string name="TrailerWeightBeforeTip">Weighed before the preprocessor's optimizer, which a save runs: the saved script may weigh less.</floater.string>
-    <floater.string name="TrailerWeightSentTip">Weighed as a save sends it, after the preprocessor.</floater.string>
-    <floater.string name="OriginWeight">Weight</floater.string>
-    <floater.string name="WeightOver">The script's code comes to about [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in.</floater.string>
-    <floater.string name="WeightOverEstimate">The script's code is about [SIZE] KB, likely more than the [LIMIT] KB [TARGET] runs a script in.</floater.string>
-    <floater.string name="WeightNear">The script's code comes to [SIZE] of the [LIMIT] KB [TARGET] runs a script in, leaving [LEFT] KB for what it allocates as it runs: its lists, its strings, its stack.</floater.string>
-    <floater.string name="WeightNearEstimate">The script's code comes to about [SIZE] of the [LIMIT] KB [TARGET] runs a script in, leaving about [LEFT] KB for what it allocates as it runs: its lists, its strings, its stack.</floater.string>
-    <floater.string name="WeightOverBefore">The script's code is [SIZE] KB before the optimizer, more than the [LIMIT] KB [TARGET] runs a script in: it may fit once the optimizer has been over it.</floater.string>
+    <floater.string name="TrailerWeightTip">Code size on [TARGET]: [BYTES] of [MAX] bytes. Memory used while it runs is not counted.</floater.string>
+    <floater.string name="TrailerWeightEstimateTip">Estimated code size on [TARGET]: [BYTES] of [MAX] bytes. Memory used while it runs is not counted.</floater.string>
+    <floater.string name="TrailerWeightBeforeTip">Measured before the preprocessor's optimizer, which runs on save; the saved script may be smaller.</floater.string>
+    <floater.string name="TrailerWeightSentTip">Measured as it is saved, after the preprocessor.</floater.string>
+    <floater.string name="OriginWeight">Memory</floater.string>
+    <floater.string name="WeightOver">The script's code is about [SIZE] KB, more than the [LIMIT] KB of memory a script has on [TARGET].</floater.string>
+    <floater.string name="WeightOverEstimate">The script's code is about [SIZE] KB, likely more than the [LIMIT] KB of memory a script has on [TARGET].</floater.string>
+    <floater.string name="WeightNear">The script's code uses [SIZE] of the [LIMIT] KB of memory a script has on [TARGET], leaving [LEFT] KB for its lists, strings and stack while it runs.</floater.string>
+    <floater.string name="WeightNearEstimate">The script's code uses about [SIZE] of the [LIMIT] KB of memory a script has on [TARGET], leaving about [LEFT] KB for its lists, strings and stack while it runs.</floater.string>
+    <floater.string name="WeightOverBefore">Before the optimizer, the script's code is [SIZE] KB, more than the [LIMIT] KB of memory a script has on [TARGET]. It may fit after the optimizer runs.</floater.string>
     <floater.string name="TrailerSize">[SIZE] KB of [LIMIT] KB</floater.string>
-    <floater.string name="TrailerSizeTip">What saving this script sends: [BYTES] of the [MAX] bytes a script may be. A preprocessed script is sent as written and as expanded, measured here before the optimizer and compression a save adds.</floater.string>
-    <floater.string name="TrailerSizeOverTip">What saving this script sends: [BYTES] bytes, [OVER] more than the [MAX] a script may be. A save is refused until it is shorter.</floater.string>
-    <floater.string name="TrailerNotecardSizeTip">The notecard's text: [BYTES] of the [MAX] bytes a notecard may hold.</floater.string>
-    <floater.string name="TrailerNotecardSizeOverTip">The notecard's text: [BYTES] bytes, [OVER] more than the [MAX] a notecard may hold. A save is refused until it is shorter, since no viewer could open it past that.</floater.string>
-    <floater.string name="WeightsNoScript">Nothing open to weigh.</floater.string>
-    <floater.string name="WeightsNoTarget">[NAME] has no code of its own to weigh: a notecard, or a script that is only ever included.</floater.string>
-    <floater.string name="WeightsNotYet">[NAME] is weighed once it has been checked.</floater.string>
+    <floater.string name="TrailerSizeTip">Save size: [BYTES] of [MAX] bytes, with any preprocessed code, before optimizing and compression.</floater.string>
+    <floater.string name="TrailerSizeOverTip">Save size: [BYTES] bytes, [OVER] over the [MAX] limit. It cannot be saved until it is smaller.</floater.string>
+    <floater.string name="TrailerNotecardSizeTip">Notecard text: [BYTES] of the [MAX] bytes a notecard can hold.</floater.string>
+    <floater.string name="TrailerNotecardSizeOverTip">Notecard text: [BYTES] bytes, [OVER] over the [MAX] limit. It cannot be saved until it is smaller.</floater.string>
+    <floater.string name="WeightsNoScript">No script is open.</floater.string>
+    <floater.string name="WeightsNoTarget">[NAME] has no code of its own to measure: it is a notecard, or a script that is only included by others.</floater.string>
+    <floater.string name="WeightsNotYet">Memory use for [NAME] is shown after it is checked.</floater.string>
     <floater.string name="WeightsHead">[NAME] on [TARGET]: [SIZE] of [LIMIT] KB used, [SHARE].</floater.string>
     <floater.string name="WeightsHeadEstimate">[NAME] on [TARGET]: about [SIZE] of [LIMIT] KB used, [SHARE].</floater.string>
     <floater.string name="WeightsHeadFailed">[NAME] does not compile for [TARGET]: [ERROR]</floater.string>
-    <floater.string name="WeightsHeadError">As it stands, [ERROR].</floater.string>
-    <floater.string name="WeightsHeadBefore">Weighed before the preprocessor's optimizer, which a save runs.</floater.string>
-    <floater.string name="WeightsHeadSent">Weighed before the preprocessor's optimizer; as a save sends it, [SENT] KB.</floater.string>
-    <floater.string name="WeightsHeadTip">What the script's code weighs as its compiler makes it, before it runs. What it allocates as it runs -- the lists it grows, the strings it builds -- is not in this, and is as often what stops a script.</floater.string>
-    <floater.string name="WeightsTargetTip">[TARGET]: [BYTES] bytes of code, of the [MAX] it runs a script in.</floater.string>
-    <floater.string name="WeightsTargetEstimateTip">[TARGET]: about [BYTES] bytes of code, of the [MAX] it runs a script in, estimated from the code its compiler makes.</floater.string>
-    <floater.string name="WeightsTargetFailedTip">[TARGET]: it does not compile for it: [ERROR]</floater.string>
-    <floater.string name="WeightsTargetErrorTip">As it stands, [ERROR].</floater.string>
+    <floater.string name="WeightsHeadError">Currently, [ERROR].</floater.string>
+    <floater.string name="WeightsHeadBefore">Measured before the preprocessor's optimizer, which runs on save.</floater.string>
+    <floater.string name="WeightsHeadSent">Measured before the preprocessor's optimizer. As saved, it is [SENT] KB.</floater.string>
+    <floater.string name="WeightsHeadTip">Code size only, not counting the lists and strings the script builds while it runs.</floater.string>
+    <floater.string name="WeightsTargetTip">[TARGET]: [BYTES] bytes of code, of [MAX] bytes of memory.</floater.string>
+    <floater.string name="WeightsTargetEstimateTip">[TARGET]: about [BYTES] bytes of code, of [MAX] bytes of memory, estimated from the compiled code.</floater.string>
+    <floater.string name="WeightsTargetFailedTip">Does not compile for [TARGET]: [ERROR]</floater.string>
+    <floater.string name="WeightsTargetErrorTip">Currently, [ERROR].</floater.string>
     <floater.string name="WeightsTargetOwnTip">The target the script is compiled for.</floater.string>
     <floater.string name="WeightsKilobytes">[SIZE] KB</floater.string>
     <floater.string name="WeightsKilobytesEstimate">~[SIZE] KB</floater.string>
@@ -622,10 +622,10 @@
     <floater.string name="WeightsNew">new</floater.string>
     <floater.string name="WeightsPartRegisters">Registers</floater.string>
     <floater.string name="WeightsPartAssembly">Assembly</floater.string>
-    <floater.string name="WeightsPartGlobals">Globals' fields</floater.string>
-    <floater.string name="WeightsPartScript">The script's own code</floater.string>
+    <floater.string name="WeightsPartGlobals">Global variables</floater.string>
+    <floater.string name="WeightsPartScript">Top-level code</floater.string>
     <floater.string name="WeightsPartStrings">Strings</floater.string>
-    <floater.string name="WeightsPartUnnamed">A function with no name</floater.string>
+    <floater.string name="WeightsPartUnnamed">Anonymous function</floater.string>
     <floater.string name="WeightsPartHandler">[EVENT] in [STATE]</floater.string>
     <floater.string name="WeightsKindFunction">Function</floater.string>
     <floater.string name="WeightsKindHandler">Event</floater.string>
@@ -633,32 +633,32 @@
     <floater.string name="WeightsKindGlobal">Global</floater.string>
     <floater.string name="WeightsKindConstant">Constant</floater.string>
     <floater.string name="WeightsKindFrame">Overhead</floater.string>
-    <floater.string name="WeightsStateTip">The state's table of handlers; the handlers are listed each on its own.</floater.string>
-    <floater.string name="WeightsFrameTip">What the target spends on the script as a whole, whatever is in it.</floater.string>
+    <floater.string name="WeightsStateTip">The state's handler table. Each handler is listed separately.</floater.string>
+    <floater.string name="WeightsFrameTip">Fixed overhead for any script on this target.</floater.string>
     <floater.string name="WeightNote">[BYTES] bytes</floater.string>
     <floater.string name="WeightNoteEstimate">~[BYTES] bytes</floater.string>
     <floater.string name="WeightNoteNamed">[NAME] [NOTE]</floater.string>
-    <floater.string name="WeightNoteTip">[NAME]: [BYTES] bytes of code on [TARGET], [SHARE] of the [LIMIT] KB it runs a script in.</floater.string>
-    <floater.string name="WeightNoteEstimateTip">[NAME]: about [BYTES] bytes of code on [TARGET], [SHARE] of the [LIMIT] KB it runs a script in.</floater.string>
-    <floater.string name="WeightHeatTip">Line [LINE]: [BYTES] bytes of code on [TARGET], [SHARE] of the [LIMIT] KB it runs a script in.</floater.string>
-    <floater.string name="WeightHeatEstimateTip">Line [LINE]: about [BYTES] bytes of code on [TARGET], [SHARE] of the [LIMIT] KB it runs a script in.</floater.string>
-    <floater.string name="OptimizerNoteLighter">(its lines [BYTES] bytes lighter on [TARGET])</floater.string>
-    <floater.string name="OptimizerNoteHeavier">(its lines [BYTES] bytes heavier on [TARGET])</floater.string>
-    <floater.string name="OptimizerNoteSame">(its lines no lighter on [TARGET])</floater.string>
+    <floater.string name="WeightNoteTip">[NAME]: [BYTES] bytes of code on [TARGET], [SHARE] of the [LIMIT] KB of memory.</floater.string>
+    <floater.string name="WeightNoteEstimateTip">[NAME]: about [BYTES] bytes of code on [TARGET], [SHARE] of the [LIMIT] KB of memory.</floater.string>
+    <floater.string name="WeightHeatTip">Line [LINE]: [BYTES] bytes of code on [TARGET], [SHARE] of the [LIMIT] KB of memory.</floater.string>
+    <floater.string name="WeightHeatEstimateTip">Line [LINE]: about [BYTES] bytes of code on [TARGET], [SHARE] of the [LIMIT] KB of memory.</floater.string>
+    <floater.string name="OptimizerNoteLighter">(saves [BYTES] bytes of code on [TARGET])</floater.string>
+    <floater.string name="OptimizerNoteHeavier">(adds [BYTES] bytes of code on [TARGET])</floater.string>
+    <floater.string name="OptimizerNoteSame">(saves no code on [TARGET])</floater.string>
     <floater.string name="TrailerOptimized">[TARGET] [BEFORE] → [AFTER] of [LIMIT] KB used</floater.string>
     <floater.string name="TrailerOptimizedEstimate">[TARGET] ~[BEFORE] → ~[AFTER] of [LIMIT] KB used</floater.string>
-    <floater.string name="TrailerOptimizedTip">What the script's code weighs on [TARGET] before the preprocessor's optimizer and after it, as this view shows it sent: [BYTESBEFORE] and then [BYTESAFTER] of the [MAX] bytes it runs a script in.</floater.string>
-    <floater.string name="TrailerOptimizedEstimateTip">About what the script's code weighs on [TARGET] before the preprocessor's optimizer and after it, as this view shows it sent: [BYTESBEFORE] and then [BYTESAFTER] of the [MAX] bytes it runs a script in, estimated from the code its compiler makes.</floater.string>
-    <floater.string name="FixLighter">[BYTES] bytes lighter on [TARGET]</floater.string>
-    <floater.string name="FixLighterEstimate">about [BYTES] bytes lighter on [TARGET]</floater.string>
-    <floater.string name="FixHeavier">[BYTES] bytes heavier on [TARGET]</floater.string>
-    <floater.string name="FixHeavierEstimate">about [BYTES] bytes heavier on [TARGET]</floater.string>
-    <floater.string name="SaveOverWeight">[NAME] was sent, but by the studio's reckoning its code comes to about [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in: the region may not compile it, or it may not run.</floater.string>
-    <floater.string name="SaveOverWeightEstimate">[NAME] was sent, but by the studio's estimate its code comes to about [SIZE] KB, likely more than the [LIMIT] KB [TARGET] runs a script in: it may not run.</floater.string>
-    <floater.string name="SaveTooLarge">[NAME] was not saved: it is [SIZE] bytes, [OVER] more than the [LIMIT] a script may be.</floater.string>
-    <floater.string name="SaveTooLargePlain">Moving part of it into another script, or into a notecard it reads, would bring it under.</floater.string>
-    <floater.string name="SaveTooLargeCompress">A preprocessed script is sent as written and as expanded: turning on Compress in the preprocessor's settings shrinks the expanded half.</floater.string>
-    <floater.string name="SaveTooLargeWrapped">A preprocessed script is sent as written and as expanded, and what it includes counts in the expanded half: including less, or moving part of it into another script, would bring it under.</floater.string>
+    <floater.string name="TrailerOptimizedTip">Code size on [TARGET] before and after optimizing: [BYTESBEFORE] → [BYTESAFTER] of [MAX] bytes.</floater.string>
+    <floater.string name="TrailerOptimizedEstimateTip">Estimated code size on [TARGET] before and after optimizing: [BYTESBEFORE] → [BYTESAFTER] of [MAX] bytes.</floater.string>
+    <floater.string name="FixLighter">[BYTES] bytes less code on [TARGET]</floater.string>
+    <floater.string name="FixLighterEstimate">about [BYTES] bytes less code on [TARGET]</floater.string>
+    <floater.string name="FixHeavier">[BYTES] bytes more code on [TARGET]</floater.string>
+    <floater.string name="FixHeavierEstimate">about [BYTES] bytes more code on [TARGET]</floater.string>
+    <floater.string name="SaveOverWeight">[NAME] was saved, but its code is about [SIZE] KB, more than the [LIMIT] KB of memory a script has on [TARGET]. It may not compile or run.</floater.string>
+    <floater.string name="SaveOverWeightEstimate">[NAME] was saved, but its code is estimated at [SIZE] KB, likely more than the [LIMIT] KB of memory a script has on [TARGET]. It may not run.</floater.string>
+    <floater.string name="SaveTooLarge">[NAME] was not saved: it is [SIZE] bytes, [OVER] bytes over the limit of [LIMIT].</floater.string>
+    <floater.string name="SaveTooLargePlain">To fit, move part of it into another script, or into a notecard it reads.</floater.string>
+    <floater.string name="SaveTooLargeCompress">A preprocessed script saves both its source and its preprocessed code. Turn on Build &gt; Firestorm &gt; Compress Preprocessed Code to shrink the preprocessed code.</floater.string>
+    <floater.string name="SaveTooLargeWrapped">A preprocessed script saves both its source and its preprocessed code, which contains its includes. To fit, include less, or move part of it into another script.</floater.string>
     <floater.string name="UndoWhatRefactor">Refactor</floater.string>
     <floater.string name="UndoWhatFormat">Format</floater.string>
     <floater.string name="UndoWhatReplace">Replace All</floater.string>
@@ -1131,7 +1131,7 @@
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="weight_notes" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="weight_notes" />
             </menu_item_check>
-            <menu_item_check label="Weight Heat in Gutter" layout="topleft" name="weight_heat">
+            <menu_item_check label="Memory Heat in Gutter" layout="topleft" name="weight_heat">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="weight_heat" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="weight_heat" />
             </menu_item_check>
@@ -1216,7 +1216,7 @@
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="search" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="search" />
             </menu_item_check>
-            <menu_item_check label="Weights" layout="topleft" name="weights">
+            <menu_item_check label="Memory" layout="topleft" name="weights">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="weights" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="weights" />
             </menu_item_check>
@@ -1225,7 +1225,7 @@
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inspector" />
             </menu_item_check>
             <menu_item_separator layout="topleft" />
-            <menu_item_check label="Preprocessed Output" layout="topleft" name="expanded">
+            <menu_item_check label="Preprocessed View" layout="topleft" name="expanded">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="expanded" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="expanded" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="expanded" />
@@ -1312,7 +1312,7 @@
                     <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_lazy" />
                     <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_lazy" />
                 </menu_item_check>
-                <menu_item_check label="Compress Output" layout="topleft" name="preproc_compress">
+                <menu_item_check label="Compress Preprocessed Code" layout="topleft" name="preproc_compress">
                     <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_compress" />
                     <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_compress" />
                 </menu_item_check>
@@ -1389,7 +1389,7 @@
      layout="topleft"
      left="8"
      name="save_btn"
-     tool_tip="Save and compile the script ([KEYS]); a notecard is saved as it is"
+     tool_tip="Save and compile the script ([KEYS]); a notecard is only saved"
      top="41"
      width="26" />
     <button
@@ -1419,7 +1419,7 @@
      layout="topleft"
      left_pad="2"
      name="redo_btn"
-     tool_tip="Redo what was undone ([KEYS])"
+     tool_tip="Redo the last undone change ([KEYS])"
      top_delta="0"
      width="26" />
     <button
@@ -1429,7 +1429,7 @@
      layout="topleft"
      left_pad="8"
      name="find_btn"
-     tool_tip="Find in this script ([KEYS]); [KEYS2] finds across scripts"
+     tool_tip="Find in this script ([KEYS]); [KEYS2] searches across scripts"
      top_delta="0"
      width="26" />
     <button
@@ -1439,7 +1439,7 @@
      layout="topleft"
      left_pad="2"
      name="format_btn"
-     tool_tip="Put the script's indentation and spacing right ([KEYS])"
+     tool_tip="Format the script's indentation and spacing ([KEYS])"
      top_delta="0"
      width="26" />
     <button
@@ -1450,7 +1450,7 @@
      layout="topleft"
      left_pad="8"
      name="expanded_btn"
-     tool_tip="Show what the preprocessor made of this script, as the server compiles it, in place of the source; press again for the source ([KEYS]). Read-only. Off while the preprocessor is: Build &gt; Preprocess on Save turns it on."
+     tool_tip="Show the preprocessed code (read-only) or the source ([KEYS]). Needs Build &gt; Preprocess on Save."
      top_delta="0"
      width="26" />
     <button
@@ -1463,7 +1463,7 @@
      layout="topleft"
      name="fold_explorer"
      right="-182"
-     tool_tip="The objects in hand and their scripts, down the left ([KEYS])"
+     tool_tip="Show or hide the Explorer: objects and their scripts ([KEYS])"
      top_delta="0"
      width="92" />
     <button
@@ -1476,7 +1476,7 @@
      layout="topleft"
      name="fold_bottom"
      right="-108"
-     tool_tip="The panel under the editor: the problems ([KEYS]), the references ([KEYS2]), what the scripts say ([KEYS3]), and search ([KEYS4])"
+     tool_tip="Show or hide Problems ([KEYS]), References ([KEYS2]), Output ([KEYS3]) and Search ([KEYS4])"
      top_delta="0"
      width="70" />
     <button
@@ -1489,7 +1489,7 @@
      layout="topleft"
      name="fold_inspector"
      right="-8"
-     tool_tip="The outline and the symbol at the caret, down the right ([KEYS])"
+     tool_tip="Show or hide the Inspector: the outline and the symbol at the caret ([KEYS])"
      top_delta="0"
      width="96" />
 
@@ -1539,7 +1539,7 @@
                  layout="topleft"
                  left="2"
                  name="explorer_filter"
-                 tool_tip="Only the objects, prims, scripts and notecards with these letters in their names"
+                 tool_tip="Show only objects, prims, scripts and notecards whose names contain this text"
                  top="2"
                  width="236" />
                 <panel
@@ -1549,7 +1549,7 @@
                  layout="topleft"
                  left="0"
                  name="explorer_tree"
-                 tool_tip="The objects in hand -- pinned, selected in world, or holding a script that is open -- and their scripts and notecards. Double-click or return opens one, delete deletes it, F2 renames it -- or an object or a prim -- where it stands, right-click for everything else. Drag them to your inventory or onto another object here, and drop on an object what your inventory holds, to put it in."
+                 tool_tip="Return or double-click opens; F2 renames; Delete deletes; right-click for more."
                  top="24"
                  width="240" />
                 <button
@@ -1559,7 +1559,7 @@
                  layout="topleft"
                  left="0"
                  name="explorer_open"
-                 tool_tip="Open the chosen scripts and notecards"
+                 tool_tip="Open the selected scripts and notecards"
                  top_pad="4"
                  width="46" />
                 <button
@@ -1569,7 +1569,7 @@
                  layout="topleft"
                  left_pad="2"
                  name="explorer_start"
-                 tool_tip="Set the chosen scripts running; every script of a chosen object or prim"
+                 tool_tip="Start the selected scripts, and all scripts in selected objects or prims"
                  top_delta="0"
                  width="46" />
                 <button
@@ -1579,7 +1579,7 @@
                  layout="topleft"
                  left_pad="2"
                  name="explorer_stop"
-                 tool_tip="Stop the chosen scripts; every script of a chosen object or prim"
+                 tool_tip="Stop the selected scripts, and all scripts in selected objects or prims"
                  top_delta="0"
                  width="46" />
                 <button
@@ -1589,7 +1589,7 @@
                  layout="topleft"
                  left_pad="2"
                  name="explorer_reset"
-                 tool_tip="Reset the chosen scripts; every script of a chosen object or prim"
+                 tool_tip="Reset the selected scripts, and all scripts in selected objects or prims"
                  top_delta="0"
                  width="46" />
                 <button
@@ -1599,7 +1599,7 @@
                  layout="topleft"
                  left_pad="2"
                  name="explorer_refresh"
-                 tool_tip="Refresh: ask the region for what the objects hold again"
+                 tool_tip="Refresh: ask the region again for the objects' contents"
                  top_delta="0"
                  width="46" />
             </panel>
@@ -1669,7 +1669,7 @@
                      left="4"
                      name="tabs"
                      right="-4"
-                     tool_tip="The scripts open here, one tab each; the tab shown is the script being edited. From the keyboard, once Go to Tabs has put it here: the arrows choose, Shift with an arrow moves a tab, Delete closes one"
+                     tool_tip="One tab per open script. After Go to Tabs: arrows choose, Shift+arrow moves a tab, Delete closes"
                      top="1" />
                 </layout_panel>
                 <!-- What the script in front has to reckon with, with what
@@ -1739,7 +1739,7 @@
                          layout="topleft"
                          name="notice_close"
                          right="-4"
-                         tool_tip="Hide this until there is something else to say"
+                         tool_tip="Hide this notice until there is a new one"
                          top="3"
                          width="22" />
                     </panel>
@@ -1785,7 +1785,7 @@
                          layout="topleft"
                          left="0"
                          name="breadcrumb"
-                         tool_tip="Where the caret is: the line and column at the right, and from the script down to the symbol around it at the left. Press a step to go there; press its arrow to pick one of the symbols beside it instead."
+                         tool_tip="Caret location. Click a part to go there; click its arrow to choose another symbol at that level."
                          top="1"
                          width="284" />
                     </panel>
@@ -1797,7 +1797,7 @@
                      layout="topleft"
                      name="experience"
                      right="-314"
-                     tool_tip="The experience the script runs under, which its experience functions need: none, one you contribute to, or the one it has. Picked here, it is set when the script is saved."
+                     tool_tip="The experience the script runs under, for its experience functions. It is set when you save."
                      top="2"
                      visible="false"
                      width="150" />
@@ -1808,7 +1808,7 @@
                      layout="topleft"
                      name="experience_profile"
                      right="-290"
-                     tool_tip="The profile of the experience the script runs under"
+                     tool_tip="Open the profile of the script's experience"
                      top="2"
                      visible="false"
                      width="20" />
@@ -1819,7 +1819,7 @@
                      layout="topleft"
                      name="reset_btn"
                      right="-226"
-                     tool_tip="Reset the script in its object: its state forgotten and state_entry run again"
+                     tool_tip="Reset the script in its object: clear its state and run state_entry again"
                      top="2"
                      width="56" />
                     <check_box
@@ -1829,7 +1829,7 @@
                      layout="topleft"
                      name="running"
                      right="-140"
-                     tool_tip="Whether the script runs in its object; a save keeps whatever this says"
+                     tool_tip="When on, the script runs in its object. Saving keeps this setting"
                      top="2"
                      width="80" />
                     <combo_box
@@ -1838,7 +1838,7 @@
                      layout="topleft"
                      name="compile_target"
                      right="-4"
-                     tool_tip="What the script compiles for when it is saved: an LSL script on Mono (the usual choice), on the legacy LSL2 machine, or on Luau; an SLua script as SLua. A target of the other language reads the script as that language from then on, for a script converted from one to the other."
+                     tool_tip="What the script compiles to on save. Picking the other language's target also changes its language."
                      top="2"
                      width="132">
                         <combo_box.item label="LSL (Mono)" name="compile_target_mono" value="mono" />
@@ -1905,7 +1905,7 @@
                                      layout="topleft"
                                      left="4"
                                      name="problems_errors"
-                                     tool_tip="Show what stops the script from compiling or running"
+                                     tool_tip="Show errors: problems that stop the script from compiling or running"
                                      top="3"
                                      width="60" />
                                     <check_box
@@ -1916,7 +1916,7 @@
                                      layout="topleft"
                                      left_pad="6"
                                      name="problems_warnings"
-                                     tool_tip="Show what probably does not do what was written"
+                                     tool_tip="Show warnings: code that probably does not do what you meant"
                                      top_delta="0"
                                      width="74" />
                                     <check_box
@@ -1927,7 +1927,7 @@
                                      layout="topleft"
                                      left_pad="6"
                                      name="problems_notes"
-                                     tool_tip="Show what is worth a look: the optimizer's changes, the lint's advice"
+                                     tool_tip="Show notes, such as optimizer changes and lint suggestions"
                                      top_delta="0"
                                      width="56" />
                                     <check_box
@@ -1938,7 +1938,7 @@
                                      layout="topleft"
                                      left_pad="6"
                                      name="problems_fixable"
-                                     tool_tip="Show only the problems that offer a fix, which the right-click menu and the lightbulb make, as does Quick Fix ([KEYS])"
+                                     tool_tip="Show only problems with a fix: use the right-click menu, the lightbulb, or Quick Fix ([KEYS])"
                                      top_delta="0"
                                      width="62" />
                                     <combo_box
@@ -1947,7 +1947,7 @@
                                      layout="topleft"
                                      left_pad="8"
                                      name="problems_scope"
-                                     tool_tip="Whose problems: the script in front, or every script open here, each under its name"
+                                     tool_tip="Show problems for the active tab, or for all open scripts, grouped by script"
                                      top_delta="-1"
                                      width="104">
                                         <combo_box.item label="This script" name="problems_scope_this" value="this" />
@@ -1959,7 +1959,7 @@
                                      layout="topleft"
                                      left_pad="6"
                                      name="problems_origin"
-                                     tool_tip="Only what one source said: the checkers, the compiler, the preprocessor, the optimizer, the script as it ran"
+                                     tool_tip="Show problems from one source only, such as the compiler, a checker, or the running script"
                                      top_delta="0"
                                      width="92" />
                                     <filter_editor
@@ -1969,7 +1969,7 @@
                                      layout="topleft"
                                      left_pad="8"
                                      name="problems_filter"
-                                     tool_tip="Only problems with these words in them"
+                                     tool_tip="Show only problems that contain this text"
                                      top_delta="0"
                                      width="80" />
                                 </layout_panel>
@@ -1988,7 +1988,7 @@
                                      layout="topleft"
                                      left="0"
                                      name="problems"
-                                     tool_tip="What the compiler and the analyzers said. Choosing one shows it in the script, and the arrow keys walk the list; return or a double-click goes there to type, escape goes back."
+                                     tool_tip="Problems from the compiler and checkers. Return or double-click goes there; Escape goes back."
                                      top="0"
                                      width="574">
                                         <pane_list.columns label="" name="icon" width="20" />
@@ -2024,7 +2024,7 @@
                              layout="topleft"
                              left="0"
                              name="references"
-                             tool_tip="Every place the name last looked up stands, in the script it was looked up from and in the object's others, whichever tab is in front. Choosing one shows it, and the arrow keys walk the list; return or a double-click goes there to type."
+                             tool_tip="Occurrences of the last name looked up, in the scripts of its object. Double-click to go there."
                              top_pad="3"
                              width="574">
                                 <pane_list.columns label="Script" name="where" width="130" />
@@ -2039,7 +2039,7 @@
                              layout="topleft"
                              left="422"
                              name="references_rename"
-                             tool_tip="Rename at the places checked, leaving the rest as they are."
+                             tool_tip="Rename only the checked occurrences."
                              top="1"
                              visible="false"
                              width="72" />
@@ -2050,7 +2050,7 @@
                              layout="topleft"
                              left_pad="4"
                              name="references_cancel"
-                             tool_tip="Rename nothing, and list the places as found."
+                             tool_tip="Cancel the rename and go back to the list of occurrences."
                              top="1"
                              visible="false"
                              width="72" />
@@ -2069,7 +2069,7 @@
                              layout="topleft"
                              left="2"
                              name="output_filter"
-                             tool_tip="Whose words to show: every object's, the scripts open here, your own objects', or one object's"
+                             tool_tip="Show messages from all objects, open scripts, your own objects, or one object"
                              top="2"
                              width="170" />
                             <combo_box
@@ -2078,7 +2078,7 @@
                              layout="topleft"
                              left_pad="6"
                              name="output_kind"
-                             tool_tip="What kind of thing to show: the run-time errors alone, what scripts told their owner, the debug channel, or what the studio itself did -- saving, compiling, preprocessing"
+                             tool_tip="What to show: errors, owner messages, debug channel, chat, IMs, or Studio actions like saving"
                              top_delta="0"
                              width="110">
                                 <combo_box.item label="Everything" name="output_kind_all" value="" />
@@ -2096,7 +2096,7 @@
                              layout="topleft"
                              left_pad="6"
                              name="output_find"
-                             tool_tip="Only what says these words, or comes from a name with them in it"
+                             tool_tip="Show only messages that contain this text, or come from a name that does"
                              top_delta="0"
                              width="136" />
                             <button
@@ -2106,7 +2106,7 @@
                              layout="topleft"
                              left_pad="6"
                              name="output_clear"
-                             tool_tip="Forget what was said so far; the filters stay as they are"
+                             tool_tip="Clear the messages so far; the filters stay as they are"
                              top_delta="0"
                              width="60" />
                             <button
@@ -2116,7 +2116,7 @@
                              layout="topleft"
                              left_pad="6"
                              name="output_copy"
-                             tool_tip="What the pane shows through its filters, on the clipboard as it reads"
+                             tool_tip="Copy what the pane shows, with its filters, to the clipboard"
                              top_delta="0"
                              width="70" />
                             <output_view
@@ -2125,7 +2125,7 @@
                              layout="topleft"
                              left="0"
                              name="output"
-                             placeholder="What the scripts say on the debug channel and to their owner appears here, as it is said. A script's name is a link to it, at the line of a run-time error."
+                             placeholder="Messages from scripts on the debug channel and to their owner appear here. Click a script's name to open it; run-time errors open at their line."
                              top_pad="2"
                              width="574" />
                         </panel>
@@ -2143,7 +2143,7 @@
                              layout="topleft"
                              left="0"
                              name="search_bar"
-                             tool_tip="A search said as a sentence: the words, how they have to match, and where to look. Return runs it, and changing a word runs it again."
+                             tool_tip="What to find, how to match it, and where to look. Return runs the search; any change runs it again."
                              top="0"
                              width="574" />
                             <button
@@ -2153,7 +2153,7 @@
                              layout="topleft"
                              name="search_replace"
                              right="-2"
-                             tool_tip="Every place found replaced by the words in the box, script by script, each script's own one step to undo, once you say so. A script that is not open is opened with the change unsaved."
+                             tool_tip="Replace all matches after you confirm. Scripts that are not open are opened, changes unsaved."
                              top="28"
                              width="90" />
                             <line_editor
@@ -2164,7 +2164,7 @@
                              layout="topleft"
                              left="0"
                              name="search_replacement"
-                             tool_tip="What to put in place of the words found; return or Replace All asks before replacing"
+                             tool_tip="Replacement text; Return or Replace All asks before replacing"
                              top_delta="0"
                              width="478" />
                             <pane_list
@@ -2175,7 +2175,7 @@
                              layout="topleft"
                              left="0"
                              name="search_results"
-                             tool_tip="Every place the words were found, kept up to date as the scripts open here are typed in. Choosing one shows it, and the arrow keys walk the list; return or a double-click goes there to type."
+                             tool_tip="Matches, kept up to date as open scripts change. Return or double-click goes there."
                              top_pad="2"
                              width="574">
                                 <pane_list.columns label="Where" name="where" width="200" />
@@ -2187,7 +2187,7 @@
                          class="script_studio_weights"
                          follows="all"
                          height="168"
-                         label="Weights"
+                         label="Memory"
                          layout="topleft"
                          name="weights_tab"
                          width="574">
@@ -2226,7 +2226,7 @@
                                      layout="topleft"
                                      left="0"
                                      name="weights_targets"
-                                     tool_tip="What the script's code would weigh on each target it could be compiled for, beside what each runs a script in: which is how to choose one. Choosing one lists its parts."
+                                     tool_tip="Code size on each compile target, and its share of that target's memory. Select one for its parts."
                                      top="0"
                                      width="236">
                                         <pane_list.columns dynamic_width="true" label="Target" name="target" />
@@ -2250,7 +2250,7 @@
                                      layout="topleft"
                                      left="0"
                                      name="weights_parts"
-                                     tool_tip="What each part of the script weighs on the target chosen: its bytes, its share of what the target runs a script in, and how that moved since the script was last saved. Choosing one shows it, and the arrow keys walk the list; return or a double-click goes there to type."
+                                     tool_tip="Memory each part uses on the selected target, and the change since saving. Double-click to go there."
                                      top="0"
                                      width="338">
                                         <pane_list.columns dynamic_width="true" label="Part" name="part" />
@@ -2332,7 +2332,7 @@
                          layout="topleft"
                          left_pad="2"
                          name="outline_sort"
-                         tool_tip="How the symbols are ordered under what holds them: as the script has them, by name, or by kind"
+                         tool_tip="Sort symbols in script order, by name, or by kind"
                          top="2"
                          width="64">
                             <combo_box.item label="Order" name="outline_sort_order" value="order" />
@@ -2346,7 +2346,7 @@
                          layout="topleft"
                          left_pad="4"
                          name="outline_filter"
-                         tool_tip="Only the symbols with these letters in their names"
+                         tool_tip="Show only symbols whose names contain this text"
                          top="2"
                          width="112" />
                         <pane_list
@@ -2355,7 +2355,7 @@
                          layout="topleft"
                          left="0"
                          name="outline"
-                         tool_tip="What the script declares, the one the caret is in chosen; the arrow before a symbol folds what it holds. Choosing one shows it, and the arrow keys walk the list, left and right folding; return or a double-click goes there to type."
+                         tool_tip="Symbols in the script; the one at the caret is selected. Left/Right fold; double-click goes there."
                          top="26"
                          width="250">
                             <pane_list.columns label="" name="icon" width="20" />
@@ -2400,7 +2400,7 @@
                          layout="topleft"
                          left="0"
                          name="symbol"
-                         placeholder="The symbol at the caret: its declaration, its documentation and its page on the wiki. F1 looks up the word at the caret; Help browses the whole reference."
+                         placeholder="The symbol at the caret: its declaration, documentation and wiki page. F1 looks up the word at the caret; the Help menu browses the full reference."
                          read_only="true"
                          top="20"
                          width="250"

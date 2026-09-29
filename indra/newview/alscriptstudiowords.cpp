@@ -589,7 +589,7 @@ std::string ALScriptStudioWords::notesOf(const Vocab& word)
     }
     if (word.godMode)
     {
-        line(alSaid("ScriptWordGodMode", "Only a god may call this"));
+        line(alSaid("ScriptWordGodMode", "Requires god mode"));
     }
     if (word.deprecated)
     {
