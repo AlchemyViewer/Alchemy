@@ -240,10 +240,10 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
         Doc::Shown row;
         row.level   = Doc::Level::Warning;
         row.origin  = services.words("OriginWeight");
-        const char* said = nearing         ? (weight.estimate ? "WeightNearEstimate" : "WeightNear")
-                           : weight.estimate ? "WeightOverEstimate"
+        const char* said = nearing                ? (weight.estimate ? "WeightNearEstimate" : "WeightNear")
+                           : weight.estimate      ? "WeightOverEstimate"
                            : !doc.weighing->exact ? "WeightOverBefore"
-                                                 : "WeightOver";
+                                                  : "WeightOver";
         row.message      = services.words(said, args);
         made.rows.push_back(std::move(row));
     }

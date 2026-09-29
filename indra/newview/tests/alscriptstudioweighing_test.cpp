@@ -362,10 +362,10 @@ namespace tut
         Doc&                    a    = tab("a", "default {}");
         services.front               = 0;
         studio.shown                 = true;
-        a.check->analysisVersion      = versionOf(a);
-        a.weighing->all               = { weightOf(Target::Mono, 1) };
-        a.weighing->allVersion        = versionOf(a);
-        a.weighing->askedFor          = versionOf(a);
+        a.check->analysisVersion     = versionOf(a);
+        a.weighing->all              = { weightOf(Target::Mono, 1) };
+        a.weighing->allVersion       = versionOf(a);
+        a.weighing->askedFor         = versionOf(a);
         unit.pump();
         ensure("the others wanted: weighed", studio.asked == Names{ "a" } && a.weighing->asking);
         unit.pump();
@@ -387,9 +387,9 @@ namespace tut
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "default {}");
         Doc&                    b    = tab("b", "default {}");
-        a.check->analysisVersion      = versionOf(a);
-        b.check->analysisVersion      = versionOf(b);
-        a.weighing->askedFor          = versionOf(a);
+        a.check->analysisVersion     = versionOf(a);
+        b.check->analysisVersion     = versionOf(b);
+        a.weighing->askedFor         = versionOf(a);
         services.front               = 0;
         unit.pump();
         ensure("weighed with its check already: nothing", studio.asked.empty());

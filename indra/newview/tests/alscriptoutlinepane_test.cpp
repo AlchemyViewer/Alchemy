@@ -392,7 +392,7 @@ namespace tut
         Doc&                 doc     = tab("a");
         outline->show(doc);
         const std::vector<LLScrollListItem*> before = outline->list()->getAllData();
-        doc.caret->crumbPath                         = { 4 };
+        doc.caret->crumbPath                        = { 4 };
         outline->followCaret(doc);
         ensure_equals("alpha chosen", chosen(), 4);
         doc.outline.insert(doc.outline.begin() + 1, entry("beta", ALScriptSymbolKind::Function, 0, 1));

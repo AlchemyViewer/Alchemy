@@ -337,7 +337,7 @@ namespace tut
         ensure("an estimate", part("LSL (Mono) ~") != nullptr);
         doc.weighing->weight.reset();
 
-        const size_t LIMIT      = ALScriptEnvelope::MAX_ASSET_BYTES;
+        const size_t LIMIT       = ALScriptEnvelope::MAX_ASSET_BYTES;
         doc.weighing->assetBytes = LIMIT / 2;
         crumbs->showTrailer(doc);
         ensure("half: nothing", parts().size() == 2);
@@ -352,11 +352,11 @@ namespace tut
         crumbs->showTrailer(doc);
         ensure("over: the error's", parts().back().color == error);
         ensure("and by how much", parts().back().toolTip.find("1 over the") != std::string::npos);
-        doc.notecard            = true;
+        doc.notecard             = true;
         doc.weighing->assetBytes = static_cast<size_t>(LLNotecard::MAX_SIZE) / 2 + 1;
         crumbs->showTrailer(doc);
         ensure("a notecard's by its own limit", parts().back().toolTip.find("Notecard text") != std::string::npos);
-        doc.notecard            = false;
+        doc.notecard             = false;
         doc.weighing->assetBytes = 0;
 
         crumbs->setTips({ "line tip", "problems tip", "source tip", "expanded tip" });

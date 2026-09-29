@@ -864,7 +864,7 @@ namespace tut
         Doc&                    lua      = tab("b");
         lua.language.lua                 = true;
         doc.expanded.valid               = true;
-        doc.weighing->sent                = true;
+        doc.weighing->sent               = true;
         preprocessing                    = true;
         checking.settingsChanged(false, 10.0);
         checking.settingsChanged(true, 10.1);

@@ -62,7 +62,7 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
     }
     const ALEditorCommand     command = doc.caret->symbolCommand;
     const ALScriptReferences& refs    = result.references;
-    doc.caret->symbolCommand           = ALEditorCommand::None;
+    doc.caret->symbolCommand          = ALEditorCommand::None;
     LLStringUtil::format_map_t args;
     const std::string          name = refs.found ? refs.name : doc.editor->document().text(doc.editor->identifierAt(doc.caret->symbolAt));
     args["[NAME]"]                  = name;
@@ -189,7 +189,7 @@ void ALScriptStudioCaret::placePath(Doc& doc)
     {
         path = ALScriptPlaces::pathAt(doc.outline, doc.editor->caret());
     }
-    const bool changed  = path != doc.caret->crumbPath || doc.caret->crumbsOf != doc.check->analysisVersion;
+    const bool changed   = path != doc.caret->crumbPath || doc.caret->crumbsOf != doc.check->analysisVersion;
     doc.caret->crumbPath = std::move(path);
     doc.caret->crumbsOf  = doc.check->analysisVersion;
     mWindow.showPath(doc, changed);

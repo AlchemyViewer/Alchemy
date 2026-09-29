@@ -327,7 +327,7 @@ namespace tut
         using V                   = ALScriptProblem::Severity;
         Doc& door                 = doc("door");
         Doc& lamp                 = doc("lamp");
-        door.check->analysis       = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning"),
+        door.check->analysis      = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning"),
                                       problem(S::Lint, V::Note, 5, "door note") };
         lamp.check->analysis       = { problem(S::Parser, V::Error, 2, "lamp error") };
         gather(lamp);
@@ -551,13 +551,13 @@ namespace tut
         make();
         Doc& d = doc("door");
         ALScriptWeight weight;
-        weight.target      = ALScriptWeight::Target::LSO;
-        weight.total       = 14 * 1024;
-        weight.limit       = 16 * 1024;
+        weight.target       = ALScriptWeight::Target::LSO;
+        weight.total        = 14 * 1024;
+        weight.limit        = 16 * 1024;
         d.weighing->weight  = weight;
         d.weighing->version = d.editor->document().version();
         d.weighing->exact   = true;
-        const auto weights = [&](const ALScriptProblemsPane::Made& made) {
+        const auto weights  = [&](const ALScriptProblemsPane::Made& made) {
             std::vector<Doc::Shown> rows;
             std::copy_if(made.rows.begin(), made.rows.end(), std::back_inserter(rows), [&](const Doc::Shown& row) { return row.origin == services.words("OriginWeight"); });
             return rows;
@@ -597,7 +597,7 @@ namespace tut
     {
         set_test_name("a script no tab holds, which an object's check reached, is listed after the open ones under its name, chosen by its item, and gives way to its tab");
         make();
-        Doc& d           = doc("door");
+        Doc& d            = doc("door");
         d.check->analysis = { problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 1, "in the open one") };
         gather(d);
         LLUUID object, item;
@@ -694,7 +694,7 @@ namespace tut
         using V                    = ALScriptProblem::Severity;
         LLTabContainer* tabs       = window.find<LLTabContainer>("bottom_tabs");
         Doc&            door       = doc("door");
-        door.check->analysis        = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning") };
+        door.check->analysis       = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning") };
         tabs->selectTabByName("references_tab");
         ensure("out of sight", !ALPaneFolds::inSight(&out));
         const S32 said = studio.counts;

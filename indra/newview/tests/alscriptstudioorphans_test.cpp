@@ -166,7 +166,7 @@ namespace tut
         o.orphan->kind = Orphan::None;
         ensure("and nothing stays nothing", Orphans::seen(o, reach) == Orphan::None);
         reach.heldByPrim = true;
-        o.orphan->kind    = Orphan::Locked;
+        o.orphan->kind   = Orphan::Locked;
         ensure("a locked text stays locked while its item is there", Orphans::seen(o, reach) == Orphan::Locked);
         reach.heldByPrim = false;
         ensure("but not once it is gone", Orphans::seen(o, reach) == Orphan::Removed);
@@ -238,7 +238,7 @@ namespace tut
         const size_t said = services().reports.size();
         unit.check();
         ensure("nothing changed: nothing said", services().reports.size() == said && studio.toolbars == 3);
-        Doc& c                 = tab("c");
+        Doc& c                  = tab("c");
         c.orphan->kind          = Orphan::Away;
         c.orphan->detached      = true;
         c.orphan->reattachTries = ALRecoveryRetry::TRIES;
@@ -303,19 +303,19 @@ namespace tut
         notice = Orphans::noticeFor(&a, words);
         ensure("away", notice.text == said("NoticeAway") && notice.buttons[0].first == "copy" && notice.buttons[1].first == "export");
         a.orphan->kind = Orphan::Offline;
-        notice        = Orphans::noticeFor(&a, words);
+        notice         = Orphans::noticeFor(&a, words);
         ensure("offline: a copy on disk alone", notice.buttons[0].first == "export" && notice.buttons[1].first.empty());
         a.orphan->kind = Orphan::Unloaded;
-        a.loadError   = "no such asset";
-        notice        = Orphans::noticeFor(&a, words);
+        a.loadError    = "no such asset";
+        notice         = Orphans::noticeFor(&a, words);
         ensure("unloaded: why, and to try again",
                notice.text.find("no such asset") != std::string::npos && notice.buttons[0].first == "retry_load");
         a.orphan->kind = Orphan::Trashed;
-        notice        = Orphans::noticeFor(&a, words);
+        notice         = Orphans::noticeFor(&a, words);
         ensure("in the Trash: said, nothing to do", notice.text == said("NoticeTrashed") && notice.buttons[0].first.empty());
         a.orphan->kind = Orphan::FileGone;
-        a.file        = "/somewhere/a.lsl";
-        notice        = Orphans::noticeFor(&a, words);
+        a.file         = "/somewhere/a.lsl";
+        notice         = Orphans::noticeFor(&a, words);
         ensure("a file gone: saved again", notice.text.find("/somewhere/a.lsl") != std::string::npos && notice.buttons[0].first == "save");
         Doc& i = tab("i", true);
         i.orphan->kind = Orphan::Removed;
@@ -470,11 +470,11 @@ namespace tut
         ensure("a save's, answered by a save; a conflict's not",
                a.offer->bySave() && !Doc::Offer{ "x", { "take_external", "keep_here" } }.bySave());
         a.orphan->kind = Orphan::Removed;
-        a.offer       = Doc::Offer{ "Kept.", { "copy", "export" } };
+        a.offer        = Doc::Offer{ "Kept.", { "copy", "export" } };
         unit.noticeAction("close");
         ensure("what a tab gone says of itself, hidden with it", a.orphan->noticeDismissed && !a.offer);
         a.orphan->noticeDismissed = false;
-        a.offer                  = Doc::Offer{ "Saving a failed.", { "retry", "copy", "export" } };
+        a.offer                   = Doc::Offer{ "Saving a failed.", { "retry", "copy", "export" } };
         unit.noticeAction("close");
         ensure("more than that: said next", a.offer && Orphans::noticeFor(&a, words).text == "Saving a failed.");
     }

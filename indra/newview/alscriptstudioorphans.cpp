@@ -236,7 +236,7 @@ F64 ALScriptStudioOrphans::check()
         {
             continue;
         }
-        changed                    = true;
+        changed                     = true;
         doc.orphan->noticeDismissed = false;
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;

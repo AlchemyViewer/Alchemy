@@ -165,7 +165,7 @@ void ALScriptStudioChecking::expandFor(Doc& doc, ALScriptAnalysis::Kind kind, co
         return;
     }
     doc.check->wanted.reset();
-    doc.check->expanding             = version;
+    doc.check->expanding            = version;
     const std::weak_ptr<bool> alive = mAlive;
     const std::string         id    = doc.id;
     // The script apart from its modules, for the analyzers to check each on
@@ -334,7 +334,7 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
         }
         if (!found && kind == ALScriptAnalysis::Kind::Check && !doc.check->configAsked)
         {
-            doc.check->configAsked           = true;
+            doc.check->configAsked          = true;
             const std::weak_ptr<bool> alive = mAlive;
             const std::string         id    = doc.id;
             sources().fetchConfig(root, [this, alive, id]() {
@@ -756,7 +756,7 @@ void ALScriptStudioChecking::askCheck(Doc& doc, F64 now)
 void ALScriptStudioChecking::checkNotecard(Doc& doc)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    doc.check->analysisDue           = 0.0;
+    doc.check->analysisDue          = 0.0;
     const ALTextDocument& text      = doc.editor->document();
     ALScriptProblems      problems;
     // Every line is EOF to a script where the notecard carries anything:
@@ -799,7 +799,7 @@ void ALScriptStudioChecking::checkNotecard(Doc& doc)
     }
     doc.check->analysis        = std::move(problems);
     doc.check->analysisVersion = text.version();
-    doc.outline               = doc.grammar == "json" ? ALNotecardFormat::outline(doc.editor->wholeText()) : std::vector<ALScriptOutlineEntry>();
+    doc.outline = doc.grammar == "json" ? ALNotecardFormat::outline(doc.editor->wholeText()) : std::vector<ALScriptOutlineEntry>();
     mWindow.refreshProblems(doc);
     mWindow.showOutline(doc);
 }

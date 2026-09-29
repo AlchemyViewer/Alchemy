@@ -229,7 +229,7 @@ void ALScriptExternalEditor::sync(Doc& doc)
     // was sent, and a file written again under an editor that has it open
     // reads to that editor as changed.
     const std::string& text = doc.editor->wholeText();
-    doc.external->written    = text;
+    doc.external->written   = text;
     std::string        held;
     if (readWholeFile(filename, held) && (held == text || (text.empty() && held == " ")))
     {

@@ -304,7 +304,7 @@ void ALScriptStudioSaving::save(Doc& doc)
                                                 : doc.orphan->kind == Doc::Orphan::Removed  ? "SaveBlockedRemoved"
                                                 : doc.orphan->kind == Doc::Orphan::Locked   ? "SaveBlockedLocked"
                                                 : doc.orphan->kind == Doc::Orphan::Unloaded ? "SaveBlockedUnloaded"
-                                                                                      : "SaveBlockedOffline",
+                                                                                            : "SaveBlockedOffline",
                                                 args),
                                 true);
             ALScriptStudioOrphans::showNotice(doc);
