@@ -115,6 +115,12 @@ public:
     std::vector<ALVimInput> keysOf(std::string_view text) const;
     // Keys spelt in the notation, as :map lists them.
     static std::string shown(const std::vector<ALVimInput>& keys);
+    // Keys as a register holds them, what q records and @ plays: the
+    // characters as they are but for < as <lt>, every other key by its name
+    // in the notation, F1 to F12 included; and read back, the notation's
+    // names taken whatever their case, <Leader> not among them.
+    static std::string             written(const std::vector<ALVimInput>& keys);
+    static std::vector<ALVimInput> keysWritten(std::string_view text);
 
     // One of the :map family, by its name -- a bang part of it -- and what
     // followed it: map, noremap, unmap and mapclear, each for the modes
@@ -157,8 +163,10 @@ public:
 
 private:
     // A name in angle brackets as keys, added to `out`; false where it is
-    // no name the notation knows.
-    bool named(const std::string& name, std::vector<ALVimInput>& out) const;
+    // no name the notation knows. namedKey() knows every name but the
+    // leaders and <Nop>, which are the table's.
+    bool        named(const std::string& name, std::vector<ALVimInput>& out) const;
+    static bool namedKey(const std::string& name, std::vector<ALVimInput>& out);
     // The mappings in `modes` whose keys start with `from`, listed.
     std::string list(U8 modes, const std::vector<ALVimInput>& from) const;
 

@@ -226,6 +226,13 @@ bool ALVimMappings::named(const std::string& name_in, std::vector<ALVimInput>& o
     {
         return true;
     }
+    return namedKey(name_in, out);
+}
+
+// static
+bool ALVimMappings::namedKey(const std::string& name_in, std::vector<ALVimInput>& out)
+{
+    const std::string name = lowered(name_in);
     for (const llwchar ch : { U'<', U' ', U'|', U'\\' })
     {
         if (name == lowered(charName(ch)))
@@ -283,17 +290,37 @@ bool ALVimMappings::named(const std::string& name_in, std::vector<ALVimInput>& o
     return false;
 }
 
-// static
-std::string ALVimMappings::shown(const std::vector<ALVimInput>& keys)
+namespace
 {
-    std::string out;
-    for (const ALVimInput& in : keys)
+    // A key that is no character in the notation, its modifiers before its
+    // name: a letter's key as a register writes it, lowered, or as :map
+    // lists it. Nothing for a key with no name and no character.
+    std::string keySpelt(const ALVimInput& in, bool lower_letters)
     {
-        if (in.isChar)
+        std::string name;
+        for (const KeyName& known : KEY_NAMES)
         {
-            const char* name = charName(in.ch);
-            out += name ? "<" + std::string(name) + ">" : utf8str_from_cp(in.ch);
-            continue;
+            if (known.key == in.key)
+            {
+                name = known.name;
+                break;
+            }
+        }
+        if (name.empty())
+        {
+            if (in.key == ' ')
+            {
+                name = "Space";
+            }
+            else if (in.key > 0x20 && in.key < 0x7F)
+            {
+                const char c = static_cast<char>(in.key);
+                name         = std::string(1, lower_letters ? static_cast<char>(std::tolower(static_cast<unsigned char>(c))) : c);
+            }
+            else
+            {
+                return std::string();
+            }
         }
         std::string mods;
         if (in.mask & ALVimInput::CONTROL)
@@ -308,20 +335,62 @@ std::string ALVimMappings::shown(const std::vector<ALVimInput>& keys)
         {
             mods += "S-";
         }
-        std::string name;
-        for (const KeyName& known : KEY_NAMES)
+        return "<" + mods + name + ">";
+    }
+}
+
+// static
+std::string ALVimMappings::shown(const std::vector<ALVimInput>& keys)
+{
+    std::string out;
+    for (const ALVimInput& in : keys)
+    {
+        if (in.isChar)
         {
-            if (known.key == in.key)
+            const char* name = charName(in.ch);
+            out += name ? "<" + std::string(name) + ">" : utf8str_from_cp(in.ch);
+            continue;
+        }
+        out += keySpelt(in, false);
+    }
+    return out;
+}
+
+// static
+std::string ALVimMappings::written(const std::vector<ALVimInput>& keys)
+{
+    std::string out;
+    for (const ALVimInput& in : keys)
+    {
+        if (in.isChar)
+        {
+            out += in.ch == '<' ? std::string("<lt>") : utf8str_from_cp(in.ch);
+            continue;
+        }
+        out += keySpelt(in, true);
+    }
+    return out;
+}
+
+// static
+std::vector<ALVimInput> ALVimMappings::keysWritten(std::string_view text)
+{
+    std::vector<ALVimInput> out;
+    size_t                  at = 0;
+    while (at < text.size())
+    {
+        if (text[at] == '<')
+        {
+            const size_t close = text.find('>', at + 1);
+            if (close != std::string_view::npos && close > at + 1 && namedKey(std::string(text.substr(at + 1, close - at - 1)), out))
             {
-                name = known.name;
-                break;
+                at = close + 1;
+                continue;
             }
         }
-        if (name.empty())
-        {
-            name = in.key == ' ' ? std::string("Space") : std::string(1, static_cast<char>(in.key));
-        }
-        out += "<" + mods + name + ">";
+        const LLCodepointAt cp = utf8str_decode_at(text, at);
+        out.push_back(ALVimInput::character(cp.cp));
+        at = llmax(cp.next, at + 1);
     }
     return out;
 }

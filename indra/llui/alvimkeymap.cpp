@@ -272,137 +272,18 @@ ALVimKeymap::~ALVimKeymap() = default;
 
 // --- keys as text ------------------------------------------------------------------
 
-namespace
-{
-    struct KeyName
-    {
-        KEY         key;
-        const char* name;
-    };
-    const KeyName KEY_NAMES[] = {
-        { KEY_ESCAPE, "Esc" },     { KEY_RETURN, "CR" },     { KEY_BACKSPACE, "BS" }, { KEY_TAB, "Tab" },        { KEY_DELETE, "Del" },
-        { KEY_UP, "Up" },          { KEY_DOWN, "Down" },     { KEY_LEFT, "Left" },    { KEY_RIGHT, "Right" },    { KEY_HOME, "Home" },
-        { KEY_END, "End" },        { KEY_PAGE_UP, "PageUp" }, { KEY_PAGE_DOWN, "PageDown" }, { KEY_INSERT, "Ins" },
-    };
-
-    std::string keyName(KEY key)
-    {
-        for (const KeyName& known : KEY_NAMES)
-        {
-            if (known.key == key)
-            {
-                return known.name;
-            }
-        }
-        if (key >= 0x20 && key < 0x7F)
-        {
-            return std::string(1, static_cast<char>(std::tolower(key)));
-        }
-        return std::string();
-    }
-
-    bool keyFromName(const std::string& name, KEY& key)
-    {
-        for (const KeyName& known : KEY_NAMES)
-        {
-            if (name == known.name)
-            {
-                key = known.key;
-                return true;
-            }
-        }
-        if (name.size() == 1)
-        {
-            key = static_cast<KEY>(std::toupper(static_cast<unsigned char>(name[0])));
-            return true;
-        }
-        return false;
-    }
-}
-
+// The notation's own, which the mappings keep: one spelling of every key
+// for what q records, @ plays and :map reads.
 // static
 std::string ALVimKeymap::encodeInputs(const std::vector<Input>& inputs)
 {
-    std::string out;
-    for (const Input& in : inputs)
-    {
-        if (in.isChar)
-        {
-            out += in.ch == '<' ? std::string("<lt>") : utf8Of(in.ch);
-            continue;
-        }
-        const std::string name = keyName(in.key);
-        if (name.empty())
-        {
-            continue;
-        }
-        std::string spelt;
-        if (in.mask & CONTROL)
-        {
-            spelt += "C-";
-        }
-        if (in.mask & MASK_ALT)
-        {
-            spelt += "A-";
-        }
-        if (in.mask & MASK_SHIFT)
-        {
-            spelt += "S-";
-        }
-        out += "<" + spelt + name + ">";
-    }
-    return out;
+    return ALVimMappings::written(inputs);
 }
 
 // static
 std::vector<ALVimKeymap::Input> ALVimKeymap::decodeInputs(std::string_view text)
 {
-    std::vector<Input> out;
-    size_t             at = 0;
-    while (at < text.size())
-    {
-        if (text[at] == '<')
-        {
-            const size_t close = text.find('>', at + 1);
-            if (close != std::string_view::npos && close > at + 1)
-            {
-                std::string name(text.substr(at + 1, close - at - 1));
-                if (name == "lt")
-                {
-                    Input in;
-                    in.isChar = true;
-                    in.ch     = '<';
-                    out.push_back(in);
-                    at = close + 1;
-                    continue;
-                }
-                MASK mask = MASK_NONE;
-                while (name.size() > 2 && name[1] == '-' && (name[0] == 'C' || name[0] == 'A' || name[0] == 'M' || name[0] == 'S'))
-                {
-                    mask |= name[0] == 'C' ? CONTROL : name[0] == 'S' ? MASK_SHIFT : MASK_ALT;
-                    name.erase(0, 2);
-                }
-                KEY key;
-                if (keyFromName(name, key))
-                {
-                    Input in;
-                    in.key  = key;
-                    in.mask = mask;
-                    out.push_back(in);
-                    at = close + 1;
-                    continue;
-                }
-            }
-        }
-        // A character, whole.
-        const LLCodepointAt cp = utf8str_decode_at(text, at);
-        Input               in;
-        in.isChar = true;
-        in.ch     = cp.cp;
-        out.push_back(in);
-        at = llmax(cp.next, at + 1);
-    }
-    return out;
+    return ALVimMappings::keysWritten(text);
 }
 
 // --- what the outside sees -------------------------------------------------------------

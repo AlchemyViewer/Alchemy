@@ -2683,4 +2683,22 @@ namespace tut
         e.undo();
         ensure_equals("the answer before it", flat(e.text()), std::string("x|x|x|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<89>()
+    {
+        set_test_name("a function key typed into a macro is kept by its name and plays; keys written and read back in the one notation");
+        ALCodeEditor& e = make("abc\n");
+        ex("nmap <F5> x");
+        keys("qa");
+        editor->handleKeyHere(KEY_F5, MASK_NONE);
+        keys("q");
+        ensure_equals("recorded by its name", vim->registerText('a'), std::string("<F5>"));
+        keys("@a");
+        ensure_equals("and played", flat(e.text()), std::string("c|"));
+        const std::vector<ALVimKeymap::Input> back = ALVimKeymap::decodeInputs("<F12><C-F3><Space><cr>");
+        ensure("read back", back.size() == 4 && back[0].key == KEY_F12 && back[1].key == KEY_F3 && (back[1].mask & ALVimKeymap::CONTROL) &&
+                                back[2].isChar && back[2].ch == ' ' && back[3].key == KEY_RETURN);
+        ensure_equals("and written", ALVimKeymap::encodeInputs(back), std::string("<F12><C-F3> <CR>"));
+    }
 }
