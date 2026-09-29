@@ -161,12 +161,12 @@ namespace tut
         reach.heldByPrim  = false;
         ensure("its prim holds it no more", Orphans::seen(o, reach) == Orphan::Removed);
         reach.heldByPrim.reset();
-        o.orphan.kind = Orphan::Removed;
+        o.orphan->kind = Orphan::Removed;
         ensure("while the prim is asked again, gone stays gone", Orphans::seen(o, reach) == Orphan::Removed);
-        o.orphan.kind = Orphan::None;
+        o.orphan->kind = Orphan::None;
         ensure("and nothing stays nothing", Orphans::seen(o, reach) == Orphan::None);
         reach.heldByPrim = true;
-        o.orphan.kind    = Orphan::Locked;
+        o.orphan->kind    = Orphan::Locked;
         ensure("a locked text stays locked while its item is there", Orphans::seen(o, reach) == Orphan::Locked);
         reach.heldByPrim = false;
         ensure("but not once it is gone", Orphans::seen(o, reach) == Orphan::Removed);
@@ -177,7 +177,7 @@ namespace tut
         Reach item = inReach();
         item.trashed = true;
         ensure("in the Trash", Orphans::seen(i, item) == Orphan::Trashed);
-        i.orphan.kind = Orphan::Unloaded;
+        i.orphan->kind = Orphan::Unloaded;
         ensure("an unloaded text stays so in the Trash", Orphans::seen(i, item) == Orphan::Unloaded);
         item.itemThere = false;
         ensure("its item gone", Orphans::seen(i, item) == Orphan::Removed);
@@ -218,32 +218,32 @@ namespace tut
         studio.reaches["a"].objectThere = false;
         const F64 due = unit.check();
         ensure("each tab's place taken", studio.placed == Names{ "a", "b" });
-        ensure("out of sight a moment: not yet away", a.orphan.kind == Orphan::None && a.orphan.awaySince > 0.0);
-        ensure("and to be looked at again once the moment is past", due > a.orphan.awaySince && due <= a.orphan.awaySince + 3.0);
-        a.orphan.awaySince -= 5.0;
-        a.orphan.noticeDismissed = true;
+        ensure("out of sight a moment: not yet away", a.orphan->kind == Orphan::None && a.orphan->awaySince > 0.0);
+        ensure("and to be looked at again once the moment is past", due > a.orphan->awaySince && due <= a.orphan->awaySince + 3.0);
+        a.orphan->awaySince -= 5.0;
+        a.orphan->noticeDismissed = true;
         unit.check();
-        ensure("gone a while: away", a.orphan.kind == Orphan::Away && !a.orphan.noticeDismissed && studio.toolbars == 1);
+        ensure("gone a while: away", a.orphan->kind == Orphan::Away && !a.orphan->noticeDismissed && studio.toolbars == 1);
         b.editor->setCaret(b.editor->document().end());
         b.editor->insertText(" typed");
         studio.reaches["b"].heldByPrim = false;
         unit.check();
-        ensure("gone with changes: kept", b.orphan.kind == Orphan::Removed && studio.kept == Names{ "b" });
+        ensure("gone with changes: kept", b.orphan->kind == Orphan::Removed && studio.kept == Names{ "b" });
         ensure("and said, with what can be done", services().reports.back().text == said("OrphanRemovedKept", "[NAME]", "b") &&
                                                        services().reports.back().actions == Names{ "copy", "export" });
         studio.reaches["a"].objectThere = true;
         unit.check();
-        ensure("back: said", a.orphan.kind == Orphan::None && services().reports.back().text == said("OrphanBack", "[NAME]", "a") &&
-                                 a.orphan.awaySince == 0.0);
+        ensure("back: said", a.orphan->kind == Orphan::None && services().reports.back().text == said("OrphanBack", "[NAME]", "a") &&
+                                 a.orphan->awaySince == 0.0);
         const size_t said = services().reports.size();
         unit.check();
         ensure("nothing changed: nothing said", services().reports.size() == said && studio.toolbars == 3);
         Doc& c                 = tab("c");
-        c.orphan.kind          = Orphan::Away;
-        c.orphan.detached      = true;
-        c.orphan.reattachTries = ALRecoveryRetry::TRIES;
+        c.orphan->kind          = Orphan::Away;
+        c.orphan->detached      = true;
+        c.orphan->reattachTries = ALRecoveryRetry::TRIES;
         unit.check();
-        ensure("a detached one back: nothing said, its load will", c.orphan.kind == Orphan::None && services().reports.size() == said);
+        ensure("a detached one back: nothing said, its load will", c.orphan->kind == Orphan::None && services().reports.size() == said);
     }
 
     template<> template<>
@@ -252,24 +252,24 @@ namespace tut
         set_test_name("a detached tab loaded under what it holds once its item is in reach, while its tries last and the next is due");
         Orphans& unit = make();
         Doc&     a    = tab("a");
-        a.orphan.detached = true;
+        a.orphan->detached = true;
         a.editor->setText("kept text");
-        a.orphan.reattachTries = ALRecoveryRetry::TRIES;
+        a.orphan->reattachTries = ALRecoveryRetry::TRIES;
         unit.check();
         ensure("tried out: waits for a person", studio.loads.empty());
-        a.orphan.reattachTries = 1;
-        a.orphan.nextReattach  = LLTimer::getTotalSeconds() + 60.0;
+        a.orphan->reattachTries = 1;
+        a.orphan->nextReattach  = LLTimer::getTotalSeconds() + 60.0;
         const F64 next = unit.check();
-        ensure("to be looked at again when its try is due", next == a.orphan.nextReattach);
+        ensure("to be looked at again when its try is due", next == a.orphan->nextReattach);
         ensure("not due yet", studio.loads.empty());
-        a.orphan.nextReattach = 0.0;
+        a.orphan->nextReattach = 0.0;
         unit.check();
         ensure("loaded", studio.loads.size() == 1 && studio.loads[0] == a.ref);
         ensure("what it holds kept first, and carried over", studio.kept == Names{ "a" } && a.carriedText && *a.carriedText == "kept text");
-        ensure("not loaded, and not to be typed in, until it is", !a.loaded && a.editor->isReadOnly() && !a.orphan.detached);
+        ensure("not loaded, and not to be typed in, until it is", !a.loaded && a.editor->isReadOnly() && !a.orphan->detached);
         Doc& u = tab("u");
-        u.orphan.detached = true;
-        u.orphan.kind     = Orphan::Unloaded;
+        u.orphan->detached = true;
+        u.orphan->kind     = Orphan::Unloaded;
         u.loadFailure     = Failure::Unreadable;
         studio.reaches["u"].heldByPrim = true;
         unit.check();
@@ -291,7 +291,7 @@ namespace tut
         ALRecoveryEntry kept;
         kept.baseAsset = LLUUID::generateNewID();
         a.recoverable  = kept;
-        a.orphan.kind  = Orphan::Away;
+        a.orphan->kind  = Orphan::Away;
         ALScriptNoticeBar::Notice notice = Orphans::noticeFor(&a, words);
         const std::string when = kept.whenSaid();
         ensure("a kept text first", notice.text == said("NoticeRecoverable", "[WHEN]", when) && notice.buttons[0].first == "compare_kept" &&
@@ -302,25 +302,25 @@ namespace tut
         a.recoverable.reset();
         notice = Orphans::noticeFor(&a, words);
         ensure("away", notice.text == said("NoticeAway") && notice.buttons[0].first == "copy" && notice.buttons[1].first == "export");
-        a.orphan.kind = Orphan::Offline;
+        a.orphan->kind = Orphan::Offline;
         notice        = Orphans::noticeFor(&a, words);
         ensure("offline: a copy on disk alone", notice.buttons[0].first == "export" && notice.buttons[1].first.empty());
-        a.orphan.kind = Orphan::Unloaded;
+        a.orphan->kind = Orphan::Unloaded;
         a.loadError   = "no such asset";
         notice        = Orphans::noticeFor(&a, words);
         ensure("unloaded: why, and to try again",
                notice.text.find("no such asset") != std::string::npos && notice.buttons[0].first == "retry_load");
-        a.orphan.kind = Orphan::Trashed;
+        a.orphan->kind = Orphan::Trashed;
         notice        = Orphans::noticeFor(&a, words);
         ensure("in the Trash: said, nothing to do", notice.text == said("NoticeTrashed") && notice.buttons[0].first.empty());
-        a.orphan.kind = Orphan::FileGone;
+        a.orphan->kind = Orphan::FileGone;
         a.file        = "/somewhere/a.lsl";
         notice        = Orphans::noticeFor(&a, words);
         ensure("a file gone: saved again", notice.text.find("/somewhere/a.lsl") != std::string::npos && notice.buttons[0].first == "save");
         Doc& i = tab("i", true);
-        i.orphan.kind = Orphan::Removed;
+        i.orphan->kind = Orphan::Removed;
         ensure("gone from the inventory, said so", Orphans::noticeFor(&i, words).text == said("NoticeRemovedInventory"));
-        i.orphan.noticeDismissed = true;
+        i.orphan->noticeDismissed = true;
         ensure("hidden: nothing", Orphans::noticeFor(&i, words).text.empty());
     }
 
@@ -340,17 +340,17 @@ namespace tut
         ensure("discarded", studio.did.back() == "discard" && !a.recoverable);
         a.recoverable = ALRecoveryEntry();
         unit.noticeAction("close");
-        ensure("hidden, the kept text let go of here", a.orphan.noticeDismissed && !a.recoverable);
+        ensure("hidden, the kept text let go of here", a.orphan->noticeDismissed && !a.recoverable);
         unit.noticeAction("copy");
         unit.noticeAction("export");
         unit.noticeAction("save");
         ensure("a copy, a file, a save", studio.did == Names{ "source a", "restore a", "source a", "discard", "copy a", "export", "save a" });
-        a.orphan.reattachTries = 3;
+        a.orphan->reattachTries = 3;
         unit.noticeAction("retry_load");
         ensure("not detached: nothing to try", studio.loads.empty());
-        a.orphan.detached = true;
+        a.orphan->detached = true;
         unit.noticeAction("retry_load");
-        ensure("tried again, from the first try", studio.loads.size() == 1 && a.orphan.reattachTries == 0);
+        ensure("tried again, from the first try", studio.loads.size() == 1 && a.orphan->reattachTries == 0);
     }
 
     template<> template<>
@@ -363,7 +363,7 @@ namespace tut
         studio.bar = bar;
         Doc& a     = tab("a");
         services().front = 0;
-        a.orphan.kind    = Orphan::Away;
+        a.orphan->kind    = Orphan::Away;
         unit.refreshNotice();
         LLView* holder = bar->getParent();
         ensure("shown", holder->getVisible());
@@ -377,10 +377,10 @@ namespace tut
         second->onCommit();
         bar->getChild<LLButton>("notice_close")->onCommit();
         ensure("the window told", window.pane().pressed == Names{ "copy", "export", "close" });
-        a.orphan.kind = Orphan::Offline;
+        a.orphan->kind = Orphan::Offline;
         unit.refreshNotice();
         ensure("one button", first->getVisible() && !second->getVisible() && bar->action(0) == "export");
-        a.orphan.kind = Orphan::None;
+        a.orphan->kind = Orphan::None;
         unit.refreshNotice();
         ensure("hidden", !holder->getVisible());
     }
@@ -403,9 +403,9 @@ namespace tut
                       "compare a: default { touch_start(integer n) { llDie(); } } | default { } (" + said("CompareCompiled") + " | " + said("CompareMade") + ")");
         ensure("the notice stays, to act on after looking", a.compiledDiffers.has_value());
         studio.did.clear();
-        a.orphan.kind = Orphan::Away;
+        a.orphan->kind = Orphan::Away;
         ensure("a tab gone first", Orphans::noticeFor(&a, words).text == said("NoticeAway"));
-        a.orphan.kind = Orphan::None;
+        a.orphan->kind = Orphan::None;
         unit.noticeAction("take_compiled");
         ensure("the source back in front, then taken as the source",
                studio.did == Names{ "source a", "carried a: default { touch_start(integer n) { llDie(); } }" } && !a.compiledDiffers);
@@ -448,12 +448,12 @@ namespace tut
         ensure("said with its buttons", notice.text == "Saving a failed." &&
                                             notice.buttons[0] == std::make_pair(std::string("retry"), std::string("NoticeRetrySave")) &&
                                             notice.buttons[1].first == "copy" && notice.buttons[2].first == "export");
-        a.orphan.kind = Orphan::Away;
+        a.orphan->kind = Orphan::Away;
         ensure("what the tab is first", Orphans::noticeFor(&a, words).text == said("NoticeAway"));
-        a.orphan.noticeDismissed = true;
+        a.orphan->noticeDismissed = true;
         ensure("then the offer, once that is hidden", Orphans::noticeFor(&a, words).text == "Saving a failed.");
-        a.orphan.kind            = Orphan::None;
-        a.orphan.noticeDismissed = false;
+        a.orphan->kind            = Orphan::None;
+        a.orphan->noticeDismissed = false;
         unit.noticeAction("retry");
         ensure("taken up, and let go of", studio.did.back() == "offer a: retry" && !a.offer);
         a.offer = Doc::Offer{ "Saved elsewhere.", { "take_saved", "keep_saved", "compare_saved" } };
@@ -463,17 +463,17 @@ namespace tut
         ensure("with it: said", notice.text == "Saved elsewhere." && notice.buttons[0].second == "NoticeTakeSaved" &&
                                     notice.buttons[2].second == "NoticeCompare");
         unit.noticeAction("close");
-        ensure("hidden: let go of, and nothing else", !a.offer && !a.orphan.noticeDismissed && studio.did.back() == "offer a: retry");
+        ensure("hidden: let go of, and nothing else", !a.offer && !a.orphan->noticeDismissed && studio.did.back() == "offer a: retry");
         a.offer           = Doc::Offer{ "Held.", { "save_anyway" } };
         a.compiledDiffers = std::string("x");
         ensure("said before a compiled half", Orphans::noticeFor(&a, words).text == "Held.");
         ensure("a save's, answered by a save; a conflict's not",
                a.offer->bySave() && !Doc::Offer{ "x", { "take_external", "keep_here" } }.bySave());
-        a.orphan.kind = Orphan::Removed;
+        a.orphan->kind = Orphan::Removed;
         a.offer       = Doc::Offer{ "Kept.", { "copy", "export" } };
         unit.noticeAction("close");
-        ensure("what a tab gone says of itself, hidden with it", a.orphan.noticeDismissed && !a.offer);
-        a.orphan.noticeDismissed = false;
+        ensure("what a tab gone says of itself, hidden with it", a.orphan->noticeDismissed && !a.offer);
+        a.orphan->noticeDismissed = false;
         a.offer                  = Doc::Offer{ "Saving a failed.", { "retry", "copy", "export" } };
         unit.noticeAction("close");
         ensure("more than that: said next", a.offer && Orphans::noticeFor(&a, words).text == "Saving a failed.");

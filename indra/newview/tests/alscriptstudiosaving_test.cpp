@@ -231,8 +231,8 @@ namespace tut
         // The analyzers' check of the text as it stands.
         static void checked(Doc& doc, ALScriptProblems problems = {})
         {
-            doc.check.analysis        = std::move(problems);
-            doc.check.analysisVersion = doc.editor->document().version();
+            doc.check->analysis        = std::move(problems);
+            doc.check->analysisVersion = doc.editor->document().version();
         }
         // The answer to the tab's own save, by the request it sent.
         static CompileResult answer(const Doc& doc, bool success = true)
@@ -277,14 +277,14 @@ namespace tut
         ensure("and kept as saved", studio.recovered == Names{ "card" } && !card.save.underway());
 
         Doc& away      = tab("away", "default {}");
-        away.orphan.kind    = Doc::Orphan::Away;
+        away.orphan->kind    = Doc::Orphan::Away;
         services.front = 2;
         saving.save(away);
         ensure_equals("out of reach, said where", lastStatus(), std::string("SaveBlockedAway"));
         ensure("stopped, and the notice back", studio.stops == 1 && studio.notices == 1 && !away.save.underway() && studio.sent.empty());
 
         Doc& detached    = tab("detached", "default {}");
-        detached.orphan.detached = true;
+        detached.orphan->detached = true;
         saving.save(detached);
         ensure("loaded under its item first", studio.reattached == Names{ "detached" } && studio.sent.empty());
         ensure_equals("and said to wait", lastStatus(), std::string("SaveWaitsForLoad"));
@@ -403,7 +403,7 @@ namespace tut
         ensure_equals("too large: said", lastSaid(), std::string("SaveTooLarge"));
         ensure("with what would shrink it", services.reports.back().text.find("SaveTooLargePlain") != std::string::npos);
         ensure("its size kept, nothing sent, stopped",
-               big.weighing.assetBytes == too_much.size() && studio.sent.size() == 2 && !big.save.underway() && studio.stops == 1);
+               big.weighing->assetBytes == too_much.size() && studio.sent.size() == 2 && !big.save.underway() && studio.stops == 1);
 
         studio.refuse = "no region";
         Doc& refused  = tab("refused", "default {}");
@@ -562,9 +562,9 @@ namespace tut
         weight.target     = ALScriptWeight::Target::Mono;
         weight.total      = 70000;
         weight.limit      = 65536;
-        doc.weighing.weight        = weight;
-        doc.weighing.version = doc.editor->document().version();
-        doc.weighing.exact   = true;
+        doc.weighing->weight        = weight;
+        doc.weighing->version = doc.editor->document().version();
+        doc.weighing->exact   = true;
         saving.warnOverWeight(doc);
         ensure_equals("over: said", lastSaid(), std::string("SaveOverWeight"));
         ensure("as a failure", services.reports.back().failure);
@@ -576,9 +576,9 @@ namespace tut
         type(guessed, " ");
         saving.save(guessed);
         weight.estimate       = true;
-        guessed.weighing.weight        = weight;
-        guessed.weighing.version = guessed.editor->document().version();
-        guessed.weighing.exact   = true;
+        guessed.weighing->weight        = weight;
+        guessed.weighing->version = guessed.editor->document().version();
+        guessed.weighing->exact   = true;
         saving.warnOverWeight(guessed);
         ensure_equals("an estimate said as one", lastSaid(), std::string("SaveOverWeightEstimate"));
         ensure("once too", services.reports.size() == said + 1);

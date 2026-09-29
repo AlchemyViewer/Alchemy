@@ -127,8 +127,8 @@ namespace tut
         // The caret's path found, as the caret's unit finds it, and shown.
         void place(ALScriptCrumbsBar* crumbs, Doc& doc)
         {
-            doc.caret.crumbPath = ALScriptPlaces::pathAt(doc.outline, doc.editor->caret());
-            doc.caret.crumbsOf  = doc.check.analysisVersion;
+            doc.caret->crumbPath = ALScriptPlaces::pathAt(doc.outline, doc.editor->caret());
+            doc.caret->crumbsOf  = doc.check->analysisVersion;
             crumbs->showPath(doc);
         }
         FakeCrumbsWindow& told() { return window.pane(); }
@@ -221,7 +221,7 @@ namespace tut
         place(crumbs, doc);
         const std::string top = "Script a [default, f, g, h, other]";
         ensure_equals("the path", path(), top + ", default [default, f, g, h, other], state_entry [state_entry, touch_start]");
-        ensure_equals("kept", doc.caret.crumbPath.size(), size_t(2));
+        ensure_equals("kept", doc.caret->crumbPath.size(), size_t(2));
         ensure_equals("the script's step", jump()->path()[0].value, std::string("top"));
         ensure_equals("said", jump()->path()[0].toolTip,
                       std::string("Script a: click to go to the top; the arrow lists the script's declarations"));
@@ -315,46 +315,46 @@ namespace tut
         weight.target = ALScriptWeight::Target::Mono;
         weight.limit  = 65536;
         weight.total  = 40960;
-        doc.weighing.weight = weight;
+        doc.weighing->weight = weight;
         crumbs->showTrailer(doc);
         const Part* weighed = part("LSL (Mono)");
         ensure("weighed", weighed && weighed->text == "LSL (Mono) 40.0 of 64 KB used" && !weighed->color);
         ensure("before the optimizer", weighed->toolTip.find("Measured before the preprocessor") != std::string::npos);
-        doc.weighing.exact = true;
-        doc.weighing.sent  = true;
-        doc.weighing.weight->total = 60000;
+        doc.weighing->exact = true;
+        doc.weighing->sent  = true;
+        doc.weighing->weight->total = 60000;
         crumbs->showTrailer(doc);
         ensure("as sent", part("LSL (Mono)")->toolTip.find("as it is saved") != std::string::npos);
         ensure("near: the warning's", part("LSL (Mono)")->color == warn);
-        doc.weighing.weight->total = 70000;
+        doc.weighing->weight->total = 70000;
         crumbs->showTrailer(doc);
         ensure("past: the error's", part("LSL (Mono)")->color == error);
-        doc.weighing.weight->estimate = true;
+        doc.weighing->weight->estimate = true;
         crumbs->showTrailer(doc);
         ensure("an estimate", part("LSL (Mono) ~") != nullptr);
-        doc.weighing.weight.reset();
+        doc.weighing->weight.reset();
 
         const size_t LIMIT      = ALScriptEnvelope::MAX_ASSET_BYTES;
-        doc.weighing.assetBytes = LIMIT / 2;
+        doc.weighing->assetBytes = LIMIT / 2;
         crumbs->showTrailer(doc);
         ensure("half: nothing", parts().size() == 2);
-        doc.weighing.assetBytes = LIMIT / 2 + 1;
+        doc.weighing->assetBytes = LIMIT / 2 + 1;
         crumbs->showTrailer(doc);
         ensure("past half", part(std::to_string((LIMIT / 2 + 1 + 1023) / 1024) + " KB") != nullptr);
         ensure("said", parts().back().toolTip.find("Save size") != std::string::npos && !parts().back().color);
-        doc.weighing.assetBytes = LIMIT * 9 / 10 + 1;
+        doc.weighing->assetBytes = LIMIT * 9 / 10 + 1;
         crumbs->showTrailer(doc);
         ensure("near: the warning's", parts().back().color == warn);
-        doc.weighing.assetBytes = LIMIT + 1;
+        doc.weighing->assetBytes = LIMIT + 1;
         crumbs->showTrailer(doc);
         ensure("over: the error's", parts().back().color == error);
         ensure("and by how much", parts().back().toolTip.find("1 over the") != std::string::npos);
         doc.notecard            = true;
-        doc.weighing.assetBytes = static_cast<size_t>(LLNotecard::MAX_SIZE) / 2 + 1;
+        doc.weighing->assetBytes = static_cast<size_t>(LLNotecard::MAX_SIZE) / 2 + 1;
         crumbs->showTrailer(doc);
         ensure("a notecard's by its own limit", parts().back().toolTip.find("Notecard text") != std::string::npos);
         doc.notecard            = false;
-        doc.weighing.assetBytes = 0;
+        doc.weighing->assetBytes = 0;
 
         crumbs->setTips({ "line tip", "problems tip", "source tip", "expanded tip" });
         doc.expandedEditor = editor("expanded_a", "integer x;\n");
@@ -378,7 +378,7 @@ namespace tut
         weight.target       = ALScriptWeight::Target::Mono;
         weight.limit        = 65536;
         weight.total        = 40960;
-        doc.weighing.weight = weight;
+        doc.weighing->weight = weight;
         doc.expandedEditor  = editor("expanded_a", "integer x;\n");
         doc.view            = Doc::View::Expanded;
         doc.uploaded.valid      = true;
@@ -465,16 +465,16 @@ namespace tut
         Doc&               doc    = tab("a");
         doc.loaded                 = true;
         const F64 now              = LLTimer::getTotalSeconds();
-        doc.check.requestedVersion = doc.editor->document().version();
-        doc.check.analysisVersion  = doc.check.requestedVersion + 1;
-        doc.check.askedAt          = now;
+        doc.check->requestedVersion = doc.editor->document().version();
+        doc.check->analysisVersion  = doc.check->requestedVersion + 1;
+        doc.check->askedAt          = now;
         crumbs->showTrailer(doc);
         ensure("just asked: nothing", part("Checking") == nullptr);
-        doc.check.askedAt = now - 1.0;
+        doc.check->askedAt = now - 1.0;
         crumbs->showTrailer(doc);
         const Part* checking = part("Checking");
         ensure("out a while: said", checking != nullptr && checking->value == "problems");
-        doc.check.analysisVersion = doc.check.requestedVersion;
+        doc.check->analysisVersion = doc.check->requestedVersion;
         crumbs->showTrailer(doc);
         ensure("answered: gone", part("Checking") == nullptr);
     }

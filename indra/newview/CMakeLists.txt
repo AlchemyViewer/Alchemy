@@ -2516,7 +2516,8 @@ if(AL_BUILD_TESTS)
     alscriptitemdrop
     UNIT
     PROJECT ${test_project}
-    LIBRARIES llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    PCH al_studio_test_common
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2860,7 +2861,8 @@ if(AL_BUILD_TESTS)
     alscriptweightspane
     UNIT
     PROJECT ${test_project}
-    LIBRARIES llui alscript ${test_libs}
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    PCH al_studio_test_common
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

@@ -86,7 +86,7 @@ public:
     bool postBuild() override;
 
     // The path of the tab in front's caret, as the caret's unit found it
-    // (doc.caret.crumbPath), and its trailer: the crumbs made again only
+    // (doc.caret->crumbPath), and its trailer: the crumbs made again only
     // where the path, the outline, the tab or its name has changed -- it
     // is asked on every key -- and the trailer every time.
     void showPath(Doc& doc);

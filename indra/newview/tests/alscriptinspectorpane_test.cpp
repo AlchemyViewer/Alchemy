@@ -115,7 +115,7 @@ namespace tut
             window.floater->addChild(doc.editor);
             doc.editor->setText(text);
             doc.editor->setCaret(ALTextPos(0, 10));
-            doc.caret.inspectAt = ALTextPos(0, 8);
+            doc.caret->inspectAt = ALTextPos(0, 8);
             return doc;
         }
         std::string shown() { return pane()->view()->document().text(); }

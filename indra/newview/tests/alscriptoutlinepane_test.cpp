@@ -196,12 +196,12 @@ namespace tut
         outline->show(doc);
         outline->fold(1);
         ensure_equals("shut", rows(), std::string("count, >default, alpha"));
-        ensure("kept by name", doc.caret.outlineFolded.contains("default"));
+        ensure("kept by name", doc.caret->outlineFolded.contains("default"));
         ensure_equals("the row it was", chosen(), 1);
         outline->fold(1);
         ensure_equals("open", rows(), std::string("count, ^default, .touch_start, .state_entry, alpha"));
         outline->fold(1, false);
-        ensure("already open: left so", !doc.caret.outlineFolded.contains("default"));
+        ensure("already open: left so", !doc.caret->outlineFolded.contains("default"));
         outline->fold(1, true);
         doc.outline.insert(doc.outline.begin(), entry("before", ALScriptSymbolKind::Variable, 0, 0));
         outline->show(doc);
@@ -254,23 +254,23 @@ namespace tut
         ALScriptOutlinePane* outline = pane();
         Doc&                 doc     = tab("a");
         outline->show(doc);
-        doc.caret.crumbPath = { 1, 3 };
+        doc.caret->crumbPath = { 1, 3 };
         outline->followCaret(doc);
         ensure_equals("the innermost", chosen(), 3);
         outline->fold(1);
         outline->list()->deselectAllItems(true);
-        doc.caret.crumbPath = { 1, 3 };
+        doc.caret->crumbPath = { 1, 3 };
         outline->followCaret(doc);
         ensure_equals("folded away: its holder", chosen(), 1);
-        doc.caret.crumbPath.clear();
+        doc.caret->crumbPath.clear();
         outline->followCaret(doc);
         ensure_equals("in none", chosen(), -1);
         outline->list()->selectByValue(LLSD(0));
-        doc.caret.crumbPath = { 9 };
+        doc.caret->crumbPath = { 9 };
         outline->followCaret(doc);
         ensure_equals("not listed", chosen(), -1);
         outline->fold(1);
-        doc.caret.crumbPath = { 1, 2 };
+        doc.caret->crumbPath = { 1, 2 };
         doc.outline[0].detail = "float";
         outline->show(doc);
         ensure_equals("followed as it is shown", chosen(), 2);
@@ -320,8 +320,8 @@ namespace tut
         ensure("escape", list->handleKeyHere(KEY_ESCAPE, MASK_NONE) && told().chosen.size() == 2 && window.services().reveals.size() == 3);
         ensure("with a key held: the list's", !list->handleKeyHere(KEY_RETURN, MASK_CONTROL) && told().chosen.size() == 2);
         list->selectByValue(LLSD(1));
-        ensure("left", list->handleKeyHere(KEY_LEFT, MASK_NONE) && doc.caret.outlineFolded.contains("default"));
-        ensure("right", list->handleKeyHere(KEY_RIGHT, MASK_NONE) && !doc.caret.outlineFolded.contains("default"));
+        ensure("left", list->handleKeyHere(KEY_LEFT, MASK_NONE) && doc.caret->outlineFolded.contains("default"));
+        ensure("right", list->handleKeyHere(KEY_RIGHT, MASK_NONE) && !doc.caret->outlineFolded.contains("default"));
 
         // The mouse only reaches what is shown.
         window.floater->setVisible(true);
@@ -342,10 +342,10 @@ namespace tut
         ensure_equals("row 1 found", row(row_y), 1);
         list->localPointToOtherView(rect.mLeft + icon->getWidth() + list->getColumnPadding() + 2, row_y, &x, &y, outline);
         ensure("an arrow clicked", outline->handleMouseDown(x, y, MASK_NONE));
-        ensure("folds", doc.caret.outlineFolded.contains("default"));
+        ensure("folds", doc.caret->outlineFolded.contains("default"));
         list->localPointToOtherView(rect.mRight - 4, row_y, &x, &y, outline);
         outline->handleMouseDown(x, y, MASK_NONE);
-        ensure("past it: not", doc.caret.outlineFolded.contains("default"));
+        ensure("past it: not", doc.caret->outlineFolded.contains("default"));
         // Row 0, a leaf, where an arrow would be: the list's, which chooses it.
         list->deselectAllItems(true);
         const S32 leaf_y = row_y + (rect.mTop - row_y) / 2 + 1;
@@ -372,7 +372,7 @@ namespace tut
         ensure_equals("seen: listed", rows(), std::string("count, ^default, .touch_start, .state_entry, alpha"));
 
         window.floater->setVisible(false);
-        doc.caret.crumbPath = { 1, 3 };
+        doc.caret->crumbPath = { 1, 3 };
         outline->followCaret(doc);
         ensure_equals("not followed unseen", chosen(), -1);
         window.floater->setVisible(true);
@@ -390,11 +390,11 @@ namespace tut
         Doc&                 doc     = tab("a");
         outline->show(doc);
         const std::vector<LLScrollListItem*> before = outline->list()->getAllData();
-        doc.caret.crumbPath                         = { 4 };
+        doc.caret->crumbPath                         = { 4 };
         outline->followCaret(doc);
         ensure_equals("alpha chosen", chosen(), 4);
         doc.outline.insert(doc.outline.begin() + 1, entry("beta", ALScriptSymbolKind::Function, 0, 1));
-        doc.caret.crumbPath = { 5 };
+        doc.caret->crumbPath = { 5 };
         outline->show(doc);
         ensure_equals("in its place", rows(), std::string("count, beta, ^default, .touch_start, .state_entry, alpha"));
         const std::vector<LLScrollListItem*> after = outline->list()->getAllData();

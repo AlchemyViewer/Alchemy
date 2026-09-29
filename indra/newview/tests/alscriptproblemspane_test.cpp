@@ -169,7 +169,7 @@ namespace tut
                 text += "line " + std::to_string(i) + "\n";
             }
             d.editor->setText(text);
-            d.check.analysisVersion = d.editor->document().version();
+            d.check->analysisVersion = d.editor->document().version();
             return d;
         }
 
@@ -249,13 +249,13 @@ namespace tut
         d.problems.push_back({ 2, 0, true, std::string(), "ERROR", "the compiler's own" });
         // The analyzers, of the text as it stands: that error, a lint with
         // a fix, and a note in an include.
-        d.check.analysis.push_back(problem(S::Parser, V::Error, 6, "syntax error, unexpected"));
+        d.check->analysis.push_back(problem(S::Parser, V::Error, 6, "syntax error, unexpected"));
         ALScriptProblem lint = problem(S::Lint, V::Warning, 4, "a local shadows another");
         lint.code            = "LocalShadow";
         lint.key             = "shadow";
         lint.fixes.push_back(fix("Rename it", true, true, 4));
-        d.check.analysis.push_back(lint);
-        d.check.analysis.push_back(problem(S::Lint, V::Note, 1, "in the include", "disk:/scripts/lib.lsl"));
+        d.check->analysis.push_back(lint);
+        d.check->analysis.push_back(problem(S::Lint, V::Note, 1, "in the include", "disk:/scripts/lib.lsl"));
         // What it said as it ran, three times; and the weight, over.
         d.runtime.push_back({ 8, -1, std::string(), "Math Error", 3 });
         ALScriptWeight weight;
@@ -263,8 +263,8 @@ namespace tut
         weight.total    = 70000;
         weight.limit    = 65536;
         weight.estimate = true;
-        d.weighing.weight        = weight;
-        d.weighing.version = d.editor->document().version();
+        d.weighing->weight        = weight;
+        d.weighing->version = d.editor->document().version();
 
         ALScriptProblemsPane::Made made = gather(d);
         std::vector<std::string> messages;
@@ -321,9 +321,9 @@ namespace tut
         using V                   = ALScriptProblem::Severity;
         Doc& door                 = doc("door");
         Doc& lamp                 = doc("lamp");
-        door.check.analysis       = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning"),
+        door.check->analysis       = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning"),
                                       problem(S::Lint, V::Note, 5, "door note") };
-        lamp.check.analysis       = { problem(S::Parser, V::Error, 2, "lamp error") };
+        lamp.check->analysis       = { problem(S::Parser, V::Error, 2, "lamp error") };
         gather(lamp);
         gather(door);
         out.fill(&door);
@@ -356,7 +356,7 @@ namespace tut
         ensure_equals("four to list", out.held(), 4);
         // Another script's problems gathered again: listed, since every
         // one's are.
-        lamp.check.analysis.push_back(problem(S::Lint, V::Warning, 7, "lamp warning"));
+        lamp.check->analysis.push_back(problem(S::Lint, V::Warning, 7, "lamp warning"));
         gather(lamp);
         ensure("the new one listed", shown().find("lamp warning") != std::string::npos);
         pick("problems_scope", "this");
@@ -387,7 +387,7 @@ namespace tut
         ALScriptProblemsPane& out = make();
         Doc&                  d   = doc("door");
         d.problems.push_back({ 1, 0, true, std::string(), "ERROR", "compiler first" });
-        d.check.analysis = { problem(ALScriptProblem::Source::Lint, ALScriptProblem::Severity::Warning, 0, "a warning before"),
+        d.check->analysis = { problem(ALScriptProblem::Source::Lint, ALScriptProblem::Severity::Warning, 0, "a warning before"),
                        problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 5, "parser later") };
         gather(d);
         out.fill(&d);
@@ -429,7 +429,7 @@ namespace tut
         two.message         = "shadowed twice";
         two.fixes           = { fix("Rename", true, true, 6) };
         ALScriptProblem plain = problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 8, "no lint");
-        d.check.analysis      = { one, two, plain };
+        d.check->analysis      = { one, two, plain };
         gather(d);
         out.fill(&d);
 
@@ -486,8 +486,8 @@ namespace tut
         // The analyzer at the missing `;`, the compiler at what came after.
         d.problems.push_back({ 7, 0, true, std::string(), "ERROR", "syntax error" });
         d.problems.push_back({ 2, 0, true, std::string(), "ERROR", "far from any" });
-        d.check.analysis.push_back(problem(S::Parser, V::Error, 6, "Missing ';'"));
-        d.check.analysisVersion = d.editor->document().version();
+        d.check->analysis.push_back(problem(S::Parser, V::Error, 6, "Missing ';'"));
+        d.check->analysisVersion = d.editor->document().version();
         ALScriptProblemsPane::Made made = gather(d);
         std::vector<std::string> messages;
         for (const Doc::Shown& row : made.rows)
@@ -522,8 +522,8 @@ namespace tut
         unused.code            = "20009";
         ALScriptProblem wrong  = problem(S::Types, V::Error, 3, "type mismatch");
         wrong.code             = "10002";
-        d.check.analysis       = { unused, wrong };
-        d.check.analysisVersion = d.editor->document().version();
+        d.check->analysis       = { unused, wrong };
+        d.check->analysisVersion = d.editor->document().version();
         ALScriptProblemsPane::Made made = gather(d);
         bool named = false, numbered = false;
         for (const Doc::Shown& row : made.rows)
@@ -548,9 +548,9 @@ namespace tut
         weight.target      = ALScriptWeight::Target::LSO;
         weight.total       = 14 * 1024;
         weight.limit       = 16 * 1024;
-        d.weighing.weight  = weight;
-        d.weighing.version = d.editor->document().version();
-        d.weighing.exact   = true;
+        d.weighing->weight  = weight;
+        d.weighing->version = d.editor->document().version();
+        d.weighing->exact   = true;
         const auto weights = [&](const ALScriptProblemsPane::Made& made) {
             std::vector<Doc::Shown> rows;
             std::copy_if(made.rows.begin(), made.rows.end(), std::back_inserter(rows), [&](const Doc::Shown& row) { return row.origin == services.words("OriginWeight"); });
@@ -560,12 +560,12 @@ namespace tut
         ensure_equals("near: one row", rows.size(), size_t(1));
         ensure("a warning", rows[0].level == Doc::Level::Warning);
         ensure("what is left", rows[0].message == services.words("WeightNear", { { "[SIZE]", "14.0" }, { "[LIMIT]", "16" }, { "[LEFT]", "2.0" }, { "[TARGET]", "LSL (LSO)" } }));
-        d.weighing.exact = false;
+        d.weighing->exact = false;
         ensure("before the optimizer, nothing", weights(gather(d)).empty());
-        d.weighing.exact            = true;
-        d.weighing.weight->total    = 12 * 1024;
+        d.weighing->exact            = true;
+        d.weighing->weight->total    = 12 * 1024;
         ensure("at three quarters, nothing", weights(gather(d)).empty());
-        d.weighing.weight->total    = 17 * 1024;
+        d.weighing->weight->total    = 17 * 1024;
         rows = weights(gather(d));
         ensure("over: the over row alone", rows.size() == 1 && rows[0].message.find("more than") != std::string::npos);
     }
@@ -578,8 +578,8 @@ namespace tut
         make();
         Doc& d = doc("door");
         ALScriptProblem made_here = problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 1, "in a switch's jump table", Doc::GENERATED);
-        d.check.analysis          = { made_here };
-        d.check.analysisVersion   = d.editor->document().version();
+        d.check->analysis          = { made_here };
+        d.check->analysisVersion   = d.editor->document().version();
         const ALScriptProblemsPane::Made made = gather(d);
         ensure_equals("one row", made.rows.size(), size_t(1));
         ensure_equals("named so", made.rows[0].fileName, services.words("InGeneratedCode"));
@@ -592,7 +592,7 @@ namespace tut
         set_test_name("a script no tab holds, which an object's check reached, is listed after the open ones under its name, chosen by its item, and gives way to its tab");
         make();
         Doc& d           = doc("door");
-        d.check.analysis = { problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 1, "in the open one") };
+        d.check->analysis = { problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 1, "in the open one") };
         gather(d);
         LLUUID object, item;
         object.generate();
@@ -688,7 +688,7 @@ namespace tut
         using V                    = ALScriptProblem::Severity;
         LLTabContainer* tabs       = window.find<LLTabContainer>("bottom_tabs");
         Doc&            door       = doc("door");
-        door.check.analysis        = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning") };
+        door.check->analysis        = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning") };
         tabs->selectTabByName("references_tab");
         ensure("out of sight", !ALPaneFolds::inSight(&out));
         const S32 said = studio.counts;
@@ -702,7 +702,7 @@ namespace tut
         ensure_equals("seen: listed", shown(), std::string("|door error|door warning"));
 
         tabs->selectTabByName("references_tab");
-        door.check.analysis.push_back(problem(S::Parser, V::Error, 5, "a second error"));
+        door.check->analysis.push_back(problem(S::Parser, V::Error, 5, "a second error"));
         gather(door);
         ensure("counted again, the rows as they were", out.held() == 3 && shown() == "|door error|door warning");
         const size_t chosen = studio.chosen.size();
@@ -731,12 +731,12 @@ namespace tut
             }
             return nullptr;
         };
-        door.check.analysis = { problem(S::Parser, V::Error, 1, "first"), problem(S::Lint, V::Warning, 3, "second") };
+        door.check->analysis = { problem(S::Parser, V::Error, 1, "first"), problem(S::Lint, V::Warning, 3, "second") };
         gather(door);
         LLScrollListItem* second = row_saying("second");
         ensure("listed", second != nullptr && second->getColumn(3)->getValue().asString().rfind("4:", 0) == 0);
         choose("second");
-        door.check.analysis = { problem(S::Parser, V::Error, 2, "first"), problem(S::Lint, V::Warning, 4, "second") };
+        door.check->analysis = { problem(S::Parser, V::Error, 2, "first"), problem(S::Lint, V::Warning, 4, "second") };
         gather(door);
         ensure("moved a line: the same row", row_saying("second") == second);
         ensure("where it is now", second->getColumn(3)->getValue().asString().rfind("5:", 0) == 0);
@@ -747,7 +747,7 @@ namespace tut
         {
             many.push_back(problem(S::Lint, V::Warning, i % 10, "many " + std::to_string(i)));
         }
-        door.check.analysis = many;
+        door.check->analysis = many;
         gather(door);
         ensure_equals("all counted", out.held(), 1005);
         S32 rows = 0;

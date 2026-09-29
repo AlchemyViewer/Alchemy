@@ -140,31 +140,31 @@ void ALScriptStudioChecking::expandFor(Doc& doc, ALScriptAnalysis::Kind kind, co
     // The question waits for the text it is about: one of its kind that
     // was already waiting is somewhere the caret or the mouse has since
     // left.
-    const auto same =
-        std::find_if(doc.check.waiting.begin(), doc.check.waiting.end(), [kind](const Doc::Waiting& was) { return was.kind == kind; });
-    if (same != doc.check.waiting.end())
+    const auto same = std::find_if(doc.check->waiting.begin(), doc.check->waiting.end(),
+                                   [kind](const Doc::Check::Waiting& was) { return was.kind == kind; });
+    if (same != doc.check->waiting.end())
     {
         same->at = at;
         same->to = to;
     }
     else
     {
-        doc.check.waiting.push_back(Doc::Waiting{ kind, at, to });
+        doc.check->waiting.push_back(Doc::Check::Waiting{ kind, at, to });
     }
     const U32 version = doc.editor->document().version();
-    if (doc.check.expanding)
+    if (doc.check->expanding)
     {
         // One at a time: every question waiting takes the one on its way,
         // or, asked about a later text, the next, made once it answers --
         // not one a key while the text is typed.
-        if (*doc.check.expanding != version)
+        if (*doc.check->expanding != version)
         {
-            doc.check.wanted = version;
+            doc.check->wanted = version;
         }
         return;
     }
-    doc.check.wanted.reset();
-    doc.check.expanding             = version;
+    doc.check->wanted.reset();
+    doc.check->expanding             = version;
     const std::weak_ptr<bool> alive = mAlive;
     const std::string         id    = doc.id;
     // The script apart from its modules, for the analyzers to check each on
@@ -187,9 +187,9 @@ void ALScriptStudioChecking::expandedAnswer(const std::string& id, U32 version, 
         return;
     }
     Doc& doc = *found;
-    if (doc.check.expanding && *doc.check.expanding == version)
+    if (doc.check->expanding && *doc.check->expanding == version)
     {
-        doc.check.expanding.reset();
+        doc.check->expanding.reset();
     }
     if (version != doc.editor->document().version())
     {
@@ -198,24 +198,24 @@ void ALScriptStudioChecking::expandedAnswer(const std::string& id, U32 version, 
         // the text as it was -- a hover over a word the edit may have
         // moved -- and the edit has scheduled a check of its own, so they
         // go rather than being asked of the wrong text.
-        const std::optional<U32> wanted = std::exchange(doc.check.wanted, std::nullopt);
-        if (wanted && *wanted == doc.editor->document().version() && !doc.check.waiting.empty())
+        const std::optional<U32> wanted = std::exchange(doc.check->wanted, std::nullopt);
+        if (wanted && *wanted == doc.editor->document().version() && !doc.check->waiting.empty())
         {
-            std::vector<Doc::Waiting> waiting;
-            waiting.swap(doc.check.waiting);
-            for (const Doc::Waiting& question : waiting)
+            std::vector<Doc::Check::Waiting> waiting;
+            waiting.swap(doc.check->waiting);
+            for (const Doc::Check::Waiting& question : waiting)
             {
                 expandFor(doc, question.kind, question.at, question.to);
             }
             return;
         }
-        doc.check.waiting.clear();
+        doc.check->waiting.clear();
         return;
     }
     doc.expanded.valid      = true;
     doc.expanded.disabled   = result.disabled;
     doc.expanded.version    = version;
-    doc.expanded.generation = ++doc.check.expansions;
+    doc.expanded.generation = ++doc.check->expansions;
     doc.expanded.modules.reset();
     doc.expanded.moduleMaps.clear();
     doc.expanded.bundle.reset();
@@ -252,9 +252,9 @@ void ALScriptStudioChecking::expandedAnswer(const std::string& id, U32 version, 
     doc.expanded.consts   = result.consts;
     // What the preprocessor found is shown with what the analyzers found.
     mWindow.refreshProblems(doc);
-    std::vector<Doc::Waiting> waiting;
-    waiting.swap(doc.check.waiting);
-    for (const Doc::Waiting& question : waiting)
+    std::vector<Doc::Check::Waiting> waiting;
+    waiting.swap(doc.check->waiting);
+    for (const Doc::Check::Waiting& question : waiting)
     {
         ask(doc, question.kind, question.at, question.to);
     }
@@ -285,11 +285,11 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
     const auto read_now = [this, &doc](U32 expansion) {
         return (expansion != 0) == preprocessed(doc) && (expansion == 0 || (doc.expanded.valid && doc.expanded.generation == expansion));
     };
-    if ((kind == ALScriptAnalysis::Kind::Hover || kind == ALScriptAnalysis::Kind::Inspect) && doc.check.hovered &&
-        doc.check.hovered->version == doc.editor->document().version() && read_now(doc.check.hovered->expansion) &&
-        doc.check.hovered->word == doc.editor->identifierAt(at).begin)
+    if ((kind == ALScriptAnalysis::Kind::Hover || kind == ALScriptAnalysis::Kind::Inspect) && doc.check->hovered &&
+        doc.check->hovered->version == doc.editor->document().version() && read_now(doc.check->hovered->expansion) &&
+        doc.check->hovered->word == doc.editor->identifierAt(at).begin)
     {
-        ALScriptAnalysis::Result said = doc.check.hovered->said;
+        ALScriptAnalysis::Result said = doc.check->hovered->said;
         said.kind                     = kind;
         if (kind == ALScriptAnalysis::Kind::Hover)
         {
@@ -326,9 +326,9 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
         {
             request.config = base;
         }
-        if (!found && kind == ALScriptAnalysis::Kind::Check && !doc.check.configAsked)
+        if (!found && kind == ALScriptAnalysis::Kind::Check && !doc.check->configAsked)
         {
-            doc.check.configAsked           = true;
+            doc.check->configAsked           = true;
             const std::weak_ptr<bool> alive = mAlive;
             const std::string         id    = doc.id;
             sources().fetchConfig(root, [this, alive, id]() {
@@ -383,7 +383,7 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
         request.targets = mWindow.weightTargets(doc);
         if (!request.targets.empty())
         {
-            doc.weighing.askedFor = request.version;
+            doc.weighing->askedFor = request.version;
         }
     }
     if (kind == ALScriptAnalysis::Kind::Weigh)
@@ -464,7 +464,7 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
     if ((result.kind == ALScriptAnalysis::Kind::Hover || result.kind == ALScriptAnalysis::Kind::Inspect) &&
         result.version == doc.editor->document().version())
     {
-        doc.check.hovered = Doc::Check::Hovered{ result.version, expansion, doc.editor->identifierAt(at).begin, shown };
+        doc.check->hovered = Doc::Check::Hovered{ result.version, expansion, doc.editor->identifierAt(at).begin, shown };
     }
     switch (result.kind)
     {
@@ -599,12 +599,12 @@ void ALScriptStudioChecking::actionsAnswered(Doc& doc, const ALScriptAnalysis::R
             return text.clamp(begin) != begin || text.clamp(end) != end;
         });
     });
-    doc.check.actions        = std::move(held.fixes);
-    doc.check.actionsVersion = result.version;
+    doc.check->actions        = std::move(held.fixes);
+    doc.check->actionsVersion = result.version;
     std::vector<ALCodeEditor::Fix> offered;
-    for (size_t i = 0; i < doc.check.actions.size(); ++i)
+    for (size_t i = 0; i < doc.check->actions.size(); ++i)
     {
-        const ALScriptFix& action = doc.check.actions[i];
+        const ALScriptFix& action = doc.check->actions[i];
         ALCodeEditor::Fix  one;
         one.title    = action.title;
         one.refactor = true;
@@ -616,7 +616,7 @@ void ALScriptStudioChecking::actionsAnswered(Doc& doc, const ALScriptAnalysis::R
         one.value["action"] = static_cast<S32>(i);
         offered.push_back(std::move(one));
     }
-    doc.editor->supplyActions(doc.check.actionsAsked, std::move(offered));
+    doc.editor->supplyActions(doc.check->actionsAsked, std::move(offered));
 }
 
 bool ALScriptStudioChecking::lslFragment(const Doc& doc) const
@@ -628,9 +628,9 @@ bool ALScriptStudioChecking::lslFragment(const Doc& doc) const
     // Walked once for each text it is asked of.
     ALCodeEditor& editor  = *doc.editor;
     const U32     version = editor.document().version();
-    if (doc.check.fragment && doc.check.fragment->first == version)
+    if (doc.check->fragment && doc.check->fragment->first == version)
     {
-        return doc.check.fragment->second;
+        return doc.check->fragment->second;
     }
     // A default state, by the grammar's tokens: `default` then `{`, past
     // blanks and comments, the brace on the same line or a later one.
@@ -657,8 +657,8 @@ bool ALScriptStudioChecking::lslFragment(const Doc& doc) const
         }
         return false;
     };
-    doc.check.fragment = std::make_pair(version, !has_default());
-    return doc.check.fragment->second;
+    doc.check->fragment = std::make_pair(version, !has_default());
+    return doc.check->fragment->second;
 }
 
 void ALScriptStudioChecking::schedule(Doc& doc, bool now)
@@ -671,7 +671,7 @@ void ALScriptStudioChecking::schedule(Doc& doc, bool now)
     {
         return;
     }
-    doc.check.analysisDue = now ? 1.0 : static_cast<F64>(LLTimer::getTotalSeconds()) + ANALYSIS_DELAY;
+    doc.check->analysisDue = now ? 1.0 : static_cast<F64>(LLTimer::getTotalSeconds()) + ANALYSIS_DELAY;
 }
 
 void ALScriptStudioChecking::settingsChanged(bool words, F64 now)
@@ -695,7 +695,7 @@ void ALScriptStudioChecking::pump(F64 now)
             doc->expanded.valid = false;
             // What a run made to be sent is made differently now: the check
             // weighs the text again, and the run that follows as it is sent.
-            doc->weighing.sent = false;
+            doc->weighing->sent = false;
             if (words && !doc->notecard && !doc->language.lua)
             {
                 ALScriptStudioWords::teach(*doc->editor, false);
@@ -714,7 +714,7 @@ void ALScriptStudioChecking::pump(F64 now)
     Doc*       next  = nullptr;
     for (Doc* doc : mServices.openDocs())
     {
-        if (doc->check.analysisDue <= 0.0 || now < doc->check.analysisDue)
+        if (doc->check->analysisDue <= 0.0 || now < doc->check->analysisDue)
         {
             continue;
         }
@@ -728,7 +728,7 @@ void ALScriptStudioChecking::pump(F64 now)
         {
             askCheck(*doc, now);
         }
-        else if (!next || doc->check.analysisDue < next->check.analysisDue)
+        else if (!next || doc->check->analysisDue < next->check->analysisDue)
         {
             next = doc;
         }
@@ -741,16 +741,16 @@ void ALScriptStudioChecking::pump(F64 now)
 
 void ALScriptStudioChecking::askCheck(Doc& doc, F64 now)
 {
-    doc.check.analysisDue      = 0.0;
-    doc.check.requestedVersion = doc.editor->document().version();
-    doc.check.askedAt          = now;
+    doc.check->analysisDue      = 0.0;
+    doc.check->requestedVersion = doc.editor->document().version();
+    doc.check->askedAt          = now;
     ask(doc, ALScriptAnalysis::Kind::Check, ALTextPos(), ALTextPos());
 }
 
 void ALScriptStudioChecking::checkNotecard(Doc& doc)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    doc.check.analysisDue           = 0.0;
+    doc.check->analysisDue           = 0.0;
     const ALTextDocument& text      = doc.editor->document();
     ALScriptProblems      problems;
     // Every line is EOF to a script where the notecard carries anything:
@@ -791,8 +791,8 @@ void ALScriptStudioChecking::checkNotecard(Doc& doc)
         problem.message   = mServices.words("NotecardLineCut", args);
         problems.push_back(std::move(problem));
     }
-    doc.check.analysis        = std::move(problems);
-    doc.check.analysisVersion = text.version();
+    doc.check->analysis        = std::move(problems);
+    doc.check->analysisVersion = text.version();
     doc.outline               = doc.grammar == "json" ? ALNotecardFormat::outline(doc.editor->wholeText()) : std::vector<ALScriptOutlineEntry>();
     mWindow.refreshProblems(doc);
     mWindow.showOutline(doc);
@@ -831,15 +831,15 @@ void ALScriptStudioChecking::analysed(const ALScriptAnalysis::Result& result)
 
 void ALScriptStudioChecking::takeProblems(Doc& doc, const ALScriptAnalysis::Result& result)
 {
-    doc.check.analysis        = result.problems;
-    doc.check.analysisVersion = result.version;
+    doc.check->analysis        = result.problems;
+    doc.check->analysisVersion = result.version;
     // Kept as said, for the lints chosen again to filter afresh.
     if (!doc.language.lua)
     {
-        doc.check.unfiltered = result.problems;
+        doc.check->unfiltered = result.problems;
     }
     filterProblems(doc);
-    doc.check.definitionsError = result.definitionsError;
+    doc.check->definitionsError = result.definitionsError;
     // A script mid-edit is answered from a copy mended to parse; one past
     // mending answers nothing, and what it declares, what its names are
     // and what goes beside them are then not nothing but what they last
@@ -875,30 +875,30 @@ void ALScriptStudioChecking::filterProblems(Doc& doc)
     // in the configuration the check ran with.
     if (!doc.language.lua)
     {
-        ALScriptLints::apply(doc.check.analysis);
+        ALScriptLints::apply(doc.check->analysis);
     }
     // An include checked with a state after it: what is said of the
     // state, and that what it declares goes unused, is not the include's.
     if (lslFragment(doc))
     {
-        const S32 own_lines = fragmentLines(doc, doc.check.analysisVersion);
-        doc.check.analysis.erase(std::remove_if(doc.check.analysis.begin(), doc.check.analysis.end(),
+        const S32 own_lines = fragmentLines(doc, doc.check->analysisVersion);
+        doc.check->analysis.erase(std::remove_if(doc.check->analysis.begin(), doc.check->analysis.end(),
                                                 [own_lines](const ALScriptProblem& problem) {
                                                     return problem.line >= own_lines || unusedWarning(problem);
                                                 }),
-                                 doc.check.analysis.end());
+                                 doc.check->analysis.end());
     }
 }
 
 void ALScriptStudioChecking::relint(Doc& doc)
 {
     const U32 version = doc.editor->document().version();
-    if (doc.language.lua || !doc.loaded || doc.notecard || doc.check.analysisVersion != version)
+    if (doc.language.lua || !doc.loaded || doc.notecard || doc.check->analysisVersion != version)
     {
         schedule(doc, true);
         return;
     }
-    doc.check.analysis = doc.check.unfiltered;
+    doc.check->analysis = doc.check->unfiltered;
     filterProblems(doc);
     if (preprocessed(doc) && doc.expanded.valid && doc.expanded.version == version)
     {
@@ -982,7 +982,7 @@ void ALScriptStudioChecking::takeColours(Doc& doc, const ALScriptAnalysis::Resul
 
 void ALScriptStudioChecking::mapProblems(Doc& doc)
 {
-    mapBack(doc.check.analysis, doc.expanded.map, doc.expanded.moduleMaps);
+    mapBack(doc.check->analysis, doc.expanded.map, doc.expanded.moduleMaps);
 }
 
 // static
@@ -1083,11 +1083,11 @@ void ALScriptStudioChecking::checked(Doc& doc)
 {
     showProblems(doc);
     mWindow.showOutline(doc);
-    if (doc.check.fixAllAfterCheck && doc.check.analysisVersion == doc.editor->document().version())
+    if (doc.check->fixAllAfterCheck && doc.check->analysisVersion == doc.editor->document().version())
     {
         FixPick pick;
-        pick.key = *doc.check.fixAllAfterCheck;
-        doc.check.fixAllAfterCheck.reset();
+        pick.key = *doc.check->fixAllAfterCheck;
+        doc.check->fixAllAfterCheck.reset();
         askFixAll(doc, pick);
     }
     if (doc.save.checked())
@@ -1130,7 +1130,7 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
         }
         return lua ? problem.key == "LuauUnknownGlobal" || problem.key == "LuauLintUnknownGlobal" : problem.key == "LSLUndeclared";
     };
-    if (std::none_of(doc.check.analysis.begin(), doc.check.analysis.end(), unknown))
+    if (std::none_of(doc.check->analysis.begin(), doc.check->analysis.end(), unknown))
     {
         return;
     }
@@ -1166,7 +1166,7 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
     // What the index knows of the names asked for: each module so named,
     // or that exports or declares one of them.
     std::vector<std::string> names;
-    for (const ALScriptProblem& problem : doc.check.analysis)
+    for (const ALScriptProblem& problem : doc.check->analysis)
     {
         if (unknown(problem) && std::find(names.begin(), names.end(), problem.args[0]) == names.end())
         {
@@ -1184,7 +1184,7 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
         }
     });
     bool                                       given_all = true;
-    for (ALScriptProblem& problem : doc.check.analysis)
+    for (ALScriptProblem& problem : doc.check->analysis)
     {
         if (!unknown(problem))
         {
@@ -1265,7 +1265,7 @@ void ALScriptStudioChecking::explainTransformWords(Doc& doc)
     const bool            preprocessing = sources().preprocessing && sources().preprocessing();
     const ALTextDocument& text          = doc.editor->document();
     const auto            line          = [&text](S32 index) { return std::string_view(text.line(index)); };
-    for (ALScriptProblem& problem : doc.check.analysis)
+    for (ALScriptProblem& problem : doc.check->analysis)
     {
         if (problem.severity != ALScriptProblem::Severity::Error || !problem.file.empty())
         {
@@ -1312,7 +1312,7 @@ void ALScriptStudioChecking::explainRequires(Doc& doc)
         LLStringUtil::format_map_t args;
         args["[NAME]"]  = required.name;
         problem.message = mServices.words("RequireNotPreprocessed", args);
-        doc.check.analysis.push_back(std::move(problem));
+        doc.check->analysis.push_back(std::move(problem));
     }
 }
 
@@ -1381,13 +1381,13 @@ void ALScriptStudioChecking::noLint(Doc& doc)
     const auto above = [&text](const ALScriptProblem& problem) {
         return problem.line > 0 ? std::string_view(text.line(problem.line - 1)) : std::string_view();
     };
-    doc.check.analysis.erase(std::remove_if(doc.check.analysis.begin(), doc.check.analysis.end(),
+    doc.check->analysis.erase(std::remove_if(doc.check->analysis.begin(), doc.check->analysis.end(),
                                             [&](const ALScriptProblem& problem) {
                                                 return ours(problem) &&
                                                        ALScriptFixes::suppressed(problem, text.line(problem.line), above(problem), lua);
                                             }),
-                             doc.check.analysis.end());
-    for (ALScriptProblem& problem : doc.check.analysis)
+                             doc.check->analysis.end());
+    for (ALScriptProblem& problem : doc.check->analysis)
     {
         if (!ours(problem))
         {
@@ -1444,9 +1444,9 @@ void ALScriptStudioChecking::askFixAll(Doc& doc, const FixPick& pick)
     // Asked of a text not checked yet -- typed in a moment ago -- whose
     // problems are not known: checked first, and asked again then, rather
     // than said to have nothing to fix.
-    if (!pick.forSave && doc.loaded && !doc.notecard && doc.check.analysisVersion != doc.editor->document().version())
+    if (!pick.forSave && doc.loaded && !doc.notecard && doc.check->analysisVersion != doc.editor->document().version())
     {
-        doc.check.fixAllAfterCheck = pick.key;
+        doc.check->fixAllAfterCheck = pick.key;
         schedule(doc, true);
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;

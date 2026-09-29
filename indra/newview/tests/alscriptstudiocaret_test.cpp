@@ -194,7 +194,7 @@ namespace tut
         Doc&                 doc   = tab("a");
         const U32            v     = ask(doc, ALEditorCommand::GoToDefinition);
         ensure_equals("asked", joined(studio.asked), std::string("references 0:8"));
-        ensure("remembered", doc.caret.symbolCommand == ALEditorCommand::GoToDefinition && doc.caret.symbolVersion == v);
+        ensure("remembered", doc.caret->symbolCommand == ALEditorCommand::GoToDefinition && doc.caret->symbolVersion == v);
         caret.answered(doc, references(v + 1), ALTextPos(0, 8));
         caret.answered(doc, references(v), ALTextPos(0, 9));
         ensure("of another text or place: nothing", studio.said.empty());
@@ -317,7 +317,7 @@ namespace tut
         ensure("not yet settled", studio.asked.empty() && studio.said.size() == 1);
         caret.pump(10.0 + ALScriptStudioCaret::SETTLE);
         ensure_equals("settled: asked", joined(studio.asked), std::string("inspect 0:8"));
-        ensure("remembered", doc.caret.inspectAt == ALTextPos(0, 8) && doc.caret.inspectVersion == doc.editor->document().version());
+        ensure("remembered", doc.caret->inspectAt == ALTextPos(0, 8) && doc.caret->inspectVersion == doc.editor->document().version());
         doc.editor->setCaret(ALTextPos(0, 12));
         caret.pump(20.0);
         caret.pump(21.0);
@@ -331,7 +331,7 @@ namespace tut
         caret.pump(40.0);
         ensure("left the lit places: put out", doc.editor->highlights().empty());
         caret.pump(41.0);
-        ensure("on no name: the problems", studio.said.back() == "problems 1:9" && doc.caret.inspectAt == ALTextPos(0, 8));
+        ensure("on no name: the problems", studio.said.back() == "problems 1:9" && doc.caret->inspectAt == ALTextPos(0, 8));
         const size_t said = studio.said.size();
         caret.pump(42.0);
         ensure_equals("told once, not every frame", studio.said.size(), said);
@@ -339,7 +339,7 @@ namespace tut
         doc.editor->setCaret(ALTextPos(1, 8));
         caret.pump(50.0);
         caret.pump(51.0);
-        ensure("some shown: the name forgotten", doc.caret.inspectAt == ALTextPos(-1, -1));
+        ensure("some shown: the name forgotten", doc.caret->inspectAt == ALTextPos(-1, -1));
     }
 
     template<> template<>
@@ -361,7 +361,7 @@ namespace tut
         caret.pump(1.0);
         caret.pump(9.0);
         ensure_equals("the expansion's caret, the path told", joined(studio.said), std::string("path 0:0"));
-        ensure("the inspector not", studio.asked.empty() && doc.caret.inspectDue == 0.0);
+        ensure("the inspector not", studio.asked.empty() && doc.caret->inspectDue == 0.0);
         ensure("not typing", studio.typing == 0);
         doc.expandedEditor->setFocus(true);
         caret.pump(9.5);
@@ -405,19 +405,19 @@ namespace tut
         doc.outline                = { state, event };
         doc.editor->setCaret(ALTextPos(1, 12));
         caret.placePath(doc);
-        ensure("in both", doc.caret.crumbPath == std::vector<size_t>({ 0, 1 }) && studio.said.back() == "path 1:12 changed");
+        ensure("in both", doc.caret->crumbPath == std::vector<size_t>({ 0, 1 }) && studio.said.back() == "path 1:12 changed");
         doc.editor->setCaret(ALTextPos(1, 14));
         caret.placePath(doc);
         ensure_equals("the same symbols: shown, not changed", studio.said.back(), std::string("path 1:14"));
         doc.editor->setCaret(ALTextPos(1, 2));
         caret.placePath(doc);
-        ensure("out of the event: changed", doc.caret.crumbPath == std::vector<size_t>({ 0 }) && studio.said.back() == "path 1:2 changed");
-        ++doc.check.analysisVersion;
+        ensure("out of the event: changed", doc.caret->crumbPath == std::vector<size_t>({ 0 }) && studio.said.back() == "path 1:2 changed");
+        ++doc.check->analysisVersion;
         caret.placePath(doc);
         ensure_equals("a new outline: changed", studio.said.back(), std::string("path 1:2 changed"));
         doc.expandedEditor = editor("expanded_a", "integer count;\n");
         doc.view           = Doc::View::Expanded;
         caret.placePath(doc);
-        ensure("the expansion in front: no path", doc.caret.crumbPath.empty());
+        ensure("the expansion in front: no path", doc.caret->crumbPath.empty());
     }
 }

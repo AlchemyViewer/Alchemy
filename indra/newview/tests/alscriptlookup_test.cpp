@@ -422,7 +422,7 @@ namespace tut
         ensure("in order", studio.shown.places.size() == 2 && studio.shown.places[0].span.line == 0);
         ensure("not declared", !studio.shown.hasDefinition);
         ensure("said", !services.statuses.empty() && has(services.statuses.back(), "ReferencesFound [COUNT]=2"));
-        ensure("done with", doc.lookup.command == ALEditorCommand::None && doc.lookup.pending == 0);
+        ensure("done with", doc.lookup->command == ALEditorCommand::None && doc.lookup->pending == 0);
     }
 
     template<> template<>
@@ -452,7 +452,7 @@ namespace tut
         const ALScriptAnalysis::Request& asked = studio.asks[0].request;
         ensure("where the declaration went", asked.kind == ALScriptAnalysis::Kind::References && asked.line == 0 && asked.column == 8);
         ensure_equals("by who asked and the script", asked.id, "lookup:" + doc.id + ":" + b.id());
-        ensure_equals("of this lookup", asked.version, doc.lookup.generation);
+        ensure_equals("of this lookup", asked.version, doc.lookup->generation);
 
         studio.asks[0].answered(answer({ span(0, 8, 5), span(1, 8, 5) }));
         ensure_equals("shown", studio.shows, 1);
@@ -480,11 +480,11 @@ namespace tut
         ensure("the open one expanded at once", studio.expands.size() == 1 && studio.expands[0].request.sourceText() == open.editor->text());
         ensure("from its tab's own copy, not another", studio.expands[0].request.source == open.snapshot());
         ensure_equals("the other read", studio.loads.size(), size_t(1));
-        ensure("both waited for", doc.lookup.pending == 2 && studio.shows == 0);
+        ensure("both waited for", doc.lookup->pending == 2 && studio.shows == 0);
 
         studio.expands[0].expanded(expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT, "inc.lsl", inc, "integer count;\n"));
         studio.asks[0].answered(answer({ span(0, 8, 5) }));
-        ensure("still one to come", studio.shows == 0 && doc.lookup.pending == 1);
+        ensure("still one to come", studio.shows == 0 && doc.lookup->pending == 1);
         studio.loads[0].loaded(LLUUID::null, "");
         ensure_equals("an empty one passed over", studio.shows, 1);
         ensure_equals("one place", studio.shown.places.size(), size_t(1));
@@ -521,9 +521,9 @@ namespace tut
         ensure("no declaration in it: nothing asked", studio.asks.empty());
         ensure_equals("shown without it", studio.shows, 2);
 
-        const U32 generation = doc.lookup.generation;
+        const U32 generation = doc.lookup->generation;
         lookUp(ALEditorCommand::FindReferences);
-        ensure("a new generation", doc.lookup.generation != generation);
+        ensure("a new generation", doc.lookup->generation != generation);
         studio.loads.back().loaded(LLUUID::null, B_TEXT);
         // A lookup of another tab's, still waiting on its read, as this
         // one waits on its expansion: both current, and both gone with it.
@@ -682,17 +682,17 @@ namespace tut
         studio.others = { { b, "B" }, { c, "C" }, { d, "D" }, { e, "E" }, { f, "F" } };
         Doc& doc      = lookUp(ALEditorCommand::FindReferences);
         ensure_equals("no more than so many read at once", studio.loads.size(), size_t(ALScriptLookup::AT_ONCE));
-        ensure_equals("every one waited for", doc.lookup.pending, S32(5));
+        ensure_equals("every one waited for", doc.lookup->pending, S32(5));
         // One that does not name it: passed over, and the next read.
         studio.loads[0].loaded(LLUUID::null, "default { }\n");
         ensure_equals("the next begun", studio.loads.size(), size_t(ALScriptLookup::AT_ONCE + 1));
-        ensure_equals("one fewer waited for", doc.lookup.pending, S32(4));
+        ensure_equals("one fewer waited for", doc.lookup->pending, S32(4));
         studio.loads[1].loaded(LLUUID::null, "");
         studio.loads[2].loaded(LLUUID::null, "");
         ensure_equals("and on", studio.loads.size(), size_t(5));
         studio.loads[3].loaded(LLUUID::null, "");
         studio.loads[4].loaded(LLUUID::null, "");
-        ensure("all done with: shown", doc.lookup.pending == 0 && studio.shows == 1);
+        ensure("all done with: shown", doc.lookup->pending == 0 && studio.shows == 1);
 
         // Begun again with some still to read: what the first had not
         // begun is let go of, and its answers dropped.

@@ -149,7 +149,7 @@ namespace
                 return;
             }
             doc.shown.clear();
-            for (const ALScriptProblem& problem : doc.check.analysis)
+            for (const ALScriptProblem& problem : doc.check->analysis)
             {
                 Doc::Shown shown;
                 shown.line     = problem.line;
@@ -158,7 +158,7 @@ namespace
                 shown.file     = problem.file;
                 shown.key      = problem.key;
                 shown.fixes    = problem.fixes;
-                shown.fixesFor = doc.check.analysisVersion;
+                shown.fixesFor = doc.check->analysisVersion;
                 doc.shown.push_back(std::move(shown));
             }
         }
@@ -378,21 +378,21 @@ namespace tut
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         checking.schedule(doc);
-        const F64 due = doc.check.analysisDue;
+        const F64 due = doc.check->analysisDue;
         ensure("due a moment on", due > 1.0);
         checking.pump(due - 0.1);
         ensure("not yet", studio.asks.empty());
         doc.editor->insertText("x");
         checking.schedule(doc);
         checking.pump(due);
-        ensure("typed again: waits again", studio.asks.empty() && doc.check.analysisDue > due);
-        checking.pump(doc.check.analysisDue);
+        ensure("typed again: waits again", studio.asks.empty() && doc.check->analysisDue > due);
+        checking.pump(doc.check->analysisDue);
         ensure_equals("asked once", studio.asks.size(), size_t(1));
         const ALScriptAnalysis::Request& asked = studio.asks[0].request;
         ensure("a check of the text as it stands",
                asked.kind == Kind::Check && asked.id == "a" && asked.version == version(doc) && *asked.text == doc.editor->text());
         ensure("with the window's settings", asked.hintTypes);
-        ensure("remembered", doc.check.requestedVersion == version(doc) && doc.check.analysisDue == 0.0);
+        ensure("remembered", doc.check->requestedVersion == version(doc) && doc.check->analysisDue == 0.0);
         checking.pump(1e9);
         ensure_equals("once", studio.asks.size(), size_t(1));
         checking.schedule(doc, true);
@@ -444,24 +444,24 @@ namespace tut
         result.outline = { entry };
         doc.editor->insertText("x");
         studio.asks[0].answered(result);
-        ensure("of another text: dropped", doc.check.analysis.empty() && studio.told.empty());
+        ensure("of another text: dropped", doc.check->analysis.empty() && studio.told.empty());
         result.version = version(doc);
         studio.asks[0].answered(result);
-        ensure("taken", doc.check.analysis.size() == 1 && doc.check.analysisVersion == version(doc) && doc.outline.size() == 1);
+        ensure("taken", doc.check->analysis.size() == 1 && doc.check->analysisVersion == version(doc) && doc.outline.size() == 1);
         ensure_equals("LSL's lints as chosen", gLintsApplied, 1);
         ensure_equals("told", joined(studio.told), std::string("problems a, outline a"));
         result.understood = false;
         result.outline.clear();
         result.problems.clear();
         studio.asks[0].answered(result);
-        ensure("past mending: the outline kept", doc.check.analysis.empty() && doc.outline.size() == 1);
+        ensure("past mending: the outline kept", doc.check->analysis.empty() && doc.outline.size() == 1);
         doc.language.lua = true;
         studio.asks[0].answered(result);
         ensure_equals("Luau's chosen by its configuration", gLintsApplied, 2);
         unit.reset();
         result.problems = { problem(1, "late") };
         studio.asks[0].answered(result);
-        ensure("gone: nothing taken", doc.check.analysis.empty());
+        ensure("gone: nothing taken", doc.check->analysis.empty());
     }
 
     template<> template<>
@@ -474,16 +474,16 @@ namespace tut
         checking.ask(doc, Kind::Inspect, ALTextPos(0, 8), ALTextPos(0, 8));
         checking.ask(doc, Kind::Inspect, ALTextPos(3, 20), ALTextPos(3, 20));
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
-        ensure("expanded once", expansions.size() == 1 && studio.asks.empty() && doc.check.waiting.size() == 2);
-        ensure("the last of a kind", doc.check.waiting[0].at == ALTextPos(3, 20));
+        ensure("expanded once", expansions.size() == 1 && studio.asks.empty() && doc.check->waiting.size() == 2);
+        ensure("the last of a kind", doc.check->waiting[0].at == ALTextPos(3, 20));
         doc.editor->insertText("//");
         expansions[0].second(expansion(SCRIPT));
-        ensure("of another text: the questions go", doc.check.waiting.empty() && studio.asks.empty() && !doc.expanded.valid);
+        ensure("of another text: the questions go", doc.check->waiting.empty() && studio.asks.empty() && !doc.expanded.valid);
         doc.editor->undoJournal().undo();
         doc.editor->setText(SCRIPT);
         checking.ask(doc, Kind::Inspect, ALTextPos(3, 20), ALTextPos(3, 20));
         expansions.back().second(expansion(SCRIPT));
-        ensure("taken", doc.expanded.valid && doc.expanded.version == version(doc) && doc.check.expansions == 1);
+        ensure("taken", doc.expanded.valid && doc.expanded.version == version(doc) && doc.check->expansions == 1);
         ensure_equals("then asked", studio.asks.size(), size_t(1));
         ensure("of the expansion, at its place", *studio.asks[0].request.text == *doc.expanded.text && studio.asks[0].request.line == 4);
         ensure("the include's line passed over", studio.asks[0].request.passedOver == (std::vector<std::pair<S32, S32>>{ { 0, 0 } }));
@@ -502,11 +502,11 @@ namespace tut
         ensure("in the include: nowhere of the script's", studio.told.size() == told);
         checking.ask(doc, Kind::Inspect, ALTextPos(0, 0), ALTextPos(0, 0));
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
-        doc.check.expansions += 1;
+        doc.check->expansions += 1;
         doc.expanded.generation += 1;
         studio.asks[2].answered(answer(doc));
-        ensure("an answer of an expansion since replaced: the check asked again", doc.check.analysisDue == 1.0 &&
-               doc.check.analysis.empty());
+        ensure("an answer of an expansion since replaced: the check asked again", doc.check->analysisDue == 1.0 &&
+               doc.check->analysis.empty());
         preprocessing = false;
         studio.asks[1].answered(result);
         ensure("read plain now: dropped", studio.told.size() == told);
@@ -588,7 +588,7 @@ namespace tut
         theirs.name            = "helper";
         result.outline         = { mine, theirs };
         studio.asks[0].answered(result);
-        const ALScriptProblems& got = doc.check.analysis;
+        const ALScriptProblems& got = doc.check->analysis;
         ensure_equals("the include's unused dropped", got.size(), size_t(4));
         ensure("not an error of that code", got[2].message == "an error with that code");
         ensure("own: in the source, its fix too", got[0].line == 3 && got[0].file.empty() && got[0].fixes.size() == 1 &&
@@ -609,8 +609,8 @@ namespace tut
         doc.file                         = "/lib.lsl";
         doc.editor->setSyntax("lsl");
         ensure("a fragment", checking.lslFragment(doc));
-        ensure("kept for the text it was asked of", doc.check.fragment && doc.check.fragment->first == doc.editor->document().version() &&
-                                                        doc.check.fragment->second);
+        ensure("kept for the text it was asked of", doc.check->fragment && doc.check->fragment->first == doc.editor->document().version() &&
+                                                        doc.check->fragment->second);
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         ensure("a state put after it", *studio.asks[0].request.text == doc.editor->text() + "\ndefault{state_entry(){}}\n");
         ALScriptProblem unused = problem(0, "helper unused", ALScriptProblem::Severity::Warning);
@@ -619,7 +619,7 @@ namespace tut
         state.name          = "default";
         state.nameSpan.line = 4;
         studio.asks[0].answered(answer(doc, { problem(1, "own"), problem(4, "in the state"), unused }));
-        ensure("only its own", doc.check.analysis.size() == 1 && doc.check.analysis[0].message == "own");
+        ensure("only its own", doc.check->analysis.size() == 1 && doc.check->analysis[0].message == "own");
         ALScriptAnalysis::Result outlined = answer(doc);
         outlined.outline                  = { state };
         studio.asks[0].answered(outlined);
@@ -651,44 +651,44 @@ namespace tut
         doc.expanded.valid         = true;
         doc.expanded.version       = version(doc);
         doc.expanded.generation    = 1;
-        doc.check.expansions       = 1;
+        doc.check->expansions       = 1;
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         doc.expanded.map = expansion(SCRIPT).map;
         ALScriptAnalysis::Result result = answer(doc, { undeclared, other });
         result.problems[0].line = 4;
         result.problems[1].line = 4;
         studio.asks[0].answered(result);
-        const ALScriptProblem& given = doc.check.analysis[0];
+        const ALScriptProblem& given = doc.check->analysis[0];
         ensure_equals("offered", given.fixes.size(), size_t(1));
         ensure("the include put in, preferred", given.fixes[0].preferred &&
                given.fixes[0].edits[0].text.find("#include \"lib.lsl\"") != std::string::npos);
-        ensure("nothing gives the other", doc.check.analysis[1].fixes.empty());
+        ensure("nothing gives the other", doc.check->analysis[1].fixes.empty());
         ensure_equals("what is near fetched", nearby.size(), size_t(1));
         const size_t asks = studio.asks.size();
         nearby[0]();
         checking.pump(1.0);
         ensure_equals("and checked again once it is in", studio.asks.size(), asks + 1);
         preprocessing = false;
-        doc.check.analysisDue = 0.0;
+        doc.check->analysisDue = 0.0;
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks.back().answered(answer(doc, { undeclared }));
-        ensure("not preprocessed: nothing to include with", doc.check.analysis[0].fixes.empty() && nearby.size() == 1);
+        ensure("not preprocessed: nothing to include with", doc.check->analysis[0].fixes.empty() && nearby.size() == 1);
         preprocessing = true;
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         ALScriptAnalysis::Result given_all = answer(doc, { undeclared });
         given_all.problems[0].line         = 4;
         studio.asks.back().answered(given_all);
-        ensure("all given: nothing fetched", !doc.check.analysis[0].fixes.empty() && nearby.size() == 1);
+        ensure("all given: nothing fetched", !doc.check->analysis[0].fixes.empty() && nearby.size() == 1);
         // What is in reach found anew on the index's thread: the script
         // checked again.
-        doc.check.analysisDue = 0.0;
+        doc.check->analysisDue = 0.0;
         ensure("a reach new to it told", (bool)modulesReady);
         modulesReady();
-        ensure("checked again", doc.check.analysisDue > 0.0);
-        doc.check.analysisDue = 0.0;
+        ensure("checked again", doc.check->analysisDue > 0.0);
+        doc.check->analysisDue = 0.0;
         unit.reset();
         nearby[0]();
-        ensure("gone: nothing asked", doc.check.analysisDue == 0.0);
+        ensure("gone: nothing asked", doc.check->analysisDue == 0.0);
     }
 
     template<> template<>
@@ -708,11 +708,11 @@ namespace tut
         theirs.file                      = "disk:/lib.lsl";
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks[0].answered(answer(doc, { quiet, said, parse, theirs }));
-        ensure_equals("the one a comment quiets dropped", doc.check.analysis.size(), size_t(3));
-        ensure_equals("an include's not explained here", doc.check.analysis[2].message, std::string("syntax error"));
-        ensure("the other offered a comment", doc.check.analysis[0].fixes.size() == 1 &&
-                                                  doc.check.analysis[0].fixes[0].kind == ALScriptFix::Kind::Suppress);
-        ensure("the switch explained", doc.check.analysis[1].message.find("syntax error PreprocHintSwitch [WORD]=switch") == 0);
+        ensure_equals("the one a comment quiets dropped", doc.check->analysis.size(), size_t(3));
+        ensure_equals("an include's not explained here", doc.check->analysis[2].message, std::string("syntax error"));
+        ensure("the other offered a comment", doc.check->analysis[0].fixes.size() == 1 &&
+                                                  doc.check->analysis[0].fixes[0].kind == ALScriptFix::Kind::Suppress);
+        ensure("the switch explained", doc.check->analysis[1].message.find("syntax error PreprocHintSwitch [WORD]=switch") == 0);
         preprocessing = true;
         switches      = true;
         doc.expanded.valid = false;
@@ -723,7 +723,7 @@ namespace tut
         plain.map.finish();
         expansions.back().second(plain);
         studio.asks.back().answered(answer(doc, { parse }));
-        ensure_equals("its transform on: not", doc.check.analysis[0].message, std::string("syntax error"));
+        ensure_equals("its transform on: not", doc.check->analysis[0].message, std::string("syntax error"));
 
         preprocessing       = false;
         Doc& lua            = tab("b", "local x = require(\"lib\")\n");
@@ -731,12 +731,12 @@ namespace tut
         checking.ask(lua, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks.back().answered(answer(lua));
         ensure("a require the preprocessor does not run over, warned of",
-               lua.check.analysis.size() == 1 && lua.check.analysis[0].message == "RequireNotPreprocessed [NAME]=lib");
+               lua.check->analysis.size() == 1 && lua.check->analysis[0].message == "RequireNotPreprocessed [NAME]=lib");
         preprocessing = true;
         checking.ask(lua, Kind::Check, ALTextPos(), ALTextPos());
         expansions.back().second(plain);
         studio.asks.back().answered(answer(lua));
-        ensure("preprocessed: not", lua.check.analysis.empty());
+        ensure("preprocessed: not", lua.check->analysis.empty());
 
         // `inline` is taken off whenever the preprocessor runs, the
         // extensions on or not: said as the preprocessor's alone.
@@ -744,7 +744,7 @@ namespace tut
         Doc& marked   = tab("m", "integer f() inline { return 1; }\n");
         checking.ask(marked, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks.back().answered(answer(marked, { problem(0, "syntax error") }));
-        ensure("inline explained: " + marked.check.analysis[0].message, marked.check.analysis[0].message.find("syntax error PreprocHintInline [WORD]=inline") == 0);
+        ensure("inline explained: " + marked.check->analysis[0].message, marked.check->analysis[0].message.find("syntax error PreprocHintInline [WORD]=inline") == 0);
         preprocessing         = true;
         marked.expanded.valid = false;
         checking.ask(marked, Kind::Check, ALTextPos(), ALTextPos());
@@ -754,15 +754,15 @@ namespace tut
         stripped.map.finish();
         expansions.back().second(stripped);
         studio.asks.back().answered(answer(marked, { problem(0, "syntax error") }));
-        ensure_equals("preprocessing, the extensions off: not", marked.check.analysis[0].message, std::string("syntax error"));
+        ensure_equals("preprocessing, the extensions off: not", marked.check->analysis[0].message, std::string("syntax error"));
 
         // And so is `const`, before a type anywhere on the line.
         preprocessing = false;
         Doc& constant = tab("c", "f(const integer n) { }\n");
         checking.ask(constant, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks.back().answered(answer(constant, { problem(0, "syntax error") }));
-        ensure("const explained: " + constant.check.analysis[0].message,
-               constant.check.analysis[0].message.find("syntax error PreprocHintConst [WORD]=const") == 0);
+        ensure("const explained: " + constant.check->analysis[0].message,
+               constant.check->analysis[0].message.find("syntax error PreprocHintConst [WORD]=const") == 0);
         preprocessing = true;
     }
 
@@ -776,11 +776,11 @@ namespace tut
         ensure("made", checking.applyFix(doc, fix("Rename it", 0, 8, 13, "total"), v));
         ensure_equals("in the text", doc.editor->document().line(0), std::string("integer total;"));
         ensure_equals("one step", doc.editor->undoJournal().undoLabel(), std::string("fix"));
-        ensure("said, checked again", services.statuses.back() == "Rename it" && doc.check.analysisDue == 1.0);
-        doc.check.analysisDue = 0.0;
+        ensure("said, checked again", services.statuses.back() == "Rename it" && doc.check->analysisDue == 1.0);
+        doc.check->analysisDue = 0.0;
         ensure("moved on: refused", !checking.applyFix(doc, fix("Again", 0, 8, 13, "sum"), v));
         ensure("said, checked again", services.statuses.back() == "FixStale" && services.statusFailures.back() &&
-               doc.check.analysisDue == 1.0);
+               doc.check->analysisDue == 1.0);
         ensure("past the end: refused", !checking.applyFix(doc, fix("Far", 40, 0, 1, "x"), version(doc)));
         ALScriptFix refactor = fix("Extract", 0, 0, 7, "float");
         refactor.kind        = ALScriptFix::Kind::Refactor;
@@ -796,12 +796,12 @@ namespace tut
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         checking.askFixAll(doc, Doc::FixPick{});
-        ensure("not checked: checked first", doc.check.fixAllAfterCheck.has_value() && services.statuses.back() == "FixChecking [NAME]=a");
+        ensure("not checked: checked first", doc.check->fixAllAfterCheck.has_value() && services.statuses.back() == "FixChecking [NAME]=a");
         checking.pump(1.0);
         ALScriptProblem one = problem(0, "one");
         one.fixes           = { fix("First", 0, 0, 7, "float") };
         studio.asks[0].answered(answer(doc, { one }));
-        ensure("then made", doc.editor->document().line(0) == "float count;" && !doc.check.fixAllAfterCheck);
+        ensure("then made", doc.editor->document().line(0) == "float count;" && !doc.check->fixAllAfterCheck);
 
         checking.pump(1.0);
         ALScriptProblem two = problem(3, "two");
@@ -863,16 +863,16 @@ namespace tut
         Doc&                    lua      = tab("b");
         lua.language.lua                 = true;
         doc.expanded.valid               = true;
-        doc.weighing.sent                = true;
+        doc.weighing->sent                = true;
         preprocessing                    = true;
         checking.settingsChanged(false, 10.0);
         checking.settingsChanged(true, 10.1);
         checking.pump(10.2);
         ensure("not yet", doc.expanded.valid);
         checking.pump(10.1 + 0.35);
-        ensure("afresh", !doc.expanded.valid && !doc.weighing.sent);
+        ensure("afresh", !doc.expanded.valid && !doc.weighing->sent);
         ensure_equals("run for a save", joined(studio.told), std::string("run a, run b"));
-        ensure("checked", doc.check.analysisDue == 0.0 && expansions.size() == 2);
+        ensure("checked", doc.check->analysisDue == 0.0 && expansions.size() == 2);
         studio.told.clear();
         checking.pump(20.0);
         ensure("once", studio.told.empty());
@@ -897,11 +897,12 @@ namespace tut
         straddle.edits[0].endLine = 9;
         result.actions       = { inside, beyond, straddle };
         studio.asks[0].answered(result);
-        ensure("kept", doc.check.actions.size() == 1 && doc.check.actions[0].title == "Rename" && doc.check.actionsVersion == version(doc));
+        ensure("kept",
+               doc.check->actions.size() == 1 && doc.check->actions[0].title == "Rename" && doc.check->actionsVersion == version(doc));
         result.version = version(doc) + 1;
         result.actions = { beyond };
         studio.asks[0].answered(result);
-        ensure("of another text: dropped", doc.check.actions.size() == 1);
+        ensure("of another text: dropped", doc.check->actions.size() == 1);
         checking.ask(doc, Kind::References, ALTextPos(0, 8), ALTextPos(0, 8));
         ALScriptAnalysis::Result refs;
         refs.kind    = Kind::References;
@@ -935,7 +936,7 @@ namespace tut
         ensure_equals("one on its way, not one a key", expansions.size(), size_t(1));
         expansions[0].second(expansion(doc.editor->text()));
         ensure_equals("the next, for the text as it is now", expansions.size(), size_t(2));
-        ensure("the latest question still waiting", doc.check.waiting.size() == 1 && doc.check.waiting[0].at == ALTextPos(0, 3) && studio.asks.empty());
+        ensure("the latest question still waiting", doc.check->waiting.size() == 1 && doc.check->waiting[0].at == ALTextPos(0, 3) && studio.asks.empty());
         expansions[1].second(expansion(doc.editor->text()));
         ensure_equals("then asked, once", studio.asks.size(), size_t(1));
         ensure("of the latest", studio.asks[0].request.version == version(doc));
@@ -954,8 +955,8 @@ namespace tut
         checking.ask(b, Kind::Check, ALTextPos(), ALTextPos());
         ensure_equals("both asked", studio.asks.size(), size_t(2));
         ensure("the front one with its targets", studio.asks[0].request.front && studio.asks[0].request.targets.size() == 1);
-        ensure("and noted as asked for", a.weighing.askedFor == version(a));
-        ensure("the other without", !studio.asks[1].request.front && studio.asks[1].request.targets.empty() && b.weighing.askedFor != version(b));
+        ensure("and noted as asked for", a.weighing->askedFor == version(a));
+        ensure("the other without", !studio.asks[1].request.front && studio.asks[1].request.targets.empty() && b.weighing->askedFor != version(b));
         ALScriptAnalysis::Result weighed = answer(a, {});
         ALScriptWeight           weight;
         weight.target   = ALScriptWeight::Target::Mono;
@@ -978,16 +979,16 @@ namespace tut
         checking.schedule(doc, true);
         checking.pump(1.0);
         studio.asks[0].answered(answer(doc, { problem(0, "wrong"), problem(1, "unused", ALScriptProblem::Severity::Warning) }));
-        ensure_equals("both taken", doc.check.analysis.size(), size_t(2));
+        ensure_equals("both taken", doc.check->analysis.size(), size_t(2));
         studio.told.clear();
         gWarningsOff = true;
         checking.relint(doc);
         ensure_equals("nothing asked", studio.asks.size(), size_t(1));
-        ensure("the warning filtered out", doc.check.analysis.size() == 1 && doc.check.analysis[0].message == "wrong");
+        ensure("the warning filtered out", doc.check->analysis.size() == 1 && doc.check->analysis[0].message == "wrong");
         ensure_equals("and shown", joined(studio.told), std::string("problems a"));
         gWarningsOff = false;
         checking.relint(doc);
-        ensure_equals("back again, from what the check said", doc.check.analysis.size(), size_t(2));
+        ensure_equals("back again, from what the check said", doc.check->analysis.size(), size_t(2));
         doc.editor->insertText("x");
         checking.relint(doc);
         checking.pump(2.0);
@@ -1061,7 +1062,7 @@ namespace tut
         in_module.file            = "object:util";
         studio.asks[0].answered(answer(doc, { in_module, problem(1, "wrong here") }));
         bool mapped = false, own = false;
-        for (const ALScriptProblem& p : doc.check.analysis)
+        for (const ALScriptProblem& p : doc.check->analysis)
         {
             mapped |= p.message == "wrong in util" && p.file == "object:util" && p.line == 11 && p.fixes.empty();
             own |= p.message == "wrong here" && p.file.empty() && p.line == 1;
@@ -1112,7 +1113,7 @@ namespace tut
         checking.schedule(a, false);
         checking.schedule(b, true);
         checking.schedule(c, true);
-        a.check.analysisDue = 0.5;
+        a.check->analysisDue = 0.5;
         checking.pump(1.0);
         std::string asked;
         for (const auto& one : studio.asks)
@@ -1171,11 +1172,11 @@ namespace tut
         checking.schedule(card, true);
         checking.pump(2.0);
         ensure("no analyzer asked", studio.asks.empty());
-        ensure_equals("two", card.check.analysis.size(), size_t(2));
-        ensure("the items, at the first", card.check.analysis[0].line == 0 && card.check.analysis[0].column == 4 &&
-                                              card.check.analysis[0].severity == ALScriptProblem::Severity::Warning);
-        ensure("the long line, from where it is cut", card.check.analysis[1].line == 1 && card.check.analysis[1].column == 1024 &&
-                                                          card.check.analysis[1].endColumn == 1030);
+        ensure_equals("two", card.check->analysis.size(), size_t(2));
+        ensure("the items, at the first", card.check->analysis[0].line == 0 && card.check->analysis[0].column == 4 &&
+                                              card.check->analysis[0].severity == ALScriptProblem::Severity::Warning);
+        ensure("the long line, from where it is cut", card.check->analysis[1].line == 1 && card.check->analysis[1].column == 1024 &&
+                                                          card.check->analysis[1].endColumn == 1030);
         ensure("no outline as plain text", card.outline.empty());
 
         card.items.reset();
@@ -1183,13 +1184,13 @@ namespace tut
         card.editor->setText("{ \"door\": { \"speed\": 2 } }\n");
         checking.schedule(card, true);
         checking.pump(3.0);
-        ensure("nothing to say", card.check.analysis.empty());
+        ensure("nothing to say", card.check->analysis.empty());
         ensure("its keys outlined", card.outline.size() == 2 && card.outline[0].name == "door" && card.outline[1].name == "speed");
 
         Doc& file     = tab("disk", "{ \"a\": 1 }\n");
         file.file     = "/tmp/a.json";
         file.notecard = true;
         checking.schedule(file, true);
-        ensure("a text file on disk is not checked", file.check.analysisDue <= 0.0);
+        ensure("a text file on disk is not checked", file.check->analysisDue <= 0.0);
     }
 }

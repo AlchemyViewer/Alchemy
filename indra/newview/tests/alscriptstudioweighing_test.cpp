@@ -166,25 +166,25 @@ namespace tut
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "default {}");
         unit.weigh(a);
-        ensure("asked", a.weighing.asking && studio.asked == Names{ "a" });
+        ensure("asked", a.weighing->asking && studio.asked == Names{ "a" });
         ALScriptAnalysis::Result old = answerFor(a, { weightOf(Target::Mono, 100) });
         old.version -= 1;
         unit.weighed(a, old);
-        ensure("older: dropped", !a.weighing.asking && !a.weighing.weight && a.weighing.all.empty());
+        ensure("older: dropped", !a.weighing->asking && !a.weighing->weight && a.weighing->all.empty());
         unit.weighed(a, answerFor(a, { weightOf(Target::Mono, 100), weightOf(Target::LSO, 200) }));
-        ensure("kept, its own first", a.weighing.weight && a.weighing.weight->total == 100 && a.weighing.all.size() == 2 &&
-                                          a.weighing.allVersion == versionOf(a) && a.weighing.version == versionOf(a));
-        ensure("exact: no optimizer after the check", a.weighing.exact && !a.weighing.sent);
+        ensure("kept, its own first", a.weighing->weight && a.weighing->weight->total == 100 && a.weighing->all.size() == 2 &&
+                                          a.weighing->allVersion == versionOf(a) && a.weighing->version == versionOf(a));
+        ensure("exact: no optimizer after the check", a.weighing->exact && !a.weighing->sent);
         ensure("the Problems and the save told", studio.problems == Names{ "a" } && studio.warned == Names{ "a" });
         studio.preprocessing = true;
         studio.optimizer     = true;
         unit.weighed(a, answerFor(a, { weightOf(Target::Mono, 90) }));
-        ensure("the optimizer after the check: not exact", !a.weighing.exact && a.weighing.weight->total == 90);
+        ensure("the optimizer after the check: not exact", !a.weighing->exact && a.weighing->weight->total == 90);
         Doc& none = tab("none", "x");
         none.notecard = true;
-        none.weighing.weight = weightOf(Target::Mono, 1);
+        none.weighing->weight = weightOf(Target::Mono, 1);
         unit.weigh(none);
-        ensure("nothing to weigh it for: its weight let go, nothing asked", !none.weighing.weight && studio.asked.size() == 1);
+        ensure("nothing to weigh it for: its weight let go, nothing asked", !none.weighing->weight && studio.asked.size() == 1);
     }
 
     template<> template<>
@@ -202,10 +202,10 @@ namespace tut
         ensure("asked of what was sent, for its own target", studio.requests.size() == 1 && *studio.requests[0].text == "sent text" &&
                                                                   studio.requests[0].targets == std::vector<Target>{ Target::Mono });
         studio.answers[0](answerFor(a, { weightOf(Target::Mono, 300) }));
-        ensure("kept as sent, and exact", a.weighing.weight && a.weighing.weight->total == 300 && a.weighing.sent && a.weighing.exact);
+        ensure("kept as sent, and exact", a.weighing->weight && a.weighing->weight->total == 300 && a.weighing->sent && a.weighing->exact);
         ensure("told", studio.problems == Names{ "a" } && studio.warned == Names{ "a" });
         unit.weighed(a, answerFor(a, { weightOf(Target::Mono, 100) }));
-        ensure("the check's of the same text does not replace it", a.weighing.weight->total == 300 && a.weighing.all.size() == 1);
+        ensure("the check's of the same text does not replace it", a.weighing->weight->total == 300 && a.weighing->all.size() == 1);
         a.uploaded.disabled = true;
         unit.weighSent(a);
         ensure("the preprocessor off: the text as written", *studio.requests[1].text == "default {}");
@@ -214,7 +214,7 @@ namespace tut
         ALScriptAnalysis::Result late = answerFor(a, { weightOf(Target::Mono, 1) });
         late.version -= 1;
         studio.answers[1](late);
-        ensure("typed on since: dropped", a.weighing.weight->total == 300);
+        ensure("typed on since: dropped", a.weighing->weight->total == 300);
     }
 
     template<> template<>
@@ -223,20 +223,20 @@ namespace tut
         set_test_name("what the text weighs while it is the text saved is kept for the change column, target by target");
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "default {}");
-        a.weighing.all        = { weightOf(Target::Mono, 100), weightOf(Target::LSO, 200) };
-        a.weighing.allVersion = versionOf(a);
+        a.weighing->all        = { weightOf(Target::Mono, 100), weightOf(Target::LSO, 200) };
+        a.weighing->allVersion = versionOf(a);
         unit.keepSaved(a);
-        ensure("kept", a.weighing.saved.size() == 2);
-        a.weighing.all = { weightOf(Target::Mono, 150) };
+        ensure("kept", a.weighing->saved.size() == 2);
+        a.weighing->all = { weightOf(Target::Mono, 150) };
         unit.keepSaved(a);
-        ensure("each target's replaced, the others kept", a.weighing.saved.size() == 2 && a.weighing.saved[0].total == 150 &&
-                                                              a.weighing.saved[1].total == 200);
+        ensure("each target's replaced, the others kept", a.weighing->saved.size() == 2 && a.weighing->saved[0].total == 150 &&
+                                                              a.weighing->saved[1].total == 200);
         a.editor->setCaret(a.editor->document().end());
         a.editor->insertText(" ");
-        a.weighing.allVersion = versionOf(a);
-        a.weighing.all        = { weightOf(Target::Mono, 1) };
+        a.weighing->allVersion = versionOf(a);
+        a.weighing->all        = { weightOf(Target::Mono, 1) };
         unit.keepSaved(a);
-        ensure("not saved: nothing kept", a.weighing.saved[0].total == 150);
+        ensure("not saved: nothing kept", a.weighing->saved[0].total == 150);
     }
 
     template<> template<>
@@ -256,9 +256,9 @@ namespace tut
         part.line = 1;
         weight.parts.push_back(part);
         weight.lines = { { 0, 40, "" }, { 1, 10, "" }, { 1, 99, "lib.lsl" } };
-        a.weighing.weight  = weight;
-        a.weighing.version = versionOf(a);
-        a.weighing.exact   = true;
+        a.weighing->weight  = weight;
+        a.weighing->version = versionOf(a);
+        a.weighing->exact   = true;
         unit.showInEditor(a);
         ensure("its part's bytes after its line", a.editor->noteAt(0).find("WeightNote") != std::string::npos);
         ensure("the included file's own not", a.editor->noteAt(1).empty());
@@ -272,7 +272,7 @@ namespace tut
         ensure("heat off: gone", a.editor->heatAt(0) == 0.f);
         studio.notes          = true;
         studio.heat           = true;
-        a.weighing.version -= 1;
+        a.weighing->version -= 1;
         unit.showInEditor(a);
         ensure("out of date: nothing new said", a.editor->noteAt(0).empty() && a.editor->heatAt(0) == 0.f);
     }
@@ -284,18 +284,18 @@ namespace tut
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "default {}");
         unit.measureAsset(a);
-        ensure_equals("the script's text", a.weighing.assetBytes, size_t(10));
-        a.weighing.assetBytes = 0;
+        ensure_equals("the script's text", a.weighing->assetBytes, size_t(10));
+        a.weighing->assetBytes = 0;
         unit.measureAsset(a);
-        ensure("measured once for a text", a.weighing.assetBytes == 0);
+        ensure("measured once for a text", a.weighing->assetBytes == 0);
         Doc& n    = tab("n", "note text");
         n.notecard = true;
         unit.measureAsset(n);
-        ensure_equals("a notecard's", n.weighing.assetBytes, size_t(9));
+        ensure_equals("a notecard's", n.weighing->assetBytes, size_t(9));
         Doc& f = tab("f", "file text");
         f.file = "/somewhere/f.lsl";
         unit.measureAsset(f);
-        ensure_equals("a file on disk has no limit", f.weighing.assetBytes, size_t(0));
+        ensure_equals("a file on disk has no limit", f.weighing->assetBytes, size_t(0));
         // Preprocessed: the envelope a save would send, measured as long as
         // it would be made.
         Doc& p                 = tab("p", "#define X 1\ndefault { /* x */ }");
@@ -305,7 +305,7 @@ namespace tut
         p.expanded.generation  = 1;
         p.expanded.text        = std::make_shared<const std::string>("default { }\n");
         unit.measureAsset(p);
-        ensure_equals("the envelope's length", p.weighing.assetBytes, p.envelopeFor(*p.expanded.text, studio.programVersion()).wrap().size());
+        ensure_equals("the envelope's length", p.weighing->assetBytes, p.envelopeFor(*p.expanded.text, studio.programVersion()).wrap().size());
     }
 
     template<> template<>
@@ -360,20 +360,20 @@ namespace tut
         Doc&                    a    = tab("a", "default {}");
         services.front               = 0;
         studio.shown                 = true;
-        a.check.analysisVersion      = versionOf(a);
-        a.weighing.all               = { weightOf(Target::Mono, 1) };
-        a.weighing.allVersion        = versionOf(a);
-        a.weighing.askedFor          = versionOf(a);
+        a.check->analysisVersion      = versionOf(a);
+        a.weighing->all               = { weightOf(Target::Mono, 1) };
+        a.weighing->allVersion        = versionOf(a);
+        a.weighing->askedFor          = versionOf(a);
         unit.pump();
-        ensure("the others wanted: weighed", studio.asked == Names{ "a" } && a.weighing.asking);
+        ensure("the others wanted: weighed", studio.asked == Names{ "a" } && a.weighing->asking);
         unit.pump();
         ensure("once, while it is asked", studio.asked.size() == 1);
-        a.weighing.asking = false;
-        a.weighing.all    = { weightOf(Target::Mono, 1), weightOf(Target::LSO, 2), weightOf(Target::LSLLuau, 3) };
+        a.weighing->asking = false;
+        a.weighing->all    = { weightOf(Target::Mono, 1), weightOf(Target::LSO, 2), weightOf(Target::LSLLuau, 3) };
         unit.pump();
         ensure("all there: nothing more", studio.asked.size() == 1);
         studio.shown          = false;
-        a.weighing.all.clear();
+        a.weighing->all.clear();
         unit.pump();
         ensure("not looked at: nothing", studio.asked.size() == 1);
     }
@@ -385,9 +385,9 @@ namespace tut
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "default {}");
         Doc&                    b    = tab("b", "default {}");
-        a.check.analysisVersion      = versionOf(a);
-        b.check.analysisVersion      = versionOf(b);
-        a.weighing.askedFor          = versionOf(a);
+        a.check->analysisVersion      = versionOf(a);
+        b.check->analysisVersion      = versionOf(b);
+        a.weighing->askedFor          = versionOf(a);
         services.front               = 0;
         unit.pump();
         ensure("weighed with its check already: nothing", studio.asked.empty());
@@ -402,7 +402,7 @@ namespace tut
         ensure("not waited on", !ALScriptStudioWeighing::asking(b));
         unit.pump();
         ensure("not before its check", studio.asked.size() == 1);
-        b.check.analysisVersion = versionOf(b);
+        b.check->analysisVersion = versionOf(b);
         unit.pump();
         ensure("then, for the new text", studio.asked == (Names{ "b", "b" }));
     }

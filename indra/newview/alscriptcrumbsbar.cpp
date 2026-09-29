@@ -174,18 +174,18 @@ ALScriptCrumbsBar::Steady ALScriptCrumbsBar::steadyOf(Doc& doc) const
     steady.optimized  = steady.expanded && doc.uploaded.valid && doc.uploaded.version == doc.editor->document().version();
     steady.codeBefore = doc.uploaded.codeBefore;
     steady.codeAfter  = doc.uploaded.codeAfter;
-    if (doc.weighing.weight)
+    if (doc.weighing->weight)
     {
         steady.weighed    = true;
-        steady.weighedFor = doc.weighing.weight->target;
-        steady.total      = doc.weighing.weight->total;
-        steady.limit      = doc.weighing.weight->limit;
-        steady.estimate   = doc.weighing.weight->estimate;
+        steady.weighedFor = doc.weighing->weight->target;
+        steady.total      = doc.weighing->weight->total;
+        steady.limit      = doc.weighing->weight->limit;
+        steady.estimate   = doc.weighing->weight->estimate;
     }
-    steady.exact        = doc.weighing.exact;
-    steady.sent         = doc.weighing.sent;
+    steady.exact        = doc.weighing->exact;
+    steady.sent         = doc.weighing->sent;
     steady.notecard     = doc.notecard;
-    steady.assetBytes   = doc.weighing.assetBytes;
+    steady.assetBytes   = doc.weighing->assetBytes;
     steady.errorColor   = doc.editor->markColor(ALCodeEditor::Mark::Error);
     steady.warningColor = doc.editor->markColor(ALCodeEditor::Mark::Warning);
     return steady;
@@ -307,11 +307,11 @@ void ALScriptCrumbsBar::weight(Doc& doc, std::vector<Part>& parts) const
     }
     // What its code weighs for its target, against what the target runs
     // it in: in the warning colour past four fifths, the error's past it.
-    if (!doc.weighing.weight || doc.weighing.weight->total <= 0)
+    if (!doc.weighing->weight || doc.weighing->weight->total <= 0)
     {
         return;
     }
-    const ALScriptWeight&      weighed = *doc.weighing.weight;
+    const ALScriptWeight&      weighed = *doc.weighing->weight;
     LLStringUtil::format_map_t args;
     args["[TARGET]"] = ALScriptWeight::nameOf(weighed.target);
     args["[SIZE]"]   = llformat("%f", (F64)weighed.total / 1024.0);
@@ -319,11 +319,11 @@ void ALScriptCrumbsBar::weight(Doc& doc, std::vector<Part>& parts) const
     args["[BYTES]"]  = std::to_string(weighed.total);
     args["[MAX]"]    = std::to_string(weighed.limit);
     std::string tip  = mServices->words(weighed.estimate ? "TrailerWeightEstimateTip" : "TrailerWeightTip", args);
-    if (!doc.weighing.exact)
+    if (!doc.weighing->exact)
     {
         tip += " " + mServices->words("TrailerWeightBeforeTip");
     }
-    else if (doc.weighing.sent)
+    else if (doc.weighing->sent)
     {
         tip += " " + mServices->words("TrailerWeightSentTip");
     }
@@ -346,17 +346,17 @@ void ALScriptCrumbsBar::sending(Doc& doc, std::vector<Part>& parts) const
     // a notecard's text -- may be: in the warning colour past nine tenths,
     // the error's past the whole, where a save is refused.
     const size_t LIMIT = doc.notecard ? static_cast<size_t>(LLNotecard::MAX_SIZE) : ALScriptEnvelope::MAX_ASSET_BYTES;
-    if (doc.weighing.assetBytes * 2 <= LIMIT)
+    if (doc.weighing->assetBytes * 2 <= LIMIT)
     {
         return;
     }
     LLStringUtil::format_map_t size;
-    size["[SIZE]"]  = std::to_string((doc.weighing.assetBytes + 1023) / 1024);
+    size["[SIZE]"]  = std::to_string((doc.weighing->assetBytes + 1023) / 1024);
     size["[LIMIT]"] = std::to_string(LIMIT / 1024);
-    size["[BYTES]"] = std::to_string(doc.weighing.assetBytes);
+    size["[BYTES]"] = std::to_string(doc.weighing->assetBytes);
     size["[MAX]"]   = std::to_string(LIMIT);
-    size["[OVER]"]  = std::to_string(doc.weighing.assetBytes > LIMIT ? doc.weighing.assetBytes - LIMIT : 0);
-    const bool  over = doc.weighing.assetBytes > LIMIT;
+    size["[OVER]"]  = std::to_string(doc.weighing->assetBytes > LIMIT ? doc.weighing->assetBytes - LIMIT : 0);
+    const bool  over = doc.weighing->assetBytes > LIMIT;
     const char* tip  = doc.notecard ? (over ? "TrailerNotecardSizeOverTip" : "TrailerNotecardSizeTip")
                                     : (over ? "TrailerSizeOverTip" : "TrailerSizeTip");
     Part        part{ mServices->words("TrailerSize", size), std::string(), mServices->words(tip, size) };
@@ -364,7 +364,7 @@ void ALScriptCrumbsBar::sending(Doc& doc, std::vector<Part>& parts) const
     {
         part.color = doc.editor->markColor(ALCodeEditor::Mark::Error);
     }
-    else if (doc.weighing.assetBytes * 10 > LIMIT * 9)
+    else if (doc.weighing->assetBytes * 10 > LIMIT * 9)
     {
         part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
     }
@@ -518,15 +518,15 @@ void ALScriptCrumbsBar::showPath(Doc& doc)
     // they are made again only where the path, the outline it was read
     // from, the tab or its name has changed -- and it is asked on every
     // key.
-    const std::vector<size_t>& path = doc.caret.crumbPath;
-    if (mShownFor == doc.id && mShownOf == doc.caret.crumbsOf && mShownPath == path && mShownName == doc.name)
+    const std::vector<size_t>& path = doc.caret->crumbPath;
+    if (mShownFor == doc.id && mShownOf == doc.caret->crumbsOf && mShownPath == path && mShownName == doc.name)
     {
         // The same steps over the same outline: only the trailer, which
         // says where the caret is.
         showTrailer(doc);
         return;
     }
-    mShownOf   = doc.caret.crumbsOf;
+    mShownOf   = doc.caret->crumbsOf;
     mShownPath = path;
     mShownName = doc.name;
 

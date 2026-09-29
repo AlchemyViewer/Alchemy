@@ -242,7 +242,7 @@ void ALScriptStudioSaving::weighForSave(Doc& doc)
         // What the run made to be sent, which is what goes.
         mWindow.weighSent(doc);
     }
-    else if (doc.weighing.weight && doc.weighing.version == doc.save.warnWeightFor())
+    else if (doc.weighing->weight && doc.weighing->version == doc.save.warnWeightFor())
     {
         warnOverWeight(doc);
     }
@@ -254,15 +254,15 @@ void ALScriptStudioSaving::weighForSave(Doc& doc)
 
 void ALScriptStudioSaving::warnOverWeight(Doc& doc)
 {
-    if (doc.save.warnWeightFor() < 0 || !doc.weighing.weight || doc.weighing.version != doc.save.warnWeightFor())
+    if (doc.save.warnWeightFor() < 0 || !doc.weighing->weight || doc.weighing->version != doc.save.warnWeightFor())
     {
         return;
     }
     doc.save.setWarnWeightFor(-1);
     // Over the limit as the text was sent, as nearly as the studio can
     // tell: Mono's an estimate, and said as one.
-    const ALScriptWeight& weight = *doc.weighing.weight;
-    if (doc.weighing.exact && weight.total > weight.limit)
+    const ALScriptWeight& weight = *doc.weighing->weight;
+    if (doc.weighing->exact && weight.total > weight.limit)
     {
         reportOverWeight(doc, weight);
     }
@@ -287,24 +287,24 @@ void ALScriptStudioSaving::save(Doc& doc)
     // Where it cannot go -- its object out of sight, the item gone, the
     // connection lost -- said, with the notice back in sight to offer a
     // copy or a file.
-    const Doc::Orphan kind         = doc.orphan.kind;
+    const Doc::Orphan kind         = doc.orphan->kind;
     const bool        out_of_reach = kind == Doc::Orphan::Away || kind == Doc::Orphan::Removed || kind == Doc::Orphan::Offline ||
                               kind == Doc::Orphan::Locked || kind == Doc::Orphan::Unloaded;
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
-    switch (doc.save.ask(out_of_reach, doc.orphan.detached))
+    switch (doc.save.ask(out_of_reach, doc.orphan->detached))
     {
         case ALScriptSaveFlow::Start::Queued:
             return;
         case ALScriptSaveFlow::Start::OutOfReach:
-            mServices.setStatus(mServices.words(doc.orphan.kind == Doc::Orphan::Away       ? "SaveBlockedAway"
-                                                : doc.orphan.kind == Doc::Orphan::Removed  ? "SaveBlockedRemoved"
-                                                : doc.orphan.kind == Doc::Orphan::Locked   ? "SaveBlockedLocked"
-                                                : doc.orphan.kind == Doc::Orphan::Unloaded ? "SaveBlockedUnloaded"
+            mServices.setStatus(mServices.words(doc.orphan->kind == Doc::Orphan::Away       ? "SaveBlockedAway"
+                                                : doc.orphan->kind == Doc::Orphan::Removed  ? "SaveBlockedRemoved"
+                                                : doc.orphan->kind == Doc::Orphan::Locked   ? "SaveBlockedLocked"
+                                                : doc.orphan->kind == Doc::Orphan::Unloaded ? "SaveBlockedUnloaded"
                                                                                       : "SaveBlockedOffline",
                                                 args),
                                 true);
-            doc.orphan.noticeDismissed = false;
+            doc.orphan->noticeDismissed = false;
             stopped(doc);
             if (&doc == mServices.frontDoc())
             {
@@ -316,7 +316,7 @@ void ALScriptStudioSaving::save(Doc& doc)
             // failed waits its turn: loaded now, what it holds carried over,
             // so that it is saved as what the item is once asked again.
             mServices.setStatus(mServices.words("SaveWaitsForLoad", args), true);
-            doc.orphan.reattachTries = 0;
+            doc.orphan->reattachTries = 0;
             mWindow.reattach(doc);
             stopped(doc);
             return;
@@ -336,7 +336,7 @@ void ALScriptStudioSaving::save(Doc& doc)
     const Options options = mWindow.saveOptions();
     if (!doc.notecard && !doc.save.external())
     {
-        const bool fix = options.fix && doc.check.analysisVersion == doc.editor->document().version() && doc.save.fixOnce();
+        const bool fix = options.fix && doc.check->analysisVersion == doc.editor->document().version() && doc.save.fixOnce();
         doc.editor->undoJournal().beginGroup();
         mWindow.tidy(doc, fix, options.format, options.trim);
         doc.editor->undoJournal().endGroup();
@@ -348,7 +348,7 @@ void ALScriptStudioSaving::save(Doc& doc)
     tab.preprocessed     = !tab.file && !tab.notecard && mWindow.preprocessed(doc);
     tab.preprocessorBusy = doc.preprocessing;
     tab.holdOnErrors     = options.holdOnErrors;
-    tab.checked          = doc.check.analysisVersion == tab.version;
+    tab.checked          = doc.check->analysisVersion == tab.version;
     tab.checkerErrors    = checkerErrors(doc);
     tab.askWorld         = !tab.file && !doc.ref.isNull() && doc.assetId.notNull();
     const ALScriptSaveFlow::Route route = doc.save.route(tab);
@@ -441,7 +441,7 @@ void ALScriptStudioSaving::save(Doc& doc)
     // the check of this text found said, where it is in.
     if (!options.holdOnErrors && tab.checked)
     {
-        const S32 errors = static_cast<S32>(std::count_if(doc.check.analysis.begin(), doc.check.analysis.end(),
+        const S32 errors = static_cast<S32>(std::count_if(doc.check->analysis.begin(), doc.check->analysis.end(),
                                                           [](const ALScriptProblem& p) { return p.severity == ALScriptProblem::Severity::Error; }));
         if (errors > 0)
         {
@@ -468,11 +468,11 @@ S32 ALScriptStudioSaving::checkerErrors(const Doc& doc)
     // The analyzers' errors, and the preprocessor's in the expansion they
     // read.
     S32 errors = 0;
-    for (const ALScriptProblem& problem : doc.check.analysis)
+    for (const ALScriptProblem& problem : doc.check->analysis)
     {
         errors += problem.severity == ALScriptProblem::Severity::Error ? 1 : 0;
     }
-    if (doc.expanded.valid && doc.expanded.version == doc.check.analysisVersion)
+    if (doc.expanded.valid && doc.expanded.version == doc.check->analysisVersion)
     {
         for (const ALScriptProblem& problem : doc.expanded.problems)
         {
@@ -499,7 +499,7 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
                              : !doc.language.lua && !mWindow.saveOptions().compress ? "SaveTooLargeCompress"
                                                                                     : "SaveTooLargeWrapped";
         mServices.report(mServices.words("SaveTooLarge", args) + " " + mServices.words(shrink), true, &doc);
-        doc.weighing.assetBytes = text.size();
+        doc.weighing->assetBytes = text.size();
         stopped(doc);
         if (&doc == mServices.frontDoc())
         {

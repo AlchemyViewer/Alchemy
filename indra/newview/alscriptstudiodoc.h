@@ -61,6 +61,27 @@ class ALScriptStudioServices;
 // of that where it made anything.
 struct ALScriptStudioDoc
 {
+    ALScriptStudioDoc();
+    ~ALScriptStudioDoc();
+    ALScriptStudioDoc(const ALScriptStudioDoc&)            = delete;
+    ALScriptStudioDoc& operator=(const ALScriptStudioDoc&) = delete;
+
+    // A unit's part of the tab: what the unit keeps of it. Made with the
+    // tab and gone with it, and const wherever the tab is.
+    template <typename T>
+    class Part
+    {
+    public:
+        Part() : mPart(std::make_unique<T>()) {}
+        T*       operator->() { return mPart.get(); }
+        const T* operator->() const { return mPart.get(); }
+        T&       operator*() { return *mPart; }
+        const T& operator*() const { return *mPart; }
+
+    private:
+        std::unique_ptr<T> mPart;
+    };
+
     ALScriptRef                                ref;
     // A file on disk rather than an item in the world -- an include
     // the preprocessor read from a folder -- by its path; `ref` is
@@ -295,7 +316,7 @@ struct ALScriptStudioDoc
         // gone only once it has been gone a moment.
         F64    awaySince = 0.0;
     };
-    Orphaned                                   orphan;
+    Part<Orphaned>                             orphan;
     // What its object and region were called, while they were in sight:
     // what a kept text says it came from once they are not.
     std::string                                objectName;
@@ -388,17 +409,6 @@ struct ALScriptStudioDoc
     // The last snapshot made, while something holds it, and its version.
     mutable std::weak_ptr<const std::string>      snapshotHeld;
     mutable U32                                   snapshotVersion = 0;
-    // A question held until the expansion it asks about comes
-    // (Check::waiting). A question of a kind replaces the one of that
-    // kind still waiting: a second hover is a hover of somewhere else,
-    // and only the last is wanted.
-    struct Waiting
-    {
-        ALScriptAnalysis::Kind kind = ALScriptAnalysis::Kind::Check;
-        ALTextPos              at;
-        // Where a stretch chosen from `at` ends: the refactors'.
-        ALTextPos              to;
-    };
     // A run of the preprocessor on its way, for a save or not: a save
     // asked for meanwhile waits on it rather than starting another.
     bool                                       preprocessing       = false;
@@ -513,7 +523,7 @@ struct ALScriptStudioDoc
         size_t                             assetBytes = 0;
         std::optional<std::pair<U32, U32>> assetMeasured;
     };
-    Weighing                                   weighing;
+    Part<Weighing>                             weighing;
     // The tab's part of checking (ALScriptStudioChecking): what the
     // analyzers said and when they are next asked, the expansion asked for
     // them and the questions waiting on it, the refactors offered at the
@@ -561,6 +571,17 @@ struct ALScriptStudioDoc
         // caret move and every frame Weights is shown, and a walk of the
         // whole text to answer.
         mutable std::optional<std::pair<U32, bool>> fragment;
+        // A question held until the expansion it asks about comes. A
+        // question of a kind replaces the one of that kind still waiting:
+        // a second hover is a hover of somewhere else, and only the last is
+        // wanted.
+        struct Waiting
+        {
+            ALScriptAnalysis::Kind kind = ALScriptAnalysis::Kind::Check;
+            ALTextPos              at;
+            // Where a stretch chosen from `at` ends: the refactors'.
+            ALTextPos              to;
+        };
         // The questions held until it comes.
         std::vector<Waiting> waiting;
         // Whether the script's `.luaurc` was asked for once, so that a
@@ -575,7 +596,7 @@ struct ALScriptStudioDoc
         // once it is: of the problems of one kind, or of all where empty.
         std::optional<std::string> fixAllAfterCheck;
     };
-    Check                                      check;
+    Part<Check>                                check;
     // How bad a problem is: what the marks, the counts, the filters
     // and the compiler's own words all go by, rather than a word
     // compared as text in six places.
@@ -691,7 +712,7 @@ struct ALScriptStudioDoc
         S32                                                                       unlisted = 0;
         std::vector<std::string>                                                  unread;
     };
-    Lookup                                     lookup;
+    Part<Lookup>                               lookup;
     // Edits to make once the script has loaded: a rename that reached
     // it from another script, each place with the name that must
     // still stand there and the one to put in its stead.
@@ -722,7 +743,7 @@ struct ALScriptStudioDoc
         std::string                    written;
         std::optional<std::string>     waiting;
     };
-    External                                   external;
+    Part<External>                             external;
     // The tab's part of what is said of its caret: the outline's folds,
     // the name asked about, the path the bar shows, and the inspector's
     // question about where the caret is.
@@ -748,7 +769,7 @@ struct ALScriptStudioDoc
         ALTextPos inspectAt{ -1, -1 };
         U32       inspectVersion = 0;
     };
-    Caret                                      caret;
+    Part<Caret>                                caret;
     boost::signals2::scoped_connection         changed;
 
     // What the Problems pane's rows say a level is, and what the compiler's

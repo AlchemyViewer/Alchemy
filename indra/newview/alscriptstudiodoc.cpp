@@ -38,6 +38,10 @@
 // static
 const std::string ALScriptStudioDoc::GENERATED = "generated:";
 
+// Out of line, where each unit's part is whole.
+ALScriptStudioDoc::ALScriptStudioDoc()  = default;
+ALScriptStudioDoc::~ALScriptStudioDoc() = default;
+
 // static
 const char* ALScriptStudioDoc::levelName(Level level)
 {
@@ -103,7 +107,7 @@ bool ALScriptStudioDoc::hasKeyboard() const
 bool ALScriptStudioDoc::checkRunning(F64 now) const
 {
     constexpr F64 SAID_AFTER = 0.4;
-    return loaded && !notecard && check.requestedVersion != check.analysisVersion && check.askedAt > 0.0 && now - check.askedAt >= SAID_AFTER;
+    return loaded && !notecard && check->requestedVersion != check->analysisVersion && check->askedAt > 0.0 && now - check->askedAt >= SAID_AFTER;
 }
 
 const ALSourceMap* ALScriptStudioDoc::runningMap() const
