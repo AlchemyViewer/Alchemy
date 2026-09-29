@@ -100,6 +100,12 @@ public:
     // tells what this one left. A test's in its place, where one is given.
     static ALScriptRecoveryStore* store();
     static void                   useStore(ALScriptRecoveryStore* store);
+    // Where a text the notecard window kept (ALScriptRecoveryStore::
+    // isWindowKey) goes back to: that window, as the viewer has it --
+    // false where it cannot have the notecard, and the text is taken up
+    // here as any other is. None where none is given, as in a test.
+    typedef std::function<bool(const Entry& entry)> notecard_window_t;
+    static void takeNotecardsTo(notecard_window_t window);
     // A tab as an entry, from the tab alone -- nothing of the world's asked
     // -- since it is written as the viewer goes as well, after the world
     // may have.

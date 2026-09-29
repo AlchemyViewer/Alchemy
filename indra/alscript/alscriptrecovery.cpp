@@ -449,6 +449,16 @@ std::string ALScriptRecoveryStore::keyOf(const LLUUID& object, const LLUUID& ite
     return object.isNull() ? "item:" + item.asString() : "task:" + object.asString() + ":" + item.asString();
 }
 
+std::string ALScriptRecoveryStore::windowKeyOf(const LLUUID& object, const LLUUID& item)
+{
+    return "card:" + keyOf(object, item, std::string());
+}
+
+bool ALScriptRecoveryStore::isWindowKey(const std::string& key)
+{
+    return key.starts_with("card:");
+}
+
 std::string ALScriptRecoveryStore::fileOf(const std::string& key) const
 {
     // By a hash of the key, which may be a path of any length and any

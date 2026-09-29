@@ -48,6 +48,21 @@ namespace
     // A test's store, in place of the account's.
     ALScriptRecoveryStore* sGivenStore = nullptr;
 
+    // The notecard window's way of taking up what it kept.
+    ALScriptStudioRecovery::notecard_window_t& notecardWindow()
+    {
+        static ALScriptStudioRecovery::notecard_window_t window;
+        return window;
+    }
+
+    // An entry the notecard window kept, taken up there: false where it is
+    // not the window's, or the window cannot have its notecard.
+    bool toNotecardWindow(const ALScriptRecoveryEntry& entry)
+    {
+        const ALScriptStudioRecovery::notecard_window_t& window = notecardWindow();
+        return ALScriptRecoveryStore::isWindowKey(entry.key) && window && window(entry);
+    }
+
     // The account's store, one for the process, made again where another
     // account has logged in since; let go of in the viewer's cleanup --
     // what it has waiting written first -- before the writer it writes on
@@ -144,6 +159,12 @@ ALScriptRecoveryStore* ALScriptStudioRecovery::store()
 void ALScriptStudioRecovery::useStore(ALScriptRecoveryStore* store)
 {
     sGivenStore = store;
+}
+
+// static
+void ALScriptStudioRecovery::takeNotecardsTo(notecard_window_t window)
+{
+    notecardWindow() = std::move(window);
 }
 
 // static
@@ -548,6 +569,12 @@ void ALScriptStudioRecovery::recover(const Entry& listed)
     {
         return;
     }
+    // What the notecard window kept goes back to it, where it can have the
+    // notecard: reading and writing a notecard needs no studio.
+    if (toNotecardWindow(entry))
+    {
+        return;
+    }
     // Open in another window: put in there, since two tabs of one script
     // would each save over the other.
     if (mWindow.recoverElsewhere(entry))
@@ -774,12 +801,23 @@ void ALScriptStudioRecovery::offer(std::function<ALScriptStudioRecovery*()> stud
                                      }
                                      return;
                                  }
-                                 ALScriptStudioRecovery* recovery = studio ? studio() : nullptr;
+                                 // What the notecard window kept goes back to
+                                 // it; the studio opens only for the rest.
+                                 std::vector<Entry> rest;
+                                 for (const Entry& entry : now)
+                                 {
+                                     Entry whole = entry;
+                                     if (!(ALScriptRecoveryStore::isWindowKey(entry.key) && kept->load(whole) && toNotecardWindow(whole)))
+                                     {
+                                         rest.push_back(entry);
+                                     }
+                                 }
+                                 ALScriptStudioRecovery* recovery = rest.empty() || !studio ? nullptr : studio();
                                  if (!recovery)
                                  {
                                      return;
                                  }
-                                 for (const Entry& entry : now)
+                                 for (const Entry& entry : rest)
                                  {
                                      recovery->recover(entry);
                                  }

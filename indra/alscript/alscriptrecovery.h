@@ -171,6 +171,12 @@ public:
     // Whose text: an item in an object, an item in the inventory, or a
     // file on disk.
     static std::string keyOf(const LLUUID& object, const LLUUID& item, const std::string& file);
+    // Whose text, where the notecard window keeps it rather than a Script
+    // Studio tab: a key of its own, so that the two never write over each
+    // other's entry for one notecard, and whoever takes an entry up knows
+    // which of them it goes back to.
+    static std::string windowKeyOf(const LLUUID& object, const LLUUID& item);
+    static bool        isWindowKey(const std::string& key);
 
     const std::string& directory() const { return mDirectory; }
     const std::string& session() const { return mSession; }

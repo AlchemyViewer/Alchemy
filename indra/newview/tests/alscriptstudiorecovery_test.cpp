@@ -603,4 +603,41 @@ namespace tut
         ensure("carried to be picked as a tab loading loads", loading.carriedTarget == std::optional<std::string>("lsl2") &&
                                                                loading.carriedExperience == std::optional<LLUUID>(experience) && !loading.targetChosen);
     }
+
+    template<> template<>
+    void alscriptstudiorecovery_object::test<13>()
+    {
+        set_test_name("what the notecard window kept goes back to it, under a key of its own; where it cannot have the notecard, the studio takes it up");
+        ALScriptStudioRecovery& r = make();
+        Entry                   card;
+        card.name     = "card";
+        card.object   = LLUUID::generateNewID();
+        card.item     = LLUUID::generateNewID();
+        card.notecard = true;
+        card.text     = "kept\n";
+        card.key      = ALScriptRecoveryStore::windowKeyOf(card.object, card.item);
+        ensure("a key of its own", ALScriptRecoveryStore::isWindowKey(card.key) && card.key != ALScriptRecoveryStore::keyOf(card.object, card.item, std::string()) &&
+                                       !ALScriptRecoveryStore::isWindowKey(ALScriptRecoveryStore::keyOf(card.object, card.item, std::string())));
+
+        std::vector<std::string> taken;
+        bool                     has = true;
+        ALScriptStudioRecovery::takeNotecardsTo([&taken, &has](const Entry& entry) {
+            taken.push_back(entry.name);
+            return has;
+        });
+        studio().inHand = false;
+        r.recover(card);
+        ensure("taken up in the window", taken.size() == 1 && studio().orphans.empty() && services().opened.empty());
+
+        // A studio tab's own entry for the same notecard is the studio's.
+        Entry tab = card;
+        tab.key   = ALScriptRecoveryStore::keyOf(card.object, card.item, std::string());
+        r.recover(tab);
+        ensure("a tab's entry is not the window's", taken.size() == 1 && studio().orphans.size() == 1);
+
+        has = false;
+        r.recover(card);
+        ensure("the window cannot have it: the studio keeps it", taken.size() == 2 && studio().orphans.size() == 2);
+        ALScriptStudioRecovery::takeNotecardsTo(nullptr);
+    }
 }
