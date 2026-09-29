@@ -27,6 +27,7 @@
 
 #include "alvimcommandline.h"
 
+#include "alvimexcommands.h"
 #include "alvimkeymap.h"
 #include "alvimtext.h"
 
@@ -236,7 +237,7 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                 remember(which, entered);
                 if (which == ':')
                 {
-                    mVim.runCommand(view, entered);
+                    mVim.mEx->runCommand(view, entered);
                 }
                 else
                 {

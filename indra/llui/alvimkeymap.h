@@ -43,6 +43,8 @@
 #include <string_view>
 #include <vector>
 
+class ALVimExCommands;
+
 // Vim over the text view, as a keymap with state: normal, insert, replace,
 // visual, visual-line and visual-block modes; counts; the operators d c y
 // > < = and g~ gu gU, composed with the motions h j k l w W b B e E 0 ^ $
@@ -296,10 +298,6 @@ private:
     // this keymap's over a plain view's text, where every bracket counts.
     // `%`, the bracket objects and [( all ask of it, by one set of rules.
     ALBracketIndex& bracketsOf(ALTextView& view) const;
-    // The position a range address names on the : line -- a number, .,
-    // $, 'x, '< '>, with an offset -- read from `at` on; false where
-    // the line has none there.
-    bool lineAddress(ALTextView& view, const std::string& line, size_t& at, S32& out) const;
     bool insert(ALTextView& view, const Input& input);
     // Insert mode's own Control keys; false where vim gives the key no
     // meaning there, and it is the view's.
@@ -341,73 +339,8 @@ private:
     // Says a count would make more text than it may, and how much.
     void     tooMuch(size_t bytes);
 
-    // The : line.
-    void runCommand(ALTextView& view, const std::string& line);
-    bool substitute(ALTextView& view, S32 first, S32 last, const std::string& spec);
-    // Vim's spelling of a replacement -- & for the match, \1 for a group,
-    // ~ for the last replacement, \r for a line break -- as the search
-    // engine's.
-    std::string replacementOf(const std::string& with) const;
     // Vim's spelling of a pattern as the search engine's (ALVimSearch).
     typedef ALVimPattern Pattern;
-    // The :s asking about each match: the edits left to make, in order,
-    // and the one being asked about; the text put in, for the question.
-    struct Confirming
-    {
-        std::vector<std::pair<ALTextRange, std::string>> edits;
-        size_t                                           at      = 0;
-        S32                                              made    = 0;
-        S32                                              lines   = 0;
-        S32                                              lastLine = -1;
-        // Whether the ones still to come are lit: once, when the asking
-        // starts, then let go of as it passes them.
-        bool                                             lit = false;
-        // The step to undo that every edit said yes to goes into, as the
-        // :s is one step: gone on with at each answer, the group closed
-        // while the question waits, so that nothing made meanwhile -- a
-        // format on save -- joins it (ALTextUndo::resumeGroup).
-        U64                                              undoStep = 0;
-        // While a :g runs its command over the lines, an asking :s puts
-        // its edits here and asks nothing; the asking starts, over the
-        // lot in order, once the :g is through.
-        bool                                             gathering = false;
-    };
-    Confirming mConfirming;
-    // Whether a :g is running its command over lines, which another :g
-    // may not do, as vim has it (E147).
-    bool       mInGlobal = false;
-    // While a :g runs a command that changes only the line it is on --
-    // :d, :s, :> and :< with no lines of their own -- the command puts its
-    // edits here, measured in the text as it was, and they go in at once
-    // when the :g is through: one edit, heard of once, for the lot. The
-    // place the caret lands is kept likewise, and what is said is added up.
-    struct GlobalBatch
-    {
-        std::vector<std::pair<ALTextRange, std::string>> edits;
-        // Where the caret goes, in the text as it was, and how many lines
-        // below that once the edits are in.
-        ALTextPos                                        landing;
-        S32                                              landingBelow = 0;
-        bool                                             landed       = false;
-        S32                                              substitutions = 0;
-        S32                                              substitutedLines = 0;
-        S32                                              deletedLines = 0;
-    };
-    GlobalBatch* mGlobalBatch = nullptr;
-    // Whether a :g's command is one it batches.
-    static bool globalBatches(const std::string& command);
-    void        applyGlobalBatch(ALTextView& view, GlobalBatch& batch);
-    bool       confirmKey(ALTextView& view, const Input& input);
-    // One of the edits made, the ones after it moved by what it changed.
-    void       applyConfirmed(ALTextView& view, size_t index);
-    // All the rest, from the one asked about on, made as one edit, as :s
-    // makes them without asking.
-    void       applyRest(ALTextView& view);
-    void       askNext(ALTextView& view);
-    void       endConfirming(ALTextView& view);
-    // g and v: the command over every line the pattern picks out, or
-    // every line it does not.
-    bool global(ALTextView& view, S32 first, S32 last, bool ranged, const std::string& spec, bool invert);
     // Keys fed as typed, for :normal and for a macro, through the mappings
     // where `remap` says -- as a macro's and :normal's are, and :normal!'s
     // are not; false where one failed or said an error, and the rest were
@@ -451,11 +384,6 @@ private:
     // A jump from `from`: vim's context marks, '' and ``, set there, and
     // the host told.
     void noteJump(ALTextView& view, const ALTextPos& from);
-    // :registers and :marks, listed as vim lists them, of the names given
-    // or of all.
-    void listRegisters(ALTextView& view, const std::string& names);
-    void listMarks(ALTextView& view, const std::string& names);
-    void list(ALTextView& view, const std::string& text);
 
     // What the mode says, in the skin's words where the skin has them
     // (strings.xml, keys Vim*), else in vim's own English; [NAME]s
@@ -556,10 +484,10 @@ private:
     // The : and search lines being typed (ALVimCommandLine).
     ALVimCommandLine         mCommandLine{ *this };
     friend class ALVimCommandLine;
-    // The last :s, for :s with nothing after it, :&, :&&, & and g&: its
-    // replacement as it read once ~ was put in, and its flags.
-    std::string mLastReplacement;
-    std::string mLastSubstituteFlags;
+    // The : commands (ALVimExCommands), held apart since they name the
+    // keymap's own types.
+    std::unique_ptr<ALVimExCommands> mEx;
+    friend class ALVimExCommands;
 
     // What the last change was, as it was typed, for . -- gathered from
     // the first key of a command until the command is done, and kept

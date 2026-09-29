@@ -28,6 +28,7 @@
 #include "alvimsearch.h"
 
 #include "alvimhost.h"
+#include "alvimexcommands.h"
 #include "alvimkeymap.h"
 
 #include <algorithm>
@@ -91,7 +92,7 @@ bool ALVimSearch::search(ALTextView& view, const std::string& pattern, bool forw
 
 ALVimSearch::Pattern ALVimSearch::patternOf(const std::string& vim, std::optional<bool> force_case) const
 {
-    return ALVimPattern::of(vim, mVim.mLastReplacement, { mVim.mShared->ignoreCase, mVim.mShared->smartCase }, force_case);
+    return ALVimPattern::of(vim, mVim.mEx->lastReplacement, { mVim.mShared->ignoreCase, mVim.mShared->smartCase }, force_case);
 }
 
 ALVimPattern::Places ALVimSearch::placesOf(const ALTextView& view) const
