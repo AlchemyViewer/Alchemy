@@ -372,6 +372,7 @@ target_sources(
         alvimpattern.h
         alvimregisters.h
         alvimsearch.h
+        alvimtext.h
         alxuiservice.h
         alchoicelist.h
         aloutputview.h
