@@ -704,6 +704,66 @@ int main(int, char**)
         typeKeys(e, ".");
         e.undo();
     });
+    // Stepping by character along that line, as l does.
+    both("l along a line of 100 characters, per step", subjects, 100, [](Subject&, ALCodeEditor& e) {
+        typeKeys(e, "0");
+        for (int i = 0; i < 99; ++i)
+        {
+            typeKeys(e, "l");
+        }
+    });
+    // A search, then n through its matches; and a search typed on the
+    // search line, with the cursor moved along it, as incsearch sees it.
+    for (Subject& s : subjects)
+    {
+        vims[&s - subjects]->takeLine(*s.editor, '/', "total", true);
+    }
+    both("n through the matches of \"total\", per n", subjects, 10, [](Subject&, ALCodeEditor& e) {
+        typeKeys(e, "nnnnnnnnnn");
+    });
+    both("/total typed, the cursor moved along it, per key", subjects, 15, [](Subject&, ALCodeEditor& e) {
+        typeKeys(e, "/total");
+        for (int i = 0; i < 4; ++i)
+        {
+            e.handleKeyHere(KEY_LEFT, MASK_NONE);
+        }
+        for (int i = 0; i < 4; ++i)
+        {
+            e.handleKeyHere(KEY_RIGHT, MASK_NONE);
+        }
+        e.handleKeyHere(KEY_ESCAPE, MASK_NONE);
+    });
+    // A macro of 500 motions played back while a mapping is made: every
+    // key it feeds is looked at as the start of one.
+    for (Subject& s : subjects)
+    {
+        vims[&s - subjects]->takeLine(*s.editor, ':', "nmap <F5> x", true);
+        s.editor->setCaret(ALTextPos(0, 0));
+        typeKeys(*s.editor, "gg");
+        std::string recorded = "qa";
+        recorded += std::string(250, 'j') + std::string(250, 'k') + "q";
+        typeKeys(*s.editor, recorded.c_str());
+    }
+    both("@a: a macro of 500 motions, a mapping made", subjects, 1, [](Subject&, ALCodeEditor& e) { typeKeys(e, "@a"); });
+    // The whole text selected by lines, then moved within: every motion
+    // makes a selection of all of it.
+    for (Subject& s : subjects)
+    {
+        typeKeys(*s.editor, "ggVG");
+    }
+    both("a motion with the whole text selected (ggVG, then k and j)", subjects, 2, [](Subject&, ALCodeEditor& e) { typeKeys(e, "kj"); });
+    for (Subject& s : subjects)
+    {
+        s.editor->handleKeyHere(KEY_ESCAPE, MASK_NONE);
+    }
+    both(":sort, then undone", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
+        vims[&s - subjects]->takeLine(e, ':', "sort", true);
+        e.undo();
+    });
+    both(":sort i, then undone", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
+        vims[&s - subjects]->takeLine(e, ':', "sort i", true);
+        e.undo();
+    });
 
     for (Subject& s : subjects)
     {
