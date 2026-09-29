@@ -1,6 +1,6 @@
 /**
  * @file alrecoverystore.cpp
- * @brief Script Studio's unsaved work, kept on disk until it is saved, so that a crash or a lost object does not take it.
+ * @brief An editor's unsaved work, kept on disk until it is saved, so that a crash or a lost object does not take it.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code

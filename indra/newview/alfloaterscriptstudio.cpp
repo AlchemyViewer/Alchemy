@@ -6327,9 +6327,14 @@ void ALFloaterScriptStudio::offerRecovery()
     // up already, restored as the viewer started.
     const bool open = LLFloaterReg::findTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD()) != nullptr;
     ALRecovery::offer(
-        []() -> ALScriptStudioRecovery* {
-            ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES);
-            return studio ? &studio->mRecovery : nullptr;
+        [](const std::vector<ALRecoveryEntry>& entries) {
+            if (ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES))
+            {
+                for (const ALRecoveryEntry& entry : entries)
+                {
+                    studio->mRecovery.recover(entry);
+                }
+            }
         },
         open);
 }

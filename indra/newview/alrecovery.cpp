@@ -27,7 +27,6 @@
 
 #include "alrecovery.h"
 
-#include "alscriptstudiorecovery.h"
 #include "lldir.h"
 #include "llfile.h"
 #include "llnotificationsutil.h"
@@ -96,7 +95,15 @@ ALRecoveryStore* ALRecovery::store()
     {
         return nullptr;
     }
-    return AccountRecovery::instance().storeFor(gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "script_studio_recovery"));
+    // Under the name it had while only Script Studio kept texts there,
+    // taken over the first time.
+    const std::string folder = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "recovery");
+    const std::string before = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "script_studio_recovery");
+    if (!LLFile::isdir(folder) && LLFile::isdir(before))
+    {
+        LLFile::rename(before, folder);
+    }
+    return AccountRecovery::instance().storeFor(folder);
 }
 
 // static
@@ -161,7 +168,7 @@ namespace
 }
 
 // static
-void ALRecovery::offer(std::function<ALScriptStudioRecovery*()> studio, bool studio_open)
+void ALRecovery::offer(studio_t studio, bool studio_open)
 {
     ALRecoveryStore* kept = store();
     if (!kept)
@@ -180,7 +187,7 @@ void ALRecovery::offer(std::function<ALScriptStudioRecovery*()> studio, bool stu
                                  [studio](const LLSD& notification, const LLSD& response) {
                                      if (LLNotificationsUtil::getSelectedOption(notification, response) == 0 && studio)
                                      {
-                                         studio();
+                                         studio({});
                                      }
                                  });
     }
@@ -196,7 +203,7 @@ void ALRecovery::offer(std::function<ALScriptStudioRecovery*()> studio, bool stu
     LLSD args;
     args["COUNT"] = static_cast<S32>(unsaved.size());
     args["NAMES"] = names;
-    LLNotificationsUtil::add(unsaved.size() == 1 ? "ScriptStudioRecoveredOne" : "ScriptStudioRecovered", args, LLSD(),
+    LLNotificationsUtil::add(unsaved.size() == 1 ? "RecoveredUnsavedOne" : "RecoveredUnsaved", args, LLSD(),
                              [studio](const LLSD& notification, const LLSD& response) {
                                  const S32              option = LLNotificationsUtil::getSelectedOption(notification, response);
                                  ALRecoveryStore* kept   = store();
@@ -232,14 +239,9 @@ void ALRecovery::offer(std::function<ALScriptStudioRecovery*()> studio, bool stu
                                          rest.push_back(entry);
                                      }
                                  }
-                                 ALScriptStudioRecovery* recovery = rest.empty() || !studio ? nullptr : studio();
-                                 if (!recovery)
+                                 if (!rest.empty() && studio)
                                  {
-                                     return;
-                                 }
-                                 for (const Entry& entry : rest)
-                                 {
-                                     recovery->recover(entry);
+                                     studio(rest);
                                  }
                              });
 }

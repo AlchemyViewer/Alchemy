@@ -1946,9 +1946,9 @@ You kept unsaved changes to [COUNT] scripts and notecards for next time: [NAMES]
 
   <notification
    icon="alertmodal.tga"
-   name="ScriptStudioRecoveredOne"
+   name="RecoveredUnsavedOne"
    type="alertmodal">
-Script Studio kept unsaved changes to [NAMES] after the viewer last closed. Open them to review and save, or discard them. Until then, they are in File &gt; Recover Unsaved Changes.
+Unsaved changes to [NAMES] were kept when the viewer last closed. Open them to review and save, or discard them. Until then, they are in Script Studio's File &gt; Recover Unsaved Changes.
     <tag>confirm</tag>
     <form name="form">
       <button
@@ -1968,9 +1968,9 @@ Script Studio kept unsaved changes to [NAMES] after the viewer last closed. Open
 
   <notification
    icon="alertmodal.tga"
-   name="ScriptStudioRecovered"
+   name="RecoveredUnsaved"
    type="alertmodal">
-Script Studio kept unsaved changes to [COUNT] scripts and notecards after the viewer last closed: [NAMES]. Open them to review and save, or discard them. Until then, they are in File &gt; Recover Unsaved Changes.
+Unsaved changes to [COUNT] scripts and notecards were kept when the viewer last closed: [NAMES]. Open them to review and save, or discard them. Until then, they are in Script Studio's File &gt; Recover Unsaved Changes.
     <tag>confirm</tag>
     <form name="form">
       <button

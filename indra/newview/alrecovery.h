@@ -31,8 +31,6 @@
 #include <string>
 #include <vector>
 
-class ALScriptStudioRecovery;
-
 // The account's store of unsaved texts (ALRecoveryStore), which the
 // viewer's editors keep what they hold unsaved in against the viewer going
 // before it was saved -- a crash, a lost connection, a quit: Script
@@ -64,10 +62,13 @@ public:
     static std::string nameOf(const Entry& entry);
 
     // At login: what a session that ended before saving left, offered, to
-    // take up now, later, or not at all; `studio` opens the studio to take
-    // it up in. What was kept on purpose at a quit opens with the studio,
-    // and where the studio is not open already, is offered to open it now.
-    static void offer(std::function<ALScriptStudioRecovery*()> studio, bool studio_open);
+    // take up now, later, or not at all -- each where it was kept: a
+    // window of the viewer's own, or Script Studio, which `studio` opens
+    // and takes up what it is given in (none, to open it alone). What was
+    // kept on purpose at a quit opens with the studio, and where the studio
+    // is not open already, is offered to open it now.
+    typedef std::function<void(const std::vector<Entry>& entries)> studio_t;
+    static void offer(studio_t studio, bool studio_open);
     // What the login offers: what sessions that ended left unsaved, and
     // what was kept on purpose, where the studio is not open to have
     // opened it.

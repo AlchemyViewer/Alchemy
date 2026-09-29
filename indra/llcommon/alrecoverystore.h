@@ -1,6 +1,6 @@
 /**
  * @file alrecoverystore.h
- * @brief Script Studio's unsaved work, kept on disk until it is saved, so that a crash or a lost object does not take it.
+ * @brief An editor's unsaved work, kept on disk until it is saved, so that a crash or a lost object does not take it.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -35,9 +35,12 @@
 #include <string>
 #include <vector>
 
-// What a tab held that nobody had saved: the text, and enough about where
-// it came from to put it back there -- the object and the item, or the
-// file -- or, where that is gone, to say what it was.
+// What an editor held that nobody had saved -- a Script Studio tab, the
+// notecard window, a legacy script editor: the text, and enough about
+// where it came from to put it back there -- the object and the item, or
+// the file -- or, where that is gone, to say what it was. What kind of
+// text it is -- a script, and in what, or a notecard, and what it
+// carries -- is kept for whoever takes it up; the store does not read it.
 struct ALRecoveryEntry
 {
     enum class State : U8
@@ -78,7 +81,7 @@ struct ALRecoveryEntry
     // says an item by its place in this list -- each as the inventory
     // writes one; what the store keeps and does not read.
     LLSD        embedded;
-    // The tab's undo history, as its journal writes it, to be put back over
+    // The editor's undo history, as its journal writes it, to be put back over
     // the text so that the steps taken before are there to take back; and
     // where the caret stood. The store keeps these and does not read them.
     LLSD        history;
@@ -208,14 +211,14 @@ public:
     // This session's entry for the key gone: the text was saved, or is not
     // this session's to keep any more.
     void forget(const std::string& key);
-    // A text written straight among the discarded, marked when -- what a
-    // tab throws away, set aside a while all the same -- leaving whatever
+    // A text written straight among the discarded, marked when -- what an
+    // editor throws away, set aside a while all the same -- leaving whatever
     // entry it came from where it is. By this session where it says none.
     bool setAside(ALRecoveryEntry entry);
     // An entry, this session's or another's, moved among the discarded:
     // set aside, and its file gone once that is written.
     bool discard(const ALRecoveryEntry& entry);
-    // An entry taken up -- put back in a tab, which keeps it from here --
+    // An entry taken up -- put back in an editor, which keeps it from here --
     // or thrown away for good.
     void remove(const ALRecoveryEntry& entry);
 
