@@ -865,7 +865,7 @@
      value="0 1 0 0.4" />
     <color
      name="ScriptBgReadOnlyColor"
-     value="0.39 0.39 0.39 1" />
+     value="0.975 0.975 0.975 1" />
     <color
      name="ScriptErrorColor"
      reference="Red" />
@@ -1274,7 +1274,7 @@
     value="0.016 0.192 0.98 1" />
   <color
     name="ScriptBracket2Color"
-    value="0.192 0.576 0.192 1" />
+    value="0.171 0.512 0.171 1" />
   <color
     name="ScriptBracket3Color"
     value="0.482 0.22 0.078 1" />
@@ -1289,10 +1289,10 @@
     reference="SyntaxLslStringLiteral" />
   <color
     name="ScriptEscape"
-    value="0.933 0 0 1" />
+    value="0.903 0 0 1" />
   <color
     name="ScriptNumber"
-    value="0.035 0.525 0.345 1" />
+    value="0.034 0.511 0.336 1" />
   <color
     name="ScriptKeyword"
     reference="SyntaxLslDataType" />
@@ -1352,10 +1352,10 @@
     value="0.804 0.192 0.192 1" />
   <color
     name="ScriptNamespace"
-    value="0.149 0.498 0.6 1" />
+    value="0.145 0.485 0.584 1" />
   <color
     name="ScriptState"
-    value="0.149 0.498 0.6 1" />
+    value="0.145 0.485 0.584 1" />
   <color
     name="ScriptGlobalVariable"
     value="0.016 0.318 0.647 1" />

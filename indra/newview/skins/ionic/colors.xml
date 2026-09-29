@@ -866,7 +866,7 @@
     value="0.16925 0.19794 0.18180 1.0"/>
    <color
     name="ScriptBgReadOnlyColor"
-    value="0.39 0.39 0.39 1" />
+    value="0.19 0.222 0.204 1" />
    <color
     name="ScriptCursorColor"
     reference="PolarityNeonGreen"/>
@@ -947,28 +947,28 @@
     reference="White"/>
    <color
     name="SyntaxLslComment"
-    value="0.38290 0.44523 0.40961 1.0"/>
+    value="0.582 0.641 0.607 1"/>
    <color
     name="SyntaxLslConstant"
-    value="0.7725490196078431 0.5215686274509804 0.3019607843137255 1"/>
+    value="0.801 0.581 0.389 1"/>
    <color
     name="SyntaxLslControlFlow"
-    value="0.71887 0.09363 0.09363 1.0"/>
+    value="0.935 0.498 0.498 1"/>
    <color
     name="SyntaxLslControlLabel"
-    value="0 0 0.8 1"/>
+    value="0.585 0.585 1 1"/>
    <color
     name="SyntaxLslDataType"
-    value="0.29457 0.51288 0.61949 1.0"/>
+    value="0.461 0.651 0.743 1"/>
    <color
     name="SyntaxLslDeprecated"
-    value="0.9 0.0 0.66 1"/>
+    value="1 0.385 0.836 1"/>
    <color
     name="SyntaxLslEvent"
     value="0.80051 0.80934 0.52660 1.0"/>
    <color
     name="SyntaxLslFunction"
-    value="0.289917 0.686646 0.389099 1"/>
+    value="0.298 0.704 0.399 1"/>
    <color
     name="SyntaxLslGodMode"
     value="0.7 .2 .35 1"/>
@@ -993,7 +993,7 @@
    value=".4 .2 .4 1" />
   <color
    name="SyntaxLslPreprocessor"
-   value="0.04686 0.60158 0.56257 1.0" />
+   value="0.054 0.699 0.654 1" />
   <!-- <FS:CR> END Script Editor Colors -->
    <color
     name="SystemChatColor"
@@ -1120,8 +1120,10 @@
      value="0.698 0.076 0.076 1.0" />
 
   <!-- Script Studio's colours that the default skin gives as values for
-       its white ground, taken back to this skin's own script colours.
-       Its gutter and pop-ups are mixed from its text and ground. -->
+       its white ground, taken back to this skin's own script colours, which
+       read at 4.5:1 or better on its ground, as a test in llui holds every
+       skin to; and its caret's line, gutter, selection and marks, dark ones
+       of its own. Its pop-ups are mixed from its text and ground. -->
   <color
     name="ScriptEscape"
     reference="SyntaxLslConstant" />
@@ -1160,7 +1162,7 @@
     reference="ScriptText" />
   <color
     name="ScriptSelectionColor"
-    value="0.7 0.83 1 1" />
+    value="0.05 0.2 0.25 1" />
   <color
     name="ScriptLineNumberColor"
     value="0.55 0.55 0.55 1" />
@@ -1169,8 +1171,29 @@
     value="0.8 0.6 0.05 1" />
   <color
     name="ScriptBracket2Color"
-    value="0.7 0.3 0.75 1" />
+    value="0.798 0.528 0.832 1" />
   <color
     name="ScriptBracket3Color"
-    value="0.1 0.55 0.9 1" />
+    value="0.302 0.651 0.922 1" />
+  <color
+    name="ScriptCurrentLineColor"
+    value="0.145 0.17 0.156 1" />
+  <color
+    name="ScriptGutterColor"
+    value="0.145 0.17 0.156 1" />
+  <color
+    name="ScriptBracketMatchColor"
+    value="0.29 0.69 0.39 0.5" />
+  <color
+    name="ScriptFindMatchColor"
+    value="0.83 0.76 0.2 0.3" />
+  <color
+    name="ScriptHighlightColor"
+    value="0.29 0.69 0.39 0.25" />
+  <color
+    name="ScriptPreprocessor"
+    reference="SyntaxLslPreprocessor" />
+  <color
+    name="ScriptInvalid"
+    value="0.886 0.525 0.525 1" />
 </colors>

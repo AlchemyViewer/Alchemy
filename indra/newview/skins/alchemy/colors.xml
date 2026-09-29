@@ -810,7 +810,7 @@
      value="0 1 0 0.4" />
     <color
      name="ScriptBgReadOnlyColor"
-     value="0.39 0.39 0.39 1" />
+     value="0.975 0.975 0.975 1" />
     <color
      name="ScriptErrorColor"
      reference="Red" />
