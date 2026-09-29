@@ -197,6 +197,9 @@ struct ALScriptStudioDoc
     // A notecard rather than a script: plain text, saved as a
     // notecard with the items it came with, never analysed.
     bool                                       notecard = false;
+    // A notecard in the world, rather than a text file on disk: what a
+    // script reads by line, which is shown the way a notecard is.
+    bool itemNotecard() const { return notecard && file.empty(); }
     // Opened by walking a pane's list past a place in it: looked at
     // without being held, and replaced by the next one looked at, until
     // it is typed in, saved, gone to or double-clicked.

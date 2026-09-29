@@ -318,8 +318,9 @@ public:
     void                         setLineNumbers(std::vector<S32> numbers) { mLineNumbers = std::move(numbers); }
     // For a text that is part of a larger one -- a script's code under
     // its envelope, which a runtime error's line counts -- the lines
-    // counted from there: the first shows base + 1.
-    void                         setLineNumberBase(S32 base) { mLineNumberBase = llmax(0, base); }
+    // counted from there: the first shows base + 1. Or -1, the lines
+    // counted from 0, as a script reads a notecard's.
+    void                         setLineNumberBase(S32 base) { mLineNumberBase = llmax(-1, base); }
     S32                          lineNumberBase() const override { return mLineNumberBase; }
     void                         setLineTints(std::vector<LLColor4> tints) { mLineTints = std::move(tints); }
     const std::vector<S32>&      lineNumbers() const { return mLineNumbers; }

@@ -279,6 +279,13 @@ private:
     std::vector<ALScriptStudioDoc*> openDocs() override;
 
     Doc*   active();
+    // Whether the tab in front is a notecard in the world, whose own view
+    // options the View menu then sets.
+    bool   frontIsNotecard()
+    {
+        const Doc* doc = active();
+        return doc && doc->itemNotecard();
+    }
     size_t indexOf(const ALScriptRef& ref) const;
     size_t indexOf(std::string_view id) const;
     // The tab in front, its editor given the keyboard where asked.
@@ -328,7 +335,9 @@ private:
     // table's names, the studio's settings.
     ALCodeEditor::Params      editorParams(const std::string& id, bool read_only) const;
     // The options every editor shares, put on one.
-    void                      applyEditorOptions(ALCodeEditor& editor);
+    // A notecard's editor takes the notecards' own wrap and line numbers,
+    // counted from 0 where that is asked for.
+    void                      applyEditorOptions(ALCodeEditor& editor, bool notecard = false);
     // The expanded text put in the document's other editor, which is shown
     // once there is one where the tab asked for it.
     void                      showExpanded(Doc& doc, const std::string& text) override;
@@ -1142,6 +1151,11 @@ private:
     // with, which is where they are wanted and nowhere else.
     ALCodeEditor::Whitespace           mWhitespace      = ALCodeEditor::Whitespace::Selection;
     bool                               mRelativeNumbers = false;
+    // A notecard's own: it wraps, and numbers its lines as a script reads
+    // them, from 0.
+    bool                               mNotecardWrap        = true;
+    bool                               mNotecardLineNumbers = true;
+    bool                               mNotecardFromZero    = true;
     bool                               mRainbowBrackets = true;
     // What the analyzers add to the picture: every name coloured by what
     // it is, and the words shown beside the text.

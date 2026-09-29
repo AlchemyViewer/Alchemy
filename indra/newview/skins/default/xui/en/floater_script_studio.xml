@@ -1075,6 +1075,11 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="relative_numbers" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="relative_numbers" />
             </menu_item_check>
+            <menu_item_check label="Notecard Lines From 0" layout="topleft" name="notecard_from_zero">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="notecard_from_zero" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="notecard_from_zero" />
+                <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="notecard_from_zero" />
+            </menu_item_check>
             <menu_item_check label="Indent Guides" layout="topleft" name="indent_guides">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="indent_guides" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="indent_guides" />

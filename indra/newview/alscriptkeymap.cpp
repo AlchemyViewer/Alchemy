@@ -335,6 +335,7 @@ namespace ALScriptKeymap
             { "word_wrap", KEY_NONE, MASK_NONE },
             { "line_numbers", KEY_NONE, MASK_NONE },
             { "relative_numbers", KEY_NONE, MASK_NONE },
+            { "notecard_from_zero", KEY_NONE, MASK_NONE },
             { "indent_guides", KEY_NONE, MASK_NONE },
             { "blanks_none", KEY_NONE, MASK_NONE },
             { "blanks_selection", KEY_NONE, MASK_NONE },

@@ -2775,4 +2775,20 @@ namespace tut
         ensure("zc folds nothing, and the text is as it was", view->text() == "f(a) {\n  x\n}\nx again\n");
         view->die();
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<93>()
+    {
+        set_test_name("under lines counted from 0, as a notecard's are read: 2G is the third line, 1G the second, and :0 the first");
+        ALCodeEditor& e = make("zero\none\ntwo\nthree\n");
+        e.setLineNumberBase(-1);
+        ensure_equals("no lower than -1", (e.setLineNumberBase(-5), e.lineNumberBase()), -1);
+        keys("2G");
+        ensure_equals("2G the third line", e.caret().line, 2);
+        ex("0");
+        ensure_equals(":0 the first", e.caret().line, 0);
+        keys("G");
+        keys("1G");
+        ensure_equals("1G the second", e.caret().line, 1);
+    }
 }

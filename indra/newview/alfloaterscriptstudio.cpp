@@ -115,6 +115,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <tuple>
 
 namespace
 {
@@ -1878,7 +1879,7 @@ void ALFloaterScriptStudio::applyTypingOptions(ALCodeEditor& editor)
     editor.setHoverDelay(llclamp(gSavedSettings.getF32("ALScriptStudioHoverDelay"), 0.f, 5.f));
 }
 
-void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor)
+void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor, bool notecard)
 {
     editor.setFont(editorFont());
     editor.setOnZoomWheel([this](S32 steps) { zoomText(steps); });
@@ -1899,8 +1900,12 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor)
     {
         editor.setModalKeymap(nullptr);
     }
-    editor.setWordWrap(mWordWrap);
-    editor.setShowLineNumbers(mLineNumbers);
+    editor.setWordWrap(notecard ? mNotecardWrap : mWordWrap);
+    editor.setShowLineNumbers(notecard ? mNotecardLineNumbers : mLineNumbers);
+    if (notecard)
+    {
+        editor.setLineNumberBase(mNotecardFromZero ? -1 : 0);
+    }
     applyTypingOptions(editor);
     editor.setShowIndentGuides(mIndentGuides);
     editor.setShowWhitespace(mWhitespace);
@@ -1926,7 +1931,7 @@ void ALFloaterScriptStudio::applyEditorOptions()
 {
     for (std::unique_ptr<Doc>& each : mDocs)
     {
-        applyEditorOptions(*each->editor);
+        applyEditorOptions(*each->editor, each->itemNotecard());
         if (each->expandedEditor)
         {
             applyEditorOptions(*each->expandedEditor);
@@ -2270,6 +2275,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         ALNotecardEmbedded& items = notecardItems(doc);
         items.loaded(answer.embedded);
         doc.editor->setSyntax("text");
+        applyEditorOptions(*doc.editor, doc.itemNotecard());
         doc.editor->setText(answer.text);
         // A kept or copied text says its items by their places in the list
         // it was kept with, which the text now put in is read against.
@@ -6522,6 +6528,7 @@ void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& 
     doc.modifiable             = true;
     doc.orphan.detached               = doc.file.empty();
     doc.notecard               = entry.notecard;
+    applyEditorOptions(*doc.editor, doc.itemNotecard());
     doc.language.lua           = entry.lua;
     doc.language.compileTarget = !entry.compileTarget.empty() ? entry.compileTarget : entry.lua ? "luau" : "mono";
     doc.assetId                = entry.baseAsset;
@@ -7983,9 +7990,30 @@ void ALFloaterScriptStudio::addGoCommands()
 void ALFloaterScriptStudio::addViewCommands()
 {
     mCommands.add("command_palette", [this]() { showCommandPalette(); });
+    // Word wrap and line numbers: a notecard's own where a notecard is in
+    // front, a script's otherwise.
+    for (const auto& [name, script, notecard] : { std::tuple{ "word_wrap", &mWordWrap, &mNotecardWrap },
+                                                  std::tuple{ "line_numbers", &mLineNumbers, &mNotecardLineNumbers } })
+    {
+        mCommands.add(
+            name,
+            [this, script, notecard]() {
+                bool& flag = frontIsNotecard() ? *notecard : *script;
+                flag       = !flag;
+                applyEditorOptions();
+            },
+            nullptr, [this, script, notecard]() { return frontIsNotecard() ? *notecard : *script; });
+    }
+    // A notecard's lines counted from 0, as llGetNotecardLine counts them.
+    mCommands.add(
+        "notecard_from_zero",
+        [this]() {
+            mNotecardFromZero = !mNotecardFromZero;
+            applyEditorOptions();
+        },
+        [this]() { return frontIsNotecard(); }, [this]() { return mNotecardFromZero; });
     // The editors' options, each on or off.
-    for (const auto& [name, flag] : { std::pair{ "word_wrap", &mWordWrap }, std::pair{ "line_numbers", &mLineNumbers },
-                                      std::pair{ "relative_numbers", &mRelativeNumbers }, std::pair{ "indent_guides", &mIndentGuides },
+    for (const auto& [name, flag] : { std::pair{ "relative_numbers", &mRelativeNumbers }, std::pair{ "indent_guides", &mIndentGuides },
                                       std::pair{ "rainbow_brackets", &mRainbowBrackets }, std::pair{ "sticky_headers", &mStickyHeaders },
                                       std::pair{ "spell_check", &mSpellCheck }, std::pair{ "map_preview", &mScrollMapPreview },
                                       std::pair{ "map_left", &mScrollMapLeft } })
@@ -8576,6 +8604,9 @@ void ALFloaterScriptStudio::writeViewOptions(LLSD& state) const
 {
     state["word_wrap"]    = mWordWrap;
     state["line_numbers"] = mLineNumbers;
+    state["notecard_wrap"]         = mNotecardWrap;
+    state["notecard_line_numbers"] = mNotecardLineNumbers;
+    state["notecard_from_zero"]    = mNotecardFromZero;
     state["indent_guides"]    = mIndentGuides;
     state["whitespace"]       = static_cast<S32>(mWhitespace);
     state["relative_numbers"] = mRelativeNumbers;
@@ -8603,6 +8634,18 @@ void ALFloaterScriptStudio::readViewOptions(const LLSD& state)
     if (state.has("line_numbers"))
     {
         mLineNumbers = state["line_numbers"].asBoolean();
+    }
+    if (state.has("notecard_wrap"))
+    {
+        mNotecardWrap = state["notecard_wrap"].asBoolean();
+    }
+    if (state.has("notecard_line_numbers"))
+    {
+        mNotecardLineNumbers = state["notecard_line_numbers"].asBoolean();
+    }
+    if (state.has("notecard_from_zero"))
+    {
+        mNotecardFromZero = state["notecard_from_zero"].asBoolean();
     }
     if (state.has("indent_guides"))
     {
