@@ -39,8 +39,10 @@
 // is what a kind looks like until it has an icon. One of the choices
 // is chosen, drawn on a band. The list is read-only and never has the
 // keyboard: whoever shows it moves the choice by the keys it is given,
-// and the mouse chooses by a press and picks by a double click. The
-// chosen line is kept in sight.
+// and the mouse chooses by a press and picks by a double click -- or, as
+// over a menu, chooses as it passes and picks by a click. The chosen line
+// is kept in sight, and the list never scrolls sideways: it is shaped to
+// its choices (widthFor), and what is wider still is cut at its edge.
 class ALChoiceList : public ALTextView
 {
 public:
@@ -82,9 +84,15 @@ public:
     // The choice moved by so many: round the ends where `wrap`, else
     // stopping at them.
     void                       moveChoice(S32 by, bool wrap);
-    // How tall the list is with so many rows in sight: what to shape it
-    // to, once the choices are in.
+    // How tall the list is with so many rows in sight, and how wide with
+    // every choice and its note whole: what to shape it to, once the
+    // choices are in, as far as there is room.
     S32                        heightFor(S32 rows);
+    S32                        widthFor();
+    // The mouse as over a menu: a choice chosen as it passes over it, and
+    // picked by a click on it -- a press and a release on the same one --
+    // rather than chosen by a press and picked by a double click.
+    void                       setMenuLike(bool menu) { mMenuLike = menu; }
 
     // The line around the list, where a view is themed after it was made:
     // the list floats over an editor and wears that editor's colours, not
@@ -92,13 +100,15 @@ public:
     void                       setBorderColor(const LLUIColor& color) { mBorderColor = color; }
 
     typedef boost::signals2::signal<void(S32 index)> choice_signal_t;
-    // A choice picked: double-clicked.
+    // A choice picked: double-clicked, or clicked where the list is menu-like.
     boost::signals2::connection onPicked(const choice_signal_t::slot_type& slot) { return mPicked.connect(slot); }
     // Told when the chosen line changes, by a key, a click or a new list.
     boost::signals2::connection onChosen(const choice_signal_t::slot_type& slot) { return mChosenSignal.connect(slot); }
 
     void draw() override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override;
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
 
 protected:
@@ -123,6 +133,10 @@ private:
     LLUIColor           mNoteColor;
     bool                mNoteColorSet = false;
     LLUIColor           mBorderColor;
+    bool                mMenuLike = false;
+    // The line a press was on, which a release on it picks where the list
+    // is menu-like; -1 for none.
+    S32                 mPressed = -1;
     choice_signal_t     mPicked;
     choice_signal_t     mChosenSignal;
 };

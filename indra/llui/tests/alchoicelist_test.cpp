@@ -190,4 +190,37 @@ namespace tut
         v.handleMouseDown(x, y, MASK_NONE);
         ensure_equals("the line pressed is the choice picked", v.chosen(), 2);
     }
+
+    template<> template<>
+    void alchoicelist_object::test<5>()
+    {
+        set_test_name("never scrolled sideways, and as wide as its choices and their notes; as a menu, chosen as the mouse passes and "
+                      "picked by a click on one, once");
+        ALChoiceList& v = make(80, 40);
+        v.setChoices({ choice("Insert ';'", ""), choice("Change 'llSya' to 'llSay'", "a longer note") }, 0);
+        ensure("wider than it is, and still no bar sideways", v.layout().contentWidth() > 80.f && !v.hasHorizontalScrollbar());
+        ensure("its width fits the widest choice and note", v.widthFor() >= static_cast<S32>(v.layout().contentWidth()) + 2 &&
+                                                             v.widthFor() <= static_cast<S32>(v.layout().contentWidth()) + 40);
+
+        v.setMenuLike(true);
+        S32 picked = -1, picks = 0;
+        v.onPicked([&](S32 index) {
+            picked = index;
+            ++picks;
+        });
+        S32 x, y;
+        pointOf(1, x, y);
+        v.handleHover(x, y, MASK_NONE);
+        ensure("the mouse over one chooses it", v.chosen() == 1 && picked == -1);
+        S32 x0, y0;
+        pointOf(0, x0, y0);
+        v.handleMouseDown(x0, y0, MASK_NONE);
+        v.handleMouseUp(x, y, MASK_NONE);
+        ensure("pressed on one and let go on another: nothing picked", picked == -1);
+        v.handleMouseDown(x, y, MASK_NONE);
+        v.handleMouseUp(x, y, MASK_NONE);
+        ensure("a click picks", picked == 1 && picks == 1);
+        v.handleDoubleClick(x, y, MASK_NONE);
+        ensure("a double click's second click picks nothing more", picks == 1);
+    }
 }

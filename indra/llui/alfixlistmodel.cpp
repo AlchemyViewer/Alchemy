@@ -29,6 +29,8 @@
 #include "alsaid.h"
 
 #include <algorithm>
+#include <optional>
+#include <string_view>
 
 // static
 void ALFixListModel::rank(std::vector<ALCodeFix>& fixes)
@@ -120,12 +122,11 @@ std::string ALFixListModel::previewOf(const ALTextDocument& text, const ALCodeFi
         stretches.back().edits.push_back(one);
         reach = llmax(reach, one.first.end.line);
     }
-    std::string says;
-    kinds.clear();
-    const auto add = [&says, &kinds](char kind, const std::string& line) {
-        says += (says.empty() ? "" : "\n") + (kind == ' ' ? line : std::string(1, kind) + " " + line);
-        kinds.push_back(kind);
-    };
+    // Each line with its kind, the lines' indentation in common taken off
+    // once they are all in: a fix deep in a block reads at the left, not
+    // past the box's edge.
+    std::vector<std::pair<char, std::string>> shown;
+    const auto add = [&shown](char kind, const std::string& line) { shown.emplace_back(kind, line); };
     for (size_t k = 0; k < stretches.size(); ++k)
     {
         if (k > 0)
@@ -149,6 +150,34 @@ std::string ALFixListModel::previewOf(const ALTextDocument& text, const ALCodeFi
             }
             rest.remove_prefix(cut + 1);
         }
+    }
+    std::optional<std::string_view> common;
+    for (const auto& [kind, line] : shown)
+    {
+        const size_t lead = line.find_first_not_of(" \t");
+        if (kind == ' ' || lead == std::string::npos)
+        {
+            continue;
+        }
+        const std::string_view indent(line.data(), lead);
+        if (!common)
+        {
+            common = indent;
+        }
+        else
+        {
+            const size_t same = static_cast<size_t>(std::mismatch(common->begin(), common->end(), indent.begin(), indent.end()).first - common->begin());
+            common            = common->substr(0, same);
+        }
+    }
+    const size_t cut = common ? common->size() : 0;
+    std::string  says;
+    kinds.clear();
+    for (const auto& [kind, line] : shown)
+    {
+        const std::string text = kind != ' ' && line.size() >= cut ? line.substr(cut) : line;
+        says += (says.empty() ? "" : "\n") + (kind == ' ' ? text : std::string(1, kind) + " " + text);
+        kinds.push_back(kind);
     }
     return says;
 }

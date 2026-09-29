@@ -512,6 +512,13 @@ void ALTextView::setWordWrap(bool wrap)
     syncScrollbar();
 }
 
+void ALTextView::setSideScroll(bool scroll)
+{
+    mSideScroll = scroll;
+    mScrollX    = 0.f;
+    syncScrollbar();
+}
+
 void ALTextView::setTabWidth(S32 spaces)
 {
     useIndentation({ spaces, mSoftTabs }, IndentFrom::Chosen);
@@ -651,7 +658,8 @@ void ALTextView::syncScrollbar()
     {
         const LLRect text   = textRect();
         const bool   need_v = !mScrollMap && mLayout.totalHeight() > llmax(1, text.getHeight());
-        const bool   need_h = !mWordWrap && mLayout.contentWidth() + static_cast<F32>(H_MARGIN) > static_cast<F32>(text.getWidth());
+        const bool   need_h =
+            mSideScroll && !mWordWrap && mLayout.contentWidth() + static_cast<F32>(H_MARGIN) > static_cast<F32>(text.getWidth());
         const bool   changed = need_v != mNeedV || need_h != mNeedH;
         mNeedV               = need_v;
         mNeedH               = need_h;
@@ -668,7 +676,7 @@ void ALTextView::syncScrollbar()
     const S32    page = llmax(1, text.getHeight());
     mScrollY          = llclamp(mScrollY, 0, llmax(0, mLayout.totalHeight() - page));
     const S32 width   = llmax(1, text.getWidth());
-    const S32 content = mWordWrap ? 0 : static_cast<S32>(ceilf(mLayout.contentWidth())) + H_MARGIN;
+    const S32 content = mWordWrap || !mSideScroll ? 0 : static_cast<S32>(ceilf(mLayout.contentWidth())) + H_MARGIN;
     mScrollX          = llclamp(mScrollX, 0.f, static_cast<F32>(llmax(0, content - width)));
     // Where the top of the view is now, in the text.
     mAnchorLine    = mLayout.lineAtY(mScrollY);

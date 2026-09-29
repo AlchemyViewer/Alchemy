@@ -231,6 +231,10 @@ public:
     bool            isReadOnly() const { return mReadOnly; }
     void            setWordWrap(bool wrap);
     bool            getWordWrap() const { return mWordWrap; }
+    // Whether the view scrolls sideways to what runs past its right edge,
+    // with a bar to do it by. A popup list sized to its choices does not:
+    // its bar would sit over the one row it has.
+    void            setSideScroll(bool scroll);
     // The most bytes the text may hold -- a notecard's 65,536 -- or none
     // for no limit. What is typed, pasted or dropped past it goes in as
     // far as it fits, cut at a character; a change of several stretches
@@ -1057,7 +1061,8 @@ private:
     bool mReadOnly   = false;
     // What the window was last told of the input method.
     bool mLanguageInput = false;
-    bool mWordWrap  = false;
+    bool mWordWrap   = false;
+    bool mSideScroll = true;
     // The line a closing word last brought out, where the caret stood
     // after it, and the blanks it had: undone if the next character makes
     // the word a longer one.

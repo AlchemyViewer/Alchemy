@@ -29,9 +29,11 @@
 #include "llrender.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
+#include "llwindow.h"
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 static LLDefaultChildRegistry::Register<ALChoiceList> r("choice_list");
 
@@ -66,6 +68,7 @@ ALChoiceList::ALChoiceList(const Params& p)
     mBorderColor(p.border_color.isProvided() ? p.border_color() : LLUIColorTable::instance().getColor("CodeCompletionBorderColor", LLColor4::grey))
 {
     setReadOnly(true);
+    setSideScroll(false);
     // The marks' column: room before every line's text while any choice
     // has a mark, which drawRowExtras fills.
     layout().setInlayProvider([this](S32 line, std::vector<ALTextLayout::Inlay>& out) {
@@ -196,6 +199,13 @@ S32 ALChoiceList::heightFor(S32 rows)
     return height + (getLocalRect().getHeight() - textRect().getHeight());
 }
 
+S32 ALChoiceList::widthFor()
+{
+    // The widest line -- a choice to its note's end -- and the room around
+    // the text, and a pixel's slack for the rounding.
+    return static_cast<S32>(std::ceil(layout().contentWidth())) + (getLocalRect().getWidth() - textRect().getWidth()) + 1;
+}
+
 // --- drawing --------------------------------------------------------------------
 
 void ALChoiceList::drawBeforeRows(const LLRect& text)
@@ -274,22 +284,64 @@ S32 ALChoiceList::lineAtLocal(S32 x, S32 y)
     return line >= 0 && line < count() ? line : -1;
 }
 
+bool ALChoiceList::handleHover(S32 x, S32 y, MASK mask)
+{
+    if (!mMenuLike)
+    {
+        return ALTextView::handleHover(x, y, mask);
+    }
+    // Over a menu: the choice under the mouse is the one chosen, and the
+    // mouse is the arrow, not the text's -- the view's own hover done
+    // first, which brings its bar into sight where the list scrolls.
+    if (const S32 line = lineAtLocal(x, y); line >= 0 && line != mChosen)
+    {
+        choose(line);
+    }
+    ALTextView::handleHover(x, y, mask);
+    if (LLWindow* window = getWindow())
+    {
+        window->setCursor(UI_CURSOR_ARROW);
+    }
+    return true;
+}
+
 bool ALChoiceList::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     if (const S32 line = lineAtLocal(x, y); line >= 0)
     {
         choose(line);
+        mPressed = line;
         return true;
     }
+    mPressed = -1;
     return ALTextView::handleMouseDown(x, y, mask);
+}
+
+bool ALChoiceList::handleMouseUp(S32 x, S32 y, MASK mask)
+{
+    const S32 pressed = std::exchange(mPressed, -1);
+    if (const S32 line = lineAtLocal(x, y); mMenuLike && line >= 0)
+    {
+        // A click: the press was on the same choice.
+        if (line == pressed)
+        {
+            mPicked(line);
+        }
+        return true;
+    }
+    return ALTextView::handleMouseUp(x, y, mask);
 }
 
 bool ALChoiceList::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
     if (const S32 line = lineAtLocal(x, y); line >= 0)
     {
-        choose(line);
-        mPicked(line);
+        // Over a menu, the first click of it picked already.
+        if (!mMenuLike)
+        {
+            choose(line);
+            mPicked(line);
+        }
         return true;
     }
     return ALTextView::handleDoubleClick(x, y, mask);

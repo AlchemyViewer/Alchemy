@@ -1362,6 +1362,14 @@ namespace tut
         nearest.edits.emplace_back(ALTextRange(ALTextPos(12, 0), ALTextPos(12, 4)), "B");
         ensure_equals("together", ALCodeEditor::previewOf(farest.document(), nearest, kinds),
                       std::string("- line 10\n- line 11\n- line 12\n+ A 10\n+ line 11\n+ B 12"));
+        // Deep in a block, the lines' indentation in common taken off.
+        ALCodeEditor&     nested = make("{\n    {\n        one;\n            two;\n    }\n}\n");
+        ALCodeEditor::Fix called;
+        called.edits.emplace_back(ALTextRange(ALTextPos(2, 8), ALTextPos(2, 11)), "one()");
+        ensure_equals("at the left", ALCodeEditor::previewOf(nested.document(), called, kinds), std::string("- one;\n+ one();"));
+        called.edits.emplace_back(ALTextRange(ALTextPos(3, 12), ALTextPos(3, 15)), "two()");
+        ensure_equals("each as far in as it is past the least", ALCodeEditor::previewOf(nested.document(), called, kinds),
+                      std::string("- one;\n-     two;\n+ one();\n+     two();"));
     }
 
     template<> template<>
