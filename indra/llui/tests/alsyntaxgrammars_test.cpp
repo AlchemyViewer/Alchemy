@@ -41,7 +41,7 @@ namespace tut
 
         alsyntaxgrammars_data()
         {
-            for (const char* name : { "lsl", "slua", "xml", "json", "text" })
+            for (const char* name : { "lsl", "slua", "xml", "json", "text", "config" })
             {
                 std::string error;
                 ensure(std::string(name) + " loads: " + error,
@@ -86,11 +86,12 @@ namespace tut
     template<> template<>
     void alsyntaxgrammars_object::test<1>()
     {
-        set_test_name("the five grammars load and answer to their extensions");
-        ensure_equals("five", library.names().size(), size_t(5));
+        set_test_name("the six grammars load and answer to their extensions");
+        ensure_equals("six", library.names().size(), size_t(6));
         ensure_equals("lsl by extension", library.forExtension(".lsl")->name(), std::string("lsl"));
         ensure_equals("luau by extension", library.forExtension("luau")->name(), std::string("slua"));
         ensure_equals("xui is xml", library.forExtension("xui")->name(), std::string("xml"));
+        ensure_equals("ini is config", library.forExtension("ini")->name(), std::string("config"));
         ensure("nothing for nothing", !library.forExtension("exe"));
     }
 
@@ -397,7 +398,7 @@ namespace tut
                 ++line;
             }
         };
-        for (const char* grammar_name : { "lsl", "slua", "xml", "json", "text" })
+        for (const char* grammar_name : { "lsl", "slua", "xml", "json", "text", "config" })
         {
             compare(grammar_name, mixed);
         }
@@ -408,5 +409,22 @@ namespace tut
         compare("slua", slua);
         compare("slua", "--[==[\n" + slua + "\n]==]");
         compare("slua", "x = [[\n" + slua + "\n]]");
+    }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<13>()
+    {
+        set_test_name("a notecard of settings: comments, sections, and a key's value -- strings, numbers, keys, true and false -- to the end of its line");
+        ALSyntaxWords words;
+        ALSyntaxState state;
+        ensure_equals("a comment", lexed("config", "# the door", state, words), std::string("comment:# the door"));
+        ensure_equals("a section", lexed("config", "[Door]", state, words), std::string("type:[Door]"));
+        ensure_equals("a number", lexed("config", "speed = 2.5", state, words), std::string("property:speed|punctuation: =|text: |number:2.5"));
+        ensure_equals("a key and true", lexed("config", "owner: 01234567-89ab-cdef-0123-456789abcdef, true", state, words),
+                      std::string("property:owner|punctuation::|text: |constant:01234567-89ab-cdef-0123-456789abcdef|punctuation:,|text: |constant:true"));
+        ensure_equals("a string, and a colon in it left as text", lexed("config", "url = \"http://x\" at 10:30", state, words),
+                      std::string("property:url|punctuation: =|text: |string:\"http://x\"|text: at |number:10|text::|number:30"));
+        ensure_equals("the next line a key again", lexed("config", "name = Door", state, words), std::string("property:name|punctuation: =|text: Door"));
+        ensure_equals("a line with no key, text", lexed("config", "just words here", state, words), std::string("text:just words here"));
     }
 }
