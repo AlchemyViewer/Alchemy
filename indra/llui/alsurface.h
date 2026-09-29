@@ -68,6 +68,17 @@ namespace ALSurface
     // comes to the same mix.
     inline LLColor4 chosenOver(const LLColor4& ink) { return LLColor4(ink.mV[VRED], ink.mV[VGREEN], ink.mV[VBLUE], CHOSEN); }
 
+    // How far apart two colours read, as WCAG 2 measures it: 1 for a
+    // colour against itself, 21 for black against white. The first is
+    // taken as drawn over the second, where it is not opaque. Text wants
+    // LEGIBLE at the least.
+    inline constexpr F32 LEGIBLE = 4.5f;
+    F32 contrast(const LLColor4& ink, const LLColor4& paper);
+    // What a word quietened from `ink` towards `wanted` may come to and
+    // still read at `least` against `paper`: `wanted` itself where it
+    // does, else the nearest to it that does on the way from the ink.
+    LLColor4 legible(const LLColor4& ink, const LLColor4& wanted, const LLColor4& paper, F32 least = LEGIBLE);
+
     // The line around it: the ink itself, thinned. A mix would tie the
     // frame to the ground it is drawn against; the ink thinned reads the
     // same over the ground, over the text and over a selection.

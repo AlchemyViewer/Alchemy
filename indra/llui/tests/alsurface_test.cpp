@@ -112,4 +112,27 @@ namespace tut
         table.setColor("EmphasisColor", LLColor4(0.1f, 0.6f, 0.9f, 1.f));
         ensure("followed", nearest(ALSurface::handle().get(), LLColor4(0.1f, 0.6f, 0.9f, 1.f)));
     }
+
+    template<> template<>
+    void alsurface_object::test<3>()
+    {
+        set_test_name("contrast as WCAG measures it, a thin ink over its paper; a quiet word kept legible");
+        const LLColor4 white(1.f, 1.f, 1.f, 1.f), black(0.f, 0.f, 0.f, 1.f);
+        ensure("black on white", std::fabs(ALSurface::contrast(black, white) - 21.f) < 0.01f);
+        ensure("either way round", std::fabs(ALSurface::contrast(white, black) - 21.f) < 0.01f);
+        ensure("a colour on itself", std::fabs(ALSurface::contrast(white, white) - 1.f) < 0.0001f);
+        // #777777 on white is the grey that just misses 4.5.
+        const LLColor4 grey(0x77 / 255.f, 0x77 / 255.f, 0x77 / 255.f, 1.f);
+        ensure("#777 on white", std::fabs(ALSurface::contrast(grey, white) - 4.48f) < 0.01f);
+        ensure("half of black over white reads as the grey between",
+               std::fabs(ALSurface::contrast(LLColor4(0.f, 0.f, 0.f, 0.5f), white) - ALSurface::contrast(LLColor4(0.5f, 0.5f, 0.5f, 1.f), white)) < 0.01f);
+
+        const LLColor4 paper(0.1f, 0.1f, 0.1f, 1.f), ink(0.9f, 0.9f, 0.9f, 1.f);
+        const LLColor4 faint(0.25f, 0.25f, 0.25f, 1.f), soft(0.7f, 0.7f, 0.7f, 1.f);
+        ensure("one that reads is kept", nearest(ALSurface::legible(ink, soft, paper), soft));
+        const LLColor4 kept = ALSurface::legible(ink, faint, paper);
+        ensure("one that does not is taken back towards the ink until it does",
+               ALSurface::contrast(kept, paper) >= ALSurface::LEGIBLE && ALSurface::contrast(kept, paper) < ALSurface::LEGIBLE + 0.05f);
+        ensure("on the way from the ink", kept.mV[0] > faint.mV[0] && kept.mV[0] < ink.mV[0]);
+    }
 }

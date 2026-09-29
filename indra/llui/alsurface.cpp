@@ -44,6 +44,50 @@ namespace ALSurface
         return mixed;
     }
 
+    namespace
+    {
+        // A channel of an sRGB colour as light, and a colour's luminance
+        // from those, as WCAG 2 weighs them.
+        F32 linear(F32 channel)
+        {
+            return channel <= 0.03928f ? channel / 12.92f : powf((channel + 0.055f) / 1.055f, 2.4f);
+        }
+        F32 luminance(const LLColor4& color)
+        {
+            return 0.2126f * linear(color.mV[VRED]) + 0.7152f * linear(color.mV[VGREEN]) + 0.0722f * linear(color.mV[VBLUE]);
+        }
+    }
+
+    F32 contrast(const LLColor4& ink, const LLColor4& paper)
+    {
+        const F32 alpha = llclamp(ink.mV[VALPHA], 0.f, 1.f);
+        LLColor4  seen;
+        for (S32 i = 0; i < 3; ++i)
+        {
+            seen.mV[i] = ink.mV[i] * alpha + paper.mV[i] * (1.f - alpha);
+        }
+        const F32 a = luminance(seen);
+        const F32 b = luminance(paper);
+        return (llmax(a, b) + 0.05f) / (llmin(a, b) + 0.05f);
+    }
+
+    LLColor4 legible(const LLColor4& ink, const LLColor4& wanted, const LLColor4& paper, F32 least)
+    {
+        if (contrast(wanted, paper) >= least)
+        {
+            return wanted;
+        }
+        // How far towards `wanted` it may go, found by halving: the
+        // contrast falls along the way, since `wanted` reads less.
+        F32 near = 0.f, far = 1.f;
+        for (S32 i = 0; i < 16; ++i)
+        {
+            const F32 mid = (near + far) / 2.f;
+            (contrast(lerp(ink, wanted, mid), paper) >= least ? near : far) = mid;
+        }
+        return lerp(ink, wanted, near);
+    }
+
     LLColor4 frame(const LLColor4& ink, F32 alpha)
     {
         return ink % (FRAME * alpha);
