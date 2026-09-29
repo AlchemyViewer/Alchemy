@@ -4607,6 +4607,27 @@ void ALTextView::drawBand(F32 alpha)
 
 // --- input ---------------------------------------------------------------------
 
+bool ALTextView::handleKey(KEY key, MASK mask, bool called_from_parent)
+{
+    LLUICtrl* const focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    if (called_from_parent || !focus || focus == this || !focus->acceptsTextInput() || !focus->hasAncestor(this))
+    {
+        return LLUICtrl::handleKey(key, mask, called_from_parent);
+    }
+    switch (const ALEditorCommand command = mKeymap.lookup(key, mask))
+    {
+        case ALEditorCommand::Find:
+        case ALEditorCommand::Replace:
+        case ALEditorCommand::FindNext:
+        case ALEditorCommand::FindPrevious:
+            return perform(command);
+        default:
+            break;
+    }
+    LLView* const parent = getParent();
+    return parent && parent->handleKey(key, mask, false);
+}
+
 bool ALTextView::handleKeyHere(KEY key, MASK mask)
 {
     // Shift-F10 or the Menu key: the menu a right click at the caret would

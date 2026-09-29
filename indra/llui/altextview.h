@@ -685,6 +685,12 @@ public:
     // Out of sight -- a tab not looked at, a window closed -- the layout
     // lets go of every line's glyphs, keeping their heights.
     void onVisibilityChange(bool new_visibility) override;
+    // A key a field of the text's own did not take -- the find bar's, with
+    // the keyboard -- is the field's, not the text's: only finding is done
+    // here, so that the next match is a key away from the find field, and
+    // the rest -- select all, undo, a word left -- go on up to the window,
+    // which gives them to the field.
+    bool handleKey(KEY key, MASK mask, bool called_from_parent) override;
     bool handleKeyHere(KEY key, MASK mask) override;
     bool handleUnicodeCharHere(llwchar uni_char) override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;

@@ -30,6 +30,7 @@
 
 #include "../llbutton.h"
 #include "../llfocusmgr.h"
+#include "../lllineeditor.h"
 #include "../llpanel.h"
 #include "../lluictrlfactory.h"
 #include "../llurlaction.h"
@@ -1795,5 +1796,29 @@ namespace tut
         v.setCaret(ALTextPos(0, 0));
         type("no cap ");
         ensure_equals("and with no cap, nothing held", v.text(), std::string("no cap far more than eight bytes"));
+    }
+
+    template<> template<>
+    void altextview_object::test<56>()
+    {
+        set_test_name("a key the find field does not take is the field's: Control-A and undo leave the text alone, finding still finds");
+        ALTextView& v = make("one\ntwo\n");
+        v.setCaret(ALTextPos(0, 3));
+        type("!");
+        ensure_equals("typed", v.document().line(0), std::string("one!"));
+        v.showFind(false);
+        LLLineEditor* field = v.findBar()->findChild<LLLineEditor>("find");
+        ensure("the find field", field != nullptr);
+        field->setFocus(true);
+        ensure("it has the keyboard", field->hasFocus());
+        // As the window gives a key: to what has the keyboard, and on up.
+        field->handleKey('A', MASK_CONTROL, false);
+        ensure("the text not all selected", !v.hasSelection());
+        field->handleKey('Z', MASK_CONTROL, false);
+        ensure_equals("nor undone", v.document().line(0), std::string("one!"));
+        ensure("Control-F still the text's", field->handleKey('F', MASK_CONTROL, false));
+        v.setFocus(true);
+        ensure("from the text itself, undo is the text's", v.handleKey('Z', MASK_CONTROL, false));
+        ensure_equals("undone", v.document().line(0), std::string("one"));
     }
 }
