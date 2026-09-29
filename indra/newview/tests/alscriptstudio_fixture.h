@@ -32,6 +32,7 @@
 #include "../alscriptlookup.h"
 #include "../alscriptnavigation.h"
 #include "../alscriptstudioanalysis.h"
+#include "../alscriptstudiofiles.h"
 #include "../alscriptstudiodoc.h"
 #include "../alscriptstudiorecovery.h"
 #include "../alscriptstudiosaves.h"
@@ -285,24 +286,60 @@ namespace al_studio_test
         std::vector<std::string> shown;
     };
 
+    // The files, for a unit given them (ALScriptStudioFiles): over tabs,
+    // an analysis and saving that do nothing, with a folder of its own to
+    // write in, taken out of the way as it goes; its window records the
+    // names a copy was to be saved as and the tabs whose files settled,
+    // picks nothing, asks nothing and has no recent list.
+    struct StudioFiles final : public ALScriptStudioFiles::Window
+    {
+        explicit StudioFiles(ALScriptStudioServices& services)
+        :   folder(fsyspath(std::filesystem::temp_directory_path() / fsyspath("alscriptstudio_" + LLUUID::generateNewID().asString())).string()),
+            unit(services, tabs, analysis, saves, *this)
+        {
+            std::filesystem::create_directories(fsyspath(folder));
+        }
+        ~StudioFiles()
+        {
+            std::error_code ignored;
+            std::filesystem::remove_all(fsyspath(folder), ignored);
+        }
+        void pickFilesToOpen(bool, std::function<void(const std::vector<std::string>&)>) override {}
+        void pickFileToSave(const std::string& name, std::function<void(const std::vector<std::string>&)>) override { picked.push_back(name); }
+        void askReload(const ALScriptStudioDoc&, std::function<void(bool)>) override {}
+        void fileSettled(ALScriptStudioDoc& doc) override { settled.push_back(doc.id); }
+        void fileWritten(const std::string&) override {}
+        void reachChanged() override {}
+        void becomeFile(ALScriptStudioDoc&, const std::string&) override {}
+        LLMenuGL* recentMenu() override { return nullptr; }
+        void      recentChanged() override {}
+        // A path in the folder.
+        std::string in(const std::string& name) const { return folder + "/" + name; }
+
+        QuietTabs                tabs;
+        QuietAnalysis            analysis;
+        QuietSaves               saves;
+        std::string              folder;
+        ALScriptStudioFiles      unit;
+        std::vector<std::string> picked, settled;
+    };
+
     // The external editor, for a unit given it (ALScriptExternalEditor):
-    // over tabs and saving that do nothing, and a window with no bridge, no
-    // copy held and no editor started, which records the tabs whose files
-    // it was asked to watch.
+    // over tabs and saving that do nothing, files of its own, and a window
+    // with no bridge, no copy held and no editor started.
     struct StudioExternal final : public ALScriptExternalEditor::Window
     {
-        explicit StudioExternal(ALScriptStudioServices& services) : unit(services, tabs, saves, *this) {}
-        void        watchFile(ALScriptStudioDoc& doc) override { watched.push_back(doc.id); }
+        explicit StudioExternal(ALScriptStudioServices& services) : files(services), unit(services, tabs, saves, files.unit, *this) {}
         std::string bridgeId(const ALScriptStudioDoc&) const override { return std::string(); }
         bool        subscribe(ALScriptStudioDoc&) override { return false; }
         void        unsubscribe(const ALScriptStudioDoc&) override {}
         std::shared_ptr<ALScriptTempFiles::Claim> holdCopy(const std::string&) override { return nullptr; }
         void startEditor(ALScriptStudioDoc&, const std::string&, bool) override {}
 
-        QuietTabs                tabs;
-        QuietSaves               saves;
-        ALScriptExternalEditor   unit;
-        std::vector<std::string> watched;
+        QuietTabs              tabs;
+        QuietSaves             saves;
+        StudioFiles            files;
+        ALScriptExternalEditor unit;
     };
 
     // The lookups, for a unit given them (ALScriptLookup): over tabs and an

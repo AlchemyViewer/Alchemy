@@ -41,6 +41,7 @@ class ALScriptNavigation;
 class ALScriptExternalEditor;
 class ALScriptStudioWeighing;
 class ALScriptStudioRecovery;
+class ALScriptStudioFiles;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 
@@ -109,8 +110,6 @@ public:
         virtual bool sendNotecard(const Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items,
                                   std::string& error, U64 request)                                                                = 0;
         virtual U64  newRequest()                                                                                                 = 0;
-        // A file's text written back where it came from.
-        virtual void saveFile(Doc& doc) = 0;
         // The asset the world holds now for the tab's item: the region asked
         // for an object's, which keeps no word of a co-owner's save; the
         // inventory's as it stands. Nothing where it cannot be told.
@@ -145,7 +144,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, ALScriptStudioRecovery& recovery, Window& window);
+    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, ALScriptStudioRecovery& recovery, ALScriptStudioFiles& files, Window& window);
 
     // --- saving ------------------------------------------------------------------------
 
@@ -226,6 +225,7 @@ private:
     ALScriptExternalEditor& mExternal;
     ALScriptStudioWeighing& mWeighing;
     ALScriptStudioRecovery& mRecovery;
+    ALScriptStudioFiles&    mFiles;
     Window&                 mWindow;
     // Held while this is, for what answers later to know it still is.
     std::shared_ptr<bool>   mAlive = std::make_shared<bool>(true);

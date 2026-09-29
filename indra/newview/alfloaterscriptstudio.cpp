@@ -2665,7 +2665,7 @@ void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 
         {
             teachEditor(*mDocs[already]);
         }
-        watchFile(*mDocs[already]);
+        mFiles.watch(*mDocs[already]);
         mFiles.noteFile(path);
         LLStringUtil::format_map_t args;
         args["[NAME]"] = mDocs[already]->name;

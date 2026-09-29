@@ -2444,9 +2444,10 @@ if(AL_BUILD_TESTS)
     alscriptnavigation.cpp
     alscriptsaveflow.cpp
     alscriptstudiodoc.cpp
-    alscriptstudiorecovery.cpp
     alscriptstudiofileio.cpp
+    alscriptstudiofiles.cpp
     alscriptstudioplaces.cpp
+    alscriptstudiorecovery.cpp
     alscriptstudioweighing.cpp
     alscriptstudiowords.cpp
     alscriptweightspane.cpp

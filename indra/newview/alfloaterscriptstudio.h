@@ -380,8 +380,6 @@ private:
     void                          openFileHere(const std::string& path, bool lua, S32 line = -1, S32 column = -1, S32 length = 0);
     // A file's text written back where it came from, and the file watched
     // for changes made outside the studio (ALScriptStudioFiles).
-    void                          saveFile(Doc& doc) override { mFiles.write(doc); }
-    void                          watchFile(Doc& doc) override { mFiles.watch(doc); }
     // A file's text is what is on disk now, however it got there: the
     // editor is clean, and the scripts that include it are expanded again.
     void                          fileSettled(Doc& doc) override;
@@ -786,7 +784,6 @@ private:
     void                         refreshPlace(Doc& doc) override;
     void                         loadScript(const ALScriptRef& ref) override;
     ALScriptNoticeBar*           noticeBar() override { return mNoticeBar; }
-    void                         saveCopyToFile() override { mFiles.saveCopy(); }
     void                         discardRecovery(const ALRecoveryEntry& entry) override;
     void                         noticeAction(const std::string& action) override { mOrphans.noticeAction(action); }
     void                         takeOffer(Doc& doc, const std::string& action) override { outputAction(doc, action); }
@@ -1169,17 +1166,17 @@ private:
     // What is unsaved in the tabs, kept against the viewer going.
     ALScriptStudioRecovery             mRecovery{ *this, *this, *this };
     // Saving and compiling the tabs.
-    ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, mExternal, mWeighing, mRecovery, *this };
+    ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, mExternal, mWeighing, mRecovery, mFiles, *this };
     // The window's side of vim, over its editors.
     ALScriptStudioVim                  mVim{ *this, *this, mSaving, mNavigation, mCommands, *this };
     // Its tabs held open in an editor outside.
-    ALScriptExternalEditor             mExternal{ *this, *this, mSaving, *this };
+    ALScriptExternalEditor             mExternal{ *this, *this, mSaving, mFiles, *this };
     // Its files on disk, and the recent lists.
     ALScriptStudioFiles                mFiles{ *this, *this, *this, mSaving, *this };
     // What its scripts weigh.
     ALScriptStudioWeighing             mWeighing{ *this, *this, mSaving, *this };
     // Its tabs whose script is gone or out of reach, and the notice.
-    ALScriptStudioOrphans              mOrphans{ *this, *this, mSaving, mRecovery, *this };
+    ALScriptStudioOrphans              mOrphans{ *this, *this, mSaving, mRecovery, mFiles, *this };
     // The places gone from, and the previews a list opens as it is walked.
     ALScriptNavigation                 mNavigation{ *this, *this, *this };
     // Its names looked up across the object's scripts, and renamed.

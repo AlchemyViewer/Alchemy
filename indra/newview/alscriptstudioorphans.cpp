@@ -29,6 +29,7 @@
 #include "alcodeeditor.h"
 #include "alrecoverystore.h"
 #include "alscriptexternaleditor.h"
+#include "alscriptstudiofiles.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudiosaves.h"
 #include "alscriptstudioservices.h"
@@ -93,7 +94,7 @@ namespace
     }
 }
 
-ALScriptStudioOrphans::ALScriptStudioOrphans(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, ALScriptStudioRecovery& recovery, Window& window) : mServices(services), mTabs(tabs), mSaves(saves), mRecovery(recovery), mWindow(window)
+ALScriptStudioOrphans::ALScriptStudioOrphans(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, ALScriptStudioRecovery& recovery, ALScriptStudioFiles& files, Window& window) : mServices(services), mTabs(tabs), mSaves(saves), mRecovery(recovery), mFiles(files), mWindow(window)
 {
 }
 
@@ -488,7 +489,7 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
     }
     else if (action == "export")
     {
-        mWindow.saveCopyToFile();
+        mFiles.saveCopy();
     }
     else if (action == "save")
     {

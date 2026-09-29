@@ -49,7 +49,6 @@ namespace
     // The window, faked: a record of what the external editor asked of it.
     struct FakeExternalWindow : public ALScriptExternalEditor::Window, public al_studio_test::QuietTabs, public al_studio_test::QuietSaves
     {
-        void watchFile(Doc& doc) override { watched.push_back(doc.id); }
         // As the window takes it: the tab's text replaced, one step to undo.
         void takeCarriedText(Doc& doc) override
         {
@@ -78,7 +77,7 @@ namespace
         // A name of its own each run: the copies go in the temp folder.
         std::string bridge      = LLUUID::generateNewID().asString();
         bool        bridgeThere = false;
-        Names       watched, taken, saved, subscribed, unsubscribed, started;
+        Names       taken, saved, subscribed, unsubscribed, started;
         // Held as the workspace holds them, the lists in a folder of the
         // run's own.
         std::string                        lists  = (std::filesystem::temp_directory_path() / ("alscriptexternaleditor_" + bridge)).string();
@@ -93,6 +92,7 @@ namespace tut
         al_studio_test::StudioWindow            window;
         al_studio_test::FakeServices            services;
         FakeExternalWindow                      studio;
+        std::unique_ptr<al_studio_test::StudioFiles> files;
         std::unique_ptr<ALScriptExternalEditor> unit;
 
         ~alscriptexternaleditor_data()
@@ -116,7 +116,8 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<ALScriptExternalEditor>(services, studio, studio, studio);
+            files = std::make_unique<al_studio_test::StudioFiles>(services);
+            unit  = std::make_unique<ALScriptExternalEditor>(services, studio, studio, files->unit, studio);
             return *unit;
         }
         // A script's tab, loaded, changeable and saved.
@@ -191,7 +192,8 @@ namespace tut
         Doc& d = tab("d", "x");
         d.file = "/somewhere/d.lsl";
         unit.edit(d);
-        ensure("a file on disk watched where it is", studio.watched == Names{ "d" } && studio.started.back() == "/somewhere/d.lsl on disk");
+        ensure("a file on disk watched where it is",
+               d.watch && d.watch->path() == "/somewhere/d.lsl" && studio.started.back() == "/somewhere/d.lsl on disk");
         ensure("with no log, and nothing for the bridge", !d.external->log && studio.subscribed.size() == 2);
 
         Doc& n    = tab("n", "x");

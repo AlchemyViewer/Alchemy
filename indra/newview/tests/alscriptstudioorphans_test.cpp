@@ -59,7 +59,6 @@ namespace
         ALScriptNoticeBar* noticeBar() override { return bar; }
         void               refreshToolbar() override { ++toolbars; }
         void               saveCopyToInventory(Doc& doc) override { did.push_back("copy " + doc.id); }
-        void               saveCopyToFile() override { did.push_back("export"); }
         void               saveAsked(Doc& doc) override { did.push_back("save " + doc.id); }
         void               takeOffer(Doc& doc, const std::string& action) override { did.push_back("offer " + doc.id + ": " + action); }
         void               discardRecovery(const ALRecoveryEntry&) override { did.push_back("discard"); }
@@ -99,6 +98,7 @@ namespace tut
         al_studio_test::StudioWindowOf<FakeNoticeWindow> window;
         FakeOrphansWindow                                studio;
         std::unique_ptr<al_studio_test::StudioRecovery>  recovery;
+        std::unique_ptr<al_studio_test::StudioFiles>     files;
         std::unique_ptr<Orphans>                         unit;
 
         al_studio_test::FakeServices& services() { return window.services(); }
@@ -119,7 +119,8 @@ namespace tut
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             recovery = std::make_unique<al_studio_test::StudioRecovery>(services(), &studio);
-            unit     = std::make_unique<Orphans>(services(), studio, studio, recovery->unit, studio);
+            files    = std::make_unique<al_studio_test::StudioFiles>(services());
+            unit     = std::make_unique<Orphans>(services(), studio, studio, recovery->unit, files->unit, studio);
             return *unit;
         }
         // A tab of a script in an object, or in the inventory, loaded and
@@ -350,7 +351,8 @@ namespace tut
         unit.noticeAction("export");
         unit.noticeAction("save");
         ensure("a copy, a file, a save",
-               studio.did == Names{ "source a", "carried a: restored text", "source a", "discard", "copy a", "export", "save a" });
+               studio.did == Names{ "source a", "carried a: restored text", "source a", "discard", "copy a", "save a" } &&
+                   files->picked == Names{ "a" });
         a.orphan->reattachTries = 3;
         unit.noticeAction("retry_load");
         ensure("not detached: nothing to try", studio.loads.empty());

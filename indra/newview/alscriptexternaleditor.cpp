@@ -29,6 +29,7 @@
 #include "alcodeeditor.h"
 #include "alfilewrite.h"
 #include "alscriptstudiofileio.h"
+#include "alscriptstudiofiles.h"
 #include "alscriptstudiosaves.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiotabs.h"
@@ -49,8 +50,8 @@ namespace
     }
 }
 
-ALScriptExternalEditor::ALScriptExternalEditor(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, Window& window)
-    : mServices(services), mTabs(tabs), mSaves(saves), mWindow(window)
+ALScriptExternalEditor::ALScriptExternalEditor(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, ALScriptStudioFiles& files, Window& window)
+    : mServices(services), mTabs(tabs), mSaves(saves), mFiles(files), mWindow(window)
 {
 }
 
@@ -84,7 +85,7 @@ void ALScriptExternalEditor::edit(Doc& doc)
     {
         // Watched since it was opened; a save there comes in as any
         // outside change does.
-        mWindow.watchFile(doc);
+        mFiles.watch(doc);
     }
     else if (!doc.watch || doc.watch->path() != filename)
     {

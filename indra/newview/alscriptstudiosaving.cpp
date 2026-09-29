@@ -32,6 +32,7 @@
 #include "alscriptnavigation.h"
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudiochecking.h"
+#include "alscriptstudiofiles.h"
 #include "alscriptstudioorphans.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudioservices.h"
@@ -41,7 +42,7 @@
 
 #include <algorithm>
 
-ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, ALScriptStudioRecovery& recovery, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mExternal(external), mWeighing(weighing), mRecovery(recovery), mWindow(window)
+ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, ALScriptStudioRecovery& recovery, ALScriptStudioFiles& files, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mExternal(external), mWeighing(weighing), mRecovery(recovery), mFiles(files), mWindow(window)
 {
 }
 
@@ -362,7 +363,7 @@ void ALScriptStudioSaving::save(Doc& doc)
     switch (route)
     {
         case ALScriptSaveFlow::Route::File:
-            mWindow.saveFile(doc);
+            mFiles.write(doc);
             return;
         case ALScriptSaveFlow::Route::AskWorld:
         {
