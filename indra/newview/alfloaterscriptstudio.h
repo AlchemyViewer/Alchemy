@@ -58,7 +58,7 @@
 #include "alscriptsnippets.h"
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
-#include "alscriptrecovery.h"
+#include "alrecoverystore.h"
 #include "alscriptworkspace.h"
 #include "alsourcemap.h"
 #include "alstudiofloater.h"
@@ -830,8 +830,8 @@ private:
     ALScriptNoticeBar*           noticeBar() override { return mNoticeBar; }
     void                         saveCopyToFile() override { mFiles.saveCopy(); }
     void                         saveAgain(Doc& doc) override { mSaving.saveAsked(doc); }
-    void                         takeUpRecovery(Doc& doc, const ALScriptRecoveryEntry& entry) override { mRecovery.takeUp(doc, entry); }
-    void                         discardRecovery(const ALScriptRecoveryEntry& entry) override;
+    void                         takeUpRecovery(Doc& doc, const ALRecoveryEntry& entry) override { mRecovery.takeUp(doc, entry); }
+    void                         discardRecovery(const ALRecoveryEntry& entry) override;
     void                         noticeAction(const std::string& action) override { mOrphans.noticeAction(action); }
     void                         takeOffer(Doc& doc, const std::string& action) override { outputAction(doc, action); }
     // The window, of all of them, that has a script or a file open.
@@ -840,12 +840,12 @@ private:
     // script opened from outside -- the inventory, an object -- goes, as a
     // script window used to open over the last one.
     static ALFloaterScriptStudio* lastWorkedIn();
-    void openOrphan(const ALScriptRecoveryEntry& entry, Doc::Orphan orphan) override;
+    void openOrphan(const ALRecoveryEntry& entry, Doc::Orphan orphan) override;
     // A tab made to hold a kept text with nothing loaded under it: unsaved,
     // with whatever its script or file was.
-    void becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& entry, Doc::Orphan orphan) override;
+    void becomeOrphan(Doc& doc, const ALRecoveryEntry& entry, Doc::Orphan orphan) override;
     // What recovery asks of the window (ALScriptStudioRecovery::Window).
-    bool recoverElsewhere(const ALScriptRecoveryEntry& entry) override;
+    bool recoverElsewhere(const ALRecoveryEntry& entry) override;
     Doc* openFileTab(const std::string& path, bool lua) override;
     bool scriptInHand(const ALScriptRef& ref) const override;
     void activate(Doc& doc) override;

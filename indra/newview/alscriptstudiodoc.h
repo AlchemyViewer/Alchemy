@@ -31,7 +31,7 @@
 #include "alscriptanalysis.h"
 #include "alscriptenvelope.h"
 #include "alscriptproblem.h"
-#include "alscriptrecovery.h"
+#include "alrecoverystore.h"
 #include "alscriptsaveflow.h"
 #include "alscriptsymbol.h"
 #include "alscripttempfiles.h"
@@ -212,7 +212,7 @@ struct ALScriptStudioDoc
     // A file changed on disk while this tab had unsaved changes, and
     // the author asked what to do: once, however often it changes.
     bool                                       askingReload = false;
-    // What keeps the unsaved text against a crash (ALScriptRecoveryStore):
+    // What keeps the unsaved text against a crash (ALRecoveryStore):
     // whose text it is; when it is next written there, or zero; and
     // whether writing it failed, which is said once.
     std::string                                recoveryKey;
@@ -227,7 +227,7 @@ struct ALScriptStudioDoc
         bool                         valid   = false;
         U32                          text    = 0;
         U32                          history = 0;
-        ALScriptRecoveryEntry::State state   = ALScriptRecoveryEntry::State::Unsaved;
+        ALRecoveryEntry::State state   = ALRecoveryEntry::State::Unsaved;
         bool                         durable = false;
         // And what was picked for its next save.
         std::optional<std::string>   target;
@@ -237,8 +237,8 @@ struct ALScriptStudioDoc
     // What an earlier session left of this, found as it opened, offered
     // in the notice until it is restored or discarded; and one being
     // taken up here, whose file goes once this tab's own is written.
-    std::optional<ALScriptRecoveryEntry>       recoverable;
-    std::optional<ALScriptRecoveryEntry>       recovering;
+    std::optional<ALRecoveryEntry>       recoverable;
+    std::optional<ALRecoveryEntry>       recovering;
     // A recovered or copied notecard's items, in place of what it loads
     // with, since its text says them by their places in this list.
     std::optional<std::vector<LLPointer<LLInventoryItem>>> carriedEmbedded;

@@ -32,7 +32,7 @@
 #include <string>
 
 class ALScriptStudioServices;
-struct ALScriptRecoveryEntry;
+struct ALRecoveryEntry;
 
 // A Script Studio window's tabs as what holds them has them, the tab's part
 // `doc.orphan` keeping it: its object out of sight, its item gone from the
@@ -104,8 +104,8 @@ public:
         virtual void takeOffer(Doc& doc, const std::string& action)                          = 0;
         virtual void saveCopyToFile()                                                        = 0;
         virtual void saveAgain(Doc& doc)                                                     = 0;
-        virtual void takeUpRecovery(Doc& doc, const ALScriptRecoveryEntry& entry)            = 0;
-        virtual void discardRecovery(const ALScriptRecoveryEntry& entry)                     = 0;
+        virtual void takeUpRecovery(Doc& doc, const ALRecoveryEntry& entry)            = 0;
+        virtual void discardRecovery(const ALRecoveryEntry& entry)                     = 0;
         // What the tab carries put in over its text, as one step to undo.
         virtual void takeCarriedText(Doc& doc)                                               = 0;
         // Two texts compared in the tab's place, each with what it is; and

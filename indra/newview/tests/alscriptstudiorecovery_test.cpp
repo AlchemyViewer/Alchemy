@@ -110,7 +110,7 @@ namespace tut
         al_studio_test::StudioWindowOf<FakeRecoveryWindow> window;
         std::unique_ptr<ALScriptStudioRecovery>             recovery;
         std::string                                         folder;
-        std::unique_ptr<ALScriptRecoveryStore>              store;
+        std::unique_ptr<ALRecoveryStore>              store;
 
         ~alscriptstudiorecovery_data()
         {
@@ -136,7 +136,7 @@ namespace tut
             studio().recovery = recovery.get();
             folder = fsyspath(std::filesystem::temp_directory_path() / fsyspath("alscriptstudiorecovery_" + LLUUID::generateNewID().asString())).string();
             std::filesystem::create_directories(fsyspath(folder));
-            store = std::make_unique<ALScriptRecoveryStore>(folder, "this-session");
+            store = std::make_unique<ALRecoveryStore>(folder, "this-session");
             ALScriptStudioRecovery::useStore(store.get());
             return *recovery;
         }
@@ -155,7 +155,7 @@ namespace tut
             Doc& doc        = services().addDoc(id, ref, id);
             doc.loaded      = true;
             doc.modifiable  = true;
-            doc.recoveryKey = ALScriptRecoveryStore::keyOf(ref.object, ref.item, std::string());
+            doc.recoveryKey = ALRecoveryStore::keyOf(ref.object, ref.item, std::string());
             ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
             p.name      = "editor_" + id;
             p.rect      = LLRect(0, 200, 400, 0);
@@ -178,7 +178,7 @@ namespace tut
         // An entry another session left for a tab's script.
         Entry leftFor(const Doc& doc, const std::string& text, const std::string& session = "old-session")
         {
-            ALScriptRecoveryStore other(folder, session);
+            ALRecoveryStore other(folder, session);
             Entry                 entry = ALScriptStudioRecovery::entryOf(doc);
             entry.text                  = text;
             entry.history               = LLSD();
@@ -279,7 +279,7 @@ namespace tut
             llofstream file(blocked);
             file << "a file where a folder would be";
         }
-        ALScriptRecoveryStore nowhere(blocked, "this-session");
+        ALRecoveryStore nowhere(blocked, "this-session");
         ALScriptStudioRecovery::useStore(&nowhere);
         type(doc, "y");
         ensure("not kept", !r.keep(doc));
@@ -512,7 +512,7 @@ namespace tut
             llofstream file(blocked);
             file << "a file where a folder would be";
         }
-        ALScriptRecoveryStore nowhere(blocked, "this-session");
+        ALRecoveryStore nowhere(blocked, "this-session");
         ALScriptStudioRecovery::useStore(&nowhere);
         type(a, "z");
         type(b, "w");
@@ -560,7 +560,7 @@ namespace tut
     {
         set_test_name("at login: what sessions left unsaved is offered; what was kept on purpose is offered where the studio is not open to have opened it");
         make();
-        ALScriptRecoveryStore earlier(folder, "earlier");
+        ALRecoveryStore earlier(folder, "earlier");
         Entry                 lost = entry("item:lost", "typed, then a crash");
         Entry                 kept = entry("item:kept", "kept for next time");
         kept.state                 = Entry::State::Kept;
@@ -615,9 +615,9 @@ namespace tut
         card.item     = LLUUID::generateNewID();
         card.notecard = true;
         card.text     = "kept\n";
-        card.key      = ALScriptRecoveryStore::windowKeyOf(card.object, card.item);
-        ensure("a key of its own", ALScriptRecoveryStore::isWindowKey(card.key) && card.key != ALScriptRecoveryStore::keyOf(card.object, card.item, std::string()) &&
-                                       !ALScriptRecoveryStore::isWindowKey(ALScriptRecoveryStore::keyOf(card.object, card.item, std::string())));
+        card.key      = ALRecoveryStore::windowKeyOf(card.object, card.item);
+        ensure("a key of its own", ALRecoveryStore::isWindowKey(card.key) && card.key != ALRecoveryStore::keyOf(card.object, card.item, std::string()) &&
+                                       !ALRecoveryStore::isWindowKey(ALRecoveryStore::keyOf(card.object, card.item, std::string())));
 
         std::vector<std::string> taken;
         bool                     has = true;
@@ -631,7 +631,7 @@ namespace tut
 
         // A studio tab's own entry for the same notecard is the studio's.
         Entry tab = card;
-        tab.key   = ALScriptRecoveryStore::keyOf(card.object, card.item, std::string());
+        tab.key   = ALRecoveryStore::keyOf(card.object, card.item, std::string());
         r.recover(tab);
         ensure("a tab's entry is not the window's", taken.size() == 1 && studio().orphans.size() == 1);
 

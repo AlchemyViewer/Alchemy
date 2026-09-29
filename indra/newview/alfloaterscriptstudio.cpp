@@ -632,7 +632,7 @@ ALFloaterScriptStudio::~ALFloaterScriptStudio()
     // Straight to the store: nothing here is to be said any more.
     // Each forced out to the disk on the writer's thread, and waited on
     // once for the lot.
-    ALScriptRecoveryStore* store = ALScriptStudioRecovery::store();
+    ALRecoveryStore* store = ALScriptStudioRecovery::store();
     for (const std::unique_ptr<Doc>& doc : mDocs)
     {
         if (store && doc->editor && !doc->recoveryKey.empty() && doc->loaded && doc->modifiable && !doc->carriedText && doc->unsaved())
@@ -1131,15 +1131,15 @@ void ALFloaterScriptStudio::reopenKept()
 {
     // What was kept on purpose at the last quit opens again, with its
     // unsaved changes, into its restored tab or a tab of its own.
-    ALScriptRecoveryStore* store = ALScriptStudioRecovery::store();
+    ALRecoveryStore* store = ALScriptStudioRecovery::store();
     if (!store)
     {
         return;
     }
     S32 reopened = 0;
-    for (const ALScriptRecoveryEntry& entry : store->left())
+    for (const ALRecoveryEntry& entry : store->left())
     {
-        if (entry.state == ALScriptRecoveryEntry::State::Kept)
+        if (entry.state == ALRecoveryEntry::State::Kept)
         {
             mRecovery.recover(entry);
             ++reopened;
@@ -1997,7 +1997,7 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     wireDoc(*doc);
     // Kept against a crash under this; and what an earlier session left of
     // it, or a window of this one that went, offered in the notice.
-    doc->recoveryKey = ALScriptRecoveryStore::keyOf(ref.object, ref.item, std::string());
+    doc->recoveryKey = ALRecoveryStore::keyOf(ref.object, ref.item, std::string());
     mRecovery.offerFor(*doc, holderOf(ref, std::string()) != nullptr);
 
     // An object's check listed it while it was closed: its tab says now.
@@ -2236,12 +2236,12 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         // own, unsaved, and says why -- and is loaded again later, further
         // apart each time, where that may go differently.
         using Failure                     = ALScriptWorkspace::Loaded::Failure;
-        const ALScriptRecoveryEntry entry = *doc.recovering;
+        const ALRecoveryEntry entry = *doc.recovering;
         doc.carriedText.reset();
         doc.carriedEmbedded.reset();
         doc.loadFailure  = answer.error.empty() ? Failure::NotPermitted : answer.failure;
         doc.loadError    = answer.error;
-        doc.orphan.nextReattach = LLTimer::getTotalSeconds() + ALScriptRecoveryRetry::delayAfter(++doc.orphan.reattachTries);
+        doc.orphan.nextReattach = LLTimer::getTotalSeconds() + ALRecoveryRetry::delayAfter(++doc.orphan.reattachTries);
         becomeOrphan(doc, entry, failedAs(doc, doc.loadFailure));
         if (doc.loadFailure == Failure::NotPermitted)
         {
@@ -2702,7 +2702,7 @@ void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 
         doc->loaded     = true;
         doc->modifiable = true;
         wireDoc(*doc);
-        doc->recoveryKey = ALScriptRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path);
+        doc->recoveryKey = ALRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path);
         mRecovery.offerFor(*doc, holderOf(ALScriptRef(), path) != nullptr);
         mDocs.push_back(std::move(doc));
         mOrphansDirty = true;
@@ -4388,11 +4388,11 @@ void ALFloaterScriptStudio::fileWritten(const std::string& path)
 void ALFloaterScriptStudio::becomeFile(Doc& doc, const std::string& path)
 {
     mProblemsPane->forget(doc.id);
-    if (ALScriptRecoveryStore* store = ALScriptStudioRecovery::store(); store && !doc.recoveryKey.empty())
+    if (ALRecoveryStore* store = ALScriptStudioRecovery::store(); store && !doc.recoveryKey.empty())
     {
         store->forget(doc.recoveryKey);
     }
-    doc.recoveryKey           = ALScriptRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path);
+    doc.recoveryKey           = ALRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path);
     doc.recoveryWritten.valid = false;
     doc.file                  = path;
     doc.name        = gDirUtilp->getBaseFileName(path);
@@ -6044,7 +6044,7 @@ void ALFloaterScriptStudio::quitAnswered(S32 option)
                     dirty.push_back(doc.get());
                 }
             }
-            if (!mRecovery.keepAll(dirty, ALScriptRecoveryEntry::State::Kept))
+            if (!mRecovery.keepAll(dirty, ALRecoveryEntry::State::Kept))
             {
                 report(getString("KeepFailed"), true);
                 stopClosing();
@@ -6271,7 +6271,7 @@ bool ALFloaterScriptStudio::moveActiveTo(ALFloaterScriptStudio* window)
     }
     // What it holds goes with it whole -- the text, the steps that led to
     // it to take back, the caret -- as a kept tab comes back next session.
-    ALScriptRecoveryEntry moving = ALScriptStudioRecovery::entryOf(*doc);
+    ALRecoveryEntry moving = ALScriptStudioRecovery::entryOf(*doc);
     moving.path.clear();
     if (!doc->file.empty())
     {
@@ -6333,7 +6333,7 @@ void ALFloaterScriptStudio::offerRecovery()
         open);
 }
 
-bool ALFloaterScriptStudio::recoverElsewhere(const ALScriptRecoveryEntry& entry)
+bool ALFloaterScriptStudio::recoverElsewhere(const ALRecoveryEntry& entry)
 {
     ALFloaterScriptStudio* holder = holderOf(ALScriptRef(entry.object, entry.item), entry.file);
     if (!holder || holder == this)
@@ -6552,7 +6552,7 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::holderOf(const ALScriptRef& ref, c
     return nullptr;
 }
 
-void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& entry, Doc::Orphan orphan)
+void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALRecoveryEntry& entry, Doc::Orphan orphan)
 {
     // Nothing loaded under it: the kept text is the tab's, unsaved, with
     // what its script was -- the language, the target, the envelope -- and
@@ -6623,7 +6623,7 @@ void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& 
     refreshNotice();
 }
 
-void ALFloaterScriptStudio::openOrphan(const ALScriptRecoveryEntry& entry, Doc::Orphan orphan)
+void ALFloaterScriptStudio::openOrphan(const ALRecoveryEntry& entry, Doc::Orphan orphan)
 {
     auto doc         = std::make_unique<Doc>();
     doc->file        = entry.file;
@@ -6721,9 +6721,9 @@ void ALFloaterScriptStudio::loadScript(const ALScriptRef& ref)
     });
 }
 
-void ALFloaterScriptStudio::discardRecovery(const ALScriptRecoveryEntry& entry)
+void ALFloaterScriptStudio::discardRecovery(const ALRecoveryEntry& entry)
 {
-    if (ALScriptRecoveryStore* store = ALScriptStudioRecovery::store())
+    if (ALRecoveryStore* store = ALScriptStudioRecovery::store())
     {
         store->discard(entry);
     }
@@ -7518,10 +7518,10 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
         // entry the tab took up goes with it only once what the tab holds
         // is safe -- set aside, saved, or the same as saved -- so that a
         // failed write, or a text nobody could save, loses nothing.
-        ALScriptRecoveryStore* store = ALScriptStudioRecovery::store();
+        ALRecoveryStore* store = ALScriptStudioRecovery::store();
         if (!keep && store && !doc.recoveryKey.empty())
         {
-            ALScriptRecoveryStore::Parting parting;
+            ALRecoveryStore::Parting parting;
             parting.key      = doc.recoveryKey;
             parting.tookUp   = doc.recovering;
             parting.carrying = doc.carriedText.has_value();
@@ -7669,7 +7669,7 @@ void ALFloaterScriptStudio::addFileCommands()
     mCommands.add(
         "recover", [this]() { mRecovery.show(); },
         []() {
-            const ALScriptRecoveryStore* store = ALScriptStudioRecovery::store();
+            const ALRecoveryStore* store = ALScriptStudioRecovery::store();
             return store && store->hasOffers();
         });
     mCommands.add(

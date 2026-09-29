@@ -1,5 +1,5 @@
 /**
- * @file alscriptrecovery.h
+ * @file alrecoverystore.h
  * @brief Script Studio's unsaved work, kept on disk until it is saved, so that a crash or a lost object does not take it.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -38,7 +38,7 @@
 // What a tab held that nobody had saved: the text, and enough about where
 // it came from to put it back there -- the object and the item, or the
 // file -- or, where that is gone, to say what it was.
-struct ALScriptRecoveryEntry
+struct ALRecoveryEntry
 {
     enum class State : U8
     {
@@ -96,7 +96,7 @@ struct ALScriptRecoveryEntry
     std::string path;
     // Whether the text and what goes with it -- the items, the history,
     // the caret -- are here, or only what a listing reads
-    // (ALScriptRecoveryStore::load).
+    // (ALRecoveryStore::load).
     bool        whole = true;
 
     // The history as it was read, or as it was written where it was made
@@ -104,7 +104,7 @@ struct ALScriptRecoveryEntry
     LLSD        historyOf() const;
     // All of it as one map, as an entry was once written whole.
     LLSD        asLLSD() const;
-    static bool fromLLSD(const LLSD& sd, ALScriptRecoveryEntry& out);
+    static bool fromLLSD(const LLSD& sd, ALRecoveryEntry& out);
     // As it is written: a line of what a listing reads -- whose it is,
     // where it came from, when -- and then a line of the text and what goes
     // with it, each LLSD notation, so that a listing reads the first line
@@ -118,7 +118,7 @@ struct ALScriptRecoveryEntry
 // When a kept text's script is loaded again after loads that failed: a
 // moment after the first failure, three times as long after each one
 // since, and a few times only before it waits for a person to ask.
-struct ALScriptRecoveryRetry
+struct ALRecoveryRetry
 {
     static constexpr F64 FIRST = 5.0;
     static constexpr S32 TRIES = 5;
@@ -132,10 +132,10 @@ struct ALScriptRecoveryRetry
 // process, stopped in the viewer's cleanup rather than joined as the
 // process goes. What a store has waiting stays the store's (writeSoon);
 // this runs its writing.
-class ALScriptRecoveryWriter final : public LLSingleton<ALScriptRecoveryWriter>
+class ALRecoveryWriter final : public LLSingleton<ALRecoveryWriter>
 {
-    LLSINGLETON(ALScriptRecoveryWriter);
-    ~ALScriptRecoveryWriter() override;
+    LLSINGLETON(ALRecoveryWriter);
+    ~ALRecoveryWriter() override;
     void cleanupSingleton() override;
 
 public:
@@ -159,14 +159,14 @@ private:
 // What typing writes goes on the writer's thread (writeSoon); everything
 // else is done where it is asked, once what the store has waiting there
 // is written, so that the files change in the order they were asked to.
-class ALScriptRecoveryStore
+class ALRecoveryStore
 {
 public:
-    ALScriptRecoveryStore(std::string directory, std::string session);
+    ALRecoveryStore(std::string directory, std::string session);
     // What is waiting written first.
-    ~ALScriptRecoveryStore();
-    ALScriptRecoveryStore(const ALScriptRecoveryStore&)            = delete;
-    ALScriptRecoveryStore& operator=(const ALScriptRecoveryStore&) = delete;
+    ~ALRecoveryStore();
+    ALRecoveryStore(const ALRecoveryStore&)            = delete;
+    ALRecoveryStore& operator=(const ALRecoveryStore&) = delete;
 
     // Whose text: an item in an object, an item in the inventory, or a
     // file on disk.
@@ -186,7 +186,7 @@ public:
     // before; the key, the session and the time filled in here, and forced
     // out to the disk. False where it could not be written, which the
     // caller is to say.
-    bool write(ALScriptRecoveryEntry entry);
+    bool write(ALRecoveryEntry entry);
     // The same a moment from now, on the writer's thread, as typing asks
     // for it: the newest for a key in place of one still waiting, and not
     // forced out to the disk -- what a crash of the viewer needs, the
@@ -194,12 +194,12 @@ public:
     // whoever waited on a slow disk or a scanner every time. Forced out
     // where `durable` says, as a batch that is flushed once is: each
     // forced out there, not here.
-    void writeSoon(ALScriptRecoveryEntry entry, bool durable = false);
+    void writeSoon(ALRecoveryEntry entry, bool durable = false);
     // Everything waiting written.
     void flush() const;
     // The text and what goes with it read in, for an entry a listing read
     // only the start of; false where its file is gone or cannot be read.
-    bool load(ALScriptRecoveryEntry& entry) const;
+    bool load(ALRecoveryEntry& entry) const;
     // The keys whose entries writeSoon could not write, since last asked;
     // and whether one key's could not, since last asked of it. Each asks
     // of its own, so that one window taking failures leaves another's.
@@ -211,13 +211,13 @@ public:
     // A text written straight among the discarded, marked when -- what a
     // tab throws away, set aside a while all the same -- leaving whatever
     // entry it came from where it is. By this session where it says none.
-    bool setAside(ALScriptRecoveryEntry entry);
+    bool setAside(ALRecoveryEntry entry);
     // An entry, this session's or another's, moved among the discarded:
     // set aside, and its file gone once that is written.
-    bool discard(const ALScriptRecoveryEntry& entry);
+    bool discard(const ALRecoveryEntry& entry);
     // An entry taken up -- put back in a tab, which keeps it from here --
     // or thrown away for good.
-    void remove(const ALScriptRecoveryEntry& entry);
+    void remove(const ALRecoveryEntry& entry);
 
     // A tab let go of -- closed, thrown away, its window gone -- as it
     // stood: what it holds unsaved of its own; the entry it took up or
@@ -227,8 +227,8 @@ public:
     struct Parting
     {
         std::string                          key;
-        std::optional<ALScriptRecoveryEntry> unsaved;
-        std::optional<ALScriptRecoveryEntry> tookUp;
+        std::optional<ALRecoveryEntry> unsaved;
+        std::optional<ALRecoveryEntry> tookUp;
         bool                                 carrying = false;
         bool                                 settled  = false;
     };
@@ -245,12 +245,12 @@ public:
     // sessions', and the discarded -- each as far as a listing reads it
     // (load reads the rest). A file that cannot be read is left where it
     // is, for a person to look at.
-    std::vector<ALScriptRecoveryEntry> list() const;
+    std::vector<ALRecoveryEntry> list() const;
     // What sessions other than this one left, unsaved or kept, newest
     // first.
-    std::vector<ALScriptRecoveryEntry> left() const;
+    std::vector<ALRecoveryEntry> left() const;
     // The newest of those for one key.
-    std::optional<ALScriptRecoveryEntry> leftFor(const std::string& key) const;
+    std::optional<ALRecoveryEntry> leftFor(const std::string& key) const;
     // This session's own entry for a key, where no tab holds the key any
     // more -- what a window that went wrote of its tabs as it went --
     // set aside among the discarded, and answered as set aside: offered
@@ -258,7 +258,7 @@ public:
     // is taken up. Set aside, it is out of the way of the forget that a
     // tab opened clean does. It keeps when it was written. None where
     // there is none, or it could not be set aside.
-    std::optional<ALScriptRecoveryEntry> reclaim(const std::string& key);
+    std::optional<ALRecoveryEntry> reclaim(const std::string& key);
     // Whether there is anything to offer: another session's entry, or a
     // discarded one. By the files' names, without reading them, and
     // then kept a moment, since a menu asks as it is drawn; anything this
@@ -267,7 +267,7 @@ public:
     // What other sessions left unsaved, marked as offered at a login --
     // their files' names say when -- to go for good a while after
     // (prune), as the discarded do, rather than to be kept for ever.
-    void markOffered(const std::vector<ALScriptRecoveryEntry>& entries, const LLDate& now = LLDate::now());
+    void markOffered(const std::vector<ALRecoveryEntry>& entries, const LLDate& now = LLDate::now());
 
     // The discarded, and what was offered and left, older than this let
     // go of for good, by when their names say; past so many, or so much,
@@ -287,11 +287,11 @@ private:
     std::string fileOf(const std::string& key) const;
     std::string pathOf(const std::string& key, const std::string& session) const;
     // An entry read: as far as a listing reads it, or whole.
-    static bool readEntry(const std::string& path, ALScriptRecoveryEntry& out, bool whole);
+    static bool readEntry(const std::string& path, ALRecoveryEntry& out, bool whole);
     // setAside's writing, which says where it wrote: empty where it could
     // not. Marked when it is set aside unless told to keep its own.
-    std::string setAsideAt(ALScriptRecoveryEntry entry, bool keep_when);
-    void        listIn(const std::string& folder, std::vector<ALScriptRecoveryEntry>& out) const;
+    std::string setAsideAt(ALRecoveryEntry entry, bool keep_when);
+    void        listIn(const std::string& folder, std::vector<ALRecoveryEntry>& out) const;
     // The folders made, once each, before anything is written in them.
     void        makeFolders(bool discarded);
     // The discarded past so many or so much, the oldest first, let go of.

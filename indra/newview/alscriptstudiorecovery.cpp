@@ -46,7 +46,7 @@ namespace
     const F64 DISCARDED_KEPT = 7.0 * 24.0 * 60.0 * 60.0;
 
     // A test's store, in place of the account's.
-    ALScriptRecoveryStore* sGivenStore = nullptr;
+    ALRecoveryStore* sGivenStore = nullptr;
 
     // The viewer's own windows' way of taking up what they kept.
     ALScriptStudioRecovery::window_t& ownWindows()
@@ -57,10 +57,10 @@ namespace
 
     // An entry one of the viewer's own windows kept, taken up there: false
     // where it is not such a window's, or the window cannot have its item.
-    bool toOwnWindow(const ALScriptRecoveryEntry& entry)
+    bool toOwnWindow(const ALRecoveryEntry& entry)
     {
         const ALScriptStudioRecovery::window_t& window = ownWindows();
-        return ALScriptRecoveryStore::isWindowKey(entry.key) && window && window(entry);
+        return ALRecoveryStore::isWindowKey(entry.key) && window && window(entry);
     }
 
     // The account's store, one for the process, made again where another
@@ -73,12 +73,12 @@ namespace
         void cleanupSingleton() override { mStore.reset(); }
 
     public:
-        ALScriptRecoveryStore* storeFor(const std::string& directory)
+        ALRecoveryStore* storeFor(const std::string& directory)
         {
             if (!mStore || mMadeFor != directory)
             {
                 LLFile::mkdir(directory);
-                mStore   = std::make_unique<ALScriptRecoveryStore>(directory, mSession);
+                mStore   = std::make_unique<ALRecoveryStore>(directory, mSession);
                 mMadeFor = directory;
                 // What was discarded long ago goes for good.
                 mStore->prune(DISCARDED_KEPT);
@@ -87,7 +87,7 @@ namespace
         }
 
     private:
-        std::unique_ptr<ALScriptRecoveryStore> mStore;
+        std::unique_ptr<ALRecoveryStore> mStore;
         std::string                            mMadeFor;
         const std::string                      mSession = LLUUID::generateNewID().asString();
     };
@@ -95,11 +95,11 @@ namespace
     AccountRecovery::AccountRecovery()
     {
         // Asked for here, so that it is let go of after this.
-        ALScriptRecoveryWriter::getInstance();
+        ALRecoveryWriter::getInstance();
     }
 
     // What an entry is called in a list: its name, or its file's.
-    std::string nameOf(const ALScriptRecoveryEntry& entry)
+    std::string nameOf(const ALRecoveryEntry& entry)
     {
         return entry.name.empty() ? gDirUtilp->getBaseFileName(entry.file) : entry.name;
     }
@@ -116,7 +116,7 @@ namespace
 
     // Whether a tab's text and history stand as they were last written,
     // as what it is asked to be written as: durably, where that is asked.
-    bool writtenAlready(const ALScriptStudioDoc& doc, ALScriptRecoveryEntry::State state, bool durable)
+    bool writtenAlready(const ALScriptStudioDoc& doc, ALRecoveryEntry::State state, bool durable)
     {
         const ALScriptStudioDoc::RecoveryWritten& was = doc.recoveryWritten;
         return was.valid && was.state == state && (was.durable || !durable) && was.text == doc.editor->document().version() &&
@@ -124,7 +124,7 @@ namespace
                was.experience == pickedExperienceOf(doc);
     }
 
-    void markWritten(ALScriptStudioDoc& doc, ALScriptRecoveryEntry::State state, bool durable)
+    void markWritten(ALScriptStudioDoc& doc, ALRecoveryEntry::State state, bool durable)
     {
         ALScriptStudioDoc::RecoveryWritten& was = doc.recoveryWritten;
         was.valid                               = true;
@@ -142,7 +142,7 @@ ALScriptStudioRecovery::ALScriptStudioRecovery(ALScriptStudioServices& services,
 // --- the store -----------------------------------------------------------------------
 
 // static
-ALScriptRecoveryStore* ALScriptStudioRecovery::store()
+ALRecoveryStore* ALScriptStudioRecovery::store()
 {
     if (sGivenStore)
     {
@@ -156,7 +156,7 @@ ALScriptRecoveryStore* ALScriptStudioRecovery::store()
 }
 
 // static
-void ALScriptStudioRecovery::useStore(ALScriptRecoveryStore* store)
+void ALScriptStudioRecovery::useStore(ALRecoveryStore* store)
 {
     sGivenStore = store;
 }
@@ -205,7 +205,7 @@ bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     doc.recoveryDue             = 0.0;
-    ALScriptRecoveryStore* kept = store();
+    ALRecoveryStore* kept = store();
     if (!kept)
     {
         // Nowhere to keep it, which matters only where there is something
@@ -257,7 +257,7 @@ bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
 bool ALScriptStudioRecovery::keepAll(const std::vector<Doc*>& docs, Entry::State state)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    ALScriptRecoveryStore* kept = store();
+    ALRecoveryStore* kept = store();
     // Each unsaved text handed to the writer, forced out to the disk
     // there, and waited on once for the lot; the rest as keep does them.
     std::vector<Doc*> written;
@@ -310,7 +310,7 @@ bool ALScriptStudioRecovery::keepAll(const std::vector<Doc*>& docs, Entry::State
 void ALScriptStudioRecovery::keepSoon(Doc& doc)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    ALScriptRecoveryStore* kept = store();
+    ALRecoveryStore* kept = store();
     // What the last of these could not write, said once, as a write here
     // says it: each tab's own, leaving another window's to it.
     if (kept)
@@ -353,7 +353,7 @@ void ALScriptStudioRecovery::keepSoon(Doc& doc)
 
 bool ALScriptStudioRecovery::setAside(Doc& doc)
 {
-    ALScriptRecoveryStore* kept = store();
+    ALRecoveryStore* kept = store();
     if (!kept || doc.recoveryKey.empty() || !kept->setAside(entryOf(doc)))
     {
         return false;
@@ -396,7 +396,7 @@ void ALScriptStudioRecovery::pump()
 
 void ALScriptStudioRecovery::offerFor(Doc& doc, bool held_elsewhere)
 {
-    ALScriptRecoveryStore* kept = store();
+    ALRecoveryStore* kept = store();
     if (!kept || doc.recoveryKey.empty())
     {
         return;
@@ -417,7 +417,7 @@ bool ALScriptStudioRecovery::wholeOf(Entry& entry)
 {
     // A listing reads what it shows; the text and what goes with it are
     // read as it is taken up.
-    ALScriptRecoveryStore* kept = store();
+    ALRecoveryStore* kept = store();
     if (entry.whole || (kept && kept->load(entry)))
     {
         return true;
@@ -624,7 +624,7 @@ void ALScriptStudioRecovery::recover(const Entry& listed)
 
 void ALScriptStudioRecovery::show()
 {
-    ALScriptRecoveryStore* kept = store();
+    ALRecoveryStore* kept = store();
     if (!kept)
     {
         return;
@@ -671,7 +671,7 @@ void ALScriptStudioRecovery::show()
         },
         [this, alive, offered](const std::string& value) {
             // Shift-Return: discarded, or, discarded already, gone for good.
-            ALScriptRecoveryStore* kept  = store();
+            ALRecoveryStore* kept  = store();
             const size_t           index = static_cast<size_t>(atoi(value.c_str()));
             if (!alive.lock() || !kept || index >= offered.size())
             {
@@ -703,7 +703,7 @@ void ALScriptStudioRecovery::show()
 }
 
 // static
-ALScriptStudioRecovery::Offers ALScriptStudioRecovery::offersAt(const ALScriptRecoveryStore& store, bool studio_open)
+ALScriptStudioRecovery::Offers ALScriptStudioRecovery::offersAt(const ALRecoveryStore& store, bool studio_open)
 {
     Offers offers;
     for (Entry& entry : store.left())
@@ -723,7 +723,7 @@ ALScriptStudioRecovery::Offers ALScriptStudioRecovery::offersAt(const ALScriptRe
 namespace
 {
     // The first few names of entries, for a question to say.
-    std::string namesOf(const std::vector<ALScriptRecoveryEntry>& entries)
+    std::string namesOf(const std::vector<ALRecoveryEntry>& entries)
     {
         std::string names;
         for (size_t i = 0; i < entries.size() && i < 5; ++i)
@@ -741,7 +741,7 @@ namespace
 // static
 void ALScriptStudioRecovery::offer(std::function<ALScriptStudioRecovery*()> studio, bool studio_open)
 {
-    ALScriptRecoveryStore* kept = store();
+    ALRecoveryStore* kept = store();
     if (!kept)
     {
         return;
@@ -777,7 +777,7 @@ void ALScriptStudioRecovery::offer(std::function<ALScriptStudioRecovery*()> stud
     LLNotificationsUtil::add(unsaved.size() == 1 ? "ScriptStudioRecoveredOne" : "ScriptStudioRecovered", args, LLSD(),
                              [studio](const LLSD& notification, const LLSD& response) {
                                  const S32              option = LLNotificationsUtil::getSelectedOption(notification, response);
-                                 ALScriptRecoveryStore* kept   = store();
+                                 ALRecoveryStore* kept   = store();
                                  if (!kept || option == 1)
                                  {
                                      return;
@@ -805,7 +805,7 @@ void ALScriptStudioRecovery::offer(std::function<ALScriptStudioRecovery*()> stud
                                  for (const Entry& entry : now)
                                  {
                                      Entry whole = entry;
-                                     if (!(ALScriptRecoveryStore::isWindowKey(entry.key) && kept->load(whole) && toOwnWindow(whole)))
+                                     if (!(ALRecoveryStore::isWindowKey(entry.key) && kept->load(whole) && toOwnWindow(whole)))
                                      {
                                          rest.push_back(entry);
                                      }

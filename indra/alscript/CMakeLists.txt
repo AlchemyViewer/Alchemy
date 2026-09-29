@@ -34,7 +34,6 @@ target_sources(
     alscriptmessages.cpp
     alscriptnameindex.cpp
     alscriptsnapshot.cpp
-    alscriptrecovery.cpp
     alnotecardformat.cpp
     alscriptweight.cpp
     alscriptstack.cpp
@@ -77,7 +76,6 @@ target_sources(
         alscriptmessages.h
         alscriptnameindex.h
         alscriptsnapshot.h
-        alscriptrecovery.h
         alnotecardformat.h
         alscriptproblem.h
         alscriptstack.h
@@ -162,7 +160,6 @@ if(AL_BUILD_TESTS)
   al_add_test(alluauconfig PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptformatter PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptmessages PROJECT alscript LIBRARIES alscript llcommon)
-  al_add_test(alscriptrecovery PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alnotecardformat PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscripttempfiles PROJECT alscript LIBRARIES alscript llcommon)
   # The preprocessor against C11's 6.10, clause by clause.

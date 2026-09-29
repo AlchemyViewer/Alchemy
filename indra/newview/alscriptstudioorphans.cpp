@@ -26,7 +26,7 @@
 
 #include "alscriptstudioorphans.h"
 
-#include "alscriptrecovery.h"
+#include "alrecoverystore.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudioservices.h"
 #include "lltimer.h"
@@ -171,7 +171,7 @@ void ALScriptStudioOrphans::reattach(Doc& doc)
     // asset carries. Written first, so that nothing typed is only in the
     // tab while it loads.
     mWindow.keepForRecovery(doc);
-    ALScriptRecoveryEntry holding = ALScriptStudioRecovery::entryOf(doc);
+    ALRecoveryEntry holding = ALScriptStudioRecovery::entryOf(doc);
     doc.orphan.detached           = false;
     doc.recovering                = holding;
     doc.carriedText               = holding.text;
@@ -254,7 +254,7 @@ F64 ALScriptStudioOrphans::check()
         const Doc& doc   = *each;
         const bool ready = doc.orphan.kind == Orphan::None ||
                            (doc.orphan.kind == Orphan::Unloaded && doc.loadFailure == ALScriptWorkspace::Loaded::Failure::Fetch);
-        const bool may = ALScriptRecoveryRetry::mayTry(doc.orphan.reattachTries);
+        const bool may = ALRecoveryRetry::mayTry(doc.orphan.reattachTries);
         if (doc.orphan.detached && doc.loaded && ready && may)
         {
             if (now >= doc.orphan.nextReattach)
@@ -410,7 +410,7 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
     }
     else if (action == "restore" && doc->recoverable)
     {
-        const ALScriptRecoveryEntry entry = *doc->recoverable;
+        const ALRecoveryEntry entry = *doc->recoverable;
         doc->recoverable.reset();
         mWindow.endCompare(*doc);
         mWindow.takeUpRecovery(*doc, entry);

@@ -20,6 +20,7 @@ target_sources(
     alfilewrite.cpp
     alserialworker.cpp
     alparamtype.cpp
+    alrecoverystore.cpp
     alregex.cpp
     alwatchedfile.cpp
     apply.cpp
@@ -122,6 +123,7 @@ target_sources(
         alfilewrite.h
         alserialworker.h
         alparamtype.h
+        alrecoverystore.h
         alregex.h
         alsimd.h
         alwatchedfile.h
@@ -295,6 +297,7 @@ if(AL_BUILD_TESTS)
   foreach(
     test
     alfilewrite
+    alrecoverystore
     alregex
     alserialworker
     alwatchedfile

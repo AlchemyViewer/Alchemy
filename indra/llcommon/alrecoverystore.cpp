@@ -1,5 +1,5 @@
 /**
- * @file alscriptrecovery.cpp
+ * @file alrecoverystore.cpp
  * @brief Script Studio's unsaved work, kept on disk until it is saved, so that a crash or a lost object does not take it.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "alscriptrecovery.h"
+#include "alrecoverystore.h"
 
 #include "alfilewrite.h"
 #include "fsyspath.h"
@@ -51,21 +51,21 @@ namespace
     // ALFileWrite wrote them: a crash's leftovers are still swept.
     constexpr std::string_view HALF_WRITTEN = ".tmp";
 
-    const char* stateName(ALScriptRecoveryEntry::State state)
+    const char* stateName(ALRecoveryEntry::State state)
     {
         switch (state)
         {
-            case ALScriptRecoveryEntry::State::Kept:      return "kept";
-            case ALScriptRecoveryEntry::State::Discarded: return "discarded";
+            case ALRecoveryEntry::State::Kept:      return "kept";
+            case ALRecoveryEntry::State::Discarded: return "discarded";
             default:                                      return "unsaved";
         }
     }
 
-    ALScriptRecoveryEntry::State stateFrom(const std::string& name)
+    ALRecoveryEntry::State stateFrom(const std::string& name)
     {
-        return name == "kept" ? ALScriptRecoveryEntry::State::Kept
-               : name == "discarded" ? ALScriptRecoveryEntry::State::Discarded
-                                     : ALScriptRecoveryEntry::State::Unsaved;
+        return name == "kept" ? ALRecoveryEntry::State::Kept
+               : name == "discarded" ? ALRecoveryEntry::State::Discarded
+                                     : ALRecoveryEntry::State::Unsaved;
     }
 
     std::string withSeparator(std::string directory)
@@ -119,7 +119,7 @@ namespace
     }
 }
 
-std::string ALScriptRecoveryEntry::whenSaid() const
+std::string ALRecoveryEntry::whenSaid() const
 {
     const time_t moment = static_cast<time_t>(when.secondsSinceEpoch());
     struct tm    local;
@@ -136,13 +136,13 @@ std::string ALScriptRecoveryEntry::whenSaid() const
 namespace
 {
     // What a listing reads of an entry, and the rest.
-    LLSD metaOf(const ALScriptRecoveryEntry& e, S32 version);
-    LLSD bodyOf(const ALScriptRecoveryEntry& entry);
-    bool metaFrom(const LLSD& sd, ALScriptRecoveryEntry& out);
-    void bodyFrom(const LLSD& sd, ALScriptRecoveryEntry& out);
+    LLSD metaOf(const ALRecoveryEntry& e, S32 version);
+    LLSD bodyOf(const ALRecoveryEntry& entry);
+    bool metaFrom(const LLSD& sd, ALRecoveryEntry& out);
+    void bodyFrom(const LLSD& sd, ALRecoveryEntry& out);
 }
 
-LLSD ALScriptRecoveryEntry::asLLSD() const
+LLSD ALRecoveryEntry::asLLSD() const
 {
     LLSD       sd   = metaOf(*this, 1);
     const LLSD body = bodyOf(*this);
@@ -153,7 +153,7 @@ LLSD ALScriptRecoveryEntry::asLLSD() const
     return sd;
 }
 
-LLSD ALScriptRecoveryEntry::historyOf() const
+LLSD ALRecoveryEntry::historyOf() const
 {
     if (history.isMap() || historyWritten.empty())
     {
@@ -164,7 +164,7 @@ LLSD ALScriptRecoveryEntry::historyOf() const
     return LLSDSerialize::fromNotation(read, in, static_cast<llssize>(historyWritten.size())) > 0 ? read : LLSD();
 }
 
-std::string ALScriptRecoveryEntry::written() const
+std::string ALRecoveryEntry::written() const
 {
     std::ostringstream meta;
     LLSDSerialize::toNotation(metaOf(*this, 2), meta);
@@ -186,7 +186,7 @@ std::string ALScriptRecoveryEntry::written() const
 
 namespace
 {
-    LLSD metaOf(const ALScriptRecoveryEntry& e, S32 version)
+    LLSD metaOf(const ALRecoveryEntry& e, S32 version)
     {
         LLSD sd;
         sd["version"]        = version;
@@ -208,7 +208,7 @@ namespace
         return sd;
     }
 
-    LLSD bodyOf(const ALScriptRecoveryEntry& e)
+    LLSD bodyOf(const ALRecoveryEntry& e)
     {
         LLSD sd;
         sd["text"] = e.text;
@@ -235,7 +235,7 @@ namespace
         return sd;
     }
 
-    bool metaFrom(const LLSD& sd, ALScriptRecoveryEntry& out)
+    bool metaFrom(const LLSD& sd, ALRecoveryEntry& out)
     {
         if (!sd.isMap() || !sd.has("key"))
         {
@@ -259,7 +259,7 @@ namespace
         return !out.key.empty();
     }
 
-    void bodyFrom(const LLSD& sd, ALScriptRecoveryEntry& out)
+    void bodyFrom(const LLSD& sd, ALRecoveryEntry& out)
     {
         out.text             = sd["text"].asString();
         out.embedded         = sd.has("embedded") ? sd["embedded"] : LLSD::emptyArray();
@@ -273,7 +273,7 @@ namespace
 }
 
 // static
-bool ALScriptRecoveryEntry::fromLLSD(const LLSD& sd, ALScriptRecoveryEntry& out)
+bool ALRecoveryEntry::fromLLSD(const LLSD& sd, ALRecoveryEntry& out)
 {
     if (!sd.isMap() || !sd.has("text") || !metaFrom(sd, out))
     {
@@ -284,7 +284,7 @@ bool ALScriptRecoveryEntry::fromLLSD(const LLSD& sd, ALScriptRecoveryEntry& out)
 }
 
 // static
-F64 ALScriptRecoveryRetry::delayAfter(S32 failures)
+F64 ALRecoveryRetry::delayAfter(S32 failures)
 {
     return FIRST * std::pow(3.0, static_cast<F64>(llmax(failures, 1) - 1));
 }
@@ -294,12 +294,12 @@ F64 ALScriptRecoveryRetry::delayAfter(S32 failures)
 // the thread that asked and held by nothing else, since an LLSD's count of
 // who holds it is no thread's but one's -- whether one is being written
 // now, and whether the writer has been asked to write them.
-struct ALScriptRecoveryStore::Writer
+struct ALRecoveryStore::Writer
 {
     struct Waiting
     {
         std::string           path;
-        ALScriptRecoveryEntry entry;
+        ALRecoveryEntry entry;
         bool                  durable = false;
     };
     std::mutex                     mutex;
@@ -335,44 +335,44 @@ struct ALScriptRecoveryStore::Writer
     }
 };
 
-struct ALScriptRecoveryWriter::Pool
+struct ALRecoveryWriter::Pool
 {
     // Only as wide as one: two stores' writes, or two of one store's, one
     // after the other.
     LL::ThreadPool pool{ "ScriptRecovery", 1, 1024 * 1024, /*auto_shutdown*/ false, /*fixed_width*/ true };
 };
 
-ALScriptRecoveryWriter::ALScriptRecoveryWriter() : mPool(std::make_unique<Pool>())
+ALRecoveryWriter::ALRecoveryWriter() : mPool(std::make_unique<Pool>())
 {
     mPool->pool.start();
 }
 
-ALScriptRecoveryWriter::~ALScriptRecoveryWriter() = default;
+ALRecoveryWriter::~ALRecoveryWriter() = default;
 
-void ALScriptRecoveryWriter::cleanupSingleton()
+void ALRecoveryWriter::cleanupSingleton()
 {
     // What is posted is written before it stops.
     mPool->pool.close();
 }
 
-bool ALScriptRecoveryWriter::post(std::function<void()> work)
+bool ALRecoveryWriter::post(std::function<void()> work)
 {
     return mPool->pool.getQueue().post(std::move(work));
 }
 
-ALScriptRecoveryStore::ALScriptRecoveryStore(std::string directory, std::string session)
+ALRecoveryStore::ALRecoveryStore(std::string directory, std::string session)
 :   mDirectory(withSeparator(std::move(directory))),
     mDiscarded(mDirectory + "discarded/"),
     mSession(std::move(session))
 {
 }
 
-ALScriptRecoveryStore::~ALScriptRecoveryStore()
+ALRecoveryStore::~ALRecoveryStore()
 {
     flush();
 }
 
-void ALScriptRecoveryStore::writeSoon(ALScriptRecoveryEntry entry, bool durable)
+void ALRecoveryStore::writeSoon(ALRecoveryEntry entry, bool durable)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     if (entry.key.empty())
@@ -411,14 +411,14 @@ void ALScriptRecoveryStore::writeSoon(ALScriptRecoveryEntry entry, bool durable)
         mWriter->posted = true;
     }
     Writer* writer = mWriter.get();
-    if (!ALScriptRecoveryWriter::instance().post([writer] { writer->drain(); }))
+    if (!ALRecoveryWriter::instance().post([writer] { writer->drain(); }))
     {
         // Stopped: written here.
         writer->drain();
     }
 }
 
-void ALScriptRecoveryStore::flush() const
+void ALRecoveryStore::flush() const
 {
     if (!mWriter)
     {
@@ -428,7 +428,7 @@ void ALScriptRecoveryStore::flush() const
     mWriter->changed.wait(lock, [this] { return mWriter->waiting.empty() && !mWriter->busy && !mWriter->posted; });
 }
 
-std::vector<std::string> ALScriptRecoveryStore::takeFailures()
+std::vector<std::string> ALRecoveryStore::takeFailures()
 {
     std::vector<std::string> out;
     if (mWriter)
@@ -439,7 +439,7 @@ std::vector<std::string> ALScriptRecoveryStore::takeFailures()
     return out;
 }
 
-bool ALScriptRecoveryStore::takeFailure(const std::string& key)
+bool ALRecoveryStore::takeFailure(const std::string& key)
 {
     if (!mWriter)
     {
@@ -454,7 +454,7 @@ bool ALScriptRecoveryStore::takeFailure(const std::string& key)
 }
 
 // static
-std::string ALScriptRecoveryStore::keyOf(const LLUUID& object, const LLUUID& item, const std::string& file)
+std::string ALRecoveryStore::keyOf(const LLUUID& object, const LLUUID& item, const std::string& file)
 {
     if (!file.empty())
     {
@@ -463,30 +463,30 @@ std::string ALScriptRecoveryStore::keyOf(const LLUUID& object, const LLUUID& ite
     return object.isNull() ? "item:" + item.asString() : "task:" + object.asString() + ":" + item.asString();
 }
 
-std::string ALScriptRecoveryStore::windowKeyOf(const LLUUID& object, const LLUUID& item)
+std::string ALRecoveryStore::windowKeyOf(const LLUUID& object, const LLUUID& item)
 {
     return "window:" + keyOf(object, item, std::string());
 }
 
-bool ALScriptRecoveryStore::isWindowKey(const std::string& key)
+bool ALRecoveryStore::isWindowKey(const std::string& key)
 {
     return key.starts_with("window:");
 }
 
-std::string ALScriptRecoveryStore::fileOf(const std::string& key) const
+std::string ALRecoveryStore::fileOf(const std::string& key) const
 {
     // By a hash of the key, which may be a path of any length and any
     // letters.
     return LLUUID::generateNewID(key).asString();
 }
 
-std::string ALScriptRecoveryStore::pathOf(const std::string& key, const std::string& session) const
+std::string ALRecoveryStore::pathOf(const std::string& key, const std::string& session) const
 {
     return mDirectory + fileOf(key) + "." + session + EXTENSION;
 }
 
 // static
-bool ALScriptRecoveryStore::readEntry(const std::string& path, ALScriptRecoveryEntry& out, bool whole)
+bool ALRecoveryStore::readEntry(const std::string& path, ALRecoveryEntry& out, bool whole)
 {
     llifstream file(path, std::ios::in | std::ios::binary);
     if (!file.is_open())
@@ -509,7 +509,7 @@ bool ALScriptRecoveryStore::readEntry(const std::string& path, ALScriptRecoveryE
         const std::string text = all.str();
         std::istringstream in(text);
         LLSD               sd;
-        if (!LLSDSerialize::deserialize(sd, in, static_cast<llssize>(text.size())) || !ALScriptRecoveryEntry::fromLLSD(sd, out))
+        if (!LLSDSerialize::deserialize(sd, in, static_cast<llssize>(text.size())) || !ALRecoveryEntry::fromLLSD(sd, out))
         {
             return false;
         }
@@ -541,7 +541,7 @@ bool ALScriptRecoveryStore::readEntry(const std::string& path, ALScriptRecoveryE
     return true;
 }
 
-bool ALScriptRecoveryStore::load(ALScriptRecoveryEntry& entry) const
+bool ALRecoveryStore::load(ALRecoveryEntry& entry) const
 {
     if (entry.whole)
     {
@@ -550,7 +550,7 @@ bool ALScriptRecoveryStore::load(ALScriptRecoveryEntry& entry) const
     flush();
     // Read again whole; what the listing said of it stands, but for what
     // only the rest says.
-    ALScriptRecoveryEntry read;
+    ALRecoveryEntry read;
     if (entry.path.empty() || !readEntry(entry.path, read, true) || read.key != entry.key)
     {
         return false;
@@ -566,7 +566,7 @@ bool ALScriptRecoveryStore::load(ALScriptRecoveryEntry& entry) const
     return true;
 }
 
-bool ALScriptRecoveryStore::write(ALScriptRecoveryEntry entry)
+bool ALRecoveryStore::write(ALRecoveryEntry entry)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     flush();
@@ -581,19 +581,19 @@ bool ALScriptRecoveryStore::write(ALScriptRecoveryEntry entry)
     return ALFileWrite::whole(pathOf(entry.key, mSession), entry.written(), /*durable*/ true);
 }
 
-void ALScriptRecoveryStore::forget(const std::string& key)
+void ALRecoveryStore::forget(const std::string& key)
 {
     flush();
     changed();
     LLFile::remove(pathOf(key, mSession), ENOENT);
 }
 
-bool ALScriptRecoveryStore::setAside(ALScriptRecoveryEntry entry)
+bool ALRecoveryStore::setAside(ALRecoveryEntry entry)
 {
     return !setAsideAt(std::move(entry), /*keep_when*/ false).empty();
 }
 
-std::string ALScriptRecoveryStore::setAsideAt(ALScriptRecoveryEntry entry, bool keep_when)
+std::string ALRecoveryStore::setAsideAt(ALRecoveryEntry entry, bool keep_when)
 {
     flush();
     // Written again whole among the discarded: what a listing read of it
@@ -607,7 +607,7 @@ std::string ALScriptRecoveryStore::setAsideAt(ALScriptRecoveryEntry entry, bool 
         entry.session = mSession;
     }
     const LLDate now = LLDate::now();
-    entry.state      = ALScriptRecoveryEntry::State::Discarded;
+    entry.state      = ALRecoveryEntry::State::Discarded;
     if (!keep_when)
     {
         entry.when = now;
@@ -627,7 +627,7 @@ std::string ALScriptRecoveryStore::setAsideAt(ALScriptRecoveryEntry entry, bool 
     return target;
 }
 
-void ALScriptRecoveryStore::makeFolders(bool discarded)
+void ALRecoveryStore::makeFolders(bool discarded)
 {
     if (!mMadeDirectory)
     {
@@ -641,7 +641,7 @@ void ALScriptRecoveryStore::makeFolders(bool discarded)
     }
 }
 
-void ALScriptRecoveryStore::capDiscarded()
+void ALRecoveryStore::capDiscarded()
 {
     // The newest kept, by when their names say they were set aside; one
     // whose name does not say goes as if it were the oldest.
@@ -681,9 +681,9 @@ void ALScriptRecoveryStore::capDiscarded()
     }
 }
 
-bool ALScriptRecoveryStore::discard(const ALScriptRecoveryEntry& entry)
+bool ALRecoveryStore::discard(const ALRecoveryEntry& entry)
 {
-    if (entry.state == ALScriptRecoveryEntry::State::Discarded)
+    if (entry.state == ALRecoveryEntry::State::Discarded)
     {
         return true;
     }
@@ -695,7 +695,7 @@ bool ALScriptRecoveryStore::discard(const ALScriptRecoveryEntry& entry)
     return true;
 }
 
-void ALScriptRecoveryStore::remove(const ALScriptRecoveryEntry& entry)
+void ALRecoveryStore::remove(const ALRecoveryEntry& entry)
 {
     flush();
     changed();
@@ -705,7 +705,7 @@ void ALScriptRecoveryStore::remove(const ALScriptRecoveryEntry& entry)
     }
 }
 
-bool ALScriptRecoveryStore::letGo(const Parting& parting)
+bool ALRecoveryStore::letGo(const Parting& parting)
 {
     bool let_go = false;
     bool safe   = true;
@@ -743,7 +743,7 @@ bool ALScriptRecoveryStore::letGo(const Parting& parting)
     return safe;
 }
 
-void ALScriptRecoveryStore::listIn(const std::string& folder, std::vector<ALScriptRecoveryEntry>& out) const
+void ALRecoveryStore::listIn(const std::string& folder, std::vector<ALRecoveryEntry>& out) const
 {
     for (const std::string& name : namesIn(folder))
     {
@@ -751,7 +751,7 @@ void ALScriptRecoveryStore::listIn(const std::string& folder, std::vector<ALScri
         {
             continue;
         }
-        ALScriptRecoveryEntry entry;
+        ALRecoveryEntry entry;
         if (readEntry(folder + name, entry, /*whole*/ false))
         {
             out.push_back(std::move(entry));
@@ -759,40 +759,40 @@ void ALScriptRecoveryStore::listIn(const std::string& folder, std::vector<ALScri
     }
 }
 
-std::vector<ALScriptRecoveryEntry> ALScriptRecoveryStore::list() const
+std::vector<ALRecoveryEntry> ALRecoveryStore::list() const
 {
     flush();
-    std::vector<ALScriptRecoveryEntry> entries;
+    std::vector<ALRecoveryEntry> entries;
     listIn(mDirectory, entries);
     listIn(mDiscarded, entries);
     std::stable_sort(entries.begin(), entries.end(),
-                     [](const ALScriptRecoveryEntry& a, const ALScriptRecoveryEntry& b) { return a.when.secondsSinceEpoch() > b.when.secondsSinceEpoch(); });
+                     [](const ALRecoveryEntry& a, const ALRecoveryEntry& b) { return a.when.secondsSinceEpoch() > b.when.secondsSinceEpoch(); });
     return entries;
 }
 
-std::vector<ALScriptRecoveryEntry> ALScriptRecoveryStore::left() const
+std::vector<ALRecoveryEntry> ALRecoveryStore::left() const
 {
     // The discarded are not read: they are in a folder of their own.
-    std::vector<ALScriptRecoveryEntry> all;
+    std::vector<ALRecoveryEntry> all;
     listIn(mDirectory, all);
-    std::vector<ALScriptRecoveryEntry> entries;
-    for (ALScriptRecoveryEntry& entry : all)
+    std::vector<ALRecoveryEntry> entries;
+    for (ALRecoveryEntry& entry : all)
     {
-        if (entry.state != ALScriptRecoveryEntry::State::Discarded && entry.session != mSession)
+        if (entry.state != ALRecoveryEntry::State::Discarded && entry.session != mSession)
         {
             entries.push_back(std::move(entry));
         }
     }
     std::stable_sort(entries.begin(), entries.end(),
-                     [](const ALScriptRecoveryEntry& a, const ALScriptRecoveryEntry& b) { return a.when.secondsSinceEpoch() > b.when.secondsSinceEpoch(); });
+                     [](const ALRecoveryEntry& a, const ALRecoveryEntry& b) { return a.when.secondsSinceEpoch() > b.when.secondsSinceEpoch(); });
     return entries;
 }
 
-std::optional<ALScriptRecoveryEntry> ALScriptRecoveryStore::leftFor(const std::string& key) const
+std::optional<ALRecoveryEntry> ALRecoveryStore::leftFor(const std::string& key) const
 {
     // By the files' names first: only this key's are read.
     const std::string                    hash = fileOf(key);
-    std::optional<ALScriptRecoveryEntry> newest;
+    std::optional<ALRecoveryEntry> newest;
     for (const std::string& name : namesIn(mDirectory))
     {
         const std::vector<std::string> parts = partsOf(name);
@@ -800,8 +800,8 @@ std::optional<ALScriptRecoveryEntry> ALScriptRecoveryStore::leftFor(const std::s
         {
             continue;
         }
-        ALScriptRecoveryEntry entry;
-        if (readEntry(mDirectory + name, entry, /*whole*/ false) && entry.key == key && entry.state != ALScriptRecoveryEntry::State::Discarded &&
+        ALRecoveryEntry entry;
+        if (readEntry(mDirectory + name, entry, /*whole*/ false) && entry.key == key && entry.state != ALRecoveryEntry::State::Discarded &&
             (!newest || entry.when.secondsSinceEpoch() > newest->when.secondsSinceEpoch()))
         {
             newest = std::move(entry);
@@ -810,7 +810,7 @@ std::optional<ALScriptRecoveryEntry> ALScriptRecoveryStore::leftFor(const std::s
     return newest;
 }
 
-std::optional<ALScriptRecoveryEntry> ALScriptRecoveryStore::reclaim(const std::string& key)
+std::optional<ALRecoveryEntry> ALRecoveryStore::reclaim(const std::string& key)
 {
     flush();
     if (key.empty())
@@ -818,8 +818,8 @@ std::optional<ALScriptRecoveryEntry> ALScriptRecoveryStore::reclaim(const std::s
         return std::nullopt;
     }
     const std::string     own = pathOf(key, mSession);
-    ALScriptRecoveryEntry entry;
-    if (!readEntry(own, entry, /*whole*/ true) || entry.key != key || entry.state == ALScriptRecoveryEntry::State::Discarded)
+    ALRecoveryEntry entry;
+    if (!readEntry(own, entry, /*whole*/ true) || entry.key != key || entry.state == ALRecoveryEntry::State::Discarded)
     {
         return std::nullopt;
     }
@@ -829,12 +829,12 @@ std::optional<ALScriptRecoveryEntry> ALScriptRecoveryStore::reclaim(const std::s
         return std::nullopt;
     }
     LLFile::remove(own, ENOENT);
-    entry.state = ALScriptRecoveryEntry::State::Discarded;
+    entry.state = ALRecoveryEntry::State::Discarded;
     entry.path  = aside;
     return entry;
 }
 
-bool ALScriptRecoveryStore::hasOffers() const
+bool ALRecoveryStore::hasOffers() const
 {
     // Another session -- another viewer on this account -- may write
     // meanwhile: asked again after a few seconds whatever this one does.
@@ -866,18 +866,18 @@ bool ALScriptRecoveryStore::hasOffers() const
     return mOffers;
 }
 
-void ALScriptRecoveryStore::markOffered(const std::vector<ALScriptRecoveryEntry>& entries, const LLDate& now)
+void ALRecoveryStore::markOffered(const std::vector<ALRecoveryEntry>& entries, const LLDate& now)
 {
     flush();
     changed();
     const std::string when = std::to_string(static_cast<S64>(now.secondsSinceEpoch() * 1000.0));
-    for (const ALScriptRecoveryEntry& entry : entries)
+    for (const ALRecoveryEntry& entry : entries)
     {
         // Another session's, not yet marked: renamed to say when.
         const size_t                   slash = entry.path.find_last_of("/\\");
         const std::string              file  = slash == std::string::npos ? entry.path : entry.path.substr(slash + 1);
         const std::vector<std::string> parts = partsOf(file);
-        if (entry.session == mSession || entry.state == ALScriptRecoveryEntry::State::Discarded || parts.size() != 2 ||
+        if (entry.session == mSession || entry.state == ALRecoveryEntry::State::Discarded || parts.size() != 2 ||
             entry.path.compare(0, mDirectory.size(), mDirectory) != 0)
         {
             continue;
@@ -886,7 +886,7 @@ void ALScriptRecoveryStore::markOffered(const std::vector<ALScriptRecoveryEntry>
     }
 }
 
-void ALScriptRecoveryStore::prune(F64 max_age_seconds, const LLDate& now)
+void ALRecoveryStore::prune(F64 max_age_seconds, const LLDate& now)
 {
     changed();
     // What was offered and left, as old since it was offered.
@@ -924,7 +924,7 @@ void ALScriptRecoveryStore::prune(F64 max_age_seconds, const LLDate& now)
         }
         if (!known)
         {
-            ALScriptRecoveryEntry entry;
+            ALRecoveryEntry entry;
             if (!readEntry(mDiscarded + name, entry, /*whole*/ false))
             {
                 continue;

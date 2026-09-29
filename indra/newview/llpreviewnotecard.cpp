@@ -166,7 +166,7 @@ void LLPreviewNotecard::draw()
     if (mRecoveryDue > 0.0 && LLTimer::getTotalSeconds() >= mRecoveryDue)
     {
         mRecoveryDue = 0.0;
-        if (ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store(); kept && mText->isDirty())
+        if (ALRecoveryStore* kept = ALScriptStudioRecovery::store(); kept && mText->isDirty())
         {
             kept->writeSoon(recoveryEntry());
             mRecoveryWritten = true;
@@ -174,7 +174,7 @@ void LLPreviewNotecard::draw()
     }
     if (mRecoveryWritten)
     {
-        if (ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store())
+        if (ALRecoveryStore* kept = ALScriptStudioRecovery::store())
         {
             for (const std::string& key : kept->takeFailures())
             {
@@ -360,7 +360,7 @@ void LLPreviewNotecard::loaded(const ALScriptWorkspace::Loaded& answer)
     {
         // Theirs over what was typed here, as one step: Undo brings back
         // what was typed, which the store keeps too.
-        if (ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store())
+        if (ALRecoveryStore* kept = ALScriptStudioRecovery::store())
         {
             kept->setAside(recoveryEntry());
         }
@@ -394,7 +394,7 @@ void LLPreviewNotecard::loaded(const ALScriptWorkspace::Loaded& answer)
     syncExternal();
     if (mPendingRecovery)
     {
-        ALScriptRecoveryEntry entry = std::move(*mPendingRecovery);
+        ALRecoveryEntry entry = std::move(*mPendingRecovery);
         mPendingRecovery.reset();
         takeUp(std::move(entry));
     }
@@ -648,7 +648,7 @@ bool LLPreviewNotecard::handleSaveChangesDialog(const LLSD& notification, const 
         case 1: // "No"
             // Thrown away, and set aside a while all the same, in case
             // that was a mistake.
-            if (ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store())
+            if (ALRecoveryStore* kept = ALScriptStudioRecovery::store())
             {
                 kept->setAside(recoveryEntry());
             }
@@ -749,12 +749,12 @@ void LLPreviewNotecard::hideNotice()
 // static
 std::string LLPreviewNotecard::recoveryKeyOf(const LLUUID& object, const LLUUID& item)
 {
-    return ALScriptRecoveryStore::windowKeyOf(object, item);
+    return ALRecoveryStore::windowKeyOf(object, item);
 }
 
-ALScriptRecoveryEntry LLPreviewNotecard::recoveryEntry() const
+ALRecoveryEntry LLPreviewNotecard::recoveryEntry() const
 {
-    ALScriptRecoveryEntry entry;
+    ALRecoveryEntry entry;
     entry.key       = mRecoveryKey;
     entry.object    = mObjectUUID;
     entry.item      = mItemUUID;
@@ -803,7 +803,7 @@ void LLPreviewNotecard::forgetKept()
     {
         return;
     }
-    if (ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store())
+    if (ALRecoveryStore* kept = ALScriptStudioRecovery::store())
     {
         kept->forget(mRecoveryKey);
     }
@@ -813,22 +813,22 @@ void LLPreviewNotecard::forgetKept()
 
 void LLPreviewNotecard::offerKept()
 {
-    ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store();
+    ALRecoveryStore* kept = ALScriptStudioRecovery::store();
     if (!kept || mRecoveryKey.empty() || !mModifiable)
     {
         return;
     }
-    const std::optional<ALScriptRecoveryEntry> left = kept->leftFor(mRecoveryKey);
+    const std::optional<ALRecoveryEntry> left = kept->leftFor(mRecoveryKey);
     if (!left)
     {
         return;
     }
     LLStringUtil::format_map_t args;
     args["[WHEN]"]                    = left->whenSaid();
-    const ALScriptRecoveryEntry entry = *left;
+    const ALRecoveryEntry entry = *left;
     showNotice(getString("Recovered", args), { { getString("Restore"), [this, entry]() { takeUp(entry); } },
                                                { getString("Discard"), [this, entry]() {
-                                                    if (ALScriptRecoveryStore* store = ALScriptStudioRecovery::store())
+                                                    if (ALRecoveryStore* store = ALScriptStudioRecovery::store())
                                                     {
                                                         store->discard(entry);
                                                     }
@@ -836,9 +836,9 @@ void LLPreviewNotecard::offerKept()
                                                 } } });
 }
 
-void LLPreviewNotecard::takeUp(ALScriptRecoveryEntry entry)
+void LLPreviewNotecard::takeUp(ALRecoveryEntry entry)
 {
-    ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store();
+    ALRecoveryStore* kept = ALScriptStudioRecovery::store();
     hideNotice();
     if (!kept || (!entry.whole && !kept->load(entry)) || !mLoaded || !mModifiable)
     {
@@ -873,7 +873,7 @@ void LLPreviewNotecard::takeUp(ALScriptRecoveryEntry entry)
 }
 
 // static
-bool LLPreviewNotecard::recover(const ALScriptRecoveryEntry& entry)
+bool LLPreviewNotecard::recover(const ALRecoveryEntry& entry)
 {
     // The notecard as the window opens it: in the inventory, or in an
     // object in sight whose contents say it is there.

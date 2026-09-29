@@ -25,7 +25,7 @@
 #pragma once
 
 #include "alquickopen.h"
-#include "alscriptrecovery.h"
+#include "alrecoverystore.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptworkspace.h"
 
@@ -52,7 +52,7 @@ class ALScriptStudioRecovery
 {
 public:
     typedef ALScriptStudioDoc     Doc;
-    typedef ALScriptRecoveryEntry Entry;
+    typedef ALRecoveryEntry Entry;
 
     // What recovery asks of the window beyond its services.
     class Window
@@ -98,10 +98,10 @@ public:
     // another has logged in since; null before one has. Every entry this
     // process writes is under one session, which is how the next session
     // tells what this one left. A test's in its place, where one is given.
-    static ALScriptRecoveryStore* store();
-    static void                   useStore(ALScriptRecoveryStore* store);
+    static ALRecoveryStore* store();
+    static void                   useStore(ALRecoveryStore* store);
     // Where a text one of the viewer's own windows kept
-    // (ALScriptRecoveryStore::isWindowKey) goes back to: the notecard
+    // (ALRecoveryStore::isWindowKey) goes back to: the notecard
     // window, a legacy script editor, as the viewer has them -- false where
     // it cannot have the item, and the text is taken up here as any other
     // is. None where none is given, as in a test.
@@ -170,7 +170,7 @@ public:
         std::vector<Entry> unsaved;
         std::vector<Entry> kept;
     };
-    static Offers offersAt(const ALScriptRecoveryStore& store, bool studio_open);
+    static Offers offersAt(const ALRecoveryStore& store, bool studio_open);
 
 private:
     // An entry a listing read only the start of, read whole; false, and

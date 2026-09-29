@@ -27,7 +27,7 @@
 #ifndef LL_LLPREVIEWNOTECARD_H
 #define LL_LLPREVIEWNOTECARD_H
 
-#include "alscriptrecovery.h"
+#include "alrecoverystore.h"
 #include "alscriptworkspace.h"
 #include "altextundo.h"
 #include "llpreview.h"
@@ -80,13 +80,13 @@ public:
     void inventoryChanged(LLViewerObject* object, LLInventoryObject::object_list_t* inventory, S32 serial_num, void* user_data) override;
 
     // The key the window keeps a notecard's unsaved text under in the
-    // recovery store (ALScriptRecoveryStore::windowKeyOf).
+    // recovery store (ALRecoveryStore::windowKeyOf).
     static std::string recoveryKeyOf(const LLUUID& object, const LLUUID& item);
     // A text the window kept, taken up where it belongs -- this window
     // for its notecard, opened, the text put in as it loads -- where the
     // notecard can be had: false where it cannot, and whoever asked keeps
     // it some other way.
-    static bool recover(const ALScriptRecoveryEntry& entry);
+    static bool recover(const ALRecoveryEntry& entry);
 
 protected:
     void updateTitleButtons() override;
@@ -136,7 +136,7 @@ private:
 
     // --- kept against a crash -----------------------------------------------------------
 
-    ALScriptRecoveryEntry recoveryEntry() const;
+    ALRecoveryEntry recoveryEntry() const;
     // What is unsaved written to the store a moment after the typing, or
     // this window's entry forgotten where nothing is unsaved.
     void keepSoon();
@@ -145,7 +145,7 @@ private:
     // loaded; and one taken up over the text, as one step to undo, or with
     // its history where nothing was typed here.
     void offerKept();
-    void takeUp(ALScriptRecoveryEntry entry);
+    void takeUp(ALRecoveryEntry entry);
 
     // --- the external editor ------------------------------------------------------------
 
@@ -200,7 +200,7 @@ private:
     F64                                  mRecoveryDue     = 0.0;
     bool                                 mRecoveryWritten = false;
     bool                                 mRecoveryFailed  = false;
-    std::optional<ALScriptRecoveryEntry> mPendingRecovery;
+    std::optional<ALRecoveryEntry> mPendingRecovery;
 
     boost::signals2::scoped_connection mSavedConnection;
     boost::signals2::scoped_connection mChangedConnection;

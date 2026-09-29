@@ -26,7 +26,7 @@
 
 #include "../alscriptstudioorphans.h"
 
-#include "alscriptrecovery.h"
+#include "alrecoverystore.h"
 #include "alscriptstudio_fixture.h"
 #include "llbutton.h"
 #include "lltextbox.h"
@@ -63,8 +63,8 @@ namespace
         void               saveCopyToFile() override { did.push_back("export"); }
         void               saveAgain(Doc& doc) override { did.push_back("save " + doc.id); }
         void               takeOffer(Doc& doc, const std::string& action) override { did.push_back("offer " + doc.id + ": " + action); }
-        void               takeUpRecovery(Doc& doc, const ALScriptRecoveryEntry& entry) override { did.push_back("restore " + doc.id); }
-        void               discardRecovery(const ALScriptRecoveryEntry&) override { did.push_back("discard"); }
+        void               takeUpRecovery(Doc& doc, const ALRecoveryEntry& entry) override { did.push_back("restore " + doc.id); }
+        void               discardRecovery(const ALRecoveryEntry&) override { did.push_back("discard"); }
         void               takeCarriedText(Doc& doc) override
         {
             did.push_back("carried " + doc.id + ": " + doc.carriedText.value_or(std::string()));
@@ -241,7 +241,7 @@ namespace tut
         Doc& c                 = tab("c");
         c.orphan.kind          = Orphan::Away;
         c.orphan.detached      = true;
-        c.orphan.reattachTries = ALScriptRecoveryRetry::TRIES;
+        c.orphan.reattachTries = ALRecoveryRetry::TRIES;
         unit.check();
         ensure("a detached one back: nothing said, its load will", c.orphan.kind == Orphan::None && services().reports.size() == said);
     }
@@ -254,7 +254,7 @@ namespace tut
         Doc&     a    = tab("a");
         a.orphan.detached = true;
         a.editor->setText("kept text");
-        a.orphan.reattachTries = ALScriptRecoveryRetry::TRIES;
+        a.orphan.reattachTries = ALRecoveryRetry::TRIES;
         unit.check();
         ensure("tried out: waits for a person", studio.loads.empty());
         a.orphan.reattachTries = 1;
@@ -288,7 +288,7 @@ namespace tut
         ensure("no tab: nothing", Orphans::noticeFor(nullptr, words).text.empty());
         Doc& a = tab("a");
         ensure("nothing to say", Orphans::noticeFor(&a, words).text.empty());
-        ALScriptRecoveryEntry kept;
+        ALRecoveryEntry kept;
         kept.baseAsset = LLUUID::generateNewID();
         a.recoverable  = kept;
         a.orphan.kind  = Orphan::Away;
@@ -331,14 +331,14 @@ namespace tut
         Orphans& unit = make();
         Doc&     a    = tab("a");
         services().front = 0;
-        a.recoverable    = ALScriptRecoveryEntry();
+        a.recoverable    = ALRecoveryEntry();
         unit.noticeAction("restore");
         ensure("restored, the source in front", studio.did == Names{ "source a", "restore a" } && !a.recoverable &&
                                services().reports.back().text == said("RecoveryRestored", "[NAME]", "a"));
-        a.recoverable = ALScriptRecoveryEntry();
+        a.recoverable = ALRecoveryEntry();
         unit.noticeAction("discard_left");
         ensure("discarded", studio.did.back() == "discard" && !a.recoverable);
-        a.recoverable = ALScriptRecoveryEntry();
+        a.recoverable = ALRecoveryEntry();
         unit.noticeAction("close");
         ensure("hidden, the kept text let go of here", a.orphan.noticeDismissed && !a.recoverable);
         unit.noticeAction("copy");
@@ -423,7 +423,7 @@ namespace tut
         Orphans& unit    = make();
         Doc&     a       = tab("a");
         services().front = 0;
-        ALScriptRecoveryEntry kept;
+        ALRecoveryEntry kept;
         kept.text     = "default { state_entry() { } }";
         a.recoverable = kept;
         unit.noticeAction("compare_kept");
