@@ -284,16 +284,16 @@ void ALVimSearch::incrementalSearch(ALTextView& view)
     }
     std::string pattern;
     std::string offset_text;
-    splitOffset(mVim.mLine, mVim.mLineKind, pattern, offset_text);
+    splitOffset(mVim.mCommandLine.line, mVim.mCommandLine.kind, pattern, offset_text);
     // A key that left the pattern as it was, in the same text: nothing
     // more to light or scroll to.
-    if (mIncrementalShown && pattern == mIncrementalPattern && mVim.mLineKind == mIncrementalKind && view.document().version() == mIncrementalVersion)
+    if (mIncrementalShown && pattern == mIncrementalPattern && mVim.mCommandLine.kind == mIncrementalKind && view.document().version() == mIncrementalVersion)
     {
         return;
     }
     mIncrementalShown   = true;
     mIncrementalPattern = pattern;
-    mIncrementalKind    = mVim.mLineKind;
+    mIncrementalKind    = mVim.mCommandLine.kind;
     mIncrementalVersion = view.document().version();
     if (pattern.empty())
     {
@@ -314,7 +314,7 @@ void ALVimSearch::incrementalSearch(ALTextView& view)
         view.scrollToCaret();
         return;
     }
-    const bool forward = mVim.mLineKind == '/';
+    const bool forward = mVim.mCommandLine.kind == '/';
     const S32  index   = ALTextSearch::nearest(matches, forward ? view.document().nextCluster(mVim.cursor(view)) : mVim.cursor(view), forward);
     const ALTextRange next = matches[static_cast<size_t>(index < 0 ? 0 : index)];
     // Every match lit where hlsearch has them, else the next alone.

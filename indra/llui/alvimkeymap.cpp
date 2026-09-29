@@ -107,7 +107,7 @@ std::string ALVimKeymap::status() const
         case Mode::VisualLine:  return recording + said("VimModeVisualLine", "-- VISUAL LINE --") + held;
         case Mode::VisualBlock: return recording + said("VimModeVisualBlock", "-- VISUAL BLOCK --") + held;
         case Mode::Command:
-        case Mode::Search:      return utf8Of(mLineKind) + mLine;
+        case Mode::Search:      return utf8Of(mCommandLine.kind) + mCommandLine.line;
         case Mode::Confirm:
         {
             // The question, saying how many lines the match runs over
@@ -278,9 +278,9 @@ bool ALVimKeymap::typingLine(std::string& line, S32& caret) const
     {
         return false;
     }
-    const std::string kind = utf8Of(mLineKind);
-    line                   = kind + mLine;
-    caret                  = static_cast<S32>(kind.size() + llmin(mLineCursor, mLine.size()));
+    const std::string kind = utf8Of(mCommandLine.kind);
+    line                   = kind + mCommandLine.line;
+    caret                  = static_cast<S32>(kind.size() + llmin(mCommandLine.cursor, mCommandLine.line.size()));
     return true;
 }
 
@@ -592,7 +592,7 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
             break;
         case Mode::Command:
         case Mode::Search:
-            taken = commandLine(view, input);
+            taken = mCommandLine.commandLine(view, input);
             if (mMode == Mode::Search)
             {
                 mSearch.incrementalSearch(view);
@@ -1122,7 +1122,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 else if (ch == ':' || ch == '/' || ch == '?')
                 {
                     clearPending();
-                    const std::vector<std::string>& history = historyOf(ch);
+                    const std::vector<std::string>& history = mCommandLine.historyOf(ch);
                     if (mHooks.historyWindow && !history.empty())
                     {
                         // The host's window of them; what is picked comes
@@ -1142,11 +1142,11 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                         return true;
                     }
                     mMode     = ch == ':' ? Mode::Command : Mode::Search;
-                    mLineKind = ch;
-                    mHistoryPrefix.clear();
-                    mHistoryAt  = history.empty() ? -1 : static_cast<S32>(history.size()) - 1;
-                    mLine       = history.empty() ? std::string() : history.back();
-                    mLineCursor = mLine.size();
+                    mCommandLine.kind = ch;
+                    mCommandLine.historyPrefix.clear();
+                    mCommandLine.historyAt  = history.empty() ? -1 : static_cast<S32>(history.size()) - 1;
+                    mCommandLine.line       = history.empty() ? std::string() : history.back();
+                    mCommandLine.cursor = mCommandLine.line.size();
                     return true;
                 }
                 clearPending();
@@ -1165,7 +1165,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                     // The last : line again.
                     clearPending();
                     mLastPlayed = ':';
-                    const std::vector<std::string>& history = historyOf(':');
+                    const std::vector<std::string>& history = mCommandLine.historyOf(':');
                     if (history.empty())
                     {
                         say(said("VimNoPreviousCommand", "E30: No previous command line"), true);
@@ -2388,10 +2388,10 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             return true;
         case ':':
             mMode      = Mode::Command;
-            mLineKind  = ':';
-            mHistoryAt = -1;
-            mLine      = visual ? std::string("'<,'>") : mCount > 0 ? std::string(".,.+") + std::to_string(mCount - 1) : std::string();
-            mLineCursor = mLine.size();
+            mCommandLine.kind  = ':';
+            mCommandLine.historyAt = -1;
+            mCommandLine.line      = visual ? std::string("'<,'>") : mCount > 0 ? std::string(".,.+") + std::to_string(mCount - 1) : std::string();
+            mCommandLine.cursor = mCommandLine.line.size();
             if (visual)
             {
                 leaveVisual(view);
@@ -2401,10 +2401,10 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
         case '/':
         case '?':
             mMode      = Mode::Search;
-            mLineKind  = ch;
-            mHistoryAt = -1;
-            mLine.clear();
-            mLineCursor = 0;
+            mCommandLine.kind  = ch;
+            mCommandLine.historyAt = -1;
+            mCommandLine.line.clear();
+            mCommandLine.cursor = 0;
             return true;
         case 'n':
         case 'N':
@@ -4267,406 +4267,27 @@ void ALVimKeymap::showVisual(ALTextView& view)
 
 // --- the : and / lines --------------------------------------------------------------------
 
-bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
-{
-    // The cursor moves by whole characters.
-    auto back = [this](size_t at) {
-        while (at > 0 && (static_cast<unsigned char>(mLine[--at]) & 0xC0) == 0x80) {}
-        return at;
-    };
-    auto forward = [this](size_t at) {
-        if (at < mLine.size())
-        {
-            ++at;
-            while (at < mLine.size() && (static_cast<unsigned char>(mLine[at]) & 0xC0) == 0x80)
-            {
-                ++at;
-            }
-        }
-        return at;
-    };
-    mLineCursor = llmin(mLineCursor, mLine.size());
-    // Tab walks the completions; anything else keeps what it put on the
-    // line and lets the rest go -- but Escape with them up only lets
-    // them go, the word as typed back on the line.
-    if (!input.isChar && input.key == KEY_TAB && !(input.mask & (CONTROL | MASK_CONTROL | MASK_ALT)))
-    {
-        complete(view, !(input.mask & MASK_SHIFT));
-        return true;
-    }
-    if (!input.isChar && input.key == KEY_ESCAPE && !mCompletion.items.empty())
-    {
-        mLine       = mLine.substr(0, mCompletion.wordStart) + mCompletion.typed + mCompletion.tail;
-        mLineCursor = mCompletion.wordStart + mCompletion.typed.size();
-        dropCompletion();
-        return true;
-    }
-    dropCompletion();
-    if (!input.isChar)
-    {
-        // Vim's own editing of the line: Control-B and Control-E to the
-        // ends, Control-W a word back, Control-U to the start, Control-H
-        // a character back.
-        if ((input.mask & CONTROL) && !(input.mask & MASK_ALT))
-        {
-            switch (input.key)
-            {
-                case KEY_LEFT:
-                case KEY_RIGHT:
-                {
-                    // A WORD, as with shift.
-                    Input as_shift = input;
-                    as_shift.mask  = MASK_SHIFT;
-                    return commandLine(view, as_shift);
-                }
-                case 'B': mLineCursor = 0; return true;
-                case 'E': mLineCursor = mLine.size(); return true;
-                case 'U':
-                    mLine.erase(0, mLineCursor);
-                    mLineCursor = 0;
-                    mHistoryAt  = -1;
-                    return true;
-                case 'W':
-                {
-                    // Blanks before the cursor, then the word or the run
-                    // of other characters before them.
-                    size_t at = mLineCursor;
-                    while (at > 0 && mLine[at - 1] == ' ')
-                    {
-                        --at;
-                    }
-                    if (at > 0)
-                    {
-                        const bool word = isalnum(static_cast<unsigned char>(mLine[at - 1])) || mLine[at - 1] == '_' || static_cast<unsigned char>(mLine[at - 1]) >= 0x80;
-                        while (at > 0 && mLine[at - 1] != ' ' &&
-                               (isalnum(static_cast<unsigned char>(mLine[at - 1])) || mLine[at - 1] == '_' || static_cast<unsigned char>(mLine[at - 1]) >= 0x80) == word)
-                        {
-                            --at;
-                        }
-                    }
-                    mLine.erase(at, mLineCursor - at);
-                    mLineCursor = at;
-                    mHistoryAt  = -1;
-                    return true;
-                }
-                case 'H':
-                {
-                    Input as_key;
-                    as_key.key = KEY_BACKSPACE;
-                    return commandLine(view, as_key);
-                }
-                default:
-                    return true;
-            }
-        }
-        switch (input.key)
-        {
-            case KEY_ESCAPE:
-                mLine.clear();
-                mLineCursor = 0;
-                mMode       = Mode::Normal;
-                mSearch.endIncremental(view);
-                moveTo(view, view.caret());
-                return true;
-            case KEY_LEFT:
-            case KEY_RIGHT:
-            {
-                // A character, or with shift a WORD -- what stands between
-                // blanks -- as vim's <S-Left> and <S-Right> have it.
-                const bool left = input.key == KEY_LEFT;
-                if (!(input.mask & MASK_SHIFT))
-                {
-                    mLineCursor = left ? back(mLineCursor) : forward(mLineCursor);
-                    return true;
-                }
-                size_t at = mLineCursor;
-                if (left)
-                {
-                    while (at > 0 && mLine[at - 1] == ' ') { --at; }
-                    while (at > 0 && mLine[at - 1] != ' ') { --at; }
-                }
-                else
-                {
-                    while (at < mLine.size() && mLine[at] != ' ') { ++at; }
-                    while (at < mLine.size() && mLine[at] == ' ') { ++at; }
-                }
-                mLineCursor = at;
-                return true;
-            }
-            case KEY_HOME: mLineCursor = 0; return true;
-            case KEY_END: mLineCursor = mLine.size(); return true;
-            case KEY_DELETE:
-                if (mLineCursor < mLine.size())
-                {
-                    mLine.erase(mLineCursor, forward(mLineCursor) - mLineCursor);
-                    mHistoryAt = -1;
-                }
-                return true;
-            case KEY_BACKSPACE:
-                mHistoryAt = -1;
-                if (mLine.empty())
-                {
-                    mMode = Mode::Normal;
-                }
-                else if (mLineCursor > 0)
-                {
-                    // The character before the cursor, whole.
-                    const size_t cut = back(mLineCursor);
-                    mLine.erase(cut, mLineCursor - cut);
-                    mLineCursor = cut;
-                }
-                return true;
-            case KEY_UP:
-            case KEY_DOWN:
-            {
-                // The lines entered before that start as this one does,
-                // older with Up and newer with Down, back to this one
-                // past the newest.
-                const std::vector<std::string>& history = historyOf(mLineKind);
-                const S32                       n       = static_cast<S32>(history.size());
-                if (mHistoryAt < 0)
-                {
-                    mHistoryPrefix = mLine;
-                    mHistoryAt     = n;
-                }
-                S32 at = mHistoryAt;
-                while (true)
-                {
-                    at += input.key == KEY_UP ? -1 : 1;
-                    if (at < 0)
-                    {
-                        return true;
-                    }
-                    if (at >= n)
-                    {
-                        mHistoryAt  = -1;
-                        mLine       = mHistoryPrefix;
-                        mLineCursor = mLine.size();
-                        return true;
-                    }
-                    if (history[static_cast<size_t>(at)].compare(0, mHistoryPrefix.size(), mHistoryPrefix) == 0)
-                    {
-                        mHistoryAt  = at;
-                        mLine       = history[static_cast<size_t>(at)];
-                        mLineCursor = mLine.size();
-                        return true;
-                    }
-                }
-            }
-            case KEY_RETURN:
-            {
-                const std::string line = mLine;
-                const llwchar     kind = mLineKind;
-                mLine.clear();
-                mLineCursor = 0;
-                mMode       = Mode::Normal;
-                mHistoryAt  = -1;
-                remember(kind, line);
-                if (kind == ':')
-                {
-                    runCommand(view, line);
-                }
-                else
-                {
-                    // /pattern/offset: an empty pattern the last one, with
-                    // the offset given, or the last one too where none is.
-                    std::string pattern;
-                    std::string offset_text;
-                    ALVimSearch::splitOffset(line, kind, pattern, offset_text);
-                    ALVimSearch::Offset offset{};
-                    const bool   has_offset = line.size() > pattern.size();
-                    if (has_offset && !ALVimSearch::parseOffset(offset_text, offset))
-                    {
-                        mSearch.endIncremental(view);
-                        say(said("VimBadOffset", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", line } }), true);
-                        finishCommand(false);
-                        return true;
-                    }
-                    if (!pattern.empty())
-                    {
-                        mSearch.pattern   = pattern;
-                        mSearch.wholeWord = false;
-                        mSearch.offset    = offset;
-                    }
-                    else if (has_offset)
-                    {
-                        mSearch.offset = offset;
-                    }
-                    mSearch.forward = kind == '/';
-                    mSearch.endIncremental(view);
-                    if (!mSearch.pattern.empty())
-                    {
-                        mSearch.search(view, mSearch.pattern, mSearch.forward, 1, mSearch.wholeWord, mSearch.offset);
-                    }
-                }
-                if (mMode == Mode::Normal)
-                {
-                    moveTo(view, view.caret());
-                }
-                finishCommand(false);
-                return true;
-            }
-            default:
-                // A plain key's character follows; a control chord is
-                // nobody's while the line is being typed.
-                return (input.mask & (CONTROL | MASK_CONTROL | MASK_ALT)) != 0;
-        }
-    }
-    if (input.ch == '\r' || input.ch == '\n')
-    {
-        Input as_key;
-        as_key.key = KEY_RETURN;
-        return commandLine(view, as_key);
-    }
-    const std::string typed = utf8Of(input.ch);
-    mLine.insert(mLineCursor, typed);
-    mLineCursor += typed.size();
-    mHistoryAt = -1;
-    return true;
-}
-
-void ALVimKeymap::dropCompletion()
-{
-    if (!mCompletion.items.empty())
-    {
-        mCompletion = Completion();
-        bump();
-    }
-}
-
 bool ALVimKeymap::menu(std::vector<std::string>& items, S32& chosen) const
 {
-    if (mMode != Mode::Command || mCompletion.items.size() < 2)
+    if (mMode != Mode::Command || mCommandLine.completion.items.size() < 2)
     {
         return false;
     }
-    items  = mCompletion.items;
-    chosen = mCompletion.at;
+    items  = mCommandLine.completion.items;
+    chosen = mCommandLine.completion.at;
     return true;
-}
-
-void ALVimKeymap::complete(ALTextView& view, bool forward)
-{
-    if (mMode != Mode::Command)
-    {
-        return;
-    }
-    if (mCompletion.items.empty())
-    {
-        // The word at the cursor: the command's name where the cursor is
-        // in it -- past any range -- else the word after the last blank,
-        // which is the command's to complete.
-        size_t at = 0;
-        while (at < mLine.size() && (isDigit(mLine[at]) || mLine[at] == '%' || mLine[at] == '.' || mLine[at] == '$' || mLine[at] == ',' || mLine[at] == '+' ||
-                                     mLine[at] == '-' || mLine[at] == '\'' || mLine[at] == '<' || mLine[at] == '>' || mLine[at] == ' '))
-        {
-            ++at;
-        }
-        const size_t name_start = at;
-        while (at < mLine.size() && (isNameChar(mLine[at]) || (at > name_start && mLine[at] == '_')))
-        {
-            ++at;
-        }
-        const size_t name_end = at;
-        if (at < mLine.size() && mLine[at] == '!')
-        {
-            ++at;
-        }
-        std::string              command;
-        size_t                   word_start = name_start;
-        std::vector<std::string> found;
-        if (mLineCursor <= name_end)
-        {
-            // The name itself: the keymap's own, the long forms, and the
-            // host's.
-            static const char* OWN[] = { "center",   "changes",  "cmap",     "cnoremap", "cunmap",   "delete",   "display",  "global",
-                                         "imap",     "inoremap", "iunmap",   "join",     "left",     "let",      "map",      "mapclear",
-                                         "mark",     "marks",    "nmap",     "nnoremap", "nohlsearch", "noremap", "normal",  "nunmap",
-                                         "omap",     "onoremap", "ounmap",   "put",      "redo",     "registers", "retab",   "right",
-                                         "set",      "substitute", "undo",   "unmap",    "vglobal",  "vmap",     "vnoremap", "vunmap",
-                                         "xmap",     "xnoremap", "xunmap",   "yank" };
-            found.assign(std::begin(OWN), std::end(OWN));
-        }
-        else
-        {
-            command    = mLine.substr(name_start, name_end - name_start);
-            word_start = mLine.rfind(' ', mLineCursor > 0 ? mLineCursor - 1 : 0);
-            word_start = word_start == std::string::npos ? at : word_start + 1;
-            if (word_start < at)
-            {
-                word_start = at;
-            }
-            if (isSetCommand(command))
-            {
-                static const char* OPTIONS[] = { "clipboard=",  "clipboard=unnamed", "expandtab",     "hlsearch",  "ignorecase",
-                                                 "incsearch",   "noexpandtab",       "nohlsearch",    "noignorecase", "noincsearch",
-                                                 "nosmartcase", "notimeout",         "nowrap",        "shiftwidth=", "smartcase",
-                                                 "tabstop=",    "timeout",           "timeoutlen=",   "wrap" };
-                found.assign(std::begin(OPTIONS), std::end(OPTIONS));
-            }
-        }
-        const std::string typed = mLine.substr(word_start, mLineCursor - word_start);
-        if (mHooks.complete)
-        {
-            mHooks.complete(view, command, typed, found);
-        }
-        std::vector<std::string> items;
-        for (const std::string& each : found)
-        {
-            if (each.size() > typed.size() && each.compare(0, typed.size(), typed) == 0)
-            {
-                items.push_back(each);
-            }
-        }
-        std::sort(items.begin(), items.end());
-        items.erase(std::unique(items.begin(), items.end()), items.end());
-        if (items.empty())
-        {
-            return;
-        }
-        mCompletion.items     = std::move(items);
-        mCompletion.at        = forward ? 0 : static_cast<S32>(mCompletion.items.size()) - 1;
-        mCompletion.wordStart = word_start;
-        mCompletion.typed     = typed;
-        mCompletion.tail      = mLine.substr(mLineCursor);
-    }
-    else
-    {
-        // On to the next, or back; the word as typed stands past either
-        // end, as vim's wildmenu has it.
-        const S32 n    = static_cast<S32>(mCompletion.items.size());
-        mCompletion.at = mCompletion.at + (forward ? 1 : -1);
-        if (mCompletion.at >= n)
-        {
-            mCompletion.at = -1;
-        }
-        else if (mCompletion.at < -1)
-        {
-            mCompletion.at = n - 1;
-        }
-    }
-    const std::string& word = mCompletion.at < 0 ? mCompletion.typed : mCompletion.items[static_cast<size_t>(mCompletion.at)];
-    mLine                   = mLine.substr(0, mCompletion.wordStart) + word + mCompletion.tail;
-    mLineCursor             = mCompletion.wordStart + word.size();
-    mHistoryAt              = -1;
-    if (mCompletion.items.size() == 1)
-    {
-        // One answer is the answer; nothing to walk.
-        mCompletion = Completion();
-    }
-    bump();
 }
 
 void ALVimKeymap::takeLine(ALTextView& view, llwchar kind, const std::string& text, bool run)
 {
     clearPending();
-    mCompletion = Completion();
+    mCommandLine.completion = ALVimCommandLine::Completion();
     mMode       = kind == ':' ? Mode::Command : Mode::Search;
-    mLineKind   = kind;
-    mLine       = text;
-    mLineCursor = mLine.size();
-    mHistoryAt  = -1;
-    mHistoryPrefix.clear();
+    mCommandLine.kind   = kind;
+    mCommandLine.line       = text;
+    mCommandLine.cursor = mCommandLine.line.size();
+    mCommandLine.historyAt  = -1;
+    mCommandLine.historyPrefix.clear();
     if (run)
     {
         // As Enter on the line: vim's window runs the row it is pressed
@@ -4674,7 +4295,7 @@ void ALVimKeymap::takeLine(ALTextView& view, llwchar kind, const std::string& te
         // edited with Up.
         Input as_key;
         as_key.key = KEY_RETURN;
-        commandLine(view, as_key);
+        mCommandLine.commandLine(view, as_key);
     }
     bump();
 }
@@ -4684,7 +4305,7 @@ void ALVimKeymap::share(std::shared_ptr<Shared> shared)
     if (shared)
     {
         mShared    = std::move(shared);
-        mHistoryAt = -1;
+        mCommandLine.historyAt = -1;
     }
 }
 
@@ -4860,22 +4481,6 @@ void ALVimKeymap::endConfirming(ALTextView& view)
     }
     finishCommand(changed);
     bump();
-}
-
-void ALVimKeymap::remember(llwchar kind, const std::string& line)
-{
-    const size_t MOST = 50;
-    if (line.empty())
-    {
-        return;
-    }
-    std::vector<std::string>& history = historyOf(kind);
-    history.erase(std::remove(history.begin(), history.end(), line), history.end());
-    history.push_back(line);
-    if (history.size() > MOST)
-    {
-        history.erase(history.begin(), history.begin() + static_cast<std::ptrdiff_t>(history.size() - MOST));
-    }
 }
 
 bool ALVimKeymap::lineAddress(ALTextView& view, const std::string& line, size_t& at_, S32& out) const

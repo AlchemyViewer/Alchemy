@@ -149,6 +149,7 @@ target_sources(
     alkeycapture.cpp
     alkeychord.cpp
     alkeymap.cpp
+    alvimcommandline.cpp
     alvimkeymap.cpp
     alvimmappings.cpp
     alvimpattern.cpp
@@ -366,6 +367,7 @@ target_sources(
         alkeychord.h
         alkeymap.h
         allinetable.h
+        alvimcommandline.h
         alvimhost.h
         alvimkeymap.h
         alvimmappings.h

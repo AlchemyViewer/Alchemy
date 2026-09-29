@@ -26,6 +26,7 @@
 
 #include "albracketindex.h"
 #include "altextview.h"
+#include "alvimcommandline.h"
 #include "alvimhost.h"
 #include "alvimmappings.h"
 #include "alvimpattern.h"
@@ -120,7 +121,7 @@ public:
     Mode   mode() const { return mMode; }
     Hooks& hooks() { return mHooks; }
     // What was typed after : or / so far.
-    const std::string& commandLine() const { return mLine; }
+    const std::string& commandLine() const { return mCommandLine.line; }
     bool               typingLine(std::string& line, S32& caret) const override;
     // A line put up on the : or / line, as the history window hands one
     // back: to be edited and entered, or run as it is, as vim's window
@@ -305,14 +306,6 @@ private:
     bool insertControl(ALTextView& view, const Input& input);
     // Text put in as though it were typed, for `.` and a count.
     void typeIn(ALTextView& view, const std::string& text);
-    bool commandLine(ALTextView& view, const Input& input);
-    // Tab on the : line: the word at the cursor completed from what the
-    // keymap and the host know -- a command's name, or what follows
-    // one -- the next of them on each Tab, the one before on Shift-Tab,
-    // and the word as typed again past the last, as vim's wildmenu
-    // walks. Any other key keeps what is on the line and drops the rest.
-    void complete(ALTextView& view, bool forward);
-    void dropCompletion();
 
     // Normal mode's command, once the count, the register and any
     // operator have been read; false where the character is not one.
@@ -412,9 +405,6 @@ private:
     void       applyRest(ALTextView& view);
     void       askNext(ALTextView& view);
     void       endConfirming(ALTextView& view);
-    // The history of a line kind, and the line entered into it.
-    std::vector<std::string>& historyOf(llwchar kind) { return kind == ':' ? mShared->command : mShared->search; }
-    void                      remember(llwchar kind, const std::string& line);
     // g and v: the command over every line the pattern picks out, or
     // every line it does not.
     bool global(ALTextView& view, S32 first, S32 last, bool ranged, const std::string& spec, bool invert);
@@ -561,30 +551,11 @@ private:
     S32         mBlockColumn       = 0;
     bool        mBlockAppend       = false;
 
-    // The : or / line being typed, and which; the lines entered before,
-    // : and search apart, oldest first, for Up and Down on the line,
-    // q: and @:; and where Up has walked to in them, with what was
-    // typed before it was pressed, which Down comes back to. -1 while
-    // not walking.
-    std::string              mLine;
-    llwchar                  mLineKind = ':';
+    // The settings and histories shared with the other buffers' keymaps.
     std::shared_ptr<Shared>  mShared = std::make_shared<Shared>();
-    S32                      mHistoryAt = -1;
-    std::string              mHistoryPrefix;
-    // Where in the line the next character goes, in bytes.
-    size_t                   mLineCursor = 0;
-    // The completions Tab found for the word at the cursor, which of
-    // them is on the line (-1 for the word as typed), where the word
-    // begins, the word as typed and what followed the cursor.
-    struct Completion
-    {
-        std::vector<std::string> items;
-        S32                      at        = -1;
-        size_t                   wordStart = 0;
-        std::string              typed;
-        std::string              tail;
-    };
-    Completion               mCompletion;
+    // The : and search lines being typed (ALVimCommandLine).
+    ALVimCommandLine         mCommandLine{ *this };
+    friend class ALVimCommandLine;
     // The last :s, for :s with nothing after it, :&, :&&, & and g&: its
     // replacement as it read once ~ was put in, and its flags.
     std::string mLastReplacement;
