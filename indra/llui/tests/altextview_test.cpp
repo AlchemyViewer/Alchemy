@@ -1751,4 +1751,49 @@ namespace tut
         v.setVisible(true);
         ensure("laid out again when asked", !v.layout().line(v.firstVisibleLine()).rows.empty());
     }
+
+    template<> template<>
+    void altextview_object::test<55>()
+    {
+        set_test_name("a cap on the bytes: typing and pasting go in as far as they fit, cut at a character; several stretches at once not at all; what shortens the text, a text put in whole and an undo are not held to it");
+        ALTextView& v = make("hello");
+        S32         fulls = 0;
+        boost::signals2::scoped_connection heard = v.onFull([&fulls]() { ++fulls; });
+        v.setMaxBytes(10);
+        v.setCaret(ALTextPos(0, 5));
+        type("abcdefgh");
+        ensure_equals("typed as far as it fits", v.text(), std::string("helloabcde"));
+        ensure("and said", fulls > 0);
+
+        v.setMaxBytes(8);
+        v.setText("hello");
+        v.setCaret(ALTextPos(0, 5));
+        fulls = 0;
+        v.insertText("\xC3\xA9\xC3\xA9");
+        ensure_equals("cut where a character starts", v.text(), std::string("hello\xC3\xA9"));
+        ensure_equals("said once", fulls, 1);
+
+        // Full: a change of several stretches that would grow it is not
+        // made; one that does not grow it is.
+        v.setText("abcdefgh");
+        fulls = 0;
+        ensure("several stretches at once, not made", !v.replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)), "xx" }, { ALTextRange(ALTextPos(0, 4), ALTextPos(0, 4)), "y" } }));
+        ensure_equals("the text as it was", v.text(), std::string("abcdefgh"));
+        ensure_equals("and said", fulls, 1);
+        ensure("the same length again, made", v.replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)), "zz" } }));
+        v.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
+        v.insertText("123");
+        ensure_equals("a selection typed over by as much", v.text(), std::string("123defgh"));
+        v.deleteRange(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
+        ensure_equals("a deletion", v.text(), std::string("defgh"));
+        v.undo();
+        ensure_equals("undone past nothing it would hold to", v.text(), std::string("123defgh"));
+
+        v.setText("far more than eight bytes");
+        ensure_equals("a text put in whole, whatever its size", v.text(), std::string("far more than eight bytes"));
+        v.setMaxBytes(0);
+        v.setCaret(ALTextPos(0, 0));
+        type("no cap ");
+        ensure_equals("and with no cap, nothing held", v.text(), std::string("no cap far more than eight bytes"));
+    }
 }

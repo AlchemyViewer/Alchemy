@@ -231,6 +231,14 @@ public:
     bool            isReadOnly() const { return mReadOnly; }
     void            setWordWrap(bool wrap);
     bool            getWordWrap() const { return mWordWrap; }
+    // The most bytes the text may hold -- a notecard's 65,536 -- or none
+    // for no limit. What is typed, pasted or dropped past it goes in as
+    // far as it fits, cut at a character; a change of several stretches
+    // at once that would pass it is not made. Either way the view beeps,
+    // and says so (onFull). Only a change that makes the text longer is
+    // held to it: a text put in whole, an undo and a redo are not.
+    void            setMaxBytes(size_t bytes) { mMaxBytes = bytes; }
+    size_t          maxBytes() const { return mMaxBytes; }
     // How the text is indented -- by tabs or by spaces, and how wide a
     // tab or a level is -- and where that was said: the defaults the view
     // was given; the text itself, as it was put in whole, where the view
@@ -581,6 +589,8 @@ public:
     boost::signals2::connection onTextChanged(const changed_signal_t::slot_type& slot) { return mChanged.connect(slot); }
     // Every time the caret lands somewhere else, however it got there.
     boost::signals2::connection onCaretMoved(const changed_signal_t::slot_type& slot) { return mCaretMoved.connect(slot); }
+    // A change cut short, or not made, for the text being full (maxBytes).
+    boost::signals2::connection onFull(const changed_signal_t::slot_type& slot) { return mFull.connect(slot); }
 
     // --- the input method ------------------------------------------------------
 
@@ -849,6 +859,14 @@ protected:
     // notification to every listener, one edit for the journal, and the
     // caret put once, at `caret` in the text as it is after.
     ALTextDocument::Edit editMany(std::vector<std::pair<ALTextRange, std::string>> edits, const ALTextPos& caret);
+    // What of a text fits in place of a stretch under maxBytes: all of
+    // it, or as much as fits, cut at a character, the view full.
+    std::string_view     fitting(const ALTextRange& over, std::string_view text);
+    // Whether stretches replaced at once keep under maxBytes; the view
+    // full where they would not.
+    bool                 fits(const std::vector<std::pair<ALTextRange, std::string>>& edits);
+    // A beep, and whoever listens told: a change was cut short or not made.
+    void                 full();
     void                 afterEdit();
     void                 placeCaret(const ALTextPos& pos, bool extend);
     // The selection put somewhere, anchor and caret at once, told to
@@ -1213,6 +1231,8 @@ private:
     bool                            mQueueSquiggles = false;
     changed_signal_t       mChanged;
     changed_signal_t       mCaretMoved;
+    changed_signal_t       mFull;
+    size_t                 mMaxBytes = 0;
 
     boost::signals2::scoped_connection mDocumentConnection;
     // In order of where they start, none over another.

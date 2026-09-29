@@ -1843,7 +1843,7 @@ ALTextDocument::Edit ALTextView::edit(const ALTextRange& range_in, std::string_v
         resetPreedit();
     }
     const ALTextRange    before = selection();
-    ALTextDocument::Edit done   = mDocument.replace(range, text);
+    ALTextDocument::Edit done   = mDocument.replace(range, fitting(range, text));
     if (done.nothing())
     {
         return done;
@@ -1864,6 +1864,10 @@ ALTextDocument::Edit ALTextView::editMany(std::vector<std::pair<ALTextRange, std
         }
         resetPreedit();
     }
+    if (!fits(edits))
+    {
+        return ALTextDocument::Edit();
+    }
     const ALTextRange    before = selection();
     ALTextDocument::Edit done   = mDocument.replaceMany(std::move(edits));
     if (done.nothing())
@@ -1874,6 +1878,57 @@ ALTextDocument::Edit ALTextView::editMany(std::vector<std::pair<ALTextRange, std
     mUndo.record(done, before, after, LLTimer::getElapsedSeconds());
     placeCaret(after, false);
     return done;
+}
+
+std::string_view ALTextView::fitting(const ALTextRange& over, std::string_view text)
+{
+    if (mMaxBytes == 0)
+    {
+        return text;
+    }
+    const ALTextRange range = over.normalised();
+    const size_t      taken = mDocument.offsetOf(range.end) - mDocument.offsetOf(range.begin);
+    const size_t      left  = mDocument.byteCount() - taken;
+    if (text.size() <= taken || left + text.size() <= mMaxBytes)
+    {
+        return text;
+    }
+    // As much as there is room for, cut where a character starts -- a
+    // notecard's item is one character too, and goes whole or not at all.
+    size_t room = mMaxBytes > left ? mMaxBytes - left : 0;
+    while (room > 0 && room < text.size() && (static_cast<unsigned char>(text[room]) & 0xC0) == 0x80)
+    {
+        --room;
+    }
+    full();
+    return text.substr(0, room);
+}
+
+bool ALTextView::fits(const std::vector<std::pair<ALTextRange, std::string>>& edits)
+{
+    if (mMaxBytes == 0)
+    {
+        return true;
+    }
+    size_t taken = 0, put = 0;
+    for (const auto& [over, text] : edits)
+    {
+        const ALTextRange range = over.normalised();
+        taken += mDocument.offsetOf(range.end) - mDocument.offsetOf(range.begin);
+        put += text.size();
+    }
+    if (put <= taken || mDocument.byteCount() - taken + put <= mMaxBytes)
+    {
+        return true;
+    }
+    full();
+    return false;
+}
+
+void ALTextView::full()
+{
+    make_ui_sound("UISndBadKeystroke");
+    mFull();
 }
 
 void ALTextView::afterEdit()
@@ -2050,6 +2105,12 @@ void ALTextView::apply(const ALTextEditing::Change& change)
     for (const ALTextEditing::Replacement& one : change.replacements)
     {
         edits.emplace_back(one.range, one.text);
+    }
+    // Not made at all, the caret left where it was, where the text has
+    // no room for it.
+    if (!fits(edits))
+    {
+        return;
     }
     mUndo.beginGroup();
     editMany(std::move(edits), change.caret);
@@ -2647,6 +2708,9 @@ void ALTextView::paste()
     // a step of its own: Undo takes back the re-indenting first, and
     // leaves the paste as it was copied.
     const ALTextRange                           into = selection().normalised();
+    // Cut to what there is room for first, so that the lines re-indented
+    // are the lines that went in.
+    text.resize(fitting(into, text).size());
     const std::optional<ALTextIndent::PastePlan> plan =
         mReindentsPaste ? ALTextIndent::planPaste(mDocument, into, text, mHighlighter.grammar().get(), editingOptions()) : std::nullopt;
     mUndo.beginGroup();
