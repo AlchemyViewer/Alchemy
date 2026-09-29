@@ -429,9 +429,10 @@ namespace tut
         Orphans& unit    = make();
         Doc&     a       = tab("a");
         services().front = 0;
-        ALRecoveryEntry kept = recovery->leftFor(a, "default { state_entry() { } }");
-        recovery->store->load(kept);
-        a.recoverable = kept;
+        // As a tab is offered it: the entry's listing, not yet its text.
+        const ALRecoveryEntry kept = recovery->leftFor(a, "default { state_entry() { } }");
+        a.recoverable              = kept;
+        ensure("offered as listed", !kept.whole);
         unit.noticeAction("compare_kept");
         ensure_equals("now beside kept", studio.did.back(),
                       "compare a: default {} | default { state_entry() { } } (" + said("CompareNow") + " | " + said("CompareKept", "[WHEN]", kept.whenSaid()) + ")");

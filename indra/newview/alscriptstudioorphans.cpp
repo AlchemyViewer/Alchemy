@@ -440,7 +440,13 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
     else if (action == "compare_kept" && doc->recoverable)
     {
         // What the tab holds now beside what was kept; the notice stays,
-        // to restore or let go of it after looking.
+        // to restore or let go of it after looking. What is offered is the
+        // entry's listing, its text read as it is looked at, as a restore
+        // reads it: where it cannot be, recovery says so.
+        if (!mRecovery.wholeOf(*doc->recoverable))
+        {
+            return;
+        }
         LLStringUtil::format_map_t when;
         when["[WHEN]"] = doc->recoverable->whenSaid();
         mWindow.compare(*doc, doc->editor->wholeText(), doc->recoverable->text, mServices.words("CompareNow"), mServices.words("CompareKept", when));

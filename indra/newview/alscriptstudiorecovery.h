@@ -151,6 +151,9 @@ public:
     // notecard's items with it. Over a tab nothing can be saved from, the
     // tab holds it on its own.
     void takeUp(Doc& doc, const Entry& entry);
+    // An entry a listing read only the start of, read whole; false, and
+    // said, where it cannot be.
+    bool wholeOf(Entry& entry);
     // Over a tab holding nothing of its own: the text with the history that
     // led to it, and the caret. False where the history is not this text's.
     bool restoreHistory(Doc& doc, const Entry& entry);
@@ -163,10 +166,6 @@ public:
     void show();
 
 private:
-    // An entry a listing read only the start of, read whole; false, and
-    // said, where it cannot be.
-    bool wholeOf(Entry& entry);
-
     ALScriptStudioServices& mServices;
     ALScriptStudioTabs&     mTabs;
     Window&                 mWindow;
