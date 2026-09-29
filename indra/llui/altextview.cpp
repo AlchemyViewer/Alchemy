@@ -3136,10 +3136,18 @@ void ALTextView::showFind(bool with_replace)
     }
     // Seeded with what is selected, when that is a line's worth or less,
     // or with the word the caret is in when nothing is; written as a
-    // pattern that finds it, where the bar is looking for patterns.
+    // pattern that finds it, where the bar is looking for patterns. Never
+    // with an atom's placeholder, which is no text to type or find: a
+    // selection holding an atom -- a notecard's item -- leaves the last
+    // query, and the word stops at an atom.
     const ALTextRange sel = selection().normalised();
     std::string       seed;
-    if (!sel.empty() && sel.begin.line == sel.end.line && sel.end.column - sel.begin.column < 200)
+    const auto        holds_atom = [this](const ALTextRange& range) {
+        const auto first =
+            std::lower_bound(mAtoms.begin(), mAtoms.end(), range.begin, [](const Atom& a, const ALTextPos& p) { return a.at < p; });
+        return first != mAtoms.end() && first->at < range.end;
+    };
+    if (!sel.empty() && sel.begin.line == sel.end.line && sel.end.column - sel.begin.column < 200 && !holds_atom(sel))
     {
         seed = mDocument.text(sel);
     }
@@ -3148,11 +3156,14 @@ void ALTextView::showFind(bool with_replace)
         const std::string& line  = mDocument.line(mCaret.line);
         size_t             begin = static_cast<size_t>(llclamp(mCaret.column, 0, static_cast<S32>(line.size())));
         size_t             end   = begin;
-        while (begin > 0 && alWordByte(line[begin - 1]))
+        const auto         word  = [&](size_t at) {
+            return alWordByte(line[at]) && !atomAt(ALTextPos(mCaret.line, static_cast<S32>(at)));
+        };
+        while (begin > 0 && word(begin - 1))
         {
             --begin;
         }
-        while (end < line.size() && alWordByte(line[end]))
+        while (end < line.size() && word(end))
         {
             ++end;
         }
