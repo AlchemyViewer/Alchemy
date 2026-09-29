@@ -235,29 +235,7 @@ struct ALScriptStudioDoc
     // (ALRecoveryStore).
     std::string                                recoveryKey;
     // The rest of what ALScriptStudioRecovery keeps of it.
-    struct Recovery
-    {
-        // When it is next written there, or zero; and whether writing it
-        // failed, which is said once.
-        F64  due    = 0.0;
-        bool failed = false;
-        // What was last written there -- the text's version, its history's
-        // revision, the picks for its next save, as what, and whether forced
-        // out to the disk -- so that nothing is written again where none
-        // has moved.
-        struct Written
-        {
-            bool                       valid   = false;
-            U32                        text    = 0;
-            U32                        history = 0;
-            ALRecoveryEntry::State     state   = ALRecoveryEntry::State::Unsaved;
-            bool                       durable = false;
-            // And what was picked for its next save.
-            std::optional<std::string> target;
-            std::optional<LLUUID>      experience;
-        };
-        Written written;
-    };
+    struct Recovery;
     Part<Recovery>                             recovery;
     // What an earlier session left of this, found as it opened, offered
     // in the notice until it is restored or discarded; and one being

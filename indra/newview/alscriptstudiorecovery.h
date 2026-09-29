@@ -36,6 +36,32 @@
 
 class ALScriptStudioServices;
 
+// A tab's part of what keeps its unsaved text against a crash: the rest of
+// what ALScriptStudioRecovery keeps of it, beside its key (Doc::recoveryKey).
+struct ALScriptStudioDoc::Recovery
+{
+    // When it is next written there, or zero; and whether writing it
+    // failed, which is said once.
+    F64  due    = 0.0;
+    bool failed = false;
+    // What was last written there -- the text's version, its history's
+    // revision, the picks for its next save, as what, and whether forced
+    // out to the disk -- so that nothing is written again where none
+    // has moved.
+    struct Written
+    {
+        bool                       valid   = false;
+        U32                        text    = 0;
+        U32                        history = 0;
+        ALRecoveryEntry::State     state   = ALRecoveryEntry::State::Unsaved;
+        bool                       durable = false;
+        // And what was picked for its next save.
+        std::optional<std::string> target;
+        std::optional<LLUUID>      experience;
+    };
+    Written written;
+};
+
 // A Script Studio window's unsaved texts kept against the viewer going
 // before they were saved -- a crash, a lost connection, a quit -- in the
 // account's recovery store, and offered back: at login, what a session

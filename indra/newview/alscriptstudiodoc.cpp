@@ -35,6 +35,7 @@
 #include "alscriptstudiocaret.h"
 #include "alscriptstudiochecking.h"
 #include "alscriptstudioorphans.h"
+#include "alscriptstudiorecovery.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudioweighing.h"
 #include "lldate.h"
