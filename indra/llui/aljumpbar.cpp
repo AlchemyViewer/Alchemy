@@ -124,8 +124,9 @@ S32 ALJumpBar::widthOf(const Crumb& crumb) const
 size_t ALJumpBar::folded() const
 {
     const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
-    const S32 trailer = mTrailerText.empty()
-                      ? 0 : font->getWidth(mTrailerText) + TRAILER_GAP;
+    S32       said    = 0;
+    trailerShown(said);
+    const S32 trailer = said > 0 ? said + TRAILER_GAP : 0;
     const S32 fold = font->getWidth(FOLD_LABEL) + CRUMB_PAD + ARROW + CRUMB_GAP;
     const S32 room = getRect().getWidth() - trailer;
 
@@ -142,6 +143,87 @@ size_t ALJumpBar::folded() const
         ++first;
     }
     return first;
+}
+
+// The path keeps its last step, and the fold before it: the trailer has
+// what is left of the room, and where that is too little, the pieces that
+// matter least go -- a separator with them, since it is said only between
+// two that are.
+std::vector<bool> ALJumpBar::trailerShown(S32& width) const
+{
+    const LLFontGL*   font  = LLFontGL::getFontSansSerifSmall();
+    const size_t      count = mTrailerParts.size();
+    std::vector<S32>  widths(count);
+    for (size_t i = 0; i < count; ++i)
+    {
+        widths[i] = font->getWidth(mTrailerParts[i].text);
+    }
+    S32 path = 0;
+    if (!mCrumbs.empty())
+    {
+        path = widthOf(mCrumbs.back()) + CRUMB_GAP;
+        if (mCrumbs.size() > 1)
+        {
+            path += font->getWidth(FOLD_LABEL) + CRUMB_PAD + ARROW + CRUMB_GAP;
+        }
+    }
+    const S32         room = getRect().getWidth() - CRUMB_PAD - TRAILER_GAP - path;
+    std::vector<bool> kept(count, true);
+    std::vector<bool> shown(count, false);
+    const auto        measure = [&]() {
+        S32    total   = 0;
+        bool   since   = false;
+        size_t pending = count;
+        for (size_t i = 0; i < count; ++i)
+        {
+            shown[i] = false;
+            if (mTrailerParts[i].between)
+            {
+                if (since && pending == count)
+                {
+                    pending = i;
+                    since   = false;
+                }
+                continue;
+            }
+            if (!kept[i])
+            {
+                continue;
+            }
+            if (pending != count)
+            {
+                shown[pending] = true;
+                total += widths[pending];
+                pending = count;
+            }
+            shown[i] = true;
+            total += widths[i];
+            since = true;
+        }
+        return total;
+    };
+    S32 total = measure();
+    while (total > room)
+    {
+        size_t next = count;
+        S32    most = 0;
+        for (size_t i = 0; i < count; ++i)
+        {
+            if (kept[i] && !mTrailerParts[i].between && mTrailerParts[i].drop > 0 && mTrailerParts[i].drop >= most)
+            {
+                most = mTrailerParts[i].drop;
+                next = i;
+            }
+        }
+        if (next == count)
+        {
+            break;
+        }
+        kept[next] = false;
+        total      = measure();
+    }
+    width = total;
+    return shown;
 }
 
 void ALJumpBar::build()
@@ -297,14 +379,17 @@ void ALJumpBar::layTrailer()
     // The pieces measured one by one, as they are placed: each rounds on
     // its own, and their sum is not the whole's. Each is a pixel wider
     // than its words, for that rounding; the last one's pixel inside.
-    S32 total = 0;
-    for (const TrailerPart& part : mTrailerParts)
-    {
-        total += font->getWidth(part.text);
-    }
+    // Those there is no room for are not said.
+    S32                     total = 0;
+    const std::vector<bool> shown = trailerShown(total);
     S32 at = llmax(0, (right - left) - total - 1);
     for (size_t i = 0; i < mTrailerPieces.size() && i < mTrailerParts.size(); ++i)
     {
+        mTrailerPieces[i]->setVisible(shown[i]);
+        if (!shown[i])
+        {
+            continue;
+        }
         const S32 width = font->getWidth(mTrailerParts[i].text);
         mTrailerPieces[i]->setText(mTrailerParts[i].text);
         mTrailerPieces[i]->setShape(LLRect(at, height - 3, at + width + 1, 0));

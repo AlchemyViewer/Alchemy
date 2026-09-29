@@ -897,6 +897,9 @@ private:
     // one or the agent has any to give it.
     void askExperienceOf(Doc& doc);
     void refreshExperience();
+    // The strip under the editor laid out for what shows on it and the
+    // width it has.
+    void layStrip();
     void onExperience();
     void onReset();
     void revert(Doc& doc) override;
@@ -970,7 +973,6 @@ private:
         bool                experienceAsking = false;
         LLUUID              experience;
         std::vector<LLUUID> ownExperiences;
-        S32                 room = 0;
         bool                operator==(const ToolbarFacts&) const = default;
     };
     ToolbarFacts                toolbarFactsOf() const;
@@ -1224,6 +1226,11 @@ private:
     LLCheckBoxCtrl*                    mRunning       = nullptr;
     LLComboBox*                        mExperience    = nullptr;
     LLButton*                          mExperienceProfile = nullptr;
+    // How wide the skin made the experience's box, which is as wide as it
+    // gets.
+    S32                                mExperienceWidth   = 0;
+    // The strip's width when it was last laid out.
+    S32                                mStripLaid         = -1;
     // What the experience list was last made of, so that it is made again
     // only when that changes; and the experiences whose names are asked.
     std::string                        mExperienceMadeOf;

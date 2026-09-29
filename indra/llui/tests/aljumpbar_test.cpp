@@ -26,6 +26,7 @@
 
 #include "../aljumpbar.h"
 #include "../lltextbox.h"
+#include "llfontgl.h"
 
 #include "../llbutton.h"
 #include "../llflyoutbutton.h"
@@ -364,6 +365,45 @@ namespace tut
         bar->setTrailer(parts);
         size = bar->findChild<LLTextBox>("trailer_1", true);
         ensure("and back in the quiet ink", size && size->getColor().get() == quiet);
+        delete bar;
+    }
+    // Too narrow for all of the trailer, the pieces that matter least go
+    // first, a separator with them; one that never goes stays; widened,
+    // all are said again. The path keeps its last step.
+    template<> template<>
+    void aljumpbar_object::test<9>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        const std::string                 dot = "   \xC2\xB7   ";
+        ALJumpBar::TrailerPart            sep{ dot, std::string(), std::string() };
+        sep.between = true;
+        std::vector<ALJumpBar::TrailerPart> parts = { { "Ln 3, Col 1", "line", "Go to a line" }, sep, { "Spaces: 4", "indent", "" }, sep,
+                                                      { "2 errors", "problems", "" },            sep, { "Source", "expanded", "" } };
+        parts[2].drop = 3;
+        parts[4].drop = 1;
+        parts[6].drop = 2;
+        const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
+        const S32       two  = font->getWidth(parts[0].text) + font->getWidth(dot) + font->getWidth(parts[4].text);
+        ALJumpBar*      bar  = make(two + 12 + 6 + 4);
+        bar->setTrailer(parts);
+        const auto said = [&](size_t i) { return bar->findChild<LLTextBox>("trailer_" + std::to_string(i), true)->getVisible(); };
+        ensure("the place and the errors, one separator between", said(0) && said(1) && said(4) && !said(3) && !said(5));
+        ensure("the indentation and the view gone", !said(2) && !said(6));
+        ensure("against the far edge", bar->findChild<LLTextBox>("trailer_4", true)->getRect().mRight <= bar->getChild<LLView>("trailer")->getRect().getWidth());
+
+        bar->reshape(two * 4, 22);
+        for (size_t i = 0; i < parts.size(); ++i)
+        {
+            ensure("widened, all said", said(i));
+        }
+
+        bar->reshape(two + 12 + 6 + 4, 22);
+        bar->setPath(path());
+        ensure("with a path, its last step kept", bar->findChild<LLView>("crumb_3", false) != nullptr);
+        ensure("and the place, which never goes", said(0) && !said(4) && !said(1));
         delete bar;
     }
 }

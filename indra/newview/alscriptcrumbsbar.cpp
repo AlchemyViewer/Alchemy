@@ -55,6 +55,22 @@ namespace
     {
         return holds(outer, ALTextPos(inner.line, inner.column)) && holds(outer, ALTextPos(inner.endLine, inner.endColumn));
     }
+
+    // Which of the trailer's pieces go first where the strip is narrow:
+    // the indentation, which the Format menu also says; which view is in
+    // front, which the toolbar also shows; what the code weighs, and
+    // whether a check is out; the selection; what a save sends. Anything
+    // said in a warning's colour, what the tab may not do and the problem
+    // counts go last, and the caret's place never.
+    constexpr S32 DROP_INDENT    = 7;
+    constexpr S32 DROP_VIEW      = 6;
+    constexpr S32 DROP_WEIGHT    = 5;
+    constexpr S32 DROP_CHECKING  = 5;
+    constexpr S32 DROP_SELECTION = 4;
+    constexpr S32 DROP_SIZE      = 3;
+    constexpr S32 DROP_WARNED    = 2;
+    constexpr S32 DROP_LEAD      = 1;
+    constexpr S32 DROP_COUNTS    = 1;
 }
 
 static LLPanelInjector<ALScriptCrumbsBar> t_script_studio_crumbs("script_studio_crumbs");
@@ -131,7 +147,9 @@ void ALScriptCrumbsBar::showTrailer(Doc& doc)
     {
         if (!said.empty())
         {
-            said.push_back({ "   \xC2\xB7   ", std::string(), std::string() });
+            Part dot{ "   \xC2\xB7   ", std::string(), std::string() };
+            dot.between = true;
+            said.push_back(std::move(dot));
         }
         said.push_back(std::move(part));
     }
@@ -180,11 +198,13 @@ void ALScriptCrumbsBar::lead(Doc& doc, std::vector<Part>& parts) const
     if (doc.loaded && !doc.modifiable)
     {
         parts.push_back({ mServices->words("TrailerReadOnly"), std::string(), mServices->words("TrailerReadOnlyTip") });
+        parts.back().drop = DROP_LEAD;
     }
     const std::string banner = mWindow->vimBanner();
     if (!banner.empty())
     {
         parts.push_back({ banner, std::string(), std::string() });
+        parts.back().drop = DROP_LEAD;
     }
 }
 
@@ -216,6 +236,7 @@ void ALScriptCrumbsBar::selection(Doc& doc, std::vector<Part>& parts) const
     {
         const S32 lines = selected.end.line - selected.begin.line + (selected.end.column > 0 ? 1 : 0);
         parts.push_back({ mServices->counted("SelectedLines", lines), std::string(), std::string() });
+        parts.back().drop = DROP_SELECTION;
     }
     else
     {
@@ -223,6 +244,7 @@ void ALScriptCrumbsBar::selection(Doc& doc, std::vector<Part>& parts) const
         // written in; a tab is one.
         const S32 chars = text.displayColumn(selected.end, 1) - text.displayColumn(selected.begin, 1);
         parts.push_back({ mServices->counted("SelectedChars", chars), std::string(), std::string() });
+        parts.back().drop = DROP_SELECTION;
     }
 }
 
@@ -232,16 +254,19 @@ void ALScriptCrumbsBar::problems(Doc& doc, std::vector<Part>& parts) const
     if (doc.checkRunning(LLTimer::getTotalSeconds()))
     {
         parts.push_back({ mServices->words("TrailerChecking"), "problems", mServices->words("TrailerCheckingTip") });
+        parts.back().drop = DROP_CHECKING;
     }
     S32 errors = 0, warnings = 0;
     mWindow->problemCounts(doc, errors, warnings);
     if (errors > 0)
     {
         parts.push_back({ mServices->counted("ProblemErrors", errors), "problems", mTips.problems });
+        parts.back().drop = DROP_COUNTS;
     }
     if (warnings > 0)
     {
         parts.push_back({ mServices->counted("ProblemWarnings", warnings), "problems", mTips.problems });
+        parts.back().drop = DROP_COUNTS;
     }
 }
 
@@ -276,6 +301,7 @@ void ALScriptCrumbsBar::weight(Doc& doc, std::vector<Part>& parts) const
         {
             part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
         }
+        part.drop = part.color ? DROP_WARNED : DROP_WEIGHT;
         parts.push_back(std::move(part));
         return;
     }
@@ -310,6 +336,7 @@ void ALScriptCrumbsBar::weight(Doc& doc, std::vector<Part>& parts) const
     {
         part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
     }
+    part.drop = part.color ? DROP_WARNED : DROP_WEIGHT;
     parts.push_back(std::move(part));
 }
 
@@ -341,6 +368,7 @@ void ALScriptCrumbsBar::sending(Doc& doc, std::vector<Part>& parts) const
     {
         part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
     }
+    part.drop = part.color ? DROP_WARNED : DROP_SIZE;
     parts.push_back(std::move(part));
 }
 
@@ -358,6 +386,7 @@ void ALScriptCrumbsBar::indentation(Doc& doc, std::vector<Part>& parts) const
     const ALTextView::IndentFrom from = editor.indentFrom();
     const char* tip = from == ALTextView::IndentFrom::Text ? "TrailerIndentTipText" : from == ALTextView::IndentFrom::Chosen ? "TrailerIndentTipChosen" : "TrailerIndentTipDefaults";
     parts.push_back({ mServices->words(editor.getSoftTabs() ? "TrailerIndentSpaces" : "TrailerIndentTabs", args), "indent", mServices->words(tip) });
+    parts.back().drop = DROP_INDENT;
 }
 
 void ALScriptCrumbsBar::showIndentMenu()
@@ -473,6 +502,7 @@ void ALScriptCrumbsBar::views(Doc& doc, std::vector<Part>& parts) const
         const bool expanded = doc.shownView() == Doc::View::Expanded;
         parts.push_back(
             { mServices->words(expanded ? "TrailerExpanded" : "TrailerSource"), "expanded", expanded ? mTips.expanded : mTips.source });
+        parts.back().drop = DROP_VIEW;
     }
 }
 

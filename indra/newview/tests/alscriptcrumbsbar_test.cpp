@@ -262,7 +262,7 @@ namespace tut
     template<> template<>
     void alscriptcrumbsbar_object::test<2>()
     {
-        set_test_name("the trailer: read only, vim's word, the caret, what is selected and the problems, each pressable one with its tip");
+        set_test_name("the trailer: read only, vim's word, the caret, what is selected and the problems, each pressable one with its tip; what goes first where narrow");
         ALScriptCrumbsBar* crumbs = bar();
         Doc&               doc    = tab("a");
         crumbs->setTips({ "line tip", "problems tip", "source tip", "expanded tip" });
@@ -281,6 +281,10 @@ namespace tut
         const std::vector<Part>& raw = jump()->trailer();
         ensure("a dot between each", raw.size() == 13 && raw[1].text == "   \xC2\xB7   " && raw[11].text == raw[1].text);
         ensure_equals("the last a part", raw[12].text, std::string("1 warning"));
+        ensure("the dots only between", raw[1].between && raw[11].between && !raw[12].between);
+        ensure("where narrow: the indentation first, then the selection, the counts and read only last, the place never",
+               part("Tab")->drop > part("2 lines")->drop && part("2 lines")->drop > part("2 errors")->drop && part("2 errors")->drop > 0 &&
+                   part("Read")->drop > 0 && part("Ln")->drop == 0);
         ensure_equals("read only, said", part("Read")->toolTip, std::string("You may read this script and not change it"));
         ensure("the problems pressable", part("2 errors")->value == "problems" && part("1 warning")->toolTip == "problems tip");
         doc.editor->setSelection(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 2)));

@@ -740,6 +740,7 @@ bool ALFloaterScriptStudio::postBuild()
     mExperience    = getChild<LLComboBox>("experience");
     mExperienceProfile = getChild<LLButton>("experience_profile");
     mResetButton   = getChild<LLButton>("reset_btn");
+    mExperienceWidth = mExperience->getRect().getWidth();
     mSaveButton    = getChild<LLButton>("save_btn");
     mSaveAllButton = getChild<LLButton>("save_all_btn");
     mUndoButton    = getChild<LLButton>("undo_btn");
@@ -1454,6 +1455,12 @@ void ALFloaterScriptStudio::draw()
         refreshTrailer(*front);
     }
     mCaret.pump(LLTimer::getTotalSeconds());
+    // The strip laid out again where its width changed: the window, or a
+    // pane beside the editor, resized.
+    if (mCrumbsBar && mCrumbsBar->getParent()->getRect().getWidth() != mStripLaid)
+    {
+        layStrip();
+    }
     mExplorerPane->pump();
     mVim.pump();
     if (mVimMode)
@@ -3281,7 +3288,6 @@ ALFloaterScriptStudio::ToolbarFacts ALFloaterScriptStudio::toolbarFactsOf() cons
         facts.anyDirty = facts.anyDirty || (each->unsaved() && each->modifiable);
     }
     facts.ownExperiences = ALScriptWorkspace::instance().ownExperiences();
-    facts.room           = mCrumbsBar ? mCrumbsBar->getParent()->getRect().getWidth() : 0;
     if (!doc)
     {
         return facts;
@@ -3369,22 +3375,60 @@ void ALFloaterScriptStudio::refreshToolbar()
         }
         mCompileTarget->setValue(doc->language.compileTarget);
     }
-    // The breadcrumb runs up to whatever of the script's own controls are
-    // showing at the strip's right, and no further: where none are, it has
-    // the strip.
-    if (mCrumbsBar)
+    layStrip();
+}
+
+namespace
+{
+    // The strip under the editor: its right margin, the gaps after each
+    // of the script's controls from the right, and what the breadcrumb
+    // keeps before the experience's box narrows, down to its least.
+    constexpr S32 STRIP_EDGE       = 4;
+    constexpr S32 STRIP_GAPS[]     = { 4, 6, 8, 4, 6 };
+    constexpr S32 CRUMBS_LEAST     = 200;
+    constexpr S32 EXPERIENCE_LEAST = 90;
+}
+
+void ALFloaterScriptStudio::layStrip()
+{
+    if (!mCrumbsBar)
     {
-        const LLView* first = task && mExperience->getVisible() ? static_cast<const LLView*>(mExperience)
-                              : task                            ? static_cast<const LLView*>(mResetButton)
-                              : script                          ? static_cast<const LLView*>(mCompileTarget)
-                                                                : nullptr;
-        const S32     right = first ? first->getRect().mLeft - 6 : mCrumbsBar->getParent()->getRect().getWidth();
-        const LLRect  crumbs = mCrumbsBar->getRect();
-        if (crumbs.mRight != right && right > crumbs.mLeft)
+        return;
+    }
+    // The script's own controls, those showing, packed against the
+    // strip's right edge in their order -- what it compiles for, whether
+    // it runs, reset, the experience's profile and the experience -- so
+    // that one hidden leaves no hole; the breadcrumb runs up to them, and
+    // where that leaves it too little, the experience's box narrows
+    // first. The breadcrumb's trailer drops what matters least of the
+    // rest (ALJumpBar::TrailerPart::drop).
+    const S32 width = mCrumbsBar->getParent()->getRect().getWidth();
+    mStripLaid      = width;
+    S32       right = width - STRIP_EDGE;
+    const S32 left  = mCrumbsBar->getRect().mLeft;
+    LLView* const order[] = { mCompileTarget, mRunning, mResetButton, mExperienceProfile, mExperience };
+    for (size_t i = 0; i < std::size(order); ++i)
+    {
+        LLView* control = order[i];
+        if (!control->getVisible())
         {
-            mCrumbsBar->reshape(right - crumbs.mLeft, crumbs.getHeight());
-            mCrumbsBar->setOrigin(crumbs.mLeft, crumbs.mBottom);
+            continue;
         }
+        S32 wide = control->getRect().getWidth();
+        if (control == mExperience)
+        {
+            wide = llclamp(right - left - CRUMBS_LEAST, EXPERIENCE_LEAST, mExperienceWidth);
+        }
+        const LLRect was = control->getRect();
+        control->setShape(LLRect(right - wide, was.mTop, right, was.mBottom));
+        right -= wide + STRIP_GAPS[i];
+    }
+    const S32    end    = right == width - STRIP_EDGE ? width : right;
+    const LLRect crumbs = mCrumbsBar->getRect();
+    if (crumbs.mRight != end && end > crumbs.mLeft)
+    {
+        mCrumbsBar->reshape(end - crumbs.mLeft, crumbs.getHeight());
+        mCrumbsBar->setOrigin(crumbs.mLeft, crumbs.mBottom);
     }
 }
 

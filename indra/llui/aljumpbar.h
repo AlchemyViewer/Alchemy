@@ -103,9 +103,16 @@ public:
         // Said in a colour of its own, where it is a warning; the quiet
         // ink otherwise.
         std::optional<LLColor4> color;
+        // Where the bar is too narrow for all of it, the pieces with the
+        // highest drop go first, the last said of those first, until the
+        // rest fits beside the path's last step; a drop of 0 never goes.
+        S32 drop = 0;
+        // A separator: said only between two pieces that are.
+        bool between = false;
         friend bool operator==(const TrailerPart& a, const TrailerPart& b)
         {
-            return a.text == b.text && a.value == b.value && a.toolTip == b.toolTip && a.color == b.color;
+            return a.text == b.text && a.value == b.value && a.toolTip == b.toolTip && a.color == b.color && a.drop == b.drop &&
+                   a.between == b.between;
         }
     };
     void setTrailer(std::vector<TrailerPart> parts);
@@ -143,6 +150,9 @@ private:
     // the fold that offers them back.
     size_t folded() const;
     S32 widthOf(const Crumb& crumb) const;
+    // Which of the trailer's pieces are said in the room the path leaves
+    // it, keeping its last step, and how wide those are together.
+    std::vector<bool> trailerShown(S32& width) const;
     void chose(size_t at, std::string value);
     void choseTrailer(std::string value);
     // The trailer's pieces given their words and their places, right up
@@ -160,7 +170,7 @@ private:
     S32                     mPathEnd = 0;
     size_t                  mFolded  = 0;
     std::vector<TrailerPart> mTrailerParts;
-    // The pieces run together, which is what the room is measured by.
+    // The pieces run together: whether there is a trailer at all.
     std::string             mTrailerText;
     chose_signal_t          mChose;
     trailer_signal_t        mTrailerChosen;
