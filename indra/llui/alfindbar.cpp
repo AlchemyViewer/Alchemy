@@ -101,7 +101,9 @@ public:
     std::string getToolTip() const override
     {
         const std::string tip = LLUICtrl::getToolTip();
-        return mKey == KEY_NONE || tip.empty() ? tip : tip + " (" + LLKeyboard::stringFromAccelerator(mKeyMask, mKey) + ")";
+        return mKey == KEY_NONE || tip.empty() ? tip
+                                               : alSaid("TipWithKeys", "[TIP] ([KEYS])",
+                                                        { { "[TIP]", tip }, { "[KEYS]", LLKeyboard::stringFromAccelerator(mKeyMask, mKey) } });
     }
     void setInk(const LLColor4& ink) { mInk = ink; }
     void setLit(const LLColor4& lit) { mLit = lit; }

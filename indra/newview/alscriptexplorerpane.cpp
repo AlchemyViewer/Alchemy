@@ -502,7 +502,8 @@ void ALScriptExplorerPane::fill()
     // script's state and an object out of sight follow its name, as the
     // inventory's worn items say so.
     // The words every row of a kind says, looked up once for all of them.
-    const auto        said        = [this](const std::string& word) { return " (" + mServices->words(word) + ")"; };
+    const auto        bracketed   = [this](const std::string& words) { return " " + mServices->words("Bracketed", { { "[TEXT]", words } }); };
+    const auto        said        = [this, bracketed](const std::string& word) { return bracketed(mServices->words(word)); };
     const std::string away        = said("KindAway");
     const std::string coming      = mServices->words("ObjectNameComing");
     const std::string unknown     = said("StateUnknown");
@@ -525,7 +526,7 @@ void ALScriptExplorerPane::fill()
                 out.overlay = row.pinned ? "Studio_Pinned" : LLStringUtil::null;
                 out.suffix = row.present         ? LLStringUtil::null
                              : row.region.empty() ? away
-                                                  : " (" + mServices->words("KindAwayIn", where) + ")";
+                                                  : bracketed(mServices->words("KindAwayIn", where));
                 out.icon   = row.many ? "Inv_Object_Multi" : "Inv_Object";
                 break;
             }

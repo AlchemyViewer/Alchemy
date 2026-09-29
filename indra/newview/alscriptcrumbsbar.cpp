@@ -284,8 +284,8 @@ void ALScriptCrumbsBar::weight(Doc& doc, std::vector<Part>& parts) const
         const size_t               limit = ALScriptWeight::limitOf(*target);
         LLStringUtil::format_map_t args;
         args["[TARGET]"]      = ALScriptWeight::nameOf(*target);
-        args["[BEFORE]"]      = llformat("%.1f", (F64)doc.uploaded.codeBefore / 1024.0);
-        args["[AFTER]"]       = llformat("%.1f", (F64)doc.uploaded.codeAfter / 1024.0);
+        args["[BEFORE]"]      = llformat("%f", (F64)doc.uploaded.codeBefore / 1024.0);
+        args["[AFTER]"]       = llformat("%f", (F64)doc.uploaded.codeAfter / 1024.0);
         args["[LIMIT]"]       = std::to_string(limit / 1024);
         args["[BYTESBEFORE]"] = std::to_string(doc.uploaded.codeBefore);
         args["[BYTESAFTER]"]  = std::to_string(doc.uploaded.codeAfter);
@@ -314,7 +314,7 @@ void ALScriptCrumbsBar::weight(Doc& doc, std::vector<Part>& parts) const
     const ALScriptWeight&      weighed = *doc.weighing.weight;
     LLStringUtil::format_map_t args;
     args["[TARGET]"] = ALScriptWeight::nameOf(weighed.target);
-    args["[SIZE]"]   = llformat("%.1f", (F64)weighed.total / 1024.0);
+    args["[SIZE]"]   = llformat("%f", (F64)weighed.total / 1024.0);
     args["[LIMIT]"]  = std::to_string(weighed.limit / 1024);
     args["[BYTES]"]  = std::to_string(weighed.total);
     args["[MAX]"]    = std::to_string(weighed.limit);

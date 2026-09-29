@@ -944,20 +944,20 @@ void ALScriptLookup::renameTo(const std::string& id, U32 generation, const std::
     if (opened > 0)
     {
         args["[SCRIPTS]"] = mServices.counted("Scripts", opened);
-        said += "; " + mServices.words("RenamedOpened", args);
+        said = mServices.clauses(said, mServices.words("RenamedOpened", args));
     }
     if (stale > 0)
     {
         args["[SCRIPTS]"] = mServices.counted("Scripts", stale);
-        said += "; " + mServices.words("RenamedLeft", args);
+        said = mServices.clauses(said, mServices.words("RenamedLeft", args));
     }
     // What it could not reach, or look through, said with what it did.
     std::string beyond = unreached(doc);
     if (const std::string missed = passedOver(doc); !missed.empty())
     {
-        beyond += (beyond.empty() ? "" : " ") + missed;
+        beyond = mServices.sentences(beyond, missed);
     }
-    mServices.report(said + "." + (beyond.empty() ? std::string() : " " + beyond), stale > 0 || !passedOver(doc).empty());
+    mServices.report(mServices.sentences(mServices.sentence(said), beyond), stale > 0 || !passedOver(doc).empty());
     mWindow.activate(doc);
     doc.editor->setFocus(true);
 }

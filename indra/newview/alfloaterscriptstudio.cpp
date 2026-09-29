@@ -3040,7 +3040,7 @@ void ALFloaterScriptStudio::fillTabs()
     mTabs->setTabs(std::move(tabs), mActive < mDocs.size() ? mDocs[mActive]->id : std::string());
     // Every window says which script is in front, as a window of one did.
     const Doc* doc = active();
-    setTitle(doc ? getString("WindowTitle") + " - " + doc->name : getString("WindowTitle"));
+    setTitle(doc ? words("WindowTitleNamed", { { "[NAME]", doc->name } }) : getString("WindowTitle"));
 }
 
 void ALFloaterScriptStudio::fillTabs(const Doc& doc)
@@ -3069,7 +3069,7 @@ void ALFloaterScriptStudio::fillTabs(const Doc& doc)
     mTabs->setTab(tabOf(doc, mTabFacts[index]));
     if (renamed && index == mActive)
     {
-        setTitle(getString("WindowTitle") + " - " + doc.name);
+        setTitle(words("WindowTitleNamed", { { "[NAME]", doc.name } }));
     }
 }
 
@@ -3811,8 +3811,9 @@ LLMenuItemGL* ALFloaterScriptStudio::menuItem(std::string_view id) const
 
 void ALFloaterScriptStudio::refreshKeyTips()
 {
-    // Each tip as the skin wrote it, its keys said as the menus have them
-    // now; a command with none loses the brackets that would hold them.
+    // Each tip as the skin wrote it, each of its fields the keys the menus
+    // have now, bracketed as the language brackets them (KeysInTip); a
+    // command with none leaves nothing, and the space before it goes too.
     for (const auto& [control, items] : mKeyTips)
     {
         LLView*    view = findChild<LLView>(control);
@@ -3831,10 +3832,13 @@ void ALFloaterScriptStudio::refreshKeyTips()
             const std::string   field = n == 1 ? std::string("[KEYS]") : "[KEYS" + std::to_string(n) + "]";
             if (keys.empty())
             {
-                LLStringUtil::replaceString(tip, " (" + field + ")", std::string());
-                LLStringUtil::replaceString(tip, "; " + field + " ", "; ");
+                LLStringUtil::replaceString(tip, " " + field, std::string());
+                LLStringUtil::replaceString(tip, field, std::string());
             }
-            LLStringUtil::replaceString(tip, field, keys);
+            else
+            {
+                LLStringUtil::replaceString(tip, field, alSaid("KeysInTip", "([KEYS])", { { "[KEYS]", keys } }));
+            }
         }
         view->setToolTip(tip);
     }
@@ -5593,24 +5597,18 @@ void ALFloaterScriptStudio::objectChecked(const ALScriptObjectCheck::Done& done)
     {
         found.push_back(counted("ProblemWarnings", mCheckedWarnings));
     }
-    said += ": " + (found.empty() ? getString("CheckedClean") : found.size() == 1 ? found[0] : found[0] + ", " + found[1]);
-    said += ".";
+    said = sentence(labelled(said, found.empty() ? getString("CheckedClean") : listed(found)));
     if (done.open > 0)
     {
-        said += " " + counted("CheckedOpen", done.open);
+        said = sentences(said, counted("CheckedOpen", done.open));
     }
     if (done.unlisted > 0)
     {
-        said += " " + counted("LookupUnlisted", done.unlisted);
+        said = sentences(said, counted("LookupUnlisted", done.unlisted));
     }
     if (!done.unread.empty())
     {
-        std::string names;
-        for (const std::string& name : done.unread)
-        {
-            names += (names.empty() ? "" : ", ") + name;
-        }
-        said += " " + counted("LookupUnread", static_cast<S32>(done.unread.size()), { { "[NAMES]", names } });
+        said = sentences(said, counted("LookupUnread", static_cast<S32>(done.unread.size()), { { "[NAMES]", listed(done.unread) } }));
     }
     report(said, mCheckedErrors > 0 || done.unlisted > 0 || !done.unread.empty());
 }

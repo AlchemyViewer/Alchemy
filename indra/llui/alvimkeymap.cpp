@@ -3647,7 +3647,7 @@ ALVimKeymap::Register ALVimKeymap::fetch(char name) const
 
 void ALVimKeymap::tooMuch(size_t bytes)
 {
-    say(said("VimCountTooLarge", "Too large a count: it would put in [SIZE] MB", { { "[SIZE]", llformat("%.1f", (F64)bytes / (1024.0 * 1024.0)) } }), true);
+    say(said("VimCountTooLarge", "Too large a count: it would put in [SIZE,number,1] MB", { { "[SIZE]", llformat("%f", (F64)bytes / (1024.0 * 1024.0)) } }), true);
 }
 
 void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool past)

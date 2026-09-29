@@ -498,7 +498,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimNoSuggestions">Sorry, no suggestions</string>
 	<string name="VimNotAddable">E764: Cannot add this word</string>
 	<string name="VimNothingInRegister">E353: Nothing in register [REGISTER]</string>
-	<string name="VimCountTooLarge">Too large a count: it would put in [SIZE] MB</string>
+	<string name="VimCountTooLarge">Too large a count: it would put in [SIZE,number,1] MB</string>
 	<string name="VimBadPattern">E486: [ERROR]</string>
 	<string name="VimPatternNotFound">E486: Pattern not found: [PATTERN]</string>
 	<string name="VimUnknownOption">E518: Unknown option: [OPTION]</string>

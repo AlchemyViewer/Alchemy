@@ -244,11 +244,11 @@ void ALScriptStudioWeighing::showInEditor(Doc& doc)
     LLStringUtil::format_map_t args;
     args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
     args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
-    const auto share = [&weight](size_t bytes) {
-        return weight.limit ? llformat("%.1f%%", (F64)bytes * 100.0 / (F64)weight.limit) : std::string();
+    const auto share = [this, &weight](size_t bytes) {
+        return weight.limit ? mServices.words("Percent", { { "[VALUE]", llformat("%f", (F64)bytes * 100.0 / (F64)weight.limit) } }) : std::string();
     };
-    // Said as weighed before the optimizer, where it was.
-    const std::string before = doc.weighing.exact ? std::string() : " " + mServices.words("WeightsHeadBefore");
+    // Said as measured before the optimizer, where it was.
+    const std::string before = doc.weighing.exact ? std::string() : mServices.words("WeightsHeadBefore");
     if (notes_shown)
     {
         // Each function, handler, state and global of the script's own, by
@@ -298,7 +298,7 @@ void ALScriptStudioWeighing::showInEditor(Doc& doc)
                 note.tip += (note.tip.empty() ? "" : "\n") +
                             mServices.words(weight.estimate ? "WeightNoteEstimateTip" : "WeightNoteTip", said);
             }
-            note.tip += before;
+            note.tip = mServices.sentences(note.tip, before);
             notes.push_back(std::move(note));
         }
         doc.editor->setLineNotes(notes);
@@ -325,7 +325,7 @@ void ALScriptStudioWeighing::showInEditor(Doc& doc)
             said["[BYTES]"]                 = std::to_string(line.bytes);
             said["[SHARE]"]                 = share(line.bytes);
             heat.push_back({ line.line, std::sqrt(static_cast<F32>(line.bytes) / static_cast<F32>(most)),
-                             mServices.words(weight.estimate ? "WeightHeatEstimateTip" : "WeightHeatTip", said) + before });
+                             mServices.sentences(mServices.words(weight.estimate ? "WeightHeatEstimateTip" : "WeightHeatTip", said), before) });
         }
         doc.editor->setLineHeat(heat);
     }

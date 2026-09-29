@@ -905,7 +905,7 @@ void ALScriptStudioSaving::reportOverWeight(const Doc& doc, const ALScriptWeight
 {
     LLStringUtil::format_map_t args;
     args["[NAME]"]   = doc.name;
-    args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
+    args["[SIZE]"]   = llformat("%f", (F64)weight.total / 1024.0);
     args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
     args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
     mServices.report(mServices.words(weight.estimate ? "SaveOverWeightEstimate" : "SaveOverWeight", args), true, &doc);

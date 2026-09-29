@@ -95,7 +95,7 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
         decoration.style   = mark == ALCodeEditor::Mark::Runtime || level == Doc::Level::Error ? ALCodeEditor::Decoration::Style::Squiggle
                              : level == Doc::Level::Warning                                     ? ALCodeEditor::Decoration::Style::Dashed
                                                                                                 : ALCodeEditor::Decoration::Style::Dotted;
-        decoration.message = origin + ": " + message;
+        decoration.message = services.labelled(origin, message);
         made.decorations.push_back(std::move(decoration));
     };
 
@@ -231,9 +231,9 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
     {
         const ALScriptWeight&      weight = *doc.weighing.weight;
         LLStringUtil::format_map_t args;
-        args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
+        args["[SIZE]"]   = llformat("%f", (F64)weight.total / 1024.0);
         args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
-        args["[LEFT]"]   = nearing ? llformat("%.1f", (F64)(weight.limit - weight.total) / 1024.0) : std::string();
+        args["[LEFT]"]   = nearing ? llformat("%f", (F64)(weight.limit - weight.total) / 1024.0) : std::string();
         args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
         Doc::Shown row;
         row.level   = Doc::Level::Warning;

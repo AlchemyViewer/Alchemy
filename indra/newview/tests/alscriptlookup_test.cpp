@@ -608,8 +608,9 @@ namespace tut
         ensure_equals("said once", services.reports.size(), size_t(1));
         const al_studio_test::FakeServices::Said& said = services.reports[0];
         ensure("the counts", has(said.text, "RenamedIn [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=4"));
-        ensure("opened", has(said.text, "; RenamedOpened [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=2"));
-        ensure("left", has(said.text, "; RenamedLeft [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=2."));
+        ensure("opened, a clause joined on", has(said.text, "[SECOND]=RenamedOpened [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=2"));
+        ensure("left, another", has(said.text, "[SECOND]=RenamedLeft [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=2"));
+        ensure("as the language joins clauses and ends a sentence", has(said.text, "Sentence [TEXT]=JoinClauses [FIRST]=JoinClauses"));
         ensure("a failure where any was left", said.failure);
         ensure("its tab brought forward", studio.activated == Names{ "a" });
     }

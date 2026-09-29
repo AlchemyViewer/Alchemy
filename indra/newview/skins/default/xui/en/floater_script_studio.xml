@@ -15,6 +15,17 @@
     <floater.string name="Untitled">Script</floater.string>
     <floater.string name="Loading">Loading...</floater.string>
     <floater.string name="Loaded">[NAME] loaded.</floater.string>
+    <!-- How the window joins what it says, in the language's order and
+         punctuation: its title with a script's name; a word in brackets
+         after a name; two clauses; a list; a label and what it labels; a
+         sentence ended; sentences one after another. -->
+    <floater.string name="WindowTitleNamed">Script Studio - [NAME]</floater.string>
+    <floater.string name="Bracketed">([TEXT])</floater.string>
+    <floater.string name="JoinClauses">[FIRST]; [SECOND]</floater.string>
+    <floater.string name="JoinList">[FIRST], [SECOND]</floater.string>
+    <floater.string name="Labelled">[LABEL]: [TEXT]</floater.string>
+    <floater.string name="Sentence">[TEXT].</floater.string>
+    <floater.string name="JoinSentences">[FIRST] [SECOND]</floater.string>
     <floater.string name="LoadedReadOnly">[NAME] loaded as read-only.</floater.string>
     <floater.string name="Saving">Saving [NAME]...</floater.string>
     <floater.string name="Compiled">[NAME] compiled.</floater.string>
@@ -582,18 +593,18 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="PaletteOff">off</floater.string>
     <floater.string name="UndoWhatRename">Rename</floater.string>
     <floater.string name="UndoWhatFix">Fix</floater.string>
-    <floater.string name="TrailerWeight">[TARGET] [SIZE] of [LIMIT] KB used</floater.string>
-    <floater.string name="TrailerWeightEstimate">[TARGET] ~[SIZE] of [LIMIT] KB used</floater.string>
+    <floater.string name="TrailerWeight">[TARGET] [SIZE,number,1] of [LIMIT] KB used</floater.string>
+    <floater.string name="TrailerWeightEstimate">[TARGET] ~[SIZE,number,1] of [LIMIT] KB used</floater.string>
     <floater.string name="TrailerWeightTip">Code size on [TARGET]: [BYTES] of [MAX] bytes. Memory used while it runs is not counted.</floater.string>
     <floater.string name="TrailerWeightEstimateTip">Estimated code size on [TARGET]: [BYTES] of [MAX] bytes. Memory used while it runs is not counted.</floater.string>
     <floater.string name="TrailerWeightBeforeTip">Measured before the preprocessor's optimizer, which runs on save; the saved script may be smaller.</floater.string>
     <floater.string name="TrailerWeightSentTip">Measured as it is saved, after the preprocessor.</floater.string>
     <floater.string name="OriginWeight">Memory</floater.string>
-    <floater.string name="WeightOver">The script's code is about [SIZE] KB, more than the [LIMIT] KB of memory a script has on [TARGET].</floater.string>
-    <floater.string name="WeightOverEstimate">The script's code is about [SIZE] KB, likely more than the [LIMIT] KB of memory a script has on [TARGET].</floater.string>
-    <floater.string name="WeightNear">The script's code uses [SIZE] of the [LIMIT] KB of memory a script has on [TARGET], leaving [LEFT] KB for its lists, strings and stack while it runs.</floater.string>
-    <floater.string name="WeightNearEstimate">The script's code uses about [SIZE] of the [LIMIT] KB of memory a script has on [TARGET], leaving about [LEFT] KB for its lists, strings and stack while it runs.</floater.string>
-    <floater.string name="WeightOverBefore">Before the optimizer, the script's code is [SIZE] KB, more than the [LIMIT] KB of memory a script has on [TARGET]. It may fit after the optimizer runs.</floater.string>
+    <floater.string name="WeightOver">The script's code is about [SIZE,number,1] KB, more than the [LIMIT] KB of memory a script has on [TARGET].</floater.string>
+    <floater.string name="WeightOverEstimate">The script's code is about [SIZE,number,1] KB, likely more than the [LIMIT] KB of memory a script has on [TARGET].</floater.string>
+    <floater.string name="WeightNear">The script's code uses [SIZE,number,1] of the [LIMIT] KB of memory a script has on [TARGET], leaving [LEFT,number,1] KB for its lists, strings and stack while it runs.</floater.string>
+    <floater.string name="WeightNearEstimate">The script's code uses about [SIZE,number,1] of the [LIMIT] KB of memory a script has on [TARGET], leaving about [LEFT,number,1] KB for its lists, strings and stack while it runs.</floater.string>
+    <floater.string name="WeightOverBefore">Before the optimizer, the script's code is [SIZE,number,1] KB, more than the [LIMIT] KB of memory a script has on [TARGET]. It may fit after the optimizer runs.</floater.string>
     <floater.string name="TrailerSize">[SIZE] KB of [LIMIT] KB</floater.string>
     <floater.string name="TrailerSizeTip">Save size: [BYTES] of [MAX] bytes, with any preprocessed code, before optimizing and compression.</floater.string>
     <floater.string name="TrailerSizeOverTip">Save size: [BYTES] bytes, [OVER] over the [MAX] limit. It cannot be saved until it is smaller.</floater.string>
@@ -602,20 +613,21 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="WeightsNoScript">No script is open.</floater.string>
     <floater.string name="WeightsNoTarget">[NAME] has no code of its own to measure: it is a notecard, or a script that is only included by others.</floater.string>
     <floater.string name="WeightsNotYet">Memory use for [NAME] is shown after it is checked.</floater.string>
-    <floater.string name="WeightsHead">[NAME] on [TARGET]: [SIZE] of [LIMIT] KB used, [SHARE].</floater.string>
-    <floater.string name="WeightsHeadEstimate">[NAME] on [TARGET]: about [SIZE] of [LIMIT] KB used, [SHARE].</floater.string>
+    <floater.string name="WeightsHead">[NAME] on [TARGET]: [SIZE,number,1] of [LIMIT] KB used, [SHARE].</floater.string>
+    <floater.string name="WeightsHeadEstimate">[NAME] on [TARGET]: about [SIZE,number,1] of [LIMIT] KB used, [SHARE].</floater.string>
     <floater.string name="WeightsHeadFailed">[NAME] does not compile for [TARGET]: [ERROR]</floater.string>
     <floater.string name="WeightsHeadError">Currently, [ERROR].</floater.string>
     <floater.string name="WeightsHeadBefore">Measured before the preprocessor's optimizer, which runs on save.</floater.string>
-    <floater.string name="WeightsHeadSent">Measured before the preprocessor's optimizer. As saved, it is [SENT] KB.</floater.string>
+    <floater.string name="WeightsHeadSent">Measured before the preprocessor's optimizer. As saved, it is [SENT,number,1] KB.</floater.string>
     <floater.string name="WeightsHeadTip">Code size only, not counting the lists and strings the script builds while it runs.</floater.string>
     <floater.string name="WeightsTargetTip">[TARGET]: [BYTES] bytes of code, of [MAX] bytes of memory.</floater.string>
     <floater.string name="WeightsTargetEstimateTip">[TARGET]: about [BYTES] bytes of code, of [MAX] bytes of memory, estimated from the compiled code.</floater.string>
     <floater.string name="WeightsTargetFailedTip">Does not compile for [TARGET]: [ERROR]</floater.string>
     <floater.string name="WeightsTargetErrorTip">Currently, [ERROR].</floater.string>
     <floater.string name="WeightsTargetOwnTip">The target the script is compiled for.</floater.string>
-    <floater.string name="WeightsKilobytes">[SIZE] KB</floater.string>
-    <floater.string name="WeightsKilobytesEstimate">~[SIZE] KB</floater.string>
+    <floater.string name="Percent">[VALUE,number,1]%</floater.string>
+    <floater.string name="WeightsKilobytes">[SIZE,number,1] KB</floater.string>
+    <floater.string name="WeightsKilobytesEstimate">~[SIZE,number,1] KB</floater.string>
     <floater.string name="WeightsNone">--</floater.string>
     <floater.string name="WeightsNew">new</floater.string>
     <floater.string name="WeightsPartRegisters">Registers</floater.string>
@@ -643,16 +655,16 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="OptimizerNoteLighter">(saves [BYTES] bytes of code on [TARGET])</floater.string>
     <floater.string name="OptimizerNoteHeavier">(adds [BYTES] bytes of code on [TARGET])</floater.string>
     <floater.string name="OptimizerNoteSame">(saves no code on [TARGET])</floater.string>
-    <floater.string name="TrailerOptimized">[TARGET] [BEFORE] → [AFTER] of [LIMIT] KB used</floater.string>
-    <floater.string name="TrailerOptimizedEstimate">[TARGET] ~[BEFORE] → ~[AFTER] of [LIMIT] KB used</floater.string>
+    <floater.string name="TrailerOptimized">[TARGET] [BEFORE,number,1] → [AFTER,number,1] of [LIMIT] KB used</floater.string>
+    <floater.string name="TrailerOptimizedEstimate">[TARGET] ~[BEFORE,number,1] → ~[AFTER,number,1] of [LIMIT] KB used</floater.string>
     <floater.string name="TrailerOptimizedTip">Code size on [TARGET] before and after optimizing: [BYTESBEFORE] → [BYTESAFTER] of [MAX] bytes.</floater.string>
     <floater.string name="TrailerOptimizedEstimateTip">Estimated code size on [TARGET] before and after optimizing: [BYTESBEFORE] → [BYTESAFTER] of [MAX] bytes.</floater.string>
     <floater.string name="FixLighter">[BYTES] bytes less code on [TARGET]</floater.string>
     <floater.string name="FixLighterEstimate">about [BYTES] bytes less code on [TARGET]</floater.string>
     <floater.string name="FixHeavier">[BYTES] bytes more code on [TARGET]</floater.string>
     <floater.string name="FixHeavierEstimate">about [BYTES] bytes more code on [TARGET]</floater.string>
-    <floater.string name="SaveOverWeight">[NAME] was saved, but its code is about [SIZE] KB, more than the [LIMIT] KB of memory a script has on [TARGET]. It may not compile or run.</floater.string>
-    <floater.string name="SaveOverWeightEstimate">[NAME] was saved, but its code is estimated at [SIZE] KB, likely more than the [LIMIT] KB of memory a script has on [TARGET]. It may not run.</floater.string>
+    <floater.string name="SaveOverWeight">[NAME] was saved, but its code is about [SIZE,number,1] KB, more than the [LIMIT] KB of memory a script has on [TARGET]. It may not compile or run.</floater.string>
+    <floater.string name="SaveOverWeightEstimate">[NAME] was saved, but its code is estimated at [SIZE,number,1] KB, likely more than the [LIMIT] KB of memory a script has on [TARGET]. It may not run.</floater.string>
     <floater.string name="SaveTooLarge">[NAME] was not saved: it is [SIZE] bytes, [OVER] bytes over the limit of [LIMIT].</floater.string>
     <floater.string name="SaveTooLargePlain">To fit, move part of it into another script, or into a notecard it reads.</floater.string>
     <floater.string name="SaveTooLargeCompress">A preprocessed script saves both its source and its preprocessed code. Turn on Build &gt; Firestorm &gt; Compress Preprocessed Code to shrink the preprocessed code.</floater.string>
@@ -1387,7 +1399,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
      layout="topleft"
      left="8"
      name="save_btn"
-     tool_tip="Save and compile the script ([KEYS]); a notecard is only saved"
+     tool_tip="Save and compile the script [KEYS]; a notecard is only saved"
      top="41"
      width="26" />
     <button
@@ -1397,7 +1409,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
      layout="topleft"
      left_pad="2"
      name="save_all_btn"
-     tool_tip="Save every script with unsaved changes ([KEYS])"
+     tool_tip="Save every script with unsaved changes [KEYS]"
      top_delta="0"
      width="26" />
     <button
@@ -1407,7 +1419,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
      layout="topleft"
      left_pad="8"
      name="undo_btn"
-     tool_tip="Undo the last change ([KEYS])"
+     tool_tip="Undo the last change [KEYS]"
      top_delta="0"
      width="26" />
     <button
@@ -1417,7 +1429,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
      layout="topleft"
      left_pad="2"
      name="redo_btn"
-     tool_tip="Redo the last undone change ([KEYS])"
+     tool_tip="Redo the last undone change [KEYS]"
      top_delta="0"
      width="26" />
     <button
@@ -1427,7 +1439,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
      layout="topleft"
      left_pad="8"
      name="find_btn"
-     tool_tip="Find in this script ([KEYS]); [KEYS2] searches across scripts"
+     tool_tip="Find in this script [KEYS]; search across scripts [KEYS2]"
      top_delta="0"
      width="26" />
     <button
@@ -1437,7 +1449,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
      layout="topleft"
      left_pad="2"
      name="format_btn"
-     tool_tip="Format the script's indentation and spacing ([KEYS])"
+     tool_tip="Format the script's indentation and spacing [KEYS]"
      top_delta="0"
      width="26" />
     <button
@@ -1448,7 +1460,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
      layout="topleft"
      left_pad="8"
      name="expanded_btn"
-     tool_tip="Show the preprocessed code (read-only) or the source ([KEYS]). Needs Build &gt; Preprocess on Save."
+     tool_tip="Show the preprocessed code (read-only) or the source [KEYS]. Needs Build &gt; Preprocess on Save."
      top_delta="0"
      width="26" />
     <button
@@ -1461,7 +1473,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
      layout="topleft"
      name="fold_explorer"
      right="-182"
-     tool_tip="Show or hide the Explorer: objects and their scripts ([KEYS])"
+     tool_tip="Show or hide the Explorer: objects and their scripts [KEYS]"
      top_delta="0"
      width="92" />
     <button
@@ -1474,7 +1486,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
      layout="topleft"
      name="fold_bottom"
      right="-108"
-     tool_tip="Show or hide Problems ([KEYS]), References ([KEYS2]), Output ([KEYS3]) and Search ([KEYS4])"
+     tool_tip="Show or hide Problems [KEYS], References [KEYS2], Output [KEYS3] and Search [KEYS4]"
      top_delta="0"
      width="70" />
     <button
@@ -1487,7 +1499,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
      layout="topleft"
      name="fold_inspector"
      right="-8"
-     tool_tip="Show or hide the Inspector: the outline and the symbol at the caret ([KEYS])"
+     tool_tip="Show or hide the Inspector: the outline and the symbol at the caret [KEYS]"
      top_delta="0"
      width="96" />
 
@@ -1936,7 +1948,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                                      layout="topleft"
                                      left_pad="6"
                                      name="problems_fixable"
-                                     tool_tip="Show only problems with a fix: use the right-click menu, the lightbulb, or Quick Fix ([KEYS])"
+                                     tool_tip="Show only problems with a fix: use the right-click menu, the lightbulb, or Quick Fix [KEYS]"
                                      top_delta="0"
                                      width="62" />
                                     <combo_box

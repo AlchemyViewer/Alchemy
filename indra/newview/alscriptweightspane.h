@@ -120,6 +120,8 @@ private:
     std::string           kindName(ALScriptWeight::Part::Kind kind) const;
     std::string           where(const ALScriptWeight::Part& part) const;
     std::string           changeText(const std::optional<S64>& change, bool fresh) const;
+    // A share of what the target runs a script in, as a percentage.
+    std::string share(size_t bytes, size_t limit) const;
     std::string           kilobytes(size_t bytes, bool estimate) const;
     S32                   compare(S32 column, const LLScrollListItem* a, const LLScrollListItem* b) const;
 

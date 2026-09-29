@@ -629,7 +629,7 @@ void ALScriptStudioRecovery::show()
                                                                       : "RecoverUnsaved";
         ALQuickOpen::Candidate one;
         one.label  = nameOf(entry);
-        one.detail = mServices.words(state) + ", " + entry.whenSaid();
+        one.detail = mServices.listed({ mServices.words(state), entry.whenSaid() });
         one.also   = !entry.file.empty() ? entry.file : entry.objectName + " " + entry.region;
         one.value  = std::to_string(i);
         candidates.push_back(std::move(one));

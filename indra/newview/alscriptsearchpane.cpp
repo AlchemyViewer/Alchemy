@@ -836,14 +836,14 @@ void ALScriptSearchPane::replaceAll()
     if (opened > 0)
     {
         args["[SCRIPTS]"] = mServices->counted("Scripts", opened);
-        said += "; " + mServices->words("SearchReplacedOpened", args);
+        said = mServices->clauses(said, mServices->words("SearchReplacedOpened", args));
     }
     if (left > 0)
     {
         args["[SCRIPTS]"] = mServices->counted("Scripts", left);
-        said += "; " + mServices->words("SearchReplacedLeft", args);
+        said = mServices->clauses(said, mServices->words("SearchReplacedLeft", args));
     }
-    mServices->report(said + ".", left > 0);
+    mServices->report(mServices->sentence(said), left > 0);
     // Whatever stood before, the places have moved: looked for again.
     run();
 }
