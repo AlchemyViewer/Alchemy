@@ -28,6 +28,7 @@
 
 #include "../alkeychord.h"
 #include "../alpopover.h"
+#include "../alsurface.h"
 #include "../llfocusmgr.h"
 #include "../lllineeditor.h"
 #include "../llmenugl.h"
@@ -505,6 +506,33 @@ namespace tut
         run();
         ensure("by its key, by two, and not by a menu", heard == std::vector<bool>({ true, true, false }));
         ensure("and not after", !window->byKeys());
+        window->closeFloater();
+    }
+
+    template<> template<>
+    void alstudiofloater_object::test<12>()
+    {
+        set_test_name("the status line goes quiet and stays legible against the window; where even the text does not read, it stays the text");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        TestStudio*    window = studio();
+        const LLColor4 text   = ALSurface::text().get();
+        for (const LLColor4& ground : { LLColor4(0.1f, 0.1f, 0.1f, 1.f), LLColor4(0.95f, 0.95f, 0.95f, 1.f), text })
+        {
+            window->setBackgroundColor(ground);
+            const LLColor4 quiet = window->quietStatusColor();
+            ensure("no louder than the text", ALSurface::contrast(quiet, ground) <= ALSurface::contrast(text, ground) + 0.001f);
+            if (ALSurface::contrast(text, ground) >= ALSurface::LEGIBLE)
+            {
+                ensure("legible", ALSurface::contrast(quiet, ground) >= ALSurface::LEGIBLE - 0.01f);
+            }
+            else
+            {
+                ensure("the text itself", quiet == text);
+            }
+        }
         window->closeFloater();
     }
 }

@@ -79,6 +79,9 @@ public:
     // after a while, so that what was said long ago does not read as news
     // -- a failure after longer than the rest.
     virtual void setStatus(const std::string& text, bool failure = false);
+    // What it goes quiet to: towards the skin's quiet words, as far as it
+    // still reads against the window's ground.
+    LLColor4 quietStatusColor() const;
 
     // Undo and redo, which every studio has: a step back and a step
     // forward, however the studio keeps them. False where there was

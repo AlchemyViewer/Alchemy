@@ -419,6 +419,13 @@ void ALStudioFloater::setStatus(const std::string& text, bool failure)
     mStatusQuiet   = text.empty();
 }
 
+LLColor4 ALStudioFloater::quietStatusColor() const
+{
+    // The skin's quiet words are a quarter of white in some skins, which
+    // over a dark window reads at about 2:1: quiet, not gone.
+    return ALSurface::legible(ALSurface::text().get(), ALSurface::quiet().get(), getBackgroundColor());
+}
+
 // Before anything else: a pane left in a window this one does not own
 // goes down with it.
 void ALStudioFloater::onClose(bool app_quitting)
@@ -437,8 +444,7 @@ void ALStudioFloater::draw()
     constexpr F64 FAILURE_SECONDS = 60.0;
     if (mStatus && !mStatusQuiet && LLTimer::getTotalSeconds() - mStatusSaidAt > (mStatusFailure ? FAILURE_SECONDS : NEWS_SECONDS))
     {
-        const LLUIColor& quiet = ALSurface::quiet();
-        mStatus->setColor(quiet);
+        mStatus->setColor(quietStatusColor());
         mStatusQuiet = true;
     }
     LLFloater::draw();
