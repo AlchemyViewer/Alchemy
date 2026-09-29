@@ -559,7 +559,7 @@ namespace tut
         std::vector<Doc::Shown> rows = weights(gather(d));
         ensure_equals("near: one row", rows.size(), size_t(1));
         ensure("a warning", rows[0].level == Doc::Level::Warning);
-        ensure("what is left", rows[0].message == services.words("WeightNear", { { "[SIZE]", "14.0" }, { "[LIMIT]", "16" }, { "[LEFT]", "2.0" }, { "[TARGET]", "LSO" } }));
+        ensure("what is left", rows[0].message == services.words("WeightNear", { { "[SIZE]", "14.0" }, { "[LIMIT]", "16" }, { "[LEFT]", "2.0" }, { "[TARGET]", "LSL (LSO)" } }));
         d.weighing.exact = false;
         ensure("before the optimizer, nothing", weights(gather(d)).empty());
         d.weighing.exact            = true;

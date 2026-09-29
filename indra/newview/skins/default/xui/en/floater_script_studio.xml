@@ -516,10 +516,10 @@
     <floater.string name="RecompileNothing">There is no script there to recompile.</floater.string>
     <floater.string name="RecompiledA">Recompiled 1 script [TARGET]</floater.string>
     <floater.string name="RecompiledB">Recompiled [COUNT] scripts [TARGET]</floater.string>
-    <floater.string name="RecompiledAsTheyAre">as each compiles now</floater.string>
-    <floater.string name="RecompiledForMono">for LSL on Mono</floater.string>
-    <floater.string name="RecompiledForLegacy">for LSL Legacy</floater.string>
-    <floater.string name="RecompiledForLuau">for LSL on Luau</floater.string>
+    <floater.string name="RecompiledAsTheyAre">without changing the target</floater.string>
+    <floater.string name="RecompiledForMono">for LSL (Mono)</floater.string>
+    <floater.string name="RecompiledForLegacy">for LSL (LSO)</floater.string>
+    <floater.string name="RecompiledForLuau">for LSL (Luau)</floater.string>
     <floater.string name="RecompiledCompiledA">1 compiled</floater.string>
     <floater.string name="RecompiledCompiledB">[COUNT] compiled</floater.string>
     <floater.string name="RecompiledFailedA">1 did not compile, its problems in Problems</floater.string>
@@ -1841,9 +1841,9 @@
                      tool_tip="What the script compiles for when it is saved: an LSL script on Mono (the usual choice), on the legacy LSL2 machine, or on Luau; an SLua script as SLua. A target of the other language reads the script as that language from then on, for a script converted from one to the other."
                      top="2"
                      width="132">
-                        <combo_box.item label="LSL on Mono" name="compile_target_mono" value="mono" />
-                        <combo_box.item label="LSL Legacy" name="compile_target_lsl2" value="lsl2" />
-                        <combo_box.item label="LSL on Luau" name="compile_target_lsl_luau" value="lsl-luau" />
+                        <combo_box.item label="LSL (Mono)" name="compile_target_mono" value="mono" />
+                        <combo_box.item label="LSL (LSO)" name="compile_target_lsl2" value="lsl2" />
+                        <combo_box.item label="LSL (Luau)" name="compile_target_lsl_luau" value="lsl-luau" />
                         <combo_box.item label="SLua" name="compile_target_luau" value="luau" />
                     </combo_box>
                 </layout_panel>

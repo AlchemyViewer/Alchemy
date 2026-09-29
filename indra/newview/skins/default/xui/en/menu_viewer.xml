@@ -1600,7 +1600,7 @@ function="World.EnvPreset"
              parameter="script_debug" />
           </menu_item_check>
           <menu_item_call
-             label="Recompile Scripts (Mono)"
+             label="Recompile Scripts as LSL (Mono)"
              name="Mono">
             <menu_item_call.on_click
                function="Tools.SelectedScriptAction"
@@ -1609,7 +1609,7 @@ function="World.EnvPreset"
                function="EditableSelectedMono" />
           </menu_item_call>
           <menu_item_call
-             label="Recompile Scripts (LSL)"
+             label="Recompile Scripts as LSL (LSO)"
              name="LSL">
             <menu_item_call.on_click
                function="Tools.SelectedScriptAction"
@@ -1618,7 +1618,7 @@ function="World.EnvPreset"
                function="EditableSelected" />
           </menu_item_call>
           <menu_item_call
-             label="Recompile Scripts (Lua)"
+             label="Recompile Scripts as SLua"
              name="Lua">
             <menu_item_call.on_click
                function="Tools.SelectedScriptAction"
@@ -1627,7 +1627,7 @@ function="World.EnvPreset"
                function="EditableSelectedLua" />
           </menu_item_call>
           <menu_item_call
-             label="Recompile Scripts (LSL on Luau)"
+             label="Recompile Scripts as LSL (Luau)"
              name="LSL on Luau">
             <menu_item_call.on_click
                function="Tools.SelectedScriptAction"

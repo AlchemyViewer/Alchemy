@@ -150,7 +150,7 @@ namespace tut
         ALPaneList* targets = list("weights_targets");
         ALPaneList* parts   = list("weights_parts");
         ensure_equals("three targets", targets->getItemCount(), 3);
-        ensure_equals("its own first", cell(targets->getAllData()[0], 0), std::string("LSO"));
+        ensure_equals("its own first", cell(targets->getAllData()[0], 0), std::string("LSL (LSO)"));
         ensure_equals("its code", cell(targets->getAllData()[0], 1), std::string("4.0 KB"));
         ensure_equals("its share", cell(targets->getAllData()[0], 2), std::string("25.0%"));
         ensure_equals("an estimate said as one", cell(targets->getAllData()[1], 1), std::string("~5.9 KB"));

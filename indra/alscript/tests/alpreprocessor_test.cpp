@@ -1148,7 +1148,7 @@ namespace tut
         ensure("the fold noted, with what its line saved", folded && folded->savedBytes && *folded->savedBytes > 0);
         ensure("the whole said", sizes != nullptr);
         ensure_equals("in code", sizes->args[2], std::to_string(r.codeBefore));
-        ensure_equals("on its target", sizes->args[4], std::string("LSO"));
+        ensure_equals("on its target", sizes->args[4], std::string("LSL (LSO)"));
         const S64 lost = S64(r.codeBefore) - S64(r.codeAfter);
         ensure("no note says more than the whole lost", *removed->savedBytes <= lost && *folded->savedBytes <= lost);
 

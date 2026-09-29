@@ -69,11 +69,11 @@ const char* ALScriptWeight::nameOf(Target target)
     switch (target)
     {
         case Target::LSO:
-            return "LSO";
+            return "LSL (LSO)";
         case Target::Mono:
-            return "Mono";
+            return "LSL (Mono)";
         case Target::LSLLuau:
-            return "LSL on Luau";
+            return "LSL (Luau)";
         case Target::SLua:
         default:
             return "SLua";

@@ -3008,7 +3008,7 @@ even though the user gets a free copy.
                  name="new_lsl_script"
                  value="lsl" />
                 <flyout_button.item
-                 label="New Lua Script"
+                 label="New SLua Script"
                  name="new_lua_script"
                  value="lua" />
             </flyout_button>

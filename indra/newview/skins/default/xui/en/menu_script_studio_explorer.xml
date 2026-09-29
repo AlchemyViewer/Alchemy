@@ -44,15 +44,15 @@
     <menu_item_call.on_enable function="Explorer.Enable" parameter="recompile" />
   </menu_item_call>
   <context_menu label="Recompile As" layout="topleft" name="recompile_as">
-    <menu_item_call label="LSL on Mono" layout="topleft" name="recompile_mono">
+    <menu_item_call label="LSL (Mono)" layout="topleft" name="recompile_mono">
       <menu_item_call.on_click function="Explorer.Action" parameter="recompile_mono" />
       <menu_item_call.on_enable function="Explorer.Enable" parameter="recompile_mono" />
     </menu_item_call>
-    <menu_item_call label="LSL Legacy" layout="topleft" name="recompile_lsl2">
+    <menu_item_call label="LSL (LSO)" layout="topleft" name="recompile_lsl2">
       <menu_item_call.on_click function="Explorer.Action" parameter="recompile_lsl2" />
       <menu_item_call.on_enable function="Explorer.Enable" parameter="recompile_lsl2" />
     </menu_item_call>
-    <menu_item_call label="LSL on Luau" layout="topleft" name="recompile_lsl_luau">
+    <menu_item_call label="LSL (Luau)" layout="topleft" name="recompile_lsl_luau">
       <menu_item_call.on_click function="Explorer.Action" parameter="recompile_lsl_luau" />
       <menu_item_call.on_enable function="Explorer.Enable" parameter="recompile_lsl_luau" />
     </menu_item_call>

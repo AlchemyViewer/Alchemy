@@ -317,21 +317,21 @@ namespace tut
         weight.total  = 40960;
         doc.weighing.weight = weight;
         crumbs->showTrailer(doc);
-        const Part* weighed = part("Mono");
-        ensure("weighed", weighed && weighed->text == "Mono 40.0 of 64 KB used" && !weighed->color);
+        const Part* weighed = part("LSL (Mono)");
+        ensure("weighed", weighed && weighed->text == "LSL (Mono) 40.0 of 64 KB used" && !weighed->color);
         ensure("before the optimizer", weighed->toolTip.find("Weighed before the preprocessor") != std::string::npos);
         doc.weighing.exact = true;
         doc.weighing.sent  = true;
         doc.weighing.weight->total = 60000;
         crumbs->showTrailer(doc);
-        ensure("as sent", part("Mono")->toolTip.find("as a save sends it") != std::string::npos);
-        ensure("near: the warning's", part("Mono")->color == warn);
+        ensure("as sent", part("LSL (Mono)")->toolTip.find("as a save sends it") != std::string::npos);
+        ensure("near: the warning's", part("LSL (Mono)")->color == warn);
         doc.weighing.weight->total = 70000;
         crumbs->showTrailer(doc);
-        ensure("past: the error's", part("Mono")->color == error);
+        ensure("past: the error's", part("LSL (Mono)")->color == error);
         doc.weighing.weight->estimate = true;
         crumbs->showTrailer(doc);
-        ensure("an estimate", part("Mono ~") != nullptr);
+        ensure("an estimate", part("LSL (Mono) ~") != nullptr);
         doc.weighing.weight.reset();
 
         const size_t LIMIT      = ALScriptEnvelope::MAX_ASSET_BYTES;
@@ -387,25 +387,25 @@ namespace tut
         doc.uploaded.codeAfter  = 10240;
         told().target           = ALScriptWeight::Target::Mono;
         crumbs->showTrailer(doc);
-        ensure_equals("before and after", part("Mono")->text, std::string("Mono ~20.0 \xE2\x86\x92 ~10.0 of 64 KB used"));
+        ensure_equals("before and after", part("LSL (Mono)")->text, std::string("LSL (Mono) ~20.0 \xE2\x86\x92 ~10.0 of 64 KB used"));
         ensure_equals("once", parts().size(), size_t(4));
         doc.uploaded.codeAfter = 60000;
         crumbs->showTrailer(doc);
-        ensure("near: the warning's", part("Mono")->color == doc.editor->markColor(ALCodeEditor::Mark::Warning));
+        ensure("near: the warning's", part("LSL (Mono)")->color == doc.editor->markColor(ALCodeEditor::Mark::Warning));
         doc.uploaded.codeAfter = 70000;
         crumbs->showTrailer(doc);
-        ensure("past: the error's", part("Mono")->color == doc.editor->markColor(ALCodeEditor::Mark::Error));
+        ensure("past: the error's", part("LSL (Mono)")->color == doc.editor->markColor(ALCodeEditor::Mark::Error));
         told().target = ALScriptWeight::Target::LSO;
         crumbs->showTrailer(doc);
-        ensure("measured, not estimated", part("LSO") && part("LSO")->text.find('~') == std::string::npos);
+        ensure("measured, not estimated", part("LSL (LSO)") && part("LSL (LSO)")->text.find('~') == std::string::npos);
         doc.editor->insertText("x");
         crumbs->showTrailer(doc);
-        ensure("typed since: its weight", part("Mono 40.0") != nullptr);
+        ensure("typed since: its weight", part("LSL (Mono) 40.0") != nullptr);
         doc.view             = Doc::View::Source;
         doc.uploaded.version = doc.editor->document().version();
         told().target        = ALScriptWeight::Target::Mono;
         crumbs->showTrailer(doc);
-        ensure("the source in front: its weight", part("Mono 40.0") != nullptr);
+        ensure("the source in front: its weight", part("LSL (Mono) 40.0") != nullptr);
     }
 
     template<> template<>
