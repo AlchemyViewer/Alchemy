@@ -51,7 +51,6 @@
 #include "llinventorydefines.h"
 #include "llinventoryfunctions.h"
 #include "llinventorymodelbackgroundfetch.h"
-#include "llpreviewnotecard.h"
 #include "llrootview.h"
 #include "llselectmgr.h"
 #include "lltoolbarview.h"
@@ -3514,14 +3513,9 @@ LLInventoryObject* LLToolDragAndDrop::locateInventory(
     }
     else if(mSource == SOURCE_NOTECARD)
     {
-        // Out of a notecard's text, wherever it is shown; or out of the
-        // legacy notecard window.
+        // Out of a notecard's text, in the notecard window or Script
+        // Studio.
         item = ALNotecardDrag::dragged(mCargoIDs[mCurItemIndex]);
-        LLPreviewNotecard* preview = item ? nullptr : LLFloaterReg::findTypedInstance<LLPreviewNotecard>("preview_notecard", mSourceID);
-        if(preview)
-        {
-            item = (LLViewerInventoryItem*)preview->getDragItem();
-        }
     }
     else if(mSource == SOURCE_VIEWER)
     {

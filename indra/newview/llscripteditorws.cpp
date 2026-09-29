@@ -52,7 +52,6 @@
 #include "llinventorydefines.h"
 #include "llnotecard.h"
 #include "llnotificationsutil.h"
-#include "llpreviewnotecard.h"
 #include "llpreviewscript.h"
 #include "llprocess.h"
 #include "alregex.h"
@@ -71,7 +70,6 @@
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
 #include "llviewermenu.h"
-#include "llviewertexteditor.h"
 #include "llvoinventorylistener.h"
 #include "roles_constants.h"
 // [RLVa:KB]
@@ -2132,26 +2130,12 @@ LLSD LLScriptEditorWSServer::saveNotecard(LLViewerObject* prim, LLInventoryItem*
     if (!answer->error.empty())
         throw LLJSONRPCConnection::InternalError("Upload failed: " + answer->error);
 
+    // The notecard window and Script Studio hear the save through the
+    // workspace, and each takes it or asks.
     LLSD response;
     response["success"] = true;
     response["prim_id"] = prim_id;
     response["item_id"] = item_id;
-
-    // If the notecard is open in the viewer's editor, update it
-    LLSD floater_key;
-    floater_key["taskid"] = prim_id;
-    floater_key["itemid"] = item_id;
-    LLPreviewNotecard* nc = LLFloaterReg::findTypedInstance<LLPreviewNotecard>("preview_notecard", floater_key);
-    if (nc)
-    {
-        LLViewerTextEditor* nc_editor = nc->getChild<LLViewerTextEditor>("Notecard Editor");
-        if (nc_editor)
-        {
-            nc_editor->setText(content);
-            nc_editor->makePristine();
-        }
-    }
-
     return response;
 }
 

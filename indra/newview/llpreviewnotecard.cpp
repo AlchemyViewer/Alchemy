@@ -28,108 +28,126 @@
 
 #include "llpreviewnotecard.h"
 
-#include "alscriptworkspace.h"
-
-#include "llinventory.h"
+#include "aldiffview.h"
+#include "alnotecardembedded.h"
+#include "alsaid.h"
+#include "alscriptstudiorecovery.h"
+#include "alsurface.h"
+#include "altextview.h"
 
 #include "llagent.h"
+#include "llappviewer.h"
+#include "llbutton.h"
 #include "lldraghandle.h"
 #include "llexternaleditor.h"
-#include "llviewerwindow.h"
-#include "llbutton.h"
 #include "llfloaterreg.h"
-// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
-#include "llfloatersearchreplace.h"
-// [/SL:KB]
-#include "llinventorydefines.h"
 #include "llinventorymodel.h"
+#include "lllayoutstack.h"
 #include "lllineeditor.h"
-// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
-#include "llnotecard.h"
-// [/SL:KB]
-#include "llnotificationsutil.h"
 #include "llmd5.h"
-#include "llresmgr.h"
+#include "llnotecard.h"
+#include "llnotificationsutil.h"
+#include "llpreviewscript.h"
 #include "roles_constants.h"
-#include "llscrollbar.h"
-#include "llselectmgr.h"
+#include "lltextbox.h"
 #include "lltrans.h"
-#include "llviewertexteditor.h"
-#include "llfilesystem.h"
+#include "lluictrlfactory.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
-#include "lldir.h"
-#include "llviewerstats.h"
-#include "llviewercontrol.h"        // gSavedSettings
-#include "llappviewer.h"        // app_abort_quit()
-#include "lllineeditor.h"
-#include "lluictrlfactory.h"
-#include "llviewerassetupload.h"
+
+#include <algorithm>
+#include <set>
+
+namespace
+{
+    // How long after typing stops, or after the first change of a run of
+    // typing, what is unsaved is written: as Script Studio writes its tabs.
+    constexpr F64 RECOVERY_DELAY = 1.5;
+}
 
 ///----------------------------------------------------------------------------
 /// Class LLPreviewNotecard
 ///----------------------------------------------------------------------------
 
-// Default constructor
-LLPreviewNotecard::LLPreviewNotecard(const LLSD& key) //const LLUUID& item_id,
-    : LLPreview( key )
+LLPreviewNotecard::LLPreviewNotecard(const LLSD& key) : LLPreview(key)
 {
-    const LLInventoryItem *item = getItem();
-    std::string note_name = "New Note";
+    const LLInventoryItem* item = getItem();
+    mNoteName                   = "New Note";
     if (item)
     {
         mAssetID = item->getAssetUUID();
         if (!item->getName().empty())
         {
-            note_name = item->getName();
+            mNoteName = item->getName();
         }
     }
-    mNoteName = note_name;
 }
 
 LLPreviewNotecard::~LLPreviewNotecard()
 {
     delete mLiveFile;
-    mEditor = nullptr;
 }
 
 bool LLPreviewNotecard::postBuild()
 {
-    mEditor = getChild<LLViewerTextEditor>("Notecard Editor");
-    mEditor->setNotecardInfo(mItemUUID, mObjectID, getKey());
-    mEditor->makePristine();
+    mText = getChild<ALTextView>("notecard_text");
+    mText->setPlaceholder(getString("Loading"));
+    mText->setReadOnly(true);
+    mChangedConnection = mText->onTextChanged([this]() { keepSoon(); });
+    mFullConnection    = mText->onFull([this]() {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"]  = mNoteName;
+        args["[LIMIT]"] = std::to_string(static_cast<S32>(LLNotecard::MAX_SIZE));
+        setStatus(alSaid("NotecardFull", "[NAME] is full: a notecard holds at most [LIMIT] bytes", args), true);
+    });
+    // A save of this notecard made anywhere: in Script Studio, from VS
+    // Code, by a copy of the viewer's own editors.
+    mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptWorkspace::Saved& saved) { heard(saved); });
 
     mSaveBtn = getChild<LLButton>("Save");
-    mSaveBtn->setCommitCallback(boost::bind(&LLPreviewNotecard::saveIfNeeded, this, nullptr, true));
+    mSaveBtn->setCommitCallback([this](LLUICtrl*, const LLSD&) { saveIfNeeded(); });
 
     mLockBtn = getChild<LLUICtrl>("lock");
     mLockBtn->setVisible(false);
 
     mDeleteBtn = getChild<LLButton>("Delete");
-    mDeleteBtn->setCommitCallback(boost::bind(&LLPreviewNotecard::deleteNotecard, this));
+    mDeleteBtn->setCommitCallback([this](LLUICtrl*, const LLSD&) { deleteNotecard(); });
     mDeleteBtn->setEnabled(false);
 
     mEditBtn = getChild<LLButton>("Edit");
-    mEditBtn->setCommitCallback(boost::bind(&LLPreviewNotecard::openInExternalEditor, this));
+    mEditBtn->setCommitCallback([this](LLUICtrl*, const LLSD&) { openInExternalEditor(); });
+
+    mStatus      = getChild<LLTextBox>("status");
+    mNoticePanel = getChild<LLLayoutPanel>("notice_panel");
+    mNoticeText  = getChild<LLTextBox>("notice_text");
+    for (size_t i = 0; i < mNoticeButtons.size(); ++i)
+    {
+        mNoticeButtons[i] = getChild<LLButton>("notice_" + std::to_string(i + 1));
+        mNoticeButtons[i]->setCommitCallback([this, i](LLUICtrl*, const LLSD&) {
+            // The action may show another notice, which takes its place.
+            const std::function<void()> action = mNoticeActions[i];
+            if (action)
+            {
+                action();
+            }
+        });
+    }
 
     const LLInventoryItem* item = getItem();
-    std::string note_name = mNoteName;
-
-    mDescEditor = getChild<LLLineEditor>("desc");
+    mDescEditor                 = getChild<LLLineEditor>("desc");
     mDescEditor->setCommitCallback(boost::bind(&LLPreview::onText, mDescEditor, this));
     if (item)
     {
         if (!item->getName().empty())
         {
-            note_name = item->getName();
+            mNoteName = item->getName();
         }
         mDescEditor->setValue(item->getDescription());
-        bool source_library = mObjectUUID.isNull() && gInventory.isObjectDescendentOf(item->getUUID(), gInventory.getLibraryRootFolderID());
+        const bool source_library = mObjectUUID.isNull() && gInventory.isObjectDescendentOf(item->getUUID(), gInventory.getLibraryRootFolderID());
         mDeleteBtn->setEnabled(!source_library);
     }
-    mNoteName = note_name;
     mDescEditor->setPrevalidate(&LLTextValidate::validateASCIIPrintableNoPipe);
 
     return LLPreview::postBuild();
@@ -137,695 +155,520 @@ bool LLPreviewNotecard::postBuild()
 
 bool LLPreviewNotecard::saveItem()
 {
-    LLInventoryItem* item = gInventory.getItem(mItemUUID);
-    return saveIfNeeded(item);
+    return saveIfNeeded();
 }
-
-void LLPreviewNotecard::setEnabled(bool enabled)
-{
-    if (mEditor)
-    {
-        mEditor->setEnabled(enabled);
-    }
-    if (mLockBtn)
-    {
-        mLockBtn->setVisible(!enabled);
-    }
-    if (mDescEditor)
-    {
-        mDescEditor->setEnabled(enabled);
-    }
-    if (mSaveBtn)
-    {
-        mSaveBtn->setEnabled(enabled && mEditor && (!mEditor->isPristine()));
-    }
-}
-
 
 void LLPreviewNotecard::draw()
 {
-    bool changed = !mEditor->isPristine();
-
-    mSaveBtn->setEnabled(changed && getEnabled());
-
+    mSaveBtn->setEnabled(mLoaded && mModifiable && !mSaving && mText->isDirty());
+    // What was typed a moment ago written, and a write that failed said
+    // once.
+    if (mRecoveryDue > 0.0 && LLTimer::getTotalSeconds() >= mRecoveryDue)
+    {
+        mRecoveryDue = 0.0;
+        if (ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store(); kept && mText->isDirty())
+        {
+            kept->writeSoon(recoveryEntry());
+            mRecoveryWritten = true;
+        }
+    }
+    if (mRecoveryWritten)
+    {
+        if (ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store())
+        {
+            for (const std::string& key : kept->takeFailures())
+            {
+                if (key == mRecoveryKey && !mRecoveryFailed)
+                {
+                    mRecoveryFailed = true;
+                    setStatus(getString("RecoveryWriteFailed"), true);
+                }
+            }
+        }
+    }
     LLPreview::draw();
 }
 
 // virtual
 bool LLPreviewNotecard::handleKeyHere(KEY key, MASK mask)
 {
-    if(('S' == key) && (MASK_CONTROL == (mask & MASK_CONTROL)))
+    if (('S' == key) && (MASK_CONTROL == (mask & MASK_CONTROL)))
     {
         saveIfNeeded();
         return true;
     }
-
-// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
-    if(('F' == key) && (MASK_CONTROL == (mask & MASK_CONTROL)))
+    // Find, from anywhere in the window: the text's own bar.
+    if (('F' == key) && (MASK_CONTROL == (mask & MASK_CONTROL)))
     {
-        LLFloaterSearchReplace::show(getEditor());
+        mText->setFocus(true);
+        mText->perform(ALEditorCommand::Find);
         return true;
     }
-// [/SL:KB]
     return LLPreview::handleKeyHere(key, mask);
 }
 
 // virtual
 bool LLPreviewNotecard::canClose()
 {
-    if(mForceClose || !mEditor || mEditor->isPristine())
+    if (mForceClose || !mText || !mLoaded || !mText->isDirty())
     {
         return true;
     }
-    else
+    if (!mSaveDialogShown)
     {
-        if(!mSaveDialogShown)
-        {
-            mSaveDialogShown = true;
-            // Bring up view-modal dialog: Save changes? Yes, No, Cancel
-            LLNotificationsUtil::add("SaveChanges", LLSD(), LLSD(), boost::bind(&LLPreviewNotecard::handleSaveChangesDialog,this, _1, _2));
-        }
-        return false;
+        mSaveDialogShown = true;
+        // Bring up view-modal dialog: Save changes? Yes, No, Cancel
+        LLNotificationsUtil::add("SaveChanges", LLSD(), LLSD(), boost::bind(&LLPreviewNotecard::handleSaveChangesDialog, this, _1, _2));
     }
+    return false;
 }
 
 /* virtual */
 void LLPreviewNotecard::setObjectID(const LLUUID& object_id)
 {
     LLPreview::setObjectID(object_id);
-
-    mEditor->setNotecardObjectID(mObjectUUID);
-    mEditor->makePristine();
-}
-
-const LLInventoryItem* LLPreviewNotecard::getDragItem()
-{
-    return mEditor->getDragItem();
-}
-
-// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
-LLTextEditor* LLPreviewNotecard::getEditor()
-{
-    return getChild<LLViewerTextEditor>("Notecard Editor");
-}
-// [/SL:KB]
-
-bool LLPreviewNotecard::hasEmbeddedInventory()
-{
-    return mEditor->hasEmbeddedInventory();
-}
-
-void LLPreviewNotecard::refreshFromInventory(const LLUUID& new_item_id)
-{
-    if (new_item_id.notNull())
-    {
-        mItemUUID = new_item_id;
-        setKey(LLSD(new_item_id));
-    }
-    LL_DEBUGS() << "LLPreviewNotecard::refreshFromInventory()" << LL_ENDL;
-    loadAsset();
 }
 
 void LLPreviewNotecard::updateTitleButtons()
 {
     LLPreview::updateTitleButtons();
 
-    if(mLockBtn && mLockBtn->getVisible() && !isMinimized()) // lock button stays visible if floater is minimized.
+    if (mLockBtn && mLockBtn->getVisible() && !isMinimized()) // lock button stays visible if floater is minimized.
     {
-        LLRect lock_rc = mLockBtn->getRect();
+        LLRect lock_rc      = mLockBtn->getRect();
         LLRect buttons_rect = getDragHandle()->getButtonsRect();
-        buttons_rect.mLeft = lock_rc.mLeft;
+        buttons_rect.mLeft  = lock_rc.mLeft;
         getDragHandle()->setButtonsRect(buttons_rect);
     }
 }
 
+// --- loading ---------------------------------------------------------------------------------
+
 void LLPreviewNotecard::loadAsset()
 {
-    // request the asset.
     const LLInventoryItem* item = getItem();
-    bool fail = false;
-    std::string note_name = mNoteName;
-
-    if(item)
+    if (!item)
     {
-        LLPermissions perm(item->getPermissions());
-        bool is_owner = gAgent.allowOperation(PERM_OWNER, perm, GP_OBJECT_MANIPULATE);
-        bool allow_copy = gAgent.allowOperation(PERM_COPY, perm, GP_OBJECT_MANIPULATE);
-        bool allow_modify = canModify(mObjectUUID, item);
-        bool source_library = mObjectUUID.isNull() && gInventory.isObjectDescendentOf(mItemUUID, gInventory.getLibraryRootFolderID());
-        if(!item->getName().empty())
+        if (mObjectUUID.notNull() && mItemUUID.notNull())
         {
-            note_name = item->getName();
-        }
-
-        if (allow_copy || gAgent.isGodlike())
-        {
-            mAssetID = item->getAssetUUID();
-            if(mAssetID.isNull())
+            LLViewerObject* object = gObjectList.findObject(mObjectUUID);
+            if (object && (object->isInventoryPending() || object->isInventoryDirty()))
             {
-                mEditor->setText(LLStringUtil::null);
-                mEditor->makePristine();
-                mEditor->setEnabled(true);
-                mAssetStatus = PREVIEW_ASSET_LOADED;
-
-// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
-                // Start the timer which will perform regular backup saves
-                if (!isBackupRunning())
+                // A notecard in an object whose contents are not here yet:
+                // loaded once they are (inventoryChanged).
+                registerVOInventoryListener(object, nullptr);
+                if (object->isInventoryDirty())
                 {
-                    startBackupTimer(60.0f);
+                    object->requestInventory();
                 }
-// [/SL:KB]
+                return;
+            }
+            if (object)
+            {
+                LLStringUtil::format_map_t args;
+                args["[REASON]"] = LLTrans::getString("WorkspaceNoSuchItemInObject");
+                showUnloaded(getString("ReadOnlyFailed", args));
             }
             else
             {
-                LLHost source_sim = LLHost();
-                LLSD* user_data = nullptr;
-                if (mObjectUUID.notNull())
-                {
-                    LLViewerObject *objectp = gObjectList.findObject(mObjectUUID);
-                    if (objectp && objectp->getRegion())
-                    {
-                        source_sim = objectp->getRegion()->getHost();
-                    }
-                    else
-                    {
-                        // The object that we're trying to look at disappeared, bail.
-                        LL_WARNS() << "Can't find object " << mObjectUUID << " associated with notecard." << LL_ENDL;
-                        mAssetID.setNull();
-                        mEditor->setText(getString("no_object"));
-                        mEditor->makePristine();
-                        mEditor->setEnabled(false);
-                        mAssetStatus = PREVIEW_ASSET_LOADED;
-                        return;
-                    }
-                    user_data = new LLSD();
-                    user_data->with("taskid", mObjectUUID).with("itemid", mItemUUID);
-                }
-                else
-                {
-                    user_data =  new LLSD(mItemUUID);
-                }
-
-                gAssetStorage->getInvItemAsset(source_sim,
-                                                gAgent.getID(),
-                                                gAgent.getSessionID(),
-                                                item->getPermissions().getOwner(),
-                                                mObjectUUID,
-                                                item->getUUID(),
-                                                item->getAssetUUID(),
-                                                item->getType(),
-                                                &onLoadComplete,
-                                                (void*)user_data,
-                                                true);
-                mAssetStatus = PREVIEW_ASSET_LOADING;
+                showUnloaded(getString("no_object"));
             }
+            mAssetStatus = PREVIEW_ASSET_ERROR;
         }
-        else
-        {
-            mAssetID.setNull();
-            mEditor->setText(getString("not_allowed"));
-            mEditor->makePristine();
-            mEditor->setEnabled(false);
-            mAssetStatus = PREVIEW_ASSET_LOADED;
-        }
-
-        if(!allow_modify)
-        {
-            mEditor->setEnabled(false);
-            mLockBtn->setVisible( true);
-            mEditBtn->setEnabled(false);
-        }
-
-        if((allow_modify || is_owner) && !source_library)
-        {
-            mDeleteBtn->setEnabled(true);
-        }
+        // Otherwise the item is not known yet -- an object's notecard
+        // before its object is set -- and this is asked again then.
+        return;
     }
-    else if (mObjectUUID.notNull() && mItemUUID.notNull())
+    if (!item->getName().empty())
     {
-        LLViewerObject* objectp = gObjectList.findObject(mObjectUUID);
-        if (objectp && (objectp->isInventoryPending() || objectp->isInventoryDirty()))
-        {
-            // It's a notecard in object's inventory and we failed to get it because inventory is not up to date.
-            // Subscribe for callback and retry at inventoryChanged()
-            registerVOInventoryListener(objectp, NULL); //removes previous listener
-
-            if (objectp->isInventoryDirty())
-            {
-                objectp->requestInventory();
-            }
-        }
-        else
-        {
-            fail = true;
-        }
+        mNoteName = item->getName();
     }
-    else
+    mRecoveryKey = recoveryKeyOf(mObjectUUID, mItemUUID);
+
+    const LLPermissions& perm           = item->getPermissions();
+    const bool           is_owner       = gAgent.allowOperation(PERM_OWNER, perm, GP_OBJECT_MANIPULATE);
+    const bool           allow_modify   = canModify(mObjectUUID, item);
+    const bool           source_library = mObjectUUID.isNull() && gInventory.isObjectDescendentOf(mItemUUID, gInventory.getLibraryRootFolderID());
+    mDeleteBtn->setEnabled((allow_modify || is_owner) && !source_library);
+
+    mAssetStatus = PREVIEW_ASSET_LOADING;
+    if (item->getAssetUUID().isNull())
     {
-        fail = true;
+        // Made and never saved: nothing to fetch.
+        ALScriptWorkspace::Loaded answer;
+        answer.ref        = ref();
+        answer.name       = mNoteName;
+        answer.viewable   = true;
+        answer.modifiable = allow_modify;
+        answer.notecard   = true;
+        loaded(answer);
+        return;
     }
-
-    mNoteName = note_name;
-
-    if (fail)
-    {
-        mEditor->setText(LLStringUtil::null);
-        mEditor->makePristine();
-        mEditor->setEnabled(true);
-        // Don't set asset status here; we may not have set the item id yet
-        // (e.g. when this gets called initially)
-        //mAssetStatus = PREVIEW_ASSET_LOADED;
-    }
+    // Through the workspace, as every editor loads: copy is enough to
+    // read, modify decides whether it can be changed.
+    LLHandle<LLFloater> handle = getHandle();
+    ALScriptWorkspace::instance().load(ref(), [handle](const ALScriptWorkspace::Loaded& answer) {
+        if (LLPreviewNotecard* self = ALViewType::as<LLPreviewNotecard>(handle.get()))
+        {
+            self->loaded(answer);
+        }
+    });
 }
 
-// static
-void LLPreviewNotecard::onLoadComplete(const LLUUID& asset_uuid,
-                                       LLAssetType::EType type,
-                                       void* user_data, S32 status, LLExtStat ext_status)
+void LLPreviewNotecard::loaded(const ALScriptWorkspace::Loaded& answer)
 {
-    LL_INFOS() << "LLPreviewNotecard::onLoadComplete()" << LL_ENDL;
-    LLSD* floater_key = (LLSD*)user_data;
-    LLPreviewNotecard* preview = LLFloaterReg::findTypedInstance<LLPreviewNotecard>("preview_notecard", *floater_key);
-    if( preview )
+    if (answer.ref.item != mItemUUID || answer.ref.object != mObjectUUID)
     {
-        if(0 == status)
-        {
-            LLFileSystem file(asset_uuid, type, LLFileSystem::READ);
-
-            S32 file_length = file.getSize();
-
-            std::vector<char> buffer(file_length+1);
-            file.read((U8*)&buffer[0], file_length);
-
-            // put a EOS at the end
-            buffer[file_length] = 0;
-
-
-            LLViewerTextEditor* previewEditor = preview->mEditor;
-
-            if( (file_length > 19) && !strncmp( &buffer[0], "Linden text version", 19 ) )
-            {
-                if( !previewEditor->importBuffer( &buffer[0], file_length+1 ) )
-                {
-                    LL_WARNS() << "Problem importing notecard" << LL_ENDL;
-                }
-            }
-            else
-            {
-                // Version 0 (just text, doesn't include version number)
-                previewEditor->setText(LLStringExplicit(&buffer[0]));
-            }
-
-            previewEditor->makePristine();
-            bool modifiable = preview->canModify(preview->mObjectID, preview->getItem());
-            preview->setEnabled(modifiable);
-            preview->syncExternal();
-            preview->mAssetStatus = PREVIEW_ASSET_LOADED;
-        }
-        else
-        {
-            if( LL_ERR_ASSET_REQUEST_NOT_IN_DATABASE == status ||
-                LL_ERR_FILE_EMPTY == status)
-            {
-                LLNotificationsUtil::add("NotecardMissing");
-            }
-            else if (LL_ERR_INSUFFICIENT_PERMISSIONS == status)
-            {
-                LLNotificationsUtil::add("NotecardNoPermissions");
-            }
-            else
-            {
-                LLNotificationsUtil::add("UnableToLoadNotecard");
-            }
-
-            LL_WARNS() << "Problem loading notecard: " << status << LL_ENDL;
-            preview->mAssetStatus = PREVIEW_ASSET_ERROR;
-        }
-
-// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
-        // Start the timer which will perform regular backup saves
-        if (!preview->isBackupRunning())
-        {
-            preview->startBackupTimer(60.0f);
-        }
-// [/SL:KB]
+        // Loaded for the notecard this was before a save made it another
+        // item; that one is loaded again.
+        return;
     }
-    delete floater_key;
-}
-
-struct LLSaveNotecardInfo
-{
-    LLPreviewNotecard* mSelf;
-    LLUUID mItemUUID;
-    LLUUID mObjectUUID;
-    LLTransactionID mTransactionID;
-    LLPointer<LLInventoryItem> mCopyItem;
-    LLSaveNotecardInfo(LLPreviewNotecard* self, const LLUUID& item_id, const LLUUID& object_id,
-                       const LLTransactionID& transaction_id, LLInventoryItem* copyitem) :
-        mSelf(self), mItemUUID(item_id), mObjectUUID(object_id), mTransactionID(transaction_id), mCopyItem(copyitem)
+    if (!answer.error.empty())
     {
-    }
-};
-
-void LLPreviewNotecard::finishInventoryUpload(LLUUID itemId, LLUUID newAssetId, LLUUID newItemId)
-{
-    // Update the UI with the new asset.
-    LLPreviewNotecard* nc = LLFloaterReg::findTypedInstance<LLPreviewNotecard>("preview_notecard", LLSD(itemId));
-    if (nc)
-    {
-        // *HACK: we have to delete the asset in the cache so
-        // that the viewer will redownload it. This is only
-        // really necessary if the asset had to be modified by
-        // the uploader, so this can be optimized away in some
-        // cases. A better design is to have a new uuid if the
-        // script actually changed the asset.
-        if (nc->hasEmbeddedInventory())
+        mTakingTheirs = false;
+        mKeepPlace.reset();
+        LLStringUtil::format_map_t args;
+        args["[REASON]"] = answer.error;
+        if (mLoaded)
         {
-            LLFileSystem::removeFile(newAssetId, LLAssetType::AT_NOTECARD);
-        }
-        if (newItemId.isNull())
-        {
-            nc->setAssetId(newAssetId);
-            nc->refreshFromInventory();
-        }
-        else
-        {
-            nc->refreshFromInventory(newItemId);
-        }
-    }
-}
-
-// static
-void LLPreviewNotecard::failedUpload(const LLUUID& taskId, const LLUUID& itemId, const std::string& reason)
-{
-    LLSD floater_key;
-    if (taskId.notNull())
-    {
-        floater_key["taskid"] = taskId;
-        floater_key["itemid"] = itemId;
-    }
-    else
-    {
-        floater_key = LLSD(itemId);
-    }
-    if (LLPreviewNotecard* nc = LLFloaterReg::findTypedInstance<LLPreviewNotecard>("preview_notecard", floater_key))
-    {
-        nc->mAssetStatus = PREVIEW_ASSET_LOADED;
-        nc->setEnabled(true);
-    }
-    LLSD args;
-    args["REASON"] = reason;
-    LLNotificationsUtil::add("SaveNotecardFailReason", args);
-}
-
-void LLPreviewNotecard::finishTaskUpload(LLUUID itemId, LLUUID newAssetId, LLUUID taskId)
-{
-
-    LLSD floater_key;
-    floater_key["taskid"] = taskId;
-    floater_key["itemid"] = itemId;
-    LLPreviewNotecard* nc = LLFloaterReg::findTypedInstance<LLPreviewNotecard>("preview_notecard", floater_key);
-    if (nc)
-    {
-        if (nc->hasEmbeddedInventory())
-        {
-            LLFileSystem::removeFile(newAssetId, LLAssetType::AT_NOTECARD);
-        }
-        nc->setAssetId(newAssetId);
-        nc->refreshFromInventory();
-    }
-}
-
-bool LLPreviewNotecard::saveIfNeeded(LLInventoryItem* copyitem, bool sync)
-{
-    if(!mEditor->isPristine())
-    {
-        std::string buffer;
-        if (!mEditor->exportBuffer(buffer))
-        {
-            return false;
-        }
-
-        mEditor->makePristine();
-        const LLInventoryItem* item = getItem();
-        // save it out to database
-        if (item)
-        {
-            const LLViewerRegion* region = gAgent.getRegion();
-            if (!region)
-            {
-                LL_WARNS() << "Not connected to a region, cannot save notecard." << LL_ENDL;
-                return false;
-            }
-            std::string agent_url = region->getCapability("UpdateNotecardAgentInventory");
-            std::string task_url = region->getCapability("UpdateNotecardTaskInventory");
-
-            if (!agent_url.empty() && !task_url.empty())
-            {
-                // Through the workspace, which every save goes through, so
-                // that every editor hears it -- the Script Studio's tabs
-                // among them.
-                const LLUUID object_uuid(mObjectUUID);
-                const LLUUID item_uuid(mItemUUID);
-                std::string  error;
-                const bool   sent = ALScriptWorkspace::instance().saveNotecardAsset(
-                    ALScriptRef(object_uuid, item_uuid), buffer,
-                    [object_uuid, item_uuid](const ALScriptWorkspace::CompileResult& result) {
-                        if (!result.error.empty())
-                        {
-                            LLPreviewNotecard::failedUpload(object_uuid, item_uuid, result.error);
-                        }
-                        else if (object_uuid.isNull())
-                        {
-                            LLPreviewNotecard::finishInventoryUpload(item_uuid, result.newAssetId, result.newItemId);
-                        }
-                        else
-                        {
-                            LLPreviewNotecard::finishTaskUpload(item_uuid, result.newAssetId, object_uuid);
-                        }
-                    },
-                    error, ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Editor));
-                if (!sent)
-                {
-                    LLSD args;
-                    args["REASON"] = error;
-                    LLNotificationsUtil::add("SaveNotecardFailReason", args);
-                    return false;
-                }
-                mAssetStatus = PREVIEW_ASSET_LOADING;
-                setEnabled(false);
-            }
-            else if (gAssetStorage)
-            {
-                // We need to update the asset information
-                LLTransactionID tid;
-                LLAssetID asset_id;
-                tid.generate();
-                asset_id = tid.makeAssetID(gAgent.getSecureSessionID());
-
-                LLFileSystem file(asset_id, LLAssetType::AT_NOTECARD, LLFileSystem::APPEND);
-
-
-                LLSaveNotecardInfo* info = new LLSaveNotecardInfo(this, mItemUUID, mObjectUUID,
-                                                                tid, copyitem);
-
-                S32 size = static_cast<S32>(buffer.length()) + 1;
-                file.write((U8*)buffer.c_str(), size);
-
-                gAssetStorage->storeAssetData(tid, LLAssetType::AT_NOTECARD,
-                                                &onSaveComplete,
-                                                (void*)info,
-                                                false);
-                return true;
-            }
-            else // !gAssetStorage
-            {
-                LL_WARNS() << "Not connected to an asset storage system." << LL_ENDL;
-                return false;
-            }
-            if(mCloseAfterSave)
-            {
-                closeFloater();
-            }
-        }
-    }
-    return true;
-}
-
-void LLPreviewNotecard::syncExternal()
-{
-    // Sync with external editor.
-    std::string note_name = getCleanNameForTmpFile();
-    std::string tmp_file = getTmpFileName(note_name);
-    llstat s;
-    if (LLFile::stat(tmp_file, &s) != 0)
-    {
-        // file doesn't exist, try with empty name
-        note_name.clear();
-        tmp_file = getTmpFileName(note_name);
-        if (LLFile::stat(tmp_file, &s) != 0)
-        {
-            // file doesn't exist, with either name, give up
+            // Loaded again, for a save heard from elsewhere, and failed:
+            // what is here stays.
+            setStatus(getString("ReadOnlyFailed", args), true);
             return;
         }
+        showUnloaded(getString(answer.failure == ALScriptWorkspace::Loaded::Failure::NotPermitted ? "not_allowed" : "ReadOnlyFailed", args));
+        mAssetStatus = PREVIEW_ASSET_ERROR;
+        return;
     }
+    const bool taking = mTakingTheirs;
+    mTakingTheirs     = false;
+    mAssetID          = answer.assetId;
+    mLoaded           = true;
+    mModifiable       = answer.modifiable && canModify(mObjectUUID, getItem());
+    mSavedThere.reset();
+    if (!mItems)
+    {
+        ALNotecardEmbedded::Holder holder;
+        holder.notecard   = [this]() { return ref(); };
+        holder.changeable = [this]() { return mLoaded && mModifiable; };
+        holder.say        = [this](const std::string& words, bool error) { setStatus(words, error); };
+        mItems            = std::make_shared<ALNotecardEmbedded>(*mText, std::move(holder), ALNotecardEmbedded::viewer());
+        mItems->wire();
+    }
+    mItems->loaded(answer.embedded);
+    if (taking && mText->isDirty())
+    {
+        // Theirs over what was typed here, as one step: Undo brings back
+        // what was typed, which the store keeps too.
+        if (ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store())
+        {
+            kept->setAside(recoveryEntry());
+        }
+        const ALTextDocument& text = mText->document();
+        mText->setReadOnly(false);
+        mText->replaceAll({ { ALTextRange(text.start(), text.end()), answer.text } });
+        mText->resetDirty();
+    }
+    else
+    {
+        mText->setText(answer.text);
+    }
+    if (mKeepPlace)
+    {
+        mText->setCaret(mText->document().clamp(mKeepPlace->first));
+        mText->setScrollY(mKeepPlace->second);
+        mKeepPlace.reset();
+    }
+    mText->setPlaceholder(std::string());
+    mItems->place();
+    // No more than a notecard is read back with.
+    mText->setMaxBytes(LLNotecard::MAX_SIZE);
+    showModifiable(mModifiable);
+    hideNotice();
+    if (mCompare && mCompare->getVisible())
+    {
+        toggleCompare();
+    }
+    mAssetStatus = PREVIEW_ASSET_LOADED;
+    forgetKept();
+    syncExternal();
+    if (mPendingRecovery)
+    {
+        ALScriptRecoveryEntry entry = std::move(*mPendingRecovery);
+        mPendingRecovery.reset();
+        takeUp(std::move(entry));
+    }
+    else
+    {
+        offerKept();
+    }
+}
 
-    if (mLiveFile) mLiveFile->ignoreNextUpdate();
-    writeToFile(tmp_file);
+void LLPreviewNotecard::showUnloaded(const std::string& why)
+{
+    mLoaded = false;
+    mText->setText(std::string());
+    mText->setPlaceholder(why);
+    showModifiable(false);
+}
+
+void LLPreviewNotecard::showModifiable(bool modifiable)
+{
+    mText->setReadOnly(!modifiable);
+    mLockBtn->setVisible(!modifiable);
+    mDescEditor->setEnabled(modifiable);
+    mEditBtn->setEnabled(modifiable);
+    // Read-only, and why, while nothing else is said.
+    if (mLoaded && !modifiable)
+    {
+        setStatus(getString("ReadOnlyNoModify"));
+    }
+    updateTitleButtons();
 }
 
 /*virtual*/
-void LLPreviewNotecard::inventoryChanged(LLViewerObject* object,
-    LLInventoryObject::object_list_t* inventory,
-    S32 serial_num,
-    void* user_data)
+void LLPreviewNotecard::inventoryChanged(LLViewerObject* object, LLInventoryObject::object_list_t* inventory, S32 serial_num, void* user_data)
 {
     removeVOInventoryListener();
     loadAsset();
 }
 
+// --- saving -----------------------------------------------------------------------------------
 
-void LLPreviewNotecard::deleteNotecard()
+bool LLPreviewNotecard::saveIfNeeded()
 {
-    LLNotificationsUtil::add("DeleteNotecard", LLSD(), LLSD(), boost::bind(&LLPreviewNotecard::handleConfirmDeleteDialog,this, _1, _2));
+    if (!mText->isDirty())
+    {
+        if (mCloseAfterSave)
+        {
+            closeFloater();
+        }
+        return true;
+    }
+    if (!mLoaded || !mModifiable)
+    {
+        return false;
+    }
+    // The text with each item it still stands, numbered afresh; the
+    // editor's own left as they are.
+    std::string                  text;
+    ALNotecardEmbedded::items_t  items;
+    mItems->forSave(text, items);
+    mSentItems.clear();
+    for (const LLPointer<LLInventoryItem>& item : items)
+    {
+        mSentItems.push_back(item->getUUID());
+    }
+    ALScriptWorkspace& workspace = ALScriptWorkspace::instance();
+    mSaveRequest                 = workspace.newRequest();
+    mSavePoint                   = mText->savePoint();
+    LLHandle<LLFloater> handle   = getHandle();
+    std::string         error;
+    const bool          sent = workspace.saveNotecard(
+        ref(), text, items,
+        [handle](const ALScriptWorkspace::CompileResult& result) {
+            if (LLPreviewNotecard* self = ALViewType::as<LLPreviewNotecard>(handle.get()))
+            {
+                self->savedHere(result);
+            }
+        },
+        error, ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Editor, mSaveRequest));
+    if (!sent)
+    {
+        LLStringUtil::format_map_t args;
+        args["[REASON]"] = error;
+        setStatus(getString("SaveFailed", args), true);
+        mCloseAfterSave = false;
+        return false;
+    }
+    mSaving = true;
+    setStatus(getString("Saving"));
+    return true;
 }
 
-// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
-void LLPreviewNotecard::onBackupTimer()
+void LLPreviewNotecard::savedHere(const ALScriptWorkspace::CompileResult& result)
 {
-    LLViewerTextEditor* pEditor = findChild<LLViewerTextEditor>("Notecard Editor");
-    if ( (pEditor) && (!pEditor->isPristine()) )
+    if (result.sender.request != mSaveRequest)
     {
-        if (mBackupFilename.empty())
-            mBackupFilename = getBackupFileName();
-
-        if (!mBackupFilename.empty())
+        return;
+    }
+    mSaving = false;
+    if (!result.error.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[REASON]"] = result.error;
+        setStatus(getString("SaveFailed", args), true);
+        // Not closed after all: a quit that waited on it waits no more.
+        if (mCloseAfterSave)
         {
-            LLNotecard notecard(LLNotecard::MAX_SIZE);
-            notecard.setText(pEditor->getText());
-
-            std::stringstream strmNotecard;
-            notecard.exportStream(strmNotecard);
-
-            llofstream outNotecardFile(mBackupFilename.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
-            if (outNotecardFile.is_open())
-            {
-                outNotecardFile << strmNotecard.rdbuf();
-                outNotecardFile.close();
-            }
+            mCloseAfterSave = false;
+            LLAppViewer::instance()->abortQuit();
         }
+        return;
+    }
+    mText->markSavedAt(mSavePoint);
+    mItems->saved(mSentItems);
+    if (result.newAssetId.notNull())
+    {
+        mAssetID = result.newAssetId;
+    }
+    // Saved as another item -- one the agent could not change in place:
+    // this window is that item's now.
+    if (result.newItemId.notNull() && result.newItemId != mItemUUID)
+    {
+        mItemUUID    = result.newItemId;
+        mRecoveryKey = recoveryKeyOf(mObjectUUID, mItemUUID);
+        setKey(LLSD(mItemUUID));
+    }
+    setStatus(getString("Saved"));
+    keepSoon();
+    if (mCloseAfterSave)
+    {
+        closeFloater();
     }
 }
 
-void LLPreviewNotecard::callbackSaveComplete()
+void LLPreviewNotecard::heard(const ALScriptWorkspace::Saved& saved)
 {
-    // Notecard was successfully saved so delete our backup copy if we have one and the editor is still pristine
-    LLViewerTextEditor* pEditor = findChild<LLViewerTextEditor>("Notecard Editor");
-    if ( (pEditor) && (pEditor->isPristine()) && (hasBackupFile()) )
+    if (!mLoaded || saved.kind != ALScriptWorkspace::Kind::Notecard || saved.ref.item != mItemUUID || saved.ref.object != mObjectUUID)
     {
-        removeBackupFile();
+        return;
+    }
+    // Our own save lands as its answer; one of ours on its way lands after
+    // this, and is what the server keeps.
+    if ((saved.sender.origin == ALScriptWorkspace::Origin::Editor && saved.sender.request == mSaveRequest) || mSaving)
+    {
+        return;
+    }
+    if (saved.asset.notNull())
+    {
+        mAssetID = saved.asset;
+    }
+    switch (ALScriptWorkspace::heard(saved.text, mText->wholeText(), mText->isDirty() && mModifiable,
+                                     [this]() { return mText->undoJournal().savedText(); }))
+    {
+        case ALScriptWorkspace::Heard::Same:
+            mText->resetDirty();
+            forgetKept();
+            return;
+        case ALScriptWorkspace::Heard::Keep:
+            return;
+        case ALScriptWorkspace::Heard::Ask:
+        {
+            mSavedThere = saved.text;
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = mNoteName;
+            args["[WHO]"]  = getString(saved.sender.origin == ALScriptWorkspace::Origin::Bridge   ? "SavedByBridge"
+                                       : saved.sender.origin == ALScriptWorkspace::Origin::Studio ? "SavedByStudio"
+                                                                                                  : "SavedByOther");
+            showNotice(getString("SavedElsewhere", args), { { getString("TakeTheirs"), [this]() { takeTheirs(); } },
+                                                            { getString("KeepMine"), [this]() { keepMine(); } },
+                                                            { getString("Compare"), [this]() { toggleCompare(); } } });
+            return;
+        }
+        case ALScriptWorkspace::Heard::Take:
+            // Nothing typed here: loaded again, for its items as well as
+            // its text, the caret and the view kept where they were.
+            mKeepPlace = std::make_pair(mText->caret(), mText->scrollY());
+            loadAsset();
+            return;
     }
 }
-// [/SL:KB]
 
-// static
-void LLPreviewNotecard::onSaveComplete(const LLUUID& asset_uuid, void* user_data, S32 status, LLExtStat ext_status) // StoreAssetData callback (fixed)
+void LLPreviewNotecard::takeTheirs()
 {
-    LLSaveNotecardInfo* info = (LLSaveNotecardInfo*)user_data;
-    if(info && (0 == status))
+    if (!mSavedThere)
     {
-        if(info->mObjectUUID.isNull())
-        {
-            LLViewerInventoryItem* item;
-            item = (LLViewerInventoryItem*)gInventory.getItem(info->mItemUUID);
-            if(item)
-            {
-                LLPointer<LLViewerInventoryItem> new_item = new LLViewerInventoryItem(item);
-                new_item->setAssetUUID(asset_uuid);
-                new_item->setTransactionID(info->mTransactionID);
-                new_item->updateServer(false);
-                gInventory.updateItem(new_item);
-                gInventory.notifyObservers();
-            }
-            else
-            {
-                LL_WARNS() << "Inventory item for script " << info->mItemUUID
-                        << " is no longer in agent inventory." << LL_ENDL;
-            }
-        }
-        else
-        {
-            LLViewerObject* object = gObjectList.findObject(info->mObjectUUID);
-            LLViewerInventoryItem* item = NULL;
-            if(object)
-            {
-                item = (LLViewerInventoryItem*)object->getInventoryObject(info->mItemUUID);
-            }
-            if(object && item)
-            {
-                item->setAssetUUID(asset_uuid);
-                item->setTransactionID(info->mTransactionID);
-                object->updateInventory(item, TASK_INVENTORY_ITEM_KEY, false);
-                dialog_refresh_all();
-            }
-            else
-            {
-                LLNotificationsUtil::add("SaveNotecardFailObjectNotFound");
-            }
-        }
-        // Perform item copy to inventory
-        if (info->mCopyItem.notNull())
-        {
-            info->mSelf->mEditor->copyInventory(info->mCopyItem);
-        }
-
-        // Find our window and close it if requested.
-
-        LLPreviewNotecard* previewp = LLFloaterReg::findTypedInstance<LLPreviewNotecard>("preview_notecard", info->mItemUUID);
-        if (previewp && previewp->mCloseAfterSave)
-        {
-            previewp->closeFloater();
-        }
+        return;
     }
-    else
+    // Loaded again for its items; the text goes in over what was typed,
+    // as one step.
+    mTakingTheirs = true;
+    hideNotice();
+    loadAsset();
+}
+
+void LLPreviewNotecard::keepMine()
+{
+    mSavedThere.reset();
+    hideNotice();
+    if (mCompare && mCompare->getVisible())
     {
-        LL_WARNS() << "Problem saving notecard: " << status << LL_ENDL;
-        LLSD args;
-        args["REASON"] = std::string(LLAssetStorage::getErrorString(status));
-        LLNotificationsUtil::add("SaveNotecardFailReason", args);
+        toggleCompare();
     }
+    setStatus(getString("KeptMine"));
+}
 
-    std::string uuid_string;
-    asset_uuid.toString(uuid_string);
-    std::string filename;
-    filename = gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_string) + ".tmp";
-    LLFile::remove(filename);
-    delete info;
+void LLPreviewNotecard::toggleCompare()
+{
+    LLView* host = mText->getParent();
+    if (!mCompare)
+    {
+        ALDiffView::Params p(LLUICtrlFactory::getDefaultParams<ALDiffView>());
+        p.name = "compare";
+        p.rect = mText->getRect();
+        p.follows.flags(FOLLOWS_ALL);
+        mCompare = LLUICtrlFactory::create<ALDiffView>(p);
+        mCompare->setVisible(false);
+        mCompare->setFont(mText->getFont());
+        mCompare->setOnEscape([this]() { toggleCompare(); });
+        host->addChild(mCompare);
+    }
+    const bool comparing = !mCompare->getVisible() && mSavedThere;
+    if (comparing)
+    {
+        mCompare->setRect(mText->getRect());
+        mCompare->setTexts(*mSavedThere, mText->wholeText());
+        mCompare->setTitles(getString("CompareTheirs"), getString("CompareMine"));
+    }
+    mCompare->setVisible(comparing);
+    mText->setVisible(!comparing);
+    (comparing ? static_cast<LLView*>(mCompare) : static_cast<LLView*>(mText))->setFocus(true);
+    if (mNoticePanel->getVisible())
+    {
+        mNoticeButtons[2]->setLabel(getString(comparing ? "BackToText" : "Compare"));
+    }
 }
 
 bool LLPreviewNotecard::handleSaveChangesDialog(const LLSD& notification, const LLSD& response)
 {
     mSaveDialogShown = false;
-    S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
-    switch(option)
+    S32 option       = LLNotificationsUtil::getSelectedOption(notification, response);
+    switch (option)
     {
-    case 0:  // "Yes"
-        mCloseAfterSave = true;
-        saveIfNeeded();
-        break;
+        case 0: // "Yes"
+            mCloseAfterSave = true;
+            if (!saveIfNeeded())
+            {
+                // Not sent, which the window says; nothing closes.
+                LLAppViewer::instance()->abortQuit();
+            }
+            break;
 
-    case 1:  // "No"
-        mForceClose = true;
-        closeFloater();
-        break;
+        case 1: // "No"
+            // Thrown away, and set aside a while all the same, in case
+            // that was a mistake.
+            if (ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store())
+            {
+                kept->setAside(recoveryEntry());
+            }
+            forgetKept();
+            mForceClose = true;
+            closeFloater();
+            break;
 
-    case 2: // "Cancel"
-    default:
-        // If we were quitting, we didn't really mean it.
-        LLAppViewer::instance()->abortQuit();
-        break;
+        case 2: // "Cancel"
+        default:
+            // If we were quitting, we didn't really mean it.
+            LLAppViewer::instance()->abortQuit();
+            break;
     }
     return false;
+}
+
+void LLPreviewNotecard::deleteNotecard()
+{
+    LLNotificationsUtil::add("DeleteNotecard", LLSD(), LLSD(), boost::bind(&LLPreviewNotecard::handleConfirmDeleteDialog, this, _1, _2));
 }
 
 bool LLPreviewNotecard::handleConfirmDeleteDialog(const LLSD& notification, const LLSD& response)
@@ -851,7 +694,7 @@ bool LLPreviewNotecard::handleConfirmDeleteDialog(const LLSD& notification, cons
     {
         // delete item from inventory of in-world object
         LLViewerObject* object = gObjectList.findObject(mObjectUUID);
-        if(object)
+        if (object)
         {
             LLViewerInventoryItem* item = dynamic_cast<LLViewerInventoryItem*>(object->getInventoryObject(mItemUUID));
             if (item != NULL)
@@ -862,19 +705,253 @@ bool LLPreviewNotecard::handleConfirmDeleteDialog(const LLSD& notification, cons
     }
 
     // close floater, ignore unsaved changes
+    forgetKept();
     mForceClose = true;
     closeFloater();
     return false;
 }
 
+// --- what the window says ---------------------------------------------------------------------
+
+void LLPreviewNotecard::setStatus(const std::string& text, bool failure)
+{
+    static const LLUIColor alarm = LLUIColorTable::instance().getColor("LtOrange", LLColor4::yellow);
+    mStatus->setColor(failure ? alarm : ALSurface::text());
+    mStatus->setText(text);
+    mStatus->setToolTip(text);
+}
+
+void LLPreviewNotecard::showNotice(const std::string& text, std::vector<NoticeButton> buttons)
+{
+    mNoticeText->setText(text);
+    mNoticeText->setToolTip(text);
+    for (size_t i = 0; i < mNoticeButtons.size(); ++i)
+    {
+        const bool shown = i < buttons.size();
+        mNoticeButtons[i]->setVisible(shown);
+        mNoticeActions[i] = shown ? buttons[i].action : std::function<void()>();
+        if (shown)
+        {
+            mNoticeButtons[i]->setLabel(buttons[i].label);
+        }
+    }
+    mNoticePanel->setVisible(true);
+}
+
+void LLPreviewNotecard::hideNotice()
+{
+    mNoticePanel->setVisible(false);
+    mNoticeActions.fill(std::function<void()>());
+}
+
+// --- kept against a crash ---------------------------------------------------------------------
+
+// static
+std::string LLPreviewNotecard::recoveryKeyOf(const LLUUID& object, const LLUUID& item)
+{
+    return ALScriptRecoveryStore::windowKeyOf(object, item);
+}
+
+ALScriptRecoveryEntry LLPreviewNotecard::recoveryEntry() const
+{
+    ALScriptRecoveryEntry entry;
+    entry.key       = mRecoveryKey;
+    entry.object    = mObjectUUID;
+    entry.item      = mItemUUID;
+    entry.name      = mNoteName;
+    entry.notecard  = true;
+    entry.baseAsset = mAssetID;
+    entry.text      = mText->text();
+    if (mObjectUUID.notNull())
+    {
+        if (LLViewerObject* object = gObjectList.findObject(mObjectUUID); object && object->getRegion())
+        {
+            entry.region = object->getRegion()->getName();
+        }
+    }
+    if (mItems)
+    {
+        entry.embedded = ALNotecardEmbedded::asLLSD(mItems->items());
+    }
+    entry.historyWritten = mText->undoJournal().asNotation();
+    entry.caretLine      = mText->caret().line;
+    entry.caretColumn    = mText->caret().column;
+    return entry;
+}
+
+void LLPreviewNotecard::keepSoon()
+{
+    if (mRecoveryKey.empty() || !mLoaded || !mModifiable)
+    {
+        return;
+    }
+    if (!mText->isDirty())
+    {
+        forgetKept();
+        return;
+    }
+    if (mRecoveryDue <= 0.0)
+    {
+        mRecoveryDue = LLTimer::getTotalSeconds() + RECOVERY_DELAY;
+    }
+}
+
+void LLPreviewNotecard::forgetKept()
+{
+    mRecoveryDue = 0.0;
+    if (!mRecoveryWritten || mRecoveryKey.empty())
+    {
+        return;
+    }
+    if (ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store())
+    {
+        kept->forget(mRecoveryKey);
+    }
+    mRecoveryWritten = false;
+    mRecoveryFailed  = false;
+}
+
+void LLPreviewNotecard::offerKept()
+{
+    ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store();
+    if (!kept || mRecoveryKey.empty() || !mModifiable)
+    {
+        return;
+    }
+    const std::optional<ALScriptRecoveryEntry> left = kept->leftFor(mRecoveryKey);
+    if (!left)
+    {
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[WHEN]"]                    = left->whenSaid();
+    const ALScriptRecoveryEntry entry = *left;
+    showNotice(getString("Recovered", args), { { getString("Restore"), [this, entry]() { takeUp(entry); } },
+                                               { getString("Discard"), [this, entry]() {
+                                                    if (ALScriptRecoveryStore* store = ALScriptStudioRecovery::store())
+                                                    {
+                                                        store->discard(entry);
+                                                    }
+                                                    hideNotice();
+                                                } } });
+}
+
+void LLPreviewNotecard::takeUp(ALScriptRecoveryEntry entry)
+{
+    ALScriptRecoveryStore* kept = ALScriptStudioRecovery::store();
+    hideNotice();
+    if (!kept || (!entry.whole && !kept->load(entry)) || !mLoaded || !mModifiable)
+    {
+        return;
+    }
+    // Its items first: the text says them by their places in the list it
+    // was kept with.
+    mItems->take(ALNotecardEmbedded::fromLLSD(entry.embedded));
+    // Nothing typed here: the text with the steps that led to it. Else, or
+    // where the steps are not of it, the text over what is here, as one
+    // step to undo.
+    if (mText->isDirty() || !mText->setTextWithHistory(entry.text, entry.historyOf()))
+    {
+        const ALTextDocument& text = mText->document();
+        mText->replaceAll({ { ALTextRange(text.start(), text.end()), entry.text } });
+    }
+    mItems->place();
+    if (entry.caretLine >= 0)
+    {
+        mText->goTo(ALTextPos(entry.caretLine, entry.caretColumn));
+    }
+    // Kept as this window's own from here; the entry it came from goes
+    // once that is written.
+    if (!mText->isDirty())
+    {
+        mText->markUnsaved();
+    }
+    kept->write(recoveryEntry());
+    mRecoveryWritten = true;
+    kept->remove(entry);
+    setStatus(getString("Restored"));
+}
+
+// static
+bool LLPreviewNotecard::recover(const ALScriptRecoveryEntry& entry)
+{
+    // The notecard as the window opens it: in the inventory, or in an
+    // object in sight whose contents say it is there.
+    LLSD key;
+    if (entry.object.isNull())
+    {
+        if (!gInventory.getItem(entry.item))
+        {
+            return false;
+        }
+        key = LLSD(entry.item);
+    }
+    else
+    {
+        LLViewerObject* object = gObjectList.findObject(entry.object);
+        if (!object || !object->getInventoryItem(entry.item))
+        {
+            return false;
+        }
+        key["taskid"] = entry.object;
+        key["itemid"] = entry.item;
+    }
+    LLPreviewNotecard* preview = LLFloaterReg::showTypedInstance<LLPreviewNotecard>("preview_notecard", key, TAKE_FOCUS_YES);
+    if (!preview)
+    {
+        return false;
+    }
+    if (preview->mLoaded)
+    {
+        preview->takeUp(entry);
+        return true;
+    }
+    // Taken up once it has loaded.
+    preview->mPendingRecovery = entry;
+    if (entry.object.notNull())
+    {
+        preview->setObjectID(entry.object);
+    }
+    return true;
+}
+
+// --- the external editor -----------------------------------------------------------------------
+
+void LLPreviewNotecard::syncExternal()
+{
+    // Sync with external editor.
+    std::string note_name = getCleanNameForTmpFile();
+    std::string tmp_file  = getTmpFileName(note_name);
+    llstat      s;
+    if (LLFile::stat(tmp_file, &s) != 0)
+    {
+        // file doesn't exist, try with empty name
+        note_name.clear();
+        tmp_file = getTmpFileName(note_name);
+        if (LLFile::stat(tmp_file, &s) != 0)
+        {
+            // file doesn't exist, with either name, give up
+            return;
+        }
+    }
+
+    if (mLiveFile)
+    {
+        mLiveFile->ignoreNextUpdate();
+    }
+    writeToFile(tmp_file);
+}
+
 void LLPreviewNotecard::openInExternalEditor()
 {
     delete mLiveFile; // deletes file
+    mLiveFile = nullptr;
 
     // Save the notecard to a temporary file.
     std::string note_name = getCleanNameForTmpFile();
-    std::string filename = getTmpFileName(note_name);
-    if(!writeToFile(filename)) {
+    std::string filename  = getTmpFileName(note_name);
+    if (!writeToFile(filename))
+    {
         // In case some characters from notecard name are forbidden
         // and not accounted for, name is too long or some other issue,
         // try file that doesn't include notecard name
@@ -890,9 +967,9 @@ void LLPreviewNotecard::openInExternalEditor()
 
     // Open it in external editor.
     {
-        LLExternalEditor ed;
+        LLExternalEditor             ed;
         LLExternalEditor::EErrorCode status;
-        std::string msg;
+        std::string                  msg;
 
         status = ed.setCommand("LL_SCRIPT_EDITOR");
         if (status != LLExternalEditor::EC_SUCCESS)
@@ -925,9 +1002,7 @@ bool LLPreviewNotecard::onExternalChange(const std::string& filename)
     {
         return false;
     }
-
-    // Disable sync to avoid recursive load->save->load calls.
-    saveIfNeeded(NULL, false);
+    saveIfNeeded();
     return true;
 }
 
@@ -938,8 +1013,12 @@ bool LLPreviewNotecard::loadNotecardText(const std::string& filename)
         LL_WARNS() << "Empty file name" << LL_ENDL;
         return false;
     }
+    if (!mLoaded || !mModifiable)
+    {
+        return false;
+    }
 
-    LLFILE* file = LLFile::fopen(filename, LLFILE_MODE("rb"));       /*Flawfinder: ignore*/
+    LLFILE* file = LLFile::fopen(filename, LLFILE_MODE("rb")); /*Flawfinder: ignore*/
     if (!file)
     {
         LL_WARNS() << "Error opening " << filename << LL_ENDL;
@@ -950,21 +1029,18 @@ bool LLPreviewNotecard::loadNotecardText(const std::string& filename)
     fseek(file, 0L, SEEK_END);
     size_t file_length = (size_t)ftell(file);
     fseek(file, 0L, SEEK_SET);
-    char* buffer = new char[file_length + 1];
-    size_t nread = fread(buffer, 1, file_length, file);
+    std::string text(file_length, '\0');
+    size_t      nread = fread(text.data(), 1, file_length, file);
     if (nread < file_length)
     {
         LL_WARNS() << "Short read" << LL_ENDL;
     }
-    buffer[nread] = '\0';
+    text.resize(nread);
     fclose(file);
 
-    std::string text = std::string(buffer);
-    LLStringUtil::replaceTabsWithSpaces(text, LLTextEditor::spacesPerTab());
-
-    mEditor->setText(text);
-    delete[] buffer;
-
+    // What the other editor wrote, as one step to undo.
+    const ALTextDocument& document = mText->document();
+    mText->replaceAll({ { ALTextRange(document.start(), document.end()), text } });
     return true;
 }
 
@@ -977,7 +1053,7 @@ bool LLPreviewNotecard::writeToFile(const std::string& filename)
         return false;
     }
 
-    std::string utf8text = mEditor->getText();
+    std::string utf8text = mText->text();
 
     if (utf8text.size() == 0)
     {
@@ -992,32 +1068,32 @@ bool LLPreviewNotecard::writeToFile(const std::string& filename)
 std::string LLPreviewNotecard::getCleanNameForTmpFile() const
 {
     std::string note_name = mNoteName;
-    if(note_name.empty()) {
+    if (note_name.empty())
+    {
         note_name = "New note";
     }
     static const std::set<char> forbidden_chars{ '<', '>', ':', '"', '\\', '/', '|', '?', '*' };
-    note_name.erase(
-        std::remove_if(note_name.begin(), note_name.end(), [](char c) {
-            return forbidden_chars.contains(c);
-        }), note_name.end());
+    note_name.erase(std::remove_if(note_name.begin(), note_name.end(), [](char c) { return forbidden_chars.contains(c); }), note_name.end());
     return note_name;
 }
 
 std::string LLPreviewNotecard::getTmpFileName(const std::string& note_name) const
 {
-    std::string notecard_id = mObjectID.asString() + "_" + mItemUUID.asString();
+    std::string notecard_id = mObjectUUID.asString() + "_" + mItemUUID.asString();
 
     // Use MD5 sum to make the file name shorter and not exceed maximum path length.
-    char notecard_id_hash_str[33];             /* Flawfinder: ignore */
-    LLMD5 notecard_id_hash((const U8 *)notecard_id.c_str());
+    char  notecard_id_hash_str[33]; /* Flawfinder: ignore */
+    LLMD5 notecard_id_hash((const U8*)notecard_id.c_str());
     notecard_id_hash.hex_digest(notecard_id_hash_str);
 
-    if(note_name.empty()) {
+    if (note_name.empty())
+    {
         return std::string(LLFile::tmpdir()) + "sl_notecard_" + notecard_id_hash_str + ".txt";
-    } else {
+    }
+    else
+    {
         return std::string(LLFile::tmpdir()) + "sl_notecard_" + note_name + "_" + notecard_id_hash_str + ".txt";
     }
 }
-
 
 // EOF

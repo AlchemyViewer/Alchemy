@@ -23,6 +23,28 @@
      name="Title">
         Notecard: [NAME]
     </floater.string>
+    <floater.string name="Loading">Loading...</floater.string>
+    <floater.string name="ReadOnlyNoModify">You can read this notecard, but you do not have permission to change it.</floater.string>
+    <floater.string name="ReadOnlyFailed">This notecard could not be loaded: [REASON]</floater.string>
+    <floater.string name="Saving">Saving...</floater.string>
+    <floater.string name="Saved">Saved.</floater.string>
+    <floater.string name="SaveFailed">Not saved: [REASON]</floater.string>
+    <floater.string name="SavedElsewhere">[NAME] was saved in [WHO] while you had unsaved changes here.</floater.string>
+    <floater.string name="SavedByBridge">VS Code</floater.string>
+    <floater.string name="SavedByStudio">Script Studio</floater.string>
+    <floater.string name="SavedByOther">another editor</floater.string>
+    <floater.string name="TakeTheirs">Take Theirs</floater.string>
+    <floater.string name="KeepMine">Keep Mine</floater.string>
+    <floater.string name="Compare">Compare</floater.string>
+    <floater.string name="BackToText">Back to Text</floater.string>
+    <floater.string name="CompareTheirs">Saved there</floater.string>
+    <floater.string name="CompareMine">Here</floater.string>
+    <floater.string name="KeptMine">Your changes are kept. Saving replaces what was saved there.</floater.string>
+    <floater.string name="Recovered">Unsaved changes to this notecard from [WHEN] were kept.</floater.string>
+    <floater.string name="Restore">Restore</floater.string>
+    <floater.string name="Discard">Discard</floater.string>
+    <floater.string name="Restored">The kept changes are back. Undo takes them out.</floater.string>
+    <floater.string name="RecoveryWriteFailed">Your unsaved changes could not be kept in case the viewer closes.</floater.string>
     <icon
      follows="top|right"
      height="18"
@@ -57,29 +79,89 @@
      max_length_bytes="127"
      name="desc"
      width="296" />
-    <text_editor
-     type="string"
-     length="1"
-     embedded_items="true"
-     follows="left|top|right|bottom"
-     font="SansSerif"
-     height="281"
-     ignore_tab="false"
+    <layout_stack
+     border_size="0"
+     follows="all"
+     height="262"
      layout="topleft"
      left="4"
-     max_length="65536"
-     name="Notecard Editor"
-     parse_urls="false" 
-     spellcheck="true"
-     tab_group="1"
+     name="stack"
+     orientation="vertical"
      top="46"
-     use_color="true"
-     show_emoji_helper="true"
-     width="392"
-     word_wrap="true">
-        Loading...
-    </text_editor>
-      <button
+     width="392">
+        <layout_panel
+         auto_resize="false"
+         height="44"
+         layout="topleft"
+         name="notice_panel"
+         visible="false"
+         width="392">
+            <text
+             follows="left|top|right"
+             font="SansSerif"
+             height="16"
+             layout="topleft"
+             left="2"
+             name="notice_text"
+             top="2"
+             use_ellipses="true"
+             width="388" />
+            <button
+             follows="top|right"
+             height="20"
+             layout="topleft"
+             left="116"
+             name="notice_1"
+             top="20"
+             width="88" />
+            <button
+             follows="top|right"
+             height="20"
+             layout="topleft"
+             left_pad="4"
+             name="notice_2"
+             top="20"
+             width="88" />
+            <button
+             follows="top|right"
+             height="20"
+             layout="topleft"
+             left_pad="4"
+             name="notice_3"
+             top="20"
+             width="88" />
+        </layout_panel>
+        <layout_panel
+         auto_resize="true"
+         height="218"
+         layout="topleft"
+         name="text_panel"
+         width="392">
+            <text_view
+             follows="all"
+             font="SansSerif"
+             height="218"
+             layout="topleft"
+             left="0"
+             name="notecard_text"
+             spellcheck="true"
+             tab_group="1"
+             top="0"
+             width="392"
+             word_wrap="true" />
+        </layout_panel>
+    </layout_stack>
+    <text
+     follows="left|right|bottom"
+     font="SansSerif"
+     height="16"
+     layout="topleft"
+     left="6"
+     name="status"
+     top="312"
+     use_ellipses="true"
+     width="388" />
+    <button
      follows="left|bottom"
      height="22"
      label="Edit..."
