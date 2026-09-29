@@ -4361,6 +4361,13 @@ void ALTextView::draw()
             dragSelectTo(mDragX, mDragY);
         }
     }
+    // The find bar in the view's colours as they are now: a theme chosen
+    // while it is open recolours it, as it does the text.
+    if (mFindBar && mFindBar->getVisible() && mFindBarColors != LLUIColorTable::instance().generation())
+    {
+        mFindBarColors = LLUIColorTable::instance().generation();
+        mFindBar->setColors(backgroundColor(), textColor());
+    }
     // The find bar's query looked for through the text again once edits
     // have stopped coming for a moment, not at every keystroke; and a
     // worker's matches taken as they come in.

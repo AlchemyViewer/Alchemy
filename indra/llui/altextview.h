@@ -1114,6 +1114,8 @@ private:
     LLHandle<LLContextMenu> mUrlMenuHandle;
 
     ALFindBar*               mFindBar = nullptr;
+    // The colour table's generation the find bar was last coloured at.
+    U32                      mFindBarColors = 0;
     // What the bar's query found, kept in step with the text.
     ALTextFind               mFind;
     LLUIColor                mFindMatchColor;
