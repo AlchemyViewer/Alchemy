@@ -27,6 +27,7 @@
 #include "alscriptstudiocaret.h"
 
 #include "alcodeeditor.h"
+#include "alscriptstudioanalysis.h"
 #include "alscriptstudiochecking.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
@@ -41,14 +42,14 @@ using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;
 
-ALScriptStudioCaret::ALScriptStudioCaret(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window) {}
+ALScriptStudioCaret::ALScriptStudioCaret(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window) : mServices(services), mAnalysis(analysis), mWindow(window) {}
 
 void ALScriptStudioCaret::ask(Doc& doc, ALEditorCommand command, const ALTextRange& word)
 {
     doc.caret->symbolCommand = command;
     doc.caret->symbolVersion = doc.editor->document().version();
     doc.caret->symbolAt      = word.begin;
-    mWindow.askAnalyzer(doc, ALScriptAnalysis::Kind::References, word.begin);
+    mAnalysis.askAnalyzer(doc, ALScriptAnalysis::Kind::References, word.begin);
 }
 
 void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at)
@@ -85,7 +86,7 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
     }
     // Back to the source: the declaration and each place in this script
     // or in an include, which keeps the include's identity.
-    const bool         mapped        = mWindow.preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version;
+    const bool         mapped        = mAnalysis.preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version;
     const ALSourceMap* map           = mapped ? &doc.expanded.map : nullptr;
     bool               hasDefinition = refs.hasDefinition;
     ALScriptSpan       definition    = refs.definition;
@@ -134,7 +135,7 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
         auto lines = place.file.empty() ? files.end() : files.find(place.file);
         if (!place.file.empty() && lines == files.end())
         {
-            lines = files.emplace(place.file, mWindow.sourceLines(place.file)).first;
+            lines = files.emplace(place.file, mAnalysis.sourceLines(place.file)).first;
         }
         if (place.file.empty())
         {
@@ -249,7 +250,7 @@ void ALScriptStudioCaret::pump(F64 now)
         {
             doc->caret->inspectAt      = word.begin;
             doc->caret->inspectVersion = version;
-            mWindow.askAnalyzer(*doc, ALScriptAnalysis::Kind::Inspect, word.begin);
+            mAnalysis.askAnalyzer(*doc, ALScriptAnalysis::Kind::Inspect, word.begin);
         }
     }
 }
@@ -259,5 +260,5 @@ void ALScriptStudioCaret::inspect(Doc& doc, const ALTextPos& at)
     doc.caret->inspectAt      = at;
     doc.caret->inspectVersion = doc.editor->document().version();
     doc.caret->inspectDue     = 0.0;
-    mWindow.askAnalyzer(doc, ALScriptAnalysis::Kind::Inspect, at);
+    mAnalysis.askAnalyzer(doc, ALScriptAnalysis::Kind::Inspect, at);
 }

@@ -28,6 +28,7 @@
 
 #include "alincludesearch.h"
 #include "alnotecardembedded.h"
+#include "alscriptstudioanalysis.h"
 #include "alscriptstudiochecking.h"
 #include "alscriptstudioorphans.h"
 #include "alscriptstudioservices.h"
@@ -37,7 +38,7 @@
 
 #include <algorithm>
 
-ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window) : mServices(services), mTabs(tabs), mWindow(window)
+ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mWindow(window)
 {
 }
 
@@ -137,7 +138,7 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
     doc.expanded.valid    = false;
     mWindow.runningKnown(doc);
     mWindow.showExpanded(doc, result.text);
-    mWindow.refreshProblems(doc);
+    mAnalysis.refreshProblems(doc);
     compareCompiled(doc, version, result);
     // And what it comes to for a save waiting on it.
     ALScriptSaveFlow::Run run;
@@ -151,14 +152,14 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
         // The text moved on while the includes came: analysed again, and
         // saved again from the start if that was the point.
         doc.expanded.valid = false;
-        mWindow.scheduleAnalysis(doc, true);
+        mAnalysis.scheduleAnalysis(doc, true);
         if (landed == ALScriptSaveFlow::Landed::MovedOn)
         {
             save(doc);
         }
         return;
     }
-    mWindow.scheduleAnalysis(doc, true);
+    mAnalysis.scheduleAnalysis(doc, true);
     // The includes that never came, by the names the script gave them.
     args["[FILES]"] = joined(result.pending);
     switch (landed)
@@ -241,7 +242,7 @@ void ALScriptStudioSaving::weighForSave(Doc& doc)
         return;
     }
     doc.save.setWarnWeightFor(doc.editor->document().version());
-    if (mWindow.preprocessed(doc))
+    if (mAnalysis.preprocessed(doc))
     {
         // What the run made to be sent, which is what goes.
         mWindow.weighSent(doc);
@@ -348,7 +349,7 @@ void ALScriptStudioSaving::save(Doc& doc)
     tab.version          = doc.editor->document().version();
     tab.file             = !doc.file.empty();
     tab.notecard         = doc.notecard;
-    tab.preprocessed     = !tab.file && !tab.notecard && mWindow.preprocessed(doc);
+    tab.preprocessed     = !tab.file && !tab.notecard && mAnalysis.preprocessed(doc);
     tab.preprocessorBusy = doc.preprocessing;
     tab.holdOnErrors     = options.holdOnErrors;
     tab.checked          = doc.check->analysisVersion == tab.version;
@@ -424,7 +425,7 @@ void ALScriptStudioSaving::save(Doc& doc)
         }
         case ALScriptSaveFlow::Route::Check:
             // Checked first; the save follows the answer.
-            mWindow.scheduleAnalysis(doc, true);
+            mAnalysis.scheduleAnalysis(doc, true);
             mServices.setStatus(mServices.words("Preflight", args));
             return;
         case ALScriptSaveFlow::Route::StoppedByAnalyzers:
@@ -544,7 +545,7 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
     // With the map the compiler's lines are read back through.
     doc.save.sent(at, map ? std::optional<ALSourceMap>(*map) : std::nullopt, {}, options.sender.request);
     doc.problems.clear();
-    mWindow.refreshProblems(doc);
+    mAnalysis.refreshProblems(doc);
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
     mServices.setStatus(mServices.words("Saving", args));
@@ -813,7 +814,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
         // A new script runs from here; what the old one said is past.
         doc.runtime.clear();
     }
-    mWindow.refreshProblems(doc);
+    mAnalysis.refreshProblems(doc);
     if (ours && doc.watch)
     {
         // The editor outside sees what was saved here, and what the

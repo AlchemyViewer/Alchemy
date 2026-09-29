@@ -41,6 +41,7 @@
 #include <string_view>
 #include <vector>
 
+class ALScriptStudioAnalysis;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 
@@ -111,7 +112,7 @@ public:
     // language, SLua's by the item's subtype or its runtime.
     static std::vector<Candidate> folderCandidates(const std::vector<const LLInventoryItem*>& items, const LLUUID& own, bool lua);
 
-    // What the lookups ask of the window beyond its services and its tabs.
+    // What the lookups ask of the window beyond its services, its tabs and its analysis.
     class Window
     {
     public:
@@ -123,11 +124,8 @@ public:
         // A script's text as the region has it, its author's source out of
         // any envelope, and its asset; nothing where it could not be read.
         virtual void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::optional<std::string>& source)> loaded) = 0;
-        // A script expanded as the compiler sees it; and the analyzers asked.
+        // A script expanded as the compiler sees it.
         virtual void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> expanded) = 0;
-        virtual void askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)> answered) = 0;
-        // An include's lines as it reads; none where it is not had.
-        virtual ALScriptPlaces::Lines sourceLines(const std::string& path) const = 0;
         // A preview held, so that following what is found does not close it.
         virtual void holdPreview(Doc& doc) = 0;
         // What Find References found: listed, lit in the script, the tab
@@ -148,7 +146,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptLookup(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window);
+    ALScriptLookup(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, Window& window);
 
     // A place added, once: by its file and where it starts.
     static void addPlace(Doc::Lookup& lookup, Doc::Place place);
@@ -227,6 +225,7 @@ private:
 
     ALScriptStudioServices& mServices;
     ALScriptStudioTabs&     mTabs;
+    ALScriptStudioAnalysis& mAnalysis;
     Window&                 mWindow;
     // Which lookup the answers arriving belong to.
     U32                     mGeneration = 0;

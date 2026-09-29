@@ -28,6 +28,7 @@
 #include "linden_common.h"
 
 #include "../alscriptstudiodoc.h"
+#include "../alscriptstudioanalysis.h"
 #include "../alscriptstudioservices.h"
 #include "../alscriptstudiotabs.h"
 
@@ -223,6 +224,22 @@ namespace al_studio_test
         void               refreshToolbar() override {}
         void               refreshNotice() override {}
         void               refreshTrailer(ALScriptStudioDoc&) override {}
+    };
+
+    // The window's analysis with the analyzers never answering, no tab
+    // preprocessed or a fragment, and no include's lines had: what a unit's
+    // test's fake of its window starts from, overriding what the test
+    // watches.
+    struct QuietAnalysis : public ALScriptStudioAnalysis
+    {
+        void askAnalysis(ALScriptAnalysis::Request, std::function<void(const ALScriptAnalysis::Result&)>) override {}
+        void askAnalyzer(ALScriptStudioDoc&, ALScriptAnalysis::Kind, const ALTextPos&) override {}
+        void scheduleAnalysis(ALScriptStudioDoc&, bool) override {}
+        bool preprocessed(const ALScriptStudioDoc&) const override { return false; }
+        bool lslFragment(const ALScriptStudioDoc&) const override { return false; }
+        std::string includeName(const ALScriptStudioDoc&, const std::string& path) const override { return path; }
+        ALScriptPlaces::Lines sourceLines(const std::string&) const override { return ALScriptPlaces::Lines(); }
+        void refreshProblems(ALScriptStudioDoc&) override {}
     };
 
     // A pane's window with nothing to fake: the services alone.

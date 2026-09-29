@@ -30,6 +30,7 @@
 #include "alnotecardformat.h"
 #include "alnotecarditems.h"
 #include "alscriptfixes.h"
+#include "alscriptstudioanalysis.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudioweighing.h"
@@ -111,7 +112,7 @@ ALScriptStudioChecking::Sources& ALScriptStudioChecking::sources()
     return sources;
 }
 
-ALScriptStudioChecking::ALScriptStudioChecking(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window) {}
+ALScriptStudioChecking::ALScriptStudioChecking(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window) : mServices(services), mAnalysis(analysis), mWindow(window) {}
 
 bool ALScriptStudioChecking::preprocessed(const Doc& doc) const
 {
@@ -252,7 +253,7 @@ void ALScriptStudioChecking::expandedAnswer(const std::string& id, U32 version, 
     doc.expanded.resolved = result.resolved;
     doc.expanded.consts   = result.consts;
     // What the preprocessor found is shown with what the analyzers found.
-    mWindow.refreshProblems(doc);
+    mAnalysis.refreshProblems(doc);
     std::vector<Doc::Check::Waiting> waiting;
     waiting.swap(doc.check->waiting);
     for (const Doc::Check::Waiting& question : waiting)
@@ -405,7 +406,7 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
         request.text = std::make_shared<const std::string>(*request.text + FRAGMENT_STATE);
     }
     const std::weak_ptr<bool> alive = mAlive;
-    mWindow.askAnalysis(std::move(request), [this, alive, expansion](const ALScriptAnalysis::Result& result) {
+    mAnalysis.askAnalysis(std::move(request), [this, alive, expansion](const ALScriptAnalysis::Result& result) {
         if (alive.lock())
         {
             answered(result, expansion);
@@ -800,7 +801,7 @@ void ALScriptStudioChecking::checkNotecard(Doc& doc)
     doc.check->analysis        = std::move(problems);
     doc.check->analysisVersion = text.version();
     doc.outline = doc.grammar == "json" ? ALNotecardFormat::outline(doc.editor->wholeText()) : std::vector<ALScriptOutlineEntry>();
-    mWindow.refreshProblems(doc);
+    mAnalysis.refreshProblems(doc);
     mWindow.showOutline(doc);
 }
 
@@ -1116,7 +1117,7 @@ void ALScriptStudioChecking::showProblems(Doc& doc)
     {
         explainTransformWords(doc);
     }
-    mWindow.refreshProblems(doc);
+    mAnalysis.refreshProblems(doc);
 }
 
 void ALScriptStudioChecking::offerImports(Doc& doc)

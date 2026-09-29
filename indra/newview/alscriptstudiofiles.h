@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 
+class ALScriptStudioAnalysis;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 class LLMenuGL;
@@ -69,12 +70,10 @@ public:
         std::string name;
     };
 
-    // What the files ask of the window beyond its services and its tabs.
+    // What the files ask of the window beyond its services, its tabs and its analysis.
     class Window
     {
     public:
-        // A tab checked again.
-        virtual void scheduleAnalysis(Doc& doc, bool now) = 0;
         // The viewer's pickers, which answer later: files to open or load,
         // several or one; where to save one, its name to start from.
         virtual void pickFilesToOpen(bool several, std::function<void(const std::vector<std::string>& files)> chosen)            = 0;
@@ -107,7 +106,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioFiles(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window);
+    ALScriptStudioFiles(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, Window& window);
 
     // A tab's file watched for changes made to it outside, whoever makes
     // them: an editor the studio started, or anything else. Taken where
@@ -153,6 +152,7 @@ public:
 private:
     ALScriptStudioServices&  mServices;
     ALScriptStudioTabs&      mTabs;
+    ALScriptStudioAnalysis&  mAnalysis;
     Window&                  mWindow;
     std::vector<std::string> mRecentFiles;
     std::vector<Recent>      mRecentScripts;

@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 
+class ALScriptStudioAnalysis;
 class ALScriptStudioServices;
 
 // A Script Studio window's check of every script of an object: its prims
@@ -74,7 +75,7 @@ public:
         std::vector<std::string> unread;
     };
 
-    // What the check asks of the window beyond its services.
+    // What the check asks of the window beyond its services and its analysis.
     class Window
     {
     public:
@@ -107,13 +108,12 @@ public:
             bool        enveloped = false;
         };
         virtual void read(const ALScriptRef& ref, std::function<void(std::optional<Read>)> told) = 0;
-        // Whether the preprocessor runs; a script expanded, and the
-        // analyzers asked -- for its problems alone, no colours nor hints;
-        // an SLua script's `.luaurc`, where it has one in hand.
-        virtual bool preprocessing() const                                                                                          = 0;
-        virtual void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> expanded)     = 0;
-        virtual void askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)> answered) = 0;
-        virtual bool luauConfig(const ALScriptPreprocessor::Request& root, ALLuauConfig& config) const                              = 0;
+        // Whether the preprocessor runs; a script expanded; an SLua
+        // script's `.luaurc`, where it has one in hand. The analyzers are
+        // asked for its problems alone, no colours nor hints.
+        virtual bool preprocessing() const                                                                                      = 0;
+        virtual void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> expanded) = 0;
+        virtual bool luauConfig(const ALScriptPreprocessor::Request& root, ALLuauConfig& config) const                          = 0;
         // A script checked, and the check done.
         virtual void scriptChecked(const Script& script) = 0;
         virtual void objectChecked(const Done& done)     = 0;
@@ -122,7 +122,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptObjectCheck(ALScriptStudioServices& services, Window& window);
+    ALScriptObjectCheck(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window);
 
     // Every script of the object with `root`, called `name`, checked.
     void check(const LLUUID& root, const std::string& name);
@@ -148,6 +148,7 @@ private:
     void passed();
 
     ALScriptStudioServices&         mServices;
+    ALScriptStudioAnalysis&         mAnalysis;
     Window&                         mWindow;
     U32                             mGeneration = 0;
     bool                            mRunning    = false;

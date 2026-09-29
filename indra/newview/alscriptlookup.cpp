@@ -26,6 +26,7 @@
 
 #include "alscriptlookup.h"
 
+#include "alscriptstudioanalysis.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiotabs.h"
@@ -42,7 +43,7 @@ using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;
 
-ALScriptLookup::ALScriptLookup(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window) : mServices(services), mTabs(tabs), mWindow(window) {}
+ALScriptLookup::ALScriptLookup(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mWindow(window) {}
 
 // static
 std::vector<ALScriptLookup::Candidate> ALScriptLookup::folderCandidates(const std::vector<const LLInventoryItem*>& items, const LLUUID& own, bool lua)
@@ -379,7 +380,7 @@ void ALScriptLookup::expanded(const std::string& id, U32 generation, const ALScr
     // The texts kept for the answer are the ones the questions hold.
     const std::weak_ptr<bool>                alive    = mAlive;
     const std::shared_ptr<const std::string> expanded_text = request.text;
-    mWindow.askAnalysis(std::move(request), [this, alive, id, generation, ref, name, source, map = result.map,
+    mAnalysis.askAnalysis(std::move(request), [this, alive, id, generation, ref, name, source, map = result.map,
                                              expanded_text](const ALScriptAnalysis::Result& answer) {
         if (alive.lock())
         {
@@ -430,7 +431,7 @@ void ALScriptLookup::answered(const std::string& id, U32 generation, const ALScr
             auto lines = file == 0 ? files.end() : files.find(place.file);
             if (file != 0 && lines == files.end())
             {
-                lines = files.emplace(place.file, mWindow.sourceLines(place.file)).first;
+                lines = files.emplace(place.file, mAnalysis.sourceLines(place.file)).first;
             }
             if (file == 0)
             {

@@ -35,6 +35,7 @@
 #include <string>
 #include <vector>
 
+class ALScriptStudioAnalysis;
 class ALScriptStudioServices;
 class ALScriptWeightsPane;
 
@@ -82,20 +83,12 @@ class ALScriptStudioWeighing
 public:
     typedef ALScriptStudioDoc Doc;
 
-    // What weighing asks of the window beyond its services.
+    // What weighing asks of the window beyond its services and its analysis.
     class Window
     {
     public:
-        // The analyzers asked to weigh a tab as its check has it; and a
-        // question of their own put to them, answered later.
-        virtual void askWeights(Doc& doc)                                                                                         = 0;
-        virtual void askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)> answered) = 0;
-        // Whether a tab is a fragment of LSL -- an include's functions --
-        // which is not weighed; whether the preprocessor makes what it
-        // sends; and the name an include is shown by.
-        virtual bool        lslFragment(const Doc& doc) const                          = 0;
-        virtual bool        preprocessed(const Doc& doc) const                         = 0;
-        virtual std::string includeName(const Doc& doc, const std::string& path) const = 0;
+        // The analyzers asked to weigh a tab as its check has it.
+        virtual void askWeights(Doc& doc) = 0;
         // The settings: whether the preprocessor's optimizer runs after
         // the check's expansion; the viewer's version, which an envelope
         // says; and whether the editors show the weights as notes and heat.
@@ -103,10 +96,9 @@ public:
         virtual std::string programVersion() const = 0;
         virtual bool        weightNotes() const    = 0;
         virtual bool        weightHeat() const     = 0;
-        // The Problems told of a tab's weight; and a save told, which warns
-        // where it is over its limit.
-        virtual void refreshProblems(Doc& doc) = 0;
-        virtual void warnOverWeight(Doc& doc)  = 0;
+        // A save told of a tab's weight, which warns where it is over its
+        // limit.
+        virtual void warnOverWeight(Doc& doc) = 0;
         // The Weights tab: whether it is looked at, and the pane.
         virtual bool                 weightsShown() const = 0;
         virtual ALScriptWeightsPane* weightsPane()        = 0;
@@ -115,7 +107,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioWeighing(ALScriptStudioServices& services, Window& window);
+    ALScriptStudioWeighing(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window);
 
     // The target a tab is weighed for; none for one that is not weighed --
     // not loaded, a notecard, a fragment, a target there is no weigher for.
@@ -169,6 +161,7 @@ private:
     void weighFixes(Doc& doc, U32 shown, const std::vector<ALCodeEditor::Fix>& fixes);
 
     ALScriptStudioServices& mServices;
+    ALScriptStudioAnalysis& mAnalysis;
     Window&                 mWindow;
     // The fix list last shown, to be weighed once nothing more is coming
     // to it.

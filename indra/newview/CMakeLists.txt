@@ -1057,6 +1057,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiovimrc.h
     alscriptstudioweighing.h
     alscriptstudiowords.h
+    alscriptstudioanalysis.h
     alscriptstudioservices.h
     alscriptstudiotabs.h
     alscripttypes.h

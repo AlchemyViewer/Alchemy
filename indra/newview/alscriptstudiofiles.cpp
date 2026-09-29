@@ -28,6 +28,7 @@
 
 #include "alcodeeditor.h"
 #include "alfilewrite.h"
+#include "alscriptstudioanalysis.h"
 #include "alscriptstudiofileio.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiotabs.h"
@@ -49,7 +50,7 @@ namespace
     constexpr size_t MOST_RECENT = 10;
 }
 
-ALScriptStudioFiles::ALScriptStudioFiles(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window) : mServices(services), mTabs(tabs), mWindow(window)
+ALScriptStudioFiles::ALScriptStudioFiles(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mWindow(window)
 {
 }
 
@@ -327,7 +328,7 @@ void ALScriptStudioFiles::chosenToSaveAs(const std::string& id, const std::vecto
     noteFile(path);
     mServices.report(mServices.words("SavedToFile", args), false, doc);
     mWindow.fileSettled(*doc);
-    mWindow.scheduleAnalysis(*doc, true);
+    mAnalysis.scheduleAnalysis(*doc, true);
 }
 
 // --- the recent lists ---------------------------------------------------------------------

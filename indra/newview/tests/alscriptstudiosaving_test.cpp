@@ -43,7 +43,7 @@ namespace
     typedef std::vector<std::string>           Names;
 
     // The window, faked: a record of what saving asked of it.
-    struct FakeSavingWindow : public ALScriptStudioSaving::Window, public al_studio_test::QuietTabs
+    struct FakeSavingWindow : public ALScriptStudioSaving::Window, public al_studio_test::QuietTabs, public al_studio_test::QuietAnalysis
     {
         struct Sent
         {
@@ -202,7 +202,7 @@ namespace tut
             }
             studio.services        = &services;
             studio.options.program = "Alchemy Test 1.2.3";
-            saving                 = std::make_unique<ALScriptStudioSaving>(services, studio, studio);
+            saving                 = std::make_unique<ALScriptStudioSaving>(services, studio, studio, studio);
             return *saving;
         }
 

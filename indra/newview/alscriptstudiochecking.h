@@ -39,6 +39,7 @@
 #include <string>
 #include <vector>
 
+class ALScriptStudioAnalysis;
 class ALScriptStudioServices;
 
 // The tab's part of checking (ALScriptStudioChecking): what the
@@ -153,24 +154,20 @@ public:
     };
     static Sources& sources();
 
-    // What checking asks of the window beyond its services.
+    // What checking asks of the window beyond its services and its analysis.
     class Window
     {
     public:
-        // The analyzers asked a question, answered later; and what the
-        // window's settings add to every question: colours, hints.
-        virtual void askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)> answered) = 0;
+        // What the window's settings add to every question: colours, hints.
         virtual void askingOptions(ALScriptAnalysis::Request& request) const = 0;
         // An answer that is not checking's -- a name's references, what is
         // at the caret, a weighing -- handed on, at the source's place.
         virtual void answeredElsewhere(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at) = 0;
-        // What a check's answer is shown by: the problems, the outline,
-        // and the weights the front tab's check weighed along with it; and
-        // the targets a weighing is asked for.
-        virtual void                                refreshProblems(Doc& doc)                                     = 0;
-        // Those asked for made now, where they wait to be made with the
-        // next frame: what is about to read them -- the fixes -- reads
-        // what the last answer said.
+        // The problems asked for with the next frame made now: what is
+        // about to read them -- the fixes -- reads what the last answer
+        // said. What else a check's answer is shown by: the outline, and
+        // the weights the front tab's check weighed along with it; and the
+        // targets a weighing is asked for.
         virtual void                                settleProblems(Doc& doc)                                      = 0;
         virtual void                                showOutline(Doc& doc)                                         = 0;
         virtual void                                weighed(Doc& doc, const ALScriptAnalysis::Result& result)     = 0;
@@ -189,7 +186,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioChecking(ALScriptStudioServices& services, Window& window);
+    ALScriptStudioChecking(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window);
 
     // --- the analyzers ------------------------------------------------------------
 
@@ -295,6 +292,7 @@ private:
     void explainRequires(Doc& doc);
 
     ALScriptStudioServices& mServices;
+    ALScriptStudioAnalysis& mAnalysis;
     Window&                 mWindow;
     // When the preprocessor's settings are next taken, or zero; and
     // whether its words changed with them.

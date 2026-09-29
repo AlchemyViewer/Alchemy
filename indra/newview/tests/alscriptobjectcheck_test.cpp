@@ -80,7 +80,7 @@ namespace
     // The window and the world, answered as a test says: the object's
     // scripts; which are open; each script's text, or none; the
     // expansions and questions asked, held for the test to answer.
-    struct FakeWindow : public Window
+    struct FakeWindow : public Window, public al_studio_test::QuietAnalysis
     {
         void listScripts(const LLUUID& root, std::function<void(Listed)> told) override
         {
@@ -175,7 +175,7 @@ namespace tut
     {
         al_studio_test::FakeServices services;
         FakeWindow                   window;
-        Check                        check{ services, window };
+        Check                        check{ services, window, window };
         const LLUUID                 root = id(1);
 
         // An object of scripts A to D: A open, D not to be read.
@@ -292,7 +292,7 @@ namespace tut
 
         FakeWindow  away;
         away.listing.present = false;
-        Check       gone(services, away);
+        Check       gone(services, away, away);
         gone.check(id(99), "Gone");
         ensure("said at once, as not in sight", away.done.size() == 1 && !away.done[0].present && away.done[0].checked == 0);
     }

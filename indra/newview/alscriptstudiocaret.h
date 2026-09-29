@@ -33,6 +33,7 @@
 #include <string>
 #include <vector>
 
+class ALScriptStudioAnalysis;
 class ALScriptStudioServices;
 
 // The tab's part of what is said of its caret: the name asked about, the
@@ -77,16 +78,10 @@ public:
     // long as the analyzers wait after the last keystroke.
     static constexpr F64 SETTLE = 0.35;
 
-    // What the name at the caret asks of the window beyond its services.
+    // What the name at the caret asks of the window beyond its services and its analysis.
     class Window
     {
     public:
-        // The analyzers asked about a place of a tab's source; whether
-        // the preprocessor makes what they read; and an include's lines as
-        // it reads, none where it is not had.
-        virtual void                 askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at) = 0;
-        virtual bool                 preprocessed(const Doc& doc) const                                     = 0;
-        virtual ALScriptPlaces::Lines sourceLines(const std::string& path) const                            = 0;
         // A jump about to be made, for Back to come back from; and the
         // keyboard in the text in front, which ends a walk down a list.
         virtual void noteJump()       = 0;
@@ -116,7 +111,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioCaret(ALScriptStudioServices& services, Window& window);
+    ALScriptStudioCaret(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window);
 
     // A command about the name at the caret asked of the analyzers, and
     // what they answered done, where it answers that question of that text.
@@ -141,5 +136,6 @@ public:
 
 private:
     ALScriptStudioServices& mServices;
+    ALScriptStudioAnalysis& mAnalysis;
     Window&                 mWindow;
 };

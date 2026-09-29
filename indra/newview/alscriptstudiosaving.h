@@ -35,6 +35,7 @@
 #include <string>
 #include <vector>
 
+class ALScriptStudioAnalysis;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 
@@ -66,7 +67,7 @@ public:
         std::string program;
     };
 
-    // What saving asks of the window beyond its services and its tabs.
+    // What saving asks of the window beyond its services, its tabs and its analysis.
     class Window
     {
     public:
@@ -79,19 +80,13 @@ public:
         virtual void tidy(Doc& doc, bool fix, bool format, bool trim) = 0;
         // What the tab shows held as a preview no longer: it is kept.
         virtual void holdPreview(Doc& doc) = 0;
-        // The analyzers asked about the text, now or after a pause.
-        virtual void scheduleAnalysis(Doc& doc, bool now) = 0;
-        // The Problems tab said again for a tab, with the next frame;
-        // brought into sight; and its first error chosen, of the checkers'
-        // alone or of all, over what the tab says by then.
-        virtual void refreshProblems(Doc& doc)            = 0;
+        // The Problems tab brought into sight; and its first error chosen,
+        // of the checkers' alone or of all, over what the tab says by then.
         virtual void showProblems()                       = 0;
         virtual void selectFirstError(bool checkers_only) = 0;
 
         // --- the preprocessor ----------------------------------------------------------
 
-        // Whether it runs over a tab.
-        virtual bool preprocessed(const Doc& doc) const = 0;
         // A run over the text as it stands, fetching its includes, and
         // what it made once it has.
         virtual void runPreprocessor(const Doc& doc, std::function<void(const ALPreprocessor::Result&)> answer) = 0;
@@ -165,7 +160,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window);
+    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, Window& window);
 
     // --- saving ------------------------------------------------------------------------
 
@@ -241,6 +236,7 @@ private:
 
     ALScriptStudioServices& mServices;
     ALScriptStudioTabs&     mTabs;
+    ALScriptStudioAnalysis& mAnalysis;
     Window&                 mWindow;
     // Held while this is, for what answers later to know it still is.
     std::shared_ptr<bool>   mAlive = std::make_shared<bool>(true);

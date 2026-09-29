@@ -43,7 +43,7 @@ namespace
     std::string at(const ALTextRange& range) { return at(range.begin) + "-" + at(range.end); }
 
     // The window, faked: a record of what the name at the caret asked of it.
-    struct FakeCaretWindow : public ALScriptStudioCaret::Window
+    struct FakeCaretWindow : public ALScriptStudioCaret::Window, public al_studio_test::QuietAnalysis
     {
         void askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& pos) override
         {
@@ -155,7 +155,7 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<ALScriptStudioCaret>(services, studio);
+            unit = std::make_unique<ALScriptStudioCaret>(services, studio, studio);
             return *unit;
         }
         ALCodeEditor* editor(const std::string& name, const std::string& text)

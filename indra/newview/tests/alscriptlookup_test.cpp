@@ -91,7 +91,7 @@ namespace
 
     // The window, faked: the scripts it offers, and each question it was
     // asked, held for the test to answer.
-    struct FakeLookupWindow : public ALScriptLookup::Window, public al_studio_test::QuietTabs
+    struct FakeLookupWindow : public ALScriptLookup::Window, public al_studio_test::QuietTabs, public al_studio_test::QuietAnalysis
     {
         struct Load
         {
@@ -340,7 +340,7 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<ALScriptLookup>(services, studio, studio);
+            unit = std::make_unique<ALScriptLookup>(services, studio, studio, studio);
             return *unit;
         }
         Doc& tab(const std::string& id, const ALScriptRef& ref, const std::string& text, const std::string& name = std::string())

@@ -30,6 +30,7 @@
 #include "alscriptoutputpane.h"
 #include "alscriptproblemspane.h"
 #include "alscriptsearchpane.h"
+#include "alscriptstudioanalysis.h"
 #include "alscriptstudiocommands.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
@@ -117,7 +118,8 @@ class LLViewerObject;
 // a script the preprocessor wrapped shown as the code the server compiled
 // with the author's source in a tab beside it. Its regions fold and come
 // out as any studio's do.
-class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptStudioTabs, public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window,
+class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptStudioTabs, public ALScriptStudioAnalysis,
+                                    public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window,
                                     public ALScriptSearchPane::Window, public ALScriptExplorerPane::Window, public ALScriptStudioRecovery::Window,
                                     public ALScriptStudioSaving::Window, public ALScriptStudioVim::Window,
                                     public ALScriptExternalEditor::Window, public ALScriptStudioFiles::Window,
@@ -1193,32 +1195,32 @@ private:
     // What is unsaved in the tabs, kept against the viewer going.
     ALScriptStudioRecovery             mRecovery{ *this, *this, *this };
     // Saving and compiling the tabs.
-    ALScriptStudioSaving               mSaving{ *this, *this, *this };
+    ALScriptStudioSaving               mSaving{ *this, *this, *this, *this };
     // The window's side of vim, over its editors.
     ALScriptStudioVim                  mVim{ *this, *this, mCommands, *this };
     // Its tabs held open in an editor outside.
     ALScriptExternalEditor             mExternal{ *this, *this, *this };
     // Its files on disk, and the recent lists.
-    ALScriptStudioFiles                mFiles{ *this, *this, *this };
+    ALScriptStudioFiles                mFiles{ *this, *this, *this, *this };
     // What its scripts weigh.
-    ALScriptStudioWeighing             mWeighing{ *this, *this };
+    ALScriptStudioWeighing             mWeighing{ *this, *this, *this };
     // Its tabs whose script is gone or out of reach, and the notice.
     ALScriptStudioOrphans              mOrphans{ *this, *this, *this };
     // The places gone from, and the previews a list opens as it is walked.
     ALScriptNavigation                 mNavigation{ *this, *this, *this };
     // Its names looked up across the object's scripts, and renamed.
-    ALScriptLookup                     mLookup{ *this, *this, *this };
+    ALScriptLookup                     mLookup{ *this, *this, *this, *this };
     // Every script of an object checked, and what it is called while it is.
-    ALScriptObjectCheck                mObjectCheck{ *this, *this };
+    ALScriptObjectCheck                mObjectCheck{ *this, *this, *this };
     // Recompiles from the Explorer.
     ALScriptRecompile                  mRecompile{ *this, *this };
     std::string                        mCheckingWhere;
     S32                                mCheckedErrors   = 0;
     S32                                mCheckedWarnings = 0;
     // The name at its caret, and the caret watched.
-    ALScriptStudioCaret                mCaret{ *this, *this };
+    ALScriptStudioCaret                mCaret{ *this, *this, *this };
     // Its checking: the analyzers asked and answered, and fixes.
-    ALScriptStudioChecking             mChecking{ *this, *this };
+    ALScriptStudioChecking             mChecking{ *this, *this, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     bool                               mClosingWindow = false;

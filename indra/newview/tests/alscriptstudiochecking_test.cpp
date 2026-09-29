@@ -115,7 +115,7 @@ namespace
 
     // The window, faked: its answers held for the test to give, and what it
     // was told. Its problems made as the Problems pane makes them.
-    struct FakeCheckingWindow : public ALScriptStudioChecking::Window
+    struct FakeCheckingWindow : public ALScriptStudioChecking::Window, public al_studio_test::QuietAnalysis
     {
         struct Ask
         {
@@ -301,7 +301,7 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<ALScriptStudioChecking>(services, studio);
+            unit = std::make_unique<ALScriptStudioChecking>(services, studio, studio);
             return *unit;
         }
         ALCodeEditor* editor(const std::string& name, const std::string& text)
