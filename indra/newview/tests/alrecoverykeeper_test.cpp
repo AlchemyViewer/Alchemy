@@ -242,12 +242,13 @@ namespace tut
         set_test_name("the legacy editors' backups taken into the store as a session that ended, named as they named them, a notecard's text out of its format, and the files gone");
         const std::string temp = folder + "/temp";
         std::filesystem::create_directories(fsyspath(temp));
+        // Written as the editors wrote them, byte for byte.
         {
-            llofstream script(temp + "/Door Script-1A2B3C4D.lslbackup");
+            llofstream script(temp + "/Door Script-1A2B3C4D.lslbackup", std::ios::out | std::ios::binary);
             script << "default { state_entry() {} }\n";
         }
         {
-            llofstream card(temp + "/Settings-0000ABCD.ncbackup");
+            llofstream card(temp + "/Settings-0000ABCD.ncbackup", std::ios::out | std::ios::binary);
             card << "Linden text version 2\n{\nLLEmbeddedItems version 1\n{\ncount 0\n}\nText length 10\nspeed = 2\n}\n";
         }
         {
