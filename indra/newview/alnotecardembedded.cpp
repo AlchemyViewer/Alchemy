@@ -1,5 +1,5 @@
 /**
- * @file alscriptnotecardtab.cpp
+ * @file alnotecardembedded.cpp
  * @brief A notecard's items in its Script Studio tab: buttons in the text, dropped in, saved, opened and copied out.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -25,7 +25,7 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alscriptnotecardtab.h"
+#include "alnotecardembedded.h"
 
 #include "alcodeeditor.h"
 #include "alnotecarditems.h"
@@ -37,12 +37,12 @@
 #include "lltrans.h"
 #include "lluictrlfactory.h"
 
-ALScriptNotecardTab::ALScriptNotecardTab(ALScriptStudioDoc& doc, ALScriptStudioServices& services, World& world)
+ALNotecardEmbedded::ALNotecardEmbedded(ALScriptStudioDoc& doc, ALScriptStudioServices& services, World& world)
     : mDoc(doc), mServices(services), mWorld(world)
 {
 }
 
-void ALScriptNotecardTab::loaded(items_t items)
+void ALNotecardEmbedded::loaded(items_t items)
 {
     mItems = std::move(items);
     mInAsset.clear();
@@ -55,18 +55,18 @@ void ALScriptNotecardTab::loaded(items_t items)
     }
 }
 
-void ALScriptNotecardTab::take(items_t items)
+void ALNotecardEmbedded::take(items_t items)
 {
     mItems = std::move(items);
 }
 
-void ALScriptNotecardTab::saved(const std::vector<LLUUID>& sent)
+void ALNotecardEmbedded::saved(const std::vector<LLUUID>& sent)
 {
     mInAsset.clear();
     mInAsset.insert(sent.begin(), sent.end());
 }
 
-void ALScriptNotecardTab::wire()
+void ALNotecardEmbedded::wire()
 {
     mDoc.editor->setDropHandler([this](S32 x, S32 y, MASK, bool dropping, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip) {
         return drop(x, y, dropping, type, cargo, accept, tooltip);
@@ -81,7 +81,7 @@ void ALScriptNotecardTab::wire()
     });
 }
 
-void ALScriptNotecardTab::place(S32 first_line, S32 last_line)
+void ALNotecardEmbedded::place(S32 first_line, S32 last_line)
 {
     const ALTextDocument& text = mDoc.editor->document();
     for (S32 line = llmax(0, first_line); line <= last_line && line < text.lineCount() && !mItems.empty(); ++line)
@@ -96,7 +96,7 @@ void ALScriptNotecardTab::place(S32 first_line, S32 last_line)
     }
 }
 
-void ALScriptNotecardTab::place()
+void ALNotecardEmbedded::place()
 {
     // Each item's character (ALNotecardItems) becomes an atom over its
     // four bytes, so the text keeps it and a save carries it.
@@ -114,7 +114,7 @@ void ALScriptNotecardTab::place()
     mDoc.editor->setAtoms(std::move(atoms));
 }
 
-void ALScriptNotecardTab::forSave(std::string& text, items_t& items) const
+void ALNotecardEmbedded::forSave(std::string& text, items_t& items) const
 {
     text = mDoc.editor->text();
     items.clear();
@@ -131,7 +131,7 @@ void ALScriptNotecardTab::forSave(std::string& text, items_t& items) const
     }
 }
 
-bool ALScriptNotecardTab::drop(S32 x, S32 y, bool dropping, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip)
+bool ALNotecardEmbedded::drop(S32 x, S32 y, bool dropping, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip)
 {
     // Only what is in the inventory can be verified.
     if (mWorld.draggedFromNotecard())
@@ -230,7 +230,7 @@ bool ALScriptNotecardTab::drop(S32 x, S32 y, bool dropping, EDragAndDropType typ
     return true;
 }
 
-ALTextView::Atom ALScriptNotecardTab::atomFor(const ALTextPos& at, size_t index)
+ALTextView::Atom ALNotecardEmbedded::atomFor(const ALTextPos& at, size_t index)
 {
     const LLPointer<LLInventoryItem> item = mItems[index];
     const LLFontGL*                  font = LLFontGL::getFontSansSerifSmall();
@@ -269,7 +269,7 @@ ALTextView::Atom ALScriptNotecardTab::atomFor(const ALTextPos& at, size_t index)
     return atom;
 }
 
-bool ALScriptNotecardTab::copy(LLPointer<LLInventoryItem> item, const LLUUID& folder, U32 callback_id)
+bool ALNotecardEmbedded::copy(LLPointer<LLInventoryItem> item, const LLUUID& folder, U32 callback_id)
 {
     if (item.isNull())
     {
@@ -284,9 +284,9 @@ bool ALScriptNotecardTab::copy(LLPointer<LLInventoryItem> item, const LLUUID& fo
         mServices.setStatus(mServices.words("NotecardCopyUnsaved", args), true);
         return false;
     }
-    std::weak_ptr<ALScriptNotecardTab> weak  = weak_from_this();
+    std::weak_ptr<ALNotecardEmbedded> weak  = weak_from_this();
     const bool                         asked = mWorld.askCopy(mDoc.ref, item->getUUID(), folder, callback_id, [weak, args](const std::string& error) {
-        if (std::shared_ptr<ALScriptNotecardTab> self = weak.lock())
+        if (std::shared_ptr<ALNotecardEmbedded> self = weak.lock())
         {
             LLStringUtil::format_map_t why = args;
             why["[ERROR]"]                 = error;
@@ -300,16 +300,16 @@ bool ALScriptNotecardTab::copy(LLPointer<LLInventoryItem> item, const LLUUID& fo
     return asked;
 }
 
-void ALScriptNotecardTab::open(LLPointer<LLInventoryItem> item)
+void ALNotecardEmbedded::open(LLPointer<LLInventoryItem> item)
 {
     if (item.isNull())
     {
         return;
     }
     // The answers may come long after, the tab gone by then.
-    std::weak_ptr<ALScriptNotecardTab> weak = weak_from_this();
+    std::weak_ptr<ALNotecardEmbedded> weak = weak_from_this();
     if (mWorld.open(item, mDoc.ref, [weak, item](const LLUUID& folder, U32 callback_id) {
-            if (std::shared_ptr<ALScriptNotecardTab> self = weak.lock())
+            if (std::shared_ptr<ALNotecardEmbedded> self = weak.lock())
             {
                 self->copy(item, folder, callback_id);
             }
@@ -328,7 +328,7 @@ void ALScriptNotecardTab::open(LLPointer<LLInventoryItem> item)
     }
     // The server finds the folder for it.
     mWorld.confirmCopy([weak, item]() {
-        if (std::shared_ptr<ALScriptNotecardTab> self = weak.lock())
+        if (std::shared_ptr<ALNotecardEmbedded> self = weak.lock())
         {
             self->copy(item, LLUUID::null);
         }
@@ -336,7 +336,7 @@ void ALScriptNotecardTab::open(LLPointer<LLInventoryItem> item)
 }
 
 // static
-LLSD ALScriptNotecardTab::asLLSD(const items_t& items)
+LLSD ALNotecardEmbedded::asLLSD(const items_t& items)
 {
     LLSD out = LLSD::emptyArray();
     for (const LLPointer<LLInventoryItem>& item : items)
@@ -347,7 +347,7 @@ LLSD ALScriptNotecardTab::asLLSD(const items_t& items)
 }
 
 // static
-ALScriptNotecardTab::items_t ALScriptNotecardTab::fromLLSD(const LLSD& items)
+ALNotecardEmbedded::items_t ALNotecardEmbedded::fromLLSD(const LLSD& items)
 {
     items_t out;
     for (LLSD::array_const_iterator it = items.beginArray(); it != items.endArray(); ++it)
@@ -367,7 +367,7 @@ ALScriptNotecardTab::items_t ALScriptNotecardTab::fromLLSD(const LLSD& items)
 }
 
 // static
-void ALScriptNotecardTab::carry(const ALScriptStudioDoc& from, ALScriptStudioDoc& to)
+void ALNotecardEmbedded::carry(const ALScriptStudioDoc& from, ALScriptStudioDoc& to)
 {
     if (from.items)
     {

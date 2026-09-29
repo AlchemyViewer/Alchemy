@@ -41,7 +41,7 @@ struct ALScriptStudioDoc;
 // rezzes or reads an item by -- or, with Shift held, its asset's key --
 // what it shows a texture, plays a sound or an animation by -- where the
 // item's permissions let the key be seen. A folder is none of this, nor a
-// notecard, whose own tab (ALScriptNotecardTab) carries the item itself.
+// notecard, whose own tab (ALNotecardEmbedded) carries the item itself.
 namespace ALScriptItemDrop
 {
     // The asset's key where it may be seen, else null: the viewer's

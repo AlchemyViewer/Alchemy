@@ -27,7 +27,7 @@
 #include "alscriptstudiosaving.h"
 
 #include "alincludesearch.h"
-#include "alscriptnotecardtab.h"
+#include "alnotecardembedded.h"
 #include "alscriptstudioservices.h"
 #include "lldate.h"
 

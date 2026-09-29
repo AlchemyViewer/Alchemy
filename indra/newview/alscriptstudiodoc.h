@@ -53,7 +53,7 @@
 #include <string_view>
 #include <vector>
 
-class ALScriptNotecardTab;
+class ALNotecardEmbedded;
 class ALScriptStudioServices;
 
 // One tab of the studio: a script, a notecard or a file, and the views
@@ -291,10 +291,10 @@ struct ALScriptStudioDoc
     // a line of -1 for none.
     ALTextPos                                  keepCaret{ -1, -1 };
     S32                                        keepScroll = 0;
-    // A notecard's items (ALScriptNotecardTab), from the moment it is
+    // A notecard's items (ALNotecardEmbedded), from the moment it is
     // loaded or kept as one; none for a script or a text file. Shared so
     // that an answer coming after the tab has gone finds nothing.
-    std::shared_ptr<ALScriptNotecardTab>       items;
+    std::shared_ptr<ALNotecardEmbedded>       items;
     // The envelope the asset came in, whose source the editor holds
     // and whose expanded code the other editor shows; a save runs
     // the preprocessor over the source and wraps both again.

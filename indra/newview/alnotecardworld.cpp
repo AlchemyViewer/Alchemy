@@ -1,5 +1,5 @@
 /**
- * @file alscriptnotecardworld.cpp
+ * @file alnotecardworld.cpp
  * @brief The viewer's side of a notecard's items in Script Studio: previews, places, profiles, sounds and copies.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -25,7 +25,7 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alscriptnotecardtab.h"
+#include "alnotecardembedded.h"
 
 #include "alscriptworkspace.h"
 #include "llagent.h"
@@ -52,7 +52,7 @@
 
 namespace
 {
-    class ALScriptNotecardWorld final : public ALScriptNotecardTab::World
+    class ALNotecardWorld final : public ALNotecardEmbedded::World
     {
     public:
         std::string iconOf(const LLInventoryItem& item) const override
@@ -213,8 +213,8 @@ namespace
 }
 
 // static
-ALScriptNotecardTab::World& ALScriptNotecardTab::viewer()
+ALNotecardEmbedded::World& ALNotecardEmbedded::viewer()
 {
-    static ALScriptNotecardWorld world;
+    static ALNotecardWorld world;
     return world;
 }

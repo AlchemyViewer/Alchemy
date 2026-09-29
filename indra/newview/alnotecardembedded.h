@@ -1,5 +1,5 @@
 /**
- * @file alscriptnotecardtab.h
+ * @file alnotecardembedded.h
  * @brief A notecard's items in its Script Studio tab: buttons in the text, dropped in, saved, opened and copied out.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -50,7 +50,7 @@ class ALScriptStudioServices;
 // stands, numbered afresh. A script's tab has none, and neither has a text
 // file's. Held by the tab (ALScriptStudioDoc::items), for as long as it is
 // a notecard's.
-class ALScriptNotecardTab : public std::enable_shared_from_this<ALScriptNotecardTab>
+class ALNotecardEmbedded : public std::enable_shared_from_this<ALNotecardEmbedded>
 {
 public:
     typedef std::vector<LLPointer<LLInventoryItem>> items_t;
@@ -93,10 +93,10 @@ public:
     protected:
         ~World() = default;
     };
-    // The viewer's (alscriptnotecardworld.cpp).
+    // The viewer's (alnotecardworld.cpp).
     static World& viewer();
 
-    ALScriptNotecardTab(ALScriptStudioDoc& doc, ALScriptStudioServices& services, World& world);
+    ALNotecardEmbedded(ALScriptStudioDoc& doc, ALScriptStudioServices& services, World& world);
 
     // The items the notecard was loaded with, which its asset carries and
     // the server can copy out of it.

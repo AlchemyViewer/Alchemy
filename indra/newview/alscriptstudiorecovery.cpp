@@ -27,7 +27,7 @@
 #include "alscriptstudiorecovery.h"
 
 #include "alcodeeditor.h"
-#include "alscriptnotecardtab.h"
+#include "alnotecardembedded.h"
 #include "alscriptstudioservices.h"
 #include "lldir.h"
 #include "llfile.h"
@@ -173,7 +173,7 @@ ALScriptStudioRecovery::Entry ALScriptStudioRecovery::entryOf(const Doc& doc)
     entry.pickedExperience = pickedExperienceOf(doc);
     if (doc.notecard && doc.file.empty())
     {
-        entry.embedded = ALScriptNotecardTab::asLLSD(doc.items ? doc.items->items() : ALScriptNotecardTab::items_t());
+        entry.embedded = ALNotecardEmbedded::asLLSD(doc.items ? doc.items->items() : ALNotecardEmbedded::items_t());
     }
     return entry;
 }
@@ -471,7 +471,7 @@ void ALScriptStudioRecovery::takeUp(Doc& doc, const Entry& listed)
     }
     if (entry.notecard && doc.file.empty())
     {
-        doc.carriedEmbedded = ALScriptNotecardTab::fromLLSD(entry.embedded);
+        doc.carriedEmbedded = ALNotecardEmbedded::fromLLSD(entry.embedded);
     }
     if (!doc.loaded)
     {

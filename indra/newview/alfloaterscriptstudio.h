@@ -26,7 +26,7 @@
 
 #include "alcodeeditor.h"
 #include "alscriptexplorerpane.h"
-#include "alscriptnotecardtab.h"
+#include "alnotecardembedded.h"
 #include "alscriptoutputpane.h"
 #include "alscriptproblemspane.h"
 #include "alscriptsearchpane.h"
@@ -441,9 +441,9 @@ private:
     // The tab's text against the text it was last saved as; asked again,
     // the source back.
     void compareWithSaved();
-    // A notecard's items (ALScriptNotecardTab), made for a tab loaded or
+    // A notecard's items (ALNotecardEmbedded), made for a tab loaded or
     // kept as a notecard, afresh where `fresh`.
-    ALScriptNotecardTab& notecardItems(Doc& doc, bool fresh = false);
+    ALNotecardEmbedded& notecardItems(Doc& doc, bool fresh = false);
     // What saving (ALScriptStudioSaving) asks of the window: how saves go,
     // as the settings say; a tab tidied, its text sent, what is kept of it
     // against a crash written again, and the Problems tab shown.

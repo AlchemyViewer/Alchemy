@@ -1,5 +1,5 @@
 /**
- * @file alscriptnotecardtab_test.cpp
+ * @file alnotecardembedded_test.cpp
  * @brief A notecard's items in its Script Studio tab, over a fake of the viewer's side.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alscriptnotecardtab.h"
+#include "../alnotecardembedded.h"
 
 #include "alnotecarditems.h"
 #include "llfontgl.h"
@@ -43,7 +43,7 @@ namespace
 {
     // The viewer's side, answered as a test says, and what was asked of it
     // kept.
-    class FakeWorld final : public ALScriptNotecardTab::World
+    class FakeWorld final : public ALNotecardEmbedded::World
     {
     public:
         std::string iconOf(const LLInventoryItem&) const override { return "Inv_Notecard"; }
@@ -82,17 +82,17 @@ namespace
 
 namespace tut
 {
-    struct alscriptnotecardtab_data
+    struct alnotecardembedded_data
     {
         al_studio_test::StudioWindow       window;
         al_studio_test::FakeServices       services{ window.floater };
         FakeWorld                          world;
-        std::shared_ptr<ALScriptNotecardTab> tab;
+        std::shared_ptr<ALNotecardEmbedded> tab;
         ALScriptStudioDoc*                 doc = nullptr;
 
         // A notecard's tab over an editor of its own, loaded, holding
         // `text`, carrying `items`, which its asset carries.
-        ALScriptNotecardTab& make(const std::string& text, ALScriptNotecardTab::items_t items = {})
+        ALNotecardEmbedded& make(const std::string& text, ALNotecardEmbedded::items_t items = {})
         {
             if (!window.floater)
             {
@@ -113,7 +113,7 @@ namespace tut
             doc->editor->setFont(LLFontGL::getFontMonospace());
             window.floater->addChild(doc->editor);
             doc->editor->setText(text);
-            tab       = std::make_shared<ALScriptNotecardTab>(*doc, services, world);
+            tab       = std::make_shared<ALNotecardEmbedded>(*doc, services, world);
             doc->items = tab;
             tab->loaded(std::move(items));
             tab->place();
@@ -153,19 +153,19 @@ namespace tut
             return accept;
         }
     };
-    typedef test_group<alscriptnotecardtab_data> alscriptnotecardtab_group;
-    typedef alscriptnotecardtab_group::object    alscriptnotecardtab_object;
-    alscriptnotecardtab_group                    alscriptnotecardtab_instance("ALScriptNotecardTab");
+    typedef test_group<alnotecardembedded_data> alnotecardembedded_group;
+    typedef alnotecardembedded_group::object    alnotecardembedded_object;
+    alnotecardembedded_group                    alnotecardembedded_instance("ALNotecardEmbedded");
 
     template<> template<>
-    void alscriptnotecardtab_object::test<1>()
+    void alnotecardembedded_object::test<1>()
     {
         set_test_name("a save sends only the items the text still stands, numbered afresh in the order it stands them");
         const auto a = item("A"), b = item("B"), c = item("C");
-        ALScriptNotecardTab& card = make("one " + at(2) + " two " + at(0) + "\n", { a, b, c });
+        ALNotecardEmbedded& card = make("one " + at(2) + " two " + at(0) + "\n", { a, b, c });
         ensure("a button over each item the text stands", doc->editor->atomAt(ALTextPos(0, 4)) != nullptr);
         std::string                  text;
-        ALScriptNotecardTab::items_t items;
+        ALNotecardEmbedded::items_t items;
         card.forSave(text, items);
         ensure_equals("renumbered", text, "one " + at(0) + " two " + at(1) + "\n");
         ensure("C, then A; B left behind", items.size() == 2 && items[0] == c && items[1] == a);
@@ -173,7 +173,7 @@ namespace tut
     }
 
     template<> template<>
-    void alscriptnotecardtab_object::test<2>()
+    void alnotecardembedded_object::test<2>()
     {
         set_test_name("several items dropped together land one after another; a later drop lands at the pointer");
         const auto a = item("A"), b = item("B"), c = item("C");
@@ -193,7 +193,7 @@ namespace tut
     }
 
     template<> template<>
-    void alscriptnotecardtab_object::test<3>()
+    void alnotecardembedded_object::test<3>()
     {
         set_test_name("a drop is refused, and says why, for what a notecard may not carry");
         make("text\n");
@@ -217,11 +217,11 @@ namespace tut
     }
 
     template<> template<>
-    void alscriptnotecardtab_object::test<4>()
+    void alnotecardembedded_object::test<4>()
     {
         set_test_name("only what the saved asset carries is copied out; a save changes what that is; an answer after the tab has gone does nothing");
         const auto saved = item("Saved"), dropped = item("Dropped");
-        ALScriptNotecardTab& card = make(at(0) + "\n", { saved });
+        ALNotecardEmbedded& card = make(at(0) + "\n", { saved });
         drop(dropped, true);
 
         ensure("a drop not saved: refused", !card.copy(dropped, LLUUID::null));
@@ -255,21 +255,21 @@ namespace tut
     }
 
     template<> template<>
-    void alscriptnotecardtab_object::test<5>()
+    void alnotecardembedded_object::test<5>()
     {
         set_test_name("a tab's items carried to another, and kept and read back in their places");
         const auto a = item("A"), b = item("B");
         make(at(0) + at(1) + "\n", { a, b });
         ALScriptStudioDoc& there = services.addDoc("there");
-        ALScriptNotecardTab::carry(*doc, there);
+        ALNotecardEmbedded::carry(*doc, there);
         ensure("carried", there.carriedEmbedded && there.carriedEmbedded->size() == 2 && (*there.carriedEmbedded)[1] == b);
         ALScriptStudioDoc& script = services.addDoc("script");
         ALScriptStudioDoc& after  = services.addDoc("after");
-        ALScriptNotecardTab::carry(script, after);
+        ALNotecardEmbedded::carry(script, after);
         ensure("a script's tab carries nothing", !after.carriedEmbedded);
 
-        const LLSD                         kept = ALScriptNotecardTab::asLLSD({ a, LLPointer<LLInventoryItem>(), b });
-        const ALScriptNotecardTab::items_t back = ALScriptNotecardTab::fromLLSD(kept);
+        const LLSD                         kept = ALNotecardEmbedded::asLLSD({ a, LLPointer<LLInventoryItem>(), b });
+        const ALNotecardEmbedded::items_t back = ALNotecardEmbedded::fromLLSD(kept);
         ensure_equals("each in its place", back.size(), size_t(3));
         ensure("a missing one stays missing", back[1].isNull());
         ensure("the rest as they were", back[0]->getUUID() == a->getUUID() && back[2]->getName() == "B");

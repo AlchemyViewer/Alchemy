@@ -2015,11 +2015,11 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     });
 }
 
-ALScriptNotecardTab& ALFloaterScriptStudio::notecardItems(Doc& doc, bool fresh)
+ALNotecardEmbedded& ALFloaterScriptStudio::notecardItems(Doc& doc, bool fresh)
 {
     if (!doc.items || fresh)
     {
-        doc.items = std::make_shared<ALScriptNotecardTab>(doc, *this, ALScriptNotecardTab::viewer());
+        doc.items = std::make_shared<ALNotecardEmbedded>(doc, *this, ALNotecardEmbedded::viewer());
     }
     return *doc.items;
 }
@@ -2254,7 +2254,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         // Plain text, with whatever the notecard carried kept to go back
         // with it; nothing to analyse or compile.
         doc.loaded                 = true;
-        ALScriptNotecardTab& items = notecardItems(doc);
+        ALNotecardEmbedded& items = notecardItems(doc);
         items.loaded(answer.embedded);
         doc.editor->setSyntax("text");
         doc.editor->setText(answer.text);
@@ -6251,7 +6251,7 @@ bool ALFloaterScriptStudio::moveActiveTo(ALFloaterScriptStudio* window)
             {
                 there.carriedExperience = doc->experience;
             }
-            ALScriptNotecardTab::carry(*doc, there);
+            ALNotecardEmbedded::carry(*doc, there);
             // Showing what it showed here, once its expansion comes there.
             window->showView(there, doc->view);
         }
@@ -6535,8 +6535,8 @@ void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& 
     if (entry.notecard && doc.file.empty())
     {
         // Nothing the asset carries is in reach: a list of its own.
-        ALScriptNotecardTab& items = notecardItems(doc, true);
-        items.take(ALScriptNotecardTab::fromLLSD(entry.embedded));
+        ALNotecardEmbedded& items = notecardItems(doc, true);
+        items.take(ALNotecardEmbedded::fromLLSD(entry.embedded));
         items.wire();
     }
     doc.editor->setText(entry.text);

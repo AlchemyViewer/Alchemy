@@ -190,8 +190,8 @@ if(AL_BUILD_VIEWER)
     alscriptmodules.cpp
     alscriptnoticebar.cpp
     alscriptitemdrop.cpp
-    alscriptnotecardtab.cpp
-    alscriptnotecardworld.cpp
+    alnotecardembedded.cpp
+    alnotecardworld.cpp
     alscriptoutlinepane.cpp
     alscriptoutputpane.cpp
     alscriptpreprocessor.cpp
@@ -1027,7 +1027,7 @@ if(AL_BUILD_VIEWER)
     alscriptmodules.h
     alscriptnoticebar.h
     alscriptitemdrop.h
-    alscriptnotecardtab.h
+    alnotecardembedded.h
     alscriptoutlinepane.h
     alscriptoutputpane.h
     alscriptpreprocessor.h
@@ -2491,7 +2491,7 @@ if(AL_BUILD_TESTS)
   # A notecard's items in its Script Studio tab, over a fake of the
   # viewer's side and the studio's own window.
   al_add_test(
-    alscriptnotecardtab
+    alnotecardembedded
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
@@ -2568,7 +2568,7 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
-    SOURCES alscriptnotecardtab.cpp alscriptstudiodoc.cpp
+    SOURCES alnotecardembedded.cpp alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2596,7 +2596,7 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
-    SOURCES alscriptnotecardtab.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
+    SOURCES alnotecardembedded.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2608,7 +2608,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES
-      alscriptnotecardtab.cpp
+      alnotecardembedded.cpp
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudiofileio.cpp
@@ -2626,7 +2626,7 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
-    SOURCES alscriptnotecardtab.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
+    SOURCES alnotecardembedded.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2638,7 +2638,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES
-      alscriptnotecardtab.cpp
+      alnotecardembedded.cpp
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudioplaces.cpp
@@ -2665,7 +2665,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES
-      alscriptnotecardtab.cpp
+      alnotecardembedded.cpp
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudiowords.cpp
@@ -2691,7 +2691,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES
-      alscriptnotecardtab.cpp
+      alnotecardembedded.cpp
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudioplaces.cpp
@@ -2707,7 +2707,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES
-      alscriptnotecardtab.cpp
+      alnotecardembedded.cpp
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudioplaces.cpp
@@ -2737,7 +2737,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES
-      alscriptnotecardtab.cpp
+      alnotecardembedded.cpp
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudioplaces.cpp
@@ -2753,7 +2753,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES
-      alscriptnotecardtab.cpp
+      alnotecardembedded.cpp
       alscriptsaveflow.cpp
       alscriptstudiochecking.cpp
       alscriptstudiodoc.cpp
@@ -2771,7 +2771,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES
-      alscriptnotecardtab.cpp
+      alnotecardembedded.cpp
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudioplaces.cpp
@@ -2788,7 +2788,7 @@ if(AL_BUILD_TESTS)
     LIBRARIES llui alscript ${test_libs}
     SOURCES
       alscriptnoticebar.cpp
-      alscriptnotecardtab.cpp
+      alnotecardembedded.cpp
       alscriptstudiodoc.cpp
       alscriptstudiorecovery.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
@@ -2801,7 +2801,7 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
-    SOURCES alscriptnotecardtab.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
+    SOURCES alnotecardembedded.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2813,7 +2813,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES
-      alscriptnotecardtab.cpp
+      alnotecardembedded.cpp
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptweightspane.cpp
@@ -2828,7 +2828,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES
-      alscriptnotecardtab.cpp
+      alnotecardembedded.cpp
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudiofileio.cpp
