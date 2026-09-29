@@ -157,6 +157,12 @@ namespace
         };
         sources.lslHelpUrl = [] { return gSavedSettings.getString("LSLHelpURL"); };
         sources.definitionsVersion = [] { return LLSyntaxDefCache::instance().getSyntaxID().asString(); };
+        sources.definitionsYaml    = [] {
+            llifstream        in(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "syntax_default", "lsl_definitions.yaml"), std::ios::binary);
+            std::stringstream text;
+            text << in.rdbuf();
+            return text.str();
+        };
         return true;
     }();
 
@@ -5019,22 +5025,44 @@ void ALFloaterScriptStudio::browseReference()
 {
     Doc*       doc = active();
     const bool lua = doc ? doc->language.lua : false;
-    std::vector<ALQuickOpen::Candidate> candidates;
-    const std::vector<Vocab>&           words = ALScriptStudioWords::vocabulary(lua);
-    for (size_t i = 0; i < words.size(); ++i)
+    // Grouped rather than one list of every word: the events, then the
+    // functions by what they are about, then the constants by family, each
+    // group's words in order; the group said beside each and answered to,
+    // so that typing "chat" finds the chat functions.
+    const std::vector<Vocab>& words = ALScriptStudioWords::vocabulary(lua);
+    std::vector<const Vocab*> listed;
+    for (const Vocab& word : words)
     {
-        if (words[i].kind != ALSyntaxKind::Function && words[i].kind != ALSyntaxKind::Event && words[i].kind != ALSyntaxKind::Constant)
+        if (word.kind == ALSyntaxKind::Function || word.kind == ALSyntaxKind::Event || word.kind == ALSyntaxKind::Constant)
         {
-            continue;
+            listed.push_back(&word);
         }
+    }
+    const auto rank = [](const Vocab* word) { return word->kind == ALSyntaxKind::Event ? 0 : word->kind == ALSyntaxKind::Function ? 1 : 2; };
+    std::stable_sort(listed.begin(), listed.end(), [&rank](const Vocab* a, const Vocab* b) {
+        if (rank(a) != rank(b))
+        {
+            return rank(a) < rank(b);
+        }
+        // Those with no group after those with one, in their kind.
+        if (a->group.empty() != b->group.empty())
+        {
+            return b->group.empty();
+        }
+        return a->group < b->group;
+    });
+    std::vector<ALQuickOpen::Candidate> candidates;
+    for (const Vocab* word : listed)
+    {
+        const std::string kind = kindName(word->kind == ALSyntaxKind::Function ? ALScriptSymbolKind::Function
+                                          : word->kind == ALSyntaxKind::Event  ? ALScriptSymbolKind::Event
+                                                                               : ALScriptSymbolKind::Constant);
         ALQuickOpen::Candidate one;
-        one.label  = words[i].text;
-        one.detail = kindName(words[i].kind == ALSyntaxKind::Function ? ALScriptSymbolKind::Function
-                              : words[i].kind == ALSyntaxKind::Event  ? ALScriptSymbolKind::Event
-                                                                       : ALScriptSymbolKind::Constant);
-        one.also   = words[i].tooltip.substr(0, words[i].tooltip.find('\n'));
+        one.label  = word->text;
+        one.detail = word->group.empty() ? kind : word->group + " \u00b7 " + kind;
+        one.also   = (word->group.empty() ? std::string() : word->group + " ") + word->tooltip.substr(0, word->tooltip.find('\n'));
         // By the word, which new definitions arriving meanwhile keep.
-        one.value  = words[i].text;
+        one.value  = word->text;
         candidates.push_back(std::move(one));
     }
     if (candidates.empty())

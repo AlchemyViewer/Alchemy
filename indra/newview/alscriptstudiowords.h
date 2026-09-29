@@ -29,6 +29,9 @@
 #include "alscriptsnippets.h"
 #include "alscriptsymbol.h"
 #include "llsd.h"
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <functional>
 #include <string>
@@ -62,6 +65,12 @@ public:
         // it.
         std::string                        sleep;
         bool                               godMode = false;
+        // Where the offline reference files it, beside its kind: a
+        // function's first category in the definitions, in words ("Avatar
+        // communication"), an SLua ll function its LSL twin's, any other
+        // SLua function its library's; a constant by the family its name
+        // begins with ("PRIM_..."); nothing for an event.
+        std::string                        group;
     };
     typedef ALScriptSnippets::Snippet Snippet;
 
@@ -78,6 +87,10 @@ public:
         // Which definitions keywords() gives: the vocabulary is built again
         // on the first ask after it moves, once for every window.
         std::function<std::string()>              definitionsVersion;
+        // The LSL definitions as YAML, which say each function's
+        // categories where the keywords do not; nothing to group by
+        // categories without them.
+        std::function<std::string()>              definitionsYaml;
     };
     static Sources& sources();
 
@@ -87,6 +100,11 @@ public:
     static void                      forget();
     // A word by its name, or none.
     static const Vocab* word(bool lua, std::string_view name);
+    // Each function the YAML definitions list under `functions:`, by the
+    // first of the categories it lists, as the file has it -- no more of
+    // YAML than that shape; a function listing none is not there.
+    typedef boost::unordered_flat_map<std::string, std::string, ll::string_hash, std::equal_to<>> Categories;
+    static void readCategories(std::string_view yaml, Categories& out);
     // What the definitions say of a word beyond its declaration, a line
     // each: its documentation, its forced delay, that only a god may call
     // it, that it is deprecated. Nothing where they say none of it.

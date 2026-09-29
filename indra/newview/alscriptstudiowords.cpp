@@ -124,6 +124,41 @@ const std::vector<ALScriptStudioWords::Vocab>& ALScriptStudioWords::vocabulary(b
         }
         return list;
     };
+    // What the offline reference files each by (Vocab::group).
+    Categories categories;
+    if (sources().definitionsYaml)
+    {
+        readCategories(sources().definitionsYaml(), categories);
+    }
+    auto inWords = [](std::string category) {
+        std::replace(category.begin(), category.end(), '_', ' ');
+        LLStringUtil::trim(category);
+        if (!category.empty())
+        {
+            category[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(category[0])));
+        }
+        return category;
+    };
+    auto groupOf = [&](const std::string& text, ALSyntaxKind kind) {
+        if (kind == ALSyntaxKind::Function)
+        {
+            // An SLua ll function is its LSL twin: ll.Say is llSay.
+            const bool        twin  = lua && text.compare(0, 3, "ll.") == 0;
+            const std::string named = twin ? "ll" + text.substr(3) : text;
+            if (const auto found = categories.find(named); found != categories.end())
+            {
+                return inWords(found->second);
+            }
+            const size_t dot = text.find('.');
+            return lua && !twin && dot != std::string::npos ? text.substr(0, dot) : std::string();
+        }
+        if (kind == ALSyntaxKind::Constant)
+        {
+            const size_t under = text.find('_');
+            return under != std::string::npos && under > 0 ? text.substr(0, under) + "_..." : std::string();
+        }
+        return std::string();
+    };
     for (LLSD::map_const_iterator group = keywords.beginMap(); group != keywords.endMap(); ++group)
     {
         if (!group->second.isMap())
@@ -202,11 +237,67 @@ const std::vector<ALScriptStudioWords::Vocab>& ALScriptStudioWords::vocabulary(b
                     word.detail = firstLine(attrs.get("tooltip").asString());
                     break;
             }
+            word.group = groupOf(word.text, kind);
             out.push_back(std::move(word));
         }
     }
     std::sort(out.begin(), out.end(), [](const Vocab& a, const Vocab& b) { return a.text < b.text; });
     return out;
+}
+
+// static
+void ALScriptStudioWords::readCategories(std::string_view yaml, Categories& out)
+{
+    // A section at the margin; a function two spaces in, a name and a
+    // colon; its keys four in; the items of a list six in, after a dash.
+    bool        in_functions  = false;
+    bool        in_categories = false;
+    std::string current;
+    size_t      at = 0;
+    while (at < yaml.size())
+    {
+        size_t end = yaml.find('\n', at);
+        if (end == std::string_view::npos)
+        {
+            end = yaml.size();
+        }
+        std::string_view line = yaml.substr(at, end - at);
+        at                    = end + 1;
+        if (!line.empty() && line.back() == '\r')
+        {
+            line.remove_suffix(1);
+        }
+        const size_t indent = line.find_first_not_of(' ');
+        if (indent == std::string_view::npos)
+        {
+            continue;
+        }
+        const std::string_view text = line.substr(indent);
+        if (indent == 0)
+        {
+            in_functions  = text == "functions:";
+            in_categories = false;
+            current.clear();
+            continue;
+        }
+        if (!in_functions)
+        {
+            continue;
+        }
+        if (indent == 2 && text.back() == ':' && text.find(' ') == std::string_view::npos)
+        {
+            current.assign(text.substr(0, text.size() - 1));
+            in_categories = false;
+        }
+        else if (indent == 4)
+        {
+            in_categories = text == "categories:";
+        }
+        else if (indent == 6 && in_categories && !current.empty() && text.compare(0, 2, "- ") == 0 && !out.contains(current))
+        {
+            out.emplace(current, std::string(text.substr(2)));
+        }
+    }
 }
 
 // static
