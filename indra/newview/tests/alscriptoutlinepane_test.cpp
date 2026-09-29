@@ -401,4 +401,16 @@ namespace tut
         ensure("the others the same rows", after.size() == 6 && after[0] == before[0] && after[2] == before[1] && after[5] == before[4]);
         ensure_equals("alpha still chosen, by its new place", chosen(), 5);
     }
+
+    template<> template<>
+    void alscriptoutlinepane_object::test<9>()
+    {
+        set_test_name("the heading as wide as its word, the sort and the filter after it in turn");
+        ALScriptOutlinePane* outline = pane();
+        const LLRect         head    = outline->getChild<LLView>("outline_head")->getRect();
+        const LLRect         sort    = outline->getChild<LLView>("outline_sort")->getRect();
+        const LLRect         filter  = outline->getChild<LLView>("outline_filter")->getRect();
+        ensure("the word fits", head.getWidth() >= outline->getChild<LLTextBox>("outline_head")->getTextPixelWidth());
+        ensure("in turn, apart", head.mRight < sort.mLeft && sort.mRight < filter.mLeft && filter.getWidth() >= 40);
+    }
 }

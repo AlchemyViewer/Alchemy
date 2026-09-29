@@ -68,6 +68,9 @@ namespace
     // a linkset's prims arrive after its root, and a region's objects in a
     // stream as one teleports in or out.
     const F64 EXPLORER_PRESENCE = 0.5;
+    // What a button adds to its words, and the gap between the buttons.
+    constexpr S32 BUTTON_PAD = 12;
+    constexpr S32 BUTTON_GAP = 2;
 
     // The roots selected in world, in their order.
     std::vector<LLUUID> selectedRoots()
@@ -244,6 +247,22 @@ bool ALScriptExplorerPane::postBuild()
     for (const char* action : { "open", "start", "stop", "reset", "refresh" })
     {
         getChild<LLButton>(std::string("explorer_") + action)->setCommitCallback([this, action](LLUICtrl*, const LLSD&) { act(action); });
+    }
+    // The buttons as wide as their words, where the skin's width is too
+    // narrow for them -- a translation's are often longer -- one after
+    // another from the first; the refresh button's picture as it is.
+    S32 next = -1;
+    for (const char* action : { "open", "start", "stop", "reset", "refresh" })
+    {
+        if (LLButton* button = findChild<LLButton>(std::string("explorer_") + action))
+        {
+            const LLRect       was   = button->getRect();
+            const std::string& label = button->getLabelUnselected();
+            const S32          width = label.empty() ? was.getWidth() : llmax(was.getWidth(), button->getFont()->getWidth(label) + BUTTON_PAD);
+            next                     = next < 0 ? was.mLeft : next;
+            button->setShape(LLRect(next, was.mTop, next + width, was.mBottom));
+            next += width + BUTTON_GAP;
+        }
     }
     // A new selection in world, looked at on the next frame rather than at
     // the next second's poll; the signal fires many times a frame while

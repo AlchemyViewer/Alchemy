@@ -32,6 +32,7 @@
 #include "alscriptstudiowords.h"
 #include "alstringmatch.h"
 #include "llcombobox.h"
+#include "lltextbox.h"
 #include "llfiltereditor.h"
 #include "llfloater.h"
 #include "llfontgl.h"
@@ -51,6 +52,20 @@ bool ALScriptOutlinePane::postBuild()
     mFilter = getChild<LLFilterEditor>("outline_filter");
     mSort   = getChild<LLComboBox>("outline_sort");
     mSort->selectFirstItem();
+    // The heading as wide as its word, which a translation may make
+    // longer, and the sort and the filter after it; the filter keeps the
+    // right edge.
+    if (LLTextBox* head = findChild<LLTextBox>("outline_head"))
+    {
+        const LLRect was   = head->getRect();
+        const S32    right = was.mLeft + llmax(was.getWidth(), head->getTextPixelWidth() + 2);
+        head->setShape(LLRect(was.mLeft, was.mTop, right, was.mBottom));
+        const LLRect sort = mSort->getRect();
+        mSort->setShape(LLRect(right + 2, sort.mTop, right + 2 + sort.getWidth(), sort.mBottom));
+        const LLRect filter = mFilter->getRect();
+        const S32    left   = right + 2 + sort.getWidth() + 4;
+        mFilter->setShape(LLRect(left, filter.mTop, llmax(left + 40, filter.mRight), filter.mBottom));
+    }
     // The window this is a pane of, found through the view tree, as what
     // the pane asks of it.
     LLFloater* window = getParentByType<LLFloater>();
