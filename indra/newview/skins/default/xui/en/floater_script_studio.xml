@@ -300,7 +300,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="VimStateModified">[Modified]</floater.string>
     <floater.string name="VimStateReadOnly">[readonly]</floater.string>
     <floater.string name="GoToLinePlaceholder">Line, or line:column</floater.string>
-    <floater.string name="GoToLineHint">Type a line number to go to (from 1 to [COUNT]).</floater.string>
+    <floater.string name="GoToLineHint">Type a line number to go to (from [FIRST] to [COUNT]).</floater.string>
     <floater.string name="GoToLineGo">Go to line [LINE].</floater.string>
     <floater.string name="GoToLineGoColumn">Go to line [LINE], column [COL].</floater.string>
     <floater.string name="GoToLineNone">There is no line [LINE]. The last line is [COUNT].</floater.string>

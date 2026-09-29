@@ -42,7 +42,7 @@ namespace ALTextGoToLine
     // The text, while it is there: null once the window or the tab it is
     // in has gone.
     typedef std::function<ALTextView*()> text_t;
-    // A word it says, by name, with [LINE], [COL] and [COUNT] in it:
+    // A word it says, by name, with [LINE], [COL], [FIRST] and [COUNT]:
     // GoToLineHint while nothing is typed; GoToLineGo and GoToLineGoColumn
     // where what is typed is a place of the text, GoToLineNone where not.
     typedef std::function<std::string(const std::string& name, const LLStringUtil::format_map_t& args)> words_t;

@@ -113,7 +113,9 @@ void ALTextGoToLine::ask(const ask_t& ask, text_t text_of, S32 base, words_t wor
         S32                        line, column;
         const bool                 there = placeOf(*text, base, typed, line, column);
         LLStringUtil::format_map_t args;
-        // In the numbers the text shows.
+        // In the numbers the text shows: the first line's too, which is
+        // 0 where they count from 0.
+        args["[FIRST]"] = std::to_string(1 + base);
         args["[COUNT]"] = std::to_string(text->document().lineCount() + base);
         args["[LINE]"]  = std::to_string(line + base);
         args["[COL]"]   = std::to_string(column);

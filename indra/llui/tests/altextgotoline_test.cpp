@@ -159,7 +159,8 @@ namespace tut
         ask();
         ensure("asked", quick != nullptr && popover() != nullptr);
         ensure_equals("nothing typed: says how many", word, std::string("GoToLineHint"));
-        ensure_equals("the last line, counted from one", said["[COUNT]"](), std::string("6"));
+        ensure_equals("the first line, counted from one", said["[FIRST]"](), std::string("1"));
+        ensure_equals("the last line", said["[COUNT]"](), std::string("6"));
         quick->setQuery("3");
         ensure_equals("going there as it is typed", v.caret(), ALTextPos(2, 0));
         ensure_equals("and saying so", word, std::string("GoToLineGo"));
@@ -202,6 +203,7 @@ namespace tut
         set_test_name("lines counted from 0, as a notecard's are read: 0 is the first, and the last is one less");
         ALTextView& v = make("zero\none\ntwo\n");
         ask(-1);
+        ensure_equals("the first line said as 0", said["[FIRST]"](), std::string("0"));
         ensure_equals("the last line, counted from 0", said["[COUNT]"](), std::string("3"));
         quick->setQuery("0");
         ensure_equals("0 the first", v.caret(), ALTextPos(0, 0));
