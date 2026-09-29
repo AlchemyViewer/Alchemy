@@ -328,7 +328,7 @@ void ALVimSearch::incrementalSearch(ALTextView& view)
         host->setLayer(ALVimHost::Layer::Search, { next });
         mFound.lit = nullptr;
     }
-    view.scrollToLine(next.begin.line);
+    view.scrollToShow(next.begin);
 }
 
 void ALVimSearch::endIncremental(ALTextView& view)

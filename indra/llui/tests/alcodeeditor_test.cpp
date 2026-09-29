@@ -2538,4 +2538,26 @@ namespace tut
         e.setFixable(1, true, true);
         ensure("the fixes listed", e.handleKeyHere('.', MASK_CONTROL) && e.fixesOpen() && e.findChild<LLView>("fixes", false) != nullptr);
     }
+    template<> template<>
+    void alcodeeditor_object::test<71>()
+    {
+        set_test_name("the next occurrence taken comes out from under the pinned headers, not scrolled to the top under them");
+        std::string text = "default\n{\n    state_entry()\n    {\n";
+        for (int i = 0; i < 80; ++i)
+        {
+            text += "        llOwnerSay(\"line " + std::to_string(i) + "\");\n";
+        }
+        text += "    }\n}\n";
+        ALCodeEditor& e = make(text.c_str());
+        e.setStickyHeaders(true);
+        const S32 row_h = e.layout().rowHeight();
+        // The last llOwnerSay taken, then the next round past the end: the
+        // first, a line above the view.
+        e.setCaret(ALTextPos(83, 10));
+        e.perform(ALEditorCommand::SelectNextOccurrence);
+        e.perform(ALEditorCommand::SelectNextOccurrence);
+        const S32 below = e.layout().lineTop(4) - e.scrollY();
+        ensure("in sight", below < e.textRect().getHeight());
+        ensure("below the handler's state pinned over it: " + std::to_string(below) + " of " + std::to_string(row_h), below >= row_h);
+    }
 }

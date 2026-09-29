@@ -706,18 +706,23 @@ void ALTextView::setScrollX(F32 x)
 
 void ALTextView::scrollToCaret()
 {
+    scrollToShow(mCaret);
+}
+
+void ALTextView::scrollToShow(const ALTextPos& pos)
+{
     const S32 row_h = mLayout.rowHeight();
     if (row_h <= 0)
     {
         return;
     }
     S32       row;
-    const F32 x      = mLayout.xOf(mCaret.line, mCaret.column, &row);
-    const S32 top    = mLayout.lineTop(mCaret.line) + mLayout.rowTop(mCaret.line, row);
-    const S32 height = mLayout.rowHeightOf(mCaret.line, row);
+    const F32 x      = mLayout.xOf(pos.line, pos.column, &row);
+    const S32 top    = mLayout.lineTop(pos.line) + mLayout.rowTop(pos.line, row);
+    const S32 height = mLayout.rowHeightOf(pos.line, row);
     const LLRect text = textRect();
     const S32 page = llmax(height, text.getHeight());
-    // Across first: where the caret is across says what covers it above.
+    // Across first: where it is across says what covers it above.
     if (mWordWrap)
     {
         mScrollX = 0.f;
@@ -738,13 +743,13 @@ void ALTextView::scrollToCaret()
     {
         mScrollY = top + height - page;
     }
-    // Up, below what is drawn over the top where the caret is -- the find
-    // bar, the lines pinned there -- which is asked again at each place
-    // tried, since what is pinned is what the top of the view is inside.
-    const S32 caret_x = text.mLeft + static_cast<S32>(x - mScrollX);
+    // Up, below what is drawn over the top where it is -- the find bar,
+    // the lines pinned there -- which is asked again at each place tried,
+    // since what is pinned is what the top of the view is inside.
+    const S32 local_x = text.mLeft + static_cast<S32>(x - mScrollX);
     for (S32 tries = 0; tries < 4 && mScrollY > 0; ++tries)
     {
-        const S32 covered = llmin(llmax(0, coveredAbove(caret_x)), llmax(0, page - height));
+        const S32 covered = llmin(llmax(0, coveredAbove(local_x)), llmax(0, page - height));
         if (top >= mScrollY + covered)
         {
             break;

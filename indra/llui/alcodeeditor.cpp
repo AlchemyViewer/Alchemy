@@ -3516,7 +3516,7 @@ bool ALCodeEditor::selectNextOccurrence()
     }
     mSnippet.addMirror({ 0, next.front() });
     setSelection(taken);
-    scrollToLine(next.front().begin.line);
+    scrollToShow(next.front().begin);
     return true;
 }
 

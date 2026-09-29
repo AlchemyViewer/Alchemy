@@ -2791,4 +2791,31 @@ namespace tut
         keys("1G");
         ensure_equals("1G the second", e.caret().line, 1);
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<94>()
+    {
+        set_test_name("the match the search line shows as it is typed, and the one it goes to, come out from under the pinned headers, as Find's do");
+        std::string text = "default\n{\n    state_entry()\n    {\n";
+        for (int i = 0; i < 80; ++i)
+        {
+            text += "        llOwnerSay(\"line " + std::to_string(i) + "\");\n";
+        }
+        text += "    }\n}\n";
+        ALCodeEditor& e = make(text.c_str());
+        e.setStickyHeaders(true);
+        const S32 row_h = e.layout().rowHeight();
+        // Deep in the handler, so that its state and it are pinned over
+        // the top; then back up to a line above the view. "line 40" is the
+        // text's 45th line.
+        keys("75G");
+        keys("?line 40");
+        const S32 shown = e.layout().lineTop(44) - e.scrollY();
+        ensure("shown below the two pinned headers as it is typed: " + std::to_string(shown) + " of " + std::to_string(row_h), shown >= 2 * row_h);
+        ensure("the caret where it was", e.caret().line == 74);
+        keys("<CR>");
+        const S32 below = e.layout().lineTop(44) - e.scrollY();
+        ensure_equals("gone to", e.caret().line, 44);
+        ensure("and below them there: " + std::to_string(below) + " of " + std::to_string(row_h), below >= 2 * row_h);
+    }
 }
