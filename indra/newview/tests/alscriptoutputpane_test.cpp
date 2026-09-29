@@ -477,4 +477,42 @@ namespace tut
         out.showKind("im");
         ensure_equals("IMs", shown(), std::string("|an IM"));
     }
+
+    template<> template<>
+    void alscriptoutputpane_object::test<10>()
+    {
+        set_test_name("the row over the log: the buttons against the right edge, the words' box the rest; narrow, the lists give way first, never overlapping");
+        ALScriptOutputPane& out   = make();
+        const LLRect        whose = out.getChild<LLView>("output_filter")->getRect();
+        const LLRect        kind  = out.getChild<LLView>("output_kind")->getRect();
+        const auto          row   = [&]() {
+            std::vector<LLRect> rects;
+            for (const char* name : { "output_filter", "output_kind", "output_find", "output_clear", "output_copy" })
+            {
+                rects.push_back(out.getChild<LLView>(name)->getRect());
+            }
+            return rects;
+        };
+        const auto apart = [](const std::vector<LLRect>& rects, S32 width) {
+            for (size_t i = 0; i + 1 < rects.size(); ++i)
+            {
+                if (rects[i].mRight > rects[i + 1].mLeft)
+                {
+                    return false;
+                }
+            }
+            return rects.back().mRight <= width;
+        };
+        out.reshape(800, out.getRect().getHeight());
+        std::vector<LLRect> wide = row();
+        ensure("wide: the lists as the skin made them", wide[0].getWidth() == whose.getWidth() && wide[1].getWidth() == kind.getWidth());
+        ensure("the copy against the right edge, the box up to the clear", wide[4].mRight == 798 && wide[2].mRight + 6 == wide[3].mLeft);
+        ensure("in order, apart", apart(wide, 800));
+        out.reshape(420, out.getRect().getHeight());
+        std::vector<LLRect> narrow = row();
+        ensure("narrow: the lists narrower", narrow[0].getWidth() < whose.getWidth() && narrow[1].getWidth() <= kind.getWidth());
+        ensure("the buttons as they were", narrow[3].getWidth() == wide[3].getWidth() && narrow[4].getWidth() == wide[4].getWidth());
+        ensure("in order, apart", apart(narrow, 420));
+        ensure("the box still there", narrow[2].getWidth() >= 60);
+    }
 }

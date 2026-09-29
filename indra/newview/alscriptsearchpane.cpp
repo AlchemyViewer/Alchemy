@@ -87,6 +87,16 @@ bool ALScriptSearchPane::postBuild()
     // the keyboard leaving the box, which the skin says.
     mReplace->setCommitCallback([this](LLUICtrl*, const LLSD&) { askReplaceAll(); });
     mReplacement->setCommitCallback([this](LLUICtrl*, const LLSD&) { askReplaceAll(); });
+    // Replace All as wide as its words, where the skin's are longer, and
+    // the box beside it the rest: both follow the edges from here.
+    {
+        const LLRect button = mReplace->getRect();
+        const LLRect box    = mReplacement->getRect();
+        const S32    gap    = button.mLeft - box.mRight;
+        const S32    width  = llmax(button.getWidth(), LLFontGL::getFontSansSerifSmall()->getWidth(mReplace->getLabelUnselected()) + 20);
+        mReplace->setShape(LLRect(button.mRight - width, button.mTop, button.mRight, button.mBottom));
+        mReplacement->setShape(LLRect(box.mLeft, box.mTop, llmax(box.mLeft + 60, button.mRight - width - gap), box.mBottom));
+    }
     mBar->onChanged([this]() { onChanged(); });
     mResults->setCommitCallback([this](LLUICtrl*, const LLSD&) { choose(false); });
     // Return and a double-click go to the place chosen, to type there, and

@@ -99,6 +99,7 @@ public:
     // it uses and which it asks what it does not do itself.
     explicit ALScriptOutputPane(const LLPanel::Params& params = getDefaultParams());
     bool postBuild() override;
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     // What a script said: a line of the log, or more where it said more,
     // its object offered in the filter the first time it speaks. What
@@ -139,6 +140,8 @@ private:
     void filter();
     // An error or a failure said: unread, where the tab is not in sight.
     void markUnread();
+    // The row over the log laid out for the width it has.
+    void layoutRow();
 
     ALScriptStudioServices*                     mServices = nullptr;
     Window*                                     mWindow   = nullptr;
@@ -146,6 +149,11 @@ private:
     LLComboBox*                                 mWhose = nullptr;
     LLComboBox*                                 mKind  = nullptr;
     LLFilterEditor*                             mFind  = nullptr;
+    LLButton*                                   mClear = nullptr;
+    LLButton*                                   mCopy  = nullptr;
+    // How wide the skin made the two lists, which is as wide as they get.
+    S32                                         mWhoseWidth = 0;
+    S32                                         mKindWidth  = 0;
     bool                                        mUnread = false;
     std::vector<std::pair<LLUUID, std::string>> mObjects;
 };
