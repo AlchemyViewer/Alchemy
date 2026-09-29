@@ -890,6 +890,9 @@
         name="TextFgColor"
         reference="White" />
     <color
+        name="CodeCompletionTextColor"
+        reference="TextFgColor" />
+    <color
         name="TextBgReadOnlyColor"
         reference="Obsidian_25" />
     <color

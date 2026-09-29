@@ -1403,6 +1403,9 @@
     name="CodeCompletionBgColor"
      reference="DkGray2" />
     <color
+    name="CodeCompletionTextColor"
+     reference="LabelTextColor" />
+    <color
     name="CodeCompletionBorderColor"
      reference="EmphasisColor_35" />
     <color

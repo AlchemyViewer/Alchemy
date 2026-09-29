@@ -1002,6 +1002,9 @@
       name="TextFgColor"
       reference="White" />
   <color
+      name="CodeCompletionTextColor"
+      reference="TextFgColor" />
+  <color
       name="TextBgReadOnlyColor"
       value="0.05 0.05 0.05 0.25" />
   <color
