@@ -21,7 +21,7 @@ else()
 endif()
 
 # al_add_test(<name> PROJECT <project> [UNIT] [PYTHON] [GL] [ISA_TIER <tier>]
-#             [SOURCES <file>...] [LIBRARIES <target>...] [INCLUDES <dir>...]
+#             [PCH <target>] [SOURCES <file>...] [LIBRARIES <target>...] [INCLUDES <dir>...]
 #             [DEFINES <define>...] [COMMAND <arg>...] [ENVIRONMENT <VAR=value>...])
 #
 # Builds tests/<name>_test.cpp into an executable and registers it as a test
@@ -42,6 +42,11 @@ endif()
 # labelled gl, and where AL_ENABLE_GL_TESTS is off it is built and
 # registered disabled.
 #
+# PCH names a target whose precompiled header the test's sources are
+# compiled against. Clang alone: a test's LL_TEST definitions differ from the
+# header's, which MSVC warns of -- an error here -- and GCC takes as a reason
+# not to use the header at all.
+#
 # ISA_TIER builds the test for that x86-64 tier (baseline, v2, v3 or v4)
 # rather than the tree's, against the tree's libraries: its own sources are
 # compiled with that tier's flag and AL_ISA_LEVEL, so a SIMD path can be
@@ -59,7 +64,7 @@ function(al_add_test name)
     PARSE_ARGV 1
     arg
     "UNIT;PYTHON;GL"
-    "PROJECT;ISA_TIER"
+    "PROJECT;ISA_TIER;PCH"
     "SOURCES;LIBRARIES;INCLUDES;DEFINES;COMMAND;ENVIRONMENT"
   )
   if(NOT arg_PROJECT)
@@ -117,6 +122,9 @@ function(al_add_test name)
       ${INDRA_SOURCE_DIR}/llui
   )
   target_compile_definitions(${target} PRIVATE "LL_TEST=${name}" "LL_TEST_${name}" ${arg_DEFINES})
+  if(arg_PCH AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_precompile_headers(${target} REUSE_FROM ${arg_PCH})
+  endif()
   set_target_properties(${target} PROPERTIES FOLDER "Tests/${arg_PROJECT}")
   if(arg_ISA_TIER)
     set_target_properties(${target} PROPERTIES AL_ISA_TIER ${arg_ISA_TIER})
