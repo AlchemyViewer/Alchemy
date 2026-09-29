@@ -1,6 +1,6 @@
 /**
  * @file alnotecardworld.cpp
- * @brief The viewer's side of a notecard's items in Script Studio: previews, places, profiles, sounds and copies.
+ * @brief The viewer's side of a notecard's items: previews, places, profiles, sounds, copies and drags.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -26,6 +26,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alnotecardembedded.h"
+#include "alnotecardworld.h"
 
 #include "alscriptworkspace.h"
 #include "llagent.h"
@@ -45,6 +46,7 @@
 #include "llnotificationsutil.h"
 #include "llpreviewtexture.h"
 #include "lltooldraganddrop.h"
+#include "llviewerassettype.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
@@ -52,6 +54,11 @@
 
 namespace
 {
+    // The last item dragged out of a notecard's text, as the inventory
+    // takes an item: the item's own kind of item, not what the notecard
+    // carries it as.
+    LLPointer<LLViewerInventoryItem> sDragged;
+
     class ALNotecardWorld final : public ALNotecardEmbedded::World
     {
     public:
@@ -209,7 +216,26 @@ namespace
                             : std::string());
             });
         }
+
+        void pressedAt(S32 screen_x, S32 screen_y) override { LLToolDragAndDrop::getInstance()->setDragStart(screen_x, screen_y); }
+
+        bool pastDragStart(S32 screen_x, S32 screen_y) override { return LLToolDragAndDrop::getInstance()->isOverThreshold(screen_x, screen_y); }
+
+        void dragOut(const LLInventoryItem& item, const ALScriptRef& notecard) override
+        {
+            // As the legacy notecard drags one: out of the notecard, named
+            // as its item and its object, which a drop in the inventory
+            // asks the region to copy it out of.
+            sDragged = new LLViewerInventoryItem(&item);
+            LLToolDragAndDrop::getInstance()->beginDrag(LLViewerAssetType::lookupDragAndDropType(item.getType()), item.getUUID(),
+                                                        LLToolDragAndDrop::SOURCE_NOTECARD, notecard.item, notecard.object);
+        }
     };
+}
+
+LLViewerInventoryItem* ALNotecardDrag::dragged(const LLUUID& item)
+{
+    return sDragged.notNull() && sDragged->getUUID() == item ? sDragged.get() : nullptr;
 }
 
 // static

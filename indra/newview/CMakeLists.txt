@@ -1028,6 +1028,7 @@ if(AL_BUILD_VIEWER)
     alscriptnoticebar.h
     alscriptitemdrop.h
     alnotecardembedded.h
+    alnotecardworld.h
     alscriptoutlinepane.h
     alscriptoutputpane.h
     alscriptpreprocessor.h

@@ -88,6 +88,13 @@ public:
         // where it says no.
         virtual bool askCopy(const ALScriptRef& notecard, const LLUUID& item, const LLUUID& folder, U32 callback_id,
                              std::function<void(const std::string& error)> refused) = 0;
+        // An item's button pressed at a point of the screen, where a drag
+        // of it is measured from; whether the mouse has gone far enough
+        // from there to be dragging it; and a drag of it out of the
+        // notecard begun, which a drop in the inventory makes a copy of.
+        virtual void pressedAt(S32 screen_x, S32 screen_y)            = 0;
+        virtual bool pastDragStart(S32 screen_x, S32 screen_y)        = 0;
+        virtual void dragOut(const LLInventoryItem& item, const ALScriptRef& notecard) = 0;
 
     protected:
         ~World() = default;
@@ -144,6 +151,11 @@ public:
     // An item's button pressed: opened as its kind opens, or a copy of it
     // offered.
     void open(LLPointer<LLInventoryItem> item);
+    // An item's button dragged, the mouse held since it was pressed, to a
+    // point of the screen: far enough, the item dragged out of the
+    // notecard -- one the saved asset carries; another is said to need a
+    // save first. Whether that is the end of the drag for the button.
+    bool dragOut(const LLPointer<LLInventoryItem>& item, S32 screen_x, S32 screen_y);
     // A copy taken into the inventory by the server: false, said why, for
     // an item the saved asset does not carry, which it could not find.
     bool copy(LLPointer<LLInventoryItem> item, const LLUUID& folder, U32 callback_id = 0);

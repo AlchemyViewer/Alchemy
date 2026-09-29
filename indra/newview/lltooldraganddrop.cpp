@@ -32,6 +32,7 @@
 #include <vector>
 #include <tuple>
 // project headers
+#include "alnotecardworld.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llagentwearables.h"
@@ -3513,7 +3514,10 @@ LLInventoryObject* LLToolDragAndDrop::locateInventory(
     }
     else if(mSource == SOURCE_NOTECARD)
     {
-        LLPreviewNotecard* preview = LLFloaterReg::findTypedInstance<LLPreviewNotecard>("preview_notecard", mSourceID);
+        // Out of a notecard's text, wherever it is shown; or out of the
+        // legacy notecard window.
+        item = ALNotecardDrag::dragged(mCargoIDs[mCurItemIndex]);
+        LLPreviewNotecard* preview = item ? nullptr : LLFloaterReg::findTypedInstance<LLPreviewNotecard>("preview_notecard", mSourceID);
         if(preview)
         {
             item = (LLViewerInventoryItem*)preview->getDragItem();

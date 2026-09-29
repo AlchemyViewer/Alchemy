@@ -36,6 +36,60 @@
 #include "lltrans.h"
 #include "lluictrlfactory.h"
 
+namespace
+{
+    // An item's button, which a drag takes out of the text: pressed, it
+    // says where; the mouse moved while held, it asks whether the item is
+    // dragged out from there.
+    class ItemButton final : public LLButton
+    {
+    public:
+        typedef LLButton::Params Params;
+
+        std::function<void(S32 screen_x, S32 screen_y)> pressedAt;
+        std::function<bool(S32 screen_x, S32 screen_y)> draggedTo;
+
+        bool handleMouseDown(S32 x, S32 y, MASK mask) override
+        {
+            const bool handled = LLButton::handleMouseDown(x, y, mask);
+            mHeld              = hasMouseCapture();
+            if (mHeld && pressedAt)
+            {
+                S32 screen_x = 0, screen_y = 0;
+                localPointToScreen(x, y, &screen_x, &screen_y);
+                pressedAt(screen_x, screen_y);
+            }
+            return handled;
+        }
+        bool handleHover(S32 x, S32 y, MASK mask) override
+        {
+            if (mHeld && hasMouseCapture() && draggedTo)
+            {
+                S32 screen_x = 0, screen_y = 0;
+                localPointToScreen(x, y, &screen_x, &screen_y);
+                if (draggedTo(screen_x, screen_y))
+                {
+                    mHeld = false;
+                    return true;
+                }
+            }
+            return LLButton::handleHover(x, y, mask);
+        }
+        bool handleMouseUp(S32 x, S32 y, MASK mask) override
+        {
+            mHeld = false;
+            return LLButton::handleMouseUp(x, y, mask);
+        }
+
+    protected:
+        friend class ::LLUICtrlFactory;
+        ItemButton(const Params& p) : LLButton(p) {}
+
+    private:
+        bool mHeld = false;
+    };
+}
+
 ALNotecardEmbedded::ALNotecardEmbedded(ALTextView& view, Holder holder, World& world)
     : mView(view), mHolder(std::move(holder)), mWorld(world)
 {
@@ -264,8 +318,10 @@ ALTextView::Atom ALNotecardEmbedded::atomFor(const ALTextPos& at, size_t index)
     p.tool_tip                = tip;
     const S32 width           = font->getWidth(item->getName()) + 16 + 12;
     p.rect                    = LLRect(0, 0, width, 0);
-    LLButton* button          = LLUICtrlFactory::create<LLButton>(p);
+    ItemButton* button        = LLUICtrlFactory::create<ItemButton>(p);
     button->setClickedCallback([this, item](LLUICtrl*, const LLSD&) { open(item); });
+    button->pressedAt = [this](S32 screen_x, S32 screen_y) { mWorld.pressedAt(screen_x, screen_y); };
+    button->draggedTo = [this, item](S32 screen_x, S32 screen_y) { return dragOut(item, screen_x, screen_y); };
     ALTextView::Atom atom;
     atom.at      = at;
     atom.length  = 4;
@@ -305,6 +361,25 @@ bool ALNotecardEmbedded::copy(LLPointer<LLInventoryItem> item, const LLUUID& fol
         mHolder.say(alSaid("NotecardCopyFailed", "[NAME] could not be copied: not connected to a region", args), true);
     }
     return asked;
+}
+
+bool ALNotecardEmbedded::dragOut(const LLPointer<LLInventoryItem>& item, S32 screen_x, S32 screen_y)
+{
+    if (item.isNull() || !mWorld.pastDragStart(screen_x, screen_y))
+    {
+        return false;
+    }
+    // The server copies out of the asset it has, which a drop is only in
+    // once saved.
+    if (!mInAsset.count(item->getUUID()))
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = item->getName();
+        mHolder.say(alSaid("NotecardCopyUnsaved", "Save the notecard first: [NAME] can only be copied from a saved notecard", args), true);
+        return true;
+    }
+    mWorld.dragOut(*item, mHolder.notecard());
+    return true;
 }
 
 void ALNotecardEmbedded::open(LLPointer<LLInventoryItem> item)

@@ -49,6 +49,9 @@ namespace
         bool        open(const LLPointer<LLInventoryItem>&, const ALScriptRef&, std::function<void(const LLUUID&, U32)>) override { return true; }
         void        confirmCopy(std::function<void()>) override {}
         bool        askCopy(const ALScriptRef&, const LLUUID&, const LLUUID&, U32, std::function<void(const std::string&)>) override { return false; }
+        void        pressedAt(S32, S32) override {}
+        bool        pastDragStart(S32, S32) override { return false; }
+        void        dragOut(const LLInventoryItem&, const ALScriptRef&) override {}
     };
 }
 

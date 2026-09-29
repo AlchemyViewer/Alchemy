@@ -35,6 +35,9 @@
 #include "llpermissions.h"
 #include "lluictrlfactory.h"
 
+#include "llbutton.h"
+#include "llfocusmgr.h"
+
 #include "../../llui/tests/alheadlessui_fixture.h"
 
 #include "../test/lltut.h"
@@ -78,6 +81,13 @@ namespace
             this->refused = std::move(refused);
             return askable;
         }
+        void pressedAt(S32 x, S32 y) override { pressed = true; }
+        bool pastDragStart(S32 x, S32 y) override { return past; }
+        void dragOut(const LLInventoryItem& item, const ALScriptRef& notecard) override
+        {
+            dragged.push_back(item.getUUID());
+            draggedFrom = notecard;
+        }
 
         bool fromNotecard = false;
         bool settings     = true;
@@ -85,6 +95,10 @@ namespace
         bool openedAll    = false;
         bool askable      = true;
         U32  frameNow     = 1;
+        bool pressed      = false;
+        bool past         = false;
+        ALScriptRef draggedFrom;
+        std::vector<LLUUID> dragged;
 
         std::vector<LLUUID>                           opened;
         std::vector<LLUUID>                           copies;
@@ -109,6 +123,7 @@ namespace tut
 
         ~alnotecardembedded_data()
         {
+            gFocusMgr.setMouseCapture(nullptr);
             tab.reset();
             delete stage;
         }
@@ -288,5 +303,46 @@ namespace tut
         ensure_equals("each in its place", back.size(), size_t(3));
         ensure("a missing one stays missing", back[1].isNull());
         ensure("the rest as they were", back[0]->getUUID() == a->getUUID() && back[2]->getName() == "B");
+    }
+
+    template<> template<>
+    void alnotecardembedded_object::test<6>()
+    {
+        set_test_name("an item's button dragged far enough drags the item out of the notecard; one not saved yet is said to need a save");
+        const auto saved = item("Saved"), dropped = item("Dropped");
+        make(at(0) + "\n", { saved });
+        drop(dropped, true);
+        // Each item's button, by the item it stands for: the drop went in
+        // ahead of the saved one.
+        auto buttonOf = [this](S32 index) -> LLButton* {
+            for (const ALTextView::Atom& atom : view->atoms())
+            {
+                if (atom.value.asInteger() == index)
+                {
+                    return dynamic_cast<LLButton*>(atom.view);
+                }
+            }
+            return nullptr;
+        };
+        LLButton* button = buttonOf(0);
+        ensure("a button over the saved item", button != nullptr);
+        button->handleMouseDown(2, 2, MASK_NONE);
+        ensure("the press measured from", world.pressed);
+        button->handleHover(3, 3, MASK_NONE);
+        ensure("not far enough: no drag", world.dragged.empty());
+        world.past = true;
+        button->handleHover(20, 3, MASK_NONE);
+        ensure("far enough: dragged out", world.dragged.size() == 1 && world.dragged.back() == saved->getUUID());
+        ensure("out of this notecard", world.draggedFrom.item == notecard.item && world.draggedFrom.object == notecard.object);
+        button->handleMouseUp(20, 3, MASK_NONE);
+
+        LLButton* unsaved = buttonOf(1);
+        ensure("a button over the drop", unsaved != nullptr);
+        said.clear();
+        unsaved->handleMouseDown(2, 2, MASK_NONE);
+        unsaved->handleHover(20, 3, MASK_NONE);
+        ensure("a drop not saved is not dragged out", world.dragged.size() == 1);
+        ensure("and a save is said to be needed", !said.empty() && said.back().second && said.back().first.find("Dropped") != std::string::npos);
+        unsaved->handleMouseUp(20, 3, MASK_NONE);
     }
 }
