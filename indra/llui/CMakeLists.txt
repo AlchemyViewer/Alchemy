@@ -632,7 +632,8 @@ if(AL_BUILD_TESTS)
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
-  # A frame, and the tab strip's tabs framed so, read back the same way.
+  # A surface's ground and frame, and the tab strip's tabs, read back the
+  # same way.
   al_add_test(
     alsurface_gl
     GL

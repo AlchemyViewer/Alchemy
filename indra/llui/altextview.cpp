@@ -3856,7 +3856,7 @@ void ALTextView::drawMap(F32 alpha)
     const S32 y0 = map.mTop - MAP_PAD - (ordinal(top_line) * MAP_LINE_H - scroll);
     const S32 y1 = map.mTop - MAP_PAD - ((ordinal(bottom_line) + 1) * MAP_LINE_H - scroll);
     gl_rect_2d(map.mLeft, y0, map.mRight, y1, ink % (alpha * 0.12f));
-    ALSurface::outline(LLRect(map.mLeft, y0, map.mRight, y1), ink % (alpha * 0.3f));
+    gl_rect_2d(map.mLeft, y0, map.mRight, y1, ink % (alpha * 0.3f), false);
 }
 
 // --- drawing -------------------------------------------------------------------

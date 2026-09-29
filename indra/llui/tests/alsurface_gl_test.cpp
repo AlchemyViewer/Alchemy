@@ -1,6 +1,6 @@
 /**
  * @file alsurface_gl_test.cpp
- * @brief A frame drawn over a rect, and the tab strip's tabs framed so, read back from llrender's hidden window.
+ * @brief A surface's ground and frame, and the tab strip's tabs, read back from llrender's hidden window.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -100,20 +100,25 @@ namespace tut
     template<> template<>
     void alsurface_gl_object::test<1>()
     {
-        set_test_name("a frame covers the pixels just inside its rect's edges and nothing else, at the window's corner too");
+        set_test_name("a surface is its ground inside its rect and its frame on the pixels just inside the edges, at the window's corner too");
         for (const LLRect& rect : { LLRect(0, 10, 20, 0), LLRect(30, 40, 50, 20) })
         {
-            const std::vector<S32> pixels = drawn([&] { ALSurface::outline(rect, LLColor4::white); });
+            const std::vector<S32> pixels = drawn([&] { ALSurface::draw(rect, LLColor4::black, LLColor4::white, 1.f); });
+            // Its frame and its ground, where both are sure to be.
+            const S32 frame  = at(pixels, rect.mLeft + 3, rect.mTop - 1);
+            const S32 ground = at(pixels, rect.mLeft + 3, rect.mBottom + 3);
+            ensure("the frame and the ground tell apart", frame != ground && ground != 0);
             for (S32 y = 0; y < 50; ++y)
             {
                 for (S32 x = 0; x < 60; ++x)
                 {
                     const bool inside = x >= rect.mLeft && x < rect.mRight && y >= rect.mBottom && y < rect.mTop;
                     const bool edge   = inside && (x == rect.mLeft || x == rect.mRight - 1 || y == rect.mBottom || y == rect.mTop - 1);
-                    if ((at(pixels, x, y) == 255) != edge)
+                    const S32  wanted = edge ? frame : inside ? ground : 0;
+                    if (at(pixels, x, y) != wanted)
                     {
-                        fail("at " + std::to_string(x) + "," + std::to_string(y) + " of the frame at " + std::to_string(rect.mLeft) + "," +
-                             std::to_string(rect.mBottom) + ": " + std::to_string(at(pixels, x, y)));
+                        fail("at " + std::to_string(x) + "," + std::to_string(y) + " of the surface at " + std::to_string(rect.mLeft) + "," +
+                             std::to_string(rect.mBottom) + ": " + std::to_string(at(pixels, x, y)) + " for " + std::to_string(wanted));
                     }
                 }
             }

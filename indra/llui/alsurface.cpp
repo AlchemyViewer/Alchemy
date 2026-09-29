@@ -93,34 +93,10 @@ namespace ALSurface
         return ink % (FRAME * alpha);
     }
 
-    void outline(const LLRect& rect, const LLColor4& color)
-    {
-        if (rect.getWidth() <= 0 || rect.getHeight() <= 0)
-        {
-            return;
-        }
-        // Across the top and the bottom, whole; down the sides between
-        // them, so that no corner is drawn twice under a colour that is
-        // not opaque.
-        gl_rect_2d(rect.mLeft, rect.mTop, rect.mRight, rect.mTop - 1, color, true);
-        if (rect.getHeight() > 1)
-        {
-            gl_rect_2d(rect.mLeft, rect.mBottom + 1, rect.mRight, rect.mBottom, color, true);
-        }
-        if (rect.getHeight() > 2)
-        {
-            gl_rect_2d(rect.mLeft, rect.mTop - 1, rect.mLeft + 1, rect.mBottom + 1, color, true);
-            if (rect.getWidth() > 1)
-            {
-                gl_rect_2d(rect.mRight - 1, rect.mTop - 1, rect.mRight, rect.mBottom + 1, color, true);
-            }
-        }
-    }
-
     void draw(const LLRect& rect, const LLColor4& paper, const LLColor4& ink, F32 alpha)
     {
         gl_rect_2d(rect, ground(paper, ink) % alpha, true);
-        ALSurface::outline(rect, frame(ink, alpha));
+        gl_rect_2d(rect, frame(ink, alpha), false);
     }
 
     const LLUIColor& well()

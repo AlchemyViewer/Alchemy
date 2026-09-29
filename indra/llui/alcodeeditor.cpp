@@ -1680,7 +1680,7 @@ void ALCodeEditor::drawWhitespace(S32 line, S32 r, const LLRect& text, S32 scree
             // because it is one. It reads as a space, and the compiler
             // will not have it.
             const S32 side = llclamp(row_h / 3, 3, 7);
-            ALSurface::outline(LLRect(cx - side / 2, mid + side / 2, cx - side / 2 + side, mid + side / 2 - side), alarm);
+            gl_rect_2d(cx - side / 2, mid + side / 2, cx - side / 2 + side, mid + side / 2 - side, alarm, false);
         }
     }
 }
@@ -1735,8 +1735,7 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             if (mirror.range.begin.line <= line && line <= mirror.range.end.line && spanOnRow(line, row, mirror.range, x0, x1))
             {
                 gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, highlightColor() % alpha);
-                ALSurface::outline(LLRect(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h),
-                                   mBracketMatchColor.get() % alpha);
+                gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, mBracketMatchColor.get() % alpha, false);
             }
         }
     }
@@ -1748,8 +1747,7 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, highlightColor() % alpha);
             if (i == mSnippet.at())
             {
-                ALSurface::outline(LLRect(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h),
-                                   mBracketMatchColor.get() % alpha);
+                gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, mBracketMatchColor.get() % alpha, false);
             }
         }
     }
@@ -1847,8 +1845,7 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             F32 x0, x1;
             if (at.line == line && spanOnRow(line, row, ALTextRange(at, document().nextCluster(at)), x0, x1))
             {
-                ALSurface::outline(LLRect(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h),
-                                   mBracketMatchColor.get() % alpha);
+                gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, mBracketMatchColor.get() % alpha, false);
             }
         }
     }
@@ -1859,7 +1856,7 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
         if (box.notEmpty())
         {
             const LLColor4 ink = foldColor() % alpha;
-            ALSurface::outline(box, ink);
+            gl_rect_2d(box, ink, false);
             getFont()->renderUTF8(foldBoxText(line), 0, static_cast<F32>(box.mLeft + 4), static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), ink, LLFontGL::LEFT, LLFontGL::BASELINE,
                                   LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
         }
@@ -4105,7 +4102,7 @@ void ALCodeEditor::drawSignature(const LLRect& text)
     const LLColor4 active = mBracketMatchColor.get() % alpha;
     const LLColor4 faint  = lineNumberColor() % alpha;
     gl_rect_2d(box, paint(Paint::Widget) % alpha, true);
-    ALSurface::outline(box, paint(Paint::WidgetBorder) % alpha);
+    gl_rect_2d(box, paint(Paint::WidgetBorder) % alpha, false);
 
     // The label in three pieces, the active parameter in its own colour.
     const F32 baseline = static_cast<F32>(box.mTop - SIGNATURE_PAD - llround(font->getAscenderHeight()));
@@ -4853,11 +4850,11 @@ void ALCodeEditor::draw()
     {
         // Over the card rather than under it, so that its own ground
         // cannot paint the frame out along the edge it shares.
-        ALSurface::outline(mCard->getRect(), paint(Paint::WidgetBorder) % getDrawContext().mAlpha);
+        gl_rect_2d(mCard->getRect(), paint(Paint::WidgetBorder) % getDrawContext().mAlpha, false);
     }
     if (mCompletionDoc && mCompletionDoc->getVisible())
     {
-        ALSurface::outline(mCompletionDoc->getRect(), paint(Paint::WidgetBorder) % getDrawContext().mAlpha);
+        gl_rect_2d(mCompletionDoc->getRect(), paint(Paint::WidgetBorder) % getDrawContext().mAlpha, false);
     }
 }
 

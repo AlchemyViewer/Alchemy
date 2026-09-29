@@ -596,11 +596,11 @@ void ALTabStrip::draw()
 
         // The shown tab is the face of what is under it; the rest sit back.
         gl_rect_2d(r, (current ? shown : rest).get() % alpha, true);
-        ALSurface::outline(r, edge.get() % alpha);
+        gl_rect_2d(r, edge.get() % alpha, false);
         if (current && hasFocus())
         {
             // Where the keyboard is, while the strip has it.
-            ALSurface::outline(LLRect(r.mLeft + 1, r.mTop - 1, r.mRight - 1, r.mBottom + 1), gFocusMgr.getFocusColor() % alpha);
+            gl_rect_2d(r.mLeft + 1, r.mTop - 1, r.mRight - 1, r.mBottom + 1, gFocusMgr.getFocusColor() % alpha, false);
         }
 
         S32 x = r.mLeft + PAD;
@@ -696,7 +696,7 @@ void ALTabStrip::draw()
         const LLRect list = listRect();
         const bool   over = mHover < 0 && list.pointInRect(mHoverX, mHoverY) && mHoverX >= 0;
         gl_rect_2d(list, rest.get() % alpha, true);
-        ALSurface::outline(list, edge.get() % alpha);
+        gl_rect_2d(list, edge.get() % alpha, false);
         const S32 cx = list.getCenterX();
         const S32 cy = list.getCenterY();
         gl_triangle_2d(cx - 4, cy + 2, cx + 4, cy + 2, cx, cy - 3, (over ? ink : quiet).get() % alpha, true);

@@ -84,14 +84,6 @@ namespace ALSurface
     // same over the ground, over the text and over a selection.
     LLColor4 frame(const LLColor4& ink, F32 alpha = 1.f);
 
-    // A line a pixel wide just inside a rect's edges, drawn as four bands.
-    // A GL line along the edge of a pixel lands on whichever side of it
-    // the driver picks -- on a Mac, a rect's left and right lines a
-    // column left of where gl_rect_2d means them, so that a frame at a
-    // view's left edge was not drawn at all -- where a band covers the
-    // pixels it names on every driver.
-    void outline(const LLRect& rect, const LLColor4& color);
-
     // Both, over a rect: the ground filled, the frame around it. `alpha`
     // is the draw context's, which every caller has and none should have
     // to remember to apply twice.
