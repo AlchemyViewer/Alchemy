@@ -159,4 +159,30 @@ namespace tut
         ensure("numbers are held to less than the code", theme.illegible().empty() && !theme.illegible(7.f, 4.5f).empty());
     }
 
+    template<> template<>
+    void alscripttheme_object::test<5>()
+    {
+        set_test_name("every theme the viewer ships reads: the text and each kind of code at 4.5:1, the line numbers at 3:1; the high-contrast ones at 7 and 4.5");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        S32 high = 0;
+        for (const ALScriptTheme& theme : ALScriptTheme::available())
+        {
+            if (theme.own)
+            {
+                continue;
+            }
+            const bool contrast = theme.name.find("High Contrast") != std::string::npos;
+            high += contrast;
+            std::string said;
+            for (const ALScriptTheme::Illegible& each : contrast ? theme.illegible(7.f, 4.5f) : theme.illegible())
+            {
+                said += "\n  " + each.name + " on " + each.against + ": " + std::to_string(each.contrast);
+            }
+            ensure(theme.name + " reads:" + said, said.empty());
+        }
+        ensure_equals("a dark and a light high-contrast theme", high, 2);
+    }
 }

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- A theme for Script Studio's editors: every colour the editors are
+     painted with, by the names the skin's colors.xml gives them, as red,
+     green, blue and alpha from 0 to 1. Choosing it in the studio's
+     preferences sets each; one saved from there lands beside these under
+     the settings folder's script_themes/. High contrast: the text and every
+     kind of code at 7:1 against the ground at the least, the line numbers
+     at 4.5:1. -->
+<llsd>
+  <map>
+    <key>name</key>
+    <string>High Contrast Light</string>
+    <key>dark</key>
+    <boolean>false</boolean>
+    <key>colors</key>
+    <map>
+      <key>ScriptText</key>
+      <array><real>0</real><real>0</real><real>0</real><real>1</real></array>
+      <key>ScriptBackground</key>
+      <array><real>1</real><real>1</real><real>1</real><real>1</real></array>
+      <key>ScriptBgReadOnlyColor</key>
+      <array><real>0.9608</real><real>0.9608</real><real>0.9608</real><real>1</real></array>
+      <key>ScriptCursorColor</key>
+      <array><real>0</real><real>0</real><real>0</real><real>1</real></array>
+      <key>ScriptSelectionColor</key>
+      <array><real>0.6784</real><real>0.8392</real><real>1</real><real>1</real></array>
+      <key>ScriptCurrentLineColor</key>
+      <array><real>0.9294</real><real>0.9294</real><real>0.9294</real><real>1</real></array>
+      <key>ScriptGutterColor</key>
+      <array><real>1</real><real>1</real><real>1</real><real>1</real></array>
+      <key>ScriptLineNumberColor</key>
+      <array><real>0.302</real><real>0.302</real><real>0.302</real><real>1</real></array>
+      <key>ScriptBracketMatchColor</key>
+      <array><real>0.0588</real><real>0.2902</real><real>0.5216</real><real>0.9</real></array>
+      <key>ScriptFindMatchColor</key>
+      <array><real>0.9529</real><real>0.5216</real><real>0.0941</real><real>0.4</real></array>
+      <key>ScriptFoldColor</key>
+      <array><real>0.302</real><real>0.302</real><real>0.302</real><real>1</real></array>
+      <key>ScriptHighlightColor</key>
+      <array><real>0.0588</real><real>0.2902</real><real>0.5216</real><real>0.2</real></array>
+      <key>ScriptChangedColor</key>
+      <array><real>0.0588</real><real>0.2902</real><real>0.5216</real><real>1</real></array>
+      <key>ScriptBracket1Color</key>
+      <array><real>0.0157</real><real>0.1922</real><real>0.9804</real><real>1</real></array>
+      <key>ScriptBracket2Color</key>
+      <array><real>0.1922</real><real>0.5765</real><real>0.1922</real><real>1</real></array>
+      <key>ScriptBracket3Color</key>
+      <array><real>0.4824</real><real>0.2196</real><real>0.0784</real><real>1</real></array>
+      <key>ScriptComment</key>
+      <array><real>0.3176</real><real>0.3176</real><real>0.3176</real><real>1</real></array>
+      <key>ScriptDocComment</key>
+      <array><real>0.3176</real><real>0.3176</real><real>0.3176</real><real>1</real></array>
+      <key>ScriptString</key>
+      <array><real>0.0588</real><real>0.2902</real><real>0.5216</real><real>1</real></array>
+      <key>ScriptEscape</key>
+      <array><real>0.5451</real><real>0.2275</real><real>0</real><real>1</real></array>
+      <key>ScriptNumber</key>
+      <array><real>0.0307</real><real>0.372</real><real>0.2457</real><real>1</real></array>
+      <key>ScriptKeyword</key>
+      <array><real>0.0588</real><real>0.2902</real><real>0.5216</real><real>1</real></array>
+      <key>ScriptControl</key>
+      <array><real>0.6352</real><real>0.1123</real><real>0.0456</real><real>1</real></array>
+      <key>ScriptType</key>
+      <array><real>0.0898</real><real>0.3517</real><real>0.4303</real><real>1</real></array>
+      <key>ScriptConstant</key>
+      <array><real>0.0392</real><real>0.3098</real><real>0.4784</real><real>1</real></array>
+      <key>ScriptFunction</key>
+      <array><real>0.3686</real><real>0.1725</real><real>0.7373</real><real>1</real></array>
+      <key>ScriptEvent</key>
+      <array><real>0.3686</real><real>0.1725</real><real>0.7373</real><real>1</real></array>
+      <key>ScriptLabel</key>
+      <array><real>0</real><real>0</real><real>0</real><real>1</real></array>
+      <key>ScriptOperator</key>
+      <array><real>0</real><real>0</real><real>0</real><real>1</real></array>
+      <key>ScriptPunctuation</key>
+      <array><real>0</real><real>0</real><real>0</real><real>1</real></array>
+      <key>ScriptPreprocessor</key>
+      <array><real>0.6352</real><real>0.1123</real><real>0.0456</real><real>1</real></array>
+      <key>ScriptTag</key>
+      <array><real>0.0588</real><real>0.2902</real><real>0.5216</real><real>1</real></array>
+      <key>ScriptAttribute</key>
+      <array><real>0.149</real><real>0.3098</real><real>0.4706</real><real>1</real></array>
+      <key>ScriptAttributeValue</key>
+      <array><real>0.0588</real><real>0.2902</real><real>0.5216</real><real>1</real></array>
+      <key>ScriptEntity</key>
+      <array><real>0.0392</real><real>0.3098</real><real>0.4784</real><real>1</real></array>
+      <key>ScriptVariable</key>
+      <array><real>0</real><real>0.0627</real><real>0.502</real><real>1</real></array>
+      <key>ScriptParameter</key>
+      <array><real>0.2392</real><real>0.1647</real><real>0.549</real><real>1</real></array>
+      <key>ScriptProperty</key>
+      <array><real>0</real><real>0.0627</real><real>0.502</real><real>1</real></array>
+      <key>ScriptDeprecated</key>
+      <array><real>0.5451</real><real>0.2275</real><real>0</real><real>1</real></array>
+      <key>ScriptInvalid</key>
+      <array><real>0.6352</real><real>0.1123</real><real>0.0456</real><real>1</real></array>
+      <key>ScriptErrorColor</key>
+      <array><real>0.7098</real><real>0.1255</real><real>0.051</real><real>1</real></array>
+      <key>ScriptWarningColor</key>
+      <array><real>0.5373</real><real>0.3333</real><real>0.0118</real><real>1</real></array>
+      <key>ScriptNoteColor</key>
+      <array><real>0.0588</real><real>0.2902</real><real>0.5216</real><real>1</real></array>
+      <key>ScriptActiveLineNumberColor</key>
+      <array><real>0</real><real>0</real><real>0</real><real>1</real></array>
+      <key>ScriptWidgetColor</key>
+      <array><real>1</real><real>1</real><real>1</real><real>1</real></array>
+      <key>ScriptWidgetBorderColor</key>
+      <array><real>0.0588</real><real>0.2902</real><real>0.5216</real><real>1</real></array>
+      <key>ScriptWidgetSelectionColor</key>
+      <array><real>0.6784</real><real>0.8392</real><real>1</real><real>1</real></array>
+      <key>ScriptNamespace</key>
+      <array><real>0.0898</real><real>0.3517</real><real>0.4303</real><real>1</real></array>
+      <key>ScriptState</key>
+      <array><real>0.0898</real><real>0.3517</real><real>0.4303</real><real>1</real></array>
+      <key>ScriptGlobalVariable</key>
+      <array><real>0</real><real>0.0627</real><real>0.502</real><real>1</real></array>
+    </map>
+  </map>
+</llsd>

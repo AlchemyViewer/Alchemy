@@ -85,15 +85,15 @@
       <key>ScriptEntity</key>
       <array><real>0.8706</real><real>0.5765</real><real>0.3725</real><real>1</real></array>
       <key>ScriptVariable</key>
-      <array><real>0.8</real><real>0.4</real><real>0.4</real><real>1</real></array>
+      <array><real>0.8162</real><real>0.4487</real><real>0.4487</real><real>1</real></array>
       <key>ScriptParameter</key>
-      <array><real>0.8</real><real>0.4</real><real>0.4</real><real>1</real></array>
+      <array><real>0.8162</real><real>0.4487</real><real>0.4487</real><real>1</real></array>
       <key>ScriptProperty</key>
-      <array><real>0.8</real><real>0.4</real><real>0.4</real><real>1</real></array>
+      <array><real>0.8162</real><real>0.4487</real><real>0.4487</real><real>1</real></array>
       <key>ScriptDeprecated</key>
       <array><real>0.8706</real><real>0.5765</real><real>0.3725</real><real>1</real></array>
       <key>ScriptInvalid</key>
-      <array><real>0.8</real><real>0.4</real><real>0.4</real><real>1</real></array>
+      <array><real>0.8162</real><real>0.4487</real><real>0.4487</real><real>1</real></array>
       <key>ScriptErrorColor</key>
       <array><real>0.8000</real><real>0.4000</real><real>0.4000</real><real>1</real></array>
       <key>ScriptWarningColor</key>

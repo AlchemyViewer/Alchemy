@@ -29,7 +29,7 @@
       <key>ScriptGutterColor</key>
       <array><real>0.1804</real><real>0.2039</real><real>0.251</real><real>1</real></array>
       <key>ScriptLineNumberColor</key>
-      <array><real>0.298</real><real>0.3373</real><real>0.4157</real><real>1</real></array>
+      <array><real>0.4459</real><real>0.4983</real><real>0.6028</real><real>1</real></array>
       <key>ScriptBracketMatchColor</key>
       <array><real>0.5333</real><real>0.7529</real><real>0.8157</real><real>0.5</real></array>
       <key>ScriptFindMatchColor</key>
@@ -47,19 +47,19 @@
       <key>ScriptBracket3Color</key>
       <array><real>0.5333</real><real>0.7529</real><real>0.8157</real><real>1</real></array>
       <key>ScriptComment</key>
-      <array><real>0.298</real><real>0.3373</real><real>0.4157</real><real>1</real></array>
+      <array><real>0.6148</real><real>0.6512</real><real>0.7239</real><real>1</real></array>
       <key>ScriptDocComment</key>
-      <array><real>0.298</real><real>0.3373</real><real>0.4157</real><real>1</real></array>
+      <array><real>0.6148</real><real>0.6512</real><real>0.7239</real><real>1</real></array>
       <key>ScriptString</key>
       <array><real>0.6392</real><real>0.7451</real><real>0.549</real><real>1</real></array>
       <key>ScriptEscape</key>
       <array><real>0.9216</real><real>0.7961</real><real>0.5451</real><real>1</real></array>
       <key>ScriptNumber</key>
-      <array><real>0.7059</real><real>0.5569</real><real>0.6784</real><real>1</real></array>
+      <array><real>0.7418</real><real>0.611</real><real>0.7177</real><real>1</real></array>
       <key>ScriptKeyword</key>
-      <array><real>0.5059</real><real>0.6314</real><real>0.7569</real><real>1</real></array>
+      <array><real>0.5461</real><real>0.6614</real><real>0.7767</real><real>1</real></array>
       <key>ScriptControl</key>
-      <array><real>0.5059</real><real>0.6314</real><real>0.7569</real><real>1</real></array>
+      <array><real>0.5461</real><real>0.6614</real><real>0.7767</real><real>1</real></array>
       <key>ScriptType</key>
       <array><real>0.5608</real><real>0.7373</real><real>0.7333</real><real>1</real></array>
       <key>ScriptConstant</key>
@@ -69,13 +69,13 @@
       <key>ScriptEvent</key>
       <array><real>0.5333</real><real>0.7529</real><real>0.8157</real><real>1</real></array>
       <key>ScriptLabel</key>
-      <array><real>0.8157</real><real>0.5294</real><real>0.4392</real><real>1</real></array>
+      <array><real>0.8392</real><real>0.5894</real><real>0.5107</real><real>1</real></array>
       <key>ScriptOperator</key>
-      <array><real>0.5059</real><real>0.6314</real><real>0.7569</real><real>1</real></array>
+      <array><real>0.5461</real><real>0.6614</real><real>0.7767</real><real>1</real></array>
       <key>ScriptPunctuation</key>
-      <array><real>0.5059</real><real>0.6314</real><real>0.7569</real><real>1</real></array>
+      <array><real>0.5461</real><real>0.6614</real><real>0.7767</real><real>1</real></array>
       <key>ScriptPreprocessor</key>
-      <array><real>0.3686</real><real>0.5059</real><real>0.6745</real><real>1</real></array>
+      <array><real>0.5633</real><real>0.6582</real><real>0.7748</real><real>1</real></array>
       <key>ScriptTag</key>
       <array><real>0.5333</real><real>0.7529</real><real>0.8157</real><real>1</real></array>
       <key>ScriptAttribute</key>
@@ -91,9 +91,9 @@
       <key>ScriptProperty</key>
       <array><real>0.5608</real><real>0.7373</real><real>0.7333</real><real>1</real></array>
       <key>ScriptDeprecated</key>
-      <array><real>0.8157</real><real>0.5294</real><real>0.4392</real><real>1</real></array>
+      <array><real>0.8392</real><real>0.5894</real><real>0.5107</real><real>1</real></array>
       <key>ScriptInvalid</key>
-      <array><real>0.749</real><real>0.3804</real><real>0.4157</real><real>1</real></array>
+      <array><real>0.8312</real><real>0.5832</real><real>0.607</real><real>1</real></array>
       <key>ScriptErrorColor</key>
       <array><real>0.7490</real><real>0.3804</real><real>0.4157</real><real>1</real></array>
       <key>ScriptWarningColor</key>

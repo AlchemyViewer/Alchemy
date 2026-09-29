@@ -29,7 +29,7 @@
       <key>ScriptGutterColor</key>
       <array><real>0.1569</real><real>0.1647</real><real>0.2118</real><real>1</real></array>
       <key>ScriptLineNumberColor</key>
-      <array><real>0.3843</real><real>0.4471</real><real>0.6431</real><real>1</real></array>
+      <array><real>0.3906</real><real>0.4528</real><real>0.6468</real><real>1</real></array>
       <key>ScriptBracketMatchColor</key>
       <array><real>0.7412</real><real>0.5765</real><real>0.9765</real><real>0.5</real></array>
       <key>ScriptFindMatchColor</key>
@@ -47,9 +47,9 @@
       <key>ScriptBracket3Color</key>
       <array><real>0.3137</real><real>0.9804</real><real>0.4824</real><real>1</real></array>
       <key>ScriptComment</key>
-      <array><real>0.3843</real><real>0.4471</real><real>0.6431</real><real>1</real></array>
+      <array><real>0.5647</real><real>0.6091</real><real>0.7477</real><real>1</real></array>
       <key>ScriptDocComment</key>
-      <array><real>0.3843</real><real>0.4471</real><real>0.6431</real><real>1</real></array>
+      <array><real>0.5647</real><real>0.6091</real><real>0.7477</real><real>1</real></array>
       <key>ScriptString</key>
       <array><real>0.9451</real><real>0.9804</real><real>0.549</real><real>1</real></array>
       <key>ScriptEscape</key>
@@ -91,9 +91,9 @@
       <key>ScriptProperty</key>
       <array><real>0.9725</real><real>0.9725</real><real>0.949</real><real>1</real></array>
       <key>ScriptDeprecated</key>
-      <array><real>1</real><real>0.3333</real><real>0.3333</real><real>1</real></array>
+      <array><real>1</real><real>0.4233</real><real>0.4233</real><real>1</real></array>
       <key>ScriptInvalid</key>
-      <array><real>1</real><real>0.3333</real><real>0.3333</real><real>1</real></array>
+      <array><real>1</real><real>0.4233</real><real>0.4233</real><real>1</real></array>
       <key>ScriptErrorColor</key>
       <array><real>1.0000</real><real>0.3333</real><real>0.3333</real><real>1</real></array>
       <key>ScriptWarningColor</key>
