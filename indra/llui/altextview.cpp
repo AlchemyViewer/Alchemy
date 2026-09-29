@@ -238,14 +238,14 @@ namespace
                 // fade is smooth.
                 const F32 x    = (static_cast<F32>(column) + 0.5f) / static_cast<F32>(scale);
                 const F32 y    = (static_cast<F32>(row) + 0.5f) / static_cast<F32>(scale) - 0.5f * static_cast<F32>(SQUIGGLE_HEIGHT);
-                F32       near = F32_MAX;
+                F32       nearest = F32_MAX;
                 for (F32 along = x - static_cast<F32>(SQUIGGLE_WAVE); along <= x + static_cast<F32>(SQUIGGLE_WAVE); along += 0.01f)
                 {
                     const F32 dx = x - along;
                     const F32 dy = y - SQUIGGLE_AMPLITUDE * sinf(along * step);
-                    near         = llmin(near, dx * dx + dy * dy);
+                    nearest      = llmin(nearest, dx * dx + dy * dy);
                 }
-                const F32 cover = llclamp((SQUIGGLE_HALF + SQUIGGLE_FEATHER - sqrtf(near)) / SQUIGGLE_FEATHER, 0.f, 1.f);
+                const F32 cover = llclamp((SQUIGGLE_HALF + SQUIGGLE_FEATHER - sqrtf(nearest)) / SQUIGGLE_FEATHER, 0.f, 1.f);
                 U8*       texel = data + (static_cast<size_t>(row) * width + column) * 4;
                 texel[0] = texel[1] = texel[2] = 255;
                 texel[3] = static_cast<U8>(llround(cover * 255.f));
