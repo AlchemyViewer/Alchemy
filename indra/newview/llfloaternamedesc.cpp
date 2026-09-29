@@ -275,23 +275,3 @@ bool LLFloaterAnimPreview::postBuild()
     getChild<LLUICtrl>("ok_btn")->setCommitCallback(boost::bind(&LLFloaterNameDesc::onBtnOK, this));
     return true;
 }
-
-//-----------------------------------------------------------------------------
-// LLFloaterScriptPreview()
-//-----------------------------------------------------------------------------
-
-LLFloaterScriptPreview::LLFloaterScriptPreview(const LLSD& args )
-    : LLFloaterNameDesc(args)
-{
-    mIsText = true;
-}
-
-bool LLFloaterScriptPreview::postBuild()
-{
-    if (!LLFloaterNameDesc::postBuild())
-    {
-        return false;
-    }
-    getChild<LLUICtrl>("ok_btn")->setCommitCallback(boost::bind(&LLFloaterNameDesc::onBtnOK, this));
-    return true;
-}

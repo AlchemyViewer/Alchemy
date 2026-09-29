@@ -81,13 +81,4 @@ public:
     bool postBuild() override;
 };
 
-class LLFloaterScriptPreview final : public LLFloaterNameDesc
-{
-public:
-    AL_VIEW_TYPE(LLFloaterScriptPreview, LLFloaterNameDesc);
-
-    LLFloaterScriptPreview(const LLSD& filename );
-    bool postBuild() override;
-};
-
 #endif  // LL_LLFLOATERNAMEDESC_H

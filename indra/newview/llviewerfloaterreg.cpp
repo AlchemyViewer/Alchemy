@@ -257,7 +257,6 @@ public:
                 "upload_anim_anim",
                 "upload_image",
                 "upload_model",
-                "upload_script",
                 "upload_sound",
                 "bulk_upload"
             };
@@ -305,7 +304,6 @@ public:
                 "upload_anim_anim",
                 "upload_image",
                 "upload_model",
-                "upload_script",
                 "upload_sound",
                 "bulk_upload",
                 "slapp_test"
@@ -568,7 +566,6 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("upload_anim_anim", "floater_animation_anim_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAnimPreview>, "upload");
     LLFloaterReg::add("upload_image", "floater_image_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterImagePreview>, "upload");
     LLFloaterReg::add("upload_model", "floater_model_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterModelPreview>, "upload");
-    LLFloaterReg::add("upload_script", "floater_script_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterScriptPreview>, "upload");
     LLFloaterReg::add("upload_sound", "floater_sound_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSoundPreview>, "upload");
 
     LLFloaterReg::add("web_content", "floater_web_content.xml", (LLFloaterBuildFunc)&LLFloaterWebContent::create);
