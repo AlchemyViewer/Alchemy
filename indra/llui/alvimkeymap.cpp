@@ -5985,23 +5985,20 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
         const bool numeric  = args.find('n') != std::string::npos;
         const bool ignore   = args.find('i') != std::string::npos;
         const bool unique   = args.find('u') != std::string::npos;
-        std::vector<std::string> lines;
-        for (S32 l = first; l <= last; ++l)
+        // Each line's key worked out once, not at every comparison: its
+        // text as it is, or cased alike with i, or its first number with n.
+        struct Line
         {
-            lines.push_back(d.line(l));
-        }
-        auto key = [&](const std::string& text) {
-            if (!ignore)
-            {
-                return text;
-            }
-            return alRecased(text, 'u');
+            std::string text;
+            std::string folded;
+            bool        numbered = false;
+            S64         number   = 0;
         };
-        auto number = [](const std::string& text) {
+        auto number = [](const std::string& text, Line& line) {
             size_t at = text.find_first_of("0123456789");
             if (at == std::string::npos)
             {
-                return std::pair<bool, S64>(false, 0);
+                return;
             }
             const bool negative = at > 0 && text[at - 1] == '-';
             S64        n        = 0;
@@ -6009,26 +6006,40 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
             {
                 n = n * 10 + (text[at++] - '0');
             }
-            return std::pair<bool, S64>(true, negative ? -n : n);
+            line.numbered = true;
+            line.number   = negative ? -n : n;
         };
-        auto before = [&](const std::string& a, const std::string& b) {
+        std::vector<Line> lines;
+        lines.reserve(static_cast<size_t>(last - first + 1));
+        for (S32 l = first; l <= last; ++l)
+        {
+            Line& line = lines.emplace_back();
+            line.text  = d.line(l);
+            if (numeric)
+            {
+                number(line.text, line);
+            }
+            else if (ignore)
+            {
+                line.folded = alRecased(line.text, 'u');
+            }
+        }
+        auto before = [&](const Line& a, const Line& b) {
             if (numeric)
             {
                 // Lines with no number come first, in their order.
-                const auto na = number(a);
-                const auto nb = number(b);
-                if (na.first != nb.first)
+                if (a.numbered != b.numbered)
                 {
-                    return !na.first;
+                    return !a.numbered;
                 }
-                return na.second < nb.second;
+                return a.number < b.number;
             }
-            return key(a) < key(b);
+            return ignore ? a.folded < b.folded : a.text < b.text;
         };
         std::stable_sort(lines.begin(), lines.end(), before);
         if (unique)
         {
-            lines.erase(std::unique(lines.begin(), lines.end(), [&](const std::string& a, const std::string& b) { return !before(a, b) && !before(b, a); }), lines.end());
+            lines.erase(std::unique(lines.begin(), lines.end(), [&](const Line& a, const Line& b) { return !before(a, b) && !before(b, a); }), lines.end());
         }
         if (reverse)
         {
@@ -6041,7 +6052,7 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
             {
                 sorted += '\n';
             }
-            sorted += lines[i];
+            sorted += lines[i].text;
         }
         view.replaceAll({ { ALTextRange(d.lineStart(first), d.lineEnd(last)), sorted } });
         moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));

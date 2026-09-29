@@ -2627,4 +2627,17 @@ namespace tut
         keys("3@a");
         ensure_equals("played through the mapping each time", flat(e.text()), std::string("l1|l3|l5|l7|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<86>()
+    {
+        set_test_name(":sort n puts the lines without a number first, u keeps one of each, i u one of each case aside");
+        ALCodeEditor& e = make("x10\nb\n-3 y\nx2\nB\nb\n");
+        ex("sort n");
+        ensure_equals("by number, those with none first as they were", flat(e.text()), std::string("b|B|b|-3 y|x2|x10|"));
+        ex("sort u");
+        ensure_equals("by bytes, each once", flat(e.text()), std::string("-3 y|B|b|x10|x2|"));
+        ex("sort i u");
+        ensure_equals("case aside, the first of each kept", flat(e.text()), std::string("-3 y|B|x10|x2|"));
+    }
 }
