@@ -1,6 +1,6 @@
 /**
  * @file alnotecardembedded.cpp
- * @brief A notecard's items in its Script Studio tab: buttons in the text, dropped in, saved, opened and copied out.
+ * @brief A notecard's items in its text: buttons in the text, dropped in, saved, opened and copied out.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -27,18 +27,17 @@
 
 #include "alnotecardembedded.h"
 
-#include "alcodeeditor.h"
 #include "alnotecarditems.h"
-#include "alscriptstudiodoc.h"
-#include "alscriptstudioservices.h"
+#include "alsaid.h"
+#include "alscriptworkspace.h"
 #include "llbutton.h"
 #include "llfontgl.h"
 #include "lltexteditor.h"
 #include "lltrans.h"
 #include "lluictrlfactory.h"
 
-ALNotecardEmbedded::ALNotecardEmbedded(ALScriptStudioDoc& doc, ALScriptStudioServices& services, World& world)
-    : mDoc(doc), mServices(services), mWorld(world)
+ALNotecardEmbedded::ALNotecardEmbedded(ALTextView& view, Holder holder, World& world)
+    : mView(view), mHolder(std::move(holder)), mWorld(world)
 {
 }
 
@@ -68,11 +67,11 @@ void ALNotecardEmbedded::saved(const std::vector<LLUUID>& sent)
 
 void ALNotecardEmbedded::wire()
 {
-    mDoc.editor->setDropHandler([this](S32 x, S32 y, MASK, bool dropping, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip) {
+    mView.setDropHandler([this](S32 x, S32 y, MASK, bool dropping, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip) {
         return drop(x, y, dropping, type, cargo, accept, tooltip);
     });
     // The view has slid its own atoms by the time the edit is heard.
-    mEdits = mDoc.editor->document().onChanged([this](const ALTextDocument::Edit& edit) {
+    mEdits = mView.document().onChanged([this](const ALTextDocument::Edit& edit) {
         LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("notecard items placed");
         if (edit.inserted.find('\xF4') != std::string::npos)
         {
@@ -83,14 +82,14 @@ void ALNotecardEmbedded::wire()
 
 void ALNotecardEmbedded::place(S32 first_line, S32 last_line)
 {
-    const ALTextDocument& text = mDoc.editor->document();
+    const ALTextDocument& text = mView.document();
     for (S32 line = llmax(0, first_line); line <= last_line && line < text.lineCount() && !mItems.empty(); ++line)
     {
         ALNotecardItems::forEach(text.line(line), [&](size_t column, size_t index) {
             const ALTextPos at(line, static_cast<S32>(column));
-            if (index < mItems.size() && mItems[index].notNull() && !mDoc.editor->atomAt(at))
+            if (index < mItems.size() && mItems[index].notNull() && !mView.atomAt(at))
             {
-                mDoc.editor->addAtom(atomFor(at, index));
+                mView.addAtom(atomFor(at, index));
             }
         });
     }
@@ -101,7 +100,7 @@ void ALNotecardEmbedded::place()
     // Each item's character (ALNotecardItems) becomes an atom over its
     // four bytes, so the text keeps it and a save carries it.
     std::vector<ALTextView::Atom> atoms;
-    const ALTextDocument&         text = mDoc.editor->document();
+    const ALTextDocument&         text = mView.document();
     for (S32 line = 0; line < text.lineCount() && !mItems.empty(); ++line)
     {
         ALNotecardItems::forEach(text.line(line), [&](size_t column, size_t index) {
@@ -111,12 +110,12 @@ void ALNotecardEmbedded::place()
             }
         });
     }
-    mDoc.editor->setAtoms(std::move(atoms));
+    mView.setAtoms(std::move(atoms));
 }
 
 void ALNotecardEmbedded::forSave(std::string& text, items_t& items) const
 {
-    text = mDoc.editor->text();
+    text = mView.text();
     items.clear();
     if (mItems.empty())
     {
@@ -138,12 +137,12 @@ bool ALNotecardEmbedded::drop(S32 x, S32 y, bool dropping, EDragAndDropType type
     {
         return false;
     }
-    if (!mDoc.loaded || !mDoc.modifiable || mDoc.editor->isReadOnly())
+    if (!mHolder.changeable() || mView.isReadOnly())
     {
         *accept = ACCEPT_NO;
         if (tooltip.empty())
         {
-            tooltip = mServices.words("NotecardReadOnlyDrop");
+            tooltip = alSaid("NotecardReadOnlyDrop", "This notecard cannot be changed");
         }
         return true;
     }
@@ -197,7 +196,7 @@ bool ALNotecardEmbedded::drop(S32 x, S32 y, bool dropping, EDragAndDropType type
         *accept = ACCEPT_NO;
         if (tooltip.empty())
         {
-            tooltip = mServices.words("NotecardDropNoCopy");
+            tooltip = alSaid("NotecardDropNoCopy", "You cannot copy this item, so it cannot be added to the notecard");
         }
         return true;
     }
@@ -217,13 +216,13 @@ bool ALNotecardEmbedded::drop(S32 x, S32 y, bool dropping, EDragAndDropType type
         // Where the drop landed -- or, for the second and later of several
         // dropped together, right after the one before, so that they keep
         // their order.
-        ALTextPos at = mDoc.editor->posAtLocal(x, y, true);
+        ALTextPos at = mView.posAtLocal(x, y, true);
         if (mDropFrame == mWorld.frame() && mDropEnd.line >= 0)
         {
             at = mDropEnd;
         }
         const std::string placeholder = ALNotecardItems::charOf(index);
-        mDoc.editor->replaceAll({ { ALTextRange(at, at), placeholder } });
+        mView.replaceAll({ { ALTextRange(at, at), placeholder } });
         mDropEnd   = ALTextPos(at.line, at.column + static_cast<S32>(placeholder.size()));
         mDropFrame = mWorld.frame();
     }
@@ -237,15 +236,17 @@ ALTextView::Atom ALNotecardEmbedded::atomFor(const ALTextPos& at, size_t index)
     LLStringUtil::format_map_t       args;
     args["[NAME]"] = item->getName();
     // What a press does, by the kind: opens, plays, or takes a copy.
-    const char* tip = "EmbeddedItemCopyTip";
+    std::string tip;
     switch (item->getType())
     {
         case LLAssetType::AT_TEXTURE:
         case LLAssetType::AT_MATERIAL:
         case LLAssetType::AT_CALLINGCARD:
-        case LLAssetType::AT_LANDMARK: tip = "EmbeddedItemOpenTip"; break;
-        case LLAssetType::AT_SOUND: tip = "EmbeddedItemPlayTip"; break;
-        default: break;
+        case LLAssetType::AT_LANDMARK: tip = alSaid("EmbeddedItemOpenTip", "[NAME], embedded in the notecard: click to open it", args); break;
+        case LLAssetType::AT_SOUND:
+            tip = alSaid("EmbeddedItemPlayTip", "[NAME], embedded in the notecard: click to play it and copy it to your inventory", args);
+            break;
+        default: tip = alSaid("EmbeddedItemCopyTip", "[NAME], embedded in the notecard: click to copy it to your inventory", args); break;
     }
     // A button with the item's icon and name, as wide as they are.
     LLButton::Params p;
@@ -254,7 +255,7 @@ ALTextView::Atom ALNotecardEmbedded::atomFor(const ALTextPos& at, size_t index)
     p.font                    = font;
     p.image_overlay           = LLUI::getUIImage(mWorld.iconOf(*item));
     p.image_overlay_alignment = "left";
-    p.tool_tip                = mServices.words(tip, args);
+    p.tool_tip                = tip;
     const S32 width           = font->getWidth(item->getName()) + 16 + 12;
     p.rect                    = LLRect(0, 0, width, 0);
     LLButton* button          = LLUICtrlFactory::create<LLButton>(p);
@@ -281,21 +282,21 @@ bool ALNotecardEmbedded::copy(LLPointer<LLInventoryItem> item, const LLUUID& fol
     {
         // The server copies out of the asset it has, which a drop is only
         // in once saved.
-        mServices.setStatus(mServices.words("NotecardCopyUnsaved", args), true);
+        mHolder.say(alSaid("NotecardCopyUnsaved", "Save the notecard first: [NAME] can only be copied from a saved notecard", args), true);
         return false;
     }
     std::weak_ptr<ALNotecardEmbedded> weak  = weak_from_this();
-    const bool                         asked = mWorld.askCopy(mDoc.ref, item->getUUID(), folder, callback_id, [weak, args](const std::string& error) {
+    const bool                         asked = mWorld.askCopy(mHolder.notecard(), item->getUUID(), folder, callback_id, [weak, args](const std::string& error) {
         if (std::shared_ptr<ALNotecardEmbedded> self = weak.lock())
         {
             LLStringUtil::format_map_t why = args;
             why["[ERROR]"]                 = error;
-            self->mServices.setStatus(self->mServices.words("NotecardCopyRefused", why), true);
+            self->mHolder.say(alSaid("NotecardCopyRefused", "[NAME] could not be copied: [ERROR]", why), true);
         }
     });
     if (!asked)
     {
-        mServices.setStatus(mServices.words("NotecardCopyFailed", args), true);
+        mHolder.say(alSaid("NotecardCopyFailed", "[NAME] could not be copied: not connected to a region", args), true);
     }
     return asked;
 }
@@ -308,7 +309,7 @@ void ALNotecardEmbedded::open(LLPointer<LLInventoryItem> item)
     }
     // The answers may come long after, the tab gone by then.
     std::weak_ptr<ALNotecardEmbedded> weak = weak_from_this();
-    if (mWorld.open(item, mDoc.ref, [weak, item](const LLUUID& folder, U32 callback_id) {
+    if (mWorld.open(item, mHolder.notecard(), [weak, item](const LLUUID& folder, U32 callback_id) {
             if (std::shared_ptr<ALNotecardEmbedded> self = weak.lock())
             {
                 self->copy(item, folder, callback_id);
@@ -323,7 +324,7 @@ void ALNotecardEmbedded::open(LLPointer<LLInventoryItem> item)
     {
         LLStringUtil::format_map_t args;
         args["[NAME]"] = item->getName();
-        mServices.setStatus(mServices.words("NotecardCopyUnsaved", args), true);
+        mHolder.say(alSaid("NotecardCopyUnsaved", "Save the notecard first: [NAME] can only be copied from a saved notecard", args), true);
         return;
     }
     // The server finds the folder for it.
@@ -364,13 +365,4 @@ ALNotecardEmbedded::items_t ALNotecardEmbedded::fromLLSD(const LLSD& items)
         out.push_back(item);
     }
     return out;
-}
-
-// static
-void ALNotecardEmbedded::carry(const ALScriptStudioDoc& from, ALScriptStudioDoc& to)
-{
-    if (from.items)
-    {
-        to.carriedEmbedded = from.items->items();
-    }
 }

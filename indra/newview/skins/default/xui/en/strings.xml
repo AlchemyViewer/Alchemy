@@ -951,6 +951,17 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="XUIEditSameName">that is the name it has</string>
 	<string name="XUIEditWouldCrossEdge">[NAME] would cross the edge it is measured from, which moves the element to the other side of its parent rather than by [COUNT] pixels</string>
 
+	<!-- A notecard's items, as buttons in its text, in the notecard window
+	     and in Script Studio (alnotecardembedded.cpp) -->
+	<string name="EmbeddedItemOpenTip">[NAME], embedded in the notecard: click to open it</string>
+	<string name="EmbeddedItemPlayTip">[NAME], embedded in the notecard: click to play it and copy it to your inventory</string>
+	<string name="EmbeddedItemCopyTip">[NAME], embedded in the notecard: click to copy it to your inventory</string>
+	<string name="NotecardReadOnlyDrop">This notecard cannot be changed</string>
+	<string name="NotecardDropNoCopy">You cannot copy this item, so it cannot be added to the notecard</string>
+	<string name="NotecardCopyUnsaved">Save the notecard first: [NAME] can only be copied from a saved notecard</string>
+	<string name="NotecardCopyFailed">[NAME] could not be copied: not connected to a region</string>
+	<string name="NotecardCopyRefused">[NAME] could not be copied: [ERROR]</string>
+
 	<!-- ToolTips for notecards -->
 	<string name="TooltipNotecardNotAllowedTypeDrop">
 Items of this type can't be attached

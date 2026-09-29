@@ -26,11 +26,31 @@
 
 #include "../alscriptstudiodoc.h"
 
+#include "../alnotecardembedded.h"
+
 #include "alscriptstudio_fixture.h"
 
 #include "../test/lltut.h"
 
 #include <string>
+
+namespace
+{
+    // The world as a notecard's items see it, answering nothing: what a
+    // tab's items need to be made, and no more.
+    class NoWorld final : public ALNotecardEmbedded::World
+    {
+    public:
+        std::string iconOf(const LLInventoryItem&) const override { return std::string(); }
+        bool        draggedFromNotecard() const override { return false; }
+        bool        carriesSettings() const override { return false; }
+        bool        mayCopy(const LLInventoryItem&) const override { return false; }
+        U32         frame() const override { return 0; }
+        bool        open(const LLPointer<LLInventoryItem>&, const ALScriptRef&, std::function<void(const LLUUID&, U32)>) override { return true; }
+        void        confirmCopy(std::function<void()>) override {}
+        bool        askCopy(const ALScriptRef&, const LLUUID&, const LLUUID&, U32, std::function<void(const std::string&)>) override { return false; }
+    };
+}
 
 namespace tut
 {
@@ -245,5 +265,32 @@ namespace tut
         ensure_equals("two warnings", doc.shownWarnings, 2);
         doc.setShown({});
         ensure("none", doc.shown.empty() && doc.shownErrors == 0 && doc.shownWarnings == 0);
+    }
+
+    template<> template<>
+    void alscriptstudiodoc_object::test<8>()
+    {
+        set_test_name("a notecard's items carried into another tab; a script's tab carries none");
+        al_studio_test::StudioWindow window;
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name = "editor";
+        p.rect = LLRect(0, 200, 400, 0);
+        Doc card;
+        card.editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        window.floater->addChild(card.editor);
+        NoWorld world;
+        card.items = std::make_shared<ALNotecardEmbedded>(*card.editor, ALNotecardEmbedded::Holder(), world);
+        LLPointer<LLInventoryItem> a = new LLInventoryItem(), b = new LLInventoryItem();
+        card.items->loaded({ a, b });
+        Doc there;
+        card.carryItemsTo(there);
+        ensure("carried", there.carriedEmbedded && there.carriedEmbedded->size() == 2 && (*there.carriedEmbedded)[1] == b);
+        Doc script, after;
+        script.carryItemsTo(after);
+        ensure("a script's tab carries nothing", !after.carriedEmbedded);
     }
 }

@@ -559,14 +559,6 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="FileOpenElsewhere">[FILE] is open in another tab.</floater.string>
     <floater.string name="NoRecentFiles">No Recent Files</floater.string>
     <floater.string name="OutputSourceVim">vim</floater.string>
-    <floater.string name="EmbeddedItemOpenTip">[NAME], embedded in the notecard: click to open it</floater.string>
-    <floater.string name="EmbeddedItemPlayTip">[NAME], embedded in the notecard: click to play it and copy it to your inventory</floater.string>
-    <floater.string name="EmbeddedItemCopyTip">[NAME], embedded in the notecard: click to copy it to your inventory</floater.string>
-    <floater.string name="NotecardReadOnlyDrop">This notecard cannot be changed</floater.string>
-    <floater.string name="NotecardDropNoCopy">You cannot copy this item, so it cannot be added to the notecard</floater.string>
-    <floater.string name="NotecardCopyUnsaved">Save the notecard first: [NAME] can only be copied from a saved notecard</floater.string>
-    <floater.string name="NotecardCopyFailed">[NAME] could not be copied: not connected to a region</floater.string>
-    <floater.string name="NotecardCopyRefused">[NAME] could not be copied: [ERROR]</floater.string>
     <floater.string name="PreprocHintSwitch">([WORD] is a Firestorm extension: turn on Build &gt; Preprocess on Save and Build &gt; Firestorm &gt; Switch Statements)</floater.string>
     <floater.string name="RequireNotPreprocessed">require("[NAME]") is saved as written, but the grid does not support require: turn on Build &gt; Preprocess on Save to include the module</floater.string>
     <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Build > Preprocess on Save and Build > Extensions)</floater.string>

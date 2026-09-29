@@ -26,6 +26,7 @@
 
 #include "alscriptstudiodoc.h"
 
+#include "alnotecardembedded.h"
 #include "alscriptfixes.h"
 #include "alscriptstudioservices.h"
 #include "lldate.h"
@@ -223,6 +224,14 @@ std::shared_ptr<const std::string> ALScriptStudioDoc::snapshot() const
         snapshotVersion = version;
     }
     return held;
+}
+
+void ALScriptStudioDoc::carryItemsTo(ALScriptStudioDoc& to) const
+{
+    if (items)
+    {
+        to.carriedEmbedded = items->items();
+    }
 }
 
 // static

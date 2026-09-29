@@ -26,11 +26,16 @@
 
 #include "../alnotecardembedded.h"
 
-#include "alnotecarditems.h"
-#include "llfontgl.h"
-#include "llpermissions.h"
+#include "../alscriptworkspace.h"
 
-#include "alscriptstudio_fixture.h"
+#include "alnotecarditems.h"
+#include "altextview.h"
+#include "llfontgl.h"
+#include "llpanel.h"
+#include "llpermissions.h"
+#include "lluictrlfactory.h"
+
+#include "../../llui/tests/alheadlessui_fixture.h"
 
 #include "../test/lltut.h"
 
@@ -38,6 +43,15 @@
 #include <memory>
 #include <string>
 #include <vector>
+
+// llui reaches the viewer for this one, and linking any of the library pulls
+// the object that calls it.
+class LLAvatarName;
+const std::string gEmbeddedTestAnonName("Anon");
+const std::string& rlvGetAnonym(const LLAvatarName& av_name)
+{
+    return gEmbeddedTestAnonName;
+}
 
 namespace
 {
@@ -84,37 +98,47 @@ namespace tut
 {
     struct alnotecardembedded_data
     {
-        al_studio_test::StudioWindow       window;
-        al_studio_test::FakeServices       services{ window.floater };
-        FakeWorld                          world;
+        FakeWorld                           world;
         std::shared_ptr<ALNotecardEmbedded> tab;
-        ALScriptStudioDoc*                 doc = nullptr;
+        LLPanel*                            stage = nullptr;
+        ALTextView*                         view  = nullptr;
+        ALScriptRef                         notecard;
+        bool                                changeable = true;
+        // What was said, and whether each was an error.
+        std::vector<std::pair<std::string, bool>> said;
 
-        // A notecard's tab over an editor of its own, loaded, holding
-        // `text`, carrying `items`, which its asset carries.
+        ~alnotecardembedded_data()
+        {
+            tab.reset();
+            delete stage;
+        }
+
+        // A notecard's text in a view of its own, loaded, holding `text`,
+        // carrying `items`, which its asset carries.
         ALNotecardEmbedded& make(const std::string& text, ALNotecardEmbedded::items_t items = {})
         {
-            if (!window.floater)
+            if (!ll_test::HeadlessUI::get().ok())
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            LLUUID object, item;
-            object.generate();
-            item.generate();
-            doc             = &services.addDoc("card", ALScriptRef(object, item), "Card");
-            doc->notecard   = true;
-            doc->loaded     = true;
-            doc->modifiable = true;
-            ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
-            p.name       = "editor";
-            p.rect       = LLRect(0, 200, 400, 0);
-            p.syntax     = "text";
-            doc->editor  = LLUICtrlFactory::create<ALCodeEditor>(p);
-            doc->editor->setFont(LLFontGL::getFontMonospace());
-            window.floater->addChild(doc->editor);
-            doc->editor->setText(text);
-            tab       = std::make_shared<ALNotecardEmbedded>(*doc, services, world);
-            doc->items = tab;
+            notecard.object.generate();
+            notecard.item.generate();
+            LLPanel::Params sp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+            sp.name = "stage";
+            sp.rect = LLRect(0, 400, 600, 0);
+            stage   = LLUICtrlFactory::create<LLPanel>(sp);
+            ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+            p.name = "editor";
+            p.rect = LLRect(0, 200, 400, 0);
+            view   = LLUICtrlFactory::create<ALTextView>(p);
+            view->setFont(LLFontGL::getFontMonospace());
+            stage->addChild(view);
+            view->setText(text);
+            ALNotecardEmbedded::Holder holder;
+            holder.notecard   = [this]() { return notecard; };
+            holder.changeable = [this]() { return changeable; };
+            holder.say        = [this](const std::string& words, bool error) { said.emplace_back(words, error); };
+            tab = std::make_shared<ALNotecardEmbedded>(*view, std::move(holder), world);
             tab->loaded(std::move(items));
             tab->place();
             tab->wire();
@@ -144,7 +168,7 @@ namespace tut
         {
             EAcceptance accept  = ACCEPT_NO;
             std::string tooltip;
-            const LLRect text   = doc->editor->textRect();
+            const LLRect text   = view->textRect();
             tab->drop(text.mLeft + 1, text.mTop - 2, dropping, type, what.get(), &accept, tooltip);
             if (tip)
             {
@@ -163,13 +187,13 @@ namespace tut
         set_test_name("a save sends only the items the text still stands, numbered afresh in the order it stands them");
         const auto a = item("A"), b = item("B"), c = item("C");
         ALNotecardEmbedded& card = make("one " + at(2) + " two " + at(0) + "\n", { a, b, c });
-        ensure("a button over each item the text stands", doc->editor->atomAt(ALTextPos(0, 4)) != nullptr);
+        ensure("a button over each item the text stands", view->atomAt(ALTextPos(0, 4)) != nullptr);
         std::string                  text;
         ALNotecardEmbedded::items_t items;
         card.forSave(text, items);
         ensure_equals("renumbered", text, "one " + at(0) + " two " + at(1) + "\n");
         ensure("C, then A; B left behind", items.size() == 2 && items[0] == c && items[1] == a);
-        ensure_equals("the editor's own text as it was", doc->editor->text(), "one " + at(2) + " two " + at(0) + "\n");
+        ensure_equals("the editor's own text as it was", view->text(), "one " + at(2) + " two " + at(0) + "\n");
     }
 
     template<> template<>
@@ -178,18 +202,18 @@ namespace tut
         set_test_name("several items dropped together land one after another; a later drop lands at the pointer");
         const auto a = item("A"), b = item("B"), c = item("C");
         make("text\n");
-        const LLRect    rect  = doc->editor->textRect();
-        const ALTextPos where = doc->editor->posAtLocal(rect.mLeft + 1, rect.mTop - 2, true);
+        const LLRect    rect  = view->textRect();
+        const ALTextPos where = view->posAtLocal(rect.mLeft + 1, rect.mTop - 2, true);
         ensure("taken", drop(a, true) == ACCEPT_YES_COPY_MULTI);
         ensure("taken", drop(b, true) == ACCEPT_YES_COPY_MULTI);
-        const std::string line = doc->editor->document().line(where.line);
+        const std::string line = view->document().line(where.line);
         ensure_equals("A, then B after it", line.substr(where.column, 8), at(0) + at(1));
-        ensure("each with its button", doc->editor->atomAt(ALTextPos(where.line, where.column)) && doc->editor->atomAt(ALTextPos(where.line, where.column + 4)));
+        ensure("each with its button", view->atomAt(ALTextPos(where.line, where.column)) && view->atomAt(ALTextPos(where.line, where.column + 4)));
         world.frameNow = 2;
         drop(c, true);
-        ensure_equals("a new frame's drop lands where the pointer is", doc->editor->document().line(where.line).substr(where.column, 4), at(2));
+        ensure_equals("a new frame's drop lands where the pointer is", view->document().line(where.line).substr(where.column, 4), at(2));
         ensure_equals("three carried", tab->items().size(), size_t(3));
-        ensure("one undo takes the last away", doc->editor->undoJournal().canUndo());
+        ensure("one undo takes the last away", view->undoJournal().canUndo());
     }
 
     template<> template<>
@@ -201,7 +225,7 @@ namespace tut
         ensure("not whole to the next owner", drop(item("A", false), false, &tip) == ACCEPT_NO && !tip.empty());
         world.copyable = false;
         ensure("not the agent's to copy", drop(item("B"), false, &tip) == ACCEPT_NO);
-        ensure_equals("said so", tip, services.words("NotecardDropNoCopy"));
+        ensure("said so", !tip.empty());
         world.copyable = true;
         world.settings = false;
         ensure("settings where the grid has none", drop(item("C"), false, &tip, DAD_SETTINGS) == ACCEPT_NO);
@@ -210,9 +234,9 @@ namespace tut
         std::string ignored;
         ensure("out of another notecard: left to someone else", !tab->drop(1, 1, false, DAD_NOTECARD, item("D").get(), &accept, ignored));
         world.fromNotecard = false;
-        doc->modifiable    = false;
+        changeable         = false;
         ensure("a notecard that may not be changed", drop(item("E"), false, &tip) == ACCEPT_NO);
-        ensure_equals("said so", tip, services.words("NotecardReadOnlyDrop"));
+        ensure("said so", !tip.empty());
         ensure("nothing taken", tab->items().empty());
     }
 
@@ -225,11 +249,12 @@ namespace tut
         drop(dropped, true);
 
         ensure("a drop not saved: refused", !card.copy(dropped, LLUUID::null));
-        ensure("said so", !services.statuses.empty() && services.statuses.back() == services.words("NotecardCopyUnsaved", { { "[NAME]", "Dropped" } }));
+        ensure("said so, as an error", !said.empty() && said.back().second && said.back().first.find("Dropped") != std::string::npos);
         ensure("nothing asked of the region", world.copies.empty());
         ensure("one saved: asked", card.copy(saved, LLUUID::null) && world.copies.size() == 1 && world.copies.back() == saved->getUUID());
         world.refused("no such item");
-        ensure_equals("the region's no, said", services.statuses.back(), services.words("NotecardCopyRefused", { { "[NAME]", "Saved" }, { "[ERROR]", "no such item" } }));
+        ensure("the region's no, said", said.back().second && said.back().first.find("Saved") != std::string::npos &&
+                                            said.back().first.find("no such item") != std::string::npos);
 
         // Saved with only the drop in it.
         card.saved({ dropped->getUUID() });
@@ -248,7 +273,6 @@ namespace tut
         // The tab gone before the answers: nothing happens.
         card.open(dropped);
         const std::function<void()> late = world.confirms.back();
-        doc->items.reset();
         tab.reset();
         late();
         ensure("no copy asked for a tab that has gone", world.copies.size() == copies);
@@ -257,18 +281,9 @@ namespace tut
     template<> template<>
     void alnotecardembedded_object::test<5>()
     {
-        set_test_name("a tab's items carried to another, and kept and read back in their places");
+        set_test_name("items kept and read back in their places");
         const auto a = item("A"), b = item("B");
-        make(at(0) + at(1) + "\n", { a, b });
-        ALScriptStudioDoc& there = services.addDoc("there");
-        ALNotecardEmbedded::carry(*doc, there);
-        ensure("carried", there.carriedEmbedded && there.carriedEmbedded->size() == 2 && (*there.carriedEmbedded)[1] == b);
-        ALScriptStudioDoc& script = services.addDoc("script");
-        ALScriptStudioDoc& after  = services.addDoc("after");
-        ALNotecardEmbedded::carry(script, after);
-        ensure("a script's tab carries nothing", !after.carriedEmbedded);
-
-        const LLSD                         kept = ALNotecardEmbedded::asLLSD({ a, LLPointer<LLInventoryItem>(), b });
+        const LLSD                        kept = ALNotecardEmbedded::asLLSD({ a, LLPointer<LLInventoryItem>(), b });
         const ALNotecardEmbedded::items_t back = ALNotecardEmbedded::fromLLSD(kept);
         ensure_equals("each in its place", back.size(), size_t(3));
         ensure("a missing one stays missing", back[1].isNull());

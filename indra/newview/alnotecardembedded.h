@@ -1,6 +1,6 @@
 /**
  * @file alnotecardembedded.h
- * @brief A notecard's items in its Script Studio tab: buttons in the text, dropped in, saved, opened and copied out.
+ * @brief A notecard's items in its text: buttons in the text, dropped in, saved, opened and copied out.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -40,23 +40,22 @@
 #include <vector>
 
 struct ALScriptRef;
-struct ALScriptStudioDoc;
-class ALScriptStudioServices;
 
-// What a notecard's tab carries: the items the notecard holds, each a
+// What a notecard's text carries: the items the notecard holds, each a
 // button in the text where its character stands (ALNotecardItems) that
 // opens the item or offers a copy of it; taken in from the inventory by a
 // drop; sent back with the text on a save, only those the text still
-// stands, numbered afresh. A script's tab has none, and neither has a text
-// file's. Held by the tab (ALScriptStudioDoc::items), for as long as it is
-// a notecard's.
+// stands, numbered afresh. Over any text view of a notecard -- a Script
+// Studio tab's (ALScriptStudioDoc::items) or the notecard window's -- for
+// as long as it is a notecard's; a script's text has none, and neither has
+// a text file's.
 class ALNotecardEmbedded : public std::enable_shared_from_this<ALNotecardEmbedded>
 {
 public:
     typedef std::vector<LLPointer<LLInventoryItem>> items_t;
 
-    // What the tab asks of the viewer beyond the window: the side of an
-    // item that is the world's. The viewer's own is `viewer()`; a test
+    // What it asks of the viewer beyond whoever holds the text: the side
+    // of an item that is the world's. The viewer's own is `viewer()`; a test
     // fakes it.
     class World
     {
@@ -96,7 +95,19 @@ public:
     // The viewer's (alnotecardworld.cpp).
     static World& viewer();
 
-    ALNotecardEmbedded(ALScriptStudioDoc& doc, ALScriptStudioServices& services, World& world);
+    // What it asks of whoever holds the text: the notecard as it is now,
+    // which a save into the inventory may make another item; whether the
+    // text is the notecard's and may be changed -- loaded, and the agent
+    // may modify it; and something said, as that one says things -- why a
+    // copy was refused, or could not be had.
+    struct Holder
+    {
+        std::function<ALScriptRef()>                              notecard;
+        std::function<bool()>                                    changeable;
+        std::function<void(const std::string& words, bool error)> say;
+    };
+
+    ALNotecardEmbedded(ALTextView& view, Holder holder, World& world);
 
     // The items the notecard was loaded with, which its asset carries and
     // the server can copy out of it.
@@ -141,16 +152,12 @@ public:
     // missing one as nothing, since the text says an item by its place.
     static LLSD    asLLSD(const items_t& items);
     static items_t fromLLSD(const LLSD& items);
-    // What a tab's items are carried as into another tab -- in another
-    // window, or loaded again under a kept text: its items, where it is a
-    // notecard's.
-    static void carry(const ALScriptStudioDoc& from, ALScriptStudioDoc& to);
 
 private:
     ALTextView::Atom atomFor(const ALTextPos& at, size_t index);
 
-    ALScriptStudioDoc&                 mDoc;
-    ALScriptStudioServices&            mServices;
+    ALTextView&                        mView;
+    Holder                             mHolder;
     World&                             mWorld;
     items_t                            mItems;
     // The items the saved asset carries, by id: what the server can copy

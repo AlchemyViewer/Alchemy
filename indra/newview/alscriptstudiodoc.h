@@ -171,6 +171,10 @@ struct ALScriptStudioDoc
     // copy of a version, shared by every question asked of it while any of
     // them holds it, rather than one copy each.
     std::shared_ptr<const std::string> snapshot() const;
+    // What this tab's items are carried as into another tab -- in another
+    // window, or this one loaded again under a kept text: its items, where
+    // it is a notecard's.
+    void carryItemsTo(ALScriptStudioDoc& to) const;
 
     // An include or a module a place in a text names: anywhere on an
     // #include line, the name it includes; anywhere in a require call of

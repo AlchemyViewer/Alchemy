@@ -2488,8 +2488,7 @@ if(AL_BUILD_TESTS)
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
-  # A notecard's items in its Script Studio tab, over a fake of the
-  # viewer's side and the studio's own window.
+  # A notecard's items in its text, over a fake of the viewer's side.
   al_add_test(
     alnotecardembedded
     UNIT
@@ -2853,7 +2852,7 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
-    SOURCES alscriptsaveflow.cpp
+    SOURCES alnotecardembedded.cpp alscriptsaveflow.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

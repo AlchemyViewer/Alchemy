@@ -26,7 +26,6 @@
 
 #include "alscriptstudioorphans.h"
 
-#include "alnotecardembedded.h"
 #include "alscriptrecovery.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudioservices.h"
@@ -176,7 +175,7 @@ void ALScriptStudioOrphans::reattach(Doc& doc)
     doc.orphan.detached           = false;
     doc.recovering                = holding;
     doc.carriedText               = holding.text;
-    ALNotecardEmbedded::carry(doc, doc);
+    doc.carryItemsTo(doc);
     doc.loaded = false;
     doc.editor->setReadOnly(true);
     mWindow.loadScript(doc.ref);

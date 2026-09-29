@@ -2019,7 +2019,12 @@ ALNotecardEmbedded& ALFloaterScriptStudio::notecardItems(Doc& doc, bool fresh)
 {
     if (!doc.items || fresh)
     {
-        doc.items = std::make_shared<ALNotecardEmbedded>(doc, *this, ALNotecardEmbedded::viewer());
+        Doc*                       raw = &doc;
+        ALNotecardEmbedded::Holder holder;
+        holder.notecard   = [raw]() { return raw->ref; };
+        holder.changeable = [raw]() { return raw->loaded && raw->modifiable; };
+        holder.say        = [this](const std::string& words, bool error) { setStatus(words, error); };
+        doc.items         = std::make_shared<ALNotecardEmbedded>(*doc.editor, std::move(holder), ALNotecardEmbedded::viewer());
     }
     return *doc.items;
 }
@@ -6251,7 +6256,7 @@ bool ALFloaterScriptStudio::moveActiveTo(ALFloaterScriptStudio* window)
             {
                 there.carriedExperience = doc->experience;
             }
-            ALNotecardEmbedded::carry(*doc, there);
+            doc->carryItemsTo(there);
             // Showing what it showed here, once its expansion comes there.
             window->showView(there, doc->view);
         }
