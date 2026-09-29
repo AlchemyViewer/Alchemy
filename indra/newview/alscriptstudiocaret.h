@@ -34,14 +34,11 @@
 
 class ALScriptStudioServices;
 
-// The tab's part of what is said of its caret: the outline's folds,
-// the name asked about, the path the bar shows, and the inspector's
-// question about where the caret is.
+// The tab's part of what is said of its caret: the name asked about, the
+// path the bar shows, and the inspector's question about where the caret
+// is.
 struct ALScriptStudioDoc::Caret
 {
-    // The outline's symbols folded shut, each by the names from the
-    // outermost down to it.
-    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> outlineFolded;
     // The name last asked about -- its definition, its references, a
     // new name -- where, and of which text.
     ALEditorCommand symbolCommand = ALEditorCommand::None;
@@ -126,6 +123,15 @@ public:
     void answered(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at);
     // Each frame, at `now`: the tab in front's caret watched.
     void pump(F64 now);
+    // A tab's caret seen afresh on the next frame, wherever it stands: the
+    // view in front is another view now, or the tab another tab.
+    static void seeAfresh(Doc& doc) { doc.caret->seen = ALTextPos(-1, -1); }
+    // The inspector told of the caret again once it is seen, having been
+    // told of another tab's since.
+    static void inspectAfresh(Doc& doc) { doc.caret->inspectAt = ALTextPos(-1, -1); }
+    // The inspector told now of the word of the source at `at`, rather than
+    // a moment after the caret settles.
+    void inspect(Doc& doc, const ALTextPos& at);
     // The symbols a tab's caret is in, found once for both of the panes
     // that show them, and shown: as the caret moves, as the outline is
     // made again, as the tab comes to the front or is renamed. None while

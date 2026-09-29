@@ -109,6 +109,9 @@ public:
     // saved from here. By value: the text is often the one held, which
     // taking it lets go of.
     void take(Doc& doc, std::string text);
+    // A save from outside held while the tab had changes, not taken: the
+    // copy is written from here at the next save.
+    void keep(Doc& doc);
     // After a save from here: the copy written again where it holds
     // something else; and the compiler's words put in the log beside it.
     void sync(Doc& doc);

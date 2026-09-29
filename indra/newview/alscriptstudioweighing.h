@@ -136,6 +136,16 @@ public:
     // What a save would send, in bytes, measured again where the text or
     // its expansion changed since.
     void measureAsset(Doc& doc);
+    // What a save would send, as a save measured it: one refused for its
+    // size, which the trailer says.
+    static void measuredBySave(Doc& doc, size_t bytes) { doc.weighing->assetBytes = bytes; }
+    // Its weights asked for with a check of the text at `version`, in the
+    // same job, rather than again when it comes to the front.
+    static void askedWithCheck(Doc& doc, U32 version) { doc.weighing->askedFor = version; }
+    // What a run of the preprocessor makes to be sent is made differently
+    // now -- its settings changed -- and the check's weighing of the text
+    // is taken again in place of what the last run made.
+    static void sendsDifferently(Doc& doc) { doc.weighing->sent = false; }
     // The fixes an editor's list shows, to be weighed once nothing more is
     // coming to it.
     void fixesShown(const std::string& id, U32 shown, const std::vector<ALCodeEditor::Fix>& fixes);

@@ -493,4 +493,34 @@ namespace tut
         const std::string vimrc = services().words("VimrcNewFile");
         ensure("the vimrc's words whole", vimrc.rfind("Script Studio's vimrc.", 0) == 0 && std::count(vimrc.begin(), vimrc.end(), '\n') == 3);
     }
+
+    template<> template<>
+    void alscriptstudioorphans_object::test<12>()
+    {
+        set_test_name("a tab's standing as the window and a save change it: the notice back each time, a kept text detached where it is an item's, "
+                      "a failed load tried later and further apart");
+        make();
+        Doc& a                    = tab("a");
+        a.orphan->noticeDismissed = true;
+        Orphans::become(a, Doc::Orphan::Removed);
+        ensure("removed, and said", a.orphan->kind == Doc::Orphan::Removed && !a.orphan->noticeDismissed && !a.orphan->detached);
+        a.orphan->noticeDismissed = true;
+        Orphans::showNotice(a);
+        ensure("the notice back", !a.orphan->noticeDismissed);
+        Orphans::detach(a, Doc::Orphan::Unloaded);
+        ensure("an item's kept text detached", a.orphan->detached && a.orphan->kind == Doc::Orphan::Unloaded);
+        Doc& f = tab("f");
+        f.file = "/nowhere/f.lsl";
+        Orphans::detach(f, Doc::Orphan::FileGone);
+        ensure("a file's not: nothing is loaded under it", !f.orphan->detached && f.orphan->kind == Doc::Orphan::FileGone);
+
+        const F64 now = LLTimer::getTotalSeconds();
+        Orphans::loadFailed(a);
+        const F64 first = a.orphan->nextReattach - now;
+        Orphans::loadFailed(a);
+        const F64 second = a.orphan->nextReattach - now;
+        ensure("tried later, further apart each time", a.orphan->reattachTries == 2 && first > 0.0 && second > first);
+        Orphans::loadWentThrough(a);
+        ensure("from the first try once one goes through", a.orphan->reattachTries == 0);
+    }
 }

@@ -801,7 +801,7 @@ private:
     // which is the world's; its place; its script loaded; the notice; and
     // the notice's actions.
     Doc::Orphan failedAs(const Doc& doc, ALScriptLoaded::Failure failure) const override;
-    void        reattach(Doc& doc) override { mOrphans.reattach(doc); }
+    void        retryLoad(Doc& doc) override { mOrphans.retryLoad(doc); }
     ALScriptStudioOrphans::Reach reach(const Doc& doc) override;
     void                         refreshPlace(Doc& doc) override;
     void                         loadScript(const ALScriptRef& ref) override;

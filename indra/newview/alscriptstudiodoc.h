@@ -66,8 +66,10 @@ struct ALScriptStudioDoc
     ALScriptStudioDoc(const ALScriptStudioDoc&)            = delete;
     ALScriptStudioDoc& operator=(const ALScriptStudioDoc&) = delete;
 
-    // A unit's part of the tab: what the unit keeps of it. Made with the
-    // tab and gone with it, and const wherever the tab is.
+    // A unit's part of the tab: what the unit keeps of it, which its header
+    // defines and only it writes; other units read it, and ask the unit to
+    // change it. Made with the tab and gone with it, and const wherever the
+    // tab is.
     template <typename T>
     class Part
     {
@@ -583,6 +585,9 @@ struct ALScriptStudioDoc
     // The script held open in an external editor (ALScriptExternalEditor).
     struct External;
     Part<External>                             external;
+    // The outline's symbols folded shut, each by the names from the
+    // outermost down to it (ALScriptOutlinePane).
+    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> outlineFolded;
     // The tab's part of what is said of its caret (ALScriptStudioCaret).
     struct Caret;
     Part<Caret>                                caret;

@@ -422,4 +422,30 @@ namespace tut
         caret.placePath(doc);
         ensure("the expansion in front: no path", doc.caret->crumbPath.empty());
     }
+
+    template<> template<>
+    void alscriptstudiocaret_object::test<8>()
+    {
+        set_test_name("the caret as the window asks: seen afresh and told again where it has not moved; the inspector told again, or now");
+        ALScriptStudioCaret& caret = make();
+        Doc&                 doc   = tab("a");
+        doc.editor->setCaret(ALTextPos(0, 10));
+        caret.pump(10.0);
+        caret.pump(10.0 + ALScriptStudioCaret::SETTLE);
+        ensure("told, and asked", studio.said.size() == 1 && studio.asked.size() == 1);
+        caret.pump(20.0);
+        ensure("not again where it stands", studio.said.size() == 1);
+        ALScriptStudioCaret::seeAfresh(doc);
+        caret.pump(30.0);
+        caret.pump(30.0 + ALScriptStudioCaret::SETTLE);
+        ensure("seen afresh: told again, the inspector not, of the same word", studio.said.size() == 2 && studio.asked.size() == 1);
+        ALScriptStudioCaret::seeAfresh(doc);
+        ALScriptStudioCaret::inspectAfresh(doc);
+        caret.pump(40.0);
+        caret.pump(40.0 + ALScriptStudioCaret::SETTLE);
+        ensure_equals("the inspector told again", joined(studio.asked), std::string("inspect 0:8, inspect 0:8"));
+        caret.inspect(doc, ALTextPos(1, 26));
+        ensure_equals("told now of a word", studio.asked.back(), std::string("inspect 1:26"));
+        ensure("which is what it was last told", doc.caret->inspectAt == ALTextPos(1, 26) && doc.caret->inspectDue == 0.0);
+    }
 }

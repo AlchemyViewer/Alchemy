@@ -277,6 +277,11 @@ std::string ALScriptStudioChecking::includeName(const Doc& doc, const std::strin
 
 void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at, const ALTextPos& to)
 {
+    if (kind == ALScriptAnalysis::Kind::Actions)
+    {
+        // The stretch the refactors are offered over once they come.
+        doc.check->actionsAsked = ALTextRange(at, to);
+    }
     if (!doc.loaded || doc.notecard)
     {
         return;
@@ -384,7 +389,7 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
         request.targets = mWindow.weightTargets(doc);
         if (!request.targets.empty())
         {
-            doc.weighing->askedFor = request.version;
+            ALScriptStudioWeighing::askedWithCheck(doc, request.version);
         }
     }
     if (kind == ALScriptAnalysis::Kind::Weigh)
@@ -696,7 +701,7 @@ void ALScriptStudioChecking::pump(F64 now)
             doc->expanded.valid = false;
             // What a run made to be sent is made differently now: the check
             // weighs the text again, and the run that follows as it is sent.
-            doc->weighing->sent = false;
+            ALScriptStudioWeighing::sendsDifferently(*doc);
             if (words && !doc->notecard && !doc->language.lua)
             {
                 ALScriptStudioWords::teach(*doc->editor, false);

@@ -100,6 +100,28 @@ public:
     // first, then what it is, unless it was hidden since that changed,
     // then what the last word about it offered to do; nothing for none.
     static ALScriptNoticeBar::Notice noticeFor(const Doc* doc, const ALScriptStudioServices& services);
+    // A tab come to stand as `kind` with what holds it, said in the notice,
+    // which is back in sight where it was hidden.
+    static void become(Doc& doc, Orphan kind)
+    {
+        doc.orphan->kind            = kind;
+        doc.orphan->noticeDismissed = false;
+    }
+    // A kept text taken up with nothing loaded under it, standing as `kind`:
+    // detached where it is an item's, to be loaded under it once the item is
+    // in reach.
+    static void detach(Doc& doc, Orphan kind)
+    {
+        // A file on disk has nothing to be loaded under it.
+        doc.orphan->detached = doc.file.empty();
+        become(doc, kind);
+    }
+    // The notice back in sight where it was hidden, saying what the tab is.
+    static void showNotice(Doc& doc) { doc.orphan->noticeDismissed = false; }
+    // A load of a tab failed, to be tried again later, further apart each
+    // time; and one gone through, after which a failure is tried again soon.
+    static void loadFailed(Doc& doc);
+    static void loadWentThrough(Doc& doc) { doc.orphan->reattachTries = 0; }
 
     // What the orphans ask of the window beyond its services.
     class Window
@@ -152,6 +174,9 @@ public:
     // a kept text is taken up: the item loaded under it, so that what it is
     // saved as is what the item is.
     void reattach(Doc& doc);
+    // The same, as a person asks for it: tried now, and a few more times
+    // after if it fails.
+    void retryLoad(Doc& doc);
     // The notice said again for the tab in front; and one of its buttons.
     void refreshNotice();
     void noticeAction(const std::string& action);

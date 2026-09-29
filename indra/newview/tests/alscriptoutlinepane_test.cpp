@@ -198,12 +198,12 @@ namespace tut
         outline->show(doc);
         outline->fold(1);
         ensure_equals("shut", rows(), std::string("count, >default, alpha"));
-        ensure("kept by name", doc.caret->outlineFolded.contains("default"));
+        ensure("kept by name", doc.outlineFolded.contains("default"));
         ensure_equals("the row it was", chosen(), 1);
         outline->fold(1);
         ensure_equals("open", rows(), std::string("count, ^default, .touch_start, .state_entry, alpha"));
         outline->fold(1, false);
-        ensure("already open: left so", !doc.caret->outlineFolded.contains("default"));
+        ensure("already open: left so", !doc.outlineFolded.contains("default"));
         outline->fold(1, true);
         doc.outline.insert(doc.outline.begin(), entry("before", ALScriptSymbolKind::Variable, 0, 0));
         outline->show(doc);
@@ -322,8 +322,8 @@ namespace tut
         ensure("escape", list->handleKeyHere(KEY_ESCAPE, MASK_NONE) && told().chosen.size() == 2 && window.services().reveals.size() == 3);
         ensure("with a key held: the list's", !list->handleKeyHere(KEY_RETURN, MASK_CONTROL) && told().chosen.size() == 2);
         list->selectByValue(LLSD(1));
-        ensure("left", list->handleKeyHere(KEY_LEFT, MASK_NONE) && doc.caret->outlineFolded.contains("default"));
-        ensure("right", list->handleKeyHere(KEY_RIGHT, MASK_NONE) && !doc.caret->outlineFolded.contains("default"));
+        ensure("left", list->handleKeyHere(KEY_LEFT, MASK_NONE) && doc.outlineFolded.contains("default"));
+        ensure("right", list->handleKeyHere(KEY_RIGHT, MASK_NONE) && !doc.outlineFolded.contains("default"));
 
         // The mouse only reaches what is shown.
         window.floater->setVisible(true);
@@ -344,10 +344,10 @@ namespace tut
         ensure_equals("row 1 found", row(row_y), 1);
         list->localPointToOtherView(rect.mLeft + icon->getWidth() + list->getColumnPadding() + 2, row_y, &x, &y, outline);
         ensure("an arrow clicked", outline->handleMouseDown(x, y, MASK_NONE));
-        ensure("folds", doc.caret->outlineFolded.contains("default"));
+        ensure("folds", doc.outlineFolded.contains("default"));
         list->localPointToOtherView(rect.mRight - 4, row_y, &x, &y, outline);
         outline->handleMouseDown(x, y, MASK_NONE);
-        ensure("past it: not", doc.caret->outlineFolded.contains("default"));
+        ensure("past it: not", doc.outlineFolded.contains("default"));
         // Row 0, a leaf, where an arrow would be: the list's, which chooses it.
         list->deselectAllItems(true);
         const S32 leaf_y = row_y + (rect.mTop - row_y) / 2 + 1;

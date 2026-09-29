@@ -253,3 +253,11 @@ void ALScriptStudioCaret::pump(F64 now)
         }
     }
 }
+
+void ALScriptStudioCaret::inspect(Doc& doc, const ALTextPos& at)
+{
+    doc.caret->inspectAt      = at;
+    doc.caret->inspectVersion = doc.editor->document().version();
+    doc.caret->inspectDue     = 0.0;
+    mWindow.askAnalyzer(doc, ALScriptAnalysis::Kind::Inspect, at);
+}

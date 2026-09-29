@@ -307,7 +307,7 @@ void ALScriptStudioSaving::save(Doc& doc)
                                                                                       : "SaveBlockedOffline",
                                                 args),
                                 true);
-            doc.orphan->noticeDismissed = false;
+            ALScriptStudioOrphans::showNotice(doc);
             stopped(doc);
             if (&doc == mServices.frontDoc())
             {
@@ -319,8 +319,7 @@ void ALScriptStudioSaving::save(Doc& doc)
             // failed waits its turn: loaded now, what it holds carried over,
             // so that it is saved as what the item is once asked again.
             mServices.setStatus(mServices.words("SaveWaitsForLoad", args), true);
-            doc.orphan->reattachTries = 0;
-            mWindow.reattach(doc);
+            mWindow.retryLoad(doc);
             stopped(doc);
             return;
         case ALScriptSaveFlow::Start::Go:
@@ -502,7 +501,7 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
                              : !doc.language.lua && !mWindow.saveOptions().compress ? "SaveTooLargeCompress"
                                                                                     : "SaveTooLargeWrapped";
         mServices.report(mServices.words("SaveTooLarge", args) + " " + mServices.words(shrink), true, &doc);
-        doc.weighing->assetBytes = text.size();
+        ALScriptStudioWeighing::measuredBySave(doc, text.size());
         stopped(doc);
         if (&doc == mServices.frontDoc())
         {

@@ -139,8 +139,9 @@ public:
 
         // --- the tab and the window ----------------------------------------------------
 
-        // A kept text loaded under its item, what it holds carried over.
-        virtual void reattach(Doc& doc) = 0;
+        // A kept text loaded under its item, what it holds carried over:
+        // tried now, and a few more times after if it fails.
+        virtual void retryLoad(Doc& doc) = 0;
         // The notice over the editor, the toolbar, the strip under the
         // editor and the tabs said again.
         virtual void refreshNotice()          = 0;

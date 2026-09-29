@@ -205,6 +205,14 @@ void ALScriptExternalEditor::take(Doc& doc, std::string text)
     mWindow.save(doc);
 }
 
+void ALScriptExternalEditor::keep(Doc& doc)
+{
+    doc.external->waiting.reset();
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    mServices.setStatus(mServices.words("ExternalKept", args));
+}
+
 void ALScriptExternalEditor::sync(Doc& doc)
 {
     if (!doc.watch)

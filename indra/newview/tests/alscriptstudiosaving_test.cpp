@@ -128,7 +128,7 @@ namespace
             }
         }
         void saveFile(Doc& doc) override { files.push_back(doc.id); }
-        void reattach(Doc& doc) override { reattached.push_back(doc.id); }
+        void retryLoad(Doc& doc) override { reattached.push_back(doc.id); }
         void refreshNotice() override { ++notices; }
         void refreshToolbar() override {}
         void refreshTrailer(Doc&) override {}

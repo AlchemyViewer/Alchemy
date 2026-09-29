@@ -502,8 +502,7 @@ void ALScriptStudio::itemRemoved(const ALScriptRef& ref)
         {
             // What was typed is not the deletion's to take: the tab stays,
             // its text kept on disk, and says what can be done with it.
-            doc.orphan->kind          = ALFloaterScriptStudio::Doc::Orphan::Removed;
-            doc.orphan->noticeDismissed = false;
+            ALScriptStudioOrphans::become(doc, ALFloaterScriptStudio::Doc::Orphan::Removed);
             window->mRecovery.keep(doc);
             window->report(window->getString("OrphanRemovedKept", args), true, &doc, { "copy", "export" });
             window->refreshNotice();
@@ -2185,7 +2184,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptLoaded& answer)
         doc.carriedEmbedded.reset();
         doc.loadFailure  = answer.error.empty() ? Failure::NotPermitted : answer.failure;
         doc.loadError    = answer.error;
-        doc.orphan->nextReattach = LLTimer::getTotalSeconds() + ALRecoveryRetry::delayAfter(++doc.orphan->reattachTries);
+        ALScriptStudioOrphans::loadFailed(doc);
         becomeOrphan(doc, entry, failedAs(doc, doc.loadFailure));
         if (doc.loadFailure == Failure::NotPermitted)
         {
@@ -2203,7 +2202,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptLoaded& answer)
     doc.loadError   = answer.error;
     if (answer.error.empty())
     {
-        doc.orphan->reattachTries = 0;
+        ALScriptStudioOrphans::loadWentThrough(doc);
     }
     if (!answer.error.empty())
     {
@@ -2505,8 +2504,8 @@ void ALFloaterScriptStudio::showView(Doc& doc, Doc::View view, bool focus)
         focusShown(doc);
     }
     // The bars read the caret of the view in front, which is another caret
-    // now, wherever it stands: seen afresh on the next frame (mCaret).
-    doc.caret->seen = ALTextPos(-1, -1);
+    // now, wherever it stands: seen afresh on the next frame.
+    ALScriptStudioCaret::seeAfresh(doc);
     refreshToolbar();
 }
 
@@ -2808,10 +2807,7 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     editor.setFixProvider([this, raw](S32 line, std::vector<ALCodeEditor::Fix>& out) { mChecking.fixesOn(*raw, line, out); });
     editor.setFixesShown(
         [this, raw](U32 shown, const std::vector<ALCodeEditor::Fix>& fixes) { mWeighing.fixesShown(raw->id, shown, fixes); });
-    editor.setActionRequest([this, raw](const ALTextRange& at) {
-        raw->check->actionsAsked = at;
-        mChecking.ask(*raw, ALScriptAnalysis::Kind::Actions, at.begin, at.end);
-    });
+    editor.setActionRequest([this, raw](const ALTextRange& at) { mChecking.ask(*raw, ALScriptAnalysis::Kind::Actions, at.begin, at.end); });
     editor.setFixHandler([this, raw](const LLSD& value) {
         if (value.has("action"))
         {
@@ -3114,8 +3110,8 @@ void ALFloaterScriptStudio::activate(size_t index, bool focus)
     // is seen. The bar at the bottom says so now -- a notecard's too, whose
     // caret is not watched -- rather than keep the last tab's path until
     // the caret moves.
-    mDocs[index]->caret->seen      = ALTextPos(-1, -1);
-    mDocs[index]->caret->inspectAt = ALTextPos(-1, -1);
+    ALScriptStudioCaret::seeAfresh(*mDocs[index]);
+    ALScriptStudioCaret::inspectAfresh(*mDocs[index]);
     mInspectorPane->forget();
     mCaret.placePath(*mDocs[index]);
     refreshNotice();
@@ -5128,10 +5124,7 @@ void ALFloaterScriptStudio::reference(Doc& doc)
     // source, whose places the analyzer answers in.
     if (!word.empty() && doc.shownView() == Doc::View::Source)
     {
-        doc.caret->inspectAt      = word.begin;
-        doc.caret->inspectVersion = doc.editor->document().version();
-        doc.caret->inspectDue     = 0.0;
-        askAnalyzer(doc, ALScriptAnalysis::Kind::Inspect, word.begin);
+        mCaret.inspect(doc, word.begin);
     }
     else
     {
@@ -6556,7 +6549,6 @@ void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALRecoveryEntry& entry,
     // a notecard's items.
     doc.loaded                 = true;
     doc.modifiable             = true;
-    doc.orphan->detached               = doc.file.empty();
     doc.notecard               = entry.notecard;
     applyEditorOptions(*doc.editor, doc.itemNotecard());
     doc.language.lua           = entry.lua;
@@ -6564,8 +6556,7 @@ void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALRecoveryEntry& entry,
     doc.assetId                = entry.baseAsset;
     doc.objectName             = entry.objectName;
     doc.regionName             = entry.region;
-    doc.orphan->kind                 = orphan;
-    doc.orphan->noticeDismissed        = false;
+    ALScriptStudioOrphans::detach(doc, orphan);
     if (entry.wrapped && !entry.notecard)
     {
         if (!doc.envelope)
@@ -7073,12 +7064,7 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
     }
     else if (action == "keep_here" && doc.external->waiting)
     {
-        // The external editor's save not sent; its copy is written from
-        // here at the next save.
-        doc.external->waiting.reset();
-        LLStringUtil::format_map_t args;
-        args["[NAME]"] = doc.name;
-        setStatus(getString("ExternalKept", args));
+        mExternal.keep(doc);
     }
     else if (action == "take_saved")
     {

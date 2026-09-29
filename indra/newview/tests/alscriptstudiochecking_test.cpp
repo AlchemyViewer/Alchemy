@@ -887,6 +887,7 @@ namespace tut
         Doc&                    doc      = tab("a");
         checking.ask(doc, Kind::Actions, ALTextPos(0, 8), ALTextPos(0, 13));
         ensure("a stretch", studio.asks[0].request.endColumn == 13);
+        ensure("kept, to offer them over", doc.check->actionsAsked.begin == ALTextPos(0, 8) && doc.check->actionsAsked.end == ALTextPos(0, 13));
         ALScriptAnalysis::Result result;
         result.kind    = Kind::Actions;
         result.id      = "a";

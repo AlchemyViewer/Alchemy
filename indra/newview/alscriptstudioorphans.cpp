@@ -163,6 +163,12 @@ ALScriptStudioOrphans::Orphan ALScriptStudioOrphans::failedAs(const Doc& doc, AL
     return object_there ? Orphan::Removed : Orphan::Away;
 }
 
+// static
+void ALScriptStudioOrphans::loadFailed(Doc& doc)
+{
+    doc.orphan->nextReattach = LLTimer::getTotalSeconds() + ALRecoveryRetry::delayAfter(++doc.orphan->reattachTries);
+}
+
 void ALScriptStudioOrphans::reattach(Doc& doc)
 {
     // What the tab holds carried over what the item has, with its history,
@@ -173,13 +179,20 @@ void ALScriptStudioOrphans::reattach(Doc& doc)
     // tab while it loads.
     mWindow.keepForRecovery(doc);
     ALRecoveryEntry holding = ALScriptStudioRecovery::entryOf(doc);
-    doc.orphan->detached           = false;
-    doc.recovering                = holding;
-    doc.carriedText               = holding.text;
+    doc.orphan->detached = false;
+    doc.recovering       = holding;
+    doc.carriedText      = holding.text;
     doc.carryItemsTo(doc);
     doc.loaded = false;
     doc.editor->setReadOnly(true);
     mWindow.loadScript(doc.ref);
+}
+
+void ALScriptStudioOrphans::retryLoad(Doc& doc)
+{
+    // Asked for: tried now, and a few more times after if it fails.
+    doc.orphan->reattachTries = 0;
+    reattach(doc);
 }
 
 F64 ALScriptStudioOrphans::check()
@@ -458,9 +471,7 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
     }
     else if (action == "retry_load" && doc->orphan->detached && doc->loaded)
     {
-        // Asked for: tried now, and a few more times after if it fails.
-        doc->orphan->reattachTries = 0;
-        reattach(*doc);
+        retryLoad(*doc);
     }
     else if (action == "copy")
     {

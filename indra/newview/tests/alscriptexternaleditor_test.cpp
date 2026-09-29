@@ -319,4 +319,21 @@ namespace tut
         ensure("the log gone", !exists(log) && !a.external->log);
         ensure("a save under way is no longer the editor's", !a.save.external());
     }
+
+    template<> template<>
+    void alscriptexternaleditor_object::test<9>()
+    {
+        set_test_name("a save outside held over changes made here, kept from when the author says so: let go, the tab's text standing, and said");
+        ALScriptExternalEditor& unit = make();
+        Doc&                    a    = tab("a", "one");
+        unit.edit(a);
+        a.editor->setCaret(a.editor->document().end());
+        a.editor->insertText(" here");
+        write(unit.fileName(a), "two");
+        unit.changed("a", unit.fileName(a));
+        ensure("held", a.external->waiting && *a.external->waiting == "two");
+        unit.keep(a);
+        ensure("let go, the tab's text standing", !a.external->waiting && studio.taken.empty() && a.editor->text() == "one here");
+        ensure("said", !services.statuses.empty() && services.statuses.back().find("ExternalKept") == 0);
+    }
 }
