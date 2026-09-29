@@ -79,13 +79,13 @@ namespace ALSurface
         }
         // How far towards `wanted` it may go, found by halving: the
         // contrast falls along the way, since `wanted` reads less.
-        F32 near = 0.f, far = 1.f;
+        F32 lo = 0.f, hi = 1.f;
         for (S32 i = 0; i < 16; ++i)
         {
-            const F32 mid = (near + far) / 2.f;
-            (contrast(lerp(ink, wanted, mid), paper) >= least ? near : far) = mid;
+            const F32 mid = (lo + hi) / 2.f;
+            (contrast(lerp(ink, wanted, mid), paper) >= least ? lo : hi) = mid;
         }
-        return lerp(ink, wanted, near);
+        return lerp(ink, wanted, lo);
     }
 
     LLColor4 frame(const LLColor4& ink, F32 alpha)

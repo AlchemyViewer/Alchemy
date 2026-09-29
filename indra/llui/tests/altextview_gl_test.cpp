@@ -59,45 +59,45 @@ namespace
     {
         using ALTextView::drawSquiggle;
     };
+
+    constexpr S32 W = ll_test::HeadlessGL::WIDTH;
+    constexpr S32 H = ll_test::HeadlessGL::HEIGHT;
+
+    ll_test::HeadlessGL& gl()
+    {
+        static ll_test::HeadlessGL instance(true, true, true, /*needs_render=*/true);
+        return instance;
+    }
+
+    // White drawn over black, blended by its alpha, and read back: how
+    // much of each pixel it covered, 0 to 255, bottom row first.
+    std::vector<S32> coverage(const std::function<void()>& draw)
+    {
+        gl().clearFramebuffer();
+        glEnable(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+        draw();
+        gGL.flush();
+        glDisable(GL_BLEND);
+        glFinish();
+        const std::vector<U8> rgba = ll_test::readFramebufferRGBA(W, H);
+        std::vector<S32>      out(static_cast<size_t>(W) * H);
+        for (size_t i = 0; i < out.size(); ++i)
+        {
+            out[i] = rgba[i * 4];
+        }
+        return out;
+    }
 }
 
 namespace tut
 {
     struct altextview_gl_data
     {
-        static constexpr S32 W = ll_test::HeadlessGL::WIDTH;
-        static constexpr S32 H = ll_test::HeadlessGL::HEIGHT;
-
-        static ll_test::HeadlessGL& gl()
-        {
-            static ll_test::HeadlessGL instance(true, true, true, /*needs_render=*/true);
-            return instance;
-        }
-
         altextview_gl_data()
         {
             gl();
             ll_test::installWhiteTexture();
-        }
-
-        // White drawn over black, blended by its alpha, and read back: how
-        // much of each pixel it covered, 0 to 255, bottom row first.
-        static std::vector<S32> coverage(const std::function<void()>& draw)
-        {
-            gl().clearFramebuffer();
-            glEnable(GL_BLEND);
-            gGL.setSceneBlendType(LLRender::BT_ALPHA);
-            draw();
-            gGL.flush();
-            glDisable(GL_BLEND);
-            glFinish();
-            const std::vector<U8> rgba = ll_test::readFramebufferRGBA(W, H);
-            std::vector<S32>      out(static_cast<size_t>(W) * H);
-            for (size_t i = 0; i < out.size(); ++i)
-            {
-                out[i] = rgba[i * 4];
-            }
-            return out;
         }
 
         // What a squiggle from x0 at height y covers of a pixel, worked out

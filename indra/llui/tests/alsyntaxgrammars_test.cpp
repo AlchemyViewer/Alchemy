@@ -388,7 +388,9 @@ namespace tut
                 ALSyntaxGrammar::sPlainLexing = false;
                 grammar->lexLine(one, quick, quick_tokens, words);
                 const std::string where = std::string(grammar_name) + " line " + std::to_string(line);
-                ensure(where + ": the same tokens: " + said(one, plain_tokens) + " against " + said(one, quick_tokens), quick_tokens == plain_tokens);
+                ensure(where + ": the same tokens: " + alsyntaxgrammars_data::said(one, plain_tokens) + " against " +
+                           alsyntaxgrammars_data::said(one, quick_tokens),
+                       quick_tokens == plain_tokens);
                 ensure(where + ": the same state after", quick == plain);
                 if (next == std::string::npos)
                 {

@@ -1393,7 +1393,7 @@ namespace tut
             {
                 body += "        " + read + "\n";
             }
-            return wrap(global + "\n", "        vector v; float f; string s;\n" + body + "        llOwnerSay((string)[v, f, s]);\n");
+            return allsloptimizer_data::wrap(global + "\n", "        vector v; float f; string s;\n" + body + "        llOwnerSay((string)[v, f, s]);\n");
         };
         const auto kept = [](const ALLSLOptimizer::Result& r, const std::string& global) { return r.text.find(global) != std::string::npos; };
         ALLSLOptimizer::Options lso  = options();
@@ -1502,10 +1502,10 @@ namespace tut
                                         "        l = l + [llFrand(1), llFrand(2)];\n"
                                         "        llOwnerSay((string)g + (string)l + (string)a + (string)b);\n");
         const auto run = [&](ALLSLOptimizer::Target target) {
-            ALLSLOptimizer::Options o = options();
+            ALLSLOptimizer::Options o = allsloptimizer_data::options();
             o.target                  = target;
             const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
-            ensure("optimized: " + notes(r), r.optimized);
+            ensure("optimized: " + allsloptimizer_data::notes(r), r.optimized);
             ALLSLService           service;
             const ALScriptProblems said = service.check(r.text, target != ALLSLOptimizer::Target::LSO);
             for (const ALScriptProblem& p : said)
@@ -1564,7 +1564,7 @@ namespace tut
             {
                 body += "        l += [llGetSubString(llGetObjectName(), " + std::to_string(k) + ", -1)];\n";
             }
-            return wrap("", body + "        llOwnerSay((string)l);\n");
+            return allsloptimizer_data::wrap("", body + "        llOwnerSay((string)l);\n");
         };
         // Once: adding a string bare needs a helper nothing else in the
         // script uses, which costs more than the one place saves.
@@ -1821,11 +1821,11 @@ namespace tut
         };
         // Folded or not, never larger than the source.
         const auto folded = [&weigh](Target target, const std::string& body) {
-            ALLSLOptimizer::Options o = options();
+            ALLSLOptimizer::Options o = allsloptimizer_data::options();
             o.target                  = target;
-            const std::string            source = wrap("", body);
+            const std::string            source = allsloptimizer_data::wrap("", body);
             const ALLSLOptimizer::Result r      = ALLSLOptimizer::run(source, o);
-            ensure("optimized: " + notes(r), r.optimized);
+            ensure("optimized: " + allsloptimizer_data::notes(r), r.optimized);
             const ALScriptWeight before = weigh(target, source);
             const ALScriptWeight after  = weigh(target, r.text);
             ensure("no larger: " + r.text, before.compiled && after.compiled && after.total <= before.total);
@@ -1891,11 +1891,11 @@ namespace tut
                                    "        counted = busy;\n        llOwnerSay(\"Q\" + (string)counted);\n        state waiting;\n    }\n}\n"
                                    "state waiting\n{\n    touch_start(integer n)\n    {\n        state default;\n    }\n}\n";
         const auto run = [&source](ALLSLOptimizer::Target target) {
-            ALLSLOptimizer::Options o = options();
+            ALLSLOptimizer::Options o = allsloptimizer_data::options();
             o.target                  = target;
             o.shrinknames             = true;
             const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
-            ensure("optimized: " + notes(r), r.optimized);
+            ensure("optimized: " + allsloptimizer_data::notes(r), r.optimized);
             return r;
         };
         const auto nameOf = [](const ALLSLOptimizer::Result& r, const std::string& name) {

@@ -270,7 +270,7 @@ namespace tut
         std::thread::id       told_on;
         ALWatchedFile         watched(file, [&](const std::string& path) {
             heard.push_back(path);
-            held.push_back(read(path));
+            held.push_back(alwatchedfile_data::read(path));
             told_on = std::this_thread::get_id();
         });
         watched.poll(0.05f);

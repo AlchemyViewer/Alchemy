@@ -704,7 +704,7 @@ namespace tut
             std::vector<ALTabStrip::Tab> tabs;
             for (S32 i = 0; i < 40; ++i)
             {
-                tabs.push_back(tab(std::string(stem) + std::string(static_cast<size_t>(1 + (i * 7) % 23), 'x') + ".xml", std::to_string(i)));
+                tabs.push_back(altabstrip_data::tab(std::string(stem) + std::string(static_cast<size_t>(1 + (i * 7) % 23), 'x') + ".xml", std::to_string(i)));
             }
             return tabs;
         };

@@ -101,7 +101,7 @@ namespace tut
 
         // Put in while the first is running: the running one told.
         Lane lane2;
-        lane2.put(queued("check x1", "x", true, [this, &lane2]() { lane2.put(queued("check x2", "x", true), take); }), take);
+        lane2.put(queued("check x1", "x", true, [this, &lane2]() { lane2.put(queued("check x2", "x", true), &alscriptjoblane_data::take); }), take);
         lane2.drain();
         ensure("the running one told to stop", jobs.back()->name == "check x2" && jobs[jobs.size() - 2]->taken && jobs[jobs.size() - 2]->stopped);
         ensure("and the later one ran after", ran.back() == "check x2");

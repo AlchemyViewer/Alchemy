@@ -686,7 +686,7 @@ namespace tut
         studio.answerRun(wrong);
         ensure_equals("sent: the save keeps the work", studio.sent.size(), size_t(1));
         const auto going = std::find_if(services.reports.begin(), services.reports.end(),
-                                        [](const al_studio_test::FakeServices::Said& s) { return nameOf(s.text) == "SavingWithout"; });
+                                        [](const al_studio_test::FakeServices::Said& s) { return alscriptstudiosaving_data::nameOf(s.text) == "SavingWithout"; });
         ensure("said as it went, by name, a failure of the tab",
                going != services.reports.end() && going->text.find("[FILES]=lib.lsl, x.lsl") != std::string::npos && going->failure && going->doc == "a");
         ensure("with where includes come from", going->text.find("PreprocessMissingDiskRoute") != std::string::npos);

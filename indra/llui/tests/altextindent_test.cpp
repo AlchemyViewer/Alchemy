@@ -300,7 +300,7 @@ namespace tut
             {
                 *caret = change ? change->caret : end;
             }
-            return change ? applied(doc.text(), *change) : doc.text();
+            return change ? altextindent_data::applied(doc.text(), *change) : doc.text();
         };
         ensure_equals("whole lines into a blank line under an opener: a level in from it",
                       pasted("f()\n{\n\n}", ALTextPos(2, 0), "        a;\n        if (x)\n        {\n            b;\n        }\n", spaces),
