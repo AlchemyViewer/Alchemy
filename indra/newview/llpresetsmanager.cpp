@@ -539,7 +539,7 @@ void LLPresetsManager::getGraphicsControlNames(std::vector<std::string>& names)
         "RenderVolumeLODFactor",
         "RenderScreenSpaceReflections",
         "RenderReflectionProbeDetail",
-        "RenderReflectionProbeLevel"
+        "RenderReflectionProbeLevel",
         "RenderCASSharpness",
     };
     names = camera_controls;
