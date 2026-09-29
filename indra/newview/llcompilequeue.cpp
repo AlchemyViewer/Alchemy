@@ -36,7 +36,7 @@
 
 #include "llcompilequeue.h"
 
-#include "alfloaterscriptstudio.h"
+#include "alscriptstudio.h"
 
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
@@ -482,7 +482,7 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
             floater->addStringMessage(LLTrans::getString("CompileQueueSkippedSaving", named));
             return true;
         }
-        if (ALFloaterScriptStudio::unsavedIn(ref))
+        if (ALScriptStudio::unsavedIn(ref))
         {
             floater->addStringMessage(LLTrans::getString("CompileQueueUnsavedInStudio", named));
         }

@@ -302,23 +302,27 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::lastWorkedIn()
     return window && window->getVisible() ? window : nullptr;
 }
 
-// static
-ALFloaterScriptStudio* ALFloaterScriptStudio::open(const ALScriptRef& ref, const std::string& name, bool take_focus)
+LLFloater* ALScriptStudio::build(const LLSD& key)
+{
+    return LLFloaterReg::build<ALFloaterScriptStudio>(key);
+}
+
+void ALScriptStudio::open(const ALScriptRef& ref, const std::string& name, bool take_focus)
 {
     // Open somewhere already: that window, brought forward -- if a
     // window may be shown at all, which a restriction on viewing
     // scripts decides the same way for every window. Else the window last
     // worked in, as a script window used to open over the last one.
-    ALFloaterScriptStudio* window = ref.isNull() ? nullptr : holderOf(ref, std::string());
+    ALFloaterScriptStudio* window = ref.isNull() ? nullptr : ALFloaterScriptStudio::holderOf(ref, std::string());
     if (!window && !ref.isNull())
     {
-        window = lastWorkedIn();
+        window = ALFloaterScriptStudio::lastWorkedIn();
     }
     if (window)
     {
         if (!LLFloaterReg::canShowInstance("script_studio", window->getKey()))
         {
-            return nullptr;
+            return;
         }
         // A floater takes the keyboard as it opens unless told otherwise.
         const bool auto_focus = window->getAutoFocus();
@@ -330,7 +334,7 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::open(const ALScriptRef& ref, const
             window->setFocus(true);
         }
         window->openScript(ref, name, std::nullopt, -1, take_focus);
-        return window;
+        return;
     }
     // Made first where it is to open without the keyboard -- a script
     // handed over while someone types elsewhere, which would otherwise
@@ -351,11 +355,9 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::open(const ALScriptRef& ref, const
     {
         studio->openScript(ref, name, std::nullopt, -1, take_focus);
     }
-    return studio;
 }
 
-// static
-void ALFloaterScriptStudio::editSnippets(bool lua)
+void ALScriptStudio::editSnippets(bool lua)
 {
     const std::string path = ALScriptSnippets::path(lua);
     if (!LLFile::isfile(path))
@@ -375,8 +377,7 @@ void ALFloaterScriptStudio::editSnippets(bool lua)
     }
 }
 
-// static
-void ALFloaterScriptStudio::openVimrc()
+void ALScriptStudio::openVimrc()
 {
     if (ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES))
     {
@@ -424,15 +425,13 @@ void ALFloaterScriptStudio::editVimrc()
     openFile(path, false);
 }
 
-// static
-ALFloaterScriptStudio* ALFloaterScriptStudio::explore(const LLUUID& root)
+void ALScriptStudio::explore(const LLUUID& root)
 {
     ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES);
     if (studio && root.notNull())
     {
         studio->mExplorerPane->explore(root);
     }
-    return studio;
 }
 
 void ALFloaterScriptStudio::worldAsset(const Doc& doc, std::function<void(std::optional<LLUUID>)> told)
@@ -488,25 +487,24 @@ void ALFloaterScriptStudio::takeLoaded(Doc& doc, const std::string& text)
     loaded(answer);
 }
 
-// static
-void ALFloaterScriptStudio::itemRemoved(const ALScriptRef& ref)
+void ALScriptStudio::itemRemoved(const ALScriptRef& ref)
 {
     for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
     {
         ALFloaterScriptStudio* window = ALViewType::as<ALFloaterScriptStudio>(floater);
-        const size_t           index  = window ? window->indexOf(ref) : NONE;
-        if (index == NONE)
+        const size_t           index  = window ? window->indexOf(ref) : ALFloaterScriptStudio::NONE;
+        if (index == ALFloaterScriptStudio::NONE)
         {
             continue;
         }
-        Doc&                       doc = *window->mDocs[index];
+        ALFloaterScriptStudio::Doc& doc = *window->mDocs[index];
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
         if (doc.loaded && doc.modifiable && doc.editor->isDirty())
         {
             // What was typed is not the deletion's to take: the tab stays,
             // its text kept on disk, and says what can be done with it.
-            doc.orphan.kind          = Doc::Orphan::Removed;
+            doc.orphan.kind          = ALFloaterScriptStudio::Doc::Orphan::Removed;
             doc.orphan.noticeDismissed = false;
             window->mRecovery.keep(doc);
             window->report(window->getString("OrphanRemovedKept", args), true, &doc, { "copy", "export" });
@@ -1743,7 +1741,7 @@ void ALFloaterScriptStudio::compare(Doc& doc, const std::string& left, const std
         p.side                    = side;
         doc.compareView           = LLUICtrlFactory::create<ALDiffView>(p);
         doc.compareView->setVisible(false);
-        doc.compareView->setFont(editorFont());
+        doc.compareView->setFont(ALScriptStudio::editorFont());
         const std::string id = doc.id;
         doc.compareView->setOnEscape([this, id]() {
             if (Doc* found = findDoc(id))
@@ -1760,8 +1758,7 @@ void ALFloaterScriptStudio::compare(Doc& doc, const std::string& left, const std
     showView(doc, Doc::View::Compare, true);
 }
 
-// static
-const LLFontGL* ALFloaterScriptStudio::editorFont()
+const LLFontGL* ALScriptStudio::editorFont()
 {
     static LLCachedControl<std::string> family(gSavedSettings, "ALScriptStudioFontFamily", "");
     static LLCachedControl<std::string> size(gSavedSettings, "ALScriptStudioFontSize", "");
@@ -1773,7 +1770,7 @@ const LLFontGL* ALFloaterScriptStudio::editorFont()
     // Zoomed: the size chosen, so many points larger or smaller.
     if (const F32 base = LLFontGL::pointsOf(name, how); zoom() != 0 && base > 0.f)
     {
-        if (const LLFontGL* zoomed = LLFontGL::getFontAtPoints(name, llclamp(base + static_cast<F32>(zoom()), MIN_TEXT_POINTS, MAX_TEXT_POINTS), look))
+        if (const LLFontGL* zoomed = LLFontGL::getFontAtPoints(name, llclamp(base + static_cast<F32>(zoom()), ALFloaterScriptStudio::MIN_TEXT_POINTS, ALFloaterScriptStudio::MAX_TEXT_POINTS), look))
         {
             return zoomed;
         }
@@ -1795,15 +1792,14 @@ void ALFloaterScriptStudio::zoomText(S32 steps)
         zoom = llclamp(zoom, static_cast<S32>(MIN_TEXT_POINTS - base), static_cast<S32>(MAX_TEXT_POINTS - base));
     }
     gSavedSettings.setS32("ALScriptStudioFontZoom", zoom);
-    refreshAll();
+    ALScriptStudio::refreshAll();
     if (base > 0.f)
     {
         setStatus(getString("TextSize", LLStringUtil::format_map_t{ { "[POINTS]", llformat("%g", base + static_cast<F32>(zoom)) } }));
     }
 }
 
-// static
-void ALFloaterScriptStudio::refreshAll()
+void ALScriptStudio::refreshAll()
 {
     for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
     {
@@ -1814,8 +1810,7 @@ void ALFloaterScriptStudio::refreshAll()
     }
 }
 
-// static
-void ALFloaterScriptStudio::applyTypingOptions(ALCodeEditor& editor)
+void ALScriptStudio::applyTypingOptions(ALCodeEditor& editor)
 {
     // What a script is indented by where it does not say, and whether it
     // is asked; one given its own for its tab keeps that.
@@ -1835,7 +1830,7 @@ void ALFloaterScriptStudio::applyTypingOptions(ALCodeEditor& editor)
 
 void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor, bool notecard)
 {
-    editor.setFont(editorFont());
+    editor.setFont(ALScriptStudio::editorFont());
     editor.setOnZoomWheel([this](S32 steps) { zoomText(steps); });
     editor.keymap() = ALScriptKeymap::current();
     // Vim put over the editor, or taken away; one already there keeps
@@ -1860,7 +1855,7 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor, bool noteca
     {
         editor.setLineNumberBase(mNotecardFromZero ? -1 : 0);
     }
-    applyTypingOptions(editor);
+    ALScriptStudio::applyTypingOptions(editor);
     editor.setShowIndentGuides(mIndentGuides);
     editor.setShowWhitespace(mWhitespace);
     editor.setRelativeLineNumbers(mRelativeNumbers);
@@ -6332,8 +6327,7 @@ bool ALFloaterScriptStudio::moveActiveTo(ALFloaterScriptStudio* window)
 
 // --- recovery ------------------------------------------------------------------------
 
-// static
-void ALFloaterScriptStudio::offerRecovery()
+void ALScriptStudio::offerRecovery()
 {
     // What was kept on purpose opens with the main window, which may be
     // up already, restored as the viewer started.
@@ -7239,15 +7233,14 @@ void ALFloaterScriptStudio::itemDeleted(const ALScriptRef& ref)
 
 bool ALFloaterScriptStudio::unsavedAnywhere(const ALScriptRef& ref) const
 {
-    return unsavedIn(ref);
+    return ALScriptStudio::unsavedIn(ref);
 }
 
-// static
-bool ALFloaterScriptStudio::unsavedIn(const ALScriptRef& ref)
+bool ALScriptStudio::unsavedIn(const ALScriptRef& ref)
 {
-    const ALFloaterScriptStudio* holder = holderOf(ref, std::string());
-    const size_t                 index  = holder ? holder->indexOf(ref) : NONE;
-    return index != NONE && holder->mDocs[index]->editor->isDirty() && holder->mDocs[index]->modifiable;
+    const ALFloaterScriptStudio* holder = ALFloaterScriptStudio::holderOf(ref, std::string());
+    const size_t                 index  = holder ? holder->indexOf(ref) : ALFloaterScriptStudio::NONE;
+    return index != ALFloaterScriptStudio::NONE && holder->mDocs[index]->editor->isDirty() && holder->mDocs[index]->modifiable;
 }
 
 namespace

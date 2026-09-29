@@ -87,8 +87,10 @@
 
 #include "llenvironment.h"
 
+#include "alscriptstudio.h"
+#include "alscripttypes.h"
+
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1)
-#include "alfloaterscriptstudio.h"
 #include "rlvactions.h"
 #include "rlvhandler.h"
 #include "rlvlocks.h"
@@ -8632,7 +8634,7 @@ public:
         LLViewerInventoryItem* item = getItem();
         if (item)
         {
-            ALFloaterScriptStudio::open(ALScriptRef(LLUUID::null, mUUID), item->getName());
+            ALScriptStudio::open(ALScriptRef(LLUUID::null, mUUID), item->getName());
         }
         LLInvFVBridgeAction::doIt();
     }

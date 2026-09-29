@@ -67,7 +67,7 @@
 #include "llviewerobjectlist.h"
 #include "llviewermessage.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
-#include "alfloaterscriptstudio.h"
+#include "alscriptstudio.h"
 #include "rlvactions.h"
 #include "rlvhandler.h"
 #include "rlvlocks.h"
@@ -975,7 +975,7 @@ void LLTaskLSLBridge::openItem()
     if (object->permModify() || gAgent.isGodlike())
     {
         const LLInventoryItem* item = findItem();
-        ALFloaterScriptStudio::open(ALScriptRef(mPanel->getTaskUUID(), mUUID), item ? item->getName() : std::string());
+        ALScriptStudio::open(ALScriptRef(mPanel->getTaskUUID(), mUUID), item ? item->getName() : std::string());
     }
     else
     {
@@ -986,7 +986,7 @@ void LLTaskLSLBridge::openItem()
 // virtual
 bool LLTaskLSLBridge::removeItem()
 {
-    ALFloaterScriptStudio::itemRemoved(ALScriptRef(mPanel->getTaskUUID(), mUUID));
+    ALScriptStudio::itemRemoved(ALScriptRef(mPanel->getTaskUUID(), mUUID));
     return LLTaskInvFVBridge::removeItem();
 }
 

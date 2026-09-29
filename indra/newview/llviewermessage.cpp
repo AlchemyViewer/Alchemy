@@ -27,7 +27,8 @@
 #include "llviewerprecompiledheaders.h"
 #include "llviewermessage.h"
 
-#include "alfloaterscriptstudio.h"
+#include "alscriptstudio.h"
+#include "alscripttypes.h"
 #include "alnotecarditems.h"
 
 // Linden libraries
@@ -1378,7 +1379,7 @@ void open_inventory_offer(const uuid_vec_t& objects, const std::string& from_nam
                         LLFloaterReg::showInstance("preview_anim", LLSD(obj_id), take_focus);
                         break;
                     case LLAssetType::AT_SCRIPT:
-                        ALFloaterScriptStudio::open(ALScriptRef(LLUUID::null, obj_id), item->getName(), take_focus);
+                        ALScriptStudio::open(ALScriptRef(LLUUID::null, obj_id), item->getName(), take_focus);
                         break;
                     case LLAssetType::AT_SOUND:
                         LLFloaterReg::showInstance("preview_sound", LLSD(obj_id), take_focus);

@@ -56,6 +56,7 @@
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
 #include "alscriptsnippets.h"
+#include "alscriptstudio.h"
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
 #include "alrecoverystore.h"
@@ -130,37 +131,15 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
 public:
     AL_VIEW_TYPE(ALFloaterScriptStudio, ALStudioFloater);
 
-    // The studio, with this script open in it: the window that has it
-    // open already, else the main one; null where a restriction keeps
-    // the studio from opening.
-    static ALFloaterScriptStudio* open(const ALScriptRef& ref, const std::string& name = std::string(), bool take_focus = true);
-    // The scripter's own snippets for a language, opened in the studio as
-    // the XML they are kept in: made with an example in it where there is
-    // none yet. What is saved there is offered at once.
-    static void editSnippets(bool lua);
-    // The vimrc opened in the studio to be edited: the notecard where one
-    // is the vimrc, else the file, made with a few lines saying what it
-    // takes where there is none yet.
-    static void openVimrc();
-    // The studio, with this object pinned in its explorer and chosen
-    // there: what the build tool's Explore in IDE button means when no
-    // external editor is listening.
-    static ALFloaterScriptStudio* explore(const LLUUID& root);
-    // At login: what an earlier session left unsaved -- a crash, a lost
-    // connection -- offered back, to open, to leave for later, or to
-    // discard.
-    static void offerRecovery();
-    // A script saved from outside the studio -- by an external editor
-    // over the bridge -- with this text: the tab that holds it, if one
-    // does, shows the text as saved. A tab with unsaved changes takes
-    // the text as one more step to undo, so that nothing typed is lost.
-    // The asset the save made, where the saver knows it.
-    // A script or notecard gone from its object, so that a tab holding
-    // it goes too.
-    static void itemRemoved(const ALScriptRef& ref);
-    // Whether a script is open with changes not saved, in any of the
-    // studio's windows: what a recompile of the server's text leaves out.
-    static bool unsavedIn(const ALScriptRef& ref);
+    // The ways in (alscriptstudio.h), which reach into every window.
+    friend void ALScriptStudio::open(const ALScriptRef& ref, const std::string& name, bool take_focus);
+    friend void ALScriptStudio::explore(const LLUUID& root);
+    friend void ALScriptStudio::itemRemoved(const ALScriptRef& ref);
+    friend bool ALScriptStudio::unsavedIn(const ALScriptRef& ref);
+    friend void ALScriptStudio::offerRecovery();
+    friend void ALScriptStudio::editSnippets(bool lua);
+    friend void ALScriptStudio::openVimrc();
+
     // Whether this is the main window, which keeps the state and is
     // hidden rather than destroyed when closed; the others are the
     // scripts popped out into windows of their own, gone when closed.
@@ -197,21 +176,16 @@ public:
     void continueClosing() override;
     // The options every editor shares -- font, keys, wrap, gutter, map --
     // put on all of them again, when a setting behind one changes; and
-    // on every studio open, which the preferences ask for.
-    void        applyEditorOptions();
-    static void refreshAll();
+    // on every studio open, which the preferences ask for
+    // (ALScriptStudio::refreshAll).
+    void applyEditorOptions();
 
     // A word of the language, as the region defines it (ALScriptStudioWords).
     typedef ALScriptStudioWords::Vocab Vocab;
-    // The typing settings put on an editor: tabs, completion, pairs, the
-    // caret, the hover card. The studio's editors and the preferences'
-    // preview share them.
-    static void applyTypingOptions(ALCodeEditor& editor);
-    // The font the settings name, or the monospace default, zoomed as the
-    // text has been, within MIN_TEXT_POINTS and MAX_TEXT_POINTS.
-    static const LLFontGL* editorFont();
-    static constexpr F32   MIN_TEXT_POINTS = 6.f;
-    static constexpr F32   MAX_TEXT_POINTS = 48.f;
+    // The least and the most a zoom takes the text to, in points
+    // (ALScriptStudio::editorFont).
+    static constexpr F32 MIN_TEXT_POINTS = 6.f;
+    static constexpr F32 MAX_TEXT_POINTS = 48.f;
     // The text a step larger, or smaller, every window's; none, as the
     // size chosen. Said in points.
     void zoomText(S32 steps);

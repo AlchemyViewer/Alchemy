@@ -45,7 +45,7 @@
 #include "material_codes.h"
 
 // project includes
-#include "alfloaterscriptstudio.h"
+#include "alscriptstudio.h"
 #include "llagent.h"
 #include "llpanelobjectinventory.h"
 #include "llresmgr.h"
@@ -477,7 +477,7 @@ void LLPanelContents::onClickPublish()
     {
         // No external editor listening: the studio's explorer, with the
         // object kept in it.
-        ALFloaterScriptStudio::explore(object_id);
+        ALScriptStudio::explore(object_id);
         // Not a toggle this way: nothing to stop.
         mPublishButton->setToggleState(false);
         return;

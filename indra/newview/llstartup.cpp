@@ -213,7 +213,7 @@
 #include "llpanelgroupnotices.h"
 #include "llparcel.h"
 #include "llpreview.h"
-#include "alfloaterscriptstudio.h"
+#include "alscriptstudio.h"
 #include "alscripttempfiles.h"
 #include "alscriptworkspace.h"
 #include "llproxy.h"
@@ -2758,7 +2758,7 @@ bool idle_startup()
         // What Script Studio kept of a session that ended before its scripts
         // were saved, offered back now the world is in; and the copies such
         // a session gave an editor outside, taken out of the temp folder.
-        ALFloaterScriptStudio::offerRecovery();
+        ALScriptStudio::offerRecovery();
         ALScriptWorkspace::instance().tempFiles().sweep();
 
         LLAgentPicksInfo::getInstance()->requestNumberOfPicks();

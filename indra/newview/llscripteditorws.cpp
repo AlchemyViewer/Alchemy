@@ -30,7 +30,6 @@
 #include "llviewerprecompiledheaders.h"
 #include "llscripteditorws.h"
 
-#include "alfloaterscriptstudio.h"
 #include "alscriptenvelope.h"
 #include "alscriptmessages.h"
 #include "alscriptpreprocessor.h"

@@ -178,7 +178,7 @@
 #include "llfloatertos.h"
 #include "llfloatertoybox.h"
 #include "llfloatertranslationsettings.h"
-#include "alfloaterscriptstudio.h"
+#include "alscriptstudio.h"
 #include "alfloaterscriptpreferences.h"
 #include "alfloaterxuistudio.h"
 #include "alfloaterxuilibrary.h"
@@ -558,7 +558,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("profile", "floater_profile.xml",(LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterProfile>);
     LLFloaterReg::add("slapp_test", "floater_test_slapp.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSLappTest>);
 
-    LLFloaterReg::add("script_studio", "floater_script_studio.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterScriptStudio>);
+    LLFloaterReg::add("script_studio", "floater_script_studio.xml", &ALScriptStudio::build);
     LLFloaterReg::add("script_studio_prefs", "floater_script_studio_prefs.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterScriptPreferences>);
     LLFloaterReg::add("xui_studio", "floater_xui_studio.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterXUIStudio>);
     LLFloaterReg::add("xui_library", "floater_xui_library.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterXUILibrary>);

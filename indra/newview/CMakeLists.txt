@@ -1035,6 +1035,7 @@ if(AL_BUILD_VIEWER)
     alscriptsaveflow.h
     alscriptsearch.h
     alscriptsearchpane.h
+    alscriptstudio.h
     alscriptstudioaccount.h
     alscriptstudiocaret.h
     alscriptstudiochecking.h

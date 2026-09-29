@@ -30,7 +30,7 @@
 #include "alsurface.h"
 
 #include "alcodeeditor.h"
-#include "alfloaterscriptstudio.h"
+#include "alscriptstudio.h"
 #include "alscriptanalysis.h"
 #include "alscriptstudiovimrc.h"
 #include "alscriptstudiowords.h"
@@ -131,7 +131,7 @@ bool ALFloaterScriptPreferences::postBuild()
     getChild<LLButton>("remove_folder")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onRemoveIncludeFolder(); });
     getChild<LLButton>("external_browse")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onBrowseExternalEditor(); });
     mVimrcNotecard = getChild<LLLineEditor>("vimrc_notecard");
-    getChild<LLButton>("vimrc_edit")->setCommitCallback([](LLUICtrl*, const LLSD&) { ALFloaterScriptStudio::openVimrc(); });
+    getChild<LLButton>("vimrc_edit")->setCommitCallback([](LLUICtrl*, const LLSD&) { ALScriptStudio::openVimrc(); });
     getChild<LLButton>("vimrc_clear")->setCommitCallback(
         [](LLUICtrl*, const LLSD&) { ALScriptStudioVimrc::instance().useNotecard(LLUUID::null); });
     mVimrcChanged = ALScriptStudioVimrc::instance().onChanged([this]() { refreshVimrc(); });
@@ -139,7 +139,7 @@ bool ALFloaterScriptPreferences::postBuild()
     getChild<LLButton>("scripting_settings")->setCommitCallback([](LLUICtrl*, const LLSD&) { LLFloaterReg::showInstance("scripting_settings"); });
     getChild<LLButton>("snippet_xml")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         flushSnippets();
-        ALFloaterScriptStudio::editSnippets(snippetLua());
+        ALScriptStudio::editSnippets(snippetLua());
     });
     getChild<LLButton>("snippet_new")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSnippetNew(); });
     getChild<LLButton>("snippet_copy")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSnippetCopy(); });
@@ -169,17 +169,17 @@ bool ALFloaterScriptPreferences::postBuild()
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
         {
             mEnableWatches.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) {
-                ALFloaterScriptStudio::refreshAll();
+                ALScriptStudio::refreshAll();
                 for (ALCodeEditor* editor : { mPreview, mTemplateLSL, mTemplateSLua, mSnippetBody })
                 {
-                    ALFloaterScriptStudio::applyTypingOptions(*editor);
+                    ALScriptStudio::applyTypingOptions(*editor);
                 }
             }));
         }
     }
     for (ALCodeEditor* editor : { mPreview, mTemplateLSL, mTemplateSLua, mSnippetBody })
     {
-        ALFloaterScriptStudio::applyTypingOptions(*editor);
+        ALScriptStudio::applyTypingOptions(*editor);
     }
     mLintsLSL  = getChild<LLScrollListCtrl>("lints_lsl");
     mLintsLuau = getChild<LLScrollListCtrl>("lints_luau");
@@ -475,7 +475,7 @@ void ALFloaterScriptPreferences::revert()
             ALScriptSnippets::restoreFileText(lua, mWasSnippets[lua ? 1 : 0], mWasSnippetsFile[lua ? 1 : 0]);
         }
     }
-    ALFloaterScriptStudio::refreshAll();
+    ALScriptStudio::refreshAll();
 }
 
 bool ALFloaterScriptPreferences::changed() const
@@ -763,7 +763,7 @@ void ALFloaterScriptPreferences::refreshPreview()
     mPreview->setSyntax(lua ? "slua" : "lsl");
     ALScriptStudioWords::teach(*mPreview, lua);
     mPreview->setText(getString(lua ? "PreviewSLua" : "PreviewLSL"));
-    mPreview->setFont(ALFloaterScriptStudio::editorFont());
+    mPreview->setFont(ALScriptStudio::editorFont());
 }
 
 void ALFloaterScriptPreferences::refreshFont()
@@ -789,8 +789,8 @@ void ALFloaterScriptPreferences::onFontPart(const std::string& part, const std::
     {
         gSavedSettings.setString("ALScriptStudioFontStyle", value);
     }
-    mPreview->setFont(ALFloaterScriptStudio::editorFont());
-    ALFloaterScriptStudio::refreshAll();
+    mPreview->setFont(ALScriptStudio::editorFont());
+    ALScriptStudio::refreshAll();
 }
 
 // --- the editor tab -------------------------------------------------------------------

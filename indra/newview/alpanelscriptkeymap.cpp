@@ -28,7 +28,7 @@
 
 #include "alstringmatch.h"
 
-#include "alfloaterscriptstudio.h"
+#include "alscriptstudio.h"
 #include "alkeycapture.h"
 #include "llbutton.h"
 #include "llkeyboard.h"
@@ -208,7 +208,7 @@ void ALPanelScriptKeymap::onClear()
     }
     mSaid->setText(LLStringUtil::null);
     fill();
-    ALFloaterScriptStudio::refreshAll();
+    ALScriptStudio::refreshAll();
 }
 
 void ALPanelScriptKeymap::onRestore()
@@ -228,7 +228,7 @@ void ALPanelScriptKeymap::onRestore()
     }
     mSaid->setText(LLStringUtil::null);
     fill();
-    ALFloaterScriptStudio::refreshAll();
+    ALScriptStudio::refreshAll();
 }
 
 void ALPanelScriptKeymap::onRestoreAll()
@@ -236,7 +236,7 @@ void ALPanelScriptKeymap::onRestoreAll()
     ALScriptKeymap::restoreAll();
     mSaid->setText(LLStringUtil::null);
     fill();
-    ALFloaterScriptStudio::refreshAll();
+    ALScriptStudio::refreshAll();
 }
 
 std::vector<std::string> ALPanelScriptKeymap::takeKey(const Chosen& keeping, const ALKeyChord& chord, bool apply) const
@@ -361,5 +361,5 @@ void ALPanelScriptKeymap::setKeys(const ALKeyChord& chord)
         mSaid->setText(getString("KeyTaken", args));
     }
     fill();
-    ALFloaterScriptStudio::refreshAll();
+    ALScriptStudio::refreshAll();
 }
