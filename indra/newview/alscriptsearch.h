@@ -59,8 +59,9 @@ public:
         U32                      version = 0;
         std::vector<ALTextRange> places;
         // A script that was not open: the text it was searched in, which a
-        // replace works out its replacements over, and whether it is a
-        // notecard, which a replace leaves alone.
+        // replace works out its replacements over; and whether it is a
+        // notecard, or, with no item, a text file, which a replace leaves
+        // alone.
         std::string              text;
         bool                     notecard = false;
         // Each place's line as listed, trimmed, and where the words start
@@ -196,12 +197,14 @@ public:
             Elsewhere
         };
         At                    at         = At::Closed;
-        bool                  notecard   = false;
+        // A text file in its tab: neither a script nor a notecard in the
+        // world, which Replace All leaves alone.
+        bool                  plainText  = false;
         bool                  loaded     = false;
         bool                  modifiable = false;
         const ALTextDocument* text       = nullptr;
     };
-    // What Replace All does with it: nothing, a notecard's places or none;
+    // What Replace All does with it: nothing, a text file's places or none;
     // its places replaced in its tab, which reads as it did when it was
     // searched; the script opened with the change unsaved; or left alone,
     // and said so -- typed in since, not to be changed, a file on disk

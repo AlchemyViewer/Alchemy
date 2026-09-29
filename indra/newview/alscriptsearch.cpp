@@ -263,7 +263,8 @@ void ALScriptSearch::rekey(const std::string& from, const std::string& to)
 // static
 ALScriptSearch::Step ALScriptSearch::step(const Found& one, const Now& now)
 {
-    if (one.places.empty() || one.notecard)
+    // A notecard is changed as a script is; a text file, not at all.
+    if (one.places.empty() || (one.notecard && one.ref.isNull()))
     {
         return Step::Skip;
     }
@@ -278,14 +279,14 @@ ALScriptSearch::Step ALScriptSearch::step(const Found& one, const Now& now)
         case Now::At::Elsewhere:
             // Changed there, as a tab here would be, where it reads as it
             // did when it was searched.
-            if (now.notecard)
+            if (now.plainText)
             {
                 return Step::Skip;
             }
             return now.loaded && now.modifiable && !one.text.empty() && now.text && now.text->text() == one.text ? Step::Replace : Step::Leave;
         case Now::At::Here:
         {
-            if (now.notecard)
+            if (now.plainText)
             {
                 return Step::Skip;
             }

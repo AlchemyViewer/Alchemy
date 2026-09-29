@@ -2038,7 +2038,7 @@ Delete [COUNT] items from their objects? This cannot be undone. Unsaved changes 
    icon="alertmodal.tga"
    name="ScriptStudioReplaceAll"
    type="alertmodal">
-Replace [PLACES] in [SCRIPTS] with &quot;[WITH]&quot;? You can undo each script's changes in one step. Scripts not open will open with the changes unsaved.
+Replace [PLACES] in [SCRIPTS] with &quot;[WITH]&quot;? You can undo each one's changes in one step. Those not open will open with the changes unsaved.
     <tag>confirm</tag>
     <usetemplate
      name="okcancelbuttons"

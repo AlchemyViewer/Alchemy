@@ -2301,6 +2301,8 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         // over or not, is what it is.
         doc.editor->setMaxBytes(LLNotecard::MAX_SIZE);
         items.wire();
+        // A Replace All that opened it for its changes: made now.
+        applyPendingEdits(doc);
         // Its References: the scripts of its object that read it.
         doc.editor->setSymbolRequest([this, raw = &doc](ALEditorCommand command, const ALTextRange&) {
             if (command == ALEditorCommand::FindReferences)

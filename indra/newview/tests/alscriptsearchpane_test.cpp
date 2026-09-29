@@ -329,7 +329,7 @@ namespace tut
     template <>
     void alscriptsearchpane_object::test<4>()
     {
-        set_test_name("Replace All, asked first: an open script's places as one step, a script not open opened with the change unsaved, a notecard left alone");
+        set_test_name("Replace All, asked first: an open script's places as one step, a script or a notecard not open opened with the change unsaved");
         ALScriptSearchPane& out  = make();
         Doc&                door = doc("door", "llSay(0, \"timer\");\n");
         const ALScriptRef   away(fresh(), fresh());
@@ -341,27 +341,30 @@ namespace tut
         out.fetched(studio.fetches[0].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\n"), false);
         out.fetched(studio.fetches[1].generation, "Thing", card, "card", std::make_shared<const std::string>("a timer\n"), true);
         ensure_equals("three found", out.search().found().size(), size_t(3));
-        services.whenOpened = [this](const ALScriptRef& ref, const std::string&) {
-            Doc& opened = doc("away", "timer\n");
+        services.whenOpened = [this, card](const ALScriptRef& ref, const std::string&) {
+            Doc& opened = ref == card ? doc("card", "a timer\n", true) : doc("away", "timer\n");
             opened.ref  = ref;
         };
 
         window.find<LLLineEditor>("search_replacement")->setText(std::string("clock"));
         out.askReplaceAll();
         ensure_equals("asked", studio.asked.size(), size_t(1));
-        ensure_equals("of the scripts, not the notecard", studio.asked[0]["SCRIPTS"].asString(), services.counted("Scripts", 2));
+        ensure_equals("of the scripts and the notecard", studio.asked[0]["SCRIPTS"].asString(), services.counted("ScriptsNotecards", 3));
         ensure_equals("the open one, replaced", door.editor->text(), std::string("llSay(0, \"clock\");\n"));
-        ensure_equals("the one not open, opened", services.opened.size(), size_t(1));
-        ensure("by its item", services.opened[0].ref == away);
+        ensure_equals("the two not open, opened", services.opened.size(), size_t(2));
+        ensure("by their items", services.opened[0].ref == away && services.opened[1].ref == card);
         const Doc* opened = services.findDoc(away);
         ensure("a tab for it", opened != nullptr);
         ensure_equals("its change waiting on its text", opened->pendingEdits.size(), size_t(1));
         ensure_equals("which it replaces", opened->pendingEdits[0].now, std::string("clock"));
-        ensure_equals("and is made", studio.applied.size(), size_t(1));
-        ensure("the notecard not opened", services.opened.size() == 1);
+        const Doc* notecard = services.findDoc(card);
+        ensure("the notecard's too", notecard && notecard->pendingEdits.size() == 1 && notecard->pendingEdits[0].now == "clock");
+        ensure_equals("and each is made", studio.applied.size(), size_t(2));
         ensure_equals("said", services.reports.back().text,
-                      services.words("SearchReplaced", { { "[PLACES]", services.counted("Places", 2) }, { "[SCRIPTS]", services.counted("Scripts", 2) } }) + "; " +
-                          services.words("SearchReplacedOpened", { { "[PLACES]", services.counted("Places", 2) }, { "[SCRIPTS]", services.counted("Scripts", 1) } }) +
+                      services.words("SearchReplaced", { { "[PLACES]", services.counted("Places", 3) }, { "[SCRIPTS]", services.counted("ScriptsNotecards", 3) } }) +
+                          "; " +
+                          services.words("SearchReplacedOpened",
+                                         { { "[PLACES]", services.counted("Places", 3) }, { "[SCRIPTS]", services.counted("ScriptsNotecards", 2) } }) +
                           ".");
     }
 
@@ -396,9 +399,9 @@ namespace tut
         now.modifiable = false;
         ensure("here, not to be changed: left", ALScriptSearch::step(one, now) == Step::Leave);
         now.modifiable = true;
-        now.notecard   = true;
-        ensure("here, a notecard: skipped", ALScriptSearch::step(one, now) == Step::Skip);
-        now.notecard = false;
+        now.plainText  = true;
+        ensure("here, a text file: skipped", ALScriptSearch::step(one, now) == Step::Skip);
+        now.plainText = false;
 
         now.at = At::Elsewhere;
         ensure("elsewhere, reading as it did: replaced", ALScriptSearch::step(one, now) == Step::Replace);
@@ -407,7 +410,11 @@ namespace tut
         ensure("elsewhere, typed in since: left", ALScriptSearch::step(one, now) == Step::Leave);
 
         one.notecard = true;
-        ensure("found in a notecard: skipped", ALScriptSearch::step(one, now) == Step::Skip);
+        now.text     = &text;
+        ensure("found in a notecard in the world: replaced as a script is", ALScriptSearch::step(one, now) == Step::Replace);
+        ALScriptSearch::Found text_file = one;
+        text_file.ref                   = ALScriptRef();
+        ensure("found in a text file: skipped", ALScriptSearch::step(text_file, now) == Step::Skip);
         one.notecard = false;
         one.places.clear();
         ensure("nothing found: skipped", ALScriptSearch::step(one, now) == Step::Skip);

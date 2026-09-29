@@ -723,14 +723,14 @@ ALScriptSearchPane::Doc* ALScriptSearchPane::tabOf(const ALScriptSearch::Found& 
 
 bool ALScriptSearchPane::replaceable(const ALScriptSearch::Found& one)
 {
-    // Places found, in a script -- a notecard is left as it is -- that may
-    // be changed where it is open.
-    if (one.places.empty() || one.notecard)
+    // Places found, in a script or a notecard in the world -- a text file
+    // is left as it is -- that may be changed where it is open.
+    if (one.places.empty() || (one.notecard && one.ref.isNull()))
     {
         return false;
     }
     const Doc* doc = tabOf(one);
-    return !doc || (!doc->notecard && doc->modifiable);
+    return !doc || ((!doc->notecard || doc->itemNotecard()) && doc->modifiable);
 }
 
 void ALScriptSearchPane::askReplaceAll()
@@ -753,7 +753,7 @@ void ALScriptSearchPane::askReplaceAll()
     }
     LLSD args;
     args["PLACES"]  = mServices->counted("Places", places);
-    args["SCRIPTS"] = mServices->counted("Scripts", scripts);
+    args["SCRIPTS"] = mServices->counted("ScriptsNotecards", scripts);
     args["WITH"]    = mReplacement->getText();
     mWindow->confirmReplaceAll(args, [this]() { replaceAll(); });
 }
@@ -783,7 +783,7 @@ void ALScriptSearchPane::replaceAll()
         now.at = here ? ALScriptSearch::Now::At::Here : there ? ALScriptSearch::Now::At::Elsewhere : ALScriptSearch::Now::At::Closed;
         if (tab)
         {
-            now.notecard   = tab->notecard;
+            now.plainText  = tab->notecard && !tab->itemNotecard();
             now.loaded     = tab->loaded;
             now.modifiable = tab->modifiable;
             now.text       = &tab->editor->document();
@@ -833,16 +833,16 @@ void ALScriptSearchPane::replaceAll()
     // What was done, a clause for each thing there is to say.
     LLStringUtil::format_map_t args;
     args["[PLACES]"]  = mServices->counted("Places", places);
-    args["[SCRIPTS]"] = mServices->counted("Scripts", scripts);
+    args["[SCRIPTS]"] = mServices->counted("ScriptsNotecards", scripts);
     std::string said  = mServices->words("SearchReplaced", args);
     if (opened > 0)
     {
-        args["[SCRIPTS]"] = mServices->counted("Scripts", opened);
+        args["[SCRIPTS]"] = mServices->counted("ScriptsNotecards", opened);
         said = mServices->clauses(said, mServices->words("SearchReplacedOpened", args));
     }
     if (left > 0)
     {
-        args["[SCRIPTS]"] = mServices->counted("Scripts", left);
+        args["[SCRIPTS]"] = mServices->counted("ScriptsNotecards", left);
         said = mServices->clauses(said, mServices->words("SearchReplacedLeft", args));
     }
     mServices->report(mServices->sentence(said), left > 0);

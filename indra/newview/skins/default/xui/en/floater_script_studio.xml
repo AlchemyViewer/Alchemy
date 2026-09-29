@@ -143,6 +143,8 @@
     <floater.string name="ProblemFixTip">Fix: [TITLE]</floater.string>
     <floater.string name="ScriptsA">1 script</floater.string>
     <floater.string name="ScriptsB">[COUNT] scripts</floater.string>
+    <floater.string name="ScriptsNotecardsA">1 script or notecard</floater.string>
+    <floater.string name="ScriptsNotecardsB">[COUNT] scripts and notecards</floater.string>
     <floater.string name="SearchReplaced">[PLACES] replaced in [SCRIPTS]</floater.string>
     <floater.string name="SearchReplacedOpened">[SCRIPTS] opened with unsaved changes</floater.string>
     <floater.string name="SearchReplacedLeft">[SCRIPTS] skipped (changed since the search)</floater.string>
