@@ -772,17 +772,6 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
-        <key>ALScriptStudioEnabled</key>
-        <map>
-            <key>Comment</key>
-            <string>Open scripts from inventory and objects in Script Studio; off, the legacy script editor opens them instead.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>1</integer>
-        </map>
         <key>ALScriptStudioRestoreTabs</key>
         <map>
             <key>Comment</key>

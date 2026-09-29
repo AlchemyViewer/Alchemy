@@ -513,17 +513,6 @@ end</floater.string>
                 General
             </text>
             <check_box
-             control_name="ALScriptStudioEnabled"
-             follows="left|top"
-             height="20"
-             label="Open scripts in Script Studio, not the old editor"
-             layout="topleft"
-             left="412"
-             name="studio_enabled"
-             tool_tip="Scripts from inventory, objects and the build tool open here; off, the old editor (one more release)"
-             top_pad="6"
-             width="370" />
-            <check_box
              control_name="ALScriptStudioRestoreTabs"
              follows="left|top"
              height="20"

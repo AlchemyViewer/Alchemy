@@ -130,10 +130,6 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
 public:
     AL_VIEW_TYPE(ALFloaterScriptStudio, ALStudioFloater);
 
-    // Whether scripts open here rather than in the legacy floaters: the
-    // ALScriptStudioEnabled setting, on unless someone turned it off,
-    // which is how the two share a viewer for a release.
-    static bool wantsScripts();
     // The studio, with this script open in it: the window that has it
     // open already, else the main one; null where a restriction keeps
     // the studio from opening.

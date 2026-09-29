@@ -1376,14 +1376,7 @@ void open_inventory_offer(const uuid_vec_t& objects, const std::string& from_nam
                         LLFloaterReg::showInstance("preview_anim", LLSD(obj_id), take_focus);
                         break;
                     case LLAssetType::AT_SCRIPT:
-                        if (ALFloaterScriptStudio::wantsScripts())
-                        {
-                            ALFloaterScriptStudio::open(ALScriptRef(LLUUID::null, obj_id), item->getName(), take_focus);
-                        }
-                        else
-                        {
-                            LLFloaterReg::showInstance("preview_script", LLSD(obj_id), take_focus);
-                        }
+                        ALFloaterScriptStudio::open(ALScriptRef(LLUUID::null, obj_id), item->getName(), take_focus);
                         break;
                     case LLAssetType::AT_SOUND:
                         LLFloaterReg::showInstance("preview_sound", LLSD(obj_id), take_focus);

@@ -975,27 +975,8 @@ void LLTaskLSLBridge::openItem()
 // [/RLVa:KB]
     if (object->permModify() || gAgent.isGodlike())
     {
-        if (ALFloaterScriptStudio::wantsScripts())
-        {
-            const LLInventoryItem* item = findItem();
-            ALFloaterScriptStudio::open(ALScriptRef(mPanel->getTaskUUID(), mUUID), item ? item->getName() : std::string());
-            return;
-        }
-
-        LLSD floater_key;
-        floater_key["taskid"] = mPanel->getTaskUUID();
-        floater_key["itemid"] = mUUID;
-
-        LLLiveLSLEditor* preview = LLFloaterReg::showTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key, TAKE_FOCUS_YES);
-        if (preview)
-        {
-            LLSelectNode *node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode(NULL, true);
-            if (node && node->mValid)
-            {
-                preview->setObjectName(node->mName);
-            }
-            preview->setObjectID(mPanel->getTaskUUID());
-        }
+        const LLInventoryItem* item = findItem();
+        ALFloaterScriptStudio::open(ALScriptRef(mPanel->getTaskUUID(), mUUID), item ? item->getName() : std::string());
     }
     else
     {

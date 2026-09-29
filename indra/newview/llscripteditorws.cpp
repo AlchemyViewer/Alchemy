@@ -32,6 +32,7 @@
 
 #include "alfloaterscriptstudio.h"
 #include "alscriptenvelope.h"
+#include "alscriptmessages.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
 
@@ -52,12 +53,12 @@
 #include "llinventorydefines.h"
 #include "llnotecard.h"
 #include "llnotificationsutil.h"
-#include "llpreviewscript.h"
 #include "llprocess.h"
 #include "alregex.h"
 #include "llmd5.h"
 #include "llsdjson.h"
 #include "llselectmgr.h"
+#include "llsyntaxid.h"
 #include "lltrans.h"
 #include "lluuid.h"
 #include "llversioninfo.h"
@@ -1872,7 +1873,7 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
             compile_target = runtime;
         else
         {
-            is_lua = is_lua_script(content);
+            is_lua = ALScriptMessages::looksLikeLua(content);
             compile_target = is_lua ? "luau" : "mono";
         }
     }
@@ -2047,21 +2048,6 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
         note["column"]  = 0;
         note["message"] = LLTrans::getString("BridgeSentCompiledAsIs");
         response["diagnostics"].append(note);
-    }
-
-    // If the script is open in the viewer's editor, update it
-    LLSD floater_key;
-    floater_key["taskid"] = prim_id;
-    floater_key["itemid"] = item_id;
-    LLLiveLSLEditor* editor = LLFloaterReg::findTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key);
-    if (editor)
-    {
-        LLScriptEdCore* sed = editor->getScriptEdCore();
-        if (sed)
-        {
-            sed->setScriptText(LLStringExplicit(text), true);
-            sed->makeEditorPristine();
-        }
     }
 
     return response;

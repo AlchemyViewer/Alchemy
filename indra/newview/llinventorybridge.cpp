@@ -8632,14 +8632,7 @@ public:
         LLViewerInventoryItem* item = getItem();
         if (item)
         {
-            if (ALFloaterScriptStudio::wantsScripts())
-            {
-                ALFloaterScriptStudio::open(ALScriptRef(LLUUID::null, mUUID), item->getName());
-            }
-            else
-            {
-                LLFloaterReg::showInstance("preview_script", LLSD(mUUID), TAKE_FOCUS_YES);
-            }
+            ALFloaterScriptStudio::open(ALScriptRef(LLUUID::null, mUUID), item->getName());
         }
         LLInvFVBridgeAction::doIt();
     }

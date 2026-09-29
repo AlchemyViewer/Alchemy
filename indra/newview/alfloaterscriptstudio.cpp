@@ -346,13 +346,6 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::lastWorkedIn()
 }
 
 // static
-bool ALFloaterScriptStudio::wantsScripts()
-{
-    static LLCachedControl<bool> enabled(gSavedSettings, "ALScriptStudioEnabled", true);
-    return enabled;
-}
-
-// static
 ALFloaterScriptStudio* ALFloaterScriptStudio::open(const ALScriptRef& ref, const std::string& name, bool take_focus)
 {
     // Open somewhere already: that window, brought forward -- if a
