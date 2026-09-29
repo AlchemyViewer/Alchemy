@@ -838,11 +838,11 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
             taken = commandLine(view, input);
             if (mMode == Mode::Search)
             {
-                incrementalSearch(view);
+                mSearch.incrementalSearch(view);
             }
-            else if (mIncrementalShown)
+            else
             {
-                endIncremental(view);
+                mSearch.endIncremental(view);
             }
             break;
         case Mode::Confirm:
@@ -909,9 +909,9 @@ void ALVimKeymap::slideHeld(const ALTextDocument::Edit& edit)
     slide(mVisualAnchor);
     slide(mVisualCaret);
     // A match an edit took some of is no match any longer.
-    if (!mLastMatch.empty() && !edit.slide(mLastMatch))
+    if (!mSearch.lastMatch.empty() && !edit.slide(mSearch.lastMatch))
     {
-        mLastMatch = ALTextRange();
+        mSearch.lastMatch = ALTextRange();
     }
     if (mBlockInsert)
     {
@@ -1603,11 +1603,11 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                         clearPending();
                         if (!word.empty())
                         {
-                            mSearchPattern   = d.text(word);
-                            mSearchForward   = ch == '*';
-                            mSearchWholeWord = false;
-                            mSearchOffset    = SearchOffset();
-                            search(view, mSearchPattern, mSearchForward, count, false);
+                            mSearch.pattern   = d.text(word);
+                            mSearch.forward   = ch == '*';
+                            mSearch.wholeWord = false;
+                            mSearch.offset    = ALVimSearch::Offset();
+                            mSearch.search(view, mSearch.pattern, mSearch.forward, count, false);
                         }
                         return true;
                     }
@@ -1629,7 +1629,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                         // The last search's match here or next: selected, or
                         // what an operator works on -- cgn, and . for the
                         // next.
-                        const std::optional<ALTextRange> match = matchNear(view, ch == 'n');
+                        const std::optional<ALTextRange> match = mSearch.matchNear(view, ch == 'n');
                         if (!match)
                         {
                             clearPending();
@@ -2651,13 +2651,13 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             return true;
         case 'n':
         case 'N':
-            if (mSearchPattern.empty())
+            if (mSearch.pattern.empty())
             {
                 say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
             }
             else
             {
-                search(view, mSearchPattern, ch == 'n' ? mSearchForward : !mSearchForward, count, mSearchWholeWord, mSearchOffset);
+                mSearch.search(view, mSearch.pattern, ch == 'n' ? mSearch.forward : !mSearch.forward, count, mSearch.wholeWord, mSearch.offset);
             }
             clearPending();
             return true;
@@ -2670,11 +2670,11 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 clearPending();
                 return true;
             }
-            mSearchPattern   = d.text(word);
-            mSearchForward   = ch == '*';
-            mSearchWholeWord = true;
-            mSearchOffset    = SearchOffset();
-            search(view, mSearchPattern, mSearchForward, count, true);
+            mSearch.pattern   = d.text(word);
+            mSearch.forward   = ch == '*';
+            mSearch.wholeWord = true;
+            mSearch.offset    = ALVimSearch::Offset();
+            mSearch.search(view, mSearch.pattern, mSearch.forward, count, true);
             clearPending();
             return true;
         }
@@ -4508,62 +4508,6 @@ void ALVimKeymap::showVisual(ALTextView& view)
 
 // --- searching --------------------------------------------------------------------------
 
-bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const SearchOffset& offset)
-{
-    const ALTextDocument& d = view.document();
-    ALTextSearchOptions   options;
-    options.regex     = !whole_word;
-    options.wholeWord = whole_word;
-    // A whole word -- * and # -- is looked for as it is, its case as
-    // ignorecase alone says; a pattern in vim's spelling.
-    const Pattern pattern_in = whole_word ? Pattern{ pattern, !mShared->ignoreCase } : patternOf(pattern);
-    options.caseSensitive    = pattern_in.caseSensitive;
-    const Found&                    found_now = found(view, pattern_in, options);
-    const std::vector<ALTextRange>& matches   = found_now.matches;
-    if (!found_now.error.empty())
-    {
-        say(said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", found_now.error } }), true);
-        return false;
-    }
-    if (matches.empty())
-    {
-        say(said("VimPatternNotFound", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", pattern } }), true);
-        return false;
-    }
-    const ALTextPos start = cursor(view);
-    // From the last match where an offset left the caret by it: n after
-    // /x/e goes on from that match, not from past its end.
-    ALTextPos   from = offset.kind && !mLastMatch.empty() && offsetFrom(d, mLastMatch, offset) == start ? mLastMatch.begin : start;
-    ALTextRange hit;
-    for (S32 n = 0; n < count; ++n)
-    {
-        const S32 index = ALTextSearch::nearest(matches, forward ? d.nextCluster(from) : from, forward);
-        if (index < 0)
-        {
-            break;
-        }
-        hit  = matches[static_cast<size_t>(index)];
-        from = hit.begin;
-    }
-    if (!hit.empty())
-    {
-        mLastMatch = hit;
-        from       = offsetFrom(d, hit, offset);
-    }
-    // Every match lit, as hlsearch has it, until :noh or the caret
-    // leaves them.
-    if (ALVimHost* host = view.vimHost(); host && !isVisual() && mShared->highlightSearch)
-    {
-        lightFound(*host);
-    }
-    if (!mOperator && from != start)
-    {
-        noteJump(view, start);
-    }
-    moveTo(view, from);
-    return true;
-}
-
 // --- the : and / lines --------------------------------------------------------------------
 
 bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
@@ -4664,7 +4608,7 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
                 mLine.clear();
                 mLineCursor = 0;
                 mMode       = Mode::Normal;
-                endIncremental(view);
+                mSearch.endIncremental(view);
                 moveTo(view, view.caret());
                 return true;
             case KEY_LEFT:
@@ -4771,31 +4715,31 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
                     // the offset given, or the last one too where none is.
                     std::string pattern;
                     std::string offset_text;
-                    splitOffset(line, kind, pattern, offset_text);
-                    SearchOffset offset{};
+                    ALVimSearch::splitOffset(line, kind, pattern, offset_text);
+                    ALVimSearch::Offset offset{};
                     const bool   has_offset = line.size() > pattern.size();
-                    if (has_offset && !parseOffset(offset_text, offset))
+                    if (has_offset && !ALVimSearch::parseOffset(offset_text, offset))
                     {
-                        endIncremental(view);
+                        mSearch.endIncremental(view);
                         say(said("VimBadOffset", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", line } }), true);
                         finishCommand(false);
                         return true;
                     }
                     if (!pattern.empty())
                     {
-                        mSearchPattern   = pattern;
-                        mSearchWholeWord = false;
-                        mSearchOffset    = offset;
+                        mSearch.pattern   = pattern;
+                        mSearch.wholeWord = false;
+                        mSearch.offset    = offset;
                     }
                     else if (has_offset)
                     {
-                        mSearchOffset = offset;
+                        mSearch.offset = offset;
                     }
-                    mSearchForward = kind == '/';
-                    endIncremental(view);
-                    if (!mSearchPattern.empty())
+                    mSearch.forward = kind == '/';
+                    mSearch.endIncremental(view);
+                    if (!mSearch.pattern.empty())
                     {
-                        search(view, mSearchPattern, mSearchForward, 1, mSearchWholeWord, mSearchOffset);
+                        mSearch.search(view, mSearch.pattern, mSearch.forward, 1, mSearch.wholeWord, mSearch.offset);
                     }
                 }
                 if (mMode == Mode::Normal)
@@ -6463,15 +6407,15 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     LLStringUtil::trim(command);
     if (pattern.empty())
     {
-        pattern = mSearchPattern;
+        pattern = mSearch.pattern;
     }
     if (pattern.empty())
     {
         say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
         return false;
     }
-    mSearchPattern   = pattern;
-    mSearchWholeWord = false;
+    mSearch.pattern   = pattern;
+    mSearch.wholeWord = false;
     if (!ranged)
     {
         // The whole text; the empty line after a final newline is no
@@ -6485,12 +6429,12 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     }
     ALTextSearchOptions options;
     options.regex         = true;
-    const Pattern pattern_in = patternOf(pattern);
+    const Pattern pattern_in = mSearch.patternOf(pattern);
     options.caseSensitive    = pattern_in.caseSensitive;
     const ALTextRange        scope(d.lineStart(first), d.lineEnd(last));
     std::string              error;
     std::vector<ALTextPos>   wholes;
-    std::vector<ALTextRange> matches = matchesOf(view, pattern_in, options, &scope, error, wholes);
+    std::vector<ALTextRange> matches = mSearch.matchesOf(view, pattern_in, options, &scope, error, wholes);
     if (!error.empty())
     {
         say(said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", error } }), true);
@@ -6638,74 +6582,6 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     return !mMessageError;
 }
 
-ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optional<bool> force_case) const
-{
-    return ALVimPattern::of(vim, mLastReplacement, { mShared->ignoreCase, mShared->smartCase }, force_case);
-}
-
-ALVimPattern::Places ALVimKeymap::placesOf(const ALTextView& view) const
-{
-    // The last visual area, as a range: whole lines for a line-wise one,
-    // the character under either end included otherwise; a block is the
-    // lines between its ends and the columns between them.
-    const ALTextDocument& d = view.document();
-    ALVimPattern::Places  places;
-    places.caret = view.caret();
-    if (mVisualLast != Mode::Normal)
-    {
-        const ALTextPos a = mVisualLastAnchor < mVisualLastCaret ? mVisualLastAnchor : mVisualLastCaret;
-        const ALTextPos b = mVisualLastAnchor < mVisualLastCaret ? mVisualLastCaret : mVisualLastAnchor;
-        places.visual     = true;
-        places.visualRange = mVisualLast == Mode::VisualLine ? ALTextRange(d.lineStart(a.line), d.lineEnd(b.line)) : ALTextRange(a, d.nextCluster(b));
-        if (mVisualLast == Mode::VisualBlock)
-        {
-            places.blockLeft   = llmin(mVisualLastAnchor.column, mVisualLastCaret.column);
-            places.blockRight  = llmax(mVisualLastAnchor.column, mVisualLastCaret.column);
-            places.visualRange = ALTextRange(d.lineStart(a.line), d.lineEnd(b.line));
-        }
-    }
-    return places;
-}
-
-std::vector<ALTextRange> ALVimKeymap::matchesOf(ALTextView& view, const Pattern& pattern, ALTextSearchOptions options, const ALTextRange* scope, std::string& error,
-                                                std::vector<ALTextPos>& wholes) const
-{
-    return pattern.matchesIn(view.document(), options, scope, placesOf(view), error, wholes);
-}
-
-const ALVimKeymap::Found& ALVimKeymap::found(ALTextView& view, const Pattern& pattern, const ALTextSearchOptions& options)
-{
-    const ALTextDocument&      d    = view.document();
-    const ALTextSearchOptions& kept = mFound.options;
-    const bool same = mFound.doc == &d && mFound.version == d.version() && mFound.pattern == pattern && kept.caseSensitive == options.caseSensitive &&
-                      kept.wholeWord == options.wholeWord && kept.regex == options.regex && kept.preserveCase == options.preserveCase &&
-                      kept.matchGroup == options.matchGroup && kept.acrossLines == options.acrossLines && kept.limit == options.limit;
-    if (same)
-    {
-        return mFound;
-    }
-    mFound.matches = matchesOf(view, pattern, options, nullptr, mFound.error, mFound.wholes);
-    // Kept where it is the text's alone to say; asked again otherwise.
-    mFound.doc     = pattern.placed() ? nullptr : &d;
-    mFound.version = d.version();
-    mFound.pattern = pattern;
-    mFound.options = options;
-    mFound.lit     = nullptr;
-    return mFound;
-}
-
-void ALVimKeymap::lightFound(ALVimHost& host)
-{
-    // Lit already where the host holds as many as were lit there: what
-    // puts them out -- :noh, the caret leaving them -- leaves none.
-    if (mFound.lit == &host && host.layer(ALVimHost::Layer::Search).size() == mFound.matches.size())
-    {
-        return;
-    }
-    host.setLayer(ALVimHost::Layer::Search, mFound.matches);
-    mFound.lit = &host;
-}
-
 std::string ALVimKeymap::replacementOf(const std::string& with) const
 {
     return ALVimPattern::replacementOf(with);
@@ -6724,12 +6600,12 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     const std::string& rest = spec;
     if (rest.empty() || rest[0] == '&')
     {
-        if (mSearchPattern.empty())
+        if (mSearch.pattern.empty())
         {
             say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
             return false;
         }
-        pattern = mSearchPattern;
+        pattern = mSearch.pattern;
         with    = mLastReplacement;
         flags   = rest.empty() ? std::string() : rest.substr(1);
     }
@@ -6763,7 +6639,7 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
         }
         if (pattern.empty())
         {
-            pattern = mSearchPattern;
+            pattern = mSearch.pattern;
         }
         if (pattern.empty())
         {
@@ -6796,8 +6672,8 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     {
         flags = mLastSubstituteFlags + flags.substr(1);
     }
-    mSearchPattern        = pattern;
-    mSearchWholeWord      = false;
+    mSearch.pattern        = pattern;
+    mSearch.wholeWord      = false;
     mLastReplacement      = with;
     mLastSubstituteFlags  = flags;
     const bool every      = flags.find('g') != std::string::npos;
@@ -6809,7 +6685,7 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     const ALTextDocument& d = view.document();
     ALTextSearchOptions   options;
     options.regex         = true;
-    const Pattern pattern_in = patternOf(pattern, exactcase ? std::optional<bool>(true) : anycase ? std::optional<bool>(false) : std::nullopt);
+    const Pattern pattern_in = mSearch.patternOf(pattern, exactcase ? std::optional<bool>(true) : anycase ? std::optional<bool>(false) : std::nullopt);
     options.caseSensitive    = pattern_in.caseSensitive;
     const ALTextRange     scope(d.lineStart(first), d.lineEnd(last));
     std::string           error;
@@ -6818,7 +6694,7 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     // pattern run again over each; none made for a count alone.
     const std::string        format = replacementOf(with);
     std::vector<std::string> replaced;
-    std::vector<ALTextRange> matches = pattern_in.matchesIn(d, options, &scope, placesOf(view), error, wholes, format, count_only ? nullptr : &replaced);
+    std::vector<ALTextRange> matches = pattern_in.matchesIn(d, options, &scope, mSearch.placesOf(view), error, wholes, format, count_only ? nullptr : &replaced);
     if (!error.empty())
     {
         say(said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", error } }), true);
@@ -6958,7 +6834,7 @@ void ALVimKeymap::listRegisters(ALTextView& view, const std::string& names)
         row(held.block ? 'b' : held.linewise ? 'l' : 'c', *name, held.linewise && !held.text.empty() ? held.text + "\n" : held.text);
     }
     row('c', ':', mShared->command.empty() ? std::string() : mShared->command.back());
-    row('c', '/', mSearchPattern);
+    row('c', '/', mSearch.pattern);
     list(view, text);
 }
 
@@ -7222,49 +7098,6 @@ bool ALVimKeymap::foldCommand(ALTextView& view, llwchar ch, llwchar prefix)
     return true;
 }
 
-std::optional<ALTextRange> ALVimKeymap::matchNear(ALTextView& view, bool forward)
-{
-    if (mSearchPattern.empty())
-    {
-        say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
-        return std::nullopt;
-    }
-    ALTextSearchOptions options;
-    options.regex         = !mSearchWholeWord;
-    options.wholeWord     = mSearchWholeWord;
-    const Pattern pattern = mSearchWholeWord ? Pattern{ mSearchPattern, !mShared->ignoreCase } : patternOf(mSearchPattern);
-    options.caseSensitive = pattern.caseSensitive;
-    const Found&                    found_now = found(view, pattern, options);
-    const std::vector<ALTextRange>& matches   = found_now.matches;
-    if (!found_now.error.empty() || matches.empty())
-    {
-        say(said("VimPatternNotFound", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", mSearchPattern } }), true);
-        return std::nullopt;
-    }
-    // gn: the one the caret is in, or the next; gN the one it is in, or
-    // the one before.
-    const ALTextPos at = cursor(view);
-    if (forward)
-    {
-        for (const ALTextRange& match : matches)
-        {
-            if (at < match.end)
-            {
-                return match;
-            }
-        }
-        return matches.front();
-    }
-    for (auto it = matches.rbegin(); it != matches.rend(); ++it)
-    {
-        if (!(at < it->begin))
-        {
-            return *it;
-        }
-    }
-    return matches.back();
-}
-
 bool ALVimKeymap::unmatchedBracket(ALTextView& view, llwchar bracket, S32 count, ALTextPos& out) const
 {
     // Out through the brackets of the other kind as well, counting pairs of
@@ -7273,146 +7106,3 @@ bool ALVimKeymap::unmatchedBracket(ALTextView& view, llwchar bracket, S32 count,
     return bracketsOf(view).enclosing(view.caret(), static_cast<char>(bracket), count, out, ALBracketIndex::ANYWHERE);
 }
 
-// static
-void ALVimKeymap::splitOffset(const std::string& line, llwchar kind, std::string& pattern, std::string& offset_text)
-{
-    // The pattern runs to the first `kind` not escaped; the rest is the
-    // offset.
-    for (size_t i = 0; i < line.size(); ++i)
-    {
-        if (line[i] == '\\')
-        {
-            ++i;
-            continue;
-        }
-        if (static_cast<llwchar>(static_cast<unsigned char>(line[i])) == kind)
-        {
-            pattern     = line.substr(0, i);
-            offset_text = line.substr(i + 1);
-            return;
-        }
-    }
-    pattern = line;
-    offset_text.clear();
-}
-
-// static
-bool ALVimKeymap::parseOffset(const std::string& text, SearchOffset& out)
-{
-    // [+-]N lines, e[+-N] from the end, s[+-N] or b[+-N] from the start;
-    // a sign alone is one.
-    out = SearchOffset{};
-    if (text.empty())
-    {
-        return true;
-    }
-    size_t at   = 0;
-    char   kind = 'l';
-    if (text[0] == 'e' || text[0] == 's' || text[0] == 'b')
-    {
-        kind = text[0] == 'e' ? 'e' : 's';
-        at   = 1;
-    }
-    S32 sign = 1;
-    if (at < text.size() && (text[at] == '+' || text[at] == '-'))
-    {
-        sign = text[at] == '-' ? -1 : 1;
-        ++at;
-    }
-    const bool signed_alone = at == text.size() && at > 0 && (text[at - 1] == '+' || text[at - 1] == '-');
-    S32        amount       = 0;
-    for (; at < text.size(); ++at)
-    {
-        if (text[at] < '0' || text[at] > '9')
-        {
-            return false;
-        }
-        amount = llmin(amount * 10 + (text[at] - '0'), 100000);
-    }
-    out.kind   = kind;
-    out.amount = sign * (signed_alone ? 1 : amount);
-    return true;
-}
-
-ALTextPos ALVimKeymap::offsetFrom(const ALTextDocument& d, const ALTextRange& match, const SearchOffset& offset) const
-{
-    if (offset.kind == 'l')
-    {
-        return ALTextPos(llclamp(match.begin.line + offset.amount, 0, d.lineCount() - 1), 0);
-    }
-    ALTextPos at = offset.kind == 'e' ? d.prevCluster(match.end) : match.begin;
-    for (S32 n = 0; n < std::abs(offset.amount); ++n)
-    {
-        at = offset.amount > 0 ? d.nextCluster(at) : d.prevCluster(at);
-    }
-    return offset.kind ? at : match.begin;
-}
-
-void ALVimKeymap::incrementalSearch(ALTextView& view)
-{
-    ALVimHost* host = view.vimHost();
-    if (!mShared->incrementalSearch || !host)
-    {
-        return;
-    }
-    std::string pattern;
-    std::string offset_text;
-    splitOffset(mLine, mLineKind, pattern, offset_text);
-    // A key that left the pattern as it was, in the same text: nothing
-    // more to light or scroll to.
-    if (mIncrementalShown && pattern == mIncrementalPattern && mLineKind == mIncrementalKind && view.document().version() == mIncrementalVersion)
-    {
-        return;
-    }
-    mIncrementalShown   = true;
-    mIncrementalPattern = pattern;
-    mIncrementalKind    = mLineKind;
-    mIncrementalVersion = view.document().version();
-    if (pattern.empty())
-    {
-        host->clearLayer(ALVimHost::Layer::Search);
-        view.scrollToCaret();
-        return;
-    }
-    // What is typed so far may not be a pattern yet: nothing lit then.
-    ALTextSearchOptions options;
-    options.regex                            = true;
-    const Pattern parsed                     = patternOf(pattern);
-    options.caseSensitive                    = parsed.caseSensitive;
-    const Found&                    found_now = found(view, parsed, options);
-    const std::vector<ALTextRange>& matches   = found_now.matches;
-    if (!found_now.error.empty() || matches.empty())
-    {
-        host->clearLayer(ALVimHost::Layer::Search);
-        view.scrollToCaret();
-        return;
-    }
-    const bool forward = mLineKind == '/';
-    const S32  index   = ALTextSearch::nearest(matches, forward ? view.document().nextCluster(cursor(view)) : cursor(view), forward);
-    const ALTextRange next = matches[static_cast<size_t>(index < 0 ? 0 : index)];
-    // Every match lit where hlsearch has them, else the next alone.
-    if (mShared->highlightSearch)
-    {
-        lightFound(*host);
-    }
-    else
-    {
-        host->setLayer(ALVimHost::Layer::Search, { next });
-        mFound.lit = nullptr;
-    }
-    view.scrollToLine(next.begin.line);
-}
-
-void ALVimKeymap::endIncremental(ALTextView& view)
-{
-    if (!mIncrementalShown)
-    {
-        return;
-    }
-    mIncrementalShown = false;
-    if (ALVimHost* host = view.vimHost())
-    {
-        host->clearLayer(ALVimHost::Layer::Search);
-    }
-    view.scrollToCaret();
-}

@@ -30,6 +30,7 @@
 #include "alvimmappings.h"
 #include "alvimpattern.h"
 #include "alvimregisters.h"
+#include "alvimsearch.h"
 #include "lltimer.h"
 
 #include <deque>
@@ -347,28 +348,6 @@ private:
     // Says a count would make more text than it may, and how much.
     void     tooMuch(size_t bytes);
 
-    // Where a search leaves the caret by its match, as /pattern/e+1 says:
-    // lines on or back ('l', column 0), or characters on or back from the
-    // match's start ('s') or its last character ('e').
-    // Zero, as SearchOffset() makes it: none.
-    struct SearchOffset
-    {
-        char kind;
-        S32  amount;
-    };
-    // A search line's pattern and offset: split at the first unescaped
-    // `kind` after the pattern.
-    static void splitOffset(const std::string& line, llwchar kind, std::string& pattern, std::string& offset_text);
-    static bool parseOffset(const std::string& text, SearchOffset& out);
-    ALTextPos   offsetFrom(const ALTextDocument& d, const ALTextRange& match, const SearchOffset& offset) const;
-    // Searching, with the last pattern kept for n and N, and its offset.
-    bool search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word,
-                const SearchOffset& offset = SearchOffset());
-    // What is typed on the search line so far, lit and brought into sight;
-    // and that let go of, the caret's place in sight again.
-    void incrementalSearch(ALTextView& view);
-    void endIncremental(ALTextView& view);
-
     // The : line.
     void runCommand(ALTextView& view, const std::string& line);
     bool substitute(ALTextView& view, S32 first, S32 last, const std::string& spec);
@@ -376,38 +355,8 @@ private:
     // ~ for the last replacement, \r for a line break -- as the search
     // engine's.
     std::string replacementOf(const std::string& with) const;
-    // Vim's spelling of a pattern as the search engine's (ALVimPattern),
-    // with the last replacement for ~ and the ignorecase and smartcase
-    // settings; and what the places a pattern names are measured against:
-    // the caret, and the last visual area.
+    // Vim's spelling of a pattern as the search engine's (ALVimSearch).
     typedef ALVimPattern Pattern;
-    Pattern              patternOf(const std::string& vim, std::optional<bool> force_case = std::nullopt) const;
-    ALVimPattern::Places placesOf(const ALTextView& view) const;
-    // The pattern's matches within a scope, the places applied, with
-    // where each whole match began.
-    std::vector<ALTextRange> matchesOf(ALTextView& view, const Pattern& pattern, ALTextSearchOptions options, const ALTextRange* scope, std::string& error,
-                                       std::vector<ALTextPos>& wholes) const;
-    // What a search finds over the whole text, kept until the text, the
-    // pattern or how it is matched changes: n, N, gn and every key on the
-    // search line ask it again of the same text. Found afresh each time
-    // where the pattern places its matches by the caret or the last visual
-    // area. `lit`: the host its matches were last lit in, by
-    // lightFound().
-    struct Found
-    {
-        const ALTextDocument*    doc     = nullptr;
-        U32                      version = 0;
-        Pattern                  pattern;
-        ALTextSearchOptions      options;
-        std::vector<ALTextRange> matches;
-        std::vector<ALTextPos>   wholes;
-        std::string              error;
-        const ALVimHost*         lit = nullptr;
-    };
-    const Found& found(ALTextView& view, const Pattern& pattern, const ALTextSearchOptions& options);
-    // Every match found lit, as hlsearch has it: not again where they are
-    // lit already.
-    void lightFound(ALVimHost& host);
     // The :s asking about each match: the edits left to make, in order,
     // and the one being asked about; the text put in, for the question.
     struct Confirming
@@ -506,9 +455,6 @@ private:
     bool changeSurround(ALTextView& view, llwchar target, llwchar with, S32 count);
     // zo zc za zR zM zj zk [z ]z: the code editor's folds.
     bool foldCommand(ALTextView& view, llwchar ch, llwchar prefix);
-    // The last search's match at the caret or after it, or at it or before
-    // it, round past the ends: what gn and gN take.
-    std::optional<ALTextRange> matchNear(ALTextView& view, bool forward);
     // [( [{ ]) ]}: the bracket the caret is inside of, open before it or
     // closed after it, the count out; false where there is none.
     bool unmatchedBracket(ALTextView& view, llwchar bracket, S32 count, ALTextPos& out) const;
@@ -562,24 +508,9 @@ private:
     llwchar mFindChar    = 0;
     bool    mFindForward = true;
     bool    mFindTill    = false;
-    // The search, for n and N; :s sets it too. How case is matched is
-    // in the shared state: sensitive unless :set ignorecase says, as
-    // vim's own default is.
-    std::string mSearchPattern;
-    SearchOffset mSearchOffset{};
-    // The last match a search went to, which n from where an offset left
-    // the caret goes on from.
-    ALTextRange mLastMatch;
-    Found       mFound;
-    // What the search line last lit as it was typed, in which text: a key
-    // that leaves it so -- the cursor moved along the line -- lights
-    // nothing again.
-    bool        mIncrementalShown = false;
-    std::string mIncrementalPattern;
-    llwchar     mIncrementalKind    = 0;
-    U32         mIncrementalVersion = 0;
-    bool        mSearchForward   = true;
-    bool        mSearchWholeWord = false;
+    // Searching: the last pattern, its matches, the search line lit.
+    ALVimSearch mSearch{ *this };
+    friend class ALVimSearch;
 
     // The registers by name: a-z, 0 for the last yank, 1-9 for the last
     // deletes of a line or more, newest first, and - for the last

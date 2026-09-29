@@ -153,6 +153,7 @@ target_sources(
     alvimmappings.cpp
     alvimpattern.cpp
     alvimregisters.cpp
+    alvimsearch.cpp
     alxuiservice.cpp
     alchoicelist.cpp
     aloutputview.cpp
@@ -370,6 +371,7 @@ target_sources(
         alvimmappings.h
         alvimpattern.h
         alvimregisters.h
+        alvimsearch.h
         alxuiservice.h
         alchoicelist.h
         aloutputview.h
