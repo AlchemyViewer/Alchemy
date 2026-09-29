@@ -127,11 +127,6 @@ namespace
         }
         std::vector<S32> problemNumbers;
         bool             hasProblems = true;
-        void jumpedFrom(Doc& doc, const ALTextView& view, const ALTextPos& from) override
-        {
-            jumps.push_back(doc.id + (&view == doc.expandedEditor ? " expanded " : " ") + std::to_string(from.line));
-        }
-        Names jumps;
         bool openIncluded(Doc&, const std::string& name, std::optional<bool>) override
         {
             includedAsked.push_back(name);
@@ -168,11 +163,12 @@ namespace tut
     {
         // The UI, and the editors' home; the services are plain, so that
         // what is said is a word's name and its blanks.
-        al_studio_test::StudioWindow       window;
-        al_studio_test::FakeServices       services;
-        ALScriptStudioCommands             commands;
-        FakeVimWindow                      studio;
-        std::unique_ptr<ALScriptStudioVim> vim;
+        al_studio_test::StudioWindow                      window;
+        al_studio_test::FakeServices                      services;
+        ALScriptStudioCommands                            commands;
+        FakeVimWindow                                     studio;
+        std::unique_ptr<al_studio_test::StudioNavigation> navigation;
+        std::unique_ptr<ALScriptStudioVim>                vim;
         // The table's commands run, by name; and two of its toggles.
         Names                              ran;
         bool                               lineNumbers = false, relativeNumbers = false;
@@ -263,7 +259,8 @@ namespace tut
                 },
                 nullptr, [this]() { return relativeNumbers; });
             studio.services = &services;
-            vim             = std::make_unique<ALScriptStudioVim>(services, studio, studio, commands, studio);
+            navigation      = std::make_unique<al_studio_test::StudioNavigation>(services);
+            vim             = std::make_unique<ALScriptStudioVim>(services, studio, studio, navigation->unit, commands, studio);
             return *vim;
         }
 
@@ -771,7 +768,9 @@ namespace tut
 
         said->hooks().jumped(*a.editor, ALTextPos(2, 0));
         said->hooks().jumped(*a.expandedEditor, ALTextPos(1, 0));
-        ensure("a jump kept where it began, in the view it was in", studio.jumps == Names{ "a 2", "a expanded 1" });
+        navigation->unit.goBack(false);
+        navigation->unit.goBack(false);
+        ensure("a jump kept where it began, in the view it was in", navigation->shown == Names{ "a expanded 1", "a 2" });
 
         ensure("Ctrl-O, Ctrl-I, K", said->hooks().command(*a.editor, "back", std::string()) &&
                                         said->hooks().command(*a.editor, "forward", std::string()) &&

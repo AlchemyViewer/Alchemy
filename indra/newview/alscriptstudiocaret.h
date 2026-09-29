@@ -34,6 +34,7 @@
 #include <vector>
 
 class ALScriptStudioAnalysis;
+class ALScriptNavigation;
 class ALScriptStudioServices;
 
 // The tab's part of what is said of its caret: the name asked about, the
@@ -82,10 +83,6 @@ public:
     class Window
     {
     public:
-        // A jump about to be made, for Back to come back from; and the
-        // keyboard in the text in front, which ends a walk down a list.
-        virtual void noteJump()       = 0;
-        virtual void keyboardInText() = 0;
         // A stretch of a tab's source gone to in the view in front, the
         // keyboard given it; a place of an include opened.
         virtual void goTo(Doc& doc, const ALTextRange& range)                                                       = 0;
@@ -111,7 +108,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioCaret(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window);
+    ALScriptStudioCaret(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, Window& window);
 
     // A command about the name at the caret asked of the analyzers, and
     // what they answered done, where it answers that question of that text.
@@ -137,5 +134,6 @@ public:
 private:
     ALScriptStudioServices& mServices;
     ALScriptStudioAnalysis& mAnalysis;
+    ALScriptNavigation&     mNavigation;
     Window&                 mWindow;
 };

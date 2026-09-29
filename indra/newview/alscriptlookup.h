@@ -42,6 +42,7 @@
 #include <vector>
 
 class ALScriptStudioAnalysis;
+class ALScriptNavigation;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 
@@ -126,8 +127,6 @@ public:
         virtual void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::optional<std::string>& source)> loaded) = 0;
         // A script expanded as the compiler sees it.
         virtual void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> expanded) = 0;
-        // A preview held, so that following what is found does not close it.
-        virtual void holdPreview(Doc& doc) = 0;
         // What Find References found: listed, lit in the script, the tab
         // brought up.
         virtual void showFound(Doc& doc, const Found& found) = 0;
@@ -146,7 +145,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptLookup(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, Window& window);
+    ALScriptLookup(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, Window& window);
 
     // A place added, once: by its file and where it starts.
     static void addPlace(Doc::Lookup& lookup, Doc::Place place);
@@ -226,6 +225,7 @@ private:
     ALScriptStudioServices& mServices;
     ALScriptStudioTabs&     mTabs;
     ALScriptStudioAnalysis& mAnalysis;
+    ALScriptNavigation&     mNavigation;
     Window&                 mWindow;
     // Which lookup the answers arriving belong to.
     U32                     mGeneration = 0;

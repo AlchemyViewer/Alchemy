@@ -27,6 +27,7 @@
 #include "alscriptstudiovim.h"
 
 #include "alcodeeditor.h"
+#include "alscriptnavigation.h"
 #include "alscriptstudiocommands.h"
 #include "alscriptstudiosaves.h"
 #include "alscriptstudioservices.h"
@@ -66,8 +67,8 @@ namespace
     }
 }
 
-ALScriptStudioVim::ALScriptStudioVim(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, ALScriptStudioCommands& commands, Window& window)
-    : mServices(services), mTabs(tabs), mSaves(saves), mCommands(commands), mWindow(window)
+ALScriptStudioVim::ALScriptStudioVim(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, ALScriptNavigation& navigation, ALScriptStudioCommands& commands, Window& window)
+    : mServices(services), mTabs(tabs), mSaves(saves), mNavigation(navigation), mCommands(commands), mWindow(window)
 {
 }
 
@@ -104,7 +105,10 @@ void ALScriptStudioVim::connect(ALVimKeymap& vim)
         {
             if (Doc* doc = docOf(view))
             {
-                mWindow.jumpedFrom(*doc, view, from);
+                // A place to come back to with Back, in the view it began
+                // in.
+                const Doc::View in = &view == doc->expandedEditor ? Doc::View::Expanded : Doc::View::Source;
+                mNavigation.remember(ALScriptNavigation::Place{ doc->id, from, in });
             }
         }
     };

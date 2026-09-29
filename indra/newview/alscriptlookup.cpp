@@ -26,6 +26,7 @@
 
 #include "alscriptlookup.h"
 
+#include "alscriptnavigation.h"
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
@@ -43,7 +44,7 @@ using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;
 
-ALScriptLookup::ALScriptLookup(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mWindow(window) {}
+ALScriptLookup::ALScriptLookup(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mWindow(window) {}
 
 // static
 std::vector<ALScriptLookup::Candidate> ALScriptLookup::folderCandidates(const std::vector<const LLInventoryItem*>& items, const LLUUID& own, bool lua)
@@ -130,7 +131,7 @@ void ALScriptLookup::start(Doc& doc, ALEditorCommand command, const ALScriptRefe
 {
     // A script names are looked up from is being worked in: a preview of
     // it is held, so that following what it finds does not close it.
-    mWindow.holdPreview(doc);
+    mNavigation.holdPreview(doc);
     Doc::Lookup& lookup   = *doc.lookup;
     lookup                = Doc::Lookup();
     lookup.generation     = ++mGeneration;

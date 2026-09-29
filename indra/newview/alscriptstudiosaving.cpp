@@ -28,6 +28,7 @@
 
 #include "alincludesearch.h"
 #include "alnotecardembedded.h"
+#include "alscriptnavigation.h"
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudiochecking.h"
 #include "alscriptstudioorphans.h"
@@ -38,7 +39,7 @@
 
 #include <algorithm>
 
-ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mWindow(window)
+ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mWindow(window)
 {
 }
 
@@ -328,7 +329,7 @@ void ALScriptStudioSaving::save(Doc& doc)
             break;
     }
     // Saved, a preview is held.
-    mWindow.holdPreview(doc);
+    mNavigation.holdPreview(doc);
     // Tidied as the scripter asked before anything is sent or checked: one
     // step to undo however many of them change it, and nothing where the
     // text is tidy already. The safe fixes first, while the text is still

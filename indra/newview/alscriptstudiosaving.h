@@ -37,6 +37,7 @@
 #include <vector>
 
 class ALScriptStudioAnalysis;
+class ALScriptNavigation;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 
@@ -79,8 +80,6 @@ public:
         // Tidied before a save, a step each to undo: the safe fixes,
         // formatting, the blanks at the lines' ends, where each is asked.
         virtual void tidy(Doc& doc, bool fix, bool format, bool trim) = 0;
-        // What the tab shows held as a preview no longer: it is kept.
-        virtual void holdPreview(Doc& doc) = 0;
         // The Problems tab brought into sight; and its first error chosen,
         // of the checkers' alone or of all, over what the tab says by then.
         virtual void showProblems()                       = 0;
@@ -161,7 +160,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, Window& window);
+    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, Window& window);
 
     // --- saving ------------------------------------------------------------------------
 
@@ -238,6 +237,7 @@ private:
     ALScriptStudioServices& mServices;
     ALScriptStudioTabs&     mTabs;
     ALScriptStudioAnalysis& mAnalysis;
+    ALScriptNavigation&     mNavigation;
     Window&                 mWindow;
     // Held while this is, for what answers later to know it still is.
     std::shared_ptr<bool>   mAlive = std::make_shared<bool>(true);

@@ -27,6 +27,7 @@
 #include "alscriptstudiocaret.h"
 
 #include "alcodeeditor.h"
+#include "alscriptnavigation.h"
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudiochecking.h"
 #include "alscriptstudioplaces.h"
@@ -42,7 +43,7 @@ using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;
 
-ALScriptStudioCaret::ALScriptStudioCaret(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window) : mServices(services), mAnalysis(analysis), mWindow(window) {}
+ALScriptStudioCaret::ALScriptStudioCaret(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, Window& window) : mServices(services), mAnalysis(analysis), mNavigation(navigation), mWindow(window) {}
 
 void ALScriptStudioCaret::ask(Doc& doc, ALEditorCommand command, const ALTextRange& word)
 {
@@ -164,7 +165,7 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
                 mServices.setStatus(mServices.words("NoDefinition", args));
                 break;
             }
-            mWindow.noteJump();
+            mNavigation.noteJump();
             if (homePath.empty())
             {
                 mWindow.goTo(doc, rangeOf(definition));
@@ -211,7 +212,7 @@ void ALScriptStudioCaret::pump(F64 now)
     const ALTextPos     caret  = shown.caret();
     if (shown.hasFocus())
     {
-        mWindow.keyboardInText();
+        mNavigation.walked();
     }
     if (caret != doc->caret->seen)
     {

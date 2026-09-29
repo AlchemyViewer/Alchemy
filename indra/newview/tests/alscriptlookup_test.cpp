@@ -160,7 +160,6 @@ namespace
             }
             return ALScriptPlaces::Lines(std::make_shared<const std::string>(text));
         }
-        void holdPreview(Doc& doc) override { held.push_back(doc.id); }
         void showFound(Doc& doc, const Found& found) override
         {
             shownIn = doc.id;
@@ -202,7 +201,7 @@ namespace
         std::vector<Load>                                  loads;
         std::vector<Expand>                                expands;
         std::vector<Ask>                                   asks;
-        Names                                              asked, held, filesOpened, activated;
+        Names                                              asked, filesOpened, activated;
         std::string                                        shownIn, askedName;
         Found                                              shown;
         S32                                                shows = 0;
@@ -305,11 +304,12 @@ namespace tut
 {
     struct alscriptlookup_data
     {
-        al_studio_test::StudioWindow    window;
-        al_studio_test::FakeServices    services;
-        FakeLookupWindow                studio;
-        std::unique_ptr<ALScriptLookup> unit;
-        const LLUUID                    object{ "11111111-1111-1111-1111-111111111111" };
+        al_studio_test::StudioWindow                      window;
+        al_studio_test::FakeServices                      services;
+        FakeLookupWindow                                  studio;
+        std::unique_ptr<al_studio_test::StudioNavigation> navigation;
+        std::unique_ptr<ALScriptLookup>                   unit;
+        const LLUUID                                      object{ "11111111-1111-1111-1111-111111111111" };
         const ALScriptRef               a{ object, LLUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa") };
         const ALScriptRef               b{ object, LLUUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb") };
         const ALScriptRef               c{ object, LLUUID("cccccccc-cccc-cccc-cccc-cccccccccccc") };
@@ -340,7 +340,8 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<ALScriptLookup>(services, studio, studio, studio);
+            navigation = std::make_unique<al_studio_test::StudioNavigation>(services);
+            unit       = std::make_unique<ALScriptLookup>(services, studio, studio, navigation->unit, studio);
             return *unit;
         }
         Doc& tab(const std::string& id, const ALScriptRef& ref, const std::string& text, const std::string& name = std::string())
@@ -411,8 +412,9 @@ namespace tut
         set_test_name("a name declared nowhere shared looked up in the script alone, answered at once and shown, the preview held");
         make();
         studio.others = { { b, "B" } };
+        tab("a", a, A_TEXT, "A").preview = true;
         Doc& doc      = lookUp(ALEditorCommand::FindReferences, false);
-        ensure("the preview held", studio.held == Names{ "a" });
+        ensure("the preview held", !doc.preview);
         ensure("nothing else asked", studio.asked.empty() && studio.loads.empty());
         ensure_equals("shown", studio.shows, 1);
         ensure_equals("in its tab", studio.shownIn, std::string("a"));

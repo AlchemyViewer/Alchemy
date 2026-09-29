@@ -28,6 +28,7 @@
 #include "linden_common.h"
 
 #include "../alscriptstudiodoc.h"
+#include "../alscriptnavigation.h"
 #include "../alscriptstudioanalysis.h"
 #include "../alscriptstudiosaves.h"
 #include "../alscriptstudioservices.h"
@@ -254,6 +255,27 @@ namespace al_studio_test
         void stopped(ALScriptStudioDoc&) override {}
         void preprocess(ALScriptStudioDoc&) override {}
         void warnOverWeight(ALScriptStudioDoc&) override {}
+    };
+
+    // Navigation, for a unit given it (ALScriptNavigation): over tabs that
+    // do nothing and a window that records the places Back and Forward
+    // show -- the tab, " expanded" where it is the expansion, and the line
+    // -- with no list walked, nothing worked from and no path open.
+    struct StudioNavigation final : public ALScriptNavigation::Window
+    {
+        explicit StudioNavigation(ALScriptStudioServices& services) : unit(services, tabs, *this) {}
+        void showPlace(ALScriptStudioDoc& doc, ALScriptStudioDoc::View view, const ALTextPos& at) override
+        {
+            shown.push_back(doc.id + (view == ALScriptStudioDoc::View::Expanded ? " expanded " : " ") + std::to_string(at.line));
+        }
+        bool pathOpen(const std::string&) const override { return false; }
+        void choosePreview(ALPaneList*) override {}
+        bool workedFrom(const ALScriptStudioDoc&) const override { return false; }
+        void focusDoc(ALScriptStudioDoc&) override {}
+
+        QuietTabs                tabs;
+        ALScriptNavigation       unit;
+        std::vector<std::string> shown;
     };
 
     // A pane's window with nothing to fake: the services alone.

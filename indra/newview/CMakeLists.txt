@@ -2429,7 +2429,8 @@ if(AL_BUILD_TESTS)
   set(test_project ${AL_VIEWER_BINARY_NAME})
 
   # What Script Studio's tests have in common -- a tab, its save's flow, a
-  # notecard's items, the places and words, the account's recovery --
+  # notecard's items, the places and words, the account's recovery, and
+  # the units a unit under test is given --
   # built once for all of them, rather than once in each. Static: a test
   # takes only the objects it uses, so one that fakes part of them keeps
   # its fakes.
@@ -2438,6 +2439,7 @@ if(AL_BUILD_TESTS)
     STATIC
     alnotecardembedded.cpp
     alrecovery.cpp
+    alscriptnavigation.cpp
     alscriptsaveflow.cpp
     alscriptstudiodoc.cpp
     alscriptstudioplaces.cpp

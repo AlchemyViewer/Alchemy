@@ -726,7 +726,7 @@ bool ALFloaterScriptStudio::postBuild()
         const size_t index = indexOf(id);
         if (index != NONE)
         {
-            holdPreview(*mDocs[index]);
+            mNavigation.holdPreview(*mDocs[index]);
         }
     });
     mProblemsPane = getChild<ALScriptProblemsPane>("problems_tab");
@@ -1278,11 +1278,6 @@ bool ALFloaterScriptStudio::readFile(const std::string& path, std::string& text)
 bool ALFloaterScriptStudio::writeFile(const std::string& path, const std::string& text)
 {
     return ALFileWrite::whole(path, text);
-}
-
-void ALFloaterScriptStudio::jumpedFrom(Doc& doc, const ALTextView& view, const ALTextPos& from)
-{
-    mNavigation.remember(NavPlace{ doc.id, from, &view == doc.expandedEditor ? Doc::View::Expanded : Doc::View::Source });
 }
 
 std::vector<std::string> ALFloaterScriptStudio::fileFolders(const Doc& doc) const
@@ -1910,7 +1905,7 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
         // called now, renamed since it was opened.
         if (!mNavigation.openingPreview())
         {
-            holdPreview(*mDocs[already]);
+            mNavigation.holdPreview(*mDocs[already]);
         }
         activate(already, focus);
         renameDoc(*mDocs[already], name);
@@ -2630,7 +2625,7 @@ void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 
     size_t            already = indexOf(id);
     if (already != NONE && !mNavigation.openingPreview())
     {
-        holdPreview(*mDocs[already]);
+        mNavigation.holdPreview(*mDocs[already]);
     }
     if (already == NONE)
     {
@@ -3337,7 +3332,7 @@ void ALFloaterScriptStudio::onTabAction(const std::string& action)
     // by the same names, about the tab in front, which a right-click chose.
     if (action == "keep")
     {
-        holdPreview(*doc);
+        mNavigation.holdPreview(*doc);
     }
     else if (action == "close_others" || action == "close_all" || action == "close_saved")
     {

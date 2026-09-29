@@ -58,6 +58,7 @@ public:
     // nowhere left to go.
     std::optional<Place> take(bool forward, const std::optional<Place>& here, const std::function<bool(const std::string& doc)>& open);
     bool                 canGo(bool forward) const { return !(forward ? mForward : mBack).empty(); }
+    size_t               places(bool forward) const { return (forward ? mForward : mBack).size(); }
     // A tab known by another id from here on.
     void                 rekey(const std::string& was, const std::string& id);
 
@@ -113,6 +114,8 @@ public:
     // Back, or Forward again.
     void goBack(bool forward);
     bool canGo(bool forward) const { return mHistory.canGo(forward); }
+    // How many places there are to go back, or forward, through.
+    size_t places(bool forward) const { return mHistory.places(forward); }
     // A tab known by another id from here on.
     void rekey(const std::string& was, const std::string& id) { mHistory.rekey(was, id); }
 

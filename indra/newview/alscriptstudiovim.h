@@ -37,6 +37,7 @@
 
 class ALScriptStudioCommands;
 class ALScriptStudioSaves;
+class ALScriptNavigation;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 class ALTextView;
@@ -88,9 +89,6 @@ public:
         // or back from -1, past either end the one at that end; 0 the one
         // at the caret or after it. False where it has none.
         virtual bool goToProblemNumber(Doc& doc, S32 number) = 0;
-        // A place in a tab's source or expansion to come back to with Back,
-        // where a vim jump began.
-        virtual void jumpedFrom(Doc& doc, const ALTextView& view, const ALTextPos& from) = 0;
         // The file an include or a module the tab's script names is,
         // opened: the one the preprocessor found, else one on disk where it
         // would look -- an include's, a module's, or either. False where it
@@ -107,7 +105,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioVim(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, ALScriptStudioCommands& commands, Window& window);
+    ALScriptStudioVim(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, ALScriptNavigation& navigation, ALScriptStudioCommands& commands, Window& window);
 
     // A keymap put over one of the window's editors: sharing its history
     // and options with the rest, and asking this what it leaves.
@@ -198,6 +196,7 @@ private:
     ALScriptStudioServices&              mServices;
     ALScriptStudioTabs&                  mTabs;
     ALScriptStudioSaves&                 mSaves;
+    ALScriptNavigation&                  mNavigation;
     ALScriptStudioCommands&              mCommands;
     Window&                              mWindow;
     std::shared_ptr<ALVimKeymap::Shared> mShared = std::make_shared<ALVimKeymap::Shared>();

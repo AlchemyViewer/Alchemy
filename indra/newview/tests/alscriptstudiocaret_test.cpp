@@ -59,8 +59,6 @@ namespace
             }
             return ALScriptPlaces::Lines(std::make_shared<const std::string>("\n\n\n\n  integer count; // held"));
         }
-        void noteJump() override { said.push_back("jump"); }
-        void keyboardInText() override { ++typing; }
         void goTo(Doc& doc, const ALTextRange& range) override { said.push_back("go " + doc.id + " " + at(range)); }
         void openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length) override
         {
@@ -87,7 +85,6 @@ namespace
         bool                    expanded = false, problems = false, inspector = true;
         std::string             held;
         Names                   asked, said;
-        S32                     typing = 0;
         std::vector<Doc::Place> found;
     };
 
@@ -128,10 +125,11 @@ namespace tut
 {
     struct alscriptstudiocaret_data
     {
-        al_studio_test::StudioWindow         window;
-        al_studio_test::FakeServices         services;
-        FakeCaretWindow                      studio;
-        std::unique_ptr<ALScriptStudioCaret> unit;
+        al_studio_test::StudioWindow                      window;
+        al_studio_test::FakeServices                      services;
+        FakeCaretWindow                                   studio;
+        std::unique_ptr<al_studio_test::StudioNavigation> navigation;
+        std::unique_ptr<ALScriptStudioCaret>              unit;
 
         alscriptstudiocaret_data()
         {
@@ -155,7 +153,8 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<ALScriptStudioCaret>(services, studio, studio);
+            navigation = std::make_unique<al_studio_test::StudioNavigation>(services);
+            unit       = std::make_unique<ALScriptStudioCaret>(services, studio, navigation->unit, studio);
             return *unit;
         }
         ALCodeEditor* editor(const std::string& name, const std::string& text)
@@ -201,13 +200,15 @@ namespace tut
         caret.answered(doc, references(v), ALTextPos(0, 9));
         ensure("of another text or place: nothing", studio.said.empty());
         caret.answered(doc, references(v), ALTextPos(0, 8));
-        ensure_equals("gone", joined(studio.said), std::string("jump, go a 0:8-0:13"));
+        ensure_equals("gone", joined(studio.said), std::string("go a 0:8-0:13"));
+        ensure_equals("a jump noted, for Back", navigation->unit.places(false), size_t(1));
         caret.answered(doc, references(v), ALTextPos(0, 8));
-        ensure_equals("answered once", studio.said.size(), size_t(2));
+        ensure("answered once", studio.said.size() == 1 && navigation->unit.places(false) == 1);
 
         ask(doc, ALEditorCommand::GoToDefinition);
         caret.answered(doc, references(v, false), ALTextPos(0, 8));
-        ensure("none: said, no jump", studio.said.size() == 2 && services.statuses.back().find("NoDefinition [NAME]=count") == 0);
+        ensure("none: said, no jump", studio.said.size() == 1 && navigation->unit.places(false) == 1 &&
+                                          services.statuses.back().find("NoDefinition [NAME]=count") == 0);
         ask(doc, ALEditorCommand::GoToDefinition);
         ALScriptAnalysis::Result none;
         none.version    = v;
@@ -272,7 +273,8 @@ namespace tut
         doc.expanded.version   = v;
         ALScriptAnalysis::Result result = references(v);
         caret.answered(doc, result, ALTextPos(0, 8));
-        ensure_equals("opened in the include", joined(studio.said), std::string("jump, open disk:/inc.lsl inc.lsl 4:8+5"));
+        ensure_equals("opened in the include", joined(studio.said), std::string("open disk:/inc.lsl inc.lsl 4:8+5"));
+        ensure_equals("a jump noted", navigation->unit.places(false), size_t(1));
 
         ask(doc, ALEditorCommand::FindReferences);
         result.references.references = { span(0, 8, 5), span(2, 26, 5), span(7, 0, 5) };
@@ -364,10 +366,12 @@ namespace tut
         caret.pump(9.0);
         ensure_equals("the expansion's caret, the path told", joined(studio.said), std::string("path 0:0"));
         ensure("the inspector not", studio.asked.empty() && doc.caret->inspectDue == 0.0);
-        ensure("not typing", studio.typing == 0);
+        navigation->unit.noteJump(true);
+        caret.pump(9.2);
+        ensure("a walk down a list goes on while the text has no keyboard", navigation->unit.walking());
         doc.expandedEditor->setFocus(true);
         caret.pump(9.5);
-        ensure_equals("typing", studio.typing, 1);
+        ensure("and ends once it has", !navigation->unit.walking());
     }
 
     template<> template<>

@@ -285,7 +285,6 @@ private:
     bool readFile(const std::string& path, std::string& text) override;
     bool writeFile(const std::string& path, const std::string& text) override;
     std::vector<std::string> fileFolders(const Doc& doc) const override;
-    void jumpedFrom(Doc& doc, const ALTextView& view, const ALTextPos& from) override;
     void pickLine(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title, S32 rows,
                   std::function<void(const std::string& line)> chosen, std::function<void(const std::string& line)> shifted,
                   std::function<void()> cancelled) override;
@@ -472,10 +471,9 @@ private:
     // Completion's link numbers: where the call being typed wants one, the
     // prims of the script's object by name, each putting in its number.
     void completeLinks(const Doc& doc, const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out);
-    // Navigation (ALScriptNavigation): the services' and saving's calls to
-    // it, and what it asks of the window.
+    // Navigation (ALScriptNavigation): the services' call to it, and what
+    // it asks of the window.
     void revealed(LLUICtrl* list, bool to_editor) override { mNavigation.revealed(list, to_editor); }
-    void holdPreview(Doc& doc) override { mNavigation.holdPreview(doc); }
     void showPlace(Doc& doc, Doc::View view, const ALTextPos& at) override;
     bool pathOpen(const std::string& path) const override;
     void choosePreview(ALPaneList* list) override;
@@ -526,11 +524,8 @@ private:
     void                 setLintLevel(bool lua, const std::string& id, ALScriptLints::Level level) override;
     void                 showLintSettings() override;
 
-    // The name at the caret (ALScriptStudioCaret): a jump noted, a walk
-    // down a list over, a place gone to, the lookup started, the bar's
-    // path and the inspector's problems.
-    void noteJump() override { mNavigation.noteJump(); }
-    void keyboardInText() override { mNavigation.walked(); }
+    // The name at the caret (ALScriptStudioCaret): a place gone to, the
+    // lookup started, the bar's path and the inspector's problems.
     void goTo(Doc& doc, const ALTextRange& range) override;
     void startLookup(Doc& doc, ALEditorCommand command, const ALScriptReferences& refs, bool has_definition, const std::string& home_path,
                      const ALScriptSpan& definition, std::vector<Doc::Place> places, U32 version) override
@@ -1188,9 +1183,9 @@ private:
     // What is unsaved in the tabs, kept against the viewer going.
     ALScriptStudioRecovery             mRecovery{ *this, *this, *this };
     // Saving and compiling the tabs.
-    ALScriptStudioSaving               mSaving{ *this, *this, *this, *this };
+    ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, *this };
     // The window's side of vim, over its editors.
-    ALScriptStudioVim                  mVim{ *this, *this, mSaving, mCommands, *this };
+    ALScriptStudioVim                  mVim{ *this, *this, mSaving, mNavigation, mCommands, *this };
     // Its tabs held open in an editor outside.
     ALScriptExternalEditor             mExternal{ *this, *this, mSaving, *this };
     // Its files on disk, and the recent lists.
@@ -1202,7 +1197,7 @@ private:
     // The places gone from, and the previews a list opens as it is walked.
     ALScriptNavigation                 mNavigation{ *this, *this, *this };
     // Its names looked up across the object's scripts, and renamed.
-    ALScriptLookup                     mLookup{ *this, *this, *this, *this };
+    ALScriptLookup                     mLookup{ *this, *this, *this, mNavigation, *this };
     // Every script of an object checked, and what it is called while it is.
     ALScriptObjectCheck                mObjectCheck{ *this, *this, *this };
     // Recompiles from the Explorer.
@@ -1211,7 +1206,7 @@ private:
     S32                                mCheckedErrors   = 0;
     S32                                mCheckedWarnings = 0;
     // The name at its caret, and the caret watched.
-    ALScriptStudioCaret                mCaret{ *this, *this, *this };
+    ALScriptStudioCaret                mCaret{ *this, *this, mNavigation, *this };
     // Its checking: the analyzers asked and answered, and fixes.
     ALScriptStudioChecking             mChecking{ *this, *this, mSaving, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;

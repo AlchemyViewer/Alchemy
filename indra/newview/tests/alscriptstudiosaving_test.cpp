@@ -77,7 +77,6 @@ namespace
             }
         }
         bool changes = false;
-        void holdPreview(Doc&) override {}
         void scheduleAnalysis(Doc& doc, bool) override { analysed.push_back(doc.id); }
         void refreshProblems(Doc&) override {}
         void showProblems() override { ++problemsShown; }
@@ -189,10 +188,11 @@ namespace tut
     {
         // The UI, and the editors' home; the services are plain, so that
         // what is said is a word's name and its blanks.
-        al_studio_test::StudioWindow          window;
-        al_studio_test::FakeServices          services;
-        FakeSavingWindow                      studio;
-        std::unique_ptr<ALScriptStudioSaving> saving;
+        al_studio_test::StudioWindow                      window;
+        al_studio_test::FakeServices                      services;
+        FakeSavingWindow                                  studio;
+        std::unique_ptr<al_studio_test::StudioNavigation> navigation;
+        std::unique_ptr<ALScriptStudioSaving>             saving;
 
         ALScriptStudioSaving& make()
         {
@@ -202,7 +202,8 @@ namespace tut
             }
             studio.services        = &services;
             studio.options.program = "Alchemy Test 1.2.3";
-            saving                 = std::make_unique<ALScriptStudioSaving>(services, studio, studio, studio);
+            navigation             = std::make_unique<al_studio_test::StudioNavigation>(services);
+            saving                 = std::make_unique<ALScriptStudioSaving>(services, studio, studio, navigation->unit, studio);
             return *saving;
         }
 
