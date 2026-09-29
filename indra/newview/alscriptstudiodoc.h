@@ -307,6 +307,23 @@ struct ALScriptStudioDoc
     // notice as the source, since the next save replaces it.
     std::optional<U32>                         compareCompiledAt;
     std::optional<std::string>                 compiledDiffers;
+    // What the last word about this tab offered to do about it -- a save
+    // tried again or made over what stopped it, a copy, a file, one of two
+    // texts taken -- said again in the notice while the tab is in front,
+    // where the status line cannot be pressed and Output may be out of
+    // sight; until one is done, from either, the notice is hidden, or a
+    // save answers a save's.
+    struct Offer
+    {
+        std::string              text;
+        std::vector<std::string> actions;
+        bool                     bySave() const
+        {
+            return std::ranges::any_of(actions, [](const std::string& action) { return action == "retry" || action == "save_anyway"; });
+        }
+        bool offers(const std::string& action) const { return std::ranges::find(actions, action) != actions.end(); }
+    };
+    std::optional<Offer>                       offer;
     // The preprocessor's run over the text at a version: what the
     // analyzers see, and what the last save uploaded, each with the
     // way back to the source and what the run said.

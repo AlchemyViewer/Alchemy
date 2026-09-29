@@ -320,7 +320,7 @@ namespace tut
     template<> template<>
     void alscriptstudiosaving_object::test<3>()
     {
-        set_test_name("held on the analyzers: checked first, their errors stopping it with Save Anyway and the first in sight; asked again, past them");
+        set_test_name("held on the analyzers: checked first, their errors stopping it with Save Anyway and the first in sight; asked again, past them, the offer answered");
         ALScriptStudioSaving& saving = make();
         studio.options.holdOnErrors  = true;
 
@@ -338,8 +338,13 @@ namespace tut
         ensure("the first of the checkers' errors in sight", studio.problemsShown == 1 && studio.firstErrors == std::vector<bool>{ true });
         ensure("stopped", studio.stops == 1 && studio.sent.empty() && !doc.save.underway());
 
+        doc.offer = Doc::Offer{ "held", { "save_anyway" } };
         saving.saveAsked(doc);
         ensure("asked again over the same text: past them", studio.sent.size() == 1);
+        ensure("what was offered answered", !doc.offer);
+        doc.offer = Doc::Offer{ "saved elsewhere", { "take_saved", "keep_saved", "compare_saved" } };
+        saving.save(doc);
+        ensure("a conflict's offer stays", doc.offer.has_value());
 
         // Not held, the errors go with the text, said.
         studio.options.holdOnErrors = false;

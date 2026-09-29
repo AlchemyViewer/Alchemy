@@ -274,6 +274,16 @@ void ALScriptStudioSaving::save(Doc& doc)
     {
         return;
     }
+    // What an earlier save stopped at is answered by this one, which says
+    // again where it stops too.
+    if (doc.offer && doc.offer->bySave())
+    {
+        doc.offer.reset();
+        if (&doc == mServices.frontDoc())
+        {
+            mWindow.refreshNotice();
+        }
+    }
     // Where it cannot go -- its object out of sight, the item gone, the
     // connection lost -- said, with the notice back in sight to offer a
     // copy or a file.

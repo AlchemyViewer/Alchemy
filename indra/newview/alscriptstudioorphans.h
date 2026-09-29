@@ -76,8 +76,8 @@ public:
     // object, or its object out of sight.
     static Orphan failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure, bool object_there);
     // What the notice says for a tab: a text kept from an earlier session
-    // first, then what it is, unless it was hidden since that changed;
-    // nothing for none.
+    // first, then what it is, unless it was hidden since that changed,
+    // then what the last word about it offered to do; nothing for none.
     static ALScriptNoticeBar::Notice noticeFor(const Doc* doc, const ALScriptStudioServices& services);
 
     // What the orphans ask of the window beyond its services.
@@ -99,6 +99,9 @@ public:
         // again; a text kept from an earlier session taken up, or thrown
         // away.
         virtual void saveCopyToInventory(Doc& doc)                                           = 0;
+        // What the last word about a tab offered, done as its link in
+        // Output does it (Doc::offer).
+        virtual void takeOffer(Doc& doc, const std::string& action)                          = 0;
         virtual void saveCopyToFile()                                                        = 0;
         virtual void saveAgain(Doc& doc)                                                     = 0;
         virtual void takeUpRecovery(Doc& doc, const ALScriptRecoveryEntry& entry)            = 0;

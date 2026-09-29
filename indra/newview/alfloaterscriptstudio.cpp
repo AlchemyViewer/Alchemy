@@ -5367,6 +5367,12 @@ void ALFloaterScriptStudio::report(const std::string& text, bool failure, const 
 {
     setStatus(text, failure);
     mOutputPane->said(text, failure, doc, actions);
+    // What can be done about it offered over the tab it is about too.
+    if (Doc* about = doc && !actions.empty() ? findDoc(doc->id) : nullptr)
+    {
+        about->offer = Doc::Offer{ text, actions };
+        refreshNotice();
+    }
 }
 
 // --- find in files -------------------------------------------------------------------
@@ -6971,8 +6977,13 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
     // What the words said could be done, done: a save held over what was
     // found asked again -- saved, as a second save would have been, where
     // the text is still what was held -- a failed one tried again, a copy
-    // into the inventory, a file.
+    // into the inventory, a file. The notice offering it is answered.
     activate(indexOf(doc.id));
+    if (doc.offer && doc.offer->offers(action))
+    {
+        doc.offer.reset();
+        refreshNotice();
+    }
     if (action == "save_anyway")
     {
         mSaving.saveAsked(doc);

@@ -821,6 +821,7 @@ private:
     void                         takeUpRecovery(Doc& doc, const ALScriptRecoveryEntry& entry) override { mRecovery.takeUp(doc, entry); }
     void                         discardRecovery(const ALScriptRecoveryEntry& entry) override;
     void                         noticeAction(const std::string& action) override { mOrphans.noticeAction(action); }
+    void                         takeOffer(Doc& doc, const std::string& action) override { outputAction(doc, action); }
     // The window, of all of them, that has a script or a file open.
     static ALFloaterScriptStudio* holderOf(const ALScriptRef& ref, const std::string& file);
     // The studio window the keyboard was last in, while it is open: where a

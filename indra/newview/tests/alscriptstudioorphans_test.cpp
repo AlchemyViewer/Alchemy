@@ -62,6 +62,7 @@ namespace
         void               saveCopyToInventory(Doc& doc) override { did.push_back("copy " + doc.id); }
         void               saveCopyToFile() override { did.push_back("export"); }
         void               saveAgain(Doc& doc) override { did.push_back("save " + doc.id); }
+        void               takeOffer(Doc& doc, const std::string& action) override { did.push_back("offer " + doc.id + ": " + action); }
         void               takeUpRecovery(Doc& doc, const ALScriptRecoveryEntry& entry) override { did.push_back("restore " + doc.id); }
         void               discardRecovery(const ALScriptRecoveryEntry&) override { did.push_back("discard"); }
         void               takeCarriedText(Doc& doc) override
@@ -431,5 +432,50 @@ namespace tut
         ensure("still offered", a.recoverable.has_value());
         unit.noticeAction("restore");
         ensure("the source in front first", studio.did[studio.did.size() - 2] == "source a" && studio.did.back() == "restore a");
+    }
+
+    template<> template<>
+    void alscriptstudioorphans_object::test<10>()
+    {
+        set_test_name("what the last word offered: said after what the tab is, in the notice's words, a conflict's only while there is another text; "
+                      "taken up as Output would, or hidden");
+        Orphans&                            unit  = make();
+        const al_studio_test::FakeServices& words = services();
+        Doc&                                a     = tab("a");
+        services().front                          = 0;
+        a.offer                                   = Doc::Offer{ "Saving a failed.", { "retry", "copy", "export" } };
+        ALScriptNoticeBar::Notice notice          = Orphans::noticeFor(&a, words);
+        ensure("said with its buttons", notice.text == "Saving a failed." &&
+                                            notice.buttons[0] == std::make_pair(std::string("retry"), std::string("NoticeRetrySave")) &&
+                                            notice.buttons[1].first == "copy" && notice.buttons[2].first == "export");
+        a.orphan.kind = Orphan::Away;
+        ensure("what the tab is first", Orphans::noticeFor(&a, words).text == said("NoticeAway"));
+        a.orphan.noticeDismissed = true;
+        ensure("then the offer, once that is hidden", Orphans::noticeFor(&a, words).text == "Saving a failed.");
+        a.orphan.kind            = Orphan::None;
+        a.orphan.noticeDismissed = false;
+        unit.noticeAction("retry");
+        ensure("taken up, and let go of", studio.did.back() == "offer a: retry" && !a.offer);
+        a.offer = Doc::Offer{ "Saved elsewhere.", { "take_saved", "keep_saved", "compare_saved" } };
+        ensure("a conflict with nothing to take: not said", Orphans::noticeFor(&a, words).text.empty());
+        a.savedThere = std::string("theirs");
+        notice       = Orphans::noticeFor(&a, words);
+        ensure("with it: said", notice.text == "Saved elsewhere." && notice.buttons[0].second == "NoticeTakeSaved" &&
+                                    notice.buttons[2].second == "NoticeCompare");
+        unit.noticeAction("close");
+        ensure("hidden: let go of, and nothing else", !a.offer && !a.orphan.noticeDismissed && studio.did.back() == "offer a: retry");
+        a.offer           = Doc::Offer{ "Held.", { "save_anyway" } };
+        a.compiledDiffers = std::string("x");
+        ensure("said before a compiled half", Orphans::noticeFor(&a, words).text == "Held.");
+        ensure("a save's, answered by a save; a conflict's not",
+               a.offer->bySave() && !Doc::Offer{ "x", { "take_external", "keep_here" } }.bySave());
+        a.orphan.kind = Orphan::Removed;
+        a.offer       = Doc::Offer{ "Kept.", { "copy", "export" } };
+        unit.noticeAction("close");
+        ensure("what a tab gone says of itself, hidden with it", a.orphan.noticeDismissed && !a.offer);
+        a.orphan.noticeDismissed = false;
+        a.offer                  = Doc::Offer{ "Saving a failed.", { "retry", "copy", "export" } };
+        unit.noticeAction("close");
+        ensure("more than that: said next", a.offer && Orphans::noticeFor(&a, words).text == "Saving a failed.");
     }
 }

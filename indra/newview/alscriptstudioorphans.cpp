@@ -36,6 +36,60 @@
 
 #include <vector>
 
+namespace
+{
+    typedef ALScriptStudioDoc Doc;
+
+    // Whether the notice says what a tab is: something, and not hidden.
+    bool orphanSaid(const Doc& doc)
+    {
+        return !doc.orphan.noticeDismissed && doc.orphan.kind != Doc::Orphan::None;
+    }
+
+    // What of a tab's offer can still be done, each with the notice's words
+    // for it: one of two texts taken only while there is still another.
+    std::vector<std::pair<std::string, std::string>> stillOffered(const Doc& doc)
+    {
+        std::vector<std::pair<std::string, std::string>> out;
+        if (!doc.offer)
+        {
+            return out;
+        }
+        for (const std::string& action : doc.offer->actions)
+        {
+            const bool external = action == "take_external" || action == "keep_here";
+            const bool there    = action == "take_saved" || action == "keep_saved" || action == "compare_saved";
+            if ((external && !doc.external.waiting) || (there && !doc.savedThere))
+            {
+                continue;
+            }
+            const char* label = action == "save_anyway"     ? "NoticeSaveAnyway"
+                                : action == "retry"         ? "NoticeRetrySave"
+                                : action == "copy"          ? "NoticeCopy"
+                                : action == "export"        ? "NoticeExport"
+                                : action == "reload_world"  ? "NoticeReload"
+                                : action == "take_external" ? "NoticeTakeExternal"
+                                : action == "keep_here"     ? "NoticeKeepHere"
+                                : action == "take_saved"    ? "NoticeTakeSaved"
+                                : action == "keep_saved"    ? "NoticeKeepSaved"
+                                : action == "compare_saved" || action == "compare_world" ? "NoticeCompare"
+                                                                                         : nullptr;
+            if (label)
+            {
+                out.emplace_back(action, label);
+            }
+        }
+        return out;
+    }
+
+    // Whether the notice says a tab's offer: nothing more pressing to say,
+    // and something of it still to be done.
+    bool offerSaid(const Doc& doc)
+    {
+        return !doc.recoverable && !orphanSaid(doc) && !stillOffered(doc).empty();
+    }
+}
+
 ALScriptStudioOrphans::ALScriptStudioOrphans(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
 {
 }
@@ -248,7 +302,7 @@ ALScriptNoticeBar::Notice ALScriptStudioOrphans::noticeFor(const Doc* doc, const
         buttons[1]       = { "restore", "NoticeRestore" };
         buttons[2]       = { "discard_left", "NoticeDiscard" };
     }
-    else if (doc && !doc->orphan.noticeDismissed && doc->orphan.kind != Orphan::None)
+    else if (doc && orphanSaid(*doc))
     {
         LLStringUtil::format_map_t args;
         args["[FILE]"] = doc->file;
@@ -293,6 +347,16 @@ ALScriptNoticeBar::Notice ALScriptStudioOrphans::noticeFor(const Doc* doc, const
                 break;
         }
     }
+    else if (doc && offerSaid(*doc))
+    {
+        // What the last word about it offered, as Output's links do.
+        text                                                 = doc->offer->text;
+        const std::vector<std::pair<std::string, std::string>> offered = stillOffered(*doc);
+        for (size_t i = 0; i < ALScriptNoticeBar::BUTTONS && i < offered.size(); ++i)
+        {
+            buttons[i] = offered[i];
+        }
+    }
     else if (doc && doc->compiledDiffers)
     {
         text       = services.words("NoticeCompiledDiffers");
@@ -318,6 +382,17 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
     {
         return;
     }
+    if (offerSaid(*doc) && (action == "close" || doc->offer->offers(action)))
+    {
+        // The offer let go of, or taken up as its link in Output would be.
+        doc->offer.reset();
+        if (action != "close")
+        {
+            mWindow.takeOffer(*doc, action);
+        }
+        refreshNotice();
+        return;
+    }
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc->name;
     if (action == "close")
@@ -327,6 +402,12 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
         // Changes, once the notice is gone.
         doc->orphan.noticeDismissed = true;
         doc->recoverable.reset();
+        // An offer of nothing but a copy or a file is what a tab gone or
+        // out of reach says of itself: hidden with it, not said next.
+        if (doc->offer && std::ranges::all_of(doc->offer->actions, [](const std::string& each) { return each == "copy" || each == "export"; }))
+        {
+            doc->offer.reset();
+        }
     }
     else if (action == "restore" && doc->recoverable)
     {
