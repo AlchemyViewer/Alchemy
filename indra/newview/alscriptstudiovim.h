@@ -57,34 +57,22 @@ public:
     class Window
     {
     public:
+        // --- the tabs ------------------------------------------------------------------
+
         // A tab closed, asked about first where it is unsaved; several at
         // once, the unsaved asked about in one question.
         virtual void closeDocument(std::string_view id)             = 0;
         virtual void closeMany(const std::vector<std::string>& ids) = 0;
-        // The selection formatted, or the whole text.
-        virtual void format(Doc& doc, bool selection_only) = 0;
-        // An entry in the Output tab; and the tab brought into sight.
-        virtual void output(const ALOutputView::Entry& entry) = 0;
-        virtual void showOutput()                             = 0;
-        // A line picked from a list over the editors, as tall as `rows`:
-        // Return on one, Shift-Return, or none picked.
-        virtual void pickLine(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,
-                              S32 rows, std::function<void(const std::string& line)> chosen,
-                              std::function<void(const std::string& line)> shifted, std::function<void()> cancelled) = 0;
         // The tabs put in this order, by id.
         virtual void reorderTabs(const std::vector<std::string>& order) = 0;
         // Whether a tab's text can be put back as it was last saved or
         // loaded.
         virtual bool revertible(const Doc& doc) const = 0;
-        // A file's text read whole, its line endings as an editor here
-        // keeps them; and a text written to one whole. False where it
-        // could not be.
-        virtual bool readFile(const std::string& path, std::string& text)        = 0;
-        virtual bool writeFile(const std::string& path, const std::string& text) = 0;
-        // The folders a file named without one is looked for in, in order:
-        // the folder of the tab's own file, where it is one, then the
-        // include folders.
-        virtual std::vector<std::string> fileFolders(const Doc& doc) const = 0;
+
+        // --- a tab's text --------------------------------------------------------------
+
+        // The selection formatted, or the whole text.
+        virtual void format(Doc& doc, bool selection_only) = 0;
         // The caret to a problem of the tab's by its number, counted from 1
         // or back from -1, past either end the one at that end; 0 the one
         // at the caret or after it. False where it has none.
@@ -94,6 +82,32 @@ public:
         // would look -- an include's, a module's, or either. False where it
         // is nowhere known.
         virtual bool openIncluded(Doc& doc, const std::string& name, std::optional<bool> require) = 0;
+
+        // --- saying and asking ---------------------------------------------------------
+
+        // An entry in the Output tab; and the tab brought into sight.
+        virtual void output(const ALOutputView::Entry& entry) = 0;
+        virtual void showOutput()                             = 0;
+        // A line picked from a list over the editors, as tall as `rows`:
+        // Return on one, Shift-Return, or none picked.
+        virtual void pickLine(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,
+                              S32 rows, std::function<void(const std::string& line)> chosen,
+                              std::function<void(const std::string& line)> shifted, std::function<void()> cancelled) = 0;
+
+        // --- files ---------------------------------------------------------------------
+
+        // A file's text read whole, its line endings as an editor here
+        // keeps them; and a text written to one whole. False where it
+        // could not be.
+        virtual bool readFile(const std::string& path, std::string& text)        = 0;
+        virtual bool writeFile(const std::string& path, const std::string& text) = 0;
+        // The folders a file named without one is looked for in, in order:
+        // the folder of the tab's own file, where it is one, then the
+        // include folders.
+        virtual std::vector<std::string> fileFolders(const Doc& doc) const = 0;
+
+        // --- the vimrc -----------------------------------------------------------------
+
         // The vimrc as it stands, and where it is, for saying: the file's
         // path, or the notecard's name. Opened in a tab, to be edited.
         virtual std::string vimrc(std::string& whence) = 0;
