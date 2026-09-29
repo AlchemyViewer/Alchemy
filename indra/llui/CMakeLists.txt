@@ -632,6 +632,15 @@ if(AL_BUILD_TESTS)
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
+  # A frame, and the tab strip's tabs framed so, read back the same way.
+  al_add_test(
+    alsurface_gl
+    GL
+    PROJECT llui
+    LIBRARIES ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
   # The code editor over 50,000-line scripts: what each change to the edit
   # pipeline, the highlighter, the layout, the folds or find is measured by.
   al_add_bench(
