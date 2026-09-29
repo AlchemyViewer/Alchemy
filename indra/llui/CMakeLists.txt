@@ -158,6 +158,7 @@ target_sources(
     alvimsearch.cpp
     alxuiservice.cpp
     alchoicelist.cpp
+    alchoicepopup.cpp
     aloutputview.cpp
     alsyntaxgrammar.cpp
     alsyntaxhighlighter.cpp
@@ -381,6 +382,7 @@ target_sources(
         alvimtext.h
         alxuiservice.h
         alchoicelist.h
+        alchoicepopup.h
         aloutputview.h
         alsyntaxgrammar.h
         alsyntaxhighlighter.h

@@ -589,13 +589,29 @@ LLRect ALTextView::bodyRect() const
 
 LLView* ALTextView::overlayAt(S32 x, S32 y)
 {
-    LLView* over = childFromPoint(x, y);
-    return over == mRuler ? nullptr : over;
+    // The frontmost child under the point that would take the mouse. Not
+    // the ruler, which is beside the text; and a child that only holds
+    // others -- a list and the box beside it, as large as the view and
+    // seen through -- only where one of those is.
+    for (LLView* child : *getChildList())
+    {
+        const S32 local_x = x - child->getRect().mLeft;
+        const S32 local_y = y - child->getRect().mBottom;
+        if (child == mRuler || !child->getVisible() || !child->pointInView(local_x, local_y))
+        {
+            continue;
+        }
+        if (child->getMouseOpaque() || child->childFromPoint(local_x, local_y))
+        {
+            return child;
+        }
+    }
+    return nullptr;
 }
 
 bool ALTextView::rulerAt(S32 x, S32 y)
 {
-    return childFromPoint(x, y) == mRuler;
+    return mRuler->getVisible() && mRuler->getRect().pointInRect(x, y) && !overlayAt(x, y);
 }
 
 LLRect ALTextView::textRect() const

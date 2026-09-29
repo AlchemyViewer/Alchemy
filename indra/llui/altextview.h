@@ -810,7 +810,9 @@ protected:
     virtual S32  coveredAbove(S32 local_x);
     // A view of its own under a point, drawn over the text -- the find bar,
     // a list, a card, a view the text holds -- which has the mouse before
-    // the text does; or nothing. Not the ruler, which is beside the text.
+    // the text does; or nothing. Not the ruler, which is beside the text;
+    // and a see-through child that only holds others is over the text only
+    // where one of those is.
     LLView*      overlayAt(S32 x, S32 y);
     // An edit command done -- typed, replaced, undone -- before the caret
     // is brought into sight: whatever a subclass left for after its edits,

@@ -36,7 +36,7 @@
 #include "lllocalcliprect.h"
 #include "llstl.h"
 #include "llrender2dutils.h"
-#include "alchoicelist.h"
+#include "alchoicepopup.h"
 #include "llstring.h"
 #include "lltooltip.h"
 #include "llui.h"
@@ -91,9 +91,10 @@ namespace
     const S32 NOTE_GAP     = 16;
     const S32 COMPLETION_WIDTH   = 360;
     const S32 COMPLETION_ROWS    = 8;
-    // The box beside a list: a completion's documentation, a fix's preview.
-    const S32 SIDE_WIDTH         = 320;
-    const S32 SIDE_PAD           = 6;
+    // The completions' popup and the fixes', by their names among the
+    // editor's children.
+    const char* const COMPLETION_POPUP = "completion_popup";
+    const char* const FIX_POPUP        = "fix_popup";
     // What a line's problems offer, as the gutter keeps it.
     const U8  FIXES_ANY          = 1;
     const U8  FIXES_CHANGE       = 2;
@@ -2344,61 +2345,74 @@ bool ALCodeEditor::canFold(ALEditorCommand command) const
 
 bool ALCodeEditor::completionOpen() const
 {
-    return mCompletionList && mCompletionList->getVisible();
+    const ALChoicePopup* popup = popupFound(COMPLETION_POPUP);
+    return popup && popup->listShown();
 }
 
-ALChoiceList* ALCodeEditor::makeChoiceList(const std::string& name)
+bool ALCodeEditor::onCompletionList(S32 x, S32 y) const
 {
-    // A child, so it draws over the text and goes where the view goes. On
-    // the text engine, as the hover card is: the choices in the editor's
-    // face and the colours of their kinds, their details in the reading
-    // face after them.
-    ALChoiceList::Params list(LLUICtrlFactory::getDefaultParams<ALChoiceList>());
-    list.name(name);
-    list.rect(LLRect(0, 10, 10, 0));
-    list.visible(false);
-    list.follows.flags(FOLLOWS_NONE);
-    list.mouse_opaque(true);
-    list.font(getFont());
-    list.bg_visible(true);
-    list.bg_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
-    list.bg_readonly_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
-    list.text_readonly_color(textColor());
-    list.context_menu(std::string());
-    list.h_pad(4);
-    list.v_pad(2);
-    ALChoiceList* made = LLUICtrlFactory::create<ALChoiceList>(list);
-    addChild(made);
-    return made;
+    const ALChoicePopup* popup = popupFound(COMPLETION_POPUP);
+    return popup && popup->onList(x, y);
 }
 
-ALChoiceList& ALCodeEditor::completionList()
+ALChoicePopup* ALCodeEditor::popupFound(std::string_view name) const
+{
+    return findChild<ALChoicePopup>(name, false);
+}
+
+ALChoicePopup& ALCodeEditor::makePopup(const char* name, const char* list, const char* side, bool menu_like)
+{
+    // A child, so it draws over the text and goes where the view goes; as
+    // large as the view, so that the list and the box beside it are put in
+    // the view's own coordinates.
+    ALChoicePopup::Params p;
+    p.name      = name;
+    p.rect      = getLocalRect();
+    p.visible   = false;
+    p.list_name = list;
+    p.side_name = side;
+    p.menu_like = menu_like;
+    p.font      = getFont();
+    ALChoicePopup* made = LLUICtrlFactory::create<ALChoicePopup>(p);
+    addChild(made);
+    return *made;
+}
+
+void ALCodeEditor::dress(ALChoicePopup& popup)
+{
+    // A list is one of the things the editor floats over its text, so it
+    // wears the editor's colours rather than the skin's. It took them from
+    // the colour table instead, which is a table the script themes never
+    // touch: on a light theme the completions stayed dark.
+    popup.setLook(getFont(), paint(Paint::Widget), textColor(), paint(Paint::WidgetSelection), paint(Paint::WidgetBorder));
+}
+
+ALChoicePopup& ALCodeEditor::completionPopup()
 {
     // Made the first time there is something to choose: most editors --
     // a tab not looked at, a read-only view -- never show one.
-    if (!mCompletionList)
+    if (ALChoicePopup* found = popupFound(COMPLETION_POPUP))
     {
-        mCompletionList = makeChoiceList("completions");
-        mCompletionList->onPicked([this](S32) { acceptCompletion(); });
-        mCompletionList->onChosen([this](S32) {
-            if (completionOpen())
-            {
-                showCompletionDoc();
-            }
-        });
+        return *found;
     }
-    return *mCompletionList;
+    ALChoicePopup& made = makePopup(COMPLETION_POPUP, "completions", "completion_doc", false);
+    made.list().onPicked([this](S32) { acceptCompletion(); });
+    made.list().onChosen([this](S32) {
+        if (completionOpen())
+        {
+            showCompletionDoc();
+        }
+    });
+    return made;
 }
 
 void ALCodeEditor::hideCompletionList()
 {
-    if (mCompletionList)
+    if (ALChoicePopup* popup = popupFound(COMPLETION_POPUP))
     {
-        mCompletionList->setVisible(false);
-        mCompletionList->setChoices({});
+        popup->hideList();
     }
     mCompletionModel.hide();
-    hideCompletionDoc();
 }
 
 void ALCodeEditor::closeCompletion()
@@ -2411,7 +2425,7 @@ void ALCodeEditor::closeCompletion()
 
 S32 ALCodeEditor::chosenCompletion() const
 {
-    return completionOpen() ? mCompletionList->chosen() : -1;
+    return completionOpen() ? popupFound(COMPLETION_POPUP)->list().chosen() : -1;
 }
 
 void ALCodeEditor::vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out)
@@ -2529,14 +2543,15 @@ LLUIImagePtr ALCodeEditor::iconOf(const Completion& completion)
 
 void ALCodeEditor::listCompletions(bool keep_choice)
 {
-    completionList();
+    ALChoicePopup& popup = completionPopup();
+    ALChoiceList&  list  = popup.list();
     // What was chosen, by its word: an answer joined to the list may put
     // rows above it, and the row under the finger must stay the word the
     // finger is on.
     std::string was;
-    if (keep_choice && mCompletionList->chosen() >= 0 && mCompletionList->chosen() < mCompletionList->count())
+    if (keep_choice && list.chosen() >= 0 && list.chosen() < list.count())
     {
-        was = mCompletionList->choices()[mCompletionList->chosen()].text;
+        was = list.choices()[list.chosen()].text;
     }
     S32 chosen = 0;
     const std::vector<Completion>& completions = mCompletionModel.list();
@@ -2548,18 +2563,7 @@ void ALCodeEditor::listCompletions(bool keep_choice)
             break;
         }
     }
-    if (mCompletionList->getFont() != getFont())
-    {
-        mCompletionList->setFont(getFont());
-    }
-    // The list is one of the things the editor floats over its text, so
-    // it wears the editor's colours rather than the skin's. It took them
-    // from the colour table instead, which is a table the script themes
-    // never touch: on a light theme the completions stayed dark.
-    mCompletionList->setBackgroundColor(paint(Paint::Widget));
-    mCompletionList->setTextColor(textColor());
-    mCompletionList->setSelectionColor(paint(Paint::WidgetSelection));
-    mCompletionList->setBorderColor(paint(Paint::WidgetBorder));
+    dress(popup);
     std::vector<ALChoiceList::Choice> choices;
     choices.reserve(completions.size());
     for (const Completion& c : completions)
@@ -2580,90 +2584,25 @@ void ALCodeEditor::listCompletions(bool keep_choice)
         choices.push_back(std::move(choice));
     }
     // The list is shaped to the width its column is laid out for, then
-    // to the rows it holds.
+    // to the rows it holds, under the word being completed.
     const LLRect local = getLocalRect();
     const S32    width = llmin(COMPLETION_WIDTH, llmax(60, local.getWidth() - 8));
-    mCompletionList->setShape(LLRect(0, 40, width, 0));
-    mCompletionList->setChoices(std::move(choices), chosen);
-    placeCompletion();
-    mCompletionList->setVisible(true);
+    popup.fill(std::move(choices), chosen, width);
+    popup.showUnder(anchorOf(mCompletionModel.range().begin), llmin(static_cast<S32>(completions.size()), COMPLETION_ROWS), width);
     showCompletionDoc();
-}
-
-void ALCodeEditor::hideCompletionDoc()
-{
-    if (mCompletionDoc)
-    {
-        mCompletionDoc->setVisible(false);
-    }
-    mCompletionDocFor.clear();
-}
-
-ALTextView* ALCodeEditor::sideBox()
-{
-    const LLColor4 ground = paint(Paint::Widget);
-    if (!mCompletionDoc)
-    {
-        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
-        p.name                = "completion_doc";
-        p.rect                = LLRect(0, 20, SIDE_WIDTH, 0);
-        p.read_only           = true;
-        p.word_wrap           = true;
-        p.tab_stop            = false;
-        p.takes_focus         = false;
-        p.mouse_opaque        = true;
-        p.font                = LLFontGL::getFontSansSerif();
-        p.bg_visible          = true;
-        p.bg_color            = ground;
-        p.bg_readonly_color   = ground;
-        p.text_readonly_color = textColor();
-        p.h_pad               = SIDE_PAD;
-        p.v_pad               = SIDE_PAD - 2;
-        p.context_menu        = std::string();
-        mCompletionDoc        = LLUICtrlFactory::create<ALTextView>(p);
-        mCompletionDoc->setVisible(false);
-        mCompletionDoc->onLinkClicked([](const ALTextView::Substitution& link) {
-            if (!link.url.empty())
-            {
-                LLUrlAction::clickAction(link.url, false);
-            }
-        });
-        addChild(mCompletionDoc);
-    }
-    mCompletionDoc->setBackgroundColor(ground);
-    mCompletionDoc->setTextColor(textColor());
-    // Shared by a completion's words and a fix's preview: the preview's
-    // tints are its own.
-    mCompletionDoc->setLineTints({});
-    return mCompletionDoc;
-}
-
-void ALCodeEditor::placeSideBox(const LLRect& list)
-{
-    // Beside the list where there is room, on the right or else the
-    // left; else under it, or over it; as tall as it says, up to a
-    // limit, the rest cut.
-    ALTextView&  box   = *mCompletionDoc;
-    const LLRect local = getLocalRect();
-    const S32    width = llmin(SIDE_WIDTH, llmax(120, local.getWidth() - 8));
-    const S32    lines = box.document().lineCount();
-    box.setShape(LLRect(0, 40, width, 0));
-    for (S32 line = 0; line < lines; ++line)
-    {
-        box.layout().line(line);
-    }
-    const S32 height = llmin(box.layout().totalHeight() + 2 * (SIDE_PAD - 2) + 2, llmax(list.getHeight(), 200));
-    box.setShape(ALPlace::beside(list, width, height, local, 2));
-    box.setVisible(true);
 }
 
 void ALCodeEditor::showCompletionDoc()
 {
+    ALChoicePopup* popup = popupFound(COMPLETION_POPUP);
     const S32 index = chosenCompletion();
     const std::vector<Completion>& completions = mCompletionModel.list();
     if (index < 0 || index >= static_cast<S32>(completions.size()) || !completions[index].documentation || completions[index].documentation->empty())
     {
-        hideCompletionDoc();
+        if (popup)
+        {
+            popup->hideSide();
+        }
         return;
     }
     const Completion& c = completions[index];
@@ -2677,11 +2616,12 @@ void ALCodeEditor::showCompletionDoc()
     // The same row chosen as the list is made again -- a letter more
     // typed, an answer joined to it -- beside a list where it was: the box
     // as it stands, not lexed and read for links again.
-    if (mCompletionDoc && mCompletionDoc->getVisible() && says == mCompletionDocFor && mCompletionList->getRect() == mCompletionDocBeside)
+    if (popup->sideSays(says))
     {
         return;
     }
-    ALTextView& box = *sideBox();
+    dress(*popup);
+    ALTextView& box = popup->side();
     box.setText(says);
     std::vector<ALTextView::Style> styles;
     styleAsCode(box, 0, styles, c.text, c.kind);
@@ -2698,9 +2638,8 @@ void ALCodeEditor::showCompletionDoc()
     {
         box.linkUrlsOn(line);
     }
-    placeSideBox(mCompletionList->getRect());
-    mCompletionDocFor    = says;
-    mCompletionDocBeside = mCompletionList->getRect();
+    popup->placeSide();
+    popup->sideSaid(says);
 }
 
 void ALCodeEditor::supplyCompletions(const ALTextPos& at, std::vector<Completion> more)
@@ -2713,25 +2652,12 @@ void ALCodeEditor::supplyCompletions(const ALTextPos& at, std::vector<Completion
     refreshCompletion();
 }
 
-void ALCodeEditor::placeCompletion()
-{
-    const LLRect local = getLocalRect();
-    placeListAt(*mCompletionList, mCompletionModel.range().begin, llmin(static_cast<S32>(mCompletionModel.list().size()), COMPLETION_ROWS),
-                llmin(COMPLETION_WIDTH, llmax(60, local.getWidth() - 8)));
-}
-
-void ALCodeEditor::placeListAt(ALChoiceList& list, const ALTextPos& at, S32 rows, S32 width)
-{
-    // Under the row, or over it where under would run off the bottom;
-    // across, within the view.
-    list.setShape(ALPlace::under(anchorOf(at), width, list.heightFor(rows), getLocalRect()));
-}
-
 // --- quick fixes -----------------------------------------------------------------
 
 bool ALCodeEditor::fixesOpen() const
 {
-    return mFixList && mFixList->getVisible();
+    const ALChoicePopup* popup = popupFound(FIX_POPUP);
+    return popup && popup->listShown();
 }
 
 void ALCodeEditor::closeFixes()
@@ -2743,17 +2669,11 @@ void ALCodeEditor::closeFixes()
     {
         return;
     }
-    if (mFixList)
+    if (ALChoicePopup* popup = popupFound(FIX_POPUP))
     {
-        mFixList->setVisible(false);
-        mFixList->setChoices({});
+        popup->hideList();
     }
     mFixListModel.close();
-    // The preview is the side box's, which the completions share.
-    if (was)
-    {
-        hideCompletionDoc();
-    }
 }
 
 bool ALCodeEditor::openFixes(S32 line)
@@ -2791,36 +2711,33 @@ void ALCodeEditor::showFixes(S32 line, std::vector<Fix> fixes, S32 chosen)
     }
 }
 
-ALChoiceList& ALCodeEditor::fixList()
+ALChoicePopup& ALCodeEditor::fixPopup()
 {
     // The fixes offered at a problem, on a list of their own made the same
     // way the first time there are any: a fix is not a completion, and the
     // one list open at a time keeps its own keys.
-    if (!mFixList)
+    if (ALChoicePopup* found = popupFound(FIX_POPUP))
     {
-        mFixList = makeChoiceList("fixes");
-        // As a menu: the mouse over a fix previews it, and a click makes it.
-        mFixList->setMenuLike(true);
-        mFixList->onPicked([this](S32 index) { takeFix(index); });
-        mFixList->onChosen([this](S32) {
-            if (fixesOpen())
-            {
-                showFixPreview();
-            }
-        });
+        return *found;
     }
-    return *mFixList;
+    // As a menu: the mouse over a fix previews it, and a click makes it.
+    ALChoicePopup& made = makePopup(FIX_POPUP, "fixes", "fix_preview", true);
+    made.list().onPicked([this](S32 index) { takeFix(index); });
+    made.list().onChosen([this](S32) {
+        if (fixesOpen())
+        {
+            showFixPreview();
+        }
+    });
+    return made;
 }
 
 void ALCodeEditor::fillFixList(S32 chosen)
 {
-    fixList();
     // In the editor's colours, as the completions are; a suppression, and
     // the word that there is nothing, quieter than what makes a change.
-    mFixList->setBackgroundColor(paint(Paint::Widget));
-    mFixList->setTextColor(textColor());
-    mFixList->setSelectionColor(paint(Paint::WidgetSelection));
-    mFixList->setBorderColor(paint(Paint::WidgetBorder));
+    ALChoicePopup& popup = fixPopup();
+    dress(popup);
     const std::vector<Fix>&           fixes = mFixListModel.fixes();
     std::vector<ALChoiceList::Choice> choices;
     for (const Fix& fix : fixes)
@@ -2837,17 +2754,15 @@ void ALCodeEditor::fillFixList(S32 chosen)
     // As wide as its fixes and their notes, within the view: laid out at
     // the most there is room for, then measured.
     const S32 room = llmax(120, getLocalRect().getWidth() - 8);
-    mFixList->setShape(LLRect(0, 40, room, 0));
-    mFixList->setChoices(std::move(choices), llclamp(chosen, 0, llmax(0, static_cast<S32>(fixes.size()) - 1)));
-    const S32 width = llclamp(mFixList->widthFor(), 120, room);
+    popup.fill(std::move(choices), llclamp(chosen, 0, llmax(0, static_cast<S32>(fixes.size()) - 1)), room);
+    const S32 width = llclamp(popup.list().widthFor(), 120, room);
     // Under the caret where it is on the line, else under the line's text.
     const S32          line  = mFixListModel.line();
     const ALTextPos    caret = this->caret();
     const std::string& text  = document().line(llclamp(line, 0, document().lineCount() - 1));
     const size_t       lead  = text.find_first_not_of(" \t");
     const ALTextPos    at    = caret.line == line ? caret : ALTextPos(line, lead == std::string::npos ? 0 : static_cast<S32>(lead));
-    placeListAt(*mFixList, at, llmin(static_cast<S32>(fixes.size()), COMPLETION_ROWS), width);
-    mFixList->setVisible(true);
+    popup.showUnder(anchorOf(at), llmin(static_cast<S32>(fixes.size()), COMPLETION_ROWS), width);
     showFixPreview();
 }
 
@@ -2857,7 +2772,7 @@ void ALCodeEditor::noteFixes(U32 shown, const std::vector<std::string>& notes)
     {
         return;
     }
-    fillFixList(mFixList->chosen());
+    fillFixList(fixPopup().list().chosen());
 }
 
 void ALCodeEditor::supplyActions(const ALTextRange& at, std::vector<Fix> actions)
@@ -2867,7 +2782,7 @@ void ALCodeEditor::supplyActions(const ALTextRange& at, std::vector<Fix> actions
         return;
     }
     const bool                            open   = fixesOpen();
-    std::optional<ALFixListModel::Joined> joined = mFixListModel.join(at, caret(), std::move(actions), open, open ? mFixList->chosen() : -1);
+    std::optional<ALFixListModel::Joined> joined = mFixListModel.join(at, caret(), std::move(actions), open, open ? fixPopup().list().chosen() : -1);
     if (joined)
     {
         showFixes(caret().line, std::move(joined->fixes), joined->chosen);
@@ -2876,16 +2791,21 @@ void ALCodeEditor::supplyActions(const ALTextRange& at, std::vector<Fix> actions
 
 void ALCodeEditor::showFixPreview()
 {
-    const S32 index = fixesOpen() ? mFixList->chosen() : -1;
+    ALChoicePopup*          popup = popupFound(FIX_POPUP);
+    const S32               index = fixesOpen() ? popup->list().chosen() : -1;
     const std::vector<Fix>& fixes = mFixListModel.fixes();
     if (index < 0 || index >= static_cast<S32>(fixes.size()) || ALFixListModel::isNothing(fixes[index]))
     {
-        hideCompletionDoc();
+        if (popup)
+        {
+            popup->hideSide();
+        }
         return;
     }
     std::vector<char> kinds;
     const std::string says = ALFixListModel::previewOf(document(), fixes[index], kinds);
-    ALTextView& box = *sideBox();
+    dress(*popup);
+    ALTextView& box = popup->side();
     box.setText(says);
     // As a comparison shows it (ALDiffView): each line on the band its
     // kind is tinted, what goes as plain code faded, what comes coloured
@@ -2915,7 +2835,7 @@ void ALCodeEditor::showFixPreview()
     }
     box.setStyles(std::move(styles));
     box.setLineTints(std::move(tints));
-    placeSideBox(mFixList->getRect());
+    popup->placeSide();
 }
 
 void ALCodeEditor::takeFix(S32 index)
@@ -3031,7 +2951,7 @@ bool ALCodeEditor::returnAccepts() const
         return true;
     }
     // Not moved through: taken only where it changes what is typed.
-    const S32 index = mCompletionList->chosen();
+    const S32 index = chosenCompletion();
     if (index < 0 || index >= static_cast<S32>(mCompletionModel.list().size()))
     {
         return false;
@@ -3360,7 +3280,7 @@ bool ALCodeEditor::acceptCompletion()
     {
         return false;
     }
-    const S32 index = mCompletionList->chosen();
+    const S32 index = chosenCompletion();
     if (index < 0 || index >= static_cast<S32>(mCompletionModel.list().size()))
     {
         closeCompletion();
@@ -4249,20 +4169,20 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
                     closeFixes();
                     return true;
                 case KEY_UP:
-                    mFixList->moveChoice(-1, true);
+                    fixPopup().list().moveChoice(-1, true);
                     return true;
                 case KEY_DOWN:
-                    mFixList->moveChoice(1, true);
+                    fixPopup().list().moveChoice(1, true);
                     return true;
                 case KEY_PAGE_UP:
-                    mFixList->moveChoice(-COMPLETION_ROWS, false);
+                    fixPopup().list().moveChoice(-COMPLETION_ROWS, false);
                     return true;
                 case KEY_PAGE_DOWN:
-                    mFixList->moveChoice(COMPLETION_ROWS, false);
+                    fixPopup().list().moveChoice(COMPLETION_ROWS, false);
                     return true;
                 case KEY_RETURN:
                 case KEY_TAB:
-                    takeFix(mFixList->chosen());
+                    takeFix(fixPopup().list().chosen());
                     return true;
                 default:
                     break;
@@ -4312,7 +4232,7 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 #endif
     if (completionOpen() && modalKeymap() && mask == REAL_CONTROL && (key == 'N' || key == 'P'))
     {
-        mCompletionList->moveChoice(key == 'N' ? 1 : -1, true);
+        completionPopup().list().moveChoice(key == 'N' ? 1 : -1, true);
         mCompletionMoved = true;
         return true;
     }
@@ -4324,19 +4244,19 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
                 closeCompletion();
                 return true;
             case KEY_UP:
-                mCompletionList->moveChoice(-1, true);
+                completionPopup().list().moveChoice(-1, true);
                 mCompletionMoved = true;
                 return true;
             case KEY_DOWN:
-                mCompletionList->moveChoice(1, true);
+                completionPopup().list().moveChoice(1, true);
                 mCompletionMoved = true;
                 return true;
             case KEY_PAGE_UP:
-                mCompletionList->moveChoice(-COMPLETION_ROWS, false);
+                completionPopup().list().moveChoice(-COMPLETION_ROWS, false);
                 mCompletionMoved = true;
                 return true;
             case KEY_PAGE_DOWN:
-                mCompletionList->moveChoice(COMPLETION_ROWS, false);
+                completionPopup().list().moveChoice(COMPLETION_ROWS, false);
                 mCompletionMoved = true;
                 return true;
             case KEY_RETURN:
@@ -4747,7 +4667,7 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
 #endif
         return true;
     }
-    if (!text.pointInRect(x, y) || (mCompletionList && mCompletionList->getVisible() && mCompletionList->getRect().pointInRect(x, y)))
+    if (!text.pointInRect(x, y) || onCompletionList(x, y))
     {
         return ALTextView::handleToolTip(x, y, mask);
     }
@@ -4775,10 +4695,13 @@ bool ALCodeEditor::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
     {
         return mCard->handleScrollWheel(x - mCard->getRect().mLeft, y - mCard->getRect().mBottom, delta);
     }
-    if (completionOpen() && mCompletionList->getRect().pointInRect(x, y))
+    if (onCompletionList(x, y))
     {
-        const LLRect& rect = mCompletionList->getRect();
-        return mCompletionList->handleScrollWheel(x - rect.mLeft, y - rect.mBottom, delta);
+        // The popup is as large as the editor, so the list's rect is in the
+        // editor's coordinates.
+        ALChoiceList& list = completionPopup().list();
+        const LLRect& rect = list.getRect();
+        return list.handleScrollWheel(x - rect.mLeft, y - rect.mBottom, delta);
     }
     hideCard();
     mWheeled = true;
@@ -4906,7 +4829,7 @@ void ALCodeEditor::draw()
     }
     // The mouse rested long enough on the text: its card, once.
     if (mHoverCards && mHoverDelay >= 0.f && !mHoverTried && !mWheeled && mMouseX >= 0 && mMouseRest.getElapsedTimeF32() >= mHoverDelay && !cardShown() &&
-        textRect().pointInRect(mMouseX, mMouseY) && !(mCompletionList && mCompletionList->getVisible() && mCompletionList->getRect().pointInRect(mMouseX, mMouseY)))
+        textRect().pointInRect(mMouseX, mMouseY) && !onCompletionList(mMouseX, mMouseY))
     {
         mHoverTried = true;
         hoverCardAt(mMouseX, mMouseY);
@@ -4921,10 +4844,6 @@ void ALCodeEditor::draw()
         // Over the card rather than under it, so that its own ground
         // cannot paint the frame out along the edge it shares.
         gl_rect_2d(mCard->getRect(), paint(Paint::WidgetBorder) % getDrawContext().mAlpha, false);
-    }
-    if (mCompletionDoc && mCompletionDoc->getVisible())
-    {
-        gl_rect_2d(mCompletionDoc->getRect(), paint(Paint::WidgetBorder) % getDrawContext().mAlpha, false);
     }
 }
 

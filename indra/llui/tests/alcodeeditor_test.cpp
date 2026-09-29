@@ -27,6 +27,7 @@
 #include "../alcodeeditor.h"
 
 #include "../alchoicelist.h"
+#include "../alchoicepopup.h"
 #include "../alfindbar.h"
 #include "../alsurface.h"
 #include "../llclipboard.h"
@@ -1285,7 +1286,7 @@ namespace tut
         ensure_equals("three", e.fixes().size(), static_cast<size_t>(3));
         ensure_equals("the preferred first", e.fixes().front().title, std::string("Insert ';'"));
         ensure_equals("the suppression last", e.fixes().back().title, std::string("Suppress it"));
-        const ALTextView* box = e.findChild<ALTextView>("completion_doc", false);
+        const ALTextView* box = e.findChild<ALTextView>("fix_preview");
         ensure("previewed", box && box->getVisible());
         ensure_equals("as a diff", box->text(), std::string("- integer a = 1\n+ integer a = 1;"));
         key(KEY_DOWN);
@@ -1840,7 +1841,7 @@ namespace tut
         key(' ', MASK_CONTROL);
         ensure("open", e.completionOpen());
         ensure_equals("the row is taller", e.layout().rowHeightOf(1, 0), 3 * e.layout().rowHeight());
-        const LLView* list = e.findChild<LLView>("completions", false);
+        const LLView* list = e.findChild<LLView>("completions");
         ensure("the list", list != nullptr);
         ensure_equals("under the row, not over its text", list->getRect().mTop,
                       e.textRect().mTop - e.layout().lineTop(1) - e.layout().rowHeightOf(1, 0));
@@ -2528,13 +2529,13 @@ namespace tut
     {
         set_test_name("an editor makes its completion and fix lists the first time each is shown, not before");
         ALCodeEditor& e = make("integer count;\nllSay(0, co");
-        ensure("no completion list yet", e.findChild<LLView>("completions", false) == nullptr);
-        ensure("no fix list yet", e.findChild<LLView>("fixes", false) == nullptr);
+        ensure("no completion list yet", e.findChild<LLView>("completions") == nullptr);
+        ensure("no fix list yet", e.findChild<LLView>("fixes") == nullptr);
         ensure("neither open", !e.completionOpen() && !e.fixesOpen());
         e.setCaret(e.document().end());
         key(' ', MASK_CONTROL);
-        ensure("the completions listed", e.completionOpen() && e.findChild<LLView>("completions", false) != nullptr);
-        ensure("and still no fix list", e.findChild<LLView>("fixes", false) == nullptr);
+        ensure("the completions listed", e.completionOpen() && e.findChild<LLView>("completions") != nullptr);
+        ensure("and still no fix list", e.findChild<LLView>("fixes") == nullptr);
         key(KEY_ESCAPE);
         e.setFixProvider([](S32 line, std::vector<ALCodeEditor::Fix>& out) {
             ALCodeEditor::Fix semi;
@@ -2544,7 +2545,7 @@ namespace tut
             out = { semi };
         });
         e.setFixable(1, true, true);
-        ensure("the fixes listed", e.handleKeyHere('.', MASK_CONTROL) && e.fixesOpen() && e.findChild<LLView>("fixes", false) != nullptr);
+        ensure("the fixes listed", e.handleKeyHere('.', MASK_CONTROL) && e.fixesOpen() && e.findChild<LLView>("fixes") != nullptr);
     }
     template<> template<>
     void alcodeeditor_object::test<71>()
@@ -2567,5 +2568,51 @@ namespace tut
         const S32 below = e.layout().lineTop(4) - e.scrollY();
         ensure("in sight", below < e.textRect().getHeight());
         ensure("below the handler's state pinned over it: " + std::to_string(below) + " of " + std::to_string(row_h), below >= row_h);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<72>()
+    {
+        set_test_name("the completion list and the box beside it are one child view, as large as the editor and seen through: a press "
+                      "on the list is the list's, one beside it the text's; the fixes have one of their own");
+        ALCodeEditor& e = make("integer count;\ninteger total;\nllSay(0, co");
+        e.setCaret(e.document().end());
+        key(' ', MASK_CONTROL);
+        ensure("open", e.completionOpen());
+        ALChoicePopup* popup = e.findChild<ALChoicePopup>("completion_popup", false);
+        ensure("found by its name among the editor's children", popup != nullptr);
+        ensure("as large as the editor", popup->getRect() == e.getLocalRect());
+        ensure("holding the list", popup->findChild<ALChoiceList>("completions", false) == &popup->list());
+        const LLRect list = popup->list().getRect();
+        const LLRect text = e.textRect();
+        const S32    row  = e.layout().rowHeight();
+        // On the list: the list's, the list staying open.
+        const ALTextPos caret = e.caret();
+        ensure("a press on the list is taken", e.handleMouseDown(list.mLeft + 8, list.mTop - row / 2, MASK_NONE));
+        e.handleMouseUp(list.mLeft + 8, list.mTop - row / 2, MASK_NONE);
+        ensure("by the list, the text as it was", e.completionOpen() && e.caret() == caret);
+        // On the first line, well above the list: the text's.
+        const S32 x = text.mLeft + 2;
+        const S32 y = text.mTop - row / 2;
+        ensure("the first line is not under the list", !list.pointInRect(x, y));
+        e.handleMouseDown(x, y, MASK_NONE);
+        e.handleMouseUp(x, y, MASK_NONE);
+        ensure("a press beside the list is the text's", !e.completionOpen() && e.caret().line == 0);
+        ensure("the popup hidden with its list", !popup->getVisible());
+
+        e.setFixProvider([](S32 line, std::vector<ALCodeEditor::Fix>& out) {
+            ALCodeEditor::Fix semi;
+            semi.title = "Insert ';'";
+            semi.value = "semi";
+            semi.edits.emplace_back(ALTextRange(ALTextPos(line, 0), ALTextPos(line, 0)), ";");
+            out = { semi };
+        });
+        e.setFixable(0, true, true);
+        ensure("the fixes listed", e.handleKeyHere('.', MASK_CONTROL) && e.fixesOpen());
+        ALChoicePopup* fixes = e.findChild<ALChoicePopup>("fix_popup", false);
+        ensure("on a popup of their own", fixes && fixes != popup && fixes->findChild<ALChoiceList>("fixes", false) == &fixes->list());
+        ensure("previewed in its own box", fixes->sideShown() && e.findChild<ALTextView>("fix_preview") == &fixes->side());
+        key(KEY_ESCAPE);
+        ensure("and the box goes with the list", !fixes->sideShown() && !fixes->getVisible());
     }
 }
