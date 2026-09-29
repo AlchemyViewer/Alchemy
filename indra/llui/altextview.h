@@ -1059,9 +1059,12 @@ private:
     std::function<void(S32)> mZoomWheel;
     F32          mZoomRemainder = 0.f;
     bool         mSelecting = false;
-    // What is selected becomes the primary selection: at once, or, while a
-    // drag goes on, once it is let go of.
+    // What is selected becomes the primary selection once a frame, and
+    // before anything here could want it -- a middle click, the focus
+    // leaving, the view hidden -- or, while a drag goes on, once it is let
+    // go of.
     void         offerPrimary();
+    void         publishPrimary();
     bool         mPrimaryStale = false;
     // A drag reaches from where the press put the anchor, not from where a
     // modal keymap then moved the caret -- vim's normal mode takes a click

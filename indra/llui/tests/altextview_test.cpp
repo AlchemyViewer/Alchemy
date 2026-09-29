@@ -64,12 +64,15 @@ namespace ll_test
         static bool seeking(const ALTextView& view) { return view.mMisspellingSought.has_value(); }
         static void trimLayout(ALTextView& view) { view.trimLayout(); }
         static S32  heldMost() { return ALTextView::LAYOUT_HELD_MOST; }
+        // What a frame does before it draws, of what a test reaches:
+        // Next Misspelling gone on with, and the primary selection offered.
         static void nextFrame(ALTextView& view)
         {
             if (view.mMisspellingSought)
             {
                 view.seekMisspelling();
             }
+            view.publishPrimary();
         }
     };
 }
@@ -1193,9 +1196,15 @@ namespace tut
         LLClipboard& clipboard = LLClipboard::instance();
         const std::string copied = "copied";
         clipboard.copyToClipboard(copied, 0, static_cast<S32>(copied.size()));
+        const std::string elsewhere = "elsewhere";
+        clipboard.copyToClipboard(elsewhere, 0, static_cast<S32>(elsewhere.size()), true);
         ALTextView& v = make("alpha beta\ngamma\n");
+        v.setSelection(ALTextRange(ALTextPos(0, 9), ALTextPos(0, 10)));
         v.setSelection(ALTextRange(ALTextPos(0, 6), ALTextPos(0, 10)));
         std::string primary;
+        clipboard.pasteFromClipboard(primary, true);
+        ensure_equals("offered once a frame, not at each change", primary, elsewhere);
+        ll_test::TextViewProbe::nextFrame(v);
         ensure("selected", clipboard.pasteFromClipboard(primary, true));
         ensure_equals("is the primary selection", primary, std::string("beta"));
         std::string held;

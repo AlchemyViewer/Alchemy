@@ -791,6 +791,7 @@ void ALTextView::onVisibilityChange(bool new_visibility)
 {
     if (!new_visibility)
     {
+        publishPrimary();
         mLayout.trim(0, -1);
     }
     LLUICtrl::onVisibilityChange(new_visibility);
@@ -841,18 +842,22 @@ void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret)
     mBlink.reset();
     if (selection() != was)
     {
+        // Offered once a frame, not at every step: a selection of the
+        // whole text moved a line at a time is otherwise copied whole at
+        // each, and a drag's once it is let go of.
         if (hasSelection())
         {
-            if (mSelecting)
-            {
-                mPrimaryStale = true;
-            }
-            else
-            {
-                offerPrimary();
-            }
+            mPrimaryStale = true;
         }
         mCaretMoved();
+    }
+}
+
+void ALTextView::publishPrimary()
+{
+    if (mPrimaryStale && !mSelecting)
+    {
+        offerPrimary();
     }
 }
 
@@ -4371,6 +4376,7 @@ void ALTextView::draw()
     {
         seekMisspelling();
     }
+    publishPrimary();
     syncScrollbar();
     trimLayout();
     const F32 alpha = getDrawContext().mAlpha;
@@ -4727,6 +4733,9 @@ bool ALTextView::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
 {
     // Over the text only, not its map or bars; nor while a drag is held.
     const bool on_text = textRect().pointInRect(x, y) && !(mScrollMap && mapRect().pointInRect(x, y));
+    // What is selected here is the primary selection by now, though the
+    // frame that offers it has not come.
+    publishPrimary();
     if (mReadOnly || mSelecting || mBarDrag != BarDrag::None || mDraggingMap || !on_text || !LLClipboard::instance().isTextAvailable(true))
     {
         return LLUICtrl::handleMiddleMouseDown(x, y, mask);
@@ -5083,6 +5092,7 @@ void ALTextView::setFocus(bool focus)
 void ALTextView::onFocusLost()
 {
     allowLanguageInput(false);
+    publishPrimary();
     if (mChangedSinceFocus)
     {
         mChangedSinceFocus = false;
