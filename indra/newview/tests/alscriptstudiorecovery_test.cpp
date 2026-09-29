@@ -290,14 +290,14 @@ namespace tut
         type(doc, "z");
         ensure("not said again", !r.keep(doc) && services().reports.size() == 1);
         ALRecovery::useStore(store.get());
-        ensure("kept, once it can be", r.keep(doc) && !doc.recoveryFailed);
+        ensure("kept, once it can be", r.keep(doc) && !doc.recovery->failed);
 
         ALRecovery::useStore(&nowhere);
         type(doc, "w");
         r.keepSoon(doc);
         nowhere.flush();
         r.keepSoon(doc);
-        ensure("from the store's thread, said once", services().reports.size() == 2 && doc.recoveryFailed);
+        ensure("from the store's thread, said once", services().reports.size() == 2 && doc.recovery->failed);
         nowhere.flush();
         r.keepSoon(doc);
         nowhere.flush();
@@ -445,17 +445,17 @@ namespace tut
         Doc&                    doc = tab("a", "x\n");
         type(doc, "y");
         r.schedule(doc);
-        const F64 due = doc.recoveryDue;
+        const F64 due = doc.recovery->due;
         ensure("due in a moment", due > LLTimer::getTotalSeconds());
         type(doc, "z");
         r.schedule(doc);
-        ensure("not put off by more typing", doc.recoveryDue == due);
+        ensure("not put off by more typing", doc.recovery->due == due);
         r.pump();
         ensure("not yet", keptFor(doc.recoveryKey) == 0);
-        doc.recoveryDue = LLTimer::getTotalSeconds() - 1.0;
+        doc.recovery->due = LLTimer::getTotalSeconds() - 1.0;
         r.pump();
         store->flush();
-        ensure("written", keptFor(doc.recoveryKey) == 1 && doc.recoveryDue == 0.0);
+        ensure("written", keptFor(doc.recoveryKey) == 1 && doc.recovery->due == 0.0);
         doc.editor->resetDirty();
         r.schedule(doc);
         ensure("clean: forgotten at once", keptFor(doc.recoveryKey) == 0);
@@ -519,7 +519,7 @@ namespace tut
         type(a, "z");
         type(b, "w");
         ensure("not kept", !r.keepAll({ &a, &b }));
-        ensure("each said once", services().reports.size() == 2 && a.recoveryFailed && b.recoveryFailed);
+        ensure("each said once", services().reports.size() == 2 && a.recovery->failed && b.recovery->failed);
         ALRecovery::useStore(store.get());
     }
 

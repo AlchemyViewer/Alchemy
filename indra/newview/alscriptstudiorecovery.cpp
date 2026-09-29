@@ -60,7 +60,7 @@ namespace
     // as what it is asked to be written as: durably, where that is asked.
     bool writtenAlready(const ALScriptStudioDoc& doc, ALRecoveryEntry::State state, bool durable)
     {
-        const ALScriptStudioDoc::RecoveryWritten& was = doc.recoveryWritten;
+        const ALScriptStudioDoc::Recovery::Written& was = doc.recovery->written;
         return was.valid && was.state == state && (was.durable || !durable) && was.text == doc.editor->document().version() &&
                was.history == doc.editor->undoJournal().revision() && was.target == pickedTargetOf(doc) &&
                was.experience == pickedExperienceOf(doc);
@@ -68,7 +68,7 @@ namespace
 
     void markWritten(ALScriptStudioDoc& doc, ALRecoveryEntry::State state, bool durable)
     {
-        ALScriptStudioDoc::RecoveryWritten& was = doc.recoveryWritten;
+        ALScriptStudioDoc::Recovery::Written& was = doc.recovery->written;
         was.valid                               = true;
         was.text                                = doc.editor->document().version();
         was.history                             = doc.editor->undoJournal().revision();
@@ -120,7 +120,7 @@ ALScriptStudioRecovery::Entry ALScriptStudioRecovery::entryOf(const Doc& doc)
 bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    doc.recoveryDue             = 0.0;
+    doc.recovery->due     = 0.0;
     ALRecoveryStore* kept = ALRecovery::store();
     if (!kept)
     {
@@ -139,7 +139,7 @@ bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
         // Saved, or never changed: nothing of this session's to keep, and
         // nothing of another's once it was taken in.
         kept->forget(doc.recoveryKey);
-        doc.recoveryWritten.valid = false;
+        doc.recovery->written.valid = false;
     }
     else if (!writtenAlready(doc, state, /*durable*/ true))
     {
@@ -148,17 +148,17 @@ bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
         if (!kept->write(entry))
         {
             // Said once, not at every pause in typing.
-            if (!doc.recoveryFailed)
+            if (!doc.recovery->failed)
             {
-                doc.recoveryFailed = true;
+                doc.recovery->failed = true;
                 LLStringUtil::format_map_t args;
                 args["[NAME]"] = doc.name;
                 mServices.report(mServices.words("RecoveryWriteFailed", args), true, &doc);
             }
-            doc.recoveryWritten.valid = false;
+            doc.recovery->written.valid = false;
             return false;
         }
-        doc.recoveryFailed = false;
+        doc.recovery->failed = false;
         markWritten(doc, state, /*durable*/ true);
     }
     // What this tab took up is its own to keep from here.
@@ -197,21 +197,21 @@ bool ALScriptStudioRecovery::keepAll(const std::vector<Doc*>& docs, Entry::State
     kept->flush();
     for (Doc* doc : written)
     {
-        doc->recoveryDue = 0.0;
+        doc->recovery->due = 0.0;
         if (kept->takeFailure(doc->recoveryKey))
         {
             all                        = false;
-            doc->recoveryWritten.valid = false;
-            if (!doc->recoveryFailed)
+            doc->recovery->written.valid = false;
+            if (!doc->recovery->failed)
             {
-                doc->recoveryFailed = true;
+                doc->recovery->failed = true;
                 LLStringUtil::format_map_t args;
                 args["[NAME]"] = doc->name;
                 mServices.report(mServices.words("RecoveryWriteFailed", args), true, doc);
             }
             continue;
         }
-        doc->recoveryFailed = false;
+        doc->recovery->failed = false;
         markWritten(*doc, state, /*durable*/ true);
         // What this tab took up is its own to keep from here.
         if (doc->recovering)
@@ -238,10 +238,10 @@ void ALScriptStudioRecovery::keepSoon(Doc& doc)
                 continue;
             }
             // Not written after all: written again next time.
-            each->recoveryWritten.valid = false;
-            if (!each->recoveryFailed)
+            each->recovery->written.valid = false;
+            if (!each->recovery->failed)
             {
-                each->recoveryFailed = true;
+                each->recovery->failed = true;
                 LLStringUtil::format_map_t args;
                 args["[NAME]"] = each->name;
                 mServices.report(mServices.words("RecoveryWriteFailed", args), true, each);
@@ -255,7 +255,7 @@ void ALScriptStudioRecovery::keepSoon(Doc& doc)
         keep(doc);
         return;
     }
-    doc.recoveryDue = 0.0;
+    doc.recovery->due = 0.0;
     if (writtenAlready(doc, Entry::State::Unsaved, /*durable*/ false))
     {
         // Neither the text nor its history has moved since.
@@ -275,7 +275,7 @@ bool ALScriptStudioRecovery::setAside(Doc& doc)
         return false;
     }
     kept->forget(doc.recoveryKey);
-    doc.recoveryWritten.valid = false;
+    doc.recovery->written.valid = false;
     return true;
 }
 
@@ -290,9 +290,9 @@ void ALScriptStudioRecovery::schedule(Doc& doc)
         keep(doc);
         return;
     }
-    if (doc.recoveryDue <= 0.0)
+    if (doc.recovery->due <= 0.0)
     {
-        doc.recoveryDue = LLTimer::getTotalSeconds() + RECOVERY_DELAY;
+        doc.recovery->due = LLTimer::getTotalSeconds() + RECOVERY_DELAY;
     }
 }
 
@@ -301,7 +301,7 @@ void ALScriptStudioRecovery::pump()
     const F64 now = LLTimer::getTotalSeconds();
     for (Doc* doc : mServices.openDocs())
     {
-        if (doc->recoveryDue > 0.0 && now >= doc->recoveryDue)
+        if (doc->recovery->due > 0.0 && now >= doc->recovery->due)
         {
             keepSoon(*doc);
         }

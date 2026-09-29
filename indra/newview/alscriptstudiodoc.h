@@ -231,28 +231,34 @@ struct ALScriptStudioDoc
     // A file changed on disk while this tab had unsaved changes, and
     // the author asked what to do: once, however often it changes.
     bool                                       askingReload = false;
-    // What keeps the unsaved text against a crash (ALRecoveryStore):
-    // whose text it is; when it is next written there, or zero; and
-    // whether writing it failed, which is said once.
+    // Whose text it is in what keeps the unsaved text against a crash
+    // (ALRecoveryStore).
     std::string                                recoveryKey;
-    F64                                        recoveryDue    = 0.0;
-    bool                                       recoveryFailed = false;
-    // What was last written there -- the text's version, its history's
-    // revision, the picks for its next save, as what, and whether forced
-    // out to the disk -- so that nothing is written again where none has
-    // moved.
-    struct RecoveryWritten
+    // The rest of what ALScriptStudioRecovery keeps of it.
+    struct Recovery
     {
-        bool                         valid   = false;
-        U32                          text    = 0;
-        U32                          history = 0;
-        ALRecoveryEntry::State state   = ALRecoveryEntry::State::Unsaved;
-        bool                         durable = false;
-        // And what was picked for its next save.
-        std::optional<std::string>   target;
-        std::optional<LLUUID>        experience;
+        // When it is next written there, or zero; and whether writing it
+        // failed, which is said once.
+        F64  due    = 0.0;
+        bool failed = false;
+        // What was last written there -- the text's version, its history's
+        // revision, the picks for its next save, as what, and whether forced
+        // out to the disk -- so that nothing is written again where none
+        // has moved.
+        struct Written
+        {
+            bool                       valid   = false;
+            U32                        text    = 0;
+            U32                        history = 0;
+            ALRecoveryEntry::State     state   = ALRecoveryEntry::State::Unsaved;
+            bool                       durable = false;
+            // And what was picked for its next save.
+            std::optional<std::string> target;
+            std::optional<LLUUID>      experience;
+        };
+        Written written;
     };
-    RecoveryWritten                            recoveryWritten;
+    Part<Recovery>                             recovery;
     // What an earlier session left of this, found as it opened, offered
     // in the notice until it is restored or discarded; and one being
     // taken up here, whose file goes once this tab's own is written.

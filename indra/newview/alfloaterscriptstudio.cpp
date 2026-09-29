@@ -4458,7 +4458,7 @@ void ALFloaterScriptStudio::becomeFile(Doc& doc, const std::string& path)
         store->forget(doc.recoveryKey);
     }
     doc.recoveryKey           = ALRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path);
-    doc.recoveryWritten.valid = false;
+    doc.recovery->written.valid = false;
     doc.file                  = path;
     doc.name        = gDirUtilp->getBaseFileName(path);
     rekeyDoc(doc, "disk:" + path);
