@@ -47,6 +47,7 @@
 #include "llmd5.h"
 #include "llnotecard.h"
 #include "llnotificationsutil.h"
+#include "lllivelslfile.h"
 #include "llpreviewscript.h"
 #include "roles_constants.h"
 #include "lltextbox.h"

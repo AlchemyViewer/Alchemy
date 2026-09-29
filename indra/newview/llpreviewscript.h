@@ -36,7 +36,7 @@
 #include "lliconctrl.h"
 #include "llframetimer.h"
 #include "llfloatergotoline.h"
-#include "lllivefile.h"
+#include "lllivelslfile.h"
 #include "llsyntaxid.h"
 #include "llscripteditor.h"
 
@@ -59,26 +59,6 @@ class LLScriptMovedObserver;
 class LLScriptEditorWSServer;
 
 bool is_lua_script(const std::string& code);
-
-class LLLiveLSLFile : public LLLiveFile
-{
-public:
-    typedef std::function<bool(const std::string& filename)> change_callback_t;
-
-    LLLiveLSLFile(std::string file_path, change_callback_t change_cb);
-    ~LLLiveLSLFile() override;
-
-    void ignoreNextUpdate() { mIgnoreNextUpdate = true; }
-
-protected:
-    bool loadFile() override;
-
-    change_callback_t   mOnChangeCallback;
-    bool                mIgnoreNextUpdate;
-    // The copy held while it is watched: Script Studio may hold the same
-    // one, and it goes with whichever lets go last.
-    std::shared_ptr<ALScriptTempFiles::Claim> mHeld;
-};
 
 // Inner, implementation class.  LLPreviewScript and LLLiveLSLEditor each own one of these.
 class LLScriptEdCore final : public LLPanel

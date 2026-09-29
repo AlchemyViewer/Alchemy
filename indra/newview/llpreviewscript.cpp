@@ -184,32 +184,6 @@ bool is_lua_script(const std::string& code)
     return ALScriptMessages::looksLikeLua(code);
 }
 
-/// ---------------------------------------------------------------------------
-/// LLLiveLSLFile
-/// ---------------------------------------------------------------------------
-
-LLLiveLSLFile::LLLiveLSLFile(std::string file_path, change_callback_t change_cb)
-:   LLLiveFile(file_path, 1.0)
-,   mOnChangeCallback(change_cb)
-,   mIgnoreNextUpdate(false)
-,   mHeld(ALScriptWorkspace::instance().tempFiles().claim(file_path))
-{
-    llassert(mOnChangeCallback);
-}
-
-LLLiveLSLFile::~LLLiveLSLFile() = default;
-
-bool LLLiveLSLFile::loadFile()
-{
-    if (mIgnoreNextUpdate)
-    {
-        mIgnoreNextUpdate = false;
-        return true;
-    }
-
-    return mOnChangeCallback(filename());
-}
-
 #if 0 // MOVED TO STANDALONE llfloatersearchreplace
 
 /// ---------------------------------------------------------------------------

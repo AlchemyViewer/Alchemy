@@ -579,6 +579,7 @@ if(AL_BUILD_VIEWER)
     llkeyconflict.cpp
     lllandmarkactions.cpp
     lllandmarklist.cpp
+    lllivelslfile.cpp
     lllegacyatmospherics.cpp
     lllistcontextmenu.cpp
     lllistview.cpp
@@ -1424,6 +1425,7 @@ if(AL_BUILD_VIEWER)
     llkeyconflict.h
     lllandmarkactions.h
     lllandmarklist.h
+    lllivelslfile.h
     lllightconstants.h
     lllistcontextmenu.h
     lllistview.h
