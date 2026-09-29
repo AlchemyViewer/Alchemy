@@ -520,13 +520,8 @@ private:
     void                 showLintSettings() override;
 
     // The name at the caret (ALScriptStudioCaret): a place gone to, the
-    // lookup started, the bar's path and the inspector's problems.
+    // bar's path and the inspector's problems.
     void goTo(Doc& doc, const ALTextRange& range) override;
-    void startLookup(Doc& doc, ALEditorCommand command, const ALScriptReferences& refs, bool has_definition, const std::string& home_path,
-                     const ALScriptSpan& definition, std::vector<Doc::Place> places, U32 version) override
-    {
-        mLookup.start(doc, command, refs, has_definition, home_path, definition, std::move(places), version);
-    }
     void showPath(Doc& doc, bool changed) override
     {
         mCrumbsBar->showPath(doc);
@@ -1199,7 +1194,7 @@ private:
     S32                                mCheckedErrors   = 0;
     S32                                mCheckedWarnings = 0;
     // The name at its caret, and the caret watched.
-    ALScriptStudioCaret                mCaret{ *this, *this, mNavigation, *this };
+    ALScriptStudioCaret                mCaret{ *this, *this, mNavigation, mLookup, *this };
     // Its checking: the analyzers asked and answered, and fixes.
     ALScriptStudioChecking             mChecking{ *this, *this, mSaving, mWeighing, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;

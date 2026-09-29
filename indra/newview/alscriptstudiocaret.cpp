@@ -27,6 +27,7 @@
 #include "alscriptstudiocaret.h"
 
 #include "alcodeeditor.h"
+#include "alscriptlookup.h"
 #include "alscriptnavigation.h"
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudiochecking.h"
@@ -43,7 +44,7 @@ using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;
 
-ALScriptStudioCaret::ALScriptStudioCaret(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, Window& window) : mServices(services), mAnalysis(analysis), mNavigation(navigation), mWindow(window) {}
+ALScriptStudioCaret::ALScriptStudioCaret(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptLookup& lookup, Window& window) : mServices(services), mAnalysis(analysis), mNavigation(navigation), mLookup(lookup), mWindow(window) {}
 
 void ALScriptStudioCaret::ask(Doc& doc, ALEditorCommand command, const ALTextRange& word)
 {
@@ -177,7 +178,7 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
             break;
         case ALEditorCommand::FindReferences:
         case ALEditorCommand::Rename:
-            mWindow.startLookup(doc, command, refs, hasDefinition, homePath, definition, std::move(places), result.version);
+            mLookup.start(doc, command, refs, hasDefinition, homePath, definition, std::move(places), result.version);
             break;
         default:
             break;

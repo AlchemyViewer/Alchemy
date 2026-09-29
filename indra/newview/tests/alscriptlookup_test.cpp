@@ -38,50 +38,9 @@
 
 #include <sstream>
 
-// A script's id is the bridge's name for it, and the bridge is the viewer's.
-std::string ALScriptRef::id() const
-{
-    return object.asString() + "_" + item.asString();
-}
-
-// What the preprocessor calls a script and a file, as it spells them; the
-// preprocessor itself is the viewer's.
-bool ALScriptPreprocessor::refOf(const std::string& path, ALScriptRef& ref)
-{
-    if (path.rfind("object:", 0) == 0)
-    {
-        const size_t colon = path.find(':', 7);
-        if (colon == std::string::npos)
-        {
-            return false;
-        }
-        ref.object.set(path.substr(7, colon - 7));
-        ref.item.set(path.substr(colon + 1));
-        return ref.object.notNull() && ref.item.notNull();
-    }
-    if (path.rfind("inventory:", 0) == 0)
-    {
-        ref.object.setNull();
-        ref.item.set(path.substr(10));
-        return ref.item.notNull();
-    }
-    return false;
-}
-
-std::string ALScriptPreprocessor::pathOf(const ALScriptRef& ref)
-{
-    return ref.inInventory() ? "inventory:" + ref.item.asString() : "object:" + ref.object.asString() + ":" + ref.item.asString();
-}
-
-bool ALScriptPreprocessor::fileOf(const std::string& path, std::string& file)
-{
-    if (path.rfind("disk:", 0) != 0)
-    {
-        return false;
-    }
-    file = path.substr(5);
-    return !file.empty();
-}
+// A script's id, and what the preprocessor calls a script and a file, as
+// the studio's tests' stubs of the viewer's spell them
+// (alscriptpaths_stub.cpp).
 
 namespace
 {

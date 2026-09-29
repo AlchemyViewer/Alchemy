@@ -29,6 +29,7 @@
 
 #include "../alscriptstudiodoc.h"
 #include "../alscriptexternaleditor.h"
+#include "../alscriptlookup.h"
 #include "../alscriptnavigation.h"
 #include "../alscriptstudioweighing.h"
 #include "../alscriptstudioanalysis.h"
@@ -298,6 +299,33 @@ namespace al_studio_test
         QuietSaves               saves;
         ALScriptExternalEditor   unit;
         std::vector<std::string> watched;
+    };
+
+    // The lookups, for a unit given them (ALScriptLookup): over tabs and an
+    // analysis that do nothing, the navigation given, and a window that
+    // names no other scripts -- a lookup declared in one waits on them --
+    // reads and expands none, and counts what it was asked to show or ask.
+    struct StudioLookup final : public ALScriptLookup::Window, public QuietAnalysis
+    {
+        StudioLookup(ALScriptStudioServices& services, ALScriptNavigation& navigation) : unit(services, tabs, *this, navigation, *this) {}
+        void candidates(const ALScriptStudioDoc&, std::function<void(ALScriptLookup::Candidates)>) override {}
+        void loadSource(const ALScriptRef&, std::function<void(const LLUUID&, const std::optional<std::string>&)>) override {}
+        void expand(ALScriptPreprocessor::Request, std::function<void(const ALPreprocessor::Result&)>) override {}
+        void showFound(ALScriptStudioDoc&, const ALScriptLookup::Found&) override { ++shown; }
+        void askNewName(ALScriptStudioDoc&, std::function<std::string(const std::string&)>, std::function<void(const std::string&)>,
+                        std::function<void(const std::string&)>) override
+        {
+            ++named;
+        }
+        void previewRename(ALScriptStudioDoc&, const ALScriptLookup::Found&, const std::string&, const std::string&,
+                           std::function<void(const std::vector<size_t>&)>) override
+        {
+        }
+
+        QuietTabs      tabs;
+        ALScriptLookup unit;
+        S32            shown = 0;
+        S32            named = 0;
     };
 
     // Weighing, for a unit given it (ALScriptStudioWeighing): over an

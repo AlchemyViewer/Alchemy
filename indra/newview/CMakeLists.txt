@@ -2440,6 +2440,7 @@ if(AL_BUILD_TESTS)
     alnotecardembedded.cpp
     alrecovery.cpp
     alscriptexternaleditor.cpp
+    alscriptlookup.cpp
     alscriptnavigation.cpp
     alscriptsaveflow.cpp
     alscriptstudiodoc.cpp
@@ -2448,6 +2449,7 @@ if(AL_BUILD_TESTS)
     alscriptstudioweighing.cpp
     alscriptstudiowords.cpp
     alscriptweightspane.cpp
+    tests/alscriptpaths_stub.cpp
     tests/alscriptstudio_stubs.cpp
   )
   get_property(studio_test_includes TARGET ${test_project} PROPERTY INTERFACE_INCLUDE_DIRECTORIES)

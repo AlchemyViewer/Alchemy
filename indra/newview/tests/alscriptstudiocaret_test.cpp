@@ -66,14 +66,6 @@ namespace
                            std::to_string(length));
         }
         void showReference(const ALScriptStudioWords::Vocab& word, bool) override { said.push_back("reference " + word.text); }
-        void startLookup(Doc& doc, ALEditorCommand command, const ALScriptReferences&, bool has_definition, const std::string& home_path,
-                         const ALScriptSpan& definition, std::vector<Doc::Place> places, U32 version) override
-        {
-            said.push_back(std::string(command == ALEditorCommand::Rename ? "rename" : "find") + " in " + doc.id +
-                           (has_definition ? " declared " + home_path + "@" + std::to_string(definition.line) : std::string(" none")) +
-                           " v" + std::to_string(version));
-            found = std::move(places);
-        }
         void showPath(Doc& doc, bool changed) override { said.push_back("path " + at(doc.editor->caret()) + (changed ? " changed" : "")); }
         bool showProblemsAt(Doc&, const ALTextPos& pos) override
         {
@@ -85,7 +77,6 @@ namespace
         bool                    expanded = false, problems = false, inspector = true;
         std::string             held;
         Names                   asked, said;
-        std::vector<Doc::Place> found;
     };
 
     ALScriptSpan span(S32 line, S32 column, S32 length)
@@ -109,6 +100,26 @@ namespace
         result.references.references    = { span(0, 8, 5), span(1, 26, 5) };
         return result;
     }
+    // The lookup a tab's caret started, as the lookup keeps it; and one of
+    // its places, by the file it is in, none for the script's own.
+    std::string started(const Doc& doc)
+    {
+        const Doc::Lookup& lookup = *doc.lookup;
+        return std::string(lookup.command == ALEditorCommand::Rename ? "rename" : "find") + " in " + doc.id +
+               (lookup.hasDefinition ? " declared " + lookup.homePath + "@" + std::to_string(lookup.definition.line) : std::string(" none")) +
+               " v" + std::to_string(lookup.version);
+    }
+    const Doc::Place* placeIn(const Doc& doc, const std::string& file, S32 line = -1)
+    {
+        for (const Doc::Place& place : doc.lookup->places)
+        {
+            if (place.file == file && (line < 0 || place.span.line == line))
+            {
+                return &place;
+            }
+        }
+        return nullptr;
+    }
     std::string joined(const Names& names)
     {
         std::string out;
@@ -129,6 +140,7 @@ namespace tut
         al_studio_test::FakeServices                      services;
         FakeCaretWindow                                   studio;
         std::unique_ptr<al_studio_test::StudioNavigation> navigation;
+        std::unique_ptr<al_studio_test::StudioLookup>     lookup;
         std::unique_ptr<ALScriptStudioCaret>              unit;
 
         alscriptstudiocaret_data()
@@ -154,7 +166,8 @@ namespace tut
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             navigation = std::make_unique<al_studio_test::StudioNavigation>(services);
-            unit       = std::make_unique<ALScriptStudioCaret>(services, studio, navigation->unit, studio);
+            lookup     = std::make_unique<al_studio_test::StudioLookup>(services, navigation->unit);
+            unit       = std::make_unique<ALScriptStudioCaret>(services, studio, navigation->unit, lookup->unit, studio);
             return *unit;
         }
         ALCodeEditor* editor(const std::string& name, const std::string& text)
@@ -279,23 +292,25 @@ namespace tut
         ask(doc, ALEditorCommand::FindReferences);
         result.references.references = { span(0, 8, 5), span(2, 26, 5), span(7, 0, 5) };
         caret.answered(doc, result, ALTextPos(0, 8));
-        ensure_equals("the lookup started", studio.said.back(), "find in a declared disk:/inc.lsl@4 v" + std::to_string(v));
-        ensure_equals("the places that map", studio.found.size(), size_t(2));
-        ensure("the include's, as held", studio.found[0].file == "disk:/inc.lsl" && studio.found[0].fileName == "inc.lsl" &&
-                                             studio.found[0].text == "integer count; // held" && studio.found[0].at == 6);
-        ensure("the script's own, as typed", studio.found[1].file.empty() && studio.found[1].span.line == 1 && studio.found[1].at == 26);
+        ensure_equals("the lookup started", started(doc), "find in a declared disk:/inc.lsl@4 v" + std::to_string(v));
+        ensure_equals("the places that map", doc.lookup->places.size(), size_t(2));
+        const Doc::Place* included = placeIn(doc, "disk:/inc.lsl");
+        ensure("the include's, as held", included && included->fileName == "inc.lsl" && included->text == "integer count; // held" && included->at == 6);
+        const Doc::Place* own = placeIn(doc, std::string());
+        ensure("the script's own, as typed", own && own->span.line == 1 && own->at == 26);
         studio.held.clear();
         ask(doc, ALEditorCommand::Rename);
         caret.answered(doc, result, ALTextPos(0, 8));
-        ensure("the include not held: the expansion's line", studio.found[0].text == "integer count;" && studio.found[0].at == -1);
-        ensure_equals("where the include has it", studio.found[0].span.line, 4);
-        ensure("to rename", studio.said.back().find("rename in a") == 0);
+        included = placeIn(doc, "disk:/inc.lsl");
+        ensure("the include not held: the expansion's line", included && included->text == "integer count;" && included->at == -1);
+        ensure_equals("where the include has it", included->span.line, 4);
+        ensure("to rename", started(doc).find("rename in a") == 0);
 
         doc.expanded.version = v + 7;
         ask(doc, ALEditorCommand::FindReferences);
         caret.answered(doc, result, ALTextPos(0, 8));
-        ensure_equals("an expansion of another text: not read through", studio.said.back(), "find in a declared @0 v" + std::to_string(v));
-        ensure("its places as they are", studio.found.size() == 3 && studio.found[2].span.line == 7);
+        ensure_equals("an expansion of another text: not read through", started(doc), "find in a declared @0 v" + std::to_string(v));
+        ensure("its places as they are", doc.lookup->places.size() == 3 && placeIn(doc, std::string(), 7));
 
         doc.expanded.version = v;
         ask(doc, ALEditorCommand::GoToDefinition);

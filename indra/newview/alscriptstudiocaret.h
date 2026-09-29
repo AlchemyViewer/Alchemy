@@ -35,6 +35,7 @@
 
 class ALScriptStudioAnalysis;
 class ALScriptNavigation;
+class ALScriptLookup;
 class ALScriptStudioServices;
 
 // The tab's part of what is said of its caret: the name asked about, the
@@ -89,11 +90,6 @@ public:
         virtual void openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length) = 0;
         // A word of the language shown in the reference.
         virtual void showReference(const ALScriptStudioWords::Vocab& word, bool lua) = 0;
-        // The lookup across the object's scripts started from what was
-        // found in the tab.
-        virtual void startLookup(Doc& doc, ALEditorCommand command, const ALScriptReferences& refs, bool has_definition,
-                                 const std::string& home_path, const ALScriptSpan& definition, std::vector<Doc::Place> places,
-                                 U32 version) = 0;
         // The symbols the caret is in, found (placePath): shown on the bar,
         // and -- where they changed -- followed by the outline; and what is
         // wrong where the caret is shown in the inspector, false where
@@ -108,7 +104,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioCaret(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, Window& window);
+    ALScriptStudioCaret(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptLookup& lookup, Window& window);
 
     // A command about the name at the caret asked of the analyzers, and
     // what they answered done, where it answers that question of that text.
@@ -135,5 +131,6 @@ private:
     ALScriptStudioServices& mServices;
     ALScriptStudioAnalysis& mAnalysis;
     ALScriptNavigation&     mNavigation;
+    ALScriptLookup&         mLookup;
     Window&                 mWindow;
 };
