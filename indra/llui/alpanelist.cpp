@@ -107,14 +107,6 @@ ALPaneList::ALPaneList(const Params& p)
 {
 }
 
-ALPaneList::~ALPaneList()
-{
-    if (LLView* menu = mCopyMenu.get())
-    {
-        menu->die();
-    }
-}
-
 void ALPaneList::clearRows()
 {
     mKeyed.clear();
@@ -433,10 +425,6 @@ bool ALPaneList::handleRightMouseDown(S32 x, S32 y, MASK mask)
     {
         return true;
     }
-    if (LLView* old = mCopyMenu.get())
-    {
-        old->die();
-    }
     LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
     LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
     const LLHandle<LLUICtrl> self = getHandle();
@@ -452,15 +440,9 @@ bool ALPaneList::handleRightMouseDown(S32 x, S32 y, MASK mask)
         const ALPaneList* list = ALViewType::as<ALPaneList>(self.get());
         return list && list->copyActionEnabled(action.asString());
     });
-    LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_pane_list.xml", LLMenuGL::sMenuContainer,
-                                                                           LLMenuHolderGL::child_registry_t::instance());
-    if (menu)
+    if (mCopyMenu.make("menu_pane_list.xml"))
     {
-        mCopyMenu = menu->getHandle();
-        // A context menu places itself; the popup puts it in front and takes
-        // the mouse. Both, in that order, as every other list here does.
-        menu->show(x, y);
-        LLMenuGL::showPopup(this, menu, x, y);
+        mCopyMenu.show(this, x, y);
     }
     return true;
 }

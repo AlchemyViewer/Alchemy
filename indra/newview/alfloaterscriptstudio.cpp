@@ -564,15 +564,7 @@ ALFloaterScriptStudio::~ALFloaterScriptStudio()
     gFocusMgr.releaseFocusIfNeeded(this);
     // A menu still open calls into this window, which is going: it goes
     // first. The menus live in the viewer's menu holder, not here.
-    for (LLHandle<LLContextMenu>* menu : { &mTabMenuHandle })
-    {
-        if (LLContextMenu* open = menu->get())
-        {
-            // Out of sight at once; gone once the frame is done with it.
-            open->hide();
-            open->die();
-        }
-    }
+    mTabMenu.close();
     // Going with unsaved text still in a tab -- the viewer made to go
     // without asking, as it does with no region to say goodbye to -- the
     // text is written as it stands, for the next login to offer back.
@@ -3313,11 +3305,6 @@ void ALFloaterScriptStudio::showTabMenu(const std::string& value, S32 x, S32 y)
     {
         return;
     }
-    if (LLContextMenu* old = mTabMenuHandle.get())
-    {
-        old->die();
-        mTabMenuHandle.markDead();
-    }
     LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
     LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
     commit.add("Tab.Action", [this](LLUICtrl*, const LLSD& param) { onTabAction(param.asString()); });
@@ -3350,8 +3337,7 @@ void ALFloaterScriptStudio::showTabMenu(const std::string& value, S32 x, S32 y)
         }
         return active() != nullptr;
     });
-    LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_script_studio_tab.xml", LLMenuGL::sMenuContainer,
-                                                                          LLMenuHolderGL::child_registry_t::instance());
+    LLContextMenu* menu = mTabMenu.make("menu_script_studio_tab.xml");
     if (!menu)
     {
         return;
@@ -3385,9 +3371,7 @@ void ALFloaterScriptStudio::showTabMenu(const std::string& value, S32 x, S32 y)
         });
         menu->insert(at++, item);
     }
-    mTabMenuHandle = menu->getHandle();
-    menu->show(x, y);
-    LLMenuGL::showPopup(mTabs, menu, x, y);
+    mTabMenu.show(mTabs, x, y);
 }
 
 void ALFloaterScriptStudio::onTabAction(const std::string& action)

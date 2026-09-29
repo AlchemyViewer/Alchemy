@@ -1048,6 +1048,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudioglue.h
     alscriptstudiofiles.h
     alscriptstudioorphans.h
+    alscriptstudiopane.h
     alscriptstudioplaces.h
     alscriptstudiorecovery.h
     alrecovery.h

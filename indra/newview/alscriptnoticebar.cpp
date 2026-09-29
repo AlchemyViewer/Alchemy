@@ -26,6 +26,7 @@
 
 #include "alscriptnoticebar.h"
 
+#include "alscriptstudiopane.h"
 #include "alscriptstudioservices.h"
 #include "llbutton.h"
 #include "llfloater.h"
@@ -42,12 +43,8 @@ bool ALScriptNoticeBar::postBuild()
     mButtons[2] = getChild<LLButton>("notice_third");
     // The window this is over, found through the view tree, as what the
     // buttons ask of it.
-    LLFloater* window = getParentByType<LLFloater>();
-    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
-    mWindow           = dynamic_cast<Window*>(window);
-    if (!mServices || !mWindow)
+    if (!ALScriptStudioPane::findWindow(*this, "The notice", mServices, mWindow))
     {
-        LL_WARNS() << "The notice is not in a Script Studio window" << LL_ENDL;
         return true;
     }
     for (size_t i = 0; i < BUTTONS; ++i)

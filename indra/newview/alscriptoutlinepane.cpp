@@ -29,6 +29,7 @@
 #include "alpanefolds.h"
 #include "alpanelist.h"
 #include "alscriptstudiocaret.h"
+#include "alscriptstudiopane.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiowords.h"
 #include "alstringmatch.h"
@@ -69,12 +70,8 @@ bool ALScriptOutlinePane::postBuild()
     }
     // The window this is a pane of, found through the view tree, as what
     // the pane asks of it.
-    LLFloater* window = getParentByType<LLFloater>();
-    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
-    mWindow           = dynamic_cast<Window*>(window);
-    if (!mServices || !mWindow)
+    if (!ALScriptStudioPane::findWindow(*this, "The outline", mServices, mWindow))
     {
-        LL_WARNS() << "The outline is not in a Script Studio window" << LL_ENDL;
         return true;
     }
     mFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) {

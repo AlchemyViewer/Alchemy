@@ -29,6 +29,7 @@
 #include "alcodeeditor.h"
 #include "alscriptenvelope.h"
 #include "alscriptstudiocaret.h"
+#include "alscriptstudiopane.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudioweighing.h"
@@ -79,28 +80,13 @@ static LLPanelInjector<ALScriptCrumbsBar> t_script_studio_crumbs("script_studio_
 
 ALScriptCrumbsBar::ALScriptCrumbsBar(const LLPanel::Params& params) : LLPanel(params) {}
 
-ALScriptCrumbsBar::~ALScriptCrumbsBar()
-{
-    // A menu still open calls into this bar, which is going: it goes
-    // first. The menus live in the viewer's menu holder, not here.
-    if (LLContextMenu* open = mIndentMenu.get())
-    {
-        open->hide();
-        open->die();
-    }
-}
-
 bool ALScriptCrumbsBar::postBuild()
 {
     mBar = getChild<ALJumpBar>("breadcrumb");
     // The window this is the bar of, found through the view tree, as what
     // the bar asks of it.
-    LLFloater* window = getParentByType<LLFloater>();
-    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
-    mWindow           = dynamic_cast<Window*>(window);
-    if (!mServices || !mWindow)
+    if (!ALScriptStudioPane::findWindow(*this, "The bar under the editor", mServices, mWindow))
     {
-        LL_WARNS() << "The bar under the editor is not in a Script Studio window" << LL_ENDL;
         return true;
     }
     mBar->onChose([this](size_t, const std::string& value) { choose(value); });
@@ -397,18 +383,12 @@ void ALScriptCrumbsBar::showIndentMenu()
     {
         return;
     }
-    if (LLContextMenu* old = mIndentMenu.get())
-    {
-        old->die();
-        mIndentMenu.markDead();
-    }
     LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
     LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
     commit.add("Indent.Action", [this](LLUICtrl*, const LLSD& param) { indentAct(param.asString()); });
     enable.add("Indent.Enable", [this](LLUICtrl*, const LLSD& param) { return indentEnabled(param.asString()); });
     enable.add("Indent.Check", [this](LLUICtrl*, const LLSD& param) { return indentChecked(param.asString()); });
-    LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_script_studio_indent.xml", LLMenuGL::sMenuContainer,
-                                                                          LLMenuHolderGL::child_registry_t::instance());
+    LLContextMenu* menu = mIndentMenu.make("menu_script_studio_indent.xml");
     if (!menu)
     {
         return;
@@ -423,9 +403,7 @@ void ALScriptCrumbsBar::showIndentMenu()
     S32 x = 0;
     S32 y = 0;
     LLUI::getInstance()->getMousePositionLocal(mBar, &x, &y);
-    mIndentMenu = menu->getHandle();
-    menu->show(x, y);
-    LLMenuGL::showPopup(mBar, menu, x, y);
+    mIndentMenu.show(mBar, x, y);
 }
 
 void ALScriptCrumbsBar::indentAct(const std::string& action)

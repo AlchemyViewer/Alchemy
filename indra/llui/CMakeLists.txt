@@ -149,6 +149,7 @@ target_sources(
     alkeycapture.cpp
     alkeychord.cpp
     alkeymap.cpp
+    almenuslot.cpp
     alvimcommandline.cpp
     alvimexcommands.cpp
     alvimkeymap.cpp
@@ -371,6 +372,7 @@ target_sources(
         alkeychord.h
         alkeymap.h
         allinetable.h
+        almenuslot.h
         alvimcommandline.h
         alvimexcommands.h
         alvimhost.h
@@ -576,6 +578,7 @@ if(AL_BUILD_TESTS)
     alkeycapture
     alscopebar
     aljumpbar
+    almenuslot
     alpanelist
     alspecimenlist
     altabstrip

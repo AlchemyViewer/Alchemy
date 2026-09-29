@@ -28,6 +28,7 @@
 
 #include "alcodeeditor.h"
 #include "alscriptstudiocaret.h"
+#include "alscriptstudiopane.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiowords.h"
 #include "altextview.h"
@@ -46,12 +47,8 @@ bool ALScriptInspectorPane::postBuild()
     mSymbol = getChild<ALTextView>("symbol");
     // The window this is a pane of, found through the view tree, as what
     // the pane asks of it.
-    LLFloater* window = getParentByType<LLFloater>();
-    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
-    mWindow           = dynamic_cast<Window*>(window);
-    if (!mServices || !mWindow)
+    if (!ALScriptStudioPane::findWindow(*this, "The inspector", mServices, mWindow))
     {
-        LL_WARNS() << "The inspector is not in a Script Studio window" << LL_ENDL;
         return true;
     }
     // The declaration, in the script the inspector is about or in the

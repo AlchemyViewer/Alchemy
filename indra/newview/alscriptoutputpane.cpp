@@ -28,6 +28,7 @@
 
 #include "alscriptmessages.h"
 #include "alscriptstudiodoc.h"
+#include "alscriptstudiopane.h"
 #include "alscriptstudioservices.h"
 #include "alstringmatch.h"
 #include "llbutton.h"
@@ -91,12 +92,8 @@ bool ALScriptOutputPane::postBuild()
     layoutRow();
     // The window this is a tab of, found through the view tree, as what
     // the tab asks of it.
-    LLFloater* window = getParentByType<LLFloater>();
-    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
-    mWindow           = dynamic_cast<Window*>(window);
-    if (!mServices || !mWindow)
+    if (!ALScriptStudioPane::findWindow(*this, "The Output tab", mServices, mWindow))
     {
-        LL_WARNS() << "The Output tab is not in a Script Studio window" << LL_ENDL;
         return true;
     }
     mView->setPlaceholder(mServices->words("NoOutput"));

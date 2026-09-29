@@ -26,6 +26,7 @@
 
 #include "alscriptexplorermodel.h"
 #include "alscriptrecompile.h"
+#include "almenuslot.h"
 #include "llui.h"
 #include "llhandle.h"
 #include "llpanel.h"
@@ -89,7 +90,6 @@ public:
     // Studio window it finds through the view tree, whose services it uses
     // and which it asks what it does not do itself.
     explicit ALScriptExplorerPane(const LLPanel::Params& params = getDefaultParams());
-    ~ALScriptExplorerPane() override;
     bool postBuild() override;
     // The keys a tree of files answers to past the tree's own -- the arrows,
     // F2, typing a name -- while the tree has the keyboard: return opens
@@ -199,7 +199,7 @@ private:
     ALScriptExplorerTree*   mTree     = nullptr;
     LLFilterEditor*         mFilter   = nullptr;
     Model                   mModel;
-    LLHandle<LLContextMenu> mMenu;
+    ALMenuSlot              mMenu;
     // Answers have come that the list does not show yet: it is filled a
     // moment after it was last filled.
     bool                    mStale  = false;

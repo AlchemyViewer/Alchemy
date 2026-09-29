@@ -29,6 +29,7 @@
 #include "alcodeeditor.h"
 #include "alpanefolds.h"
 #include "alpanelist.h"
+#include "alscriptstudiopane.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
 #include "llbutton.h"
@@ -53,12 +54,8 @@ bool ALScriptReferencesPane::postBuild()
     mHeadRight = mHead->getRect().mRight;
     // The window this is a tab of, found through the view tree, as what
     // the tab asks of it.
-    LLFloater* window = getParentByType<LLFloater>();
-    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
-    mWindow           = dynamic_cast<Window*>(window);
-    if (!mServices || !mWindow)
+    if (!ALScriptStudioPane::findWindow(*this, "The References tab", mServices, mWindow))
     {
-        LL_WARNS() << "The References tab is not in a Script Studio window" << LL_ENDL;
         return true;
     }
     // A box ticked, where a rename is previewed, is read before the place

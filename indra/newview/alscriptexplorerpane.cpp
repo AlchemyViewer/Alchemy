@@ -32,6 +32,7 @@
 #include "alpanefolds.h"
 #include "alscriptexplorertree.h"
 #include "alscriptstudiodoc.h"
+#include "alscriptstudiopane.h"
 #include "alscriptstudioservices.h"
 #include "alscriptworkspace.h"
 #include "llagent.h"
@@ -155,29 +156,14 @@ static LLPanelInjector<ALScriptExplorerPane> t_script_studio_explorer("script_st
 
 ALScriptExplorerPane::ALScriptExplorerPane(const LLPanel::Params& params) : LLPanel(params), mModel(ALScriptWorkspace::instance().contentsIndex()) {}
 
-ALScriptExplorerPane::~ALScriptExplorerPane()
-{
-    // A menu still open calls into this pane, which is going: it goes
-    // first. The menus live in the viewer's menu holder, not here.
-    if (LLContextMenu* open = mMenu.get())
-    {
-        open->hide();
-        open->die();
-    }
-}
-
 bool ALScriptExplorerPane::postBuild()
 {
     mTree   = getChild<ALScriptExplorerTree>("explorer_tree");
     mFilter = getChild<LLFilterEditor>("explorer_filter");
     // The window this is the explorer of, found through the view tree, as
     // what the explorer asks of it.
-    LLFloater* window = getParentByType<LLFloater>();
-    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
-    mWindow           = dynamic_cast<Window*>(window);
-    if (!mServices || !mWindow)
+    if (!ALScriptStudioPane::findWindow(*this, "The explorer", mServices, mWindow))
     {
-        LL_WARNS() << "The explorer is not in a Script Studio window" << LL_ENDL;
         return true;
     }
     ALScriptExplorerTree::Hooks hooks;
@@ -1012,11 +998,6 @@ void ALScriptExplorerPane::showMenu(S32 x, S32 y)
     {
         return;
     }
-    if (LLContextMenu* old = mMenu.get())
-    {
-        old->die();
-        mMenu.markDead();
-    }
     LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
     LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
     commit.add("Explorer.Action", [this](LLUICtrl*, const LLSD& param) { act(param.asString()); });
@@ -1025,15 +1006,11 @@ void ALScriptExplorerPane::showMenu(S32 x, S32 y)
         const std::vector<Choice> rows = choice();
         return param.asString() == "pin" && !rows.empty() && mModel.isPinned(rows.front().root);
     });
-    LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_script_studio_explorer.xml", LLMenuGL::sMenuContainer,
-                                                                          LLMenuHolderGL::child_registry_t::instance());
-    if (!menu)
+    if (!mMenu.make("menu_script_studio_explorer.xml"))
     {
         return;
     }
-    mMenu = menu->getHandle();
-    menu->show(x, y);
-    LLMenuGL::showPopup(mTree, menu, x, y);
+    mMenu.show(mTree, x, y);
 }
 
 // --- keys, the build tools, descriptions ----------------------------------------------

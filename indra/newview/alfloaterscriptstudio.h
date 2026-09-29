@@ -55,6 +55,7 @@
 #include "alscriptstudiochecking.h"
 #include "alscriptstudioplaces.h"
 #include "alfindings.h"
+#include "almenuslot.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
 #include "alscriptsnippets.h"
@@ -1218,7 +1219,7 @@ private:
     ALScriptStudioCaret                mCaret{ *this, *this, mNavigation, mLookup, *this };
     // Its checking: the analyzers asked and answered, and fixes.
     ALScriptStudioChecking             mChecking{ *this, *this, mSaving, mWeighing, *this };
-    LLHandle<LLContextMenu>            mTabMenuHandle;
+    ALMenuSlot                         mTabMenu;
     bool                               mMain = true;
     bool                               mClosingWindow = false;
     LLComboBox*                        mCompileTarget = nullptr;

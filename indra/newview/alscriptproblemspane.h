@@ -26,6 +26,7 @@
 
 #include "alcodeeditor.h"
 #include "alfindings.h"
+#include "almenuslot.h"
 #include "alscriptanalysis.h"
 #include "alscriptstudiodoc.h"
 #include "llhandle.h"
@@ -143,7 +144,6 @@ public:
     // Script Studio window it finds through the view tree, whose services
     // it uses and which it asks what it does not do itself.
     explicit ALScriptProblemsPane(const LLPanel::Params& params = getDefaultParams());
-    ~ALScriptProblemsPane() override;
     bool postBuild() override;
 
     // A tab's problems made anew: kept, and listed again where the list
@@ -276,5 +276,5 @@ private:
     // Whose rows the list holds, and whether they wait for it to be seen.
     std::string             mRowsFor;
     bool                    mRowsWanted = false;
-    LLHandle<LLContextMenu> mMenu;
+    ALMenuSlot              mMenu;
 };

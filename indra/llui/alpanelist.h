@@ -24,6 +24,7 @@
 #pragma once
 
 #include "aldraggesture.h"
+#include "almenuslot.h"
 #include "llframetimer.h"
 #include "llscrolllistcell.h"
 #include "llscrolllistctrl.h"
@@ -170,7 +171,6 @@ public:
     // every cell of every row. Where it says nothing, a cell's own tip.
     void setRowTip(std::function<std::string(const LLScrollListItem*)> tip) { mRowTip = std::move(tip); }
 
-    ~ALPaneList() override;
 
     void clearRows() override;
     bool handleKeyHere(KEY key, MASK mask) override;
@@ -239,7 +239,7 @@ private:
     // The cell last right-clicked, for the copy meant to be pasted into a
     // line of code rather than read; and the menu that copies it.
     std::string                 mMenuCell;
-    LLHandle<LLView>            mCopyMenu;
+    ALMenuSlot                  mCopyMenu;
     group_t                     mGrouping;
     compare_t                   mComparison;
     boost::signals2::connection mSortConnection;

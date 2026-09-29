@@ -32,6 +32,7 @@
 #include "alpanefolds.h"
 #include "alpanelist.h"
 #include "alscriptstudiochecking.h"
+#include "alscriptstudiopane.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudioweighing.h"
 #include "llcheckboxctrl.h"
@@ -282,12 +283,8 @@ bool ALScriptProblemsPane::postBuild()
     mFilter   = getChild<LLFilterEditor>("problems_filter");
     // The window this is a tab of, found through the view tree, as what
     // the tab asks of it.
-    LLFloater* window = getParentByType<LLFloater>();
-    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
-    mWindow           = dynamic_cast<Window*>(window);
-    if (!mServices || !mWindow)
+    if (!ALScriptStudioPane::findWindow(*this, "The Problems tab", mServices, mWindow))
     {
-        LL_WARNS() << "The Problems tab is not in a Script Studio window" << LL_ENDL;
         return true;
     }
     // A row chosen shows its place and keeps the keyboard in the list, so
@@ -351,16 +348,6 @@ bool ALScriptProblemsPane::postBuild()
 }
 
 
-
-ALScriptProblemsPane::~ALScriptProblemsPane()
-{
-    // A menu still open calls into this pane, which is going: it goes
-    // first. The menus live in the viewer's menu holder, not here.
-    if (LLContextMenu* open = mMenu.get())
-    {
-        open->die();
-    }
-}
 
 void ALScriptProblemsPane::changed(const Doc& doc)
 {
@@ -1089,24 +1076,17 @@ void ALScriptProblemsPane::showMenu(S32 x, S32 y)
         return;
     }
     mList->selectItemAt(x, y, MASK_NONE);
-    if (LLContextMenu* old = mMenu.get())
-    {
-        old->die();
-        mMenu.markDead();
-    }
     LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
     LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
     commit.add("Problem.Action", [this](LLUICtrl*, const LLSD& param) { act(param.asString()); });
     enable.add("Problem.Enable", [this](LLUICtrl*, const LLSD& param) { return enabled(param.asString()); });
     enable.add("Problem.Check", [this](LLUICtrl*, const LLSD&) { return lintIsError(); });
     enable.add("Problem.FixVisible", [this](LLUICtrl*, const LLSD& param) { return fixShown(param.asString()); });
-    LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_script_studio_problem.xml", LLMenuGL::sMenuContainer,
-                                                                          LLMenuHolderGL::child_registry_t::instance());
+    LLContextMenu* menu = mMenu.make("menu_script_studio_problem.xml");
     if (!menu)
     {
         return;
     }
-    mMenu = menu->getHandle();
     const Doc::Shown* shown = chosenShown();
     const Doc*        doc   = chosenDoc();
     // Each fix the problem offers, by what it does, first in the menu:
@@ -1126,8 +1106,7 @@ void ALScriptProblemsPane::showMenu(S32 x, S32 y)
         }
     }
     menu->setItemVisible("fix_separator", shown && doc && doc->modifiable && !shown->fixes.empty());
-    menu->show(x, y);
-    LLMenuGL::showPopup(mList, menu, x, y);
+    mMenu.show(mList, x, y);
 }
 
 void ALScriptProblemsPane::act(const std::string& action)
