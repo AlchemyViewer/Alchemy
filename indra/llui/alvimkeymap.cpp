@@ -3667,54 +3667,19 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             {
                 return;
             }
-            // Each line one step further in, or one back: a tab, or the
-            // tab's width in spaces where tabs are soft; a blank line is
-            // left alone going in.
-            const S32         width = llmax(1, view.getTabWidth());
-            const std::string unit  = view.getSoftTabs() ? std::string(width, ' ') : std::string("\t");
+            // Each line the count's levels further in, or back, as the
+            // editor's own indent does (ALTextIndent::shiftLines): a tab, or
+            // the tab's width in spaces where tabs are soft; an empty line
+            // is left alone going in, as vim leaves it.
+            ALTextIndent::Options options;
+            options.tabWidth                   = llmax(1, view.getTabWidth());
+            options.softTabs                   = view.getSoftTabs();
+            const ALTextEditing::Change shifted = ALTextIndent::shiftLines(d, first, last, llmax(1, count), op == '>', options);
             std::vector<std::pair<ALTextRange, std::string>> edits;
-            for (S32 line = first; line <= last; ++line)
+            edits.reserve(shifted.replacements.size());
+            for (const ALTextEditing::Replacement& replacement : shifted.replacements)
             {
-                if (op == '>')
-                {
-                    if (lineBlank(d, line))
-                    {
-                        continue;
-                    }
-                    std::string in;
-                    for (S32 n = 0; n < llmax(1, count); ++n)
-                    {
-                        in += unit;
-                    }
-                    edits.emplace_back(ALTextRange(d.lineStart(line), d.lineStart(line)), in);
-                }
-                else
-                {
-                    const std::string& text = d.line(line);
-                    S32                cut  = 0;
-                    for (S32 n = 0; n < llmax(1, count); ++n)
-                    {
-                        if (cut < static_cast<S32>(text.size()) && text[cut] == '\t')
-                        {
-                            ++cut;
-                            continue;
-                        }
-                        S32 spaces = 0;
-                        while (cut + spaces < static_cast<S32>(text.size()) && text[cut + spaces] == ' ' && spaces < width)
-                        {
-                            ++spaces;
-                        }
-                        if (spaces == 0)
-                        {
-                            break;
-                        }
-                        cut += spaces;
-                    }
-                    if (cut > 0)
-                    {
-                        edits.emplace_back(ALTextRange(d.lineStart(line), ALTextPos(line, cut)), std::string());
-                    }
-                }
+                edits.emplace_back(replacement.range, replacement.text);
             }
             if (mGlobalBatch)
             {
@@ -5829,46 +5794,18 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
             }
             return;
         }
-        const std::string block = d.text(ALTextRange(d.lineStart(first), d.lineEnd(last)));
-        const S32         count = last - first + 1;
-        view.undoJournal().beginGroup();
-        // Put first, then taken out, so that the addresses stay what
-        // they were; the copy goes after line `to`, before line to+1.
-        if (to < 0)
+        // Under line `to`, -1 for the top, as one change (ALTextEditing):
+        // the caret on the last line put there.
+        const std::optional<ALTextEditing::Change> change =
+            move ? ALTextEditing::moveLinesTo(d, first, last, to) : std::optional<ALTextEditing::Change>(ALTextEditing::copyLinesTo(d, first, last, to));
+        if (change)
         {
-            view.setCaret(d.lineStart(0));
-            view.insertText(block + "\n");
+            view.apply(*change);
         }
-        else
-        {
-            view.setCaret(d.lineEnd(to));
-            view.insertText("\n" + block);
-        }
-        S32 landed = to < 0 ? 0 : to + 1;
-        if (move)
-        {
-            const S32 shift = to < first ? count : 0;
-            const S32 f     = first + shift;
-            const S32 l     = last + shift;
-            ALTextRange whole;
-            if (l + 1 < d.lineCount())
-            {
-                whole = ALTextRange(d.lineStart(f), d.lineStart(l + 1));
-            }
-            else
-            {
-                whole = ALTextRange(d.lineEnd(f - 1), d.lineEnd(l));
-            }
-            view.deleteRange(whole);
-            if (to >= last)
-            {
-                landed -= count;
-            }
-        }
-        view.undoJournal().endGroup();
-        moveTo(view, ALTextPos(llclamp(landed + count - 1, 0, d.lineCount() - 1), 0));
+        const S32 landed = change ? change->caret.line : last;
+        moveTo(view, ALTextPos(llclamp(landed, 0, d.lineCount() - 1), 0));
         moveTo(view, ALTextPos(view.caret().line, firstNonBlankColumn(d, view.caret().line)));
-        finishCommand(true);
+        finishCommand(change.has_value());
         return;
     }
     if (name == "sor" || name == "sort" || name == "sor!" || name == "sort!")

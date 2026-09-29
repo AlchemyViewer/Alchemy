@@ -70,6 +70,13 @@ namespace ALTextEditing
     // The lines past the one above or below them, the selection with
     // them; nothing where they are at the top or the bottom already.
     std::optional<Change> moveLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, S32 direction);
+    // Lines first through last put under line `below` -- -1 for above the
+    // first -- as vim's :m and :t have it: moved, as one replacement of the
+    // lines between, nothing where `below` is among them or is the line
+    // above them already; or copied. The caret at the start of the last
+    // line put there.
+    std::optional<Change> moveLinesTo(const ALTextDocument& doc, S32 first, S32 last, S32 below);
+    Change                copyLinesTo(const ALTextDocument& doc, S32 first, S32 last, S32 below);
     // The lines gone, the last with the break before it, and the caret on
     // the line that took their place, in its column where that line has it.
     Change deleteLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret);

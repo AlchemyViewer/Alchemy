@@ -80,21 +80,65 @@ std::optional<Change> moveLines(const ALTextDocument& doc, const ALTextPos& anch
     {
         return std::nullopt;
     }
-    const std::string block = doc.text(ALTextRange(doc.lineStart(first), doc.lineEnd(last)));
-    Change            change;
-    if (direction < 0)
+    std::optional<Change> change = moveLinesTo(doc, first, last, direction < 0 ? first - 2 : last + 1);
+    if (change)
     {
-        const std::string above = doc.line(first - 1);
-        change.replacements.push_back({ ALTextRange(doc.lineStart(first - 1), doc.lineEnd(last)), block + "\n" + above });
+        change->selects = true;
+        change->anchor  = ALTextPos(anchor.line + direction, anchor.column);
+        change->caret   = ALTextPos(caret.line + direction, caret.column);
+    }
+    return change;
+}
+
+std::optional<Change> moveLinesTo(const ALTextDocument& doc, S32 first, S32 last, S32 below)
+{
+    const S32 count = doc.lineCount();
+    first           = llclamp(first, 0, count - 1);
+    last            = llclamp(last, first, count - 1);
+    below           = llclamp(below, -1, count - 1);
+    if (below >= first - 1 && below <= last)
+    {
+        return std::nullopt;
+    }
+    const std::string block = doc.text(ALTextRange(doc.lineStart(first), doc.lineEnd(last)));
+    const S32         lines = last - first + 1;
+    Change            change;
+    if (below < first)
+    {
+        // Up: the lines between go under them.
+        const std::string between = doc.text(ALTextRange(doc.lineStart(below + 1), doc.lineEnd(first - 1)));
+        change.replacements.push_back({ ALTextRange(doc.lineStart(below + 1), doc.lineEnd(last)), block + "\n" + between });
+        change.caret = ALTextPos(below + lines, 0);
     }
     else
     {
-        const std::string below = doc.line(last + 1);
-        change.replacements.push_back({ ALTextRange(doc.lineStart(first), doc.lineEnd(last + 1)), below + "\n" + block });
+        // Down: the lines between go above them.
+        const std::string between = doc.text(ALTextRange(doc.lineStart(last + 1), doc.lineEnd(below)));
+        change.replacements.push_back({ ALTextRange(doc.lineStart(first), doc.lineEnd(below)), between + "\n" + block });
+        change.caret = ALTextPos(below, 0);
     }
-    change.selects = true;
-    change.anchor  = ALTextPos(anchor.line + direction, anchor.column);
-    change.caret   = ALTextPos(caret.line + direction, caret.column);
+    change.anchor = change.caret;
+    return change;
+}
+
+Change copyLinesTo(const ALTextDocument& doc, S32 first, S32 last, S32 below)
+{
+    const S32 count = doc.lineCount();
+    first           = llclamp(first, 0, count - 1);
+    last            = llclamp(last, first, count - 1);
+    below           = llclamp(below, -1, count - 1);
+    const std::string block = doc.text(ALTextRange(doc.lineStart(first), doc.lineEnd(last)));
+    Change            change;
+    if (below < 0)
+    {
+        change.replacements.push_back({ ALTextRange(doc.lineStart(0), doc.lineStart(0)), block + "\n" });
+    }
+    else
+    {
+        change.replacements.push_back({ ALTextRange(doc.lineEnd(below), doc.lineEnd(below)), "\n" + block });
+    }
+    change.caret  = ALTextPos(below + last - first + 1, 0);
+    change.anchor = change.caret;
     return change;
 }
 

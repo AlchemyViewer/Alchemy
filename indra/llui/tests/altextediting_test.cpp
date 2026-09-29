@@ -133,4 +133,37 @@ namespace tut
         ensure_equals("the blanks kept", applied(text, *joinLines(doc, 0, 1, true)), std::string("call(a,    b\n    )\n\nend"));
         ensure("one line is nothing to join", !joinLines(doc, 4, 4, false) && !joinLines(doc, 4, 9, false));
     }
+
+    template<> template<>
+    void altextediting_object::test<5>()
+    {
+        set_test_name("lines moved or copied under a line, as :m and :t, each one replacement, the caret on the last put there");
+        const std::string    text = "a\nb\nc\nd\ne";
+        const ALTextDocument doc(text);
+
+        const std::optional<Change> down = moveLinesTo(doc, 0, 1, 3);
+        ensure("down", down.has_value() && down->replacements.size() == 1);
+        ensure_equals("under d", applied(text, *down), std::string("c\nd\na\nb\ne"));
+        ensure("the caret on b", down->caret == ALTextPos(3, 0));
+
+        const std::optional<Change> up = moveLinesTo(doc, 3, 4, 0);
+        ensure_equals("under a", applied(text, *up), std::string("a\nd\ne\nb\nc"));
+        ensure("the caret on e", up->caret == ALTextPos(2, 0));
+
+        const std::optional<Change> top = moveLinesTo(doc, 2, 2, -1);
+        ensure_equals("to the top", applied(text, *top), std::string("c\na\nb\nd\ne"));
+        ensure("the caret on c", top->caret == ALTextPos(0, 0));
+        ensure_equals("to the end", applied(text, *moveLinesTo(doc, 0, 0, 4)), std::string("b\nc\nd\ne\na"));
+
+        ensure("into themselves, nothing", !moveLinesTo(doc, 1, 3, 2));
+        ensure("under their own last, nothing", !moveLinesTo(doc, 1, 3, 3));
+        ensure("under the line above them already, nothing", !moveLinesTo(doc, 1, 3, 0));
+
+        const Change copy = copyLinesTo(doc, 3, 4, 0);
+        ensure_equals("copied under a", applied(text, copy), std::string("a\nd\ne\nb\nc\nd\ne"));
+        ensure("the caret on the copy's last", copy.caret == ALTextPos(2, 0));
+        const Change first = copyLinesTo(doc, 1, 1, -1);
+        ensure_equals("copied to the top", applied(text, first), std::string("b\na\nb\nc\nd\ne"));
+        ensure("the caret on it", first.caret == ALTextPos(0, 0));
+    }
 }

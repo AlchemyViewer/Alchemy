@@ -614,41 +614,13 @@ std::optional<Change> reindentPasted(const ALTextDocument& doc, const ALTextPos&
 Change indentLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, bool in, const Options& options)
 {
     const auto [first, last] = ALTextEditing::selectedLines(ALTextRange(anchor, caret));
-    Change change;
+    Change change            = shiftLines(doc, first, last, 1, in, options);
     // What each line gained or lost at its start.
     std::vector<S32> delta(static_cast<size_t>(last - first + 1), 0);
-    for (S32 l = first; l <= last; ++l)
+    for (const ALTextEditing::Replacement& replacement : change.replacements)
     {
-        const std::string& line = doc.line(l);
-        if (in)
-        {
-            if (!line.empty())
-            {
-                const std::string tab = options.softTabs ? std::string(options.tabWidth, ' ') : std::string("\t");
-                change.replacements.push_back({ ALTextRange(ALTextPos(l, 0), ALTextPos(l, 0)), tab });
-                delta[l - first] = static_cast<S32>(tab.size());
-            }
-        }
-        else
-        {
-            S32 taken = 0;
-            if (!line.empty() && line[0] == '\t')
-            {
-                taken = 1;
-            }
-            else
-            {
-                while (taken < options.tabWidth && taken < static_cast<S32>(line.size()) && line[taken] == ' ')
-                {
-                    ++taken;
-                }
-            }
-            if (taken)
-            {
-                change.replacements.push_back({ ALTextRange(ALTextPos(l, 0), ALTextPos(l, taken)), std::string() });
-                delta[l - first] = -taken;
-            }
-        }
+        const S32 line          = replacement.range.begin.line;
+        delta[line - first]     = in ? static_cast<S32>(replacement.text.size()) : -replacement.range.end.column;
     }
     // The caret and the anchor stay where they were, moved by what their
     // lines gained or lost, and never before a line's start.
@@ -662,6 +634,56 @@ Change indentLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALT
     change.selects = true;
     change.anchor  = moved(anchor);
     change.caret   = moved(caret);
+    return change;
+}
+
+Change shiftLines(const ALTextDocument& doc, S32 first, S32 last, S32 levels, bool in, const Options& options)
+{
+    levels          = llmax(1, levels);
+    const S32 width = llmax(1, options.tabWidth);
+    Change    change;
+    for (S32 l = llmax(0, first); l <= last && l < doc.lineCount(); ++l)
+    {
+        const std::string& line = doc.line(l);
+        if (in)
+        {
+            if (!line.empty())
+            {
+                const std::string level = options.softTabs ? std::string(width, ' ') : std::string("\t");
+                std::string       text;
+                for (S32 n = 0; n < levels; ++n)
+                {
+                    text += level;
+                }
+                change.replacements.push_back({ ALTextRange(ALTextPos(l, 0), ALTextPos(l, 0)), std::move(text) });
+            }
+            continue;
+        }
+        // Out: each level a tab, or up to a tab's width of spaces.
+        S32 taken = 0;
+        for (S32 n = 0; n < levels; ++n)
+        {
+            if (taken < static_cast<S32>(line.size()) && line[taken] == '\t')
+            {
+                ++taken;
+                continue;
+            }
+            S32 spaces = 0;
+            while (spaces < width && taken + spaces < static_cast<S32>(line.size()) && line[taken + spaces] == ' ')
+            {
+                ++spaces;
+            }
+            if (spaces == 0)
+            {
+                break;
+            }
+            taken += spaces;
+        }
+        if (taken > 0)
+        {
+            change.replacements.push_back({ ALTextRange(ALTextPos(l, 0), ALTextPos(l, taken)), std::string() });
+        }
+    }
     return change;
 }
 

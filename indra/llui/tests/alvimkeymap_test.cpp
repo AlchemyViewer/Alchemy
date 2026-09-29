@@ -2701,4 +2701,25 @@ namespace tut
                                 back[2].isChar && back[2].ch == ' ' && back[3].key == KEY_RETURN);
         ensure_equals("and written", ALVimKeymap::encodeInputs(back), std::string("<F12><C-F3> <CR>"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<90>()
+    {
+        set_test_name(":m and :t are one change each; > shifts a line of blanks and leaves an empty line, as vim does");
+        ALCodeEditor& e = make("a\nb\nc\nd\n");
+        ex("1,2m3");
+        ensure("moved under c", flat(e.text()) == "c|a|b|d|" && e.caret().line == 2);
+        e.undo();
+        ensure_equals("one step back", flat(e.text()), std::string("a|b|c|d|"));
+        ex("4t0");
+        ensure("copied to the top", flat(e.text()) == "d|a|b|c|d|" && e.caret().line == 0);
+        e.undo();
+
+        e.setText("x\n  \n\ny\n");
+        e.setCaret(ALTextPos(0, 0));
+        keys(">3j");
+        ensure("shifted", e.document().line(0).size() > 1 && e.document().line(3).size() > 1);
+        ensure("a line of blanks too", e.document().line(1).size() > 2);
+        ensure("an empty one not", e.document().line(2).empty());
+    }
 }

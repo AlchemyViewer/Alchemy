@@ -396,4 +396,31 @@ namespace tut
         ensure("after something written, as typed",
                !outdentAsTyped(written, ALTextPos(0, 10), ALTextPos(0, 10), '/', lsl, none(), AutoOutdent(), spaces).replacement);
     }
+
+    template<> template<>
+    void altextindent_object::test<12>()
+    {
+        set_test_name("lines shifted so many levels in, empty ones left alone, and out by a tab or a tab's width of spaces a level, as vim's > and <");
+        const std::string text = "a\n\n  \n\tb\n      c";
+        const ALTextDocument doc(text);
+        const auto applied = [&](const ALTextIndent::Change& change) {
+            ALTextDocument out(text);
+            for (auto it = change.replacements.rbegin(); it != change.replacements.rend(); ++it)
+            {
+                out.replace(it->range, it->text);
+            }
+            return out.text();
+        };
+        ALTextIndent::Options soft;
+        soft.tabWidth = 2;
+        soft.softTabs = true;
+        ensure_equals("in by two, the empty line left", applied(ALTextIndent::shiftLines(doc, 0, 4, 2, true, soft)),
+                      std::string("    a\n\n      \n    \tb\n          c"));
+        ALTextIndent::Options hard;
+        hard.tabWidth = 4;
+        ensure_equals("in by a tab", applied(ALTextIndent::shiftLines(doc, 0, 0, 1, true, hard)), std::string("\ta\n\n  \n\tb\n      c"));
+        ensure_equals("out by one: a tab, or up to a tab's width of spaces", applied(ALTextIndent::shiftLines(doc, 0, 4, 1, false, hard)),
+                      std::string("a\n\n\nb\n  c"));
+        ensure_equals("out by two", applied(ALTextIndent::shiftLines(doc, 0, 4, 2, false, hard)), std::string("a\n\n\nb\nc"));
+    }
 }
