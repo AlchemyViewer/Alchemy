@@ -98,6 +98,21 @@ ALScriptStudioDoc::Shown ALScriptStudioDoc::analysisRow(const ALScriptProblem& p
     return row;
 }
 
+bool ALScriptStudioDoc::unsaved() const
+{
+    return (editor && editor->isDirty()) || targetChosen || experienceChosen;
+}
+
+ALCodeEditor* ALScriptStudioDoc::shownText() const
+{
+    switch (shownView())
+    {
+        case View::Compare:  return compareView->shown();
+        case View::Expanded: return expandedEditor;
+        default:             return editor;
+    }
+}
+
 bool ALScriptStudioDoc::hasKeyboard() const
 {
     for (const LLView* view : { static_cast<const LLView*>(editor), static_cast<const LLView*>(expandedEditor), static_cast<const LLView*>(compareView) })
@@ -401,10 +416,4 @@ std::vector<const ALScriptFix*> ALScriptStudioDoc::pickFixes(const FixPick& pick
         kept.push_back(fix);
     }
     return kept;
-}
-
-// static
-ALCodeEditor::Mark ALScriptStudioDoc::markOf(Level level)
-{
-    return level == Level::Error ? ALCodeEditor::Mark::Error : level == Level::Warning ? ALCodeEditor::Mark::Warning : ALCodeEditor::Mark::Note;
 }

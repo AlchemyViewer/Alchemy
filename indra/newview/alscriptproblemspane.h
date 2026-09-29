@@ -79,6 +79,8 @@ public:
         std::function<std::string(const std::string& path)> includeName;
     };
     static Made make(const Doc& doc, const ALScriptStudioServices& services, const Making& making);
+    // The mark a level puts in the gutter.
+    static ALCodeEditor::Mark markOf(Doc::Level level);
 
     // --- the pane ------------------------------------------------------------------
 

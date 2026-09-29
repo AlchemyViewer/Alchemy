@@ -127,7 +127,7 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
         {
             continue;
         }
-        add(problem.line, problem.column, problem.hasColumn, problem.line, problem.column, Doc::markOf(level), level, services.words("OriginCompiler"),
+        add(problem.line, problem.column, problem.hasColumn, problem.line, problem.column, markOf(level), level, services.words("OriginCompiler"),
             problem.message + as_saved, problem.file);
     }
     // The preprocessor's own word on the text as it stands, and the
@@ -149,7 +149,7 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
             args["[TARGET]"] = ALScriptWeight::nameOf(*target);
             message += " " + services.words(*problem.savedBytes > 0 ? "OptimizerNoteLighter" : *problem.savedBytes < 0 ? "OptimizerNoteHeavier" : "OptimizerNoteSame", args);
         }
-        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, Doc::markOf(level), level,
+        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(level), level,
             services.words(optimizer ? "OriginOptimizer" : "OriginPreprocessor"), message, problem.file);
         made.rows.back().key      = problem.key;
         made.rows.back().fixes    = problem.fixes;
@@ -181,7 +181,7 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
     for (const ALScriptProblem& problem : doc.check->analysis)
     {
         const Doc::Shown said = Doc::analysisRow(problem, doc.language.lua, services);
-        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, Doc::markOf(said.level), said.level, said.origin, said.message,
+        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(said.level), said.level, said.origin, said.message,
             problem.file, said.lint);
         made.rows.back().key      = problem.key;
         made.rows.back().fixes    = problem.fixes;
@@ -256,6 +256,14 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
         return a.line != b.line ? a.line < b.line : a.column < b.column;
     });
     return made;
+}
+
+// static
+ALCodeEditor::Mark ALScriptProblemsPane::markOf(Doc::Level level)
+{
+    return level == Doc::Level::Error     ? ALCodeEditor::Mark::Error
+           : level == Doc::Level::Warning ? ALCodeEditor::Mark::Warning
+                                          : ALCodeEditor::Mark::Note;
 }
 
 static LLPanelInjector<ALScriptProblemsPane> t_script_studio_problems("script_studio_problems");
@@ -824,7 +832,7 @@ void ALScriptProblemsPane::listRows(const Doc* doc)
             row.value["group"] = static_cast<S32>(group_index);
             row.value["owner"] = group.owner;
             row.value["index"] = static_cast<S32>(group.index[k]);
-            const ALCodeEditor::Mark mark = problem->origin == runtime ? ALCodeEditor::Mark::Runtime : Doc::markOf(problem->level);
+            const ALCodeEditor::Mark mark = problem->origin == runtime ? ALCodeEditor::Mark::Runtime : markOf(problem->level);
             LLScrollListCell::Params icon = cell("icon",
                                                  problem->level == Doc::Level::Error     ? "Problem_Error"
                                                  : problem->level == Doc::Level::Warning ? "Problem_Warning"

@@ -142,20 +142,12 @@ struct ALScriptStudioDoc
     // compile target or an experience picked for the next save to set --
     // what the tab's dot, Save All and a close all go by. What is kept
     // against a crash is the text alone.
-    bool          unsaved() const { return (editor && editor->isDirty()) || targetChosen || experienceChosen; }
+    bool          unsaved() const;
     // A save on its way: sent, or waiting on the preprocessor or a
     // check -- or the preprocessor busy with the tab for any reason,
     // whose answer a save may yet wait on.
     bool          saveUnderway() const { return save.underway() || preprocessing; }
-    ALCodeEditor* shownText() const
-    {
-        switch (shownView())
-        {
-            case View::Compare:  return compareView->shown();
-            case View::Expanded: return expandedEditor;
-            default:             return editor;
-        }
-    }
+    ALCodeEditor* shownText() const;
     // Whether the keyboard is in one of its views, shown or not.
     bool          hasKeyboard() const;
     // Whether a check asked about is still unanswered at `now`, a while
@@ -594,11 +586,10 @@ struct ALScriptStudioDoc
     boost::signals2::scoped_connection         changed;
 
     // What the Problems pane's rows say a level is, and what the compiler's
-    // own word for one means; and the mark a level puts in the gutter.
-    static const char*        levelName(Level level);
-    static Level              levelOf(const std::string& said);
-    static Level              levelOf(ALScriptProblem::Severity severity);
-    static ALCodeEditor::Mark markOf(Level level);
+    // own word for one means.
+    static const char* levelName(Level level);
+    static Level       levelOf(const std::string& said);
+    static Level       levelOf(ALScriptProblem::Severity severity);
     // A problem the analyzers found as its row says it: its level, whose
     // word it is, the message with the lint's name after it, and the lint
     // where a scripter may turn it off. Its place and file are the

@@ -117,7 +117,6 @@ namespace tut
         ensure("anything else is an error, as the server has two", Doc::levelOf("ERROR") == Doc::Level::Error && Doc::levelOf("oops") == Doc::Level::Error);
         ensure("a note", Doc::levelOf(ALScriptProblem::Severity::Note) == Doc::Level::Note);
         ensure("named", std::string(Doc::levelName(Doc::Level::Warning)) == "WARNING");
-        ensure("marked", Doc::markOf(Doc::Level::Error) == ALCodeEditor::Mark::Error && Doc::markOf(Doc::Level::Note) == ALCodeEditor::Mark::Note);
 
         Doc::Shown shown;
         shown.level    = Doc::Level::Warning;

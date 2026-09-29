@@ -300,6 +300,9 @@ namespace tut
                underline(2) == Style::Squiggle && underline(4) == Style::Dashed && underline(8) == Style::Squiggle);
         ensure("the run-time mark on its line",
                std::find(made.marks.begin(), made.marks.end(), std::make_pair(S32(8), ALCodeEditor::Mark::Runtime)) != made.marks.end());
+        ensure("each level's mark", ALScriptProblemsPane::markOf(Doc::Level::Error) == ALCodeEditor::Mark::Error &&
+                                        ALScriptProblemsPane::markOf(Doc::Level::Warning) == ALCodeEditor::Mark::Warning &&
+                                        ALScriptProblemsPane::markOf(Doc::Level::Note) == ALCodeEditor::Mark::Note);
         ensure_equals("the lint's line offers its fix", made.fixable.size(), size_t(1));
         ensure("which changes the script", made.fixable[0] == std::make_pair(S32(4), true));
 
