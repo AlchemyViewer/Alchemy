@@ -4619,12 +4619,11 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
     // ignorecase alone says; a pattern in vim's spelling.
     const Pattern pattern_in = whole_word ? Pattern{ pattern, !mShared->ignoreCase } : patternOf(pattern);
     options.caseSensitive    = pattern_in.caseSensitive;
-    std::string              error;
-    std::vector<ALTextPos>   wholes;
-    std::vector<ALTextRange> matches = matchesOf(view, pattern_in, options, nullptr, error, wholes);
-    if (!error.empty())
+    const Found&                    found_now = found(view, pattern_in, options);
+    const std::vector<ALTextRange>& matches   = found_now.matches;
+    if (!found_now.error.empty())
     {
-        say(said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", error } }), true);
+        say(said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", found_now.error } }), true);
         return false;
     }
     if (matches.empty())
@@ -4656,7 +4655,7 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
     // leaves them.
     if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view); editor && !isVisual() && mShared->highlightSearch)
     {
-        editor->setHighlights(ALCodeEditor::Highlight::Search, matches);
+        lightFound(*editor);
     }
     if (!mOperator && from != start)
     {
@@ -6789,6 +6788,39 @@ std::vector<ALTextRange> ALVimKeymap::matchesOf(ALTextView& view, const Pattern&
     return pattern.matchesIn(view.document(), options, scope, placesOf(view), error, wholes);
 }
 
+const ALVimKeymap::Found& ALVimKeymap::found(ALTextView& view, const Pattern& pattern, const ALTextSearchOptions& options)
+{
+    const ALTextDocument&      d    = view.document();
+    const ALTextSearchOptions& kept = mFound.options;
+    const bool same = mFound.doc == &d && mFound.version == d.version() && mFound.pattern == pattern && kept.caseSensitive == options.caseSensitive &&
+                      kept.wholeWord == options.wholeWord && kept.regex == options.regex && kept.preserveCase == options.preserveCase &&
+                      kept.matchGroup == options.matchGroup && kept.acrossLines == options.acrossLines && kept.limit == options.limit;
+    if (same)
+    {
+        return mFound;
+    }
+    mFound.matches = matchesOf(view, pattern, options, nullptr, mFound.error, mFound.wholes);
+    // Kept where it is the text's alone to say; asked again otherwise.
+    mFound.doc     = pattern.placed() ? nullptr : &d;
+    mFound.version = d.version();
+    mFound.pattern = pattern;
+    mFound.options = options;
+    mFound.lit     = nullptr;
+    return mFound;
+}
+
+void ALVimKeymap::lightFound(ALCodeEditor& editor)
+{
+    // Lit already where the editor holds as many as were lit there: what
+    // puts them out -- :noh, the caret leaving them -- leaves none.
+    if (mFound.lit == &editor && editor.highlights(ALCodeEditor::Highlight::Search).size() == mFound.matches.size())
+    {
+        return;
+    }
+    editor.setHighlights(ALCodeEditor::Highlight::Search, mFound.matches);
+    mFound.lit = &editor;
+}
+
 std::string ALVimKeymap::replacementOf(const std::string& with) const
 {
     return ALVimPattern::replacementOf(with);
@@ -7319,10 +7351,9 @@ std::optional<ALTextRange> ALVimKeymap::matchNear(ALTextView& view, bool forward
     options.wholeWord     = mSearchWholeWord;
     const Pattern pattern = mSearchWholeWord ? Pattern{ mSearchPattern, !mShared->ignoreCase } : patternOf(mSearchPattern);
     options.caseSensitive = pattern.caseSensitive;
-    std::string              error;
-    std::vector<ALTextPos>   wholes;
-    std::vector<ALTextRange> matches = matchesOf(view, pattern, options, nullptr, error, wholes);
-    if (!error.empty() || matches.empty())
+    const Found&                    found_now = found(view, pattern, options);
+    const std::vector<ALTextRange>& matches   = found_now.matches;
+    if (!found_now.error.empty() || matches.empty())
     {
         say(said("VimPatternNotFound", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", mSearchPattern } }), true);
         return std::nullopt;
@@ -7444,7 +7475,16 @@ void ALVimKeymap::incrementalSearch(ALTextView& view)
     std::string pattern;
     std::string offset_text;
     splitOffset(mLine, mLineKind, pattern, offset_text);
-    mIncrementalShown = true;
+    // A key that left the pattern as it was, in the same text: nothing
+    // more to light or scroll to.
+    if (mIncrementalShown && pattern == mIncrementalPattern && mLineKind == mIncrementalKind && view.document().version() == mIncrementalVersion)
+    {
+        return;
+    }
+    mIncrementalShown   = true;
+    mIncrementalPattern = pattern;
+    mIncrementalKind    = mLineKind;
+    mIncrementalVersion = view.document().version();
     if (pattern.empty())
     {
         editor->clearHighlights(ALCodeEditor::Highlight::Search);
@@ -7453,13 +7493,12 @@ void ALVimKeymap::incrementalSearch(ALTextView& view)
     }
     // What is typed so far may not be a pattern yet: nothing lit then.
     ALTextSearchOptions options;
-    options.regex             = true;
-    const Pattern parsed      = patternOf(pattern);
-    options.caseSensitive     = parsed.caseSensitive;
-    std::string              error;
-    std::vector<ALTextPos>   wholes;
-    std::vector<ALTextRange> matches = matchesOf(view, parsed, options, nullptr, error, wholes);
-    if (!error.empty() || matches.empty())
+    options.regex                            = true;
+    const Pattern parsed                     = patternOf(pattern);
+    options.caseSensitive                    = parsed.caseSensitive;
+    const Found&                    found_now = found(view, parsed, options);
+    const std::vector<ALTextRange>& matches   = found_now.matches;
+    if (!found_now.error.empty() || matches.empty())
     {
         editor->clearHighlights(ALCodeEditor::Highlight::Search);
         view.scrollToCaret();
@@ -7469,7 +7508,15 @@ void ALVimKeymap::incrementalSearch(ALTextView& view)
     const S32  index   = ALTextSearch::nearest(matches, forward ? view.document().nextCluster(cursor(view)) : cursor(view), forward);
     const ALTextRange next = matches[static_cast<size_t>(index < 0 ? 0 : index)];
     // Every match lit where hlsearch has them, else the next alone.
-    editor->setHighlights(ALCodeEditor::Highlight::Search, mShared->highlightSearch ? matches : std::vector<ALTextRange>{ next });
+    if (mShared->highlightSearch)
+    {
+        lightFound(*editor);
+    }
+    else
+    {
+        editor->setHighlights(ALCodeEditor::Highlight::Search, { next });
+        mFound.lit = nullptr;
+    }
     view.scrollToLine(next.begin.line);
 }
 

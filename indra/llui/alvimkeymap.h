@@ -40,6 +40,8 @@
 #include <string_view>
 #include <vector>
 
+class ALCodeEditor;
+
 // Vim over the text view, as a keymap with state: normal, insert, replace,
 // visual, visual-line and visual-block modes; counts; the operators d c y
 // > < = and g~ gu gU, composed with the motions h j k l w W b B e E 0 ^ $
@@ -386,6 +388,27 @@ private:
     // where each whole match began.
     std::vector<ALTextRange> matchesOf(ALTextView& view, const Pattern& pattern, ALTextSearchOptions options, const ALTextRange* scope, std::string& error,
                                        std::vector<ALTextPos>& wholes) const;
+    // What a search finds over the whole text, kept until the text, the
+    // pattern or how it is matched changes: n, N, gn and every key on the
+    // search line ask it again of the same text. Found afresh each time
+    // where the pattern places its matches by the caret or the last visual
+    // area. `lit`: the editor its matches were last lit in, by
+    // lightFound().
+    struct Found
+    {
+        const ALTextDocument*    doc     = nullptr;
+        U32                      version = 0;
+        Pattern                  pattern;
+        ALTextSearchOptions      options;
+        std::vector<ALTextRange> matches;
+        std::vector<ALTextPos>   wholes;
+        std::string              error;
+        const ALCodeEditor*      lit = nullptr;
+    };
+    const Found& found(ALTextView& view, const Pattern& pattern, const ALTextSearchOptions& options);
+    // Every match found lit, as hlsearch has it: not again where they are
+    // lit already.
+    void lightFound(ALCodeEditor& editor);
     // The :s asking about each match: the edits left to make, in order,
     // and the one being asked about; the text put in, for the question.
     struct Confirming
@@ -540,7 +563,14 @@ private:
     // The last match a search went to, which n from where an offset left
     // the caret goes on from.
     ALTextRange mLastMatch;
+    Found       mFound;
+    // What the search line last lit as it was typed, in which text: a key
+    // that leaves it so -- the cursor moved along the line -- lights
+    // nothing again.
     bool        mIncrementalShown = false;
+    std::string mIncrementalPattern;
+    llwchar     mIncrementalKind    = 0;
+    U32         mIncrementalVersion = 0;
     bool        mSearchForward   = true;
     bool        mSearchWholeWord = false;
 

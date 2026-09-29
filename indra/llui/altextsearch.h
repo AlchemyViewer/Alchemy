@@ -89,7 +89,8 @@ public:
 
     // Going forward, the first match starting at or after `from`; going
     // back, the last starting before it; round the ends either way. -1
-    // with none.
+    // with none. The matches are in the order they begin, as every search
+    // here gives them.
     static S32 nearest(const std::vector<ALTextRange>& matches, const ALTextPos& from, bool forward);
 
     // What replaces a match: the text itself, or with $1 and \1 filled

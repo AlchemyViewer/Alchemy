@@ -2582,4 +2582,37 @@ namespace tut
         keys("gg]s");
         ensure("with time, at once", e.caret() == ALTextPos(3, 0));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<84>()
+    {
+        set_test_name("n goes through the matches found once, sees an edit, lights them again after :noh; the search line lights as it is typed, not as the cursor moves");
+        ALCodeEditor& e = make("one x\ntwo x\nthree x\n");
+        const auto lit = [&]() { return e.highlights(ALCodeEditor::Highlight::Search).size(); };
+        keys("/x<CR>");
+        ensure("the first", e.caret() == ALTextPos(0, 4) && lit() == 3);
+        keys("n");
+        ensure("the next", e.caret() == ALTextPos(1, 4) && lit() == 3);
+        keys("ggix<Esc>");
+        keys("n");
+        ensure("the text as it is now", e.caret() == ALTextPos(0, 5) && lit() == 4);
+        ex("noh");
+        ensure("put out", lit() == 0);
+        keys("n");
+        ensure("lit again by the next n", e.caret() == ALTextPos(1, 4) && lit() == 4);
+        ex("noh");
+        keys("/th");
+        ensure_equals("lit as typed", lit(), size_t(1));
+        keys("<Left><Right>");
+        ensure_equals("the same as the cursor moves", lit(), size_t(1));
+        keys("<BS>");
+        ensure_equals("and again as the pattern changes", lit(), size_t(2));
+        keys("<Esc>");
+        ensure_equals("put out when left", lit(), size_t(0));
+        // A pattern that stands by the caret is found afresh from wherever
+        // it is: \%# only where the caret is.
+        e.setCaret(ALTextPos(2, 6));
+        keys("/\\%#x<CR>");
+        ensure("at the caret", e.caret() == ALTextPos(2, 6));
+    }
 }

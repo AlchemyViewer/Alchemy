@@ -363,25 +363,14 @@ S32 ALTextSearch::nearest(const std::vector<ALTextRange>& matches, const ALTextP
     {
         return -1;
     }
+    // The first starting at or after `from`, by a search: matches are in
+    // the order they begin.
+    const auto at = std::lower_bound(matches.begin(), matches.end(), from, [](const ALTextRange& match, const ALTextPos& p) { return match.begin < p; });
     if (forward)
     {
-        for (size_t i = 0; i < matches.size(); ++i)
-        {
-            if (!(matches[i].begin < from))
-            {
-                return static_cast<S32>(i);
-            }
-        }
-        return 0;
+        return at == matches.end() ? 0 : static_cast<S32>(at - matches.begin());
     }
-    for (size_t i = matches.size(); i-- > 0;)
-    {
-        if (matches[i].begin < from)
-        {
-            return static_cast<S32>(i);
-        }
-    }
-    return static_cast<S32>(matches.size()) - 1;
+    return at == matches.begin() ? static_cast<S32>(matches.size()) - 1 : static_cast<S32>(at - matches.begin()) - 1;
 }
 
 // static

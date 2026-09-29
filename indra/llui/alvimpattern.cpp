@@ -548,6 +548,11 @@ std::vector<ALTextRange> ALVimPattern::matchesIn(const ALTextDocument& d, ALText
     return matches;
 }
 
+bool ALVimPattern::placed() const
+{
+    return std::any_of(where.begin(), where.end(), [](const Where& place) { return place.kind == Where::Kind::Visual || place.kind == Where::Kind::Caret; });
+}
+
 void ALVimPattern::constrain(const ALTextDocument& d, const Places& places, std::vector<ALTextRange>& matches, std::vector<ALTextPos>& wholes,
                              std::vector<std::string>* replaced) const
 {

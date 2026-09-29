@@ -61,10 +61,17 @@ struct ALVimPattern
         S32  side       = 0;
         S32  number     = 0;
         bool afterStart = false;
+
+        bool operator==(const Where&) const = default;
     };
     std::vector<Where> where;
     std::string        wholeRegex;
     bool               acrossLines = false;
+
+    bool operator==(const ALVimPattern&) const = default;
+    // Whether where its matches may stand depends on the caret or the last
+    // visual area, not on the text alone.
+    bool placed() const;
 
     // How case is matched where neither the pattern (\c, \C) nor its
     // caller says: vim's `ignorecase` and `smartcase`.
