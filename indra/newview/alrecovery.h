@@ -60,6 +60,14 @@ public:
     // What an entry is called in a list: its name, or its file's.
     static std::string nameOf(const Entry& entry);
 
+    // What the legacy editors' backups left in a folder -- the temp
+    // folder, where they wrote a changed script (.lslbackup) or notecard
+    // (.ncbackup) every minute -- taken into the store as a session of
+    // their own that ended, to be offered at login as any other, and the
+    // files gone once written. They name no item, only a name, so each is
+    // taken up in a tab of its own. How many were taken.
+    static S32 importLegacyBackups(const std::string& folder);
+
     // At login: what a session that ended before saving left, offered, to
     // take up now, later, or not at all -- each where it was kept: a
     // window of the viewer's own, or Script Studio, which `studio` opens

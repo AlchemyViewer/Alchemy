@@ -26,11 +26,16 @@
 
 #include "alrecovery.h"
 
+#include "alscriptmessages.h"
 #include "lldir.h"
+#include "lldiriterator.h"
 #include "llfile.h"
+#include "llnotecard.h"
 #include "llnotificationsutil.h"
 
+#include <iterator>
 #include <memory>
+#include <sstream>
 
 namespace
 {
@@ -128,6 +133,71 @@ bool ALRecovery::toOwnWindow(const Entry& entry)
 std::string ALRecovery::nameOf(const Entry& entry)
 {
     return entry.name.empty() ? gDirUtilp->getBaseFileName(entry.file) : entry.name;
+}
+
+// static
+S32 ALRecovery::importLegacyBackups(const std::string& folder)
+{
+    ALRecoveryStore* kept = store();
+    if (!kept || folder.empty())
+    {
+        return 0;
+    }
+    const std::string dir = folder.back() == '/' || folder.back() == '\\' ? folder : folder + gDirUtilp->getDirDelimiter();
+    // Written as a session of their own, which the one logging in finds
+    // left, as it finds what any session that ended left.
+    ALRecoveryStore legacy(kept->directory(), "legacy-backups");
+    S32             taken = 0;
+    for (const auto& [mask, notecard] : { std::pair{ "*.lslbackup", false }, std::pair{ "*.ncbackup", true } })
+    {
+        LLDirIterator files(dir, mask);
+        std::string   file;
+        while (files.next(file))
+        {
+            const std::string path = dir + file;
+            std::string       text;
+            {
+                llifstream in(path.c_str(), std::ios::in | std::ios::binary);
+                if (!in.is_open())
+                {
+                    continue;
+                }
+                text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+            }
+            // A notecard was backed up in its format; its items are not in
+            // the backup, and their characters stand for nothing now.
+            if (notecard)
+            {
+                LLNotecard         parsed(LLNotecard::MAX_SIZE);
+                std::istringstream in(text);
+                if (parsed.importStream(in))
+                {
+                    text = parsed.getText();
+                }
+            }
+            // Named as the backup named it: the item's name, then a dash and
+            // eight digits of a checksum of its id.
+            std::string name = gDirUtilp->getBaseFileName(file, true);
+            if (const size_t dash = name.find_last_of('-'); dash != std::string::npos && dash != 0 && dash == name.size() - 9)
+            {
+                name.erase(dash);
+            }
+            LLStringUtil::trim(name);
+            Entry entry;
+            entry.key      = "legacy:" + file;
+            entry.state    = Entry::State::Unsaved;
+            entry.name     = name.empty() ? file : name;
+            entry.notecard = notecard;
+            entry.lua      = !notecard && ALScriptMessages::looksLikeLua(text);
+            entry.text     = std::move(text);
+            if (legacy.write(std::move(entry)))
+            {
+                LLFile::remove(path);
+                ++taken;
+            }
+        }
+    }
+    return taken;
 }
 
 // static

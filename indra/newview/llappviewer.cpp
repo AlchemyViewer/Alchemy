@@ -122,9 +122,6 @@
 // [/RLVa:KB]
 
 #include "llweb.h"
-// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2011-11-24 (Catznip-3.2)
-#include "llfloaterassetrecovery.h"
-// [/SL:KB]
 #include "llspellcheck.h"
 #include "llscenemonitor.h"
 #include "llavatarrenderinfoaccountant.h"
@@ -135,6 +132,7 @@
 
 // Linden library includes
 #include "llavatarnamecache.h"
+#include "alrecovery.h"
 #include "alregex.h"
 #include "alxmlmergelog.h"
 #include "lldiriterator.h"
@@ -6826,9 +6824,9 @@ void LLAppViewer::handleLoginComplete()
     mOnLoginCompleted();
     mOnLoginCompleted.disconnect_all_slots(); // No longer needed
 
-// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2011-11-24 (Catznip-3.2)
-    LLAssetRecoverQueue::recoverIfNeeded();
-// [/SL:KB]
+    // What the legacy editors' old backups left in the temp folder, taken
+    // into the recovery store, to be offered with everything else kept.
+    ALRecovery::importLegacyBackups(LLFile::tmpdir());
 
     writeDebugInfo();
 

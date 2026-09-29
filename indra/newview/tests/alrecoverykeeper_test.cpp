@@ -235,4 +235,38 @@ namespace tut
         ensure_equals("once", failed, 1);
         ALRecovery::useStore(store.get());
     }
+
+    template<> template<>
+    void alrecoverykeeper_object::test<4>()
+    {
+        set_test_name("the legacy editors' backups taken into the store as a session that ended, named as they named them, a notecard's text out of its format, and the files gone");
+        const std::string temp = folder + "/temp";
+        std::filesystem::create_directories(fsyspath(temp));
+        {
+            llofstream script(temp + "/Door Script-1A2B3C4D.lslbackup");
+            script << "default { state_entry() {} }\n";
+        }
+        {
+            llofstream card(temp + "/Settings-0000ABCD.ncbackup");
+            card << "Linden text version 2\n{\nLLEmbeddedItems version 1\n{\ncount 0\n}\nText length 10\nspeed = 2\n}\n";
+        }
+        {
+            llofstream other(temp + "/unrelated.txt");
+            other << "left alone";
+        }
+        ensure_equals("two taken", ALRecovery::importLegacyBackups(temp), 2);
+        ensure("the backups gone", !LLFile::isfile(temp + "/Door Script-1A2B3C4D.lslbackup") && !LLFile::isfile(temp + "/Settings-0000ABCD.ncbackup"));
+        ensure("anything else left alone", LLFile::isfile(temp + "/unrelated.txt"));
+        bool script = false, card = false;
+        for (ALRecoveryEntry& entry : store->left())
+        {
+            ensure("whole", store->load(entry));
+            script |= entry.name == "Door Script" && !entry.notecard && entry.text == "default { state_entry() {} }\n" &&
+                      entry.state == ALRecoveryEntry::State::Unsaved;
+            card |= entry.name == "Settings" && entry.notecard && entry.text == "speed = 2\n";
+        }
+        ensure("the script, as left by a session that ended", script);
+        ensure("the notecard, its text out of its format", card);
+        ensure_equals("nothing more the next time", ALRecovery::importLegacyBackups(temp), 0);
+    }
 }

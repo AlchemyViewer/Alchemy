@@ -381,7 +381,6 @@ if(AL_BUILD_VIEWER)
     llflexibleobject.cpp
     llfloater360capture.cpp
     llfloaterabout.cpp
-    llfloaterassetrecovery.cpp
     llfloateravatarwelcomepack.cpp
     llfloaterbvhpreview.cpp
     llfloaterauction.cpp
@@ -1225,7 +1224,6 @@ if(AL_BUILD_VIEWER)
     llflexibleobject.h
     llfloater360capture.h
     llfloaterabout.h
-    llfloaterassetrecovery.h
     llfloateravatarwelcomepack.h
     llfloaterbvhpreview.h
     llfloaterauction.h
