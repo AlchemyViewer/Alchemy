@@ -71,6 +71,9 @@ public:
     bool postBuild() override;
     void setObjectID(const LLUUID& object_id) override;
     void draw() override;
+    // Its keys before the viewer's menu has them: Control-F is Search out
+    // there, and Control-G Gestures.
+    bool hasAccelerators() const override { return true; }
     bool handleKeyHere(KEY key, MASK mask) override;
     bool canClose() override;
 
