@@ -199,13 +199,16 @@ namespace
 
     // How long the word at the caret is left unmarked after it was typed.
     const F32 SPELL_SETTLE_SECONDS = 1.5f;
-    // A squiggle: a wave a pixel high either way and five pixels long,
-    // drawn as a line a pixel wide whose edges fade over a pixel more, as
-    // gl_polyline_2d draws one.
+    // A squiggle: a wave a pixel high either way and six pixels long,
+    // drawn as a line a pixel and a half wide, whose edges fade over a
+    // pixel more. A pixel was too thin to see in a pale colour; six rather
+    // than five so that the crests bend no tighter than the line is wide.
+    // The texture is taller than the wave and its fade, so that a sampler
+    // between texels, which wraps, never blends its top into its bottom.
     constexpr F32 SQUIGGLE_AMPLITUDE = 1.f;
-    constexpr S32 SQUIGGLE_WAVE      = 5;
-    constexpr S32 SQUIGGLE_HEIGHT    = 6;
-    constexpr F32 SQUIGGLE_HALF      = 0.5f;
+    constexpr S32 SQUIGGLE_WAVE      = 6;
+    constexpr S32 SQUIGGLE_HEIGHT    = 8;
+    constexpr F32 SQUIGGLE_HALF      = 0.75f;
     constexpr F32 SQUIGGLE_FEATHER   = 1.f;
 
     // One wave of a squiggle, which a squiggle repeats along its length: so

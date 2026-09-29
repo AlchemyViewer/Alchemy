@@ -36,8 +36,6 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "llrender2dutils.h"
-
 #include "../test/lltut.h"
 
 #include <algorithm>
@@ -102,16 +100,37 @@ namespace tut
             return out;
         }
 
-        // The squiggle as it was drawn before it was a texture: a ribbon
-        // through a point at each pixel from x0 to x1.
-        static void ribbon(F32 x0, F32 x1, S32 y)
+        // What a squiggle from x0 at height y covers of a pixel, worked out
+        // afresh: how near the wave comes to the pixel's middle, the line
+        // solid for three quarters of a point either side and fading over
+        // a point more -- a wave a point high either way and six long --
+        // with as many pixels to a point as `scale`.
+        static S32 expected(F32 x0, S32 y, F32 scale, S32 px, S32 py)
         {
-            std::vector<LLVector2> points;
-            for (F32 x = x0; x <= x1; x += 1.f)
+            constexpr F32 AMPLITUDE = 1.f, WAVE = 6.f, HALF = 0.75f, FEATHER = 1.f;
+            const F32     x         = (static_cast<F32>(px) + 0.5f) / scale - x0;
+            const F32     dy        = (static_cast<F32>(py) + 0.5f) / scale - static_cast<F32>(y);
+            F32           nearest   = F32_MAX;
+            for (F32 along = x - WAVE; along <= x + WAVE; along += 0.005f)
             {
-                points.emplace_back(x, static_cast<F32>(y) + sinf((x - x0) * (2.f * F_PI / 5.f)));
+                const F32 ax = x - along;
+                const F32 ay = dy - AMPLITUDE * sinf(along * 2.f * F_PI / WAVE);
+                nearest      = llmin(nearest, ax * ax + ay * ay);
             }
-            gl_polyline_2d(points, LLColor4::white, 1.f);
+            const F32 cover = llclamp((HALF + FEATHER - sqrtf(nearest)) / FEATHER, 0.f, 1.f);
+            return static_cast<S32>(llround(cover * 255.f));
+        }
+        static std::vector<S32> expectedAll(F32 x0, F32 x1, S32 y, F32 scale)
+        {
+            std::vector<S32> out(static_cast<size_t>(W) * H, 0);
+            for (S32 py = 0; py < H; ++py)
+            {
+                for (S32 px = static_cast<S32>(x0 * scale); px < static_cast<S32>(x1 * scale) && px < W; ++px)
+                {
+                    out[static_cast<size_t>(py) * W + px] = expected(x0, y, scale, px, py);
+                }
+            }
+            return out;
         }
 
         struct Difference
@@ -149,19 +168,18 @@ namespace tut
     tut::altextview_gl_test                altextview_gl_testcase("altextview_gl");
 
     // A squiggle is one quad over a texture of one wave, and covers what
-    // the ribbon of triangles it replaced did: pixel for pixel near enough,
-    // and as much of them all told.
+    // the wave works out to: pixel for pixel, each texel's middle falling
+    // on a pixel's, and as much of them all told.
     template<> template<>
     void altextview_gl_object::test<1>()
     {
         const LLRect           all(0, H, W, 0);
-        const std::vector<S32> was = coverage([] { ribbon(40.f, 140.f, 128); });
+        const std::vector<S32> was = expectedAll(40.f, 140.f, 128, 1.f);
         const std::vector<S32> now = coverage([&] { Painter::drawSquiggle(40.f, 140.f, 128, LLColor4::white, all); });
-        // Its ends aside, where the ribbon's caps reach past the last point.
-        const Difference d = differ(was, now, 42, 138);
-        ensure("the ribbon drew something" + said(d), d.covered > 0);
-        ensure("no pixel far from the ribbon's" + said(d), d.most <= 64);
-        ensure("as much covered as the ribbon" + said(d), std::abs(d.covered - d.compared) * 16 <= d.covered);
+        const Difference       d   = differ(was, now, 40, 140);
+        ensure("the wave covers something" + said(d), d.covered > 0);
+        ensure("no pixel far from the wave's" + said(d), d.most <= 6);
+        ensure("as much covered as the wave" + said(d), std::abs(d.covered - d.compared) * 64 <= d.covered);
         // Nothing above or below the band it was drawn in.
         for (S32 y = 0; y < H; ++y)
         {
@@ -203,7 +221,8 @@ namespace tut
     }
 
     // Where the UI is scaled, the wave is made with as many texels to a
-    // point as the scale has pixels, and covers what the ribbon does there.
+    // point as the scale has pixels, and covers what the wave works out to
+    // there.
     template<> template<>
     void altextview_gl_object::test<3>()
     {
@@ -219,13 +238,13 @@ namespace tut
                 gGL.popUIMatrix();
             });
         };
-        const std::vector<S32> was = scaled([] { ribbon(10.f, 110.f, 64); });
+        const std::vector<S32> was = expectedAll(10.f, 110.f, 64, 2.f);
         const std::vector<S32> now = scaled([] { Painter::drawSquiggle(10.f, 110.f, 64, LLColor4::white, LLRect(0, H, W, 0)); });
         scale = was_scale;
-        const Difference d = differ(was, now, 24, 216);
-        ensure("the ribbon drew something" + said(d), d.covered > 0);
-        ensure("no pixel far from the ribbon's" + said(d), d.most <= 64);
-        ensure("as much covered as the ribbon" + said(d), std::abs(d.covered - d.compared) * 16 <= d.covered);
+        const Difference d = differ(was, now, 20, 220);
+        ensure("the wave covers something" + said(d), d.covered > 0);
+        ensure("no pixel far from the wave's" + said(d), d.most <= 6);
+        ensure("as much covered as the wave" + said(d), std::abs(d.covered - d.compared) * 64 <= d.covered);
     }
     // The map draws each line's runs from what it read last, and reads a
     // line again when it changes -- a space made a tab moves the runs after
