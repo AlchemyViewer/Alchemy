@@ -71,6 +71,10 @@ public:
         Optional<S32>           min_tab_width;
         Optional<S32>           max_tab_width;
         Optional<S32>           gap;
+        // Whether the strip sits on what its tabs show, the shown tab
+        // opening into it: drawn without its bottom edge, as a folder's tab
+        // is part of the folder.
+        Optional<bool>          attached;
         Params();
     };
 
@@ -252,6 +256,7 @@ private:
     S32                 mMinTabWidth;
     S32                 mMaxTabWidth;
     S32                 mGap;
+    bool                mAttached = false;
     tab_signal_t        mChosenSignal;
     tab_signal_t        mClosedSignal;
     tab_signal_t        mHeldSignal;

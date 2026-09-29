@@ -92,7 +92,8 @@ namespace
 ALTabStrip::Params::Params()
 :   min_tab_width("min_tab_width", 64),
     max_tab_width("max_tab_width", 220),
-    gap("gap", 2)
+    gap("gap", 2),
+    attached("attached", false)
 {
 }
 
@@ -100,7 +101,8 @@ ALTabStrip::ALTabStrip(const Params& p)
 :   LLUICtrl(p),
     mMinTabWidth(p.min_tab_width),
     mMaxTabWidth(p.max_tab_width),
-    mGap(p.gap)
+    mGap(p.gap),
+    mAttached(p.attached)
 {
 }
 
@@ -595,8 +597,14 @@ void ALTabStrip::draw()
         const S32 baseline = (height - font->getLineHeight()) / 2;
 
         // The shown tab is the face of what is under it; the rest sit back.
+        // Where the strip sits on what it shows, the shown tab opens into
+        // it: its bottom edge filled over, between its sides.
         gl_rect_2d(r, (current ? shown : rest).get() % alpha, true);
         gl_rect_2d(r, edge.get() % alpha, false);
+        if (current && mAttached)
+        {
+            gl_rect_2d(r.mLeft + 1, r.mBottom + 1, r.mRight - 1, r.mBottom, shown.get() % alpha, true);
+        }
         if (current && hasFocus())
         {
             // Where the keyboard is, while the strip has it.

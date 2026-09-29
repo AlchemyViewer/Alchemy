@@ -157,4 +157,41 @@ namespace tut
         ensure_equals("its ground just inside", at(pixels, first.mLeft + 1, middle), ground);
         strip->die();
     }
+
+    template<> template<>
+    void alsurface_gl_object::test<3>()
+    {
+        set_test_name("a strip attached to what it shows opens its shown tab into it, with no bottom edge; the tabs behind, and an unattached "
+                      "strip's shown tab, keep theirs");
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        for (const bool attached : { true, false })
+        {
+            ALTabStrip::Params p(LLUICtrlFactory::getDefaultParams<ALTabStrip>());
+            p.name                 = "tabs";
+            p.rect                 = LLRect(0, 24, W, 0);
+            p.attached             = attached;
+            ALTabStrip*                  strip = LLUICtrlFactory::create<ALTabStrip>(p);
+            std::vector<ALTabStrip::Tab> tabs(2);
+            tabs[0].label = "first";
+            tabs[0].value = "a";
+            tabs[1].label = "second";
+            tabs[1].value = "b";
+            strip->setTabs(tabs, "b");
+            const std::vector<S32> pixels = drawn([&] { strip->draw(); });
+            const LLRect           shown  = strip->rectOf(1);
+            const LLRect           behind = strip->rectOf(0);
+            const S32              frame  = at(pixels, shown.mLeft + 3, shown.mTop - 1);
+            const S32              ground = at(pixels, shown.mLeft + 3, shown.getCenterY());
+            ensure("the frame and the shown tab's ground tell apart", frame != ground);
+            ensure_equals(attached ? "the shown tab open at its bottom" : "unattached, the shown tab closed at its bottom",
+                          at(pixels, shown.mLeft + 3, shown.mBottom), attached ? ground : frame);
+            ensure_equals("its sides still framed", at(pixels, shown.mLeft, shown.getCenterY()), frame);
+            ensure_equals("a tab behind closed at its bottom", at(pixels, behind.mLeft + 3, behind.mBottom), frame);
+            strip->die();
+        }
+    }
 }

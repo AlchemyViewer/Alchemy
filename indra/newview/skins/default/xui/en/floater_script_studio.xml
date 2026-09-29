@@ -1779,7 +1779,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                  background_opaque="true"
                  bg_opaque_color="StudioStripColor"
                  border="true">
+                    <!-- On the head's bottom edge, the shown tab open into the
+                         editor under it: no gap between them. -->
                     <tab_strip
+                     attached="true"
                      follows="left|top|right"
                      height="22"
                      layout="topleft"
@@ -1787,7 +1790,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                      name="tabs"
                      right="-4"
                      tool_tip="One tab per open script. After Go to Tabs: arrows choose, Shift+arrow moves a tab, Delete closes"
-                     top="1" />
+                     top="2" />
                 </layout_panel>
                 <!-- What the script in front has to reckon with, with what
                      can be done about it: changes kept from an earlier
