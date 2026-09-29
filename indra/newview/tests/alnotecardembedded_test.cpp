@@ -345,4 +345,21 @@ namespace tut
         ensure("and a save is said to be needed", !said.empty() && said.back().second && said.back().first.find("Dropped") != std::string::npos);
         unsaved->handleMouseUp(20, 3, MASK_NONE);
     }
+
+    template<> template<>
+    void alnotecardembedded_object::test<7>()
+    {
+        set_test_name("a line holding an item is tall enough for its icon inside the chip's frame; the lines around it keep the text's height");
+        ALNotecardEmbedded& card = make("above\nhere " + at(0) + " it is\nbelow\n", { item("A") });
+        (void)card;
+        const S32 text_h = view->layout().rowHeight();
+        ensure("a row an inventory icon is taller than: " + std::to_string(text_h), text_h < 16 + 4);
+        view->placeAtomViews();
+        ensure_equals("the item's line: the icon, a pixel either side, and a pixel off the rows", view->layout().lineHeight(1), 16 + 4);
+        ensure_equals("the line above as it was", view->layout().lineHeight(0), text_h);
+        ensure_equals("and the line below", view->layout().lineHeight(2), text_h);
+        const ALTextView::Atom* atom = view->atomAt(ALTextPos(1, 5));
+        ensure("the item's button", atom && atom->view);
+        ensure_equals("as tall as its line", atom->view->getRect().getHeight(), 16 + 4);
+    }
 }

@@ -30,13 +30,29 @@
 #include "alnotecarditems.h"
 #include "alsaid.h"
 #include "alscriptworkspace.h"
+#include "alsurface.h"
 #include "llbutton.h"
+#include "llfocusmgr.h"
 #include "llfontgl.h"
 #include "lltrans.h"
 #include "lluictrlfactory.h"
 
 namespace
 {
+    // An item's chip, from its left: the gap before the icon, the room
+    // the icon has -- an inventory icon's own size -- the gap between it
+    // and the name, and after the name; how wide a name may be before it
+    // is cut short; and how tall the chip is, with the frame a pixel in
+    // from the row above and below and the icon a pixel in from the frame:
+    // a line holding an item is that tall, so that the icon is drawn at
+    // its own size inside the frame rather than scaled over it.
+    constexpr S32 CHIP_PAD_LEFT  = 3;
+    constexpr S32 CHIP_ICON      = 16;
+    constexpr S32 CHIP_GAP       = 4;
+    constexpr S32 CHIP_PAD_RIGHT = 6;
+    constexpr S32 CHIP_NAME_MOST = 320;
+    constexpr S32 CHIP_HEIGHT    = CHIP_ICON + 4;
+
     // An item's button, which a drag takes out of the text: pressed, it
     // says where; the mouse moved while held, it asks whether the item is
     // dragged out from there.
@@ -78,6 +94,58 @@ namespace
         {
             mHeld = false;
             return LLButton::handleMouseUp(x, y, mask);
+        }
+
+        // A chip in the line, drawn here rather than as a button is: a
+        // button's icon is scaled to its whole height and put at its very
+        // edge, which in a row about as tall as the icon covered the frame.
+        // The icon inset within the frame, centred, and no taller than the
+        // frame leaves room for; the name after it on the line's own
+        // baseline, so that it reads with the words around it, cut short
+        // past CHIP_NAME_MOST; the ground and frame every surface has
+        // (ALSurface), in the text's own colours, a shade stronger under
+        // the mouse and again while pressed, and framed in the focus colour
+        // while it has the keyboard.
+        void draw() override
+        {
+            const ALTextView* text  = ALViewType::as<ALTextView>(getParent());
+            const LLColor4    paper = text ? text->backgroundColor() : LLColor4::white;
+            const LLColor4    ink   = text ? text->textColor() : LLColor4::black;
+            const F32         alpha = getDrawContext().mAlpha * (isInEnabledChain() ? 1.f : 0.5f);
+            // Off the rows above and below, so that items on lines one
+            // under the other are two frames, not one.
+            LLRect box = getLocalRect();
+            box.stretch(0, -1);
+            bool pressed = false;
+            if (hasMouseCapture())
+            {
+                S32 x = 0, y = 0;
+                LLUI::getInstance()->getMousePositionLocal(this, &x, &y);
+                pressed = pointInView(x, y);
+            }
+            const F32 amount = pressed ? ALSurface::CHOSEN * 1.5f : mNeedsHighlight ? ALSurface::CHOSEN : ALSurface::GROUND;
+            gl_rect_2d(box, ALSurface::shade(paper, ink, amount) % alpha, true);
+            gl_rect_2d(box, hasFocus() ? gFocusMgr.getFocusColor() % alpha : ALSurface::frame(ink, alpha), false);
+
+            S32 x = box.mLeft + CHIP_PAD_LEFT;
+            if (LLPointer<LLUIImage> icon = getImageOverlay(); icon.notNull() && icon->getWidth() > 1)
+            {
+                const S32 room = llmin(CHIP_ICON, box.getHeight() - 2);
+                const S32 side = llmax(1, llmin(room, llmax(icon->getWidth(), icon->getHeight())));
+                icon->draw(x + (CHIP_ICON - side) / 2, box.getCenterY() - side / 2, side, side, LLColor4::white % alpha);
+            }
+            x += CHIP_ICON + CHIP_GAP;
+            if (const LLFontGL* font = getFont())
+            {
+                // The row's text sits at its bottom, its baseline its line's
+                // height less its ascent above that, as the view draws it
+                // (ALTextView::drawRowAt).
+                const S32 above    = text && text->getFont() ? text->layout().rowHeight() - ll_round(text->getFont()->getAscenderHeight())
+                                                             : static_cast<S32>(font->getDescenderHeight()) + 1;
+                const F32 baseline = static_cast<F32>(getLocalRect().mBottom + above);
+                font->renderUTF8(getCurrentLabel().getString(), 0, static_cast<F32>(x), baseline, ink % alpha, LLFontGL::LEFT, LLFontGL::BASELINE,
+                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, llmax(0, box.mRight - CHIP_PAD_RIGHT - x), nullptr, true);
+            }
         }
 
     protected:
@@ -307,7 +375,8 @@ ALTextView::Atom ALNotecardEmbedded::atomFor(const ALTextPos& at, size_t index)
             break;
         default: tip = alSaid("EmbeddedItemCopyTip", "[NAME], embedded in the notecard: click to copy it to your inventory", args); break;
     }
-    // A button with the item's icon and name, as wide as they are.
+    // A button with the item's icon and name, as wide as they are, or as
+    // wide as a name is let be (ItemButton::draw).
     LLButton::Params p;
     p.name                    = "embedded_item";
     p.label                   = item->getName();
@@ -315,7 +384,8 @@ ALTextView::Atom ALNotecardEmbedded::atomFor(const ALTextPos& at, size_t index)
     p.image_overlay           = LLUI::getUIImage(mWorld.iconOf(*item));
     p.image_overlay_alignment = "left";
     p.tool_tip                = tip;
-    const S32 width           = font->getWidth(item->getName()) + 16 + 12;
+    const S32 name_width      = llmin(CHIP_NAME_MOST, static_cast<S32>(font->getWidthF32(item->getName()) + 0.99f));
+    const S32 width           = CHIP_PAD_LEFT + CHIP_ICON + CHIP_GAP + name_width + CHIP_PAD_RIGHT;
     p.rect                    = LLRect(0, 0, width, 0);
     ItemButton* button        = LLUICtrlFactory::create<ItemButton>(p);
     button->setClickedCallback([this, item](LLUICtrl*, const LLSD&) { open(item); });
@@ -325,6 +395,7 @@ ALTextView::Atom ALNotecardEmbedded::atomFor(const ALTextPos& at, size_t index)
     atom.at      = at;
     atom.length  = 4;
     atom.width   = width;
+    atom.height  = CHIP_HEIGHT;
     atom.view    = button;
     atom.tooltip = p.tool_tip();
     atom.value   = static_cast<S32>(index);
