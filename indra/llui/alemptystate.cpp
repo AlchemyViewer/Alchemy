@@ -109,6 +109,24 @@ ALEmptyState::ALEmptyState(const Params& p)
     mSecondButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSecondAction(); });
     addChild(mSecondButton);
 
+    LLTextBox::Params lp;
+    lp.name        = "link";
+    lp.rect        = LLRect(0, HEADLINE_HEIGHT, 10, 0);
+    lp.font        = LLFontGL::getFontSansSerifSmall();
+    lp.font_halign = LLFontGL::HCENTER;
+    lp.text_color  = LLUIColorTable::instance().getColor("HTMLLinkColor", LLColor4(0.4f, 0.6f, 1.f, 1.f));
+    lp.visible     = false;
+    mLinkText      = LLUICtrlFactory::create<LLTextBox>(lp);
+    mLinkText->setClickedCallback([this](void*) { mLink(); });
+    addChild(mLinkText);
+
+    layout();
+}
+
+void ALEmptyState::setLink(const std::string& label)
+{
+    mLinkLabel = label;
+    mLinkText->setText(mLinkLabel);
     layout();
 }
 
@@ -176,6 +194,8 @@ void ALEmptyState::layout()
     add(has_headline, HEADLINE_HEIGHT);
     add(has_sentence, sentence_height);
     add(has_action, BUTTON_HEIGHT);
+    const bool has_link = !mLinkLabel.empty();
+    add(has_link, HEADLINE_HEIGHT);
 
     S32 top = (getRect().getHeight() + tall) / 2;
     const auto place = [&](LLView* view, bool part, S32 height, S32 how_wide)
@@ -207,9 +227,16 @@ void ALEmptyState::layout()
         const LLFontGL* font = mButton->getFont() ? mButton->getFont() : LLFontGL::getFontSansSerif();
         return llmax((S32)font->getWidth(label) + 2 * BUTTON_PAD, 60);
     };
+    // The link under them, as wide as its words, so that only they are
+    // what a click takes.
+    const auto place_link = [&]() {
+        const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
+        place(mLinkText, has_link, HEADLINE_HEIGHT, llmin((S32)font->getWidth(mLinkLabel) + 4, width));
+    };
     if (!has_second)
     {
         place(mButton, has_action, BUTTON_HEIGHT, has_action ? llmin(wants(mActionLabel), width) : width);
+        place_link();
         return;
     }
     S32       first  = wants(mActionLabel);
@@ -224,4 +251,6 @@ void ALEmptyState::layout()
     mButton->setVisible(true);
     mButton->setShape(LLRect(at, top, at + first, top - BUTTON_HEIGHT));
     mSecondButton->setShape(LLRect(at + first + GAP, top, at + first + GAP + second, top - BUTTON_HEIGHT));
+    top -= BUTTON_HEIGHT + GAP;
+    place_link();
 }

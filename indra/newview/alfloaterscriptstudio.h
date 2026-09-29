@@ -851,6 +851,15 @@ private:
     // them.
     void applyMenuKeys();
     void refreshKeyTips();
+    // The first open, with nothing kept: the text given the room -- the
+    // Inspector folded, the bottom panel folded until it has something to
+    // show (mBottomWaiting, refreshBottomTabs), the window taller than the
+    // skin's where the screen has room.
+    void firstOpen();
+    bool mBottomWaiting = false;
+    // The empty editor's words: Go to Script with its keys as they are now,
+    // New Script beside it, and Open File as a link.
+    void sayNoDocs();
     // Edit > Undo and Redo named for the step they take, where it has one.
     void refreshUndoLabels();
     // The window's own commands in the table, by the menu that gives them;
@@ -1063,7 +1072,8 @@ private:
     bool                               mRestoring = false;
     // The tabs of a window's state opened in it; the popped-out windows
     // made again; and what was kept on purpose at the quit opened again.
-    void                               restoreTabs(const LLSD& open);
+    // How many it opened or waits for.
+    S32                                restoreTabs(const LLSD& open);
     void                               restoreWindows(const LLSD& windows);
     void                               reopenKept();
     // The tips that say a menu item's keys, as the skin wrote them, to be

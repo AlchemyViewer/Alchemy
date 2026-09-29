@@ -43,7 +43,8 @@ class LLTextBox;
 //
 // Four parts, all of them optional: an icon, a headline, a sentence, and an
 // action -- or two, side by side, where there are two ways out of the
-// emptiness. What is given is laid out down the middle of whatever room
+// emptiness -- and under them a link, for a way out that is not the one to
+// lead with. What is given is laid out down the middle of whatever room
 // there is; what is not is not there at all, so a state with only a
 // sentence is one line of text and not a line of text under two empty rows.
 //
@@ -68,6 +69,8 @@ public:
              const std::string& action = LLStringUtil::null,
              const std::string& second_action = LLStringUtil::null);
     void setIcon(const std::string& name);
+    // The link under the actions, or none for an empty label.
+    void setLink(const std::string& label);
 
     const std::string& headline() const { return mHeadline; }
     const std::string& sentence() const { return mSentence; }
@@ -82,6 +85,11 @@ public:
     boost::signals2::connection onSecondAction(const action_signal_t::slot_type& cb)
     {
         return mSecondAction.connect(cb);
+    }
+    // The link, clicked.
+    boost::signals2::connection onLink(const action_signal_t::slot_type& cb)
+    {
+        return mLink.connect(cb);
     }
 
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
@@ -101,10 +109,13 @@ private:
     LLTextBox*      mSentenceText = nullptr;
     LLButton*       mButton = nullptr;
     LLButton*       mSecondButton = nullptr;
+    LLTextBox*      mLinkText = nullptr;
     std::string     mHeadline;
     std::string     mSentence;
     std::string     mActionLabel;
     std::string     mSecondLabel;
+    std::string     mLinkLabel;
     action_signal_t mAction;
     action_signal_t mSecondAction;
+    action_signal_t mLink;
 };

@@ -523,6 +523,17 @@ end</floater.string>
              tool_tip="A script opened from inventory, an object's contents or the build tool opens here; off, the old script editor opens it, for one more release"
              top_pad="6"
              width="370" />
+            <check_box
+             control_name="ALScriptStudioRestoreTabs"
+             follows="left|top"
+             height="20"
+             label="Reopen the last session's tabs"
+             layout="topleft"
+             left="412"
+             name="restore_tabs"
+             tool_tip="When the window opens, the tabs it had open last time come back; off, it opens with what you opened it for"
+             top_pad="2"
+             width="370" />
             <text
              follows="left|top"
              font="SansSerifBold"

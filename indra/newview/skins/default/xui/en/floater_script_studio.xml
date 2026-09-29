@@ -5,7 +5,7 @@
  height="560"
  layout="topleft"
  min_height="360"
- min_width="640"
+ min_width="680"
  name="script_studio"
  help_topic="script_studio"
  save_rect="true"
@@ -33,9 +33,11 @@
     <floater.string name="RevertFailed">[NAME] could not be read again, and is as it was: [ERROR]</floater.string>
     <floater.string name="NoProblems">No problems.</floater.string>
     <floater.string name="NoScriptOpenHeadline">No script open</floater.string>
-    <floater.string name="NoScriptOpenSentence">Choose a script or a notecard in the Explorer, or open a file from your computer.</floater.string>
-    <floater.string name="NoScriptOpenAction">Open File...</floater.string>
+    <floater.string name="NoScriptOpenSentence">Go to any script you have by its name, choose one in the Explorer, or start a new one.</floater.string>
+    <floater.string name="NoScriptOpenGoTo">Go to Script ([KEYS])</floater.string>
+    <floater.string name="NoScriptOpenGoToNoKeys">Go to Script...</floater.string>
     <floater.string name="NoScriptOpenNew">New Script...</floater.string>
+    <floater.string name="NoScriptOpenFile">Open a file from your computer...</floater.string>
     <floater.string name="NoReferences">Nothing looked up yet. Put the caret on a name and press Find References.</floater.string>
     <floater.string name="NoOutline">Nothing in this script to outline yet.</floater.string>
     <floater.string name="NoOutlineYet">Still loading.</floater.string>
@@ -326,6 +328,8 @@
     <floater.string name="FilterWarningsCount">Warnings ([COUNT])</floater.string>
     <floater.string name="FilterNotes">Notes</floater.string>
     <floater.string name="FilterNotesCount">Notes ([COUNT])</floater.string>
+    <floater.string name="RestoredTab">Reopened 1 tab from last time.</floater.string>
+    <floater.string name="RestoredTabs">Reopened [COUNT] tabs from last time.</floater.string>
     <floater.string name="TabProblems">Problems</floater.string>
     <floater.string name="TabProblemsCount">Problems ([COUNT])</floater.string>
     <floater.string name="TabReferences">References</floater.string>

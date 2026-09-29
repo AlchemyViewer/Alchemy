@@ -686,7 +686,14 @@ bool ALFloaterScriptStudio::postBuild()
     mFolds.bind(this, { { "explorer", "explorer_panel", "fold_explorer", getString("PaneExplorer") },
                         { "bottom", "bottom_panel", "fold_bottom", getString("PaneBottom") },
                         { "inspector", "inspector_panel", "fold_inspector", getString("PaneInspector") } });
-    mFolds.onChanged([this]() { saveState(); });
+    mFolds.onChanged([this]() {
+        // Unfolded, by anyone: waiting for something to show is over.
+        if (mBottomWaiting && !mFolds.collapsed("bottom"))
+        {
+            mBottomWaiting = false;
+        }
+        saveState();
+    });
 
     mEditorHost    = getChild<LLPanel>("editor_panel");
     // What the window says with no script open. The editors are made as
@@ -703,9 +710,10 @@ bool ALFloaterScriptStudio::postBuild()
         ep.visible            = false;
         mNoDocs               = LLUICtrlFactory::create<ALEmptyState>(ep);
         mEditorHost->addChild(mNoDocs);
-        mNoDocs->say(getString("NoScriptOpenHeadline"), getString("NoScriptOpenSentence"), getString("NoScriptOpenAction"), getString("NoScriptOpenNew"));
-        mNoDocs->onAction([this]() { mCommands.run("open_file"); });
+        mNoDocs->onAction([this]() { mCommands.run("quick_open"); });
         mNoDocs->onSecondAction([this]() { mCommands.run("new_script"); });
+        mNoDocs->onLink([this]() { mCommands.run("open_file"); });
+        sayNoDocs();
     }
     mTabs          = getChild<ALTabStrip>("tabs");
     mCrumbsBar     = getChild<ALScriptCrumbsBar>("crumbs");
@@ -909,7 +917,10 @@ bool ALFloaterScriptStudio::postBuild()
         }
     });
 
-    loadState();
+    if (!loadState())
+    {
+        firstOpen();
+    }
     // Unsaved text kept against a crash, a lost connection noticed, and what
     // holds each tab looked at, whether the window is shown or not: a
     // window closed or hidden a moment after typing still writes what was
@@ -941,9 +952,19 @@ bool ALFloaterScriptStudio::postBuild()
     // after them, so that each goes to the window that has its tab.
     if (mMain)
     {
-        restoreTabs(mRestoreTabs);
+        // Unless the author would rather it opened with what it was opened
+        // for alone; said either way, since the tabs that come back were
+        // not asked for this time.
+        const bool restore = gSavedSettings.getBOOL("ALScriptStudioRestoreTabs");
+        if (const S32 came = restore ? restoreTabs(mRestoreTabs) : 0; came > 0)
+        {
+            LLStringUtil::format_map_t args;
+            args["[COUNT]"] = std::to_string(came);
+            setStatus(getString(came == 1 ? "RestoredTab" : "RestoredTabs", args));
+        }
         mRestoreTabs                     = LLSD();
-        const LLSD                windows = std::exchange(mRestoreWindows, LLSD());
+        const LLSD                windows = restore ? std::exchange(mRestoreWindows, LLSD()) : LLSD::emptyArray();
+        mRestoreWindows                   = LLSD();
         const LLHandle<LLFloater> handle  = getHandle();
         doOnIdleOneTime([handle, windows]() {
             if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
@@ -956,7 +977,7 @@ bool ALFloaterScriptStudio::postBuild()
     return true;
 }
 
-void ALFloaterScriptStudio::restoreTabs(const LLSD& open)
+S32 ALFloaterScriptStudio::restoreTabs(const LLSD& open)
 {
     // Where they can still be had: an inventory item that is still there, a
     // file that is, an object's item that the object in sight lists; one
@@ -964,8 +985,10 @@ void ALFloaterScriptStudio::restoreTabs(const LLSD& open)
     // asked about before the viewer quit.
     if (!open.isMap())
     {
-        return;
+        return 0;
     }
+    const size_t docs_before    = mDocs.size();
+    const size_t pending_before = mPendingRestores.size();
     TabsHeld    held(*this);
     const LLSD  tabs   = open["tabs"];
     const S32   chosen = open["active"].asInteger();
@@ -1015,6 +1038,25 @@ void ALFloaterScriptStudio::restoreTabs(const LLSD& open)
     {
         activate(index);
     }
+    return static_cast<S32>((mDocs.size() - docs_before) + (mPendingRestores.size() - pending_before));
+}
+
+void ALFloaterScriptStudio::firstOpen()
+{
+    mFolds.setCollapsed("inspector", true);
+    mFolds.setCollapsed("bottom", true);
+    mBottomWaiting = true;
+    // About 700 tall, as far as the screen goes, the window's own minimum
+    // the least.
+    constexpr S32 FIRST_HEIGHT = 700;
+    constexpr S32 SCREEN_MARGIN = 40;
+    const S32     room   = gFloaterView ? gFloaterView->getRect().getHeight() - SCREEN_MARGIN : FIRST_HEIGHT;
+    const S32     height = llmax(getMinHeight(), llmin(FIRST_HEIGHT, room));
+    if (height > getRect().getHeight())
+    {
+        reshape(getRect().getWidth(), height);
+    }
+    saveState();
 }
 
 void ALFloaterScriptStudio::restoreWindows(const LLSD& windows)
@@ -3540,7 +3582,15 @@ void ALFloaterScriptStudio::refreshBottomTabs()
     const size_t found = mReferencesPane ? mReferencesPane->found().places.size() : 0;
     args["[COUNT]"]    = std::to_string(found);
     title("references_tab", getString(found == 0 ? "TabReferences" : "TabReferencesCount", args));
-    title("output_tab", getString(mOutputPane && mOutputPane->unread() ? "TabOutputUnread" : "TabOutput"));
+    const bool unread = mOutputPane && mOutputPane->unread();
+    title("output_tab", getString(unread ? "TabOutputUnread" : "TabOutput"));
+    // Folded until it has something to show, from the first open: the first
+    // problems, references or output unfold it at the tab that has them.
+    if (mBottomWaiting && mFolds.collapsed("bottom") && (held > 0 || found > 0 || unread))
+    {
+        mBottomWaiting = false;
+        showBottom(held > 0 ? "problems_tab" : found > 0 ? "references_tab" : "output_tab", false);
+    }
 }
 
 std::vector<ALTextPos> ALFloaterScriptStudio::problemPlaces(const Doc& doc) const
@@ -3742,6 +3792,21 @@ void ALFloaterScriptStudio::refreshKeyTips()
     {
         refreshTrailer(*doc);
     }
+    sayNoDocs();
+}
+
+void ALFloaterScriptStudio::sayNoDocs()
+{
+    // Go to Script leads, with the keys that do the same: it reaches every
+    // script there is by name, where Open File reaches only the computer's,
+    // which is the link under the buttons.
+    const LLMenuItemGL*        item = menuItem("quick_open");
+    const std::string          keys = item ? item->getAcceleratorString() : std::string();
+    LLStringUtil::format_map_t args;
+    args["[KEYS]"] = keys;
+    mNoDocs->say(getString("NoScriptOpenHeadline"), getString("NoScriptOpenSentence"),
+                 getString(keys.empty() ? "NoScriptOpenGoToNoKeys" : "NoScriptOpenGoTo", args), getString("NoScriptOpenNew"));
+    mNoDocs->setLink(getString("NoScriptOpenFile"));
 }
 
 void ALFloaterScriptStudio::refreshUndoLabels()
@@ -8401,6 +8466,7 @@ void ALFloaterScriptStudio::takeViewOptions(const ALFloaterScriptStudio& from)
 void ALFloaterScriptStudio::writeState(LLSD& state) const
 {
     writeViewOptions(state);
+    state["bottom_waiting"] = mBottomWaiting;
     if (mExplorerPane)
     {
         mExplorerPane->saveState(state);
@@ -8495,6 +8561,7 @@ LLSD ALFloaterScriptStudio::openTabs() const
 void ALFloaterScriptStudio::readState(const LLSD& state)
 {
     readViewOptions(state);
+    mBottomWaiting = state["bottom_waiting"].asBoolean();
     if (mExplorerPane)
     {
         mExplorerPane->readState(state);

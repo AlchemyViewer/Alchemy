@@ -512,17 +512,17 @@ void ALStudioFloater::saveState()
     }
 }
 
-void ALStudioFloater::loadState()
+bool ALStudioFloater::loadState()
 {
     if (mStateSetting.empty())
     {
-        return;
+        return false;
     }
     LLControlGroup* settings = LLUI::getInstance()->getSettingGroup("config");
     const LLSD state = settings ? settings->getLLSD(mStateSetting) : LLSD();
     if (!state.isMap())
     {
-        return;
+        return false;
     }
     readState(state);
     mFolds.load(state);
@@ -531,4 +531,5 @@ void ALStudioFloater::loadState()
         mRestoredRect = LLRect(state["rect"][0].asInteger(), state["rect"][3].asInteger(),
                                state["rect"][2].asInteger(), state["rect"][1].asInteger());
     }
+    return true;
 }

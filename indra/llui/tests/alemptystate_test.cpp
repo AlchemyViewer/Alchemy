@@ -242,4 +242,35 @@ namespace tut
         ensure("gone when not given", !part(state, "second_action")->getVisible());
         state->die();
     }
+
+    // A way out not to lead with: a link under the buttons, clicked as one.
+    template<> template<>
+    void alemptystate_object::test<8>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALEmptyState* state = build();
+        S32 clicked = 0;
+        state->onLink([&clicked]() { ++clicked; });
+        state->say("No script open", "Go to one, or make one.", "Go to Script...", "New Script...");
+        ensure("no link until given", !part(state, "link")->getVisible());
+        state->setLink("Open a file...");
+        const LLRect link = part(state, "link")->getRect();
+        ensure("shown", part(state, "link")->getVisible());
+        ensure("under the buttons", link.mTop <= part(state, "action")->getRect().mBottom);
+        ensure("inside the room", state->getLocalRect().contains(link));
+        ensure("narrower than the room", link.getWidth() < state->getRect().getWidth() - 32);
+        LLTextBox* text = state->getChild<LLTextBox>("link", true);
+        const S32  x    = link.getWidth() / 2;
+        const S32  y    = link.getHeight() / 2;
+        text->handleMouseDown(x, y, MASK_NONE);
+        text->handleMouseUp(x, y, MASK_NONE);
+        ensure_equals("clicked", clicked, 1);
+        state->setLink(std::string());
+        ensure("gone when taken away", !part(state, "link")->getVisible());
+        state->die();
+    }
 }

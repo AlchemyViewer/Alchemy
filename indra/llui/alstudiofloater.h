@@ -204,7 +204,8 @@ protected:
     // subclass writes and reads. Saved on close and whenever the window
     // is dragged to another shape; a subclass saves on its own changes.
     void saveState();
-    void loadState();
+    // False where nothing was kept: the window's first open.
+    bool loadState();
     virtual void writeState(LLSD& state) const {}
     virtual void readState(const LLSD& state) {}
 

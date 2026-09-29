@@ -783,6 +783,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALScriptStudioRestoreTabs</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio opens again the tabs that were open when it was last put away, and says how many came back; off, it opens with what it was opened for alone.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptStudioState</key>
         <map>
             <key>Comment</key>
