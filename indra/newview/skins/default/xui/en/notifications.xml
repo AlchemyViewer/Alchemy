@@ -1944,27 +1944,6 @@ You kept unsaved changes to [COUNT] scripts and notecards for next time: [NAMES]
     </form>
   </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="RecoveredForEditor"
-   type="alertmodal">
-Unsaved changes to [NAME] were kept on [WHEN], when the viewer closed before they were saved. Put them back in the editor, over the saved script?
-    <tag>confirm</tag>
-    <form name="form">
-      <button
-       index="0"
-       name="Restore"
-       text="Put Them Back"/>
-      <button
-       index="1"
-       name="Discard"
-       text="Discard Them"/>
-      <button
-       index="2"
-       name="Later"
-       text="Later"/>
-    </form>
-  </notification>
 
   <notification
    icon="alertmodal.tga"
@@ -2197,28 +2176,7 @@ There was a problem saving a notecard due to the following reason: [REASON].  Pl
 <tag>fail</tag>
   </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="ScriptCannotUndo"
-   type="alertmodal">
-Could not undo all changes in your version of the script.
-Would you like to load the server&apos;s last saved version?
-(**Warning** This operation cannot be undone.)
-    <tag>confirm</tag>
-    <usetemplate
-     name="okcancelbuttons"
-     notext="Cancel"
-     yestext="OK"/>
-  </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="SaveScriptFailObjectNotFound"
-   type="alertmodal">
-Could not save the script because the object it is in could not be found.
-The object may be out of range or may have been deleted.
-<tag>fail</tag>
-  </notification>
 
   <notification
    icon="alertmodal.tga"
@@ -2232,14 +2190,6 @@ Please type the Region name in Start Location box or choose My Last Location or 
      yestext="OK"/>
   </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="CouldNotStartStopScript"
-   type="alertmodal">
-Could not start or stop the script because the object it is on could not be found.
-The object may be out of range or may have been deleted.
-  <tag>fail</tag>
-  </notification>
 
   <notification
    icon="alertmodal.tga"
@@ -7888,29 +7838,8 @@ Please try again.
      yestext="OK"/>
   </notification>
 
-  <notification
-   icon="notifytip.tga"
-   name="ScriptMissing"
-   type="notifytip">
-Script is missing from database.
-  <tag>fail</tag>
-  </notification>
 
-  <notification
-   icon="notifytip.tga"
-   name="ScriptNoPermissions"
-   type="notifytip">
-Insufficient permissions to view script.
-  <tag>fail</tag>
-  </notification>
 
-  <notification
-   icon="notifytip.tga"
-   name="UnableToLoadScript"
-   type="notifytip">
-Unable to load script.  Please try again.
-  <tag>fail</tag>
-  </notification>
 
   <notification
    icon="notifytip.tga"

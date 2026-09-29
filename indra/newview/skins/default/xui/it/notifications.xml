@@ -557,21 +557,11 @@ L'oggetto potrebbe essere troppo lontano oppure essere stato cancellato.</notifi
 	<notification name="SaveNotecardFailObjectNotFound">Non è possibile salvare la notecard perchè non è stato trovato l'oggetto o l'inventario associato.
 L'oggetto potrebbe essere troppo lontano oppure essere stato cancellato.</notification>
 	<notification name="SaveNotecardFailReason">C'è stato un problema salvando la notecard a causa del seguente motivo: [REASON].  Riprova a salvare la notecard più tardi.</notification>
-	<notification name="ScriptCannotUndo">
-		Non è stato possibile annullare tutti i cambiamenti nella tua versione dello script.
-Vuoi ripristinare l'ultima versione salvata sul server?
-(**Attenzione** Questa operazione non è reversibile)
-		<usetemplate name="okcancelbuttons" notext="Annulla" yestext="OK"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">Non è stato possibile salvare lo script perchè l'oggetto che lo contiene non è stato trovato.
-L'oggetto potrebbe essere troppo lontano oppure essere stato cancellato.</notification>
 	<notification name="StartRegionEmpty">
 		La tua Regione di inizio non è stata definita.
 Per scegliere il luogo dove vuoi trovarti all'accesso, digita il nome della regione nel campo del luogo di partenza oppure scegli La mia ultima Ubicazione o Casa mia.
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
-	<notification name="CouldNotStartStopScript">Non è stato possibile lanciare o fermare lo script perchè l'oggetto che lo contiene non è stato trovato.
-L'oggetto potrebbe essere troppo lontano oppure essere stato cancellato.</notification>
 	<notification name="CannotDownloadFile">Non è stato possibile scaricare il file</notification>
 	<notification label="" name="MediaFileDownloadUnsupported">
 		Hai richiesto il download di un file, cosa che non è supportata in [SECOND_LIFE].
@@ -2044,9 +2034,6 @@ Questo potrebbe incidere sulla tua password.</notification>
 	<notification name="IMAcrossParentEstates">Impossibile inviare IM tra proprietà principali diverse.</notification>
 	<notification name="TransferInventoryAcrossParentEstates">Impossibile trasferire l'inventario tra proprietà principali diverse.</notification>
 	<notification name="UnableToLoadNotecard">Impossibile caricare la notecard in questo momento.</notification>
-	<notification name="ScriptMissing">Script non trovato nel database.</notification>
-	<notification name="ScriptNoPermissions">Permessi insufficenti per visualizzare lo script.</notification>
-	<notification name="UnableToLoadScript">Impossibile caricare lo script. Riprova.</notification>
 	<notification name="IncompleteInventory">Il contenuto che stai offrendo per il momento non è localmente disponibile. Prova a rioffrire gli oggetti fra un minuto.</notification>
 	<notification name="CannotModifyProtectedCategories">Non è possibile modificare le categorie protette.</notification>
 	<notification name="CannotRemoveProtectedCategories">Non è possibile rimuovere le categorie protette.</notification>

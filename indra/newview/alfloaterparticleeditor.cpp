@@ -35,7 +35,6 @@
 #include "llinventorytype.h"
 #include "llnotificationsutil.h"
 #include "llpermissions.h"
-#include "llpreviewscript.h"
 #include "llsd.h"
 #include "lltexturectrl.h"
 #include "lltoolmgr.h"

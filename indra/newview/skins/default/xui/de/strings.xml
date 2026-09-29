@@ -2145,15 +2145,6 @@ Falls diese Meldung weiterhin angezeigt wird, wenden Sie sich unter http://suppo
 	<string name="SaveComplete">
 		Speichervorgang abgeschlossen.
 	</string>
-	<string name="UploadFailed">
-		Datei-Upload fehlgeschlagen:
-	</string>
-	<string name="ObjectOutOfRange">
-		Skript (Objekt außerhalb des Bereichs)
-	</string>
-	<string name="ScriptWasDeleted">
-		Skript (aus Inventar gelöscht)
-	</string>
 	<string name="GodToolsObjectOwnedBy">
 		Objekt [OBJECT], Besitzer [OWNER]
 	</string>
@@ -2440,9 +2431,6 @@ Falls diese Meldung weiterhin angezeigt wird, wenden Sie sich unter http://suppo
 	</string>
 	<string name="ATTACH_HIND_RFOOT">
 		Rechter hinterer Fuß
-	</string>
-	<string name="CursorPos">
-		Zeile [LINE], Spalte [COLUMN]
 	</string>
 	<string name="PanelDirCountFound">
 		[COUNT] gefunden

@@ -565,21 +565,11 @@ Das Objekt ist möglicherweise außer Reichweite oder wurde gelöscht.</notifica
 	<notification name="SaveNotecardFailObjectNotFound">Notizkarte konnte nicht gespeichert werden, da das Objekt oder das zugehörige Objektinventar nicht gefunden wurden.
 Das Objekt ist möglicherweise außer Reichweite oder wurde gelöscht.</notification>
 	<notification name="SaveNotecardFailReason">Eine Notizkarte konnte aus folgendem Grund nicht gespeichert werden: [REASON].  Speichern Sie die Notizkarte bitte später.</notification>
-	<notification name="ScriptCannotUndo">
-		Es konnten nicht alle Änderungen in Ihrer Skriptversion rückgängig gemacht werden.
-Möchten Sie die letzte gespeicherte Version vom Server laden?
-(**Warnung** Dieser Vorgang kann nicht rückgängig gemacht werden.)
-		<usetemplate name="okcancelbuttons" notext="Abbrechen" yestext="OK"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">Skript konnte nicht gespeichert werden, weil das zugehörige Objekt nicht gefunden wurde.
-Das Objekt ist möglicherweise außer Reichweite oder wurde gelöscht.</notification>
 	<notification name="StartRegionEmpty">
 		Ihre Startregion ist nicht definiert.
 Geben Sie den Namen der Region im Feld „Startposition“ ein oder wählen Sie „Mein letzter Standort“ oder „Mein Zuhause“ als Startposition aus.
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
-	<notification name="CouldNotStartStopScript">Skript konnte nicht gestartet oder beendet werden, weil das zugehörige Objekt nicht gefunden wurde.
-Das Objekt ist möglicherweise außer Reichweite oder wurde gelöscht.</notification>
 	<notification name="CannotDownloadFile">Dateidownload nicht möglich</notification>
 	<notification label="" name="MediaFileDownloadUnsupported">
 		Sie haben einen Datei-Download angefordert, der in [SECOND_LIFE] nicht unterstützt wird.
@@ -2055,9 +2045,6 @@ Dies kann die Eingabe Ihres Passworts beeinflussen.</notification>
 	<notification name="IMAcrossParentEstates">Senden von IMs über übergeordnete Grundbesitze hinweg nicht möglich.</notification>
 	<notification name="TransferInventoryAcrossParentEstates">Inventarübertragung über übergeordnete Grundbesitze hinweg nicht möglich.</notification>
 	<notification name="UnableToLoadNotecard">Notizkarten-Asset konnte nicht geladen werden.</notification>
-	<notification name="ScriptMissing">Skript fehlt in Datenbank.</notification>
-	<notification name="ScriptNoPermissions">Unzureichende Rechte zur Anzeige des Skripts.</notification>
-	<notification name="UnableToLoadScript">Skript konnte nicht geladen werden.  Bitte versuchen Sie es erneut.</notification>
 	<notification name="IncompleteInventory">Die von Ihnen angebotenen Inhalte sind noch nicht vollständig lokal verfügbar. Warten Sie kurz und wiederholen Sie dann das Angebot.</notification>
 	<notification name="CannotModifyProtectedCategories">Geschützte Kategorien können nicht geändert werden.</notification>
 	<notification name="CannotRemoveProtectedCategories">Geschützte Kategorien können nicht entfernt werden.</notification>

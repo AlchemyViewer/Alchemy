@@ -2090,15 +2090,6 @@ Se você continuar a receber essa mensagem, entre em contato com o suporte do Se
 	<string name="SaveComplete">
 		Salvo.
 	</string>
-	<string name="UploadFailed">
-		Falha ao carregar arquivo:
-	</string>
-	<string name="ObjectOutOfRange">
-		Script (objeto fora de alcance)
-	</string>
-	<string name="ScriptWasDeleted">
-		Script (excluído do inventário)
-	</string>
 	<string name="GodToolsObjectOwnedBy">
 		Objeto [OBJECT] de propriedade de [OWNER]
 	</string>
@@ -2385,9 +2376,6 @@ Se você continuar a receber essa mensagem, entre em contato com o suporte do Se
 	</string>
 	<string name="ATTACH_HIND_RFOOT">
 		Pata dir. traseira
-	</string>
-	<string name="CursorPos">
-		Linha [LINE], Coluna [COLUMN]
 	</string>
 	<string name="PanelDirCountFound">
 		[COUNT] encontrado

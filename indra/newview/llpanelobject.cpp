@@ -47,7 +47,6 @@
 #include "llfocusmgr.h"
 #include "llmanipscale.h"
 #include "llmenubutton.h"
-#include "llpreviewscript.h"
 #include "llresmgr.h"
 #include "llselectmgr.h"
 #include "llspinctrl.h"

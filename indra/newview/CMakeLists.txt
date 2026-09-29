@@ -428,7 +428,6 @@ if(AL_BUILD_VIEWER)
     llfloatergesture.cpp
     llfloatergestureautocompletepicker.cpp
     llfloatergodtools.cpp
-    llfloatergotoline.cpp
     llfloatergridstatus.cpp
     llfloatergroupbulkban.cpp
     llfloatergroupinvite.cpp
@@ -493,10 +492,8 @@ if(AL_BUILD_VIEWER)
     llfloatersaveprefpreset.cpp
     llfloatersceneloadstats.cpp
     llfloaterscriptdebug.cpp
-    llfloaterscriptedprefs.cpp
     llfloaterscripting.cpp
     llfloaterscriptlimits.cpp
-    llfloatersearchreplace.cpp
     llfloatersellland.cpp
     llfloatersettingscolor.cpp
     llfloatersettingsdebug.cpp
@@ -750,7 +747,6 @@ if(AL_BUILD_VIEWER)
     llpreviewanim.cpp
     llpreviewgesture.cpp
     llpreviewnotecard.cpp
-    llpreviewscript.cpp
     llpreviewsound.cpp
     llpreviewtexture.cpp
     llproductinforequest.cpp
@@ -767,7 +763,6 @@ if(AL_BUILD_VIEWER)
     llscenemonitor.cpp
     llsceneview.cpp
     llscreenchannel.cpp
-    llscripteditor.cpp
     llscripteditorws.cpp
     llscriptfloater.cpp
     llscrollingpanelparam.cpp
@@ -1272,7 +1267,6 @@ if(AL_BUILD_VIEWER)
     llfloatergesture.h
     llfloatergestureautocompletepicker.h
     llfloatergodtools.h
-    llfloatergotoline.h
     llfloatergridstatus.h
     llfloatergroupbulkban.h
     llfloatergroupinvite.h
@@ -1341,10 +1335,8 @@ if(AL_BUILD_VIEWER)
     llfloatersaveprefpreset.h
     llfloatersceneloadstats.h
     llfloaterscriptdebug.h
-    llfloaterscriptedprefs.h
     llfloaterscripting.h
     llfloaterscriptlimits.h
-    llfloatersearchreplace.h
     llfloatersellland.h
     llfloatersettingscolor.h
     llfloatersettingsdebug.h
@@ -1582,7 +1574,6 @@ if(AL_BUILD_VIEWER)
     llpreviewanim.h
     llpreviewgesture.h
     llpreviewnotecard.h
-    llpreviewscript.h
     llpreviewsound.h
     llpreviewtexture.h
     llproductinforequest.h
@@ -1601,7 +1592,6 @@ if(AL_BUILD_VIEWER)
     llscenemonitor.h
     llsceneview.h
     llscreenchannel.h
-    llscripteditor.h
     llscripteditorws.h
     llscriptfloater.h
     llscriptruntimeperms.h

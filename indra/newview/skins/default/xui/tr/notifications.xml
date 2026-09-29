@@ -658,24 +658,10 @@ Nesne aralık dışında ya da silinmiş olabilir.
 	<notification name="SaveNotecardFailReason">
 		Aşağıdaki nedenden dolayı, not kartı kaydedilirken bir sorun oluştu: [REASON].  Lütfen not kartını kaydetmeyi daha sonra tekrar deneyin.
 	</notification>
-	<notification name="ScriptCannotUndo">
-		Komut dosyası sürümünüzdeki tüm değişiklikler geri alınamadı.
-Sunucunun son kaydedilmiş sürümünü yüklemek ister misiniz?
-(**Uyarı** Bu işlem geri alınamaz.)
-		<usetemplate name="okcancelbuttons" notext="İptal" yestext="Tamam"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">
-		İçinde olduğu nesne bulunamadığından komut dosyası kaydedilemiyor.
-Nesne aralık dışında ya da silinmiş olabilir.
-	</notification>
 	<notification name="StartRegionEmpty">
 		Başlangıç Bölgeniz tanımlanmamış.
 Lütfen Başlangıç Konumu kutusuna Bölge adını yazın ya da Son Bulunduğum Konum veya Ana Konumumu Başlangıç Konumu olarak seçin.
 		<usetemplate name="okbutton" yestext="Tamam"/>
-	</notification>
-	<notification name="CouldNotStartStopScript">
-		Üzerinde bulunduğu nesne bulunamadığından komut dosyası başlatılamadı veya durdurulamadı.
-Nesne aralık dışında ya da silinmiş olabilir.
 	</notification>
 	<notification name="CannotDownloadFile">
 		Dosya karşıdan yüklenemiyor.
@@ -2600,15 +2586,6 @@ Parolanızı yanlış yazmanıza sebep olabilir.
 	<notification name="UnableToLoadNotecard">
 		Not kartı karşıya yüklenemiyor.
 Lütfen tekrar deneyin.
-	</notification>
-	<notification name="ScriptMissing">
-		Komut dosyası veri tabanında yok.
-	</notification>
-	<notification name="ScriptNoPermissions">
-		Komut dosyasını görüntülemek için yetersiz izin.
-	</notification>
-	<notification name="UnableToLoadScript">
-		Komut dosyası karşıya yüklenemiyor. Lütfen tekrar deneyin.
 	</notification>
 	<notification name="IncompleteInventory">
 		Teklif etmek istediğiniz içeriğin tamamı henüz yerel olarak kullanılabilir değil. Lütfen bu öğeleri bir dakika içerisinde tekrar teklif etmeyi deneyin.

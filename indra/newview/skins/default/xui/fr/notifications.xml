@@ -557,21 +557,11 @@ L'objet est peut-être inaccessible ou a peut-être été supprimé.</notificati
 	<notification name="SaveNotecardFailObjectNotFound">La note n'a pas pu être enregistrée car l'objet ou l'inventaire de l'objet associé n'a pas été trouvé.
 L'objet est peut-être inaccessible ou a peut-être été supprimé.</notification>
 	<notification name="SaveNotecardFailReason">Une erreur est survenue lors de l'enregistrement de la note, suite au problème suivant : [REASON]. Essayez d'enregistrer votre note ultérieurement.</notification>
-	<notification name="ScriptCannotUndo">
-		Impossible d'annuler tous les changements dans votre version du script.
-Souhaitez-vous charger la dernière version enregistrée sur le serveur ?
-(**Attention** Cette opération est irréversible.)
-		<usetemplate name="okcancelbuttons" notext="Annuler" yestext="OK"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">Impossible d'enregistrer le script car l'objet qui le contient est introuvable.
-L'objet est peut-être inaccessible ou a peut-être été supprimé.</notification>
 	<notification name="StartRegionEmpty">
 		Vous n'avez pas défini de région de départ.
 Saisissez le nom de la région voulue dans la case Lieu de départ ou choisissez Dernier emplacement ou Domicile comme lieu de départ.
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
-	<notification name="CouldNotStartStopScript">Impossible de lancer ou d'arrêter le script car l'objet qui le contient est introuvable.
-L'objet est peut-être inaccessible ou a peut-être été supprimé.</notification>
 	<notification name="CannotDownloadFile">Impossible de télécharger le fichier</notification>
 	<notification label="" name="MediaFileDownloadUnsupported">
 		Vous avez demandé un téléchargement de fichier, qui n’est pas pris en charge dans [SECOND_LIFE].
@@ -2041,9 +2031,6 @@ Cela risque d'impacter votre mot de passe.</notification>
 	<notification name="IMAcrossParentEstates">Impossible d'envoyer d'IM entre domaines parents.</notification>
 	<notification name="TransferInventoryAcrossParentEstates">Impossible de transférer l'inventaire entre domaines parents.</notification>
 	<notification name="UnableToLoadNotecard">Impossible de lire les données de la note actuellement.</notification>
-	<notification name="ScriptMissing">Script absent de la base de données.</notification>
-	<notification name="ScriptNoPermissions">Droits insuffisants pour voir le script.</notification>
-	<notification name="UnableToLoadScript">Impossible de charger le script. Merci de réessayer.</notification>
 	<notification name="IncompleteInventory">Tous les éléments que vous souhaitez transférer ne sont pas encore disponibles sur le serveur.
 Merci d'essayer à nouveau dans une minute.</notification>
 	<notification name="CannotModifyProtectedCategories">Vous ne pouvez pas modifier de catégories protégées.</notification>

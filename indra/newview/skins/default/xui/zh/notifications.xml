@@ -651,24 +651,10 @@
 	<notification name="SaveNotecardFailReason">
 		儲存記事卡時出問題，原因：[REASON]。  請稍後再嘗試儲存記事卡。
 	</notification>
-	<notification name="ScriptCannotUndo">
-		無法取消你這個版本腳本的變更。
-是否從伺服器載入上次成功儲存的版本？
-（*警告* 這動作無法還原。）
-		<usetemplate name="okcancelbuttons" notext="取消" yestext="確定"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">
-		無法儲存腳本，找不到它所屬的物件。
-該物件可能超出範圍或已被刪除。
-	</notification>
 	<notification name="StartRegionEmpty">
 		你的起始地區尚未定義。
 請在「開始位置」框裡輸入區域名，或選擇「我上一次位置」或「我的家」作為開始位置。
 		<usetemplate name="okbutton" yestext="確定"/>
-	</notification>
-	<notification name="CouldNotStartStopScript">
-		無法啟動或停止腳本，找不到它所屬的物件。
-該物件可能超出範圍或已被刪除。
 	</notification>
 	<notification name="CannotDownloadFile">
 		無法下載檔案
@@ -2585,15 +2571,6 @@ SHA1 指紋：[MD5_DIGEST]
 	<notification name="UnableToLoadNotecard">
 		無法載入記事卡。
 請再試一次。
-	</notification>
-	<notification name="ScriptMissing">
-		腳本在資料庫中遺失。
-	</notification>
-	<notification name="ScriptNoPermissions">
-		察看腳本時發生權限衝突。
-	</notification>
-	<notification name="UnableToLoadScript">
-		無法載入腳本。  請再試一次。
 	</notification>
 	<notification name="IncompleteInventory">
 		你所提供的完整內容在本地還無法取得。 請幾分鐘後再試著提供這些物項。

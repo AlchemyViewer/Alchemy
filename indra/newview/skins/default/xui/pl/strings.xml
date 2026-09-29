@@ -2115,15 +2115,6 @@ Jeśli ciągle otrzymujesz tą wiadomość, to skontaktuj się z pomocą technic
 	<string name="SaveComplete">
 		Zapisywanie zakończone.
 	</string>
-	<string name="UploadFailed">
-		Przesyłanie nieudane:
-	</string>
-	<string name="ObjectOutOfRange">
-		Skrypt (obiekt poza zasięgiem)
-	</string>
-	<string name="ScriptWasDeleted">
-		Skrypt (usunięty z zawartości obiektu)
-	</string>
 	<string name="GodToolsObjectOwnedBy">
 		Obiekt [OBJECT] należący do [OWNER]
 	</string>
@@ -2413,9 +2404,6 @@ Jeśli ciągle otrzymujesz tą wiadomość, to skontaktuj się z pomocą technic
 	</string>
 	<string name="ATTACH_HIND_RFOOT">
 		Prawa tylna stopa
-	</string>
-	<string name="CursorPos">
-		Linia [LINE], Kolumna [COLUMN]
 	</string>
 	<string name="PanelDirCountFound">
 		[COUNT] odnalezionych

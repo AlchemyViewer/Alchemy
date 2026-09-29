@@ -586,23 +586,9 @@ Obiekt może znajdować się zbyt daleko albo został usunięty.
 	<notification name="SaveNotecardFailReason">
 		Nie można zapisać notki z następującego powodu: [REASON]. Spróbuj zapisać jeszcze raz później.
 	</notification>
-	<notification name="ScriptCannotUndo">
-		Nie można cofnąć wszystkich zmian w Twojej wersji skryptu.
-Czy chcesz załadować ostatnią wersję zapisaną na serwerze?
-(*UWAGA* Ta operacja jest nieodwracalna.)
-		<usetemplate name="okcancelbuttons" notext="Anuluj" />
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">
-		Nie można zapisać skryptu ponieważ obiekt w którym się zawiera nie został znaleziony.
-Obiekt może znajdować się zbyt daleko albo został usunięty.
-	</notification>
 	<notification name="StartRegionEmpty">
 		Twoje miejsce startu nie zostało określone.
 Wpisz proszę nazwę regionu w lokalizację startu w polu Lokalizacja Startu lub wybierz &apos;Moja ostatnia lokalizacja&apos; albo &apos;Miejsce Startu&apos;.
-	</notification>
-	<notification name="CouldNotStartStopScript">
-		Nie można uruchomić lub zatrzymać skryptu ponieważ obiekt w którym się zawiera nie został znaleziony.
-Obiekt może znajdować się zbyt daleko albo został usunięty.
 	</notification>
 	<notification name="CannotDownloadFile">
 		Nie można pobrać pliku
@@ -2497,16 +2483,6 @@ Ponieważ ma to wpływ na wpisywane hasło, możesz chcieć go wyłączyć.
 	</notification>
 	<notification name="UnableToLoadNotecard">
 		Nie można załadować notki w tym momencie.
-Spróbuj jeszcze raz.
-	</notification>
-	<notification name="ScriptMissing">
-		Skrypt nie został znaleziony w bazie danych.
-	</notification>
-	<notification name="ScriptNoPermissions">
-		Nie masz uprawnień na podejrzenie skryptu.
-	</notification>
-	<notification name="UnableToLoadScript">
-		Ładowanie skryptu nie powiodło się.
 Spróbuj jeszcze raz.
 	</notification>
 	<notification name="IncompleteInventory">

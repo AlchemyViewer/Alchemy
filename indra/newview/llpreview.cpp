@@ -34,11 +34,6 @@
 #include "llresmgr.h"
 #include "lltextbox.h"
 #include "llfloaterreg.h"
-// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-3.0)
-#include "llfloatersearchreplace.h"
-#include "llpreviewscript.h"
-#include "llscripteditor.h"
-// [/SL:KB]
 #include "llfocusmgr.h"
 #include "lltooldraganddrop.h"
 #include "llradiogroup.h"
@@ -544,27 +539,6 @@ void LLMultiPreview::tabOpen(LLFloater* opened_floater, bool from_click)
     {
         opened_preview->loadAsset();
     }
-
-// [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
-    LLFloaterSearchReplace* pSearchFloater = LLFloaterReg::getTypedInstance<LLFloaterSearchReplace>("search_replace");
-    if ( (pSearchFloater) && (pSearchFloater->getDependee() == this) )
-    {
-        // A notecard has a find bar of its own.
-        LLPreviewLSL* pPreviewScript = NULL; LLLiveLSLEditor* pPreviewScriptLive = NULL;
-        if ((pPreviewScript = ALViewType::as<LLPreviewLSL>(opened_preview)) != NULL)
-        {
-            LLFloaterSearchReplace::show(pPreviewScript->getEditor());
-        }
-        else if ((pPreviewScriptLive = ALViewType::as<LLLiveLSLEditor>(opened_preview)) != NULL)
-        {
-            LLFloaterSearchReplace::show(pPreviewScriptLive->getEditor());
-        }
-        else
-        {
-            pSearchFloater->setVisible(false);
-        }
-    }
-// [/SL:KB]
 }
 
 

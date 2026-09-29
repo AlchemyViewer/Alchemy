@@ -2136,15 +2136,6 @@ http://secondlife.com/support 求助解決問題。
 	<string name="SaveComplete">
 		儲存完畢。
 	</string>
-	<string name="UploadFailed">
-		檔案上傳失敗：
-	</string>
-	<string name="ObjectOutOfRange">
-		腳本（物件超出範圍）
-	</string>
-	<string name="ScriptWasDeleted">
-		腳本（已從收納區刪除）
-	</string>
 	<string name="GodToolsObjectOwnedBy">
 		物件 [OBJECT] 為 [OWNER] 所擁有
 	</string>
@@ -2431,9 +2422,6 @@ http://secondlife.com/support 求助解決問題。
 	</string>
 	<string name="ATTACH_HIND_RFOOT">
 		右後腳
-	</string>
-	<string name="CursorPos">
-		橫行 [LINE]，縱列 [COLUMN]
 	</string>
 	<string name="PanelDirCountFound">
 		找到 [COUNT]

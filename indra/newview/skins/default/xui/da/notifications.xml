@@ -1075,15 +1075,6 @@ Det kan påvirke din indtastning af password.
 		Ikke muligt at indlæse note.
 Prøv venligst igen.
 	</notification>
-	<notification name="ScriptMissing">
-		Script mangler i databasen.
-	</notification>
-	<notification name="ScriptNoPermissions">
-		Utilstrækkelige tilladelser til at se script.
-	</notification>
-	<notification name="UnableToLoadScript">
-		Ikke muligt at indlæse script.  Prøv venligst igen.
-	</notification>
 	<notification name="IncompleteInventory">
 		Det komplette indhold, du tilbyder, er ikke endnu tilgængelig lokalt. Prøv venligst at tilbyde tingene igen om lidt.
 	</notification>

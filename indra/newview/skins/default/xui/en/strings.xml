@@ -963,10 +963,6 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="NotecardCopyRefused">[NAME] could not be copied: [ERROR]</string>
 	<string name="NotecardFull">[NAME] is full: a notecard holds at most [LIMIT] bytes</string>
 
-	<!-- A legacy script editor's unsaved text not kept in the recovery store
-	     (llpreviewscript.cpp) -->
-	<string name="RecoveryWriteFailedEditor">Your unsaved changes could not be kept in case the viewer closes.</string>
-
 	<!-- ToolTips for notecards -->
 	<string name="TooltipNotecardNotAllowedTypeDrop">
 Items of this type can't be attached
@@ -3345,9 +3341,6 @@ If you continue to receive this message, please contact Second Life support for 
 	<string name="CompileSuccessful">Compile successful!</string>
 	<string name="CompileSuccessfulSaving">Compile successful, saving...</string>
 	<string name="SaveComplete">Save complete.</string>
-	<string name="UploadFailed">File upload failed: </string>
-	<string name="ObjectOutOfRange">Script (object out of range)</string>
-	<string name="ScriptWasDeleted">Script (deleted from inventory)</string>
 	
 	<!-- god tools -->
 	<string name="GodToolsObjectOwnedBy">Object [OBJECT] owned by [OWNER]</string>
@@ -3470,7 +3463,6 @@ If you continue to receive this message, please contact Second Life support for 
     <string name="ATTACH_HIND_RFOOT">Right Hind Foot</string>
 
 	<!-- script editor -->
-	<string name="CursorPos">Line [LINE], Column [COLUMN]</string>
 
 	<!-- panel dir browser -->
 	<string name="PanelDirCountFound">[COUNT] found</string>

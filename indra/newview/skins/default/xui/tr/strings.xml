@@ -2143,15 +2143,6 @@ Bu mesaj size gelmeye devam ederse lütfen http://support.secondlife.com adresin
 	<string name="SaveComplete">
 		Kaydetme tamamlandı.
 	</string>
-	<string name="UploadFailed">
-		Dosya karşıya yüklenemedi:
-	</string>
-	<string name="ObjectOutOfRange">
-		Komut dosyası (nesne kapsam dışı)
-	</string>
-	<string name="ScriptWasDeleted">
-		Komut Dosyası (envanterden silindi)
-	</string>
 	<string name="GodToolsObjectOwnedBy">
 		[OWNER] mülkiyetindeki [OBJECT] nesnesi
 	</string>
@@ -2438,9 +2429,6 @@ Bu mesaj size gelmeye devam ederse lütfen http://support.secondlife.com adresin
 	</string>
 	<string name="ATTACH_HIND_RFOOT">
 		Sağ Arka Ayak
-	</string>
-	<string name="CursorPos">
-		Satır [LINE], Sütun [COLUMN]
 	</string>
 	<string name="PanelDirCountFound">
 		[COUNT] bulundu

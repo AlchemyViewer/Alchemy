@@ -2122,15 +2122,6 @@ Si sigues recibiendo el mismo mensaje, solicita ayuda al personal de asistencia 
 	<string name="SaveComplete">
 		Guardado.
 	</string>
-	<string name="UploadFailed">
-		Error al subir el archivo:
-	</string>
-	<string name="ObjectOutOfRange">
-		Script (objeto fuera de rango)
-	</string>
-	<string name="ScriptWasDeleted">
-		Script (eliminado del inventario)
-	</string>
 	<string name="GodToolsObjectOwnedBy">
 		El objeto [OBJECT] es propiedad de [OWNER]
 	</string>
@@ -2417,9 +2408,6 @@ Si sigues recibiendo el mismo mensaje, solicita ayuda al personal de asistencia 
 	</string>
 	<string name="ATTACH_HIND_RFOOT">
 		Pata trasera derecha
-	</string>
-	<string name="CursorPos">
-		Línea [LINE], Columna [COLUMN]
 	</string>
 	<string name="PanelDirCountFound">
 		[COUNT] resultados

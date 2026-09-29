@@ -2374,15 +2374,6 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="SaveComplete">
 		保存しました。
 	</string>
-	<string name="UploadFailed">
-		ファイルのアップロードに失敗しました：
-	</string>
-	<string name="ObjectOutOfRange">
-		スクリプト（オブジェクトが範囲外にあります）
-	</string>
-	<string name="ScriptWasDeleted">
-		スクリプト（インベントリから削除済み）
-	</string>
 	<!-- god tools -->
 	<string name="GodToolsObjectOwnedBy">
 		[OWNER]が所有している「[OBJECT]」というオブジェクト
@@ -2685,9 +2676,6 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		右後足
 	</string>
 	<!-- script editor -->
-	<string name="CursorPos">
-		[LINE]行目、[COLUMN]列目
-	</string>
 	<!-- panel dir browser -->
 	<string name="PanelDirCountFound">
 		[COUNT]件見つかりました

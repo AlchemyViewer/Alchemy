@@ -689,24 +689,10 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 		以下の理由で、ノートカードの保存時に問題が起こりました：[REASON]
 お手数ですが、後でもう一度試してください。
 	</notification>
-	<notification name="ScriptCannotUndo">
-		あなたのスクリプトのバージョンでは、変更を元に戻すことはできませんでした。
-最後にサーバーに保存されたバージョンを読み込みますか？
-（**警告**：この操作後元に戻すことはできません）
-		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">
-		スクリプトの保存に失敗しました。スクリプトが入ったオブジェクトが見つかりません。
-オブジェクトは範囲外か、または削除されているかもしれません。
-	</notification>
 	<notification name="StartRegionEmpty">
 		ログイン位置が指定されていません。
 ログイン位置の欄にリージョン名を入力するか、「最後にログアウトした場所」か「ホーム」を選択してください。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
-	</notification>
-	<notification name="CouldNotStartStopScript">
-		スクリプトの起動または停止に失敗しました。スクリプトが格納されているオブジェクトが見つかりません。
-オブジェクトが範囲内に存在しないか、または削除された可能性があります。
 	</notification>
 	<notification name="CannotDownloadFile">
 		ファイルをダウンロードできません。
@@ -2859,15 +2845,6 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 	<notification name="CantSelectReflectionProbe">
     反射プローブを設置しましたが、「反射プローブの選択」が無効になっています。反射プローブを選択できるようにするには、「ビルド」＞「オプション」＞「反射プローブを選択」にチェックを入れてください。
 		<usetemplate ignoretext="次回から表示しない" name="okignore" yestext="はい"/>
-	</notification>
-	<notification name="ScriptMissing">
-		データベースにスクリプトがありません。
-	</notification>
-	<notification name="ScriptNoPermissions">
-		スクリプトを閲覧するには権限が不十分です。
-	</notification>
-	<notification name="UnableToLoadScript">
-		スクリプトを読み込めません。もう一度試してください。
 	</notification>
 	<notification name="IncompleteInventory">
 		あなたの提供するコンテンツは、ローカルではまだ全部揃っていません。

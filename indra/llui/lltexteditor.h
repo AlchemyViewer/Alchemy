@@ -207,11 +207,6 @@ public:
     virtual bool    importBuffer(const char* buffer, S32 length );
     virtual bool    exportBuffer(std::string& buffer );
 
-// [SL:KB] - Patch: Build-AssetRecovery | Checked: 2013-07-28 (Catznip-3.6)
-    // NOTE-Catznip: doesn't save embedded items, text only
-    bool            loadFromFile(const std::string& filename);
-    bool            writeToFile(const std::string& filename);
-// [/SL:KB]
 
     const LLUUID&   getSourceID() const                     { return mSourceID; }
 

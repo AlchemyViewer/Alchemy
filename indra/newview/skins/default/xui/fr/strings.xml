@@ -2146,15 +2146,6 @@ Si vous continuez de recevoir ce message, contactez l’assistance Second Life �
 	<string name="SaveComplete">
 		Enregistrement terminé.
 	</string>
-	<string name="UploadFailed">
-		Échec du chargement de fichier :
-	</string>
-	<string name="ObjectOutOfRange">
-		Script (objet hors de portée)
-	</string>
-	<string name="ScriptWasDeleted">
-		Script (supprimé de l’inventaire)
-	</string>
 	<string name="GodToolsObjectOwnedBy">
 		Objet [OBJECT] appartenant à [OWNER]
 	</string>
@@ -2441,9 +2432,6 @@ Si vous continuez de recevoir ce message, contactez l’assistance Second Life �
 	</string>
 	<string name="ATTACH_HIND_RFOOT">
 		Pied arrière droit
-	</string>
-	<string name="CursorPos">
-		Ligne [LINE], colonne [COLUMN]
 	</string>
 	<string name="PanelDirCountFound">
 		[COUNT] trouvé(s)

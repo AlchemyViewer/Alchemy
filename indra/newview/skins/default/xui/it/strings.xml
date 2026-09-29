@@ -2130,15 +2130,6 @@ Se continui a ricevere questo messaggio, contatta l'assistenza Second Life su ht
 	<string name="SaveComplete">
 		Salvataggio completato.
 	</string>
-	<string name="UploadFailed">
-		Caricamento file non riuscito:
-	</string>
-	<string name="ObjectOutOfRange">
-		Script (oggetto fuori portata)
-	</string>
-	<string name="ScriptWasDeleted">
-		Script (eliminato da inventario)
-	</string>
 	<string name="GodToolsObjectOwnedBy">
 		Oggetto [OBJECT] di proprietà di [OWNER]
 	</string>
@@ -2425,9 +2416,6 @@ Se continui a ricevere questo messaggio, contatta l'assistenza Second Life su ht
 	</string>
 	<string name="ATTACH_HIND_RFOOT">
 		Piede posteriore destro
-	</string>
-	<string name="CursorPos">
-		Riga [LINE], Colonna [COLUMN]
 	</string>
 	<string name="PanelDirCountFound">
 		[COUNT] trovato/i

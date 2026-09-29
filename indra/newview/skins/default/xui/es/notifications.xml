@@ -555,21 +555,11 @@ El objeto debe de haber sido borrado o estar fuera de rango ('out of range').</n
 	<notification name="SaveNotecardFailObjectNotFound">No se ha podido guardar la nota porque no se pudo encontrar el objeto o el objeto asociado del inventario.
 El objeto debe de haber sido borrado o estar fuera de rango ('out of range').</notification>
 	<notification name="SaveNotecardFailReason">Al guardar una nota, hubo un problema por: [REASON]. Por favor, vuelve a intentar guardarla más tarde.</notification>
-	<notification name="ScriptCannotUndo">
-		No se han podido deshacer todos los cambios en tu versión del script.
-¿Quieres cargar la última versión guardada en el servidor?
-(**Cuidado** No podrás deshacer esta operación).
-		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="OK"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">No se ha podido guardar el script porque no se pudo encontrar el objeto que incluye.
-El objeto debe de haber sido borrado o estar fuera de rango ('out of range')..</notification>
 	<notification name="StartRegionEmpty">
 		No está definida tu región inicial.
 Por favor, escribe el nombre de la región en el cuadro de Posición inicial o elige para esa posición Mi Base o Mi última posición.
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
-	<notification name="CouldNotStartStopScript">No se ha podido correr o parar el script porque no se pudo encontrar el objeto que incluye.
-El objeto debe de haber sido borrado o estar fuera de rango ('out of range')..</notification>
 	<notification name="CannotDownloadFile">No se ha podido descargar el archivo.</notification>
 	<notification label="" name="MediaFileDownloadUnsupported">
 		Has solicitado descargar un archivo, pero [SECOND_LIFE] no lo admite.
@@ -2049,9 +2039,6 @@ Esto puede influir en tu contraseña.</notification>
 	<notification name="IMAcrossParentEstates">No se pueden enviar mensajes instantáneos entre propiedades principales.</notification>
 	<notification name="TransferInventoryAcrossParentEstates">No se puede transferir el inventario entre propiedades principales.</notification>
 	<notification name="UnableToLoadNotecard">En este momento no se puede cargar la nota.</notification>
-	<notification name="ScriptMissing">El script ha desaparecido de la base de datos.</notification>
-	<notification name="ScriptNoPermissions">No tienes permisos suficientes para ver el script.</notification>
-	<notification name="UnableToLoadScript">No se ha podido cargar el script. Por favor, vuelve a intentarlo.</notification>
 	<notification name="IncompleteInventory">Los contenidos que estás ofreciendo aún no están disponibles. Por favor, vuelve a ofrecerlos en un minuto.</notification>
 	<notification name="CannotModifyProtectedCategories">No puedes modificar categorías que están protegidas.</notification>
 	<notification name="CannotRemoveProtectedCategories">No puedes quitar categorías que están protegidas.</notification>

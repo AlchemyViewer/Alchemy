@@ -2143,15 +2143,6 @@ support@secondlife.com.
 	<string name="SaveComplete">
 		Сохранение завершено.
 	</string>
-	<string name="UploadFailed">
-		Не удалось загрузить файл:
-	</string>
-	<string name="ObjectOutOfRange">
-		Скрипт (объект вне области)
-	</string>
-	<string name="ScriptWasDeleted">
-		Скрипт (удален из инвентаря)
-	</string>
 	<string name="GodToolsObjectOwnedBy">
 		Объект [OBJECT] пользователя [OWNER]
 	</string>
@@ -2438,9 +2429,6 @@ support@secondlife.com.
 	</string>
 	<string name="ATTACH_HIND_RFOOT">
 		Правая задняя нога
-	</string>
-	<string name="CursorPos">
-		Строка [LINE], столбец [COLUMN]
 	</string>
 	<string name="PanelDirCountFound">
 		Найдено: [COUNT]

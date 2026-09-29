@@ -553,21 +553,11 @@ O objeto pode estar fora de alcance ou foi deletado.</notification>
 	<notification name="SaveNotecardFailObjectNotFound">Não foi possível salvar uma nota pois o objeto ou o inventário associado ao objeto não foi encontrado.
 O objeto pode estar fora de alcance ou foi deletado.</notification>
 	<notification name="SaveNotecardFailReason">Houve um problema em salvar uma nota devido a seguinte razão: [REASON]. Tente salvar a nota novamente mais tarde.</notification>
-	<notification name="ScriptCannotUndo">
-		Não foi possível desfazer todas as mudanças na sua versão de script.
-Gostaria de carregar a última versão salva?
-(**Aviso** Esta operação não pode ser desfeita).
-		<usetemplate name="okcancelbuttons" notext="Não" yestext="Sim"/>
-	</notification>
-	<notification name="SaveScriptFailObjectNotFound">Não foi possível salvar o script pois o objeto em que ele está não pôde ser encontrado.
-O objeto pode estar fora de alcance ou ter sido deletado.</notification>
 	<notification name="StartRegionEmpty">
 		Sua região de partida não está definida.
 Digite o nome da região na caixa 'Ponto de partida' ou selecione 'Meu último local' ou 'Minha casa' como ponto de partida.
 		<usetemplate name="okbutton" yestext="OK"/>
 	</notification>
-	<notification name="CouldNotStartStopScript">Não foi possível iniciar ou parar o script pois o objeto em que ele está não pôde ser encontrado.
-O objeto pode estar fora de alcance ou ter sido deletado.</notification>
 	<notification name="CannotDownloadFile">Não foi possível baixar o arquivo.</notification>
 	<notification label="" name="MediaFileDownloadUnsupported">
 		Você solicitou o download de um arquivo que não tem suporte no [SECOND_LIFE].
@@ -2034,9 +2024,6 @@ Ela pode afetar a digitação da senha.</notification>
 	<notification name="IMAcrossParentEstates">Não é possível enviar MIs entre propriedades-pai.</notification>
 	<notification name="TransferInventoryAcrossParentEstates">Não é possível transferir o inventário para propriedades-pai.</notification>
 	<notification name="UnableToLoadNotecard">Não é possível carregar notas neste momento.</notification>
-	<notification name="ScriptMissing">O script foi perdido no banco de dados.</notification>
-	<notification name="ScriptNoPermissions">Permissões insuficientes para visualizar o script.</notification>
-	<notification name="UnableToLoadScript">Impossível carregar o script. Por favor, tente novamente.</notification>
 	<notification name="IncompleteInventory">Os conteúdos completos que vocë está oferecendo, não estão ainda disponíveis localmente. Por favor, tente oferecê-los novamente em um minuto.</notification>
 	<notification name="CannotModifyProtectedCategories">Você não pode modificar categorias protegidas.</notification>
 	<notification name="CannotRemoveProtectedCategories">Você não pode remover categorias protegidas.</notification>

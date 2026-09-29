@@ -1565,9 +1565,6 @@ Prøv venligst om lidt igen.
 	<string name="SaveComplete">
 		Gemt.
 	</string>
-	<string name="ObjectOutOfRange">
-		Script ("object out of range")
-	</string>
 	<string name="GodToolsObjectOwnedBy">
 		Objekt [OBJECT] ejet af [OWNER]
 	</string>
@@ -1770,9 +1767,6 @@ Prøv venligst om lidt igen.
 	</string>
 	<string name="ATTACH_HUD_BOTTOM_RIGHT">
 		HUD Nederst til højre
-	</string>
-	<string name="CursorPos">
-		Linie [LINE], Kolonne [COLUMN]
 	</string>
 	<string name="PanelDirCountFound">
 		[COUNT] fundet

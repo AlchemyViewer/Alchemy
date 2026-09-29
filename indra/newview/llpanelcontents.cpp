@@ -48,7 +48,6 @@
 #include "alfloaterscriptstudio.h"
 #include "llagent.h"
 #include "llpanelobjectinventory.h"
-#include "llpreviewscript.h"
 #include "llresmgr.h"
 #include "llselectmgr.h"
 #include "lltool.h"
