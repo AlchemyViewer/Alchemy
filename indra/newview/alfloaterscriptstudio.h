@@ -428,7 +428,6 @@ private:
     bool sendNotecard(const Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items, std::string& error,
                       U64 request) override;
     U64  newRequest() override;
-    void keepForRecovery(Doc& doc) override;
     void takeLoaded(Doc& doc, const std::string& text) override;
     void worldAsset(const Doc& doc, std::function<void(std::optional<LLUUID>)> told) override;
     void takeCarried(Doc& doc) override { takeCarriedText(doc); }
@@ -788,7 +787,6 @@ private:
     void                         loadScript(const ALScriptRef& ref) override;
     ALScriptNoticeBar*           noticeBar() override { return mNoticeBar; }
     void                         saveCopyToFile() override { mFiles.saveCopy(); }
-    void                         takeUpRecovery(Doc& doc, const ALRecoveryEntry& entry) override { mRecovery.takeUp(doc, entry); }
     void                         discardRecovery(const ALRecoveryEntry& entry) override;
     void                         noticeAction(const std::string& action) override { mOrphans.noticeAction(action); }
     void                         takeOffer(Doc& doc, const std::string& action) override { outputAction(doc, action); }
@@ -1171,7 +1169,7 @@ private:
     // What is unsaved in the tabs, kept against the viewer going.
     ALScriptStudioRecovery             mRecovery{ *this, *this, *this };
     // Saving and compiling the tabs.
-    ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, mExternal, mWeighing, *this };
+    ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, mExternal, mWeighing, mRecovery, *this };
     // The window's side of vim, over its editors.
     ALScriptStudioVim                  mVim{ *this, *this, mSaving, mNavigation, mCommands, *this };
     // Its tabs held open in an editor outside.
@@ -1181,7 +1179,7 @@ private:
     // What its scripts weigh.
     ALScriptStudioWeighing             mWeighing{ *this, *this, mSaving, *this };
     // Its tabs whose script is gone or out of reach, and the notice.
-    ALScriptStudioOrphans              mOrphans{ *this, *this, mSaving, *this };
+    ALScriptStudioOrphans              mOrphans{ *this, *this, mSaving, mRecovery, *this };
     // The places gone from, and the previews a list opens as it is walked.
     ALScriptNavigation                 mNavigation{ *this, *this, *this };
     // Its names looked up across the object's scripts, and renamed.

@@ -33,6 +33,7 @@
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudiochecking.h"
 #include "alscriptstudioorphans.h"
+#include "alscriptstudiorecovery.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiotabs.h"
 #include "alscriptstudioweighing.h"
@@ -40,7 +41,7 @@
 
 #include <algorithm>
 
-ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mExternal(external), mWeighing(weighing), mWindow(window)
+ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, ALScriptStudioRecovery& recovery, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mExternal(external), mWeighing(weighing), mRecovery(recovery), mWindow(window)
 {
 }
 
@@ -752,7 +753,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
     }
     // Saved: nothing of it to keep against a crash any more, or only what
     // was typed while the save was on its way.
-    mWindow.keepForRecovery(doc);
+    mRecovery.keep(doc);
     if (result.kind == ALScriptKind::Notecard)
     {
         // The asset carries what was sent, and the server can copy it out.

@@ -40,6 +40,7 @@ class ALScriptStudioAnalysis;
 class ALScriptNavigation;
 class ALScriptExternalEditor;
 class ALScriptStudioWeighing;
+class ALScriptStudioRecovery;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 
@@ -129,9 +130,6 @@ public:
         // A kept text loaded under its item, what it holds carried over:
         // tried now, and a few more times after if it fails.
         virtual void retryLoad(Doc& doc) = 0;
-        // Written to the recovery store as it stands: saved, what is kept
-        // of it against a crash forgotten.
-        virtual void keepForRecovery(Doc& doc) = 0;
 
         // --- closing -------------------------------------------------------------------
 
@@ -147,7 +145,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, Window& window);
+    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, ALScriptStudioRecovery& recovery, Window& window);
 
     // --- saving ------------------------------------------------------------------------
 
@@ -227,6 +225,7 @@ private:
     ALScriptNavigation&     mNavigation;
     ALScriptExternalEditor& mExternal;
     ALScriptStudioWeighing& mWeighing;
+    ALScriptStudioRecovery& mRecovery;
     Window&                 mWindow;
     // Held while this is, for what answers later to know it still is.
     std::shared_ptr<bool>   mAlive = std::make_shared<bool>(true);

@@ -2444,6 +2444,7 @@ if(AL_BUILD_TESTS)
     alscriptnavigation.cpp
     alscriptsaveflow.cpp
     alscriptstudiodoc.cpp
+    alscriptstudiorecovery.cpp
     alscriptstudiofileio.cpp
     alscriptstudioplaces.cpp
     alscriptstudioweighing.cpp
@@ -2804,7 +2805,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES al_studio_test_common llui alscript ${test_libs}
     PCH al_studio_test_common
-    SOURCES alscriptnoticebar.cpp alscriptstudiorecovery.cpp
+    SOURCES alscriptnoticebar.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

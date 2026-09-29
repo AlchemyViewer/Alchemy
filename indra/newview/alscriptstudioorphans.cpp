@@ -93,7 +93,7 @@ namespace
     }
 }
 
-ALScriptStudioOrphans::ALScriptStudioOrphans(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, Window& window) : mServices(services), mTabs(tabs), mSaves(saves), mWindow(window)
+ALScriptStudioOrphans::ALScriptStudioOrphans(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, ALScriptStudioRecovery& recovery, Window& window) : mServices(services), mTabs(tabs), mSaves(saves), mRecovery(recovery), mWindow(window)
 {
 }
 
@@ -180,7 +180,7 @@ void ALScriptStudioOrphans::reattach(Doc& doc)
     // whether it runs, whether it may be changed, the items a notecard's
     // asset carries. Written first, so that nothing typed is only in the
     // tab while it loads.
-    mWindow.keepForRecovery(doc);
+    mRecovery.keep(doc);
     ALRecoveryEntry holding = ALScriptStudioRecovery::entryOf(doc);
     doc.orphan->detached = false;
     doc.recovering       = holding;
@@ -247,7 +247,7 @@ F64 ALScriptStudioOrphans::check()
         {
             // What was typed is on disk now, not only in the tab, and the
             // Output says what can be done with it.
-            mWindow.keepForRecovery(doc);
+            mRecovery.keep(doc);
             mServices.report(mServices.words(doc.orphan->kind == Orphan::Away ? "OrphanAwayKept" : "OrphanRemovedKept", args), true, &doc,
                              doc.file.empty() ? std::vector<std::string>{ "copy", "export" } : std::vector<std::string>{ "export" });
         }
@@ -430,7 +430,7 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
         const ALRecoveryEntry entry = *doc->recoverable;
         doc->recoverable.reset();
         mWindow.endCompare(*doc);
-        mWindow.takeUpRecovery(*doc, entry);
+        mRecovery.takeUp(*doc, entry);
         // A tab left holding it on its own has said why instead.
         if (doc->orphan->kind == Orphan::None)
         {

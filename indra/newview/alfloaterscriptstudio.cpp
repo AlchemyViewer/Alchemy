@@ -1355,11 +1355,6 @@ void ALFloaterScriptStudio::runPreprocessor(const Doc& doc, std::function<void(c
     ALScriptPreprocessor::instance().run(mChecking.preprocessRequest(doc), std::move(answer));
 }
 
-void ALFloaterScriptStudio::keepForRecovery(Doc& doc)
-{
-    mRecovery.keep(doc);
-}
-
 void ALFloaterScriptStudio::showProblems()
 {
     showBottom("problems_tab");

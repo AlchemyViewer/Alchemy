@@ -55,7 +55,6 @@ namespace
     {
         Reach reach(const Doc& doc) override { return reaches.count(doc.id) ? reaches[doc.id] : Reach(); }
         void  refreshPlace(Doc& doc) override { placed.push_back(doc.id); }
-        void  keepForRecovery(Doc& doc) override { kept.push_back(doc.id); }
         void  loadScript(const ALScriptRef& ref) override { loads.push_back(ref); }
         ALScriptNoticeBar* noticeBar() override { return bar; }
         void               refreshToolbar() override { ++toolbars; }
@@ -63,7 +62,6 @@ namespace
         void               saveCopyToFile() override { did.push_back("export"); }
         void               saveAsked(Doc& doc) override { did.push_back("save " + doc.id); }
         void               takeOffer(Doc& doc, const std::string& action) override { did.push_back("offer " + doc.id + ": " + action); }
-        void               takeUpRecovery(Doc& doc, const ALRecoveryEntry& entry) override { did.push_back("restore " + doc.id); }
         void               discardRecovery(const ALRecoveryEntry&) override { did.push_back("discard"); }
         void               takeCarriedText(Doc& doc) override
         {
@@ -78,7 +76,7 @@ namespace
         void endCompare(Doc& doc) override { did.push_back("source " + doc.id); }
 
         std::map<std::string, Reach> reaches;
-        Names                        placed, kept, did;
+        Names                        placed, did;
         std::vector<ALScriptRef>     loads;
         ALScriptNoticeBar*           bar      = nullptr;
         S32                          toolbars = 0;
@@ -100,6 +98,7 @@ namespace tut
     {
         al_studio_test::StudioWindowOf<FakeNoticeWindow> window;
         FakeOrphansWindow                                studio;
+        std::unique_ptr<al_studio_test::StudioRecovery>  recovery;
         std::unique_ptr<Orphans>                         unit;
 
         al_studio_test::FakeServices& services() { return window.services(); }
@@ -119,7 +118,8 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<Orphans>(services(), studio, studio, studio);
+            recovery = std::make_unique<al_studio_test::StudioRecovery>(services(), &studio);
+            unit     = std::make_unique<Orphans>(services(), studio, studio, recovery->unit, studio);
             return *unit;
         }
         // A tab of a script in an object, or in the inventory, loaded and
@@ -127,6 +127,7 @@ namespace tut
         Doc& tab(const std::string& id, bool inventory = false)
         {
             Doc& doc = services().addDoc(id, ALScriptRef(inventory ? LLUUID::null : LLUUID::generateNewID(), LLUUID::generateNewID()), id);
+            doc.recoveryKey = ALRecoveryStore::keyOf(doc.ref.object, doc.ref.item, std::string());
             doc.name       = id;
             doc.loaded     = true;
             doc.modifiable = true;
@@ -228,7 +229,7 @@ namespace tut
         b.editor->insertText(" typed");
         studio.reaches["b"].heldByPrim = false;
         unit.check();
-        ensure("gone with changes: kept", b.orphan->kind == Orphan::Removed && studio.kept == Names{ "b" });
+        ensure("gone with changes: kept", b.orphan->kind == Orphan::Removed && recovery->keptFor(b.recoveryKey) == 1);
         ensure("and said, with what can be done", services().reports.back().text == said("OrphanRemovedKept", "[NAME]", "b") &&
                                                        services().reports.back().actions == Names{ "copy", "export" });
         studio.reaches["a"].objectThere = true;
@@ -253,7 +254,10 @@ namespace tut
         Orphans& unit = make();
         Doc&     a    = tab("a");
         a.orphan->detached = true;
-        a.editor->setText("kept text");
+        // A kept text, unsaved over nothing loaded.
+        a.editor->setText("kept");
+        a.editor->setCaret(a.editor->document().end());
+        a.editor->insertText(" text");
         a.orphan->reattachTries = ALRecoveryRetry::TRIES;
         unit.check();
         ensure("tried out: waits for a person", studio.loads.empty());
@@ -265,7 +269,8 @@ namespace tut
         a.orphan->nextReattach = 0.0;
         unit.check();
         ensure("loaded", studio.loads.size() == 1 && studio.loads[0] == a.ref);
-        ensure("what it holds kept first, and carried over", studio.kept == Names{ "a" } && a.carriedText && *a.carriedText == "kept text");
+        ensure("what it holds kept first, and carried over",
+               recovery->keptFor(a.recoveryKey) == 1 && a.carriedText && *a.carriedText == "kept text");
         ensure("not loaded, and not to be typed in, until it is", !a.loaded && a.editor->isReadOnly() && !a.orphan->detached);
         Doc& u = tab("u");
         u.orphan->detached = true;
@@ -331,10 +336,10 @@ namespace tut
         Orphans& unit = make();
         Doc&     a    = tab("a");
         services().front = 0;
-        a.recoverable    = ALRecoveryEntry();
+        a.recoverable    = recovery->leftFor(a, "restored text");
         unit.noticeAction("restore");
-        ensure("restored, the source in front", studio.did == Names{ "source a", "restore a" } && !a.recoverable &&
-                               services().reports.back().text == said("RecoveryRestored", "[NAME]", "a"));
+        ensure("restored, the source in front", studio.did == Names{ "source a", "carried a: restored text" } && !a.recoverable &&
+                                                     services().reports.back().text == said("RecoveryRestored", "[NAME]", "a"));
         a.recoverable = ALRecoveryEntry();
         unit.noticeAction("discard_left");
         ensure("discarded", studio.did.back() == "discard" && !a.recoverable);
@@ -344,7 +349,8 @@ namespace tut
         unit.noticeAction("copy");
         unit.noticeAction("export");
         unit.noticeAction("save");
-        ensure("a copy, a file, a save", studio.did == Names{ "source a", "restore a", "source a", "discard", "copy a", "export", "save a" });
+        ensure("a copy, a file, a save",
+               studio.did == Names{ "source a", "carried a: restored text", "source a", "discard", "copy a", "export", "save a" });
         a.orphan->reattachTries = 3;
         unit.noticeAction("retry_load");
         ensure("not detached: nothing to try", studio.loads.empty());
@@ -423,15 +429,16 @@ namespace tut
         Orphans& unit    = make();
         Doc&     a       = tab("a");
         services().front = 0;
-        ALRecoveryEntry kept;
-        kept.text     = "default { state_entry() { } }";
+        ALRecoveryEntry kept = recovery->leftFor(a, "default { state_entry() { } }");
+        recovery->store->load(kept);
         a.recoverable = kept;
         unit.noticeAction("compare_kept");
         ensure_equals("now beside kept", studio.did.back(),
                       "compare a: default {} | default { state_entry() { } } (" + said("CompareNow") + " | " + said("CompareKept", "[WHEN]", kept.whenSaid()) + ")");
         ensure("still offered", a.recoverable.has_value());
         unit.noticeAction("restore");
-        ensure("the source in front first", studio.did[studio.did.size() - 2] == "source a" && studio.did.back() == "restore a");
+        ensure("the source in front first",
+               studio.did[studio.did.size() - 2] == "source a" && studio.did.back() == "carried a: default { state_entry() { } }");
     }
 
     template<> template<>

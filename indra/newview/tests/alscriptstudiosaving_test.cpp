@@ -128,7 +128,6 @@ namespace
         void refreshToolbar() override {}
         void refreshTrailer(Doc&) override {}
         void fillTabs() override {}
-        void keepForRecovery(Doc& doc) override { recovered.push_back(doc.id); }
         bool quittingOnUs() const override { return false; }
         void stopClosing() override { ++stops; }
         // Let go of, as the window does: the tab is gone.
@@ -154,7 +153,7 @@ namespace
         bool                                                preprocessor = false;
         std::string                                         refuse;
         std::function<void(const ALPreprocessor::Result&)> run;
-        Names                                               tidied, analysed, runs, files, reattached, recovered, closed, known;
+        Names                                               tidied, analysed, runs, files, reattached, closed, known;
         std::vector<Sent>                                   sent;
         Names                                               notecards;
         U64                                                 requests = 0;
@@ -187,6 +186,7 @@ namespace tut
         std::unique_ptr<al_studio_test::StudioNavigation> navigation;
         std::unique_ptr<al_studio_test::StudioExternal>   external;
         std::unique_ptr<al_studio_test::StudioWeighing>   weighing;
+        std::unique_ptr<al_studio_test::StudioRecovery>   recovery;
         std::unique_ptr<ALScriptStudioSaving>             saving;
 
         ALScriptStudioSaving& make()
@@ -200,7 +200,9 @@ namespace tut
             navigation             = std::make_unique<al_studio_test::StudioNavigation>(services);
             external               = std::make_unique<al_studio_test::StudioExternal>(services);
             weighing               = std::make_unique<al_studio_test::StudioWeighing>(services);
-            saving = std::make_unique<ALScriptStudioSaving>(services, studio, studio, navigation->unit, external->unit, weighing->unit, studio);
+            recovery               = std::make_unique<al_studio_test::StudioRecovery>(services);
+            saving = std::make_unique<ALScriptStudioSaving>(services, studio, studio, navigation->unit, external->unit, weighing->unit,
+                                                            recovery->unit, studio);
             return *saving;
         }
 
@@ -211,9 +213,10 @@ namespace tut
             LLUUID object, item;
             object.generate();
             item.generate();
-            Doc& doc       = services.addDoc(id, ALScriptRef(object, item), id);
-            doc.loaded     = true;
-            doc.modifiable = true;
+            Doc& doc        = services.addDoc(id, ALScriptRef(object, item), id);
+            doc.loaded      = true;
+            doc.modifiable  = true;
+            doc.recoveryKey = ALRecoveryStore::keyOf(object, item, std::string());
             ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
             p.name     = "editor_" + id;
             p.rect     = LLRect(0, 200, 400, 0);
@@ -269,6 +272,9 @@ namespace tut
 
         Doc& card     = tab("card", "some words");
         card.notecard = true;
+        // Kept against a crash before, which a save lets go of.
+        recovery->store->write(ALScriptStudioRecovery::entryOf(card));
+        ensure("kept before", recovery->keptFor(card.recoveryKey) == 1);
         saving.save(card);
         ensure("a notecard sent as it stands", studio.notecards == Names{ "some words" });
         ensure("and not tidied", studio.tidied.size() == 1);
@@ -276,7 +282,7 @@ namespace tut
         saved.kind          = ALScriptKind::Notecard;
         saving.compiled(saved);
         ensure_equals("its answer said", lastSaid(), std::string("SavedNotecard"));
-        ensure("and kept as saved", studio.recovered == Names{ "card" } && !card.save.underway());
+        ensure("and kept as saved: what was kept let go of", recovery->keptFor(card.recoveryKey) == 0 && !card.save.underway());
 
         Doc& away      = tab("away", "default {}");
         away.orphan->kind    = Doc::Orphan::Away;
@@ -386,7 +392,7 @@ namespace tut
         ensure_equals("compiled", lastSaid(), std::string("Compiled"));
         ensure("what was typed since still unsaved", doc.editor->isDirty());
         ensure("the experience it went with is the one it runs under", !doc.experienceChosen && doc.experienceKnown);
-        ensure("kept for recovery as it is now", studio.recovered == Names{ "a" });
+        ensure("kept for recovery as it is now", recovery->keptFor(doc.recoveryKey) == 1);
 
         Doc& clean = tab("clean", "default {}");
         type(clean, " ");

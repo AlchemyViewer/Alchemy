@@ -27,15 +27,17 @@
 
 #include "linden_common.h"
 
-#include "../alscriptstudiodoc.h"
+#include "../alrecovery.h"
 #include "../alscriptexternaleditor.h"
 #include "../alscriptlookup.h"
 #include "../alscriptnavigation.h"
-#include "../alscriptstudioweighing.h"
 #include "../alscriptstudioanalysis.h"
+#include "../alscriptstudiodoc.h"
+#include "../alscriptstudiorecovery.h"
 #include "../alscriptstudiosaves.h"
 #include "../alscriptstudioservices.h"
 #include "../alscriptstudiotabs.h"
+#include "../alscriptstudioweighing.h"
 
 #include "alcodeeditor.h"
 #include "aldockpanel.h"
@@ -44,6 +46,7 @@
 #include "alpanelist.h"
 #include "alscopebar.h"
 #include "altabstrip.h"
+#include "fsyspath.h"
 #include "llfloater.h"
 #include "llpanel.h"
 #include "lluictrlfactory.h"
@@ -51,6 +54,7 @@
 
 #include "../../llui/tests/alheadlessui_fixture.h"
 
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -326,6 +330,71 @@ namespace al_studio_test
         ALScriptLookup unit;
         S32            shown = 0;
         S32            named = 0;
+    };
+
+    // Recovery, for a unit given it (ALScriptStudioRecovery): over the tabs
+    // a test gives -- its own fake, to see a kept text taken up -- or ones
+    // that do nothing, and a store of its own, this session's, in a folder
+    // of its own, taken out of the way as it goes; its window has no other
+    // window to take a text up, no script in hand, and makes nothing an
+    // orphan.
+    struct StudioRecovery final : public ALScriptStudioRecovery::Window
+    {
+        explicit StudioRecovery(ALScriptStudioServices& services, ALScriptStudioTabs* given = nullptr)
+        :   folder(fsyspath(std::filesystem::temp_directory_path() / fsyspath("alscriptstudio_" + LLUUID::generateNewID().asString())).string()),
+            unit(services, given ? *given : tabs, *this)
+        {
+            std::filesystem::create_directories(fsyspath(folder));
+            store = std::make_unique<ALRecoveryStore>(folder, "this-session");
+            ALRecovery::useStore(store.get());
+        }
+        ~StudioRecovery()
+        {
+            ALRecovery::useStore(nullptr);
+            store.reset();
+            std::error_code ignored;
+            std::filesystem::remove_all(fsyspath(folder), ignored);
+        }
+        bool recoverElsewhere(const ALRecoveryEntry&) override { return false; }
+        bool scriptInHand(const ALScriptRef&) const override { return false; }
+        void openOrphan(const ALRecoveryEntry&, ALScriptStudioDoc::Orphan) override {}
+        void becomeOrphan(ALScriptStudioDoc&, const ALRecoveryEntry&, ALScriptStudioDoc::Orphan) override {}
+        ALScriptStudioDoc::Orphan failedAs(const ALScriptStudioDoc&, ALScriptLoaded::Failure) const override
+        {
+            return ALScriptStudioDoc::Orphan::Unloaded;
+        }
+        void pick(std::vector<ALQuickOpen::Candidate>, const std::string&, const std::string&, std::function<void(const std::string&)>,
+                  std::function<void(const std::string&)>) override
+        {
+        }
+
+        // How many entries this session keeps for a key.
+        size_t keptFor(const std::string& key) const
+        {
+            size_t count = 0;
+            for (const ALRecoveryEntry& entry : store->list())
+            {
+                count += entry.key == key && entry.session == "this-session" && entry.state != ALRecoveryEntry::State::Discarded;
+            }
+            return count;
+        }
+        // A text of a tab's left by an earlier session, as this one's store
+        // finds it.
+        ALRecoveryEntry leftFor(const ALScriptStudioDoc& doc, const std::string& text)
+        {
+            ALRecoveryStore other(folder, "old-session");
+            ALRecoveryEntry entry = ALScriptStudioRecovery::entryOf(doc);
+            entry.text            = text;
+            entry.history         = LLSD();
+            entry.historyWritten.clear();
+            other.write(entry);
+            return store->leftFor(entry.key).value_or(ALRecoveryEntry());
+        }
+
+        QuietTabs                        tabs;
+        std::string                      folder;
+        std::unique_ptr<ALRecoveryStore> store;
+        ALScriptStudioRecovery           unit;
     };
 
     // Weighing, for a unit given it (ALScriptStudioWeighing): over an

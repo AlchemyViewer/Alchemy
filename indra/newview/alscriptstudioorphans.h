@@ -32,6 +32,7 @@
 #include <string>
 
 class ALScriptStudioSaves;
+class ALScriptStudioRecovery;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 struct ALRecoveryEntry;
@@ -133,21 +134,18 @@ public:
         // is, while it is in sight, taken again.
         virtual Reach reach(const Doc& doc)    = 0;
         virtual void  refreshPlace(Doc& doc)   = 0;
-        // What a tab holds kept against a crash, now; and its script
-        // loaded again, the answer going where every load's goes.
-        virtual void keepForRecovery(Doc& doc)         = 0;
+        // A tab's script loaded again, the answer going where every load's
+        // goes.
         virtual void loadScript(const ALScriptRef& ref) = 0;
         // The notice.
         virtual ALScriptNoticeBar* noticeBar() = 0;
-        // The notice's actions: a copy in the inventory or on disk; a save
-        // again; a text kept from an earlier session taken up, or thrown
-        // away.
+        // The notice's actions: a copy in the inventory or on disk; a text
+        // kept from an earlier session thrown away.
         virtual void saveCopyToInventory(Doc& doc)                                           = 0;
         // What the last word about a tab offered, done as its link in
         // Output does it (Doc::offer).
         virtual void takeOffer(Doc& doc, const std::string& action)                          = 0;
         virtual void saveCopyToFile()                                                        = 0;
-        virtual void takeUpRecovery(Doc& doc, const ALRecoveryEntry& entry)            = 0;
         virtual void discardRecovery(const ALRecoveryEntry& entry)                     = 0;
         // Two texts compared in the tab's place, each with what it is; and
         // the tab's source back in front where it shows a comparison.
@@ -159,7 +157,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioOrphans(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, Window& window);
+    ALScriptStudioOrphans(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, ALScriptStudioRecovery& recovery, Window& window);
 
     // Every tab looked at again: what it is called and where, what it is
     // now -- an object out of sight a moment not yet gone -- said where it
@@ -183,5 +181,6 @@ private:
     ALScriptStudioServices& mServices;
     ALScriptStudioTabs&     mTabs;
     ALScriptStudioSaves&    mSaves;
+    ALScriptStudioRecovery& mRecovery;
     Window&                 mWindow;
 };
