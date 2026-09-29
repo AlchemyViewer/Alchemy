@@ -590,7 +590,18 @@ ALTextPos ALTextDocument::nextCluster(ALTextPos pos) const
     {
         return pos.line + 1 < lineCount() ? ALTextPos(pos.line + 1, 0) : pos;
     }
-    return ALTextPos(pos.line, static_cast<S32>(utf8str_step_grapheme_forward(mLines[pos.line], pos.column)));
+    // A plain ASCII character with another after it, or the line's end, is
+    // a cluster of its own -- all that can join to one is not ASCII, but
+    // for a carriage return and the line feed after it -- and needs no
+    // walk of the line to say so.
+    const std::string&  line = mLines[pos.line];
+    const size_t        at   = static_cast<size_t>(pos.column);
+    const unsigned char c    = static_cast<unsigned char>(line[at]);
+    if (c < 0x80 && (at + 1 == line.size() || (static_cast<unsigned char>(line[at + 1]) < 0x80 && !(c == '\r' && line[at + 1] == '\n'))))
+    {
+        return ALTextPos(pos.line, pos.column + 1);
+    }
+    return ALTextPos(pos.line, static_cast<S32>(utf8str_step_grapheme_forward(line, pos.column)));
 }
 
 ALTextPos ALTextDocument::prevCluster(ALTextPos pos) const
@@ -600,7 +611,16 @@ ALTextPos ALTextDocument::prevCluster(ALTextPos pos) const
     {
         return pos.line > 0 ? lineEnd(pos.line - 1) : pos;
     }
-    return ALTextPos(pos.line, static_cast<S32>(utf8str_step_grapheme_backward(mLines[pos.line], pos.column)));
+    // Likewise back over a plain ASCII character with another before it,
+    // or the line's start.
+    const std::string&  line = mLines[pos.line];
+    const size_t        at   = static_cast<size_t>(pos.column) - 1;
+    const unsigned char c    = static_cast<unsigned char>(line[at]);
+    if (c < 0x80 && (at == 0 || (static_cast<unsigned char>(line[at - 1]) < 0x80 && !(line[at - 1] == '\r' && c == '\n'))))
+    {
+        return ALTextPos(pos.line, pos.column - 1);
+    }
+    return ALTextPos(pos.line, static_cast<S32>(utf8str_step_grapheme_backward(line, pos.column)));
 }
 
 ALTextPos ALTextDocument::nextWord(ALTextPos pos) const
