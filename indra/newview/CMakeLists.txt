@@ -207,6 +207,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocommands.cpp
     alscriptstudiodoc.cpp
     alscriptstudiofileio.cpp
+    alscriptstudioglue.cpp
     alscriptstudiofiles.cpp
     alscriptstudioorphans.cpp
     alscriptstudioplaces.cpp
@@ -1044,6 +1045,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocommands.h
     alscriptstudiodoc.h
     alscriptstudiofileio.h
+    alscriptstudioglue.h
     alscriptstudiofiles.h
     alscriptstudioorphans.h
     alscriptstudioplaces.h

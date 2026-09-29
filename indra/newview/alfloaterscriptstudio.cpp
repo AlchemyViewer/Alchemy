@@ -41,6 +41,7 @@
 #include "alscriptpreprocessor.h"
 #include "alscriptweightspane.h"
 #include "alscriptstudiofileio.h"
+#include "alscriptstudioglue.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudiovimrc.h"
 #include "alscriptworkspace.h"
@@ -75,7 +76,6 @@
 #include "lldirpicker.h"
 #include "lleditmenuhandler.h"
 #include "llfocusmgr.h"
-#include "llfilepicker.h"
 #include "llfiltereditor.h"
 #include "llfloaterperms.h"
 #include "llexperiencecache.h"
@@ -94,7 +94,6 @@
 #include "lltextbox.h"
 #include "lltexteditor.h"
 #include "lltrans.h"
-#include "llexternaleditor.h"
 #include "lllogchat.h"
 #include "llscripteditorws.h"
 #include "llui.h"
@@ -105,7 +104,6 @@
 #include "llviewernetwork.h"
 #include "llviewerinventory.h"
 #include "llweb.h"
-#include "llviewermenufile.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
@@ -4396,19 +4394,9 @@ void ALFloaterScriptStudio::startEditor(Doc& doc, const std::string& filename, b
         report(getString("ExternalOpenedVSCode", args), false, &doc);
         return;
     }
-    LLExternalEditor             editor;
-    LLExternalEditor::EErrorCode status = editor.setCommand("LL_SCRIPT_EDITOR");
-    if (status != LLExternalEditor::EC_SUCCESS)
+    if (std::string error; !ALScriptStudioGlue::startEditor(filename, doc.editor->caret().line + 1, error))
     {
-        const std::string message = status == LLExternalEditor::EC_NOT_SPECIFIED ? LLTrans::getString("ExternalEditorNotSet")
-                                                                                   : LLExternalEditor::getErrorMessage(status);
-        LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", message));
-        return;
-    }
-    status = editor.run(filename, doc.editor->caret().line + 1);
-    if (status != LLExternalEditor::EC_SUCCESS)
-    {
-        LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLExternalEditor::getErrorMessage(status)));
+        LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", error));
         return;
     }
     report(getString("ExternalOpened", args), false, &doc);
@@ -4417,27 +4405,23 @@ void ALFloaterScriptStudio::startEditor(Doc& doc, const std::string& filename, b
 void ALFloaterScriptStudio::pickFilesToOpen(bool several, std::function<void(const std::vector<std::string>& files)> chosen)
 {
     const LLHandle<LLFloater> handle = getHandle();
-    LLFilePickerReplyThread::startPicker(
-        [handle, chosen](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
-            if (handle.get())
-            {
-                chosen(files);
-            }
-        },
-        LLFilePicker::FFLOAD_SCRIPT, several);
+    ALScriptStudioGlue::pickToOpen(several, [handle, chosen](const std::vector<std::string>& files) {
+        if (handle.get())
+        {
+            chosen(files);
+        }
+    });
 }
 
 void ALFloaterScriptStudio::pickFileToSave(const std::string& name, std::function<void(const std::vector<std::string>& files)> chosen)
 {
     const LLHandle<LLFloater> handle = getHandle();
-    LLFilePickerReplyThread::startPicker(
-        [handle, chosen](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
-            if (handle.get())
-            {
-                chosen(files);
-            }
-        },
-        LLFilePicker::FFSAVE_SCRIPT, name);
+    ALScriptStudioGlue::pickToSave(name, [handle, chosen](const std::vector<std::string>& files) {
+        if (handle.get())
+        {
+            chosen(files);
+        }
+    });
 }
 
 void ALFloaterScriptStudio::askReload(const Doc& doc, std::function<void(bool reload)> answered)
