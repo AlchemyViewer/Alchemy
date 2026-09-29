@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "alscripttypes.h"
+
 #include "llassettype.h"
 #include "llextendedstatus.h"
 #include "llinventory.h"
@@ -54,41 +56,6 @@ class LLEventTimer;
 class LLInventoryItem;
 class LLMessageSystem;
 class LLViewerObject;
-
-// Where a script lives: an item of the agent's inventory, or an item of an
-// object's contents. The one identity for a script wherever the viewer
-// meets it, so that the studio, the legacy floaters, the bridge and the
-// compile queue agree about which script is which -- the floater keys and
-// the bridge's subscription hash both come from it.
-struct ALScriptRef
-{
-    // Null for the agent's inventory.
-    LLUUID object;
-    LLUUID item;
-
-    ALScriptRef() = default;
-    ALScriptRef(const LLUUID& object_in, const LLUUID& item_in) : object(object_in), item(item_in) {}
-
-    bool inInventory() const { return object.isNull(); }
-    bool isNull() const { return item.isNull(); }
-
-    // The bridge's subscription id, which is also the name of the temp
-    // file an external editor is given.
-    std::string id() const;
-    // A floater key, and back.
-    LLSD               key() const;
-    static ALScriptRef fromKey(const LLSD& key);
-
-    friend bool operator==(const ALScriptRef& a, const ALScriptRef& b) { return a.object == b.object && a.item == b.item; }
-    friend bool operator!=(const ALScriptRef& a, const ALScriptRef& b) { return !(a == b); }
-    // For a map by it.
-    friend size_t hash_value(const ALScriptRef& ref) noexcept
-    {
-        size_t seed = hash_value(ref.object);
-        boost::hash_combine(seed, hash_value(ref.item));
-        return seed;
-    }
-};
 
 // What a script is and what happens to it: its language and compile target
 // decided once, its text fetched, its text uploaded and compiled with the

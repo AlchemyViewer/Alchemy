@@ -217,6 +217,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiovimrc.cpp
     alscriptstudioweighing.cpp
     alscriptstudiowords.cpp
+    alscripttypes.cpp
     alscriptweightspane.cpp
     alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
@@ -1052,6 +1053,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudioweighing.h
     alscriptstudiowords.h
     alscriptstudioservices.h
+    alscripttypes.h
     alscriptweightspane.h
     alscriptworkspace.h
     alterrainsurfacemaps.h

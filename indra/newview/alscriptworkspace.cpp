@@ -45,7 +45,6 @@
 #include "llinventory.h"
 #include "llinventorydefines.h"
 #include "llinventorymodel.h"
-#include "llmd5.h"
 #include "llinventoryobserver.h"
 #include "llnotecard.h"
 #include "llselectmgr.h"
@@ -258,34 +257,6 @@ namespace
         }
         LLAppViewer::instance()->postToMainCoro(std::forward<Call>(call));
     }
-}
-
-// --- ALScriptRef -------------------------------------------------------------
-
-std::string ALScriptRef::id() const
-{
-    const std::string                 joined = object.asString() + "_" + item.asString();
-    std::array<char, MD5HEX_STR_SIZE> hex    = {};
-    LLMD5                             hash(reinterpret_cast<const U8*>(joined.c_str()));
-    hash.hex_digest(hex.data());
-    return std::string(hex.data());
-}
-
-LLSD ALScriptRef::key() const
-{
-    LLSD key;
-    key["taskid"] = object;
-    key["itemid"] = item;
-    return key;
-}
-
-ALScriptRef ALScriptRef::fromKey(const LLSD& key)
-{
-    if (key.isMap())
-    {
-        return ALScriptRef(key["taskid"].asUUID(), key["itemid"].asUUID());
-    }
-    return ALScriptRef(LLUUID::null, key.asUUID());
 }
 
 // --- language ------------------------------------------------------------------
