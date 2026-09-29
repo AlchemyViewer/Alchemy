@@ -209,6 +209,11 @@ struct ALScriptStudioDoc
     // without being held, and replaced by the next one looked at, until
     // it is typed in, saved, gone to or double-clicked.
     bool                                       preview = false;
+    // The file watched for changes made to it outside the studio: the
+    // tab's own on disk (ALScriptStudioFiles), or the copy under the
+    // temp folder an external editor was given, watched for the editor's
+    // saves (ALScriptExternalEditor).
+    std::unique_ptr<ALWatchedFile>             watch;
     // A file changed on disk while this tab had unsaved changes, and
     // the author asked what to do: once, however often it changes.
     bool                                       askingReload = false;
@@ -705,11 +710,8 @@ struct ALScriptStudioDoc
     // write the file back, is the save's (ALScriptSaveFlow::external).
     struct External
     {
-        // The file under the temp folder the editor was given, watched
-        // for the editor's saves -- or the tab's file on disk, watched
-        // for changes made to it outside; and the log beside the copy the
+        // The log beside the copy the editor was given, which the
         // compiler's words go to, held while the tab has it.
-        std::unique_ptr<ALWatchedFile>            watch;
         std::shared_ptr<ALScriptTempFiles::Claim> log;
         // Whether the bridge was told, so that VS Code can subscribe.
         bool                           subscribed = false;

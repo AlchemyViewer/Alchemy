@@ -83,15 +83,15 @@ void ALScriptExternalEditor::edit(Doc& doc)
         // outside change does.
         mWindow.watchFile(doc);
     }
-    else if (!external.watch || external.watch->path() != filename)
+    else if (!doc.watch || doc.watch->path() != filename)
     {
         // Watched from what was just written, which is no save of the
         // editor's: a tab with unsaved changes is not saved for being
         // opened outside.
-        external.watch.reset();
+        doc.watch.reset();
         const std::weak_ptr<bool> alive = mAlive;
         const std::string         id    = doc.id;
-        external.watch                  = std::make_unique<StudioLiveFile>(
+        doc.watch                       = std::make_unique<StudioLiveFile>(
             filename,
             [this, alive, id](const std::string& file) {
                 if (alive.lock())
@@ -103,7 +103,7 @@ void ALScriptExternalEditor::edit(Doc& doc)
     }
     else
     {
-        external.watch->seen();
+        doc.watch->seen();
     }
     if (on_disk)
     {
@@ -207,11 +207,11 @@ void ALScriptExternalEditor::take(Doc& doc, std::string text)
 
 void ALScriptExternalEditor::sync(Doc& doc)
 {
-    if (!doc.external.watch)
+    if (!doc.watch)
     {
         return;
     }
-    const std::string filename = doc.external.watch->path();
+    const std::string filename = doc.watch->path();
     if (!gDirUtilp->fileExists(filename))
     {
         return;
@@ -227,7 +227,7 @@ void ALScriptExternalEditor::sync(Doc& doc)
         return;
     }
     writeWhole(filename, text);
-    doc.external.watch->seen();
+    doc.watch->seen();
 }
 
 void ALScriptExternalEditor::log(Doc& doc, const ALScriptCompileResult& result)
@@ -259,7 +259,7 @@ void ALScriptExternalEditor::stop(Doc& doc)
         mWindow.unsubscribe(doc);
         doc.external.subscribed = false;
     }
-    doc.external.watch.reset();
+    doc.watch.reset();
     doc.external.log.reset();
     doc.save.endExternal();
 }

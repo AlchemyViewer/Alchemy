@@ -77,7 +77,7 @@ ALScriptStudioFiles::Language ALScriptStudioFiles::languageOf(const std::string&
 
 void ALScriptStudioFiles::watch(Doc& doc)
 {
-    if (doc.file.empty() || doc.external.watch)
+    if (doc.file.empty() || doc.watch)
     {
         return;
     }
@@ -85,7 +85,7 @@ void ALScriptStudioFiles::watch(Doc& doc)
     // editor the studio started, or anything else.
     const std::weak_ptr<bool> alive = mAlive;
     const std::string         id    = doc.id;
-    doc.external.watch              = std::make_unique<StudioLiveFile>(
+    doc.watch                       = std::make_unique<StudioLiveFile>(
         doc.file,
         [this, alive, id](const std::string& file) {
             if (alive.lock())
@@ -165,10 +165,10 @@ void ALScriptStudioFiles::write(Doc& doc)
         mWindow.saveStopped(doc);
         return;
     }
-    if (doc.external.watch)
+    if (doc.watch)
     {
         // The watcher on the file: this write is not an outside change.
-        doc.external.watch->seen();
+        doc.watch->seen();
     }
     mServices.report(mServices.words("SavedToFile", args), false, &doc);
     mWindow.fileSettled(doc);
@@ -319,7 +319,7 @@ void ALScriptStudioFiles::chosenToSaveAs(const std::string& id, const std::vecto
     // The tab is the new file from here on: keyed by it, named after
     // it, watched for changes to it, its problems its own, and in the
     // language its name says.
-    doc->external.watch.reset();
+    doc->watch.reset();
     mWindow.becomeFile(*doc, path);
     watch(*doc);
     noteFile(path);

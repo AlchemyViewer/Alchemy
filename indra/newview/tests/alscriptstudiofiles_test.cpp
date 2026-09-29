@@ -300,7 +300,7 @@ namespace tut
         f.editor->setText("new");
         unit.write(f);
         ensure_equals("written", contents(f.file), std::string("new"));
-        ensure("its own write is no change to the watch", !f.external.watch->check() && !f.external.watch->check());
+        ensure("its own write is no change to the watch", !f.watch->check() && !f.watch->check());
         ensure("said, settled, told of", !said().failure && studio.settled == Names{ f.id } && studio.written == Names{ f.file });
         Doc& g = fileTab("g.lsl", "x");
         g.file = in("no/such/folder/g.lsl");
@@ -316,7 +316,7 @@ namespace tut
         ALScriptStudioFiles& unit = make();
         Doc&                 f    = fileTab("f.lsl", "one");
         unit.watch(f);
-        ensure("watched", f.external.watch && f.external.watch->path() == f.file);
+        ensure("watched", f.watch && f.watch->path() == f.file);
         write(f.file, "two");
         unit.changedOutside(f.id, f.file);
         ensure("clean: taken, settled, said", studio.taken == Names{ "two" } && studio.settled == Names{ f.id } && !said().failure);
@@ -393,7 +393,7 @@ namespace tut
         studio.toSave({ in("g.luau") });
         ensure_equals("written there", contents(in("g.luau")), std::string("file text"));
         ensure("the tab that file now", studio.became == Names{ in("g.luau") } && f.file == in("g.luau"));
-        ensure("watched there", f.external.watch && f.external.watch->path() == in("g.luau"));
+        ensure("watched there", f.watch && f.watch->path() == in("g.luau"));
         ensure("noted, settled, checked", unit.recentFiles().front() == in("g.luau") && studio.settled.back() == f.id &&
                                                studio.checked.back() == f.id + " now");
         f.editor->setText("changed");

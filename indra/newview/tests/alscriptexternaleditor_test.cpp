@@ -180,7 +180,7 @@ namespace tut
         unit.edit(a);
         const std::string file = unit.fileName(a);
         ensure_equals("the copy", contents(file), std::string("default {}"));
-        ensure("watched", a.external.watch && a.external.watch->path() == file);
+        ensure("watched", a.watch && a.watch->path() == file);
         ensure("the log beside it", a.external.log && a.external.log->path() == file + ".log");
         ensure("the bridge told", studio.subscribed == Names{ "a" } && a.external.subscribed);
         ensure("the editor started on it", studio.started == Names{ file });
@@ -199,7 +199,7 @@ namespace tut
         Doc& n    = tab("n", "x");
         n.notecard = true;
         unit.edit(n);
-        ensure("a notecard not", studio.started.size() == 3 && !n.external.watch);
+        ensure("a notecard not", studio.started.size() == 3 && !n.watch);
     }
 
     template<> template<>
@@ -296,7 +296,7 @@ namespace tut
         d.file = "/somewhere/d.lsl";
         unit.log(d, result);
         unit.sync(d);
-        ensure("a tab not held outside: nothing", !d.external.log && !d.external.watch);
+        ensure("a tab not held outside: nothing", !d.external.log && !d.watch);
     }
 
     template<> template<>
@@ -315,7 +315,7 @@ namespace tut
         a.save.fromExternal(1);
         unit.stop(a);
         ensure("the bridge told", studio.unsubscribed == Names{ "a" } && !a.external.subscribed);
-        ensure("the watch gone, and the studio's copy with it", !a.external.watch && !exists(file));
+        ensure("the watch gone, and the studio's copy with it", !a.watch && !exists(file));
         ensure("the log gone", !exists(log) && !a.external.log);
         ensure("a save under way is no longer the editor's", !a.save.external());
     }
