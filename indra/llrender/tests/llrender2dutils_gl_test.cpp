@@ -227,4 +227,50 @@ namespace tut
         ensureNear("bottom", b.min_y, 25.f);
         ensureNear("top", b.max_y, 60.f);
     }
+
+    // A rect's outline covers the pixels just inside its edges, and
+    // nothing else: at the window's corner too, where a line along the
+    // edge of a pixel landing outside the rect is not drawn at all; and
+    // with the UI scaled up, a screen pixel thick, not a unit.
+    template<> template<>
+    void llrender2dutils_object::test<4>()
+    {
+        constexpr S32 W = ll_test::HeadlessGL::WIDTH;
+        constexpr S32 H = ll_test::HeadlessGL::HEIGHT;
+        ll_test::installWhiteTexture();
+        const auto drawn = [&](const LLRect& rect, F32 scale) {
+            gl().clearFramebuffer();
+            gGL.pushUIMatrix();
+            gGL.scaleUI(scale, scale, 1.f);
+            gl_rect_2d(rect, LLColor4::white, false);
+            gGL.flush();
+            gGL.popUIMatrix();
+            glFinish();
+            return ll_test::readFramebufferRGBA(W, H);
+        };
+        for (F32 scale : { 1.f, 2.f })
+        {
+            for (const LLRect& rect : { LLRect(0, 10, 20, 0), LLRect(30, 40, 50, 20) })
+            {
+                const std::vector<U8> rgba = drawn(rect, scale);
+                // The rect on the screen, in its pixels.
+                const S32 left = static_cast<S32>(rect.mLeft * scale), right = static_cast<S32>(rect.mRight * scale);
+                const S32 bottom = static_cast<S32>(rect.mBottom * scale), top = static_cast<S32>(rect.mTop * scale);
+                for (S32 y = 0; y < 120; ++y)
+                {
+                    for (S32 x = 0; x < 120; ++x)
+                    {
+                        const bool inside = x >= left && x < right && y >= bottom && y < top;
+                        const bool edge   = inside && (x == left || x == right - 1 || y == bottom || y == top - 1);
+                        const U8   red    = rgba[(static_cast<size_t>(y) * W + x) * 4];
+                        if ((red == 255) != edge)
+                        {
+                            fail("at " + std::to_string(x) + "," + std::to_string(y) + " of the outline at " + std::to_string(rect.mLeft) + "," +
+                                 std::to_string(rect.mBottom) + ", scaled " + std::to_string(scale) + ": " + std::to_string(red));
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

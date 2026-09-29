@@ -125,14 +125,26 @@ void gl_rect_2d(S32 left, S32 top, S32 right, S32 bottom, bool filled )
     }
     else
     {
-        top--;
-        right--;
+        // Through the middle of the first screen pixel inside each edge.
+        // A line along the edge of a pixel lands on whichever side of it
+        // the driver picks -- on a Mac the left and right a column left,
+        // so that a rect's left line fell outside it -- where one through
+        // a pixel's middle lands on that pixel. Half a screen pixel is less
+        // than half a unit where the UI is scaled up, and the line stays a
+        // screen pixel thick.
+        const LLVector3 scale = gGL.getUIScale();
+        const F32       in_x  = 0.5f / llmax(scale.mV[VX], 0.01f);
+        const F32       in_y  = 0.5f / llmax(scale.mV[VY], 0.01f);
+        const F32       l     = static_cast<F32>(left) + in_x;
+        const F32       r     = static_cast<F32>(right) - in_x;
+        const F32       b     = static_cast<F32>(bottom) + in_y;
+        const F32       t     = static_cast<F32>(top) - in_y;
         gGL.begin( LLRender::LINE_STRIP );
-            gGL.vertex2i(left, top);
-            gGL.vertex2i(left, bottom);
-            gGL.vertex2i(right, bottom);
-            gGL.vertex2i(right, top);
-            gGL.vertex2i(left, top);
+            gGL.vertex2f(l, t);
+            gGL.vertex2f(l, b);
+            gGL.vertex2f(r, b);
+            gGL.vertex2f(r, t);
+            gGL.vertex2f(l, t);
         gGL.end();
     }
 }
