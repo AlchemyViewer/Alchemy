@@ -27,7 +27,6 @@
 #include "alstudiofloater.h"
 
 #include "alsurface.h"
-#include "alpopover.h"
 #include "llcontrol.h"
 #include "lleditmenuhandler.h"
 #include "llfocusmgr.h"
@@ -311,95 +310,8 @@ ALQuickOpen* ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> cand
                                         LLView* anchor, S32 width, S32 height, std::function<void()> escaped,
                                         std::function<void(const std::string&)> hold, std::function<void()> left)
 {
-    // Asked for again while it is up -- the same key pressed twice -- it is
-    // what was typed that is wanted back, not a fresh field, and the answer
-    // goes to whoever asked last. Another question is asked afresh: the
-    // list up answers whoever asked it, and a command picked from a list
-    // of symbols is a jump to the first symbol. A freeform one is another
-    // question whatever it asks.
-    const std::string question = title + "\n" + placeholder;
-    if (ALPopover* popover = mQuickPopover.get())
-    {
-        ALQuickOpen* quick = popover->findChild<ALQuickOpen>("quick_open");
-        if (quick && !quick->freeform() && question == mQuickQuestion)
-        {
-            quick->setCandidates(std::move(candidates));
-            answerQuickOpen(popover, quick, std::move(chose), std::move(escaped), std::move(hold), std::move(left));
-            quick->takeFocus();
-            return quick;
-        }
-    }
-    mQuickPopover.close();
-
-    constexpr S32 WIDTH = 460;
-    constexpr S32 HEIGHT = 300;
-
-    ALQuickOpen::Params qp(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
-    qp.name = "quick_open";
-    qp.rect = LLRect(0, height > 0 ? height : HEIGHT, width > 0 ? width : WIDTH, 0);
-    qp.placeholder = placeholder;
-    ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(qp);
-    quick->setCandidates(std::move(candidates));
-
-    // The popover takes the content, and takes it even when it cannot
-    // show. Over the top of the anchor, centred, which is where a person
-    // typing a name into a window looks.
-    ALPopover* popover = ALPopover::showOver(anchor ? anchor : this, quick, title);
-    if (!popover)
-    {
-        return nullptr;
-    }
-    mQuickQuestion = question;
-    answerQuickOpen(popover, quick, std::move(chose), std::move(escaped), std::move(hold), std::move(left));
-    quick->takeFocus();
-    return quick;
-}
-
-void ALStudioFloater::answerQuickOpen(ALPopover* popover, ALQuickOpen* quick, std::function<void(const std::string&)> chose,
-                                      std::function<void()> escaped, std::function<void(const std::string&)> hold,
-                                      std::function<void()> left)
-{
-    // Whether an answer came: gone without one, whoever asked is told how
-    // -- escaped, and what it previewed is put back; looked away from, and
-    // what it previewed stands. Not put back there: the look away is a
-    // click, on the editor as often as not, and a view put back under the
-    // click lands it on another line than the one it was aimed at.
-    const auto          answered = std::make_shared<bool>(false);
-    LLHandle<ALPopover> held     = popover->getDerivedHandle<ALPopover>();
-    const auto          settled  = [held, answered]()
-    {
-        // Settled first, so the keyboard comes back to the window before
-        // what was chosen is acted on -- a choice that puts the keyboard
-        // somewhere needs it back to give.
-        *answered = true;
-        if (ALPopover* up = held.get())
-        {
-            up->settle();
-        }
-    };
-    mQuickChose = quick->onChose([settled, chose = std::move(chose)](const std::string& value)
-    {
-        settled();
-        chose(value);
-    });
-    mQuickHold.disconnect();
-    if (hold)
-    {
-        mQuickHold = quick->onChoseToHold([settled, hold = std::move(hold)](const std::string& value) {
-            settled();
-            hold(value);
-        });
-    }
-    mQuickPopover.hold(popover, [answered, escaped = std::move(escaped), left = std::move(left)](bool was_escaped) {
-        if (was_escaped && escaped)
-        {
-            escaped();
-        }
-        else if (!was_escaped && !*answered && left)
-        {
-            left();
-        }
-    });
+    return mQuickAsk.ask(std::move(candidates), placeholder, title, std::move(chose), anchor ? anchor : this, width, height, std::move(escaped),
+                         std::move(hold), std::move(left));
 }
 
 void ALStudioFloater::setStatus(const std::string& text, bool failure)

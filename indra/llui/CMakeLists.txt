@@ -129,6 +129,7 @@ target_sources(
     alpanelist.cpp
     alplace.cpp
     alpopover.cpp
+    alquickask.cpp
     alquickopen.cpp
     alscopebar.cpp
     alsettingrow.cpp
@@ -339,6 +340,7 @@ target_sources(
         alpanelist.h
         alplace.h
         alpopover.h
+        alquickask.h
         alquickopen.h
         alsaid.h
         altextchars.h
