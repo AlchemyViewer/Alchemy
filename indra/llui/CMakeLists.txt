@@ -576,6 +576,7 @@ if(AL_BUILD_TESTS)
     altabstrip
     alquickopen
     alstudiofloater
+    altextgotoline
     alxuifields
     alxuischema
     alxuiselection

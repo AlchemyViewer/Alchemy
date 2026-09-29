@@ -24,13 +24,45 @@
 
 #pragma once
 
+#include "llstring.h"
 #include "stdtypes.h"
 
+#include <functional>
 #include <string>
 
-// Go to Line over a text.
+class ALQuickOpen;
+class ALTextView;
+struct ALTextPos;
+
+// Go to Line over a text: a line, or a line and a column, typed into a
+// quick open by the numbers the text shows, the text going there as it is
+// typed. What a studio's Go to Line is, and the notecard window's.
 namespace ALTextGoToLine
 {
+    // The text, while it is there: null once the window or the tab it is
+    // in has gone.
+    typedef std::function<ALTextView*()> text_t;
+    // A word it says, by name, with [LINE], [COL] and [COUNT] in it:
+    // GoToLineHint while nothing is typed; GoToLineGo and GoToLineGoColumn
+    // where what is typed is a place of the text, GoToLineNone where not.
+    typedef std::function<std::string(const std::string& name, const LLStringUtil::format_map_t& args)> words_t;
+    // Gone somewhere from `was`, where the caret stood as it was asked:
+    // by Return, or looked away from with the text somewhere else.
+    typedef std::function<void(const ALTextPos& was)> went_t;
+    // The quick open shown, with what answers it -- Return, Escape, a
+    // look away -- and given back, or null where it could not be shown:
+    // through the window's ALQuickAsk, as its other quick opens are.
+    typedef std::function<ALQuickOpen*(std::function<void(const std::string&)> chose, std::function<void()> escaped,
+                                       std::function<void()> left)>
+        ask_t;
+
+    // Asked: the text at the place typed while it is typed, and back
+    // where it was while nothing is, or where Escape is pressed; Return
+    // keeps it and gives the text the keyboard, and so does a look away.
+    // By the numbers the text shows: `base` added to a line counted from
+    // one (ALTextView::lineNumberBase).
+    void ask(const ask_t& ask, text_t text, S32 base, words_t words, went_t went = {});
+
     // "12" or "12:5", as a person types a place: the line and the column
     // from one, zero where there is none or it is not a number.
     void placeTyped(const std::string& text, S32& line, S32& column);

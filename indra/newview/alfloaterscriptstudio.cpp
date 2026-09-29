@@ -4706,108 +4706,32 @@ void ALFloaterScriptStudio::goToLine()
         return;
     }
     // A line of the view in front: of the expansion, while it is the one
-    // being read.
+    // being read, by the numbers it shows -- the expansion's count from
+    // past the envelope's lines, as a runtime error's does.
     const std::string         id     = doc->id;
     const Doc::View           view   = doc->shownView();
-    const ALTextPos           was    = doc->shownText()->caret();
     const LLHandle<LLFloater> handle = getHandle();
-    // The editor at the place typed, while it is typed; return leaves it
-    // there, and so does looking away, escape puts it back.
-    auto docOf = [handle, id]() -> Doc* {
-        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-        const size_t           index  = studio ? studio->indexOf(id) : NONE;
-        return index == NONE ? nullptr : studio->mDocs[index].get();
-    };
-    // By the numbers the view shows: the expansion's count from past the
-    // envelope's lines, as a runtime error's does.
-    auto placeOf = [](const Doc& doc, const std::string& typed, S32& line, S32& column) {
-        ALTextGoToLine::placeTyped(typed, line, column);
-        line -= doc.shownText()->lineNumberBase();
-        const S32 count = doc.shownText()->document().lineCount();
-        return line >= 1 && line <= count;
-    };
-    ALQuickOpen* quick = quickOpen(
-        {}, getString("GoToLinePlaceholder"), getString("GoToLineTitle"),
-        [handle, docOf, placeOf, was, view](const std::string& typed) {
-            Doc* doc = docOf();
-            if (!doc)
-            {
-                return;
-            }
-            ALCodeEditor& text = *doc->shownText();
-            S32           line, column;
-            if (placeOf(*doc, typed, line, column))
-            {
-                // Gone from where the caret was before the line was typed,
-                // which the preview has moved it from since.
-                if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
-                {
-                    studio->mNavigation.remember(NavPlace{ doc->id, was, view });
-                }
-                text.goTo(column > 0 ? text.document().posAtDisplayColumn(line - 1, column - 1, text.getTabWidth()) : ALTextPos(line - 1, 0));
-            }
-            else
-            {
-                text.goTo(was);
-            }
-            text.setFocus(true);
+    ALTextGoToLine::ask(
+        [this](std::function<void(const std::string&)> chose, std::function<void()> escaped, std::function<void()> left) {
+            return quickOpen({}, getString("GoToLinePlaceholder"), getString("GoToLineTitle"), std::move(chose), mEditorHost, 420,
+                             ALQuickOpen::heightForRows(1), std::move(escaped), {}, std::move(left));
         },
-        mEditorHost, 420, ALQuickOpen::heightForRows(1),
-        [docOf, was]() {
-            if (Doc* doc = docOf())
-            {
-                doc->shownText()->goTo(was);
-            }
-        },
-        {},
-        // Looked away from: the line it went to stands, since that is
-        // what was looked at, and the way back from it is kept, as a
-        // line gone to by Return keeps it.
-        [handle, docOf, was, view]() {
+        [handle, id]() -> ALTextView* {
             ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-            Doc*                   doc    = docOf();
-            if (studio && doc && doc->shownText()->caret() != was)
+            const size_t           index  = studio ? studio->indexOf(id) : NONE;
+            return index == NONE ? nullptr : studio->mDocs[index]->shownText();
+        },
+        doc->shownText()->lineNumberBase(),
+        [handle](const std::string& name, const LLStringUtil::format_map_t& args) {
+            LLFloater* studio = handle.get();
+            return studio ? studio->getString(name, args) : std::string();
+        },
+        [handle, id, view](const ALTextPos& was) {
+            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
             {
-                studio->mNavigation.remember(NavPlace{ doc->id, was, view });
+                studio->mNavigation.remember(NavPlace{ id, was, view });
             }
         });
-    if (!quick)
-    {
-        return;
-    }
-    quick->onQueryChanged([handle, docOf, placeOf, quick, was](const std::string& typed) {
-        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-        Doc*                   doc    = docOf();
-        if (!studio || !doc)
-        {
-            return;
-        }
-        ALCodeEditor&              text = *doc->shownText();
-        S32                        line, column;
-        const bool                 there = placeOf(*doc, typed, line, column);
-        LLStringUtil::format_map_t args;
-        // In the numbers the view shows.
-        args["[COUNT]"] = std::to_string(text.document().lineCount() + text.lineNumberBase());
-        args["[LINE]"]  = std::to_string(line + text.lineNumberBase());
-        args["[COL]"]   = std::to_string(column);
-        std::string trimmed = typed;
-        LLStringUtil::trim(trimmed);
-        if (trimmed.empty())
-        {
-            quick->setHint(studio->getString("GoToLineHint", args));
-            text.goTo(was);
-        }
-        else if (there)
-        {
-            quick->setHint(studio->getString(column > 0 ? "GoToLineGoColumn" : "GoToLineGo", args));
-            text.goTo(column > 0 ? text.document().posAtDisplayColumn(line - 1, column - 1, text.getTabWidth()) : ALTextPos(line - 1, 0));
-        }
-        else
-        {
-            quick->setHint(studio->getString("GoToLineNone", args));
-        }
-    });
-    quick->setQuery(std::string());
 }
 
 void ALFloaterScriptStudio::showCommandPalette()
