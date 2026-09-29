@@ -211,6 +211,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudioplaces.cpp
     alscriptstudiorecovery.cpp
     alrecovery.cpp
+    alrecoverykeeper.cpp
     alscriptstudiosaving.cpp
     alscriptstudiovim.cpp
     alscriptstudiovimrc.cpp
@@ -1049,6 +1050,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudioplaces.h
     alscriptstudiorecovery.h
     alrecovery.h
+    alrecoverykeeper.h
     alscriptstudiosaving.h
     alscriptstudiovim.h
     alscriptstudiovimrc.h
@@ -2561,6 +2563,15 @@ if(AL_BUILD_TESTS)
     LIBRARIES llui alscript ${test_libs}
     SOURCES alscriptsearch.cpp alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A window's unsaved text kept in a recovery store of the test's.
+  al_add_test(
+    alrecoverykeeper
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES alrecovery.cpp
   )
 
   # A Script Studio window's unsaved texts kept in a recovery store of the

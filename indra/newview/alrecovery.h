@@ -2,7 +2,6 @@
  * @file alrecovery.h
  * @brief The account's store of unsaved texts, where what each editor kept goes back to, and what is offered back at login.
  *
- *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
  * Copyright (C) 2026, Rye <rye@alchemyviewer.org>

@@ -27,7 +27,7 @@
 #ifndef LL_LLPREVIEWNOTECARD_H
 #define LL_LLPREVIEWNOTECARD_H
 
-#include "alrecoverystore.h"
+#include "alrecoverykeeper.h"
 #include "alscriptworkspace.h"
 #include "altextundo.h"
 #include "llpreview.h"
@@ -79,9 +79,6 @@ public:
 
     void inventoryChanged(LLViewerObject* object, LLInventoryObject::object_list_t* inventory, S32 serial_num, void* user_data) override;
 
-    // The key the window keeps a notecard's unsaved text under in the
-    // recovery store (ALRecoveryStore::windowKeyOf).
-    static std::string recoveryKeyOf(const LLUUID& object, const LLUUID& item);
     // A text the window kept, taken up where it belongs -- this window
     // for its notecard, opened, the text put in as it loads -- where the
     // notecard can be had: false where it cannot, and whoever asked keeps
@@ -137,10 +134,6 @@ private:
     // --- kept against a crash -----------------------------------------------------------
 
     ALRecoveryEntry recoveryEntry() const;
-    // What is unsaved written to the store a moment after the typing, or
-    // this window's entry forgotten where nothing is unsaved.
-    void keepSoon();
-    void forgetKept();
     // What earlier sessions kept of this notecard, offered once it has
     // loaded; and one taken up over the text, as one step to undo, or with
     // its history where nothing was typed here.
@@ -192,18 +185,12 @@ private:
     // elsewhere to put them back.
     std::optional<std::pair<ALTextPos, S32>> mKeepPlace;
 
-    // The recovery store's key for this notecard; when what is typed is
-    // next written; whether an entry of this session's is there to
-    // forget; a failure to write it said once; and a kept text to take
+    // What is typed kept in the recovery store; and a kept text to take
     // up once the notecard has loaded.
-    std::string                          mRecoveryKey;
-    F64                                  mRecoveryDue     = 0.0;
-    bool                                 mRecoveryWritten = false;
-    bool                                 mRecoveryFailed  = false;
-    std::optional<ALRecoveryEntry> mPendingRecovery;
+    ALRecoveryKeeper                     mKeeper;
+    std::optional<ALRecoveryEntry>       mPendingRecovery;
 
     boost::signals2::scoped_connection mSavedConnection;
-    boost::signals2::scoped_connection mChangedConnection;
     boost::signals2::scoped_connection mFullConnection;
 
     LLLiveLSLFile* mLiveFile = nullptr;

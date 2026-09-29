@@ -60,18 +60,14 @@
 #include <algorithm>
 #include <set>
 
-namespace
-{
-    // How long after typing stops, or after the first change of a run of
-    // typing, what is unsaved is written: as Script Studio writes its tabs.
-    constexpr F64 RECOVERY_DELAY = 1.5;
-}
-
 ///----------------------------------------------------------------------------
 /// Class LLPreviewNotecard
 ///----------------------------------------------------------------------------
 
-LLPreviewNotecard::LLPreviewNotecard(const LLSD& key) : LLPreview(key)
+LLPreviewNotecard::LLPreviewNotecard(const LLSD& key)
+    : LLPreview(key),
+      mKeeper(ALRecoveryKeeper::Holder{ [this]() { return recoveryEntry(); }, [this]() { return mLoaded && mModifiable && mText && mText->isDirty(); },
+                                        [this]() { setStatus(getString("RecoveryWriteFailed"), true); } })
 {
     const LLInventoryItem* item = getItem();
     mNoteName                   = "New Note";
@@ -95,7 +91,6 @@ bool LLPreviewNotecard::postBuild()
     mText = getChild<ALTextView>("notecard_text");
     mText->setPlaceholder(getString("Loading"));
     mText->setReadOnly(true);
-    mChangedConnection = mText->onTextChanged([this]() { keepSoon(); });
     mFullConnection    = mText->onFull([this]() {
         LLStringUtil::format_map_t args;
         args["[NAME]"]  = mNoteName;
@@ -161,31 +156,8 @@ bool LLPreviewNotecard::saveItem()
 void LLPreviewNotecard::draw()
 {
     mSaveBtn->setEnabled(mLoaded && mModifiable && !mSaving && mText->isDirty());
-    // What was typed a moment ago written, and a write that failed said
-    // once.
-    if (mRecoveryDue > 0.0 && LLTimer::getTotalSeconds() >= mRecoveryDue)
-    {
-        mRecoveryDue = 0.0;
-        if (ALRecoveryStore* kept = ALRecovery::store(); kept && mText->isDirty())
-        {
-            kept->writeSoon(recoveryEntry());
-            mRecoveryWritten = true;
-        }
-    }
-    if (mRecoveryWritten)
-    {
-        if (ALRecoveryStore* kept = ALRecovery::store())
-        {
-            for (const std::string& key : kept->takeFailures())
-            {
-                if (key == mRecoveryKey && !mRecoveryFailed)
-                {
-                    mRecoveryFailed = true;
-                    setStatus(getString("RecoveryWriteFailed"), true);
-                }
-            }
-        }
-    }
+    // What was typed a moment ago kept against the viewer going.
+    mKeeper.pump(mText->document().version(), LLTimer::getTotalSeconds());
     LLPreview::draw();
 }
 
@@ -283,7 +255,7 @@ void LLPreviewNotecard::loadAsset()
     {
         mNoteName = item->getName();
     }
-    mRecoveryKey = recoveryKeyOf(mObjectUUID, mItemUUID);
+    mKeeper.setItem(mObjectUUID, mItemUUID);
 
     const LLPermissions& perm           = item->getPermissions();
     const bool           is_owner       = gAgent.allowOperation(PERM_OWNER, perm, GP_OBJECT_MANIPULATE);
@@ -360,10 +332,7 @@ void LLPreviewNotecard::loaded(const ALScriptWorkspace::Loaded& answer)
     {
         // Theirs over what was typed here, as one step: Undo brings back
         // what was typed, which the store keeps too.
-        if (ALRecoveryStore* kept = ALRecovery::store())
-        {
-            kept->setAside(recoveryEntry());
-        }
+        mKeeper.setAside();
         const ALTextDocument& text = mText->document();
         mText->setReadOnly(false);
         mText->replaceAll({ { ALTextRange(text.start(), text.end()), answer.text } });
@@ -390,7 +359,7 @@ void LLPreviewNotecard::loaded(const ALScriptWorkspace::Loaded& answer)
         toggleCompare();
     }
     mAssetStatus = PREVIEW_ASSET_LOADED;
-    forgetKept();
+    mKeeper.forget();
     syncExternal();
     if (mPendingRecovery)
     {
@@ -516,12 +485,15 @@ void LLPreviewNotecard::savedHere(const ALScriptWorkspace::CompileResult& result
     // this window is that item's now.
     if (result.newItemId.notNull() && result.newItemId != mItemUUID)
     {
-        mItemUUID    = result.newItemId;
-        mRecoveryKey = recoveryKeyOf(mObjectUUID, mItemUUID);
+        mItemUUID = result.newItemId;
+        mKeeper.setItem(mObjectUUID, mItemUUID);
         setKey(LLSD(mItemUUID));
     }
     setStatus(getString("Saved"));
-    keepSoon();
+    if (!mText->isDirty())
+    {
+        mKeeper.forget();
+    }
     if (mCloseAfterSave)
     {
         closeFloater();
@@ -549,7 +521,7 @@ void LLPreviewNotecard::heard(const ALScriptWorkspace::Saved& saved)
     {
         case ALScriptWorkspace::Heard::Same:
             mText->resetDirty();
-            forgetKept();
+            mKeeper.forget();
             return;
         case ALScriptWorkspace::Heard::Keep:
             return;
@@ -648,11 +620,7 @@ bool LLPreviewNotecard::handleSaveChangesDialog(const LLSD& notification, const 
         case 1: // "No"
             // Thrown away, and set aside a while all the same, in case
             // that was a mistake.
-            if (ALRecoveryStore* kept = ALRecovery::store())
-            {
-                kept->setAside(recoveryEntry());
-            }
-            forgetKept();
+            mKeeper.setAside();
             mForceClose = true;
             closeFloater();
             break;
@@ -705,7 +673,7 @@ bool LLPreviewNotecard::handleConfirmDeleteDialog(const LLSD& notification, cons
     }
 
     // close floater, ignore unsaved changes
-    forgetKept();
+    mKeeper.forget();
     mForceClose = true;
     closeFloater();
     return false;
@@ -746,16 +714,9 @@ void LLPreviewNotecard::hideNotice()
 
 // --- kept against a crash ---------------------------------------------------------------------
 
-// static
-std::string LLPreviewNotecard::recoveryKeyOf(const LLUUID& object, const LLUUID& item)
-{
-    return ALRecoveryStore::windowKeyOf(object, item);
-}
-
 ALRecoveryEntry LLPreviewNotecard::recoveryEntry() const
 {
     ALRecoveryEntry entry;
-    entry.key       = mRecoveryKey;
     entry.object    = mObjectUUID;
     entry.item      = mItemUUID;
     entry.name      = mNoteName;
@@ -779,59 +740,19 @@ ALRecoveryEntry LLPreviewNotecard::recoveryEntry() const
     return entry;
 }
 
-void LLPreviewNotecard::keepSoon()
-{
-    if (mRecoveryKey.empty() || !mLoaded || !mModifiable)
-    {
-        return;
-    }
-    if (!mText->isDirty())
-    {
-        forgetKept();
-        return;
-    }
-    if (mRecoveryDue <= 0.0)
-    {
-        mRecoveryDue = LLTimer::getTotalSeconds() + RECOVERY_DELAY;
-    }
-}
-
-void LLPreviewNotecard::forgetKept()
-{
-    mRecoveryDue = 0.0;
-    if (!mRecoveryWritten || mRecoveryKey.empty())
-    {
-        return;
-    }
-    if (ALRecoveryStore* kept = ALRecovery::store())
-    {
-        kept->forget(mRecoveryKey);
-    }
-    mRecoveryWritten = false;
-    mRecoveryFailed  = false;
-}
-
 void LLPreviewNotecard::offerKept()
 {
-    ALRecoveryStore* kept = ALRecovery::store();
-    if (!kept || mRecoveryKey.empty() || !mModifiable)
-    {
-        return;
-    }
-    const std::optional<ALRecoveryEntry> left = kept->leftFor(mRecoveryKey);
+    const std::optional<ALRecoveryEntry> left = mModifiable ? mKeeper.left() : std::nullopt;
     if (!left)
     {
         return;
     }
     LLStringUtil::format_map_t args;
-    args["[WHEN]"]                    = left->whenSaid();
+    args["[WHEN]"]              = left->whenSaid();
     const ALRecoveryEntry entry = *left;
     showNotice(getString("Recovered", args), { { getString("Restore"), [this, entry]() { takeUp(entry); } },
                                                { getString("Discard"), [this, entry]() {
-                                                    if (ALRecoveryStore* store = ALRecovery::store())
-                                                    {
-                                                        store->discard(entry);
-                                                    }
+                                                    mKeeper.turnDown(entry);
                                                     hideNotice();
                                                 } } });
 }
@@ -866,9 +787,7 @@ void LLPreviewNotecard::takeUp(ALRecoveryEntry entry)
     {
         mText->markUnsaved();
     }
-    kept->write(recoveryEntry());
-    mRecoveryWritten = true;
-    kept->remove(entry);
+    mKeeper.took(entry, mText->document().version());
     setStatus(getString("Restored"));
 }
 
