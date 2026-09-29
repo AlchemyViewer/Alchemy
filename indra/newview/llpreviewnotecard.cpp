@@ -199,9 +199,16 @@ void LLPreviewNotecard::goToLine()
         [this](std::function<void(const std::string&)> chose, std::function<void()> escaped, std::function<void()> left) {
             // As wide as the studio's where the window is, and within it
             // where it is narrower.
-            const S32 width = llmin(420, mText->getRect().getWidth() - 16);
-            return mQuickAsk.ask({}, getString("GoToLinePlaceholder"), getString("GoToLineTitle"), std::move(chose), mText, width,
-                                 ALQuickOpen::heightForRows(1), std::move(escaped), {}, std::move(left));
+            const S32    width = llmin(420, mText->getRect().getWidth() - 16);
+            ALQuickOpen* quick = mQuickAsk.ask({}, getString("GoToLinePlaceholder"), getString("GoToLineTitle"), std::move(chose), mText,
+                                               width, ALQuickOpen::heightForRows(1), std::move(escaped), {}, std::move(left));
+            // In the text's own colours, as the studio's are in its
+            // editor's: part of what it is over.
+            if (quick)
+            {
+                quick->setColors(mText->backgroundColor(), mText->textColor());
+            }
+            return quick;
         },
         [handle]() -> ALTextView* {
             LLPreviewNotecard* window = ALViewType::as<LLPreviewNotecard>(handle.get());
