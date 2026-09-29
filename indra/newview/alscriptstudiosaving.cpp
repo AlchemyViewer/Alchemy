@@ -40,7 +40,7 @@
 
 #include <algorithm>
 
-ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mExternal(external), mWindow(window)
+ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mExternal(external), mWeighing(weighing), mWindow(window)
 {
 }
 
@@ -179,7 +179,7 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
                 mServices.setStatus(mServices.words("Preprocessed", args));
                 // Weighed as a save would send it; not with an include still
                 // to come, which may yet.
-                mWindow.weighSent(doc);
+                mWeighing.weighSent(doc);
             }
             return;
         case ALScriptSaveFlow::Landed::MovedOn:
@@ -239,7 +239,7 @@ void ALScriptStudioSaving::sendPreprocessed(Doc& doc, const Doc::Expanded& sent)
 
 void ALScriptStudioSaving::weighForSave(Doc& doc)
 {
-    if (!mWindow.weightTarget(doc))
+    if (!mWeighing.target(doc))
     {
         return;
     }
@@ -247,7 +247,7 @@ void ALScriptStudioSaving::weighForSave(Doc& doc)
     if (mAnalysis.preprocessed(doc))
     {
         // What the run made to be sent, which is what goes.
-        mWindow.weighSent(doc);
+        mWeighing.weighSent(doc);
     }
     else if (doc.weighing->weight && doc.weighing->version == doc.save.warnWeightFor())
     {
@@ -255,7 +255,7 @@ void ALScriptStudioSaving::weighForSave(Doc& doc)
     }
     else
     {
-        mWindow.weigh(doc);
+        mWeighing.weigh(doc);
     }
 }
 
@@ -744,7 +744,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
         }
         // Nothing picked waits on a save any more.
         mTabs.fillTabs();
-        mWindow.keepSavedWeights(doc);
+        mWeighing.keepSaved(doc);
     }
     if (result.newAssetId.notNull())
     {

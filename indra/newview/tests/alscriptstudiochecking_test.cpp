@@ -164,11 +164,6 @@ namespace
             }
         }
         void showOutline(Doc& doc) override { told.push_back("outline " + doc.id); }
-        void weighed(Doc& doc, const ALScriptAnalysis::Result& result) override
-        {
-            told.push_back("weighed " + doc.id + " " + std::to_string(result.weights.size()));
-        }
-        std::vector<ALScriptWeight::Target> weightTargets(const Doc&) override { return targets; }
         void                                save(Doc& doc) override { told.push_back("save " + doc.id); }
         void                                preprocess(Doc& doc) override { told.push_back("run " + doc.id); }
         ALCodeEditor&                       editorInFront(Doc& doc) override { return *doc.editor; }
@@ -182,7 +177,6 @@ namespace
         Names                               told;
         // What each answer it was handed elsewhere said of the word.
         Names                               labels;
-        std::vector<ALScriptWeight::Target> targets;
         // The tab in front, by id.
         std::string                         front;
         LLSD                                confirmed;
@@ -251,10 +245,11 @@ namespace tut
 
     struct alscriptstudiochecking_data
     {
-        al_studio_test::StudioWindow            window;
-        al_studio_test::FakeServices            services;
-        FakeCheckingWindow                      studio;
-        std::unique_ptr<ALScriptStudioChecking> unit;
+        al_studio_test::StudioWindow                    window;
+        al_studio_test::FakeServices                    services;
+        FakeCheckingWindow                              studio;
+        std::unique_ptr<al_studio_test::StudioWeighing> weighing;
+        std::unique_ptr<ALScriptStudioChecking>         unit;
         // The viewer's side: whether the preprocessor runs, and its answers
         // held for the test to give.
         bool                                    preprocessing = false;
@@ -301,7 +296,8 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<ALScriptStudioChecking>(services, studio, studio, studio);
+            weighing = std::make_unique<al_studio_test::StudioWeighing>(services);
+            unit     = std::make_unique<ALScriptStudioChecking>(services, studio, studio, weighing->unit, studio);
             return *unit;
         }
         ALCodeEditor* editor(const std::string& name, const std::string& text)
@@ -914,11 +910,11 @@ namespace tut
         refs.column  = 8;
         studio.asks.back().answered(refs);
         ensure_equals("handed on", studio.told.back(), std::string("references a 0:8"));
-        studio.targets.clear();
-        const size_t asks = studio.asks.size();
+        doc.language.compileTarget = "none";
+        const size_t asks          = studio.asks.size();
         checking.ask(doc, Kind::Weigh, ALTextPos(), ALTextPos());
         ensure("nothing to weigh for: not asked", studio.asks.size() == asks);
-        studio.targets = { ALScriptWeight::Target::Mono };
+        doc.language.compileTarget = "mono";
         checking.ask(doc, Kind::Weigh, ALTextPos(), ALTextPos());
         ensure("weighed for its targets", studio.asks.size() == asks + 1 && studio.asks.back().request.targets.size() == 1);
     }
@@ -951,7 +947,6 @@ namespace tut
         ALScriptStudioChecking& checking = make();
         Doc&                    a        = tab("a");
         Doc&                    b        = tab("b");
-        studio.targets                   = { ALScriptWeight::Target::Mono };
         studio.front                     = "a";
         checking.ask(a, Kind::Check, ALTextPos(), ALTextPos());
         checking.ask(b, Kind::Check, ALTextPos(), ALTextPos());
@@ -965,8 +960,8 @@ namespace tut
         weight.total    = 100;
         weighed.weights = { weight };
         studio.asks[0].answered(weighed);
-        ensure_equals("its weights handed on with the check, before its problems are shown", joined(studio.told),
-                      std::string("weighed a 1, problems a, outline a"));
+        ensure_equals("its problems shown", joined(studio.told), std::string("problems a, outline a"));
+        ensure("its weights handed on with the check", a.weighing->weight && a.weighing->weight->total == 100);
         studio.told.clear();
         studio.asks[1].answered(answer(b, {}));
         ensure_equals("none for the other", joined(studio.told), std::string("problems b, outline b"));

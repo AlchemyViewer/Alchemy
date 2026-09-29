@@ -113,7 +113,7 @@ ALScriptStudioChecking::Sources& ALScriptStudioChecking::sources()
     return sources;
 }
 
-ALScriptStudioChecking::ALScriptStudioChecking(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptStudioSaves& saves, Window& window) : mServices(services), mAnalysis(analysis), mSaves(saves), mWindow(window) {}
+ALScriptStudioChecking::ALScriptStudioChecking(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptStudioSaves& saves, ALScriptStudioWeighing& weighing, Window& window) : mServices(services), mAnalysis(analysis), mSaves(saves), mWeighing(weighing), mWindow(window) {}
 
 bool ALScriptStudioChecking::preprocessed(const Doc& doc) const
 {
@@ -388,7 +388,7 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
     {
         // The tab in front weighed with its check, of the same text, in
         // the same job; the rest when they come to the front, or at a save.
-        request.targets = mWindow.weightTargets(doc);
+        request.targets = mWeighing.targets(doc);
         if (!request.targets.empty())
         {
             ALScriptStudioWeighing::askedWithCheck(doc, request.version);
@@ -396,7 +396,7 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
     }
     if (kind == ALScriptAnalysis::Kind::Weigh)
     {
-        request.targets = mWindow.weightTargets(doc);
+        request.targets = mWeighing.targets(doc);
         if (request.targets.empty())
         {
             return;
@@ -832,7 +832,7 @@ void ALScriptStudioChecking::analysed(const ALScriptAnalysis::Result& result)
     // What the check weighed, where it was asked to.
     if (!result.weights.empty())
     {
-        mWindow.weighed(doc, result);
+        mWeighing.weighed(doc, result);
     }
     checked(doc);
 }

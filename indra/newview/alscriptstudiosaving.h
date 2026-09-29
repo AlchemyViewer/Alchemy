@@ -39,6 +39,7 @@
 class ALScriptStudioAnalysis;
 class ALScriptNavigation;
 class ALScriptExternalEditor;
+class ALScriptStudioWeighing;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 
@@ -97,17 +98,6 @@ public:
         // what waited on it -- a run-time error, a line to go to -- placed.
         virtual void runningKnown(Doc& doc) = 0;
 
-        // --- weighing ------------------------------------------------------------------
-
-        // The target a tab is weighed for; none for one that is not.
-        virtual std::optional<ALScriptWeight::Target> weightTarget(const Doc& doc) const = 0;
-        // Weighed as it stands, and as a run of the preprocessor made it to
-        // be sent.
-        virtual void weigh(Doc& doc)     = 0;
-        virtual void weighSent(Doc& doc) = 0;
-        // What it weighs kept as what it weighs saved.
-        virtual void keepSavedWeights(Doc& doc) = 0;
-
         // --- sending -------------------------------------------------------------------
 
         // A script's text sent to be saved and compiled; a notecard's, with
@@ -157,7 +147,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, Window& window);
+    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, Window& window);
 
     // --- saving ------------------------------------------------------------------------
 
@@ -236,6 +226,7 @@ private:
     ALScriptStudioAnalysis& mAnalysis;
     ALScriptNavigation&     mNavigation;
     ALScriptExternalEditor& mExternal;
+    ALScriptStudioWeighing& mWeighing;
     Window&                 mWindow;
     // Held while this is, for what answers later to know it still is.
     std::shared_ptr<bool>   mAlive = std::make_shared<bool>(true);

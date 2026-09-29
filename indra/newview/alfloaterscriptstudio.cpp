@@ -4466,7 +4466,7 @@ LLMenuGL* ALFloaterScriptStudio::recentMenu()
 void ALFloaterScriptStudio::fileSettled(Doc& doc)
 {
     doc.editor->resetDirty();
-    keepSavedWeights(doc);
+    mWeighing.keepSaved(doc);
     mRecovery.keep(doc);
     // The scripts that include it see the file as it is now: those whose
     // last expansion read it, and those that one may have been wanted by

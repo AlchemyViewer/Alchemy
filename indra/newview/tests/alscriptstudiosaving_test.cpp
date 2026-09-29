@@ -89,10 +89,6 @@ namespace
         }
         void showExpanded(Doc&, const std::string&) override {}
         void runningKnown(Doc& doc) override { known.push_back(doc.id); }
-        std::optional<ALScriptWeight::Target> weightTarget(const Doc&) const override { return target; }
-        void weigh(Doc&) override { weighs.push_back("text"); }
-        void weighSent(Doc&) override { weighs.push_back("sent"); }
-        void keepSavedWeights(Doc&) override {}
         bool send(const Doc& doc, const std::string& text, const ALScriptSaveOptions& with, std::string& error) override
         {
             if (!refuse.empty())
@@ -156,10 +152,9 @@ namespace
         al_studio_test::FakeServices*                       services = nullptr;
         ALScriptStudioSaving::Options                       options;
         bool                                                preprocessor = false;
-        std::optional<ALScriptWeight::Target>               target;
         std::string                                         refuse;
         std::function<void(const ALPreprocessor::Result&)> run;
-        Names                                               tidied, analysed, runs, weighs, files, reattached, recovered, closed, known;
+        Names                                               tidied, analysed, runs, files, reattached, recovered, closed, known;
         std::vector<Sent>                                   sent;
         Names                                               notecards;
         U64                                                 requests = 0;
@@ -191,6 +186,7 @@ namespace tut
         FakeSavingWindow                                  studio;
         std::unique_ptr<al_studio_test::StudioNavigation> navigation;
         std::unique_ptr<al_studio_test::StudioExternal>   external;
+        std::unique_ptr<al_studio_test::StudioWeighing>   weighing;
         std::unique_ptr<ALScriptStudioSaving>             saving;
 
         ALScriptStudioSaving& make()
@@ -203,7 +199,8 @@ namespace tut
             studio.options.program = "Alchemy Test 1.2.3";
             navigation             = std::make_unique<al_studio_test::StudioNavigation>(services);
             external               = std::make_unique<al_studio_test::StudioExternal>(services);
-            saving = std::make_unique<ALScriptStudioSaving>(services, studio, studio, navigation->unit, external->unit, studio);
+            weighing               = std::make_unique<al_studio_test::StudioWeighing>(services);
+            saving = std::make_unique<ALScriptStudioSaving>(services, studio, studio, navigation->unit, external->unit, weighing->unit, studio);
             return *saving;
         }
 
@@ -424,7 +421,6 @@ namespace tut
         set_test_name("preprocessed first: sent with its errors said, what it made in the envelope with its map, and a text moved on is run again");
         ALScriptStudioSaving& saving = make();
         studio.preprocessor          = true;
-        studio.target                = ALScriptWeight::Target::Mono;
 
         Doc& doc = tab("a", "#include \"x.lsl\"\ndefault {}");
         saving.save(doc);
@@ -454,7 +450,7 @@ namespace tut
         ensure_equals("what it made", envelope->expanded, made.text);
         ensure_equals("by this viewer", envelope->programVersion, studio.options.program);
         ensure("with its map, for the compiler's lines", doc.save.sentMap().has_value());
-        ensure("weighed as each went", std::count(studio.weighs.begin(), studio.weighs.end(), "sent") == 2);
+        ensure("weighed as each went", std::count(weighing->weighs.begin(), weighing->weighs.end(), "sent") == 2);
         saving.compiled(answer(doc));
 
         // The text moved on while the includes came: checked, and run again.
@@ -557,12 +553,11 @@ namespace tut
     {
         set_test_name("what a save sends weighed as it goes, and over its target's limit said once, where the weight is exact; an estimate's said as one");
         ALScriptStudioSaving& saving = make();
-        studio.target                = ALScriptWeight::Target::Mono;
 
         Doc& doc = tab("a", "default {}");
         type(doc, " ");
         saving.save(doc);
-        ensure("weighed", studio.weighs == Names{ "text" });
+        ensure("weighed", weighing->weighs == Names{ "text" });
         ALScriptWeight weight;
         weight.target     = ALScriptWeight::Target::Mono;
         weight.total      = 70000;

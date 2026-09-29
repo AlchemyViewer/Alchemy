@@ -41,6 +41,7 @@
 
 class ALScriptStudioAnalysis;
 class ALScriptStudioSaves;
+class ALScriptStudioWeighing;
 class ALScriptStudioServices;
 
 // The tab's part of checking (ALScriptStudioChecking): what the
@@ -166,13 +167,9 @@ public:
         virtual void answeredElsewhere(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at) = 0;
         // The problems asked for with the next frame made now: what is
         // about to read them -- the fixes -- reads what the last answer
-        // said. What else a check's answer is shown by: the outline, and
-        // the weights the front tab's check weighed along with it; and the
-        // targets a weighing is asked for.
-        virtual void                                settleProblems(Doc& doc)                                      = 0;
-        virtual void                                showOutline(Doc& doc)                                         = 0;
-        virtual void                                weighed(Doc& doc, const ALScriptAnalysis::Result& result)     = 0;
-        virtual std::vector<ALScriptWeight::Target> weightTargets(const Doc& doc)                                 = 0;
+        // said. And the outline, which a check's answer is shown by too.
+        virtual void settleProblems(Doc& doc) = 0;
+        virtual void showOutline(Doc& doc)    = 0;
         // The editor of the view in front, which a fix is made in; and the
         // question of whether to make many fixes at once, `yes` where they
         // are to be.
@@ -183,7 +180,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioChecking(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptStudioSaves& saves, Window& window);
+    ALScriptStudioChecking(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptStudioSaves& saves, ALScriptStudioWeighing& weighing, Window& window);
 
     // --- the analyzers ------------------------------------------------------------
 
@@ -291,6 +288,7 @@ private:
     ALScriptStudioServices& mServices;
     ALScriptStudioAnalysis& mAnalysis;
     ALScriptStudioSaves&    mSaves;
+    ALScriptStudioWeighing& mWeighing;
     Window&                 mWindow;
     // When the preprocessor's settings are next taken, or zero; and
     // whether its words changed with them.

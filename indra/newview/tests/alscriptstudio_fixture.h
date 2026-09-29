@@ -30,6 +30,7 @@
 #include "../alscriptstudiodoc.h"
 #include "../alscriptexternaleditor.h"
 #include "../alscriptnavigation.h"
+#include "../alscriptstudioweighing.h"
 #include "../alscriptstudioanalysis.h"
 #include "../alscriptstudiosaves.h"
 #include "../alscriptstudioservices.h"
@@ -297,6 +298,30 @@ namespace al_studio_test
         QuietSaves               saves;
         ALScriptExternalEditor   unit;
         std::vector<std::string> watched;
+    };
+
+    // Weighing, for a unit given it (ALScriptStudioWeighing): over an
+    // analysis and saving that answer nothing, recording each weighing
+    // asked -- of the text as it stands, "text", or as a save sent it,
+    // "sent" -- and a window with the Weights tab out of sight, the
+    // optimizer off, and no notes nor heat.
+    struct StudioWeighing final : public ALScriptStudioWeighing::Window, public QuietAnalysis, public QuietSaves
+    {
+        explicit StudioWeighing(ALScriptStudioServices& services) : unit(services, *this, *this, *this) {}
+        void askWeights(ALScriptStudioDoc&) override { weighs.push_back("text"); }
+        void askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)>) override
+        {
+            weighs.push_back(request.weighing == ALScriptAnalysis::Request::Weighing::Sent ? "sent" : "asked");
+        }
+        bool                 optimizing() const override { return false; }
+        std::string          programVersion() const override { return std::string(); }
+        bool                 weightNotes() const override { return false; }
+        bool                 weightHeat() const override { return false; }
+        bool                 weightsShown() const override { return false; }
+        ALScriptWeightsPane* weightsPane() override { return nullptr; }
+
+        ALScriptStudioWeighing   unit;
+        std::vector<std::string> weighs;
     };
 
     // A pane's window with nothing to fake: the services alone.

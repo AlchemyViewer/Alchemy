@@ -2445,7 +2445,9 @@ if(AL_BUILD_TESTS)
     alscriptstudiodoc.cpp
     alscriptstudiofileio.cpp
     alscriptstudioplaces.cpp
+    alscriptstudioweighing.cpp
     alscriptstudiowords.cpp
+    alscriptweightspane.cpp
     tests/alscriptstudio_stubs.cpp
   )
   get_property(studio_test_includes TARGET ${test_project} PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
@@ -2823,7 +2825,6 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES al_studio_test_common llui alscript ${test_libs}
     PCH al_studio_test_common
-    SOURCES alscriptweightspane.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

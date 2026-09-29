@@ -346,17 +346,12 @@ private:
     void askingOptions(ALScriptAnalysis::Request& request) const override;
     void answeredElsewhere(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at) override;
     void showOutline(Doc& doc) override { mOutlinePane->show(doc); }
-    std::vector<ALScriptWeight::Target> weightTargets(const Doc& doc) override { return mWeighing.targets(doc); }
-    void weighed(Doc& doc, const ALScriptAnalysis::Result& result) override { mWeighing.weighed(doc, result); }
     bool inspectorShown() const override;
     ALCodeEditor&                       editorInFront(Doc& doc) override { return sourceInFront(doc); }
     void                                confirmFixAll(const LLSD& args, std::function<void()> yes) override;
-    // Weighing (ALScriptStudioWeighing): saving's calls to it, and what
-    // it asks of the window.
+    // Weighing (ALScriptStudioWeighing): the bar's call to it, and what it
+    // asks of the window.
     std::optional<ALScriptWeight::Target> weightTarget(const Doc& doc) const override { return mWeighing.target(doc); }
-    void                                  weigh(Doc& doc) override { mWeighing.weigh(doc); }
-    void                                  weighSent(Doc& doc) override { mWeighing.weighSent(doc); }
-    void                                  keepSavedWeights(Doc& doc) override { mWeighing.keepSaved(doc); }
     void                                  askWeights(Doc& doc) override { askAnalyzer(doc, ALScriptAnalysis::Kind::Weigh, ALTextPos()); }
     void askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)> answered) override;
     bool optimizing() const override;
@@ -1181,7 +1176,7 @@ private:
     // What is unsaved in the tabs, kept against the viewer going.
     ALScriptStudioRecovery             mRecovery{ *this, *this, *this };
     // Saving and compiling the tabs.
-    ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, mExternal, *this };
+    ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, mExternal, mWeighing, *this };
     // The window's side of vim, over its editors.
     ALScriptStudioVim                  mVim{ *this, *this, mSaving, mNavigation, mCommands, *this };
     // Its tabs held open in an editor outside.
@@ -1206,7 +1201,7 @@ private:
     // The name at its caret, and the caret watched.
     ALScriptStudioCaret                mCaret{ *this, *this, mNavigation, *this };
     // Its checking: the analyzers asked and answered, and fixes.
-    ALScriptStudioChecking             mChecking{ *this, *this, mSaving, *this };
+    ALScriptStudioChecking             mChecking{ *this, *this, mSaving, mWeighing, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     bool                               mClosingWindow = false;
