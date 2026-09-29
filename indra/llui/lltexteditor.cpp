@@ -48,7 +48,6 @@
 #include "llstl.h"
 #include "llstring.h"
 #include "llkeyboard.h"
-#include "llkeywords.h"
 #include "llundo.h"
 #include "llviewborder.h"
 #include "llcontrol.h"

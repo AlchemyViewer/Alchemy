@@ -33,8 +33,8 @@
 #include "llfonttextcache.h"
 #include "llspellcheckmenuhandler.h"
 #include "llstyle.h"
-#include "llkeywords.h"
 #include "llpanel.h"
+#include "llpointer.h"
 #include "llurlmatch.h"
 
 #include <string>
@@ -44,6 +44,8 @@
 #include <boost/signals2.hpp>
 
 class LLScrollContainer;
+class LLTextSegment;
+typedef LLPointer<LLTextSegment> LLTextSegmentPtr;
 class LLContextMenu;
 class LLUrlMatch;
 class LLTextBase;
@@ -96,8 +98,6 @@ public:
     //virtual void              setColor(const LLUIColor &color);
     virtual LLStyleConstSP      getStyle() const;
     virtual void                setStyle(LLStyleConstSP style);
-    virtual void                setToken( LLKeywordToken* token );
-    virtual LLKeywordToken*     getToken() const;
     virtual void                setToolTip(const std::string& tooltip);
     virtual void                dump() const;
 
@@ -146,8 +146,6 @@ public:
     /*virtual*/ const LLUIColor&     getColor() const                    { return mStyle->getColor(); }
     /*virtual*/ LLStyleConstSP      getStyle() const                    { return mStyle; }
     /*virtual*/ void                setStyle(LLStyleConstSP style)  { mStyle = style; }
-    /*virtual*/ void                setToken( LLKeywordToken* token )   { mToken = token; }
-    /*virtual*/ LLKeywordToken*     getToken() const                    { return mToken; }
     /*virtual*/ void                setToolTip(const std::string& tooltip);
     /*virtual*/ void                dump() const;
 
@@ -172,7 +170,6 @@ protected:
 protected:
     class LLTextBase&   mEditor;
     LLStyleConstSP      mStyle;
-    LLKeywordToken*     mToken;
     std::string         mTooltip;
     boost::signals2::connection mImageLoadedConnection;
 

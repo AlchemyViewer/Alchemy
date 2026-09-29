@@ -3893,8 +3893,6 @@ const LLUIColor& LLTextSegment::getColor() const { static const LLUIColor white 
 //void LLTextSegment::setColor(const LLUIColor &color) {}
 LLStyleConstSP LLTextSegment::getStyle() const {static LLStyleConstSP sp(new LLStyle()); return sp; }
 void LLTextSegment::setStyle(LLStyleConstSP style) {}
-void LLTextSegment::setToken( LLKeywordToken* token ) {}
-LLKeywordToken* LLTextSegment::getToken() const { return NULL; }
 void LLTextSegment::setToolTip( const std::string &msg ) {}
 void LLTextSegment::dump() const {}
 bool LLTextSegment::handleMouseDown(S32 x, S32 y, MASK mask) { return false; }
@@ -3924,7 +3922,6 @@ bool LLTextSegment::hasMouseCapture() { return false; }
 LLNormalTextSegment::LLNormalTextSegment( LLStyleConstSP style, S32 start, S32 end, LLTextBase& editor )
 :   LLTextSegment(start, end),
     mStyle( style ),
-    mToken(NULL),
     mEditor(editor)
 {
     mCanEdit = !mStyle->getDrawHighlightBg();
@@ -3938,7 +3935,6 @@ LLNormalTextSegment::LLNormalTextSegment( LLStyleConstSP style, S32 start, S32 e
 
 LLNormalTextSegment::LLNormalTextSegment( const LLUIColor& color, S32 start, S32 end, LLTextBase& editor, bool is_visible)
 :   LLTextSegment(start, end),
-    mToken(NULL),
     mEditor(editor)
 {
     mStyle = new LLStyle(LLStyle::Params().visible(is_visible).color(color));
@@ -4208,14 +4204,7 @@ bool LLNormalTextSegment::handleMouseUp(S32 x, S32 y, MASK mask)
 
 bool LLNormalTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
 {
-    std::string msg;
-    // do we have a tooltip for a loaded keyword (for script editor)?
-    if (mToken && !mToken->getToolTip().empty())
-    {
-        LLToolTipMgr::instance().show(mToken->getToolTip(), (mToken->getType() == LLKeywordToken::TT_FUNCTION));
-        return true;
-    }
-    // or do we have an explicitly set tooltip (e.g., for Urls)
+    // An explicitly set tooltip (e.g., for Urls)
     if (!mTooltip.empty())
     {
         LLToolTipMgr::instance().show(mTooltip);
@@ -4251,12 +4240,6 @@ bool LLNormalTextSegment::handleToolTip(S32 x, S32 y, MASK mask)
 
 void LLNormalTextSegment::setToolTip(const std::string& tooltip)
 {
-    // we cannot replace a keyword tooltip that's loaded from a file
-    if (mToken)
-    {
-        LL_WARNS() << "LLTextSegment::setToolTip: cannot replace keyword tooltip." << LL_ENDL;
-        return;
-    }
     mTooltip = tooltip;
 }
 

@@ -48,7 +48,6 @@ target_sources(
     llfolderviewitem.cpp
     llfolderviewmodel.cpp
     lliconctrl.cpp
-    llkeywords.cpp
     lllayoutstack.cpp
     lllineeditor.cpp
     llloadingindicator.cpp
@@ -248,7 +247,6 @@ target_sources(
         llfunctorregistry.h
         llhelp.h
         lliconctrl.h
-        llkeywords.h
         lllayoutstack.h
         lllazyvalue.h
         lllineeditor.h
