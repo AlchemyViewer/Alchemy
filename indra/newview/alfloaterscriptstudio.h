@@ -198,6 +198,23 @@ private:
     ALFloaterScriptStudio(const LLSD& key);
     ~ALFloaterScriptStudio() override;
 
+    // loaded's parts: a revert that could not be had; a kept text whose
+    // script could not be; the prim asked again for a script it did not
+    // list; and a notecard's and a script's text taken in.
+    void revertFailed(Doc& doc, size_t index, bool could_change, const std::string& error);
+    void keptTextNotHad(Doc& doc, const ALScriptLoaded& answer);
+    void askPrimAgain(Doc& doc);
+    void loadedNotecard(Doc& doc, const ALScriptLoaded& answer);
+    void loadedScript(Doc& doc, const ALScriptLoaded& answer);
+    // postBuild's parts, in the order it takes them.
+    void buildMenus();
+    void findPanes();
+    void wirePanes();
+    void listenToWorkspace();
+    void listenToSettings();
+    void listenToWorld();
+    void openAsLeft();
+
     // One tab (alscriptstudiodoc.h).
     using Doc = ALScriptStudioDoc;
     static constexpr size_t NONE = static_cast<size_t>(-1);
