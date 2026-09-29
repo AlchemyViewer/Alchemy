@@ -387,6 +387,7 @@ target_sources(
         altextdiff.h
         altextdocument.h
         altextediting.h
+        altextfeatures.h
         altextfind.h
         altextgotoline.h
         altextindent.h

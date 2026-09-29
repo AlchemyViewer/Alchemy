@@ -181,6 +181,7 @@ ALCodeEditor::ALCodeEditor(const Params& p)
     mBracketIndex.attach(&document());
     // Copy and Cut with nothing selected take the line, as code editors do.
     setClipsLines(true);
+    setFeatures(this);
     layout().setInlayProvider([this](S32 line, std::vector<ALTextLayout::Inlay>& out) { provideInlays(line, out); });
     mChangedConnection = onTextChanged([this]() {
         if (completionOpen())
@@ -219,8 +220,9 @@ ALCodeEditor::ALCodeEditor(const Params& p)
 ALCodeEditor::~ALCodeEditor()
 {
     // The layout outlives this part of the editor, and asks the provider
-    // about this part's inlays.
+    // about this part's inlays; the view, its features.
     layout().setInlayProvider(nullptr);
+    setFeatures(nullptr);
     clearHandlers();
 }
 
@@ -2045,7 +2047,71 @@ void ALCodeEditor::revealLine(S32 line)
     }
     else
     {
-        ALTextView::revealLine(line);
+        layout().setHidden(line, line, false);
+    }
+}
+
+bool ALCodeEditor::performFeature(ALEditorCommand command)
+{
+    typedef ALEditorCommand C;
+    switch (command)
+    {
+        case C::Fold:
+        case C::Unfold:
+        case C::FoldAll:
+        case C::UnfoldAll:
+            return performFold(command);
+        case C::NextFunction:
+        case C::PreviousFunction:
+        case C::SelectFunction:
+        case C::GoToMatchingBracket:
+        case C::ExpandSelection:
+        case C::ShrinkSelection:
+        case C::SelectNextOccurrence:
+        case C::ChangeAllOccurrences:
+            return performFunction(command);
+        case C::Complete:
+            return complete();
+        case C::SignatureHelp:
+            return signatureHelp();
+        case C::QuickFix:
+            return quickFix();
+        case C::GoToDefinition:
+        case C::FindReferences:
+        case C::Rename:
+            return performSymbol(command);
+        default:
+            return false;
+    }
+}
+
+bool ALCodeEditor::canPerformFeature(ALEditorCommand command) const
+{
+    typedef ALEditorCommand C;
+    switch (command)
+    {
+        case C::Fold:
+        case C::Unfold:
+        case C::FoldAll:
+        case C::UnfoldAll:
+            return canFold(command);
+        case C::NextFunction:
+        case C::PreviousFunction:
+        case C::SelectFunction:
+        case C::GoToMatchingBracket:
+        case C::ExpandSelection:
+        case C::ShrinkSelection:
+        case C::SelectNextOccurrence:
+        case C::ChangeAllOccurrences:
+            return canFunction(command);
+        case C::QuickFix:
+            return canQuickFix();
+        case C::GoToDefinition:
+        case C::FindReferences:
+        case C::Rename:
+            return canSymbol(command);
+        default:
+            return false;
     }
 }
 

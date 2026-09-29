@@ -29,6 +29,7 @@
 #include "alkeychord.h"
 
 #include "altextchars.h"
+#include "altextfeatures.h"
 #include "alsurface.h"
 #include "alviewtype.h"
 #include "llclipboard.h"
@@ -853,7 +854,14 @@ void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret)
     mCaret                = snapped(mDocument.clamp(caret), was.end);
     if (mLayout.hidden(mCaret.line))
     {
-        revealLine(mCaret.line);
+        if (mFeatures)
+        {
+            mFeatures->revealLine(mCaret.line);
+        }
+        else
+        {
+            mLayout.setHidden(mCaret.line, mCaret.line, false);
+        }
     }
     mBlink.reset();
     if (selection() != was)
@@ -2106,7 +2114,7 @@ ALTextIndent::Options ALTextView::editingOptions() const
 
 ALTextIndent::opener_t ALTextView::openerOf()
 {
-    return [this](const ALTextPos& closer, ALTextPos& opener) { return closerOpenedAt(closer, opener); };
+    return [this](const ALTextPos& closer, ALTextPos& opener) { return mFeatures && mFeatures->closerOpenedAt(closer, opener); };
 }
 
 void ALTextView::apply(const ALTextEditing::Change& change)
@@ -2417,7 +2425,7 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::ShrinkSelection:
         case C::SelectNextOccurrence:
         case C::ChangeAllOccurrences:
-            return performFunction(command);
+            return mFeatures && mFeatures->performFeature(command);
         case C::JoinLines:
         {
             // The lines selected, or the caret's and the next.
@@ -2465,20 +2473,16 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::Unfold:
         case C::FoldAll:
         case C::UnfoldAll:
-            return performFold(command);
         case C::Complete:
-            return complete();
         case C::SignatureHelp:
-            return signatureHelp();
         case C::QuickFix:
-            return quickFix();
-        case C::NextMisspelling:
-        case C::PreviousMisspelling:
-            return goToMisspelling(command == C::NextMisspelling);
         case C::GoToDefinition:
         case C::FindReferences:
         case C::Rename:
-            return performSymbol(command);
+            return mFeatures && mFeatures->performFeature(command);
+        case C::NextMisspelling:
+        case C::PreviousMisspelling:
+            return goToMisspelling(command == C::NextMisspelling);
         case C::Find:
             showFind(false);
             return true;
@@ -2518,13 +2522,12 @@ bool ALTextView::canPerform(ALEditorCommand command) const
         case C::Unfold:
         case C::FoldAll:
         case C::UnfoldAll:
-            return canFold(command);
         case C::GoToDefinition:
         case C::FindReferences:
         case C::Rename:
-            return canSymbol(command);
+            return mFeatures && mFeatures->canPerformFeature(command);
         case C::QuickFix:
-            return !mReadOnly && canQuickFix();
+            return !mReadOnly && mFeatures && mFeatures->canPerformFeature(command);
         case C::NextMisspelling:
         case C::PreviousMisspelling:
             return getSpellCheck();
@@ -2536,7 +2539,7 @@ bool ALTextView::canPerform(ALEditorCommand command) const
         case C::ShrinkSelection:
         case C::SelectNextOccurrence:
         case C::ChangeAllOccurrences:
-            return canFunction(command);
+            return mFeatures && mFeatures->canPerformFeature(command);
         case C::PreviousChange:
             return mChangeAt > 0;
         case C::NextChange:
@@ -3062,10 +3065,10 @@ void ALTextView::showContextMenu(S32 x, S32 y)
     // What the name the click landed on is about, where anyone would say.
     for (const char* symbol : { "go_to_definition", "find_references", "rename", "Symbol Separator" })
     {
-        menu->setItemVisible(symbol, offersSymbols());
+        menu->setItemVisible(symbol, mFeatures && mFeatures->offersSymbols());
     }
     // What would put right a problem at the caret, where there is one.
-    const bool fixes = !mReadOnly && canQuickFix();
+    const bool fixes = !mReadOnly && mFeatures && mFeatures->canPerformFeature(ALEditorCommand::QuickFix);
     menu->setItemVisible("quick_fix", fixes);
     menu->setItemVisible("Fix Separator", fixes);
     S32 screen_x, screen_y;
@@ -3454,26 +3457,27 @@ void ALTextView::drawBars(F32 alpha)
         // The lines with a mark, found again only where the text or the
         // marks have changed; their colours asked every frame, which a
         // change of theme may change.
-        if (mRulerMarksVersion != mDocument.version() || mRulerMarksRevision != marksRevision() || !mRulerMarksValid)
+        const U32 marks_revision = mFeatures ? mFeatures->marksRevision() : 0;
+        if (mRulerMarksVersion != mDocument.version() || mRulerMarksRevision != marks_revision || !mRulerMarksValid)
         {
             mRulerMarkLines.clear();
             LLColor4  unused;
-            const S32 count = mDocument.lineCount();
+            const S32 count = mFeatures ? mDocument.lineCount() : 0;
             for (S32 line = 0; line < count; ++line)
             {
-                if (mapMark(line, unused))
+                if (mFeatures->mapMark(line, unused))
                 {
                     mRulerMarkLines.push_back(line);
                 }
             }
             mRulerMarksVersion  = mDocument.version();
-            mRulerMarksRevision = marksRevision();
+            mRulerMarksRevision = marks_revision;
             mRulerMarksValid    = true;
         }
         LLColor4 mark;
         for (const S32 line : mRulerMarkLines)
         {
-            if (mapMark(line, mark))
+            if (mFeatures->mapMark(line, mark))
             {
                 const S32 y = yOf(line);
                 gl_rect_2d(middle, y, ruler.mRight - 2, y - 2, mark % alpha);
@@ -3847,7 +3851,7 @@ void ALTextView::drawMap(F32 alpha)
         }
         // A mark beside the line, and a match in it.
         LLColor4 mark;
-        if (mapMark(line, mark))
+        if (mFeatures && mFeatures->mapMark(line, mark))
         {
             gl_rect_2d_in_batch(mark_left, top, mark_left + MAP_MARK_W, bottom - 1, mark % alpha);
         }

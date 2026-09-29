@@ -52,6 +52,7 @@
 #include <vector>
 
 class ALFindBar;
+class ALTextFeatures;
 class ALVimHost;
 class LLContextMenu;
 
@@ -365,6 +366,10 @@ public:
     // What vim asks beyond the view -- lit layers, folds, functions,
     // brackets kept with the text -- where this view has them (ALVimHost).
     virtual ALVimHost* vimHost() { return nullptr; }
+    // What a view built over this one adds -- folding, completion, fixes,
+    // names, marks beside lines, a bracket's partner -- where it has any
+    // (ALTextFeatures).
+    ALTextFeatures* features() const { return mFeatures; }
     // Whether a character typed now goes into the text: always, but for a
     // modal keymap outside its inserting modes, where it is a command.
     bool           typingText() const { return !mModal || mModal->inserting(); }
@@ -774,6 +779,10 @@ protected:
     friend class LLUICtrlFactory;
     ALTextView(const Params& p);
 
+    // The features a subclass adds, told by it once it is built and
+    // taken back before it goes.
+    void setFeatures(ALTextFeatures* features) { mFeatures = features; }
+
     // What a subclass adds to the picture: room at the left of the text
     // for a gutter, whatever it draws there and under the rows before they
     // are drawn, and whatever it draws over each row after its glyphs --
@@ -806,37 +815,11 @@ protected:
     // A line's row drawn at a place, coloured as it is in the text: what
     // a header pinned at the top is drawn with.
     void drawRowAt(S32 line, S32 row, F32 left, S32 screen_top, F32 alpha);
-    // What a subclass does about folding: the caret has landed on a
-    // hidden line and it must be seen; a fold command was given; whether
-    // one could be.
-    virtual void revealLine(S32 line) { mLayout.setHidden(line, line, false); }
-    virtual bool performFold(ALEditorCommand command) { return false; }
-    virtual bool canFold(ALEditorCommand command) const { return false; }
-    // And about the code's structure: the functions a code editor's host
-    // knows of, and a bracket's partner.
-    virtual bool performFunction(ALEditorCommand command) { return false; }
-    virtual bool canFunction(ALEditorCommand command) const { return false; }
     // Whether a click lands where the last one did, which is what makes
     // it the next of a run; and the run armed for a third click, once a
     // subclass has taken a double click as its own.
     bool sameClickSpot(S32 x, S32 y) const;
     void armTripleClick();
-    // Completion was asked for.
-    virtual bool complete() { return false; }
-    // What the call at the caret takes, asked for again.
-    virtual bool signatureHelp() { return false; }
-    // The fixes for the problem at the caret offered, and whether there are
-    // any to offer.
-    virtual bool quickFix() { return false; }
-    virtual bool canQuickFix() const { return false; }
-    // What the map shows beside a line: a mark's colour, where the
-    // subclass has one for it; and a count that moves on whenever the
-    // marks do, so that the lines with one are not looked for every frame.
-    virtual bool mapMark(S32 line, LLColor4& color) const { return false; }
-    virtual U32  marksRevision() const { return 0; }
-    // The bracket a closing one at a place closes, where the subclass
-    // knows how to match them past strings and comments.
-    virtual bool closerOpenedAt(const ALTextPos& closer, ALTextPos& opener) { return false; }
     // The x span of a range on a row, if it touches the row; a range past
     // the line's end reaches a little past the last glyph.
     bool spanOnRow(S32 line, S32 row, const ALTextRange& range, F32& x0, F32& x1);
@@ -859,13 +842,6 @@ protected:
     // A squiggle as a row draws one: drawn with the rest of the frame's
     // squiggles, once the rows are drawn, where the rows are being drawn.
     void squiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, const LLRect& clip);
-    // Something was asked about the name at the caret: its definition,
-    // its references, a new name; whether it could be.
-    virtual bool performSymbol(ALEditorCommand command) { return false; }
-    virtual bool canSymbol(ALEditorCommand command) const { return false; }
-    // Whether anyone answers those questions of this view at all: the
-    // right-click menu leaves them out of a view nobody answers them for.
-    virtual bool offersSymbols() const { return false; }
     // The screen y of the top of a line's row -- the row's own top; a row
     // a box made taller than the font's line holds its text at its
     // bottom -- and every row on screen in turn, for a subclass drawing
@@ -1023,6 +999,7 @@ private:
     ALSyntaxHighlighter mHighlighter;
     ALTextLayout        mLayout;
     ALKeymap            mKeymap;
+    ALTextFeatures*     mFeatures = nullptr;
     std::unique_ptr<ALModalKeymap> mModal;
     // The band under the text a modal keymap has: its line, or its
     // status and message.

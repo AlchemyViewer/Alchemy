@@ -1852,4 +1852,23 @@ namespace tut
         v.showFind(false);
         ensure_equals("the word before it, without it", v.findBar()->query(), std::string("see"));
     }
+
+    template<> template<>
+    void altextview_object::test<58>()
+    {
+        set_test_name("a view with no features does none of their commands and offers none, and a caret on a hidden line shows it");
+        ALTextView& v = make("one\ntwo\nthree\n");
+        ensure("no features", v.features() == nullptr);
+        for (const ALEditorCommand command : { ALEditorCommand::Fold, ALEditorCommand::UnfoldAll, ALEditorCommand::NextFunction,
+                                               ALEditorCommand::GoToMatchingBracket, ALEditorCommand::QuickFix, ALEditorCommand::GoToDefinition,
+                                               ALEditorCommand::Rename })
+        {
+            ensure("none could be done", !v.canPerform(command));
+            ensure("nor is done", !v.perform(command));
+        }
+        ensure("no completion, nor what a call takes", !v.perform(ALEditorCommand::Complete) && !v.perform(ALEditorCommand::SignatureHelp));
+        v.layout().setHidden(1, 1, true);
+        v.setCaret(ALTextPos(1, 1));
+        ensure("the caret's line shown again", !v.layout().hidden(1) && v.caret() == ALTextPos(1, 1));
+    }
 }

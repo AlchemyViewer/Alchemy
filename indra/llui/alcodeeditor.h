@@ -32,6 +32,7 @@
 #include "alfoldmodel.h"
 #include "allinetable.h"
 #include "alsnippetsession.h"
+#include "altextfeatures.h"
 #include "altextview.h"
 #include "alvimhost.h"
 #include "llstl.h"
@@ -59,7 +60,7 @@ class ALChoiceList;
 // none of the analyzers hands over regions of its own.
 // Completions come from whoever is set as the provider, and until someone
 // is, from the grammar's vocabulary and the words in the document.
-class ALCodeEditor : public ALTextView, public ALVimHost
+class ALCodeEditor : public ALTextView, public ALVimHost, private ALTextFeatures
 {
 public:
     AL_VIEW_TYPE(ALCodeEditor, ALTextView);
@@ -730,25 +731,35 @@ protected:
     // The blank marks on one row, over the glyphs the layout placed, so
     // that a tab is marked across the width it actually took.
     void drawWhitespace(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha);
+    // --- ALTextFeatures ----------------------------------------------------------
+
+    bool performFeature(ALEditorCommand command) override;
+    bool canPerformFeature(ALEditorCommand command) const override;
+    bool offersSymbols() const override { return static_cast<bool>(mSymbolRequest); }
     void revealLine(S32 line) override;
-    bool performFold(ALEditorCommand command) override;
-    bool canFold(ALEditorCommand command) const override;
-    bool performFunction(ALEditorCommand command) override;
+    bool mapMark(S32 line, LLColor4& color) const override;
+    U32  marksRevision() const override { return mMarksRevision; }
+    bool closerOpenedAt(const ALTextPos& closer, ALTextPos& opener) override;
+    // The features' commands, by what they are about: folding; the code's
+    // structure, the functions a host knows of and a bracket's partner;
+    // completion; what the call at the caret takes, asked for again; the
+    // fixes for the problem at the caret; and the name at the caret -- its
+    // definition, its references, a new name. Each with whether it could
+    // be done.
+    bool performFold(ALEditorCommand command);
+    bool canFold(ALEditorCommand command) const;
+    bool performFunction(ALEditorCommand command);
     // Where Go to Matching Bracket goes, or false for nowhere.
     bool bracketToGoTo(ALTextPos& to);
     // What Expand Selection would grow the selection to (ALSmartSelect).
     std::optional<ALTextRange> grownSelection();
-    bool canFunction(ALEditorCommand command) const override;
-    bool complete() override;
-    bool signatureHelp() override;
-    bool quickFix() override;
-    bool canQuickFix() const override;
-    bool performSymbol(ALEditorCommand command) override;
-    bool canSymbol(ALEditorCommand command) const override;
-    bool offersSymbols() const override { return static_cast<bool>(mSymbolRequest); }
-    bool mapMark(S32 line, LLColor4& color) const override;
-    U32  marksRevision() const override { return mMarksRevision; }
-    bool closerOpenedAt(const ALTextPos& closer, ALTextPos& opener) override;
+    bool canFunction(ALEditorCommand command) const;
+    bool complete();
+    bool signatureHelp();
+    bool quickFix();
+    bool canQuickFix() const;
+    bool performSymbol(ALEditorCommand command);
+    bool canSymbol(ALEditorCommand command) const;
 
 private:
     void onEdit(const ALTextDocument::Edit& edit);
