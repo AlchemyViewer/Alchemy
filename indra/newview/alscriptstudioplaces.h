@@ -26,7 +26,7 @@
 
 #include "alscriptanalysis.h"
 #include "alscriptstudiodoc.h"
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 
 #include <memory>
 #include <string>

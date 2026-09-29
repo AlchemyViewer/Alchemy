@@ -43,6 +43,7 @@
 #include "alscriptstudiofileio.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudiovimrc.h"
+#include "alscriptworkspace.h"
 #include "alemptystate.h"
 #include "aljumpbar.h"
 #include "aloutputview.h"

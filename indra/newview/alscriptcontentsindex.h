@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 #include "lluuid.h"
 
 #include <boost/signals2.hpp>

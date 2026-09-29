@@ -27,7 +27,7 @@
 #pragma once
 
 #include "lljsonrpcws.h"
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 #include "llpublishedobjectmgr.h"
 #include "llsd.h"
 #include "lluuid.h"

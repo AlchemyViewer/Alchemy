@@ -26,8 +26,8 @@
 
 #include "alpreprocessor.h"
 #include "alscriptstudiodoc.h"
+#include "alscripttypes.h"
 #include "alscriptweight.h"
-#include "alscriptworkspace.h"
 
 #include <functional>
 #include <memory>

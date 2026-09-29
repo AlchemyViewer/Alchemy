@@ -25,7 +25,7 @@
 #pragma once
 
 #include "alscriptstudiodoc.h"
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 #include "altextsearch.h"
 #include "lluuid.h"
 

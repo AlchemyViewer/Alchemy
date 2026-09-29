@@ -198,7 +198,7 @@ private:
     Window*                 mWindow   = nullptr;
     ALScriptExplorerTree*   mTree     = nullptr;
     LLFilterEditor*         mFilter   = nullptr;
-    Model                   mModel{ ALScriptWorkspace::instance().contentsIndex() };
+    Model                   mModel;
     LLHandle<LLContextMenu> mMenu;
     // Answers have come that the list does not show yet: it is filled a
     // moment after it was last filled.

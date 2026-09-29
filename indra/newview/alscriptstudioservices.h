@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 #include "llstring.h"
 
 #include <optional>

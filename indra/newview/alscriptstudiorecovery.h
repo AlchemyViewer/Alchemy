@@ -27,7 +27,7 @@
 #include "alquickopen.h"
 #include "alrecoverystore.h"
 #include "alscriptstudiodoc.h"
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 
 #include <functional>
 #include <memory>

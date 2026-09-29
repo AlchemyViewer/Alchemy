@@ -32,6 +32,7 @@
 #include "alnotecardembedded.h"
 #include "alrecovery.h"
 #include "alsaid.h"
+#include "alscriptworkspace.h"
 #include "alsurface.h"
 #include "altextgotoline.h"
 #include "altextview.h"

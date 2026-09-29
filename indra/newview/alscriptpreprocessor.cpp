@@ -40,6 +40,7 @@
 #include "alluauconfig.h"
 #include "alscriptenvelope.h"
 #include "alscriptstack.h"
+#include "alscriptworkspace.h"
 #include "llagent.h"
 #include "lldir.h"
 #include "llsdjson.h"

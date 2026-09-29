@@ -25,7 +25,7 @@
 #pragma once
 
 #include "aloutputview.h"
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 #include "llpanel.h"
 #include "lluuid.h"
 

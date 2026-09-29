@@ -26,7 +26,7 @@
 
 #include "alincludesearch.h"
 #include "alscriptpreprocessor.h"
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 #include "llinventorymodel.h"
 
 #include <boost/signals2.hpp>

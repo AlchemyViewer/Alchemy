@@ -49,6 +49,7 @@
 #include "llagent.h"
 #include "llpanelobjectinventory.h"
 #include "llresmgr.h"
+#include "llscripteditorws.h"
 #include "llselectmgr.h"
 #include "lltool.h"
 #include "lltoolcomp.h"

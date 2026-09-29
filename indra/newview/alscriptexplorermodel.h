@@ -25,7 +25,7 @@
 #pragma once
 
 #include "alscriptcontentsindex.h"
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 #include "v3dmath.h"
 #include "llsd.h"
 #include "lluuid.h"

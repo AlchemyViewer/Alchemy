@@ -33,6 +33,7 @@
 #include "alscriptexplorertree.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
+#include "alscriptworkspace.h"
 #include "llagent.h"
 #include "llbutton.h"
 #include "llclipboard.h"
@@ -152,7 +153,7 @@ namespace
 
 static LLPanelInjector<ALScriptExplorerPane> t_script_studio_explorer("script_studio_explorer");
 
-ALScriptExplorerPane::ALScriptExplorerPane(const LLPanel::Params& params) : LLPanel(params) {}
+ALScriptExplorerPane::ALScriptExplorerPane(const LLPanel::Params& params) : LLPanel(params), mModel(ALScriptWorkspace::instance().contentsIndex()) {}
 
 ALScriptExplorerPane::~ALScriptExplorerPane()
 {

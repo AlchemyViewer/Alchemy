@@ -33,7 +33,7 @@
 #include "alscripttextcache.h"
 #include "alluauconfig.h"
 #include "alpreprocessor.h"
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 #include "llinventorymodel.h"
 #include "llsingleton.h"
 #include "llstl.h"

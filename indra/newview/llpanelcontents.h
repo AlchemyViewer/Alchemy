@@ -33,7 +33,6 @@
 #include "lluuid.h"
 #include "llviewerobject.h"
 #include "llvoinventorylistener.h"
-#include "llscripteditorws.h"
 #include "v3math.h"
 
 class LLButton;

@@ -59,7 +59,7 @@
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
 #include "alrecoverystore.h"
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 #include "alsourcemap.h"
 #include "alstudiofloater.h"
 #include "altabstrip.h"

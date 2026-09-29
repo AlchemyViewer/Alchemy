@@ -36,7 +36,7 @@
 #include "alscriptsymbol.h"
 #include "alscripttempfiles.h"
 #include "alscriptweight.h"
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 #include "alsourcemap.h"
 #include "alstringmatch.h"
 #include "alwatchedfile.h"

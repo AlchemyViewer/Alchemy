@@ -29,7 +29,7 @@
 
 #include "alquickask.h"
 #include "alrecoverykeeper.h"
-#include "alscriptworkspace.h"
+#include "alscripttypes.h"
 #include "altextundo.h"
 #include "llpreview.h"
 #include "llvoinventorylistener.h"
