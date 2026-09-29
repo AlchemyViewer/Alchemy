@@ -29,6 +29,7 @@
 #include "alstringmatch.h"
 
 #include "alregex.h"
+#include "altextchars.h"
 #include "lldir.h"
 #include "llsdserialize.h"
 #include "llstring.h"
@@ -48,13 +49,6 @@ namespace
         "namespace", "state",   "global_variable", "path",
     };
     static_assert(sizeof(KIND_NAMES) / sizeof(KIND_NAMES[0]) == static_cast<size_t>(ALSyntaxKind::COUNT), "every kind has a name");
-
-    // A byte that is part of a word: a letter, a digit, an underscore, or
-    // anything beyond ASCII.
-    bool wordByte(unsigned char c)
-    {
-        return c >= 0x80 || c == '_' || std::isalnum(c);
-    }
 
     // What a character class rule matches: a set of ASCII bytes, and
     // whether every byte beyond ASCII is in it too.
@@ -740,7 +734,7 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
                 return npos;
             }
             size_t end = pos + rule.text.size();
-            if (rule.wholeWord && ((pos > 0 && wordByte(line[pos - 1])) || (end < len && wordByte(line[end]))))
+            if (rule.wholeWord && ((pos > 0 && alWordByte(line[pos - 1])) || (end < len && alWordByte(line[end]))))
             {
                 return npos;
             }

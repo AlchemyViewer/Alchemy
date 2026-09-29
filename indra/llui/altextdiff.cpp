@@ -26,6 +26,7 @@
 
 #include "altextdiff.h"
 
+#include "altextchars.h"
 #include "llstl.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -181,7 +182,6 @@ namespace
         boost::unordered_flat_map<std::string_view, S32, ll::string_hash, std::equal_to<>> mIds;
     };
 
-    bool wordByte(unsigned char c) { return c >= 0x80 || c == '_' || (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
     bool blank(unsigned char c) { return c == ' ' || c == '\t'; }
 
     // A line's words, each as [begin, end) in it.
@@ -193,9 +193,9 @@ namespace
         {
             const unsigned char c   = static_cast<unsigned char>(line[i]);
             size_t              end = i + 1;
-            if (wordByte(c))
+            if (alWordByte(static_cast<char>(c)))
             {
-                while (end < line.size() && wordByte(static_cast<unsigned char>(line[end])))
+                while (end < line.size() && alWordByte(line[end]))
                 {
                     ++end;
                 }

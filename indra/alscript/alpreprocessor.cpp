@@ -28,6 +28,7 @@
 #include "alpreprocessor.h"
 
 #include "alscriptfixes.h"
+#include "alscriptlexicon.h"
 #include "alscriptweight.h"
 
 #include "llstl.h"
@@ -204,9 +205,9 @@ namespace
 
     // ---- the tokenizers ---------------------------------------------------------
 
-    bool isIdentStart(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }
+    bool isIdentStart(char c) { return ALScriptLexicon::isNameStart(c); }
     bool isDigit(char c) { return c >= '0' && c <= '9'; }
-    bool isIdentChar(char c) { return isIdentStart(c) || isDigit(c); }
+    bool isIdentChar(char c) { return ALScriptLexicon::isNameByte(c); }
     bool isBlank(char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\f' || c == '\v'; }
 
     // Longest first, so that the first match is the longest.
@@ -3363,8 +3364,7 @@ namespace
     private:
         static bool isType(const Token& t)
         {
-            static constexpr std::string_view TYPES[] = { "integer", "float", "string", "key", "vector", "rotation", "quaternion", "list" };
-            return t.kind == Kind::Ident && std::find(std::begin(TYPES), std::end(TYPES), t.text) != std::end(TYPES);
+            return t.kind == Kind::Ident && ALScriptLexicon::isLslType(t.text);
         }
     };
 
@@ -4843,18 +4843,16 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
         const size_t first = name.find_first_not_of(" \t");
         const size_t last  = name.find_last_not_of(" \t");
         name = first == std::string::npos ? std::string() : name.substr(first, last - first + 1);
-        const bool identifier = !name.empty() && !isdigit(static_cast<unsigned char>(name[0])) &&
-                                std::all_of(name.begin(), name.end(), [](char c) { return isalnum(static_cast<unsigned char>(c)) || c == '_'; });
-        if (identifier)
+        if (ALScriptLexicon::isName(name))
         {
             engine.predefine(name + " " + value);
         }
     }
     if (!options.lua)
     {
-        for (const char* type : { "integer", "float", "string", "key", "vector", "rotation", "quaternion", "list" })
+        for (const std::string_view type : ALScriptLexicon::LSL_TYPES)
         {
-            engine.predefine(std::string(type) + "(...) ((" + type + ")(__VA_ARGS__))");
+            engine.predefine(std::string(type) + "(...) ((" + std::string(type) + ")(__VA_ARGS__))");
         }
     }
 
@@ -5251,7 +5249,7 @@ std::vector<ALPreprocessor::Required> ALPreprocessor::requiresIn(std::string_vie
 // static
 ALPreprocessor::Transform ALPreprocessor::transformAt(const std::function<std::string_view(S32)>& line, S32 count, S32 at, std::string& word)
 {
-    const auto isWord = [](char c) { return isalnum(static_cast<unsigned char>(c)) || c == '_'; };
+    const auto isWord = ALScriptLexicon::isNameByte;
     const auto blank  = std::string_view(" \t");
     // The line's first statement's shape, and its word.
     const auto shapeOf = [&](S32 index) {
@@ -5322,9 +5320,7 @@ ALPreprocessor::Transform ALPreprocessor::transformAt(const std::function<std::s
             {
                 ++end;
             }
-            static constexpr std::string_view TYPES[] = { "integer", "float", "string", "key", "vector", "rotation", "quaternion", "list" };
-            if (type != std::string_view::npos && end > type &&
-                std::find(std::begin(TYPES), std::end(TYPES), text.substr(type, end - type)) != std::end(TYPES))
+            if (type != std::string_view::npos && end > type && ALScriptLexicon::isLslType(text.substr(type, end - type)))
             {
                 word = "const";
                 return Transform::Extensions;

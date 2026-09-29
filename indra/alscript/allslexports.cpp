@@ -27,6 +27,7 @@
 #include "allslexports.h"
 
 #include "alpreprocessor.h"
+#include "alscriptlexicon.h"
 
 #include <algorithm>
 
@@ -37,14 +38,14 @@ namespace
 
     bool isType(const std::string& word)
     {
-        static const char* const TYPES[] = { "integer", "float", "string", "key", "vector", "rotation", "quaternion", "list" };
-        return std::any_of(std::begin(TYPES), std::end(TYPES), [&word](const char* type) { return word == type; });
+        return ALScriptLexicon::isLslType(word);
     }
 
+    // A word of the language's or the preprocessor's, which names nothing
+    // the script exports.
     bool isWord(const std::string& word)
     {
-        static const char* const WORDS[] = { "default", "state", "if", "else", "for", "while", "do", "jump", "return", "inline", "const", "print" };
-        return isType(word) || std::any_of(std::begin(WORDS), std::end(WORDS), [&word](const char* one) { return word == one; });
+        return (ALScriptLexicon::lslWord(word) & (ALScriptLexicon::LSL_KEYWORD | ALScriptLexicon::LSL_EXTENSION)) != 0;
     }
 
     bool significant(const Token& token)

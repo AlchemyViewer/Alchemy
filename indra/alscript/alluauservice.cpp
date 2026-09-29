@@ -50,6 +50,7 @@
 #include "Luau/Type.h"
 #include "Luau/TypeArena.h"
 #include "Luau/TypePack.h"
+#include "alscriptlexicon.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
@@ -2531,7 +2532,7 @@ std::vector<ALScriptFix> ALLuauService::actions(std::string_view source, S32 lin
         }
         const std::string_view text = sliceOf(source, Luau::Position(hint.line, 0), Luau::Position(hint.line, hint.column));
         S32                    from = hint.column;
-        while (from > 0 && (isalnum(static_cast<unsigned char>(text[from - 1])) || text[from - 1] == '_'))
+        while (from > 0 && ALScriptLexicon::isNameByte(text[from - 1]))
         {
             --from;
         }

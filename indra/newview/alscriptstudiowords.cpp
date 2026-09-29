@@ -28,6 +28,7 @@
 
 #include "alsaid.h"
 
+#include "alscriptlexicon.h"
 #include "alscriptstudiodoc.h"
 #include "lluistring.h"
 
@@ -607,14 +608,14 @@ bool ALScriptStudioWords::hoverText(bool lua, const ALTextDocument& text, const 
     std::string        name(word);
     const std::string& line = text.line(at.line);
     S32                from = at.column;
-    while (from > 0 && line[from - 1] != '.' && (isalnum(static_cast<unsigned char>(line[from - 1])) || line[from - 1] == '_'))
+    while (from > 0 && ALScriptLexicon::isNameByte(line[from - 1]))
     {
         --from;
     }
     while (from > 0 && line[from - 1] == '.')
     {
         S32 head = from - 1;
-        while (head > 0 && (isalnum(static_cast<unsigned char>(line[head - 1])) || line[head - 1] == '_'))
+        while (head > 0 && ALScriptLexicon::isNameByte(line[head - 1]))
         {
             --head;
         }

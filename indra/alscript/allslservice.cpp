@@ -32,6 +32,7 @@
 
 #include "almessagemap.h"
 #include "allsltraits.h"
+#include "alscriptlexicon.h"
 
 #include "llfile.h"
 
@@ -607,7 +608,7 @@ namespace
 
     bool identifierByte(char c)
     {
-        return isalnum(static_cast<unsigned char>(c)) || c == '_';
+        return ALScriptLexicon::isNameByte(c);
     }
 
     // The statement the caret is in, closed where the caret is: a string
@@ -2206,7 +2207,7 @@ namespace
             return false;
         }
         return stringLiteral(text) ||
-               std::all_of(text.begin(), text.end(), [](char c) { return isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '.'; });
+               std::all_of(text.begin(), text.end(), [](char c) { return ALScriptLexicon::isNameByte(c) || c == '.'; });
     }
 
     // Whether an expression is the whole of what it is given to -- a

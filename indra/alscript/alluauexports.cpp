@@ -28,6 +28,7 @@
 
 #include "Luau/Ast.h"
 #include "Luau/Parser.h"
+#include "alscriptlexicon.h"
 
 #include <algorithm>
 
@@ -35,21 +36,7 @@ namespace
 {
     bool isName(std::string_view word)
     {
-        if (word.empty() || !(isalpha(static_cast<unsigned char>(word[0])) || word[0] == '_'))
-        {
-            return false;
-        }
-        for (char c : word)
-        {
-            if (!isalnum(static_cast<unsigned char>(c)) && c != '_')
-            {
-                return false;
-            }
-        }
-        static const char* const KEYWORDS[] = { "and",   "break", "do",  "else", "elseif", "end",    "false", "for",   "function", "if",
-                                                "in",    "local", "nil", "not",  "or",     "repeat", "return", "then", "true",     "until",
-                                                "while", "continue" };
-        return std::none_of(std::begin(KEYWORDS), std::end(KEYWORDS), [word](const char* keyword) { return word == keyword; });
+        return ALScriptLexicon::isName(word) && !ALScriptLexicon::isLuauKeyword(word);
     }
 
     struct Names

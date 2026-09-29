@@ -27,6 +27,7 @@
 
 #include "alvimcommandline.h"
 
+#include "altextchars.h"
 #include "alvimexcommands.h"
 #include "alvimkeymap.h"
 #include "alvimtext.h"
@@ -110,9 +111,8 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                     }
                     if (at > 0)
                     {
-                        const bool word = isalnum(static_cast<unsigned char>(line[at - 1])) || line[at - 1] == '_' || static_cast<unsigned char>(line[at - 1]) >= 0x80;
-                        while (at > 0 && line[at - 1] != ' ' &&
-                               (isalnum(static_cast<unsigned char>(line[at - 1])) || line[at - 1] == '_' || static_cast<unsigned char>(line[at - 1]) >= 0x80) == word)
+                        const bool word = alWordByte(line[at - 1]);
+                        while (at > 0 && line[at - 1] != ' ' && alWordByte(line[at - 1]) == word)
                         {
                             --at;
                         }

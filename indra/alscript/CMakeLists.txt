@@ -31,6 +31,7 @@ target_sources(
     alscriptenvelope.cpp
     alscriptfixes.cpp
     alscriptformatter.cpp
+    alscriptlexicon.cpp
     alscriptmessages.cpp
     alscriptnameindex.cpp
     alscriptsnapshot.cpp
@@ -73,6 +74,7 @@ target_sources(
         alscriptfixes.h
         alscriptformatter.h
         alscriptjoblane.h
+        alscriptlexicon.h
         alscriptmessages.h
         alscriptnameindex.h
         alscriptsnapshot.h
@@ -159,6 +161,7 @@ if(AL_BUILD_TESTS)
   al_add_test(almessagemap PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alluauconfig PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptformatter PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(alscriptlexicon PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptmessages PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alnotecardformat PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscripttempfiles PROJECT alscript LIBRARIES alscript llcommon)

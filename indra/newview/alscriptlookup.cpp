@@ -26,6 +26,7 @@
 
 #include "alscriptlookup.h"
 
+#include "alscriptlexicon.h"
 #include "alscriptnavigation.h"
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudioplaces.h"
@@ -101,11 +102,7 @@ bool ALScriptLookup::reserved(bool lua, const std::string& name)
     // its keywords and types, the preprocessor's words while their
     // transforms are on, and every function, event and constant the
     // definitions give.
-    static const std::set<std::string> LSL{ "default", "state", "event", "jump", "return", "if", "else", "for", "do", "while", "print",
-                                           "integer", "float", "string", "key", "vector", "rotation", "quaternion", "list" };
-    static const std::set<std::string> LUAU{ "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "if", "in",
-                                            "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while", "continue" };
-    if (lua ? LUAU.count(name) > 0 : LSL.count(name) > 0)
+    if (ALScriptLexicon::isKeyword(lua, name))
     {
         return true;
     }
@@ -608,7 +605,7 @@ bool ALScriptLookup::mentions(std::string_view text, std::string_view name, bool
         }
         return at + 1 + level < text.size() && text[at + 1 + level] == '[' ? "]" + std::string(level, '=') + "]" : std::string();
     };
-    const auto name_byte = [](char c) { return isalnum(static_cast<unsigned char>(c)) || c == '_'; };
+    const auto name_byte = ALScriptLexicon::isNameByte;
     for (size_t i = 0; i < text.size();)
     {
         const char c = text[i];

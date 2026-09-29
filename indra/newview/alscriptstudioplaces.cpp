@@ -27,6 +27,7 @@
 #include "alscriptstudioplaces.h"
 
 #include "alscriptenvelope.h"
+#include "alscriptlexicon.h"
 
 namespace ALScriptPlaces
 {
@@ -156,22 +157,10 @@ namespace ALScriptPlaces
         return text.line(line);
     }
 
-    // A name as both languages spell one: a letter or an underscore, then
-    // letters, digits and underscores.
+    // A name as both languages spell one.
     bool isIdentifier(const std::string& text)
     {
-        if (text.empty() || (!isalpha(static_cast<unsigned char>(text[0])) && text[0] != '_'))
-        {
-            return false;
-        }
-        for (const char c : text)
-        {
-            if (!isalnum(static_cast<unsigned char>(c)) && c != '_')
-            {
-                return false;
-            }
-        }
-        return true;
+        return ALScriptLexicon::isName(text);
     }
 
     S32 mapSpan(const ALSourceMap& map, ALScriptSpan& span)

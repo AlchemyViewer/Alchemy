@@ -36,6 +36,7 @@
 #include "allsleffects.h"
 #include "allslservice.h"
 #include "allsltraits.h"
+#include "alscriptlexicon.h"
 
 #include <tailslide/tailslide.hh>
 #include <tailslide/operations.hh>
@@ -374,14 +375,9 @@ namespace
 
     bool isBuiltinOrKeyword(const std::string& name, ScriptContext& context)
     {
-        static const char* const keywords[] = { "default", "state", "event", "jump", "return", "if", "else", "for", "do", "while", "print", "integer",
-                                                "float", "string", "key", "vector", "rotation", "quaternion", "list", "TRUE", "FALSE", nullptr };
-        for (const char* const* k = keywords; *k; ++k)
+        if (ALScriptLexicon::lslWord(name) & (ALScriptLexicon::LSL_KEYWORD | ALScriptLexicon::LSL_CONSTANT))
         {
-            if (name == *k)
-            {
-                return true;
-            }
+            return true;
         }
         return context.builtins && context.builtins->lookup(name.c_str(), SYM_ANY);
     }

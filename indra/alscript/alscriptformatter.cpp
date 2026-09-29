@@ -27,6 +27,7 @@
 #include "alscriptformatter.h"
 
 #include "alpreprocessor.h"
+#include "alscriptlexicon.h"
 
 #include <algorithm>
 #include <set>
@@ -78,21 +79,12 @@ namespace
 
     bool significant(const Token& t) { return t.kind != Kind::Space && t.kind != Kind::Comment; }
 
-    bool isLslKeyword(std::string_view w)
+    // LSL's words that shape the code -- not its types, nor print, which
+    // are laid out as names are -- and Luau's keywords.
+    bool isKeyword(bool lua, const Token& t)
     {
-        static const std::set<std::string_view> words = { "if", "else", "for", "while", "do", "return", "jump", "state", "default" };
-        return words.count(w) > 0;
+        return t.kind == Kind::Ident && (lua ? ALScriptLexicon::isLuauKeyword(t.text) : ALScriptLexicon::lslWord(t.text) == ALScriptLexicon::LSL_CONTROL);
     }
-
-    bool isLuaKeyword(std::string_view w)
-    {
-        static const std::set<std::string_view> words = { "and",   "break", "const", "continue", "do",  "else",   "elseif", "end",   "export", "false",
-                                                          "for",   "function", "if", "in",       "local", "nil",  "not",    "or",    "repeat", "return",
-                                                          "then",  "true",  "until", "while" };
-        return words.count(w) > 0;
-    }
-
-    bool isKeyword(bool lua, const Token& t) { return t.kind == Kind::Ident && (lua ? isLuaKeyword(t.text) : isLslKeyword(t.text)); }
 
     bool isOperator(bool lua, std::string_view op)
     {

@@ -26,6 +26,7 @@
 
 #include "alscriptfixes.h"
 
+#include "alscriptlexicon.h"
 #include "llstring.h"
 
 #include <algorithm>
@@ -115,12 +116,12 @@ namespace
 
     bool identifierByte(char c)
     {
-        return isalnum(static_cast<unsigned char>(c)) || c == '_';
+        return ALScriptLexicon::isNameByte(c);
     }
 
     bool isIdentifier(std::string_view word)
     {
-        return !word.empty() && !isdigit(static_cast<unsigned char>(word.front())) && std::all_of(word.begin(), word.end(), identifierByte);
+        return ALScriptLexicon::isName(word);
     }
 
     // A name and its members, `math.abs` or `LLEvents:on`.
@@ -203,9 +204,7 @@ namespace
     // float. What it does not, no fix offers.
     bool castable(const std::string& from, const std::string& to)
     {
-        static const char* const TYPES[] = { "integer", "float", "string", "key", "vector", "rotation", "list" };
-        const auto known = [](const std::string& type) { return std::find(std::begin(TYPES), std::end(TYPES), type) != std::end(TYPES); };
-        if (from == to || !known(from) || !known(to))
+        if (from == to || !ALScriptLexicon::isLslType(from) || !ALScriptLexicon::isLslType(to))
         {
             return false;
         }
@@ -651,7 +650,7 @@ namespace
         }
         else if (lua && (is(key, Fixed::LuauLintTableInsertZero) || is(key, Fixed::LuauLintTableRemoveZero) || is(key, Fixed::LuauLintTableMoveZero) ||
                          is(key, Fixed::LuauLintForRangeZero)) &&
-                 !marked.empty() && marked.front() == '0' && (marked.size() == 1 || !(isalnum(static_cast<unsigned char>(marked[1])) || marked[1] == '.' || marked[1] == '_')))
+                 !marked.empty() && marked.front() == '0' && (marked.size() == 1 || !(ALScriptLexicon::isNameByte(marked[1]) || marked[1] == '.')))
         {
             // Counted from 1, where SLua's arrays start: the 0 the lint
             // marks -- the index given, or where the loop begins.
@@ -1203,7 +1202,6 @@ namespace ALScriptFixes
             return;
         }
         // The type it is declared as, before its name.
-        static const char* const TYPES[] = { "integer", "float", "string", "key", "vector", "rotation", "quaternion", "list" };
         S32 word_end = column;
         while (word_end > 0 && isspace(static_cast<unsigned char>(first[word_end - 1])))
         {
@@ -1214,7 +1212,7 @@ namespace ALScriptFixes
         {
             --word;
         }
-        if (word < word_end && std::find(std::begin(TYPES), std::end(TYPES), first.substr(word, word_end - word)) != std::end(TYPES))
+        if (word < word_end && ALScriptLexicon::isLslType(first.substr(word, word_end - word)))
         {
             column = word;
         }

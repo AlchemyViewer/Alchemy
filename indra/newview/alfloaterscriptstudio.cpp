@@ -31,6 +31,7 @@
 #include "alcodeeditor.h"
 #include "aldiffview.h"
 #include "aldiskincludes.h"
+#include "alscriptlexicon.h"
 #include "alserialworker.h"
 #include "alfilewrite.h"
 #include "fsyspath.h"
@@ -3041,7 +3042,7 @@ void ALFloaterScriptStudio::completeLinks(const Doc& doc, const ALTextPos& at, s
         --end;
     }
     S32 start = end;
-    while (start > 0 && (std::isalnum(static_cast<unsigned char>(line[start - 1])) || line[start - 1] == '_' || line[start - 1] == '.'))
+    while (start > 0 && (ALScriptLexicon::isNameByte(line[start - 1]) || line[start - 1] == '.'))
     {
         --start;
     }

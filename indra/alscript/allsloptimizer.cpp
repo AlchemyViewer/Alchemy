@@ -35,6 +35,7 @@
 #include "allslservice.h"
 #include "allsltraits.h"
 #include "allslvalues.h"
+#include "alscriptlexicon.h"
 #include "llmath.h"
 #include "llmd5.h"
 #include "llstl.h"
@@ -4920,10 +4921,6 @@ namespace
         std::map<LSLSymbol*, LSLASTNode*> of;
     };
 
-    const char* const KEYWORDS[] = { "default", "state",  "event",   "jump",     "return", "if",    "else",       "for",  "do",
-                                     "while",   "print",  "integer", "float",    "string", "key",   "vector",     "rotation",
-                                     "quaternion", "list", "TRUE",   "FALSE",    "inline", "const", "break", "continue",   "switch", "case", nullptr };
-
     // What each character of a name costs the target's code, where the
     // compiled script keeps it. Mono keeps a global's as its field's, and a
     // function's as its method's, and each once more where the code
@@ -5021,12 +5018,11 @@ namespace
         // Every name given so far, which none is given again but a label's.
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> given;
         const auto usable = [&](const std::string& name) {
-            for (const char* const* k = KEYWORDS; *k; ++k)
+            // No word of the language's, the preprocessor's extensions
+            // included, whether or not they are on.
+            if (ALScriptLexicon::lslWord(name) != ALScriptLexicon::LSL_NAME)
             {
-                if (name == *k)
-                {
-                    return false;
-                }
+                return false;
             }
             return !given.contains(name) && !(context.builtins && context.builtins->lookup(name.c_str(), SYM_ANY));
         };
