@@ -26,6 +26,7 @@
 
 #include "alscriptfixes.h"
 
+#include "allsltraits.h"
 #include "alscriptlexicon.h"
 #include "llstring.h"
 
@@ -1599,9 +1600,13 @@ namespace ALScriptFixes
                 // What the definitions say to use instead, where they name
                 // one thing, put in place of the whole of what was written
                 // -- and only where that is the name the lint said, as it
-                // is for `ll.Abs` and not for an alias of it. Not safe: the
-                // reason usually says how the two differ.
-                if (problem.endLine == problem.line)
+                // is for `ll.Abs` and not for an alias of it. Not where what
+                // they name takes other arguments -- ll.SetPrimitiveParams'
+                // ll.SetLinkPrimitiveParamsFast wants a link first -- which
+                // the name alone would leave a call that cannot work. Not
+                // safe: the reason usually says how the two differ.
+                const ALLSLTraits::Trait* row = args[0].rfind("ll.", 0) == 0 ? ALLSLTraits::of(("ll" + args[0].substr(3)).c_str()) : nullptr;
+                if (problem.endLine == problem.line && !(row && (row->slua & ALLSLTraits::SluaUseDiffers)))
                 {
                     const std::string_view line = lines.line(problem.line);
                     if (problem.column >= 0 && problem.endColumn <= static_cast<S32>(line.size()) &&

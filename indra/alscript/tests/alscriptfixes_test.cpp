@@ -1204,4 +1204,29 @@ namespace tut
         const ALScriptProblem* problem  = keyed(problems, "LuauLintSlNilSentinel");
         ensure("safe", problem && !problem->fixes.empty() && problem->fixes.front().safe);
     }
+
+    template<> template<>
+    void object::test<41>()
+    {
+        set_test_name("a deprecated ll function's replacement put in by name only where it takes the same arguments: not "
+                      "ll.SetPrimitiveParams', which wants a link first");
+        ensure("definitions: " + error, luauLoaded);
+        ensure_equals("the same arguments", fixed("ll.SetLinkPrimitiveParams(LINK_THIS, {})\n", true, "LuauLintDeprecatedMemberUse",
+                                                  "Use 'll.SetLinkPrimitiveParamsFast' instead of 'll.SetLinkPrimitiveParams'"),
+                      std::string("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {})\n"));
+        for (const char* call : { "ll.SetPrimitiveParams({})\n", "ll.MakeFire(1, 1, 1, 1, 1, \"\", vector(0, 0, 0))\n" })
+        {
+            const ALScriptProblems problems = check(call, true);
+            for (const ALScriptProblem& problem : problems)
+            {
+                if (problem.key.rfind("LuauLintDeprecatedMemberUse", 0) == 0)
+                {
+                    for (const ALScriptFix& fix : problem.fixes)
+                    {
+                        ensure("no replacement by name: " + std::string(call) + fix.title, fix.key != "ScriptFixUseInstead");
+                    }
+                }
+            }
+        }
+    }
 }

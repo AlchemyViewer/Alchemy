@@ -15,7 +15,8 @@ where LSL answers 1 or 0 (a result with bool-semantics), or gives booleans
 in the list it answers (bool-semantics on a list); whether `ll` lacks it,
 leaving it to `llcompat` alone, or SLua has it nowhere -- read from what
 secondlife.d.luau, beside the YAML, declares in each; and what SLua would
-have used in its stead (slua-deprecated's `use`). The performance lints
+have used in its stead (slua-deprecated's `use`), and whether that takes
+other arguments. The performance lints
 read how long each makes the script sleep, under LSO and under Mono,
 where the two differ (sleep, mono-sleep). And the constants LSL
 types a string that SLua types a uuid, NULL_KEY among them, for
@@ -125,8 +126,12 @@ def main(argv):
     declared = {"ll": set(), "llcompat": set()}
     deprecated = set()
     # The arguments of each ll function SLua takes either a string or a uuid
-    # for, as bits by their places.
+    # for, as bits by their places; and each one's parameters' types.
     text_args = {}
+    params = {}
+    # What secondlife.d.luau's deprecation says to use, which is what Luau's
+    # lint says and its fix puts in.
+    luau_use = {}
     table = None
     for line in (source.parent / "secondlife.d.luau").read_text(encoding="utf-8").split("\n"):
         m = re.match(r"^declare (ll|llcompat): \{\s*$", line)
@@ -143,7 +148,11 @@ def main(argv):
                 deprecated.add(m.group(1))
             if table == "ll":
                 bits = 0
-                for i, t in enumerate(ll_params(line)):
+                params[m.group(1)] = ll_params(line)
+                said = re.search(r"use='([^']+)'", line)
+                if said:
+                    luau_use[m.group(1)] = said.group(1)
+                for i, t in enumerate(params[m.group(1)]):
                     if re.search(r"\bstring\b", t) and re.search(r"\buuid\b", t) and "{" not in t:
                         bits |= 1 << i
                 text_args[m.group(1)] = bits
@@ -283,6 +292,12 @@ def main(argv):
             slua.append("SluaRemoved" if bare in declared["llcompat"] else "SluaAbsent")
         elif bare in deprecated:
             slua.append("SluaDeprecated")
+        # What SLua's deprecation says to use, where it is ll's, taking
+        # other arguments: its name alone put in place is no call that works.
+        used = luau_use.get(bare, "")
+        used = used[3:] if used.startswith("ll.") else None
+        if used and bare in params and used in params and params[used] != params[bare]:
+            slua.append("SluaUseDiffers")
         use = '"%s"' % t["use"].replace('\\', '\\\\').replace('"', '\\"') if t["use"] else "nullptr"
         reason = '"%s"' % t["reason"].replace('\\', '\\\\').replace('"', '\\"') if t["reason"] else "nullptr"
         lines.append(

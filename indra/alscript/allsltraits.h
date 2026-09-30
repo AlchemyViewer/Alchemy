@@ -44,8 +44,10 @@ public:
     // a boolean where LSL answers 1 or 0 (SluaBool), or gives booleans in
     // the list it answers where LSL gave 1 or 0 (SluaBoolList); or lacks it,
     // leaving it to `llcompat` alone (SluaRemoved), or has it but deprecates
-    // it (SluaDeprecated). `llcompat` has every function as LSL has it, but
-    // those SLua has nowhere (SluaAbsent).
+    // it (SluaDeprecated), for another of ll's that takes other arguments
+    // (SluaUseDiffers), so that its name alone is no replacement. `llcompat`
+    // has every function as LSL has it, but those SLua has nowhere
+    // (SluaAbsent).
     enum Slua : U8
     {
         SluaIndexResult = 1 << 0,
@@ -55,6 +57,7 @@ public:
         SluaBoolList    = 1 << 4,
         SluaAbsent      = 1 << 5,
         SluaDeprecated  = 1 << 6,
+        SluaUseDiffers  = 1 << 7,
         SluaIndex       = SluaIndexResult | SluaIndexArgs,
     };
     struct Trait
