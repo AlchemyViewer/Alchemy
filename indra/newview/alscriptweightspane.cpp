@@ -340,6 +340,7 @@ void ALScriptWeightsPane::fillParts()
                 one.change = S64(part.bytes) - S64(found->second);
             }
         }
+        one.name        = partName(part);
         const S32 index = static_cast<S32>(mRows.size());
         if (held && identity(part, one.nth) == *held)
         {
@@ -351,7 +352,7 @@ void ALScriptWeightsPane::fillParts()
         LLSD row;
         row["value"]                          = index;
         row["columns"][PART_NAME]["column"]   = "part";
-        row["columns"][PART_NAME]["value"]    = partName(part);
+        row["columns"][PART_NAME]["value"]    = one.name;
         row["columns"][PART_KIND]["column"]   = "kind";
         row["columns"][PART_KIND]["value"]    = kindName(part.kind);
         row["columns"][PART_BYTES]["column"]  = "bytes";
@@ -488,7 +489,7 @@ S32 ALScriptWeightsPane::compare(S32 column, const LLScrollListItem* a, const LL
     switch (column)
     {
         case PART_NAME:
-            said = LLStringUtil::compareDict(partName(x.part), partName(y.part));
+            said = LLStringUtil::compareDict(x.name, y.name);
             break;
         case PART_KIND:
             said = order(S64(x.part.kind), S64(y.part.kind));

@@ -111,6 +111,8 @@ private:
         size_t               nth = 0;
         std::optional<S64>   change;
         bool                 fresh = false;
+        // Its name as shown, made once for the row and for sorting by it.
+        std::string          name;
     };
 
     const ALScriptWeight* chosen() const;

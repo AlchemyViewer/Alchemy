@@ -242,6 +242,14 @@ namespace tut
         parts->sortByColumn("change", false);
         parts->updateSort();
         ensure_equals("the new function moved most", cell(parts->getAllData()[0], 0), std::string("twice"));
+        // By name, as the names are shown.
+        parts->sortByColumn("part", true);
+        parts->updateSort();
+        const std::vector<std::string> names = column(parts, 0);
+        for (size_t i = 1; i < names.size(); ++i)
+        {
+            ensure("in the order of their names" + joined(names), LLStringUtil::compareDict(names[i - 1], names[i]) <= 0);
+        }
     }
 
     // Nothing to show says why, and holds nothing to choose.
