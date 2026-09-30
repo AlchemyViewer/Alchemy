@@ -64,6 +64,8 @@ namespace
         { "SlZeroIndex", true, Severity::Warning, true, true, nullptr },
         // llcompat.X where ll.X means the same: its fix is ll's.
         { "SlCompatCall", true, Severity::Note, true, true, nullptr },
+        // b == 1, where b is a boolean: LSL's truths were numbers.
+        { "SlBooleanNumber", true, Severity::Error, true, true, nullptr },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -430,6 +432,10 @@ namespace
             if (on("SlCompatCall"))
             {
                 compatCompare(node);
+            }
+            if (on("SlBooleanNumber"))
+            {
+                booleanNumber(node);
             }
             return true;
         }
@@ -1135,6 +1141,66 @@ namespace
             compatSaid(node->location, *found, (negate ? "not " : "") + shown(*found) + ask, std::move(edits));
         }
 
+        // --- SlBooleanNumber: a truth compared with a number -----------------
+
+        // A boolean compared with a number, which it never equals: LSL's
+        // TRUE and FALSE were 1 and 0. Or an if-then-else of 1 and 0 made
+        // only to be compared with one of them, which asks no more than
+        // its condition.
+        void booleanNumber(Luau::AstExprBinary* node)
+        {
+            using Op = Luau::AstExprBinary::Op;
+            if (node->op != Op::CompareEq && node->op != Op::CompareNe)
+            {
+                return;
+            }
+            Luau::AstExpr*        side  = node->left;
+            Luau::AstExpr*        other = node->right;
+            std::optional<double> value = literal(other);
+            if (!value)
+            {
+                std::swap(side, other);
+                value = literal(other);
+            }
+            if (!value)
+            {
+                return;
+            }
+            const bool equal = node->op == Op::CompareEq;
+            if (auto* choice = unbracketed(side)->as<Luau::AstExprIfElse>())
+            {
+                const std::optional<double> yes = literal(choice->trueExpr);
+                const std::optional<double> no  = literal(choice->falseExpr);
+                if (!yes || !no || *yes == *no || (*yes != 0 && *yes != 1) || (*no != 0 && *no != 1) || (*value != 0 && *value != 1))
+                {
+                    return;
+                }
+                // Whether it holds where the condition does.
+                const bool        with = (*yes == *value) == equal;
+                const std::string now  = with ? text(choice->condition->location) : "not " + bracketed(choice->condition);
+                ALScriptProblem&  said = problem(node->location, "LuauLintSlBooleanNumberChoice",
+                                                 "[1] asks no more than [2]: its 1 or 0 is made only to be compared", { text(node->location), now },
+                                                 "SlBooleanNumber", Severity::Note);
+                offer(said, now, { edit(node->location, now) }, false);
+                return;
+            }
+            if (!is(side, Kind::Boolean))
+            {
+                return;
+            }
+            const std::string subject = text(side->location);
+            ALScriptProblem&  said    = problem(node->location, equal ? "LuauLintSlBooleanNumber" : "LuauLintSlBooleanNumberAlways",
+                                                equal ? "[1] == [2] never holds: [1] is true or false, never a number as LSL's truths were"
+                                                      : "[1] ~= [2] always holds: [1] is true or false, never a number as LSL's truths were",
+                                                { subject, text(other->location) }, "SlBooleanNumber");
+            if (*value == 0 || *value == 1)
+            {
+                // == 1 and ~= 0 ask whether it is true.
+                const std::string now = (*value == 1) == equal ? subject : "not " + bracketed(side);
+                offer(said, now, { edit(node->location, now) }, false);
+            }
+        }
+
         // What a condition asks the truth of: itself, or each side of an
         // and or an or, inside brackets or not.
         void truth(Luau::AstExpr* e)
@@ -1175,11 +1241,14 @@ namespace
             return std::string(mSource.substr(from, offset(where.end) - from));
         }
 
-        ALScriptProblem& problem(const Luau::Location& where, const char* key, const char* english, std::vector<std::string> args, const char* name)
+        // Said as the rule says, or as `severity` says where one of the
+        // rule's findings is more or less than the others.
+        ALScriptProblem& problem(const Luau::Location& where, const char* key, const char* english, std::vector<std::string> args, const char* name,
+                                 std::optional<Severity> severity = std::nullopt)
         {
             const ALScriptLintPass::Rule* rule = ALScriptLintPass::rule(name);
             ALScriptProblem               p;
-            p.severity  = mAllErrors || (mFatal & ALScriptLintPass::bit(name)) ? Severity::Error : rule->severity;
+            p.severity  = mAllErrors || (mFatal & ALScriptLintPass::bit(name)) ? Severity::Error : severity.value_or(rule->severity);
             p.source    = ALScriptProblem::Source::Lint;
             p.line      = static_cast<S32>(where.begin.line);
             p.column    = static_cast<S32>(where.begin.column);

@@ -875,6 +875,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlZeroIndexArg">[1] counts from 1 in SLua, as Luau does: its first is 1, not 0</string>
 	<string name="LuauLintSlZeroIndexFound">[1] is never 0: [2] answers from 1, where LSL's answered from 0, so its first is 1</string>
 	<string name="LuauLintSlCompatCall">[1] is LSL's, kept for scripts moved from it; ll's means the same here: [2]</string>
+	<string name="LuauLintSlBooleanNumber">[1] == [2] never holds: [1] is true or false, never a number as LSL's truths were</string>
+	<string name="LuauLintSlBooleanNumberAlways">[1] ~= [2] always holds: [1] is true or false, never a number as LSL's truths were</string>
+	<string name="LuauLintSlBooleanNumberChoice">[1] asks no more than [2]: its 1 or 0 is made only to be compared</string>
 	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
 	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauUnknownType">Unknown type '[1]'</string>

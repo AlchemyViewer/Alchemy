@@ -259,4 +259,33 @@ namespace tut
         ensure_equals("a find, on the right", fixed("print(-1 < llcompat.SubStringIndex(\"ab\", \"a\"))\n", "LuauLintSlCompatCall", "Write it ll.SubStringIndex(...) ~= nil", true),
                       std::string("print(ll.SubStringIndex(\"ab\", \"a\") ~= nil)\n"));
     }
+
+    template<> template<>
+    void object::test<4>()
+    {
+        set_test_name("SlBooleanNumber: a boolean compared with a number, on either side, an error; an if-then-else of 1 and 0 compared with "
+                      "one, a note; not a number compared with one");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local on = false\n"
+                                       "local n = 1\n"
+                                       "if on == 1 or 0 ~= on then print(1) end\n"
+                                       "if ll.SameGroup(ll.GetOwner()) == 0 or (n > 2) == 5 then print(2) end\n"
+                                       "if (if on then 1 else 0) == 1 or (if n > 2 then 0 else 1) ~= 0 then print(3) end\n"
+                                       "if n == 1 or (if on then 2 else 0) == 1 then print(4) end\n",
+                                       "SlBooleanNumber", ALScriptProblem::Severity::Error);
+        ensure_equals("each", said,
+                      std::string("2 LuauLintSlBooleanNumber|on|1\n"
+                                  "2 LuauLintSlBooleanNumberAlways|on|0\n"
+                                  "3 LuauLintSlBooleanNumber|ll.SameGroup(ll.GetOwner())|0\n"
+                                  "3 LuauLintSlBooleanNumber|(n > 2)|5\n"
+                                  "4 LuauLintSlBooleanNumberChoice|(if on then 1 else 0) == 1|on (another severity)\n"
+                                  "4 LuauLintSlBooleanNumberChoice|(if n > 2 then 0 else 1) ~= 0|not (n > 2) (another severity)\n"));
+        ensure_equals("true", fixed("local on = false\nprint(on == 1)\n", "LuauLintSlBooleanNumber", "Write it on", false),
+                      std::string("local on = false\nprint(on)\n"));
+        ensure_equals("false, on the right", fixed("print(0 == ll.SameGroup(ll.GetOwner()))\n", "LuauLintSlBooleanNumber", "Write it not ll.SameGroup(ll.GetOwner())", false),
+                      std::string("print(not ll.SameGroup(ll.GetOwner()))\n"));
+        ensure_equals("a choice", fixed("local n = 1\nprint((if n > 2 then 0 else 1) ~= 0)\n", "LuauLintSlBooleanNumberChoice", "Write it not (n > 2)", false),
+                      std::string("local n = 1\nprint(not (n > 2))\n"));
+        unfixed("local n = 1\nprint((n > 2) == 5)\n", "LuauLintSlBooleanNumber");
+    }
 }
