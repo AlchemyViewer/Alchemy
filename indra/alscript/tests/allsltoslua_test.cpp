@@ -379,7 +379,7 @@ namespace tut
                                               "    integer f; for (f = 0; f < 3; ++f) total += f;\n"
                                               "    llOwnerSay((string)(total + f));\n"
                                               "} }\n");
-        ensure("up to a length: " + r.text, has(r, "for a = 0, #l - 1 do"));
+        ensure("up to a length: " + r.text, has(r, "for a = 1, #l do\n    total += l[a]"));
         ensure("down by a step: " + r.text, has(r, "for b = 10, 0, -2 do"));
         ensure("up to and with: " + r.text, has(r, "for c = 1, n do"));
         ensure("a counter set in its body keeps the while: " + r.text, has(r, "while d < n do"));
@@ -545,8 +545,8 @@ namespace tut
                                               "    for (k = 0; k < 2; ++k) gReport += \"y\";\n"
                                               "    llOwnerSay(out + seen + gReport + (string)outParts);\n"
                                               "} }\n");
-        ensure("the outer loop's table, a name of its own: " + r.text, has(r, "local outParts2 = {}\n    for i = 0, #names - 1 do"));
-        ensure("the pieces put in: " + r.text, has(r, "table.insert(outParts2, ") && has(r, " .. row)"));
+        ensure("the outer loop's table, a name of its own: " + r.text, has(r, "local outParts2 = {}\n    for i = 1, #names do"));
+        ensure("the pieces put in: " + r.text, has(r, "table.insert(outParts2, names[i] .. row)"));
         ensure("joined after: " + r.text, has(r, "    end\n    out ..= table.concat(outParts2)"));
         ensure("the inner loop's, declared in the outer: " + r.text,
                has(r, "        local rowParts = {}\n        for j = 0, 2 do\n            table.insert(rowParts, tostring(j))") &&
@@ -842,6 +842,31 @@ namespace tut
         ensure("down to nought: " + r.text, has(r, "for k = n - 1, 0, -1 do\n    print(ll.GetInventoryName(INVENTORY_SOUND, k + 1))"));
         ensure("to and with, a number added: " + r.text, has(r, "for c = 1, 3 do\n    print(ll.GetSubString(s, c, c + 1))"));
         ensure("no llcompat: " + r.text, !has(r, "llcompat."));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<29>()
+    {
+        set_test_name("a list's items read by index where they are already what is asked for: within its length as they are, else LSL's empty value past the end; tostring where that makes them so; llcompat where nothing does");
+        const ALLSLToSLua::Result r = convert("list gNames = [\"a\", \"b\"];\n"
+                                              "list parts(string s) { return llParseString2List(s, [\",\"], []); }\n"
+                                              "default { state_entry() {\n"
+                                              "    list p = parts(\"x,y\");\n"
+                                              "    list mixed = [1, \"two\", 3.0];\n"
+                                              "    list keys = [llGetOwner(), \"text\"];\n"
+                                              "    integer n = 1;\n"
+                                              "    llOwnerSay(llList2String(gNames, 0) + llList2String(p, -1) + llList2String(keys, 1));\n"
+                                              "    llOwnerSay(llList2String(mixed, 2) + (string)llList2Integer(mixed, 0) + llList2String(gNames, n));\n"
+                                              "    integer i; for (i = 0; i < llGetListLength(p); ++i) llOwnerSay(llList2String(p, i));\n"
+                                              "} }\n");
+        ensure("from the start, empty past the end: " + r.text, has(r, "(gNames[1] or \"\")"));
+        ensure("back from the end, through a function's list: " + r.text, has(r, "(p[#p] or \"\")"));
+        ensure("keys and text made text: " + r.text, has(r, "tostring(keys[2] or \"\")"));
+        ensure("a float's text is not tostring's, and an index not known: llcompat: " + r.text,
+               has(r, "llcompat.List2String(mixed, 2)") && has(r, "llcompat.List2String(gNames, n)"));
+        ensure("mixed items for a number: llcompat: " + r.text, has(r, "llcompat.List2Integer(mixed, 0)"));
+        ensure("within its length, as it is, counting from 1: " + r.text, has(r, "for i = 1, #p do\n    print(p[i])"));
         checksClean(r);
     }
 }

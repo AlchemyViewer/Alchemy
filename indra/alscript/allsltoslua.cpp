@@ -415,6 +415,33 @@ namespace
         void  writeSteps(const std::vector<LSLExpression*>& steps);
         boost::unordered_flat_set<LSLExpression*> mHoisted;
 
+        // --- list item types ---------------------------------------------------------
+
+        // The types a list's items may have, as bits: what each list
+        // variable, and each function of the script's own answering a list,
+        // is given -- literals, llParseString2List's strings, the lists it is
+        // made from -- until no more are. Anything else may hold anything.
+        enum ItemTypes : U8
+        {
+            ItemInteger  = 1 << 0,
+            ItemFloat    = 1 << 1,
+            ItemString   = 1 << 2,
+            ItemKey      = 1 << 3,
+            ItemVector   = 1 << 4,
+            ItemRotation = 1 << 5,
+            ItemAny      = (1 << 6) - 1,
+        };
+        void findListTypes();
+        U8   itemTypes(LSLExpression* e);
+        U8   itemBit(LSLExpression* e);
+        // llList2String and its kin as an index into the list, where the
+        // list's items are already what is asked for: l[i + 1], or LSL's
+        // empty value past the end.
+        std::optional<Expr> listItem(LSLFunctionExpression* e, const std::string& lsl);
+        // Whether listItem writes a call as an index into its list: its
+        // items already what is asked for.
+        bool listItemFits(LSLFunctionExpression* e);
+
         // --- keys that hold text -----------------------------------------------------
 
         // LSL's keys hold any text; SLua's uuid() stops the script on text
@@ -491,6 +518,9 @@ namespace
         boost::unordered_flat_map<LSLForStatement*, Counting> mNumeric;
         boost::unordered_flat_set<LSLSymbol*>                 mNonNegative;
         boost::unordered_flat_set<LSLSymbol*>                 mFromOne;
+        // Counters within a list's length, i < llGetListLength(l): the list.
+        boost::unordered_flat_map<LSLSymbol*, LSLSymbol*>     mWithin;
+        boost::unordered_flat_map<LSLSymbol*, U8>             mListTypes;
         boost::unordered_flat_set<LSLSymbol*>                 mLoopOnly;
         boost::unordered_flat_set<LSLSymbol*>                 mBooleans;
         boost::unordered_flat_set<LSLSymbol*>                 mZeroOne;
@@ -1018,6 +1048,13 @@ namespace
     std::optional<Expr> Writer::idiom(LSLFunctionExpression* e, const std::string& lsl)
     {
         const auto arg = [&](int at) { return value(argumentAt(e, at)); };
+        if (mOptions.sluaCalls)
+        {
+            if (std::optional<Expr> item = listItem(e, lsl))
+            {
+                return item;
+            }
+        }
         if (lsl == "llPow")
         {
             // Luau's ^ binds tighter than a minus before it.
@@ -2358,6 +2395,16 @@ namespace
         {
             mNonNegative.insert(c.var);
         }
+        // Up by one, below a list's length: within the list.
+        LSLExpression* limit_call = unwrapped(c.limit);
+        if (up && c.step == 1 && c.check == OP_LESS && limit_call->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
+            std::string_view(static_cast<LSLFunctionExpression*>(limit_call)->getIdentifier()->getName()) == "llGetListLength")
+        {
+            if (LSLSymbol* list = wholeVariable(argumentAt(static_cast<LSLFunctionExpression*>(limit_call), 0)))
+            {
+                mWithin[c.var] = list;
+            }
+        }
         if (from_one)
         {
             mFromOne.insert(c.var);
@@ -2370,6 +2417,7 @@ namespace
         mLoops.pop_back();
         mNonNegative.erase(c.var);
         mFromOne.erase(c.var);
+        mWithin.erase(c.var);
         line("end");
     }
 
@@ -2419,8 +2467,10 @@ namespace
             const ALLSLTraits::Trait* trait   = builtin ? ALLSLTraits::of(id->getName()) : nullptr;
             const U8 not_ll = ALLSLTraits::SluaRemoved | ALLSLTraits::SluaBoolList | ALLSLTraits::SluaDeprecated | ALLSLTraits::SluaAbsent;
             const std::string_view name = id->getName();
-            only = trait && (trait->slua & ALLSLTraits::SluaIndexArgs) && !(trait->slua & not_ll) &&
-                   (trait->sluaIndexArgs & (1 << arg->getParentSlot())) && name.rfind("llDetected", 0) != 0;
+            // Or the place in a list its items are read from as they are.
+            const bool item = builtin && arg->getParentSlot() == 1 && listItemFits(static_cast<LSLFunctionExpression*>(call));
+            only = item || (trait && (trait->slua & ALLSLTraits::SluaIndexArgs) && !(trait->slua & not_ll) &&
+                            (trait->sluaIndexArgs & (1 << arg->getParentSlot())) && name.rfind("llDetected", 0) != 0);
         });
         return any && only;
     }
@@ -3567,6 +3617,253 @@ namespace
         }
     }
 
+    // --- list item types -----------------------------------------------------------
+
+    U8 Writer::itemBit(LSLExpression* e)
+    {
+        switch (slType(e))
+        {
+            case LST_INTEGER: return ItemInteger;
+            case LST_FLOATINGPOINT: return ItemFloat;
+            case LST_STRING: return ItemString;
+            case LST_KEY: return ItemKey;
+            case LST_VECTOR: return ItemVector;
+            case LST_QUATERNION: return ItemRotation;
+            default: return ItemAny;
+        }
+    }
+
+    U8 Writer::itemTypes(LSLExpression* e)
+    {
+        e = unwrapped(e);
+        if (!e)
+        {
+            return ItemAny;
+        }
+        if (e->getIType() != LST_LIST)
+        {
+            return itemBit(e);
+        }
+        switch (e->getNodeSubType())
+        {
+            case NODE_LIST_EXPRESSION:
+            {
+                U8 out = 0;
+                for (LSLASTNode* item = e->getChild(0); !isNull(item); item = item->getNext())
+                {
+                    out |= itemBit(static_cast<LSLExpression*>(item));
+                }
+                return out;
+            }
+            case NODE_CONSTANT_EXPRESSION:
+            {
+                U8 out = 0;
+                for (LSLConstant* item = static_cast<LSLListConstant*>(e->getChild(0))->getValue(); item;
+                     item = static_cast<LSLConstant*>(item->getNext()))
+                {
+                    switch (item->getNodeSubType())
+                    {
+                        case NODE_INTEGER_CONSTANT: out |= ItemInteger; break;
+                        case NODE_FLOAT_CONSTANT: out |= ItemFloat; break;
+                        case NODE_STRING_CONSTANT: out |= ItemString; break;
+                        case NODE_KEY_CONSTANT: out |= ItemKey; break;
+                        case NODE_VECTOR_CONSTANT: out |= ItemVector; break;
+                        case NODE_QUATERNION_CONSTANT: out |= ItemRotation; break;
+                        default: out |= ItemAny; break;
+                    }
+                }
+                return out;
+            }
+            case NODE_BINARY_EXPRESSION:
+                if (e->getOperation() == OP_PLUS)
+                {
+                {
+                    auto* b = static_cast<LSLBinaryExpression*>(e);
+                    return itemTypes(b->getLHS()) | itemTypes(b->getRHS());
+                }
+                }
+                return ItemAny;
+            case NODE_TYPECAST_EXPRESSION: return itemTypes(static_cast<LSLTypecastExpression*>(e)->getChildExpr());
+            case NODE_LVALUE_EXPRESSION:
+            {
+                const auto found = mListTypes.find(wholeVariable(e));
+                return found == mListTypes.end() ? ItemAny : found->second;
+            }
+            case NODE_FUNCTION_EXPRESSION:
+            {
+                auto*      call   = static_cast<LSLFunctionExpression*>(e);
+                LSLSymbol* symbol = call->getIdentifier()->getSymbol();
+                if (symbol && symbol->getSubType() != SYM_BUILTIN)
+                {
+                    const auto found = mListTypes.find(symbol);
+                    return found == mListTypes.end() ? ItemAny : found->second;
+                }
+                const std::string_view name = call->getIdentifier()->getName();
+                if (name == "llParseString2List" || name == "llParseStringKeepNulls" || name == "llCSV2List")
+                {
+                    return ItemString;
+                }
+                // What gives back the list it was given, or part of it.
+                if (name == "llList2List" || name == "llListSort" || name == "llDeleteSubList" || name == "llList2ListStrided" ||
+                    name == "llListRandomize" || name == "llList2ListSlice" || name == "llListSortStrided")
+                {
+                    return itemTypes(argumentAt(call, 0));
+                }
+                if (name == "llListReplaceList" || name == "llListInsertList")
+                {
+                    return itemTypes(argumentAt(call, 0)) | itemTypes(argumentAt(call, 1));
+                }
+                return ItemAny;
+            }
+            default: return ItemAny;
+        }
+    }
+
+    void Writer::findListTypes()
+    {
+        // Every list variable and function of the script's own, nothing yet.
+        std::vector<std::pair<LSLSymbol*, LSLExpression*>> given;
+        const auto candidate = [&](LSLIdentifier* id, LSLExpression* init) {
+            if (id->getIType() == LST_LIST && id->getSymbol())
+            {
+                mListTypes.emplace(id->getSymbol(), 0);
+                if (!isNull(init))
+                {
+                    given.emplace_back(id->getSymbol(), init);
+                }
+            }
+        };
+        walk(mScript, [&](LSLASTNode* node) {
+            if (node->getNodeType() == NODE_GLOBAL_VARIABLE)
+            {
+                candidate(static_cast<LSLGlobalVariable*>(node)->getIdentifier(), static_cast<LSLGlobalVariable*>(node)->getInitializer());
+            }
+            else if (node->getNodeType() == NODE_GLOBAL_FUNCTION)
+            {
+                auto* f = static_cast<LSLGlobalFunction*>(node);
+                if (f->getIdentifier()->getIType() == LST_LIST && f->getSymbol())
+                {
+                    mListTypes.emplace(f->getSymbol(), 0);
+                }
+            }
+            else if (node->getNodeSubType() == NODE_DECLARATION)
+            {
+                candidate(static_cast<LSLDeclaration*>(node)->getIdentifier(), static_cast<LSLDeclaration*>(node)->getInitializer());
+            }
+        });
+        walk(mScript, [&](LSLASTNode* node) {
+            if (node->getNodeSubType() == NODE_RETURN_STATEMENT)
+            {
+                LSLExpression* e = static_cast<LSLReturnStatement*>(node)->getExpr();
+                if (LSLSymbol* f = enclosingFunction(node); f && !isNull(e) && mListTypes.contains(f))
+                {
+                    given.emplace_back(f, e);
+                }
+                return;
+            }
+            // Given by = or added to by +=.
+            if (LSLSymbol* var = setBy(node); var && mListTypes.contains(var) && node->getNodeSubType() == NODE_BINARY_EXPRESSION)
+            {
+                const LSLOperator op = static_cast<LSLExpression*>(node)->getOperation();
+                if (op == OP_ASSIGN || op == OP_ADD_ASSIGN)
+                {
+                    given.emplace_back(var, static_cast<LSLBinaryExpression*>(node)->getRHS());
+                }
+            }
+        });
+        for (bool changed = true; changed;)
+        {
+            changed = false;
+            for (const auto& [symbol, e] : given)
+            {
+                const U8 before = mListTypes[symbol];
+                const U8 after  = before | itemTypes(e);
+                if (after != before)
+                {
+                    mListTypes[symbol] = after;
+                    changed            = true;
+                }
+            }
+        }
+    }
+
+    bool Writer::listItemFits(LSLFunctionExpression* e)
+    {
+        static const boost::unordered_flat_map<std::string_view, std::pair<U8, U8>> FITS = {
+            { "llList2String", { ItemString, ItemString | ItemKey | ItemInteger } },
+            { "llList2Integer", { ItemInteger, 0 } },
+            { "llList2Float", { ItemFloat | ItemInteger, 0 } },
+            { "llList2Key", { ItemKey, 0 } },
+            { "llList2Vector", { ItemVector, 0 } },
+            { "llList2Rot", { ItemRotation, 0 } },
+        };
+        const auto fits = FITS.find(std::string_view(e->getIdentifier()->getName()));
+        LSLExpression* list = argumentAt(e, 0);
+        if (!mOptions.idioms || fits == FITS.end() || !wholeVariable(list))
+        {
+            return false;
+        }
+        const U8 types = itemTypes(list);
+        return (types & ~fits->second.first) == 0 || (types & ~fits->second.second) == 0;
+    }
+
+    std::optional<Expr> Writer::listItem(LSLFunctionExpression* e, const std::string& lsl)
+    {
+        struct Kind
+        {
+            U8          as_is;
+            U8          as_text;
+            const char* empty;
+        };
+        // What each gives as it is, what tostring makes right, and what
+        // past the end.
+        static const boost::unordered_flat_map<std::string_view, Kind> KINDS = {
+            { "llList2String", { ItemString, ItemString | ItemKey | ItemInteger, "\"\"" } },
+            { "llList2Integer", { ItemInteger, 0, "0" } },
+            { "llList2Float", { ItemFloat | ItemInteger, 0, "0" } },
+            { "llList2Key", { ItemKey, 0, "NULL_KEY" } },
+            { "llList2Vector", { ItemVector, 0, "ZERO_VECTOR" } },
+            { "llList2Rot", { ItemRotation, 0, "ZERO_ROTATION" } },
+        };
+        const auto kind = KINDS.find(lsl);
+        if (kind == KINDS.end())
+        {
+            return std::nullopt;
+        }
+        LSLExpression* list  = argumentAt(e, 0);
+        LSLExpression* index = argumentAt(e, 1);
+        LSLSymbol*     var   = wholeVariable(list);
+        const U8       types = var ? itemTypes(list) : ItemAny;
+        const bool     as_is = (types & ~kind->second.as_is) == 0;
+        if (!var || (!as_is && (types & ~kind->second.as_text) != 0))
+        {
+            return std::nullopt;
+        }
+        // Where: from 1, or back from the end.
+        const std::string name = lvalue(static_cast<LSLLValueExpression*>(unwrapped(list))).text;
+        std::string       at;
+        int               v = 0;
+        if (wholeNumber(index, v) && v < 0)
+        {
+            at = "#" + name + (v == -1 ? std::string() : " - " + std::to_string(-v - 1));
+        }
+        else if (std::optional<std::string> from_one = llIndex(index))
+        {
+            at = *from_one;
+        }
+        else
+        {
+            return std::nullopt;
+        }
+        // A counter within the list's own length finds an item every time.
+        LSLSymbol*        counter = wholeVariable(index);
+        const auto        within  = counter ? mWithin.find(counter) : mWithin.end();
+        const bool        found   = within != mWithin.end() && within->second == var;
+        const std::string item    = name + "[" + at + "]";
+        const Expr        read    = found ? Expr{ item } : Expr{ item + " or " + kind->second.empty, OR };
+        return as_is ? read : Expr{ "tostring(" + read.text + ")" };
+    }
+
     // --- keys that hold text --------------------------------------------------------
 
     LSLIType Writer::slType(LSLExpression* e) const
@@ -4061,6 +4358,7 @@ end
         });
         forgetMemoryHacks();
         findTextKeys();
+        findListTypes();
         findBooleans();
         findOwnedLists();
         findStringBuilds();
