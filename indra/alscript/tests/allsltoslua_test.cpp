@@ -168,7 +168,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<3>()
     {
-        set_test_name("loops: a for as a while with its steps, a jump out as break and to the next turn as continue, a do as repeat; another jump noted");
+        set_test_name("loops: a counting for as Luau's numeric for, a jump out as break and to the next turn as continue, a do as repeat; another jump noted");
         const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
                                               "    integer i; integer n;\n"
                                               "    for (i = 0; i < 10; ++i) {\n"
@@ -185,9 +185,9 @@ namespace tut
                                               "    @away;\n"
                                               "    llOwnerSay((string)n);\n"
                                               "} }\n");
-        ensure("started, then a while: " + r.text, has(r, "i = 0\nwhile i < 10 do"));
-        ensure("its steps at the end: " + r.text, has(r, "    i += 1\nend"));
-        ensure("continue runs the steps first: " + r.text, has(r, "i += 1\n        continue"));
+        ensure("a numeric for: " + r.text, has(r, "for i = 0, 9 do"));
+        ensure("its counter declared by it alone: " + r.text, !has(r, "local i = 0"));
+        ensure("continue, the step Luau's own: " + r.text, has(r, "then\n        continue"));
         ensure("break: " + r.text, has(r, "break"));
         ensure("repeat: " + r.text, has(r, "repeat") && has(r, "until not (n > 5)"));
         ensure("a step: " + r.text, has(r, "n -= 1"));
@@ -329,5 +329,28 @@ namespace tut
         ensure("converted", r.converted);
         ensure("no comment: " + r.text, !has(r, "-- LSL:"));
         ensure("but noted", noted(r, "SluaIntegerDivision"));
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<11>()
+    {
+        set_test_name("numeric for where it counts as LSL's did: up, down, by a step, to a length; a while where the counter or the limit could change, or the counter is read after");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    list l = [1, 2, 3]; integer n = 4; integer total;\n"
+                                              "    integer a; for (a = 0; a < llGetListLength(l); a++) total += llList2Integer(l, a);\n"
+                                              "    integer b; for (b = 10; b >= 0; b -= 2) total += b;\n"
+                                              "    integer c; for (c = 1; c <= n; ++c) total += c;\n"
+                                              "    integer d; for (d = 0; d < n; ++d) { if (total > 100) d = n; }\n"
+                                              "    integer e; for (e = 0; e < n; ++e) { n--; }\n"
+                                              "    integer f; for (f = 0; f < 3; ++f) total += f;\n"
+                                              "    llOwnerSay((string)(total + f));\n"
+                                              "} }\n");
+        ensure("up to a length: " + r.text, has(r, "for a = 0, #l - 1 do"));
+        ensure("down by a step: " + r.text, has(r, "for b = 10, 0, -2 do"));
+        ensure("up to and with: " + r.text, has(r, "for c = 1, n do"));
+        ensure("a counter set in its body keeps the while: " + r.text, has(r, "while d < n do"));
+        ensure("a limit set in its body keeps the while: " + r.text, has(r, "while e < n do"));
+        ensure("a counter read after keeps the while: " + r.text, has(r, "while f < 3 do") && has(r, "local f = 0"));
+        checksClean(r);
     }
 }

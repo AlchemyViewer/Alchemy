@@ -263,6 +263,31 @@ namespace
         void assign(LSLLValueExpression* target, LSLOperator op, LSLExpression* rhs);
         void stateChange(LSLStateStatement* s, bool last);
 
+        // --- loops as Luau counts -------------------------------------------------
+
+        // A for that counts one variable from a start to a limit by a
+        // constant step: its variable, where it starts, the check's limit
+        // and comparison, and the step. None for any other shape.
+        struct Counting
+        {
+            LSLSymbol*     var   = nullptr;
+            LSLIdentifier* id    = nullptr;
+            LSLExpression* from  = nullptr;
+            LSLExpression* limit = nullptr;
+            LSLOperator    check = OP_NONE;
+            int            step  = 0;
+        };
+        std::optional<Counting> counting(LSLForStatement* f) const;
+        // Whether an expression reads the same on every turn of a loop:
+        // nothing it reads is set in the loop, and it calls only what the
+        // definitions call pure.
+        bool steadyIn(LSLExpression* e, LSLASTNode* loop) const;
+        // Before a function's or a handler's body is written: its for
+        // loops that Luau's numeric for says exactly, and the variables
+        // that only such loops use, whose declarations go.
+        void prepareBody(LSLASTNode* body);
+        void numericFor(LSLForStatement* f, const Counting& c);
+
         // --- the script -------------------------------------------------------------
 
         void globals();
@@ -310,6 +335,10 @@ namespace
         // Lines made for an expression's function, whose notes go over the
         // statement it stands in.
         bool mInline = false;
+        // The for loops of the body being written that are Luau's numeric
+        // for, and the variables used by nothing else.
+        boost::unordered_flat_map<LSLForStatement*, Counting> mNumeric;
+        boost::unordered_flat_set<LSLSymbol*>                 mLoopOnly;
     };
 
     void Writer::note(LSLASTNode* at, const std::string& key, const std::string& said)
@@ -1354,6 +1383,11 @@ namespace
                 const LSLIType    type = id->getIType();
                 LSLExpression*    init = d->getInitializer();
                 const std::string name = nameOf(id);
+                // A counter that only numeric fors use, each with its own.
+                if (mLoopOnly.contains(id->getSymbol()) && (isNull(init) || init->getNodeSubType() == NODE_CONSTANT_EXPRESSION))
+                {
+                    return;
+                }
                 line("local " + name + typed(type) + " = " + (isNull(init) ? defaultOf(type) : coerced(init, type).text));
                 return;
             }
@@ -1419,9 +1453,15 @@ namespace
             }
             case NODE_FOR_STATEMENT:
             {
-                // As LSL runs one: what starts it, then while the check holds,
-                // the body and then the steps.
+                // Luau's numeric for where it counts as LSL's did.
                 auto* f = static_cast<LSLForStatement*>(s);
+                if (const auto numeric = mNumeric.find(f); numeric != mNumeric.end())
+                {
+                    numericFor(f, numeric->second);
+                    return;
+                }
+                // Else as LSL runs one: what starts it, then while the check
+                // holds, the body and then the steps.
                 for (LSLASTNode* init = f->getInitExprs() ? f->getInitExprs()->getChild(0) : nullptr; init; init = init->getNext())
                 {
                     effect(static_cast<LSLExpression*>(init));
@@ -1482,6 +1522,250 @@ namespace
             default:
                 return;
         }
+    }
+
+    // --- loops as Luau counts ---------------------------------------------------------
+
+    namespace
+    {
+        LSLExpression* unwrapped(LSLExpression* e)
+        {
+            while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+            {
+                e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
+            }
+            return e;
+        }
+
+        // The variable an lvalue names, whole: none for a part of one.
+        LSLSymbol* wholeVariable(LSLExpression* e)
+        {
+            e = unwrapped(e);
+            if (!e || e->getNodeSubType() != NODE_LVALUE_EXPRESSION || !isNull(static_cast<LSLLValueExpression*>(e)->getMember()))
+            {
+                return nullptr;
+            }
+            return static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol();
+        }
+
+        // The variable an expression sets, where it sets one: an
+        // assignment of any kind, or a step.
+        LSLSymbol* setBy(LSLASTNode* node)
+        {
+            if (node->getNodeSubType() == NODE_BINARY_EXPRESSION)
+            {
+                const LSLOperator op = static_cast<LSLExpression*>(node)->getOperation();
+                if (op == OP_ASSIGN || op == OP_ADD_ASSIGN || op == OP_SUB_ASSIGN || op == OP_MUL_ASSIGN || op == OP_DIV_ASSIGN || op == OP_MOD_ASSIGN)
+                {
+                    LSLExpression* lhs = static_cast<LSLBinaryExpression*>(node)->getLHS();
+                    return lhs && lhs->getNodeSubType() == NODE_LVALUE_EXPRESSION ? static_cast<LSLLValueExpression*>(lhs)->getIdentifier()->getSymbol()
+                                                                                   : nullptr;
+                }
+            }
+            if (node->getNodeSubType() == NODE_UNARY_EXPRESSION)
+            {
+                const LSLOperator op = static_cast<LSLExpression*>(node)->getOperation();
+                if (op == OP_PRE_INCR || op == OP_PRE_DECR || op == OP_POST_INCR || op == OP_POST_DECR)
+                {
+                    LSLExpression* child = static_cast<LSLUnaryExpression*>(node)->getChildExpr();
+                    return child && child->getNodeSubType() == NODE_LVALUE_EXPRESSION
+                               ? static_cast<LSLLValueExpression*>(child)->getIdentifier()->getSymbol()
+                               : nullptr;
+                }
+            }
+            return nullptr;
+        }
+    }
+
+    std::optional<Writer::Counting> Writer::counting(LSLForStatement* f) const
+    {
+        // One start, i = from; one check, i against a limit; one step, by
+        // a constant, the way the check is going.
+        LSLASTNode* init = f->getInitExprs() ? f->getInitExprs()->getChild(0) : nullptr;
+        LSLASTNode* incr = f->getIncrExprs() ? f->getIncrExprs()->getChild(0) : nullptr;
+        auto*       check = static_cast<LSLExpression*>(f->getCheckExpr());
+        if (!init || init->getNext() || !incr || incr->getNext() || isNull(check) || init->getNodeSubType() != NODE_BINARY_EXPRESSION ||
+            static_cast<LSLExpression*>(init)->getOperation() != OP_ASSIGN)
+        {
+            return std::nullopt;
+        }
+        Counting c;
+        auto*    start = static_cast<LSLBinaryExpression*>(init);
+        c.var          = wholeVariable(start->getLHS());
+        if (!c.var || c.var->getIType() != LST_INTEGER || c.var->getSubType() != SYM_LOCAL)
+        {
+            return std::nullopt;
+        }
+        c.id   = static_cast<LSLLValueExpression*>(unwrapped(start->getLHS()))->getIdentifier();
+        c.from = start->getRHS();
+        check  = unwrapped(check);
+        if (check->getNodeSubType() == NODE_BOOL_CONVERSION_EXPRESSION)
+        {
+            check = unwrapped(static_cast<LSLBoolConversionExpression*>(check)->getChildExpr());
+        }
+        if (!check || check->getNodeSubType() != NODE_BINARY_EXPRESSION)
+        {
+            return std::nullopt;
+        }
+        auto* test = static_cast<LSLBinaryExpression*>(check);
+        c.check    = test->getOperation();
+        if ((c.check != OP_LESS && c.check != OP_LEQ && c.check != OP_GREATER && c.check != OP_GEQ) || wholeVariable(test->getLHS()) != c.var)
+        {
+            return std::nullopt;
+        }
+        c.limit = test->getRHS();
+        // The step: ++ and -- either side, or += and -= a whole number.
+        const LSLOperator op = static_cast<LSLExpression*>(incr)->getOperation();
+        if (setBy(incr) != c.var)
+        {
+            return std::nullopt;
+        }
+        int by = 0;
+        if (op == OP_PRE_INCR || op == OP_POST_INCR)
+        {
+            c.step = 1;
+        }
+        else if (op == OP_PRE_DECR || op == OP_POST_DECR)
+        {
+            c.step = -1;
+        }
+        else if ((op == OP_ADD_ASSIGN || op == OP_SUB_ASSIGN) && wholeNumber(static_cast<LSLBinaryExpression*>(incr)->getRHS(), by) && by > 0)
+        {
+            c.step = op == OP_ADD_ASSIGN ? by : -by;
+        }
+        const bool up = c.check == OP_LESS || c.check == OP_LEQ;
+        if (c.step == 0 || (c.step > 0) != up)
+        {
+            return std::nullopt;
+        }
+        // Nothing in the loop sets the counter but its step, and the limit
+        // and where it starts are read once, as Luau reads them.
+        bool setInBody = false;
+        walk(f->getBody(), [&](LSLASTNode* node) { setInBody = setInBody || setBy(node) == c.var; });
+        if (setInBody || !steadyIn(c.limit, f))
+        {
+            return std::nullopt;
+        }
+        return c;
+    }
+
+    bool Writer::steadyIn(LSLExpression* e, LSLASTNode* loop) const
+    {
+        // What the loop sets, and whether it calls anything of the script's
+        // own, which could set a global.
+        boost::unordered_flat_set<LSLSymbol*> set;
+        bool                                  calls = false;
+        walk(loop, [&](LSLASTNode* node) {
+            if (LSLSymbol* var = setBy(node))
+            {
+                set.insert(var);
+            }
+            if (node->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+            {
+                LSLSymbol* fn = static_cast<LSLFunctionExpression*>(node)->getIdentifier()->getSymbol();
+                calls         = calls || !fn || fn->getSubType() != SYM_BUILTIN;
+            }
+        });
+        bool steady = true;
+        walk(e, [&](LSLASTNode* node) {
+            switch (node->getNodeSubType())
+            {
+                case NODE_LVALUE_EXPRESSION:
+                {
+                    LSLSymbol* var = static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol();
+                    steady = steady && var && (var->getSubType() == SYM_BUILTIN ||
+                                               (!set.contains(var) && (var->getSubType() != SYM_GLOBAL || !calls)));
+                    break;
+                }
+                case NODE_FUNCTION_EXPRESSION:
+                    steady = steady && ALLSLTraits::pure(static_cast<LSLFunctionExpression*>(node)->getIdentifier()->getName());
+                    break;
+                case NODE_BINARY_EXPRESSION:
+                case NODE_UNARY_EXPRESSION:
+                    steady = steady && !setBy(node);
+                    break;
+                default:
+                    break;
+            }
+        });
+        return steady;
+    }
+
+    void Writer::prepareBody(LSLASTNode* body)
+    {
+        mNumeric.clear();
+        mLoopOnly.clear();
+        // The fors of the shape, by their counters.
+        boost::unordered_flat_map<LSLSymbol*, std::vector<LSLForStatement*>> byCounter;
+        walk(body, [&](LSLASTNode* node) {
+            if (node->getNodeSubType() == NODE_FOR_STATEMENT)
+            {
+                if (std::optional<Counting> c = counting(static_cast<LSLForStatement*>(node)))
+                {
+                    mNumeric.emplace(static_cast<LSLForStatement*>(node), *c);
+                    byCounter[c->var].push_back(static_cast<LSLForStatement*>(node));
+                }
+            }
+        });
+        // A counter read or set anywhere but in its own numeric fors keeps
+        // them LSL's: Luau's is a new local, gone after the loop.
+        for (auto& [var, loops] : byCounter)
+        {
+            bool elsewhere = false;
+            const auto within = [&loops](LSLASTNode* node) {
+                for (LSLASTNode* up = node; up; up = up->getParent())
+                {
+                    if (std::find(loops.begin(), loops.end(), up) != loops.end())
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            walk(body, [&](LSLASTNode* node) {
+                if (node->getNodeSubType() == NODE_LVALUE_EXPRESSION && static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol() == var &&
+                    !within(node))
+                {
+                    elsewhere = true;
+                }
+            });
+            if (elsewhere)
+            {
+                for (LSLForStatement* f : loops)
+                {
+                    mNumeric.erase(f);
+                }
+                continue;
+            }
+            mLoopOnly.insert(var);
+        }
+    }
+
+    void Writer::numericFor(LSLForStatement* f, const Counting& c)
+    {
+        // i < b counts to b - 1 in whole numbers, i > b to b + 1.
+        int               limit = 0;
+        std::string       to;
+        const bool        strict = c.check == OP_LESS || c.check == OP_GREATER;
+        const int         shift  = c.check == OP_LESS ? -1 : c.check == OP_GREATER ? 1 : 0;
+        if (wholeNumber(c.limit, limit))
+        {
+            to = std::to_string(limit + shift);
+        }
+        else
+        {
+            const Expr bound = value(c.limit);
+            to = strict ? bracketed(bound, ADD) + (shift < 0 ? " - 1" : " + 1") : bound.text;
+        }
+        const std::string step = c.step == 1 ? std::string() : ", " + std::to_string(c.step);
+        line("for " + nameOf(c.id) + " = " + value(c.from).text + ", " + to + step + " do");
+        // A jump to its next turn is continue, its step Luau's own.
+        mLoops.push_back(nullptr);
+        ++mDepth;
+        block(f->getBody());
+        --mDepth;
+        mLoops.pop_back();
+        line("end");
     }
 
     // --- the script -------------------------------------------------------------------
@@ -1557,6 +1841,7 @@ namespace
             line(std::string(forward ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +
                  typed(f->getIdentifier()->getIType()));
             ++mDepth;
+            prepareBody(f->getStatements());
             block(f->getStatements());
             --mDepth;
             line("end");
@@ -1588,6 +1873,7 @@ namespace
 
     void Writer::handlerBody(LSLEventHandler* handler)
     {
+        prepareBody(handler->getStatements());
         mInDetected = detectedEvent(handler->getIdentifier()->getName());
         block(handler->getStatements());
         mInDetected = false;
