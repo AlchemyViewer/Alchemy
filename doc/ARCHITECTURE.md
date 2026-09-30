@@ -101,8 +101,9 @@ Depth of field runs **before** bloom and before the tonemapper, on linear HDR. G
 
 **Render target packs** (`RenderTargetPack` in pipeline.h):
 - `mMainRT` — Full resolution for main scene
-- `mAuxillaryRT` — 512×512 for reflection probes and dynamic texture bakes
+- `mAuxillaryRT` — Reflection probe faces, at probe resolution × `ALProbeSuperSample`, and scaled by `RenderResolutionDivisor`/`RenderResolutionMultiplier` like the main pack. The GLTF material preview renders its sphere and post chain here
 - `mHeroProbeRT` — High-res hero probe rendering
+- `mPreviewMap` and `mBakeMap` sit outside the packs and are sized to their users, not the screen: `mPreviewMap` is `MAX_PREVIEW_WIDTH` square, the target every UI preview (`LLViewerDynamicTexture` below `ORDER_LAST`) draws into and copies out of; `mBakeMap` is the appearance bake scratch target
 - Additional targets: `mSceneMap` (SSR input), `mLuminanceMap`/`mExposureMap` (auto-exposure), `postPingMap`/`postPongMap` (post-process ping-pong), `mFXAAMap`, `mSMAABlendBuffer`, `bloomMip[BLOOM_MAX_MIPS]` (HDR bloom pyramid, up to 7 levels, live count in `bloomMipCount`), `mWaterDis` (refraction; also lends its quadrants to the cross-screen filter's two scratch buffers and accumulator, and its whole to depth of field's sharp copy, while it is idle after the water pass — `crossFilterReady`/`crossFilterWidth`/`crossFilterHeight` tell `colorCorrect` where the accumulator is), `mSpotShadow[2]`, `mPbrBrdfLut`
 - `mGlow[3]` is the **legacy non-HDR glow chain**, not the bloom pyramid, and lives outside the pack. So does `mLensDirtMap`, the generated lens dirt plate — an `LLRenderTarget` allocated the first frame the effect is enabled and released when it is switched off.
 
