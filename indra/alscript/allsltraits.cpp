@@ -37,6 +37,8 @@
 
 namespace
 {
+    // The table's SLua flags by their own names.
+    using enum ALLSLTraits::Slua;
     const ALLSLTraits::Trait TRAITS[] = {
 #include "allsltraits.inc"
     };

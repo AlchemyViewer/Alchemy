@@ -1183,6 +1183,13 @@ namespace tut
             ensure(std::string(pure) + " is pure", ALLSLTraits::pure(pure));
         }
         ensure("llGetPos is not", !ALLSLTraits::pure("llGetPos") && ALLSLTraits::of("llGetPos")->mustUse);
+        // What SLua makes of each, from the same definitions.
+        ensure("llGetSubString counts from one in SLua's ll", ALLSLTraits::of("llGetSubString")->slua == ALLSLTraits::SluaIndex);
+        ensure("llListFindList answers an index", (ALLSLTraits::of("llListFindList")->slua & ALLSLTraits::SluaIndex) != 0);
+        ensure("llSameGroup answers a boolean", ALLSLTraits::of("llSameGroup")->slua == ALLSLTraits::SluaBool);
+        ensure("llSetTimerEvent is llcompat's alone", ALLSLTraits::of("llSetTimerEvent")->slua == ALLSLTraits::SluaRemoved);
+        ensure("llSay is as it was", ALLSLTraits::of("llSay")->slua == 0 && !ALLSLTraits::of("llSay")->sluaUse);
+        ensure("llAbs has math.abs in its stead", ALLSLTraits::of("llAbs")->sluaUse && std::string(ALLSLTraits::of("llAbs")->sluaUse) == "math.abs");
     }
     template<> template<>
     void allsloptimizer_object::test<33>()

@@ -37,12 +37,27 @@ namespace Tailslide
 class ALLSLTraits
 {
 public:
+    // What SLua makes of a function: its `ll` counts an index from one
+    // where LSL counts from nought, in an argument or the result
+    // (SluaIndex); answers a boolean where LSL answers 1 or 0 (SluaBool);
+    // or lacks it, leaving it to `llcompat` alone (SluaRemoved). `llcompat`
+    // has every function as LSL has it.
+    enum Slua : U8
+    {
+        SluaIndex   = 1 << 0,
+        SluaBool    = 1 << 1,
+        SluaRemoved = 1 << 2,
+    };
     struct Trait
     {
         const char* name;
         bool        pure;
         bool        mustUse;
         bool        native;
+        U8          slua;
+        // What SLua would use in its stead, where it says: a library
+        // function of its own, an operator; or null.
+        const char* sluaUse;
     };
     // The function's row, or null for a name the definitions lack.
     static const Trait* of(const char* name);
