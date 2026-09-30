@@ -381,4 +381,38 @@ namespace tut
         ensure_equals("swapped", fixed("local a, b = 1, 2\na = b\nb = a\nprint(a, b)\n", "LuauLintSlAlmostSwapped", "Write it a, b = b, a", false),
                       std::string("local a, b = 1, 2\na, b = b, a\nprint(a, b)\n"));
     }
+
+    template<> template<>
+    void object::test<8>()
+    {
+        set_test_name("SlMustUse: ll's, llcompat's, a library's, a global's and a string's method that only answer, their answers unread; "
+                      "given back where the first given is a variable of the kind answered; not a call that does something");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local l = {1, 2}\n"
+                                       "local s = \"abc\"\n"
+                                       "ll.DeleteSubList(l, 1, 1)\n"
+                                       "string.upper(s)\n"
+                                       "s:lower()\n"
+                                       "string.len(s)\n"
+                                       "tostring(l)\n"
+                                       "llcompat.GetPos()\n"
+                                       "ll.Say(0, s)\n"
+                                       "table.insert(l, 3)\n"
+                                       "math.random()\n"
+                                       "print(ll.DeleteSubList(l, 1, 1))\n",
+                                       "SlMustUse", ALScriptProblem::Severity::Warning);
+        ensure_equals("each", said,
+                      std::string("2 LuauLintSlMustUse|ll.DeleteSubList\n"
+                                  "3 LuauLintSlMustUse|string.upper\n"
+                                  "4 LuauLintSlMustUse|s:lower\n"
+                                  "5 LuauLintSlMustUse|string.len\n"
+                                  "6 LuauLintSlMustUse|tostring\n"
+                                  "7 LuauLintSlMustUse|llcompat.GetPos\n"));
+        ensure_equals("a list", fixed("local l = {1, 2}\nll.DeleteSubList(l, 1, 1)\nprint(l)\n", "LuauLintSlMustUse", "Write it l = ll.DeleteSubList(...)", false),
+                      std::string("local l = {1, 2}\nl = ll.DeleteSubList(l, 1, 1)\nprint(l)\n"));
+        ensure_equals("a method", fixed("local s = \"abc\"\ns:upper()\nprint(s)\n", "LuauLintSlMustUse", "Write it s = s:upper(...)", false),
+                      std::string("local s = \"abc\"\ns = s:upper()\nprint(s)\n"));
+        unfixed("local s = \"abc\"\nstring.len(s)\n", "LuauLintSlMustUse");
+        unfixed("string.upper(\"abc\")\n", "LuauLintSlMustUse");
+    }
 }

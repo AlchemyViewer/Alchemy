@@ -35,6 +35,7 @@
 #include "Luau/ParseResult.h"
 #include "Luau/Scope.h"
 #include "Luau/Type.h"
+#include "Luau/TypePack.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
@@ -75,6 +76,9 @@ namespace
         { "SlParenCondition", true, Severity::Note, true, true, "parenthese_conditions" },
         // a = b followed by b = a, which is no swap.
         { "SlAlmostSwapped", true, Severity::Warning, true, true, "almost_swapped" },
+        // string.upper(s) alone, ll.DeleteSubList(l, 1, 1) alone: an answer
+        // thrown away from what does nothing else.
+        { "SlMustUse", true, Severity::Warning, true, true, nullptr },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -117,6 +121,39 @@ namespace
             case Luau::AstExprBinary::Concat: return "..";
             default: return nullptr;
         }
+    }
+
+    // What Luau's library, and SLua's, answer without changing anything: a
+    // global function, or a library's -- all of math's but its random
+    // numbers, and of string's, table's and the rest those that only
+    // answer.
+    bool onlyAnswers(std::string_view library, std::string_view name)
+    {
+        using Names = std::initializer_list<std::string_view>;
+        const auto among = [&](Names names) { return std::find(names.begin(), names.end(), name) != names.end(); };
+        if (library.empty())
+        {
+            return among({ "tostring", "tonumber", "type", "typeof", "rawequal", "rawlen", "rawget", "select", "touuid", "tovector", "toquaternion",
+                           "torotation" });
+        }
+        if (library == "math")
+        {
+            return name != "random" && name != "randomseed";
+        }
+        if (library == "vector" || library == "quaternion" || library == "bit32" || library == "utf8" || library == "llbase64")
+        {
+            return true;
+        }
+        if (library == "string")
+        {
+            return among({ "byte", "char", "find", "format", "gmatch", "gsub", "len", "lower", "match", "rep", "reverse", "split", "sub", "upper",
+                           "pack", "packsize", "unpack" });
+        }
+        if (library == "table")
+        {
+            return among({ "concat", "find", "clone", "pack", "unpack" });
+        }
+        return library == "lljson" && among({ "encode", "decode", "slencode", "sldecode" });
     }
 
     bool comparison(Luau::AstExprBinary::Op op)
@@ -363,6 +400,7 @@ namespace
         Table,
         List,
         Vector,
+        Quaternion,
     };
 
     class Pass final : public Luau::AstVisitor
@@ -578,8 +616,121 @@ namespace
             if (auto* call = node->expr->as<Luau::AstExprCall>())
             {
                 mStatements.insert(call);
+                if (on("SlMustUse"))
+                {
+                    mustUse(call);
+                }
             }
             return true;
+        }
+
+        // --- SlMustUse: an answer thrown away ---------------------------------
+
+        // The kind an expression is, of those an answer may be given back as.
+        std::optional<Kind> kindOf(Luau::AstExpr* e)
+        {
+            for (Kind kind : { Kind::Number, Kind::String, Kind::Boolean, Kind::List, Kind::Table, Kind::Vector, Kind::Quaternion })
+            {
+                if (is(e, kind))
+                {
+                    return kind;
+                }
+            }
+            return std::nullopt;
+        }
+
+        // The kind a call answers first. A call whose answer is unread is
+        // checked as a pack of answers, where the check keeps one; else its
+        // function's type says.
+        std::optional<Kind> answerKind(Luau::AstExprCall* call)
+        {
+            if (const std::optional<Kind> kind = kindOf(call))
+            {
+                return kind;
+            }
+            std::optional<Luau::TypeId> answer;
+            if (const Luau::TypePackId* pack = mChecked ? mChecked->astTypePacks.find(call) : nullptr)
+            {
+                answer = Luau::first(*pack);
+            }
+            const Luau::TypeId* callee = mChecked && !answer ? mChecked->astTypes.find(call->func) : nullptr;
+            if (const auto* function = callee ? Luau::get<Luau::FunctionType>(Luau::follow(*callee)) : nullptr)
+            {
+                answer = Luau::first(function->retTypes);
+            }
+            if (!answer)
+            {
+                // A string's own, on what the old solver's nonstrict mode
+                // calls any: those that answer a string.
+                static constexpr std::initializer_list<std::string_view> TEXT = { "format", "gsub", "lower", "rep", "reverse", "sub", "upper" };
+                const auto* callee = call->func->as<Luau::AstExprIndexName>();
+                const auto* lib    = callee ? callee->expr->as<Luau::AstExprGlobal>() : nullptr;
+                const bool  own    = callee && ((callee->op == ':' && is(callee->expr, Kind::String)) ||
+                                            (callee->op == '.' && lib && std::string_view(lib->name.value) == "string"));
+                const bool  text   = own && std::find(TEXT.begin(), TEXT.end(), std::string_view(callee->index.value)) != TEXT.end();
+                return text ? std::optional<Kind>(Kind::String) : std::nullopt;
+            }
+            for (Kind kind : { Kind::Number, Kind::String, Kind::Boolean, Kind::List, Kind::Table, Kind::Vector, Kind::Quaternion })
+            {
+                if (of(*answer, kind))
+                {
+                    return kind;
+                }
+            }
+            return std::nullopt;
+        }
+
+        // A call that does nothing but answer, its answer unread: LSL's
+        // llDeleteSubList(l, 0, 0) alone, which a scripter meant to change
+        // l. Fixed where the first thing it is given is a variable of the
+        // kind it answers: the answer given back to it.
+        void mustUse(Luau::AstExprCall* call)
+        {
+            std::string    function;
+            Luau::AstExpr* given = call->args.size ? call->args.data[0] : nullptr;
+            if (const auto* global = call->func->as<Luau::AstExprGlobal>())
+            {
+                if (!onlyAnswers("", global->name.value))
+                {
+                    return;
+                }
+                function = global->name.value;
+            }
+            else if (const auto* callee = call->func->as<Luau::AstExprIndexName>())
+            {
+                const auto*            lib  = callee->expr->as<Luau::AstExprGlobal>();
+                const std::string_view from = lib && callee->op == '.' ? lib->name.value : "";
+                const std::string_view name = callee->index.value;
+                if (from == "ll" || from == "llcompat")
+                {
+                    const ALLSLTraits::Trait* row = ALLSLTraits::of(("ll" + std::string(name)).c_str());
+                    if (!row || !(row->pure || row->mustUse))
+                    {
+                        return;
+                    }
+                }
+                else if (callee->op == ':' && is(callee->expr, Kind::String) && onlyAnswers("string", name))
+                {
+                    given = callee->expr;
+                }
+                else if (from.empty() || !onlyAnswers(from, name))
+                {
+                    return;
+                }
+                function = text(callee->location);
+            }
+            else
+            {
+                return;
+            }
+            ALScriptProblem& said = problem(call->location, "LuauLintSlMustUse", "[1] changes nothing and only answers, and nothing reads its answer here",
+                                            { function }, "SlMustUse");
+            const std::optional<Kind> answer = given && same(given, given) ? answerKind(call) : std::nullopt;
+            if (answer && kindOf(given) == answer)
+            {
+                const std::string back = text(given->location) + " = ";
+                offer(said, back + function + "(...)", { edit(Luau::Location(call->location.begin, call->location.begin), back) }, false);
+            }
         }
 
     private:
@@ -610,7 +761,7 @@ namespace
                        (want == Kind::List && table->props.empty() && table->indexer && of(table->indexer->indexType, Kind::Number));
             }
             const auto* extern_type = Luau::get<Luau::ExternType>(followed);
-            return want == Kind::Vector && extern_type && extern_type->name == "vector";
+            return extern_type && ((want == Kind::Vector && extern_type->name == "vector") || (want == Kind::Quaternion && extern_type->name == "quaternion"));
         }
 
         // Whether the check found an expression of a kind. A local the

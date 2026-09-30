@@ -885,6 +885,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlGlobalFunctionInScope">function [1] here makes a global, and only once this runs. local function [1] keeps it to this block</string>
 	<string name="LuauLintSlParenCondition">Luau's [1] needs no brackets round its condition, where LSL's did</string>
 	<string name="LuauLintSlAlmostSwapped">[1] = [2] and then [2] = [1] leave both [2]: a swap is [3]</string>
+	<string name="LuauLintSlMustUse">[1] changes nothing and only answers, and nothing reads its answer here</string>
 	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
 	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauUnknownType">Unknown type '[1]'</string>
