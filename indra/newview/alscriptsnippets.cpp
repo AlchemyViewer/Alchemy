@@ -32,6 +32,7 @@
 #include "llfile.h"
 #include "llsdserialize.h"
 
+#include <algorithm>
 #include <sstream>
 
 namespace ALScriptSnippets
@@ -57,6 +58,67 @@ namespace ALScriptSnippets
             }
             return aside;
         }
+
+        // The snippets an LLSD array holds, added to `out`: each map with a
+        // name and a body, into `out` or, where it says a language, the
+        // list for that one.
+        void snippetsIn(const LLSD& list, bool builtin, std::vector<Snippet>& out, std::vector<Snippet>* lsl = nullptr,
+                        std::vector<Snippet>* slua = nullptr)
+        {
+            for (LLSD::array_const_iterator it = list.beginArray(); it != list.endArray(); ++it)
+            {
+                Snippet one;
+                one.name    = (*it)["name"].asString();
+                one.prefix  = (*it)["prefix"].asString();
+                one.detail  = (*it)["detail"].asString();
+                one.body    = (*it)["body"].asString();
+                one.builtin = builtin;
+                if (one.name.empty() || one.body.empty())
+                {
+                    continue;
+                }
+                const std::string language = (*it)["language"].asString();
+                std::vector<Snippet>& into = language == "lsl" && lsl ? *lsl : language == "slua" && slua ? *slua : out;
+                into.push_back(std::move(one));
+            }
+        }
+
+        // The array a file or a notecard holds: each snippet with a name and
+        // a body, and the language where one is given.
+        void appendTo(LLSD& list, const std::vector<Snippet>& snippets, const char* language)
+        {
+            for (const Snippet& one : snippets)
+            {
+                // One without a name or a body is one being written, and is
+                // kept in the tab rather than in the file.
+                if (one.builtin || one.name.empty() || one.body.empty())
+                {
+                    continue;
+                }
+                LLSD entry;
+                entry["name"]   = one.name;
+                entry["prefix"] = one.prefix;
+                entry["detail"] = one.detail;
+                entry["body"]   = one.body;
+                if (language)
+                {
+                    entry["language"] = language;
+                }
+                list.append(entry);
+            }
+        }
+
+        // The array as XML, with a note after the declaration for whoever
+        // opens it.
+        std::string xmlOf(const LLSD& list, const std::string& note)
+        {
+            std::ostringstream xml;
+            LLSDSerialize::toPrettyXML(list, xml);
+            std::string  text     = xml.str();
+            const size_t declared = text.find("?>");
+            text.insert(declared == std::string::npos ? 0 : declared + 2, note);
+            return text;
+        }
     }
 
     bool readFrom(const std::string& file, bool builtin, std::vector<Snippet>& out)
@@ -73,19 +135,7 @@ namespace ALScriptSnippets
             LL_WARNS("ScriptStudio") << "The snippets at " << file << " could not be read" << LL_ENDL;
             return false;
         }
-        for (LLSD::array_const_iterator it = list.beginArray(); it != list.endArray(); ++it)
-        {
-            Snippet one;
-            one.name    = (*it)["name"].asString();
-            one.prefix  = (*it)["prefix"].asString();
-            one.detail  = (*it)["detail"].asString();
-            one.body    = (*it)["body"].asString();
-            one.builtin = builtin;
-            if (!one.name.empty() && !one.body.empty())
-            {
-                out.push_back(std::move(one));
-            }
-        }
+        snippetsIn(list, builtin, out);
         return true;
     }
 
@@ -107,33 +157,77 @@ namespace ALScriptSnippets
             LL_INFOS("ScriptStudio") << "The snippets at " << file << " could not be read, and are kept as " << aside << LL_ENDL;
         }
         LLSD list = LLSD::emptyArray();
-        for (const Snippet& one : snippets)
-        {
-            // One without a name or a body is one being written, and is
-            // kept in the tab rather than in the file.
-            if (one.builtin || one.name.empty() || one.body.empty())
-            {
-                continue;
-            }
-            LLSD entry;
-            entry["name"]   = one.name;
-            entry["prefix"] = one.prefix;
-            entry["detail"] = one.detail;
-            entry["body"]   = one.body;
-            list.append(entry);
-        }
-        std::ostringstream xml;
-        LLSDSerialize::toPrettyXML(list, xml);
+        appendTo(list, snippets, nullptr);
         // How they are written, for whoever opens the file.
-        std::string text = xml.str();
-        const size_t declared = text.find("?>");
         const std::string note = "\n<!-- Your own snippets, offered beside the viewer's: each a map with a name,\n"
                                  "     the prefix completion offers it under, a line of detail, and the body,\n"
                                  "     where ${1:text}, ${2} and $1 are the places Tab goes through in order\n"
                                  "     and $0 is where the caret ends. The preferences' Snippets tab edits these. -->";
-        text.insert(declared == std::string::npos ? 0 : declared + 2, note);
         // Whole or not at all: beside it, then in its place.
-        return ALFileWrite::whole(file, text);
+        return ALFileWrite::whole(file, xmlOf(list, note));
+    }
+
+    std::string notecardText(const std::vector<Snippet>& lsl, const std::vector<Snippet>& slua)
+    {
+        LLSD list = LLSD::emptyArray();
+        appendTo(list, lsl, "lsl");
+        appendTo(list, slua, "slua");
+        const std::string note = "\n<!-- Script Studio snippets. Drop this notecard on the Snippets tab of Script\n"
+                                 "     Studio's preferences to add them to your own. -->";
+        return xmlOf(list, note);
+    }
+
+    bool readNotecard(const std::string& text, bool lua, std::vector<Snippet>& lsl, std::vector<Snippet>& slua)
+    {
+        std::istringstream in(text);
+        LLSD               list;
+        if (LLSDSerialize::fromXML(list, in) == LLSDParser::PARSE_FAILURE || !list.isArray())
+        {
+            return false;
+        }
+        std::vector<Snippet> read_lsl;
+        std::vector<Snippet> read_slua;
+        snippetsIn(list, false, lua ? read_slua : read_lsl, &read_lsl, &read_slua);
+        if (read_lsl.empty() && read_slua.empty())
+        {
+            return false;
+        }
+        lsl.insert(lsl.end(), std::make_move_iterator(read_lsl.begin()), std::make_move_iterator(read_lsl.end()));
+        slua.insert(slua.end(), std::make_move_iterator(read_slua.begin()), std::make_move_iterator(read_slua.end()));
+        return true;
+    }
+
+    Merged merge(std::vector<Snippet>& own, const std::vector<Snippet>& incoming)
+    {
+        Merged     merged;
+        const auto named = [&own](const std::string& name) {
+            return std::find_if(own.begin(), own.end(), [&name](const Snippet& one) { return one.name == name; });
+        };
+        for (const Snippet& one : incoming)
+        {
+            // Its name, then the numbered ones, until one is free -- or
+            // holds this body already, as the same notecard dropped twice
+            // would find.
+            for (int n = 1;; ++n)
+            {
+                const std::string name  = n == 1 ? one.name : one.name + " (" + std::to_string(n) + ")";
+                const auto        there = named(name);
+                if (there != own.end() && there->body == one.body)
+                {
+                    ++merged.skipped;
+                    break;
+                }
+                if (there == own.end())
+                {
+                    own.push_back(one);
+                    own.back().name    = name;
+                    own.back().builtin = false;
+                    ++(n == 1 ? merged.added : merged.renamed);
+                    break;
+                }
+            }
+        }
+        return merged;
     }
 
     std::string path(bool lua)

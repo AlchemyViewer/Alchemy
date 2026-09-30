@@ -63,6 +63,27 @@ namespace ALScriptSnippets
     bool readFrom(const std::string& file, bool builtin, std::vector<Snippet>& out);
     bool writeTo(const std::string& file, const std::vector<Snippet>& snippets);
 
+    // Snippets as a notecard carries them, to keep in inventory or give to
+    // someone: the file's array, each entry saying the language it is for,
+    // so that one notecard carries both. And read back, each into the
+    // language it says -- one saying none into `lua`'s -- keys it does not
+    // know passed over; false, with nothing added, where the text is not
+    // snippets.
+    std::string notecardText(const std::vector<Snippet>& lsl, const std::vector<Snippet>& slua);
+    bool        readNotecard(const std::string& text, bool lua, std::vector<Snippet>& lsl, std::vector<Snippet>& slua);
+
+    // Snippets brought in beside the scripter's own: one with the name and
+    // the body of one there already is left out; one whose name is taken
+    // by another body comes in as "name (2)", or the first number free --
+    // left out too where a numbered one holds its body.
+    struct Merged
+    {
+        size_t added   = 0;
+        size_t renamed = 0;
+        size_t skipped = 0;
+    };
+    Merged merge(std::vector<Snippet>& own, const std::vector<Snippet>& incoming);
+
     // Where the scripter's own are kept.
     std::string path(bool lua);
     // The file's text as it stands, or nothing where there is no file; and

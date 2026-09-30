@@ -150,4 +150,76 @@ namespace tut
         ensure("not written", !wrote);
         ensure("and the file as it was", read(file) == written);
     }
+
+    template<> template<>
+    void alscriptsnippets_object::test<4>()
+    {
+        set_test_name("a notecard carries both languages and reads back into each; keys it does not know are passed over");
+        ALScriptSnippets::Snippet say = snippet("say", "llSay(0, \"${1:hello}\");");
+        say.prefix                    = "say";
+        say.detail                    = "Say something";
+        ALScriptSnippets::Snippet builtin = snippet("builtin", "not given");
+        builtin.builtin                   = true;
+        const std::string text = ALScriptSnippets::notecardText({ say, builtin, snippet("", "no name") }, { snippet("print", "print(${1})") });
+        std::vector<ALScriptSnippets::Snippet> lsl;
+        std::vector<ALScriptSnippets::Snippet> slua;
+        ensure("read", ALScriptSnippets::readNotecard(text, false, lsl, slua));
+        ensure_equals("the LSL one, and not the viewer's or the unnamed", lsl.size(), 1U);
+        ensure_equals("its name", lsl[0].name, std::string("say"));
+        ensure_equals("its prefix", lsl[0].prefix, std::string("say"));
+        ensure_equals("its detail", lsl[0].detail, std::string("Say something"));
+        ensure_equals("its body", lsl[0].body, say.body);
+        ensure("not the viewer's", !lsl[0].builtin);
+        ensure_equals("the SLua one in SLua's", slua.size(), 1U);
+        ensure_equals("its body", slua[0].body, std::string("print(${1})"));
+
+        // Written by hand or by an older viewer: no language, and a key
+        // this one does not know.
+        const std::string plain = "<llsd><array><map><key>name</key><string>loop</string><key>body</key><string>for</string>"
+                                  "<key>colour</key><string>red</string></map></array></llsd>";
+        lsl.clear();
+        slua.clear();
+        ensure("read", ALScriptSnippets::readNotecard(plain, true, lsl, slua));
+        ensure("into the language shown", lsl.empty() && slua.size() == 1 && slua[0].name == "loop");
+    }
+
+    template<> template<>
+    void alscriptsnippets_object::test<5>()
+    {
+        set_test_name("a notecard that is not snippets reads as nothing, and says so");
+        std::vector<ALScriptSnippets::Snippet> lsl;
+        std::vector<ALScriptSnippets::Snippet> slua;
+        for (const char* text : { "Dear diary, today I scripted a door.", "<llsd><map><key>name</key><string>x</string></map></llsd>",
+                                  "<llsd><array><map><key>title</key><string>x</string></map></array></llsd>", "<llsd><array /></llsd>", "" })
+        {
+            ensure(std::string("not snippets: ") + text, !ALScriptSnippets::readNotecard(text, false, lsl, slua));
+            ensure("and nothing added", lsl.empty() && slua.empty());
+        }
+    }
+
+    template<> template<>
+    void alscriptsnippets_object::test<6>()
+    {
+        set_test_name("brought in beside one's own: the same left out, a name taken by another body numbered, and again left out");
+        std::vector<ALScriptSnippets::Snippet> own = { snippet("say", "llSay(0, \"a\");"), snippet("loop", "for") };
+        const std::vector<ALScriptSnippets::Snippet> incoming = { snippet("say", "llSay(0, \"b\");"), snippet("loop", "for"),
+                                                                  snippet("new", "x") };
+        ALScriptSnippets::Merged merged = ALScriptSnippets::merge(own, incoming);
+        ensure_equals("one added under its own name", merged.added, 1U);
+        ensure_equals("one under a number", merged.renamed, 1U);
+        ensure_equals("one the same", merged.skipped, 1U);
+        ensure_equals("four now", own.size(), 4U);
+        ensure_equals("numbered", own[2].name, std::string("say (2)"));
+        ensure_equals("with its body", own[2].body, std::string("llSay(0, \"b\");"));
+        ensure_equals("and the new one", own[3].name, std::string("new"));
+
+        // The same notecard again brings nothing in.
+        merged = ALScriptSnippets::merge(own, incoming);
+        ensure("nothing again", merged.added == 0 && merged.renamed == 0 && merged.skipped == 3);
+        ensure_equals("still four", own.size(), 4U);
+
+        // A third body takes the next number free.
+        merged = ALScriptSnippets::merge(own, { snippet("say", "llSay(0, \"c\");") });
+        ensure_equals("numbered past the taken", own.back().name, std::string("say (3)"));
+    }
 }
