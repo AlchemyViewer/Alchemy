@@ -28,6 +28,7 @@
 #include "llcontrolavatar.h"
 #include "lldrawable.h"
 #include "llspatialpartition.h"
+#include "llviewercontrol.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
 #include "llvoavatar.h"
@@ -107,7 +108,19 @@ void ALRenderIsolation::disarm()
 // static
 bool ALRenderIsolation::isArmedAvatar(const LLVOAvatar* avatar)
 {
-    return avatar && sArmed.notNull() && avatar->getID() == sArmed;
+    if (!avatar || sArmed.isNull())
+    {
+        return false;
+    }
+    if (avatar->getID() == sArmed)
+    {
+        return true;
+    }
+
+    // Seated on the armed linkset, with the cutout taking seated avatars.
+    static LLCachedControl<bool> include_seated(gSavedSettings, "ALSnapshotCutoutIncludeSeated", false);
+    const LLViewerObject* seat = static_cast<const LLViewerObject*>(avatar->getParent());
+    return include_seated() && seat && !seat->isAvatar() && seat->getRootEdit()->getID() == sArmed;
 }
 
 // static

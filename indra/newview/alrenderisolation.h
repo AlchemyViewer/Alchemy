@@ -73,9 +73,10 @@ public:
     static void disarm();
     static const LLUUID& armedTarget() { return sArmed; }
 
-    /// Whether @a avatar is the armed subject. Such an avatar is never
-    /// impostored for being one too many (LLVOAvatar::computeUpdatePeriod):
-    /// an impostor drops the attachments and draws a billboard.
+    /// Whether @a avatar is the armed subject, or sits on it while the cutout
+    /// takes seated avatars along. Such an avatar is never impostored for
+    /// being one too many (LLVOAvatar::computeUpdatePeriod): an impostor drops
+    /// the attachments and draws a billboard.
     static bool isArmedAvatar(const LLVOAvatar* avatar);
 
     /// The armed subject if it is in the scene now, or null.
