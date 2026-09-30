@@ -41,8 +41,10 @@ void LLDrawPoolGlow::renderPostDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
-    // This pass writes glow into the alpha channel, which in a cutout frame
-    // holds the subject's coverage; glow added to it would read back as opacity.
+    // This pass writes only glow, into the alpha channel. In a cutout frame
+    // that channel is the subject's coverage, and the stamp that follows the
+    // opaque pools (LLPipeline::stampCutoutCoverage) writes over whatever this
+    // put there, so it would be work for nothing.
     if (LLPipeline::cutoutFiltering())
     {
         return;

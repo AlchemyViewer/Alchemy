@@ -1114,7 +1114,6 @@ void LLSnapshotLivePreview::saveLocal(const snapshot_saved_signal_t::slot_type& 
     saveLocal(mFormattedImage, success_cb, failure_cb);
 }
 
-//Check if failed due to insufficient memory
 // static
 LLPointer<LLImageFormatted> LLSnapshotLivePreview::createFormattedImage(LLSnapshotModel::ESnapshotFormat format, S32 quality)
 {
@@ -1137,6 +1136,7 @@ LLPointer<LLImageFormatted> LLSnapshotLivePreview::createFormattedImage(LLSnapsh
     return new LLImagePNG();
 }
 
+//Check if failed due to insufficient memory
 void LLSnapshotLivePreview::saveLocal(LLPointer<LLImageFormatted> image, const snapshot_saved_signal_t::slot_type& success_cb, const snapshot_saved_signal_t::slot_type& failure_cb)
 {
     sSaveLocalImage = image;
