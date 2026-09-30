@@ -2185,6 +2185,19 @@ bool LLTextureFetchWorker::deleteOK()
         delete_ok = false;
     }
 
+    // Do not delete while a decode is in-flight on the ImageDecode thread pool.
+    // endWork() may zero mDecodeHandle without waiting for the decode thread to
+    // finish, so we also guard on !mDecoded: callbackDecoded() sets mDecoded=true
+    // under mWorkMutex, guaranteeing the thread is done touching this object
+    // before we allow deletion.
+    {
+        LLMutexLock lock(&mWorkMutex);
+        if (mDecodeHandle != 0 || (mState == DECODE_IMAGE_UPDATE && !mDecoded))
+        {
+            delete_ok = false;
+        }
+    }
+
     return delete_ok;
 }
 
