@@ -168,4 +168,21 @@ namespace tut
         LLPointer<LLImageRaw> rgb = new LLImageRaw(1, 1, 3);
         ensure("three components refused", !ALCutoutImage::resolve(*rgb, 1, 1, LLColor4::black, true));
     }
+
+    // A resolved cutout -- straight RGBA -- made smaller, as its thumbnail is,
+    // keeps its edge colour. Its control is test 2's: the same texels scaled
+    // as they are come out half dark.
+    template<> template<>
+    void cutout_object::test<8>()
+    {
+        LLPointer<LLImageRaw> raw = image(2, 1, { { 255, 0, 0, 255 }, { 0, 255, 0, 0 } });
+        ensure("scales", ALCutoutImage::scaleStraight(*raw, 1, 1));
+        ensure_equals("still four components", (S32)raw->getComponents(), 4);
+
+        const std::vector<U8> edge = texel(raw, 0);
+        close_to("edge keeps its red", edge[0], 255, 3);
+        // The empty texel's colour, green, carries no weight: it covers nothing.
+        close_to("no green from the empty texel", edge[1], 0, 3);
+        close_to("edge is half covered", edge[3], 128, 3);
+    }
 }

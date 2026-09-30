@@ -58,6 +58,12 @@ namespace ALCutoutImage
     ///
     /// False where @a raw is not four components or cannot be resized.
     bool resolve(LLImageRaw& raw, S32 width, S32 height, const LLColor4& fill, bool keep_alpha);
+
+    /// Scales @a raw -- straight RGBA, as a resolved cutout is -- to @a width
+    /// by @a height without darkening its edges: premultiplied, averaged, and
+    /// divided back out, which is resolve() over a fill of nothing. Anything
+    /// but four components is scaled as it is.
+    bool scaleStraight(LLImageRaw& raw, S32 width, S32 height);
 }
 
 #endif // AL_CUTOUTIMAGE_H

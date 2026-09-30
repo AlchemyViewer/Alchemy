@@ -110,3 +110,25 @@ bool ALCutoutImage::resolve(LLImageRaw& raw, S32 width, S32 height, const LLColo
     memcpy(raw.getData(), out.data(), out.size());
     return true;
 }
+
+bool ALCutoutImage::scaleStraight(LLImageRaw& raw, S32 width, S32 height)
+{
+    LLImageDataLock lock(&raw);
+
+    if (raw.getComponents() != 4 || raw.isBufferInvalid())
+    {
+        return raw.scale(width, height);
+    }
+
+    U8* data = raw.getData();
+    const S32 texels = raw.getWidth() * raw.getHeight();
+    for (S32 i = 0; i < texels; ++i, data += 4)
+    {
+        const U32 alpha = data[3];
+        for (S32 c = 0; c < 3; ++c)
+        {
+            data[c] = (U8)((data[c] * alpha + 127) / 255);
+        }
+    }
+    return resolve(raw, width, height, LLColor4::transparent, true);
+}

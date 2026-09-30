@@ -27,6 +27,7 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "alcutoutimage.h"
 #include "llagent.h"
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
@@ -584,8 +585,9 @@ void LLSnapshotLivePreview::generateThumbnailImage(bool force_update)
                      mPreviewImage->getHeight(),
                      mPreviewImage->getComponents());
         raw->copy(mPreviewImage);
-        // Scale to the thumbnail size
-        if (!raw->scale(mThumbnailWidth, mThumbnailHeight))
+        // Scale to the thumbnail size. Straight alpha, as a cutout's is, is
+        // scaled without averaging what its empty texels hold into its edges.
+        if (!ALCutoutImage::scaleStraight(*raw, mThumbnailWidth, mThumbnailHeight))
         {
             raw = NULL ;
         }
