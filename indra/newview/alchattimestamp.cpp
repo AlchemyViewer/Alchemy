@@ -29,11 +29,15 @@
 
 namespace
 {
-// Date and AM/PM are optional. Group 1 retains minutes, group 2 seconds,
-// and group 3 the AM/PM suffix, including its original spacing and case.
-const std::string TIME_PATTERN = R"(((?:\d{4}/\d{1,2}/\d{1,2}\s+)?\d{1,2}:\d{2})(:\d{2})?(\s[AaPp][Mm])?)";
-const ALRegex     TIME(TIME_PATTERN);
-const ALRegex     PREFIX("\\[" + TIME_PATTERN + "\\]\\s*");
+// The date is optional. Group 1 retains minutes and group 2 seconds.
+const std::string CLOCK_PATTERN = R"(((?:\d{4}/\d{1,2}/\d{1,2}\s+)?\d{1,2}:\d{2})(:\d{2})?)";
+// A log line's timestamp, whose AM/PM group 3 retains with its original
+// spacing and case.
+const ALRegex     PREFIX("\\[" + CLOCK_PATTERN + R"((\s[AaPp][Mm])?\]\s*)");
+// A displayed timestamp names the half of the day in the viewer's language,
+// and not every language spells it AM or PM, so group 3 retains whatever
+// follows the clock after a blank.
+const ALRegex     TIME(CLOCK_PATTERN + R"((\s.*)?)");
 } // namespace
 
 size_t ALChatTimestamp::prefixLength(std::string_view line)

@@ -4500,6 +4500,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyIMShowSeconds</key>
+        <map>
+            <key>Comment</key>
+            <string>Show seconds in chat timestamps and include seconds in chat logs.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ChatOOCPrefix</key>
         <map>
             <key>Comment</key>

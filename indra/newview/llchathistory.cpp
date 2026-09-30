@@ -223,7 +223,7 @@ public:
 
                 // Just add current date if not full.
                 // Should be fine since both times are supposed to be SLT.
-                if (!time_string.empty() && time_string.size() < 7)
+                if (!time_string.empty() && time_string.find('/') == std::string::npos)
                 {
                     time_string = "[" + LLTrans::getString("TimeMonth") + "]/["
                         + LLTrans::getString("TimeDay") + "]/["
@@ -525,7 +525,7 @@ public:
 
                 // Just add current date if not full.
                 // Should be fine since both times are supposed to be SLT.
-                if (!time_string.empty() && time_string.size() < 7)
+                if (!time_string.empty() && time_string.find('/') == std::string::npos)
                 {
                     time_string = "[" + LLTrans::getString("TimeMonth") + "]/["
                         + LLTrans::getString("TimeDay") + "]/["

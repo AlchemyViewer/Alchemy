@@ -30,7 +30,7 @@
 // The external editor's log says when on its first line, by the chat log's
 // clock, which is the viewer's: a fixed word here, which a test can look
 // for.
-std::string LLLogChat::timestamp2LogString(U32, bool)
+std::string LLLogChat::timestamp2LogString(U32, bool, bool)
 {
     return "[when]";
 }

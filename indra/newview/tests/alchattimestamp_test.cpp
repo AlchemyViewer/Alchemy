@@ -74,7 +74,8 @@ void alchattimestamp_object::test<3>()
 {
     for (const std::string date : { "", "2026/09/25 " })
     {
-        for (const std::string suffix : { "", " AM", " pm" })
+        // Italian and Japanese name the afternoon in words of their own.
+        for (const std::string suffix : { "", " AM", " pm", " pomeridiane", " \xe5\x8d\x88\xe5\xbe\x8c" })
         {
             for (const std::string seconds : { ":00", ":09", ":59" })
             {
@@ -99,5 +100,6 @@ void alchattimestamp_object::test<4>()
         ensure_equals("not a timestamp prefix: " + line, ALChatTimestamp::prefixLength(line), size_t(0));
     }
     ensure_equals("unknown time is not rewritten", ALChatTimestamp::format("unknown:time:00", false), "unknown:time:00");
+    ensure_equals("overlong seconds are not rewritten", ALChatTimestamp::format("14:05:091", false), "14:05:091");
 }
 } // namespace tut

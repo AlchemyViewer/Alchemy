@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "lltoastimpanel.h"
 
+#include "alchattimestamp.h"
 #include "llagent.h"
 #include "llavatarnamecache.h"
 #include "llfloaterreg.h"
@@ -127,7 +128,7 @@ LLToastIMPanel::LLToastIMPanel(LLToastIMPanel::Params &p) : LLToastPanel(p.notif
     }
 // [/SL:KB]
 
-    mTime->setValue(p.time);
+    mTime->setValue(ALChatTimestamp::format(p.time, gSavedSettings.getBOOL("AlchemyIMShowSeconds")));
     mSessionID = p.session_id;
     mAvatarID = p.avatar_id;
     mNotification = p.notification;

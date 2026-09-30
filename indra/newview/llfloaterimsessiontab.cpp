@@ -927,11 +927,12 @@ bool LLFloaterIMSessionTab::onIMShowModesMenuItemCheck(const LLSD& userdata)
 bool LLFloaterIMSessionTab::onIMShowModesMenuItemEnable(const LLSD& userdata)
 {
     std::string item = userdata.asString();
+    bool plain_text = gSavedSettings.getS32("AlchemyChatHistoryStyle") >= 1;
     if (item == "AlchemyIMShowSeconds")
     {
-        return gSavedSettings.getBOOL("IMShowTime");
+        // Expanded headers always show the time; plain text only when asked.
+        return !plain_text || gSavedSettings.getBOOL("IMShowTime");
     }
-    bool plain_text = gSavedSettings.getS32("AlchemyChatHistoryStyle") >= 1;
     bool is_not_names = (item != "IMShowNamesForP2PConv");
     return (plain_text && (is_not_names || mIsP2PChat));
 }
