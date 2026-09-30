@@ -64,8 +64,10 @@ public:
         bool        mustUse;
         bool        native;
         U8          slua;
-        // The arguments that are an index, a bit for each by its place.
+        // The arguments that are an index, a bit for each by its place; and
+        // those SLua takes text for, a string or a uuid, likewise.
         U16         sluaIndexArgs;
+        U16         sluaTextArgs;
         // What SLua would use in its stead, where it says: a library
         // function of its own, an operator; or null. And why, where it says.
         const char* sluaUse;
@@ -77,6 +79,11 @@ public:
     // A constant LSL types a string that SLua types a uuid: NULL_KEY, the
     // TEXTURE_ and IMG_USE_BAKED_ ones, COMBAT_LOG_ID.
     static bool uuidConstant(std::string_view name);
+    // An event's parameter, by its place from nought, that LSL types a key
+    // and SLua passes as a string: link_message's id.
+    static bool eventTextParam(std::string_view event, int index);
+    // Whether text is a UUID as LSL writes one: 8-4-4-4-12 hexadecimal.
+    static bool isUuid(std::string_view text);
 
     // What an expression can be dropped, or read at another time, without
     // losing anything: no assignment, no call but to a function the

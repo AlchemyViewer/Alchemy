@@ -32,6 +32,7 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <iterator>
 #include <string_view>
 
@@ -78,6 +79,33 @@ bool ALLSLTraits::pure(const char* name)
 {
     const Trait* t = of(name);
     return t && t->pure;
+}
+
+// static
+bool ALLSLTraits::eventTextParam(std::string_view event, int index)
+{
+    static constexpr std::pair<std::string_view, int> PARAMS[] = {
+#include "allsleventtext.inc"
+    };
+    return std::find(std::begin(PARAMS), std::end(PARAMS), std::pair<std::string_view, int>(event, index)) != std::end(PARAMS);
+}
+
+// static
+bool ALLSLTraits::isUuid(std::string_view text)
+{
+    if (text.size() != 36)
+    {
+        return false;
+    }
+    for (size_t i = 0; i < text.size(); ++i)
+    {
+        const bool dash = i == 8 || i == 13 || i == 18 || i == 23;
+        if (dash ? text[i] != '-' : !std::isxdigit(static_cast<unsigned char>(text[i])))
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 // static

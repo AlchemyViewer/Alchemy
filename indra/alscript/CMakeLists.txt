@@ -66,6 +66,7 @@ target_sources(
         allsloptimizer.h
         allsltraits.inc
         allsluuids.inc
+        allsleventtext.inc
         alluauconfig.h
         alluauexports.h
         alluauservice.h

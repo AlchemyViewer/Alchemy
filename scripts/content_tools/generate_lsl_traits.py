@@ -58,6 +58,54 @@ DETERMINISTIC = {
 }
 
 
+def ll_params(line):
+    """The parameters' types of an ll member's signature, in order: after
+    its attributes, whose reasons may hold brackets and quotes, and any
+    generics."""
+    rest = line.split(":", 1)[1].strip()
+    while rest.startswith("@"):
+        if rest.startswith("@["):
+            depth, quote, at = 0, None, 1
+            while at < len(rest):
+                c = rest[at]
+                if quote:
+                    quote = None if c == quote else quote
+                elif c in "'\"":
+                    quote = c
+                elif c == "[":
+                    depth += 1
+                elif c == "]":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                at += 1
+            rest = rest[at + 1:].strip()
+        else:
+            rest = rest.split(None, 1)[1] if " " in rest else ""
+    if rest.startswith("<"):
+        rest = rest[rest.index(">") + 1:].strip()
+    if not rest.startswith("("):
+        return []
+    depth, at = 0, 0
+    for at, c in enumerate(rest):
+        depth += c in "({[<"
+        depth -= c in ")}]>"
+        if depth == 0:
+            break
+    inner, params, depth, start = rest[1:at], [], 0, 0
+    for i, c in enumerate(inner + ","):
+        if c in "({[<":
+            depth += 1
+        elif c in ")}]>":
+            depth -= 1
+        elif c == "," and depth == 0:
+            piece = inner[start:i].strip()
+            if piece:
+                params.append(piece.split(":", 1)[1].strip() if ":" in piece else piece)
+            start = i + 1
+    return params
+
+
 def main(argv):
     if len(argv) != 2:
         print(__doc__)
@@ -69,6 +117,9 @@ def main(argv):
     # what it marks deprecated in ll.
     declared = {"ll": set(), "llcompat": set()}
     deprecated = set()
+    # The arguments of each ll function SLua takes either a string or a uuid
+    # for, as bits by their places.
+    text_args = {}
     table = None
     for line in (source.parent / "secondlife.d.luau").read_text(encoding="utf-8").split("\n"):
         m = re.match(r"^declare (ll|llcompat): \{\s*$", line)
@@ -83,11 +134,22 @@ def main(argv):
             declared[table].add(m.group(1))
             if table == "ll" and re.match(r"^  [A-Za-z_][A-Za-z0-9_]*: @(deprecated|\[deprecated)", line):
                 deprecated.add(m.group(1))
+            if table == "ll":
+                bits = 0
+                for i, t in enumerate(ll_params(line)):
+                    if re.search(r"\bstring\b", t) and re.search(r"\buuid\b", t) and "{" not in t:
+                        bits |= 1 << i
+                text_args[m.group(1)] = bits
     if not declared["ll"] or not declared["llcompat"]:
         print("no ll or llcompat in " + str(source.parent / "secondlife.d.luau"))
         return 1
     functions = {}
     uuids = []
+    # Each event's parameters LSL types a key that SLua passes as a string.
+    event_text = []
+    event = None
+    event_param = -1
+    param_type = None
     name = None
     section = None
     constant = None
@@ -96,6 +158,22 @@ def main(argv):
         if m:
             section = m.group(1)
             name = constant = None
+            continue
+        if section == "events":
+            m = re.match(r"^  ([A-Za-z_][A-Za-z0-9_]*):\s*$", line)
+            if m:
+                event, event_param = m.group(1), -1
+                continue
+            if re.match(r"^    - [A-Za-z_][A-Za-z0-9_]*:\s*$", line):
+                event_param += 1
+                param_type = None
+                continue
+            m = re.match(r"^        type: (\S+)\s*$", line)
+            if m:
+                param_type = m.group(1)
+            m = re.match(r"^        slua-type: (\S+)\s*$", line)
+            if m and param_type == "key" and m.group(1).strip("'\"") == "string":
+                event_text.append((event, event_param))
             continue
         if section == "constants":
             m = re.match(r"^  ([A-Za-z_][A-Za-z0-9_]*):\s*$", line)
@@ -147,13 +225,20 @@ def main(argv):
             functions[name]["return"] = m.group(1)
         if re.match(r"^    slua-deprecated:", line):
             in_deprecated = True
+            folded = None
             continue
         if in_deprecated:
             m = re.match(r"^      (use|reason): (.*?)\s*$", line)
             if m:
                 functions[name][m.group(1)] = m.group(2).strip("'\"")
+                folded = m.group(1)
+            elif line.startswith("        ") and folded:
+                # A value folded onto the lines after its key.
+                functions[name][folded] = (functions[name][folded] + " " + line.strip()).strip("'\"")
             elif not line.startswith("      "):
                 in_deprecated = False
+            else:
+                folded = None
     if not functions:
         print("no functions found in " + str(source))
         return 1
@@ -168,7 +253,8 @@ def main(argv):
         "// its name, whether it has no side effects, whether its result must",
         "// be used, whether it needs a native implementation off LSO; what",
         "// SLua makes of it (ALLSLTraits::Slua); the arguments that are an",
-        "// index, by their places; and what SLua would use, and why.",
+        "// index, and those SLua takes text for, by their places; and what",
+        "// SLua would use, and why.",
         "// clang-format off",
     ]
     for fn in sorted(functions):
@@ -188,7 +274,7 @@ def main(argv):
         use = '"%s"' % t["use"].replace('\\', '\\\\').replace('"', '\\"') if t["use"] else "nullptr"
         reason = '"%s"' % t["reason"].replace('\\', '\\\\').replace('"', '\\"') if t["reason"] else "nullptr"
         lines.append(
-            '{ "%s", %s, %s, %s, %s, 0x%x, %s, %s },'
+            '{ "%s", %s, %s, %s, %s, 0x%x, 0x%x, %s, %s },'
             % (
                 fn,
                 "true" if t["pure"] else "false",
@@ -196,6 +282,7 @@ def main(argv):
                 "true" if t["native"] else "false",
                 " | ".join(slua) if slua else "0",
                 t["index-args"],
+                text_args.get(bare, 0),
                 use,
                 reason,
             )
@@ -212,6 +299,15 @@ def main(argv):
         encoding="utf-8",
     )
     print("%d string constants SLua types a uuid -> %s" % (len(named), uuids_out))
+    events_out = out.with_name("allsleventtext.inc")
+    events_out.write_text(
+        "// Generated by scripts/content_tools/generate_lsl_traits.py from\n"
+        "// lsl_definitions.yaml; do not edit. Each event's parameters LSL\n"
+        "// types a key that SLua passes as a string, by their places.\n"
+        + "".join('{ "%s", %d },\n' % e for e in event_text),
+        encoding="utf-8",
+    )
+    print("%d event parameters SLua passes as text -> %s" % (len(event_text), events_out))
     return 0
 
 

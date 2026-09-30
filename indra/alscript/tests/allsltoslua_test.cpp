@@ -715,4 +715,35 @@ namespace tut
                has(r, "llcompat.List2String(l, at)") && has(r, "-- LSL: SLua deprecates ll.List2String: Use '[]' and 'tostring' instead."));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<23>()
+    {
+        set_test_name("keys that hold text: link_message's id as SLua passes it, a string; a key given text that is no UUID kept a string; text where SLua takes it, uuid() where only a uuid will do");
+        const ALLSLToSLua::Result r = convert("key DOMAIN = \"MY CHANNEL\";\n"
+                                              "key gOwner;\n"
+                                              "send(key to) { llMessageLinked(LINK_SET, 0, \"\", to); }\n"
+                                              "default {\n"
+                                              "    state_entry() {\n"
+                                              "        gOwner = llGetOwner();\n"
+                                              "        llMessageLinked(LINK_SET, 1, \"hi\", DOMAIN);\n"
+                                              "        send(\"other text\");\n"
+                                              "        llMessageLinked(LINK_SET, 2, \"x\", gOwner);\n"
+                                              "    }\n"
+                                              "    link_message(integer s, integer n, string m, key id) {\n"
+                                              "        if (id == DOMAIN) llOwnerSay(m);\n"
+                                              "        if (id == gOwner) llOwnerSay(\"owner\");\n"
+                                              "        key k = id;\n"
+                                              "        llOwnerSay((string)llGetOwnerKey(\"abc\") + (string)k);\n"
+                                              "    }\n"
+                                              "}\n");
+        ensure("a key given text, a string: " + r.text, has(r, "local DOMAIN = \"MY CHANNEL\""));
+        ensure("text where SLua takes it: " + r.text,
+               has(r, "ll.MessageLinked(LINK_SET, 1, \"hi\", DOMAIN)") && has(r, "ll.MessageLinked(LINK_SET, 2, \"x\", gOwner)") &&
+                   has(r, "send(\"other text\")") && has(r, "ll.MessageLinked(LINK_SET, 0, \"\", to)"));
+        ensure("compared as text: " + r.text, has(r, "if id == DOMAIN then") && has(r, "if id == tostring(gOwner) then"));
+        ensure("a key given the id, text: " + r.text, has(r, "local k = id") && has(r, " .. k)"));
+        ensure("uuid() where only a uuid will do, said: " + r.text, has(r, "ll.GetOwnerKey(uuid(\"abc\"))") && noted(r, "SluaKeyText"));
+        checksClean(r);
+    }
 }

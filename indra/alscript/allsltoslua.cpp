@@ -189,13 +189,6 @@ namespace
         return id->getSymbol() && id->getSymbol()->getSubType() == SYM_BUILTIN && ALLSLTraits::uuidConstant(id->getName());
     }
 
-    // An expression's type as SLua has what it is written as: LSL's, but
-    // a key for those constants.
-    LSLIType slType(LSLExpression* e)
-    {
-        return uuidConstant(e) ? LST_KEY : e->getIType();
-    }
-
     // Every node under one, and it, in the tree's order.
     void walk(LSLASTNode* node, const std::function<void(LSLASTNode*)>& each)
     {
@@ -256,7 +249,10 @@ namespace
         // An assignment or a step inside an expression, which SLua makes a
         // statement: done in a function called on the spot.
         Expr sideEffect(LSLExpression* e);
-        std::string args(LSLASTNode* list, LSLParamList* params);
+        // The arguments, each as its parameter's type -- but those SLua takes
+        // either text or a uuid for (`text`, a bit for each by its place),
+        // as they are.
+        std::string args(LSLASTNode* list, LSLParamList* params, U16 text = 0);
         // What SLua has in a library call's stead, where it means the same;
         // nothing where it has nothing.
         std::optional<Expr> idiom(LSLFunctionExpression* e, const std::string& lsl);
@@ -386,6 +382,23 @@ namespace
         // A name no other in the script has, nor SLua holds.
         std::string freshName(const std::string& base);
 
+        // --- keys that hold text -----------------------------------------------------
+
+        // LSL's keys hold any text; SLua's uuid() stops the script on text
+        // that is no UUID. The event parameters SLua passes as text --
+        // link_message's id -- and the key variables given text that is no
+        // UUID, or such a parameter, or another such, which SLua holds as
+        // strings.
+        void findTextKeys();
+        // An expression's type as SLua has it: LSL's, but a key for the
+        // constants SLua types a uuid, and a string for those above.
+        LSLIType slType(LSLExpression* e) const;
+        // A variable's type as SLua holds it.
+        LSLIType varType(LSLSymbol* var, LSLIType lsl) const
+        {
+            return var && (mTextKeys.contains(var) || mTextParams.contains(var)) ? LST_STRING : lsl;
+        }
+
         // x = x op y, which Luau writes x op= y: the compound operator and
         // what follows it -- for a string, each piece of s = s + a + b, as
         // Luau's .. joins them whichever way round. False for any other.
@@ -462,6 +475,8 @@ namespace
         boost::unordered_flat_map<LSLSymbol*, std::string>              mBuilding;
         // Appends in loops that are noted rather than built.
         boost::unordered_flat_set<LSLASTNode*> mUnbuilt;
+        boost::unordered_flat_set<LSLSymbol*>  mTextParams;
+        boost::unordered_flat_set<LSLSymbol*>  mTextKeys;
     };
 
     void Writer::note(LSLASTNode* at, const std::string& key, const std::string& said)
@@ -689,6 +704,27 @@ namespace
         const LSLIType from = slType(e);
         if (to == LST_KEY && from == LST_STRING)
         {
+            // Text written out that is no UUID, where only a uuid will do --
+            // text is kept as text where SLua takes it (Writer::args,
+            // Writer::varType) -- which uuid() stops the script on.
+            LSLExpression* inner = e;
+            while (inner && inner->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+            {
+                inner = static_cast<LSLParenthesisExpression*>(inner)->getChildExpr();
+            }
+            const bool constant = inner && inner->getNodeSubType() == NODE_CONSTANT_EXPRESSION;
+            if (constant && inner->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
+            {
+                const std::string_view text = static_cast<LSLStringConstant*>(inner->getChild(0))->getValue();
+                if (!text.empty() && !ALLSLTraits::isUuid(text))
+                {
+                    noteOnce(e, "SluaKeyText", "LSL's keys held any text; SLua's uuid() stops the script on text that is no UUID, as it "
+                                               "would here, where only a uuid will do.");
+                }
+                return { "uuid(" + out.text + ")" };
+            }
+            noteOnce(e, "SluaUuidText", "uuid() stops the script on text that is no UUID, where LSL's keys held any text; touuid() "
+                                        "answers nil instead.");
             return { "uuid(" + out.text + ")" };
         }
         if (to == LST_STRING && from == LST_KEY)
@@ -698,14 +734,20 @@ namespace
         return out;
     }
 
-    std::string Writer::args(LSLASTNode* list, LSLParamList* params)
+    std::string Writer::args(LSLASTNode* list, LSLParamList* params, U16 text)
     {
         std::string out;
         LSLASTNode* param = params ? params->getChild(0) : nullptr;
-        for (LSLASTNode* arg = isNull(list) ? nullptr : list->getChild(0); arg; arg = arg->getNext())
+        int         at    = 0;
+        for (LSLASTNode* arg = isNull(list) ? nullptr : list->getChild(0); arg; arg = arg->getNext(), ++at)
         {
-            const LSLIType to = param ? param->getIType() : static_cast<LSLExpression*>(arg)->getIType();
-            out += (out.empty() ? "" : ", ") + coerced(static_cast<LSLExpression*>(arg), to).text;
+            auto*    given = static_cast<LSLExpression*>(arg);
+            LSLIType to    = param ? varType(static_cast<LSLIdentifier*>(param)->getSymbol(), param->getIType()) : given->getIType();
+            if ((text & (1 << at)) && (slType(given) == LST_STRING || slType(given) == LST_KEY))
+            {
+                to = slType(given);
+            }
+            out += (out.empty() ? "" : ", ") + coerced(given, to).text;
             param = param ? param->getNext() : nullptr;
         }
         return out;
@@ -1009,7 +1051,8 @@ namespace
             {
                 noteOnce(e, "SluaUse" + lsl, "SLua would use " + std::string(trait->sluaUse) + " for " + lsl + ".");
             }
-            const std::string called = (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params);
+            const std::string called =
+                (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params, trait ? trait->sluaTextArgs : 0);
             return { "ll." + bare + "(" + called + ")", PRIMARY, (slua & ALLSLTraits::SluaBool) != 0 };
         }
         // An index SLua's ll counts from 1, or nil for none, read as LSL's:
@@ -1393,7 +1436,7 @@ namespace
     void Writer::assign(LSLLValueExpression* target, LSLOperator op, LSLExpression* rhs)
     {
         LSLIdentifier* id      = target->getIdentifier();
-        const LSLIType type    = id->getSymbol() ? id->getSymbol()->getIType() : target->getIType();
+        const LSLIType type    = varType(id->getSymbol(), id->getSymbol() ? id->getSymbol()->getIType() : target->getIType());
         const std::string name = nameOf(id);
         LSLASTNode*    member  = target->getMember();
         // What the new value is, from the old one where the operator makes
@@ -1673,7 +1716,7 @@ namespace
             {
                 auto*             d    = static_cast<LSLDeclaration*>(s);
                 LSLIdentifier*    id   = d->getIdentifier();
-                const LSLIType    type = id->getIType();
+                const LSLIType    type = varType(id->getSymbol(), id->getIType());
                 LSLExpression*    init = d->getInitializer();
                 const std::string name = nameOf(id);
                 // A counter that only numeric fors use, each with its own.
@@ -3079,6 +3122,129 @@ namespace
         return name;
     }
 
+    // --- keys that hold text --------------------------------------------------------
+
+    LSLIType Writer::slType(LSLExpression* e) const
+    {
+        if (uuidConstant(e))
+        {
+            return LST_KEY;
+        }
+        LSLExpression* inner = e;
+        while (inner && inner->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            inner = static_cast<LSLParenthesisExpression*>(inner)->getChildExpr();
+        }
+        if (inner && inner->getNodeSubType() == NODE_LVALUE_EXPRESSION && isNull(static_cast<LSLLValueExpression*>(inner)->getMember()))
+        {
+            return varType(static_cast<LSLLValueExpression*>(inner)->getIdentifier()->getSymbol(), e->getIType());
+        }
+        return e->getIType();
+    }
+
+    void Writer::findTextKeys()
+    {
+        walk(mScript, [&](LSLASTNode* node) {
+            if (node->getNodeType() != NODE_EVENT_HANDLER)
+            {
+                return;
+            }
+            auto*             handler = static_cast<LSLEventHandler*>(node);
+            const std::string event   = handler->getIdentifier()->getName();
+            int               at      = 0;
+            for (LSLASTNode* param = handler->getArguments() ? handler->getArguments()->getChild(0) : nullptr; !isNull(param);
+                 param = param->getNext(), ++at)
+            {
+                if (ALLSLTraits::eventTextParam(event, at))
+                {
+                    mTextParams.insert(static_cast<LSLIdentifier*>(param)->getSymbol());
+                }
+            }
+        });
+        // What each key variable is given; each that is given text, until
+        // none more is.
+        std::vector<std::pair<LSLSymbol*, LSLExpression*>> given;
+        const auto key = [&](LSLIdentifier* id, LSLExpression* init) {
+            if (id->getIType() == LST_KEY && id->getSymbol() && !isNull(init))
+            {
+                given.emplace_back(id->getSymbol(), init);
+            }
+        };
+        // A function of the script's own, by its symbol: its parameters.
+        boost::unordered_flat_map<LSLSymbol*, LSLASTNode*> parameters;
+        walk(mScript, [&](LSLASTNode* node) {
+            auto* f = static_cast<LSLGlobalFunction*>(node);
+            if (node->getNodeType() == NODE_GLOBAL_FUNCTION && f->getArguments())
+            {
+                parameters.emplace(f->getSymbol(), f->getArguments());
+            }
+        });
+        walk(mScript, [&](LSLASTNode* node) {
+            if (node->getNodeType() == NODE_GLOBAL_VARIABLE)
+            {
+                key(static_cast<LSLGlobalVariable*>(node)->getIdentifier(), static_cast<LSLGlobalVariable*>(node)->getInitializer());
+            }
+            else if (node->getNodeSubType() == NODE_DECLARATION)
+            {
+                key(static_cast<LSLDeclaration*>(node)->getIdentifier(), static_cast<LSLDeclaration*>(node)->getInitializer());
+            }
+            else if (node->getNodeSubType() == NODE_BINARY_EXPRESSION && static_cast<LSLExpression*>(node)->getOperation() == OP_ASSIGN)
+            {
+                auto* b      = static_cast<LSLBinaryExpression*>(node);
+                auto* target = static_cast<LSLLValueExpression*>(b->getLHS());
+                if (b->getLHS()->getNodeSubType() == NODE_LVALUE_EXPRESSION && isNull(target->getMember()))
+                {
+                    key(target->getIdentifier(), b->getRHS());
+                }
+            }
+            else if (node->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+            {
+                // Each argument to a parameter of the script's own.
+                auto*      call  = static_cast<LSLFunctionExpression*>(node);
+                const auto found = parameters.find(call->getIdentifier()->getSymbol());
+                if (found == parameters.end() || isNull(call->getArguments()))
+                {
+                    return;
+                }
+                LSLASTNode* param = found->second->getChild(0);
+                for (LSLASTNode* arg = call->getArguments()->getChild(0); arg && !isNull(param);
+                     arg = arg->getNext(), param = param->getNext())
+                {
+                    key(static_cast<LSLIdentifier*>(param), static_cast<LSLExpression*>(arg));
+                }
+            }
+        });
+        const auto text = [&](LSLExpression* e) {
+            while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+            {
+                e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
+            }
+            if (e && e->getNodeSubType() == NODE_CONSTANT_EXPRESSION && e->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
+            {
+                const std::string_view value = static_cast<LSLStringConstant*>(e->getChild(0))->getValue();
+                return !value.empty() && !ALLSLTraits::isUuid(value);
+            }
+            if (e && e->getNodeSubType() == NODE_LVALUE_EXPRESSION && isNull(static_cast<LSLLValueExpression*>(e)->getMember()))
+            {
+                LSLSymbol* var = static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol();
+                return mTextParams.contains(var) || mTextKeys.contains(var);
+            }
+            return false;
+        };
+        for (bool changed = true; changed;)
+        {
+            changed = false;
+            for (const auto& [var, e] : given)
+            {
+                if (!mTextKeys.contains(var) && text(e))
+                {
+                    mTextKeys.insert(var);
+                    changed = true;
+                }
+            }
+        }
+    }
+
     // --- the script -------------------------------------------------------------------
 
     void Writer::globals()
@@ -3099,8 +3265,8 @@ namespace
             }
             else
             {
-                line("local " + nameOf(id) + typed(id->getIType()) + " = " +
-                     (isNull(init) ? defaultOf(id->getIType()) : coerced(init, id->getIType()).text));
+                const LSLIType type = varType(id->getSymbol(), id->getIType());
+                line("local " + nameOf(id) + typed(type) + " = " + (isNull(init) ? defaultOf(type) : coerced(init, type).text));
             }
             any = true;
         }
@@ -3154,7 +3320,8 @@ namespace
             std::string params;
             for (LSLASTNode* p = f->getArguments() ? f->getArguments()->getChild(0) : nullptr; p; p = p->getNext())
             {
-                params += (params.empty() ? "" : ", ") + nameOf(static_cast<LSLIdentifier*>(p)) + typed(p->getIType());
+                params += (params.empty() ? "" : ", ") + nameOf(static_cast<LSLIdentifier*>(p)) +
+                          typed(varType(static_cast<LSLIdentifier*>(p)->getSymbol(), p->getIType()));
             }
             mFunction = f->getSymbol();
             line(std::string(forward ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +
@@ -3448,6 +3615,7 @@ end
             }
         });
         forgetMemoryHacks();
+        findTextKeys();
         findBooleans();
         findOwnedLists();
         findStringBuilds();
