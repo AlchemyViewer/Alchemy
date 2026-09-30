@@ -782,6 +782,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LSLSlSleepingTexture">[1] makes the script sleep [2] s each call; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
 	<string name="LSLSlSleepingTextureOften">[1] makes the script sleep [2] s each time it runs here, in a loop or the timer event; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
 	<string name="LSLSlMergeablePrimParams">These [1] calls to [2] could be one, with all their rules, and PRIM_LINK_TARGET where the link changes</string>
+	<string name="LSLSlCostlyListen">This listens on channel 0 for anyone, so the script wakes for every line of chat nearby. A name, a key, or another channel hears less</string>
+	<string name="LSLSlFastTimer">A timer every [1] s, under a tenth of a second, fires every few of the region's 45 frames a second, and the time it takes is time other scripts there wait for</string>
+	<string name="LSLSlFastSensor">A sensor sweeping every [1] s, under a second, searches round the object that often: once a second or less is plenty for most</string>
 	<string name="LuauLintUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauLintDeprecatedGlobal">Global '[1]' is deprecated, use '[2]' instead</string>
 	<string name="LuauLintDeprecatedGlobalPlain">Global '[1]' is deprecated</string>
@@ -903,6 +906,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlSleepingTexture">[1] makes the script sleep [2] s each call; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
 	<string name="LuauLintSlSleepingTextureOften">[1] makes the script sleep [2] s each time it runs here, in a loop or a timer; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
 	<string name="LuauLintSlMergeablePrimParams">These [1] calls to [2] could be one, with all their rules, and PRIM_LINK_TARGET where the link changes</string>
+	<string name="LuauLintSlCostlyListen">This listens on channel 0 for anyone, so the script wakes for every line of chat nearby. A name, a key, or another channel hears less</string>
+	<string name="LuauLintSlFastTimer">A timer every [1] s, under a tenth of a second, fires every few of the region's 45 frames a second, and the time it takes is time other scripts there wait for</string>
+	<string name="LuauLintSlFastSensor">A sensor sweeping every [1] s, under a second, searches round the object that often: once a second or less is plenty for most</string>
 	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
 	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauUnknownType">Unknown type '[1]'</string>

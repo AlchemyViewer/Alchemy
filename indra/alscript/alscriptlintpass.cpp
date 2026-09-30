@@ -94,6 +94,12 @@ namespace
         { "SlSleepingCall", Rule::Both, Severity::Note, true, true, nullptr },
         // Prim-params calls one after another, which one call could do.
         { "SlMergeablePrimParams", Rule::Both, Severity::Note, true, true, nullptr },
+        // llListen(0, "", NULL_KEY, ""): every line of chat nearby.
+        { "SlCostlyListen", Rule::Both, Severity::Note, true, false, nullptr },
+        // A timer under 0.1 s.
+        { "SlFastTimer", Rule::Both, Severity::Note, true, false, nullptr },
+        // A sensor repeat under 1 s.
+        { "SlFastSensor", Rule::Both, Severity::Note, true, false, nullptr },
     };
 
     const ALScriptLintPass::PrimParams PRIM_PARAMS[] = {
@@ -822,6 +828,7 @@ namespace
             {
                 sleepingCall(node);
             }
+            costlyEvents(node);
             // What math's functions are given is a number.
             const auto* callee = node->func->as<Luau::AstExprIndexName>();
             const auto* lib    = callee ? callee->expr->as<Luau::AstExprGlobal>() : nullptr;
@@ -2187,6 +2194,63 @@ namespace
                 return;
             }
             offer(said, fast + "(" + *written + ")", std::move(edits), false);
+        }
+
+        // --- SlCostlyListen, SlFastTimer, SlFastSensor ------------------------
+
+        // A number as written, or PUBLIC_CHANNEL.
+        static std::optional<double> numberOf(Luau::AstExpr* e)
+        {
+            const auto* global = unbracketed(e)->as<Luau::AstExprGlobal>();
+            return global && std::string_view(global->name.value) == "PUBLIC_CHANNEL" ? std::optional<double>(0) : literal(e);
+        }
+
+        // "" as written, or NULL_KEY.
+        static bool nothing(Luau::AstExpr* e)
+        {
+            e                  = unbracketed(e);
+            const auto* text   = e->as<Luau::AstExprConstantString>();
+            const auto* global = e->as<Luau::AstExprGlobal>();
+            return (text && text->value.size == 0) || (global && std::string_view(global->name.value) == "NULL_KEY");
+        }
+
+        // What the script sets going that costs the region more than it
+        // needs: a listen that hears all chat, a timer under a tenth of a
+        // second, a sensor sweeping more than once a second. Notes: each
+        // may be what the script is for.
+        void costlyEvents(Luau::AstExprCall* node)
+        {
+            const auto*            callee = node->func->as<Luau::AstExprIndexName>();
+            const auto*            lib    = callee ? callee->expr->as<Luau::AstExprGlobal>() : nullptr;
+            const std::string_view from   = lib ? lib->name.value : "";
+            const std::string_view name   = callee ? callee->index.value : "";
+            const bool             ll     = callee && callee->op == '.' && (from == "ll" || from == "llcompat");
+            const auto             arg    = [&](size_t i) { return i < node->args.size ? node->args.data[i] : nullptr; };
+            if (on("SlCostlyListen") && ll && name == "Listen" && node->args.size == 4 && numberOf(arg(0)) == 0.0 && nothing(arg(1)) &&
+                nothing(arg(2)))
+            {
+                problem(node->location, "LuauLintSlCostlyListen",
+                        "This listens on channel 0 for anyone, so the script wakes for every line of chat nearby. A name, a key, or "
+                        "another channel hears less",
+                        {}, "SlCostlyListen");
+            }
+            const bool timer = (ll && name == "SetTimerEvent") || (callee && callee->op == ':' && from == "LLTimers" && name == "every");
+            const std::optional<double> every = timer && arg(0) ? literal(arg(0)) : std::nullopt;
+            if (on("SlFastTimer") && every && *every > 0 && *every < 0.1)
+            {
+                problem(node->location, "LuauLintSlFastTimer",
+                        "A timer every [1] s, under a tenth of a second, fires every few of the region's 45 frames a second, and the "
+                        "time it takes is time other scripts there wait for",
+                        { text(arg(0)->location) }, "SlFastTimer");
+            }
+            const std::optional<double> rate = ll && name == "SensorRepeat" && arg(5) ? literal(arg(5)) : std::nullopt;
+            if (on("SlFastSensor") && rate && *rate > 0 && *rate < 1)
+            {
+                problem(node->location, "LuauLintSlFastSensor",
+                        "A sensor sweeping every [1] s, under a second, searches round the object that often: once a second or less "
+                        "is plenty for most",
+                        { text(arg(5)->location) }, "SlFastSensor");
+            }
         }
 
         // What a condition asks the truth of: itself, or each side of an

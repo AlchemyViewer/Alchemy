@@ -462,6 +462,73 @@ namespace
         });
     }
 
+    // SlCostlyListen, SlFastTimer, SlFastSensor: what the script sets going
+    // that costs the region more than it needs -- a listen that hears all
+    // chat, a timer under a tenth of a second, a sensor sweeping more than
+    // once a second. Notes: each may be what the script is for.
+    void costlyEvents(LSLScript* script, ALScriptProblems& out)
+    {
+        const auto number = [](LSLASTNode* node) -> std::optional<double> {
+            LSLConstant* cv = isNull(node) ? nullptr : node->getConstantValue();
+            if (cv && cv->getIType() == LST_INTEGER)
+            {
+                return static_cast<LSLIntegerConstant*>(cv)->getValue();
+            }
+            if (cv && cv->getIType() == LST_FLOATINGPOINT)
+            {
+                return static_cast<LSLFloatConstant*>(cv)->getValue();
+            }
+            return std::nullopt;
+        };
+        // "", or NULL_KEY.
+        const auto nothing = [](LSLASTNode* node) {
+            LSLConstant* cv = isNull(node) ? nullptr : node->getConstantValue();
+            if (!cv || (cv->getIType() != LST_STRING && cv->getIType() != LST_KEY))
+            {
+                return false;
+            }
+            const std::string_view value = static_cast<LSLStringConstant*>(cv)->getValue();
+            return value.empty() || value == "00000000-0000-0000-0000-000000000000";
+        };
+        walk(script, [&](LSLASTNode* node) {
+            if (node->getNodeSubType() != NODE_FUNCTION_EXPRESSION)
+            {
+                return;
+            }
+            auto*                  call   = static_cast<LSLFunctionExpression*>(node);
+            LSLSymbol*             symbol = call->getIdentifier()->getSymbol();
+            const std::string_view name   = symbol && symbol->getSubType() == SYM_BUILTIN ? symbol->getName() : "";
+            std::vector<LSLASTNode*> args;
+            for (LSLASTNode* arg = call->getArguments() ? call->getArguments()->getChild(0) : nullptr; arg; arg = arg->getNext())
+            {
+                args.push_back(arg);
+            }
+            if (name == "llListen" && args.size() == 4 && number(args[0]) == 0.0 && nothing(args[1]) && nothing(args[2]))
+            {
+                problem(node, "LSLSlCostlyListen",
+                        "This listens on channel 0 for anyone, so the script wakes for every line of chat nearby. A name, a key, or "
+                        "another channel hears less",
+                        {}, "SlCostlyListen", out);
+            }
+            const std::optional<double> every = name == "llSetTimerEvent" && args.size() == 1 ? number(args[0]) : std::nullopt;
+            if (every && *every > 0 && *every < 0.1)
+            {
+                problem(node, "LSLSlFastTimer",
+                        "A timer every [1] s, under a tenth of a second, fires every few of the region's 45 frames a second, and the "
+                        "time it takes is time other scripts there wait for",
+                        { llformat("%g", *every) }, "SlFastTimer", out);
+            }
+            const std::optional<double> rate = name == "llSensorRepeat" && args.size() == 6 ? number(args[5]) : std::nullopt;
+            if (rate && *rate > 0 && *rate < 1)
+            {
+                problem(node, "LSLSlFastSensor",
+                        "A sensor sweeping every [1] s, under a second, searches round the object that often: once a second or less "
+                        "is plenty for most",
+                        { llformat("%g", *rate) }, "SlFastSensor", out);
+            }
+        });
+    }
+
     // SlLoopInvariantCall: a call in a loop's check to a function the
     // definitions call pure, whose arguments nothing in the loop changes --
     // llGetListLength(l) where the loop leaves l be -- worked out again on
@@ -542,4 +609,5 @@ void ALLSLLintPass::check(std::string_view source, LSLScript* script, ALScriptPr
     const Text text(source);
     sleepingCalls(text, script, out);
     mergeablePrimParams(text, script, out);
+    costlyEvents(script, out);
 }

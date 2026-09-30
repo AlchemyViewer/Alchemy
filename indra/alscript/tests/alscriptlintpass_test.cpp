@@ -661,4 +661,47 @@ namespace tut
                                        false, false),
                       std::string("default { state_entry() { llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.5, PRIM_COLOR, ALL_SIDES, <1, 0, 0>, 1.0]); } }\n"));
     }
+
+    template<> template<>
+    void object::test<17>()
+    {
+        set_test_name("SlCostlyListen, SlFastTimer, SlFastSensor in both languages: notes, with no fix; not a listen narrowed, a timer "
+                      "stopped or of a tenth, nor a sensor once a second");
+        ensure("definitions: " + error, loaded);
+        ensure("builtins: " + error, lslLoaded);
+        const auto three = [&](const std::string& script, bool lua) {
+            return found(script, "SlCostlyListen", ALScriptProblem::Severity::Note, lua) +
+                   found(script, "SlFastTimer", ALScriptProblem::Severity::Note, lua) +
+                   found(script, "SlFastSensor", ALScriptProblem::Severity::Note, lua);
+        };
+        ensure_equals("SLua", three("ll.Listen(0, \"\", NULL_KEY, \"\")\n"
+                                    "ll.Listen(PUBLIC_CHANNEL, \"\", \"\", \"hello\")\n"
+                                    "ll.Listen(0, \"Bob\", NULL_KEY, \"\")\n"
+                                    "ll.Listen(7, \"\", NULL_KEY, \"\")\n"
+                                    "LLTimers:every(0.05, function() end)\n"
+                                    "llcompat.SetTimerEvent(0.02)\n"
+                                    "LLTimers:every(0.1, function() end)\n"
+                                    "llcompat.SetTimerEvent(0)\n"
+                                    "ll.SensorRepeat(\"\", NULL_KEY, AGENT, 10, PI, 0.5)\n"
+                                    "ll.SensorRepeat(\"\", NULL_KEY, AGENT, 10, PI, 1)\n",
+                                    true),
+                      std::string("0 LuauLintSlCostlyListen\n"
+                                  "1 LuauLintSlCostlyListen\n"
+                                  "4 LuauLintSlFastTimer|0.05\n"
+                                  "5 LuauLintSlFastTimer|0.02\n"
+                                  "8 LuauLintSlFastSensor|0.5\n"));
+        ensure_equals("LSL", three("default {\n"
+                                   "    state_entry() {\n"
+                                   "        llListen(PUBLIC_CHANNEL, \"\", NULL_KEY, \"\");\n"
+                                   "        llListen(0, \"\", llGetOwner(), \"\");\n"
+                                   "        llSetTimerEvent(0.05);\n"
+                                   "        llSetTimerEvent(0.0);\n"
+                                   "        llSensorRepeat(\"\", NULL_KEY, AGENT, 10.0, PI, 0.25);\n"
+                                   "    }\n"
+                                   "}\n",
+                                   false),
+                      std::string("2 LSLSlCostlyListen\n"
+                                  "4 LSLSlFastTimer|0.05\n"
+                                  "6 LSLSlFastSensor|0.25\n"));
+    }
 }
