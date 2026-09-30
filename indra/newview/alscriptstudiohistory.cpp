@@ -43,6 +43,37 @@ std::string ALScriptStudioHistory::keyOf(const Doc& doc)
     return doc.file.empty() && doc.ref.item.notNull() ? ALRecoveryStore::keyOf(doc.ref.object, doc.ref.item, std::string()) : std::string();
 }
 
+// static
+std::vector<ALQuickOpen::Candidate> ALScriptStudioHistory::candidatesOf(const std::vector<ALSavedText>& saves, const LLUUID& current,
+                                                                       const words_t&                                           words,
+                                                                       const std::function<std::string(const std::vector<std::string>&)>& listed)
+{
+    std::vector<ALQuickOpen::Candidate> candidates;
+    for (size_t i = 0; i < saves.size(); ++i)
+    {
+        const ALSavedText&       save = saves[i];
+        std::vector<std::string> said = { words("HistoryBytes", static_cast<S32>(save.bytes)) };
+        // Against the save before it, which is the next one listed.
+        if (i + 1 < saves.size())
+        {
+            const S64 moved = static_cast<S64>(save.bytes) - static_cast<S64>(saves[i + 1].bytes);
+            said.push_back(moved > 0   ? words("HistoryLonger", static_cast<S32>(moved))
+                           : moved < 0 ? words("HistoryShorter", static_cast<S32>(-moved))
+                                       : words("HistorySameLength", std::nullopt));
+        }
+        if (save.asset.notNull() && save.asset == current)
+        {
+            said.push_back(words("HistoryCurrent", std::nullopt));
+        }
+        ALQuickOpen::Candidate one;
+        one.label  = ALRecoveryEntry::sayWhen(save.when);
+        one.detail = listed(said);
+        one.value  = std::to_string(i);
+        candidates.push_back(std::move(one));
+    }
+    return candidates;
+}
+
 void ALScriptStudioHistory::show(Doc& doc)
 {
     const std::string              key     = keyOf(doc);
@@ -59,29 +90,10 @@ void ALScriptStudioHistory::show(Doc& doc)
         mServices.setStatus(mServices.words("HistoryNone", args));
         return;
     }
-    std::vector<ALQuickOpen::Candidate> candidates;
-    for (size_t i = 0; i < saves.size(); ++i)
-    {
-        const ALSavedText&       save = saves[i];
-        std::vector<std::string> said = { mServices.counted("HistoryBytes", static_cast<S32>(save.bytes)) };
-        // Against the save before it, which is the next one listed.
-        if (i + 1 < saves.size())
-        {
-            const S64 moved = static_cast<S64>(save.bytes) - static_cast<S64>(saves[i + 1].bytes);
-            said.push_back(moved > 0   ? mServices.counted("HistoryLonger", static_cast<S32>(moved))
-                           : moved < 0 ? mServices.counted("HistoryShorter", static_cast<S32>(-moved))
-                                       : mServices.words("HistorySameLength"));
-        }
-        if (save.asset.notNull() && save.asset == doc.assetId)
-        {
-            said.push_back(mServices.words("HistoryCurrent"));
-        }
-        ALQuickOpen::Candidate one;
-        one.label  = ALRecoveryEntry::sayWhen(save.when);
-        one.detail = mServices.listed(said);
-        one.value  = std::to_string(i);
-        candidates.push_back(std::move(one));
-    }
+    std::vector<ALQuickOpen::Candidate> candidates = candidatesOf(
+        saves, doc.assetId,
+        [this](const char* name, std::optional<S32> count) { return count ? mServices.counted(name, *count) : mServices.words(name); },
+        [this](const std::vector<std::string>& items) { return mServices.listed(items); });
     const std::weak_ptr<bool> alive = mAlive;
     const std::string         id    = doc.id;
     mWindow.pick(

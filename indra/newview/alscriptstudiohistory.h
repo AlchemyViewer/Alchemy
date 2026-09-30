@@ -30,6 +30,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -70,6 +71,15 @@ public:
     // The key a tab's item's saves are kept under; none for a file on
     // disk, which is saved there rather than sent.
     static std::string keyOf(const Doc& doc);
+    // What a list of saves, newest first, says of each: when, how long,
+    // how much longer or shorter than the one before, and which is what is
+    // saved now -- in the words of whichever window lists them, the notecard
+    // window's as well as the studio's: a word by its name, or with a count
+    // (HistoryBytes, HistoryLonger, HistoryShorter) in the form the count
+    // takes. Each one's value is its place in the list.
+    typedef std::function<std::string(const char* name, std::optional<S32> count)> words_t;
+    static std::vector<ALQuickOpen::Candidate> candidatesOf(const std::vector<ALSavedText>& saves, const LLUUID& current, const words_t& words,
+                                                            const std::function<std::string(const std::vector<std::string>&)>& listed);
     // The saves of a tab's item offered to compare with it; said where
     // there are none.
     void show(Doc& doc);
