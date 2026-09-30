@@ -320,6 +320,7 @@ bool    LLPipeline::sUseFarClip = true;
 bool    LLPipeline::sShadowRender = false;
 bool    LLPipeline::sRenderGlow = false;
 bool    LLPipeline::sImpostorRender = false;
+bool    LLPipeline::sCutoutRender = false;
 bool    LLPipeline::sUnderWaterRender = false;
 bool    LLPipeline::sTextureBindTest = false;
 bool    LLPipeline::sRenderAttachedLights = true;
@@ -338,6 +339,19 @@ bool    LLPipeline::sUseDepthTexture = false;
 bool    LLPipeline::sScopeCapture = false;
 bool    LLPipeline::sGradeBypass = false;
 U32     LLPipeline::sGradeBypassMask = 0;
+
+// static
+bool LLPipeline::cutoutMainPass()
+{
+    return !sShadowRender && !sImpostorRender && !sRenderingHUDs && !gCubeSnapshot
+        && LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_WORLD;
+}
+
+// static
+bool LLPipeline::cleanPlate()
+{
+    return gSnapshotNoPost || sCutoutRender;
+}
 
 // EventHost API LLPipeline listener.
 static LLPipelineListener sPipelineListener;
@@ -8092,7 +8106,7 @@ void LLPipeline::generateLensFlareState(LLRenderTarget* src)
     static LLCachedControl<F32> lens_flare_occlusion_scale(gSavedSettings, "RenderLensFlareOcclusionScale", 1.f);
     static LLCachedControl<F32> lens_flare_fade_time(gSavedSettings, "RenderLensFlareFadeTime", 0.35f);
 
-    if (gSnapshotNoPost)
+    if (cleanPlate())
     {
         // A clean-plate render: colorCorrect zeroes the strength for this
         // frame, so hold the history rather than clear it, or the flare would
@@ -8362,7 +8376,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 // quadrant of mWaterDis, whose completeness says nothing about
                 // what is in it.
                 const bool streaks_live = mRT->crossFilterReady && mWaterDis.isComplete();
-                const F32  streaks      = (streaks_live && !gSnapshotNoPost)
+                const F32  streaks      = (streaks_live && !cleanPlate())
                                         ? llclamp(streak_strength_setting(), 0.f, CROSS_FILTER_MAX_STRENGTH) * strength_gate
                                         : 0.f;
                 shader->uniform1f(LLShaderMgr::CROSS_STRENGTH, streaks);
@@ -8390,7 +8404,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // aberration and the lens flare are applied *inside* this program, in
         // every variant including the no-post ones, so their strengths have to
         // be silenced here or a clean plate still carries both.
-        const bool clean_plate = gSnapshotNoPost;
+        const bool clean_plate = cleanPlate();
         // The material preview renders through here too, inside the auxiliary
         // target pack. The flare state was measured for the world frame, so
         // only the main pack gets the flare; aberration is left as it was.
@@ -10319,7 +10333,7 @@ void LLPipeline::renderFinalize()
         // Dither is not in the list on purpose. It is a quantisation aid rather
         // than a look, and an 8-bit PNG wants it whether or not the rest is
         // wanted.
-        const bool clean_plate = gSnapshotNoPost;
+        const bool clean_plate = cleanPlate();
 
         // Lens distortion
         //
@@ -12488,24 +12502,6 @@ LLRenderTarget* LLPipeline::getSpotShadowTarget(U32 i)
     return &mSpotShadow[i];
 }
 
-// helper class for disabling occlusion culling for the current stack frame
-class LLDisableOcclusionCulling
-{
-public:
-    S32 mUseOcclusion;
-
-    LLDisableOcclusionCulling()
-    {
-        mUseOcclusion = LLPipeline::sUseOcclusion;
-        LLPipeline::sUseOcclusion = 0;
-    }
-
-    ~LLDisableOcclusionCulling()
-    {
-        LLPipeline::sUseOcclusion = mUseOcclusion;
-    }
-};
-
 // Re-bucket a shared sun-shadow cull (produced by a single union octree walk) down to one
 // cascade: copy the union's visible/drawable groups whose object bounds intersect this
 // cascade's frustum into `dst` (the same AABBInFrustumObjectBounds test the per-cascade
@@ -13575,6 +13571,53 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
     }
 }
 
+void LLPipeline::drawFarPlaneQuad(U32 depth_func, const LLColor4* color)
+{
+    gGL.getTextureSlot(0)->unbind();
+
+    // Both directions auto-translate under reverse-Z (via LLGLDepthTest::remap),
+    // and the quad sits at the reverse-Z far plane (~0) instead of ~1.
+    LLGLDepthTest depth(GL_TRUE, GL_FALSE, depth_func);
+
+    gGL.flush();
+
+    gGL.pushMatrix();
+    gGL.loadIdentity();
+    gGL.matrixMode(LLRender::MM_PROJECTION);
+    gGL.pushMatrix();
+    gGL.loadIdentity();
+
+    // Mirror the forward WINDOW depth (0.99999 ndc -> 0.999995 window -> 0.000005 under ZO),
+    // consistent with the sunDisc/moon far pins.
+    const F32 clip_plane = LLRender::sReverseZ ? 0.000005f : 0.99999f;
+
+    gDebugProgram.bind();
+
+    if (color)
+    {
+        gGL.diffuseColor4fv(color->mV);
+    }
+
+    gGL.begin(LLRender::TRIANGLES);
+    {
+        gGL.vertex3f(-1.f, -1.f, clip_plane);
+        gGL.vertex3f(1.f, -1.f, clip_plane);
+        gGL.vertex3f(1.f, 1.f, clip_plane);
+
+        gGL.vertex3f(-1.f, -1.f, clip_plane);
+        gGL.vertex3f(1.f, 1.f, clip_plane);
+        gGL.vertex3f(-1.f, 1.f, clip_plane);
+    }
+    gGL.end();
+    gGL.flush();
+
+    gDebugProgram.unbind();
+
+    gGL.popMatrix();
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    gGL.popMatrix();
+}
+
 void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool for_profile, LLViewerObject* specific_attachment)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -13934,56 +13977,21 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
             // caller, so every morph preview after the first in a frame lost its background.
             LLGLSColorMask mask(visually_muted || too_complex, true);
 
-            gGL.getTextureSlot(0)->unbind();
-
-            // GL_GREATER auto-translates to LESS under reverse-Z (via LLGLDepthTest::remap), and
-            // the background fill sits at the reverse-Z far plane (~0) instead of ~1.
-            LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
-
-            gGL.flush();
-
-            gGL.pushMatrix();
-            gGL.loadIdentity();
-            gGL.matrixMode(LLRender::MM_PROJECTION);
-            gGL.pushMatrix();
-            gGL.loadIdentity();
-
-            // Mirror the forward WINDOW depth (0.99999 ndc -> 0.999995 window -> 0.000005 under ZO),
-            // consistent with the sunDisc/moon far pins.
-            const F32 clip_plane = LLRender::sReverseZ ? 0.000005f : 0.99999f;
-
-            gDebugProgram.bind();
-
+            LLColor4 fill_color;
+            const LLColor4* fill = nullptr;
             if (visually_muted)
             {   // Visually muted avatar
-                LLColor4 muted_color(avatar->getMutedAVColor());
-                LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set solid color " << muted_color << LL_ENDL;
-                gGL.diffuseColor4fv( muted_color.mV );
+                fill_color = LLColor4(avatar->getMutedAVColor());
+                fill = &fill_color;
+                LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set solid color " << fill_color << LL_ENDL;
             }
             else if (!preview_avatar)
             { //grey muted avatar
+                fill = &LLColor4::pink;
                 LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set grey" << LL_ENDL;
-                gGL.diffuseColor4fv(LLColor4::pink.mV );
             }
 
-            gGL.begin(LLRender::TRIANGLES);
-            {
-                gGL.vertex3f(-1.f, -1.f, clip_plane);
-                gGL.vertex3f(1.f, -1.f, clip_plane);
-                gGL.vertex3f(1.f, 1.f, clip_plane);
-
-                gGL.vertex3f(-1.f, -1.f, clip_plane);
-                gGL.vertex3f(1.f, 1.f, clip_plane);
-                gGL.vertex3f(-1.f, 1.f, clip_plane);
-            }
-            gGL.end();
-            gGL.flush();
-
-            gDebugProgram.unbind();
-
-            gGL.popMatrix();
-            gGL.matrixMode(LLRender::MM_MODELVIEW);
-            gGL.popMatrix();
+            drawFarPlaneQuad(GL_GREATER, fill);
         }
     };
 

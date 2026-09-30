@@ -140,6 +140,13 @@ public:
     //  specific_attachment - specific attachment to profile, or nullptr to profile entire avatar
     void generateImpostor(LLVOAvatar* avatar, bool preview_avatar = false, bool for_profile = false, LLViewerObject* specific_attachment = nullptr);
 
+    // A full-screen quad at the far plane, depth-tested against the bound
+    // target's depth and never writing it: GL_GREATER reaches every texel that
+    // geometry covers, GL_LEQUAL every texel that nothing does. Drawn with
+    // gDebugProgram in `color`, or in the current diffuse colour where it is
+    // null. Blend and colour mask are the caller's to set.
+    void drawFarPlaneQuad(U32 depth_func, const LLColor4* color = nullptr);
+
     void bindScreenToTexture();
     void renderFinalize();
     void copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst);
@@ -776,6 +783,8 @@ public:
     static bool             sDynamicLOD;
     static bool             sPickAvatar;
     static bool             sImpostorRender;
+    // Set for the frames of a snapshot cutout (ALRenderIsolation::Scope).
+    static bool             sCutoutRender;
     static bool             sUnderWaterRender;
     static bool             sRenderGlow;
     static bool             sTextureBindTest;
@@ -801,6 +810,23 @@ public:
     /// RenderColorGrade instead would mark the active Look dirty, and a key
     /// released at the wrong moment could save the comparison as the look.
     static bool             sGradeBypass;
+
+    /// The main camera's pass of a cutout frame: the one pass whose view is
+    /// cut down to the cutout's subject. Shadows, impostor bakes, probes and
+    /// HUDs in the same frame still see the whole world, which is what keeps
+    /// the subject lit where it stands.
+    static bool cutoutFiltering() { return sCutoutRender && cutoutMainPass(); }
+
+    /// Whether the alpha channel accumulates coverage rather than glow: in an
+    /// impostor bake, and in a cutout frame's main pass. Blended geometry adds
+    /// its coverage and glow writes are left out.
+    static bool alphaWritesCoverage() { return sImpostorRender || cutoutFiltering(); }
+
+    /// A frame without the lens and print effects: a "No post-processing"
+    /// snapshot, and every cutout frame, since each of those effects reaches
+    /// past the subject's edge into what is to be left empty. Grading is not
+    /// part of this -- only "No post-processing" drops the grade.
+    static bool cleanPlate();
 
     /// One bit per grading group, for comparing a single section against the
     /// rest of the grade rather than against nothing at all.
@@ -1398,6 +1424,27 @@ public:
     static S32 RenderHeroProbeUpdateRate;
     static S32 RenderHeroProbeConservativeUpdateMultiplier;
     static bool RenderAvatarCloth;
+
+private:
+    static bool cutoutMainPass();
+};
+
+// Occlusion culling off for as long as this lives.
+class LLDisableOcclusionCulling
+{
+public:
+    S32 mUseOcclusion;
+
+    LLDisableOcclusionCulling()
+    {
+        mUseOcclusion = LLPipeline::sUseOcclusion;
+        LLPipeline::sUseOcclusion = 0;
+    }
+
+    ~LLDisableOcclusionCulling()
+    {
+        LLPipeline::sUseOcclusion = mUseOcclusion;
+    }
 };
 
 void render_bbox(const LLVector3 &min, const LLVector3 &max);
