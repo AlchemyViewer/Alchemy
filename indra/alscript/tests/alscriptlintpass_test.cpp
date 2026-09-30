@@ -288,4 +288,45 @@ namespace tut
                       std::string("local n = 1\nprint(not (n > 2))\n"));
         unfixed("local n = 1\nprint((n > 2) == 5)\n", "LuauLintSlBooleanNumber");
     }
+
+    template<> template<>
+    void object::test<5>()
+    {
+        set_test_name("SlGlobalAssign: a global made at the top, once, a note; a function made global in a block, a warning; not a name the "
+                      "script is given; each made local, in place or declared before it is first named, and not where _G is");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("count = 0\n"
+                                       "function bump() count += 1; total = count end\n"
+                                       "local function early() return later end\n"
+                                       "later = 5\n"
+                                       "print = print\n"
+                                       "local function outer()\n"
+                                       "    function inner() return 1 end\n"
+                                       "    function shared() return 2 end\n"
+                                       "    return inner()\n"
+                                       "end\n"
+                                       "x, y = 1, 2\n"
+                                       "print(bump, early, outer, shared, total, x, y)\n"
+                                       "count = 1\n",
+                                       "SlGlobalAssign", ALScriptProblem::Severity::Warning);
+        ensure_equals("each", said,
+                      std::string("0 LuauLintSlGlobalAssign|count (another severity)\n"
+                                  "1 LuauLintSlGlobalFunction|bump (another severity)\n"
+                                  "3 LuauLintSlGlobalAssign|later (another severity)\n"
+                                  "6 LuauLintSlGlobalFunctionInScope|inner\n"
+                                  "7 LuauLintSlGlobalFunctionInScope|shared\n"
+                                  "10 LuauLintSlGlobalAssign|x, y (another severity)\n"));
+        ensure_equals("in place", fixed("count = 0\nprint(count)\n", "LuauLintSlGlobalAssign", "Write it local count", false),
+                      std::string("local count = 0\nprint(count)\n"));
+        ensure_equals("declared first", fixed("local function early() return later end\nlater = 5\nprint(early())\n", "LuauLintSlGlobalAssign",
+                                              "Declare local later before it is first named", false),
+                      std::string("local later\nlocal function early() return later end\nlater = 5\nprint(early())\n"));
+        ensure_equals("a function", fixed("function f() return 1 end\nprint(f())\n", "LuauLintSlGlobalFunction", "Write it local function f", false),
+                      std::string("local function f() return 1 end\nprint(f())\n"));
+        ensure_equals("in a block", fixed("local function outer()\n    function inner() return 1 end\n    return inner()\nend\nprint(outer())\n",
+                                          "LuauLintSlGlobalFunctionInScope", "Write it local function inner", false),
+                      std::string("local function outer()\n    local function inner() return 1 end\n    return inner()\nend\nprint(outer())\n"));
+        unfixed("local function outer()\n    function shared() return 2 end\nend\nprint(outer, shared)\n", "LuauLintSlGlobalFunctionInScope");
+        unfixed("print(_G)\ny = 2\n", "LuauLintSlGlobalAssign");
+    }
 }

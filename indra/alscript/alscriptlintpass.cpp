@@ -32,6 +32,7 @@
 #include "Luau/Ast.h"
 #include "Luau/Module.h"
 #include "Luau/ParseResult.h"
+#include "Luau/Scope.h"
 #include "Luau/Type.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -66,6 +67,9 @@ namespace
         { "SlCompatCall", true, Severity::Note, true, true, nullptr },
         // b == 1, where b is a boolean: LSL's truths were numbers.
         { "SlBooleanNumber", true, Severity::Error, true, true, nullptr },
+        // x = 0 or function f() making a global; a function f() in a nested
+        // scope, lute's global_function_in_scope.
+        { "SlGlobalAssign", true, Severity::Warning, true, true, nullptr },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -329,6 +333,22 @@ namespace
         Luau::AstLocal* mLocal;
     };
 
+    // Every place each global is named, in the order of the text, and
+    // whether the script names _G, through which any global may be read.
+    class Globals final : public Luau::AstVisitor
+    {
+    public:
+        boost::unordered_flat_map<std::string, std::vector<Luau::Location>> named;
+        bool                                                                 viaG = false;
+
+        bool visit(Luau::AstExprGlobal* node) override
+        {
+            named[node->name.value].push_back(node->location);
+            viaG = viaG || std::string_view(node->name.value) == "_G";
+            return true;
+        }
+    };
+
     // What the pass asks the check an expression is.
     enum class Kind : U8
     {
@@ -343,15 +363,45 @@ namespace
     class Pass final : public Luau::AstVisitor
     {
     public:
-        Pass(std::string_view source, const Luau::Module* checked, const Locals& locals, uint64_t enabled, uint64_t fatal, bool all_errors,
-             ALScriptProblems& out)
-            : mSource(source), mChecked(checked), mLocals(locals), mEnabled(enabled), mFatal(fatal), mAllErrors(all_errors), mOut(out)
+        Pass(std::string_view source, const Luau::AstStatBlock* root, const Luau::Module* checked, const Locals& locals, const Globals& globals,
+             uint64_t enabled, uint64_t fatal, bool all_errors, ALScriptProblems& out)
+            : mSource(source), mRoot(root), mChecked(checked), mLocals(locals), mGlobals(globals), mEnabled(enabled), mFatal(fatal),
+              mAllErrors(all_errors), mOut(out)
         {
             mStarts.push_back(0);
             for (size_t at = source.find('\n'); at != std::string_view::npos; at = source.find('\n', at + 1))
             {
                 mStarts.push_back(at + 1);
             }
+            // The names the script is given, which are not its to make:
+            // those of every scope above its own.
+            if (checked)
+            {
+                if (const Luau::ScopePtr own = checked->getModuleScope())
+                {
+                    for (Luau::ScopePtr scope = own->parent; scope; scope = scope->parent)
+                    {
+                        for (const auto& [symbol, binding] : scope->bindings)
+                        {
+                            mGiven.insert(symbol.c_str());
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- SlGlobalAssign: a global made where a local would do ------------
+
+        bool visit(Luau::AstStatBlock* node) override
+        {
+            if (on("SlGlobalAssign"))
+            {
+                for (Luau::AstStat* stat : node->body)
+                {
+                    node == mRoot ? topGlobal(stat) : nestedFunction(node, stat);
+                }
+            }
+            return true;
         }
 
         // --- SlNumberTruth: a number asked whether it is true ------------------
@@ -1201,6 +1251,140 @@ namespace
             }
         }
 
+        // A global's name the script makes: not one it is given, nor _G.
+        bool made(const Luau::AstExprGlobal* global) const
+        {
+            return global && !mGiven.contains(global->name.value) && std::string_view(global->name.value) != "_G";
+        }
+
+        const std::vector<Luau::Location>& named(const Luau::AstExprGlobal* global) const
+        {
+            return mGlobals.named.at(global->name.value);
+        }
+
+        // Whether nothing but blanks comes before a place on its line, so
+        // that a line may be put in before it.
+        bool startsLine(const Luau::Position& at) const
+        {
+            if (at.line >= mStarts.size())
+            {
+                return false;
+            }
+            const std::string_view before = mSource.substr(mStarts[at.line], std::min<size_t>(at.column, mSource.size() - mStarts[at.line]));
+            return before.find_first_not_of(" \t") == std::string_view::npos;
+        }
+
+        // x = ..., or function f(), at the top of the script, the first to
+        // make the global: a note, since the script may mean it, fixed as a
+        // local -- in place where it names the global first, else declared
+        // before the statement that names it first, the global's nil being
+        // the local's until it is given something.
+        void topGlobal(Luau::AstStat* stat)
+        {
+            std::vector<const Luau::AstExprGlobal*> made_here;
+            const bool                              function = stat->is<Luau::AstStatFunction>();
+            if (const auto* assign = stat->as<Luau::AstStatAssign>())
+            {
+                for (Luau::AstExpr* var : assign->vars)
+                {
+                    const auto* global = var->as<Luau::AstExprGlobal>();
+                    if (!made(global))
+                    {
+                        return;
+                    }
+                    made_here.push_back(global);
+                }
+            }
+            else if (const auto* named_function = stat->as<Luau::AstStatFunction>())
+            {
+                const auto* global = named_function->name->as<Luau::AstExprGlobal>();
+                if (!made(global))
+                {
+                    return;
+                }
+                made_here.push_back(global);
+            }
+            std::string names;
+            bool        first = true;
+            for (const Luau::AstExprGlobal* global : made_here)
+            {
+                // Said once, where the top of the script first gives it.
+                if (!mTopMade.insert(global->name.value).second)
+                {
+                    return;
+                }
+                first = first && named(global).front().begin == global->location.begin;
+                names += (names.empty() ? "" : ", ") + std::string(global->name.value);
+            }
+            if (names.empty())
+            {
+                return;
+            }
+            ALScriptProblem& said = function ? problem(stat->location, "LuauLintSlGlobalFunction",
+                                                       "function [1] makes a global. local function [1] is quicker for Luau to call", { names },
+                                                       "SlGlobalAssign", Severity::Note)
+                                             : problem(stat->location, "LuauLintSlGlobalAssign",
+                                                       "This makes [1] a global. A local is quicker for Luau to read", { names }, "SlGlobalAssign",
+                                                       Severity::Note);
+            if (mGlobals.viaG)
+            {
+                return;
+            }
+            if (first)
+            {
+                offer(said, "local " + std::string(function ? "function " : "") + names,
+                      { edit(Luau::Location(stat->location.begin, stat->location.begin), "local ") }, false);
+                return;
+            }
+            // A local of each, before the first statement of the script's
+            // top that names it.
+            if (made_here.size() != 1)
+            {
+                return;
+            }
+            const Luau::Position first_named = named(made_here.front()).front().begin;
+            for (Luau::AstStat* top : mRoot->body)
+            {
+                if (top->location.end < first_named)
+                {
+                    continue;
+                }
+                if (startsLine(top->location.begin))
+                {
+                    const std::string indent(top->location.begin.column, ' ');
+                    offerTitled(said, "ScriptFixDeclareFirst", "Declare local [1] before it is first named", { names },
+                                { edit(Luau::Location(top->location.begin, top->location.begin), "local " + names + "\n" + indent) }, false);
+                }
+                return;
+            }
+        }
+
+        // function f() in a block of its own, which makes a global only when
+        // the block runs: a local of the block's where the block alone names
+        // it, after it.
+        void nestedFunction(Luau::AstStatBlock* block, Luau::AstStat* stat)
+        {
+            const auto* named_function = stat->as<Luau::AstStatFunction>();
+            const auto* global         = named_function ? named_function->name->as<Luau::AstExprGlobal>() : nullptr;
+            if (!made(global))
+            {
+                return;
+            }
+            const std::string name = global->name.value;
+            ALScriptProblem&  said = problem(stat->location, "LuauLintSlGlobalFunctionInScope",
+                                             "function [1] here makes a global, and only once this runs. local function [1] keeps it to this block",
+                                             { name }, "SlGlobalAssign");
+            bool within = !mGlobals.viaG;
+            for (const Luau::Location& at : named(global))
+            {
+                within = within && !(at.begin < stat->location.begin) && !(block->location.end < at.end);
+            }
+            if (within)
+            {
+                offer(said, "local function " + name, { edit(Luau::Location(stat->location.begin, stat->location.begin), "local ") }, false);
+            }
+        }
+
         // What a condition asks the truth of: itself, or each side of an
         // and or an or, inside brackets or not.
         void truth(Luau::AstExpr* e)
@@ -1267,7 +1451,13 @@ namespace
         // cannot change what the script does (YD5).
         static void offer(ALScriptProblem& problem, const std::string& now, std::vector<ALScriptEdit> edits, bool safe)
         {
-            ALScriptFix fix = ALScriptFixes::titled("ScriptFixWriteIt", "Write it [1]", { now });
+            offerTitled(problem, "ScriptFixWriteIt", "Write it [1]", { now }, std::move(edits), safe);
+        }
+
+        static void offerTitled(ALScriptProblem& problem, const char* key, const char* english, std::vector<std::string> args,
+                                std::vector<ALScriptEdit> edits, bool safe)
+        {
+            ALScriptFix fix = ALScriptFixes::titled(key, english, std::move(args));
             fix.preferred   = true;
             fix.safe        = safe;
             fix.edits       = std::move(edits);
@@ -1290,17 +1480,21 @@ namespace
             return loose ? "(" + text(e->location) + ")" : text(e->location);
         }
 
-        std::string_view    mSource;
-        std::vector<size_t> mStarts;
-        const Luau::Module* mChecked;
-        const Locals&       mLocals;
-        boost::unordered_flat_map<std::pair<Luau::AstLocal*, Kind>, bool>    mLocalKinds;
-        boost::unordered_flat_map<Luau::AstLocal*, std::optional<Find>> mFindLocals;
-        boost::unordered_flat_set<const Luau::AstExprCall*>             mStatements;
-        uint64_t            mEnabled;
-        uint64_t            mFatal;
-        bool                mAllErrors;
-        ALScriptProblems&   mOut;
+        std::string_view                                                  mSource;
+        std::vector<size_t>                                               mStarts;
+        const Luau::AstStatBlock*                                         mRoot;
+        const Luau::Module*                                               mChecked;
+        const Locals&                                                     mLocals;
+        const Globals&                                                    mGlobals;
+        boost::unordered_flat_set<std::string>                            mGiven;
+        boost::unordered_flat_set<std::string>                            mTopMade;
+        boost::unordered_flat_map<std::pair<Luau::AstLocal*, Kind>, bool> mLocalKinds;
+        boost::unordered_flat_map<Luau::AstLocal*, std::optional<Find>>   mFindLocals;
+        boost::unordered_flat_set<const Luau::AstExprCall*>               mStatements;
+        uint64_t                                                          mEnabled;
+        uint64_t                                                          mFatal;
+        bool                                                              mAllErrors;
+        ALScriptProblems&                                                 mOut;
     };
 }
 
@@ -1368,6 +1562,14 @@ void ALScriptLintPass::check(std::string_view source, const Luau::SourceModule& 
     }
     Locals locals;
     module.root->visit(&locals);
-    Pass pass(source, checked, locals, enabled, fatal, all_errors, out);
+    Globals globals;
+    module.root->visit(&globals);
+    // In the order of the text, which a statement's parts are not always
+    // visited in.
+    for (auto& [name, places] : globals.named)
+    {
+        std::sort(places.begin(), places.end(), [](const Luau::Location& a, const Luau::Location& b) { return a.begin < b.begin; });
+    }
+    Pass pass(source, module.root, checked, locals, globals, enabled, fatal, all_errors, out);
     module.root->visit(&pass);
 }
