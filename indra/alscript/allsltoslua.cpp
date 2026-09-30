@@ -29,6 +29,7 @@
 #include "alscriptfixes.h"
 
 #include "alscriptengine.h"
+#include "alscriptstack.h"
 #include "allsleffects.h"
 #include "allslservice.h"
 #include "allsltraits.h"
@@ -4754,36 +4755,40 @@ ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& op
         result.problems.push_back(std::move(p));
         return result;
     }
-    AL_SCRIPT_ENGINE_HELD;
-    ScopedScriptParser parser(nullptr);
-    LSLScript*         script = parser.parseLSLBytes(lsl.data(), static_cast<int>(lsl.size()));
-    if (script)
-    {
-        script->collectSymbols();
-        script->determineTypes();
-    }
-    if (!script || parser.logger.getErrors())
-    {
-        for (LogMessage* message : parser.logger.getMessages())
+    // Tailslide's walks and the writer recurse on how the script nests,
+    // which LSL lets go deeper than the stack a thread is given holds.
+    alScriptOnLargeStack([&]() {
+        AL_SCRIPT_ENGINE_HELD;
+        ScopedScriptParser parser(nullptr);
+        LSLScript*         script = parser.parseLSLBytes(lsl.data(), static_cast<int>(lsl.size()));
+        if (script)
         {
-            if (message->getType() != LOG_ERROR && message->getType() != LOG_INTERNAL_ERROR)
-            {
-                continue;
-            }
-            ALScriptProblem p;
-            p.severity = ALScriptProblem::Severity::Error;
-            p.source   = ALScriptProblem::Source::Parser;
-            p.line     = zeroBased(message->getLoc()->first_line);
-            p.column   = zeroBased(message->getLoc()->first_column);
-            p.message  = message->getMessage();
-            result.problems.push_back(std::move(p));
+            script->collectSymbols();
+            script->determineTypes();
         }
-        return result;
-    }
-    Writer writer(script, options);
-    result.text      = writer.write();
-    result.notes     = std::move(writer.notes());
-    result.converted = true;
+        if (!script || parser.logger.getErrors())
+        {
+            for (LogMessage* message : parser.logger.getMessages())
+            {
+                if (message->getType() != LOG_ERROR && message->getType() != LOG_INTERNAL_ERROR)
+                {
+                    continue;
+                }
+                ALScriptProblem p;
+                p.severity = ALScriptProblem::Severity::Error;
+                p.source   = ALScriptProblem::Source::Parser;
+                p.line     = zeroBased(message->getLoc()->first_line);
+                p.column   = zeroBased(message->getLoc()->first_column);
+                p.message  = message->getMessage();
+                result.problems.push_back(std::move(p));
+            }
+            return;
+        }
+        Writer writer(script, options);
+        result.text      = writer.write();
+        result.notes     = std::move(writer.notes());
+        result.converted = true;
+    });
     return result;
 }
 
