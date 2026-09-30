@@ -103,6 +103,7 @@
     <floater.string name="LintLuauSlGeneralizedFor">for k, v in pairs(t), where Luau's for walks t itself (the studio's own)</floater.string>
     <floater.string name="LintLuauSlEmptyBlock">An if, an else or a loop whose block is empty (the studio's own)</floater.string>
     <floater.string name="LintLuauSlIndexDivision">A list indexed by a / division, which may be a fraction (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlVectorProduct">Two vectors multiplied where a number is wanted, or taken % each other, as LSL's dot and cross products (the studio's own)</floater.string>
     <floater.string name="LintLuauName">[DESCRIPTION]
 
 In a .luaurc: [NAME]</floater.string>

@@ -85,6 +85,9 @@ namespace
         { "SlEmptyBlock", true, Severity::Warning, true, true, "empty_if empty_loop" },
         // t[n / 2]: Luau's / makes a fraction, which a list has nothing at.
         { "SlIndexDivision", true, Severity::Warning, true, true, nullptr },
+        // a * b of vectors where a number is wanted, LSL's dot product; a % b,
+        // LSL's cross product.
+        { "SlVectorProduct", true, Severity::Warning, true, true, nullptr },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -621,6 +624,10 @@ namespace
             {
                 booleanNumber(node);
             }
+            if (on("SlVectorProduct"))
+            {
+                vectorProducts(node);
+            }
             return true;
         }
 
@@ -666,6 +673,16 @@ namespace
             if (on("SlCompatCall"))
             {
                 compatCall(node, mStatements.contains(node));
+            }
+            // What math's functions are given is a number.
+            const auto* callee = node->func->as<Luau::AstExprIndexName>();
+            const auto* lib    = callee ? callee->expr->as<Luau::AstExprGlobal>() : nullptr;
+            if (on("SlVectorProduct") && lib && std::string_view(lib->name.value) == "math")
+            {
+                for (Luau::AstExpr* arg : node->args)
+                {
+                    dotProduct(arg);
+                }
             }
             return true;
         }
@@ -1788,6 +1805,61 @@ namespace
                                              "integers divided whole. [2] rounds down",
                                              { was, now }, "SlIndexDivision");
             offer(said, now, { edit(Luau::Location(at, at), "/") }, false);
+        }
+
+        // --- SlVectorProduct: LSL's products of two vectors -------------------
+
+        // a * b of two vectors, where a number is wanted of it: LSL's was
+        // their dot product, SLua's multiplies each part and gives a vector.
+        void dotProduct(Luau::AstExpr* e)
+        {
+            auto* product = unbracketed(e)->as<Luau::AstExprBinary>();
+            if (!product || product->op != Luau::AstExprBinary::Mul || !is(product->left, Kind::Vector) || !is(product->right, Kind::Vector))
+            {
+                return;
+            }
+            const std::string a    = text(product->left->location);
+            const std::string b    = text(product->right->location);
+            const std::string now  = "vector.dot(" + a + ", " + b + ")";
+            ALScriptProblem&  said = problem(product->location, "LuauLintSlVectorProduct",
+                                             "[1] multiplies each part of two vectors, and gives a vector: LSL's * of two vectors was their dot "
+                                             "product, a number. vector.dot([2], [3]) is LSL's",
+                                             { text(product->location), a, b }, "SlVectorProduct");
+            offer(said, now, { edit(product->location, now) }, false);
+        }
+
+        // A product of two vectors where the other side of an operator is a
+        // number, which a vector can be neither compared with nor added to;
+        // and a % b of two vectors, LSL's cross product.
+        void vectorProducts(Luau::AstExprBinary* node)
+        {
+            using Op = Luau::AstExprBinary::Op;
+            if (node->op == Op::Mod && is(node->left, Kind::Vector) && is(node->right, Kind::Vector))
+            {
+                const std::string a    = text(node->left->location);
+                const std::string b    = text(node->right->location);
+                const std::string now  = "vector.cross(" + a + ", " + b + ")";
+                ALScriptProblem&  said = problem(node->location, "LuauLintSlVectorCross",
+                                                 "[1] is each part's remainder in SLua: LSL's % of two vectors was their cross product. "
+                                                 "vector.cross([2], [3]) is LSL's",
+                                                 { text(node->location), a, b }, "SlVectorProduct");
+                offer(said, now, { edit(node->location, now) }, false);
+                return;
+            }
+            const bool numeric = node->op == Op::Add || node->op == Op::Sub || node->op == Op::Pow || comparison(node->op);
+            if (!numeric)
+            {
+                return;
+            }
+            const auto number = [&](Luau::AstExpr* e) { return literal(e).has_value() || is(e, Kind::Number); };
+            if (number(node->right))
+            {
+                dotProduct(node->left);
+            }
+            if (number(node->left))
+            {
+                dotProduct(node->right);
+            }
         }
 
         // What a condition asks the truth of: itself, or each side of an

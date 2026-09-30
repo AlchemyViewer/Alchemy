@@ -500,4 +500,29 @@ namespace tut
         ensure_equals("rounded down", fixed("local t = {1}\nlocal n = #t\nprint(t[n / 2])\n", "LuauLintSlIndexDivision", "Write it n // 2", false),
                       std::string("local t = {1}\nlocal n = #t\nprint(t[n // 2])\n"));
     }
+
+    template<> template<>
+    void object::test<12>()
+    {
+        set_test_name("SlVectorProduct: two vectors multiplied where a number is wanted -- compared, added to one, given to math -- and "
+                      "taken % each other, a warning, fixed as vector.dot and vector.cross; not a product kept a vector, nor by a number");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local a = vector(1, 0, 0)\n"
+                                       "local b = vector(0, 1, 0)\n"
+                                       "if a * b > 0.5 then print(1) end\n"
+                                       "print(math.acos(a * b), (a * b) + 1)\n"
+                                       "local c = a % b\n"
+                                       "local s = a * b\n"
+                                       "print(a * 2, s, c)\n",
+                                       "SlVectorProduct", ALScriptProblem::Severity::Warning);
+        ensure_equals("each", said,
+                      std::string("2 LuauLintSlVectorProduct|a * b|a|b\n"
+                                  "3 LuauLintSlVectorProduct|a * b|a|b\n"
+                                  "3 LuauLintSlVectorProduct|a * b|a|b\n"
+                                  "4 LuauLintSlVectorCross|a % b|a|b\n"));
+        ensure_equals("dot", fixed("local a = vector(1, 0, 0)\nprint(a * a > 0.5)\n", "LuauLintSlVectorProduct", "Write it vector.dot(a, a)", false),
+                      std::string("local a = vector(1, 0, 0)\nprint(vector.dot(a, a) > 0.5)\n"));
+        ensure_equals("cross", fixed("local a = vector(1, 0, 0)\nlocal c = a % a\nprint(c)\n", "LuauLintSlVectorCross", "Write it vector.cross(a, a)", false),
+                      std::string("local a = vector(1, 0, 0)\nlocal c = vector.cross(a, a)\nprint(c)\n"));
+    }
 }

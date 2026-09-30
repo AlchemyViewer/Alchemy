@@ -891,6 +891,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlGeneralizedForList">Luau's for walks a table given as it is: in [1] walks a list as in [2] does, where the list has no gaps</string>
 	<string name="LuauLintSlEmptyBlock">This [1]'s block is empty: it does nothing</string>
 	<string name="LuauLintSlIndexDivision">[1] may be a fraction, which a list has nothing at: Luau's / divides as floats do, where LSL's integers divided whole. [2] rounds down</string>
+	<string name="LuauLintSlVectorProduct">[1] multiplies each part of two vectors, and gives a vector: LSL's * of two vectors was their dot product, a number. vector.dot([2], [3]) is LSL's</string>
+	<string name="LuauLintSlVectorCross">[1] is each part's remainder in SLua: LSL's % of two vectors was their cross product. vector.cross([2], [3]) is LSL's</string>
 	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
 	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauUnknownType">Unknown type '[1]'</string>
