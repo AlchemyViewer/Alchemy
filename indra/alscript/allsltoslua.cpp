@@ -381,6 +381,11 @@ namespace
         // them, l is held elsewhere -- noted, with why -- or what is added
         // could change l.
         bool grow(LSLLValueExpression* target, const std::string& name, LSLOperator op, LSLExpression* rhs);
+        // l = llDeleteSubList(l, 0, 0) or (l, -1, -1), l =
+        // llListInsertList(l, [x], 0), on a list no other holds, as
+        // table.remove and table.insert on it: at its front or its back,
+        // which no index can fall past.
+        bool editInPlace(LSLSymbol* var, const std::string& name, LSLExpression* rhs);
 
         // --- strings built in loops -------------------------------------------------
 
@@ -1739,6 +1744,10 @@ namespace
             return;
         }
         if (type == LST_LIST && (op == OP_ADD_ASSIGN || op == OP_ASSIGN) && grow(target, name, op, rhs))
+        {
+            return;
+        }
+        if (type == LST_LIST && op == OP_ASSIGN && isNull(member) && editInPlace(id->getSymbol(), name, rhs))
         {
             return;
         }
@@ -3172,6 +3181,39 @@ namespace
                 }
             }
         }
+    }
+
+    bool Writer::editInPlace(LSLSymbol* var, const std::string& name, LSLExpression* rhs)
+    {
+        LSLExpression* e = unwrapped(rhs);
+        if (!mOptions.idioms || !owned(var) || !e || e->getNodeSubType() != NODE_FUNCTION_EXPRESSION)
+        {
+            return false;
+        }
+        auto*                  call = static_cast<LSLFunctionExpression*>(e);
+        const std::string_view lsl  = call->getIdentifier()->getName();
+        if (wholeVariable(argumentAt(call, 0)) != var)
+        {
+            return false;
+        }
+        int from = 1;
+        int to   = 1;
+        if (lsl == "llDeleteSubList" && wholeNumber(argumentAt(call, 1), from) && wholeNumber(argumentAt(call, 2), to) && from == to &&
+            (from == 0 || from == -1))
+        {
+            line(from == 0 ? "table.remove(" + name + ", 1)" : "table.remove(" + name + ")");
+            return true;
+        }
+        LSLExpression* added = unwrapped(argumentAt(call, 1));
+        if (lsl == "llListInsertList" && wholeNumber(argumentAt(call, 2), from) && from == 0 && added &&
+            added->getNodeSubType() == NODE_LIST_EXPRESSION && added->getChild(0) && !added->getChild(0)->getNext() &&
+            !mEffects.of(added).writes(var))
+        {
+            auto* item = static_cast<LSLExpression*>(added->getChild(0));
+            line("table.insert(" + name + ", 1, " + coerced(item, item->getIType()).text + ")");
+            return true;
+        }
+        return false;
     }
 
     bool Writer::grow(LSLLValueExpression* target, const std::string& name, LSLOperator op, LSLExpression* rhs)

@@ -869,4 +869,26 @@ namespace tut
         ensure("within its length, as it is, counting from 1: " + r.text, has(r, "for i = 1, #p do\n    print(p[i])"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<30>()
+    {
+        set_test_name("a list no other holds taken from or put to at its front or back in place: table.remove and table.insert; anywhere else, or one held elsewhere, as LSL made a new one");
+        const ALLSLToSLua::Result r = convert("list gQueue;\n"
+                                              "list gShared;\n"
+                                              "keep(list l) { gShared = l; }\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    gQueue += [n];\n"
+                                              "    gQueue = llListInsertList(gQueue, [n + 1], 0);\n"
+                                              "    gQueue = llDeleteSubList(gQueue, 0, 0);\n"
+                                              "    gQueue = llDeleteSubList(gQueue, -1, -1);\n"
+                                              "    gQueue = llDeleteSubList(gQueue, 1, 1);\n"
+                                              "    keep(gShared);\n"
+                                              "    gShared = llDeleteSubList(gShared, 0, 0);\n"
+                                              "} }\n");
+        ensure("in place: " + r.text, has(r, "table.insert(gQueue, 1, n + 1)") && has(r, "table.remove(gQueue, 1)") && has(r, "table.remove(gQueue)\n"));
+        ensure("elsewhere in the list, as LSL did: " + r.text, has(r, "gQueue = llcompat.DeleteSubList(gQueue, 1, 1)"));
+        ensure("one held elsewhere, as LSL did: " + r.text, has(r, "gShared = llcompat.DeleteSubList(gShared, 0, 0)"));
+        checksClean(r);
+    }
 }
