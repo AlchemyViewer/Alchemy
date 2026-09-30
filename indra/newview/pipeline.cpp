@@ -6163,26 +6163,24 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
         }
 
         // UPDATE THE EXISTING NEARBY LIGHTS
+        light_set_t cur_nearby_lights;
         for (light_set_t::iterator iter = mNearbyLights.begin();
-            iter != mNearbyLights.end();)
+            iter != mNearbyLights.end(); ++iter)
         {
             const Light* light = &(*iter);
             LLDrawable* drawable = light->drawable;
             const LLViewerObject *vobj = light->drawable->getVObj();
-            if(vobj && vobj->isAttachment())
+            if (vobj && vobj->isAttachment())
             {
                 if (!sRenderAttachedLights)
                 {
                     drawable->clearState(LLDrawable::NEARBY_LIGHT);
-                    iter = mNearbyLights.erase(iter);
                     continue;
                 }
-
                 LLVOAvatar *avatar = vobj->getAvatar();
                 if (avatar && (avatar->isTooComplex() || avatar->isInMuteList() || avatar->isTooSlow()))
                 {
                     drawable->clearState(LLDrawable::NEARBY_LIGHT);
-                    iter = mNearbyLights.erase(iter);
                     continue;
                 }
             }
@@ -6191,50 +6189,38 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
             if (!volight || !drawable->isState(LLDrawable::LIGHT))
             {
                 drawable->clearState(LLDrawable::NEARBY_LIGHT);
-                iter = mNearbyLights.erase(iter);
                 continue;
             }
             if (light->fade <= -LIGHT_FADE_TIME)
             {
                 drawable->clearState(LLDrawable::NEARBY_LIGHT);
-                iter = mNearbyLights.erase(iter);
                 continue;
             }
 
             F32 dist = calc_light_dist(volight, cam_pos, max_dist);
             F32 fade = light->fade;
-            // actual fade gets decreased/increased by setupHWLights
-            // light->fade value is 'time'.
-            // >=0 and light will become visible as value increases
-            // <0 and light will fade out
             if (dist < max_dist)
             {
                 if (fade < 0)
                 {
-                    // mark light to fade in
-                    // if fade was -LIGHT_FADE_TIME - it was fully invisible
-                    // if fade -0 - it was fully visible
-                    // visibility goes up from 0 to LIGHT_FADE_TIME.
                     fade += LIGHT_FADE_TIME;
                 }
             }
             else
             {
-                // mark light to fade out
-                // visibility goes down from -0 to -LIGHT_FADE_TIME.
                 if (fade >= LIGHT_FADE_TIME)
                 {
-                    fade = -0.0001f; // was fully visible
+                    fade = -0.0001f;
                 }
                 else if (fade >= 0)
                 {
-                    // 0.75 visible light should stay 0.75 visible, but should reverse direction
                     fade -= LIGHT_FADE_TIME;
                 }
             }
-
-            ++iter; // Advance to next light
+            // Re-insert with updated distance so the set stays correctly sorted
+            cur_nearby_lights.insert(Light(drawable, dist, fade));
         }
+        mNearbyLights = cur_nearby_lights;
 
         // FIND NEW LIGHTS THAT ARE IN RANGE
         for (LLDrawable::ordered_drawable_set_t::iterator iter = mLights.begin();
@@ -13453,6 +13439,13 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("generateImpostor");
     LLGLState::checkStates();
+    
+    // Save the caller's cull result so the impostor bake doesn't clobber it.
+    // In upstream this was harmless because the impostor postSort skipped the alpha
+    // group sort (sShadowRender=true). Now that we sort during impostor bakes,
+    // grabReferences() below would leave sCull pointing at the impostor's result
+    // after we return, causing the main frame's alpha pool to iterate the wrong list.
+    LLCullResult* saved_cull = sCull;
 
     static LLCullResult result;
     result.clear();
@@ -13926,6 +13919,8 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
 
     LLVertexBuffer::unbind();
     LLGLState::checkStates();
+    // Restore the main frame's cull result before returning.
+    sCull = saved_cull;
 }
 
 bool LLPipeline::hasRenderBatches(const U32 type) const
