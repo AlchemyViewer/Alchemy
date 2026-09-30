@@ -90,7 +90,7 @@ namespace tut
         // SLua's way where it means the same, llcompat's where not.
         static bool unwanted(const ALScriptProblem& p)
         {
-            return p.severity == ALScriptProblem::Severity::Error || p.code == "SlCompoundAssign" || p.code == "SlNumberTruth" ||
+            return p.severity == ALScriptProblem::Severity::Error || p.code == "SlCompoundAssign" || p.code == "SlNumberTruth" || p.code == "SlZeroIndex" ||
                    (p.key.rfind("LuauLintDeprecatedMember", 0) == 0 && !p.args.empty() && p.args[0].rfind("ll.", 0) == 0);
         }
 

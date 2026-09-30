@@ -38,6 +38,7 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 
 namespace
@@ -58,6 +59,9 @@ namespace
         { "SlNilSentinel", true, Severity::Error, true, true, nullptr },
         // t == {}: a table built there equals no other.
         { "SlTableCompare", true, Severity::Error, true, true, nullptr },
+        // t[0], for i = 0, #t - 1, string.sub(s, 0, n), ll.X(s, 0): LSL
+        // counted from 0.
+        { "SlZeroIndex", true, Severity::Warning, true, true, nullptr },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -102,6 +106,46 @@ namespace
         }
     }
 
+    Luau::AstExpr* unbracketed(Luau::AstExpr* e)
+    {
+        while (auto* group = e->as<Luau::AstExprGroup>())
+        {
+            e = group->expr;
+        }
+        return e;
+    }
+
+    // A number written as one, bracketed or negated or not.
+    std::optional<double> literal(Luau::AstExpr* e)
+    {
+        e = unbracketed(e);
+        if (const auto* negated = e->as<Luau::AstExprUnary>(); negated && negated->op == Luau::AstExprUnary::Op::Minus)
+        {
+            const std::optional<double> inner = literal(negated->expr);
+            return inner ? std::optional<double>(-*inner) : std::nullopt;
+        }
+        const auto* number = e->as<Luau::AstExprConstantNumber>();
+        return number ? std::optional<double>(number->value) : std::nullopt;
+    }
+
+    bool constant(Luau::AstExpr* e, double value)
+    {
+        const std::optional<double> number = literal(e);
+        return number && *number == value;
+    }
+
+    bool isNil(Luau::AstExpr* e) { return unbracketed(e)->is<Luau::AstExprConstantNil>(); }
+
+    // A number as a script writes it, where it is a whole one.
+    std::optional<std::string> whole(double value)
+    {
+        if (value != std::floor(value) || std::fabs(value) > 1e15)
+        {
+            return std::nullopt;
+        }
+        return std::to_string(static_cast<long long>(value));
+    }
+
     // What each local is given, where it is declared and at each
     // assignment, for the old solver's nonstrict mode, which types an
     // unannotated local any: a local given only numbers is one.
@@ -117,6 +161,37 @@ namespace
         boost::unordered_flat_set<Luau::AstLocal*> bare;
         // Given x op= y: a number still, but not the one it was given.
         boost::unordered_flat_set<Luau::AstLocal*> compounded;
+        // Indexes written to, and tables given something at 0, by an
+        // assignment or where they are built: a table keyed by number, 0
+        // among them, as a channel may be.
+        boost::unordered_flat_set<const Luau::AstExprIndexExpr*> written;
+        boost::unordered_flat_set<Luau::AstLocal*>                zeroKeyed;
+
+        void writes(Luau::AstExpr* var)
+        {
+            if (const auto* index = var->as<Luau::AstExprIndexExpr>())
+            {
+                written.insert(index);
+                if (const auto* table = index->expr->as<Luau::AstExprLocal>(); table && constant(index->index, 0))
+                {
+                    zeroKeyed.insert(table->local);
+                }
+            }
+        }
+
+        void builds(Luau::AstLocal* local, Luau::AstExpr* value)
+        {
+            if (const auto* table = unbracketed(value)->as<Luau::AstExprTable>())
+            {
+                for (const Luau::AstExprTable::Item& item : table->items)
+                {
+                    if (item.kind == Luau::AstExprTable::Item::Kind::General && constant(item.key, 0))
+                    {
+                        zeroKeyed.insert(local);
+                    }
+                }
+            }
+        }
 
         bool visit(Luau::AstStatLocal* node) override
         {
@@ -128,6 +203,7 @@ namespace
                 if (alone)
                 {
                     given[node->vars.data[i]].push_back(node->values.data[i]);
+                    builds(node->vars.data[i], node->values.data[i]);
                 }
                 else if (node->values.size > 0)
                 {
@@ -144,11 +220,13 @@ namespace
         {
             for (size_t i = 0; i < node->vars.size; ++i)
             {
+                writes(node->vars.data[i]);
                 if (auto* local = node->vars.data[i]->as<Luau::AstExprLocal>())
                 {
                     if (i < node->values.size && (i + 1 < node->values.size || node->vars.size == 1))
                     {
                         given[local->local].push_back(node->values.data[i]);
+                        builds(local->local, node->values.data[i]);
                     }
                     else
                     {
@@ -160,6 +238,7 @@ namespace
         }
         bool visit(Luau::AstStatCompoundAssign* node) override
         {
+            writes(node->var);
             // A number stays one but for .., which makes a string.
             if (auto* local = node->var->as<Luau::AstExprLocal>())
             {
@@ -192,6 +271,37 @@ namespace
             }
             return true;
         }
+    };
+
+    // Where a local is read in a stretch of the tree: every time, and each
+    // time it is what a table is indexed by, the first such kept.
+    class Uses final : public Luau::AstVisitor
+    {
+    public:
+        explicit Uses(Luau::AstLocal* local) : mLocal(local) {}
+
+        size_t                     all     = 0;
+        size_t                     indexes = 0;
+        const Luau::AstExprIndexExpr* first  = nullptr;
+
+        bool visit(Luau::AstExprLocal* node) override
+        {
+            all += node->local == mLocal;
+            return true;
+        }
+        bool visit(Luau::AstExprIndexExpr* node) override
+        {
+            const auto* index = node->index->as<Luau::AstExprLocal>();
+            if (index && index->local == mLocal)
+            {
+                ++indexes;
+                first = first ? first : node;
+            }
+            return true;
+        }
+
+    private:
+        Luau::AstLocal* mLocal;
     };
 
     // What the pass asks the check an expression is.
@@ -289,6 +399,46 @@ namespace
             if (on("SlTableCompare"))
             {
                 tableCompare(node);
+            }
+            if (on("SlZeroIndex"))
+            {
+                zeroFound(node);
+            }
+            return true;
+        }
+
+        // --- SlZeroIndex: counted from 0, as LSL counted -------------------
+
+        bool visit(Luau::AstExprIndexExpr* node) override
+        {
+            const auto* table = node->expr->as<Luau::AstExprLocal>();
+            if (on("SlZeroIndex") && constant(node->index, 0) && !mLocals.written.contains(node) &&
+                !(table && mLocals.zeroKeyed.contains(table->local)) && is(node->expr, Kind::List))
+            {
+                const std::string list  = bracketed(node->expr);
+                ALScriptProblem&  said  = problem(node->location, "LuauLintSlZeroIndex",
+                                                  "[1][0] is nothing: Luau's lists count from 1, where LSL's counted from 0. [1][1] is the first",
+                                                  { list }, "SlZeroIndex");
+                offer(said, list + "[1]", { edit(node->index->location, "1") }, false);
+            }
+            return true;
+        }
+
+        bool visit(Luau::AstStatFor* node) override
+        {
+            if (on("SlZeroIndex"))
+            {
+                zeroLoop(node);
+            }
+            return true;
+        }
+
+        bool visit(Luau::AstExprCall* node) override
+        {
+            if (on("SlZeroIndex"))
+            {
+                zeroSub(node);
+                zeroArg(node);
             }
             return true;
         }
@@ -461,18 +611,7 @@ namespace
             return text(e->location);
         }
 
-        static bool constant(Luau::AstExpr* e, double value)
-        {
-            e = unbracketed(e);
-            if (const auto* negated = e->as<Luau::AstExprUnary>(); negated && negated->op == Luau::AstExprUnary::Op::Minus)
-            {
-                return value != 0 && constant(negated->expr, -value);
-            }
-            const auto* number = e->as<Luau::AstExprConstantNumber>();
-            return number && number->value == value;
-        }
 
-        static bool isNil(Luau::AstExpr* e) { return unbracketed(e)->is<Luau::AstExprConstantNil>(); }
 
         // A find compared with what it never answers: SLua's with -1 --
         // equal, not equal, or LSL's order against 0 or -1, an error at
@@ -615,6 +754,179 @@ namespace
             offer(said, asked, { edit(node->location, asked) }, false);
         }
 
+
+
+        // A counting loop from 0 to a length less 1, whose counter indexes
+        // a table: LSL's walk of a list, which in Luau reads nothing at 0
+        // and never the last. A counter read otherwise too -- given to
+        // llcompat, which counts from 0 -- may be right as it is: fixed
+        // only where every read of it indexes.
+        void zeroLoop(Luau::AstStatFor* node)
+        {
+            const auto* less   = unbracketed(node->to)->as<Luau::AstExprBinary>();
+            const auto* length = less && less->op == Luau::AstExprBinary::Sub && constant(less->right, 1)
+                                   ? unbracketed(less->left)->as<Luau::AstExprUnary>()
+                                   : nullptr;
+            if (!constant(node->from, 0) || (node->step && !constant(node->step, 1)) || !length || length->op != Luau::AstExprUnary::Op::Len)
+            {
+                return;
+            }
+            Uses uses(node->var);
+            node->body->visit(&uses);
+            if (!uses.first)
+            {
+                return;
+            }
+            const std::string count = text(length->location);
+            const std::string var   = node->var->name.value;
+            ALScriptProblem&  said  = problem(node->location, "LuauLintSlZeroIndexLoop",
+                                              "This loop counts from 0 to [1] - 1, as LSL's lists did, but Luau's count from 1: [2] reads nothing at "
+                                              "0 and never the last. for [3] = 1, [1] counts as Luau does",
+                                              { count, text(uses.first->location), var }, "SlZeroIndex");
+            if (uses.all == uses.indexes)
+            {
+                offer(said, "for " + var + " = 1, " + count, { edit(node->from->location, "1"), edit(node->to->location, count) }, false);
+            }
+        }
+
+        // string.sub(s, 0, n), or s:sub(0, n): Luau's takes 0 as 1, and so
+        // ends a character sooner than LSL's llGetSubString(s, 0, n) did.
+        // Fixed where the end's place is plain: a number, or a length less
+        // one or more.
+        void zeroSub(Luau::AstExprCall* node)
+        {
+            const auto* callee = node->func->as<Luau::AstExprIndexName>();
+            if (!callee || std::string_view(callee->index.value) != "sub")
+            {
+                return;
+            }
+            const auto*  lib    = callee->expr->as<Luau::AstExprGlobal>();
+            const bool   method = callee->op == ':' && is(callee->expr, Kind::String);
+            const size_t first  = method ? 0 : 1;
+            if ((!method && !(callee->op == '.' && lib && std::string_view(lib->name.value) == "string")) || node->args.size != first + 2 ||
+                !constant(node->args.data[first], 0))
+            {
+                return;
+            }
+            Luau::AstExpr*             end = node->args.data[first + 1];
+            std::optional<std::string> after;
+            if (const std::optional<double> at = literal(end))
+            {
+                after = *at < 0 ? std::optional<std::string>(text(end->location)) : whole(*at + 1);
+            }
+            else if (const auto* less = unbracketed(end)->as<Luau::AstExprBinary>(); less && less->op == Luau::AstExprBinary::Sub)
+            {
+                const std::optional<double>      by    = literal(less->right);
+                const std::optional<std::string> fewer = by && *by > 1 ? whole(*by - 1) : std::nullopt;
+                if (by && *by == 1)
+                {
+                    after = text(less->left->location);
+                }
+                else if (fewer)
+                {
+                    after = text(less->left->location) + " - " + *fewer;
+                }
+            }
+            const std::string function = text(node->func->location);
+            ALScriptProblem&  said     = problem(node->location, "LuauLintSlZeroIndexSub",
+                                                 "[1] counts from 1 and takes 0 as 1, so it ends a character sooner than LSL's llGetSubString with the "
+                                                 "same numbers",
+                                                 { function }, "SlZeroIndex");
+            if (after)
+            {
+                std::string now = function + "(";
+                for (size_t i = 0; i < node->args.size; ++i)
+                {
+                    now += (i ? ", " : "") + (i == first ? std::string("1") : i == first + 1 ? *after : text(node->args.data[i]->location));
+                }
+                offer(said, now + ")", { edit(node->args.data[first]->location, "1"), edit(end->location, *after) }, false);
+            }
+        }
+
+        // An index of ll's given as 0, which SLua's ll counts from 1. Where
+        // every index the call is given is a number, those from 0 up are
+        // moved by one, as the converter moves them; one from the end stays.
+        void zeroArg(Luau::AstExprCall* node)
+        {
+            const auto* callee = node->func->as<Luau::AstExprIndexName>();
+            const auto* lib    = callee ? callee->expr->as<Luau::AstExprGlobal>() : nullptr;
+            if (!lib || callee->op != '.' || std::string_view(lib->name.value) != "ll")
+            {
+                return;
+            }
+            const std::string          lsl = "ll" + std::string(callee->index.value);
+            const ALLSLTraits::Trait*  row = ALLSLTraits::of(lsl.c_str());
+            if (!row || !(row->slua & ALLSLTraits::SluaIndexArgs))
+            {
+                return;
+            }
+            bool                      zero  = false;
+            bool                      plain = true;
+            std::vector<ALScriptEdit> edits;
+            std::vector<std::string>  written;
+            for (size_t i = 0; i < node->args.size; ++i)
+            {
+                Luau::AstExpr* arg = node->args.data[i];
+                std::string    now = text(arg->location);
+                if (i < 16 && (row->sluaIndexArgs & (1u << i)))
+                {
+                    const std::optional<double>      at    = literal(arg);
+                    const std::optional<std::string> moved = at && *at >= 0 ? whole(*at + 1) : std::nullopt;
+                    zero  = zero || (at && *at == 0);
+                    plain = plain && at && (*at < 0 || moved);
+                    if (moved)
+                    {
+                        now = *moved;
+                        edits.push_back(edit(arg->location, now));
+                    }
+                }
+                written.push_back(std::move(now));
+            }
+            if (!zero)
+            {
+                return;
+            }
+            const std::string function = text(node->func->location);
+            ALScriptProblem&  said = problem(node->location, "LuauLintSlZeroIndexArg", "[1] counts from 1 in SLua, as Luau does: its first is 1, not 0",
+                                             { function }, "SlZeroIndex");
+            if (plain)
+            {
+                std::string now = function + "(";
+                for (size_t i = 0; i < written.size(); ++i)
+                {
+                    now += (i ? ", " : "") + written[i];
+                }
+                offer(said, now + ")", std::move(edits), false);
+            }
+        }
+
+        // A find compared with 0, which SLua's never answers: LSL's first.
+        void zeroFound(Luau::AstExprBinary* node)
+        {
+            using Op = Luau::AstExprBinary::Op;
+            if (node->op != Op::CompareEq && node->op != Op::CompareNe)
+            {
+                return;
+            }
+            Luau::AstExpr*      side  = node->left;
+            Luau::AstExpr*      zero  = node->right;
+            std::optional<Find> found = constant(zero, 0) ? find(side) : std::nullopt;
+            if (!found)
+            {
+                std::swap(side, zero);
+                found = constant(zero, 0) ? find(side) : std::nullopt;
+            }
+            if (!found || !found->nil)
+            {
+                return;
+            }
+            const std::string subject = this->subject(side);
+            ALScriptProblem&  said    = problem(node->location, "LuauLintSlZeroIndexFound",
+                                                "[1] is never 0: [2] answers from 1, where LSL's answered from 0, so its first is 1",
+                                                { subject, found->function }, "SlZeroIndex");
+            offer(said, subject + (node->op == Op::CompareEq ? " == 1" : " ~= 1"), { edit(zero->location, "1") }, false);
+        }
+
         // What a condition asks the truth of: itself, or each side of an
         // and or an or, inside brackets or not.
         void truth(Luau::AstExpr* e)
@@ -691,14 +1003,6 @@ namespace
                                 static_cast<S32>(where.end.column), std::move(with));
         }
 
-        static Luau::AstExpr* unbracketed(Luau::AstExpr* e)
-        {
-            while (auto* group = e->as<Luau::AstExprGroup>())
-            {
-                e = group->expr;
-            }
-            return e;
-        }
 
         // An expression's text, bracketed where an operator put before it
         // would take less of it.
@@ -785,10 +1089,7 @@ void ALScriptLintPass::check(std::string_view source, const Luau::SourceModule& 
         return;
     }
     Locals locals;
-    if (enabled & (bit("SlNumberTruth") | bit("SlNilSentinel")))
-    {
-        module.root->visit(&locals);
-    }
+    module.root->visit(&locals);
     Pass pass(source, checked, locals, enabled, fatal, all_errors, out);
     module.root->visit(&pass);
 }

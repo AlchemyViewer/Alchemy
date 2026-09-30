@@ -168,4 +168,54 @@ namespace tut
                       std::string("local d = {a = 1}\nprint(next(d) ~= nil)\n"));
         unfixed("local t = {1}\nprint(t == {1})\n", "LuauLintSlTableCompareItems");
     }
+
+    template<> template<>
+    void object::test<2>()
+    {
+        set_test_name("SlZeroIndex: a list at 0, a loop from 0 to a length less 1 that indexes, string.sub and ll from 0, a find against 0; "
+                      "not a table keyed at 0, nor a loop given to llcompat");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local t = {1, 2}\n"
+                                       "print(t[0])\n"
+                                       "for i = 0, #t - 1 do print(t[i]) end\n"
+                                       "for i = 0, #t - 1 do print(i, t[i]) end\n"
+                                       "for i = 0, #t - 1 do print(llcompat.List2String(t, i)) end\n"
+                                       "local s = \"abcdef\"\n"
+                                       "print(string.sub(s, 0, 2), s:sub(0, #s - 1), s:sub(0, -1), s:sub(0, #t), s:sub(1, 2))\n"
+                                       "print(ll.GetSubString(s, 0, 2), ll.GetSubString(s, 0, #s), ll.GetSubString(s, 1, 2))\n"
+                                       "if ll.SubStringIndex(s, \"a\") == 0 or 0 ~= table.find(t, 2) then print(1) end\n"
+                                       "local d = {[0] = 1}\n"
+                                       "local h = {}\n"
+                                       "h[0] = 2\n"
+                                       "print(d[0], h[0], llcompat.SubStringIndex(s, \"a\") == 0)\n",
+                                       "SlZeroIndex", ALScriptProblem::Severity::Warning);
+        ensure_equals("each", said,
+                      std::string("1 LuauLintSlZeroIndex|t\n"
+                                  "2 LuauLintSlZeroIndexLoop|#t|t[i]|i\n"
+                                  "3 LuauLintSlZeroIndexLoop|#t|t[i]|i\n"
+                                  "6 LuauLintSlZeroIndexSub|string.sub\n"
+                                  "6 LuauLintSlZeroIndexSub|s:sub\n"
+                                  "6 LuauLintSlZeroIndexSub|s:sub\n"
+                                  "6 LuauLintSlZeroIndexSub|s:sub\n"
+                                  "7 LuauLintSlZeroIndexArg|ll.GetSubString\n"
+                                  "7 LuauLintSlZeroIndexArg|ll.GetSubString\n"
+                                  "8 LuauLintSlZeroIndexFound|ll.SubStringIndex(...)|ll.SubStringIndex\n"
+                                  "8 LuauLintSlZeroIndexFound|table.find(...)|table.find\n"));
+        ensure_equals("a list", fixed("local t = {1}\nprint(t[0])\n", "LuauLintSlZeroIndex", "Write it t[1]", false),
+                      std::string("local t = {1}\nprint(t[1])\n"));
+        ensure_equals("a loop", fixed("local t = {1}\nfor i = 0, #t - 1 do print(t[i]) end\n", "LuauLintSlZeroIndexLoop", "Write it for i = 1, #t", false),
+                      std::string("local t = {1}\nfor i = 1, #t do print(t[i]) end\n"));
+        ensure_equals("a method to a length less 1", fixed("local s = \"abc\"\nprint(s:sub(0, #s - 1))\n", "LuauLintSlZeroIndexSub", "Write it s:sub(1, #s)", false),
+                      std::string("local s = \"abc\"\nprint(s:sub(1, #s))\n"));
+        ensure_equals("string's, to a number", fixed("print(string.sub(\"abc\", 0, 2))\n", "LuauLintSlZeroIndexSub", "Write it string.sub(\"abc\", 1, 3)", false),
+                      std::string("print(string.sub(\"abc\", 1, 3))\n"));
+        ensure_equals("ll's, one from the end kept", fixed("print(ll.GetSubString(\"abc\", 0, -1))\n", "LuauLintSlZeroIndexArg",
+                                                           "Write it ll.GetSubString(\"abc\", 1, -1)", false),
+                      std::string("print(ll.GetSubString(\"abc\", 1, -1))\n"));
+        ensure_equals("a find", fixed("print(ll.SubStringIndex(\"ab\", \"a\") == 0)\n", "LuauLintSlZeroIndexFound", "Write it ll.SubStringIndex(...) == 1", false),
+                      std::string("print(ll.SubStringIndex(\"ab\", \"a\") == 1)\n"));
+        unfixed("local t = {1}\nfor i = 0, #t - 1 do print(i, t[i]) end\n", "LuauLintSlZeroIndexLoop");
+        unfixed("local s = \"abc\"\nlocal n = 2\nprint(s:sub(0, n))\n", "LuauLintSlZeroIndexSub");
+        unfixed("local s = \"abc\"\nprint(ll.GetSubString(s, 0, #s))\n", "LuauLintSlZeroIndexArg");
+    }
 }

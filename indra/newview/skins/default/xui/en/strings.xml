@@ -869,6 +869,11 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlTableCompare">[1] == {} is always false: {} is a new table, equal to no other. [2] asks whether [1] is empty</string>
 	<string name="LuauLintSlTableCompareAlways">[1] ~= {} is always true: {} is a new table, equal to no other. [2] asks whether [1] has anything in it</string>
 	<string name="LuauLintSlTableCompareItems">[1] can never equal a table built where it is compared: a new table is equal to no other. LSL compared lists by their lengths alone, which #[1] gives</string>
+	<string name="LuauLintSlZeroIndex">[1][0] is nothing: Luau's lists count from 1, where LSL's counted from 0. [1][1] is the first</string>
+	<string name="LuauLintSlZeroIndexLoop">This loop counts from 0 to [1] - 1, as LSL's lists did, but Luau's count from 1: [2] reads nothing at 0 and never the last. for [3] = 1, [1] counts as Luau does</string>
+	<string name="LuauLintSlZeroIndexSub">[1] counts from 1 and takes 0 as 1, so it ends a character sooner than LSL's llGetSubString with the same numbers</string>
+	<string name="LuauLintSlZeroIndexArg">[1] counts from 1 in SLua, as Luau does: its first is 1, not 0</string>
+	<string name="LuauLintSlZeroIndexFound">[1] is never 0: [2] answers from 1, where LSL's answered from 0, so its first is 1</string>
 	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
 	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauUnknownType">Unknown type '[1]'</string>
