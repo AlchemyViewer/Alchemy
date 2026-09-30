@@ -53,6 +53,7 @@
 #include "v3color.h"
 #include "llui.h"
 #include "llglheaders.h"
+#include "alrenderisolation.h"
 #include "alsamplerstate.h"
 #include "aluniformbuffer.h"
 #include "alwhitebalancesolver.h"
@@ -3178,7 +3179,12 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result)
         }
     }
 
-    if (hasRenderType(LLPipeline::RENDER_TYPE_SKY) &&
+    // Neither sky is part of a cutout's subject, and both come in here rather
+    // than through a partition the cutout's choke points see.
+    const bool cutout = cutoutFiltering();
+
+    if (!cutout &&
+        hasRenderType(LLPipeline::RENDER_TYPE_SKY) &&
         gSky.mVOSkyp.notNull() &&
         gSky.mVOSkyp->mDrawable.notNull())
     {
@@ -3188,7 +3194,8 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result)
         stop_glerror();
     }
 
-    if (hasRenderType(LLPipeline::RENDER_TYPE_WL_SKY) &&
+    if (!cutout &&
+        hasRenderType(LLPipeline::RENDER_TYPE_WL_SKY) &&
         gPipeline.canUseWindLightShaders() &&
         gSky.mVOWLSkyp.notNull() &&
         gSky.mVOWLSkyp->mDrawable.notNull())
@@ -3218,8 +3225,12 @@ void LLPipeline::markNotCulled(LLSpatialGroup* group, LLCamera& camera)
     { //render by drawable
         sCull->pushDrawableGroup(group);
     }
-    else
+    else if (!cutoutFiltering() || ALRenderIsolation::includes(group))
     {   //render by group
+        // A cutout frame's main pass draws only its subject's groups. The rest
+        // were marked visible above all the same: what one snapshot leaves out
+        // must not read as out of view to object-cache eviction, LOD or
+        // texture priority.
         sCull->pushVisibleGroup(group);
     }
 
@@ -3500,6 +3511,15 @@ void LLPipeline::markVisible(LLDrawable *drawablep, LLCamera& camera)
 {
     if(drawablep && !drawablep->isDead())
     {
+        if (cutoutFiltering() && !ALRenderIsolation::includes(drawablep))
+        {
+            // Left out of a cutout's frame, but seen, for the same reason as in
+            // markNotCulled. A bridge culls its own octree here, and each of its
+            // groups is turned away there in turn.
+            drawablep->setVisible(camera);
+            return;
+        }
+
         if (drawablep->isSpatialBridge())
         {
             const LLDrawable* root = ((LLSpatialBridge*) drawablep)->mDrawable;
@@ -3906,6 +3926,13 @@ void LLPipeline::stateSort(LLDrawable* drawablep, LLCamera& camera)
     if (!drawablep
         || drawablep->isDead()
         || !hasRenderType(drawablep->getRenderType()))
+    {
+        return;
+    }
+
+    // markVisible turned everything else away; this is the backstop for
+    // anything that reaches the visible list some other way.
+    if (cutoutFiltering() && !ALRenderIsolation::includes(drawablep))
     {
         return;
     }

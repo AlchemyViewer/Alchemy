@@ -168,6 +168,7 @@ if(AL_BUILD_VIEWER)
     alfloatersceneexplorerfilters.cpp
     alfloaterscopes.cpp
     alfloatertransactionlog.cpp
+    alrenderisolation.cpp
     alsceneexplorerpredicate.cpp
     alscopedata.cpp
     alscriptanalysis.cpp
@@ -1040,6 +1041,7 @@ if(AL_BUILD_VIEWER)
     alfloatersceneexplorerfilters.h
     alfloaterscopes.h
     alfloatertransactionlog.h
+    alrenderisolation.h
     alsceneexplorerpredicate.h
     alscopedata.h
     alscriptanalysis.h

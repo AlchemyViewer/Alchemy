@@ -38,6 +38,7 @@
 #include "raytrace.h"
 
 #include "alavatargroups.h"
+#include "alrenderisolation.h"
 #include "aoengine.h"
 #include "llagent.h" //  Get state values from here
 #include "llagentbenefits.h"
@@ -4808,10 +4809,13 @@ void LLVOAvatar::computeUpdatePeriod()
             mUpdatePeriod = UPDATE_RATE_SLOW;
         }
         else if (!shouldImpostorByRank()
-            || mDrawable->mDistanceWRTCamera < 1.f + mag)
+            || mDrawable->mDistanceWRTCamera < 1.f + mag
+            || ALRenderIsolation::isArmedAvatar(this))
         {   // first 25% of max visible avatars are not impostored
             // also, don't impostor avatars whose bounding box may be penetrating the
             // impostor camera near clip plane
+            // nor the one a snapshot cutout is waiting to take: an impostor has
+            // no attachments and is a billboard
             mUpdatePeriod = 1;
         }
         else if (shouldImpostorByRank(4.0))
