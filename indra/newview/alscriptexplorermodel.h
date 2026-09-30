@@ -320,6 +320,19 @@ public:
     // object's root; none for the row of prims holding nothing.
     static LLUUID primOf(const LLSD& row);
 
+    // --- comparing -----------------------------------------------------------------
+
+    // Two scripts, or two notecards, chosen to be compared, in their order;
+    // nothing where the rows are not two items of one kind.
+    static std::optional<std::pair<Choice, Choice>> comparing(const std::vector<Choice>& rows);
+    // What an item may be compared with: each other item of its kind a
+    // listed prim is known to hold, those of its name first, the rest in
+    // the list's order.
+    std::vector<Choice> comparableWith(const Choice& row) const;
+    // Where a row is, in words: its object's name, and its prim's after it
+    // where that is not the root.
+    std::string placeOf(const Choice& row) const;
+
     // --- pins ----------------------------------------------------------------------
 
     bool isPinned(const LLUUID& root) const;

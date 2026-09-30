@@ -59,6 +59,7 @@
 #include "roles_constants.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 namespace
 {
@@ -755,10 +756,7 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
     // only where it may modify it; an item read only where it may copy it,
     // and a script where it may modify it too.
     auto changeable = [this](const Choice& row) { return mModel.primModifiable(row.prim); };
-    auto readable   = [this](const Choice& row) {
-        const std::optional<ALScriptContents::Item> item = mModel.itemAt(row.ref());
-        return !item || gAgent.isGodlike() || (item->copy && (item->modify || !item->script));
-    };
+    auto readable   = [this](const Choice& row) { return this->readable(row); };
     auto itemChangeable = [this](const Choice& row) {
         const std::optional<ALScriptContents::Item> item = mModel.itemAt(row.ref());
         return !item || item->modify;
@@ -830,7 +828,71 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
     {
         return !rows.empty();
     }
+    if (action == "compare")
+    {
+        const auto pair = Model::comparing(rows);
+        return pair && readable(pair->first) && readable(pair->second);
+    }
+    if (action == "compare_with")
+    {
+        return rows.size() == 1 && rows.front().isItem() && readable(rows.front());
+    }
     return false;
+}
+
+bool ALScriptExplorerPane::readable(const Choice& row) const
+{
+    const std::optional<ALScriptContents::Item> item = mModel.itemAt(row.ref());
+    return !item || gAgent.isGodlike() || (item->copy && (item->modify || !item->script));
+}
+
+void ALScriptExplorerPane::compare(const Choice& first, const Choice& second)
+{
+    // The one open already is the one compared, its text as it is now:
+    // only a tab can be set beside another text.
+    const bool    swap  = !mServices->findDoc(first.ref()) && mServices->findDoc(second.ref());
+    const Choice& open  = swap ? second : first;
+    const Choice& other = swap ? first : second;
+    const auto    title = [this](const Choice& row) {
+        const std::string place = mModel.placeOf(row);
+        return place.empty() ? row.name : place + " \xE2\x96\xB8 " + row.name;
+    };
+    mWindow->compareItems(open.ref(), open.name, title(open), other.ref(), title(other));
+}
+
+void ALScriptExplorerPane::compareWith(const Choice& row)
+{
+    std::vector<Choice> others = mModel.comparableWith(row);
+    others.erase(std::remove_if(others.begin(), others.end(), [this](const Choice& one) { return !readable(one); }), others.end());
+    if (others.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = row.name;
+        mServices->setStatus(mServices->words("ExplorerNothingToCompare", args));
+        return;
+    }
+    std::vector<ALQuickOpen::Candidate> candidates;
+    for (size_t i = 0; i < others.size(); ++i)
+    {
+        ALQuickOpen::Candidate candidate;
+        candidate.label  = others[i].name;
+        candidate.detail = mModel.placeOf(others[i]);
+        candidate.value  = std::to_string(i);
+        candidates.push_back(std::move(candidate));
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"]                 = row.name;
+    const LLHandle<LLPanel> handle = getHandle();
+    mWindow->pick(std::move(candidates), mServices->words("ExplorerComparePlaceholder"), mServices->words("ExplorerCompareTitle", args),
+                  [handle, row, others](const std::string& value) {
+                      ALScriptExplorerPane* pane  = ALViewType::as<ALScriptExplorerPane>(handle.get());
+                      const size_t          index = static_cast<size_t>(std::strtoul(value.c_str(), nullptr, 10));
+                      if (pane && index < others.size())
+                      {
+                          pane->compare(row, others[index]);
+                      }
+                  },
+                  nullptr);
 }
 
 void ALScriptExplorerPane::act(const std::string& action)
@@ -926,6 +988,17 @@ void ALScriptExplorerPane::act(const std::string& action)
     else if (action == "edit_in_world")
     {
         editInWorld(rows.front());
+    }
+    else if (action == "compare")
+    {
+        if (const auto pair = Model::comparing(rows))
+        {
+            compare(pair->first, pair->second);
+        }
+    }
+    else if (action == "compare_with")
+    {
+        compareWith(rows.front());
     }
     else if (action == "describe")
     {

@@ -2377,6 +2377,7 @@ void ALFloaterScriptStudio::loadedNotecard(Doc& doc, const ALScriptLoaded& answe
         relistExplorer();
     }
     goToPending(doc);
+    comparePending(doc);
 }
 
 // A script loaded: its text, or the source out of the envelope it went up
@@ -2474,6 +2475,7 @@ void ALFloaterScriptStudio::loadedScript(Doc& doc, const ALScriptLoaded& answer)
         refreshProblems(doc);
     }
     goToPending(doc);
+    comparePending(doc);
 }
 
 void ALFloaterScriptStudio::showExpanded(Doc& doc, const std::string& text)
@@ -6052,6 +6054,77 @@ void ALFloaterScriptStudio::goToPlace(const ALScriptRef& ref, const std::string&
         doc.pendingColumn = column;
         doc.pendingLength = length;
     }
+}
+
+void ALFloaterScriptStudio::compareItems(const ALScriptRef& first, const std::string& name, const std::string& first_title,
+                                         const ALScriptRef& second, const std::string& second_title)
+{
+    size_t index = indexOf(first);
+    // Open in another window: compared there.
+    if (ALFloaterScriptStudio* holder = index == NONE ? holderOf(first, std::string()) : nullptr; holder && holder != this)
+    {
+        holder->openFloater(holder->getKey());
+        holder->setFocus(true);
+        holder->compareItems(first, name, first_title, second, second_title);
+        return;
+    }
+    if (index == NONE)
+    {
+        openScript(first, name);
+        index = indexOf(first);
+        if (index == NONE)
+        {
+            return;
+        }
+    }
+    else
+    {
+        activate(index);
+    }
+    // The other's text as the region has it, out of its envelope, set
+    // beside this one's as it is now -- or once it has loaded.
+    const LLHandle<LLFloater> handle = getHandle();
+    const std::string         id     = mDocs[index]->id;
+    ALScriptWorkspace::instance().load(second, [handle, id, first_title, second_title](const ALScriptLoaded& answer) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        Doc*                   found  = studio ? studio->findDoc(id) : nullptr;
+        if (!found)
+        {
+            return;
+        }
+        if (!answer.error.empty())
+        {
+            LLStringUtil::format_map_t args;
+            args["[NAME]"]  = second_title;
+            args["[ERROR]"] = answer.error;
+            studio->setStatus(studio->getString("CompareNotLoaded", args), true);
+            return;
+        }
+        found->pendingCompare = Doc::PendingCompare{ answer.notecard ? answer.text : sourceOf(answer), second_title, first_title };
+        if (found->loaded)
+        {
+            studio->comparePending(*found);
+        }
+    });
+}
+
+void ALFloaterScriptStudio::comparePending(Doc& doc)
+{
+    if (!doc.pendingCompare)
+    {
+        return;
+    }
+    const Doc::PendingCompare pending = std::move(*doc.pendingCompare);
+    doc.pendingCompare.reset();
+    // This tab's text as it stands, which it says where it is not saved.
+    std::string own = pending.ownTitle;
+    if (doc.unsaved())
+    {
+        LLStringUtil::format_map_t args;
+        args["[TITLE]"] = own;
+        own             = getString("CompareUnsaved", args);
+    }
+    compare(doc, pending.text, doc.editor->wholeText(), pending.theirTitle, own);
 }
 
 // --- windows ---------------------------------------------------------------------------

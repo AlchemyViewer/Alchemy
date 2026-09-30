@@ -557,6 +557,16 @@ struct ALScriptStudioDoc
         bool         replace = false;
     };
     std::vector<PendingEdit>                   pendingEdits;
+    // Another item's text to set this one's beside once it has loaded --
+    // the Explorer's Compare, asked before the tab had its text -- under
+    // the other's title and its own.
+    struct PendingCompare
+    {
+        std::string text;
+        std::string theirTitle;
+        std::string ownTitle;
+    };
+    std::optional<PendingCompare>              pendingCompare;
     // The script held open in an external editor (ALScriptExternalEditor).
     struct External;
     Part<External>                             external;

@@ -588,4 +588,71 @@ namespace tut
         const std::vector<Model::Row> all = again.rows(std::string());
         ensure("listed away, with its region", !all.empty() && !all[0].present && all[0].region == "Morris");
     }
+
+    template<> template<>
+    void alscriptexplorermodel_object::test<14>()
+    {
+        set_test_name("two scripts or two notecards compare; what one compares with is its kind elsewhere, its name first; and where each is");
+        const LLUUID door  = object(10, "Door", 2);
+        const LLUUID lamp  = object(20, "Lamp");
+        selected           = { door, lamp };
+        list();
+        ask(false, false);
+        holds(id(10), { "open.lsl", "notes" });
+        holds(id(11), { "open.lsl" });
+        holds(id(20), { "blink.lsl", "open.lsl", "notes" });
+        const auto choiceOf = [this](const LLUUID& prim, const std::string& name) {
+            Model::Choice one;
+            for (const Model::Object& object : model.objects())
+            {
+                for (const Model::Prim& part : object.prims)
+                {
+                    if (part.id == prim)
+                    {
+                        one.root = object.root;
+                    }
+                }
+            }
+            one.prim = prim;
+            for (const ALScriptContents::Item& item : index.items(prim))
+            {
+                if (item.name == name)
+                {
+                    one.item   = item.id;
+                    one.name   = item.name;
+                    one.script = item.script;
+                }
+            }
+            return one;
+        };
+        const Model::Choice here   = choiceOf(id(10), "open.lsl");
+        const Model::Choice child  = choiceOf(id(11), "open.lsl");
+        const Model::Choice notes  = choiceOf(id(10), "notes");
+        const Model::Choice there  = choiceOf(id(20), "open.lsl");
+        const Model::Choice blink  = choiceOf(id(20), "blink.lsl");
+        Model::Choice       prim;
+        prim.root = door;
+        prim.prim = id(11);
+
+        const auto pair = Model::comparing({ here, there });
+        ensure("two scripts, in their order", pair && pair->first.ref() == here.ref() && pair->second.ref() == there.ref());
+        ensure("not a script and a notecard", !Model::comparing({ here, notes }));
+        ensure("not one", !Model::comparing({ here }));
+        ensure("not three", !Model::comparing({ here, there, blink }));
+        ensure("not a prim", !Model::comparing({ here, prim }));
+        ensure("not the same twice", !Model::comparing({ here, here }));
+
+        const std::vector<Model::Choice> others = model.comparableWith(here);
+        std::string                      said;
+        for (const Model::Choice& one : others)
+        {
+            said += (said.empty() ? "" : " ") + model.placeOf(one) + "/" + one.name;
+        }
+        ensure_equals("scripts only, its name first, not itself", said,
+                      std::string("Door \xE2\x96\xB8 Door.1/open.lsl Lamp/open.lsl Lamp/blink.lsl"));
+        ensure_equals("a notecard's are notecards", model.comparableWith(notes).size(), 1U);
+        ensure("a prim compares with nothing", model.comparableWith(prim).empty());
+        ensure_equals("a root's place is its object", model.placeOf(here), std::string("Door"));
+        ensure_equals("a child's has its prim", model.placeOf(child), std::string("Door \xE2\x96\xB8 Door.1"));
+    }
 }

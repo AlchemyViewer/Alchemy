@@ -389,8 +389,9 @@ private:
     void loadedNotecard(Doc& doc, const ALScriptLoaded& answer);
     void loadedScript(Doc& doc, const ALScriptLoaded& answer);
     // The caret to the line, or the stretch, asked for before the text had
-    // loaded, once it has.
+    // loaded, once it has; and the Compare asked for then.
     void goToPending(Doc& doc);
+    void comparePending(Doc& doc);
     // A notecard's items (ALNotecardEmbedded), made for a tab loaded or
     // kept as a notecard, afresh where `fresh`.
     ALNotecardEmbedded& notecardItems(Doc& doc, bool fresh = false);
@@ -893,6 +894,8 @@ private:
     void itemRenamed(const ALScriptRef& ref, const std::string& name) override;
     void itemDeleted(const ALScriptRef& ref) override;
     bool unsavedAnywhere(const ALScriptRef& ref) const override;
+    void compareItems(const ALScriptRef& first, const std::string& name, const std::string& first_title, const ALScriptRef& second,
+                      const std::string& second_title) override;
     // What the Search tab asks of the window (ALScriptSearchPane::Window).
     void listObjects(const LLUUID& only, std::function<void(std::vector<ALScriptSearchPane::Window::Object>)> told) override;
     std::string                                     objectName(const LLUUID& root) const override;

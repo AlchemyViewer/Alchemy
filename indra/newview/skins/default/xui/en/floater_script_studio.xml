@@ -450,6 +450,11 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="NoticeCompare">Compare</floater.string>
     <floater.string name="NoticeCompareTip">Show both texts side by side, with changes marked; Escape closes the comparison</floater.string>
     <floater.string name="CompareNow">This tab now</floater.string>
+    <floater.string name="CompareUnsaved">[TITLE] (unsaved)</floater.string>
+    <floater.string name="CompareNotLoaded">Could not load [NAME] to compare: [ERROR]</floater.string>
+    <floater.string name="ExplorerCompareTitle">Compare [NAME] with</floater.string>
+    <floater.string name="ExplorerComparePlaceholder">Type a name to find a script or notecard</floater.string>
+    <floater.string name="ExplorerNothingToCompare">Nothing listed in the Explorer is like [NAME] to compare it with. Pin or select the other object first.</floater.string>
     <floater.string name="CompareSaved">As last saved</floater.string>
     <floater.string name="CompareNothingSaved">There is no saved text to compare with: you undid past the last save, then made a change.</floater.string>
     <floater.string name="CompareKept">Unsaved changes, [WHEN]</floater.string>
