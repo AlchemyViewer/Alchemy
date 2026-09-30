@@ -777,6 +777,10 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LSLSyntaxUnexpectedWanted">Did not expect [1] here; expected [2].</string>
 	<string name="LSLParameterUntyped">The parameter '[1]' needs its type before it: integer, float, string, key, vector, rotation or list.</string>
 	<string name="LSLSlLoopInvariantCall">[1] is worked out again on every turn of the loop, though nothing in the loop changes what it is given: a local set before the loop works it out once</string>
+	<string name="LSLSlSleepingCall">[1] makes the script sleep [2] s each call; [3] does the same without the sleep</string>
+	<string name="LSLSlSleepingCallOften">[1] makes the script sleep [2] s each time it runs here, in a loop or the timer event; [3] does the same without the sleep</string>
+	<string name="LSLSlSleepingTexture">[1] makes the script sleep [2] s each call; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
+	<string name="LSLSlSleepingTextureOften">[1] makes the script sleep [2] s each time it runs here, in a loop or the timer event; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
 	<string name="LuauLintUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauLintDeprecatedGlobal">Global '[1]' is deprecated, use '[2]' instead</string>
 	<string name="LuauLintDeprecatedGlobalPlain">Global '[1]' is deprecated</string>
@@ -893,6 +897,10 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlIndexDivision">[1] may be a fraction, which a list has nothing at: Luau's / divides as floats do, where LSL's integers divided whole. [2] rounds down</string>
 	<string name="LuauLintSlVectorProduct">[1] multiplies each part of two vectors, and gives a vector: LSL's * of two vectors was their dot product, a number. vector.dot([2], [3]) is LSL's</string>
 	<string name="LuauLintSlVectorCross">[1] is each part's remainder in SLua: LSL's % of two vectors was their cross product. vector.cross([2], [3]) is LSL's</string>
+	<string name="LuauLintSlSleepingCall">[1] makes the script sleep [2] s each call; [3] does the same without the sleep</string>
+	<string name="LuauLintSlSleepingCallOften">[1] makes the script sleep [2] s each time it runs here, in a loop or a timer; [3] does the same without the sleep</string>
+	<string name="LuauLintSlSleepingTexture">[1] makes the script sleep [2] s each call; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
+	<string name="LuauLintSlSleepingTextureOften">[1] makes the script sleep [2] s each time it runs here, in a loop or a timer; [3] sets a face's texture with no sleep, given its repeats, offsets and rotation too</string>
 	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
 	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauUnknownType">Unknown type '[1]'</string>

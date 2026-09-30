@@ -371,7 +371,7 @@ namespace ALScriptLints
         Level defaultOf(bool lua, std::string_view id)
         {
             const ALScriptLintPass::Rule* rule = ALScriptLintPass::rule(id);
-            return rule && rule->lua == lua && !rule->on ? Level::Off : Level::Warning;
+            return rule && rule->in(lua) && !rule->on ? Level::Off : Level::Warning;
         }
     }
 
@@ -386,7 +386,7 @@ namespace ALScriptLints
             // The studio's own after Tailslide's.
             for (const ALScriptLintPass::Rule& rule : ALScriptLintPass::rules())
             {
-                if (!rule.lua)
+                if (rule.in(false))
                 {
                     out.push_back(Lint{ rule.name, false });
                 }
@@ -398,7 +398,7 @@ namespace ALScriptLints
             // The studio's own after Luau's.
             for (const ALScriptLintPass::Rule& rule : ALScriptLintPass::rules())
             {
-                if (rule.lua)
+                if (rule.in(true))
                 {
                     out.push_back(Lint{ rule.name, true });
                 }

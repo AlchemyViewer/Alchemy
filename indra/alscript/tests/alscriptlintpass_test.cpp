@@ -24,6 +24,7 @@
 
 #include "linden_common.h"
 
+#include "../allslservice.h"
 #include "../alluauservice.h"
 #include "../alscriptfixes.h"
 
@@ -38,8 +39,10 @@ namespace tut
     struct alscriptlintpass_data
     {
         ALLuauService luau;
+        ALLSLService  lsl;
         std::string   error;
-        bool          loaded = false;
+        bool          loaded    = false;
+        bool          lslLoaded = false;
         // Luau's new type solver, where the run asks for it: CTest runs
         // these twice, the second time with AL_TEST_LUAU_SOLVER=new.
         const bool    newSolver = getenv("AL_TEST_LUAU_SOLVER") && std::string(getenv("AL_TEST_LUAU_SOLVER")) == "new";
@@ -50,8 +53,12 @@ namespace tut
             std::stringstream text;
             text << in.rdbuf();
             luau.setNewSolver(newSolver, error);
-            loaded = luau.loadDefinitions(text.str(), error);
+            loaded    = luau.loadDefinitions(text.str(), error);
+            lslLoaded = lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error);
         }
+
+        // A rule both languages have is said by both: SLua's, or LSL's.
+        ALScriptProblems check(const std::string& script, bool lua) { return lua ? luau.check(script) : lsl.check(script); }
 
         static std::string said(const ALScriptProblems& problems)
         {
@@ -79,9 +86,9 @@ namespace tut
         // What a rule said of a script, in the order of its places: each as
         // its line, its key, and its args, split by |; and its severity where
         // that is not the one expected.
-        std::string found(const std::string& script, const std::string& rule, ALScriptProblem::Severity expected)
+        std::string found(const std::string& script, const std::string& rule, ALScriptProblem::Severity expected, bool lua = true)
         {
-            ALScriptProblems problems = luau.check(script);
+            ALScriptProblems problems = check(script, lua);
             std::stable_sort(problems.begin(), problems.end(), [](const ALScriptProblem& a, const ALScriptProblem& b) {
                 return a.line != b.line ? a.line < b.line : a.column < b.column;
             });
@@ -105,9 +112,9 @@ namespace tut
         // The problem keyed so, its preferred fix -- titled so, and safe or
         // not as said -- the text with it made, and that text checked again:
         // the problem gone, and no error in its place.
-        std::string fixed(const std::string& script, const std::string& key, const std::string& title, bool safe)
+        std::string fixed(const std::string& script, const std::string& key, const std::string& title, bool safe, bool lua = true)
         {
-            const ALScriptProblems problems = luau.check(script);
+            const ALScriptProblems problems = check(script, lua);
             const ALScriptProblem* problem  = keyed(problems, key);
             ensure("said: " + key + "\n" + said(problems), problem != nullptr);
             ensure("a fix: " + said(problems), !problem->fixes.empty());
@@ -117,7 +124,7 @@ namespace tut
             ensure_equals("safe or not", fix.safe, safe);
             const std::optional<std::string> made = ALScriptFixes::apply(script, fix);
             ensure("applies", made.has_value());
-            const ALScriptProblems after = luau.check(*made);
+            const ALScriptProblems after = check(*made, lua);
             ensure("gone from:\n" + *made + "\n" + said(after), keyed(after, key) == nullptr);
             ensure("no error in its place:\n" + *made + "\n" + said(after),
                    errors(after) <= errors(problems) - (problem->severity == ALScriptProblem::Severity::Error ? 1 : 0));
@@ -125,9 +132,9 @@ namespace tut
         }
 
         // The problem keyed so is said, and offers no fix.
-        void unfixed(const std::string& script, const std::string& key)
+        void unfixed(const std::string& script, const std::string& key, bool lua = true)
         {
-            const ALScriptProblems problems = luau.check(script);
+            const ALScriptProblems problems = check(script, lua);
             const ALScriptProblem* problem  = keyed(problems, key);
             ensure("said: " + key + "\n" + said(problems), problem != nullptr);
             ensure("no fix: " + said(problems), problem->fixes.empty());
@@ -524,5 +531,74 @@ namespace tut
                       std::string("local a = vector(1, 0, 0)\nprint(vector.dot(a, a) > 0.5)\n"));
         ensure_equals("cross", fixed("local a = vector(1, 0, 0)\nlocal c = a % a\nprint(c)\n", "LuauLintSlVectorCross", "Write it vector.cross(a, a)", false),
                       std::string("local a = vector(1, 0, 0)\nlocal c = vector.cross(a, a)\nprint(c)\n"));
+    }
+
+    template<> template<>
+    void object::test<13>()
+    {
+        set_test_name("SlSleepingCall in SLua: a call that sleeps where a Fast one does not, a note, and a warning in a loop or a timer; "
+                      "fixed as the Fast call, its arguments put in or, where only settled, written again; a texture's, no fix");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local v = vector(1, 2, 3)\n"
+                                       "ll.SetPos(v)\n"
+                                       "for i = 1, 3 do ll.SetRot(quaternion(0, 0, 0, 1)) end\n"
+                                       "LLTimers:every(1, function() ll.SetPrimitiveParams({PRIM_POSITION, v}) end)\n"
+                                       "ll.SetTexture(\"x\", 0)\n"
+                                       "ll.SetLinkRenderMaterial(LINK_THIS, \"m\", 0)\n"
+                                       "ll.SetLinkPrimitiveParamsFast(LINK_THIS, {})\n"
+                                       "llcompat.SetPos(v)\n",
+                                       "SlSleepingCall", ALScriptProblem::Severity::Note);
+        ensure_equals("each", said,
+                      std::string("1 LuauLintSlSleepingCall|ll.SetPos|0.2|ll.SetLinkPrimitiveParamsFast\n"
+                                  "2 LuauLintSlSleepingCallOften|ll.SetRot|0.2|ll.SetLinkPrimitiveParamsFast (another severity)\n"
+                                  "3 LuauLintSlSleepingCallOften|ll.SetPrimitiveParams|0.2|ll.SetLinkPrimitiveParamsFast (another severity)\n"
+                                  "4 LuauLintSlSleepingTexture|ll.SetTexture|0.2|PRIM_TEXTURE\n"
+                                  "5 LuauLintSlSleepingCall|ll.SetLinkRenderMaterial|0.2|ll.SetLinkPrimitiveParamsFast\n"
+                                  "7 LuauLintSlSleepingCall|llcompat.SetPos|0.2|llcompat.SetLinkPrimitiveParamsFast\n"));
+        ensure_equals("put in", fixed("local v = vector(1, 2, 3)\nll.SetPos(v)\n", "LuauLintSlSleepingCall",
+                                      "Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_POSITION, v})", false),
+                      std::string("local v = vector(1, 2, 3)\nll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_POSITION, v})\n"));
+        ensure_equals("a link first, in a timer", fixed("LLTimers:every(1, function() ll.SetPrimitiveParams({}) end)\n", "LuauLintSlSleepingCallOften",
+                                                        "Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {})", false),
+                      std::string("LLTimers:every(1, function() ll.SetLinkPrimitiveParamsFast(LINK_THIS, {}) end)\n"));
+        ensure_equals("written again", fixed("ll.SetLinkRenderMaterial(LINK_THIS, \"m\", 0)\n", "LuauLintSlSleepingCall",
+                                             "Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_RENDER_MATERIAL, 0, \"m\"})", false),
+                      std::string("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_RENDER_MATERIAL, 0, \"m\"})\n"));
+        unfixed("ll.SetTexture(\"x\", 0)\n", "LuauLintSlSleepingTexture");
+        unfixed("ll.SetRenderMaterial(tostring(1), 0)\n", "LuauLintSlSleepingCall");
+    }
+
+    template<> template<>
+    void object::test<14>()
+    {
+        set_test_name("SlSleepingCall in LSL: the same table, a warning in a loop or the timer event; fixed over the text, a vector's commas "
+                      "and a comment in the way");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string said = found("default {\n"
+                                       "    state_entry() {\n"
+                                       "        llSetPos(<1, 2, 3>);\n"
+                                       "        integer i;\n"
+                                       "        for (i = 0; i < 3; ++i) llSetRot(ZERO_ROTATION);\n"
+                                       "        llSetLinkRenderMaterial(LINK_THIS, \"m\", ALL_SIDES);\n"
+                                       "        llSetTexture(\"x\", 0);\n"
+                                       "    }\n"
+                                       "    timer() {\n"
+                                       "        llSetPrimitiveParams([PRIM_POSITION, <1, 2, 3>]);\n"
+                                       "    }\n"
+                                       "}\n",
+                                       "SlSleepingCall", ALScriptProblem::Severity::Note, false);
+        ensure_equals("each", said,
+                      std::string("2 LSLSlSleepingCall|llSetPos|0.2|llSetLinkPrimitiveParamsFast\n"
+                                  "4 LSLSlSleepingCallOften|llSetRot|0.2|llSetLinkPrimitiveParamsFast (another severity)\n"
+                                  "5 LSLSlSleepingCall|llSetLinkRenderMaterial|0.2|llSetLinkPrimitiveParamsFast\n"
+                                  "6 LSLSlSleepingTexture|llSetTexture|0.2|PRIM_TEXTURE\n"
+                                  "9 LSLSlSleepingCallOften|llSetPrimitiveParams|0.2|llSetLinkPrimitiveParamsFast (another severity)\n"));
+        ensure_equals("put in", fixed("default { state_entry() { llSetPos( <1, 2, 3> /* here */ ); } }\n", "LSLSlSleepingCall",
+                                      "Write it llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_POSITION, <1, 2, 3> /* here */])", false, false),
+                      std::string("default { state_entry() { llSetLinkPrimitiveParamsFast( LINK_THIS, [PRIM_POSITION, <1, 2, 3> /* here */] ); } }\n"));
+        ensure_equals("written again", fixed("default { state_entry() { llSetLinkRenderMaterial(LINK_THIS, \"m\", ALL_SIDES); } }\n", "LSLSlSleepingCall",
+                                             "Write it llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_RENDER_MATERIAL, ALL_SIDES, \"m\"])", false, false),
+                      std::string("default { state_entry() { llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_RENDER_MATERIAL, ALL_SIDES, \"m\"]); } }\n"));
+        unfixed("default { state_entry() { llSetRenderMaterial(llGetInventoryName(INVENTORY_MATERIAL, 0), 0); } }\n", "LSLSlSleepingCall", false);
     }
 }

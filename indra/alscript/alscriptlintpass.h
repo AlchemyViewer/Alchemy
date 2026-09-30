@@ -27,7 +27,10 @@
 #include "alscriptproblem.h"
 
 #include <cstdint>
+#include <optional>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace Luau
@@ -53,17 +56,47 @@ class ALScriptLintPass
 public:
     struct Rule
     {
+        // The languages a rule reads: a habit both share -- a sleeping
+        // call, a merge of prim params -- is one rule in each.
+        enum Languages : U8
+        {
+            SLua = 1,
+            LSL  = 2,
+            Both = SLua | LSL,
+        };
         const char*               name;
-        // SLua's; else LSL's.
-        bool                      lua;
+        Languages                 languages;
         // What it says where on and not an error: a warning, or a note of
         // a way SLua has of its own.
         ALScriptProblem::Severity severity;
         bool                      on;
         bool                      fixable;
         const char*               selene;
+
+        bool in(bool lua) const { return (languages & (lua ? SLua : LSL)) != 0; }
     };
     static const std::vector<Rule>& rules();
+
+    // SlSleepingCall's table, which both languages' passes read: a call
+    // that sleeps, and what does the same without -- its function, and
+    // its arguments with $1, $2 for the call's own -- or where nothing
+    // does quite the same, the prim-params rule that would, with more.
+    struct Sleepless
+    {
+        const char* lsl;
+        const char* fast;
+        const char* args;
+        const char* rule;
+    };
+    static const Sleepless* sleepless(std::string_view lsl);
+    // The sleepless call's arguments, the call's own put in their places,
+    // a list's brackets SLua's where `lua`; nothing where it has none, or
+    // is given too few.
+    static std::optional<std::string> sleeplessArgs(const Sleepless& call, const std::vector<std::string>& args, bool lua);
+    // Where it takes the call's arguments in their order, together, what
+    // comes before and after them: the sleepless call made by putting
+    // those in, rather than writing the arguments again.
+    static std::optional<std::pair<std::string, std::string>> around(const Sleepless& call, bool lua);
     static const Rule*              rule(std::string_view name);
     // A rule's bit, or 0 for a name that is none.
     static uint64_t bit(std::string_view name);

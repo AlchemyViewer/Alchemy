@@ -1553,10 +1553,20 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
         }
         problems.push_back(std::move(problem));
     }
-    // The studio's own lints, beside Tailslide's warnings.
+    // The studio's own lints, beside Tailslide's warnings: their fixes,
+    // made as the pass read the script, offered only where they will be
+    // read.
     if (script)
     {
-        ALLSLLintPass::check(script, problems);
+        const size_t before = problems.size();
+        ALLSLLintPass::check(source, script, problems);
+        for (size_t i = before; i < problems.size(); ++i)
+        {
+            if (ALSourceMap::within(mImpl->passedOver, problems[i].line, std::max(problems[i].line, problems[i].endLine)))
+            {
+                problems[i].fixes.clear();
+            }
+        }
     }
     // A name it does not know changed to the nearest it does, where one is
     // near: Tailslide suggested one itself once, and no longer does.

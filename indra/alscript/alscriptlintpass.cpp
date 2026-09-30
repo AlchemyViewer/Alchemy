@@ -47,47 +47,72 @@
 namespace
 {
     using Severity = ALScriptProblem::Severity;
+    using Rule     = ALScriptLintPass::Rule;
 
     // --- the table ------------------------------------------------------------------
 
-    const std::vector<ALScriptLintPass::Rule> RULES = {
+    const std::vector<Rule> RULES = {
         // x = x + 1, where Luau has x += 1.
-        { "SlCompoundAssign", true, Severity::Note, true, true, nullptr },
+        { "SlCompoundAssign", Rule::SLua, Severity::Note, true, true, nullptr },
         // LSL: llGetListLength(l) in a loop's check, l unchanged in it.
-        { "SlLoopInvariantCall", false, Severity::Note, true, true, nullptr },
+        { "SlLoopInvariantCall", Rule::LSL, Severity::Note, true, true, nullptr },
         // if n then, where n is a number: true at 0 as at anything.
-        { "SlNumberTruth", true, Severity::Warning, true, true, nullptr },
+        { "SlNumberTruth", Rule::SLua, Severity::Warning, true, true, nullptr },
         // ll.ListFindList(l, x) == -1, where it answers nil; llcompat's
         // against nil, where it answers -1.
-        { "SlNilSentinel", true, Severity::Error, true, true, nullptr },
+        { "SlNilSentinel", Rule::SLua, Severity::Error, true, true, nullptr },
         // t == {}: a table built there equals no other.
-        { "SlTableCompare", true, Severity::Error, true, true, nullptr },
+        { "SlTableCompare", Rule::SLua, Severity::Error, true, true, nullptr },
         // t[0], for i = 0, #t - 1, string.sub(s, 0, n), ll.X(s, 0): LSL
         // counted from 0.
-        { "SlZeroIndex", true, Severity::Warning, true, true, nullptr },
+        { "SlZeroIndex", Rule::SLua, Severity::Warning, true, true, nullptr },
         // llcompat.X where ll.X means the same: its fix is ll's.
-        { "SlCompatCall", true, Severity::Note, true, true, nullptr },
+        { "SlCompatCall", Rule::SLua, Severity::Note, true, true, nullptr },
         // b == 1, where b is a boolean: LSL's truths were numbers.
-        { "SlBooleanNumber", true, Severity::Error, true, true, nullptr },
+        { "SlBooleanNumber", Rule::SLua, Severity::Error, true, true, nullptr },
         // x = 0 or function f() making a global; a function f() in a nested
         // scope, lute's global_function_in_scope.
-        { "SlGlobalAssign", true, Severity::Warning, true, true, nullptr },
+        { "SlGlobalAssign", Rule::SLua, Severity::Warning, true, true, nullptr },
         // if (x) then: LSL's brackets, which Luau's if needs none of.
-        { "SlParenCondition", true, Severity::Note, true, true, "parenthese_conditions" },
+        { "SlParenCondition", Rule::SLua, Severity::Note, true, true, "parenthese_conditions" },
         // a = b followed by b = a, which is no swap.
-        { "SlAlmostSwapped", true, Severity::Warning, true, true, "almost_swapped" },
+        { "SlAlmostSwapped", Rule::SLua, Severity::Warning, true, true, "almost_swapped" },
         // string.upper(s) alone, ll.DeleteSubList(l, 1, 1) alone: an answer
         // thrown away from what does nothing else.
-        { "SlMustUse", true, Severity::Warning, true, true, nullptr },
+        { "SlMustUse", Rule::SLua, Severity::Warning, true, true, nullptr },
         // for k, v in pairs(t), where Luau's for walks t itself.
-        { "SlGeneralizedFor", true, Severity::Note, true, true, nullptr },
+        { "SlGeneralizedFor", Rule::SLua, Severity::Note, true, true, nullptr },
         // An if or a loop whose block is empty.
-        { "SlEmptyBlock", true, Severity::Warning, true, true, "empty_if empty_loop" },
+        { "SlEmptyBlock", Rule::SLua, Severity::Warning, true, true, "empty_if empty_loop" },
         // t[n / 2]: Luau's / makes a fraction, which a list has nothing at.
-        { "SlIndexDivision", true, Severity::Warning, true, true, nullptr },
+        { "SlIndexDivision", Rule::SLua, Severity::Warning, true, true, nullptr },
         // a * b of vectors where a number is wanted, LSL's dot product; a % b,
         // LSL's cross product.
-        { "SlVectorProduct", true, Severity::Warning, true, true, nullptr },
+        { "SlVectorProduct", Rule::SLua, Severity::Warning, true, true, nullptr },
+        // llSetPos, llSetPrimitiveParams: a call that sleeps, which a Fast
+        // one does without. A warning in a loop or a timer.
+        { "SlSleepingCall", Rule::Both, Severity::Note, true, true, nullptr },
+    };
+
+    // The sleeping calls with a sleepless way of doing the same, the
+    // arguments by their places: $1, $2. A list is written [ ], which SLua
+    // writes { }. Where nothing does quite the same -- a texture's calls,
+    // whose rule sets its repeats, offsets and rotation with it -- the rule
+    // alone, and no call.
+    const ALScriptLintPass::Sleepless SLEEPLESS[] = {
+        { "llGetPrimitiveParams", "llGetLinkPrimitiveParams", "LINK_THIS, $1", nullptr },
+        { "llOffsetTexture", nullptr, nullptr, "PRIM_TEXTURE" },
+        { "llRotateTexture", nullptr, nullptr, "PRIM_TEXTURE" },
+        { "llScaleTexture", nullptr, nullptr, "PRIM_TEXTURE" },
+        { "llSetLinkPrimitiveParams", "llSetLinkPrimitiveParamsFast", "$1, $2", nullptr },
+        { "llSetLinkRenderMaterial", "llSetLinkPrimitiveParamsFast", "$1, [PRIM_RENDER_MATERIAL, $3, $2]", nullptr },
+        { "llSetLinkTexture", nullptr, nullptr, "PRIM_TEXTURE" },
+        { "llSetLocalRot", "llSetLinkPrimitiveParamsFast", "LINK_THIS, [PRIM_ROT_LOCAL, $1]", nullptr },
+        { "llSetPos", "llSetLinkPrimitiveParamsFast", "LINK_THIS, [PRIM_POSITION, $1]", nullptr },
+        { "llSetPrimitiveParams", "llSetLinkPrimitiveParamsFast", "LINK_THIS, $1", nullptr },
+        { "llSetRenderMaterial", "llSetLinkPrimitiveParamsFast", "LINK_THIS, [PRIM_RENDER_MATERIAL, $2, $1]", nullptr },
+        { "llSetRot", "llSetLinkPrimitiveParamsFast", "LINK_THIS, [PRIM_ROTATION, $1]", nullptr },
+        { "llSetTexture", nullptr, nullptr, "PRIM_TEXTURE" },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -449,6 +474,7 @@ namespace
         // gap, and a table's own __iter is what for uses, pairs not.
         bool visit(Luau::AstStatForIn* node) override
         {
+            mOften.push_back(node->body->location);
             emptyLoop(node->body, Luau::Location(node->location.begin, node->body->location.begin),
                       Luau::Location(node->body->location.begin, node->location.end), "for");
             if (!on("SlGeneralizedFor") || node->values.size == 0)
@@ -546,6 +572,7 @@ namespace
         {
             truth(node->condition);
             bracketedCondition(node->condition, node->location);
+            mOften.push_back(node->body->location);
             emptyLoop(node->body, Luau::Location(node->location.begin, node->body->location.begin),
                       Luau::Location(node->body->location.begin, node->location.end), "while");
             return true;
@@ -554,6 +581,7 @@ namespace
         {
             truth(node->condition);
             bracketedCondition(node->condition, std::nullopt);
+            mOften.push_back(node->body->location);
             emptyLoop(node->body, node->location, Luau::Location(node->body->location.begin, node->condition->location.begin), "repeat");
             return true;
         }
@@ -587,6 +615,10 @@ namespace
 
         bool visit(Luau::AstStatAssign* node) override
         {
+            for (size_t i = 0; i < node->vars.size && i < node->values.size; ++i)
+            {
+                timerFunction(node->vars.data[i], node->values.data[i]);
+            }
             if (on("SlCompoundAssign") && node->vars.size == 1 && node->values.size == 1)
             {
                 const auto* sum = node->values.data[0]->as<Luau::AstExprBinary>();
@@ -658,6 +690,7 @@ namespace
             {
                 zeroLoop(node);
             }
+            mOften.push_back(node->body->location);
             emptyLoop(node->body, Luau::Location(node->location.begin, node->body->location.begin),
                       Luau::Location(node->body->location.begin, node->location.end), "for");
             return true;
@@ -673,6 +706,11 @@ namespace
             if (on("SlCompatCall"))
             {
                 compatCall(node, mStatements.contains(node));
+            }
+            timerCallbacks(node);
+            if (on("SlSleepingCall"))
+            {
+                sleepingCall(node);
             }
             // What math's functions are given is a number.
             const auto* callee = node->func->as<Luau::AstExprIndexName>();
@@ -1862,6 +1900,179 @@ namespace
             }
         }
 
+        // --- SlSleepingCall: a call that sleeps, which a Fast one does not ----
+
+        // A table's timer = function, as the converter writes a state's.
+        bool visit(Luau::AstExprTable* node) override
+        {
+            for (const Luau::AstExprTable::Item& item : node->items)
+            {
+                const auto* key = item.key ? item.key->as<Luau::AstExprConstantString>() : nullptr;
+                if (item.kind == Luau::AstExprTable::Item::Kind::Record && key && std::string_view(key->value.data, key->value.size) == "timer" &&
+                    item.value->is<Luau::AstExprFunction>())
+                {
+                    mOften.push_back(item.value->location);
+                }
+            }
+            return true;
+        }
+
+        // LLEvents.timer = function, or the converter's timerHandler, which
+        // its LLTimers helper calls.
+        void timerFunction(Luau::AstExpr* var, Luau::AstExpr* value)
+        {
+            if (!value->is<Luau::AstExprFunction>())
+            {
+                return;
+            }
+            const auto* field  = var->as<Luau::AstExprIndexName>();
+            const auto* events = field ? field->expr->as<Luau::AstExprGlobal>() : nullptr;
+            const auto* local  = var->as<Luau::AstExprLocal>();
+            const auto* global = var->as<Luau::AstExprGlobal>();
+            const std::string_view name = local ? local->local->name.value : global ? global->name.value : "";
+            if ((events && std::string_view(events->name.value) == "LLEvents" && std::string_view(field->index.value) == "timer") ||
+                name == "timerHandler")
+            {
+                mOften.push_back(value->location);
+            }
+        }
+
+        // What LLTimers:every and :once are given to call, and LLEvents:on
+        // and :once for "timer".
+        void timerCallbacks(Luau::AstExprCall* node)
+        {
+            const auto* callee = node->func->as<Luau::AstExprIndexName>();
+            const auto* lib    = callee && callee->op == ':' ? callee->expr->as<Luau::AstExprGlobal>() : nullptr;
+            if (!lib)
+            {
+                return;
+            }
+            const std::string_view from = lib->name.value;
+            const std::string_view how  = callee->index.value;
+            const auto*            what = node->args.size ? node->args.data[0]->as<Luau::AstExprConstantString>() : nullptr;
+            const bool timers = from == "LLTimers" && (how == "every" || how == "once");
+            const bool events = from == "LLEvents" && (how == "on" || how == "once") && what &&
+                                std::string_view(what->value.data, what->value.size) == "timer";
+            for (Luau::AstExpr* arg : node->args)
+            {
+                if ((timers || events) && arg->is<Luau::AstExprFunction>())
+                {
+                    mOften.push_back(arg->location);
+                }
+            }
+        }
+
+        // Whether a place is in a loop's body or a timer's function.
+        bool often(const Luau::Location& at) const
+        {
+            return std::any_of(mOften.begin(), mOften.end(),
+                               [&](const Luau::Location& in) { return !(at.begin < in.begin) && !(in.end < at.end); });
+        }
+
+        // What changes nothing and runs nothing to be read: a constant, a
+        // variable, a field of one, their sums, a vector or a quaternion
+        // made of them -- what may be read in another order.
+        static bool settled(Luau::AstExpr* e)
+        {
+            e = unbracketed(e);
+            if (e->is<Luau::AstExprConstantNumber>() || e->is<Luau::AstExprConstantString>() || e->is<Luau::AstExprConstantBool>() ||
+                e->is<Luau::AstExprConstantNil>() || e->is<Luau::AstExprLocal>() || e->is<Luau::AstExprGlobal>())
+            {
+                return true;
+            }
+            if (const auto* field = e->as<Luau::AstExprIndexName>())
+            {
+                return settled(field->expr);
+            }
+            if (const auto* unary = e->as<Luau::AstExprUnary>())
+            {
+                return settled(unary->expr);
+            }
+            if (const auto* binary = e->as<Luau::AstExprBinary>())
+            {
+                return settled(binary->left) && settled(binary->right);
+            }
+            const auto* call   = e->as<Luau::AstExprCall>();
+            const auto* global = call ? call->func->as<Luau::AstExprGlobal>() : nullptr;
+            const std::string_view made = global ? global->name.value : "";
+            return (made == "vector" || made == "quaternion" || made == "rotation") &&
+                   std::all_of(call->args.begin(), call->args.end(), [](Luau::AstExpr* arg) { return settled(arg); });
+        }
+
+        // ll.SetPos and its kin, which sleep where a Fast call does not: a
+        // warning in a loop or a timer, where the sleep adds up; a note
+        // elsewhere. Fixed as the Fast call, not safe: a script may pace
+        // itself by the sleep.
+        void sleepingCall(Luau::AstExprCall* node)
+        {
+            const auto* callee = node->func->as<Luau::AstExprIndexName>();
+            const auto* lib    = callee && callee->op == '.' ? callee->expr->as<Luau::AstExprGlobal>() : nullptr;
+            const std::string_view from = lib ? lib->name.value : "";
+            if (from != "ll" && from != "llcompat")
+            {
+                return;
+            }
+            const std::string                  lsl  = "ll" + std::string(callee->index.value);
+            const ALScriptLintPass::Sleepless* call = ALScriptLintPass::sleepless(lsl);
+            const ALLSLTraits::Trait*          row  = ALLSLTraits::of(lsl.c_str());
+            if (!call || !row || row->monoSleep <= 0)
+            {
+                return;
+            }
+            const bool        repeated = often(node->location);
+            const std::string function = std::string(from) + "." + std::string(callee->index.value);
+            const std::string seconds  = llformat("%g", row->monoSleep);
+            if (!call->fast)
+            {
+                problem(node->location, repeated ? "LuauLintSlSleepingTextureOften" : "LuauLintSlSleepingTexture",
+                        repeated ? "[1] makes the script sleep [2] s each time it runs here, in a loop or a timer; [3] sets a face's texture "
+                                   "with no sleep, given its repeats, offsets and rotation too"
+                                 : "[1] makes the script sleep [2] s each call; [3] sets a face's texture with no sleep, given its repeats, "
+                                   "offsets and rotation too",
+                        { function, seconds, call->rule }, "SlSleepingCall", repeated ? Severity::Warning : Severity::Note);
+                return;
+            }
+            const std::string fast = std::string(from) + "." + std::string(call->fast + 2);
+            ALScriptProblem&  said = problem(node->location, repeated ? "LuauLintSlSleepingCallOften" : "LuauLintSlSleepingCall",
+                                             repeated ? "[1] makes the script sleep [2] s each time it runs here, in a loop or a timer; [3] does "
+                                                        "the same without the sleep"
+                                                      : "[1] makes the script sleep [2] s each call; [3] does the same without the sleep",
+                                             { function, seconds, fast }, "SlSleepingCall", repeated ? Severity::Warning : Severity::Note);
+            if (node->args.size == 0)
+            {
+                return;
+            }
+            std::vector<std::string> given;
+            for (Luau::AstExpr* arg : node->args)
+            {
+                given.push_back(text(arg->location));
+            }
+            const std::optional<std::string> written = ALScriptLintPass::sleeplessArgs(*call, given, true);
+            if (!written)
+            {
+                return;
+            }
+            std::vector<ALScriptEdit> edits = { edit(callee->indexLocation, call->fast + 2) };
+            const Luau::Location      first = node->args.data[0]->location;
+            const Luau::Location      last  = node->args.data[node->args.size - 1]->location;
+            if (const auto kept = ALScriptLintPass::around(*call, true))
+            {
+                edits.push_back(edit(Luau::Location(first.begin, first.begin), kept->first));
+                edits.push_back(edit(Luau::Location(last.end, last.end), kept->second));
+            }
+            else if (std::all_of(node->args.begin(), node->args.end(), [](Luau::AstExpr* arg) { return settled(arg); }))
+            {
+                // Its arguments in another order, which only what runs
+                // nothing may be read in.
+                edits.push_back(edit(Luau::Location(first.begin, last.end), *written));
+            }
+            else
+            {
+                return;
+            }
+            offer(said, fast + "(" + *written + ")", std::move(edits), false);
+        }
+
         // What a condition asks the truth of: itself, or each side of an
         // and or an or, inside brackets or not.
         void truth(Luau::AstExpr* e)
@@ -1977,6 +2188,8 @@ namespace
         boost::unordered_flat_map<std::pair<Luau::AstLocal*, Kind>, bool> mLocalKinds;
         boost::unordered_flat_map<Luau::AstLocal*, std::optional<Find>>   mFindLocals;
         boost::unordered_flat_set<const Luau::AstExprCall*>               mStatements;
+        // Loops' bodies, and timers' functions: where a call runs often.
+        std::vector<Luau::Location>                                       mOften;
         uint64_t                                                          mEnabled;
         uint64_t                                                          mFatal;
         bool                                                              mAllErrors;
@@ -1988,6 +2201,75 @@ namespace
 const std::vector<ALScriptLintPass::Rule>& ALScriptLintPass::rules()
 {
     return RULES;
+}
+
+// static
+const ALScriptLintPass::Sleepless* ALScriptLintPass::sleepless(std::string_view lsl)
+{
+    const auto found = std::find_if(std::begin(SLEEPLESS), std::end(SLEEPLESS), [lsl](const Sleepless& s) { return lsl == s.lsl; });
+    return found == std::end(SLEEPLESS) ? nullptr : &*found;
+}
+
+// static
+std::optional<std::string> ALScriptLintPass::sleeplessArgs(const Sleepless& call, const std::vector<std::string>& args, bool lua)
+{
+    if (!call.args)
+    {
+        return std::nullopt;
+    }
+    std::string out;
+    for (const char* at = call.args; *at; ++at)
+    {
+        if (*at == '$' && at[1] >= '1' && at[1] <= '9')
+        {
+            const size_t n = static_cast<size_t>(at[1] - '1');
+            if (n >= args.size())
+            {
+                return std::nullopt;
+            }
+            out += args[n];
+            ++at;
+        }
+        else
+        {
+            out += lua && *at == '[' ? '{' : lua && *at == ']' ? '}' : *at;
+        }
+    }
+    return out;
+}
+
+// static
+std::optional<std::pair<std::string, std::string>> ALScriptLintPass::around(const Sleepless& call, bool lua)
+{
+    // "…$1, $2, …, $n…": every argument once, in its place, as written.
+    if (!call.args)
+    {
+        return std::nullopt;
+    }
+    const std::string_view args  = call.args;
+    const size_t           first = args.find("$1");
+    if (first == std::string_view::npos || args.substr(0, first).find('$') != std::string_view::npos)
+    {
+        return std::nullopt;
+    }
+    size_t end = first + 2;
+    for (char n = '2'; n <= '9' && args.substr(end, 4) == std::string(", $") + n; ++n)
+    {
+        end += 4;
+    }
+    if (args.find('$', end) != std::string_view::npos)
+    {
+        return std::nullopt;
+    }
+    const auto bracketed = [lua](std::string_view piece) {
+        std::string out(piece);
+        for (char& c : out)
+        {
+            c = lua && c == '[' ? '{' : lua && c == ']' ? '}' : c;
+        }
+        return out;
+    };
+    return std::make_pair(bracketed(args.substr(0, first)), bracketed(args.substr(end)));
 }
 
 // static

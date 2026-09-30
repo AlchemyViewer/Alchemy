@@ -26,6 +26,8 @@
 
 #include "alscriptproblem.h"
 
+#include <string_view>
+
 namespace Tailslide
 {
     class LSLScript;
@@ -39,5 +41,7 @@ namespace Tailslide
 class ALLSLLintPass
 {
 public:
-    static void check(Tailslide::LSLScript* script, ALScriptProblems& out);
+    // Over the script parsed from `source`, whose text the fixes are made
+    // over.
+    static void check(std::string_view source, Tailslide::LSLScript* script, ALScriptProblems& out);
 };
