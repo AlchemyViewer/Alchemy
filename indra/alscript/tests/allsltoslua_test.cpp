@@ -242,7 +242,8 @@ namespace tut
                                               "}\n");
         ensure("the tables: " + r.text, has(r, "states.default = {") && has(r, "states.running = {"));
         ensure("setState: " + r.text, has(r, "local function setState(name: string)") && has(r, "setState(\"default\")"));
-        ensure("a change ends the event: " + r.text, has(r, "setState(\"running\")\n        return") && has(r, "setState(\"default\")\n            return\n        end"));
+        ensure("a change ends the event, where anything follows: " + r.text,
+               has(r, "setState(\"running\")\n    end,") && has(r, "setState(\"default\")\n            return\n        end"));
         ensure("the timer on LLTimers: " + r.text, has(r, "setTimer(1") && has(r, "LLTimers:every(seconds") && noted(r, "SluaTimers"));
         ensure("calling the state's handler: " + r.text, has(r, "states[currentState].timer") && has(r, "event ~= \"timer\""));
         ensure("state_exit a handler of its state: " + r.text, has(r, "state_exit = function()"));
@@ -803,6 +804,23 @@ namespace tut
         ensure("a global with nothing of the script's called: " + r.text, has(r, "print(tostring(gLine))\ngLine += 1\n"));
         ensure("a global beside a call of the script's, kept: " + r.text, has(r, "tostring(bump()) .. tostring((function() local was = gLine;"));
         ensure("a return's step before it: " + r.text, has(r, "    gLine += 1\n    return gLine\n"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<27>()
+    {
+        set_test_name("simpler conditions: !(a == b) as a ~= b, a boolean given TRUE or FALSE by an if as the check itself");
+        const ALLSLToSLua::Result r = convert("integer gOn;\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    if (!(n == 2)) llOwnerSay(\"not two\");\n"
+                                              "    if (!(n != 3)) llOwnerSay(\"three\");\n"
+                                              "    if (n > 1) gOn = TRUE; else gOn = FALSE;\n"
+                                              "    if (n > 5) { gOn = FALSE; } else { gOn = TRUE; }\n"
+                                              "    if (gOn) llOwnerSay(\"on\");\n"
+                                              "} }\n");
+        ensure("flipped: " + r.text, has(r, "if n ~= 2 then") && has(r, "if n == 3 then"));
+        ensure("the check itself: " + r.text, has(r, "    gOn = n > 1\n") && has(r, "    gOn = not (n > 5)\n"));
         checksClean(r);
     }
 }

@@ -327,7 +327,13 @@ namespace
         // else the value as a condition.
         std::string truthOf(LSLExpression* e);
         // A truth value compared with TRUE or FALSE: itself, or not it.
-        std::optional<Expr> truthAsked(LSLBinaryExpression* e);
+        std::optional<Expr> truthAsked(LSLBinaryExpression* e, LSLOperator op);
+        // An if and its else that give one boolean TRUE and FALSE: which,
+        // and whether TRUE where the check holds.
+        bool booleanChoice(LSLIfStatement* i, LSLIdentifier*& var, bool& when_true);
+        // Whether a statement is the last its event handler runs: the last
+        // of the handler's body, or of an if's branch that is.
+        static bool handlerTail(LSLASTNode* s);
         bool        boolean(LSLSymbol* var) const { return var && mBooleans.contains(var); }
 
         // --- LSL's order ----------------------------------------------------------------
@@ -494,6 +500,8 @@ namespace
         // Appends in loops that are noted rather than built.
         boost::unordered_flat_set<LSLASTNode*> mUnbuilt;
         boost::unordered_flat_set<LSLSymbol*>  mTextParams;
+        // Comparisons written the other way round, a not before them.
+        boost::unordered_flat_set<LSLASTNode*> mFlipped;
         boost::unordered_flat_set<LSLSymbol*>  mTextKeys;
     };
 
@@ -1189,7 +1197,8 @@ namespace
 
     Expr Writer::binary(LSLBinaryExpression* e)
     {
-        const LSLOperator op  = e->getOperation();
+        // == and ~= the other way round under a not (unary).
+        const LSLOperator op  = !mFlipped.contains(e) ? e->getOperation() : e->getOperation() == OP_EQ ? OP_NEQ : OP_EQ;
         LSLExpression*    lhs = e->getLHS();
         LSLExpression*    rhs = e->getRHS();
         const LSLIType    lt  = slType(lhs);
@@ -1329,7 +1338,7 @@ namespace
             case OP_EQ:
             case OP_NEQ:
             {
-                if (std::optional<Expr> asked = truthAsked(e))
+                if (std::optional<Expr> asked = truthAsked(e, op))
                 {
                     return *asked;
                 }
@@ -1395,7 +1404,28 @@ namespace
                 const Expr v = value(child);
                 return { "-" + (!v.text.empty() && v.text.front() == '-' ? "(" + v.text + ")" : bracketed(v, UNARY)), UNARY };
             }
-            case OP_BOOLEAN_NOT: return { "not " + bracketed(condition(child), UNARY), UNARY, true };
+            case OP_BOOLEAN_NOT:
+            {
+                // !(a == b) as a ~= b, and !(a != b) as a == b: not of two
+                // lists, whose != is how much longer the left is.
+                LSLExpression* inner = child;
+                while (inner->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+                {
+                    inner = static_cast<LSLParenthesisExpression*>(inner)->getChildExpr();
+                }
+                const bool compare = inner->getNodeSubType() == NODE_BINARY_EXPRESSION &&
+                                     (inner->getOperation() == OP_EQ || inner->getOperation() == OP_NEQ) &&
+                                     !(static_cast<LSLBinaryExpression*>(inner)->getLHS()->getIType() == LST_LIST &&
+                                       static_cast<LSLBinaryExpression*>(inner)->getRHS()->getIType() == LST_LIST);
+                if (compare)
+                {
+                    mFlipped.insert(inner);
+                    const Expr flipped = condition(inner);
+                    mFlipped.erase(inner);
+                    return { flipped.text, flipped.prec, true };
+                }
+                return { "not " + bracketed(condition(child), UNARY), UNARY, true };
+            }
             case OP_BIT_NOT:
                 noteOnce(e, "SluaBit32", "bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.");
                 return { "bit32.bnot(" + value(child).text + ")" };
@@ -1783,7 +1813,12 @@ namespace
         {
             note(s, "SluaStateSame", "a change to the state the script is in; a script of one state has no other to go to.");
         }
-        // LSL's state change ends the event it is made in.
+        // LSL's state change ends the event it is made in: nothing to say
+        // where nothing in it follows.
+        if (last && handlerTail(s))
+        {
+            return;
+        }
         if (!last)
         {
             line("do return end");
@@ -1883,6 +1918,15 @@ namespace
             case NODE_IF_STATEMENT:
             {
                 auto* i = static_cast<LSLIfStatement*>(s);
+                // A boolean given TRUE or FALSE by the check: the check.
+                LSLIdentifier* chosen    = nullptr;
+                bool           when_true = true;
+                if (booleanChoice(i, chosen, when_true))
+                {
+                    const Expr check = condition(i->getCheckExpr());
+                    line(nameOf(chosen) + " = " + (when_true ? check.text : "not " + bracketed(check, UNARY)));
+                    return;
+                }
                 line("if " + condition(i->getCheckExpr()).text + " then");
                 for (;;)
                 {
@@ -2531,7 +2575,78 @@ namespace
         boost::unordered::erase_if(mBooleans, [&readSome](LSLSymbol* symbol) { return !readSome.contains(symbol); });
     }
 
-    std::optional<Expr> Writer::truthAsked(LSLBinaryExpression* e)
+    namespace
+    {
+        // The one statement a branch is, as an assignment of a whole
+        // variable: its target, or null.
+        LSLBinaryExpression* branchAssignment(LSLASTNode* branch)
+        {
+            if (!isNull(branch) && branch->getNodeSubType() == NODE_COMPOUND_STATEMENT)
+            {
+                LSLASTNode* only = branch->getChild(0);
+                branch           = only && !only->getNext() ? only : nullptr;
+            }
+            if (isNull(branch) || branch->getNodeSubType() != NODE_EXPRESSION_STATEMENT)
+            {
+                return nullptr;
+            }
+            LSLExpression* e = unwrapped(static_cast<LSLExpressionStatement*>(branch)->getExpr());
+            if (e->getNodeSubType() != NODE_BINARY_EXPRESSION || e->getOperation() != OP_ASSIGN ||
+                !wholeVariable(static_cast<LSLBinaryExpression*>(e)->getLHS()))
+            {
+                return nullptr;
+            }
+            return static_cast<LSLBinaryExpression*>(e);
+        }
+    }
+
+    bool Writer::booleanChoice(LSLIfStatement* i, LSLIdentifier*& var, bool& when_true)
+    {
+        LSLBinaryExpression* yes = branchAssignment(i->getTrueBranch());
+        LSLBinaryExpression* no  = branchAssignment(i->getFalseBranch());
+        bool                 a   = false;
+        bool                 b   = false;
+        if (!yes || !no || wholeVariable(yes->getLHS()) != wholeVariable(no->getLHS()) || !boolean(wholeVariable(yes->getLHS())) ||
+            !truthConstant(yes->getRHS(), a) || !truthConstant(no->getRHS(), b) || a == b)
+        {
+            return false;
+        }
+        var       = static_cast<LSLLValueExpression*>(unwrapped(yes->getLHS()))->getIdentifier();
+        when_true = a;
+        return true;
+    }
+
+    // static
+    bool Writer::handlerTail(LSLASTNode* s)
+    {
+        for (LSLASTNode* node = s; node;)
+        {
+            LSLASTNode* parent = node->getParent();
+            if (!parent)
+            {
+                return false;
+            }
+            if (parent->getNodeType() == NODE_EVENT_HANDLER)
+            {
+                return true;
+            }
+            if (parent->getNodeSubType() == NODE_COMPOUND_STATEMENT)
+            {
+                if (node->getNext())
+                {
+                    return false;
+                }
+            }
+            else if (parent->getNodeSubType() != NODE_IF_STATEMENT || node->getParentSlot() == 0)
+            {
+                return false;
+            }
+            node = parent;
+        }
+        return false;
+    }
+
+    std::optional<Expr> Writer::truthAsked(LSLBinaryExpression* e, LSLOperator op)
     {
         bool           truth = false;
         LSLExpression* side  = nullptr;
@@ -2548,7 +2663,7 @@ namespace
             return std::nullopt;
         }
         const Expr is = expr(side);
-        if ((e->getOperation() == OP_EQ) == truth)
+        if ((op == OP_EQ) == truth)
         {
             return Expr{ is.text, is.prec, true };
         }
