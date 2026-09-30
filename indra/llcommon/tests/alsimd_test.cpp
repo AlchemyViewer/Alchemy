@@ -579,8 +579,8 @@ namespace tut
         {
             return reinterpret_cast<unsigned char*>((reinterpret_cast<uintptr_t>(p) + 63) & ~uintptr_t(63));
         };
-        unsigned char* src_line = aligned64(source.data());
-        unsigned char* dst_line = aligned64(destination.data());
+        unsigned char* src_line = aligned64(source.data() + GUARD);
+        unsigned char* dst_line = aligned64(destination.data() + GUARD);
 
         std::vector<size_t> sizes;
         for (size_t size = 16; size <= 1024; size += 16)
