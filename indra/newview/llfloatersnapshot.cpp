@@ -297,6 +297,7 @@ void LLFloaterSnapshot::Impl::updateControls(LLFloaterSnapshotBase* floater)
     LLSnapshotModel::ESnapshotType shot_type = getActiveSnapshotType(floater);
     LLSnapshotModel::ESnapshotFormat shot_format = (LLSnapshotModel::ESnapshotFormat)gSavedSettings.getS32("SnapshotFormat");
     LLSnapshotModel::ESnapshotLayerType layer_type = getLayerType(floater);
+    const std::optional<ALSnapshotCutout> cutout = ALSnapshotCutout::current(shot_type, shot_format);
 
     floater->getChild<LLComboBox>("local_format_combo")->selectNthItem(gSavedSettings.getS32("SnapshotFormat"));
     floater->getChildView("layer_types")->setEnabled(shot_type == LLSnapshotModel::SNAPSHOT_LOCAL);
@@ -330,7 +331,8 @@ void LLFloaterSnapshot::Impl::updateControls(LLFloaterSnapshotBase* floater)
         }
 
         // Clamp snapshot resolution to window size when showing UI or HUD in snapshot.
-        if (gSavedSettings.getBOOL("RenderUIInSnapshot") || gSavedSettings.getBOOL("RenderHUDInSnapshot"))
+        // A cutout shows neither, whatever the boxes it greys out still say.
+        if (!cutout && (gSavedSettings.getBOOL("RenderUIInSnapshot") || gSavedSettings.getBOOL("RenderHUDInSnapshot")))
         {
             S32 width = gViewerWindow->getWindowWidthRaw();
             S32 height = gViewerWindow->getWindowHeightRaw();
@@ -428,7 +430,7 @@ void LLFloaterSnapshot::Impl::updateControls(LLFloaterSnapshotBase* floater)
         previewp->setSnapshotType(shot_type);
         previewp->setSnapshotFormat(shot_format);
         previewp->setSnapshotBufferType(layer_type);
-        previewp->setCutout(ALSnapshotCutout::current(shot_type, shot_format));
+        previewp->setCutout(cutout);
     }
 
     updateCutoutControls(floater);
