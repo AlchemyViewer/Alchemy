@@ -140,24 +140,12 @@
 						Paso 1: Nivel de detalle
 					</text>
 					<combo_box name="physics_lod_combo" tool_tip="Niveles de detalle para utilizar con la forma física">
-						<combo_item name="choose_one">
-							Elegir uno...
-						</combo_item>
-						<combo_item name="physics_high">
-							Alto
-						</combo_item>
-						<combo_item name="physics_medium">
-							Medio
-						</combo_item>
-						<combo_item name="physics_low">
-							Bajo
-						</combo_item>
-						<combo_item name="physics_lowest">
-							Mínimo
-						</combo_item>
-						<combo_item name="load_from_file">
-							De archivo
-						</combo_item>
+						<combo_item name="choose_one" label="Elegir uno..."/>
+						<combo_item name="physics_high" label="Alto"/>
+						<combo_item name="physics_medium" label="Medio"/>
+						<combo_item name="physics_low" label="Bajo"/>
+						<combo_item name="physics_lowest" label="Mínimo"/>
+						<combo_item name="load_from_file" label="De archivo"/>
 					</combo_box>
 					<button label="Buscar..." name="physics_browse"/>
 				</panel>

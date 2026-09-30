@@ -122,12 +122,12 @@
 						Krok 1: Poziom detali
 					</text>
 					<combo_box name="physics_lod_combo" tool_tip="Poziom detali (LoD) używany dla kształtu fizycznego">
-						<combo_item name="choose_one">Wybierz...</combo_item>
-						<combo_item name="physics_high">Wysoki</combo_item>
-						<combo_item name="physics_medium">Średni</combo_item>
-						<combo_item name="physics_low">Niski</combo_item>
-						<combo_item name="physics_lowest">Najniższy</combo_item>
-						<combo_item name="load_from_file">Z pliku</combo_item>
+						<combo_item name="choose_one" label="Wybierz..."/>
+						<combo_item name="physics_high" label="Wysoki"/>
+						<combo_item name="physics_medium" label="Średni"/>
+						<combo_item name="physics_low" label="Niski"/>
+						<combo_item name="physics_lowest" label="Najniższy"/>
+						<combo_item name="load_from_file" label="Z pliku"/>
 					</combo_box>
 					<button name="physics_browse" label="Przeglądaj" />
 				</panel>

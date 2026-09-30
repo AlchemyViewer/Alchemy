@@ -104,18 +104,10 @@
 			<panel label="Physics" name="physics_panel">
 				<panel name="physics geometry">
 					<combo_box name="physics_lod_combo" tool_tip="LOD to use for physics shape">
-						<combo_item name="physics_lowest">
-						Lowest
-					</combo_item>
-						<combo_item name="physics_low">
-						Low
-					</combo_item>
-						<combo_item name="physics_medium">
-						Medium
-					</combo_item>
-						<combo_item name="physics_high">
-						High
-					</combo_item>
+						<combo_item name="physics_lowest" label="Lowest"/>
+						<combo_item name="physics_low" label="Low"/>
+						<combo_item name="physics_medium" label="Medium"/>
+						<combo_item name="physics_high" label="High"/>
 					</combo_box>
 					<button label="Browse..." name="physics_browse"/>
 				</panel>

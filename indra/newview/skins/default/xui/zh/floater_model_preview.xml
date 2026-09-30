@@ -140,24 +140,12 @@
 						步驟 1：細節層次
 					</text>
 					<combo_box name="physics_lod_combo" tool_tip="物理形狀所採用的細節層次">
-						<combo_item name="choose_one">
-							選擇一項…
-						</combo_item>
-						<combo_item name="physics_high">
-							高
-						</combo_item>
-						<combo_item name="physics_medium">
-							中
-						</combo_item>
-						<combo_item name="physics_low">
-							低
-						</combo_item>
-						<combo_item name="physics_lowest">
-							最低
-						</combo_item>
-						<combo_item name="load_from_file">
-							來自檔案
-						</combo_item>
+						<combo_item name="choose_one" label="選擇一項…"/>
+						<combo_item name="physics_high" label="高"/>
+						<combo_item name="physics_medium" label="中"/>
+						<combo_item name="physics_low" label="低"/>
+						<combo_item name="physics_lowest" label="最低"/>
+						<combo_item name="load_from_file" label="來自檔案"/>
 					</combo_box>
 					<button label="瀏覽…" name="physics_browse"/>
 				</panel>

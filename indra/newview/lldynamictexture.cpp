@@ -189,15 +189,15 @@ bool LLViewerDynamicTexture::updateAllInstances()
         return true;
     }
 
-    LLRenderTarget& preview_target = gPipeline.mAuxillaryRT.deferredScreen;
+    LLRenderTarget& preview_target = gPipeline.mPreviewMap;
     LLRenderTarget& bake_target = gPipeline.mBakeMap;
     if (!preview_target.isComplete() || !bake_target.isComplete())
     {
         llassert(false);
         return false;
     }
-    llassert(preview_target.getWidth() <= LLPipeline::MAX_PREVIEW_WIDTH);
-    llassert(preview_target.getHeight() <= LLPipeline::MAX_PREVIEW_WIDTH);
+    llassert(preview_target.getWidth() >= LLPipeline::MAX_PREVIEW_WIDTH);
+    llassert(preview_target.getHeight() >= LLPipeline::MAX_PREVIEW_WIDTH);
     llassert(bake_target.getWidth() >= (U32) LLAvatarAppearanceDefines::SCRATCH_TEX_WIDTH);
     llassert(bake_target.getHeight() >= (U32) LLAvatarAppearanceDefines::SCRATCH_TEX_HEIGHT);
 
@@ -240,7 +240,7 @@ bool LLViewerDynamicTexture::updateAllInstances()
     {
         for (LLViewerDynamicTexture* dynamicTexture : LLViewerDynamicTexture::sInstances[order])
         {
-            update_func(dynamicTexture, preview_target, LLPipeline::MAX_PREVIEW_WIDTH, LLPipeline::MAX_PREVIEW_WIDTH);
+            update_func(dynamicTexture, preview_target, preview_target.getWidth(), preview_target.getHeight());
         }
     }
     preview_target.flush();
