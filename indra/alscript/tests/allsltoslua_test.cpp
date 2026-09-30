@@ -76,14 +76,15 @@ namespace tut
             return r;
         }
 
-        // What SLua's check says of it: nothing at the error level.
+        // What SLua's check says of it: nothing at the error level, and
+        // nothing the studio's own lints would have written SLua's way.
         void checksClean(const ALLSLToSLua::Result& r)
         {
             ensure("the definitions", definitions);
             std::string said;
             for (const ALScriptProblem& p : service.check(r.text))
             {
-                if (p.severity == ALScriptProblem::Severity::Error)
+                if (p.severity == ALScriptProblem::Severity::Error || p.code == "SlCompoundAssign")
                 {
                     said += llformat("[%d:%d] %s\n", p.line + 1, p.column + 1, p.message.c_str());
                 }
@@ -421,7 +422,7 @@ namespace tut
                                               "} }\n");
         ensure("appended: " + r.text, has(r, "table.insert(gItems, \"x\")"));
         ensure("prepended: " + r.text, has(r, "table.insert(gItems, 1, \"y\")"));
-        ensure("a string: " + r.text, has(r, "gLog = gLog .. \"b\""));
+        ensure("a string: " + r.text, has(r, "gLog ..= \"b\""));
         ensure("nothing cleared first: " + r.text, !has(r, "gItems = {} return") && !has(r, "gLog = \"\" return"));
         ensure("noted once for each variable: " + r.text, noted(r, "SluaMemoryHack") && count(r, "-- LSL: (gItems = []) + gItems") == 1 &&
                                                          count(r, "-- LSL: (gLog = \"\") + gLog") == 1);
@@ -541,5 +542,26 @@ namespace tut
                                                            typed);
         ensure("typed: " + t.text, has(t, "local sParts: { string } = {}"));
         checksClean(t);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<16>()
+    {
+        set_test_name("LSL's /= and %=, and x = x op y, as Luau's own compound assignments, noted as / and % are; a vector's %= its cross product");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    integer a = 7; float f = 3.0; vector v = <1, 0, 0>;\n"
+                                              "    a /= 2; a %= 3; f /= 2.0; v %= <0, 1, 0>;\n"
+                                              "    integer b = 1; integer c = 2; string s = \"x\";\n"
+                                              "    b = b + c; b = b - (c - 1); b = b - c - 1; c = c * 2 + b; s = s + \"y\" + (string)b;\n"
+                                              "    llOwnerSay((string)a + (string)f + (string)v + s + (string)(b + c));\n"
+                                              "} }\n");
+        ensure("integer division: " + r.text, has(r, "a //= 2") && noted(r, "SluaIntegerDivision"));
+        ensure("remainder: " + r.text, has(r, "a %= 3") && noted(r, "SluaModulo"));
+        ensure("a float's: " + r.text, has(r, "f /= 2.0"));
+        ensure("a vector's cross product: " + r.text, has(r, "v = vector.cross(v, vector(0, 1, 0))"));
+        ensure("x = x op y: " + r.text, has(r, "b += c") && has(r, "b -= c - 1"));
+        ensure("not where the left of the operator is more than x: " + r.text, has(r, "b = b - c - 1") && has(r, "c = c * 2 + b"));
+        ensure("a string's pieces, joined: " + r.text, has(r, "s ..= \"y\" .. tostring(b)"));
+        checksClean(r);
     }
 }

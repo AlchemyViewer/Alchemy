@@ -363,6 +363,11 @@ namespace
         // A name no other in the script has, nor SLua holds.
         std::string freshName(const std::string& base);
 
+        // x = x op y, which Luau writes x op= y: the compound operator and
+        // what follows it -- for a string, each piece of s = s + a + b, as
+        // Luau's .. joins them whichever way round. False for any other.
+        static bool selfOperation(LSLSymbol* var, LSLIType type, LSLExpression* rhs, LSLOperator& op, std::vector<LSLExpression*>& parts);
+
         // --- the script -------------------------------------------------------------
 
         void globals();
@@ -1342,6 +1347,11 @@ namespace
                     }
                     return old + " / " + bracketed(v, MUL + 1);
                 case OP_MOD_ASSIGN:
+                    // LSL's % of two vectors is their cross product.
+                    if (t == LST_VECTOR)
+                    {
+                        return "vector.cross(" + old + ", " + v.text + ")";
+                    }
                     note(rhs, "SluaModulo", "Luau's % takes the divisor's sign, and LSL's took the dividend's: they differ where one is negative.");
                     return old + " % " + bracketed(v, MUL + 1);
                 default: return v.text;
@@ -1383,6 +1393,21 @@ namespace
                 return;
             }
         }
+        // x = x op y as x op= y, where Luau has it.
+        if (std::vector<LSLExpression*> parts; op == OP_ASSIGN && isNull(member) && selfOperation(id->getSymbol(), type, rhs, op, parts))
+        {
+            if (type == LST_STRING)
+            {
+                std::string joined;
+                for (LSLExpression* part : parts)
+                {
+                    joined += (joined.empty() ? "" : " .. ") + bracketed(coerced(part, LST_STRING), CONCAT + 1);
+                }
+                line(name + " ..= " + joined);
+                return;
+            }
+            rhs = parts.front();
+        }
         // Luau's compound assignments where they mean LSL's.
         if (type != LST_LIST && op != OP_ASSIGN)
         {
@@ -1398,6 +1423,25 @@ namespace
                 case OP_POST_DECR: line(name + " -= 1"); return;
                 case OP_SUB_ASSIGN: line(name + " -= " + v.text); return;
                 case OP_MUL_ASSIGN: line(name + " *= " + v.text); return;
+                case OP_DIV_ASSIGN:
+                    if (type == LST_INTEGER && rhs && rhs->getIType() == LST_INTEGER)
+                    {
+                        note(rhs, "SluaIntegerDivision",
+                             "// rounds down, and LSL's integer / rounded toward zero: they differ where the answer is negative.");
+                        line(name + " //= " + v.text);
+                        return;
+                    }
+                    line(name + " /= " + v.text);
+                    return;
+                case OP_MOD_ASSIGN:
+                    if (type == LST_INTEGER)
+                    {
+                        note(rhs, "SluaModulo",
+                             "Luau's % takes the divisor's sign, and LSL's took the dividend's: they differ where one is negative.");
+                        line(name + " %= " + v.text);
+                        return;
+                    }
+                    break;
                 default: break;
             }
         }
@@ -2870,6 +2914,48 @@ namespace
         {
             line(name + " ..= table.concat(" + parts + ")");
         }
+    }
+
+    bool Writer::selfOperation(LSLSymbol* var, LSLIType type, LSLExpression* rhs, LSLOperator& op, std::vector<LSLExpression*>& parts)
+    {
+        LSLExpression* e = unwrapped(rhs);
+        if (!var || type == LST_LIST || !e || e->getNodeSubType() != NODE_BINARY_EXPRESSION)
+        {
+            return false;
+        }
+        const LSLOperator by = e->getOperation();
+        if (type == LST_STRING)
+        {
+            // Down the +'s to s, which Luau's .. joins either way round.
+            while (e && e->getNodeSubType() == NODE_BINARY_EXPRESSION && e->getOperation() == OP_PLUS)
+            {
+                parts.insert(parts.begin(), static_cast<LSLBinaryExpression*>(e)->getRHS());
+                e = unwrapped(static_cast<LSLBinaryExpression*>(e)->getLHS());
+            }
+            if (wholeVariable(e) != var || parts.empty())
+            {
+                parts.clear();
+                return false;
+            }
+            op = OP_ADD_ASSIGN;
+            return true;
+        }
+        auto* b = static_cast<LSLBinaryExpression*>(e);
+        if (wholeVariable(b->getLHS()) != var)
+        {
+            return false;
+        }
+        switch (by)
+        {
+            case OP_PLUS: op = OP_ADD_ASSIGN; break;
+            case OP_MINUS: op = OP_SUB_ASSIGN; break;
+            case OP_MUL: op = OP_MUL_ASSIGN; break;
+            case OP_DIV: op = OP_DIV_ASSIGN; break;
+            case OP_MOD: op = OP_MOD_ASSIGN; break;
+            default: return false;
+        }
+        parts.push_back(b->getRHS());
+        return true;
     }
 
     std::string Writer::freshName(const std::string& base)
