@@ -981,7 +981,30 @@ static bool needs_tooltip(LLSelectNode* nodep)
 {
     if (!nodep || !nodep->mValid)
         return false;
-    return true;
+
+    // <SK:Nexii> Restore the interactivity test SL-11532 removed so ShowAllObjectHoverTip is honored again
+    LLViewerObject* object = nodep->getObject();
+    if (!object)
+        return false;
+
+    LLViewerObject* parent = (LLViewerObject*)object->getParent();
+    if (object->flagHandleTouch()
+        || (parent && parent->flagHandleTouch())
+        || object->flagTakesMoney()
+        || (parent && parent->flagTakesMoney())
+        || object->flagAllowInventoryAdd())
+    {
+        return true;
+    }
+
+    U8 click_action = final_click_action(object);
+    if (click_action != CLICK_ACTION_TOUCH && click_action != CLICK_ACTION_DISABLED)
+    {
+        return true;
+    }
+
+    return anyone_copy_selection(nodep) || for_sale_selection(nodep);
+    // </SK:Nexii>
 }
 
 
