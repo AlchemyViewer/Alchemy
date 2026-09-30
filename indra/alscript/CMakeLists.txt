@@ -25,6 +25,7 @@ target_sources(
     alluauservice.cpp
     allslexports.cpp
     allslservice.cpp
+    allsltoslua.cpp
     allsltraits.cpp
     allslvalues.cpp
     alpreprocessor.cpp
@@ -66,6 +67,7 @@ target_sources(
         alluauservice.h
         allslexports.h
         allslservice.h
+        allsltoslua.h
         allsltraits.h
         allslvalues.h
         alpreprocessor.h
@@ -198,6 +200,14 @@ if(AL_BUILD_TESTS)
     PROJECT alscript
     LIBRARIES alscript llcommon
     DEFINES ${definitions_defines} "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
+  )
+  # LSL written again as SLua, each result checked as SLua against the
+  # grid's definitions.
+  al_add_test(
+    allsltoslua
+    PROJECT alscript
+    LIBRARIES alscript llcommon
+    DEFINES ${definitions_defines}
   )
   # The golden files under tests/preprocessor/: every test_*.lsl beside
   # its expected output.

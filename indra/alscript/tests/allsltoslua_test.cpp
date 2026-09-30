@@ -1,0 +1,246 @@
+/**
+ * @file allsltoslua_test.cpp
+ * @brief Tests for ALLSLToSLua: LSL written again as SLua, checked as SLua.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "../allsltoslua.h"
+#include "../allslservice.h"
+#include "../alluauservice.h"
+
+#include "../test/lltut.h"
+
+#include <fstream>
+#include <sstream>
+
+namespace tut
+{
+    struct allsltoslua_data
+    {
+        ALLuauService service;
+        bool          definitions = false;
+
+        allsltoslua_data()
+        {
+            static bool loaded = false;
+            std::string error;
+            if (!loaded)
+            {
+                ALLSLService lsl;
+                loaded = lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error);
+                if (!loaded)
+                {
+                    fail("the builtins did not load: " + error);
+                }
+            }
+            llifstream        in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
+            std::stringstream text;
+            text << in.rdbuf();
+            definitions = service.loadDefinitions(text.str(), error);
+        }
+
+        // Written again, and it must have been.
+        ALLSLToSLua::Result convert(const std::string& lsl)
+        {
+            ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl);
+            std::string         why;
+            for (const ALScriptProblem& p : r.problems)
+            {
+                why += p.message + "\n";
+            }
+            ensure("converted: " + why, r.converted);
+            return r;
+        }
+
+        // What SLua's check says of it: nothing at the error level.
+        void checksClean(const ALLSLToSLua::Result& r)
+        {
+            ensure("the definitions", definitions);
+            std::string said;
+            for (const ALScriptProblem& p : service.check(r.text))
+            {
+                if (p.severity == ALScriptProblem::Severity::Error)
+                {
+                    said += llformat("[%d:%d] %s\n", p.line + 1, p.column + 1, p.message.c_str());
+                }
+            }
+            ensure("checks as SLua:\n" + said + "---\n" + r.text, said.empty());
+        }
+
+        static bool has(const ALLSLToSLua::Result& r, const std::string& text) { return r.text.find(text) != std::string::npos; }
+        static bool noted(const ALLSLToSLua::Result& r, const std::string& key)
+        {
+            for (const ALScriptProblem& p : r.notes)
+            {
+                if (p.key == key)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+    };
+
+    typedef test_group<allsltoslua_data> allsltoslua_group;
+    typedef allsltoslua_group::object    allsltoslua_object;
+    tut::allsltoslua_group               allsltoslua_test("ALLSLToSLua");
+
+    template<> template<>
+    void allsltoslua_object::test<1>()
+    {
+        set_test_name("a script of one state: globals and functions as locals, handlers on LLEvents, the detected count from the table, state_entry run last");
+        const ALLSLToSLua::Result r = convert("integer gCount = 2;\n"
+                                              "string greet(string who) { return \"Hello, \" + who; }\n"
+                                              "default {\n"
+                                              "    state_entry() { llSay(0, greet(\"world\")); }\n"
+                                              "    touch_start(integer total_number) {\n"
+                                              "        gCount += total_number;\n"
+                                              "        llSay(0, greet(llDetectedName(0)) + \" \" + (string)gCount);\n"
+                                              "    }\n"
+                                              "}\n");
+        ensure("the global: " + r.text, has(r, "local gCount = 2"));
+        ensure("the function: " + r.text, has(r, "local function greet(who)") && has(r, "return \"Hello, \" .. who"));
+        ensure("the handler: " + r.text, has(r, "LLEvents:on(\"touch_start\", function(detected)") && has(r, "local total_number = #detected"));
+        ensure("the step: " + r.text, has(r, "gCount += total_number"));
+        ensure("a detected function through llcompat: " + r.text, has(r, "llcompat.DetectedName(0)") && noted(r, "SluaDetected"));
+        ensure("an integer as a string: " + r.text, has(r, "tostring(gCount)"));
+        ensure("state_entry last: " + r.text, r.text.find("-- state_entry") > r.text.find("LLEvents:on") && has(r, "ll.Say(0, greet(\"world\"))"));
+        ensure("the note over its line: " + r.text, has(r, "-- LSL: llcompat.Detected*"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<2>()
+    {
+        set_test_name("expressions: conditions as LSL reads them, comparisons as 1 or 0 where they are numbers, integer division and remainder noted, lists joined and measured");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    integer a = 7; integer b = 2; float f = 1.5; string s = \"x\"; list l = [1, 2];\n"
+                                              "    integer same = a == b;\n"
+                                              "    if (a) llOwnerSay(\"a\");\n"
+                                              "    if (s) llOwnerSay(\"said\");\n"
+                                              "    if (a > 1 && llGetListLength(l) > 1) llOwnerSay(\"both\");\n"
+                                              "    integer q = a / b; integer m = a % b;\n"
+                                              "    l += 3; l = l + [4] + \"five\";\n"
+                                              "    integer t = TRUE; if (FALSE) t = 0;\n"
+                                              "    llOwnerSay((string)f + (string)((integer)\"12abc\"));\n"
+                                              "    if (l == [1]) llOwnerSay(\"one long\");\n"
+                                              "    integer flags = a & b | 4;\n"
+                                              "    vector v = <1, 2, 3>; v.x = 4; v.z += 1;\n"
+                                              "    llOwnerSay((string)v + (string)same + (string)q + (string)m + (string)t + (string)flags);\n"
+                                              "} }\n");
+        ensure("a comparison as a number: " + r.text, has(r, "local same = if a == b then 1 else 0"));
+        ensure("an integer's truth: " + r.text, has(r, "if a ~= 0 then"));
+        ensure("a string's: " + r.text, has(r, "if s ~= \"\" then"));
+        ensure("and: " + r.text, has(r, "if a > 1 and #l > 1 then"));
+        ensure("integer division: " + r.text, has(r, "local q = a // b") && noted(r, "SluaIntegerDivision"));
+        ensure("remainder: " + r.text, has(r, "local m = a % b") && noted(r, "SluaModulo"));
+        ensure("lists joined: " + r.text, has(r, "l = joinLists(l, {3})") && has(r, "local function joinLists"));
+        ensure("TRUE and FALSE: " + r.text, has(r, "local t = 1") && has(r, "if false then"));
+        ensure("a float as LSL writes it: " + r.text, has(r, "string.format(\"%.6f\", f)"));
+        ensure("a string as an integer: " + r.text, has(r, "lslInteger(\"12abc\")") && has(r, "local function lslInteger"));
+        ensure("lists compared by length: " + r.text, has(r, "#l == #{1}") && noted(r, "SluaListCompare"));
+        ensure("bits: " + r.text, has(r, "bit32.bor(bit32.band(a, b), 4)") && noted(r, "SluaBit32"));
+        ensure("a vector's part set: " + r.text, has(r, "v = vector(4, v.y, v.z)") && has(r, "v = vector(v.x, v.y, v.z + 1)"));
+        ensure("a vector as LSL writes it: " + r.text, has(r, "ll.DumpList2String({v}, \"\")"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<3>()
+    {
+        set_test_name("loops: a for as a while with its steps, a jump out as break and to the next turn as continue, a do as repeat; another jump noted");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    integer i; integer n;\n"
+                                              "    for (i = 0; i < 10; ++i) {\n"
+                                              "        if (i == 3) jump next;\n"
+                                              "        if (i == 8) jump done;\n"
+                                              "        n += i;\n"
+                                              "        @next;\n"
+                                              "    }\n"
+                                              "    @done;\n"
+                                              "    do { n -= 1; } while (n > 5);\n"
+                                              "    while (n) { n--; }\n"
+                                              "    jump away;\n"
+                                              "    n = 1;\n"
+                                              "    @away;\n"
+                                              "    llOwnerSay((string)n);\n"
+                                              "} }\n");
+        ensure("started, then a while: " + r.text, has(r, "i = 0\nwhile i < 10 do"));
+        ensure("its steps at the end: " + r.text, has(r, "    i += 1\nend"));
+        ensure("continue runs the steps first: " + r.text, has(r, "i += 1\n        continue"));
+        ensure("break: " + r.text, has(r, "break"));
+        ensure("repeat: " + r.text, has(r, "repeat") && has(r, "until not (n > 5)"));
+        ensure("a step: " + r.text, has(r, "n -= 1"));
+        ensure("another jump noted and kept as a mark: " + r.text, noted(r, "SluaJump") && has(r, "-- jump away") && has(r, "-- @away"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<4>()
+    {
+        set_test_name("states: each a table of handlers, entered by setState, a state change ending the event; the timer through llcompat, noted");
+        const ALLSLToSLua::Result r = convert("default {\n"
+                                              "    state_entry() { llSetTimerEvent(1.0); }\n"
+                                              "    timer() { state running; }\n"
+                                              "    state_exit() { llOwnerSay(\"leaving\"); }\n"
+                                              "}\n"
+                                              "state running {\n"
+                                              "    state_entry() { llOwnerSay(\"running\"); }\n"
+                                              "    touch_start(integer n) { if (n > 1) { state default; } llOwnerSay(\"touched\"); }\n"
+                                              "}\n");
+        ensure("the tables: " + r.text, has(r, "states.default = {") && has(r, "states.running = {"));
+        ensure("setState: " + r.text, has(r, "local function setState(name: string)") && has(r, "setState(\"default\")"));
+        ensure("a change ends the event: " + r.text, has(r, "setState(\"running\")\n        return") && has(r, "setState(\"default\")\n            return\n        end"));
+        ensure("the timer: " + r.text, has(r, "llcompat.SetTimerEvent(1") && noted(r, "SluaTimer") && noted(r, "SluaCompatOnlyllSetTimerEvent"));
+        ensure("state_exit a handler of its state: " + r.text, has(r, "state_exit = function()"));
+        ensure("what is let go of noted: " + r.text, noted(r, "SluaStates"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<5>()
+    {
+        set_test_name("names: one Luau or SLua holds renamed, functions declared first where one calls another after it; assignments inside expressions made in place");
+        const ALLSLToSLua::Result r = convert("integer table = 1;\n"
+                                              "integer first(integer end) { return second(end) + table; }\n"
+                                              "integer second(integer x) { return x * 2; }\n"
+                                              "default { state_entry() {\n"
+                                              "    integer i; integer j = (i = 4) + i++;\n"
+                                              "    llOwnerSay((string)first(j));\n"
+                                              "} }\n");
+        ensure("renamed: " + r.text, has(r, "local table_ = 1") && has(r, "(end_)"));
+        ensure("declared first: " + r.text, has(r, "local first, second\n") && has(r, "function first(end_)"));
+        ensure("an assignment in place: " + r.text, has(r, "(function() i = 4 return i end)()") && noted(r, "SluaAssignInExpression"));
+        ensure("a step after, what it was: " + r.text, has(r, "(function() local was = i; i += 1 return was end)()"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<6>()
+    {
+        set_test_name("LSL that does not parse writes nothing, and says why");
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert("default { state_entry() { integer = ; } }");
+        ensure("not converted", !r.converted && r.text.empty());
+        ensure("why", !r.problems.empty());
+    }
+}

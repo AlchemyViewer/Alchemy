@@ -109,7 +109,9 @@ struct ALScriptProblem : ALScriptSpan
         Lint,
         Preprocessor,
         // What the optimizer did, as notes, or why it could not.
-        Optimizer
+        Optimizer,
+        // Where an LSL script written again as SLua means something else.
+        Assistant
     };
 
     Severity    severity = Severity::Error;
