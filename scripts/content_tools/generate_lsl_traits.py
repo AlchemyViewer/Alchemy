@@ -74,18 +74,33 @@ def main(argv):
         m = re.match(r"^  ([A-Za-z_][A-Za-z0-9_]*):\s*$", line)
         if m:
             name = m.group(1)
-            functions[name] = {"pure": False, "must-use": False, "native": False, "index": False, "bool": False, "removed": False, "use": None}
+            functions[name] = {
+                "pure": False,
+                "must-use": False,
+                "native": False,
+                "index-result": False,
+                "index-args": 0,
+                "bool": False,
+                "removed": False,
+                "use": None,
+            }
             in_deprecated = False
+            argument = -1
             continue
         if name is None:
             continue
         m = re.match(r"^    (pure|must-use|native): (true|false)\s*$", line)
         if m:
             functions[name][m.group(1)] = m.group(2) == "true"
-        # An index counted from nought, in the result (four spaces in) or an
-        # argument (eight); a result that is a boolean as 1 or 0.
-        if re.match(r"^(    |        )index-semantics: true\s*$", line):
-            functions[name]["index"] = True
+        # Each argument as it starts, counted from nought; an index counted
+        # from nought in the result (four spaces in) or an argument (eight),
+        # the arguments by their places; a result that is a boolean as 1 or 0.
+        if re.match(r"^    - [A-Za-z_][A-Za-z0-9_]*:\s*$", line):
+            argument += 1
+        if re.match(r"^    index-semantics: true\s*$", line):
+            functions[name]["index-result"] = True
+        if re.match(r"^        index-semantics: true\s*$", line) and argument >= 0:
+            functions[name]["index-args"] |= 1 << argument
         if re.match(r"^    bool-semantics: true\s*$", line):
             functions[name]["bool"] = True
         if re.match(r"^    slua-removed: true\s*$", line):
@@ -112,27 +127,31 @@ def main(argv):
         "// lsl_definitions.yaml; do not edit. One row per library function:",
         "// its name, whether it has no side effects, whether its result must",
         "// be used, whether it needs a native implementation off LSO; what",
-        "// SLua makes of it (ALLSLTraits::Slua); and what SLua would use.",
+        "// SLua makes of it (ALLSLTraits::Slua); the arguments that are an",
+        "// index, by their places; and what SLua would use.",
         "// clang-format off",
     ]
     for fn in sorted(functions):
         t = functions[fn]
         slua = []
-        if t["index"]:
-            slua.append("SluaIndex")
+        if t["index-result"]:
+            slua.append("SluaIndexResult")
+        if t["index-args"]:
+            slua.append("SluaIndexArgs")
         if t["bool"]:
             slua.append("SluaBool")
         if t["removed"]:
             slua.append("SluaRemoved")
         use = '"%s"' % t["use"].replace('\\', '\\\\').replace('"', '\\"') if t["use"] else "nullptr"
         lines.append(
-            '{ "%s", %s, %s, %s, %s, %s },'
+            '{ "%s", %s, %s, %s, %s, 0x%x, %s },'
             % (
                 fn,
                 "true" if t["pure"] else "false",
                 "true" if t["must-use"] else "false",
                 "true" if t["native"] else "false",
                 " | ".join(slua) if slua else "0",
+                t["index-args"],
                 use,
             )
         )

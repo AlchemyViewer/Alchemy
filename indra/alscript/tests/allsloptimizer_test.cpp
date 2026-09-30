@@ -1184,8 +1184,9 @@ namespace tut
         }
         ensure("llGetPos is not", !ALLSLTraits::pure("llGetPos") && ALLSLTraits::of("llGetPos")->mustUse);
         // What SLua makes of each, from the same definitions.
-        ensure("llGetSubString counts from one in SLua's ll", ALLSLTraits::of("llGetSubString")->slua == ALLSLTraits::SluaIndex);
-        ensure("llListFindList answers an index", (ALLSLTraits::of("llListFindList")->slua & ALLSLTraits::SluaIndex) != 0);
+        ensure("llGetSubString takes its second and third from one in SLua's ll",
+               ALLSLTraits::of("llGetSubString")->slua == ALLSLTraits::SluaIndexArgs && ALLSLTraits::of("llGetSubString")->sluaIndexArgs == 0x6);
+        ensure("llListFindList answers an index", ALLSLTraits::of("llListFindList")->slua == ALLSLTraits::SluaIndexResult);
         ensure("llSameGroup answers a boolean", ALLSLTraits::of("llSameGroup")->slua == ALLSLTraits::SluaBool);
         ensure("llSetTimerEvent is llcompat's alone", ALLSLTraits::of("llSetTimerEvent")->slua == ALLSLTraits::SluaRemoved);
         ensure("llSay is as it was", ALLSLTraits::of("llSay")->slua == 0 && !ALLSLTraits::of("llSay")->sluaUse);
