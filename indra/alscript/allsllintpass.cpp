@@ -146,11 +146,17 @@ namespace
             return ALScriptEdit(line, column, end_line, end_column, std::move(with));
         }
 
-        // The ) that closes the ( at `open`, past strings and comments;
-        // npos where there is none.
+        // The ) or ] that closes the ( or [ at `open`, past strings and
+        // comments; npos where there is none.
         size_t closing(size_t open) const
         {
-            int depth = 0;
+            if (open >= mSource.size() || (mSource[open] != '(' && mSource[open] != '['))
+            {
+                return std::string_view::npos;
+            }
+            const char opens  = mSource[open];
+            const char closes = opens == '(' ? ')' : ']';
+            int        depth  = 0;
             for (size_t at = open; at < mSource.size(); ++at)
             {
                 const char c = mSource[at];
@@ -170,11 +176,11 @@ namespace
                     const size_t end = mSource.find("*/", at + 2);
                     at               = end == std::string_view::npos ? mSource.size() : end + 1;
                 }
-                else if (c == '(')
+                else if (c == opens)
                 {
                     ++depth;
                 }
-                else if (c == ')' && --depth == 0)
+                else if (c == closes && --depth == 0)
                 {
                     return at;
                 }
@@ -186,6 +192,67 @@ namespace
         std::string_view    mSource;
         std::vector<size_t> mStarts;
     };
+
+    // A call's pieces in the text: its name, its brackets, and each of its
+    // arguments' stretches and words.
+    struct CallText
+    {
+        size_t                   at    = 0;
+        size_t                   named = 0;
+        size_t                   close = 0;
+        std::vector<size_t>      begins;
+        std::vector<size_t>      ends;
+        std::vector<std::string> given;
+    };
+
+    std::optional<CallText> callText(const Text& text, LSLFunctionExpression* call, const char* name)
+    {
+        const std::string_view source = text.source();
+        CallText               out;
+        out.at    = text.begin(call->getIdentifier());
+        out.named = out.at == std::string_view::npos ? out.at : out.at + std::strlen(name);
+        if (out.named == std::string_view::npos || source.substr(out.at, out.named - out.at) != name)
+        {
+            return std::nullopt;
+        }
+        const size_t open = source.find_first_not_of(" \t\r\n", out.named);
+        out.close         = open == std::string_view::npos ? open : text.closing(open);
+        if (out.close == std::string_view::npos)
+        {
+            return std::nullopt;
+        }
+        std::vector<LSLASTNode*> args;
+        for (LSLASTNode* arg = call->getArguments() ? call->getArguments()->getChild(0) : nullptr; arg; arg = arg->getNext())
+        {
+            args.push_back(arg);
+        }
+        for (size_t i = 0; i < args.size(); ++i)
+        {
+            const size_t begin = text.begin(args[i]);
+            size_t       end   = i + 1 < args.size() ? text.begin(args[i + 1]) : out.close;
+            if (begin == std::string_view::npos || end == std::string_view::npos || end <= begin)
+            {
+                return std::nullopt;
+            }
+            // Back over the comma before the next, and the blanks.
+            if (i + 1 < args.size())
+            {
+                end = source.rfind(',', end);
+                if (end == std::string_view::npos || end < begin)
+                {
+                    return std::nullopt;
+                }
+            }
+            while (end > begin && std::isspace(static_cast<unsigned char>(source[end - 1])))
+            {
+                --end;
+            }
+            out.begins.push_back(begin);
+            out.ends.push_back(end);
+            out.given.emplace_back(source.substr(begin, end - begin));
+        }
+        return out;
+    }
 
     // SlSleepingCall: llSetPos and its kin, which make the script sleep
     // where a Fast call does not -- a warning in a loop or the timer event,
@@ -233,16 +300,8 @@ namespace
                                                   : "[1] makes the script sleep [2] s each call; [3] does the same without the sleep",
                                             { name, seconds, sleepless->fast }, "SlSleepingCall", out, severity);
             // The call's name, its brackets and each argument, in the text.
-            const std::string_view source = text.source();
-            const size_t           at     = text.begin(call->getIdentifier());
-            const size_t           named  = at == std::string_view::npos ? at : at + std::strlen(name);
-            if (named == std::string_view::npos || source.substr(at, named - at) != name)
-            {
-                return;
-            }
-            const size_t open  = source.find_first_not_of(" \t\r\n", named);
-            const size_t close = open != std::string_view::npos && source[open] == '(' ? text.closing(open) : std::string_view::npos;
-            if (close == std::string_view::npos)
+            const std::optional<CallText> parts = callText(text, call, name);
+            if (!parts)
             {
                 return;
             }
@@ -251,34 +310,11 @@ namespace
             {
                 args.push_back(arg);
             }
-            std::vector<std::string> given;
-            std::vector<size_t>      begins;
-            std::vector<size_t>      ends;
-            for (size_t i = 0; i < args.size(); ++i)
-            {
-                const size_t begin = text.begin(args[i]);
-                size_t       end   = i + 1 < args.size() ? text.begin(args[i + 1]) : close;
-                if (begin == std::string_view::npos || end == std::string_view::npos || end <= begin)
-                {
-                    return;
-                }
-                // Back over the comma before the next, and the blanks.
-                if (i + 1 < args.size())
-                {
-                    end = source.rfind(',', end);
-                    if (end == std::string_view::npos || end < begin)
-                    {
-                        return;
-                    }
-                }
-                while (end > begin && std::isspace(static_cast<unsigned char>(source[end - 1])))
-                {
-                    --end;
-                }
-                begins.push_back(begin);
-                ends.push_back(end);
-                given.emplace_back(source.substr(begin, end - begin));
-            }
+            const std::vector<std::string>& given  = parts->given;
+            const std::vector<size_t>&      begins = parts->begins;
+            const std::vector<size_t>&      ends   = parts->ends;
+            const size_t                    at     = parts->at;
+            const size_t                    named  = parts->named;
             const std::optional<std::string> written = ALScriptLintPass::sleeplessArgs(*sleepless, given, false);
             if (!written || args.empty())
             {
@@ -304,6 +340,125 @@ namespace
             fix.preferred   = true;
             fix.edits       = std::move(edits);
             said.fixes.push_back(std::move(fix));
+        });
+    }
+
+    // SlMergeablePrimParams: prim-params calls one after another, each with
+    // its rules written out as a list, calling the same function, which one
+    // call with all their rules does -- PRIM_LINK_TARGET between where the
+    // link changes. After the first, only where all a call is given changes
+    // nothing and reads nothing the calls before it could change. A note;
+    // fixed as the one call, not safe.
+    void mergeablePrimParams(const Text& text, LSLScript* script, ALScriptProblems& out)
+    {
+        struct PrimStat
+        {
+            LSLFunctionExpression*     call;
+            const char*                name;
+            int                        link;
+            CallText                   parts;
+            ALScriptLintPass::PrimCall prim;
+        };
+        const std::string_view source = text.source();
+        const auto primStat = [&](LSLASTNode* stat, bool later) -> std::optional<PrimStat> {
+            if (stat->getNodeSubType() != NODE_EXPRESSION_STATEMENT)
+            {
+                return std::nullopt;
+            }
+            LSLASTNode* expr = static_cast<LSLExpressionStatement*>(stat)->getExpr();
+            if (isNull(expr) || expr->getNodeSubType() != NODE_FUNCTION_EXPRESSION)
+            {
+                return std::nullopt;
+            }
+            auto*       call   = static_cast<LSLFunctionExpression*>(expr);
+            LSLSymbol*  symbol = call->getIdentifier()->getSymbol();
+            const char* name   = symbol && symbol->getSubType() == SYM_BUILTIN ? symbol->getName() : nullptr;
+            const ALScriptLintPass::PrimParams* params = name ? ALScriptLintPass::primParams(name) : nullptr;
+            if (!params)
+            {
+                return std::nullopt;
+            }
+            std::vector<LSLASTNode*> args;
+            for (LSLASTNode* arg = call->getArguments() ? call->getArguments()->getChild(0) : nullptr; arg; arg = arg->getNext())
+            {
+                args.push_back(arg);
+            }
+            if (args.size() != static_cast<size_t>(params->rules + 1) || args[params->rules]->getNodeSubType() != NODE_LIST_EXPRESSION ||
+                (later && !std::all_of(args.begin(), args.end(), [](LSLASTNode* arg) { return ALLSLTraits::sideEffectFree(arg); })))
+            {
+                return std::nullopt;
+            }
+            std::optional<CallText> parts = callText(text, call, name);
+            if (!parts)
+            {
+                return std::nullopt;
+            }
+            // What is inside the rules' brackets.
+            const size_t open  = text.begin(args[params->rules]);
+            const size_t close = open == std::string_view::npos ? open : text.closing(open);
+            if (close == std::string_view::npos)
+            {
+                return std::nullopt;
+            }
+            std::string_view inner = source.substr(open + 1, close - open - 1);
+            const size_t     from  = inner.find_first_not_of(" \t\r\n");
+            inner                  = from == std::string_view::npos ? std::string_view() : inner.substr(from, inner.find_last_not_of(" \t\r\n") - from + 1);
+            PrimStat out{ call, name, params->link, std::move(*parts), {} };
+            out.prim.link    = params->link < 0 ? std::string("LINK_THIS") : out.parts.given[params->link];
+            out.prim.rules   = std::string(inner);
+            out.prim.targets = inner.find("PRIM_LINK_TARGET") != std::string_view::npos;
+            return out;
+        };
+        walk(script, [&](LSLASTNode* node) {
+            if (node->getNodeSubType() != NODE_COMPOUND_STATEMENT)
+            {
+                return;
+            }
+            for (LSLASTNode* stat = node->getChild(0); stat;)
+            {
+                std::optional<PrimStat> first = primStat(stat, false);
+                LSLASTNode*             next  = stat->getNext();
+                if (!first)
+                {
+                    stat = next;
+                    continue;
+                }
+                std::vector<PrimStat> run;
+                run.push_back(std::move(*first));
+                for (; next; next = next->getNext())
+                {
+                    std::optional<PrimStat> more = primStat(next, true);
+                    if (!more || std::string_view(more->name) != run.front().name)
+                    {
+                        break;
+                    }
+                    run.push_back(std::move(*more));
+                }
+                stat = next;
+                if (run.size() < 2)
+                {
+                    continue;
+                }
+                std::vector<ALScriptLintPass::PrimCall> calls;
+                for (const PrimStat& each : run)
+                {
+                    calls.push_back(each.prim);
+                }
+                const PrimStat&   head = run.front();
+                const std::string now  = std::string(head.name) + "(" + (head.link < 0 ? std::string() : head.prim.link + ", ") +
+                                        ALScriptLintPass::mergedRules(calls, false) + ")";
+                ALScriptProblem&  said = problem(head.call, "LSLSlMergeablePrimParams",
+                                                 "These [1] calls to [2] could be one, with all their rules, and PRIM_LINK_TARGET where the link changes",
+                                                 { std::to_string(run.size()), head.name }, "SlMergeablePrimParams", out);
+                // Said over the whole run; the last call's ; kept.
+                const auto [end_line, end_column] = text.place(run.back().parts.close + 1);
+                said.endLine                      = end_line;
+                said.endColumn                    = end_column;
+                ALScriptFix fix = ALScriptFixes::titled("ScriptFixWriteIt", "Write it [1]", { now });
+                fix.preferred   = true;
+                fix.edits.push_back(text.edit(head.parts.at, run.back().parts.close + 1, now));
+                said.fixes.push_back(std::move(fix));
+            }
         });
     }
 
@@ -384,5 +539,7 @@ void ALLSLLintPass::check(std::string_view source, LSLScript* script, ALScriptPr
     }
     const ALLSLEffects effects(script);
     loopInvariantCalls(script, effects, out);
-    sleepingCalls(Text(source), script, out);
+    const Text text(source);
+    sleepingCalls(text, script, out);
+    mergeablePrimParams(text, script, out);
 }

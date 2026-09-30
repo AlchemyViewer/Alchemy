@@ -97,6 +97,29 @@ public:
     // comes before and after them: the sleepless call made by putting
     // those in, rather than writing the arguments again.
     static std::optional<std::pair<std::string, std::string>> around(const Sleepless& call, bool lua);
+
+    // SlMergeablePrimParams': the calls that set a prim's params, and which
+    // of their arguments is the link (-1 for none: LINK_THIS) and which the
+    // rules.
+    struct PrimParams
+    {
+        const char* lsl;
+        int         link;
+        int         rules;
+    };
+    static const PrimParams* primParams(std::string_view lsl);
+    // One call of a run: its link as written, and what is inside its rules'
+    // brackets; whether those send what follows to another link.
+    struct PrimCall
+    {
+        std::string link;
+        std::string rules;
+        bool        targets = false;
+    };
+    // The rules of one call that sets what the run did: each call's joined
+    // on, with PRIM_LINK_TARGET and its link before them where it is not
+    // the link the rules before it were for. Bracketed as `lua` writes it.
+    static std::string mergedRules(const std::vector<PrimCall>& calls, bool lua);
     static const Rule*              rule(std::string_view name);
     // A rule's bit, or 0 for a name that is none.
     static uint64_t bit(std::string_view name);

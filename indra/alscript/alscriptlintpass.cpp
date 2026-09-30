@@ -92,6 +92,14 @@ namespace
         // llSetPos, llSetPrimitiveParams: a call that sleeps, which a Fast
         // one does without. A warning in a loop or a timer.
         { "SlSleepingCall", Rule::Both, Severity::Note, true, true, nullptr },
+        // Prim-params calls one after another, which one call could do.
+        { "SlMergeablePrimParams", Rule::Both, Severity::Note, true, true, nullptr },
+    };
+
+    const ALScriptLintPass::PrimParams PRIM_PARAMS[] = {
+        { "llSetLinkPrimitiveParams", 0, 1 },
+        { "llSetLinkPrimitiveParamsFast", 0, 1 },
+        { "llSetPrimitiveParams", -1, 0 },
     };
 
     // The sleeping calls with a sleepless way of doing the same, the
@@ -530,7 +538,109 @@ namespace
                     almostSwapped(node->body.data[i], node->body.data[i + 1]);
                 }
             }
+            if (on("SlMergeablePrimParams"))
+            {
+                mergeablePrimParams(node);
+            }
             return true;
+        }
+
+        // --- SlMergeablePrimParams: prim-params calls one call could make ----
+
+        struct PrimStat
+        {
+            Luau::AstExprCall*         call;
+            std::string                function;
+            int                        link;
+            ALScriptLintPass::PrimCall parts;
+        };
+
+        // A statement that is a call setting prim params with a list of
+        // rules written out; one after the first of a run only where all
+        // it is given is settled, so that nothing it reads could see what
+        // the calls before it did.
+        std::optional<PrimStat> primStat(Luau::AstStat* stat, bool later)
+        {
+            auto*       expr   = stat->as<Luau::AstStatExpr>();
+            auto*       call   = expr ? expr->expr->as<Luau::AstExprCall>() : nullptr;
+            const auto* callee = call ? call->func->as<Luau::AstExprIndexName>() : nullptr;
+            const auto* lib    = callee && callee->op == '.' ? callee->expr->as<Luau::AstExprGlobal>() : nullptr;
+            const std::string_view from = lib ? lib->name.value : "";
+            if (from != "ll" && from != "llcompat")
+            {
+                return std::nullopt;
+            }
+            const ALScriptLintPass::PrimParams* params = ALScriptLintPass::primParams("ll" + std::string(callee->index.value));
+            if (!params || call->args.size != static_cast<size_t>(params->rules + 1) ||
+                (later && !std::all_of(call->args.begin(), call->args.end(), [](Luau::AstExpr* arg) { return settled(arg); })))
+            {
+                return std::nullopt;
+            }
+            const auto* rules = unbracketed(call->args.data[params->rules])->as<Luau::AstExprTable>();
+            if (!rules)
+            {
+                return std::nullopt;
+            }
+            PrimStat out{ call, std::string(from) + "." + std::string(callee->index.value), params->link, {} };
+            for (const Luau::AstExprTable::Item& item : rules->items)
+            {
+                if (item.kind != Luau::AstExprTable::Item::Kind::List)
+                {
+                    return std::nullopt;
+                }
+                const auto* global = item.value->as<Luau::AstExprGlobal>();
+                out.parts.targets  = out.parts.targets || (global && std::string_view(global->name.value) == "PRIM_LINK_TARGET");
+            }
+            out.parts.link  = params->link < 0 ? "LINK_THIS" : text(call->args.data[params->link]->location);
+            out.parts.rules = rules->items.size == 0
+                                  ? std::string()
+                                  : text(Luau::Location(rules->items.data[0].value->location.begin, rules->items.data[rules->items.size - 1].value->location.end));
+            return out;
+        }
+
+        // Each run of such statements, one after another, calling the same
+        // function: one call with all their rules sets the same. A note;
+        // fixed as that call, not safe, since it is one change to the prim
+        // where there were several.
+        void mergeablePrimParams(Luau::AstStatBlock* block)
+        {
+            for (size_t i = 0; i < block->body.size;)
+            {
+                const std::optional<PrimStat> first = primStat(block->body.data[i], false);
+                size_t                        next  = i + 1;
+                if (!first)
+                {
+                    i = next;
+                    continue;
+                }
+                std::vector<PrimStat> run = { *first };
+                for (; next < block->body.size; ++next)
+                {
+                    std::optional<PrimStat> more = primStat(block->body.data[next], true);
+                    if (!more || more->function != first->function)
+                    {
+                        break;
+                    }
+                    run.push_back(std::move(*more));
+                }
+                i = next;
+                if (run.size() < 2)
+                {
+                    continue;
+                }
+                std::vector<ALScriptLintPass::PrimCall> calls;
+                for (const PrimStat& each : run)
+                {
+                    calls.push_back(each.parts);
+                }
+                const std::string    now = first->function + "(" + (first->link < 0 ? std::string() : first->parts.link + ", ") +
+                                        ALScriptLintPass::mergedRules(calls, true) + ")";
+                const Luau::Location all(run.front().call->location.begin, run.back().call->location.end);
+                ALScriptProblem&     said = problem(all, "LuauLintSlMergeablePrimParams",
+                                                    "These [1] calls to [2] could be one, with all their rules, and PRIM_LINK_TARGET where the link changes",
+                                                    { std::to_string(run.size()), first->function }, "SlMergeablePrimParams");
+                offer(said, now, { edit(all, now) }, false);
+            }
         }
 
         // --- SlAlmostSwapped: a swap written a step at a time ----------------
@@ -1970,8 +2080,8 @@ namespace
         }
 
         // What changes nothing and runs nothing to be read: a constant, a
-        // variable, a field of one, their sums, a vector or a quaternion
-        // made of them -- what may be read in another order.
+        // variable, a field of one, their sums, a vector or a quaternion or
+        // a table made of them -- what may be read in another order.
         static bool settled(Luau::AstExpr* e)
         {
             e = unbracketed(e);
@@ -1991,6 +2101,12 @@ namespace
             if (const auto* binary = e->as<Luau::AstExprBinary>())
             {
                 return settled(binary->left) && settled(binary->right);
+            }
+            if (const auto* table = e->as<Luau::AstExprTable>())
+            {
+                return std::all_of(table->items.begin(), table->items.end(), [](const Luau::AstExprTable::Item& item) {
+                    return (!item.key || settled(item.key)) && settled(item.value);
+                });
             }
             const auto* call   = e->as<Luau::AstExprCall>();
             const auto* global = call ? call->func->as<Luau::AstExprGlobal>() : nullptr;
@@ -2270,6 +2386,40 @@ std::optional<std::pair<std::string, std::string>> ALScriptLintPass::around(cons
         return out;
     };
     return std::make_pair(bracketed(args.substr(0, first)), bracketed(args.substr(end)));
+}
+
+// static
+const ALScriptLintPass::PrimParams* ALScriptLintPass::primParams(std::string_view lsl)
+{
+    const auto found = std::find_if(std::begin(PRIM_PARAMS), std::end(PRIM_PARAMS), [lsl](const PrimParams& p) { return lsl == p.lsl; });
+    return found == std::end(PRIM_PARAMS) ? nullptr : &*found;
+}
+
+// static
+std::string ALScriptLintPass::mergedRules(const std::vector<PrimCall>& calls, bool lua)
+{
+    std::string items;
+    const auto  add = [&](const std::string& piece) {
+        if (!piece.empty())
+        {
+            items += (items.empty() ? "" : ", ") + piece;
+        }
+    };
+    // Whose the rules so far are: the first call's link, until a rule sends
+    // them elsewhere.
+    std::string link  = calls.empty() ? std::string() : calls.front().link;
+    bool        known = true;
+    for (size_t i = 0; i < calls.size(); ++i)
+    {
+        if (i > 0 && (!known || calls[i].link != link))
+        {
+            add("PRIM_LINK_TARGET, " + calls[i].link);
+            link = calls[i].link;
+        }
+        add(calls[i].rules);
+        known = !calls[i].targets;
+    }
+    return lua ? "{" + items + "}" : "[" + items + "]";
 }
 
 // static

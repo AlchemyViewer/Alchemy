@@ -601,4 +601,64 @@ namespace tut
                       std::string("default { state_entry() { llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_RENDER_MATERIAL, ALL_SIDES, \"m\"]); } }\n"));
         unfixed("default { state_entry() { llSetRenderMaterial(llGetInventoryName(INVENTORY_MATERIAL, 0), 0); } }\n", "LSLSlSleepingCall", false);
     }
+
+    template<> template<>
+    void object::test<15>()
+    {
+        set_test_name("SlMergeablePrimParams in SLua: a run of the same prim-params call, its rules written out, a note; merged with "
+                      "PRIM_LINK_TARGET where the link changes, or a list sends its rules elsewhere; broken by anything between, a call "
+                      "whose arguments read the world, or another function");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_COLOR, ALL_SIDES, vector(1, 0, 0), 1})\n"
+                                       "ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0.5})\n"
+                                       "ll.SetLinkPrimitiveParamsFast(2, {PRIM_GLOW, ALL_SIDES, 0})\n"
+                                       "print(\"between\")\n"
+                                       "ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0})\n"
+                                       "ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_POSITION, ll.GetPos()})\n"
+                                       "ll.SetPrimitiveParams({PRIM_GLOW, ALL_SIDES, 0})\n"
+                                       "ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0})\n",
+                                       "SlMergeablePrimParams", ALScriptProblem::Severity::Note);
+        ensure_equals("each", said, std::string("0 LuauLintSlMergeablePrimParams|3|ll.SetLinkPrimitiveParamsFast\n"));
+        ensure_equals("a link changed", fixed("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0.5})\nll.SetLinkPrimitiveParamsFast(2, {PRIM_GLOW, ALL_SIDES, 0})\n",
+                                              "LuauLintSlMergeablePrimParams",
+                                              "Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0.5, PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 0})",
+                                              false),
+                      std::string("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_GLOW, ALL_SIDES, 0.5, PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 0})\n"));
+        ensure_equals("sent elsewhere, then back", fixed("ll.SetLinkPrimitiveParamsFast(1, {PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 1})\n"
+                                                         "ll.SetLinkPrimitiveParamsFast(1, {PRIM_GLOW, ALL_SIDES, 0})\n",
+                                                         "LuauLintSlMergeablePrimParams",
+                                                         "Write it ll.SetLinkPrimitiveParamsFast(1, {PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 1, PRIM_LINK_TARGET, 1, "
+                                                         "PRIM_GLOW, ALL_SIDES, 0})",
+                                                         false),
+                      std::string("ll.SetLinkPrimitiveParamsFast(1, {PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 1, PRIM_LINK_TARGET, 1, PRIM_GLOW, ALL_SIDES, 0})\n"));
+    }
+
+    template<> template<>
+    void object::test<16>()
+    {
+        set_test_name("SlMergeablePrimParams in LSL: the same, over the text, each call's ; but the last's taken with it");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string said = found("default {\n"
+                                       "    state_entry() {\n"
+                                       "        llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_GLOW, ALL_SIDES, 0.5]);\n"
+                                       "        llSetLinkPrimitiveParamsFast(2, [PRIM_GLOW, ALL_SIDES, 0.0]);\n"
+                                       "        llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.0]);\n"
+                                       "        llSetPrimitiveParams([PRIM_POSITION, llGetPos()]);\n"
+                                       "    }\n"
+                                       "}\n",
+                                       "SlMergeablePrimParams", ALScriptProblem::Severity::Note, false);
+        ensure_equals("each", said, std::string("2 LSLSlMergeablePrimParams|2|llSetLinkPrimitiveParamsFast\n"));
+        ensure_equals("a link changed", fixed("default { state_entry() {\n    llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_GLOW, ALL_SIDES, 0.5]);\n"
+                                              "    llSetLinkPrimitiveParamsFast(2, [ PRIM_GLOW, ALL_SIDES, 0.0 ]);\n} }\n",
+                                              "LSLSlMergeablePrimParams",
+                                              "Write it llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_GLOW, ALL_SIDES, 0.5, PRIM_LINK_TARGET, 2, PRIM_GLOW, ALL_SIDES, 0.0])",
+                                              false, false),
+                      std::string("default { state_entry() {\n    llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_GLOW, ALL_SIDES, 0.5, PRIM_LINK_TARGET, 2, "
+                                  "PRIM_GLOW, ALL_SIDES, 0.0]);\n} }\n"));
+        ensure_equals("no link", fixed("default { state_entry() { llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.5]); llSetPrimitiveParams([PRIM_COLOR, "
+                                       "ALL_SIDES, <1, 0, 0>, 1.0]); } }\n",
+                                       "LSLSlMergeablePrimParams", "Write it llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.5, PRIM_COLOR, ALL_SIDES, <1, 0, 0>, 1.0])",
+                                       false, false),
+                      std::string("default { state_entry() { llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 0.5, PRIM_COLOR, ALL_SIDES, <1, 0, 0>, 1.0]); } }\n"));
+    }
 }
