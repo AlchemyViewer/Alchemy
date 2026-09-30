@@ -66,7 +66,9 @@ public:
     /// neighbours' until then, and only a spatial bridge of its own can be
     /// told apart from them. That is one-way, as it is for any object the
     /// viewer sees move, and it takes a rebuild, so it happens on the pick
-    /// rather than on the frame that needs it.
+    /// rather than on the frame that needs it -- and again for each Scope,
+    /// for a subject the viewer has made anew since (a teleport back, a
+    /// region reloaded), which comes back static.
     static void arm(const LLUUID& target_id);
     static void disarm();
     static const LLUUID& armedTarget() { return sArmed; }
@@ -108,6 +110,8 @@ public:
     static bool includes(LLSpatialGroup* group);
 
 private:
+    /// Gives a static linkset a spatial bridge of its own (see arm()).
+    static void separate(LLViewerObject* object);
     static bool includesAvatar(const LLVOAvatar* avatar);
     static void collectSeated(LLViewerObject* object);
 

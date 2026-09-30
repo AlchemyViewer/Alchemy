@@ -82,12 +82,16 @@ LLUUID ALRenderIsolation::targetFromPick(const LLUUID& picked_id)
 void ALRenderIsolation::arm(const LLUUID& target_id)
 {
     sArmed = target_id;
+    separate(findArmed());
+}
 
-    LLViewerObject* object = findArmed();
-    if (object && !object->asAvatar())
+// static
+void ALRenderIsolation::separate(LLViewerObject* object)
+{
+    if (object && !object->asAvatar() && object->getPCode() == LL_PCODE_VOLUME)
     {
-        LLDrawable* drawable = object->mDrawable;
-        if (drawable && drawable->isStatic() && object->getPCode() == LL_PCODE_VOLUME)
+        LLDrawable* drawable = object->getRootEdit()->mDrawable;
+        if (drawable && drawable->isStatic())
         {
             drawable->makeActive();
         }
@@ -132,6 +136,8 @@ ALRenderIsolation::Scope::Scope(const LLUUID& target_id, bool include_seated)
         else
         {
             sRoot = object->getRootEdit();
+            // Made anew since it was armed, it is static again.
+            separate(sRoot);
             if (include_seated)
             {
                 collectSeated(sRoot);
