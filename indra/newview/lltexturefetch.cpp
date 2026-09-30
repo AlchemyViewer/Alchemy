@@ -342,23 +342,36 @@ private:
 
         // Threads:  Ttf
         DecodeResponder(LLTextureFetch* fetcher, const LLUUID& id, LLTextureFetchWorker* worker)
-            : mFetcher(fetcher), mID(id)
+            : mFetcher(fetcher), mID(id), mWorker(worker)
         {
+            ++mWorker->mDecodesInFlight;
+        }
+
+        // Threads:  Tid once the decode has run, or the posting thread if it could not be queued
+        ~DecodeResponder() override
+        {
+            // The last thing this responder does with the worker. deleteOK holds the worker's
+            // deletion until every responder carrying a pointer to it has got this far.
+            --mWorker->mDecodesInFlight;
         }
 
         // Threads:  Tid
         virtual void completed(bool success, const std::string& error_message, LLImageRaw* raw, LLImageRaw* aux, U32 request_id)
         {
             LL_PROFILE_ZONE_SCOPED;
-            LLTextureFetchWorker* worker = mFetcher->getWorker(mID);
-            if (worker)
+            // A worker taken out of the fetcher is on its way to deletion and takes no result.
+            // The lookup's answer is only compared, never called through: this responder keeps
+            // mWorker alive, while a newer worker filed under the same id did not ask for this
+            // decode and could be freed between the lookup and the call.
+            if (mFetcher->getWorker(mID) == mWorker)
             {
-                worker->callbackDecoded(success, error_message, raw, aux, request_id);
+                mWorker->callbackDecoded(success, error_message, raw, aux, request_id);
             }
         }
     private:
         LLTextureFetch* mFetcher;
         LLUUID mID;
+        LLTextureFetchWorker* mWorker;
     };
 
     struct Compare
@@ -564,6 +577,10 @@ private:
                                 mCachedSize;
     e_request_state mSentRequest;
     handle_t mDecodeHandle;
+    // DecodeResponders alive that point at this worker. A responder lives on past completed()
+    // and past the worker's interest in its decode, so neither mDecodeHandle nor mDecoded can
+    // say when the last one is gone; this can.
+    std::atomic<S32> mDecodesInFlight;
     bool mLoaded;
     bool mDecoded;
     bool mWritten;
@@ -891,6 +908,7 @@ LLTextureFetchWorker::LLTextureFetchWorker(LLTextureFetch* fetcher,
       mLoaded(false),
       mSentRequest(UNSENT),
       mDecodeHandle(0),
+      mDecodesInFlight(0),
       mDecoded(false),
       mWritten(false),
       mNeedsAux(false),
@@ -2185,17 +2203,12 @@ bool LLTextureFetchWorker::deleteOK()
         delete_ok = false;
     }
 
-    // Do not delete while a decode is in-flight on the ImageDecode thread pool.
-    // endWork() may zero mDecodeHandle without waiting for the decode thread to
-    // finish, so we also guard on !mDecoded: callbackDecoded() sets mDecoded=true
-    // under mWorkMutex, guaranteeing the thread is done touching this object
-    // before we allow deletion.
+    // A decode responder dereferences this worker until it is destroyed, whether or not its
+    // decode still matters. Once a worker is out of mRequestMap its decode's result is
+    // dropped, so neither mDecodeHandle nor mDecoded ever settles for it; the count does.
+    if (mDecodesInFlight > 0)
     {
-        LLMutexLock lock(&mWorkMutex);
-        if (mDecodeHandle != 0 || (mState == DECODE_IMAGE_UPDATE && !mDecoded))
-        {
-            delete_ok = false;
-        }
+        delete_ok = false;
     }
 
     return delete_ok;
