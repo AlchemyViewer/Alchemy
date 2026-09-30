@@ -1947,6 +1947,12 @@ ALScriptProblems ALLuauService::check(std::string_view source)
                 }
                 problem.severity = *said == ALSeleneFilters::Action::Deny ? ALScriptProblem::Severity::Error : ALScriptProblem::Severity::Warning;
             }
+            // Its fixes, made as it read the script, offered only where
+            // they will be read.
+            if (ALSourceMap::within(impl.passedOver, problem.line, std::max(problem.line, problem.endLine)))
+            {
+                problem.fixes.clear();
+            }
             problems.push_back(std::move(problem));
         }
     }

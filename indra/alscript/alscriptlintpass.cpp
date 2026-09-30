@@ -26,6 +26,7 @@
 
 #include "alscriptlintpass.h"
 
+#include "alscriptfixes.h"
 #include "allsltraits.h"
 
 #include "Luau/Ast.h"
@@ -55,6 +56,8 @@ namespace
         // ll.ListFindList(l, x) == -1, where it answers nil; llcompat's
         // against nil, where it answers -1.
         { "SlNilSentinel", true, Severity::Error, true, true, nullptr },
+        // t == {}: a table built there equals no other.
+        { "SlTableCompare", true, Severity::Error, true, true, nullptr },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -191,6 +194,17 @@ namespace
         }
     };
 
+    // What the pass asks the check an expression is.
+    enum class Kind : U8
+    {
+        Number,
+        String,
+        Boolean,
+        Table,
+        List,
+        Vector,
+    };
+
     class Pass final : public Luau::AstVisitor
     {
     public:
@@ -272,61 +286,84 @@ namespace
             {
                 sentinel(node);
             }
+            if (on("SlTableCompare"))
+            {
+                tableCompare(node);
+            }
             return true;
         }
 
     private:
         bool on(std::string_view name) const { return (mEnabled & ALScriptLintPass::bit(name)) != 0; }
 
-        bool number(Luau::AstExpr* e) { return primitive(e, Luau::PrimitiveType::Number); }
+        bool number(Luau::AstExpr* e) { return is(e, Kind::Number); }
 
-        // Whether the check found an expression of one primitive type, and
-        // nothing else: not number?, whose nil is false; a string's
-        // literal, typed as itself, is a string. A local the check says is
-        // any -- unannotated, in the old solver's nonstrict mode -- by what
-        // it is given.
-        bool primitive(Luau::AstExpr* e, Luau::PrimitiveType::Type want)
+        // Whether a type is of a kind, and nothing else: not number?, whose
+        // nil is false. A string's or a boolean's literal, typed as itself,
+        // is one; a list is a table with number keys and no fields.
+        static bool of(Luau::TypeId type, Kind want)
+        {
+            const Luau::TypeId followed = Luau::follow(type);
+            if (const auto* prim = Luau::get<Luau::PrimitiveType>(followed))
+            {
+                return (want == Kind::Number && prim->type == Luau::PrimitiveType::Number) ||
+                       (want == Kind::String && prim->type == Luau::PrimitiveType::String) ||
+                       (want == Kind::Boolean && prim->type == Luau::PrimitiveType::Boolean);
+            }
+            if (const auto* single = Luau::get<Luau::SingletonType>(followed))
+            {
+                return (want == Kind::String && Luau::get<Luau::StringSingleton>(single)) ||
+                       (want == Kind::Boolean && Luau::get<Luau::BooleanSingleton>(single));
+            }
+            if (const auto* table = Luau::get<Luau::TableType>(followed))
+            {
+                return want == Kind::Table ||
+                       (want == Kind::List && table->props.empty() && table->indexer && of(table->indexer->indexType, Kind::Number));
+            }
+            const auto* extern_type = Luau::get<Luau::ExternType>(followed);
+            return want == Kind::Vector && extern_type && extern_type->name == "vector";
+        }
+
+        // Whether the check found an expression of a kind. A local the
+        // check says is any -- unannotated, in the old solver's nonstrict
+        // mode -- by what it is given.
+        bool is(Luau::AstExpr* e, Kind want)
         {
             const Luau::TypeId* type = mChecked ? mChecked->astTypes.find(e) : nullptr;
             if (!type)
             {
                 return false;
             }
-            const Luau::TypeId followed = Luau::follow(*type);
-            if (const auto* prim = Luau::get<Luau::PrimitiveType>(followed))
+            if (of(*type, want))
             {
-                return prim->type == want;
-            }
-            if (const auto* single = Luau::get<Luau::SingletonType>(followed))
-            {
-                return want == Luau::PrimitiveType::String && Luau::get<Luau::StringSingleton>(single);
+                return true;
             }
             auto* local = e->as<Luau::AstExprLocal>();
-            return local && Luau::get<Luau::AnyType>(followed) && primitiveLocal(local->local, want);
+            return local && Luau::get<Luau::AnyType>(Luau::follow(*type)) && localIs(local->local, want);
         }
 
-        bool primitiveLocal(Luau::AstLocal* local, Luau::PrimitiveType::Type want)
+        bool localIs(Luau::AstLocal* local, Kind want)
         {
             const auto asked = std::make_pair(local, want);
-            if (const auto known = mPrimitiveLocals.find(asked); known != mPrimitiveLocals.end())
+            if (const auto known = mLocalKinds.find(asked); known != mLocalKinds.end())
             {
                 return known->second;
             }
             // Taken as none while its own are asked about, which a loop of
             // locals given each other cannot then make one.
-            mPrimitiveLocals[asked] = false;
-            bool is = want == Luau::PrimitiveType::Number && mLocals.counters.contains(local);
-            if (!is && !mLocals.unknown.contains(local) && !mLocals.counters.contains(local) && !local->annotation)
+            mLocalKinds[asked] = false;
+            bool yes = want == Kind::Number && mLocals.counters.contains(local);
+            if (!yes && !mLocals.unknown.contains(local) && !mLocals.counters.contains(local) && !local->annotation)
             {
                 const auto given = mLocals.given.find(local);
-                is = given != mLocals.given.end() && !given->second.empty();
-                for (size_t i = 0; is && i < given->second.size(); ++i)
+                yes = given != mLocals.given.end() && !given->second.empty();
+                for (size_t i = 0; yes && i < given->second.size(); ++i)
                 {
-                    is = primitive(given->second[i], want);
+                    yes = is(given->second[i], want);
                 }
             }
-            mPrimitiveLocals[asked] = is;
-            return is;
+            mLocalKinds[asked] = yes;
+            return yes;
         }
 
         // What a find answers where it finds nothing: SLua's own answer
@@ -343,10 +380,7 @@ namespace
         // and, for one that answers -1, never nil before it is given one.
         std::optional<Find> find(Luau::AstExpr* e)
         {
-            while (auto* group = e->as<Luau::AstExprGroup>())
-            {
-                e = group->expr;
-            }
+            e = unbracketed(e);
             if (auto* local = e->as<Luau::AstExprLocal>())
             {
                 return findLocal(local->local);
@@ -373,7 +407,7 @@ namespace
                 }
                 return std::nullopt;
             }
-            if (name == "find" && (from == "table" || from == "string" || (callee->op == ':' && primitive(callee->expr, Luau::PrimitiveType::String))))
+            if (name == "find" && (from == "table" || from == "string" || (callee->op == ':' && is(callee->expr, Kind::String))))
             {
                 return Find{ from == "table" ? "table.find" : "string.find", true };
             }
@@ -415,10 +449,7 @@ namespace
         // call's function and (...).
         std::string subject(Luau::AstExpr* e) const
         {
-            while (auto* group = e->as<Luau::AstExprGroup>())
-            {
-                e = group->expr;
-            }
+            e = unbracketed(e);
             if (const auto* local = e->as<Luau::AstExprLocal>())
             {
                 return local->local->name.value;
@@ -432,10 +463,7 @@ namespace
 
         static bool constant(Luau::AstExpr* e, double value)
         {
-            while (auto* group = e->as<Luau::AstExprGroup>())
-            {
-                e = group->expr;
-            }
+            e = unbracketed(e);
             if (const auto* negated = e->as<Luau::AstExprUnary>(); negated && negated->op == Luau::AstExprUnary::Op::Minus)
             {
                 return value != 0 && constant(negated->expr, -value);
@@ -444,14 +472,7 @@ namespace
             return number && number->value == value;
         }
 
-        static bool isNil(Luau::AstExpr* e)
-        {
-            while (auto* group = e->as<Luau::AstExprGroup>())
-            {
-                e = group->expr;
-            }
-            return e->is<Luau::AstExprConstantNil>();
-        }
+        static bool isNil(Luau::AstExpr* e) { return unbracketed(e)->is<Luau::AstExprConstantNil>(); }
 
         // A find compared with what it never answers: SLua's with -1 --
         // equal, not equal, or LSL's order against 0 or -1, an error at
@@ -549,6 +570,51 @@ namespace
             }
         }
 
+        // A table built where it is compared, which nothing equals: an
+        // empty one asked of as LSL asked `l == []`, fixed as whether the
+        // table is empty -- by its length where it is a list -- or with
+        // items, which LSL compared by their count alone.
+        void tableCompare(Luau::AstExprBinary* node)
+        {
+            using Op = Luau::AstExprBinary::Op;
+            if (node->op != Op::CompareEq && node->op != Op::CompareNe)
+            {
+                return;
+            }
+            Luau::AstExpr*            other = node->left;
+            const Luau::AstExprTable* built = unbracketed(node->right)->as<Luau::AstExprTable>();
+            if (!built)
+            {
+                other = node->right;
+                built = unbracketed(node->left)->as<Luau::AstExprTable>();
+            }
+            if (!built)
+            {
+                return;
+            }
+            other                     = unbracketed(other);
+            const std::string subject = text(other->location);
+            const bool        table   = !is(other, Kind::Number) && !is(other, Kind::String) && !is(other, Kind::Boolean) && !is(other, Kind::Vector);
+            if (built->items.size != 0 || !table)
+            {
+                problem(node->location, "LuauLintSlTableCompareItems",
+                        "[1] can never equal a table built where it is compared: a new table is equal to no other. LSL compared lists by "
+                        "their lengths alone, which #[1] gives",
+                        { subject }, "SlTableCompare");
+                return;
+            }
+            const bool        equal = node->op == Op::CompareEq;
+            const std::string asked = is(other, Kind::List) ? "#" + bracketed(other) + (equal ? " == 0" : " > 0")
+                                                           : "next(" + subject + (equal ? ") == nil" : ") ~= nil");
+            ALScriptProblem&  said  = equal ? problem(node->location, "LuauLintSlTableCompare",
+                                                      "[1] == {} is always false: {} is a new table, equal to no other. [2] asks whether [1] is empty",
+                                                      { subject, asked }, "SlTableCompare")
+                                            : problem(node->location, "LuauLintSlTableCompareAlways",
+                                                      "[1] ~= {} is always true: {} is a new table, equal to no other. [2] asks whether [1] has anything in it",
+                                                      { subject, asked }, "SlTableCompare");
+            offer(said, asked, { edit(node->location, asked) }, false);
+        }
+
         // What a condition asks the truth of: itself, or each side of an
         // and or an or, inside brackets or not.
         void truth(Luau::AstExpr* e)
@@ -589,7 +655,7 @@ namespace
             return std::string(mSource.substr(from, offset(where.end) - from));
         }
 
-        void problem(const Luau::Location& where, const char* key, const char* english, std::vector<std::string> args, const char* name)
+        ALScriptProblem& problem(const Luau::Location& where, const char* key, const char* english, std::vector<std::string> args, const char* name)
         {
             const ALScriptLintPass::Rule* rule = ALScriptLintPass::rule(name);
             ALScriptProblem               p;
@@ -604,14 +670,51 @@ namespace
             p.message   = ALScriptProblem::fill(english, args);
             p.args      = std::move(args);
             mOut.push_back(std::move(p));
+            return mOut.back();
+        }
+
+        // The fix for a problem just said, which writes it as `now`: its
+        // edits made over the text the pass read, and safe only where it
+        // cannot change what the script does (YD5).
+        static void offer(ALScriptProblem& problem, const std::string& now, std::vector<ALScriptEdit> edits, bool safe)
+        {
+            ALScriptFix fix = ALScriptFixes::titled("ScriptFixWriteIt", "Write it [1]", { now });
+            fix.preferred   = true;
+            fix.safe        = safe;
+            fix.edits       = std::move(edits);
+            problem.fixes.push_back(std::move(fix));
+        }
+
+        static ALScriptEdit edit(const Luau::Location& where, std::string with)
+        {
+            return ALScriptEdit(static_cast<S32>(where.begin.line), static_cast<S32>(where.begin.column), static_cast<S32>(where.end.line),
+                                static_cast<S32>(where.end.column), std::move(with));
+        }
+
+        static Luau::AstExpr* unbracketed(Luau::AstExpr* e)
+        {
+            while (auto* group = e->as<Luau::AstExprGroup>())
+            {
+                e = group->expr;
+            }
+            return e;
+        }
+
+        // An expression's text, bracketed where an operator put before it
+        // would take less of it.
+        std::string bracketed(Luau::AstExpr* e) const
+        {
+            const bool loose = e->is<Luau::AstExprBinary>() || e->is<Luau::AstExprUnary>() || e->is<Luau::AstExprIfElse>() ||
+                               e->is<Luau::AstExprTypeAssertion>();
+            return loose ? "(" + text(e->location) + ")" : text(e->location);
         }
 
         std::string_view    mSource;
         std::vector<size_t> mStarts;
         const Luau::Module* mChecked;
         const Locals&       mLocals;
-        boost::unordered_flat_map<std::pair<Luau::AstLocal*, Luau::PrimitiveType::Type>, bool> mPrimitiveLocals;
-        boost::unordered_flat_map<Luau::AstLocal*, std::optional<Find>>                      mFindLocals;
+        boost::unordered_flat_map<std::pair<Luau::AstLocal*, Kind>, bool>    mLocalKinds;
+        boost::unordered_flat_map<Luau::AstLocal*, std::optional<Find>> mFindLocals;
         uint64_t            mEnabled;
         uint64_t            mFatal;
         bool                mAllErrors;
