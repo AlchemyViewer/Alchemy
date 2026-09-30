@@ -1802,7 +1802,10 @@ namespace
             {
                 return;
             }
-            compatSaid(node->location, *found, shown(*found), std::move(found->edits));
+            // Named before the edits are moved out, which shown counts: a
+            // call's arguments are made in no order the language sets.
+            const std::string now = shown(*found);
+            compatSaid(node->location, *found, now, std::move(found->edits));
         }
 
         // A boolean of llcompat's compared with 1 or 0, which ll's answers
