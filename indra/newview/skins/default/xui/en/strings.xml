@@ -944,6 +944,57 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauFailsAtRuntimeIn">in the function '[1]', 'the argument '[2]' is used in a way that will error at runtime</string>
 	<string name="LuauFailsAtRuntime">the argument '[1]' is used in a way that will error at runtime</string>
 
+	<!-- What the LSL to SLua converter notes where the two languages differ
+	     (allsltoslua.cpp): in a comment marked LSL over the line, and at the
+	     LSL's place. [1], [2], [3] are names, the definitions' own words, or code -->
+	<string name="SluaSharedAssigned">set where the assignment's value is used</string>
+	<string name="SluaSharedCalled">read where a call of the script's in the same statement changes it</string>
+	<string name="SluaSharedHeld">given a list another may hold</string>
+	<string name="SluaSharedGiven">given to another variable</string>
+	<string name="SluaSharedReturned">returned by a function</string>
+	<string name="SluaSharedKept">passed to a function of the script's that keeps it</string>
+	<string name="SluaKeyText">LSL's keys held any text; SLua's uuid() stops the script on text that is no UUID, as it would here, where only a uuid will do.</string>
+	<string name="SluaUuidText">uuid() stops the script on text that is no UUID, where LSL's keys held any text; touuid() answers nil instead.</string>
+	<string name="SluaDetectedTable">detected[n] is what LSL read with llDetected*(n - 1): SLua counts it from 1, and one past its end is an error, where LSL answered nothing.</string>
+	<string name="SluaMathDomain">math.sqrt, math.log and math.log10 answer nan or -inf out of their range, where LSL answered 0 or stopped with a math error.</string>
+	<string name="SluaAbsent">SLua has no [1], in ll or in llcompat: it is left out.</string>
+	<string name="SluaUse">SLua would use [1] for [2].</string>
+	<string name="SluaCompatOnlyTimer">SLua's ll has no SetTimerEvent; llcompat's is LSL's. SLua's own timers are LLTimers:every(seconds, callback) and LLTimers:once, several at a time.</string>
+	<string name="SluaCompatOnly">SLua's ll has no [1]; llcompat.[1] is LSL's.</string>
+	<string name="SluaDetected">llcompat.Detected* count from 0, as LSL's did. SLua's own way is the handler's detected table: detected[n + 1]:getKey(), :getName(), :getPos() and the rest.</string>
+	<string name="SluaDeprecatedForWhy">SLua deprecates ll.[1], for [2]: [3]</string>
+	<string name="SluaDeprecatedFor">SLua deprecates ll.[1], for [2].</string>
+	<string name="SluaDeprecatedWhy">SLua deprecates ll.[1]: [2]</string>
+	<string name="SluaDeprecated">SLua deprecates ll.[1].</string>
+	<string name="SluaIndexFound">llcompat.[1] counts from 0 and says -1 for none, as LSL did; ll.[1] counts from 1 and says nil.</string>
+	<string name="SluaIndex">llcompat.[1] takes indexes from 0, as LSL did; ll.[1] takes them from 1.</string>
+	<string name="SluaBool">llcompat.[1] answers 1 or 0, as LSL did; ll.[1] answers true or false.</string>
+	<string name="SluaBoolList">llcompat.[1]'s list has 1 or 0 where LSL's did; ll.[1]'s has true or false there.</string>
+	<string name="SluaRightFirst">LSL ran the right side of this before the left, and Luau runs the left first: one side changes what the other reads.</string>
+	<string name="SluaBit32">bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.</string>
+	<string name="SluaIntegerDivision">// rounds down, and LSL's integer / rounded toward zero: they differ where the answer is negative.</string>
+	<string name="SluaModulo">Luau's % takes the divisor's sign, and LSL's took the dividend's: they differ where one is negative.</string>
+	<string name="SluaListCompare">LSL compares lists by their lengths alone, and != answers the difference of them.</string>
+	<string name="SluaShortCircuit">[1] leaves its right side unrun once the left decides it; LSL ran both sides, the right one first.</string>
+	<string name="SluaUuid">SLua's uuid holds a key; LSL's key could hold any text.</string>
+	<string name="SluaAssignInExpression">SLua's assignments are statements: this one is made by a function called where it stood.</string>
+	<string name="SluaStringBuild">[1] is built with .. in a loop, which makes a new string each time. SLua's way is to put the pieces in a table and join them once, with table.concat.</string>
+	<string name="SluaMemoryHack">([1] = [2]) + [1] spared LSO's memory, clearing [1] once LSL, going right to left, had read it. Luau goes left to right and needs no such thing: the clearing is left out.</string>
+	<string name="SluaStateSame">a change to the state the script is in; a script of one state has no other to go to.</string>
+	<string name="SluaJump">jump [1]: SLua has no goto, and this jump is neither out of a loop nor to its next turn. Rewrite it.</string>
+	<string name="SluaListCopy">LSL's lists were values, and [1] is [2], so each + makes a new list of it, as LSL did. Where nothing else holds it, table.insert([1], x) grows it in place.</string>
+	<string name="SluaStateExit">state_exit runs as a script leaves a state, and this one has no other: it never ran.</string>
+	<string name="SluaTimer">the timer event, set going by llcompat.SetTimerEvent; LLTimers:every is SLua's own.</string>
+	<string name="SluaStates">LSL let go of a state's listens, sensor repeats and targets as it left the state; setState does not. Remove them yourself where the script relied on it.</string>
+	<string name="SluaTimers">SLua's LLTimers can run several timers at once: LLTimers:every(seconds, callback), LLTimers:once(seconds, callback) and LLTimers:off(timer).</string>
+	<string name="SluaTimerStates">the timer event, set going by llcompat.SetTimerEvent, keeps going from state to state, as LSL's did; LLTimers:every is SLua's own.</string>
+	<string name="SluaHeader">Written from LSL by Script Studio. Each "-- LSL:" comment marks a place where
+SLua means something else than LSL did, or has a way of its own: read it, then
+delete it. LSL's integers wrapped at 32 bits and its floats were single
+precision; SLua's numbers are doubles, which do neither.</string>
+	<string name="SluaHeaderPlain">Written from LSL by Script Studio. LSL's integers wrapped at 32 bits and its
+floats were single precision; SLua's numbers are doubles, which do neither.</string>
+
 	<!-- What the script workspace says when a load, a save or a queue
 	     cannot go ahead (alscriptworkspace.cpp), and the analyzers when
 	     their definitions are missing (alscriptanalysis.cpp) -->

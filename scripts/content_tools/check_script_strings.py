@@ -8,7 +8,8 @@ translator may work from the same English under the same keys. Nothing in
 the build keeps the copies together, so this does:
 
   * every `"Key", "English"` pair the code passes to alSaid, said, fail,
-    note, problem and the like, against the key's text in strings.xml;
+    note, problem and the like, against the key's text in strings.xml --
+    the LSL to SLua converter's notes among them, under Slua;
   * every row of the map's LSL table against Tailslide's logger.cc, by
     error code, with %s and %d read as the marks;
   * every row of the lint table against the emitWarning calls in Luau's
@@ -68,7 +69,7 @@ CODE = [
 ]
 # The keys that are the studio's: what strings.xml groups under these
 # prefixes is compared; the rest of the file is the viewer's.
-PREFIXES = ("Vim", "Preproc", "Optimizer", "Inliner", "LuauLint", "Luau", "LSL", "Workspace", "Analysis", "XUIEdit", "FindBar", "TabStrip", "ScriptFix", "ScriptAction")
+PREFIXES = ("Vim", "Preproc", "Optimizer", "Inliner", "LuauLint", "Luau", "LSL", "Workspace", "Analysis", "XUIEdit", "FindBar", "TabStrip", "ScriptFix", "ScriptAction", "Slua")
 # The viewer's own under those prefixes: the legacy editor's tooltips.
 NOT_OURS = ("LSLTip",)
 # The calls that pass a key with its English, and which arguments those
@@ -80,6 +81,7 @@ CALLS = {
     "fail": [(0, 1, "")],
     "problem": [(1, 2, "")],
     "note": [(1, 2, "")],
+    "noteOnce": [(1, 2, "")],
     "noteAt": [(1, 2, "")],
     "titled": [(0, 1, "")],
     "alSaidCount": [(0, 2, "A"), (0, 3, "B")],
@@ -248,15 +250,20 @@ def arguments(text, at):
 
 
 def literal_or_branches(arg):
-    """A string literal as [(None, text)], or a `c ? "a" : "b"` as its two
+    """A string literal as [(None, text)] -- adjacent literals, "a" "b",
+    joined as the compiler joins them -- or a `c ? "a" : "b"` as its two
     branches [(0, a), (1, b)]; nothing for anything else."""
-    lit = r'"((?:[^"\\]|\\.)*)"'
-    m = re.fullmatch(lit, arg, re.S)
+    lits = r'((?:"(?:[^"\\]|\\.)*"\s*)+)'
+
+    def joined(text):
+        return "".join(unescape_c(m) for m in re.findall(r'"((?:[^"\\]|\\.)*)"', text))
+
+    m = re.fullmatch(lits, arg, re.S)
     if m:
-        return [(None, unescape_c(m.group(1)))]
-    m = re.fullmatch(r".*?\?\s*" + lit + r"\s*:\s*" + lit, arg, re.S)
+        return [(None, joined(m.group(1)))]
+    m = re.fullmatch(r".*?\?\s*" + lits + r":\s*" + lits, arg, re.S)
     if m:
-        return [(0, unescape_c(m.group(1))), (1, unescape_c(m.group(2)))]
+        return [(0, joined(m.group(1))), (1, joined(m.group(2)))]
     return []
 
 

@@ -203,6 +203,24 @@ namespace
         }
     }
 
+    // Why a list is not grown in place: something else may hold it.
+    enum class Shared : U8
+    {
+        None,
+        // Set where the assignment's value is used.
+        Assigned,
+        // Read where a call of the script's in the same statement changes it.
+        Called,
+        // Given a list another may hold.
+        Held,
+        // Given to another variable.
+        Given,
+        // Returned by a function.
+        Returned,
+        // Passed to a function of the script's that keeps it.
+        Kept,
+    };
+
     class Writer
     {
     public:
@@ -214,11 +232,17 @@ namespace
     private:
         // --- where the two languages differ -----------------------------------------
 
-        // Said over the statement being written, and at the LSL's place;
+        // Words by their key: the studio's, where it gives them
+        // (Options::words), else the English with its marks filled.
+        std::string said(const char* key, const char* english, const std::vector<std::string>& args = {}) const;
+        // Said over the statement being written, and at the LSL's place,
+        // carrying the lint that finds the same in SLua where one does;
         // once a statement.
-        void note(LSLASTNode* at, const std::string& key, const std::string& said);
-        // The same, once in the script.
-        void noteOnce(LSLASTNode* at, const std::string& key, const std::string& said);
+        void note(LSLASTNode* at, const char* key, const char* english, std::vector<std::string> args = {});
+        // The same, once in the script for its key and words.
+        void noteOnce(LSLASTNode* at, const char* key, const char* english, std::vector<std::string> args = {});
+        // Why a list is shared, as SluaListCopy says it.
+        std::string sharedWords(Shared why) const;
 
         // --- names ------------------------------------------------------------------
 
@@ -375,7 +399,7 @@ namespace
         bool fresh(LSLExpression* e) const;
         // Why a read of a list hands the list itself on, or null where it
         // does not.
-        const char* handedOn(LSLASTNode* read) const;
+        Shared handedOn(LSLASTNode* read) const;
         // l += x, l += [x, y], l += other, l = l + x and l = x + l written
         // as table.insert or table.move on l; false where it is none of
         // them, l is held elsewhere -- noted, with why -- or what is added
@@ -538,7 +562,7 @@ namespace
         boost::unordered_flat_set<LSLSymbol*>  mFreshFunctions;
         boost::unordered_flat_set<LSLSymbol*>  mBorrows;
         // Why a list variable is not one of mOwned.
-        boost::unordered_flat_map<LSLSymbol*, const char*> mSharedWhy;
+        boost::unordered_flat_map<LSLSymbol*, Shared>      mSharedWhy;
         // The strings each loop builds, and those being built, by the
         // table of their pieces.
         boost::unordered_flat_map<LSLASTNode*, std::vector<LSLSymbol*>> mBuilds;
@@ -551,18 +575,29 @@ namespace
         boost::unordered_flat_set<LSLSymbol*>  mTextKeys;
     };
 
-    void Writer::note(LSLASTNode* at, const std::string& key, const std::string& said)
+    std::string Writer::said(const char* key, const char* english, const std::vector<std::string>& args) const
     {
-        if (std::find(mPending.begin(), mPending.end(), said) != mPending.end())
+        return mOptions.words ? mOptions.words(key, args, english) : ALScriptProblem::fill(english, args);
+    }
+
+    void Writer::note(LSLASTNode* at, const char* key, const char* english, std::vector<std::string> args)
+    {
+        std::string words = said(key, english, args);
+        if (std::find(mPending.begin(), mPending.end(), words) != mPending.end())
         {
             return;
         }
-        mPending.push_back(said);
+        mPending.push_back(words);
         ALScriptProblem p;
         p.severity = ALScriptProblem::Severity::Note;
         p.source   = ALScriptProblem::Source::Assistant;
         p.key      = key;
-        p.message  = said;
+        p.args     = std::move(args);
+        p.message  = std::move(words);
+        if (const char* lint = ALLSLToSLua::lintOf(key))
+        {
+            p.code = lint;
+        }
         if (at)
         {
             p.line      = zeroBased(at->getLoc()->first_line);
@@ -573,11 +608,31 @@ namespace
         mNotes.push_back(std::move(p));
     }
 
-    void Writer::noteOnce(LSLASTNode* at, const std::string& key, const std::string& said)
+    std::string Writer::sharedWords(Shared why) const
     {
-        if (mOnce.insert(key).second)
+        switch (why)
         {
-            note(at, key, said);
+            case Shared::Assigned: return said("SluaSharedAssigned", "set where the assignment's value is used");
+            case Shared::Called: return said("SluaSharedCalled", "read where a call of the script's in the same statement changes it");
+            case Shared::Held: return said("SluaSharedHeld", "given a list another may hold");
+            case Shared::Given: return said("SluaSharedGiven", "given to another variable");
+            case Shared::Returned: return said("SluaSharedReturned", "returned by a function");
+            case Shared::Kept: return said("SluaSharedKept", "passed to a function of the script's that keeps it");
+            case Shared::None: break;
+        }
+        return {};
+    }
+
+    void Writer::noteOnce(LSLASTNode* at, const char* key, const char* english, std::vector<std::string> args)
+    {
+        std::string once = key;
+        for (const std::string& arg : args)
+        {
+            once += '\x1f' + arg;
+        }
+        if (mOnce.insert(once).second)
+        {
+            note(at, key, english, std::move(args));
         }
     }
 
@@ -1213,7 +1268,7 @@ namespace
         // call alone out).
         if (slua & ALLSLTraits::SluaAbsent)
         {
-            noteOnce(e, "SluaAbsent" + lsl, "SLua has no " + lsl + ", in ll or in llcompat: it is left out.");
+            noteOnce(e, "SluaAbsent", "SLua has no [1], in ll or in llcompat: it is left out.", { lsl });
             return { defaultOf(e->getIType()) };
         }
         // SLua's ll where it means the same: a boolean answer, which a
@@ -1229,7 +1284,7 @@ namespace
         {
             if (trait && trait->sluaUse)
             {
-                noteOnce(e, "SluaUse" + lsl, "SLua would use " + std::string(trait->sluaUse) + " for " + lsl + ".");
+                noteOnce(e, "SluaUse", "SLua would use [1] for [2].", { trait->sluaUse, lsl });
             }
             const std::string called =
                 (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params, trait ? trait->sluaTextArgs : 0);
@@ -1245,10 +1300,15 @@ namespace
         }
         if (slua & ALLSLTraits::SluaRemoved)
         {
-            noteOnce(e, "SluaCompatOnly" + lsl,
-                     lsl == "llSetTimerEvent" ? "SLua's ll has no SetTimerEvent; llcompat's is LSL's. SLua's own timers are "
-                                                "LLTimers:every(seconds, callback) and LLTimers:once, several at a time."
-                                              : "SLua's ll has no " + bare + "; llcompat." + bare + " is LSL's.");
+            if (lsl == "llSetTimerEvent")
+            {
+                noteOnce(e, "SluaCompatOnlyTimer", "SLua's ll has no SetTimerEvent; llcompat's is LSL's. SLua's own timers are "
+                                                   "LLTimers:every(seconds, callback) and LLTimers:once, several at a time.");
+            }
+            else
+            {
+                noteOnce(e, "SluaCompatOnly", "SLua's ll has no [1]; llcompat.[1] is LSL's.", { bare });
+            }
         }
         else if (lsl.rfind("llDetected", 0) == 0)
         {
@@ -1258,33 +1318,44 @@ namespace
         else if (slua & ALLSLTraits::SluaDeprecated)
         {
             // SLua's word on it, what it would use and why: which says more
-            // than how its indexes count.
-            std::string said = "SLua deprecates ll." + bare;
-            said += trait->sluaUse ? ", for " + std::string(trait->sluaUse) : std::string();
-            said += trait->sluaReason ? ": " + std::string(trait->sluaReason) : std::string(".");
-            noteOnce(e, "SluaDeprecated" + lsl, said);
+            // than how its indexes count. The why is the definitions' own.
+            if (trait->sluaUse && trait->sluaReason)
+            {
+                noteOnce(e, "SluaDeprecatedForWhy", "SLua deprecates ll.[1], for [2]: [3]", { bare, trait->sluaUse, trait->sluaReason });
+            }
+            else if (trait->sluaUse)
+            {
+                noteOnce(e, "SluaDeprecatedFor", "SLua deprecates ll.[1], for [2].", { bare, trait->sluaUse });
+            }
+            else if (trait->sluaReason)
+            {
+                noteOnce(e, "SluaDeprecatedWhy", "SLua deprecates ll.[1]: [2]", { bare, trait->sluaReason });
+            }
+            else
+            {
+                noteOnce(e, "SluaDeprecated", "SLua deprecates ll.[1].", { bare });
+            }
         }
         else if (slua & ALLSLTraits::SluaIndexResult)
         {
-            noteOnce(e, "SluaIndex" + lsl, "llcompat." + bare + " counts from 0 and says -1 for none, as LSL did; ll." + bare +
-                                               " counts from 1 and says nil.");
+            noteOnce(e, "SluaIndexFound", "llcompat.[1] counts from 0 and says -1 for none, as LSL did; ll.[1] counts from 1 and says nil.",
+                     { bare });
         }
         else if (slua & ALLSLTraits::SluaIndexArgs)
         {
-            noteOnce(e, "SluaIndex" + lsl, "llcompat." + bare + " takes indexes from 0, as LSL did; ll." + bare + " takes them from 1.");
+            noteOnce(e, "SluaIndex", "llcompat.[1] takes indexes from 0, as LSL did; ll.[1] takes them from 1.", { bare });
         }
         else if (slua & ALLSLTraits::SluaBool)
         {
-            noteOnce(e, "SluaBool" + lsl, "llcompat." + bare + " answers 1 or 0, as LSL did; ll." + bare + " answers true or false.");
+            noteOnce(e, "SluaBool", "llcompat.[1] answers 1 or 0, as LSL did; ll.[1] answers true or false.", { bare });
         }
         else if (slua & ALLSLTraits::SluaBoolList)
         {
-            noteOnce(e, "SluaBoolList" + lsl, "llcompat." + bare + "'s list has 1 or 0 where LSL's did; ll." + bare +
-                                                  "'s has true or false there.");
+            noteOnce(e, "SluaBoolList", "llcompat.[1]'s list has 1 or 0 where LSL's did; ll.[1]'s has true or false there.", { bare });
         }
         if (trait && trait->sluaUse && !(slua & ALLSLTraits::SluaDeprecated))
         {
-            noteOnce(e, "SluaUse" + lsl, "SLua would use " + std::string(trait->sluaUse) + " for " + lsl + ".");
+            noteOnce(e, "SluaUse", "SLua would use [1] for [2].", { trait->sluaUse, lsl });
         }
         return { "llcompat." + bare + "(" + args(e->getArguments(), params) + ")" };
     }
@@ -1468,8 +1539,8 @@ namespace
                 // changes, which changes nothing.
                 if (!ALLSLTraits::changesNothing(rhs))
                 {
-                    note(e, "SluaShortCircuit", std::string(and_ ? "and" : "or") + " leaves its right side unrun once the left decides it; "
-                                                "LSL ran both sides, the right one first.");
+                    note(e, "SluaShortCircuit", "[1] leaves its right side unrun once the left decides it; LSL ran both sides, the right one first.",
+                         { and_ ? "and" : "or" });
                 }
                 const int  prec = and_ ? AND : OR;
                 const Expr a    = condition(lhs);
@@ -1860,19 +1931,20 @@ namespace
                 {
                     // Said once for each variable it clears.
                     const std::string name = static_cast<LSLLValueExpression*>(b->getLHS())->getIdentifier()->getName();
-                    if (mUnbuilt.contains(b) && mOnce.insert("SluaStringBuild " + name).second)
+                    if (mUnbuilt.contains(b))
                     {
-                        note(b, "SluaStringBuild",
-                             name + " is built with .. in a loop, which makes a new string each time. SLua's way is to put the pieces "
-                                    "in a table and join them once, with table.concat.");
+                        noteOnce(b, "SluaStringBuild",
+                                 "[1] is built with .. in a loop, which makes a new string each time. SLua's way is to put the pieces in a table "
+                                 "and join them once, with table.concat.",
+                                 { name });
                     }
-                    if (mFreedFirst.contains(b) && mOnce.insert("SluaMemoryHack " + name).second)
+                    if (mFreedFirst.contains(b))
                     {
                         const std::string empty = b->getLHS()->getIType() == LST_LIST ? "[]" : "\"\"";
-                        note(b, "SluaMemoryHack",
-                             "(" + name + " = " + empty + ") + " + name + " spared LSO's memory, clearing " + name +
-                                 " once LSL, going right to left, had read it. Luau goes left to right and needs no such thing: the "
-                                 "clearing is left out.");
+                        noteOnce(b, "SluaMemoryHack",
+                                 "([1] = [2]) + [1] spared LSO's memory, clearing [1] once LSL, going right to left, had read it. Luau goes left to "
+                                 "right and needs no such thing: the clearing is left out.",
+                                 { name, empty });
                     }
                     assign(static_cast<LSLLValueExpression*>(b->getLHS()), op, b->getRHS());
                     return;
@@ -2145,8 +2217,8 @@ namespace
                     line("continue");
                     return;
                 }
-                note(s, "SluaJump", std::string("jump ") + j->getIdentifier()->getName() +
-                                        ": SLua has no goto, and this jump is neither out of a loop nor to its next turn. Rewrite it.");
+                note(s, "SluaJump", "jump [1]: SLua has no goto, and this jump is neither out of a loop nor to its next turn. Rewrite it.",
+                     { j->getIdentifier()->getName() });
                 line("-- jump " + std::string(j->getIdentifier()->getName()));
                 return;
             }
@@ -3022,7 +3094,7 @@ namespace
         }
     }
 
-    const char* Writer::handedOn(LSLASTNode* read) const
+    Shared Writer::handedOn(LSLASTNode* read) const
     {
         // Up through brackets, and casts to what it already is.
         LSLASTNode* node   = read;
@@ -3035,21 +3107,20 @@ namespace
         }
         if (!parent)
         {
-            return nullptr;
+            return Shared::None;
         }
         const int slot = node->getParentSlot();
         switch (parent->getNodeSubType())
         {
             case NODE_BINARY_EXPRESSION:
-                return static_cast<LSLExpression*>(parent)->getOperation() == OP_ASSIGN && slot == 1 ? "given to another variable"
-                                                                                                        : nullptr;
-            case NODE_DECLARATION: return slot == 1 ? "given to another variable" : nullptr;
+                return static_cast<LSLExpression*>(parent)->getOperation() == OP_ASSIGN && slot == 1 ? Shared::Given : Shared::None;
+            case NODE_DECLARATION: return slot == 1 ? Shared::Given : Shared::None;
             case NODE_RETURN_STATEMENT:
-                return readOf(read) && readOf(read)->getSubType() == SYM_LOCAL ? nullptr : "returned by a function";
+                return readOf(read) && readOf(read)->getSubType() == SYM_LOCAL ? Shared::None : Shared::Returned;
             default:
                 if (parent->getNodeType() == NODE_GLOBAL_VARIABLE)
                 {
-                    return slot == 1 ? "given to another variable" : nullptr;
+                    return slot == 1 ? Shared::Given : Shared::None;
                 }
                 if (parent->getNodeType() == NODE_AST_NODE_LIST && parent->getParent() &&
                     parent->getParent()->getNodeSubType() == NODE_FUNCTION_EXPRESSION && readOf(parent->getParent()))
@@ -3059,11 +3130,11 @@ namespace
                     LSLASTNode*   param  = params ? params->getChild(slot) : nullptr;
                     if (!isNull(param) && mBorrows.contains(static_cast<LSLIdentifier*>(param)->getSymbol()))
                     {
-                        return nullptr;
+                        return Shared::None;
                     }
-                    return "passed to a function of the script's that keeps it";
+                    return Shared::Kept;
                 }
-                return nullptr;
+                return Shared::None;
         }
     }
 
@@ -3084,7 +3155,7 @@ namespace
                 }
             }
         };
-        const auto letGo = [&](LSLSymbol* symbol, const char* why) {
+        const auto letGo = [&](LSLSymbol* symbol, Shared why) {
             mSharedWhy.emplace(symbol, why);
             return mOwned.erase(symbol) + mFreshFunctions.erase(symbol) + mBorrows.erase(symbol) != 0;
         };
@@ -3140,7 +3211,7 @@ namespace
             mBorrows.erase(var);
             if (valueUsed(node))
             {
-                letGo(var, "set where the assignment's value is used");
+                letGo(var, Shared::Assigned);
             }
             else if (static_cast<LSLExpression*>(node)->getOperation() == OP_ASSIGN)
             {
@@ -3173,7 +3244,7 @@ namespace
             });
             if (changes)
             {
-                letGo(var, "read where a call of the script's in the same statement changes it");
+                letGo(var, Shared::Called);
             }
         }
         for (bool changed = true; changed;)
@@ -3183,7 +3254,7 @@ namespace
             {
                 if ((mOwned.contains(symbol) || mFreshFunctions.contains(symbol)) && !fresh(e))
                 {
-                    changed = letGo(symbol, "given a list another may hold") || changed;
+                    changed = letGo(symbol, Shared::Held) || changed;
                 }
             }
             for (LSLASTNode* read : reads)
@@ -3191,7 +3262,7 @@ namespace
                 LSLSymbol* var = readOf(read);
                 if ((owned(var) || mBorrows.contains(var)) && !assignedBy(read))
                 {
-                    if (const char* why = handedOn(read))
+                    if (const Shared why = handedOn(read); why != Shared::None)
                     {
                         changed = letGo(var, why) || changed;
                     }
@@ -3272,13 +3343,12 @@ namespace
         if (!owned(var))
         {
             // Why each + makes a new list of it.
-            const auto why = mSharedWhy.find(var);
-            if (why != mSharedWhy.end() && mOnce.insert("SluaListCopy " + name).second)
+            if (const auto why = mSharedWhy.find(var); why != mSharedWhy.end())
             {
-                note(target, "SluaListCopy",
-                     "LSL's lists were values, and " + name + " is " + why->second +
-                         ", so each + makes a new list of it, as LSL did. Where nothing else holds it, table.insert(" + name +
-                         ", x) grows it in place.");
+                noteOnce(target, "SluaListCopy",
+                         "LSL's lists were values, and [1] is [2], so each + makes a new list of it, as LSL did. Where nothing else holds it, "
+                         "table.insert([1], x) grows it in place.",
+                         { name, sharedWords(why->second) });
             }
             return false;
         }
@@ -4316,7 +4386,7 @@ namespace
                 const std::string params = handlerParams(handler, lead);
                 if (event == "timer" && !mTimers)
                 {
-                    noteOnce(handler, "SluaTimer",
+                    noteOnce(handler, "SluaTimerStates",
                              "the timer event, set going by llcompat.SetTimerEvent, keeps going from state to state, as LSL's "
                              "did; LLTimers:every is SLua's own.");
                 }
@@ -4432,16 +4502,47 @@ end
         globals();
         functions();
         states();
-        std::string out = mOptions.comments
-                              ? "-- Written from LSL by Script Studio. Each \"-- LSL:\" comment marks a place where\n"
-                                "-- SLua means something else than LSL did, or has a way of its own: read it, then\n"
-                                "-- delete it. LSL's integers wrapped at 32 bits and its floats were single\n"
-                                "-- precision; SLua's numbers are doubles, which do neither.\n\n"
-                              : "-- Written from LSL by Script Studio. LSL's integers wrapped at 32 bits and its\n"
-                                "-- floats were single precision; SLua's numbers are doubles, which do neither.\n\n";
+        // Each of its lines a comment, whatever language the studio says
+        // it in.
+        const std::string head = mOptions.comments
+                                     ? said("SluaHeader", "Written from LSL by Script Studio. Each \"-- LSL:\" comment marks a place where\n"
+                                                          "SLua means something else than LSL did, or has a way of its own: read it, then\n"
+                                                          "delete it. LSL's integers wrapped at 32 bits and its floats were single\n"
+                                                          "precision; SLua's numbers are doubles, which do neither.")
+                                     : said("SluaHeaderPlain", "Written from LSL by Script Studio. LSL's integers wrapped at 32 bits and its\n"
+                                                               "floats were single precision; SLua's numbers are doubles, which do neither.");
+        std::string out;
+        for (size_t from = 0; from <= head.size();)
+        {
+            const size_t cut = std::min(head.find('\n', from), head.size());
+            out += "-- " + head.substr(from, cut - from) + "\n";
+            from = cut + 1;
+        }
+        out += "\n";
         helpers(out);
         return out + mText;
     }
+}
+
+// static
+const char* ALLSLToSLua::lintOf(std::string_view note)
+{
+    // An llcompat call left as LSL had it, which SlCompatCall writes as
+    // ll's where ll's means the same.
+    static constexpr std::pair<std::string_view, const char*> LINTS[] = {
+        { "SluaBool", "SlCompatCall" },
+        { "SluaDetected", "SlCompatCall" },
+        { "SluaIndex", "SlCompatCall" },
+        { "SluaIndexFound", "SlCompatCall" },
+    };
+    for (const auto& [key, lint] : LINTS)
+    {
+        if (key == note)
+        {
+            return lint;
+        }
+    }
+    return nullptr;
 }
 
 // static

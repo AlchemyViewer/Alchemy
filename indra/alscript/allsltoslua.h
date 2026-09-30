@@ -27,6 +27,7 @@
 #include "alscriptproblem.h"
 #include "stdtypes.h"
 
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -81,6 +82,10 @@ public:
         // Each place noted as a "-- LSL:" comment over its line, as well as
         // in the notes.
         bool comments = true;
+        // What a note says, by its key -- the studio's own words for it,
+        // in its skin's language -- where given; else the English, its
+        // marks filled from the args.
+        std::function<std::string(const std::string& key, const std::vector<std::string>& args, const std::string& english)> words;
 
         static Options closeToLSL()
         {
@@ -97,7 +102,9 @@ public:
     {
         bool             converted = false;
         std::string      text;
-        // Where the two languages differ, each where it stands in the LSL.
+        // Where the two languages differ, each where it stands in the LSL:
+        // its key and the words it was said with, and as its code the lint
+        // that finds the same in SLua, where one does (lintOf).
         ALScriptProblems notes;
         // Why nothing was converted: the LSL does not parse, or the
         // definitions are not loaded.
@@ -105,6 +112,11 @@ public:
     };
 
     static Result convert(std::string_view lsl, const Options& options);
+    // The studio's own lint that finds in SLua what a note says of the LSL,
+    // by the note's key -- SlCompatCall for an llcompat call ll's could
+    // make -- or null where none does. A note carries it as its code, so
+    // that its fix may be offered where the note is.
+    static const char* lintOf(std::string_view note);
     // As SLua has it (Options' defaults).
     static Result convert(std::string_view lsl);
 };

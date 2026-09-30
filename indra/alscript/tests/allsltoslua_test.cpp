@@ -121,11 +121,13 @@ namespace tut
             }
             return n;
         }
-        static bool noted(const ALLSLToSLua::Result& r, const std::string& key)
+        // A note of the key, and where one is given, whose first arg is it:
+        // the function a note of a call is about.
+        static bool noted(const ALLSLToSLua::Result& r, const std::string& key, const std::string& about = {})
         {
             for (const ALScriptProblem& p : r.notes)
             {
-                if (p.key == key)
+                if (p.key == key && (about.empty() || (!p.args.empty() && p.args[0] == about)))
                 {
                     return true;
                 }
@@ -295,7 +297,7 @@ namespace tut
         ensure("llcompat's Detected: " + r.text, has(r, "llcompat.DetectedName(0)") && noted(r, "SluaDetected"));
         ensure("the timer event: " + r.text, has(r, "llcompat.SetTimerEvent(2") && has(r, "LLEvents:on(\"timer\"") && noted(r, "SluaTimer"));
         ensure("llcompat.OwnerSay, SLua deprecating ll's for print: " + r.text,
-               has(r, "llcompat.OwnerSay(\"tick\")") && noted(r, "SluaDeprecatedllOwnerSay"));
+               has(r, "llcompat.OwnerSay(\"tick\")") && noted(r, "SluaDeprecatedFor", "OwnerSay"));
         checksClean(r);
     }
 
@@ -320,7 +322,7 @@ namespace tut
         ensure("a boolean in a condition: " + r.text, has(r, "if ll.SameGroup(k) then"));
         ensure("and as a number: " + r.text, has(r, "local same = if ll.SameGroup(k) then 1 else 0"));
         ensure("a constant index moved on: " + r.text, has(r, "ll.GetSubString(s, 1, 3)"));
-        ensure("one that is not, through llcompat: " + r.text, has(r, "llcompat.GetSubString(s, i, -1)") && noted(r, "SluaIndexllGetSubString"));
+        ensure("one that is not, through llcompat: " + r.text, has(r, "llcompat.GetSubString(s, i, -1)") && noted(r, "SluaIndex", "GetSubString"));
         ensure("one thing found in a list: " + r.text, has(r, "if table.find(l, \"a\") ~= nil then"));
         ensure("~ of a find: " + r.text, has(r, "if ll.SubStringIndex(s, \"c\") ~= nil then"));
         ensure("< 0 of one: " + r.text, has(r, "if ll.SubStringIndex(s, \"z\") == nil then"));
@@ -617,9 +619,9 @@ namespace tut
                                               "    list e = llGetExperienceList(NULL_KEY);\n"
                                               "    if (llList2Integer(llGetPrimitiveParams([PRIM_FULLBRIGHT, 0]), 0)) llOwnerSay((string)llGetListLength(e));\n"
                                               "} }\n");
-        ensure("left out: " + r.text, !has(r, "PointAt(") && has(r, "-- llPointAt, left out") && noted(r, "SluaAbsentllPointAt"));
-        ensure("its empty value where read: " + r.text, has(r, "local e = {}") && noted(r, "SluaAbsentllGetExperienceList"));
-        ensure("llcompat, said: " + r.text, has(r, "llcompat.GetPrimitiveParams({PRIM_FULLBRIGHT, 0})") && noted(r, "SluaBoolListllGetPrimitiveParams"));
+        ensure("left out: " + r.text, !has(r, "PointAt(") && has(r, "-- llPointAt, left out") && noted(r, "SluaAbsent", "llPointAt"));
+        ensure("its empty value where read: " + r.text, has(r, "local e = {}") && noted(r, "SluaAbsent", "llGetExperienceList"));
+        ensure("llcompat, said: " + r.text, has(r, "llcompat.GetPrimitiveParams({PRIM_FULLBRIGHT, 0})") && noted(r, "SluaBoolList", "GetPrimitiveParams"));
         ensure("not a truth: " + r.text, !has(r, "if llcompat.GetPrimitiveParams"));
         checksClean(r);
     }
@@ -901,5 +903,61 @@ namespace tut
         ensure("elsewhere in the list, as LSL did: " + r.text, has(r, "gQueue = llcompat.DeleteSubList(gQueue, 1, 1)"));
         ensure("one held elsewhere, as LSL did: " + r.text, has(r, "gShared = llcompat.DeleteSubList(gShared, 0, 0)"));
         checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<31>()
+    {
+        set_test_name("each note is keyed, with the words it was said with, and carries the lint that finds the same in SLua where one "
+                      "does; the studio's words for a note are its comment's, and the header's");
+        const std::string lsl = "default {\n"
+                                "    touch_start(integer n) {\n"
+                                "        string s = \"abc\";\n"
+                                "        integer i = llSubStringIndex(s, \"b\");\n"
+                                "        integer j = n / 2;\n"
+                                "        llOwnerSay(llGetSubString(s, i, j) + llGetSubString(s, j, i) + (string)llSameGroup(llGetOwner()));\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLToSLua::Options close = ALLSLToSLua::Options::closeToLSL();
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, close);
+        ensure("converted", r.converted);
+        std::string listed;
+        for (const ALScriptProblem& p : r.notes)
+        {
+            listed += p.key + "(" + (p.args.empty() ? std::string() : p.args[0]) + ") " + p.code + "\n";
+        }
+        // Once for each function, with the lint where there is one.
+        ensure("an index: " + listed, noted(r, "SluaIndex", "GetSubString"));
+        size_t indexes = 0;
+        for (const ALScriptProblem& p : r.notes)
+        {
+            indexes += p.key == "SluaIndex";
+            const bool compat = p.key == "SluaIndex" || p.key == "SluaIndexFound" || p.key == "SluaBool";
+            ensure("the lint of " + p.key + ": " + listed, compat ? p.code == "SlCompatCall" : p.code.empty());
+            ensure_equals("no mark left unfilled", p.message, ALScriptProblem::fill(p.message, p.args));
+        }
+        ensure_equals("one index note for one function", indexes, size_t(1));
+        ensure("a found index and a boolean: " + listed, noted(r, "SluaIndexFound", "SubStringIndex") && noted(r, "SluaBool", "SameGroup"));
+        ensure("words filled: " + listed, has(r, "-- LSL: llcompat.GetSubString takes indexes from 0, as LSL did; ll.GetSubString takes them from 1."));
+        ensure("the lint by key", std::string(ALLSLToSLua::lintOf("SluaIndex")) == "SlCompatCall" && !ALLSLToSLua::lintOf("SluaIntegerDivision"));
+
+        // The studio's words: each comment's, each note's, and the header's,
+        // a line at a time.
+        close.words = [](const std::string& key, const std::vector<std::string>& args, const std::string&) {
+            return key == "SluaHeader" ? std::string("first\nsecond") : "<" + key + (args.empty() ? "" : " " + args[0]) + ">";
+        };
+        const ALLSLToSLua::Result said = ALLSLToSLua::convert(lsl, close);
+        ensure("the header's: " + said.text, said.text.rfind("-- first\n-- second\n\n", 0) == 0);
+        ensure("a comment's: " + said.text, has(said, "-- LSL: <SluaIndex GetSubString>\n"));
+        ensure("a note's", noted(said, "SluaIndex", "GetSubString") && [&] {
+            for (const ALScriptProblem& p : said.notes)
+            {
+                if (p.key == "SluaIndex")
+                {
+                    return p.message == "<SluaIndex GetSubString>";
+                }
+            }
+            return false;
+        }());
     }
 }
