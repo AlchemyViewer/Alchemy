@@ -85,15 +85,23 @@ namespace tut
             return r;
         }
 
-        // What SLua's check says of it: nothing at the error level, and
-        // nothing the studio's own lints would have written SLua's way.
+        // What the converter must not write: an error, what the studio's own
+        // lints would have written SLua's way, or a deprecated ll function --
+        // SLua's way where it means the same, llcompat's where not.
+        static bool unwanted(const ALScriptProblem& p)
+        {
+            return p.severity == ALScriptProblem::Severity::Error || p.code == "SlCompoundAssign" || p.code == "SlNumberTruth" ||
+                   (p.key.rfind("LuauLintDeprecatedMember", 0) == 0 && !p.args.empty() && p.args[0].rfind("ll.", 0) == 0);
+        }
+
+        // What SLua's check says of it: nothing unwanted.
         void checksClean(const ALLSLToSLua::Result& r)
         {
             ensure("the definitions", definitions);
             std::string said;
             for (const ALScriptProblem& p : service.check(r.text))
             {
-                if (p.severity == ALScriptProblem::Severity::Error || p.code == "SlCompoundAssign" || p.code == "SlNumberTruth")
+                if (unwanted(p))
                 {
                     said += llformat("[%d:%d] %s\n", p.line + 1, p.column + 1, p.message.c_str());
                 }
@@ -283,7 +291,8 @@ namespace tut
         ensure("converted", r.converted);
         ensure("llcompat's Detected: " + r.text, has(r, "llcompat.DetectedName(0)") && noted(r, "SluaDetected"));
         ensure("the timer event: " + r.text, has(r, "llcompat.SetTimerEvent(2") && has(r, "LLEvents:on(\"timer\"") && noted(r, "SluaTimer"));
-        ensure("ll.OwnerSay, with print noted: " + r.text, has(r, "ll.OwnerSay(\"tick\")") && noted(r, "SluaUsellOwnerSay"));
+        ensure("llcompat.OwnerSay, SLua deprecating ll's for print: " + r.text,
+               has(r, "llcompat.OwnerSay(\"tick\")") && noted(r, "SluaDeprecatedllOwnerSay"));
         checksClean(r);
     }
 
@@ -314,7 +323,7 @@ namespace tut
         ensure("< 0 of one: " + r.text, has(r, "if ll.SubStringIndex(s, \"z\") == nil then"));
         ensure("a find's index as a number, through llcompat: " + r.text, has(r, "llcompat.ListFindList(l, {\"a\", \"b\"})"));
         ensure("^, math and vector: " + r.text, has(r, "2.0 ^ 3.0") && has(r, "math.abs(-1.0)") && has(r, "vector.magnitude(vector(1, 2, 3) - ZERO_VECTOR)"));
-        ensure("not math.round for llRound: " + r.text, has(r, "ll.Round(2.5)"));
+        ensure("half up, as LSL rounds, not math.round: " + r.text, has(r, "math.floor(2.5 + 0.5)"));
         ensure("os.time and print: " + r.text, has(r, "os.time()") && has(r, "print("));
         checksClean(r);
     }
@@ -679,7 +688,7 @@ namespace tut
             ++converted;
             for (const ALScriptProblem& p : service.check(r.text))
             {
-                if (p.severity == ALScriptProblem::Severity::Error)
+                if (unwanted(p))
                 {
                     wrong += llformat("%s: [%d:%d] %s\n", name.c_str(), p.line + 1, p.column + 1, p.message.c_str());
                     break;
@@ -688,5 +697,22 @@ namespace tut
         }
         ensure("every one as it should be:\n" + wrong, wrong.empty());
         ensure_equals("those taken, converted", converted + REFUSED.size(), files.size());
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<22>()
+    {
+        set_test_name("what SLua deprecates: its own way where it means the same -- math.floor(x + 0.5), utf8.len, an index read as LSL's -- and llcompat, with SLua's word, where not");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    string s = \"a:b\"; list l = [\"x\", 2];\n"
+                                              "    integer at = llSubStringIndex(s, \":\");\n"
+                                              "    integer n = llStringLength(s) + llRound(1.5);\n"
+                                              "    llOwnerSay(llList2String(l, at) + (string)(at + n));\n"
+                                              "} }\n");
+        ensure("an index read as LSL's: " + r.text, has(r, "local at = (ll.SubStringIndex(s, \":\") or 0) - 1"));
+        ensure("utf8.len and half up: " + r.text, has(r, "local n = (utf8.len(s) :: number) + math.floor(1.5 + 0.5)"));
+        ensure("llcompat, with SLua's word: " + r.text,
+               has(r, "llcompat.List2String(l, at)") && has(r, "-- LSL: SLua deprecates ll.List2String: Use '[]' and 'tostring' instead."));
+        checksClean(r);
     }
 }

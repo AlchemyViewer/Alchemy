@@ -43,8 +43,9 @@ public:
     // nought, in the arguments `sluaIndexArgs` says (SluaIndexArgs); answers
     // a boolean where LSL answers 1 or 0 (SluaBool), or gives booleans in
     // the list it answers where LSL gave 1 or 0 (SluaBoolList); or lacks it,
-    // leaving it to `llcompat` alone (SluaRemoved). `llcompat` has every
-    // function as LSL has it, but those SLua has nowhere (SluaAbsent).
+    // leaving it to `llcompat` alone (SluaRemoved), or has it but deprecates
+    // it (SluaDeprecated). `llcompat` has every function as LSL has it, but
+    // those SLua has nowhere (SluaAbsent).
     enum Slua : U8
     {
         SluaIndexResult = 1 << 0,
@@ -53,6 +54,7 @@ public:
         SluaRemoved     = 1 << 3,
         SluaBoolList    = 1 << 4,
         SluaAbsent      = 1 << 5,
+        SluaDeprecated  = 1 << 6,
         SluaIndex       = SluaIndexResult | SluaIndexArgs,
     };
     struct Trait
@@ -65,8 +67,9 @@ public:
         // The arguments that are an index, a bit for each by its place.
         U16         sluaIndexArgs;
         // What SLua would use in its stead, where it says: a library
-        // function of its own, an operator; or null.
+        // function of its own, an operator; or null. And why, where it says.
         const char* sluaUse;
+        const char* sluaReason;
     };
     // The function's row, or null for a name the definitions lack.
     static const Trait* of(const char* name);

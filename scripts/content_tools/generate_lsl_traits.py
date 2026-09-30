@@ -65,8 +65,10 @@ def main(argv):
     source = Path(argv[1])
     out = Path(__file__).resolve().parents[2] / "indra" / "alscript" / "allsltraits.inc"
     uuids_out = out.with_name("allsluuids.inc")
-    # What SLua declares in ll and in llcompat, by their bare names.
+    # What SLua declares in ll and in llcompat, by their bare names; and
+    # what it marks deprecated in ll.
     declared = {"ll": set(), "llcompat": set()}
+    deprecated = set()
     table = None
     for line in (source.parent / "secondlife.d.luau").read_text(encoding="utf-8").split("\n"):
         m = re.match(r"^declare (ll|llcompat): \{\s*$", line)
@@ -79,6 +81,8 @@ def main(argv):
         m = re.match(r"^  ([A-Za-z_][A-Za-z0-9_]*):", line)
         if table and m:
             declared[table].add(m.group(1))
+            if table == "ll" and re.match(r"^  [A-Za-z_][A-Za-z0-9_]*: @(deprecated|\[deprecated)", line):
+                deprecated.add(m.group(1))
     if not declared["ll"] or not declared["llcompat"]:
         print("no ll or llcompat in " + str(source.parent / "secondlife.d.luau"))
         return 1
@@ -117,6 +121,7 @@ def main(argv):
                 "bool": False,
                 "return": None,
                 "use": None,
+                "reason": None,
             }
             in_deprecated = False
             argument = -1
@@ -144,9 +149,9 @@ def main(argv):
             in_deprecated = True
             continue
         if in_deprecated:
-            m = re.match(r"^      use: (.*?)\s*$", line)
+            m = re.match(r"^      (use|reason): (.*?)\s*$", line)
             if m:
-                functions[name]["use"] = m.group(1).strip("'\"")
+                functions[name][m.group(1)] = m.group(2).strip("'\"")
             elif not line.startswith("      "):
                 in_deprecated = False
     if not functions:
@@ -163,7 +168,7 @@ def main(argv):
         "// its name, whether it has no side effects, whether its result must",
         "// be used, whether it needs a native implementation off LSO; what",
         "// SLua makes of it (ALLSLTraits::Slua); the arguments that are an",
-        "// index, by their places; and what SLua would use.",
+        "// index, by their places; and what SLua would use, and why.",
         "// clang-format off",
     ]
     for fn in sorted(functions):
@@ -178,9 +183,12 @@ def main(argv):
         bare = fn[2:] if fn.startswith("ll") else fn
         if bare not in declared["ll"]:
             slua.append("SluaRemoved" if bare in declared["llcompat"] else "SluaAbsent")
+        elif bare in deprecated:
+            slua.append("SluaDeprecated")
         use = '"%s"' % t["use"].replace('\\', '\\\\').replace('"', '\\"') if t["use"] else "nullptr"
+        reason = '"%s"' % t["reason"].replace('\\', '\\\\').replace('"', '\\"') if t["reason"] else "nullptr"
         lines.append(
-            '{ "%s", %s, %s, %s, %s, 0x%x, %s },'
+            '{ "%s", %s, %s, %s, %s, 0x%x, %s, %s },'
             % (
                 fn,
                 "true" if t["pure"] else "false",
@@ -189,6 +197,7 @@ def main(argv):
                 " | ".join(slua) if slua else "0",
                 t["index-args"],
                 use,
+                reason,
             )
         )
     lines.append("// clang-format on")

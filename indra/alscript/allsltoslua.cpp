@@ -864,8 +864,20 @@ namespace
         {
             return Expr{ "print(" + coerced(argumentAt(e, 0), LST_STRING).text + ")" };
         }
-        // Luau's math where it answers what LSL's did: not llRound, which
-        // rounds a half up where math.round rounds it away from nought.
+        // Half up, as LSL rounds, where math.round rounds a half away from
+        // nought.
+        if (lsl == "llRound")
+        {
+            return Expr{ "math.floor(" + bracketed(arg(0), ADD) + " + 0.5)" };
+        }
+        // Characters, as LSL counts them: its strings are always UTF-8,
+        // which utf8.len answers nil for none of.
+        if (lsl == "llStringLength")
+        {
+            // Bracketed: after `::` Luau reads a < or a - as more type.
+            return Expr{ "(utf8.len(" + coerced(argumentAt(e, 0), LST_STRING).text + ") :: number)" };
+        }
+        // Luau's math where it answers what LSL's did.
         static const boost::unordered_flat_map<std::string_view, std::string_view> MATH = {
             { "llAbs", "abs" },   { "llFabs", "abs" },   { "llAcos", "acos" }, { "llAsin", "asin" },   { "llAtan2", "atan2" },
             { "llCeil", "ceil" }, { "llCos", "cos" },    { "llFloor", "floor" }, { "llSin", "sin" },   { "llTan", "tan" },
@@ -985,10 +997,13 @@ namespace
         // SLua's ll where it means the same: a boolean answer, which a
         // condition reads as it is and a number takes as 1 or 0; index
         // arguments written out, moved on by one. Not where the list it
-        // answers has booleans in LSL's 1 and 0's places.
-        const U8 compat_only = ALLSLTraits::SluaRemoved | ALLSLTraits::SluaIndexResult | ALLSLTraits::SluaBoolList;
-        if (slua == 0 ||
-            (mOptions.sluaCalls && !(slua & compat_only) && (!(slua & ALLSLTraits::SluaIndexArgs) || constantIndexes(e, indexes))))
+        // answers has booleans in LSL's 1 and 0's places, nor one SLua
+        // deprecates, which llcompat keeps LSL's where no way of SLua's
+        // own (Writer::idiom) is sure to mean the same.
+        const U8 compat_only =
+            ALLSLTraits::SluaRemoved | ALLSLTraits::SluaIndexResult | ALLSLTraits::SluaBoolList | ALLSLTraits::SluaDeprecated;
+        const bool ll_indexes = !(slua & ALLSLTraits::SluaIndexArgs) || constantIndexes(e, indexes);
+        if (slua == 0 || (mOptions.sluaCalls && !(slua & compat_only) && ll_indexes))
         {
             if (trait && trait->sluaUse)
             {
@@ -996,6 +1011,14 @@ namespace
             }
             const std::string called = (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params);
             return { "ll." + bare + "(" + called + ")", PRIMARY, (slua & ALLSLTraits::SluaBool) != 0 };
+        }
+        // An index SLua's ll counts from 1, or nil for none, read as LSL's:
+        // from 0, or -1.
+        const U8 not_ll = compat_only & ~ALLSLTraits::SluaIndexResult;
+        if (mOptions.sluaCalls && (slua & ALLSLTraits::SluaIndexResult) && !(slua & not_ll) && ll_indexes)
+        {
+            const std::string called = (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params);
+            return { "(ll." + bare + "(" + called + ") or 0) - 1", ADD };
         }
         if (slua & ALLSLTraits::SluaRemoved)
         {
@@ -1027,7 +1050,15 @@ namespace
             noteOnce(e, "SluaBoolList" + lsl, "llcompat." + bare + "'s list has 1 or 0 where LSL's did; ll." + bare +
                                                   "'s has true or false there.");
         }
-        if (trait && trait->sluaUse)
+        if (slua & ALLSLTraits::SluaDeprecated)
+        {
+            // SLua's word on it, what it would use and why.
+            std::string said = "SLua deprecates ll." + bare;
+            said += trait->sluaUse ? ", for " + std::string(trait->sluaUse) : std::string();
+            said += trait->sluaReason ? ": " + std::string(trait->sluaReason) : std::string(".");
+            noteOnce(e, "SluaDeprecated" + lsl, said);
+        }
+        else if (trait && trait->sluaUse)
         {
             noteOnce(e, "SluaUse" + lsl, "SLua would use " + std::string(trait->sluaUse) + " for " + lsl + ".");
         }
