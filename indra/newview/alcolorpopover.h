@@ -32,6 +32,8 @@
 #include <functional>
 #include <string>
 
+class LLColorSwatchCtrl;
+
 /// The inline picker for a colour: XUI Studio's hue ring, shade square and
 /// channel tracks, under a title, with a way on to the viewer's full picker
 /// for typed numbers and the eyedropper.
@@ -69,10 +71,12 @@ public:
     static LLFloater::Params params(const std::string& title);
 
     /// @a show_alpha adds the alpha track; leave it off for a Color3, where it
-    /// would be a control that does nothing.
+    /// would be a control that does nothing. The way on to the full picker
+    /// settles this popover -- the full picker starts from what was picked
+    /// here, and keeps it if it is closed -- and opens @a swatch's own.
     ALColorPopover(const LLFloater::Params& p, const LLColor4& start, bool show_alpha,
                    std::function<void(const LLColor4&)> on_change,
-                   std::function<void()> on_full_picker,
+                   LLColorSwatchCtrl* swatch,
                    const std::string& full_picker_label, const std::string& full_picker_tooltip);
 
 private:

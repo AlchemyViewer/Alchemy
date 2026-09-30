@@ -27,6 +27,7 @@
 
 #include "alcolorpicker.h"
 #include "llbutton.h"
+#include "llcolorswatch.h"
 #include "lluictrlfactory.h"
 
 // static
@@ -46,7 +47,7 @@ LLFloater::Params ALColorPopover::params(const std::string& title)
 
 ALColorPopover::ALColorPopover(const LLFloater::Params& p, const LLColor4& start, bool show_alpha,
                                std::function<void(const LLColor4&)> on_change,
-                               std::function<void()> on_full_picker,
+                               LLColorSwatchCtrl* swatch,
                                const std::string& full_picker_label, const std::string& full_picker_tooltip)
 :   ALPopover(p)
 {
@@ -79,11 +80,13 @@ ALColorPopover::ALColorPopover(const LLFloater::Params& p, const LLColor4& start
     bp.rect = LLRect(width - GAP - BUTTON_WIDTH, GAP + BUTTON_HEIGHT, width - GAP, GAP);
     bp.follows.flags = FOLLOWS_RIGHT | FOLLOWS_BOTTOM;
     LLButton* full = LLUICtrlFactory::create<LLButton>(bp);
-    full->setCommitCallback([on_full_picker](LLUICtrl*, const LLSD&)
+    LLHandle<LLView> swatch_handle = swatch ? swatch->getHandle() : LLHandle<LLView>();
+    full->setCommitCallback([this, swatch_handle](LLUICtrl*, const LLSD&)
     {
-        if (on_full_picker)
+        settle();
+        if (LLColorSwatchCtrl* swatch = ALViewType::as<LLColorSwatchCtrl>(swatch_handle.get()))
         {
-            on_full_picker();
+            swatch->showClassicPicker(true);
         }
     });
     addChild(full);

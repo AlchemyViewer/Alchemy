@@ -799,7 +799,6 @@ bool LLFloaterSnapshot::Impl::openCutoutFillPopover(LLFloaterSnapshotBase* float
     mCutoutFillPopover.close(false);
 
     const LLSD original = control->getValue();
-    LLHandle<LLView> swatch_handle = swatch->getHandle();
     ALColorPopover* popover = new ALColorPopover(
         ALColorPopover::params(floater->getString("cutout_fill_title")),
         LLColor4(original),
@@ -808,19 +807,7 @@ bool LLFloaterSnapshot::Impl::openCutoutFillPopover(LLFloaterSnapshotBase* float
         {
             gSavedSettings.setColor4("ALSnapshotCutoutFill", color);
         },
-        [swatch_handle]()
-        {
-            // Settled rather than escaped: the full picker starts from what
-            // was picked here, and keeps it if it is closed.
-            if (LLFloaterSnapshot* floater = LLFloaterSnapshot::findInstance())
-            {
-                ((Impl*)floater->impl)->mCutoutFillPopover.close(false);
-            }
-            if (LLColorSwatchCtrl* swatch = ALViewType::as<LLColorSwatchCtrl>(swatch_handle.get()))
-            {
-                swatch->showClassicPicker(true);
-            }
-        },
+        swatch,
         floater->getString("cutout_full_picker"), floater->getString("cutout_full_picker_tooltip"));
 
     // Escape puts the colour back.

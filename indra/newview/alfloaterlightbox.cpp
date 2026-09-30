@@ -866,7 +866,6 @@ bool ALFloaterLightBox::openColorPopover(LLColorSwatchCtrl* swatch, const std::s
     mColorOriginal = control->getValue();
 
     LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
-    LLHandle<LLView> swatch_handle = swatch->getHandle();
     // Every colour row here is a Color3 setting: an alpha track would be a
     // control that does nothing.
     ALColorPopover* popover = new ALColorPopover(
@@ -880,19 +879,7 @@ bool ALFloaterLightBox::openColorPopover(LLColorSwatchCtrl* swatch, const std::s
                 floater->onColorPicked(color);
             }
         },
-        [self, swatch_handle]()
-        {
-            // Settled rather than escaped: the full picker starts from what
-            // was picked here, and keeps it if it is closed.
-            if (ALFloaterLightBox* floater = self.get())
-            {
-                floater->closePopover(false);
-            }
-            if (LLColorSwatchCtrl* swatch = ALViewType::as<LLColorSwatchCtrl>(swatch_handle.get()))
-            {
-                swatch->showClassicPicker(true);
-            }
-        },
+        swatch,
         getString("color_full_picker"), getString("color_full_picker_tooltip"));
     adoptPopover(PopoverKind::Color, popover, swatch);
     return true;
