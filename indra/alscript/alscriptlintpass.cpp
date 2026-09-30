@@ -73,6 +73,8 @@ namespace
         { "SlGlobalAssign", true, Severity::Warning, true, true, nullptr },
         // if (x) then: LSL's brackets, which Luau's if needs none of.
         { "SlParenCondition", true, Severity::Note, true, true, "parenthese_conditions" },
+        // a = b followed by b = a, which is no swap.
+        { "SlAlmostSwapped", true, Severity::Warning, true, true, "almost_swapped" },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -404,7 +406,40 @@ namespace
                     node == mRoot ? topGlobal(stat) : nestedFunction(node, stat);
                 }
             }
+            if (on("SlAlmostSwapped"))
+            {
+                for (size_t i = 0; i + 1 < node->body.size; ++i)
+                {
+                    almostSwapped(node->body.data[i], node->body.data[i + 1]);
+                }
+            }
             return true;
+        }
+
+        // --- SlAlmostSwapped: a swap written a step at a time ----------------
+
+        // a = b, then b = a: both are b's after, which a swap was meant.
+        void almostSwapped(Luau::AstStat* first, Luau::AstStat* second)
+        {
+            const auto* one = first->as<Luau::AstStatAssign>();
+            const auto* two = second->as<Luau::AstStatAssign>();
+            if (!one || !two || one->vars.size != 1 || one->values.size != 1 || two->vars.size != 1 || two->values.size != 1)
+            {
+                return;
+            }
+            Luau::AstExpr* a = one->vars.data[0];
+            Luau::AstExpr* b = one->values.data[0];
+            if (same(a, b) || !same(a, two->values.data[0]) || !same(b, two->vars.data[0]))
+            {
+                return;
+            }
+            const std::string was_a = text(a->location);
+            const std::string was_b = text(b->location);
+            const std::string now   = was_a + ", " + was_b + " = " + was_b + ", " + was_a;
+            const Luau::Location both(first->location.begin, second->location.end);
+            ALScriptProblem&     said = problem(both, "LuauLintSlAlmostSwapped", "[1] = [2] and then [2] = [1] leave both [2]: a swap is [3]",
+                                                { was_a, was_b, now }, "SlAlmostSwapped");
+            offer(said, now, { edit(both, now) }, false);
         }
 
         // --- SlNumberTruth: a number asked whether it is true ------------------

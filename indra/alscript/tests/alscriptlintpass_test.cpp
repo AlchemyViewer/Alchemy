@@ -358,4 +358,27 @@ namespace tut
                                                         "SlParenCondition", ALScriptProblem::Severity::Note),
                       std::string());
     }
+
+    template<> template<>
+    void object::test<7>()
+    {
+        set_test_name("SlAlmostSwapped: a = b then b = a, locals, globals or fields, a warning, fixed as a swap; not a swap, nor with "
+                      "something between");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local a, b = 1, 2\n"
+                                       "a = b\n"
+                                       "b = a\n"
+                                       "local t = {x = 1, y = 2}\n"
+                                       "t.x = t.y; t.y = t.x\n"
+                                       "a, b = b, a\n"
+                                       "a = b\n"
+                                       "print(a)\n"
+                                       "b = a\n",
+                                       "SlAlmostSwapped", ALScriptProblem::Severity::Warning);
+        ensure_equals("each", said,
+                      std::string("1 LuauLintSlAlmostSwapped|a|b|a, b = b, a\n"
+                                  "4 LuauLintSlAlmostSwapped|t.x|t.y|t.x, t.y = t.y, t.x\n"));
+        ensure_equals("swapped", fixed("local a, b = 1, 2\na = b\nb = a\nprint(a, b)\n", "LuauLintSlAlmostSwapped", "Write it a, b = b, a", false),
+                      std::string("local a, b = 1, 2\na, b = b, a\nprint(a, b)\n"));
+    }
 }
