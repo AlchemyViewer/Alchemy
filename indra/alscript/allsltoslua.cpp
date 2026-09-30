@@ -27,6 +27,7 @@
 #include "allsltoslua.h"
 
 #include "alscriptengine.h"
+#include "allsleffects.h"
 #include "allslservice.h"
 #include "allsltraits.h"
 #include "allslvalues.h"
@@ -189,7 +190,7 @@ namespace
     class Writer
     {
     public:
-        Writer(LSLScript* script, const ALLSLToSLua::Options& options) : mScript(script), mOptions(options) {}
+        Writer(LSLScript* script, const ALLSLToSLua::Options& options) : mScript(script), mOptions(options), mEffects(script) {}
 
         std::string write();
         ALScriptProblems& notes() { return mNotes; }
@@ -310,6 +311,19 @@ namespace
         std::optional<Expr> truthAsked(LSLBinaryExpression* e);
         bool        boolean(LSLSymbol* var) const { return var && mBooleans.contains(var); }
 
+        // --- LSL's order ----------------------------------------------------------------
+
+        // Whether a binary's sides run the other way round could do or give
+        // something else: one changes what the other reads, or both do
+        // something past the script. LSL ran the right side first, and Luau
+        // runs the left.
+        bool orderMatters(LSLExpression* lhs, LSLExpression* rhs) const;
+        // l = (l = []) + l + ..., which spared LSO's memory by clearing l
+        // after LSL, going right to left, had read it: the clearing taken
+        // out of the tree, since Luau would clear it first, and what is left
+        // is the append it meant.
+        void forgetMemoryHacks();
+
         // --- the script -------------------------------------------------------------
 
         void globals();
@@ -328,6 +342,8 @@ namespace
 
         LSLScript*                                       mScript;
         const ALLSLToSLua::Options&                      mOptions;
+        // What each part of the script may change, for LSL's order.
+        ALLSLEffects                                     mEffects;
         std::string                                      mText;
         int                                              mDepth = 0;
         std::vector<std::string>                         mPending;
@@ -365,6 +381,9 @@ namespace
         boost::unordered_flat_set<LSLSymbol*>                 mZeroOne;
         // The function of the script's own being written.
         LSLSymbol* mFunction = nullptr;
+        // The assignments whose clearing was taken out, noted as each is
+        // written.
+        boost::unordered_flat_set<LSLASTNode*> mFreedFirst;
     };
 
     void Writer::note(LSLASTNode* at, const std::string& key, const std::string& said)
@@ -964,6 +983,16 @@ namespace
                 }
             }
         }
+        // Both sides run, the right first in LSL: said where that could
+        // show, but for && and ||, whose note says so.
+        const bool assigns = op == OP_ASSIGN || op == OP_ADD_ASSIGN || op == OP_SUB_ASSIGN || op == OP_MUL_ASSIGN || op == OP_DIV_ASSIGN ||
+                             op == OP_MOD_ASSIGN;
+        const bool andOr = op == OP_BOOLEAN_AND || op == OP_BOOLEAN_OR;
+        if (!assigns && !(andOr && !ALLSLTraits::sideEffectFree(rhs)) && orderMatters(lhs, rhs))
+        {
+            note(e, "SluaRightFirst",
+                 "LSL ran the right side of this before the left, and Luau runs the left first: one side changes what the other reads.");
+        }
         const auto bit = [&](const char* fn) -> Expr {
             noteOnce(e, "SluaBit32", "bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.");
             return { std::string("bit32.") + fn + "(" + value(lhs).text + ", " + value(rhs).text + ")" };
@@ -1051,7 +1080,7 @@ namespace
                 if (!ALLSLTraits::sideEffectFree(rhs))
                 {
                     note(e, "SluaShortCircuit", std::string(and_ ? "and" : "or") + " leaves its right side unrun once the left decides it; "
-                                                "LSL ran both sides.");
+                                                "LSL ran both sides, the right one first.");
                 }
                 const int  prec = and_ ? AND : OR;
                 const Expr a    = condition(lhs);
@@ -1324,6 +1353,16 @@ namespace
                 if (op == OP_ASSIGN || op == OP_ADD_ASSIGN || op == OP_SUB_ASSIGN || op == OP_MUL_ASSIGN || op == OP_DIV_ASSIGN ||
                     op == OP_MOD_ASSIGN)
                 {
+                    // Said once for each variable it clears.
+                    const std::string name = static_cast<LSLLValueExpression*>(b->getLHS())->getIdentifier()->getName();
+                    if (mFreedFirst.contains(b) && mOnce.insert("SluaMemoryHack " + name).second)
+                    {
+                        const std::string empty = b->getLHS()->getIType() == LST_LIST ? "[]" : "\"\"";
+                        note(b, "SluaMemoryHack",
+                             "(" + name + " = " + empty + ") + " + name + " spared LSO's memory, clearing " + name +
+                                 " once LSL, going right to left, had read it. Luau goes left to right and needs no such thing: the "
+                                 "clearing is left out.");
+                    }
                     assign(static_cast<LSLLValueExpression*>(b->getLHS()), op, b->getRHS());
                     return;
                 }
@@ -2123,6 +2162,111 @@ namespace
         return condition(e).text;
     }
 
+    // --- LSL's order -------------------------------------------------------------------
+
+    bool Writer::orderMatters(LSLExpression* lhs, LSLExpression* rhs) const
+    {
+        const ALLSLEffects::Writes left  = mEffects.of(lhs);
+        const ALLSLEffects::Writes right = mEffects.of(rhs);
+        // Both past the script, where either may change something there.
+        if (left.impure && right.impure && !(ALLSLTraits::changesNothing(lhs) && ALLSLTraits::changesNothing(rhs)))
+        {
+            return true;
+        }
+        // What one side sets, the other reads, or a function of the
+        // script's that it calls may.
+        const auto sees = [](const ALLSLEffects::Writes& w, LSLExpression* other) {
+            if (w.variables.empty())
+            {
+                return false;
+            }
+            bool seen = false;
+            walk(other, [&](LSLASTNode* node) {
+                if (node->getNodeSubType() == NODE_LVALUE_EXPRESSION)
+                {
+                    seen = seen || w.writes(static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol());
+                }
+                else if (node->getNodeSubType() == NODE_FUNCTION_EXPRESSION && readOf(node))
+                {
+                    seen = true;
+                }
+            });
+            return seen;
+        };
+        return sees(left, rhs) || sees(right, lhs);
+    }
+
+    namespace
+    {
+        // [] or "" written out.
+        bool emptyValue(LSLExpression* e)
+        {
+            e = unwrapped(e);
+            if (!e)
+            {
+                return false;
+            }
+            if (e->getNodeSubType() == NODE_LIST_EXPRESSION)
+            {
+                return isNull(e->getChild(0));
+            }
+            if (e->getNodeSubType() != NODE_CONSTANT_EXPRESSION)
+            {
+                return false;
+            }
+            LSLASTNode* c = e->getChild(0);
+            if (c->getNodeSubType() == NODE_LIST_CONSTANT)
+            {
+                return !static_cast<LSLListConstant*>(c)->getValue();
+            }
+            return c->getNodeSubType() == NODE_STRING_CONSTANT && !*static_cast<LSLStringConstant*>(c)->getValue();
+        }
+    }
+
+    void Writer::forgetMemoryHacks()
+    {
+        // Found first, then taken out, the tree not changed under the walk.
+        std::vector<LSLBinaryExpression*> clearings;
+        walk(mScript, [&](LSLASTNode* node) {
+            if (node->getNodeSubType() != NODE_BINARY_EXPRESSION || static_cast<LSLExpression*>(node)->getOperation() != OP_ASSIGN ||
+                valueUsed(node))
+            {
+                return;
+            }
+            auto*          assignment = static_cast<LSLBinaryExpression*>(node);
+            LSLSymbol*     var        = wholeVariable(assignment->getLHS());
+            const LSLIType type       = assignment->getLHS()->getIType();
+            if (!var || (type != LST_LIST && type != LST_STRING))
+            {
+                return;
+            }
+            // The innermost of the +'s it is set to, whose left runs last.
+            LSLExpression*       top   = unwrapped(assignment->getRHS());
+            LSLBinaryExpression* first = nullptr;
+            for (LSLExpression* e = top; e && e->getNodeSubType() == NODE_BINARY_EXPRESSION && e->getOperation() == OP_PLUS;
+                 e = unwrapped(static_cast<LSLBinaryExpression*>(e)->getLHS()))
+            {
+                first = static_cast<LSLBinaryExpression*>(e);
+            }
+            if (!first || (first == top && first->getRHS()->getIType() != type))
+            {
+                return;
+            }
+            LSLExpression* clear = unwrapped(first->getLHS());
+            if (clear->getNodeSubType() == NODE_BINARY_EXPRESSION && clear->getOperation() == OP_ASSIGN &&
+                wholeVariable(static_cast<LSLBinaryExpression*>(clear)->getLHS()) == var &&
+                emptyValue(static_cast<LSLBinaryExpression*>(clear)->getRHS()))
+            {
+                clearings.push_back(first);
+                mFreedFirst.insert(node);
+            }
+        });
+        for (LSLBinaryExpression* first : clearings)
+        {
+            LSLASTNode::replaceNode(first, first->takeChild(1));
+        }
+    }
+
     // --- the script -------------------------------------------------------------------
 
     void Writer::globals()
@@ -2486,6 +2630,7 @@ end
                 mTimers = true;
             }
         });
+        forgetMemoryHacks();
         findBooleans();
         if (mManyStates)
         {

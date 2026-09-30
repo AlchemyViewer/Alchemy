@@ -92,6 +92,15 @@ namespace tut
         }
 
         static bool has(const ALLSLToSLua::Result& r, const std::string& text) { return r.text.find(text) != std::string::npos; }
+        static size_t count(const ALLSLToSLua::Result& r, const std::string& text)
+        {
+            size_t n = 0;
+            for (size_t at = r.text.find(text); at != std::string::npos; at = r.text.find(text, at + 1))
+            {
+                ++n;
+            }
+            return n;
+        }
         static bool noted(const ALLSLToSLua::Result& r, const std::string& key)
         {
             for (const ALScriptProblem& p : r.notes)
@@ -395,5 +404,50 @@ namespace tut
                                                            typed);
         ensure("typed boolean: " + t.text, has(t, "local function ready(n: number): boolean") && has(t, "local ok: boolean = ready(3)"));
         checksClean(t);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<13>()
+    {
+        set_test_name("LSL ran a binary's right side first: (l = []) + l is the append it meant, and where the order could show it is noted");
+        const ALLSLToSLua::Result r = convert("list gItems;\n"
+                                              "string gLog = \"a\";\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    gItems = (gItems = []) + gItems + [\"x\"];\n"
+                                              "    gItems = (gItems = []) + [\"y\"] + gItems;\n"
+                                              "    gLog = (gLog = \"\") + gLog + \"b\";\n"
+                                              "    llOwnerSay(gLog + (string)llGetListLength(gItems));\n"
+                                              "} }\n");
+        ensure("appended: " + r.text, has(r, "gItems = joinLists(gItems, {\"x\"})"));
+        ensure("prepended: " + r.text, has(r, "gItems = joinLists({\"y\"}, gItems)"));
+        ensure("a string: " + r.text, has(r, "gLog = gLog .. \"b\""));
+        ensure("nothing cleared first: " + r.text, !has(r, "gItems = {} return") && !has(r, "gLog = \"\" return"));
+        ensure("noted once for each variable: " + r.text, noted(r, "SluaMemoryHack") && count(r, "-- LSL: (gItems = []) + gItems") == 1 &&
+                                                         count(r, "-- LSL: (gLog = \"\") + gLog") == 1);
+        ensure("not taken as an order that shows", !noted(r, "SluaRightFirst"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result order = convert("integer gCount;\n"
+                                                  "integer bump() { return ++gCount; }\n"
+                                                  "default { state_entry() {\n"
+                                                  "    integer i = 1;\n"
+                                                  "    integer j = i + (i = 5);\n"
+                                                  "    integer k = gCount - bump();\n"
+                                                  "    llOwnerSay((string)(j + k));\n"
+                                                  "} }\n");
+        ensure("an assignment the other side reads", noted(order, "SluaRightFirst"));
+        ensure("said over its line: " + order.text, has(order, "-- LSL: LSL ran the right side of this before the left"));
+        checksClean(order);
+
+        const ALLSLToSLua::Result quiet = convert("integer gCount;\n"
+                                                  "integer bump() { return ++gCount; }\n"
+                                                  "default { state_entry() {\n"
+                                                  "    integer i = 1;\n"
+                                                  "    integer j = (i + 1) * bump();\n"
+                                                  "    string s = \"n: \" + (string)bump();\n"
+                                                  "    llOwnerSay(s + (string)(j + (integer)llGetTime()));\n"
+                                                  "} }\n");
+        ensure("nothing either side changes the other reads: " + quiet.text, !noted(quiet, "SluaRightFirst"));
+        checksClean(quiet);
     }
 }
