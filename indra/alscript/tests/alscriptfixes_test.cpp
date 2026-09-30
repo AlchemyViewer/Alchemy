@@ -1229,4 +1229,19 @@ namespace tut
             }
         }
     }
+
+    template<> template<>
+    void object::test<42>()
+    {
+        set_test_name("a script made --!strict: its head's --!nonstrict or --!nocheck changed, else it put first; nothing where it is already");
+        const auto made = [](const std::string& text) {
+            const std::optional<ALScriptFix> fix = ALScriptFixes::strictFix(text);
+            return fix ? ALScriptFixes::apply(text, *fix).value_or("(not made)") : std::string("(none)");
+        };
+        ensure_equals("put first", made("-- a door\nlocal x = 1\n"), std::string("--!strict\n-- a door\nlocal x = 1\n"));
+        ensure_equals("changed", made("-- a door\n--!nonstrict\nlocal x = 1\n"), std::string("-- a door\n--!strict\nlocal x = 1\n"));
+        ensure_equals("from nocheck", made("--!nocheck\nprint(1)\n"), std::string("--!strict\nprint(1)\n"));
+        ensure_equals("already", made("--!strict\nprint(1)\n"), std::string("(none)"));
+        ensure_equals("past the head, not read", made("print(1)\n--!nonstrict\n"), std::string("--!strict\nprint(1)\n--!nonstrict\n"));
+    }
 }

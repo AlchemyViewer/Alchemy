@@ -187,6 +187,10 @@ namespace ALScriptFixes
     // after the comments it opens with, apart from the code after. Never
     // preferred nor safe here: which module is meant, and whether running
     // it is wanted, is the caller's to know.
+    // An SLua script made --!strict: a --!nonstrict or --!nocheck at its
+    // head changed to it, else it put first. Nothing where it is already.
+    std::optional<ALScriptFix> strictFix(std::string_view slua);
+
     void offerRequire(ALScriptProblem& problem, std::string_view text, const std::string& module, bool field);
     void offerRequire(ALScriptProblem& problem, const Lines& lines, const std::string& module, bool field);
     // The same for LSL: `#include "include"` for a name an include

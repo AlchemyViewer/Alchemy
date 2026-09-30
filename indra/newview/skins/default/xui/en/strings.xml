@@ -710,6 +710,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixKeepCall">Keep [1] in a local, [2]</string>
 	<string name="ScriptFixNoteDone">Done: take the note out</string>
 	<string name="ScriptFixNoteLint">[1], and take the note out</string>
+	<string name="ScriptFixMakeStrict">Make the script --!strict</string>
 	<string name="ScriptActionAnnotate">Declare it as '[1]'</string>
 	<string name="ScriptActionExtract">Put it in a local, '[1]'</string>
 	<string name="ScriptActionInterpolate">Write it as an interpolated string</string>
