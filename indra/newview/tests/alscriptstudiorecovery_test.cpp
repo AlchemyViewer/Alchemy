@@ -37,6 +37,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <future>
 
 namespace
 {
@@ -656,5 +657,45 @@ namespace tut
         store->flush();
         ensure("the old let go of", a.recoveryKey != was && keptFor(was) == 0);
         ensure("written afresh, though nothing moved", r.keep(a) && keptFor(a.recoveryKey) == 1);
+    }
+
+    template<> template<>
+    void alscriptstudiorecovery_object::test<15>()
+    {
+        set_test_name("a save kept in the history on the writer's thread; one given a new item takes the old one's saves with it");
+        const std::string folder =
+            fsyspath(std::filesystem::temp_directory_path() / fsyspath("alsavehistory_" + LLUUID::generateNewID().asString())).string();
+        auto history = std::make_shared<ALSaveHistory>(folder);
+        ALRecovery::useHistory(history);
+        // Everything posted before this, done: the writer is one thread.
+        const auto written = []() {
+            std::promise<void> done;
+            std::future<void>  waited = done.get_future();
+            if (ALRecoveryWriter::instance().post([&done]() { done.set_value(); }))
+            {
+                waited.wait();
+            }
+        };
+        const F64 now  = LLDate::now().secondsSinceEpoch();
+        auto      save = [now](const std::string& key, const std::string& text, F64 ago) {
+            ALSavedText one;
+            one.key  = key;
+            one.text = text;
+            one.when = LLDate(now - ago);
+            return one;
+        };
+        ALRecovery::keepSaved(save("item:x", "one", 30.0));
+        ALRecovery::keepSaved(save("task:p:old", "a", 20.0));
+        ALRecovery::keepSaved(save("task:p:new", "b", 10.0), "task:p:old");
+        written();
+        ensure_equals("kept", history->list("item:x").size(), 1U);
+        ensure("the old item's moved", history->list("task:p:old").empty());
+        const std::vector<ALSavedText> moved = history->list("task:p:new");
+        ensure_equals("behind the new one's", moved.size(), 2U);
+        ALRecovery::keepSaved(save("", "nobody's", 5.0));
+        written();
+        ALRecovery::useHistory(nullptr);
+        std::error_code ec;
+        std::filesystem::remove_all(fsyspath(folder), ec);
     }
 }

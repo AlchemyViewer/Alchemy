@@ -308,6 +308,9 @@ private:
     // An answer handed to its caller and every listener, on the main
     // coroutine; and, where the text went up, said as saved with it.
     void        deliver(const ALScriptCompileResult& result, const ALScriptCompileCallback& callback, const std::string* text = nullptr);
+    // A save that went up kept in the account's history (ALRecovery),
+    // whoever sent it, with what the item and its object are called.
+    void        keepInHistory(const ALScriptSaved& saved) const;
     // A notecard's asset sent, and `text`, its text, said as saved.
     bool        uploadNotecard(const ALScriptRef& ref, const std::string& buffer, const std::string& text, bool carries,
                                ALScriptCompileCallback callback, std::string& error, ALScriptSender sender);

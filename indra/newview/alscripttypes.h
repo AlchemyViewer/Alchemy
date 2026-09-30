@@ -212,6 +212,9 @@ struct ALScriptSaved
     LLUUID         asset;
     ALScriptSender sender;
     bool           compiled = false;
+    // The item the save made anew in place of `ref`'s, where it made one:
+    // a notecard in an object.
+    LLUUID         newItem;
 
     // What an editor holding the item does about a save of it heard from
     // elsewhere -- the author's text as it went up, a script's out of its

@@ -25,8 +25,10 @@
 #pragma once
 
 #include "alrecoverystore.h"
+#include "alsavehistory.h"
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -47,6 +49,16 @@ public:
     // tells what this one left. A test's in its place, where one is given.
     static ALRecoveryStore* store();
     static void             useStore(ALRecoveryStore* store);
+    // The account's history of saves (ALSaveHistory), beside the store:
+    // made the first time it is asked for, and pruned then; null before a
+    // login; a test's in its place, where one is given. Shared, since a
+    // save is kept on the writer's thread.
+    static std::shared_ptr<ALSaveHistory> history();
+    static void                           useHistory(std::shared_ptr<ALSaveHistory> history);
+    // A save kept in it, on the writer's thread (ALRecoveryWriter): the
+    // saves kept under `was`, where it is given, moved to its key first --
+    // a notecard in an object its save gave a new item.
+    static void keepSaved(ALSavedText saved, std::string was = std::string());
     // Where a text one of the viewer's own windows kept
     // (ALRecoveryStore::isWindowKey) goes back to: the notecard window, as
     // the viewer has it -- false where

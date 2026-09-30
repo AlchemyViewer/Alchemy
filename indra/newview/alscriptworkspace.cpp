@@ -27,6 +27,7 @@
 #include "alscriptworkspace.h"
 
 #include "alobjectproperties.h"
+#include "alrecovery.h"
 #include "alscriptanalysis.h"
 #include "alscriptcontentsindex.h"
 #include "alscriptenvelope.h"
@@ -553,8 +554,62 @@ void ALScriptWorkspace::deliver(const ALScriptCompileResult& result, const ALScr
         saved.asset    = result.newAssetId;
         saved.sender   = result.sender;
         saved.compiled = result.success;
+        saved.newItem  = result.newItemId;
         mSaved(saved);
+        keepInHistory(saved);
     }
+}
+
+void ALScriptWorkspace::keepInHistory(const ALScriptSaved& saved) const
+{
+    // Named here, where the inventory and the world are, by the item it
+    // was; kept under the one it is now.
+    const bool  moved = saved.newItem.notNull() && saved.newItem != saved.ref.item;
+    ALSavedText kept;
+    kept.key      = ALRecoveryStore::keyOf(saved.ref.object, moved ? saved.newItem : saved.ref.item, std::string());
+    kept.notecard = saved.kind == ALScriptKind::Notecard;
+    kept.asset    = saved.asset;
+    kept.text     = saved.text;
+    // A script's author's text, not the envelope it went up in.
+    if (!kept.notecard)
+    {
+        if (std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(saved.text))
+        {
+            kept.text = std::move(envelope->source);
+        }
+    }
+    if (saved.ref.inInventory())
+    {
+        if (const LLViewerInventoryItem* item = gInventory.getItem(saved.ref.item))
+        {
+            kept.name = item->getName();
+            kept.lua  = item->getInventorySubType() == SST_LUA;
+        }
+    }
+    else
+    {
+        for (const ALScriptContents::Item& item : mContentsIndex->items(saved.ref.object))
+        {
+            if (item.id == saved.ref.item)
+            {
+                kept.name = item.name;
+                kept.lua  = item.lua;
+            }
+        }
+        if (LLViewerObject* prim = gObjectList.findObject(saved.ref.object))
+        {
+            const LLViewerObject* root = prim->getRootEdit() ? prim->getRootEdit() : prim;
+            if (const ALScriptContentsIndex::Prim* known = mContentsIndex->prim(root->getID()))
+            {
+                kept.objectName = known->name;
+            }
+            if (prim->getRegion())
+            {
+                kept.region = prim->getRegion()->getName();
+            }
+        }
+    }
+    ALRecovery::keepSaved(std::move(kept), moved ? ALRecoveryStore::keyOf(saved.ref.object, saved.ref.item, std::string()) : std::string());
 }
 
 bool ALScriptWorkspace::saving(const ALScriptRef& ref) const

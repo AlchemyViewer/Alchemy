@@ -42,8 +42,9 @@ namespace
     // How long discarded text is kept before it goes for good.
     const F64 DISCARDED_KEPT = 7.0 * 24.0 * 60.0 * 60.0;
 
-    // A test's store, in place of the account's.
-    ALRecoveryStore* sGivenStore = nullptr;
+    // A test's store and history, in place of the account's.
+    ALRecoveryStore*               sGivenStore = nullptr;
+    std::shared_ptr<ALSaveHistory> sGivenHistory;
 
     // The viewer's own windows' way of taking up what they kept.
     ALRecovery::window_t& ownWindows()
@@ -59,7 +60,11 @@ namespace
     class AccountRecovery final : public LLSingleton<AccountRecovery>
     {
         LLSINGLETON(AccountRecovery);
-        void cleanupSingleton() override { mStore.reset(); }
+        void cleanupSingleton() override
+        {
+            mStore.reset();
+            mHistory.reset();
+        }
 
     public:
         ALRecoveryStore* storeFor(const std::string& directory)
@@ -75,9 +80,29 @@ namespace
             return mStore.get();
         }
 
+        std::shared_ptr<ALSaveHistory> historyFor(const std::string& directory)
+        {
+            if (!mHistory || mHistoryFor != directory)
+            {
+                LLFile::mkdir(directory);
+                mHistory    = std::make_shared<ALSaveHistory>(directory);
+                mHistoryFor = directory;
+                // What is past the limits goes, out of the way of the
+                // frame: every file of every item is looked at.
+                auto prune = [history = mHistory]() { history->prune(); };
+                if (!ALRecoveryWriter::instance().post(prune))
+                {
+                    prune();
+                }
+            }
+            return mHistory;
+        }
+
     private:
         std::unique_ptr<ALRecoveryStore> mStore;
         std::string                            mMadeFor;
+        std::shared_ptr<ALSaveHistory>         mHistory;
+        std::string                            mHistoryFor;
         const std::string                      mSession = LLUUID::generateNewID().asString();
     };
 
@@ -114,6 +139,48 @@ ALRecoveryStore* ALRecovery::store()
 void ALRecovery::useStore(ALRecoveryStore* store)
 {
     sGivenStore = store;
+}
+
+// static
+std::shared_ptr<ALSaveHistory> ALRecovery::history()
+{
+    if (sGivenHistory)
+    {
+        return sGivenHistory;
+    }
+    if (!gDirUtilp || gDirUtilp->getLindenUserDir().empty() || AccountRecovery::wasDeleted())
+    {
+        return nullptr;
+    }
+    return AccountRecovery::instance().historyFor(gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "history"));
+}
+
+// static
+void ALRecovery::useHistory(std::shared_ptr<ALSaveHistory> history)
+{
+    sGivenHistory = std::move(history);
+}
+
+// static
+void ALRecovery::keepSaved(ALSavedText saved, std::string was)
+{
+    std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
+    if (!history || saved.key.empty())
+    {
+        return;
+    }
+    // Off the main thread: a text may be long, and the disk slow.
+    auto keep = [history, saved = std::move(saved), was = std::move(was)]() mutable {
+        if (!was.empty())
+        {
+            history->rekey(was, saved.key);
+        }
+        history->keep(std::move(saved));
+    };
+    if (!ALRecoveryWriter::instance().post(keep))
+    {
+        keep();
+    }
 }
 
 // static
