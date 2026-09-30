@@ -6138,7 +6138,11 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     assertInitialized();
 
-    if (gCubeSnapshot || LLPipeline::sRenderingHUDs || LLApp::isExiting())
+    // The nearby set is the frame camera's, and its fade clock runs once a frame. Probe faces
+    // and impostor bakes render from cameras of their own and take the set as the frame left
+    // it: a bake runs before the frame's deferred lighting, which would otherwise draw the
+    // set in the bake camera's order.
+    if (gCubeSnapshot || LLPipeline::sImpostorRender || LLPipeline::sRenderingHUDs || LLApp::isExiting())
     {
         return;
     }
@@ -6167,6 +6171,7 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
         // one is lifted out by its node, given its new distance and fade, and dropped into
         // updated_lights in its new order. The node moves with it, so nothing is reallocated.
         light_set_t updated_lights;
+        const F32 frame_interval = gFrameIntervalSeconds.value();
         for (light_set_t::iterator iter = mNearbyLights.begin();
             iter != mNearbyLights.end();)
         {
@@ -6207,7 +6212,8 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
 
             F32 dist = calc_light_dist(volight, cam_pos, max_dist);
             F32 fade = light->fade;
-            // actual fade gets decreased/increased by setupHWLights
+            // actual fade gets decreased/increased below, once a frame for every light;
+            // setupHWLights only reads it
             // light->fade value is 'time'.
             // >=0 and light will become visible as value increases
             // <0 and light will fade out
@@ -6235,6 +6241,13 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
                     // 0.75 visible light should stay 0.75 visible, but should reverse direction
                     fade -= LIGHT_FADE_TIME;
                 }
+            }
+
+            // advance the fade in whichever direction it now runs; a fully visible light
+            // holds, and one that reaches -LIGHT_FADE_TIME is erased next frame
+            if (fade < LIGHT_FADE_TIME)
+            {
+                fade += (fade >= 0.f) ? frame_interval : -frame_interval;
             }
 
             light_set_t::node_type node = mNearbyLights.extract(iter++);
@@ -6425,12 +6438,10 @@ void LLPipeline::setupHWLights()
                 if (fade >= 0.f)
                 {
                     fade = fade / LIGHT_FADE_TIME;
-                    ((Light*) (&(*iter)))->fade += gFrameIntervalSeconds.value();
                 }
                 else
                 {
                     fade = 1.f + fade / LIGHT_FADE_TIME;
-                    ((Light*) (&(*iter)))->fade -= gFrameIntervalSeconds.value();
                 }
                 fade = llclamp(fade,0.f,1.f);
                 light_color *= fade;
