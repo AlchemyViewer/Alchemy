@@ -84,7 +84,7 @@ namespace tut
             std::string said;
             for (const ALScriptProblem& p : service.check(r.text))
             {
-                if (p.severity == ALScriptProblem::Severity::Error || p.code == "SlCompoundAssign")
+                if (p.severity == ALScriptProblem::Severity::Error || p.code == "SlCompoundAssign" || p.code == "SlNumberTruth")
                 {
                     said += llformat("[%d:%d] %s\n", p.line + 1, p.column + 1, p.message.c_str());
                 }

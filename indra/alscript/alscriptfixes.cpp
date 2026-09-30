@@ -70,6 +70,8 @@
     X(LuauLintImportUnused) \
     X(LuauLintLocalUnused) \
     X(LuauLintSlCompoundAssign) \
+    X(LuauLintSlNumberTruth) \
+    X(LuauLintSlNumberTruthNot) \
     X(LuauLintTableInsertZero) \
     X(LuauLintTableMoveZero) \
     X(LuauLintTableRemoveZero) \
@@ -1433,6 +1435,45 @@ namespace ALScriptFixes
                     fix.edits.push_back(
                         { problem.line, problem.column, problem.line, static_cast<S32>(at), args[0] + " " + args[1] + "= " });
                     problem.fixes.push_back(std::move(fix));
+                }
+            }
+            else if (lua && is(key, Fixed::LuauLintSlNumberTruth) && args.size() == 2 && lines.offsetOf(problem.endLine, problem.endColumn))
+            {
+                // Asked whether it is not 0, as LSL asked. Not safe: the
+                // script did otherwise, whatever it meant.
+                const bool  bracket = args[1] == "(";
+                ALScriptFix fix     = titled("ScriptFixCompareZero", "Compare it: [1] ~= 0", { args[0] });
+                fix.preferred       = true;
+                if (bracket)
+                {
+                    fix.edits.push_back({ problem.line, problem.column, problem.line, problem.column, "(" });
+                }
+                fix.edits.push_back(
+                    { problem.endLine, problem.endColumn, problem.endLine, problem.endColumn, bracket ? ") ~= 0" : " ~= 0" });
+                problem.fixes.push_back(std::move(fix));
+            }
+            else if (lua && is(key, Fixed::LuauLintSlNumberTruthNot) && args.size() == 1 && problem.column >= 0 &&
+                     lines.offsetOf(problem.endLine, problem.endColumn))
+            {
+                // not n as n == 0: the not and what follows it taken out,
+                // where n begins on the same line.
+                const std::string_view line = lines.line(problem.line);
+                size_t                 at   = static_cast<size_t>(problem.column);
+                if (line.substr(at, 3) == "not")
+                {
+                    at += 3;
+                    while (at < line.size() && (line[at] == ' ' || line[at] == '\t'))
+                    {
+                        ++at;
+                    }
+                    if (at < line.size())
+                    {
+                        ALScriptFix fix = titled("ScriptFixEqualsZero", "Ask whether it is 0: [1] == 0", { args[0] });
+                        fix.preferred   = true;
+                        fix.edits.push_back({ problem.line, problem.column, problem.line, static_cast<S32>(at), "" });
+                        fix.edits.push_back({ problem.endLine, problem.endColumn, problem.endLine, problem.endColumn, " == 0" });
+                        problem.fixes.push_back(std::move(fix));
+                    }
                 }
             }
             else if (!lua && is(key, Fixed::LSLSlLoopInvariantCall) && args.size() == 4 && problem.line == problem.endLine &&

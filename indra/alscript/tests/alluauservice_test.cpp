@@ -1081,4 +1081,48 @@ namespace tut
         ensure("selene's words for the studio's own", ALSeleneFilters::slLints("SlCompoundAssign") == ALScriptLintPass::bit("SlCompoundAssign") &&
                                                           ALSeleneFilters::slLints("unused_variable") == 0);
     }
+
+    template<> template<>
+    void alluauservice_object::test<35>()
+    {
+        set_test_name("SlNumberTruth: a number read as a condition, through and, or and brackets, and under not; not number?, nor a comparison");
+        ensure("definitions loaded: " + error, loaded);
+        const auto found = [&](const std::string& text) {
+            std::vector<std::string> out;
+            for (const ALScriptProblem& p : service.check(text))
+            {
+                if (p.code == "SlNumberTruth")
+                {
+                    out.push_back(p.key + " " + p.args[0] + " " + std::to_string(p.line));
+                }
+            }
+            return out;
+        };
+        const std::vector<std::string> said = found("local n = 0\n"
+                                                    "if n then print(1) end\n"
+                                                    "while (true and n) do break end\n"
+                                                    "local b = not n\n"
+                                                    "local t = if n then 1 else 2\n"
+                                                    "local m: number? = nil\n"
+                                                    "if m then print(m) end\n"
+                                                    "if n ~= 0 or not (n > 1) then print(b, t) end\n");
+        ensure_equals("four: " + llformat("%zu", said.size()), said.size(), size_t(4));
+        ensure("each: " + said[0] + "|" + said[1] + "|" + said[2] + "|" + said[3],
+               said[0] == "LuauLintSlNumberTruth n 1" && said[1] == "LuauLintSlNumberTruth n 2" && said[2] == "LuauLintSlNumberTruthNot n 3" &&
+                   said[3] == "LuauLintSlNumberTruth n 4");
+        // A local by what it is given, where the old solver's nonstrict
+        // mode says any: a copy of a number is one; one given a string, or
+        // joined to one, or a parameter, is not.
+        const std::vector<std::string> given = found("local n = llcompat.ListFindList({1}, {1})\n"
+                                                     "local copy = n\n"
+                                                     "local s = 0\n"
+                                                     "s = \"x\"\n"
+                                                     "local j = 0\n"
+                                                     "j ..= \"y\"\n"
+                                                     "local function f(p) if p then return 1 end return 0 end\n"
+                                                     "if copy or s or j then print(f(n)) end\n");
+        // The new solver types j a number still, and is taken at its word.
+        ensure("a copy only: " + (given.empty() ? std::string() : given[0]),
+               given.size() == (newSolver ? 2u : 1u) && given[0] == "LuauLintSlNumberTruth copy 7");
+    }
 }

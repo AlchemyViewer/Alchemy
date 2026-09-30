@@ -1156,4 +1156,21 @@ namespace tut
         const ALScriptProblem* alone = keyed(in_if, "LSLSlLoopInvariantCall");
         ensure("said, with no fix", alone && alone->fixes.empty());
     }
+
+    template<> template<>
+    void object::test<39>()
+    {
+        set_test_name("SlNumberTruth's fixes: n ~= 0, an if-then-else bracketed first, and not n as n == 0; not safe");
+        ensure("definitions: " + error, luauLoaded);
+        ensure_equals("compared", fixed("local n = 0\nif n then print(n) end\n", true, "LuauLintSlNumberTruth", "Compare it: n ~= 0"),
+                      std::string("local n = 0\nif n ~= 0 then print(n) end\n"));
+        ensure_equals("bracketed", fixed("local c = true\nif (if c then 1 else 2) then print(c) end\n", true, "LuauLintSlNumberTruth",
+                                         "Compare it: if c then 1 else 2 ~= 0"),
+                      std::string("local c = true\nif ((if c then 1 else 2) ~= 0) then print(c) end\n"));
+        ensure_equals("not", fixed("local n = 0\nprint(not n)\n", true, "LuauLintSlNumberTruthNot", "Ask whether it is 0: n == 0"),
+                      std::string("local n = 0\nprint(n == 0)\n"));
+        const ALScriptProblems problems = check("local n = 0\nif n then print(n) end\n", true);
+        const ALScriptProblem* problem  = keyed(problems, "LuauLintSlNumberTruth");
+        ensure("not safe", problem && !problem->fixes.front().safe);
+    }
 }

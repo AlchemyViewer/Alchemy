@@ -698,6 +698,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixInclude">Include '[1]'</string>
 	<string name="ScriptFixCompoundAssign">Write it [1] [2]= ...</string>
 	<string name="ScriptFixHoistCall">Work out [1] once, before the loop</string>
+	<string name="ScriptFixCompareZero">Compare it: [1] ~= 0</string>
+	<string name="ScriptFixEqualsZero">Ask whether it is 0: [1] == 0</string>
 	<string name="ScriptActionAnnotate">Declare it as '[1]'</string>
 	<string name="ScriptActionExtract">Put it in a local, '[1]'</string>
 	<string name="ScriptActionInterpolate">Write it as an interpolated string</string>
@@ -856,6 +858,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintDeprecatedFunctionReason">Function '[1]' is deprecated. [2]</string>
 	<string name="LuauLintDeprecatedFunction">Function '[1]' is deprecated</string>
 	<string name="LuauLintSlCompoundAssign">Luau's [2]= says this once: [1] [2]= ...</string>
+	<string name="LuauLintSlNumberTruth">[1] is a number, and Luau counts every number true, 0 too: [1] ~= 0 asks whether it is not 0</string>
+	<string name="LuauLintSlNumberTruthNot">not [1] is always false: [1] is a number, and Luau counts every number true, 0 too. [1] == 0 asks whether it is 0</string>
 	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
 	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauUnknownType">Unknown type '[1]'</string>
