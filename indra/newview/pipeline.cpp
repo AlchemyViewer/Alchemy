@@ -6165,8 +6165,7 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
     {
         // mNearbyLight (and all light_set_t's) are sorted such that
         // begin() == the closest light and rbegin() == the farthest light
-        const S32 MAX_LOCAL_LIGHTS = 6;
-        LLVector3 cam_pos = camera.getOrigin();
+        const LLVector3& cam_pos = camera.getOrigin();
 
         F32 max_dist;
         if (LLPipeline::sRenderDeferred)
