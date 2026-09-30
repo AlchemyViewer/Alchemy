@@ -114,7 +114,7 @@ struct ALScriptStudioDoc::Check
     ALTextRange              actionsAsked;
     // A Fix All asked before the text as it stands was checked, made
     // once it is: of the problems of one kind, or of all where empty.
-    std::optional<std::string> fixAllAfterCheck;
+    std::optional<FixPick> fixAllAfterCheck;
     // A Fix All previewed: what it picked, over the text at that version,
     // made by Apply while the text is still that.
     struct FixAllPreview

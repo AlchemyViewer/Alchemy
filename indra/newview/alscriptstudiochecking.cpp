@@ -1088,8 +1088,7 @@ void ALScriptStudioChecking::checked(Doc& doc)
     mWindow.showOutline(doc);
     if (doc.check->fixAllAfterCheck && doc.check->analysisVersion == doc.editor->document().version())
     {
-        FixPick pick;
-        pick.key = *doc.check->fixAllAfterCheck;
+        const FixPick pick = *doc.check->fixAllAfterCheck;
         doc.check->fixAllAfterCheck.reset();
         askFixAll(doc, pick);
     }
@@ -1472,7 +1471,7 @@ void ALScriptStudioChecking::askFixAll(Doc& doc, const FixPick& pick)
     // than said to have nothing to fix.
     if (!pick.forSave && doc.loaded && !doc.notecard && doc.check->analysisVersion != doc.editor->document().version())
     {
-        doc.check->fixAllAfterCheck = pick.key;
+        doc.check->fixAllAfterCheck = pick;
         schedule(doc, true);
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
@@ -1482,6 +1481,14 @@ void ALScriptStudioChecking::askFixAll(Doc& doc, const FixPick& pick)
     mWindow.settleProblems(doc);
     size_t                                left  = 0;
     const std::vector<const ALScriptFix*> fixes = doc.pickFixes(pick, &left);
+    // What is left from LSL, where any of it could change what the script
+    // does: all of it seen first, beside the text as it is, and made by
+    // Apply.
+    if (pick.migration && std::any_of(fixes.begin(), fixes.end(), [](const ALScriptFix* fix) { return !fix->safe; }))
+    {
+        previewFixAll(doc, pick);
+        return;
+    }
     // What is not safe to make without a look, said to be left for one.
     const std::string left_said = left > 0 ? mServices.counted("FixesLeft", static_cast<S32>(left)) : std::string();
     if (fixes.size() < 2)

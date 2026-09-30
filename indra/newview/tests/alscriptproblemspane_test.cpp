@@ -71,7 +71,7 @@ namespace
             fixed.push_back(doc.id + ":" + fix.title);
             return true;
         }
-        void fixAllOfKind(Doc& doc, const std::string& key) override { kinds.push_back(doc.id + ":" + key); }
+        void fixAll(Doc& doc, const Doc::FixPick& pick) override { kinds.push_back(doc.id + ":" + (pick.migration ? "from LSL" : pick.key)); }
         void refreshProblems(Doc& doc) override { refreshed.push_back(doc.id); }
         void runtimeCleared(Doc& doc) override { cleared.push_back(doc.id); }
         bool isLint(bool, const std::string& id) const override { return lints.count(id) > 0; }
@@ -866,5 +866,30 @@ namespace tut
         pane->showOrigin("OriginMigration");
         LLComboBox* origins = window.find<LLComboBox>("problems_origin");
         ensure("listed alone", origins && origins->getValue().asString() == services.words("OriginMigration"));
+    }
+
+    template <>
+    template <>
+    void alscriptproblemspane_object::test<15>()
+    {
+        set_test_name("the menu of a problem left from LSL offers what is left from LSL fixed, and makes it; another problem's does not");
+        ALScriptProblemsPane& out = make();
+        Doc&                  d   = doc("door");
+        d.language.lua            = true;
+        ALScriptProblem zero      = problem(ALScriptProblem::Source::Lint, ALScriptProblem::Severity::Warning, 2, "reads nothing at 0");
+        zero.code                 = "SlZeroIndex";
+        zero.fixes.push_back(fix("Write it t[1]", true, false, 2));
+        ALScriptProblem shadow = problem(ALScriptProblem::Source::Lint, ALScriptProblem::Severity::Warning, 4, "shadowed");
+        shadow.code            = "LocalShadow";
+        shadow.fixes.push_back(fix("Rename", true, true, 4));
+        d.check->analysis = { zero, shadow };
+        gather(d);
+        out.fill(&d);
+        choose("shadowed [LocalShadow]");
+        ensure("not of another", !out.fixShown("migration"));
+        choose("reads nothing at 0 [SlZeroIndex]");
+        ensure("offered", out.fixShown("migration"));
+        out.act("fix_migration");
+        ensure("asked", !studio.kinds.empty() && studio.kinds.back() == "door:from LSL");
     }
 }

@@ -520,6 +520,9 @@ struct ALScriptStudioDoc
         std::string key;
         // Only what may be made on a save: safe, and taking nothing out.
         bool        forSave = false;
+        // What is left from LSL alone (Shown::migration), every preferred
+        // fix of it, safe or not: what is not is seen before it is made.
+        bool        migration = false;
     };
     // The preferred fixes picked, of the script's own problems, none of
     // whose edits overlap another taken before it. Over the whole script,

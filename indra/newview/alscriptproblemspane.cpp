@@ -1106,6 +1106,13 @@ bool ALScriptProblemsPane::fixShown(const std::string& which) const
         // with it: an empty kind would be every kind.
         return !shown->key.empty() && doc->pickFixes(Doc::FixPick{ shown->key }).size() > 1;
     }
+    if (which == "migration")
+    {
+        // All that is left from LSL, from one of it.
+        Doc::FixPick pick;
+        pick.migration = true;
+        return shown->migration && !doc->pickFixes(pick).empty();
+    }
     size_t left = 0;
     return which == "all" && doc->pickFixes(Doc::FixPick{}, &left).size() + left > 1;
 }
@@ -1243,12 +1250,17 @@ void ALScriptProblemsPane::act(const std::string& action)
     {
         if (const Doc::Shown* shown = chosenShown(); shown && !shown->key.empty())
         {
-            const std::string key = shown->key;
-            mWindow->fixAllOfKind(doc, key);
+            mWindow->fixAll(doc, Doc::FixPick{ shown->key });
         }
     }
     else if (action == "fix_all")
     {
-        mWindow->fixAllOfKind(doc, std::string());
+        mWindow->fixAll(doc, Doc::FixPick{});
+    }
+    else if (action == "fix_migration")
+    {
+        Doc::FixPick pick;
+        pick.migration = true;
+        mWindow->fixAll(doc, pick);
     }
 }

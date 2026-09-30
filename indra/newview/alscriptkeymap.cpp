@@ -495,6 +495,7 @@ namespace ALScriptKeymap
             { "close_all", KEY_NONE, MASK_NONE },
             // Edit
             { "fix_all", KEY_NONE, MASK_NONE },
+            { "fix_migration", KEY_NONE, MASK_NONE },
             { "check_object", KEY_NONE, MASK_NONE },
             { "format", 'F', MASK_SHIFT | MASK_ALT },
             { "format_selection", KEY_NONE, MASK_NONE },

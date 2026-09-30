@@ -29,6 +29,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "../alscriptstudiochecking.h"
+#include "alscriptlintpass.h"
 
 #include "../alnotecardembedded.h"
 #include "../alscriptstudioweighing.h"
@@ -160,6 +161,8 @@ namespace
                 shown.key      = problem.key;
                 shown.fixes    = problem.fixes;
                 shown.fixesFor = doc.check->analysisVersion;
+                // As the pane's rows have it (ALScriptStudioDoc::analysisRow).
+                shown.migration = doc.language.lua && ALScriptLintPass::migration(problem);
                 doc.shown.push_back(std::move(shown));
             }
         }
@@ -1280,5 +1283,49 @@ namespace tut
         checking.pump(3.0);
         studio.asks.back().answered(answer(lsl));
         ensure("none in LSL", lsl.check->analysis.empty());
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<23>()
+    {
+        set_test_name("what is left from LSL fixed: every preferred fix of it, not another problem's; seen first where any could change "
+                      "what the script does, asked as Fix All asks where none could");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        doc.language.lua                 = true;
+        checking.schedule(doc, true);
+        checking.pump(1.0);
+        const auto lint = [&](S32 line, const char* code, const ALScriptFix& with) {
+            ALScriptProblem out = problem(line, code, ALScriptProblem::Severity::Warning);
+            out.source          = ALScriptProblem::Source::Lint;
+            out.code            = code;
+            out.fixes           = { with };
+            return out;
+        };
+        const ALScriptProblem zero   = lint(0, "SlZeroIndex", fix("First", 0, 0, 7, "float", false));
+        const ALScriptProblem paren  = lint(3, "SlParenCondition", fix("Second", 3, 4, 15, "touch_start", true));
+        const ALScriptProblem shadow = lint(1, "LocalShadow", fix("Third", 1, 0, 1, "x", true));
+        studio.asks.back().answered(answer(doc, { zero, paren, shadow }));
+        Doc::FixPick pick;
+        pick.migration = true;
+        studio.preview = nullptr;
+        checking.askFixAll(doc, pick);
+        ensure("not asked: seen", !studio.preview);
+        const std::string& compared = studio.told.back();
+        ensure("the two from LSL, not the other: " + compared, compared.find("FixAllAfter [FIXES]=Fixes [COUNT]=2") != std::string::npos &&
+                                                                   compared.find("float count;") != std::string::npos);
+        ensure("Apply offered", services.reports.back().actions == Names{ "apply_fixes" });
+        ensure("made", checking.applyPreviewed(doc) && doc.editor->document().line(0) == "float count;");
+
+        Doc& safe       = tab("b");
+        safe.language.lua = true;
+        checking.schedule(safe, true);
+        checking.pump(2.0);
+        const ALScriptProblem first  = lint(0, "SlParenCondition", fix("First", 0, 0, 7, "float", true));
+        const ALScriptProblem second = lint(3, "SlCompoundAssign", fix("Second", 3, 4, 15, "touch_start", true));
+        studio.asks.back().answered(answer(safe, { first, second }));
+        studio.preview = nullptr;
+        checking.askFixAll(safe, pick);
+        ensure("all safe: asked as Fix All asks", (bool)studio.preview);
     }
 }

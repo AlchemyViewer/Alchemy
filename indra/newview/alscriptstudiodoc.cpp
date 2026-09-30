@@ -379,10 +379,10 @@ std::vector<const ALScriptFix*> ALScriptStudioDoc::pickFixes(const FixPick& pick
 {
     std::vector<const ALScriptFix*> taken;
     const U32                       now       = editor->document().version();
-    const bool                      only_safe = pick.forSave || pick.key.empty();
+    const bool                      only_safe = pick.forSave || (pick.key.empty() && !pick.migration);
     for (const Shown& one : shown)
     {
-        if (!one.file.empty() || one.fixesFor != now || (!pick.key.empty() && one.key != pick.key))
+        if (!one.file.empty() || one.fixesFor != now || (!pick.key.empty() && one.key != pick.key) || (pick.migration && !one.migration))
         {
             continue;
         }

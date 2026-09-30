@@ -1022,6 +1022,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fix_all" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fix_all" />
             </menu_item_call>
+            <menu_item_call label="Fix What Is Left From LSL" layout="topleft" name="fix_migration">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fix_migration" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fix_migration" />
+            </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Format Document" layout="topleft" name="format">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="format" />

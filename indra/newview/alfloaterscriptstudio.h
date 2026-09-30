@@ -857,7 +857,7 @@ private:
     void                 problemFiltersChanged() override { saveState(); }
     std::string          problemIcon(const Doc& doc, const std::string& include) const override;
     std::string          scriptIcon(bool lua, const std::string& include) const override;
-    void                 fixAllOfKind(Doc& doc, const std::string& key) override;
+    void                 fixAll(Doc& doc, const FixPick& pick) override;
     bool                 isLint(bool lua, const std::string& id) const override;
     ALScriptLints::Level lintLevel(bool lua, const std::string& id) const override;
     void                 setLintLevel(bool lua, const std::string& id, ALScriptLints::Level level) override;

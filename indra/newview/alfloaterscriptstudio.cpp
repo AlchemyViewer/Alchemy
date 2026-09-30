@@ -3827,9 +3827,9 @@ std::string ALFloaterScriptStudio::scriptIcon(bool lua, const std::string& inclu
     return include.empty() || include == Doc::GENERATED ? (lua ? "Inv_Script_Luau" : "Inv_Script") : includeImage(include, lua);
 }
 
-void ALFloaterScriptStudio::fixAllOfKind(Doc& doc, const std::string& key)
+void ALFloaterScriptStudio::fixAll(Doc& doc, const FixPick& pick)
 {
-    mChecking.askFixAll(doc, FixPick{ key });
+    mChecking.askFixAll(doc, pick);
 }
 
 bool ALFloaterScriptStudio::isLint(bool lua, const std::string& id) const
@@ -8164,6 +8164,24 @@ void ALFloaterScriptStudio::addEditCommands()
             Doc*   doc  = active();
             size_t left = 0;
             return doc && doc->loaded && doc->modifiable && (!doc->pickFixes(FixPick{}, &left).empty() || left > 0);
+        });
+    // What is left from LSL put right, what could change the script seen
+    // first.
+    mCommands.add(
+        "fix_migration",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                FixPick pick;
+                pick.migration = true;
+                mChecking.askFixAll(*doc, pick);
+            }
+        },
+        [this]() {
+            Doc*    doc = active();
+            FixPick pick;
+            pick.migration = true;
+            return doc && doc->loaded && doc->modifiable && doc->language.lua && !doc->pickFixes(pick).empty();
         });
     for (const auto& [name, selection] : { std::pair{ "format", false }, std::pair{ "format_selection", true } })
     {
