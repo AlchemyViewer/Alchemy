@@ -198,6 +198,7 @@ if(AL_BUILD_VIEWER)
     alscriptpreprocessor.cpp
     alscriptproblemspane.cpp
     alscriptreferencespane.cpp
+    alscriptregionusage.cpp
     alscriptsaveflow.cpp
     alscriptsearch.cpp
     alscriptsearchpane.cpp
@@ -1039,6 +1040,7 @@ if(AL_BUILD_VIEWER)
     alscriptpreprocessor.h
     alscriptproblemspane.h
     alscriptreferencespane.h
+    alscriptregionusage.h
     alscriptsaveflow.h
     alscriptsearch.h
     alscriptsearchpane.h
@@ -2564,6 +2566,10 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
   )
+
+  # What the region reserves for the objects in hand, the world faked: the
+  # answers read, each object asked once a minute, the attachments at once.
+  al_add_test(alscriptregionusage UNIT PROJECT ${test_project} LIBRARIES llui alscript ${test_libs})
 
   # What the Script Studio's explorer lists, and the rows it makes of them,
   # with nothing of the world.

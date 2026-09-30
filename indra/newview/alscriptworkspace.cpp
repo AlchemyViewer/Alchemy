@@ -32,9 +32,11 @@
 #include "alscriptcontentsindex.h"
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
+#include "alscriptregionusage.h"
 #include "alscripttempfiles.h"
 #include "lldbstrings.h"
 #include "llagent.h"
+#include "llcorehttputil.h"
 #include "llappviewer.h"
 #include "llassetstorage.h"
 #include "llcallbacklist.h"
@@ -59,6 +61,7 @@
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
+#include "llsdutil_math.h"
 #include "llvoinventorylistener.h"
 #include "message.h"
 // [RLVa:KB]
@@ -261,6 +264,69 @@ namespace
         }
         LLAppViewer::instance()->postToMainCoro(std::forward<Call>(call));
     }
+
+    // What the region reserves, asked of the viewer's world.
+    ALScriptRegionUsage::World regionUsageWorld()
+    {
+        typedef ALScriptRegionUsage::World World;
+        World world;
+        world.kindOf = [](const LLUUID& root) {
+            // The agent's own attachments, which AttachmentResources answers
+            // for; an object on land in the agent's region, whose parcel
+            // LandResources answers for there; nothing else.
+            const LLViewerObject* object = gObjectList.findObject(root);
+            if (!object || object->isAvatar())
+            {
+                return World::Kind::None;
+            }
+            if (object->isAttachment())
+            {
+                return object->permYouOwner() ? World::Kind::Attachment : World::Kind::None;
+            }
+            return object->getRegion() && object->getRegion() == gAgent.getRegion() ? World::Kind::Land : World::Kind::None;
+        };
+        world.askAttachments = [](std::function<void(const LLSD&)> told) {
+            if (LLViewerRegion* region = gAgent.getRegion())
+            {
+                region->requestGetCapability("AttachmentResources", [told](const LLSD& answer) { onMain([told, answer]() { told(answer); }); });
+            }
+        };
+        world.askLand = [](const LLUUID& root, std::function<void(const LLSD&)> told) {
+            // The parcel under the object, then what its objects reserve --
+            // the details, which list each object -- as the Script Limits
+            // floater asks.
+            const LLViewerObject* object = gObjectList.findObject(root);
+            LLViewerRegion*       region = gAgent.getRegion();
+            if (!object || !region || object->getRegion() != region)
+            {
+                return;
+            }
+            LLSD where;
+            where["location"]  = ll_sd_from_vector3(object->getPositionRegion());
+            where["region_id"] = region->getRegionID();
+            region->requestPostCapability("RemoteParcelRequest", where, [told](const LLSD& parcel) {
+                LLViewerRegion* here = gAgent.getRegion();
+                const LLUUID    id   = parcel["parcel_id"].asUUID();
+                if (!here || id.isNull())
+                {
+                    return;
+                }
+                LLSD asked;
+                asked["parcel_id"] = id;
+                here->requestPostCapability("LandResources", asked, [told](const LLSD& resources) {
+                    const std::string url = resources["ScriptResourceDetails"].asString();
+                    if (url.empty())
+                    {
+                        return;
+                    }
+                    LLCoreHttpUtil::HttpCoroutineAdapter::callbackHttpGet(url, [told](const LLSD& details) {
+                        onMain([told, details]() { told(details); });
+                    });
+                });
+            });
+        };
+        return world;
+    }
 }
 
 // --- language ------------------------------------------------------------------
@@ -299,6 +365,7 @@ ALScriptWorkspace::ALScriptWorkspace()
     };
     world.askRunning = [this](const ALScriptRef& ref) { askRunning(ref); };
     mContentsIndex   = std::make_unique<ALScriptContentsIndex>(std::move(world));
+    mRegionUsage     = std::make_unique<ALScriptRegionUsage>(regionUsageWorld());
     // A prim gone from the world is asked again if it comes back: what it
     // held and which of its scripts ran are not kept for every prim ever
     // seen.
