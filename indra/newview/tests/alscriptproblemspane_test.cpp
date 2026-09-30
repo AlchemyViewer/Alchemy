@@ -82,6 +82,11 @@ namespace
         }
         void setLintLevel(bool, const std::string& id, ALScriptLints::Level level) override { levels[id] = level; }
         void showLintSettings() override { ++settings; }
+        LLUUID rootOf(const ALScriptRef& ref) const override
+        {
+            const auto found = roots.find(ref.object);
+            return found != roots.end() ? found->second : LLUUID::null;
+        }
 
         S32                                         counts      = 0;
         S32                                         filtersKept = 0;
@@ -94,6 +99,8 @@ namespace
         std::vector<std::string>                    cleared;
         std::set<std::string>                       lints;
         std::map<std::string, ALScriptLints::Level> levels;
+        // Each prim's object, by its root.
+        std::map<LLUUID, LLUUID>                    roots;
     };
 
     ALScriptProblem problem(ALScriptProblem::Source source, ALScriptProblem::Severity severity, S32 line, const std::string& message,
@@ -763,5 +770,56 @@ namespace tut
         }
         ensure_equals("a thousand listed", rows, 1000);
         ensure("the rest said", shown().find(services.counted("ProblemsUnlisted", 5)) != std::string::npos);
+    }
+
+    template<> template<>
+    void alscriptproblemspane_object::test<13>()
+    {
+        set_test_name("an object's check lists that object's scripts: its open ones and those it read, none of another object's open beside them");
+        make();
+        const LLUUID house = LLUUID::generateNewID();
+        const LLUUID shed  = LLUUID::generateNewID();
+        Doc&         door  = doc("door");
+        Doc&         lamp  = doc("lamp");
+        Doc&         bench = doc("bench");
+        studio.roots[door.ref.object]  = house;
+        studio.roots[lamp.ref.object]  = house;
+        studio.roots[bench.ref.object] = shed;
+        door.check->analysis  = { problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 1, "the door's") };
+        lamp.check->analysis  = { problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 1, "the lamp's") };
+        bench.check->analysis = { problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 1, "the bench's") };
+        gather(door);
+        gather(lamp);
+        gather(bench);
+        // A script the check read, in the house's root prim, whose object
+        // has gone out of sight since.
+        const ALScriptRef closed(house, LLUUID::generateNewID());
+        Doc::Shown        row;
+        row.line    = 3;
+        row.level   = Doc::Level::Warning;
+        row.origin  = "Lint";
+        row.message = "the hinge's";
+        pane->clearChecked();
+        pane->checkedScript(closed, "hinge.lsl", false, { row }, "House");
+        pane->showObject(house);
+        std::string listed = shown();
+        ensure("the house's open scripts: " + listed, listed.find("the door's") != std::string::npos && listed.find("the lamp's") != std::string::npos);
+        ensure("and the one it read: " + listed, listed.find("the hinge's") != std::string::npos);
+        ensure("not the shed's: " + listed, listed.find("the bench's") == std::string::npos);
+        ensure_equals("counted as the house's", pane->held(), 3);
+
+        // In front or not, the shed's script is not the house's.
+        services.front = 2;
+        pane->fill(&bench);
+        ensure("the shed's in front, still not listed", shown().find("the bench's") == std::string::npos);
+
+        // Every open script's lists them all; and it is what is kept.
+        pane->showEveryScript();
+        listed = shown();
+        ensure("every open one's: " + listed, listed.find("the bench's") != std::string::npos && listed.find("the door's") != std::string::npos);
+        pane->showObject(house);
+        LLSD state;
+        pane->saveState(state);
+        ensure_equals("one object's is not kept", state["problem_scope"].asString(), std::string("all"));
     }
 }

@@ -2122,11 +2122,12 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                                      layout="topleft"
                                      left_pad="8"
                                      name="problems_scope"
-                                     tool_tip="Show problems for the active tab, or for all open scripts, grouped by script"
+                                     tool_tip="Show problems for the active tab, for all open scripts, or for the scripts of the object last checked, grouped by script"
                                      top_delta="-1"
                                      width="104">
                                         <combo_box.item label="This script" name="problems_scope_this" value="this" />
                                         <combo_box.item label="All open scripts" name="problems_scope_all" value="all" />
+                                        <combo_box.item label="Checked object" name="problems_scope_object" value="object" />
                                     </combo_box>
                                     <combo_box
                                      follows="left|top"

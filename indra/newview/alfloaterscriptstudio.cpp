@@ -5626,7 +5626,7 @@ void ALFloaterScriptStudio::checkObject(const LLUUID& root)
     // The last check's let go of, and every script's listed, which is what
     // was asked for.
     mProblemsPane->clearChecked();
-    mProblemsPane->showEveryScript();
+    mProblemsPane->showObject(root);
     showProblems();
     setStatus(words("CheckingObject", { { "[OBJECT]", mCheckingWhere } }));
     mObjectCheck.check(root, mCheckingWhere);

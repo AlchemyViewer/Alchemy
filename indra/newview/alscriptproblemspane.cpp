@@ -355,7 +355,7 @@ void ALScriptProblemsPane::changed(const Doc& doc)
     // The list, where it lists this script's: the one it is about, or
     // every one open.
     Doc* shown = listed();
-    if (shown && (shown == &doc || everyScript()))
+    if (shown && (shown == &doc || (manyScripts() && inScope(doc.ref))))
     {
         fill(shown);
     }
@@ -409,7 +409,7 @@ void ALScriptProblemsPane::relist(Checked& one)
     one.rows = one.analysed;
     one.rows.insert(one.rows.end(), one.compiled.begin(), one.compiled.end());
     mStore.replace(one.id, one.rows);
-    if (everyScript())
+    if (manyScripts())
     {
         fill(listed());
     }
@@ -452,7 +452,7 @@ void ALScriptProblemsPane::forgetChecked(const ALScriptRef& ref)
     }
     mStore.forget(found->id);
     mChecked.erase(found);
-    if (everyScript())
+    if (manyScripts())
     {
         fill(listed());
     }
@@ -478,17 +478,28 @@ void ALScriptProblemsPane::showEveryScript()
     fill(listed());
 }
 
+void ALScriptProblemsPane::showObject(const LLUUID& root)
+{
+    mObjectRoot = root;
+    if (!objectScripts())
+    {
+        mScope->selectByValue("object");
+        mWindow->problemFiltersChanged();
+    }
+    fill(listed());
+}
+
 std::vector<const ALScriptProblemsPane::Checked*> ALScriptProblemsPane::checkedFor()
 {
     std::vector<const Checked*> out;
-    if (!everyScript())
+    if (!manyScripts())
     {
         return out;
     }
     for (const Checked& one : mChecked)
     {
         // Opened since, its tab's are what is listed.
-        if (!mServices->findDoc(one.ref))
+        if (!mServices->findDoc(one.ref) && inScope(one.ref))
         {
             out.push_back(&one);
         }
@@ -499,6 +510,27 @@ std::vector<const ALScriptProblemsPane::Checked*> ALScriptProblemsPane::checkedF
 bool ALScriptProblemsPane::everyScript() const
 {
     return mScope->getValue().asString() == "all";
+}
+
+bool ALScriptProblemsPane::objectScripts() const
+{
+    return mScope->getValue().asString() == "object";
+}
+
+bool ALScriptProblemsPane::inScope(const ALScriptRef& ref) const
+{
+    if (!objectScripts())
+    {
+        return true;
+    }
+    // One whose object is out of sight now, which its check reached, is
+    // still counted as its; one in the inventory is no object's.
+    if (ref.inInventory() || mObjectRoot.isNull())
+    {
+        return false;
+    }
+    const LLUUID root = mWindow->rootOf(ref);
+    return root.isNull() ? ref.object == mObjectRoot : root == mObjectRoot;
 }
 
 ALScriptProblemsPane::store_t::Query ALScriptProblemsPane::query(const std::string& id) const
@@ -522,12 +554,16 @@ std::vector<const ALScriptProblemsPane::Doc*> ALScriptProblemsPane::docsFor(cons
     {
         return docs;
     }
-    docs.push_back(doc);
-    if (everyScript())
+    // The one in front first, where the list holds it.
+    if (!objectScripts() || (doc->file.empty() && inScope(doc->ref)))
+    {
+        docs.push_back(doc);
+    }
+    if (manyScripts())
     {
         for (const Doc* other : mServices->openDocs())
         {
-            if (other != doc && !other->notecard)
+            if (other != doc && !other->notecard && (!objectScripts() || (other->file.empty() && inScope(other->ref))))
             {
                 docs.push_back(other);
             }
@@ -580,7 +616,9 @@ void ALScriptProblemsPane::choose(bool to_editor)
 void ALScriptProblemsPane::saveState(LLSD& state) const
 {
     state["problem_levels"] = LLSD::emptyArray().with(0, mErrors->get()).with(1, mWarnings->get()).with(2, mNotes->get()).with(3, mFixable->get());
-    state["problem_scope"]  = mScope->getValue().asString();
+    // One object's scripts are the last check's, which is not kept: every
+    // open one's in its place.
+    state["problem_scope"]  = objectScripts() ? std::string("all") : mScope->getValue().asString();
     state["problem_origin"] = mOrigin->getValue().asString();
 }
 
@@ -735,7 +773,7 @@ void ALScriptProblemsPane::listRows(const Doc* doc)
     }
 
     static const LLUIColor ink = LLUIColorTable::instance().getColor("ScrollUnselectedColor", LLColor4::white);
-    const bool all      = docs.size() + checked.size() > 1 || everyScript();
+    const bool all      = docs.size() + checked.size() > 1 || manyScripts();
     // Whose they are, over them, wherever that is not plain: more than one
     // script's or file's, or another script's than the one in front, which
     // a row followed into an include leaves the list on.

@@ -135,6 +135,9 @@ public:
         virtual ALScriptLints::Level lintLevel(bool lua, const std::string& id) const                 = 0;
         virtual void                 setLintLevel(bool lua, const std::string& id, ALScriptLints::Level) = 0;
         virtual void                 showLintSettings()                                              = 0;
+        // The object a script is in, by its root; none for one in the
+        // inventory, or out of sight.
+        virtual LLUUID rootOf(const ALScriptRef&) const { return LLUUID::null; }
 
     protected:
         ~Window() = default;
@@ -169,6 +172,9 @@ public:
     void forgetChecked(const ALScriptRef& ref);
     void clearChecked();
     void showEveryScript();
+    // The list brought to one object's scripts -- those open, and those
+    // its check read -- which an object's check lists.
+    void showObject(const LLUUID& root);
     size_t checkedCount() const { return mChecked.size(); }
 
     // The list filled with a tab's problems, and every open script's
@@ -223,7 +229,13 @@ private:
     // The filters' question of one script's problems, by its id.
     store_t::Query          query(const std::string& id) const;
     std::vector<const Doc*> docsFor(const Doc* doc);
+    // Which scripts the list holds: every open one's, one object's, or
+    // more than the one in front either way; and whether a script is one
+    // of them.
     bool                    everyScript() const;
+    bool                    objectScripts() const;
+    bool                    manyScripts() const { return everyScript() || objectScripts(); }
+    bool                    inScope(const ALScriptRef& ref) const;
     void                    layoutFilters();
     // The chosen row's script, its problem, and its lint where there is a
     // choice about it.
@@ -269,6 +281,8 @@ private:
     LLFilterEditor*         mFilter   = nullptr;
     store_t                 mStore;
     std::vector<Checked>    mChecked;
+    // The object whose scripts the list holds, where it holds one's.
+    LLUUID                  mObjectRoot;
     // Whose problems the list holds, so that a refill of the same
     // script's keeps the row chosen and the scroll.
     std::string             mShownFor;
