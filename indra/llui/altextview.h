@@ -859,6 +859,12 @@ protected:
     // A squiggle as a row draws one: drawn with the rest of the frame's
     // squiggles, once the rows are drawn, where the rows are being drawn.
     void squiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, const LLRect& clip);
+    // Where a row's squiggles have their middle, the row's text standing
+    // from `text_top` with its baseline `ascent` under it: under the
+    // baseline, so that the wave leaves the text above it whole -- a
+    // period's foot too -- and crosses only the descenders, as any
+    // editor's does.
+    static S32 squiggleMiddle(S32 text_top, S32 ascent);
     // The screen y of the top of a line's row -- the row's own top; a row
     // a box made taller than the font's line holds its text at its
     // bottom -- and every row on screen in turn, for a subclass drawing

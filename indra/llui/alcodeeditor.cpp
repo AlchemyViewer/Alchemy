@@ -1802,7 +1802,8 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
         }
         else if (d.style == Decoration::Style::Squiggle)
         {
-            squiggle(left + x0, left + x1, screen_top - row_h + 2, d.color % alpha, text);
+            squiggle(left + x0, left + x1, squiggleMiddle(screen_top, layout().line(line).rows[static_cast<size_t>(row)].ascent), d.color % alpha,
+                     text);
         }
         else
         {

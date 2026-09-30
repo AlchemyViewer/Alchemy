@@ -202,6 +202,14 @@ namespace
     constexpr S32 SQUIGGLE_HEIGHT    = 8;
     constexpr F32 SQUIGGLE_HALF      = 0.75f;
     constexpr F32 SQUIGGLE_FEATHER   = 1.f;
+    // Its middle this far under the baseline: its line, a pixel and three
+    // quarters above the middle at the crests, stops a pixel short of the
+    // baseline, and only the fade reaches the pixel under it. Its middle
+    // on the row's bottom, as it was, lay on the baseline wherever the
+    // font's lines are closer than its letters are tall, and hid a
+    // period's foot; under it, the wave crosses the descenders, and where
+    // they reach into the next row, it reaches there with them.
+    constexpr S32 SQUIGGLE_BELOW = 3;
 
     // One wave of a squiggle, which a squiggle repeats along its length: so
     // that one is a quad, however long, rather than a ribbon of triangles
@@ -3709,6 +3717,12 @@ void ALTextView::drawSquiggles(const Squiggle* squiggles, size_t count)
     gGL.getTextureSlot(0)->unbind();
 }
 
+// static
+S32 ALTextView::squiggleMiddle(S32 text_top, S32 ascent)
+{
+    return text_top - ascent - SQUIGGLE_BELOW;
+}
+
 void ALTextView::squiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, const LLRect& clip)
 {
     if (mQueueSquiggles)
@@ -3809,7 +3823,7 @@ void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, con
             F32 x0, x1;
             if (spanOnRow(line, r, ALTextRange(ALTextPos(line, begin), ALTextPos(line, end)), x0, x1))
             {
-                squiggle(left + x0, left + x1, screen_top - row_h + 2, mSpellErrorColor.get() % alpha, text);
+                squiggle(left + x0, left + x1, squiggleMiddle(screen_top, row.ascent), mSpellErrorColor.get() % alpha, text);
             }
         }
     }
