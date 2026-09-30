@@ -26,6 +26,8 @@
 
 #include "allsltoslua.h"
 
+#include "alscriptfixes.h"
+
 #include "alscriptengine.h"
 #include "allsleffects.h"
 #include "allslservice.h"
@@ -47,6 +49,88 @@ using namespace Tailslide;
 
 namespace
 {
+    // A note a lint of the studio's finds the same as in SLua, with the
+    // words it is said in, which the note is written with and read back by.
+    struct Linted
+    {
+        const char* key;
+        const char* english;
+        const char* lint;
+    };
+    constexpr Linted linted(const char* key, const char* english, const char* lint)
+    {
+        return { key, english, lint };
+    }
+    // An llcompat call left as LSL had it, which SlCompatCall writes as ll's
+    // where ll's means the same; a string built in a loop, which
+    // SlStringBuild puts in a table.
+    constexpr Linted LINTED[] = {
+        linted("SluaBool", "llcompat.[1] answers 1 or 0, as LSL did; ll.[1] answers true or false.", "SlCompatCall"),
+        linted("SluaDetected",
+               "llcompat.Detected* count from 0, as LSL's did. SLua's own way is the handler's detected table: detected[n + 1]:getKey(), "
+               ":getName(), :getPos() and the rest.",
+               "SlCompatCall"),
+        linted("SluaIndex", "llcompat.[1] takes indexes from 0, as LSL did; ll.[1] takes them from 1.", "SlCompatCall"),
+        linted("SluaIndexFound", "llcompat.[1] counts from 0 and says -1 for none, as LSL did; ll.[1] counts from 1 and says nil.", "SlCompatCall"),
+        linted("SluaStringBuild",
+               "[1] is built with .. in a loop, which makes a new string each time. SLua's way is to put the pieces in a table and join them "
+               "once, with table.concat.",
+               "SlStringBuild"),
+    };
+
+    const char* englishOf(std::string_view key)
+    {
+        for (const Linted& each : LINTED)
+        {
+            if (key == each.key)
+            {
+                return each.english;
+            }
+        }
+        return "";
+    }
+
+    // Whether words are a note's, as its words with marks say it: what
+    // lies between the marks there, in order, the first at the start and
+    // the last at the end.
+    bool saidAs(std::string_view pattern, std::string_view said)
+    {
+        std::vector<std::string_view> pieces;
+        size_t                        from = 0;
+        for (size_t at = 0; at + 2 < pattern.size(); ++at)
+        {
+            if (pattern[at] == '[' && pattern[at + 1] >= '1' && pattern[at + 1] <= '9' && pattern[at + 2] == ']')
+            {
+                pieces.push_back(pattern.substr(from, at - from));
+                from = at + 3;
+                at += 2;
+            }
+        }
+        pieces.push_back(pattern.substr(from));
+        if (pieces.size() == 1)
+        {
+            return pattern == said;
+        }
+        if (said.substr(0, pieces.front().size()) != pieces.front())
+        {
+            return false;
+        }
+        size_t at = pieces.front().size();
+        for (size_t i = 1; i + 1 < pieces.size(); ++i)
+        {
+            at = said.find(pieces[i], at);
+            if (at == std::string_view::npos)
+            {
+                return false;
+            }
+            at += pieces[i].size();
+        }
+        const std::string_view last = pieces.back();
+        return said.size() >= at + last.size() && said.substr(said.size() - last.size()) == last;
+    }
+
+    // What marks a note in the SLua.
+    constexpr std::string_view NOTE_MARK = "-- LSL:";
     // Luau's precedence, loosest first: an if-expression holds everything to
     // its right, so it is bracketed wherever it is an operand.
     enum Prec : int
@@ -680,7 +764,7 @@ namespace
             {
                 if (mOptions.comments)
                 {
-                    mText += indent() + "-- LSL: " + said + "\n";
+                    mText += indent() + std::string(NOTE_MARK) + " " + said + "\n";
                 }
             }
             mPending.clear();
@@ -1312,8 +1396,7 @@ namespace
         }
         else if (lsl.rfind("llDetected", 0) == 0)
         {
-            noteOnce(e, "SluaDetected", "llcompat.Detected* count from 0, as LSL's did. SLua's own way is the handler's detected table: "
-                                        "detected[n + 1]:getKey(), :getName(), :getPos() and the rest.");
+            noteOnce(e, "SluaDetected", englishOf("SluaDetected"));
         }
         else if (slua & ALLSLTraits::SluaDeprecated)
         {
@@ -1338,16 +1421,15 @@ namespace
         }
         else if (slua & ALLSLTraits::SluaIndexResult)
         {
-            noteOnce(e, "SluaIndexFound", "llcompat.[1] counts from 0 and says -1 for none, as LSL did; ll.[1] counts from 1 and says nil.",
-                     { bare });
+            noteOnce(e, "SluaIndexFound", englishOf("SluaIndexFound"), { bare });
         }
         else if (slua & ALLSLTraits::SluaIndexArgs)
         {
-            noteOnce(e, "SluaIndex", "llcompat.[1] takes indexes from 0, as LSL did; ll.[1] takes them from 1.", { bare });
+            noteOnce(e, "SluaIndex", englishOf("SluaIndex"), { bare });
         }
         else if (slua & ALLSLTraits::SluaBool)
         {
-            noteOnce(e, "SluaBool", "llcompat.[1] answers 1 or 0, as LSL did; ll.[1] answers true or false.", { bare });
+            noteOnce(e, "SluaBool", englishOf("SluaBool"), { bare });
         }
         else if (slua & ALLSLTraits::SluaBoolList)
         {
@@ -1933,10 +2015,7 @@ namespace
                     const std::string name = static_cast<LSLLValueExpression*>(b->getLHS())->getIdentifier()->getName();
                     if (mUnbuilt.contains(b))
                     {
-                        noteOnce(b, "SluaStringBuild",
-                                 "[1] is built with .. in a loop, which makes a new string each time. SLua's way is to put the pieces in a table "
-                                 "and join them once, with table.concat.",
-                                 { name });
+                        noteOnce(b, "SluaStringBuild", englishOf("SluaStringBuild"), { name });
                     }
                     if (mFreedFirst.contains(b))
                     {
@@ -4527,24 +4606,137 @@ end
 // static
 const char* ALLSLToSLua::lintOf(std::string_view note)
 {
-    // An llcompat call left as LSL had it, which SlCompatCall writes as
-    // ll's where ll's means the same.
-    static constexpr std::pair<std::string_view, const char*> LINTS[] = {
-        { "SluaBool", "SlCompatCall" },
-        { "SluaDetected", "SlCompatCall" },
-        { "SluaIndex", "SlCompatCall" },
-        { "SluaIndexFound", "SlCompatCall" },
-        // A string built in a loop, which SlStringBuild puts in a table.
-        { "SluaStringBuild", "SlStringBuild" },
-    };
-    for (const auto& [key, lint] : LINTS)
+    for (const Linted& each : LINTED)
     {
-        if (key == note)
+        if (note == each.key)
         {
-            return lint;
+            return each.lint;
         }
     }
     return nullptr;
+}
+
+// static
+ALScriptProblems ALLSLToSLua::notesIn(std::string_view slua, const Words& words)
+{
+    // Each linted note's words, as the studio says them and as English does:
+    // a script may have been written in either.
+    std::vector<std::pair<std::string, const char*>> patterns;
+    for (const Linted& each : LINTED)
+    {
+        if (words)
+        {
+            patterns.emplace_back(words(each.key, {}, each.english), each.lint);
+        }
+        patterns.emplace_back(each.english, each.lint);
+    }
+    ALScriptProblems out;
+    S32              line = 0;
+    for (size_t start = 0; start <= slua.size(); ++line)
+    {
+        const size_t     end  = std::min(slua.find('\n', start), slua.size());
+        std::string_view text = slua.substr(start, end - start);
+        if (!text.empty() && text.back() == '\r')
+        {
+            text.remove_suffix(1);
+        }
+        const size_t at = text.find_first_not_of(" \t");
+        if (at != std::string_view::npos && text.substr(at, NOTE_MARK.size()) == NOTE_MARK)
+        {
+            std::string_view said = text.substr(at + NOTE_MARK.size());
+            said.remove_prefix(std::min(said.size(), said.find_first_not_of(' ')));
+            ALScriptProblem note;
+            note.severity  = ALScriptProblem::Severity::Note;
+            note.source    = ALScriptProblem::Source::Assistant;
+            note.key       = "SluaNote";
+            note.line      = line;
+            note.column    = static_cast<S32>(at);
+            note.endLine   = line;
+            note.endColumn = static_cast<S32>(text.size());
+            note.message   = std::string(said);
+            note.args      = { note.message };
+            for (const auto& [pattern, lint] : patterns)
+            {
+                if (saidAs(pattern, said))
+                {
+                    note.code = lint;
+                    break;
+                }
+            }
+            // Done: the comment taken out, and its line with it, which
+            // holds nothing else. Safe, but never on a save, nor what a Fix
+            // All of the whole script takes: a note is to be read.
+            ALScriptFix done = ALScriptFixes::titled("ScriptFixNoteDone", "Done: take the note out", {});
+            done.safe        = true;
+            done.removes     = true;
+            done.edits.push_back(end < slua.size() ? ALScriptEdit(line, 0, line + 1, 0, std::string())
+                                                   : ALScriptEdit(line, 0, line, static_cast<S32>(text.size()), std::string()));
+            note.fixes.push_back(std::move(done));
+            out.push_back(std::move(note));
+        }
+        if (end == slua.size())
+        {
+            break;
+        }
+        start = end + 1;
+    }
+    return out;
+}
+
+// static
+void ALLSLToSLua::linkNotes(ALScriptProblems& notes, const ALScriptProblems& found, std::string_view slua)
+{
+    std::vector<std::string_view> lines;
+    for (size_t start = 0;;)
+    {
+        const size_t end = std::min(slua.find('\n', start), slua.size());
+        lines.push_back(slua.substr(start, end - start));
+        if (end == slua.size())
+        {
+            break;
+        }
+        start = end + 1;
+    }
+    const auto spoken = [&](S32 line) {
+        const std::string_view text = lines[line];
+        const size_t           at   = text.find_first_not_of(" \t\r");
+        return at == std::string_view::npos || text.substr(at, NOTE_MARK.size()) == NOTE_MARK;
+    };
+    for (ALScriptProblem& note : notes)
+    {
+        if (note.code.empty() || note.fixes.empty())
+        {
+            continue;
+        }
+        // The line it stands over: the first after it neither blank nor
+        // another note.
+        S32 target = note.line + 1;
+        while (target < static_cast<S32>(lines.size()) && spoken(target))
+        {
+            ++target;
+        }
+        for (const ALScriptProblem& problem : found)
+        {
+            if (problem.code != note.code || !problem.file.empty() || problem.line > target || std::max(problem.line, problem.endLine) < target)
+            {
+                continue;
+            }
+            const auto fix = std::find_if(problem.fixes.begin(), problem.fixes.end(),
+                                          [](const ALScriptFix& each) { return each.preferred && each.kind == ALScriptFix::Kind::Fix; });
+            if (fix == problem.fixes.end())
+            {
+                continue;
+            }
+            // The lint's fix, and the note taken out with it: offered first.
+            ALScriptFix both = ALScriptFixes::titled("ScriptFixNoteLint", "[1], and take the note out", { fix->title });
+            both.preferred   = true;
+            both.safe        = fix->safe;
+            both.edits       = fix->edits;
+            both.edits.insert(both.edits.end(), note.fixes.back().edits.begin(), note.fixes.back().edits.end());
+            note.fixes.insert(note.fixes.begin(), std::move(both));
+            break;
+        }
+    }
 }
 
 // static

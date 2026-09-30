@@ -89,7 +89,8 @@ ALScriptStudioDoc::Shown ALScriptStudioDoc::analysisRow(const ALScriptProblem& p
     // off: Luau's own, LSL's as its key has it. An error's number says
     // nothing to whoever reads it.
     std::string name = ALScriptFixes::lintName(problem, lua);
-    if (name.empty() && !problem.code.empty() && problem.code.find_first_not_of("0123456789") != std::string::npos)
+    if (name.empty() && problem.source != ALScriptProblem::Source::Assistant && !problem.code.empty() &&
+        problem.code.find_first_not_of("0123456789") != std::string::npos)
     {
         name = problem.code;
     }

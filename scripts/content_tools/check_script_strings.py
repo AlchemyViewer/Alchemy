@@ -82,6 +82,7 @@ CALLS = {
     "problem": [(1, 2, "")],
     "note": [(1, 2, "")],
     "noteOnce": [(1, 2, "")],
+    "linted": [(0, 1, "")],
     "noteAt": [(1, 2, "")],
     "titled": [(0, 1, "")],
     "alSaidCount": [(0, 2, "A"), (0, 3, "B")],

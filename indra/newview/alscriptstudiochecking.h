@@ -283,6 +283,10 @@ private:
     void noLint(Doc& doc);
     void explainTransformWords(Doc& doc);
     void explainRequires(Doc& doc);
+    // Each "-- LSL:" comment the converter left in an SLua script, a note
+    // to see to, with its lint's fix where there is one
+    // (ALLSLToSLua::notesIn).
+    void notesAsProblems(Doc& doc);
 
     ALScriptStudioServices& mServices;
     ALScriptStudioAnalysis& mAnalysis;

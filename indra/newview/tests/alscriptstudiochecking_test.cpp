@@ -1240,4 +1240,45 @@ namespace tut
         ensure("changed since: not made", !checking.applyPreviewed(doc) && doc.editor->wholeText() == "default {}\n");
         ensure("said", services.statuses.back() == "FixAllChangedSince" && services.statusFailures.back());
     }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<22>()
+    {
+        set_test_name("each LSL comment in an SLua script a note to see to, before the check's own: Done, and the lint's fix of the line it "
+                      "stands over with it; read again, not twice; none in LSL");
+        ALScriptStudioChecking& checking = make();
+        const std::string       text     = "local s = \"abc\"\n"
+                                           "-- LSL: llcompat.GetSubString takes indexes from 0, as LSL did; ll.GetSubString takes them from 1.\n"
+                                           "print(llcompat.GetSubString(s, 0, 2))\n"
+                                           "-- LSL: something else\n"
+                                           "print(s)\n";
+        Doc& doc          = tab("a", text);
+        doc.language.lua  = true;
+        checking.schedule(doc, true);
+        checking.pump(1.0);
+        ALScriptProblem compat = problem(2, "llcompat.GetSubString is ll's", ALScriptProblem::Severity::Note);
+        compat.source          = ALScriptProblem::Source::Lint;
+        compat.code            = "SlCompatCall";
+        compat.fixes           = { fix("Write it ll.GetSubString(s, 1, 3)", 2, 6, 36, "ll.GetSubString(s, 1, 3)") };
+        studio.asks.back().answered(answer(doc, { compat }));
+        const ALScriptProblems& said = doc.check->analysis;
+        ensure_equals("two notes, then the lint", said.size(), size_t(3));
+        ensure("the notes first", said[0].key == "SluaNote" && said[0].line == 1 && said[1].key == "SluaNote" && said[1].line == 3 &&
+                                      said[2].code == "SlCompatCall");
+        ensure("the lint's fix with the note's", said[0].fixes.size() == 2 && said[0].fixes[0].preferred &&
+                                                     said[0].fixes[0].title == "Write it ll.GetSubString(s, 1, 3), and take the note out");
+        ensure("the other: Done alone", said[1].fixes.size() == 1 && !said[1].fixes[0].preferred);
+        ensure("made", checking.applyFix(doc, said[0].fixes[0], version(doc)) &&
+                           doc.editor->wholeText() == "local s = \"abc\"\nprint(ll.GetSubString(s, 1, 3))\n-- LSL: something else\nprint(s)\n");
+
+        checking.pump(2.0);
+        studio.asks.back().answered(answer(doc));
+        ensure("read again: the one left, once", doc.check->analysis.size() == 1 && doc.check->analysis[0].line == 2);
+
+        Doc& lsl = tab("b", "// -- LSL: not SLua\ndefault { state_entry() {} }\n");
+        checking.schedule(lsl, true);
+        checking.pump(3.0);
+        studio.asks.back().answered(answer(lsl));
+        ensure("none in LSL", lsl.check->analysis.empty());
+    }
 }

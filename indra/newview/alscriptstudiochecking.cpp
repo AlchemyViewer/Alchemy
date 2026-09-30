@@ -26,6 +26,7 @@
 
 #include "alscriptstudiochecking.h"
 
+#include "allsltoslua.h"
 #include "alnotecardembedded.h"
 #include "alnotecardformat.h"
 #include "alnotecarditems.h"
@@ -1107,12 +1108,35 @@ void ALScriptStudioChecking::showProblems(Doc& doc)
     if (doc.language.lua)
     {
         explainRequires(doc);
+        notesAsProblems(doc);
     }
     else
     {
         explainTransformWords(doc);
     }
     mAnalysis.refreshProblems(doc);
+}
+
+void ALScriptStudioChecking::notesAsProblems(Doc& doc)
+{
+    // Those read before, gone with the text they were read in.
+    ALScriptProblems& analysis = doc.check->analysis;
+    analysis.erase(std::remove_if(analysis.begin(), analysis.end(), [](const ALScriptProblem& problem) { return problem.key == "SluaNote"; }),
+                   analysis.end());
+    if (doc.check->analysisVersion != doc.editor->document().version())
+    {
+        return;
+    }
+    const std::string text  = doc.editor->wholeText();
+    ALScriptProblems  notes = ALLSLToSLua::notesIn(text, alScriptKeyedWords);
+    if (notes.empty())
+    {
+        return;
+    }
+    ALLSLToSLua::linkNotes(notes, analysis, text);
+    // First: a Fix All takes a note's fix, which takes the note out with
+    // the lint's, before the lint's own, which would leave the note.
+    analysis.insert(analysis.begin(), std::make_move_iterator(notes.begin()), std::make_move_iterator(notes.end()));
 }
 
 void ALScriptStudioChecking::offerImports(Doc& doc)

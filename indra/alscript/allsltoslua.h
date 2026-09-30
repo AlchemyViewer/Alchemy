@@ -117,6 +117,19 @@ public:
     // make -- or null where none does. A note carries it as its code, so
     // that its fix may be offered where the note is.
     static const char* lintOf(std::string_view note);
+
+    // Words by their key, as Options::words gives them.
+    typedef std::function<std::string(const std::string& key, const std::vector<std::string>& args, const std::string& english)> Words;
+    // Each "-- LSL:" comment in SLua, as a note to see to: a note-level
+    // problem over the comment, keyed SluaNote, saying its words, with Done
+    // -- the comment and its line taken out -- as its fix. Where its words
+    // are a note a lint finds the same as (read as `words` says them, or
+    // as English does), that lint as its code.
+    static ALScriptProblems notesIn(std::string_view slua, const Words& words);
+    // Each such note's lint fix, where the lint said something of the line
+    // the note stands over: that fix, with the note taken out too, offered
+    // first.
+    static void linkNotes(ALScriptProblems& notes, const ALScriptProblems& found, std::string_view slua);
     // As SLua has it (Options' defaults).
     static Result convert(std::string_view lsl);
 };
