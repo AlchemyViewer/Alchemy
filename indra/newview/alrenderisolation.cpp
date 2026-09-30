@@ -140,6 +140,12 @@ ALRenderIsolation::Scope::Scope(const LLUUID& target_id, bool include_seated)
         mHasSubject = true;
     }
 
+    // Screen-space reflections trace the last frame's scene map, and a cutout
+    // renders offscreen at its own size, which reallocates that map with
+    // whatever the driver left in it. Traced, that is noise; cleared, the
+    // march finds nothing and the probes answer, as they do off-screen.
+    gPipeline.clearSceneMap();
+
     LLPipeline::sCutoutRender = true;
 }
 

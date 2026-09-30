@@ -40,6 +40,13 @@
 void LLDrawPoolGlow::renderPostDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+
+    // This pass writes glow into the alpha channel, which in a cutout frame
+    // holds the subject's coverage; glow added to it would read back as opacity.
+    if (LLPipeline::cutoutFiltering())
+    {
+        return;
+    }
     LLGLSLShader* shader = &gDeferredEmissiveProgram;
 
     LLGLEnable blend(GL_BLEND);

@@ -2114,6 +2114,8 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("crossFilterMap");
 
+    mReservedUniforms.push_back("uCutoutPremultiplied");
+
     // Text Shadow
     mReservedUniforms.push_back("textShadowMode");
 

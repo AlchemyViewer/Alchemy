@@ -147,6 +147,20 @@ public:
     // null. Blend and colour mask are the caller's to set.
     void drawFarPlaneQuad(U32 depth_func, const LLColor4* color = nullptr);
 
+    // A cutout frame's coverage, laid into the scene target's alpha once the
+    // opaque forward pools have drawn and before the blended ones, as an
+    // impostor bake lays its own: nothing over the background, colour and
+    // alpha both, and full coverage wherever opaque geometry sits.
+    void stampCutoutCoverage();
+    // After the frame is finished: the scene target's alpha -- the cutout's
+    // coverage -- into the alpha of whatever is bound, colour untouched. The
+    // post chain carries no alpha a cutout could use (glow tags, FXAA luma,
+    // 2-bit ping-pong buffers), so it comes from the scene target directly.
+    void writeCutoutCoverage();
+    // The screen-space reflection source emptied: no colour, depth at the far
+    // plane, so a march through it finds nothing.
+    void clearSceneMap();
+
     void bindScreenToTexture();
     void renderFinalize();
     void copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst);

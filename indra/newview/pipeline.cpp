@@ -4804,6 +4804,13 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     // do water haze just before pre water alpha
     U32 water_haze_pass = LLDrawPool::POOL_ALPHA_PRE_WATER;
 
+    // A cutout's coverage is stamped once every opaque pool has laid down its
+    // depth -- fullbright, shiny and alpha-masked fullbright draw here, after
+    // lighting, and would otherwise be left uncovered -- and before the first
+    // blended pool adds to it.
+    U32 cutout_stamp_pass = LLDrawPool::POOL_ALPHA_PRE_WATER;
+    bool done_cutout_stamp = !cutoutFiltering();
+
     calcNearbyLights(camera);
     setupHWLights();
 
@@ -4823,6 +4830,12 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     done_atmospherics = done_atmospherics || low_detail_probe;
     done_water_haze   = done_water_haze || low_detail_probe;
 
+    // Underwater, the water haze is a full-screen pass, and it would fog the
+    // empty background of a cutout frame -- which then bleeds into whatever
+    // blended geometry is composited over it. Above water it has nothing to
+    // draw there, the water being left out.
+    done_water_haze = done_water_haze || cutoutFiltering();
+
 
     while ( iter1 != mPools.end() )
     {
@@ -4840,6 +4853,12 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
         { // do atmospherics against depth buffer before rendering alpha
             doAtmospherics();
             done_atmospherics = true;
+        }
+
+        if (cur_type >= cutout_stamp_pass && !done_cutout_stamp)
+        {
+            stampCutoutCoverage();
+            done_cutout_stamp = true;
         }
 
         if (cur_type >= water_haze_pass && !done_water_haze)
@@ -4910,6 +4929,11 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
         stop_glerror();
     }
 
+    if (!done_cutout_stamp)
+    {
+        stampCutoutCoverage();
+    }
+
     gGLLastMatrix = NULL;
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
@@ -4917,8 +4941,8 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     // An impostor is a billboard: baking selection highlights or debug geometry into its
     // texture freezes them there for the life of the impostor and replays them into the scene
     // G-buffer, which is not what either is for. They belong to the frame that draws the
-    // billboard, where they are already drawn.
-    if (!gCubeSnapshot && !sImpostorRender)
+    // billboard, where they are already drawn. Nor are they part of a cutout's subject.
+    if (!gCubeSnapshot && !sImpostorRender && !sCutoutRender)
     {
         // debug displays
         renderHighlights();
@@ -8381,7 +8405,9 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 // Pyramid needs at least 3 mips for the downsample/upsample chain
                 // to be meaningful; otherwise gate the signal to zero so a partial
                 // allocation doesn't leak an unfiltered mip into the scene.
-                const F32 strength_gate = (mRT->bloomMipCount >= 3) ? 1.0f : 0.0f;
+                // A cutout frame builds no pyramid, so what is in it is an
+                // earlier frame's.
+                const F32 strength_gate = (mRT->bloomMipCount >= 3 && !sCutoutRender) ? 1.0f : 0.0f;
                 shader->uniform1f(LLShaderMgr::BLOOM_STRENGTH,    llmax(bloom_strength(), 0.0f)    * strength_gate);
                 shader->uniform1f(LLShaderMgr::HALATION_STRENGTH, llmax(halation_strength(), 0.0f) * strength_gate);
                 const LLColor3& tint = halation_tint();
@@ -8424,6 +8450,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         }
 
         shader->uniform2f(LLShaderMgr::SCREEN_RESOLUTION, (GLfloat)src->getWidth(), (GLfloat)src->getHeight());
+        shader->uniform1f(LLShaderMgr::CUTOUT_PREMULTIPLIED, sCutoutRender ? 1.f : 0.f);
 
         // The other half of the "No post-processing" contract. The grade is
         // gated where this pass's program is chosen and the print effects in
@@ -10166,7 +10193,20 @@ void LLPipeline::renderFinalize()
 
     static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
     bool hdr = gGLManager.mGLVersion > 4.05f && has_hdr();
-    if (hdr)
+
+    // A cutout frame measures nothing and leaves nothing behind. It is mostly
+    // empty, so metering it would brighten the subject, and the next live frame
+    // would reflect and meter a world with everything but the subject cut out.
+    // The last live frame's exposure serves, as it does for the scopes.
+    //
+    // Everything that spreads past a pixel is left out as well -- depth of
+    // field, bloom, glow, anti-aliasing and sharpening -- since each carries
+    // the subject's edge into what is to be left empty, where the coverage
+    // written after the frame (writeCutoutCoverage) knows nothing of it.
+    // Edges come from rendering the cutout larger and averaging it down.
+    const bool cutout = sCutoutRender;
+
+    if (hdr && !cutout)
     {
         copyScreenSpaceReflections(&mRT->screen, &mSceneMap);
 
@@ -10184,7 +10224,11 @@ void LLPipeline::renderFinalize()
     // rather than the scene -- which is no use to a tool whose whole job is to
     // decide what the grade should be. It has to precede DoF for the same
     // reason: a sample from a defocused pixel describes the blur, not the scene.
-    serviceScenePixelProbe(&mRT->screen);
+    // Nor from a cutout, which describes one subject on nothing.
+    if (!cutout)
+    {
+        serviceScenePixelProbe(&mRT->screen);
+    }
 
     // Depth of field, in place on mRT->screen.
     //
@@ -10207,7 +10251,7 @@ void LLPipeline::renderFinalize()
     // SSR, luminance and exposure stay above deliberately: reflections keep
     // their detail, and a blur conserves mean energy so metering is unaffected.
     static LLCachedControl<bool> RenderDepthOfFieldInEditMode(gSavedSettings, "RenderDepthOfFieldInEditMode", false);
-    if (RenderDepthOfField && (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) && !gCubeSnapshot)
+    if (RenderDepthOfField && (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) && !gCubeSnapshot && !cutout)
     {
         renderDoF();
 
@@ -10220,7 +10264,7 @@ void LLPipeline::renderFinalize()
         glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
     }
 
-    if (hdr)
+    if (hdr && !cutout)
     {
         // HDR bloom runs pre-tonemap against the linear scene buffer -- now the
         // defocused one. The pyramid is generated here; the additive composite
@@ -10244,7 +10288,7 @@ void LLPipeline::renderFinalize()
 
     // Legacy glow for non-HDR path.  In the HDR path, glow is extracted as part of the
     // bloom process and composited back in after tonemapping.
-    if (!hdr)
+    if (!hdr && !cutout)
     {
         generateGlow(&mRT->postPingMap);
     }
@@ -10252,7 +10296,11 @@ void LLPipeline::renderFinalize()
     LLRenderTarget* sourceBuffer = &mRT->postPingMap;
     LLRenderTarget* targetBuffer = &mRT->postPongMap;
 
-    if (RenderFSAAType == 1)
+    if (cutout)
+    {
+        // Nothing past colour correction spreads less than a pixel.
+    }
+    else if (RenderFSAAType == 1)
     {
         applyFXAA(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
@@ -10265,13 +10313,13 @@ void LLPipeline::renderFinalize()
     }
 
     static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
-    if (cas_sharpness > 0.0f && gCASProgram.isComplete())
+    if (cas_sharpness > 0.0f && gCASProgram.isComplete() && !cutout)
     {
         applyCAS(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
     }
 
-    if (!hdr)
+    if (!hdr && !cutout)
     {
         combineGlow(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
@@ -10292,7 +10340,7 @@ void LLPipeline::renderFinalize()
     }
 // [/RLVa:KB]
 
-    if (RenderBufferVisualization > -1)
+    if (RenderBufferVisualization > -1 && !cutout)
     {
         switch (RenderBufferVisualization)
         {
@@ -10328,12 +10376,16 @@ void LLPipeline::renderFinalize()
 
     // Measure what is about to be presented. After every post pass, before
     // the vignette/grain/dither the final blit adds -- those are print
-    // effects, deliberately outside the measurement.
-    captureScopeSample(sourceBuffer);
+    // effects, deliberately outside the measurement. A cutout frame is not
+    // what the scopes describe.
+    if (!cutout)
+    {
+        captureScopeSample(sourceBuffer);
 
-    // Same point, same reason: a still and the scopes must agree about what a
-    // frame is, or the numbers will not describe the picture beside them.
-    captureReferenceStill(sourceBuffer);
+        // Same point, same reason: a still and the scopes must agree about what a
+        // frame is, or the numbers will not describe the picture beside them.
+        captureReferenceStill(sourceBuffer);
+    }
 
     // Present the screen target.
     {
@@ -10648,7 +10700,7 @@ void LLPipeline::renderFinalize()
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
-    if (hasRenderDebugMask(LLPipeline::RENDER_DEBUG_PHYSICS_SHAPES))
+    if (hasRenderDebugMask(LLPipeline::RENDER_DEBUG_PHYSICS_SHAPES) && !cutout)
     {
         renderPhysicsDisplay();
     }
@@ -13643,6 +13695,66 @@ void LLPipeline::drawFarPlaneQuad(U32 depth_func, const LLColor4* color)
     gGL.popMatrix();
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.popMatrix();
+}
+
+void LLPipeline::stampCutoutCoverage()
+{
+    LL_PROFILE_GPU_ZONE("cutout coverage stamp");
+
+    LLGLDisable blend(GL_BLEND);
+
+    // Nothing covers the background, so it is cleared to nothing, colour and
+    // alpha both. Lighting left it the sky's emissive copy (magenta, with the
+    // emissive buffer on) or black; the blended geometry drawn over it next has
+    // to be composited over black for the colour to come out premultiplied by
+    // the coverage accumulated alongside it.
+    {
+        LLGLSColorMask mask(true, true);
+        drawFarPlaneQuad(GL_LEQUAL, &LLColor4::transparent);
+    }
+
+    // Opaque geometry covers its texel whole. The alpha pool's blend adds to
+    // this (alphaWritesCoverage), so a blended surface over opaque stays at 1
+    // and over the background becomes its own coverage.
+    {
+        LLGLSColorMask mask(false, true);
+        drawFarPlaneQuad(GL_GREATER, &LLColor4::white);
+    }
+}
+
+void LLPipeline::writeCutoutCoverage()
+{
+    LL_PROFILE_GPU_ZONE("cutout coverage write");
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    LLGLDisable blend(GL_BLEND);
+    LLGLSColorMask mask(false, true);
+
+    // Across the whole frame, sampled as the final blit sampled the colour, so
+    // the two agree texel for texel whatever the scene target's resolution.
+    const LLRect& rect = gViewerWindow->getWorldViewRectRaw();
+    glViewport(rect.mLeft, rect.mBottom, rect.getWidth(), rect.getHeight());
+
+    gCopyProgram.bind();
+    gCopyProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mRT->screen);
+    mScreenTriangleVB->setBuffer();
+    mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+    gCopyProgram.unbind();
+}
+
+void LLPipeline::clearSceneMap()
+{
+    if (mSceneMap.isComplete())
+    {
+        // The depth clear value is the reverse-Z latch's far plane. Clears obey
+        // the write masks, so both are opened for it.
+        LLGLSColorMask mask(true, true);
+        LLGLDepthTest depth(GL_TRUE, GL_TRUE);
+        mSceneMap.bindTarget();
+        glClearColor(0.f, 0.f, 0.f, 0.f);
+        mSceneMap.clear();
+        mSceneMap.flush();
+    }
 }
 
 void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool for_profile, LLViewerObject* specific_attachment)
