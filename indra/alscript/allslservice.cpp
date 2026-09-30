@@ -31,6 +31,7 @@
 #include "alscriptengine.h"
 
 #include "almessagemap.h"
+#include "allsllintpass.h"
 #include "allsltraits.h"
 #include "alscriptlexicon.h"
 
@@ -1551,6 +1552,11 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
             problem.args = std::move(known.args);
         }
         problems.push_back(std::move(problem));
+    }
+    // The studio's own lints, beside Tailslide's warnings.
+    if (script)
+    {
+        ALLSLLintPass::check(script, problems);
     }
     // A name it does not know changed to the nearest it does, where one is
     // near: Tailslide suggested one itself once, and no longer does.

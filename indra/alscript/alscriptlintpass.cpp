@@ -41,6 +41,8 @@ namespace
     const std::vector<ALScriptLintPass::Rule> RULES = {
         // x = x + 1, where Luau has x += 1.
         { "SlCompoundAssign", true, Severity::Note, true, true, nullptr },
+        // LSL: llGetListLength(l) in a loop's check, l unchanged in it.
+        { "SlLoopInvariantCall", false, Severity::Note, true, true, nullptr },
     };
 
     // --- the pass -------------------------------------------------------------------

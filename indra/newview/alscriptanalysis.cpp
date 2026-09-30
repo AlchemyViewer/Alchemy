@@ -370,8 +370,8 @@ namespace ALScriptLints
         // table has off.
         Level defaultOf(bool lua, std::string_view id)
         {
-            const ALScriptLintPass::Rule* rule = lua ? ALScriptLintPass::rule(id) : nullptr;
-            return rule && !rule->on ? Level::Off : Level::Warning;
+            const ALScriptLintPass::Rule* rule = ALScriptLintPass::rule(id);
+            return rule && rule->lua == lua && !rule->on ? Level::Off : Level::Warning;
         }
     }
 
@@ -382,6 +382,14 @@ namespace ALScriptLints
             for (const char* id : LSL_WARNINGS)
             {
                 out.push_back(Lint{ id, false });
+            }
+            // The studio's own after Tailslide's.
+            for (const ALScriptLintPass::Rule& rule : ALScriptLintPass::rules())
+            {
+                if (!rule.lua)
+                {
+                    out.push_back(Lint{ rule.name, false });
+                }
             }
             for (const std::string& name : ALLuauConfig::lintNames())
             {
@@ -459,17 +467,23 @@ namespace ALScriptLints
     void apply(ALScriptProblems& problems)
     {
         const LLSD levels = gSavedSettings.getLLSD("ALScriptLintLevels");
-        if (!levels.isMap() || levels.size() == 0)
-        {
-            return;
-        }
+        const bool chosen = levels.isMap() && levels.size() > 0;
         problems.erase(std::remove_if(problems.begin(), problems.end(),
-                                      [&levels](ALScriptProblem& problem) {
-                                          if (problem.severity != ALScriptProblem::Severity::Warning || problem.code.empty())
+                                      [&](ALScriptProblem& problem) {
+                                          // Tailslide's warnings, and the studio's own, which may be notes.
+                                          const ALScriptLintPass::Rule* own = problem.source == ALScriptProblem::Source::Lint
+                                                                                  ? ALScriptLintPass::rule(problem.code)
+                                                                                  : nullptr;
+                                          if ((problem.severity != ALScriptProblem::Severity::Warning && !own) || problem.code.empty())
                                           {
                                               return false;
                                           }
-                                          const std::string said = levels.has("lsl:" + problem.code) ? levels["lsl:" + problem.code].asString() : std::string();
+                                          const std::string key  = "lsl:" + problem.code;
+                                          std::string       said = chosen && levels.has(key) ? levels[key].asString() : std::string();
+                                          if (said.empty() && own && !own->on)
+                                          {
+                                              said = "off";
+                                          }
                                           if (said == "error")
                                           {
                                               problem.severity = ALScriptProblem::Severity::Error;

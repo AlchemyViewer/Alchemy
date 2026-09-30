@@ -17,6 +17,7 @@ target_sources(
     allslconsts.cpp
     allslcosts.cpp
     allsleffects.cpp
+    allsllintpass.cpp
     allslinliner.cpp
     almessagemap.cpp
     allsloptimizer.cpp
@@ -59,6 +60,7 @@ target_sources(
         allslconsts.h
         allslcosts.h
         allsleffects.h
+        allsllintpass.h
         allslinliner.h
         almessagemap.h
         allsloptimizer.h

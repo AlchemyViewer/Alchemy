@@ -59,6 +59,7 @@
     <floater.string name="LintLSL20018">== used as a statement</floater.string>
     <floater.string name="LintLSL20019">A deprecated function or constant</floater.string>
     <floater.string name="LintLSL20020">A deprecated function or constant with a replacement</floater.string>
+    <floater.string name="LintLSLSlLoopInvariantCall">llGetListLength(l) in a loop's check, l unchanged in the loop (the studio's own)</floater.string>
     <floater.string name="LintLuauUnknownGlobal">An unknown global (the type checker also reports it)</floater.string>
     <floater.string name="LintLuauDeprecatedGlobal">A deprecated global</floater.string>
     <floater.string name="LintLuauGlobalUsedAsLocal">A global used only inside one function</floater.string>

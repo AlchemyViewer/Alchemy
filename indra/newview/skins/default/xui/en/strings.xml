@@ -766,6 +766,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LSLSyntaxUnexpected">Did not expect [1] here.</string>
 	<string name="LSLSyntaxUnexpectedWanted">Did not expect [1] here; expected [2].</string>
 	<string name="LSLParameterUntyped">The parameter '[1]' needs its type before it: integer, float, string, key, vector, rotation or list.</string>
+	<string name="LSLSlLoopInvariantCall">[1] is worked out again on every turn of the loop, though nothing in the loop changes what it is given: a local set before the loop works it out once</string>
 	<string name="LuauLintUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauLintDeprecatedGlobal">Global '[1]' is deprecated, use '[2]' instead</string>
 	<string name="LuauLintDeprecatedGlobalPlain">Global '[1]' is deprecated</string>
