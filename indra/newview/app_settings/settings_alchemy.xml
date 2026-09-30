@@ -574,6 +574,83 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALScriptConvertLLTimers</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua puts llSetTimerEvent's timer on LLTimers, calling the timer handler of the state the script is in, rather than the timer event llcompat.SetTimerEvent sets going.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertDetectedTable</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua reads what was detected from the handler's detected table, detected[i + 1]:getKey(), where the call stands in the handler, rather than through llcompat.Detected*.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertSLuaCalls</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua calls SLua's ll rather than llcompat where it means the same: a boolean answer, a constant index moved on by one, a find asked only whether it found, read against nil.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertIdioms</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua writes what SLua has in a call's stead where it means the same: math, vector and quaternion's functions, ^, print, os.time and table.find.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertHandlerFields</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua assigns handlers to LLEvents' fields (LLEvents.touch_start = function ...), one for each event, rather than putting them on with LLEvents:on.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptConvertTypes</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua writes Luau types on locals, parameters and what functions return, from LSL's types.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptConvertComments</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua writes a -- LSL: comment over each place where SLua means something else than LSL did, or has a way of its own.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptStudioAutoClose</key>
         <map>
             <key>Comment</key>

@@ -460,7 +460,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ConvertSLuaTitle">Written in SLua</floater.string>
     <floater.string name="ConvertNotesA">1 place noted</floater.string>
     <floater.string name="ConvertNotesB">[COUNT] places noted</floater.string>
-    <floater.string name="Converted">Wrote [NAME] as SLua in the new script [NEW], unsaved, beside the LSL: [NOTES] with "-- LSL:" comments. The LSL script is as it was.</floater.string>
+    <floater.string name="Converted">Wrote [NAME] as SLua in the new script [NEW], unsaved, beside the LSL: [NOTES] with "-- LSL:" comments. The LSL script is as it was. How it is written: Preferences, LSL to SLua.</floater.string>
     <floater.string name="ConvertedExpanded">Wrote [NAME] as SLua in the new script [NEW] from what the preprocessor made of it, unsaved, beside that: [NOTES] with "-- LSL:" comments. The LSL script is as it was.</floater.string>
     <floater.string name="ConvertFailed">Could not write [NAME] as SLua: line [LINE], [ERROR].</floater.string>
     <floater.string name="RenameAfter">Renamed to [NAME]</floater.string>

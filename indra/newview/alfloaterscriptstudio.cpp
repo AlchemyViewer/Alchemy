@@ -7562,12 +7562,22 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     }
     // The source as it stands; where the preprocessor's words keep it
     // from reading as LSL, what the preprocessor made of it.
+    // As the preferences say: SLua's own ways, as far as each means the
+    // same, by default.
+    ALLSLToSLua::Options options;
+    options.llTimers      = gSavedSettings.getBOOL("ALScriptConvertLLTimers");
+    options.detectedTable = gSavedSettings.getBOOL("ALScriptConvertDetectedTable");
+    options.sluaCalls     = gSavedSettings.getBOOL("ALScriptConvertSLuaCalls");
+    options.idioms        = gSavedSettings.getBOOL("ALScriptConvertIdioms");
+    options.handlers      = gSavedSettings.getBOOL("ALScriptConvertHandlerFields") ? ALLSLToSLua::Options::Handlers::Field : ALLSLToSLua::Options::Handlers::On;
+    options.types         = gSavedSettings.getBOOL("ALScriptConvertTypes");
+    options.comments      = gSavedSettings.getBOOL("ALScriptConvertComments");
     const std::string   source    = doc.editor->wholeText();
-    ALLSLToSLua::Result converted = ALLSLToSLua::convert(source);
+    ALLSLToSLua::Result converted = ALLSLToSLua::convert(source, options);
     bool                expanded  = false;
     if (!converted.converted && doc.expanded.valid && doc.expanded.text && !doc.expanded.text->empty() && *doc.expanded.text != source)
     {
-        ALLSLToSLua::Result again = ALLSLToSLua::convert(*doc.expanded.text);
+        ALLSLToSLua::Result again = ALLSLToSLua::convert(*doc.expanded.text, options);
         if (again.converted)
         {
             converted = std::move(again);

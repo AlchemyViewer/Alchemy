@@ -86,6 +86,15 @@ namespace
         "ALScriptStudioVimClipboard",
         "ALScriptFormatBlankLines",  "ALScriptFormatSpacing",      "ALScriptFormatOnSave",      "ALScriptTrimOnSave",        "ALScriptFixOnSave",
         "ALScriptTemplateLSL",       "ALScriptTemplateSLua",       "ALScriptPreprocDefines",    "ExternalEditor",
+        "ALScriptConvertLLTimers",   "ALScriptConvertDetectedTable", "ALScriptConvertSLuaCalls", "ALScriptConvertIdioms",
+        "ALScriptConvertHandlerFields", "ALScriptConvertTypes",    "ALScriptConvertComments",
+    };
+
+    // What each preset of Convert to SLua sets: SLua's own ways, or as
+    // close to LSL as SLua lets it be. Handlers, types and comments are
+    // the scripter's either way.
+    const std::pair<const char*, bool> CONVERT_MODERN[] = {
+        { "ALScriptConvertLLTimers", true }, { "ALScriptConvertDetectedTable", true }, { "ALScriptConvertSLuaCalls", true }, { "ALScriptConvertIdioms", true },
     };
 
     // The places an include is looked for, as the setting spells them.
@@ -151,6 +160,15 @@ bool ALFloaterScriptPreferences::postBuild()
     getChild<LLButton>("snippet_delete")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSnippetDelete(); });
     getChild<LLButton>("snippet_to_inventory")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSnippetsToInventory(); });
     mSnippetLang->setCommitCallback([this](LLUICtrl*, const LLSD&) { fillSnippets(true); });
+    getChild<LLComboBox>("convert_preset")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onConvertPreset(); });
+    for (const auto& [setting, modern] : CONVERT_MODERN)
+    {
+        if (LLControlVariable* control = gSavedSettings.getControl(setting))
+        {
+            mConvertConnections.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) { refreshConvertPreset(); }));
+        }
+    }
+    refreshConvertPreset();
     mSnippetList->setCommitCallback([this](LLUICtrl*, const LLSD&) { showSnippet(); });
     for (LLLineEditor* field : { mSnippetName, mSnippetPrefix, mSnippetDetail })
     {
@@ -1346,6 +1364,32 @@ void ALFloaterScriptPreferences::onSnippetsToInventory()
     create_inventory_item(gAgent.getID(), gAgent.getSessionID(), gInventory.findCategoryUUIDForType(LLFolderType::FT_NOTECARD),
                           LLTransactionID::tnull, name, desc, LLAssetType::AT_NOTECARD, LLInventoryType::IT_NOTECARD, NO_INV_SUBTYPE,
                           LLFloaterPerms::getNextOwnerPerms("Notecards"), made);
+}
+
+void ALFloaterScriptPreferences::refreshConvertPreset()
+{
+    bool all = true, none = true;
+    for (const auto& [setting, modern] : CONVERT_MODERN)
+    {
+        const bool on = gSavedSettings.getBOOL(setting);
+        all           = all && on == modern;
+        none          = none && on != modern;
+    }
+    getChild<LLComboBox>("convert_preset")->selectByValue(all ? "modern" : none ? "close" : "custom");
+}
+
+void ALFloaterScriptPreferences::onConvertPreset()
+{
+    const std::string preset = getChild<LLComboBox>("convert_preset")->getValue().asString();
+    if (preset == "custom")
+    {
+        return;
+    }
+    for (const auto& [setting, modern] : CONVERT_MODERN)
+    {
+        gSavedSettings.setBOOL(setting, preset == "modern" ? modern : !modern);
+    }
+    refreshConvertPreset();
 }
 
 void ALFloaterScriptPreferences::addSnippetsFrom(const LLViewerInventoryItem& notecard)

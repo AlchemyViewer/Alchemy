@@ -1484,6 +1484,125 @@ end</floater.string>
                      width="380" />
         </panel>
         <panel
+         follows="all"
+         height="478"
+         label="LSL to SLua"
+         layout="topleft"
+         name="convert_tab"
+         width="804">
+            <text
+             follows="left|top|right"
+             height="32"
+             layout="topleft"
+             left="12"
+             name="convert_note"
+             top="12"
+             width="780"
+             wrap="true">
+                How Code &gt; Convert to SLua writes an LSL script. Each choice changes only what means exactly what the LSL did; what it leaves as LSL had it is noted, with SLua's way.
+            </text>
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="convert_preset_label"
+             top_pad="10"
+             width="70">
+                Write it:
+            </text>
+            <combo_box
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="convert_preset"
+             tool_tip="SLua's own ways, as far as each means what the LSL did; or as close to LSL as SLua lets it be, with llcompat and the timer event"
+             top_delta="-3"
+             width="220">
+                <combo_box.item label="In SLua's own ways" name="convert_modern" value="modern" />
+                <combo_box.item label="As close to LSL as it can be" name="convert_close" value="close" />
+                <combo_box.item label="As chosen below" name="convert_custom" value="custom" />
+            </combo_box>
+            <check_box
+             control_name="ALScriptConvertLLTimers"
+             follows="left|top"
+             height="20"
+             label="Timers on LLTimers"
+             layout="topleft"
+             left="12"
+             name="convert_timers"
+             tool_tip="llSetTimerEvent's timer runs on LLTimers, calling the timer handler of the state the script is in. Off: the timer event, set going by llcompat.SetTimerEvent."
+             top_pad="10"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertDetectedTable"
+             follows="left|top"
+             height="20"
+             label="What was detected from the handler's table"
+             layout="topleft"
+             left="12"
+             name="convert_detected"
+             tool_tip="llDetectedKey(0) in a touch_start becomes detected[1]:getKey(). Off: llcompat.DetectedKey(0)."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertSLuaCalls"
+             follows="left|top"
+             height="20"
+             label="SLua's ll where it means the same as llcompat"
+             layout="topleft"
+             left="12"
+             name="convert_calls"
+             tool_tip="A boolean answer (if ll.SameGroup(id) then), a constant index moved on by one, and a find asked only whether it found, read against nil. Off: llcompat for all of them."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertIdioms"
+             follows="left|top"
+             height="20"
+             label="What SLua has in a call's stead"
+             layout="topleft"
+             left="12"
+             name="convert_idioms"
+             tool_tip="math, vector and quaternion's functions, ^, print, os.time and table.find, where they mean the same as the LSL call."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertHandlerFields"
+             follows="left|top"
+             height="20"
+             label="Handlers assigned to LLEvents' fields"
+             layout="topleft"
+             left="12"
+             name="convert_fields"
+             tool_tip="LLEvents.touch_start = function(detected) ... end, one for each event. Off: LLEvents:on, which lets other code listen to the event too."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertTypes"
+             follows="left|top"
+             height="20"
+             label="Luau types on locals, parameters and returns"
+             layout="topleft"
+             left="12"
+             name="convert_types"
+             tool_tip="local count: number = 0, and function names(who: string): string, from LSL's types."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertComments"
+             follows="left|top"
+             height="20"
+             label="A -- LSL: comment over each place the two languages differ"
+             layout="topleft"
+             left="12"
+             name="convert_comments"
+             tool_tip="Each place SLua means something else than LSL did, or has a way of its own, said over its line. Off: said only in Output."
+             top_pad="4"
+             width="700" />
+        </panel>
+        <panel
          class="al_panel_script_keymap"
          filename="panel_script_studio_keys.xml"
          follows="all"
