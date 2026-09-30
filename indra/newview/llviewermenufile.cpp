@@ -1089,31 +1089,8 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
                                        LLSnapshotModel::SNAPSHOT_TYPE_COLOR,
                                        high_res ? S32_MAX : MAX_SNAPSHOT_IMAGE_SIZE)) //per side
         {
-            LLPointer<LLImageFormatted> formatted;
             LLSnapshotModel::ESnapshotFormat fmt = (LLSnapshotModel::ESnapshotFormat) gSavedSettings.getS32("SnapshotFormat");
-            switch (fmt)
-            {
-            case LLSnapshotModel::SNAPSHOT_FORMAT_JPEG:
-                formatted = new LLImageJPEG(gSavedSettings.getS32("SnapshotQuality"));
-                break;
-            default:
-                LL_WARNS() << "Unknown local snapshot format: " << fmt << LL_ENDL;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_PNG:
-                formatted = new LLImagePNG;
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_BMP:
-                formatted = new LLImageBMP;
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
-                formatted = new LLImageWebP;
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
-                formatted = new LLImageAVIF(gSavedSettings.getS32("SnapshotQuality"));
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS:
-                formatted = new LLImageAVIF(100); // quality 100 == lossless
-                break;
-            }
+            LLPointer<LLImageFormatted> formatted = LLSnapshotLivePreview::createFormattedImage(fmt, gSavedSettings.getS32("SnapshotQuality"));
             formatted->enableOverSize() ;
             formatted->encode(raw, 0);
             formatted->disableOverSize() ;

@@ -1002,27 +1002,7 @@ LLPointer<LLImageFormatted> LLSnapshotLivePreview::getFormattedImage()
         LLSnapshotModel::ESnapshotFormat format = getSnapshotFormat();
         LL_DEBUGS("Snapshot") << "Encoding new image of format " << format << LL_ENDL;
 
-        switch (format)
-        {
-            case LLSnapshotModel::SNAPSHOT_FORMAT_PNG:
-                mFormattedImage = new LLImagePNG();
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_JPEG:
-                mFormattedImage = new LLImageJPEG(mSnapshotQuality);
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_BMP:
-                mFormattedImage = new LLImageBMP();
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
-                mFormattedImage = new LLImageWebP();
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
-                mFormattedImage = new LLImageAVIF(mSnapshotQuality);
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS:
-                mFormattedImage = new LLImageAVIF(100); // quality 100 == lossless
-                break;
-        }
+        mFormattedImage = createFormattedImage(format, mSnapshotQuality);
         if (mFormattedImage->encode(mPreviewImage, 0))
         {
             // We can update the data size precisely at that point
@@ -1133,6 +1113,28 @@ void LLSnapshotLivePreview::saveLocal(const snapshot_saved_signal_t::slot_type& 
 }
 
 //Check if failed due to insufficient memory
+// static
+LLPointer<LLImageFormatted> LLSnapshotLivePreview::createFormattedImage(LLSnapshotModel::ESnapshotFormat format, S32 quality)
+{
+    switch (format)
+    {
+    case LLSnapshotModel::SNAPSHOT_FORMAT_PNG:
+        return new LLImagePNG();
+    case LLSnapshotModel::SNAPSHOT_FORMAT_JPEG:
+        return new LLImageJPEG(quality);
+    case LLSnapshotModel::SNAPSHOT_FORMAT_BMP:
+        return new LLImageBMP();
+    case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
+        return new LLImageWebP();
+    case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
+        return new LLImageAVIF(quality);
+    case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS:
+        return new LLImageAVIF(100); // quality 100 == lossless
+    }
+    LL_WARNS() << "Unknown local snapshot format: " << format << LL_ENDL;
+    return new LLImagePNG();
+}
+
 void LLSnapshotLivePreview::saveLocal(LLPointer<LLImageFormatted> image, const snapshot_saved_signal_t::slot_type& success_cb, const snapshot_saved_signal_t::slot_type& failure_cb)
 {
     sSaveLocalImage = image;

@@ -48,6 +48,8 @@ public:
     typedef boost::signals2::signal<void(void)> snapshot_saved_signal_t;
 
     static void saveLocal(LLPointer<LLImageFormatted> image, const snapshot_saved_signal_t::slot_type& success_cb = snapshot_saved_signal_t(), const snapshot_saved_signal_t::slot_type& failure_cb = snapshot_saved_signal_t());
+    /// An empty image of @a format, at @a quality where the format has one.
+    static LLPointer<LLImageFormatted> createFormattedImage(LLSnapshotModel::ESnapshotFormat format, S32 quality);
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Params()
