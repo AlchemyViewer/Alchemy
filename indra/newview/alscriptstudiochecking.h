@@ -115,6 +115,14 @@ struct ALScriptStudioDoc::Check
     // A Fix All asked before the text as it stands was checked, made
     // once it is: of the problems of one kind, or of all where empty.
     std::optional<std::string> fixAllAfterCheck;
+    // A Fix All previewed: what it picked, over the text at that version,
+    // made by Apply while the text is still that.
+    struct FixAllPreview
+    {
+        FixPick pick;
+        U32     version = 0;
+    };
+    std::optional<FixAllPreview> fixAllPreviewed;
 };
 
 // A Script Studio window's checking, as the tab's part `doc.check` keeps
@@ -156,7 +164,11 @@ public:
         // question of whether to make many fixes at once, `yes` where they
         // are to be.
         virtual ALCodeEditor& editorInFront(Doc& doc)                              = 0;
-        virtual void          confirmFixAll(const LLSD& args, std::function<void()> yes) = 0;
+        // Or to see them first, `preview` where they are.
+        virtual void          confirmFixAll(const LLSD& args, std::function<void()> yes, std::function<void()> preview) = 0;
+        // Two texts side by side in a tab's place, each under its title.
+        virtual void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
+                             const std::string& right_title) = 0;
 
     protected:
         ~Window() = default;
@@ -211,6 +223,11 @@ public:
     // asked; and made, the asking done. True where anything was made.
     void askFixAll(Doc& doc, const FixPick& pick);
     bool fixAll(Doc& doc, const FixPick& pick);
+    // The text as the fixes would make it, beside the text as it is, and
+    // Apply offered over the tab (the action apply_fixes); and made by it,
+    // where the text is still what was previewed.
+    void previewFixAll(Doc& doc, const FixPick& pick);
+    bool applyPreviewed(Doc& doc);
     // The fixes of the problems on a line, as the editor lists them, each
     // with the value that finds it again; none where the text has moved on
     // since the check they were made in. And the problem a value is.

@@ -77,6 +77,7 @@ namespace
                                 : action == "take_saved"    ? "NoticeTakeSaved"
                                 : action == "keep_saved"    ? "NoticeKeepSaved"
                                 : action == "compare_saved" || action == "compare_world" ? "NoticeCompare"
+                                : action == "apply_fixes"                                ? "NoticeApplyFixes"
                                                                                          : nullptr;
             if (label)
             {

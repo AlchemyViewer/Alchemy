@@ -3694,14 +3694,26 @@ void ALFloaterScriptStudio::answeredElsewhere(Doc& doc, const ALScriptAnalysis::
     }
 }
 
-void ALFloaterScriptStudio::confirmFixAll(const LLSD& args, std::function<void()> yes)
+void ALFloaterScriptStudio::confirmFixAll(const LLSD& args, std::function<void()> yes, std::function<void()> preview)
 {
-    // Asked first, as Replace All asks: many changes at once, said as many.
+    // Asked first, as Replace All asks: many changes at once, said as many;
+    // or seen first.
     const LLHandle<LLFloater> handle = getHandle();
-    LLNotificationsUtil::add("ScriptStudioFixAll", args, LLSD(), [handle, yes](const LLSD& notification, const LLSD& response) {
-        if (handle.get() && LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+    LLNotificationsUtil::add("ScriptStudioFixAll", args, LLSD(), [handle, yes, preview](const LLSD& notification, const LLSD& response) {
+        if (!handle.get())
         {
-            yes();
+            return;
+        }
+        switch (LLNotificationsUtil::getSelectedOption(notification, response))
+        {
+            case 0:
+                yes();
+                break;
+            case 1:
+                preview();
+                break;
+            default:
+                break;
         }
     });
 }
@@ -7235,6 +7247,11 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
         // What was typed here set aside for File > Recover, and the tab
         // loaded again as the world has it.
         revert(doc);
+    }
+    else if (action == "apply_fixes")
+    {
+        endCompare(doc);
+        mChecking.applyPreviewed(doc);
     }
     else if (action == "compare_world")
     {

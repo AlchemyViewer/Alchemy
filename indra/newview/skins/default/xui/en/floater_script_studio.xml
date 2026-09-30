@@ -453,6 +453,13 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="NoticeCompareTip">Show both texts side by side, with changes marked; Escape closes the comparison</floater.string>
     <floater.string name="CompareNow">This tab now</floater.string>
     <floater.string name="CompareUnsaved">[TITLE] (unsaved)</floater.string>
+    <floater.string name="FixAllAfter">After [FIXES]</floater.string>
+    <floater.string name="FixAllPreviewed">[FIXES] for [NAME], shown beside the text. Apply makes them, as one step to undo.</floater.string>
+    <floater.string name="FixAllChangedSince">The text changed after the preview, so its fixes were not made. Use Fix All again to see them for the text now.</floater.string>
+    <floater.string name="ActionApplyFixes">Apply</floater.string>
+    <floater.string name="ActionApplyFixesTip">Make the fixes previewed in [NAME], as one step to undo</floater.string>
+    <floater.string name="NoticeApplyFixes">Apply Fixes</floater.string>
+    <floater.string name="NoticeApplyFixesTip">Make the fixes shown, as one step to undo</floater.string>
     <floater.string name="HistoryNone">No saves of [NAME] are kept here yet. Each save from now on is kept for 30 days.</floater.string>
     <floater.string name="HistoryTitle">Saves of [NAME]</floater.string>
     <floater.string name="HistoryPlaceholder">Type a date or time to find a save</floater.string>

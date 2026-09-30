@@ -2085,11 +2085,12 @@ Replace [PLACES] in [SCRIPTS] with &quot;[WITH]&quot;? You can undo each one's c
    icon="alertmodal.tga"
    name="ScriptStudioFixAll"
    type="alertmodal">
-Apply [FIXES] in &quot;[NAME]&quot;, one per problem, such as &quot;[EXAMPLE]&quot;? You can undo them in one step.[LEFT]
+Apply [FIXES] in &quot;[NAME]&quot;, one per problem, such as &quot;[EXAMPLE]&quot;? You can undo them in one step, or preview them first.[LEFT]
     <tag>confirm</tag>
     <usetemplate
-     name="okcancelbuttons"
-     notext="Cancel"
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Preview"
      yestext="Fix"/>
   </notification>
 

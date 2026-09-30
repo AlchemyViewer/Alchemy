@@ -167,10 +167,16 @@ namespace
         void                                save(Doc& doc) override { told.push_back("save " + doc.id); }
         void                                preprocess(Doc& doc) override { told.push_back("run " + doc.id); }
         ALCodeEditor&                       editorInFront(Doc& doc) override { return *doc.editor; }
-        void                                confirmFixAll(const LLSD& args, std::function<void()> yes) override
+        void                                confirmFixAll(const LLSD& args, std::function<void()> yes, std::function<void()> see) override
         {
             confirmed = args;
             confirm   = std::move(yes);
+            preview   = std::move(see);
+        }
+        void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
+                     const std::string& right_title) override
+        {
+            told.push_back("compare " + doc.id + ": " + left + " | " + right + " (" + left_title + " | " + right_title + ")");
         }
 
         std::vector<Ask>                    asks;
@@ -181,6 +187,7 @@ namespace
         std::string                         front;
         LLSD                                confirmed;
         std::function<void()>               confirm;
+        std::function<void()>               preview;
         // The tabs whose problems are asked for and not made yet.
         std::set<std::string>               waiting;
     };
@@ -1190,5 +1197,47 @@ namespace tut
         file.notecard = true;
         checking.schedule(file, true);
         ensure("a text file on disk is not checked", file.check->analysisDue <= 0.0);
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<21>()
+    {
+        set_test_name("Fix All previewed: the text after beside the text now, Apply offered, made as one step; not over a text changed since");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        // Asked before the check, asked again once it has answered.
+        checking.askFixAll(doc, Doc::FixPick{});
+        checking.pump(1.0);
+        ALScriptProblem one = problem(0, "one");
+        one.fixes           = { fix("First", 0, 0, 7, "float") };
+        ALScriptProblem two = problem(3, "two");
+        two.fixes           = { fix("Second", 3, 4, 15, "touch_start") };
+        const std::string before = doc.editor->wholeText();
+        studio.asks.back().answered(answer(doc, { one, two }));
+        ensure("asked, with a preview", (bool)studio.preview);
+        studio.preview();
+        ensure("nothing made yet", doc.editor->wholeText() == before);
+        const std::string& compared = studio.told.back();
+        ensure("the text now beside it after" + compared,
+               compared.rfind("compare a: " + before + " | float count;", 0) == 0 && compared.find("    touch_start() { count = 1; }") != std::string::npos &&
+                   compared.find("(CompareNow | FixAllAfter [FIXES]=Fixes [COUNT]=2") != std::string::npos);
+        ensure("Apply offered", services.reports.back().actions == Names{ "apply_fixes" } && services.reports.back().doc == "a");
+        ensure("made", checking.applyPreviewed(doc) && doc.editor->document().line(0) == "float count;" &&
+                           doc.editor->undoJournal().undoLabel() == "fix");
+        ensure("once", !checking.applyPreviewed(doc));
+
+        checking.pump(1.0);
+        ALScriptProblem three = problem(0, "three");
+        three.fixes           = { fix("Third", 0, 0, 5, "integer") };
+        ALScriptProblem four  = problem(3, "four");
+        four.fixes            = { fix("Fourth", 3, 4, 15, "touch_end") };
+        studio.preview = nullptr;
+        studio.asks.back().answered(answer(doc, { three, four }));
+        checking.askFixAll(doc, Doc::FixPick{});
+        ensure("asked again", (bool)studio.preview);
+        studio.preview();
+        doc.editor->setText("default {}\n");
+        ensure("changed since: not made", !checking.applyPreviewed(doc) && doc.editor->wholeText() == "default {}\n");
+        ensure("said", services.statuses.back() == "FixAllChangedSince" && services.statusFailures.back());
     }
 }

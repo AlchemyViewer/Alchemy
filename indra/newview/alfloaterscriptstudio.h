@@ -709,7 +709,7 @@ private:
     void answeredElsewhere(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at) override;
     void showOutline(Doc& doc) override { mOutlinePane->show(doc); }
     ALCodeEditor&                       editorInFront(Doc& doc) override { return sourceInFront(doc); }
-    void                                confirmFixAll(const LLSD& args, std::function<void()> yes) override;
+    void                                confirmFixAll(const LLSD& args, std::function<void()> yes, std::function<void()> preview) override;
     // What weighing (ALScriptStudioWeighing) asks of the window: its
     // weights asked for, the settings it goes by, and the Weights tab.
     void                                  askWeights(Doc& doc) override { askAnalyzer(doc, ALScriptAnalysis::Kind::Weigh, ALTextPos()); }

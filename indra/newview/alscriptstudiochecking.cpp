@@ -1483,12 +1483,67 @@ void ALScriptStudioChecking::askFixAll(Doc& doc, const FixPick& pick)
     args["LEFT"]                    = left_said.empty() ? std::string() : " " + left_said;
     const std::weak_ptr<bool> alive = mAlive;
     const std::string         id    = doc.id;
-    mWindow.confirmFixAll(args, [this, alive, id, pick]() {
-        if (Doc* asked = alive.lock() ? mServices.findDoc(id) : nullptr)
-        {
-            fixAll(*asked, pick);
-        }
-    });
+    mWindow.confirmFixAll(
+        args,
+        [this, alive, id, pick]() {
+            if (Doc* asked = alive.lock() ? mServices.findDoc(id) : nullptr)
+            {
+                fixAll(*asked, pick);
+            }
+        },
+        [this, alive, id, pick]() {
+            if (Doc* asked = alive.lock() ? mServices.findDoc(id) : nullptr)
+            {
+                previewFixAll(*asked, pick);
+            }
+        });
+}
+
+void ALScriptStudioChecking::previewFixAll(Doc& doc, const FixPick& pick)
+{
+    if (!doc.loaded)
+    {
+        return;
+    }
+    // The fixes' edits made over a copy of the source, as they would be
+    // made over it: in the text's order, none meeting another.
+    mWindow.settleProblems(doc);
+    const std::vector<const ALScriptFix*> fixes = doc.pickFixes(pick);
+    ALScriptFix                           all;
+    for (const ALScriptFix* fix : fixes)
+    {
+        all.edits.insert(all.edits.end(), fix->edits.begin(), fix->edits.end());
+    }
+    const std::string                now   = doc.editor->wholeText();
+    const std::optional<std::string> after = fixes.empty() ? std::nullopt : ALScriptFixes::apply(now, all);
+    if (!after)
+    {
+        mServices.setStatus(mServices.words("FixNone"));
+        return;
+    }
+    doc.check->fixAllPreviewed = Doc::Check::FixAllPreview{ pick, doc.editor->document().version() };
+    LLStringUtil::format_map_t args;
+    args["[FIXES]"] = mServices.counted("Fixes", static_cast<S32>(fixes.size()));
+    args["[NAME]"]  = doc.name;
+    mWindow.compare(doc, now, *after, mServices.words("CompareNow"), mServices.words("FixAllAfter", args));
+    mServices.report(mServices.words("FixAllPreviewed", args), false, &doc, { "apply_fixes" });
+}
+
+bool ALScriptStudioChecking::applyPreviewed(Doc& doc)
+{
+    if (!doc.check->fixAllPreviewed)
+    {
+        return false;
+    }
+    const Doc::Check::FixAllPreview previewed = *doc.check->fixAllPreviewed;
+    doc.check->fixAllPreviewed.reset();
+    // Made only over the text that was seen with them.
+    if (!doc.loaded || doc.editor->document().version() != previewed.version)
+    {
+        mServices.setStatus(mServices.words("FixAllChangedSince"), true);
+        return false;
+    }
+    return fixAll(doc, previewed.pick);
 }
 
 bool ALScriptStudioChecking::fixAll(Doc& doc, const FixPick& pick)
