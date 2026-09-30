@@ -72,6 +72,10 @@ public:
         // function of its own, an operator; or null. And why, where it says.
         const char* sluaUse;
         const char* sluaReason;
+        // The seconds a call makes the script sleep, under LSO and under
+        // Mono, which differ for a few: llTextBox's under Mono is none.
+        F32 sleep;
+        F32 monoSleep;
     };
     // The function's row, or null for a name the definitions lack.
     static const Trait* of(const char* name);

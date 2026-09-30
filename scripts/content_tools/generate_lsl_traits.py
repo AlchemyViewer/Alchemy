@@ -15,7 +15,9 @@ where LSL answers 1 or 0 (a result with bool-semantics), or gives booleans
 in the list it answers (bool-semantics on a list); whether `ll` lacks it,
 leaving it to `llcompat` alone, or SLua has it nowhere -- read from what
 secondlife.d.luau, beside the YAML, declares in each; and what SLua would
-have used in its stead (slua-deprecated's `use`). And the constants LSL
+have used in its stead (slua-deprecated's `use`). The performance lints
+read how long each makes the script sleep, under LSO and under Mono,
+where the two differ (sleep, mono-sleep). And the constants LSL
 types a string that SLua types a uuid, NULL_KEY among them, for
 allsluuids.inc. Run it whenever the definitions change:
 
@@ -104,6 +106,11 @@ def ll_params(line):
                 params.append(piece.split(":", 1)[1].strip() if ":" in piece else piece)
             start = i + 1
     return params
+
+
+def seconds(value):
+    """A sleep as C++ writes a float: 0.2f, 1.0f."""
+    return repr(float(value))
 
 
 def main(argv):
@@ -200,6 +207,8 @@ def main(argv):
                 "return": None,
                 "use": None,
                 "reason": None,
+                "sleep": 0.0,
+                "mono-sleep": None,
             }
             in_deprecated = False
             argument = -1
@@ -223,6 +232,9 @@ def main(argv):
         m = re.match(r"^    return: (\S+)\s*$", line)
         if m:
             functions[name]["return"] = m.group(1)
+        m = re.match(r"^    (sleep|mono-sleep): ([0-9.]+)\s*$", line)
+        if m:
+            functions[name][m.group(1)] = float(m.group(2))
         if re.match(r"^    slua-deprecated:", line):
             in_deprecated = True
             folded = None
@@ -253,8 +265,8 @@ def main(argv):
         "// its name, whether it has no side effects, whether its result must",
         "// be used, whether it needs a native implementation off LSO; what",
         "// SLua makes of it (ALLSLTraits::Slua); the arguments that are an",
-        "// index, and those SLua takes text for, by their places; and what",
-        "// SLua would use, and why.",
+        "// index, and those SLua takes text for, by their places; what SLua",
+        "// would use, and why; and the seconds it sleeps under LSO and Mono.",
         "// clang-format off",
     ]
     for fn in sorted(functions):
@@ -274,7 +286,7 @@ def main(argv):
         use = '"%s"' % t["use"].replace('\\', '\\\\').replace('"', '\\"') if t["use"] else "nullptr"
         reason = '"%s"' % t["reason"].replace('\\', '\\\\').replace('"', '\\"') if t["reason"] else "nullptr"
         lines.append(
-            '{ "%s", %s, %s, %s, %s, 0x%x, 0x%x, %s, %s },'
+            '{ "%s", %s, %s, %s, %s, 0x%x, 0x%x, %s, %s, %sf, %sf },'
             % (
                 fn,
                 "true" if t["pure"] else "false",
@@ -285,6 +297,8 @@ def main(argv):
                 text_args.get(bare, 0),
                 use,
                 reason,
+                seconds(t["sleep"]),
+                seconds(t["mono-sleep"] if t["mono-sleep"] is not None else t["sleep"]),
             )
         )
     lines.append("// clang-format on")
