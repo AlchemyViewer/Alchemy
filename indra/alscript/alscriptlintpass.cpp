@@ -62,6 +62,8 @@ namespace
         // t[0], for i = 0, #t - 1, string.sub(s, 0, n), ll.X(s, 0): LSL
         // counted from 0.
         { "SlZeroIndex", true, Severity::Warning, true, true, nullptr },
+        // llcompat.X where ll.X means the same: its fix is ll's.
+        { "SlCompatCall", true, Severity::Note, true, true, nullptr },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -103,6 +105,27 @@ namespace
             case Luau::AstExprBinary::Pow: return "^";
             case Luau::AstExprBinary::Concat: return "..";
             default: return nullptr;
+        }
+    }
+
+    bool comparison(Luau::AstExprBinary::Op op)
+    {
+        using Op = Luau::AstExprBinary::Op;
+        return op == Op::CompareEq || op == Op::CompareNe || op == Op::CompareLt || op == Op::CompareLe || op == Op::CompareGt ||
+               op == Op::CompareGe;
+    }
+
+    // The comparison that asks the same with its sides the other way round.
+    Luau::AstExprBinary::Op mirrored(Luau::AstExprBinary::Op op)
+    {
+        using Op = Luau::AstExprBinary::Op;
+        switch (op)
+        {
+            case Op::CompareLt: return Op::CompareGt;
+            case Op::CompareGt: return Op::CompareLt;
+            case Op::CompareLe: return Op::CompareGe;
+            case Op::CompareGe: return Op::CompareLe;
+            default: return op;
         }
     }
 
@@ -404,6 +427,10 @@ namespace
             {
                 zeroFound(node);
             }
+            if (on("SlCompatCall"))
+            {
+                compatCompare(node);
+            }
             return true;
         }
 
@@ -439,6 +466,20 @@ namespace
             {
                 zeroSub(node);
                 zeroArg(node);
+            }
+            if (on("SlCompatCall"))
+            {
+                compatCall(node, mStatements.contains(node));
+            }
+            return true;
+        }
+
+        // A call whose answer nobody reads.
+        bool visit(Luau::AstStatExpr* node) override
+        {
+            if (auto* call = node->expr->as<Luau::AstExprCall>())
+            {
+                mStatements.insert(call);
             }
             return true;
         }
@@ -621,8 +662,7 @@ namespace
         {
             using Op = Luau::AstExprBinary::Op;
             Op op = node->op;
-            if (op != Op::CompareEq && op != Op::CompareNe && op != Op::CompareLt && op != Op::CompareLe && op != Op::CompareGt &&
-                op != Op::CompareGe)
+            if (!comparison(op))
             {
                 return;
             }
@@ -638,14 +678,7 @@ namespace
                 }
                 std::swap(side, other);
                 // As though the find were on the left.
-                switch (op)
-                {
-                    case Op::CompareLt: op = Op::CompareGt; break;
-                    case Op::CompareGt: op = Op::CompareLt; break;
-                    case Op::CompareLe: op = Op::CompareGe; break;
-                    case Op::CompareGe: op = Op::CompareLe; break;
-                    default: break;
-                }
+                op = mirrored(op);
             }
             // Whether it asks if the find found nothing, else something;
             // and whether it asks it by order, else by equality.
@@ -927,6 +960,181 @@ namespace
             offer(said, subject + (node->op == Op::CompareEq ? " == 1" : " ~= 1"), { edit(zero->location, "1") }, false);
         }
 
+        // --- SlCompatCall: llcompat's where ll's means the same --------------
+
+        // What ll's row says of an llcompat call, and the call written as
+        // ll's: llcompat put as ll, each index from 0 up moved by one, as
+        // the assistant moves them. Nothing where ll lacks the function or
+        // deprecates it, gives booleans in a list, or an index is not a
+        // number.
+        struct Compat
+        {
+            const ALLSLTraits::Trait* row = nullptr;
+            // Its name without ll, and as LSL's: Say, llSay.
+            std::string               name;
+            std::string               lsl;
+            std::string               written;
+            std::vector<ALScriptEdit> edits;
+        };
+
+        std::optional<Compat> compat(Luau::AstExpr* e)
+        {
+            auto*       call   = unbracketed(e)->as<Luau::AstExprCall>();
+            const auto* callee = call ? call->func->as<Luau::AstExprIndexName>() : nullptr;
+            const auto* lib    = callee ? callee->expr->as<Luau::AstExprGlobal>() : nullptr;
+            if (!lib || callee->op != '.' || std::string_view(lib->name.value) != "llcompat")
+            {
+                return std::nullopt;
+            }
+            Compat out;
+            out.name = callee->index.value;
+            out.lsl  = "ll" + out.name;
+            out.row  = ALLSLTraits::of(out.lsl.c_str());
+            constexpr U8 lacking = ALLSLTraits::SluaRemoved | ALLSLTraits::SluaAbsent | ALLSLTraits::SluaDeprecated | ALLSLTraits::SluaBoolList;
+            if (!out.row || (out.row->slua & lacking))
+            {
+                return std::nullopt;
+            }
+            out.written = "ll." + out.name + "(";
+            out.edits.push_back(edit(lib->location, "ll"));
+            for (size_t i = 0; i < call->args.size; ++i)
+            {
+                Luau::AstExpr* arg = call->args.data[i];
+                std::string    now = text(arg->location);
+                if ((out.row->slua & ALLSLTraits::SluaIndexArgs) && i < 16 && (out.row->sluaIndexArgs & (1u << i)))
+                {
+                    const std::optional<double> at = literal(arg);
+                    if (!at)
+                    {
+                        return std::nullopt;
+                    }
+                    if (*at >= 0)
+                    {
+                        const std::optional<std::string> moved = whole(*at + 1);
+                        if (!moved)
+                        {
+                            return std::nullopt;
+                        }
+                        now = *moved;
+                        out.edits.push_back(edit(arg->location, now));
+                    }
+                }
+                out.written += (i ? ", " : "") + now;
+            }
+            out.written += ")";
+            return out;
+        }
+
+        // The call as its fix names it: whole where an index moved, else
+        // its function and (...).
+        static std::string shown(const Compat& found)
+        {
+            return found.edits.size() > 1 ? found.written : "ll." + found.name + "(...)";
+        }
+
+        void compatSaid(const Luau::Location& where, const Compat& found, const std::string& now, std::vector<ALScriptEdit> edits)
+        {
+            ALScriptProblem& said = problem(where, "LuauLintSlCompatCall", "[1] is LSL's, kept for scripts moved from it; ll's means the same here: [2]",
+                                            { "llcompat." + found.name, now }, "SlCompatCall");
+            offer(said, now, std::move(edits), true);
+        }
+
+        // A call ll's answers as LSL's did, or whose answer nobody reads. A
+        // boolean's or a find's answer is read otherwise, and is asked of
+        // where it is compared.
+        void compatCall(Luau::AstExprCall* node, bool unread)
+        {
+            std::optional<Compat> found = compat(node);
+            if (!found || (!unread && (found->row->slua & (ALLSLTraits::SluaBool | ALLSLTraits::SluaIndexResult))))
+            {
+                return;
+            }
+            compatSaid(node->location, *found, shown(*found), std::move(found->edits));
+        }
+
+        // A boolean of llcompat's compared with 1 or 0, which ll's answers
+        // as true or false; a find's with -1 or 0, which ll's answers as nil
+        // or from 1.
+        void compatCompare(Luau::AstExprBinary* node)
+        {
+            using Op = Luau::AstExprBinary::Op;
+            if (!comparison(node->op))
+            {
+                return;
+            }
+            Luau::AstExpr*        side  = node->left;
+            Luau::AstExpr*        other = node->right;
+            std::optional<Compat> found = compat(side);
+            Op                    op    = node->op;
+            if (!found)
+            {
+                std::swap(side, other);
+                found = compat(side);
+                op    = mirrored(op);
+            }
+            if (!found)
+            {
+                return;
+            }
+            const std::optional<double> value = literal(other);
+            const bool                  equal = op == Op::CompareEq || op == Op::CompareNe;
+            std::string                 ask;
+            bool                        negate = false;
+            if ((found->row->slua & ALLSLTraits::SluaBool) && equal && value && (*value == 0 || *value == 1))
+            {
+                // == 1 and ~= 0 ask whether it is true.
+                negate = (*value == 1) != (op == Op::CompareEq);
+            }
+            else if ((found->row->slua & ALLSLTraits::SluaIndexResult) && ALLSLTraits::atLeastMinusOne(found->lsl.c_str()) && value)
+            {
+                if (equal && (*value == -1 || *value == 0))
+                {
+                    ask = std::string(op == Op::CompareEq ? " == " : " ~= ") + (*value == -1 ? "nil" : "1");
+                }
+                else if ((op == Op::CompareLt && *value == 0) || (op == Op::CompareLe && *value == -1))
+                {
+                    ask = " == nil";
+                }
+                else if ((op == Op::CompareGe && *value == 0) || (op == Op::CompareGt && *value == -1))
+                {
+                    ask = " ~= nil";
+                }
+                else
+                {
+                    return;
+                }
+            }
+            else
+            {
+                return;
+            }
+            // The comparison taken out round the call, which stays where it
+            // is, llcompat's edits inside it.
+            const Luau::Location& at    = node->location;
+            const Luau::Location& call  = side->location;
+            std::vector<ALScriptEdit> edits;
+            const bool                left = side == node->left;
+            if (left)
+            {
+                if (negate)
+                {
+                    edits.push_back(edit(Luau::Location(call.begin, call.begin), "not "));
+                }
+                edits.insert(edits.end(), found->edits.begin(), found->edits.end());
+                edits.push_back(edit(Luau::Location(call.end, at.end), ask));
+            }
+            else
+            {
+                edits.push_back(edit(Luau::Location(at.begin, call.begin), negate ? "not " : ""));
+                edits.insert(edits.end(), found->edits.begin(), found->edits.end());
+                if (!ask.empty())
+                {
+                    edits.push_back(edit(Luau::Location(at.end, at.end), ask));
+                }
+            }
+            compatSaid(node->location, *found, (negate ? "not " : "") + shown(*found) + ask, std::move(edits));
+        }
+
         // What a condition asks the truth of: itself, or each side of an
         // and or an or, inside brackets or not.
         void truth(Luau::AstExpr* e)
@@ -1019,6 +1227,7 @@ namespace
         const Locals&       mLocals;
         boost::unordered_flat_map<std::pair<Luau::AstLocal*, Kind>, bool>    mLocalKinds;
         boost::unordered_flat_map<Luau::AstLocal*, std::optional<Find>> mFindLocals;
+        boost::unordered_flat_set<const Luau::AstExprCall*>             mStatements;
         uint64_t            mEnabled;
         uint64_t            mFatal;
         bool                mAllErrors;

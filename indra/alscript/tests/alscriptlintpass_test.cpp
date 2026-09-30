@@ -218,4 +218,45 @@ namespace tut
         unfixed("local s = \"abc\"\nlocal n = 2\nprint(s:sub(0, n))\n", "LuauLintSlZeroIndexSub");
         unfixed("local s = \"abc\"\nprint(ll.GetSubString(s, 0, #s))\n", "LuauLintSlZeroIndexArg");
     }
+
+    template<> template<>
+    void object::test<3>()
+    {
+        set_test_name("SlCompatCall: llcompat's where ll's means the same -- the same function, indexes that are numbers, a boolean against 1 "
+                      "or 0, a find against -1 or 0, an answer unread; not where ll deprecates it, nor an answer read otherwise");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local s = \"abc\"\n"
+                                       "llcompat.Say(0, s)\n"
+                                       "print(llcompat.GetSubString(s, 0, -1))\n"
+                                       "print(llcompat.GetSubString(s, 0, #s))\n"
+                                       "if llcompat.SameGroup(ll.GetOwner()) == 1 then print(1) end\n"
+                                       "if 0 == llcompat.SameGroup(ll.GetOwner()) then print(2) end\n"
+                                       "if llcompat.SubStringIndex(s, \"b\") ~= -1 then print(3) end\n"
+                                       "if 0 > llcompat.SubStringIndex(s, \"b\") then print(4) end\n"
+                                       "llcompat.SameGroup(ll.GetOwner())\n"
+                                       "local n = llcompat.SubStringIndex(s, \"b\")\n"
+                                       "local g = llcompat.SameGroup(ll.GetOwner()) + 1\n"
+                                       "print(n, g, llcompat.ListFindList({1}, {1}) == -1)\n",
+                                       "SlCompatCall", ALScriptProblem::Severity::Note);
+        ensure_equals("each", said,
+                      std::string("1 LuauLintSlCompatCall|llcompat.Say|ll.Say(...)\n"
+                                  "2 LuauLintSlCompatCall|llcompat.GetSubString|ll.GetSubString(s, 1, -1)\n"
+                                  "4 LuauLintSlCompatCall|llcompat.SameGroup|ll.SameGroup(...)\n"
+                                  "5 LuauLintSlCompatCall|llcompat.SameGroup|not ll.SameGroup(...)\n"
+                                  "6 LuauLintSlCompatCall|llcompat.SubStringIndex|ll.SubStringIndex(...) ~= nil\n"
+                                  "7 LuauLintSlCompatCall|llcompat.SubStringIndex|ll.SubStringIndex(...) == nil\n"
+                                  "8 LuauLintSlCompatCall|llcompat.SameGroup|ll.SameGroup(...)\n"));
+        ensure_equals("the same", fixed("llcompat.Say(0, \"hi\")\n", "LuauLintSlCompatCall", "Write it ll.Say(...)", true),
+                      std::string("ll.Say(0, \"hi\")\n"));
+        ensure_equals("indexes", fixed("print(llcompat.GetSubString(\"abc\", 0, 1))\n", "LuauLintSlCompatCall", "Write it ll.GetSubString(\"abc\", 1, 2)", true),
+                      std::string("print(ll.GetSubString(\"abc\", 1, 2))\n"));
+        ensure_equals("a boolean on the right", fixed("print(0 == llcompat.SameGroup(ll.GetOwner()))\n", "LuauLintSlCompatCall", "Write it not ll.SameGroup(...)", true),
+                      std::string("print(not ll.SameGroup(ll.GetOwner()))\n"));
+        ensure_equals("a boolean", fixed("print(llcompat.SameGroup(ll.GetOwner()) ~= 0)\n", "LuauLintSlCompatCall", "Write it ll.SameGroup(...)", true),
+                      std::string("print(ll.SameGroup(ll.GetOwner()))\n"));
+        ensure_equals("a find, first", fixed("print(llcompat.SubStringIndex(\"ab\", \"a\") == 0)\n", "LuauLintSlCompatCall", "Write it ll.SubStringIndex(...) == 1", true),
+                      std::string("print(ll.SubStringIndex(\"ab\", \"a\") == 1)\n"));
+        ensure_equals("a find, on the right", fixed("print(-1 < llcompat.SubStringIndex(\"ab\", \"a\"))\n", "LuauLintSlCompatCall", "Write it ll.SubStringIndex(...) ~= nil", true),
+                      std::string("print(ll.SubStringIndex(\"ab\", \"a\") ~= nil)\n"));
+    }
 }
