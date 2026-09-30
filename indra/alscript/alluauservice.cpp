@@ -27,6 +27,7 @@
 #include "alluauservice.h"
 
 #include "alscriptfixes.h"
+#include "alscriptlintpass.h"
 #include "alselenefilters.h"
 
 #include "almessagemap.h"
@@ -675,20 +676,35 @@ namespace
         {
             Luau::Location          where;
             ALSeleneFilters::Action action;
+            // Luau's lints, and the studio's own (ALScriptLintPass's bits).
             uint64_t                lints;
+            uint64_t                slLints;
         };
-        std::vector<std::pair<ALSeleneFilters::Action, uint64_t>> file;
-        std::vector<Scoped>                                       scoped;
+        struct File
+        {
+            ALSeleneFilters::Action action;
+            uint64_t                lints;
+            uint64_t                slLints;
+        };
+        std::vector<File>   file;
+        std::vector<Scoped> scoped;
 
         // What they say of a lint at a place: the innermost statement's
         // about it, else the file's last.
         std::optional<ALSeleneFilters::Action> about(Luau::LintWarning::Code code, const Luau::Location& at) const
         {
-            const uint64_t bit  = 1ull << code;
-            const Scoped*  best = nullptr;
+            return about(1ull << code, 0, at);
+        }
+        // Of one of the studio's own, by its bit.
+        std::optional<ALSeleneFilters::Action> aboutSl(uint64_t bit, const Luau::Location& at) const { return about(0, bit, at); }
+
+        std::optional<ALSeleneFilters::Action> about(uint64_t bit, uint64_t sl_bit, const Luau::Location& at) const
+        {
+            const Scoped* best = nullptr;
             for (const Scoped& one : scoped)
             {
-                if ((one.lints & bit) && one.where.containsClosed(at.begin) && (!best || best->where.encloses(one.where)))
+                if (((one.lints & bit) || (one.slLints & sl_bit)) && one.where.containsClosed(at.begin) &&
+                    (!best || best->where.encloses(one.where)))
                 {
                     best = &one;
                 }
@@ -698,11 +714,11 @@ namespace
                 return best->action;
             }
             std::optional<ALSeleneFilters::Action> out;
-            for (const auto& [action, lints] : file)
+            for (const File& one : file)
             {
-                if (lints & bit)
+                if ((one.lints & bit) || (one.slLints & sl_bit))
                 {
-                    out = action;
+                    out = one.action;
                 }
             }
             return out;
@@ -752,7 +768,8 @@ namespace
             const size_t                                  from      = offset(comment.location.begin);
             const std::optional<ALSeleneFilters::Directive> directive = ALSeleneFilters::read(source.substr(from, offset(comment.location.end) - from));
             const uint64_t                                lints     = directive ? ALSeleneFilters::luauLints(*directive) : 0;
-            if (!lints)
+            const uint64_t                                sl_lints  = directive ? ALSeleneFilters::slLints(*directive) : 0;
+            if (!lints && !sl_lints)
             {
                 continue;
             }
@@ -760,7 +777,7 @@ namespace
             {
                 if (comment.location.end <= first_code)
                 {
-                    out.file.emplace_back(directive->action, lints);
+                    out.file.push_back({ directive->action, lints, sl_lints });
                 }
                 continue;
             }
@@ -795,7 +812,7 @@ namespace
             }
             if (beside)
             {
-                out.scoped.push_back({ *beside, directive->action, lints });
+                out.scoped.push_back({ *beside, directive->action, lints, sl_lints });
             }
         }
         return out;
@@ -1208,6 +1225,9 @@ struct ALLuauService::Impl
     std::string                     moduleName = SCRIPT_MODULE;
     // The lines nobody reads the names, hints and fixes of (setPassedOver).
     std::vector<std::pair<S32, S32>> passedOver;
+    // The studio's own lints on and fatal, as the last configuration said.
+    uint64_t                        slLints      = ALScriptLintPass::defaults();
+    uint64_t                        slFatalLints = 0;
     // The modules each kept script requires, by its module's name: what
     // lets a module go once no kept script requires it.
     boost::unordered_flat_map<std::string, std::vector<std::string>, ll::string_hash, std::equal_to<>> requiredBy;
@@ -1574,6 +1594,8 @@ void ALLuauService::setConfig(const ALLuauConfig& config)
     // The script asked about now's own, told before every question whether
     // or not anything changed: the same configuration leaves what was
     // checked as it is, and another script's is its own.
+    impl.slLints      = config.slLints;
+    impl.slFatalLints = config.slFatalLints;
     Luau::Config& own = impl.configs.configs[impl.moduleName];
     if (own.mode == mode && own.enabledLint.warningMask == config.lints && own.fatalLint.warningMask == config.fatalLints &&
         own.lintErrors == config.lintErrors && own.globals == config.globals)
@@ -1843,6 +1865,19 @@ ALScriptProblems ALLuauService::check(std::string_view source)
             severity = *said == ALSeleneFilters::Action::Deny ? ALScriptProblem::Severity::Error : ALScriptProblem::Severity::Warning;
         }
         const char* name = Luau::LintWarning::getName(warning.code);
+        // A --!nolint of one of the studio's own lints, which Luau does not
+        // know, is no mistake.
+        if (warning.code == Luau::LintWarning::Code_CommentDirective)
+        {
+            const std::string_view text   = warning.text;
+            const size_t           quoted = text.find("unknown lint rule '");
+            const size_t           from   = quoted == std::string_view::npos ? quoted : quoted + 19;
+            const size_t           to     = from == std::string_view::npos ? from : text.find('\'', from);
+            if (to != std::string_view::npos && ALScriptLintPass::bit(text.substr(from, to - from)))
+            {
+                return;
+            }
+        }
         problems.push_back(problemAt(warning.location, severity, ALScriptProblem::Source::Lint, name, warning.text));
         ALMessageMap::Match known;
         if (ALMessageMap::luauLint(name, warning.text, known))
@@ -1858,6 +1893,26 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     for (const Luau::LintWarning& warning : result.lintResult.warnings)
     {
         lint(warning, ALScriptProblem::Severity::Warning);
+    }
+    // The studio's own, beside Luau's, as selene's comments say of them too.
+    if (module_source)
+    {
+        ALScriptProblems own;
+        const Luau::Config& config = impl.configs.configs[impl.moduleName];
+        ALScriptLintPass::check(source, *module_source, module.get(), impl.slLints, impl.slFatalLints, config.lintErrors, own);
+        for (ALScriptProblem& problem : own)
+        {
+            const Luau::Location where(Luau::Position(problem.line, problem.column), Luau::Position(problem.endLine, problem.endColumn));
+            if (const std::optional<ALSeleneFilters::Action> said = selene.aboutSl(ALScriptLintPass::bit(problem.code), where))
+            {
+                if (*said == ALSeleneFilters::Action::Allow)
+                {
+                    continue;
+                }
+                problem.severity = *said == ALSeleneFilters::Action::Deny ? ALScriptProblem::Severity::Error : ALScriptProblem::Severity::Warning;
+            }
+            problems.push_back(std::move(problem));
+        }
     }
     // A global it does not know changed to the nearest name that is in
     // scope there, where one is near: the script's own locals, its globals

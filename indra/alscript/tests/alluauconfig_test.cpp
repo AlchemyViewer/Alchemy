@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../alluauconfig.h"
+#include "../alscriptlintpass.h"
 
 #include "../test/lltut.h"
 
@@ -170,5 +171,41 @@ namespace tut
         ALLuauConfig none;
         ensure("none that parse is no configuration", !ALLuauConfig::parseChain({ broken }, none, &base));
         ensure_equals("and leaves the base", none.mode, std::string("strict"));
+    }
+
+    template<> template<>
+    void alluauconfig_object::test<7>()
+    {
+        set_test_name("the studio's own lints in a .luaurc: taken out for Luau and said for the studio, first, last or alone, with the rest read whole; * says for them too");
+        const uint64_t compound = ALScriptLintPass::bit("SlCompoundAssign");
+        ensure("a rule of the table", compound != 0 && (ALScriptLintPass::defaults() & compound) != 0);
+        ALLuauConfig out;
+        std::string  error;
+        ensure("beside Luau's: " + error,
+               ALLuauConfig::parse("{ \"languageMode\": \"strict\", \"lint\": { \"LocalUnused\": false, \"SlCompoundAssign\": false } }", out, error));
+        ensure("the rest read", out.mode == "strict" && (out.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
+        ensure("ours off", (out.slLints & compound) == 0);
+        ensure("alone: " + error, ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false } }", out, error) && (out.slLints & compound) == 0);
+        ensure("first: " + error, ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false, \"LocalUnused\": false }, \"globals\": [\"g\"] }", out, error) &&
+                                      (out.slLints & compound) == 0 && out.globals == std::vector<std::string>{ "g" } &&
+                                      (out.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
+        ensure("with // comments, over lines: " + error,
+               ALLuauConfig::parse("{\n  // c style\n  \"lint\": {\n    \"LocalUnused\": true,\n    \"SlCompoundAssign\": false\n  }\n}", out, error) &&
+                   (out.slLints & compound) == 0);
+        ensure("* for ours too: " + error, ALLuauConfig::parse("{ \"lint\": { \"*\": false } }", out, error) && out.slLints == 0 &&
+                                               (out.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
+        ensure("then one on: " + error,
+               ALLuauConfig::parse("{ \"lint\": { \"*\": false, \"SlCompoundAssign\": true } }", out, error) && out.slLints == compound);
+        ensure("an Sl name that is none", !ALLuauConfig::parse("{ \"lint\": { \"SlNope\": true } }", out, error) && error == "Unknown lint SlNope");
+        ensure("a value that is none", !ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": \"fatal\" } }", out, error) &&
+                                           error == "Bad setting 'fatal'.  Valid options are true and false");
+        ensure("Luau's words on the rest keep their lines: " + error,
+               !ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false },\n  \"globals\": 3 }", out, error) && error.find("line 2") != std::string::npos);
+
+        ALLuauConfig base;
+        base.slLints      = 0;
+        base.slFatalLints = compound;
+        ensure("the base's where the file does not say: " + error,
+               ALLuauConfig::parse("{ \"languageMode\": \"strict\" }", out, error, &base) && out.slLints == 0 && out.slFatalLints == compound);
     }
 }

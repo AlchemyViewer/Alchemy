@@ -52,6 +52,13 @@ struct ALLuauConfig
     // its warning codes: Luau's defaults unless the file says.
     uint64_t lints      = 0;
     uint64_t fatalLints = 0;
+    // The studio's own lints on, and the ones that are errors, as the
+    // masks of ALScriptLintPass's bits: its defaults unless the file says.
+    // Luau knows none of them; a file's "lint" entries named Sl... are
+    // taken out before Luau reads the rest, and "*" and lintErrors say for
+    // them too.
+    uint64_t slLints      = 0;
+    uint64_t slFatalLints = 0;
     // Every lint an error.
     bool lintErrors = false;
     // Names the script may use as globals without declaring them.

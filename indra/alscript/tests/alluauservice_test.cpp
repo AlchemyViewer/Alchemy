@@ -26,6 +26,8 @@
 
 #include "../alluauservice.h"
 #include "../alluauconfig.h"
+#include "../alscriptfixes.h"
+#include "../alscriptlintpass.h"
 #include "../alselenefilters.h"
 
 #include "../test/lltut.h"
@@ -1022,5 +1024,61 @@ namespace tut
             }
             ensure(name + ":" + wrong, wrong.empty());
         }
+    }
+
+    template<> template<>
+    void alluauservice_object::test<34>()
+    {
+        set_test_name("the studio's own lints beside Luau's: found, off or an error as configured, turned off by --!nolint and selene's comments, and a NOLINT answers to its name");
+        ensure("definitions loaded: " + error, loaded);
+        const auto found = [&](const std::string& text) {
+            ALScriptProblems out;
+            for (const ALScriptProblem& p : service.check(text))
+            {
+                if (p.code == "SlCompoundAssign" || p.key.rfind("LuauLintDirective", 0) == 0)
+                {
+                    out.push_back(p);
+                }
+            }
+            return out;
+        };
+        const std::string script = "local x = 1\nx = x + 1\nlocal t = { n = \"a\" }\nt.n = t.n .. \"b\"\nx = 1 + x\nprint(x, t.n)\n";
+        ALScriptProblems  said   = found(script);
+        ensure_equals("two: x and t.n", said.size(), size_t(2));
+        ensure("the first, a note in its words: " + said[0].message,
+               said[0].key == "LuauLintSlCompoundAssign" && said[0].severity == ALScriptProblem::Severity::Note && said[0].line == 1 &&
+                   said[0].args == std::vector<std::string>{ "x", "+" } && said[0].source == ALScriptProblem::Source::Lint);
+        ensure("a field, joined: " + said[1].message, said[1].line == 3 && said[1].args == std::vector<std::string>{ "t.n", ".." });
+        ensure("a NOLINT answers to its name", ALScriptFixes::suppressed(said[0], "x = x + 1 -- NOLINT(SlCompoundAssign)", "", true) &&
+                                                   !ALScriptFixes::suppressed(said[0], "x = x + 1 -- NOLINT(LocalUnused)", "", true));
+
+        ALLuauConfig config;
+        config.slLints = 0;
+        service.setConfig(config);
+        ensure("off", found(script).empty());
+        config.slLints      = ALScriptLintPass::defaults();
+        config.slFatalLints = ALScriptLintPass::bit("SlCompoundAssign");
+        service.setConfig(config);
+        said = found(script);
+        ensure("an error", said.size() == 2 && said[0].severity == ALScriptProblem::Severity::Error);
+        config.slFatalLints = 0;
+        config.lintErrors   = true;
+        service.setConfig(config);
+        said = found(script);
+        ensure("every lint an error", said.size() == 2 && said[0].severity == ALScriptProblem::Severity::Error);
+        service.setConfig(ALLuauConfig());
+
+        said = found("--!nolint SlCompoundAssign\n" + script);
+        ensure("--!nolint by its name, and no word that Luau does not know it", said.empty());
+        ensure("--!nolint alone", found("--!nolint\n" + script).empty());
+        said = found("--!nolint SlNope\n" + script);
+        ensure("a name that is none is still said", said.size() == 3 && said[0].key.rfind("LuauLintDirective", 0) == 0);
+
+        said = found("local x = 1\nx = x + 1 -- selene: allow(SlCompoundAssign)\nprint(x)\n");
+        ensure("selene's comment beside it", said.empty());
+        said = found("--# selene: deny(SlCompoundAssign)\nlocal x = 1\nx = x + 1\nprint(x)\n");
+        ensure("selene's for the whole file, an error", said.size() == 1 && said[0].severity == ALScriptProblem::Severity::Error);
+        ensure("selene's words for the studio's own", ALSeleneFilters::slLints("SlCompoundAssign") == ALScriptLintPass::bit("SlCompoundAssign") &&
+                                                          ALSeleneFilters::slLints("unused_variable") == 0);
     }
 }

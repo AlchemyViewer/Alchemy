@@ -32,8 +32,9 @@
 #include <vector>
 
 // What a comment for selene, the Lua linter, says of the lints -- its own
-// names mapped to Luau's, which are what the studio's SLua checks raise,
-// so that a script written for selene is checked as it asks:
+// names mapped to Luau's and the studio's own (ALScriptLintPass), which
+// are what the studio's SLua checks raise, so that a script written for
+// selene is checked as it asks:
 //
 //   -- selene: allow(unused_variable)       the code beside it
 //   --# selene: allow(unused_variable, x)   the whole file, before any code
@@ -68,4 +69,8 @@ public:
     static uint64_t luauLints(std::string_view name);
     // Every name a directive gives, so.
     static uint64_t luauLints(const Directive& directive);
+    // The studio's own lints a name stands for, as ALScriptLintPass's
+    // bits: one's own name, or selene's for the same check.
+    static uint64_t slLints(std::string_view name);
+    static uint64_t slLints(const Directive& directive);
 };

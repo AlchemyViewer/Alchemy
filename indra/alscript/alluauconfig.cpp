@@ -26,16 +26,186 @@
 
 #include "alluauconfig.h"
 
+#include "alscriptlintpass.h"
+
 #include "Luau/Config.h"
+#include "Luau/Lexer.h"
 
 #include <algorithm>
 #include <cctype>
+
+namespace
+{
+    // What a file's "lint" object says of the studio's own lints, in the
+    // order it says it: each Sl... name and "*", with its value.
+    using Said = std::vector<std::pair<std::string, std::string>>;
+
+    // The file's text with its Sl... lint entries blanked -- each key, its
+    // value and the comma that parts it from the rest -- so that Luau's
+    // parser, which knows none of them, reads the rest, and its words on
+    // it keep their lines. Read as Luau reads the file: Luau's own tokens,
+    // with // comments passed over. Where the text stops being a
+    // configuration, what was read to there is blanked and the rest left
+    // for Luau to say what is wrong with.
+    std::string withoutSl(std::string_view text, Said& said)
+    {
+        std::string         out(text);
+        std::vector<size_t> starts{ 0 };
+        for (size_t at = text.find('\n'); at != std::string_view::npos; at = text.find('\n', at + 1))
+        {
+            starts.push_back(at + 1);
+        }
+        const auto offset = [&](const Luau::Position& p) {
+            return p.line < starts.size() ? std::min(text.size(), starts[p.line] + p.column) : text.size();
+        };
+        const auto blank = [&](const Luau::Position& from, const Luau::Position& to) {
+            for (size_t at = offset(from); at < offset(to); ++at)
+            {
+                if (out[at] != '\n')
+                {
+                    out[at] = ' ';
+                }
+            }
+        };
+
+        Luau::Allocator    allocator;
+        Luau::AstNameTable names(allocator);
+        Luau::Lexer        lexer(text.data(), text.size(), names);
+        const auto         next = [&] {
+            lexer.next();
+            while (lexer.current().type == Luau::Lexeme::FloorDiv)
+            {
+                lexer.nextline();
+            }
+        };
+        next();
+        if (lexer.current().type != '{')
+        {
+            return out;
+        }
+        next();
+        // The keys down to here; and the comma before the entry being read,
+        // where one was.
+        std::vector<std::string>      keys;
+        bool                          array = false;
+        std::optional<Luau::Location> comma;
+        for (int guard = 0; guard < 1000000; ++guard)
+        {
+            const Luau::Lexeme& at = lexer.current();
+            if (at.type == Luau::Lexeme::Eof)
+            {
+                return out;
+            }
+            if (array)
+            {
+                if (at.type == ']')
+                {
+                    array = false;
+                    keys.pop_back();
+                }
+                next();
+                continue;
+            }
+            if (at.type == '}')
+            {
+                if (keys.empty())
+                {
+                    return out;
+                }
+                keys.pop_back();
+                comma.reset();
+                next();
+                continue;
+            }
+            if (at.type == ',')
+            {
+                comma = at.location;
+                next();
+                continue;
+            }
+            if (at.type != Luau::Lexeme::QuotedString)
+            {
+                return out;
+            }
+            const Luau::Location key_at = at.location;
+            std::string          key(at.data, at.getLength());
+            next();
+            if (lexer.current().type != ':')
+            {
+                return out;
+            }
+            next();
+            const Luau::Lexeme& value = lexer.current();
+            if (value.type == '{' || value.type == '[')
+            {
+                array = value.type == '[';
+                keys.push_back(std::move(key));
+                comma.reset();
+                next();
+                continue;
+            }
+            if (value.type != Luau::Lexeme::QuotedString && value.type != Luau::Lexeme::ReservedTrue && value.type != Luau::Lexeme::ReservedFalse)
+            {
+                return out;
+            }
+            const std::string said_value = value.type == Luau::Lexeme::QuotedString ? std::string(value.data, value.getLength())
+                                                                                    : value.type == Luau::Lexeme::ReservedTrue ? "true" : "false";
+            const Luau::Position value_end = value.location.end;
+            next();
+            const bool ours = keys.size() == 1 && keys[0] == "lint" && key.rfind("Sl", 0) == 0;
+            if (keys.size() == 1 && keys[0] == "lint" && (ours || key == "*"))
+            {
+                said.emplace_back(key, said_value);
+            }
+            if (!ours)
+            {
+                comma.reset();
+                continue;
+            }
+            // The comma after it goes with it; the last one's, the comma
+            // before.
+            if (lexer.current().type == ',')
+            {
+                blank(key_at.begin, lexer.current().location.end);
+                next();
+            }
+            else
+            {
+                blank(comma ? comma->begin : key_at.begin, value_end);
+            }
+            comma.reset();
+        }
+        return out;
+    }
+
+    // What a file says of the studio's own lints, over what was there.
+    bool applySl(const Said& said, ALLuauConfig& out, std::string& error)
+    {
+        for (const auto& [name, value] : said)
+        {
+            if (value != "true" && value != "false")
+            {
+                error = "Bad setting '" + value + "'.  Valid options are true and false";
+                return false;
+            }
+            const uint64_t bits = name == "*" ? ~0ull : ALScriptLintPass::bit(name);
+            if (!bits)
+            {
+                error = "Unknown lint " + name;
+                return false;
+            }
+            out.slLints = value == "true" ? out.slLints | bits : out.slLints & ~bits;
+        }
+        return true;
+    }
+}
 
 ALLuauConfig::ALLuauConfig()
 {
     Luau::LintOptions defaults;
     defaults.setDefaults();
-    lints = defaults.warningMask;
+    lints   = defaults.warningMask;
+    slLints = ALScriptLintPass::defaults();
 }
 
 // static
@@ -54,9 +224,14 @@ bool ALLuauConfig::parse(std::string_view text, ALLuauConfig& out, std::string& 
     Luau::ConfigOptions options;
     // Aliases are taken however they are cased in the file.
     options.aliasOptions = Luau::ConfigOptions::AliasOptions{ std::nullopt, true };
-    if (std::optional<std::string> failed = Luau::parseConfig(std::string(text), config, options))
+    Said said;
+    if (std::optional<std::string> failed = Luau::parseConfig(withoutSl(text, said), config, options))
     {
         error = *failed;
+        return false;
+    }
+    if (!applySl(said, out, error))
+    {
         return false;
     }
     for (const auto& [name, info] : config.aliases)

@@ -33,6 +33,7 @@ target_sources(
     alscriptfixes.cpp
     alscriptformatter.cpp
     alscriptlexicon.cpp
+    alscriptlintpass.cpp
     alscriptmessages.cpp
     alscriptnameindex.cpp
     alscriptsnapshot.cpp
@@ -77,6 +78,7 @@ target_sources(
         alscriptformatter.h
         alscriptjoblane.h
         alscriptlexicon.h
+        alscriptlintpass.h
         alscriptmessages.h
         alscriptnameindex.h
         alscriptsnapshot.h

@@ -27,6 +27,7 @@
 #include "alscriptanalysis.h"
 
 #include "alscriptanalyzers.h"
+#include "alscriptlintpass.h"
 #include "alscriptstack.h"
 #include "llappviewer.h"
 #include "llviewercontrol.h"
@@ -364,6 +365,14 @@ namespace ALScriptLints
         {
             return level == Level::Off ? "off" : level == Level::Error ? "error" : "warning";
         }
+
+        // What one is where nobody chose: on, but for the studio's own the
+        // table has off.
+        Level defaultOf(bool lua, std::string_view id)
+        {
+            const ALScriptLintPass::Rule* rule = lua ? ALScriptLintPass::rule(id) : nullptr;
+            return rule && !rule->on ? Level::Off : Level::Warning;
+        }
     }
 
     const std::vector<Lint>& all()
@@ -378,6 +387,14 @@ namespace ALScriptLints
             {
                 out.push_back(Lint{ name, true });
             }
+            // The studio's own after Luau's.
+            for (const ALScriptLintPass::Rule& rule : ALScriptLintPass::rules())
+            {
+                if (rule.lua)
+                {
+                    out.push_back(Lint{ rule.name, true });
+                }
+            }
             return out;
         }();
         return lints;
@@ -387,7 +404,7 @@ namespace ALScriptLints
     {
         const LLSD        levels = gSavedSettings.getLLSD("ALScriptLintLevels");
         const std::string said   = levels.has(keyOf(lua, id)) ? levels[keyOf(lua, id)].asString() : std::string();
-        return said == "off" ? Level::Off : said == "error" ? Level::Error : Level::Warning;
+        return said == "off" ? Level::Off : said == "error" ? Level::Error : said == "warning" ? Level::Warning : defaultOf(lua, id);
     }
 
     void setLevel(bool lua, std::string_view id, Level to)
@@ -399,7 +416,7 @@ namespace ALScriptLints
         }
         // Only what differs from the default is kept, so that a default
         // that changes reaches everyone who did not choose otherwise.
-        if (to == Level::Warning)
+        if (to == defaultOf(lua, id))
         {
             levels.erase(keyOf(lua, id));
         }
@@ -419,7 +436,7 @@ namespace ALScriptLints
         }
         for (const auto& [id, to] : chosen)
         {
-            if (to == Level::Warning)
+            if (to == defaultOf(lua, id))
             {
                 levels.erase(keyOf(lua, id));
             }
@@ -489,6 +506,24 @@ namespace ALScriptLints
         {
             if (!lint.lua)
             {
+                continue;
+            }
+            // The studio's own, in masks of their own.
+            if (const uint64_t own = ALScriptLintPass::bit(lint.id))
+            {
+                switch (level(true, lint.id))
+                {
+                    case Level::Off:
+                        base.slLints &= ~own;
+                        break;
+                    case Level::Error:
+                        base.slLints |= own;
+                        base.slFatalLints |= own;
+                        break;
+                    default:
+                        base.slLints |= own;
+                        break;
+                }
                 continue;
             }
             const uint64_t bit = ALLuauConfig::lintBit(lint.id);
