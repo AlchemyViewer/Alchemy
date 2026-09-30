@@ -582,4 +582,15 @@ namespace tut
         ensure("twice: " + r.text, has(r, "-(-a)"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<18>()
+    {
+        set_test_name("a script of one state: its state_exit, which never ran and SLua has no event for, left out and said");
+        const ALLSLToSLua::Result r = convert("default { state_entry() { llOwnerSay(\"in\"); } state_exit() { llOwnerSay(\"out\"); } touch_start(integer n) { } }\n");
+        ensure("not an event: " + r.text, !has(r, "\"state_exit\"") && !has(r, "print(\"out\")"));
+        ensure("said where it was: " + r.text, noted(r, "SluaStateExit") && has(r, "-- LSL: state_exit runs as a script leaves a state") &&
+                                                  has(r, "-- state_exit, left out"));
+        checksClean(r);
+    }
 }

@@ -3119,7 +3119,12 @@ namespace
             }
             if (event == "state_exit")
             {
+                // Not an event SLua has, and one that never came: said, over
+                // a line of its own, and left out.
                 note(handler, "SluaStateExit", "state_exit runs as a script leaves a state, and this one has no other: it never ran.");
+                line("-- state_exit, left out");
+                line("");
+                continue;
             }
             std::string lead;
             const std::string params = handlerParams(handler, lead);
