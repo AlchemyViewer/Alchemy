@@ -5483,6 +5483,23 @@ bool LLViewerWindow::thumbnailSnapshot(LLImageRaw *raw, S32 preview_width, S32 p
     return rawSnapshot(raw, preview_width, preview_height, false, false, show_ui, show_hud, do_rebuild, no_post, gSavedSettings.getBOOL("RenderBalanceInSnapshot"), type);
 }
 
+namespace
+{
+    // Runs a callable when the scope that declares it is left, however it is left.
+    template <typename F>
+    class OnScopeExit
+    {
+    public:
+        explicit OnScopeExit(F f) : mF(std::move(f)) {}
+        ~OnScopeExit() { mF(); }
+        OnScopeExit(const OnScopeExit&) = delete;
+        OnScopeExit& operator=(const OnScopeExit&) = delete;
+
+    private:
+        F mF;
+    };
+}
+
 // Saves the image from the screen to a raw image
 // Since the required size might be bigger than the available screen, this method rerenders the scene in parts (called subimages) and copy
 // the results over to the final raw image.
@@ -5504,6 +5521,13 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         }
     }
 
+    // What the single-pass path below changes, recorded so the restore can undo it.
+    LLRenderTarget scratch_space;
+    S32 original_width = 0;
+    S32 original_height = 0;
+    bool reset_deferred = false;
+    LLRect window_rect;
+
     // PRE SNAPSHOT
     gSnapshotNoPost = no_post;
     gDisplaySwapBuffers = false;
@@ -5512,18 +5536,55 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     setCursor(UI_CURSOR_WAIT);
 
     // Hide all the UI widgets first and draw a frame
-    bool prev_draw_ui = gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI);
+    const bool prev_draw_ui = gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI);
 
     if ( prev_draw_ui != show_ui)
     {
         LLPipeline::toggleRenderDebugFeature(LLPipeline::RENDER_DEBUG_FEATURE_UI);
     }
 
-    bool hide_hud = !show_hud && LLPipeline::sShowHUDAttachments;
+    const bool hide_hud = !show_hud && LLPipeline::sShowHUDAttachments;
     if (hide_hud)
     {
         LLPipeline::sShowHUDAttachments = false;
     }
+
+    // POST SNAPSHOT, on every way out. The early returns below used to skip all
+    // of it: the UI stayed hidden, the wait cursor stayed up, and past the
+    // single-pass branch the screen buffers stayed at the snapshot's size with
+    // the scratch target still bound.
+    OnScopeExit restore([&]()
+    {
+        gDisplaySwapBuffers = false;
+        gSnapshotNoPost = false;
+        gDepthDirty = true;
+
+        // Put the UI back the way it was found, rather than forcing it on: a
+        // snapshot taken with the interface hidden should leave it hidden.
+        if (gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI) != prev_draw_ui)
+        {
+            LLPipeline::toggleRenderDebugFeature(LLPipeline::RENDER_DEBUG_FEATURE_UI);
+        }
+
+        if (hide_hud)
+        {
+            LLPipeline::sShowHUDAttachments = true;
+        }
+
+        setCursor(UI_CURSOR_ARROW);
+
+        if (reset_deferred)
+        {
+            mWorldViewRectRaw = window_rect;
+            LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
+            LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
+            scratch_space.flush();
+            scratch_space.release();
+            gPipeline.allocateScreenBuffer(original_width, original_height);
+        }
+
+        setBalanceVisible(true);
+    });
 
     // if not showing ui, use full window to render world view
     updateWorldViewRect(!show_ui);
@@ -5531,7 +5592,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     // Copy screen to a buffer
     // crop sides or top and bottom, if taking a snapshot of different aspect ratio
     // from window
-    LLRect window_rect = show_ui ? getWindowRectRaw() : getWorldViewRectRaw();
+    window_rect = show_ui ? getWindowRectRaw() : getWorldViewRectRaw();
 
     S32 snapshot_width  = window_rect.getWidth();
     S32 snapshot_height = window_rect.getHeight();
@@ -5548,12 +5609,6 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
         setBalanceVisible(show_balance);
     }
-
-    S32 original_width = 0;
-    S32 original_height = 0;
-    bool reset_deferred = false;
-
-    LLRenderTarget scratch_space;
 
     F32 scale_factor = 1.0f ;
     if (!keep_window_aspect || (image_width > window_width) || (image_height > window_height))
@@ -5666,13 +5721,11 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     }
     else
     {
-        setBalanceVisible(true);
         return false;
     }
 
     if (raw->isBufferInvalid())
     {
-        setBalanceVisible(true);
         return false;
     }
 
@@ -5839,21 +5892,6 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         output_buffer_offset_y += subimage_y_offset;
     }
 
-    gDisplaySwapBuffers = false;
-    gSnapshotNoPost = false;
-    gDepthDirty = true;
-
-    // POST SNAPSHOT
-    if (!gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI))
-    {
-        LLPipeline::toggleRenderDebugFeature(LLPipeline::RENDER_DEBUG_FEATURE_UI);
-    }
-
-    if (hide_hud)
-    {
-        LLPipeline::sShowHUDAttachments = true;
-    }
-
     /*if (high_res)
     {
         initFonts(1.f);
@@ -5875,8 +5913,6 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         ret = raw->scale( image_width, image_height, false );
     }
 
-    setCursor(UI_CURSOR_ARROW);
-
     if (do_rebuild)
     {
         // If we had to do a rebuild, that means that the lists of drawables to be rendered
@@ -5887,22 +5923,10 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         gPipeline.resetDrawOrders();
     }
 
-    if (reset_deferred)
-    {
-        mWorldViewRectRaw = window_rect;
-        LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
-        LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
-        scratch_space.flush();
-        scratch_space.release();
-        gPipeline.allocateScreenBuffer(original_width, original_height);
-
-    }
-
     if (high_res)
     {
         send_agent_resume();
     }
-    setBalanceVisible(true);
 
     return ret;
 }
