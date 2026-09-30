@@ -1157,7 +1157,13 @@ namespace
         LSLExpression* child = e->getChildExpr();
         switch (e->getOperation())
         {
-            case OP_MINUS: return { "-" + bracketed(value(child), UNARY), UNARY };
+            case OP_MINUS:
+            {
+                // Bracketed where it begins with a minus of its own, which
+                // after this one would be a comment.
+                const Expr v = value(child);
+                return { "-" + (!v.text.empty() && v.text.front() == '-' ? "(" + v.text + ")" : bracketed(v, UNARY)), UNARY };
+            }
             case OP_BOOLEAN_NOT: return { "not " + bracketed(condition(child), UNARY), UNARY, true };
             case OP_BIT_NOT:
                 noteOnce(e, "SluaBit32", "bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.");

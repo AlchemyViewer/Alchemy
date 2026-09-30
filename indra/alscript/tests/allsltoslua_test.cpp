@@ -571,4 +571,15 @@ namespace tut
         ensure("a string's pieces, joined: " + r.text, has(r, "s ..= \"y\" .. tostring(b)"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<17>()
+    {
+        set_test_name("a minus before a negative number is bracketed, not a comment");
+        const ALLSLToSLua::Result r = convert("default { state_entry() { integer a = -5; llOwnerSay((string)(-(-2147483648)) + (string)(-a) + (string)(- -a)); } }\n");
+        ensure("bracketed: " + r.text, has(r, "-(-2147483648)") && !has(r, "--2147483648"));
+        ensure("a name as it was: " + r.text, has(r, "tostring(-a)"));
+        ensure("twice: " + r.text, has(r, "-(-a)"));
+        checksClean(r);
+    }
 }
