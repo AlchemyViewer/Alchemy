@@ -478,8 +478,8 @@ namespace tut
         ensure("not one that says its type:" + listed, !has(2, 11, ": number"));
         ensure("name: before the string:" + listed, has(3, 6, "name:"));
         ensure("nothing before an argument that is the name:" + listed, !has(3, 12, "times:"));
-        ensure("the channel's name before the 0:" + listed, has(4, 7, "Channel:") || has(4, 7, "channel:"));
-        ensure("and the text's:" + listed, has(4, 10, "Text:") || has(4, 10, "text:"));
+        ensure("the channel's name before the 0:" + listed, has(4, 7, "channel:"));
+        ensure("and the message's:" + listed, has(4, 10, "msg:"));
         std::vector<ALScriptInlayHint> only_types = service.inlayHints(script, false, true);
         ensure("types alone, when asked", only_types.size() == 1 && only_types.front().kind == ALScriptInlayHint::Kind::Type);
         ensure("nothing when neither is asked", service.inlayHints(script, false, false).empty());

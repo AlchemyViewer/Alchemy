@@ -28,6 +28,7 @@
 
 #include "alscriptengine.h"
 #include "allslservice.h"
+#include "alluauservice.h"
 #include "alsourcemap.h"
 
 #include "Luau/Bytecode.h"
@@ -427,6 +428,8 @@ namespace ALScriptWeigh
     ALScriptWeight slua(std::string_view source)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+        // Compiled as the grid compiles it, with SLua's flags.
+        ALLuauService::setUpProcess();
         ALScriptWeight weight;
         weight.target = ALScriptWeight::Target::SLua;
         weight.limit  = ALScriptWeight::limitOf(weight.target);

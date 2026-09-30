@@ -597,7 +597,7 @@ namespace tut
         std::string made = actedOn(script, false, "llListen", false, "Add a handler for 'listen'");
         ensure_equals("before the brace, after a blank line", made,
                       "default\n{\n    state_entry()\n    {\n        llListen(0, \"\", NULL_KEY, \"\");\n        llSetTimerEvent(1.0);\n    }\n\n"
-                      "    listen(integer Channel, string Name, key ID, string Text)\n    {\n    }\n}\n");
+                      "    listen(integer channel, string name, key id, string msg)\n    {\n    }\n}\n");
         ensure("the timer too", actions(script, false, 4, 8, 4, 8).size() == 2);
         // Heard already: nothing.
         const std::string heard = "default\n{\n    state_entry() {\n        llSetTimerEvent(1.0);\n    }\n\n    timer() {\n    }\n}\n";
@@ -605,7 +605,7 @@ namespace tut
         // The brace where the state's first handler has it.
         const std::string same = "default\n{\n    state_entry() {\n        llSensorRepeat(\"\", NULL_KEY, AGENT, 10.0, PI, 5.0);\n    }\n}\n";
         made = actedOn(same, false, "llSensorRepeat", false, "Add a handler for 'sensor'");
-        ensure("on its line: " + made, made.find("\n\n    sensor(integer NumberDetected) {\n    }\n}\n") != std::string::npos);
+        ensure("on its line: " + made, made.find("\n\n    sensor(integer num_detected) {\n    }\n}\n") != std::string::npos);
         // Asked for from a function a handler calls, and from one that one
         // calls: offered all the same.
         const std::string helper = "arm()\n{\n    llSetTimerEvent(1.0);\n}\nstart()\n{\n    arm();\n}\n"
@@ -679,7 +679,7 @@ namespace tut
         const std::string script = "ll.Listen(0, \"\", ll.GetOwner(), \"\")\n";
         std::string       made   = actedOn(script, true, "Listen", false, "Add a handler for 'listen'");
         ensure_equals("at the end", made,
-                      script + "\nLLEvents:on(\"listen\", function(Channel: number, Name: string, ID: uuid, Text: string)\nend)\n");
+                      script + "\nLLEvents:on(\"listen\", function(channel: number, name: string, id: uuid, msg: string)\nend)\n");
         const std::string heard = script + "LLEvents:on(\"listen\", function(channel, name, id, text) end)\n";
         ensure("heard: " + titles(actions(heard, true, 0, 3, 0, 3)), actedOn(heard, true, "Listen", false, "Add a handler for 'listen'").rfind("offered", 0) == 0);
         // A handler taken off is no handler put on.
@@ -1086,7 +1086,7 @@ namespace tut
                                                           "Write the parameters 'touch_start' takes"),
                       std::string("default { touch_start(integer n) { llOwnerSay((string)n); } }"));
         ensure_equals("too few, the builtins' names", fixed("default { touch_start() { } }", false, "LSLTooFewArgumentsEvent", "Write the parameters 'touch_start' takes"),
-                      std::string("default { touch_start(integer NumberOfTouches) { } }"));
+                      std::string("default { touch_start(integer num_detected) { } }"));
         ensure_equals("too many", fixed("default { touch_start(integer n, integer m) { } }", false, "LSLTooManyArgumentsEvent", "Write the parameters 'touch_start' takes"),
                       std::string("default { touch_start(integer n) { } }"));
         ensure_equals("an event's with no type", fixed("default { touch_start(n) { } }", false, "LSLParameterUntyped", "Write the parameters 'touch_start' takes"),

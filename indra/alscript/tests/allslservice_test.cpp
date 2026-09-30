@@ -431,8 +431,8 @@ namespace tut
             }
             return false;
         };
-        ensure("the channel's name before the 0:" + listed, has(6, 14, "Channel:") || has(6, 14, "channel:"));
-        ensure("the text's before the cast:" + listed, has(6, 17, "Text:") || has(6, 17, "text:"));
+        ensure("the channel's name before the 0:" + listed, has(6, 14, "channel:"));
+        ensure("the message's before the cast:" + listed, has(6, 17, "msg:"));
         ensure("nothing before n, which is the name:" + listed, !has(6, 30, "n:"));
         ensure("n: before the 2:" + listed, has(7, 29, "n:"));
         ensure("nothing when not asked", service.inlayHints(script, false).empty());

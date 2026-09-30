@@ -1441,6 +1441,10 @@ void ALLuauService::setUpProcess()
 {
     static std::once_flag once;
     std::call_once(once, []() {
+        // The upstream flags SLua's semantics depend on, as the grid runs
+        // it: its integer type and library among them, which the grid's
+        // definitions name.
+        Luau::setRequiredSLuaFlags();
         // A type in a message is a glance, not a listing: `ll` has
         // hundreds of fields, and an error naming it must not print them
         // all.
