@@ -132,9 +132,11 @@ struct ALScriptWeight
 
 namespace ALScriptWeigh
 {
-    // The compile options the server is taken to use for SLua: Luau's
-    // defaults, optimisation level 1 and line information, until Linden Lab
-    // says otherwise. Named here so that there is one place to change.
+    // The compile options the server uses for SLua: Luau's defaults at
+    // optimisation level 1 and debug level 1 (line information), with the
+    // upstream flags of slua's SLUA_REQUIRED_FFLAGS set, as
+    // ALLuauService::setUpProcess sets them. Named here so that there is
+    // one place to change.
     constexpr int SLUA_OPTIMIZATION_LEVEL = 1;
     constexpr int SLUA_DEBUG_LEVEL        = 1;
 
