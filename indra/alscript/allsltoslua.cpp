@@ -382,6 +382,24 @@ namespace
         // A name no other in the script has, nor SLua holds.
         std::string freshName(const std::string& base);
 
+        // --- steps as statements -----------------------------------------------------
+
+        // The steps and assignments inside a statement's expression that can
+        // be statements of their own: its variable, whole, read nowhere else
+        // in it, and -- a global -- no function of the script's called in it
+        // to see it changed early or late. ++x and x = v go before the
+        // statement, x++ after it where `after` allows. Each is marked, and
+        // stands in the expression as its variable. The root itself too, but
+        // where it is a statement's own, which is made as a statement anyway.
+        struct Steps
+        {
+            std::vector<LSLExpression*> before;
+            std::vector<LSLExpression*> after;
+        };
+        Steps hoistSteps(LSLExpression* root, bool after, bool statement = false);
+        void  writeSteps(const std::vector<LSLExpression*>& steps);
+        boost::unordered_flat_set<LSLExpression*> mHoisted;
+
         // --- keys that hold text -----------------------------------------------------
 
         // LSL's keys hold any text; SLua's uuid() stops the script on text
@@ -1445,6 +1463,13 @@ namespace
 
     Expr Writer::sideEffect(LSLExpression* e)
     {
+        // Made as a statement of its own, before or after: its variable.
+        if (mHoisted.contains(e))
+        {
+            LSLExpression* target = e->getNodeSubType() == NODE_UNARY_EXPRESSION ? static_cast<LSLUnaryExpression*>(e)->getChildExpr()
+                                                                                 : static_cast<LSLBinaryExpression*>(e)->getLHS();
+            return lvalue(static_cast<LSLLValueExpression*>(target));
+        }
         note(e, "SluaAssignInExpression", "SLua's assignments are statements: this one is made by a function called where it stood.");
         // The assignment, then what it gives: the variable after it, or
         // before it for a step after.
@@ -1807,7 +1832,15 @@ namespace
                 --mDepth;
                 line("end");
                 return;
-            case NODE_EXPRESSION_STATEMENT: effect(static_cast<LSLExpressionStatement*>(s)->getExpr()); return;
+            case NODE_EXPRESSION_STATEMENT:
+            {
+                LSLExpression* e     = static_cast<LSLExpressionStatement*>(s)->getExpr();
+                const Steps    steps = hoistSteps(e, true, true);
+                writeSteps(steps.before);
+                effect(e);
+                writeSteps(steps.after);
+                return;
+            }
             case NODE_DECLARATION:
             {
                 auto*             d    = static_cast<LSLDeclaration*>(s);
@@ -1820,17 +1853,23 @@ namespace
                 {
                     return;
                 }
+                const Steps steps = isNull(init) ? Steps() : hoistSteps(init, true);
+                writeSteps(steps.before);
                 if (boolean(id->getSymbol()))
                 {
                     line("local " + name + (mOptions.types ? ": boolean" : "") + " = " + (isNull(init) ? std::string("false") : truthOf(init)));
-                    return;
                 }
-                line("local " + name + typed(type) + " = " + (isNull(init) ? defaultOf(type) : coerced(init, type).text));
+                else
+                {
+                    line("local " + name + typed(type) + " = " + (isNull(init) ? defaultOf(type) : coerced(init, type).text));
+                }
+                writeSteps(steps.after);
                 return;
             }
             case NODE_RETURN_STATEMENT:
             {
                 LSLExpression*    e    = static_cast<LSLReturnStatement*>(s)->getExpr();
+                writeSteps(isNull(e) ? std::vector<LSLExpression*>() : hoistSteps(e, false).before);
                 // As the function's type: a string function's NULL_KEY is
                 // LSL's string.
                 const std::string given = isNull(e)             ? std::string()
@@ -3216,6 +3255,70 @@ namespace
         }
         mTaken.insert(name);
         return name;
+    }
+
+    // --- steps as statements --------------------------------------------------------
+
+    Writer::Steps Writer::hoistSteps(LSLExpression* root, bool after, bool statement)
+    {
+        Steps out;
+        // A step or an assignment, and what it sets, whole.
+        const auto stepOf = [](LSLASTNode* node, bool& post) -> LSLSymbol* {
+            post = false;
+            if (node->getNodeSubType() == NODE_UNARY_EXPRESSION)
+            {
+                const LSLOperator op = static_cast<LSLExpression*>(node)->getOperation();
+                if (op != OP_PRE_INCR && op != OP_PRE_DECR && op != OP_POST_INCR && op != OP_POST_DECR)
+                {
+                    return nullptr;
+                }
+                post = op == OP_POST_INCR || op == OP_POST_DECR;
+                return wholeVariable(static_cast<LSLUnaryExpression*>(node)->getChildExpr());
+            }
+            return node->getNodeSubType() == NODE_BINARY_EXPRESSION ? setBy(node) : nullptr;
+        };
+        // What the statement reads and calls.
+        boost::unordered_flat_map<LSLSymbol*, int> reads;
+        bool                                       calls = false;
+        walk(root, [&](LSLASTNode* node) {
+            if (node->getNodeSubType() == NODE_LVALUE_EXPRESSION)
+            {
+                ++reads[static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol()];
+            }
+            calls = calls || (node->getNodeSubType() == NODE_FUNCTION_EXPRESSION && readOf(node));
+        });
+        walk(root, [&](LSLASTNode* node) {
+            bool       post = false;
+            LSLSymbol* var  = node == root && statement ? nullptr : stepOf(node, post);
+            if (!var || reads[var] != 1 || (post && !after) || (calls && var->getSubType() == SYM_GLOBAL))
+            {
+                return;
+            }
+            // Not one inside another step, which is made where it stands.
+            for (LSLASTNode* up = node->getParent(); up && up != root; up = up->getParent())
+            {
+                bool inner = false;
+                if (stepOf(up, inner))
+                {
+                    return;
+                }
+            }
+            auto* step = static_cast<LSLExpression*>(node);
+            mHoisted.insert(step);
+            (post ? out.after : out.before).push_back(step);
+        });
+        return out;
+    }
+
+    void Writer::writeSteps(const std::vector<LSLExpression*>& steps)
+    {
+        for (LSLExpression* step : steps)
+        {
+            // Made as the statement it would have been, not as its variable.
+            mHoisted.erase(step);
+            effect(step);
+            mHoisted.insert(step);
+        }
     }
 
     // --- keys that hold text --------------------------------------------------------

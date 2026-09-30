@@ -782,4 +782,27 @@ namespace tut
         ensure("not across operators: " + r.text, has(r, "bit32.band(bit32.bor(f, 2), n)"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<26>()
+    {
+        set_test_name("steps as statements: x++ after its statement, ++x and x = v before it, where nothing else in it reads x; kept in place where something could");
+        const ALLSLToSLua::Result r = convert("integer gLine;\n"
+                                              "integer bump() { return ++gLine; }\n"
+                                              "default { state_entry() {\n"
+                                              "    integer n = 0;\n"
+                                              "    llSay(n++, \"a\");\n"
+                                              "    integer m = ++n;\n"
+                                              "    integer k = n++ + n;\n"
+                                              "    llOwnerSay((string)(gLine++));\n"
+                                              "    llOwnerSay((string)bump() + (string)(gLine++) + (string)(m + k));\n"
+                                              "} }\n");
+        ensure("after: " + r.text, has(r, "ll.Say(n, \"a\")\nn += 1\n"));
+        ensure("before: " + r.text, has(r, "\nn += 1\nlocal m = n\n"));
+        ensure("read again, kept: " + r.text, has(r, "local k = (function() local was = n; n += 1 return was end)() + n"));
+        ensure("a global with nothing of the script's called: " + r.text, has(r, "print(tostring(gLine))\ngLine += 1\n"));
+        ensure("a global beside a call of the script's, kept: " + r.text, has(r, "tostring(bump()) .. tostring((function() local was = gLine;"));
+        ensure("a return's step before it: " + r.text, has(r, "    gLine += 1\n    return gLine\n"));
+        checksClean(r);
+    }
 }
