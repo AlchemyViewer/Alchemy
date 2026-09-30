@@ -348,6 +348,21 @@ namespace
         // could change l.
         bool grow(LSLLValueExpression* target, const std::string& name, LSLOperator op, LSLExpression* rhs);
 
+        // --- strings built in loops -------------------------------------------------
+
+        // For each string local, the outermost loop it is only ever
+        // appended to in -- s += x, s = s + x + y -- never read otherwise,
+        // and declared outside of: written with its pieces put in a table
+        // and joined once after. Appends in a loop that cannot be are noted.
+        void findStringBuilds();
+        // A loop that builds strings, written between its table and the join.
+        void buildingLoop(LSLASTNode* loop, bool last);
+        // What an append to a string adds, in order; empty where the node
+        // is not one.
+        static std::vector<LSLExpression*> appended(LSLASTNode* node, LSLSymbol*& var);
+        // A name no other in the script has, nor SLua holds.
+        std::string freshName(const std::string& base);
+
         // --- the script -------------------------------------------------------------
 
         void globals();
@@ -413,6 +428,12 @@ namespace
         boost::unordered_flat_set<LSLSymbol*>  mBorrows;
         // Why a list variable is not one of mOwned.
         boost::unordered_flat_map<LSLSymbol*, const char*> mSharedWhy;
+        // The strings each loop builds, and those being built, by the
+        // table of their pieces.
+        boost::unordered_flat_map<LSLASTNode*, std::vector<LSLSymbol*>> mBuilds;
+        boost::unordered_flat_map<LSLSymbol*, std::string>              mBuilding;
+        // Appends in loops that are noted rather than built.
+        boost::unordered_flat_set<LSLASTNode*> mUnbuilt;
     };
 
     void Writer::note(LSLASTNode* at, const std::string& key, const std::string& said)
@@ -1346,6 +1367,22 @@ namespace
         {
             return;
         }
+        // A string whose pieces a loop puts in a table.
+        if (const auto building = mBuilding.find(id->getSymbol()); building != mBuilding.end() && rhs)
+        {
+            LSLBinaryExpression* whole = static_cast<LSLBinaryExpression*>(target->getParent());
+            LSLSymbol*           var   = nullptr;
+            std::string          piece;
+            for (LSLExpression* part : appended(whole, var))
+            {
+                piece += (piece.empty() ? "" : " .. ") + bracketed(coerced(part, LST_STRING), CONCAT + 1);
+            }
+            if (!piece.empty())
+            {
+                line("table.insert(" + building->second + ", " + piece + ")");
+                return;
+            }
+        }
         // Luau's compound assignments where they mean LSL's.
         if (type != LST_LIST && op != OP_ASSIGN)
         {
@@ -1388,6 +1425,12 @@ namespace
                 {
                     // Said once for each variable it clears.
                     const std::string name = static_cast<LSLLValueExpression*>(b->getLHS())->getIdentifier()->getName();
+                    if (mUnbuilt.contains(b) && mOnce.insert("SluaStringBuild " + name).second)
+                    {
+                        note(b, "SluaStringBuild",
+                             name + " is built with .. in a loop, which makes a new string each time. SLua's way is to put the pieces "
+                                    "in a table and join them once, with table.concat.");
+                    }
                     if (mFreedFirst.contains(b) && mOnce.insert("SluaMemoryHack " + name).second)
                     {
                         const std::string empty = b->getLHS()->getIType() == LST_LIST ? "[]" : "\"\"";
@@ -1470,6 +1513,11 @@ namespace
     {
         if (isNull(s))
         {
+            return;
+        }
+        if (mBuilds.contains(s))
+        {
+            buildingLoop(s, last);
             return;
         }
         switch (s->getNodeSubType())
@@ -2672,6 +2720,179 @@ namespace
         return true;
     }
 
+    // --- strings built in loops ---------------------------------------------------------
+
+    std::vector<LSLExpression*> Writer::appended(LSLASTNode* node, LSLSymbol*& var)
+    {
+        std::vector<LSLExpression*> parts;
+        if (!node || node->getNodeSubType() != NODE_BINARY_EXPRESSION || valueUsed(node))
+        {
+            return parts;
+        }
+        auto*             b  = static_cast<LSLBinaryExpression*>(node);
+        const LSLOperator op = b->getOperation();
+        var                  = wholeVariable(b->getLHS());
+        if (!var || b->getLHS()->getIType() != LST_STRING)
+        {
+            return parts;
+        }
+        if (op == OP_ADD_ASSIGN)
+        {
+            parts.push_back(b->getRHS());
+        }
+        else if (op == OP_ASSIGN)
+        {
+            // s = s + a + b: the +'s down their left to s.
+            LSLExpression* sum = unwrapped(b->getRHS());
+            while (sum && sum->getNodeSubType() == NODE_BINARY_EXPRESSION && sum->getOperation() == OP_PLUS)
+            {
+                parts.insert(parts.begin(), static_cast<LSLBinaryExpression*>(sum)->getRHS());
+                sum = unwrapped(static_cast<LSLBinaryExpression*>(sum)->getLHS());
+            }
+            if (wholeVariable(sum) != var)
+            {
+                parts.clear();
+            }
+        }
+        return parts;
+    }
+
+    void Writer::findStringBuilds()
+    {
+        const auto loop = [](LSLASTNode* node) {
+            const LSLNodeSubType t = node->getNodeSubType();
+            return t == NODE_FOR_STATEMENT || t == NODE_WHILE_STATEMENT || t == NODE_DO_STATEMENT;
+        };
+        walk(mScript, [&](LSLASTNode* node) {
+            if (!loop(node))
+            {
+                return;
+            }
+            // Its appends, and each string read or set any other way in it
+            // or declared in it.
+            std::vector<std::pair<LSLSymbol*, LSLASTNode*>> appends;
+            boost::unordered_flat_set<LSLASTNode*>          accounted;
+            walk(node, [&](LSLASTNode* inner) {
+                LSLSymbol* var = nullptr;
+                if (appended(inner, var).empty())
+                {
+                    return;
+                }
+                appends.emplace_back(var, inner);
+                auto* b = static_cast<LSLBinaryExpression*>(inner);
+                accounted.insert(unwrapped(b->getLHS()));
+                LSLExpression* sum = unwrapped(b->getRHS());
+                while (b->getOperation() == OP_ASSIGN && sum->getNodeSubType() == NODE_BINARY_EXPRESSION)
+                {
+                    sum = unwrapped(static_cast<LSLBinaryExpression*>(sum)->getLHS());
+                }
+                accounted.insert(sum);
+            });
+            if (appends.empty())
+            {
+                return;
+            }
+            boost::unordered_flat_set<LSLSymbol*> otherwise;
+            walk(node, [&](LSLASTNode* inner) {
+                if (inner->getNodeSubType() == NODE_LVALUE_EXPRESSION && !accounted.contains(inner))
+                {
+                    otherwise.insert(static_cast<LSLLValueExpression*>(inner)->getIdentifier()->getSymbol());
+                }
+                else if (inner->getNodeSubType() == NODE_DECLARATION)
+                {
+                    otherwise.insert(static_cast<LSLDeclaration*>(inner)->getIdentifier()->getSymbol());
+                }
+            });
+            for (const auto& [var, append] : appends)
+            {
+                // Built by a loop around this one already.
+                bool outer = false;
+                for (LSLASTNode* up = node->getParent(); up && !outer; up = up->getParent())
+                {
+                    const auto builds = mBuilds.find(up);
+                    outer = builds != mBuilds.end() && std::ranges::find(builds->second, var) != builds->second.end();
+                }
+                if (outer)
+                {
+                    continue;
+                }
+                std::vector<LSLSymbol*>& built = mBuilds[node];
+                if (var->getSubType() == SYM_LOCAL && !otherwise.contains(var))
+                {
+                    if (std::ranges::find(built, var) == built.end())
+                    {
+                        built.push_back(var);
+                    }
+                }
+                else
+                {
+                    mUnbuilt.insert(append);
+                }
+                if (built.empty())
+                {
+                    mBuilds.erase(node);
+                }
+            }
+        });
+        // An append an outer loop builds after all is not noted.
+        boost::unordered::erase_if(mUnbuilt, [&](LSLASTNode* append) {
+            LSLSymbol* var = nullptr;
+            appended(append, var);
+            bool built = false;
+            for (LSLASTNode* up = append->getParent(); up && !built; up = up->getParent())
+            {
+                const auto builds = mBuilds.find(up);
+                built = builds != mBuilds.end() && std::ranges::find(builds->second, var) != builds->second.end();
+            }
+            return built;
+        });
+    }
+
+    void Writer::buildingLoop(LSLASTNode* loop, bool last)
+    {
+        const std::vector<LSLSymbol*> vars = std::move(mBuilds[loop]);
+        mBuilds.erase(loop);
+        std::vector<std::pair<std::string, std::string>> joins;
+        for (LSLSymbol* var : vars)
+        {
+            const std::string name  = mNames.contains(var) ? mNames[var] : nameOf(var->getName());
+            const std::string parts = freshName(name + "Parts");
+            line("local " + parts + (mOptions.types ? ": { string }" : "") + " = {}");
+            mBuilding[var] = parts;
+            joins.emplace_back(name, parts);
+        }
+        statement(loop, last);
+        for (LSLSymbol* var : vars)
+        {
+            mBuilding.erase(var);
+        }
+        for (const auto& [name, parts] : joins)
+        {
+            line(name + " ..= table.concat(" + parts + ")");
+        }
+    }
+
+    std::string Writer::freshName(const std::string& base)
+    {
+        if (mTaken.empty())
+        {
+            walk(mScript, [&](LSLASTNode* node) {
+                if (node->getNodeType() == NODE_IDENTIFIER)
+                {
+                    mTaken.insert(static_cast<LSLIdentifier*>(node)->getName());
+                    mTaken.insert(nameOf(static_cast<LSLIdentifier*>(node)->getName()));
+                }
+            });
+        }
+        std::string name = base;
+        for (int n = 2; mTaken.contains(name) || reservedName(name); ++n)
+        {
+            name = base + std::to_string(n);
+        }
+        mTaken.insert(name);
+        return name;
+    }
+
     // --- the script -------------------------------------------------------------------
 
     void Writer::globals()
@@ -3038,6 +3259,7 @@ end
         forgetMemoryHacks();
         findBooleans();
         findOwnedLists();
+        findStringBuilds();
         if (mManyStates)
         {
             statesPreamble();

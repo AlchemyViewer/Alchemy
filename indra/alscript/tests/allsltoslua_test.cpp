@@ -502,4 +502,44 @@ namespace tut
         ensure("said once for each: " + r.text, count(r, "and gPassed is") == 1);
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<15>()
+    {
+        set_test_name("strings built in loops: their pieces in a table, joined once after the loop that builds them; noted where they cannot be");
+        const ALLSLToSLua::Result r = convert("string gReport;\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    list names = [\"a\", \"b\", \"c\"];\n"
+                                              "    integer outParts = 1;\n"
+                                              "    string out = \"Names: \";\n"
+                                              "    integer i;\n"
+                                              "    for (i = 0; i < llGetListLength(names); ++i) {\n"
+                                              "        string row = \"\";\n"
+                                              "        integer j;\n"
+                                              "        for (j = 0; j < 3; ++j) row += (string)j;\n"
+                                              "        out = out + llList2String(names, i) + row;\n"
+                                              "    }\n"
+                                              "    string seen;\n"
+                                              "    integer k;\n"
+                                              "    for (k = 0; k < 3; ++k) { seen += \"x\"; if (llStringLength(seen) > 2) llOwnerSay(seen); }\n"
+                                              "    for (k = 0; k < 2; ++k) gReport += \"y\";\n"
+                                              "    llOwnerSay(out + seen + gReport + (string)outParts);\n"
+                                              "} }\n");
+        ensure("the outer loop's table, a name of its own: " + r.text, has(r, "local outParts2 = {}\n    for i = 0, #names - 1 do"));
+        ensure("the pieces put in: " + r.text, has(r, "table.insert(outParts2, ") && has(r, " .. row)"));
+        ensure("joined after: " + r.text, has(r, "    end\n    out ..= table.concat(outParts2)"));
+        ensure("the inner loop's, declared in the outer: " + r.text,
+               has(r, "        local rowParts = {}\n        for j = 0, 2 do\n            table.insert(rowParts, tostring(j))") &&
+                   has(r, "        row ..= table.concat(rowParts)"));
+        ensure("read in its loop: noted: " + r.text, has(r, "seen ..= \"x\"") && has(r, "-- LSL: seen is built with .. in a loop"));
+        ensure("a global: noted: " + r.text, has(r, "gReport ..= \"y\"") && has(r, "-- LSL: gReport is built with .. in a loop"));
+        checksClean(r);
+
+        ALLSLToSLua::Options typed;
+        typed.types = true;
+        const ALLSLToSLua::Result t = ALLSLToSLua::convert("default { state_entry() { string s; integer i; for (i = 0; i < 3; ++i) s += \"z\"; llOwnerSay(s); } }\n",
+                                                           typed);
+        ensure("typed: " + t.text, has(t, "local sParts: { string } = {}"));
+        checksClean(t);
+    }
 }
