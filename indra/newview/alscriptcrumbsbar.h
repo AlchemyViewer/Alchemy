@@ -156,8 +156,9 @@ private:
         U8          indentFrom = 0;
         // The problems'.
         bool        checking = false;
-        S32         errors   = 0;
-        S32         warnings = 0;
+        S32         errors    = 0;
+        S32         warnings  = 0;
+        S32         migration = 0;
         // The weight's, or the optimizer's.
         std::optional<ALScriptWeight::Target> target;
         bool                                  optimized  = false;

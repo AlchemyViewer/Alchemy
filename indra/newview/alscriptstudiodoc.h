@@ -496,12 +496,18 @@ struct ALScriptStudioDoc
         // The version of the text the fixes are in the places of: the
         // check's, or the preprocessor run's that made the note.
         U32                      fixesFor = 0;
+        // What a script moved from LSL is left to see to: a note the
+        // converter left, an LSL habit's lint, a call to llcompat
+        // (ALScriptLintPass::migration).
+        bool                     migration = false;
     };
     std::vector<Shown>                         shown;
     // How many of them are errors and warnings, counted as they are put
     // in: the tab's dot and the trailer ask on every key.
-    S32                                        shownErrors   = 0;
-    S32                                        shownWarnings = 0;
+    S32                                        shownErrors    = 0;
+    S32                                        shownWarnings  = 0;
+    // And how many are left to move from LSL, whatever their level.
+    S32                                        shownMigration = 0;
     // The rows put in, and counted.
     void setShown(std::vector<Shown> rows);
     // The problem listed at a place, in the script or an include, saying

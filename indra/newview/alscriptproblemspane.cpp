@@ -184,9 +184,10 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
         const Doc::Shown said = Doc::analysisRow(problem, doc.language.lua, services);
         add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(said.level), said.level, said.origin, said.message,
             problem.file, said.lint);
-        made.rows.back().key      = problem.key;
-        made.rows.back().fixes    = problem.fixes;
-        made.rows.back().fixesFor = doc.check->analysisVersion;
+        made.rows.back().key       = problem.key;
+        made.rows.back().fixes     = problem.fixes;
+        made.rows.back().fixesFor  = doc.check->analysisVersion;
+        made.rows.back().migration = said.migration;
         // The gutter's word on what the line offers: a lightbulb where the
         // caret is, a round mark where a fix changes the script.
         if (analysis_current && problem.file.empty() && !problem.fixes.empty())
@@ -298,8 +299,8 @@ bool ALScriptProblemsPane::postBuild()
     mList->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showMenu(x, y); });
     // The pane's filters: whose, which levels, which source, which words.
     mOrigin->add(mServices->words("OriginAny"), LLSD(""));
-    for (const char* origin : { "OriginParser", "OriginTypes", "OriginLint", "OriginCompiler", "OriginPreprocessor", "OriginOptimizer", "OriginRuntime", "OriginDefinitions",
-                                "OriginWeight" })
+    for (const char* origin : { "OriginParser", "OriginTypes", "OriginLint", "OriginMigration", "OriginCompiler", "OriginPreprocessor", "OriginOptimizer",
+                                "OriginRuntime", "OriginDefinitions", "OriginWeight" })
     {
         mOrigin->add(mServices->words(origin), LLSD(mServices->words(origin)));
     }
@@ -473,6 +474,15 @@ void ALScriptProblemsPane::showEveryScript()
     if (!everyScript())
     {
         mScope->selectByValue("all");
+        mWindow->problemFiltersChanged();
+    }
+    fill(listed());
+}
+
+void ALScriptProblemsPane::showOrigin(const std::string& origin)
+{
+    if (mOrigin->selectByValue(LLSD(mServices->words(origin))))
+    {
         mWindow->problemFiltersChanged();
     }
     fill(listed());

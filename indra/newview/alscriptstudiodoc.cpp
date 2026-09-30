@@ -31,6 +31,7 @@
 #include "alnotecardembedded.h"
 #include "alscriptexternaleditor.h"
 #include "alscriptfixes.h"
+#include "alscriptlintpass.h"
 #include "alscriptlookup.h"
 #include "alscriptstudiocaret.h"
 #include "alscriptstudiochecking.h"
@@ -78,10 +79,12 @@ ALScriptStudioDoc::Level ALScriptStudioDoc::levelOf(ALScriptProblem::Severity se
 ALScriptStudioDoc::Shown ALScriptStudioDoc::analysisRow(const ALScriptProblem& problem, bool lua, const ALScriptStudioServices& services)
 {
     Shown row;
-    row.level  = levelOf(problem.severity);
-    row.origin = problem.source == ALScriptProblem::Source::Parser  ? services.words("OriginParser")
-                 : problem.source == ALScriptProblem::Source::Types ? services.words("OriginTypes")
-                                                                    : services.words("OriginLint");
+    row.level     = levelOf(problem.severity);
+    row.migration = lua && ALScriptLintPass::migration(problem);
+    row.origin    = row.migration                                      ? services.words("OriginMigration")
+                    : problem.source == ALScriptProblem::Source::Parser ? services.words("OriginParser")
+                    : problem.source == ALScriptProblem::Source::Types  ? services.words("OriginTypes")
+                                                                        : services.words("OriginLint");
     // A lint's name says what to look up, or what a NOLINT comment turns
     // off: Luau's own, LSL's as its key has it. An error's number says
     // nothing to whoever reads it.
@@ -347,13 +350,15 @@ std::string ALScriptStudioDoc::foundAs(const std::string& name, std::optional<bo
 
 void ALScriptStudioDoc::setShown(std::vector<Shown> rows)
 {
-    shown         = std::move(rows);
-    shownErrors   = 0;
-    shownWarnings = 0;
+    shown          = std::move(rows);
+    shownErrors    = 0;
+    shownWarnings  = 0;
+    shownMigration = 0;
     for (const Shown& one : shown)
     {
         shownErrors += one.level == Level::Error ? 1 : 0;
         shownWarnings += one.level == Level::Warning ? 1 : 0;
+        shownMigration += one.migration && one.file.empty() ? 1 : 0;
     }
 }
 

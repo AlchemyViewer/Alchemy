@@ -5331,6 +5331,11 @@ void ALFloaterScriptStudio::trailerChosen(const std::string& value)
     {
         showBottom("problems_tab", true);
     }
+    else if (value == "migration")
+    {
+        showBottom("problems_tab", true);
+        mProblemsPane->showOrigin("OriginMigration");
+    }
     else if (value == "expanded")
     {
         toggleExpanded();

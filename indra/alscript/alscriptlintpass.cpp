@@ -53,42 +53,42 @@ namespace
 
     const std::vector<Rule> RULES = {
         // x = x + 1, where Luau has x += 1.
-        { "SlCompoundAssign", Rule::SLua, Severity::Note, true, true, nullptr },
+        { "SlCompoundAssign", Rule::SLua, Severity::Note, true, true, nullptr, true },
         // LSL: llGetListLength(l) in a loop's check, l unchanged in it.
         { "SlLoopInvariantCall", Rule::LSL, Severity::Note, true, true, nullptr },
         // if n then, where n is a number: true at 0 as at anything.
-        { "SlNumberTruth", Rule::SLua, Severity::Warning, true, true, nullptr },
+        { "SlNumberTruth", Rule::SLua, Severity::Warning, true, true, nullptr, true },
         // ll.ListFindList(l, x) == -1, where it answers nil; llcompat's
         // against nil, where it answers -1.
-        { "SlNilSentinel", Rule::SLua, Severity::Error, true, true, nullptr },
+        { "SlNilSentinel", Rule::SLua, Severity::Error, true, true, nullptr, true },
         // t == {}: a table built there equals no other.
-        { "SlTableCompare", Rule::SLua, Severity::Error, true, true, nullptr },
+        { "SlTableCompare", Rule::SLua, Severity::Error, true, true, nullptr, true },
         // t[0], for i = 0, #t - 1, string.sub(s, 0, n), ll.X(s, 0): LSL
         // counted from 0.
-        { "SlZeroIndex", Rule::SLua, Severity::Warning, true, true, nullptr },
+        { "SlZeroIndex", Rule::SLua, Severity::Warning, true, true, nullptr, true },
         // llcompat.X where ll.X means the same: its fix is ll's.
-        { "SlCompatCall", Rule::SLua, Severity::Note, true, true, nullptr },
+        { "SlCompatCall", Rule::SLua, Severity::Note, true, true, nullptr, true },
         // b == 1, where b is a boolean: LSL's truths were numbers.
-        { "SlBooleanNumber", Rule::SLua, Severity::Error, true, true, nullptr },
+        { "SlBooleanNumber", Rule::SLua, Severity::Error, true, true, nullptr, true },
         // x = 0 or function f() making a global; a function f() in a nested
         // scope, lute's global_function_in_scope.
-        { "SlGlobalAssign", Rule::SLua, Severity::Warning, true, true, nullptr },
+        { "SlGlobalAssign", Rule::SLua, Severity::Warning, true, true, nullptr, true },
         // if (x) then: LSL's brackets, which Luau's if needs none of.
-        { "SlParenCondition", Rule::SLua, Severity::Note, true, true, "parenthese_conditions" },
+        { "SlParenCondition", Rule::SLua, Severity::Note, true, true, "parenthese_conditions", true },
         // a = b followed by b = a, which is no swap.
-        { "SlAlmostSwapped", Rule::SLua, Severity::Warning, true, true, "almost_swapped" },
+        { "SlAlmostSwapped", Rule::SLua, Severity::Warning, true, true, "almost_swapped", true },
         // string.upper(s) alone, ll.DeleteSubList(l, 1, 1) alone: an answer
         // thrown away from what does nothing else.
-        { "SlMustUse", Rule::SLua, Severity::Warning, true, true, nullptr },
+        { "SlMustUse", Rule::SLua, Severity::Warning, true, true, nullptr, true },
         // for k, v in pairs(t), where Luau's for walks t itself.
-        { "SlGeneralizedFor", Rule::SLua, Severity::Note, true, true, nullptr },
+        { "SlGeneralizedFor", Rule::SLua, Severity::Note, true, true, nullptr, true },
         // An if or a loop whose block is empty.
-        { "SlEmptyBlock", Rule::SLua, Severity::Warning, true, true, "empty_if empty_loop" },
+        { "SlEmptyBlock", Rule::SLua, Severity::Warning, true, true, "empty_if empty_loop", true },
         // t[n / 2]: Luau's / makes a fraction, which a list has nothing at.
-        { "SlIndexDivision", Rule::SLua, Severity::Warning, true, true, nullptr },
+        { "SlIndexDivision", Rule::SLua, Severity::Warning, true, true, nullptr, true },
         // a * b of vectors where a number is wanted, LSL's dot product; a % b,
         // LSL's cross product.
-        { "SlVectorProduct", Rule::SLua, Severity::Warning, true, true, nullptr },
+        { "SlVectorProduct", Rule::SLua, Severity::Warning, true, true, nullptr, true },
         // llSetPos, llSetPrimitiveParams: a call that sleeps, which a Fast
         // one does without. A warning in a loop or a timer.
         { "SlSleepingCall", Rule::Both, Severity::Note, true, true, nullptr },
@@ -2778,6 +2778,24 @@ std::string ALScriptLintPass::mergedRules(const std::vector<PrimCall>& calls, bo
         known = !calls[i].targets;
     }
     return lua ? "{" + items + "}" : "[" + items + "]";
+}
+
+// static
+bool ALScriptLintPass::migration(const ALScriptProblem& problem)
+{
+    if (problem.key == "SluaNote")
+    {
+        return true;
+    }
+    if (problem.source == ALScriptProblem::Source::Lint)
+    {
+        const Rule* own = rule(problem.code);
+        if (own && own->migration)
+        {
+            return true;
+        }
+    }
+    return problem.key.rfind("LuauLintDeprecatedMemberUse", 0) == 0 && !problem.args.empty() && problem.args[0].rfind("llcompat.", 0) == 0;
 }
 
 // static

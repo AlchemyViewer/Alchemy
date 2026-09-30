@@ -172,6 +172,8 @@ public:
     void forgetChecked(const ALScriptRef& ref);
     void clearChecked();
     void showEveryScript();
+    // The list brought to one origin, by its word's name: OriginMigration.
+    void showOrigin(const std::string& origin);
     // The list brought to one object's scripts -- those open, and those
     // its check read -- which an object's check lists.
     void showObject(const LLUUID& root);

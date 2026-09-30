@@ -72,10 +72,17 @@ public:
         bool                      on;
         bool                      fixable;
         const char*               selene;
+        // An LSL habit in SLua, which a script moved from LSL is left with:
+        // what the studio counts as left to move (the plan's stage C).
+        bool                      migration = false;
 
         bool in(bool lua) const { return (languages & (lua ? SLua : LSL)) != 0; }
     };
     static const std::vector<Rule>& rules();
+    // Whether a problem of SLua's is what a script moved from LSL is left
+    // to see to: a migration rule's, a note the converter left
+    // (SluaNote), or a call to llcompat, which Luau calls deprecated.
+    static bool migration(const ALScriptProblem& problem);
 
     // SlSleepingCall's table, which both languages' passes read: a call
     // that sleeps, and what does the same without -- its function, and
