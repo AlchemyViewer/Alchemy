@@ -746,4 +746,24 @@ namespace tut
         ensure("uuid() where only a uuid will do, said: " + r.text, has(r, "ll.GetOwnerKey(uuid(\"abc\"))") && noted(r, "SluaKeyText"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<24>()
+    {
+        set_test_name("a note only where it says something: bit32's range not for an & with a flag nor a truth, && not over a read, a deprecated call's reason rather than its indexes");
+        const ALLSLToSLua::Result r = convert("integer sayIt() { llOwnerSay(\"x\"); return 1; }\n"
+                                              "default { changed(integer what) {\n"
+                                              "    if (what & CHANGED_LINK && llGetLinkNumber() == 0) llDie();\n"
+                                              "    integer m = what | 0x80000000;\n"
+                                              "    list l = [\"a\"];\n"
+                                              "    llOwnerSay(llList2String(l, what) + (string)m);\n"
+                                              "    if ((what & 3) && sayIt()) llDie();\n"
+                                              "} }\n");
+        ensure("bit32's range where it shows: " + r.text,
+               count(r, "-- LSL: bit32 answers") == 1 && has(r, "-- LSL: bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.\n    local m"));
+        ensure("&& said once, over a call that does something: " + r.text,
+               count(r, "leaves its right side unrun") == 1 && has(r, "LSL ran both sides, the right one first.\n    if bit32.band(what, 3) ~= 0 and sayIt()"));
+        ensure("the deprecated call's reason only: " + r.text, has(r, "-- LSL: SLua deprecates ll.List2String") && !has(r, "takes indexes from 0"));
+        checksClean(r);
+    }
 }

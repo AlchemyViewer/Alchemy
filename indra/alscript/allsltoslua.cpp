@@ -753,6 +753,66 @@ namespace
         return out;
     }
 
+    bool wholeNumber(LSLExpression* e, int& v);
+
+    // A whole number not below nought: written out, or one of LSL's
+    // constants, CHANGED_LINK and the rest.
+    bool nonNegative(LSLExpression* e)
+    {
+        int v = 0;
+        if (wholeNumber(e, v))
+        {
+            return v >= 0;
+        }
+        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
+        }
+        if (!e || e->getNodeSubType() != NODE_LVALUE_EXPRESSION)
+        {
+            return false;
+        }
+        LSLSymbol*   symbol = static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol();
+        LSLConstant* value  = symbol && symbol->getSubType() == SYM_BUILTIN ? symbol->getConstantValue() : nullptr;
+        return value && value->getNodeSubType() == NODE_INTEGER_CONSTANT && static_cast<LSLIntegerConstant*>(value)->getValue() >= 0;
+    }
+
+    // Whether what an expression gives is only asked whether it is
+    // nought: a condition, an operand of !, && or ||, or compared with 0.
+    bool truthOnly(LSLASTNode* e)
+    {
+        LSLASTNode* node   = e;
+        LSLASTNode* parent = node->getParent();
+        while (parent && parent->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            node   = parent;
+            parent = parent->getParent();
+        }
+        if (!parent)
+        {
+            return false;
+        }
+        const int slot = node->getParentSlot();
+        switch (parent->getNodeSubType())
+        {
+            case NODE_BOOL_CONVERSION_EXPRESSION: return true;
+            case NODE_IF_STATEMENT:
+            case NODE_WHILE_STATEMENT: return slot == 0;
+            case NODE_DO_STATEMENT:
+            case NODE_FOR_STATEMENT: return slot == 1;
+            case NODE_UNARY_EXPRESSION: return static_cast<LSLExpression*>(parent)->getOperation() == OP_BOOLEAN_NOT;
+            case NODE_BINARY_EXPRESSION:
+            {
+                const LSLOperator op = static_cast<LSLExpression*>(parent)->getOperation();
+                int               v  = 1;
+                auto*             b  = static_cast<LSLBinaryExpression*>(parent);
+                return op == OP_BOOLEAN_AND || op == OP_BOOLEAN_OR ||
+                       ((op == OP_EQ || op == OP_NEQ) && wholeNumber(slot == 0 ? b->getRHS() : b->getLHS(), v) && v == 0);
+            }
+            default: return false;
+        }
+    }
+
     // A whole number written out, and what it is: a constant, or one with a
     // minus before it.
     bool wholeNumber(LSLExpression* e, int& v)
@@ -1075,6 +1135,15 @@ namespace
             noteOnce(e, "SluaDetected", "llcompat.Detected* count from 0, as LSL's did. SLua's own way is the handler's detected table: "
                                         "detected[n + 1]:getKey(), :getName(), :getPos() and the rest.");
         }
+        else if (slua & ALLSLTraits::SluaDeprecated)
+        {
+            // SLua's word on it, what it would use and why: which says more
+            // than how its indexes count.
+            std::string said = "SLua deprecates ll." + bare;
+            said += trait->sluaUse ? ", for " + std::string(trait->sluaUse) : std::string();
+            said += trait->sluaReason ? ": " + std::string(trait->sluaReason) : std::string(".");
+            noteOnce(e, "SluaDeprecated" + lsl, said);
+        }
         else if (slua & ALLSLTraits::SluaIndexResult)
         {
             noteOnce(e, "SluaIndex" + lsl, "llcompat." + bare + " counts from 0 and says -1 for none, as LSL did; ll." + bare +
@@ -1093,15 +1162,7 @@ namespace
             noteOnce(e, "SluaBoolList" + lsl, "llcompat." + bare + "'s list has 1 or 0 where LSL's did; ll." + bare +
                                                   "'s has true or false there.");
         }
-        if (slua & ALLSLTraits::SluaDeprecated)
-        {
-            // SLua's word on it, what it would use and why.
-            std::string said = "SLua deprecates ll." + bare;
-            said += trait->sluaUse ? ", for " + std::string(trait->sluaUse) : std::string();
-            said += trait->sluaReason ? ": " + std::string(trait->sluaReason) : std::string(".");
-            noteOnce(e, "SluaDeprecated" + lsl, said);
-        }
-        else if (trait && trait->sluaUse)
+        if (trait && trait->sluaUse && !(slua & ALLSLTraits::SluaDeprecated))
         {
             noteOnce(e, "SluaUse" + lsl, "SLua would use " + std::string(trait->sluaUse) + " for " + lsl + ".");
         }
@@ -1166,7 +1227,15 @@ namespace
                  "LSL ran the right side of this before the left, and Luau runs the left first: one side changes what the other reads.");
         }
         const auto bit = [&](const char* fn) -> Expr {
-            noteOnce(e, "SluaBit32", "bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.");
+            // Not where the answer is the same number: an & with a number not
+            // below nought, or an | or ^ of two; nor where it is only asked
+            // whether it is nought.
+            const bool same = (op == OP_BIT_AND && (nonNegative(lhs) || nonNegative(rhs))) ||
+                              ((op == OP_BIT_OR || op == OP_BIT_XOR) && nonNegative(lhs) && nonNegative(rhs)) || truthOnly(e);
+            if (!same)
+            {
+                noteOnce(e, "SluaBit32", "bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.");
+            }
             return { std::string("bit32.") + fn + "(" + value(lhs).text + ", " + value(rhs).text + ")" };
         };
         switch (op)
@@ -1249,7 +1318,9 @@ namespace
             case OP_BOOLEAN_OR:
             {
                 const bool and_ = op == OP_BOOLEAN_AND;
-                if (!ALLSLTraits::sideEffectFree(rhs))
+                // Said where leaving it unrun could show: not a read of what
+                // changes, which changes nothing.
+                if (!ALLSLTraits::changesNothing(rhs))
                 {
                     note(e, "SluaShortCircuit", std::string(and_ ? "and" : "or") + " leaves its right side unrun once the left decides it; "
                                                 "LSL ran both sides, the right one first.");
