@@ -5634,6 +5634,9 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             scratch_space.flush();
             scratch_space.release();
             gPipeline.allocateScreenBuffer(original_width, original_height);
+            // Reallocated, the SSR source holds whatever was in that memory,
+            // and the next live frame's reflections would trace it.
+            gPipeline.clearSceneMap();
         }
 
         setBalanceVisible(true);
