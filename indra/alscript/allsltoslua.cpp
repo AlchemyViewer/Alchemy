@@ -39,6 +39,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <optional>
 #include <string_view>
 
 using namespace Tailslide;
@@ -92,7 +93,8 @@ namespace
             "torotation", "touuid", "ipairs", "pairs", "next", "select", "error", "assert", "pcall", "xpcall", "unpack",
             "rawget", "rawset", "rawequal", "rawlen", "setmetatable", "getmetatable", "require", "lljson", "llbase64",
             // What the text written here defines of its own.
-            "states", "currentState", "setState", "joinLists", "lslInteger", "lslFloat", "detected",
+            "states", "currentState", "setState", "joinLists", "lslInteger", "lslFloat", "detected", "setTimer", "timerHandle",
+            "timerHandler",
         };
         return RESERVED.contains(name);
     }
@@ -187,7 +189,7 @@ namespace
     class Writer
     {
     public:
-        explicit Writer(LSLScript* script) : mScript(script) {}
+        Writer(LSLScript* script, const ALLSLToSLua::Options& options) : mScript(script), mOptions(options) {}
 
         std::string write();
         ALScriptProblems& notes() { return mNotes; }
@@ -231,6 +233,25 @@ namespace
         // statement: done in a function called on the spot.
         Expr sideEffect(LSLExpression* e);
         std::string args(LSLASTNode* list, LSLParamList* params);
+        // What SLua has in a library call's stead, where it means the same;
+        // nothing where it has nothing.
+        std::optional<Expr> idiom(LSLFunctionExpression* e, const std::string& lsl);
+        // What was detected, from the handler's own table.
+        std::optional<Expr> detected(LSLFunctionExpression* e, const std::string& lsl);
+        // A call to a function answering an index or -1, which ll answers
+        // from one or nil, read against nil where it is only asked whether
+        // it found: `found` says whether the test is of finding.
+        std::optional<Expr> foundTest(LSLExpression* call, bool found);
+        // A call whose answer is an index or -1, that ll can make with the
+        // arguments it has.
+        LSLFunctionExpression* findCall(LSLExpression* e);
+        // Whether each of a call's index arguments is a whole number
+        // written out, which ll takes moved on by one.
+        bool constantIndexes(LSLFunctionExpression* e, U16 indexes);
+        // The call's arguments for ll: its index arguments moved on by one.
+        std::string llArgs(LSLFunctionExpression* e, U16 indexes);
+        // `: type` for an LSL type, where types are written.
+        std::string typed(LSLIType type) const;
 
         // --- statements -------------------------------------------------------------
 
@@ -249,11 +270,17 @@ namespace
         void states();
         void singleState(LSLState* state);
         void multiState();
+        // What a script of several states has before anything that could
+        // change state: the tables and setState; and the timer on LLTimers,
+        // before anything that could set it.
+        void statesPreamble();
+        void timersPreamble();
         std::string handlerParams(LSLEventHandler* handler, std::string& lead);
         void handlerBody(LSLEventHandler* handler);
         void helpers(std::string& out);
 
         LSLScript*                                       mScript;
+        const ALLSLToSLua::Options&                      mOptions;
         std::string                                      mText;
         int                                              mDepth = 0;
         std::vector<std::string>                         mPending;
@@ -266,6 +293,11 @@ namespace
         bool mLslInteger = false;
         bool mLslFloat   = false;
         bool mManyStates = false;
+        // llSetTimerEvent's timer on LLTimers, where the script sets one.
+        bool mTimers = false;
+        // Inside a handler of an event SLua hands what was detected, where
+        // the detected table is read.
+        bool mInDetected = false;
         // The loops being written, innermost last: a for's steps, which a
         // jump to its end runs before `continue`.
         std::vector<LSLASTNode*> mLoops;
@@ -352,7 +384,10 @@ namespace
         {
             for (const std::string& said : mPending)
             {
-                mText += indent() + "-- LSL: " + said + "\n";
+                if (mOptions.comments)
+                {
+                    mText += indent() + "-- LSL: " + said + "\n";
+                }
             }
             mPending.clear();
         }
@@ -462,6 +497,14 @@ namespace
                 return { std::string_view(id->getName()) == "TRUE" ? "true" : "false", PRIMARY, true };
             }
         }
+        // ~ of a find, as LSL asks whether it found: -1 is all bits.
+        if (inner && inner->getNodeSubType() == NODE_UNARY_EXPRESSION && inner->getOperation() == OP_BIT_NOT)
+        {
+            if (std::optional<Expr> test = foundTest(static_cast<LSLUnaryExpression*>(inner)->getChildExpr(), true))
+            {
+                return *test;
+            }
+        }
         Expr out = expr(e);
         if (out.boolean)
         {
@@ -511,6 +554,232 @@ namespace
         return out;
     }
 
+    // A whole number written out, and what it is: a constant, or one with a
+    // minus before it.
+    bool wholeNumber(LSLExpression* e, int& v)
+    {
+        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
+        }
+        if (!e)
+        {
+            return false;
+        }
+        if (e->getNodeSubType() == NODE_CONSTANT_EXPRESSION && e->getChild(0)->getNodeSubType() == NODE_INTEGER_CONSTANT)
+        {
+            v = static_cast<LSLIntegerConstant*>(e->getChild(0))->getValue();
+            return true;
+        }
+        if (e->getNodeSubType() == NODE_UNARY_EXPRESSION && e->getOperation() == OP_MINUS &&
+            wholeNumber(static_cast<LSLUnaryExpression*>(e)->getChildExpr(), v))
+        {
+            v = -v;
+            return true;
+        }
+        return false;
+    }
+
+    LSLExpression* argumentAt(LSLFunctionExpression* e, int at)
+    {
+        LSLASTNode* arg = isNull(e->getArguments()) ? nullptr : e->getArguments()->getChild(0);
+        for (int i = 0; arg && i < at; ++i)
+        {
+            arg = arg->getNext();
+        }
+        return static_cast<LSLExpression*>(arg);
+    }
+
+    std::string Writer::typed(LSLIType type) const
+    {
+        if (!mOptions.types)
+        {
+            return std::string();
+        }
+        switch (type)
+        {
+            case LST_INTEGER:
+            case LST_FLOATINGPOINT: return ": number";
+            case LST_STRING: return ": string";
+            case LST_KEY: return ": uuid";
+            case LST_VECTOR: return ": vector";
+            case LST_QUATERNION: return ": quaternion";
+            case LST_LIST: return ": { any }";
+            default: return std::string();
+        }
+    }
+
+    bool Writer::constantIndexes(LSLFunctionExpression* e, U16 indexes)
+    {
+        for (int i = 0; i < 16; ++i)
+        {
+            int v = 0;
+            if ((indexes & (1 << i)) && !wholeNumber(argumentAt(e, i), v))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    std::string Writer::llArgs(LSLFunctionExpression* e, U16 indexes)
+    {
+        // An index from nought moved on by one; one from the end, which
+        // counts back from -1 either way, as it is.
+        LSLSymbol*    symbol = e->getIdentifier()->getSymbol();
+        LSLParamList* params = symbol ? symbol->getFunctionDecl() : nullptr;
+        LSLASTNode*   param  = params ? params->getChild(0) : nullptr;
+        std::string   out;
+        int           at = 0;
+        for (LSLASTNode* arg = isNull(e->getArguments()) ? nullptr : e->getArguments()->getChild(0); arg; arg = arg->getNext(), ++at)
+        {
+            int         v = 0;
+            std::string one;
+            if ((indexes & (1 << at)) && wholeNumber(static_cast<LSLExpression*>(arg), v))
+            {
+                one = std::to_string(v >= 0 ? v + 1 : v);
+            }
+            else
+            {
+                const LSLIType to = param ? param->getIType() : static_cast<LSLExpression*>(arg)->getIType();
+                one               = coerced(static_cast<LSLExpression*>(arg), to).text;
+            }
+            out += (out.empty() ? "" : ", ") + one;
+            param = param ? param->getNext() : nullptr;
+        }
+        return out;
+    }
+
+    std::optional<Expr> Writer::detected(LSLFunctionExpression* e, const std::string& lsl)
+    {
+        // Each llDetected* and the detected event's method that says the
+        // same; the group as a boolean, as SLua has it.
+        static const boost::unordered_flat_map<std::string_view, std::string_view> METHODS = {
+            { "llDetectedKey", "getKey" },           { "llDetectedName", "getName" },
+            { "llDetectedOwner", "getOwner" },       { "llDetectedGroup", "getGroup" },
+            { "llDetectedPos", "getPos" },           { "llDetectedRot", "getRot" },
+            { "llDetectedVel", "getVel" },           { "llDetectedLinkNumber", "getLinkNumber" },
+            { "llDetectedGrab", "getGrab" },         { "llDetectedTouchFace", "getTouchFace" },
+            { "llDetectedTouchPos", "getTouchPos" }, { "llDetectedTouchNormal", "getTouchNormal" },
+            { "llDetectedTouchBinormal", "getTouchBinormal" }, { "llDetectedTouchST", "getTouchST" },
+            { "llDetectedTouchUV", "getTouchUV" },   { "llDetectedType", "getType" },
+            { "llDetectedRezzer", "getRezzer" },     { "llDetectedDamage", "getDamage" },
+        };
+        const auto found = METHODS.find(lsl);
+        LSLExpression* index = argumentAt(e, 0);
+        if (found == METHODS.end() || !index)
+        {
+            return std::nullopt;
+        }
+        noteOnce(e, "SluaDetectedTable", "detected[n] is what LSL read with llDetected*(n - 1): SLua counts it from 1, and one past its "
+                                         "end is an error, where LSL answered nothing.");
+        int v = 0;
+        const std::string at = wholeNumber(index, v) ? std::to_string(v + 1) : bracketed(value(index), ADD + 1) + " + 1";
+        return Expr{ "detected[" + at + "]:" + std::string(found->second) + "()", PRIMARY, found->second == "getGroup" };
+    }
+
+    std::optional<Expr> Writer::idiom(LSLFunctionExpression* e, const std::string& lsl)
+    {
+        const auto arg = [&](int at) { return value(argumentAt(e, at)); };
+        if (lsl == "llPow")
+        {
+            // Luau's ^ binds tighter than a minus before it.
+            return Expr{ bracketed(arg(0), POWER + 1) + " ^ " + bracketed(arg(1), UNARY), POWER };
+        }
+        if (lsl == "llVecMag" || lsl == "llVecNorm")
+        {
+            return Expr{ std::string(lsl == "llVecMag" ? "vector.magnitude(" : "vector.normalize(") + arg(0).text + ")" };
+        }
+        if (lsl == "llVecDist")
+        {
+            return Expr{ "vector.magnitude(" + bracketed(arg(0), ADD) + " - " + bracketed(arg(1), ADD + 1) + ")" };
+        }
+        if (lsl == "llRot2Fwd" || lsl == "llRot2Left" || lsl == "llRot2Up")
+        {
+            const char* fn = lsl == "llRot2Fwd" ? "tofwd" : lsl == "llRot2Left" ? "toleft" : "toup";
+            return Expr{ std::string("quaternion.") + fn + "(" + arg(0).text + ")" };
+        }
+        if (lsl == "llGetUnixTime")
+        {
+            return Expr{ "os.time()" };
+        }
+        if (lsl == "llOwnerSay")
+        {
+            return Expr{ "print(" + coerced(argumentAt(e, 0), LST_STRING).text + ")" };
+        }
+        // Luau's math where it answers what LSL's did: not llRound, which
+        // rounds a half up where math.round rounds it away from nought.
+        static const boost::unordered_flat_map<std::string_view, std::string_view> MATH = {
+            { "llAbs", "abs" },   { "llFabs", "abs" },   { "llAcos", "acos" }, { "llAsin", "asin" },   { "llAtan2", "atan2" },
+            { "llCeil", "ceil" }, { "llCos", "cos" },    { "llFloor", "floor" }, { "llSin", "sin" },   { "llTan", "tan" },
+            { "llSqrt", "sqrt" }, { "llLog", "log" },    { "llLog10", "log10" },
+        };
+        if (const auto found = MATH.find(lsl); found != MATH.end())
+        {
+            if (lsl == "llSqrt" || lsl == "llLog" || lsl == "llLog10")
+            {
+                noteOnce(e, "SluaMathDomain", "math.sqrt, math.log and math.log10 answer nan or -inf out of their range, where LSL "
+                                              "answered 0 or stopped with a math error.");
+            }
+            std::string out;
+            for (LSLASTNode* a = isNull(e->getArguments()) ? nullptr : e->getArguments()->getChild(0); a; a = a->getNext())
+            {
+                out += (out.empty() ? "" : ", ") + value(static_cast<LSLExpression*>(a)).text;
+            }
+            return Expr{ "math." + std::string(found->second) + "(" + out + ")" };
+        }
+        return std::nullopt;
+    }
+
+    LSLFunctionExpression* Writer::findCall(LSLExpression* e)
+    {
+        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
+        }
+        if (!mOptions.sluaCalls || !e || e->getNodeSubType() != NODE_FUNCTION_EXPRESSION)
+        {
+            return nullptr;
+        }
+        auto*      call   = static_cast<LSLFunctionExpression*>(e);
+        LSLSymbol* symbol = call->getIdentifier()->getSymbol();
+        if (!symbol || symbol->getSubType() != SYM_BUILTIN)
+        {
+            return nullptr;
+        }
+        const ALLSLTraits::Trait* trait = ALLSLTraits::of(call->getIdentifier()->getName());
+        if (!trait || !(trait->slua & ALLSLTraits::SluaIndexResult) || (trait->slua & (ALLSLTraits::SluaRemoved | ALLSLTraits::SluaBool)))
+        {
+            return nullptr;
+        }
+        return !(trait->slua & ALLSLTraits::SluaIndexArgs) || constantIndexes(call, trait->sluaIndexArgs) ? call : nullptr;
+    }
+
+    std::optional<Expr> Writer::foundTest(LSLExpression* e, bool found)
+    {
+        LSLFunctionExpression* call = findCall(e);
+        if (!call)
+        {
+            return std::nullopt;
+        }
+        const std::string lsl   = call->getIdentifier()->getName();
+        LSLExpression*    among = argumentAt(call, 1);
+        std::string       asked;
+        // One thing looked for in a list: table.find, which answers as
+        // ll.ListFindList does.
+        if (mOptions.idioms && lsl == "llListFindList" && among && among->getNodeSubType() == NODE_LIST_EXPRESSION && among->getChild(0) &&
+            !among->getChild(0)->getNext())
+        {
+            asked = "table.find(" + value(argumentAt(call, 0)).text + ", " + value(static_cast<LSLExpression*>(among->getChild(0))).text + ")";
+        }
+        else
+        {
+            const ALLSLTraits::Trait* trait = ALLSLTraits::of(lsl.c_str());
+            asked = "ll." + lsl.substr(2) + "(" + llArgs(call, trait ? trait->sluaIndexArgs : 0) + ")";
+        }
+        return Expr{ asked + (found ? " ~= nil" : " == nil"), COMPARE, true };
+    }
+
     Expr Writer::call(LSLFunctionExpression* e)
     {
         LSLIdentifier* id     = e->getIdentifier();
@@ -527,9 +796,40 @@ namespace
         {
             return { "#" + bracketed(value(static_cast<LSLExpression*>(e->getArguments()->getChild(0))), UNARY), UNARY };
         }
-        const ALLSLTraits::Trait* trait  = ALLSLTraits::of(lsl.c_str());
-        const U8                  slua   = trait ? trait->slua : 0;
-        const bool                compat = slua != 0;
+        if (lsl == "llSetTimerEvent" && mTimers)
+        {
+            return { "setTimer(" + args(e->getArguments(), params) + ")" };
+        }
+        if (mOptions.detectedTable && mInDetected)
+        {
+            if (std::optional<Expr> read = detected(e, lsl))
+            {
+                return *read;
+            }
+        }
+        if (mOptions.idioms)
+        {
+            if (std::optional<Expr> said = idiom(e, lsl))
+            {
+                return *said;
+            }
+        }
+        const ALLSLTraits::Trait* trait   = ALLSLTraits::of(lsl.c_str());
+        const U8                  slua    = trait ? trait->slua : 0;
+        const U16                 indexes = trait ? trait->sluaIndexArgs : 0;
+        // SLua's ll where it means the same: a boolean answer, which a
+        // condition reads as it is and a number takes as 1 or 0; index
+        // arguments written out, moved on by one.
+        if (slua == 0 || (mOptions.sluaCalls && !(slua & (ALLSLTraits::SluaRemoved | ALLSLTraits::SluaIndexResult)) &&
+                          (!(slua & ALLSLTraits::SluaIndexArgs) || constantIndexes(e, indexes))))
+        {
+            if (trait && trait->sluaUse)
+            {
+                noteOnce(e, "SluaUse" + lsl, "SLua would use " + std::string(trait->sluaUse) + " for " + lsl + ".");
+            }
+            const std::string called = (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params);
+            return { "ll." + bare + "(" + called + ")", PRIMARY, (slua & ALLSLTraits::SluaBool) != 0 };
+        }
         if (slua & ALLSLTraits::SluaRemoved)
         {
             noteOnce(e, "SluaCompatOnly" + lsl,
@@ -542,10 +842,14 @@ namespace
             noteOnce(e, "SluaDetected", "llcompat.Detected* count from 0, as LSL's did. SLua's own way is the handler's detected table: "
                                         "detected[n + 1]:getKey(), :getName(), :getPos() and the rest.");
         }
-        else if (slua & ALLSLTraits::SluaIndex)
+        else if (slua & ALLSLTraits::SluaIndexResult)
         {
             noteOnce(e, "SluaIndex" + lsl, "llcompat." + bare + " counts from 0 and says -1 for none, as LSL did; ll." + bare +
                                                " counts from 1 and says nil.");
+        }
+        else if (slua & ALLSLTraits::SluaIndexArgs)
+        {
+            noteOnce(e, "SluaIndex" + lsl, "llcompat." + bare + " takes indexes from 0, as LSL did; ll." + bare + " takes them from 1.");
         }
         else if (slua & ALLSLTraits::SluaBool)
         {
@@ -555,7 +859,7 @@ namespace
         {
             noteOnce(e, "SluaUse" + lsl, "SLua would use " + std::string(trait->sluaUse) + " for " + lsl + ".");
         }
-        return { std::string(compat ? "llcompat." : "ll.") + bare + "(" + args(e->getArguments(), params) + ")" };
+        return { "llcompat." + bare + "(" + args(e->getArguments(), params) + ")" };
     }
 
     Expr Writer::binary(LSLBinaryExpression* e)
@@ -570,6 +874,41 @@ namespace
             const Expr b = value(rhs);
             return { bracketed(a, right_assoc ? prec + 1 : prec) + " " + word + " " + bracketed(b, right_assoc ? prec : prec + 1), prec, boolean };
         };
+        // A find's answer asked only whether it found: against nil, as ll
+        // answers, where LSL's -1 said nothing was found.
+        {
+            int         v    = 0;
+            const bool  left = findCall(lhs) != nullptr;
+            const bool  right = !left && findCall(rhs) != nullptr;
+            LSLExpression* call  = left ? lhs : rhs;
+            LSLExpression* other = left ? rhs : lhs;
+            if ((left || right) && wholeNumber(other, v))
+            {
+                // Each test by what it says of the find, with the call on
+                // its left: found, or not.
+                std::optional<bool> found;
+                LSLOperator         as = op;
+                if (right)
+                {
+                    as = op == OP_LESS ? OP_GREATER : op == OP_GREATER ? OP_LESS : op == OP_LEQ ? OP_GEQ : op == OP_GEQ ? OP_LEQ : op;
+                }
+                if ((as == OP_EQ && v == -1) || (as == OP_LESS && v == 0) || (as == OP_LEQ && v == -1))
+                {
+                    found = false;
+                }
+                else if ((as == OP_NEQ && v == -1) || (as == OP_GEQ && v == 0) || (as == OP_GREATER && v == -1))
+                {
+                    found = true;
+                }
+                if (found)
+                {
+                    if (std::optional<Expr> test = foundTest(call, *found))
+                    {
+                        return *test;
+                    }
+                }
+            }
+        }
         const auto bit = [&](const char* fn) -> Expr {
             noteOnce(e, "SluaBit32", "bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.");
             return { std::string("bit32.") + fn + "(" + value(lhs).text + ", " + value(rhs).text + ")" };
@@ -1015,7 +1354,7 @@ namespace
                 const LSLIType    type = id->getIType();
                 LSLExpression*    init = d->getInitializer();
                 const std::string name = nameOf(id);
-                line("local " + name + " = " + (isNull(init) ? defaultOf(type) : coerced(init, type).text));
+                line("local " + name + typed(type) + " = " + (isNull(init) ? defaultOf(type) : coerced(init, type).text));
                 return;
             }
             case NODE_RETURN_STATEMENT:
@@ -1159,7 +1498,8 @@ namespace
             auto*          global = static_cast<LSLGlobalVariable*>(g);
             LSLIdentifier* id     = global->getIdentifier();
             LSLExpression* init   = global->getInitializer();
-            line("local " + nameOf(id) + " = " + (isNull(init) ? defaultOf(id->getIType()) : coerced(init, id->getIType()).text));
+            line("local " + nameOf(id) + typed(id->getIType()) + " = " +
+                 (isNull(init) ? defaultOf(id->getIType()) : coerced(init, id->getIType()).text));
             any = true;
         }
         if (any)
@@ -1212,9 +1552,10 @@ namespace
             std::string params;
             for (LSLASTNode* p = f->getArguments() ? f->getArguments()->getChild(0) : nullptr; p; p = p->getNext())
             {
-                params += (params.empty() ? "" : ", ") + nameOf(static_cast<LSLIdentifier*>(p));
+                params += (params.empty() ? "" : ", ") + nameOf(static_cast<LSLIdentifier*>(p)) + typed(p->getIType());
             }
-            line(std::string(forward ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")");
+            line(std::string(forward ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +
+                 typed(f->getIdentifier()->getIType()));
             ++mDepth;
             block(f->getStatements());
             --mDepth;
@@ -1247,7 +1588,9 @@ namespace
 
     void Writer::handlerBody(LSLEventHandler* handler)
     {
+        mInDetected = detectedEvent(handler->getIdentifier()->getName());
         block(handler->getStatements());
+        mInDetected = false;
     }
 
     void Writer::singleState(LSLState* state)
@@ -1268,11 +1611,17 @@ namespace
             }
             std::string lead;
             const std::string params = handlerParams(handler, lead);
-            if (event == "timer")
+            // The timer's handler, which LLTimers calls, where the script's
+            // timer is on LLTimers.
+            const bool timer = event == "timer" && mTimers;
+            if (event == "timer" && !mTimers)
             {
                 noteOnce(handler, "SluaTimer", "the timer event, set going by llcompat.SetTimerEvent; LLTimers:every is SLua's own.");
             }
-            line("LLEvents:on(" + luaString(event) + ", function(" + params + ")");
+            const bool field = mOptions.handlers == ALLSLToSLua::Options::Handlers::Field;
+            line(timer   ? "timerHandler = function()"
+                 : field ? "LLEvents." + event + " = function(" + params + ")"
+                         : "LLEvents:on(" + luaString(event) + ", function(" + params + ")");
             ++mDepth;
             if (!lead.empty())
             {
@@ -1280,7 +1629,7 @@ namespace
             }
             handlerBody(handler);
             --mDepth;
-            line("end)");
+            line(timer || field ? "end" : "end)");
             line("");
         }
         if (entry)
@@ -1294,10 +1643,11 @@ namespace
         }
     }
 
-    void Writer::multiState()
+    void Writer::statesPreamble()
     {
+        const bool field = mOptions.handlers == ALLSLToSLua::Options::Handlers::Field;
         line("-- LSL's states, which SLua has none of: each state's handlers in a table,");
-        line("-- put on LLEvents as it is entered and taken off as it is left.");
+        line(field ? "-- set on LLEvents as it is entered and taken off as it is left." : "-- put on LLEvents as it is entered and taken off as it is left.");
         note(nullptr, "SluaStates",
              "LSL let go of a state's listens, sensor repeats and targets as it left the state; setState does not. Remove them "
              "yourself where the script relied on it.");
@@ -1305,33 +1655,74 @@ namespace
         line("local currentState: string? = nil");
         line("");
         line("local function setState(name: string)");
-        mText += R"LUA(    if name == currentState then
-        return
-    end
-    local leaving = currentState and states[currentState]
-    if leaving then
-        if leaving.state_exit then
-            leaving.state_exit()
-        end
-        for event, handler in leaving do
-            if event ~= "state_entry" and event ~= "state_exit" then
-                LLEvents:off(event :: any, handler)
-            end
-        end
-    end
-    currentState = name
-    local entering = states[name]
-    for event, handler in entering do
-        if event ~= "state_entry" and event ~= "state_exit" then
-            LLEvents:on(event :: any, handler)
-        end
-    end
-    if entering.state_entry then
-        entering.state_entry()
-    end
-end
+        // Not an LLEvents event: state_entry and state_exit, which setState
+        // runs, and the timer where LLTimers calls it.
+        const std::string own = mTimers ? "event ~= \"state_entry\" and event ~= \"state_exit\" and event ~= \"timer\""
+                                        : "event ~= \"state_entry\" and event ~= \"state_exit\"";
+        const std::string off = field ? "(LLEvents :: any)[event] = nil" : "LLEvents:off(event :: any, handler)";
+        const std::string on  = field ? "(LLEvents :: any)[event] = handler" : "LLEvents:on(event :: any, handler)";
+        mText += "    if name == currentState then\n"
+                 "        return\n"
+                 "    end\n"
+                 "    local leaving = currentState and states[currentState]\n"
+                 "    if leaving then\n"
+                 "        if leaving.state_exit then\n"
+                 "            leaving.state_exit()\n"
+                 "        end\n"
+                 "        for event, handler in leaving do\n"
+                 "            if " + own + " then\n"
+                 "                " + off + "\n"
+                 "            end\n"
+                 "        end\n"
+                 "    end\n"
+                 "    currentState = name\n"
+                 "    local entering = states[name]\n"
+                 "    for event, handler in entering do\n"
+                 "        if " + own + " then\n"
+                 "            " + on + "\n"
+                 "        end\n"
+                 "    end\n"
+                 "    if entering.state_entry then\n"
+                 "        entering.state_entry()\n"
+                 "    end\n"
+                 "end\n\n";
+    }
 
-)LUA";
+    void Writer::timersPreamble()
+    {
+        // llSetTimerEvent's one timer, on LLTimers: set going again, or
+        // stopped, by each setTimer, calling the timer handler of the state
+        // the script is in.
+        line("-- llSetTimerEvent's timer, on LLTimers: one at a time, as LSL had it.");
+        noteOnce(nullptr, "SluaTimers", "SLua's LLTimers can run several timers at once: LLTimers:every(seconds, callback), "
+                                        "LLTimers:once(seconds, callback) and LLTimers:off(timer).");
+        if (!mManyStates)
+        {
+            line("local timerHandler: (() -> ())? = nil");
+        }
+        line("local timerHandle: any = nil");
+        line("");
+        line("local function setTimer(seconds: number)");
+        mText += "    if timerHandle then\n"
+                 "        LLTimers:off(timerHandle)\n"
+                 "        timerHandle = nil\n"
+                 "    end\n"
+                 "    if seconds > 0 then\n"
+                 "        timerHandle = LLTimers:every(seconds, function()\n";
+        mText += mManyStates ? "            local handler = currentState and states[currentState].timer\n"
+                               "            if handler then\n"
+                               "                handler()\n"
+                               "            end\n"
+                             : "            if timerHandler then\n"
+                               "                timerHandler()\n"
+                               "            end\n";
+        mText += "        end)\n"
+                 "    end\n"
+                 "end\n\n";
+    }
+
+    void Writer::multiState()
+    {
         for (LSLASTNode* s = mScript->getStates()->getChild(0); s; s = s->getNext())
         {
             auto*             state = static_cast<LSLState*>(s);
@@ -1344,7 +1735,7 @@ end
                 const std::string event   = handler->getIdentifier()->getName();
                 std::string       lead;
                 const std::string params = handlerParams(handler, lead);
-                if (event == "timer")
+                if (event == "timer" && !mTimers)
                 {
                     noteOnce(handler, "SluaTimer",
                              "the timer event, set going by llcompat.SetTimerEvent, keeps going from state to state, as LSL's "
@@ -1370,7 +1761,6 @@ end
     void Writer::states()
     {
         LSLASTNode* first = mScript->getStates()->getChild(0);
-        mManyStates       = first && first->getNext();
         if (mManyStates)
         {
             multiState();
@@ -1436,20 +1826,41 @@ end
                 mUnstructured.insert(j->getIdentifier()->getSymbol());
             }
         });
+        // What the script sets going: a timer on LLTimers where it sets one.
+        LSLASTNode* first = mScript->getStates()->getChild(0);
+        mManyStates       = first && first->getNext();
+        walk(mScript, [&](LSLASTNode* node) {
+            if (mOptions.llTimers && node->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
+                std::string_view(static_cast<LSLFunctionExpression*>(node)->getIdentifier()->getName()) == "llSetTimerEvent")
+            {
+                mTimers = true;
+            }
+        });
+        if (mManyStates)
+        {
+            statesPreamble();
+        }
+        if (mTimers)
+        {
+            timersPreamble();
+        }
         globals();
         functions();
         states();
-        std::string out = "-- Written from LSL by Script Studio. Each \"-- LSL:\" comment marks a place where\n"
-                          "-- SLua means something else than LSL did, or has a way of its own: read it, then\n"
-                          "-- delete it. LSL's integers wrapped at 32 bits and its floats were single\n"
-                          "-- precision; SLua's numbers are doubles, which do neither.\n\n";
+        std::string out = mOptions.comments
+                              ? "-- Written from LSL by Script Studio. Each \"-- LSL:\" comment marks a place where\n"
+                                "-- SLua means something else than LSL did, or has a way of its own: read it, then\n"
+                                "-- delete it. LSL's integers wrapped at 32 bits and its floats were single\n"
+                                "-- precision; SLua's numbers are doubles, which do neither.\n\n"
+                              : "-- Written from LSL by Script Studio. LSL's integers wrapped at 32 bits and its\n"
+                                "-- floats were single precision; SLua's numbers are doubles, which do neither.\n\n";
         helpers(out);
         return out + mText;
     }
 }
 
 // static
-ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl)
+ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& options)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Result result;
@@ -1489,9 +1900,15 @@ ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl)
         }
         return result;
     }
-    Writer writer(script);
+    Writer writer(script, options);
     result.text      = writer.write();
     result.notes     = std::move(writer.notes());
     result.converted = true;
     return result;
+}
+
+// static
+ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl)
+{
+    return convert(lsl, Options());
 }

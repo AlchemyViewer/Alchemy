@@ -122,10 +122,10 @@ namespace tut
         ensure("the function: " + r.text, has(r, "local function greet(who)") && has(r, "return \"Hello, \" .. who"));
         ensure("the handler: " + r.text, has(r, "LLEvents:on(\"touch_start\", function(detected)") && has(r, "local total_number = #detected"));
         ensure("the step: " + r.text, has(r, "gCount += total_number"));
-        ensure("a detected function through llcompat: " + r.text, has(r, "llcompat.DetectedName(0)") && noted(r, "SluaDetected"));
+        ensure("what was detected from the table: " + r.text, has(r, "detected[1]:getName()") && noted(r, "SluaDetectedTable"));
         ensure("an integer as a string: " + r.text, has(r, "tostring(gCount)"));
         ensure("state_entry last: " + r.text, r.text.find("-- state_entry") > r.text.find("LLEvents:on") && has(r, "ll.Say(0, greet(\"world\"))"));
-        ensure("the note over its line: " + r.text, has(r, "-- LSL: llcompat.Detected*"));
+        ensure("the note over its line: " + r.text, has(r, "-- LSL: detected[n] is what LSL read"));
         checksClean(r);
     }
 
@@ -198,7 +198,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<4>()
     {
-        set_test_name("states: each a table of handlers, entered by setState, a state change ending the event; the timer through llcompat, noted");
+        set_test_name("states: each a table of handlers, entered by setState, a state change ending the event; the timer on LLTimers, calling the state's");
         const ALLSLToSLua::Result r = convert("default {\n"
                                               "    state_entry() { llSetTimerEvent(1.0); }\n"
                                               "    timer() { state running; }\n"
@@ -211,7 +211,8 @@ namespace tut
         ensure("the tables: " + r.text, has(r, "states.default = {") && has(r, "states.running = {"));
         ensure("setState: " + r.text, has(r, "local function setState(name: string)") && has(r, "setState(\"default\")"));
         ensure("a change ends the event: " + r.text, has(r, "setState(\"running\")\n        return") && has(r, "setState(\"default\")\n            return\n        end"));
-        ensure("the timer: " + r.text, has(r, "llcompat.SetTimerEvent(1") && noted(r, "SluaTimer") && noted(r, "SluaCompatOnlyllSetTimerEvent"));
+        ensure("the timer on LLTimers: " + r.text, has(r, "setTimer(1") && has(r, "LLTimers:every(seconds") && noted(r, "SluaTimers"));
+        ensure("calling the state's handler: " + r.text, has(r, "states[currentState].timer") && has(r, "event ~= \"timer\""));
         ensure("state_exit a handler of its state: " + r.text, has(r, "state_exit = function()"));
         ensure("what is let go of noted: " + r.text, noted(r, "SluaStates"));
         checksClean(r);
@@ -242,5 +243,91 @@ namespace tut
         const ALLSLToSLua::Result r = ALLSLToSLua::convert("default { state_entry() { integer = ; } }");
         ensure("not converted", !r.converted && r.text.empty());
         ensure("why", !r.problems.empty());
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<7>()
+    {
+        set_test_name("close to LSL: llcompat's Detected functions and timer event, as LSL had them, noted with SLua's ways");
+        const ALLSLToSLua::Options close = ALLSLToSLua::Options::closeToLSL();
+        const ALLSLToSLua::Result  r     = ALLSLToSLua::convert("default {\n"
+                                                                "    state_entry() { llSetTimerEvent(2.0); }\n"
+                                                                "    timer() { llOwnerSay(\"tick\"); }\n"
+                                                                "    touch_start(integer n) { llOwnerSay(llDetectedName(0)); }\n"
+                                                                "}\n",
+                                                                close);
+        ensure("converted", r.converted);
+        ensure("llcompat's Detected: " + r.text, has(r, "llcompat.DetectedName(0)") && noted(r, "SluaDetected"));
+        ensure("the timer event: " + r.text, has(r, "llcompat.SetTimerEvent(2") && has(r, "LLEvents:on(\"timer\"") && noted(r, "SluaTimer"));
+        ensure("ll.OwnerSay, with print noted: " + r.text, has(r, "ll.OwnerSay(\"tick\")") && noted(r, "SluaUsellOwnerSay"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<8>()
+    {
+        set_test_name("SLua's ll where it means the same -- a boolean, a constant index moved on, a find against nil -- and what SLua has in a call's stead");
+        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
+                                              "    key k = llDetectedKey(0); string s = \"abcdef\"; list l = [\"a\", \"b\"]; integer i = 2;\n"
+                                              "    if (llSameGroup(k)) llOwnerSay(\"group\");\n"
+                                              "    integer same = llSameGroup(k);\n"
+                                              "    string head = llGetSubString(s, 0, 2);\n"
+                                              "    string tail = llGetSubString(s, i, -1);\n"
+                                              "    if (llListFindList(l, [\"a\"]) != -1) llOwnerSay(\"found\");\n"
+                                              "    if (~llSubStringIndex(s, \"c\")) llOwnerSay(\"has c\");\n"
+                                              "    if (llSubStringIndex(s, \"z\") < 0) llOwnerSay(\"no z\");\n"
+                                              "    integer at = llListFindList(l, [\"a\", \"b\"]);\n"
+                                              "    float p = llPow(2.0, 3.0) + llFabs(-1.0) + llVecDist(<1,2,3>, ZERO_VECTOR);\n"
+                                              "    integer r = llRound(2.5) + llGetUnixTime();\n"
+                                              "    llOwnerSay(head + tail + (string)same + (string)at + (string)p + (string)r);\n"
+                                              "} }\n");
+        ensure("a boolean in a condition: " + r.text, has(r, "if ll.SameGroup(k) then"));
+        ensure("and as a number: " + r.text, has(r, "local same = if ll.SameGroup(k) then 1 else 0"));
+        ensure("a constant index moved on: " + r.text, has(r, "ll.GetSubString(s, 1, 3)"));
+        ensure("one that is not, through llcompat: " + r.text, has(r, "llcompat.GetSubString(s, i, -1)") && noted(r, "SluaIndexllGetSubString"));
+        ensure("one thing found in a list: " + r.text, has(r, "if table.find(l, \"a\") ~= nil then"));
+        ensure("~ of a find: " + r.text, has(r, "if ll.SubStringIndex(s, \"c\") ~= nil then"));
+        ensure("< 0 of one: " + r.text, has(r, "if ll.SubStringIndex(s, \"z\") == nil then"));
+        ensure("a find's index as a number, through llcompat: " + r.text, has(r, "llcompat.ListFindList(l, {\"a\", \"b\"})"));
+        ensure("^, math and vector: " + r.text, has(r, "2.0 ^ 3.0") && has(r, "math.abs(-1.0)") && has(r, "vector.magnitude(vector(1, 2, 3) - ZERO_VECTOR)"));
+        ensure("not math.round for llRound: " + r.text, has(r, "ll.Round(2.5)"));
+        ensure("os.time and print: " + r.text, has(r, "os.time()") && has(r, "print("));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<9>()
+    {
+        set_test_name("handlers assigned to LLEvents' fields, and Luau types on what LSL typed");
+        ALLSLToSLua::Options options;
+        options.handlers = ALLSLToSLua::Options::Handlers::Field;
+        options.types    = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert("integer gCount = 2;\n"
+                                                           "string greet(string who) { return \"Hi \" + who; }\n"
+                                                           "default { touch_start(integer n) { string s = greet(\"x\"); gCount += n; llOwnerSay(s); } }\n",
+                                                           options);
+        ensure("converted", r.converted);
+        ensure("a field: " + r.text, has(r, "LLEvents.touch_start = function(detected)") && !has(r, "LLEvents:on"));
+        ensure("typed: " + r.text, has(r, "local gCount: number = 2") && has(r, "local function greet(who: string): string") &&
+                                       has(r, "local s: string = greet(\"x\")"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result many = ALLSLToSLua::convert("default { touch_start(integer n) { state other; } }\n"
+                                                              "state other { touch_start(integer n) { state default; } }\n",
+                                                              options);
+        ensure("setState sets the fields: " + many.text, has(many, "(LLEvents :: any)[event] = handler") && has(many, "(LLEvents :: any)[event] = nil"));
+        checksClean(many);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<10>()
+    {
+        set_test_name("no comments where they are not wanted: the notes are still said");
+        ALLSLToSLua::Options options;
+        options.comments = false;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert("default { state_entry() { integer a = 7 / 2; llOwnerSay((string)a); } }\n", options);
+        ensure("converted", r.converted);
+        ensure("no comment: " + r.text, !has(r, "-- LSL:"));
+        ensure("but noted", noted(r, "SluaIntegerDivision"));
     }
 }

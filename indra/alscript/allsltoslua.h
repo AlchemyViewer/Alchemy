@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alscriptproblem.h"
+#include "stdtypes.h"
 
 #include <string>
 #include <string_view>
@@ -46,6 +47,52 @@
 class ALLSLToSLua
 {
 public:
+    // How far the SLua goes from LSL's ways to SLua's own, each only where
+    // it means exactly what the LSL did; what each leaves as LSL had it is
+    // noted, with SLua's way. As SLua has it, by default; closeToLSL() has
+    // every one off.
+    struct Options
+    {
+        // A handler put on with LLEvents:on, which lets others listen too;
+        // or assigned, LLEvents.touch_start = ..., one for each event.
+        enum class Handlers : U8
+        {
+            On,
+            Field
+        };
+        Handlers handlers = Handlers::On;
+        // llSetTimerEvent's timer on LLTimers, calling the state's timer
+        // handler, rather than the timer event llcompat sets going.
+        bool llTimers = true;
+        // What was detected read from the handler's own detected table --
+        // detected[i + 1]:getKey() -- where the call stands in the handler,
+        // rather than through llcompat.Detected*.
+        bool detectedTable = true;
+        // SLua's ll rather than llcompat where it means the same: a boolean
+        // answer, a constant index moved on by one, a find's answer read
+        // against nil.
+        bool sluaCalls = true;
+        // What SLua has in a call's stead where it means the same: math,
+        // vector and quaternion's functions, ^, print, os.time, table.find.
+        bool idioms = true;
+        // Luau types on locals, parameters and what functions return, from
+        // LSL's types.
+        bool types = false;
+        // Each place noted as a "-- LSL:" comment over its line, as well as
+        // in the notes.
+        bool comments = true;
+
+        static Options closeToLSL()
+        {
+            Options o;
+            o.llTimers      = false;
+            o.detectedTable = false;
+            o.sluaCalls     = false;
+            o.idioms        = false;
+            return o;
+        }
+    };
+
     struct Result
     {
         bool             converted = false;
@@ -57,5 +104,7 @@ public:
         ALScriptProblems problems;
     };
 
+    static Result convert(std::string_view lsl, const Options& options);
+    // As SLua has it (Options' defaults).
     static Result convert(std::string_view lsl);
 };
