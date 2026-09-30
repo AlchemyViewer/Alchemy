@@ -154,6 +154,18 @@ F32 LLSnapshotLivePreview::getImageAspect()
     return (mKeepAspectRatio ? ((F32)getRect().getWidth()) / ((F32)getRect().getHeight()) : ((F32)getWidth()) / ((F32)getHeight()));
 }
 
+void LLSnapshotLivePreview::setCutout(const std::optional<ALSnapshotCutout>& cutout)
+{
+    if (cutout != mCutout)
+    {
+        mCutout = cutout;
+        // A little later rather than now: a colour dragged across the fill's
+        // wheel is many changes a second, and each is a whole render.
+        constexpr F32 CUTOUT_CHANGE_DELAY = 0.25f;
+        updateSnapshot(true, true, CUTOUT_CHANGE_DELAY);
+    }
+}
+
 void LLSnapshotLivePreview::updateSnapshot(bool new_snapshot, bool new_thumbnail, F32 delay)
 {
     LL_DEBUGS("Snapshot") << "updateSnapshot: mSnapshotUpToDate = " << getSnapshotUpToDate() << LL_ENDL;
@@ -562,7 +574,10 @@ void LLSnapshotLivePreview::generateThumbnailImage(bool force_update)
 
     LLPointer<LLImageRaw> raw = new LLImageRaw;
 
-    if (mThumbnailSubsampled)
+    // A cutout's thumbnail is the cutout made smaller, not a render of its
+    // own: that would reallocate every screen buffer a second time for the
+    // same frame.
+    if (mThumbnailSubsampled || (mCutout && mPreviewImage.notNull()))
     {
         // The thumbnail is be a subsampled version of the preview (used in SL Share previews, i.e. Flickr, Twitter)
         raw->resize( mPreviewImage->getWidth(),
@@ -754,7 +769,8 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
                 render_no_post,
                 render_balance,
                 previewp->mSnapshotBufferType,
-                previewp->getMaxImageSize()))
+                previewp->getMaxImageSize(),
+                previewp->mCutout ? &*previewp->mCutout : nullptr))
         {
             // Invalidate/delete any existing encoded image
             previewp->mPreviewImageEncoded = NULL;

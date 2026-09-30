@@ -27,9 +27,12 @@
 #ifndef LL_LLSNAPSHOTLIVEPREVIEW_H
 #define LL_LLSNAPSHOTLIVEPREVIEW_H
 
+#include "alsnapshotcutout.h"
 #include "llsnapshotmodel.h"
 #include "llviewertexture.h"
 #include "llviewerwindow.h"
+
+#include <optional>
 
 class LLImageJPEG;
 
@@ -102,6 +105,11 @@ public:
     void setAllowFullScreenPreview(bool allow) { mAllowFullScreenPreview = allow; }
     void setFilter(std::string filter_name) { mFilterName = filter_name; }
     std::string  getFilter() const { return mFilterName; }
+    /// The cutout this preview takes, or none. Set by whoever owns the preview
+    /// (ALSnapshotCutout::current), never read from settings here: previews of
+    /// other floaters share the list and the settings.
+    void setCutout(const std::optional<ALSnapshotCutout>& cutout);
+    bool hasCutout() const { return mCutout.has_value(); }
     void updateSnapshot(bool new_snapshot, bool new_thumbnail = false, F32 delay = 0.f);
     void saveTexture(bool outfit_snapshot = false, std::string name = "");
     void saveLocal(const snapshot_saved_signal_t::slot_type& success_cb, const snapshot_saved_signal_t::slot_type& failure_cb);
@@ -175,6 +183,7 @@ private:
     bool                        mSnapshotActive;
     LLSnapshotModel::ESnapshotLayerType mSnapshotBufferType;
     std::string                 mFilterName;
+    std::optional<ALSnapshotCutout> mCutout;
 
     static LLPointer<LLImageFormatted> sSaveLocalImage;
 
