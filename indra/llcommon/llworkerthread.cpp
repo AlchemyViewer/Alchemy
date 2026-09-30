@@ -89,9 +89,15 @@ size_t LLWorkerThread::update(F32 max_time_ms)
     {
         delete_list_t::iterator curiter = iter++;
         LLWorkerClass* worker = *curiter;
+        // Whether the work has finished is read BEFORE deleteOK is asked. Finished is final for
+        // a worker awaiting deletion -- doWork cannot run for it again -- so anything deleteOK
+        // then finds clear stays clear. Read after, doWork could start something deleteOK must
+        // wait for (a decode, a cache read, an HTTP request) and finish in between, and the
+        // worker would be deleted with it outstanding.
+        const bool work_finished = worker->getFlags(LLWorkerClass::WCF_WORK_FINISHED);
         if (worker->deleteOK())
         {
-            if (worker->getFlags(LLWorkerClass::WCF_WORK_FINISHED))
+            if (work_finished)
             {
                 worker->setFlags(LLWorkerClass::WCF_DELETE_REQUESTED);
                 delete_list.push_back(worker);
