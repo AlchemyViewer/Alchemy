@@ -6163,24 +6163,30 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
         }
 
         // UPDATE THE EXISTING NEARBY LIGHTS
-        light_set_t cur_nearby_lights;
+        // Distance is the set's sort key, so a light cannot be updated where it stands: each
+        // one is lifted out by its node, given its new distance and fade, and dropped into
+        // updated_lights in its new order. The node moves with it, so nothing is reallocated.
+        light_set_t updated_lights;
         for (light_set_t::iterator iter = mNearbyLights.begin();
-            iter != mNearbyLights.end(); ++iter)
+            iter != mNearbyLights.end();)
         {
             const Light* light = &(*iter);
             LLDrawable* drawable = light->drawable;
             const LLViewerObject *vobj = light->drawable->getVObj();
-            if (vobj && vobj->isAttachment())
+            if(vobj && vobj->isAttachment())
             {
                 if (!sRenderAttachedLights)
                 {
                     drawable->clearState(LLDrawable::NEARBY_LIGHT);
+                    iter = mNearbyLights.erase(iter);
                     continue;
                 }
+
                 LLVOAvatar *avatar = vobj->getAvatar();
                 if (avatar && (avatar->isTooComplex() || avatar->isInMuteList() || avatar->isTooSlow()))
                 {
                     drawable->clearState(LLDrawable::NEARBY_LIGHT);
+                    iter = mNearbyLights.erase(iter);
                     continue;
                 }
             }
@@ -6189,38 +6195,54 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
             if (!volight || !drawable->isState(LLDrawable::LIGHT))
             {
                 drawable->clearState(LLDrawable::NEARBY_LIGHT);
+                iter = mNearbyLights.erase(iter);
                 continue;
             }
             if (light->fade <= -LIGHT_FADE_TIME)
             {
                 drawable->clearState(LLDrawable::NEARBY_LIGHT);
+                iter = mNearbyLights.erase(iter);
                 continue;
             }
 
             F32 dist = calc_light_dist(volight, cam_pos, max_dist);
             F32 fade = light->fade;
+            // actual fade gets decreased/increased by setupHWLights
+            // light->fade value is 'time'.
+            // >=0 and light will become visible as value increases
+            // <0 and light will fade out
             if (dist < max_dist)
             {
                 if (fade < 0)
                 {
+                    // mark light to fade in
+                    // if fade was -LIGHT_FADE_TIME - it was fully invisible
+                    // if fade -0 - it was fully visible
+                    // visibility goes up from 0 to LIGHT_FADE_TIME.
                     fade += LIGHT_FADE_TIME;
                 }
             }
             else
             {
+                // mark light to fade out
+                // visibility goes down from -0 to -LIGHT_FADE_TIME.
                 if (fade >= LIGHT_FADE_TIME)
                 {
-                    fade = -0.0001f;
+                    fade = -0.0001f; // was fully visible
                 }
                 else if (fade >= 0)
                 {
+                    // 0.75 visible light should stay 0.75 visible, but should reverse direction
                     fade -= LIGHT_FADE_TIME;
                 }
             }
-            // Re-insert with updated distance so the set stays correctly sorted
-            cur_nearby_lights.insert(Light(drawable, dist, fade));
+
+            light_set_t::node_type node = mNearbyLights.extract(iter++);
+            node.value().dist = dist;
+            node.value().fade = fade;
+            updated_lights.insert(std::move(node));
         }
-        mNearbyLights = cur_nearby_lights;
+        mNearbyLights.swap(updated_lights);
 
         // FIND NEW LIGHTS THAT ARE IN RANGE
         for (LLDrawable::ordered_drawable_set_t::iterator iter = mLights.begin();
@@ -13439,7 +13461,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("generateImpostor");
     LLGLState::checkStates();
-    
+
     // Save the caller's cull result so the impostor bake doesn't clobber it.
     // In upstream this was harmless because the impostor postSort skipped the alpha
     // group sort (sShadowRender=true). Now that we sort during impostor bakes,
