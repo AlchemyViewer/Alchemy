@@ -166,9 +166,16 @@ uint64_t ALSeleneFilters::slLints(std::string_view name)
     uint64_t out = ALScriptLintPass::bit(name);
     for (const ALScriptLintPass::Rule& rule : ALScriptLintPass::rules())
     {
-        if (rule.selene && name == rule.selene)
+        // Selene's names for the rule, a blank between each.
+        for (std::string_view names = rule.selene ? rule.selene : ""; !names.empty();)
         {
-            out |= ALScriptLintPass::bit(rule.name);
+            const size_t           cut  = names.find(' ');
+            const std::string_view each = names.substr(0, cut);
+            names                       = cut == std::string_view::npos ? std::string_view() : names.substr(cut + 1);
+            if (name == each)
+            {
+                out |= ALScriptLintPass::bit(rule.name);
+            }
         }
     }
     return out;

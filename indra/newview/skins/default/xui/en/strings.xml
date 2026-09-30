@@ -705,6 +705,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixWriteIt">Write it [1]</string>
 	<string name="ScriptFixDeclareFirst">Declare local [1] before it is first named</string>
 	<string name="ScriptFixUnbracket">Take out the brackets</string>
+	<string name="ScriptFixRemoveElse">Take out the empty else</string>
 	<string name="ScriptActionAnnotate">Declare it as '[1]'</string>
 	<string name="ScriptActionExtract">Put it in a local, '[1]'</string>
 	<string name="ScriptActionInterpolate">Write it as an interpolated string</string>
@@ -888,6 +889,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlMustUse">[1] changes nothing and only answers, and nothing reads its answer here</string>
 	<string name="LuauLintSlGeneralizedFor">Luau's for walks a table given as it is: in [1] says what in [2] says</string>
 	<string name="LuauLintSlGeneralizedForList">Luau's for walks a table given as it is: in [1] walks a list as in [2] does, where the list has no gaps</string>
+	<string name="LuauLintSlEmptyBlock">This [1]'s block is empty: it does nothing</string>
 	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
 	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauUnknownType">Unknown type '[1]'</string>

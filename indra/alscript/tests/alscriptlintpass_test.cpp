@@ -439,4 +439,43 @@ namespace tut
         ensure_equals("next", fixed("local t = {1}\nfor k, v in next, t do print(k, v) end\n", "LuauLintSlGeneralizedFor", "Write it in t", false),
                       std::string("local t = {1}\nfor k, v in t do print(k, v) end\n"));
     }
+
+    template<> template<>
+    void object::test<10>()
+    {
+        set_test_name("SlEmptyBlock: an empty if, elseif, else, while, for and repeat, a warning; not one holding a comment; an empty then "
+                      "before an else turned round, and an empty else taken out, safe; selene's names allow it");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local c = true\n"
+                                       "if c then end\n"
+                                       "if c then else print(1) end\n"
+                                       "if c then print(2) elseif not c then end\n"
+                                       "if c then print(3) else end\n"
+                                       "while c do end\n"
+                                       "for i = 1, 2 do end\n"
+                                       "for k, v in {} do end\n"
+                                       "repeat until c\n"
+                                       "if c then -- later\n"
+                                       "end\n"
+                                       "while c do break end\n",
+                                       "SlEmptyBlock", ALScriptProblem::Severity::Warning);
+        ensure_equals("each", said,
+                      std::string("1 LuauLintSlEmptyBlock|if\n"
+                                  "2 LuauLintSlEmptyBlock|if\n"
+                                  "3 LuauLintSlEmptyBlock|elseif\n"
+                                  "4 LuauLintSlEmptyBlock|else\n"
+                                  "5 LuauLintSlEmptyBlock|while\n"
+                                  "6 LuauLintSlEmptyBlock|for\n"
+                                  "7 LuauLintSlEmptyBlock|for\n"
+                                  "8 LuauLintSlEmptyBlock|repeat\n"));
+        ensure_equals("turned round", fixed("local c = true\nif c then else print(1) end\n", "LuauLintSlEmptyBlock", "Write it if not c then", false),
+                      std::string("local c = true\nif not c then print(1) end\n"));
+        ensure_equals("an else", fixed("local c = true\nif c then print(3) else end\n", "LuauLintSlEmptyBlock", "Take out the empty else", true),
+                      std::string("local c = true\nif c then print(3) end\n"));
+        ensure_equals("an else on its own line", fixed("local c = true\nif c then\n    print(3)\nelse\nend\n", "LuauLintSlEmptyBlock", "Take out the empty else", true),
+                      std::string("local c = true\nif c then\n    print(3)\nend\n"));
+        ensure_equals("selene's names", found("local c = true\n-- selene: allow(empty_loop)\nwhile c do end\n-- selene: allow(empty_if)\nif c then end\n",
+                                              "SlEmptyBlock", ALScriptProblem::Severity::Warning),
+                      std::string());
+    }
 }

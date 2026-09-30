@@ -81,6 +81,8 @@ namespace
         { "SlMustUse", true, Severity::Warning, true, true, nullptr },
         // for k, v in pairs(t), where Luau's for walks t itself.
         { "SlGeneralizedFor", true, Severity::Note, true, true, nullptr },
+        // An if or a loop whose block is empty.
+        { "SlEmptyBlock", true, Severity::Warning, true, true, "empty_if empty_loop" },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -442,6 +444,8 @@ namespace
         // gap, and a table's own __iter is what for uses, pairs not.
         bool visit(Luau::AstStatForIn* node) override
         {
+            emptyLoop(node->body, Luau::Location(node->location.begin, node->body->location.begin),
+                      Luau::Location(node->body->location.begin, node->location.end), "for");
             if (!on("SlGeneralizedFor") || node->values.size == 0)
             {
                 return true;
@@ -530,18 +534,22 @@ namespace
         {
             truth(node->condition);
             bracketedCondition(node->condition, node->location);
+            emptyIf(node);
             return true;
         }
         bool visit(Luau::AstStatWhile* node) override
         {
             truth(node->condition);
             bracketedCondition(node->condition, node->location);
+            emptyLoop(node->body, Luau::Location(node->location.begin, node->body->location.begin),
+                      Luau::Location(node->body->location.begin, node->location.end), "while");
             return true;
         }
         bool visit(Luau::AstStatRepeat* node) override
         {
             truth(node->condition);
             bracketedCondition(node->condition, std::nullopt);
+            emptyLoop(node->body, node->location, Luau::Location(node->body->location.begin, node->condition->location.begin), "repeat");
             return true;
         }
         bool visit(Luau::AstExprIfElse* node) override
@@ -637,6 +645,8 @@ namespace
             {
                 zeroLoop(node);
             }
+            emptyLoop(node->body, Luau::Location(node->location.begin, node->body->location.begin),
+                      Luau::Location(node->body->location.begin, node->location.end), "for");
             return true;
         }
 
@@ -1656,6 +1666,76 @@ namespace
                         { edit(Luau::Location(at.begin, Luau::Position(at.begin.line, at.begin.column + 1)), spaced_before ? " " : ""),
                           edit(Luau::Location(close, at.end), spaced_after ? " " : "") },
                         true);
+        }
+
+        // --- SlEmptyBlock: an if or a loop that does nothing -----------------
+
+        // A block with nothing in it, not even a comment, which would say it
+        // is meant: `stretch` is where a comment in it would be.
+        bool empty(const Luau::AstStatBlock* block, const Luau::Location& stretch) const
+        {
+            return block->body.size == 0 && text(stretch).find("--") == std::string::npos;
+        }
+
+        // An if, elseif or else whose block is empty. Nothing in its place
+        // but an else: the condition turned round, if not c then. An empty
+        // else taken out, and its line where it stands alone.
+        void emptyIf(Luau::AstStatIf* node)
+        {
+            if (!on("SlEmptyBlock") || !node->thenLocation)
+            {
+                return;
+            }
+            const std::string head    = text(Luau::Location(node->location.begin, node->condition->location.begin));
+            const std::string keyword = head.substr(0, head.find_first_not_of("abcdefghijklmnopqrstuvwxyz"));
+            auto*             plain   = node->elsebody ? node->elsebody->as<Luau::AstStatBlock>() : nullptr;
+            const Luau::Position then_end = node->elseLocation ? node->elseLocation->begin
+                                          : node->elsebody   ? node->elsebody->location.begin
+                                                             : node->location.end;
+            if (empty(node->thenbody, Luau::Location(node->thenLocation->end, then_end)))
+            {
+                ALScriptProblem& said = problem(Luau::Location(node->location.begin, node->thenLocation->end), "LuauLintSlEmptyBlock",
+                                                "This [1]'s block is empty: it does nothing", { keyword }, "SlEmptyBlock");
+                if (keyword == "if" && plain && node->elseLocation && !empty(plain, Luau::Location(node->elseLocation->end, node->location.end)))
+                {
+                    const std::string turned = "not " + bracketed(node->condition);
+                    offer(said, "if " + turned + " then",
+                          { edit(node->condition->location, turned), edit(Luau::Location(node->thenLocation->end, node->elseLocation->end), "") }, false);
+                }
+            }
+            if (plain && node->elseLocation && empty(plain, Luau::Location(node->elseLocation->end, node->location.end)))
+            {
+                ALScriptProblem& said = problem(*node->elseLocation, "LuauLintSlEmptyBlock", "This [1]'s block is empty: it does nothing", { "else" },
+                                                "SlEmptyBlock");
+                // Its line with it, where it has one of its own.
+                Luau::Position from = node->elseLocation->begin;
+                Luau::Position to   = node->elseLocation->end;
+                const std::string_view line   = mSource.substr(mStarts[from.line], (from.line + 1 < mStarts.size() ? mStarts[from.line + 1] : mSource.size()) - mStarts[from.line]);
+                const bool             alone  = line.substr(0, from.column).find_first_not_of(" \t") == std::string_view::npos &&
+                                                line.substr(to.column).find_first_not_of(" \t\r\n") == std::string_view::npos && from.line + 1 < mStarts.size();
+                if (alone)
+                {
+                    from = Luau::Position(from.line, 0);
+                    to   = Luau::Position(from.line + 1, 0);
+                }
+                else
+                {
+                    while (from.column > 0 && (line[from.column - 1] == ' ' || line[from.column - 1] == '\t'))
+                    {
+                        --from.column;
+                    }
+                }
+                offerTitled(said, "ScriptFixRemoveElse", "Take out the empty else", {}, { edit(Luau::Location(from, to), "") }, true);
+            }
+        }
+
+        // A loop whose block is empty, which spins and does nothing.
+        void emptyLoop(const Luau::AstStatBlock* body, const Luau::Location& head, const Luau::Location& stretch, const char* keyword)
+        {
+            if (on("SlEmptyBlock") && empty(body, stretch))
+            {
+                problem(head, "LuauLintSlEmptyBlock", "This [1]'s block is empty: it does nothing", { keyword }, "SlEmptyBlock");
+            }
         }
 
         // What a condition asks the truth of: itself, or each side of an

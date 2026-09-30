@@ -42,8 +42,8 @@ namespace Luau
 // a NOLINT and the Lints preferences name it as they name Luau's, and
 // declared once in the table below -- the language it reads, what it says
 // where it is on, whether it is on unless a scripter says, whether a fix
-// is offered for it, and selene's name for the same check, where selene
-// has one. Its words are keyed "LuauLint" and its name; its description in
+// is offered for it, and selene's names for the same check, where selene
+// has them, a blank between each. Its words are keyed "LuauLint" and its name; its description in
 // the preferences "LintLuau" and its name.
 //
 // A lint's bit in the masks is its place in the table, so that the two
