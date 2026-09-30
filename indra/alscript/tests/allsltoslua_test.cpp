@@ -39,6 +39,9 @@ namespace tut
     {
         ALLuauService service;
         bool          definitions = false;
+        // Luau's new type solver, where the run asks for it: CTest runs
+        // these twice, the second time with AL_TEST_LUAU_SOLVER=new.
+        const bool    newSolver = getenv("AL_TEST_LUAU_SOLVER") && std::string(getenv("AL_TEST_LUAU_SOLVER")) == "new";
 
         allsltoslua_data()
         {
@@ -56,6 +59,7 @@ namespace tut
             llifstream        in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
             std::stringstream text;
             text << in.rdbuf();
+            service.setNewSolver(newSolver, error);
             definitions = service.loadDefinitions(text.str(), error);
         }
 

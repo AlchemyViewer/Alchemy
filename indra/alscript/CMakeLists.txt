@@ -125,9 +125,10 @@ if(AL_BUILD_TESTS)
     LIBRARIES alscript llcommon
     DEFINES ${definitions_defines}
   )
-  # The SLua checks again with Luau's new type solver, which a scripter may
-  # choose (ALScriptLuauSolver): the same tests, told by the environment.
-  foreach(test alluauservice alscriptfixes)
+  # The SLua checks, and LSL written again as SLua, again with Luau's new
+  # type solver, which a scripter may choose (ALScriptLuauSolver): the same
+  # tests, told by the environment.
+  foreach(test alluauservice alscriptfixes allsltoslua)
     add_test(
       NAME INTEGRATION_TEST_RUNNER_${test}_newsolver
       COMMAND $<TARGET_FILE:INTEGRATION_TEST_${test}>
