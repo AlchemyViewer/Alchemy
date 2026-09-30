@@ -31,6 +31,7 @@
 #include "alcodeeditor.h"
 #include "aldiffview.h"
 #include "aldiskincludes.h"
+#include "allsltoslua.h"
 #include "alscriptlexicon.h"
 #include "alscriptstudioviewer.h"
 #include "alserialworker.h"
@@ -7553,6 +7554,73 @@ void ALFloaterScriptStudio::nameNewInventoryScript(bool lua, const std::string& 
     });
 }
 
+void ALFloaterScriptStudio::convertToSLua(Doc& doc)
+{
+    if (!doc.loaded || doc.notecard || doc.language.lua)
+    {
+        return;
+    }
+    // The source as it stands; where the preprocessor's words keep it
+    // from reading as LSL, what the preprocessor made of it.
+    const std::string   source    = doc.editor->wholeText();
+    ALLSLToSLua::Result converted = ALLSLToSLua::convert(source);
+    bool                expanded  = false;
+    if (!converted.converted && doc.expanded.valid && doc.expanded.text && !doc.expanded.text->empty() && *doc.expanded.text != source)
+    {
+        ALLSLToSLua::Result again = ALLSLToSLua::convert(*doc.expanded.text);
+        if (again.converted)
+        {
+            converted = std::move(again);
+            expanded  = true;
+        }
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    if (!converted.converted)
+    {
+        const ALScriptProblem* why = converted.problems.empty() ? nullptr : &converted.problems.front();
+        args["[LINE]"]  = std::to_string(why ? why->line + 1 : 0);
+        args["[ERROR]"] = why ? why->message : std::string();
+        report(getString("ConvertFailed", args), true, &doc);
+        return;
+    }
+    // Named after it, in the inventory's scripts folder, as a new script
+    // is made; opened with the SLua put in unsaved, and set beside the LSL
+    // once it has loaded.
+    const std::string         name     = getString("ConvertName", args);
+    const std::string         lsl      = expanded ? *doc.expanded.text : source;
+    const std::string         text     = converted.text;
+    const std::string         theirs   = getString(expanded ? "ConvertExpandedTitle" : "ConvertLSLTitle", args);
+    const std::string         own      = getString("ConvertSLuaTitle");
+    const LLHandle<LLFloater> handle   = getHandle();
+    LLPointer<LLBoostFuncInventoryCallback> made = new LLBoostFuncInventoryCallback(create_script_cb);
+    made->addOnFireFunc([handle, text, lsl, theirs, own](const LLUUID& item_id) {
+        ALFloaterScriptStudio*       studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        const LLViewerInventoryItem* item   = item_id.notNull() ? gInventory.getItem(item_id) : nullptr;
+        if (!studio || !item)
+        {
+            return;
+        }
+        const ALScriptRef ref(LLUUID::null, item_id);
+        studio->openScript(ref, item->getName(), text);
+        if (Doc* opened = studio->findDoc(ref))
+        {
+            opened->pendingCompare = Doc::PendingCompare{ lsl, theirs, own };
+            if (opened->loaded)
+            {
+                studio->comparePending(*opened);
+            }
+        }
+    });
+    std::string desc;
+    LLViewerAssetType::generateDescriptionFor(LLAssetType::AT_LSL_TEXT, desc);
+    create_inventory_item(gAgent.getID(), gAgent.getSessionID(), gInventory.findCategoryUUIDForType(LLFolderType::FT_LSL_TEXT), LLTransactionID::tnull,
+                          name, desc, LLAssetType::AT_LSL_TEXT, LLInventoryType::IT_LSL, SST_LUA, LLFloaterPerms::getNextOwnerPerms("Scripts"), made);
+    args["[NEW]"]   = name;
+    args["[NOTES]"] = counted("ConvertNotes", static_cast<S32>(converted.notes.size()));
+    report(getString(expanded ? "ConvertedExpanded" : "Converted", args), false, &doc);
+}
+
 // --- copying from a list -------------------------------------------------------------
 
 // static
@@ -8019,6 +8087,18 @@ void ALFloaterScriptStudio::addEditCommands()
     addEditorCommand("shrink_selection", ALEditorCommand::ShrinkSelection, false);
     addEditorCommand("select_next_occurrence", ALEditorCommand::SelectNextOccurrence, true);
     addEditorCommand("change_all_occurrences", ALEditorCommand::ChangeAllOccurrences, true);
+    mCommands.add(
+        "convert_slua",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                convertToSLua(*doc);
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->loaded && !doc->notecard && !doc->language.lua && ALScriptWorkspace::luaEnabled(ALScriptRef());
+        });
     // The whole script's indentation made of spaces, or of tabs.
     for (const auto& [name, spaces] : { std::pair{ "indent_spaces", true }, std::pair{ "indent_tabs", false } })
     {

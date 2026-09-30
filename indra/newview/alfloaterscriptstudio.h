@@ -430,6 +430,10 @@ private:
     // What a tab holds saved as a new item in the inventory -- a script or
     // a notecard, its items with it -- and the tab closed once it is.
     void saveCopyToInventory(Doc& doc) override;
+    // An LSL tab written again as SLua (ALLSLToSLua) in a new SLua script
+    // of the inventory's, its text put in unsaved and set beside the LSL;
+    // the LSL script left as it is.
+    void convertToSLua(Doc& doc);
 
     // --- problems and checks -----------------------------------------------------------
 

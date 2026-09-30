@@ -500,6 +500,7 @@ namespace ALScriptKeymap
             { "format_selection", KEY_NONE, MASK_NONE },
             { "indent_spaces", KEY_NONE, MASK_NONE },
             { "indent_tabs", KEY_NONE, MASK_NONE },
+            { "convert_slua", KEY_NONE, MASK_NONE },
             { "find_in_files", 'F', MASK_CONTROL | MASK_SHIFT },
             // Insert
             { "insert_snippet", 'I', MASK_CONTROL | MASK_SHIFT },
