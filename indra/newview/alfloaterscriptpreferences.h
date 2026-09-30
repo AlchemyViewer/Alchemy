@@ -43,6 +43,7 @@ class LLPanel;
 class LLScrollListCtrl;
 class LLTabContainer;
 class LLTextBox;
+class LLViewerInventoryItem;
 
 // One window for everything about the studio a person sets once:
 // Colours, with a theme to pick and every colour to change by hand
@@ -116,6 +117,11 @@ private:
     void onSnippetNew();
     void onSnippetCopy();
     void onSnippetDelete();
+    // The scripter's own, both languages, to a new notecard in Notecards;
+    // and a notecard dropped on the list read, and its snippets brought in
+    // beside them.
+    void onSnippetsToInventory();
+    void addSnippetsFrom(const LLViewerInventoryItem& notecard);
     bool snippetLua() const;
     // The chosen row: one of the scripter's own, by index, or not.
     S32  chosenOwnSnippet() const;

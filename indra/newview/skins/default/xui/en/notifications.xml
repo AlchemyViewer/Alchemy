@@ -1836,6 +1836,62 @@ A built-in theme is already named &quot;[NAME]&quot;. Choose another name.
 
   <notification
    icon="alertmodal.tga"
+   name="ScriptStudioSnippetsNone"
+   type="alertmodal">
+You have no snippets of your own to save. Make one with New, or Copy a built-in one, first.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsTooLarge"
+   type="alertmodal">
+Your snippets come to [SIZE] bytes, and a notecard holds [LIMIT]. Delete some, or keep them with Edit as XML instead.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsNotSaved"
+   type="alertmodal">
+Your snippets could not be saved to the notecard &quot;[NAME]&quot;: [REASON].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ScriptStudioSnippetsSaved"
+   log_to_chat="false"
+   type="notifytip">
+Saved [COUNT] snippets to the notecard &quot;[NAME]&quot; in your Notecards folder.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsNotRead"
+   type="alertmodal">
+The notecard &quot;[NAME]&quot; could not be read: [REASON].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioSnippetsNotSnippets"
+   type="alertmodal">
+The notecard &quot;[NAME]&quot; does not hold snippets. Save to Inventory on the Snippets tab makes a notecard that does.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ScriptStudioSnippetsAdded"
+   log_to_chat="false"
+   type="notifytip">
+Snippets from &quot;[NAME]&quot;: [ADDED] added, [RENAMED] added under a numbered name as theirs was taken, [SKIPPED] you had already.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="ScriptStudioDeleteItems"
    type="alertmodal">
 [QUESTION]
