@@ -3827,9 +3827,9 @@ std::string ALFloaterScriptStudio::scriptIcon(bool lua, const std::string& inclu
     return include.empty() || include == Doc::GENERATED ? (lua ? "Inv_Script_Luau" : "Inv_Script") : includeImage(include, lua);
 }
 
-void ALFloaterScriptStudio::fixAllOfKind(Doc& doc, const std::string& key)
+void ALFloaterScriptStudio::fixAll(Doc& doc, const FixPick& pick)
 {
-    mChecking.askFixAll(doc, FixPick{ key });
+    mChecking.askFixAll(doc, pick);
 }
 
 bool ALFloaterScriptStudio::isLint(bool lua, const std::string& id) const
@@ -3892,7 +3892,7 @@ void ALFloaterScriptStudio::refreshBottomTabs()
     }
 }
 
-std::vector<ALTextPos> ALFloaterScriptStudio::problemPlaces(const Doc& doc) const
+std::vector<ALTextPos> ALFloaterScriptStudio::problemPlaces(const Doc& doc, bool migration) const
 {
     // The script's own problems, each place once and in order; not the
     // note about the definitions, nor the one about the script's weight,
@@ -3902,7 +3902,7 @@ std::vector<ALTextPos> ALFloaterScriptStudio::problemPlaces(const Doc& doc) cons
     std::vector<ALTextPos> places;
     for (const Doc::Shown& row : doc.shown)
     {
-        if (row.file.empty() && row.origin != definitions && row.origin != weight)
+        if (row.file.empty() && row.origin != definitions && row.origin != weight && (!migration || row.migration))
         {
             places.push_back(doc.editor->document().clamp(ALTextPos(row.line, row.hasColumn ? row.column : 0)));
         }
@@ -3942,10 +3942,15 @@ bool ALFloaterScriptStudio::goToProblemNumber(Doc& doc, S32 number)
     return true;
 }
 
-void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
+void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction, bool migration)
 {
     settleProblems(doc);
-    const std::vector<ALTextPos> places = problemPlaces(doc);
+    const std::vector<ALTextPos> places = problemPlaces(doc, migration);
+    if (places.empty() && migration)
+    {
+        migrationDone(doc);
+        return;
+    }
     if (places.empty())
     {
         LLStringUtil::format_map_t args;
@@ -3975,6 +3980,20 @@ void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
         }
     }
     goToProblemAt(doc, to);
+}
+
+void ALFloaterScriptStudio::migrationDone(Doc& doc)
+{
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    if (doc.language.lua && doc.modifiable && ALScriptFixes::strictFix(doc.editor->wholeText()))
+    {
+        report(getString("MigrationDoneStrict", args), false, &doc, { "make_strict" });
+    }
+    else
+    {
+        setStatus(getString("MigrationDone", args));
+    }
 }
 
 void ALFloaterScriptStudio::showProblemCard(Doc& doc, const ALTextPos& at)
@@ -5330,6 +5349,11 @@ void ALFloaterScriptStudio::trailerChosen(const std::string& value)
     else if (value == "problems")
     {
         showBottom("problems_tab", true);
+    }
+    else if (value == "migration")
+    {
+        showBottom("problems_tab", true);
+        mProblemsPane->showOrigin("OriginMigration");
     }
     else if (value == "expanded")
     {
@@ -7274,6 +7298,13 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
         endCompare(doc);
         mChecking.applyPreviewed(doc);
     }
+    else if (action == "make_strict")
+    {
+        if (const std::optional<ALScriptFix> strict = ALScriptFixes::strictFix(doc.editor->wholeText()))
+        {
+            mChecking.applyFix(doc, *strict, doc.editor->document().version());
+        }
+    }
     else if (action == "compare_world")
     {
         const LLHandle<LLFloater> handle = getHandle();
@@ -8160,6 +8191,24 @@ void ALFloaterScriptStudio::addEditCommands()
             size_t left = 0;
             return doc && doc->loaded && doc->modifiable && (!doc->pickFixes(FixPick{}, &left).empty() || left > 0);
         });
+    // What is left from LSL put right, what could change the script seen
+    // first.
+    mCommands.add(
+        "fix_migration",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                FixPick pick;
+                pick.migration = true;
+                mChecking.askFixAll(*doc, pick);
+            }
+        },
+        [this]() {
+            Doc*    doc = active();
+            FixPick pick;
+            pick.migration = true;
+            return doc && doc->loaded && doc->modifiable && doc->language.lua && !doc->pickFixes(pick).empty();
+        });
     for (const auto& [name, selection] : { std::pair{ "format", false }, std::pair{ "format_selection", true } })
     {
         mCommands.add(
@@ -8253,6 +8302,23 @@ void ALFloaterScriptStudio::addGoCommands()
             Doc* doc = active();
             return doc && (doc->itemNotecard() ? doc->loaded && !doc->ref.inInventory() : doc->shownText()->canPerform(ALEditorCommand::FindReferences));
         });
+    // What is left from LSL, one at a time; an SLua script's, which the
+    // converter wrote or a scripter moved by hand.
+    for (const auto& [name, step] : { std::pair{ "next_migration", 1 }, std::pair{ "previous_migration", -1 } })
+    {
+        mCommands.add(
+            name,
+            [this, step]() {
+                if (Doc* doc = active())
+                {
+                    goToProblem(*doc, step, true);
+                }
+            },
+            [this]() {
+                Doc* doc = active();
+                return doc && doc->loaded && doc->language.lua;
+            });
+    }
     for (const auto& [name, step] : { std::pair{ "next_problem", 1 }, std::pair{ "previous_problem", -1 } })
     {
         mCommands.add(

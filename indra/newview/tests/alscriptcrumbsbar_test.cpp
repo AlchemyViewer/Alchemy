@@ -518,4 +518,21 @@ namespace tut
         crumbs->showTrailer(other);
         ensure("another tab: its own", said > 2 && part("3 errors") != nullptr && part("Tab Size: 4") != nullptr);
     }
+
+    template<> template<>
+    void alscriptcrumbsbar_object::test<9>()
+    {
+        set_test_name("what is left from LSL counted, pressed to show it; none, not said");
+        ALScriptCrumbsBar* crumbs = bar();
+        Doc&               doc    = tab("a");
+        crumbs->showTrailer(doc);
+        ensure("none: not said", trailer().find("left from LSL") == std::string::npos);
+        doc.shownMigration = 3;
+        crumbs->showTrailer(doc);
+        const Part* left = part("3 left from LSL");
+        ensure("counted", left != nullptr && left->value == "migration" && !left->toolTip.empty());
+        doc.shownMigration = 1;
+        crumbs->showTrailer(doc);
+        ensure("counted again", part("1 left from LSL") != nullptr);
+    }
 }

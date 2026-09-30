@@ -26,6 +26,7 @@
 
 #include "alscriptstudiochecking.h"
 
+#include "allsltoslua.h"
 #include "alnotecardembedded.h"
 #include "alnotecardformat.h"
 #include "alnotecarditems.h"
@@ -1087,8 +1088,7 @@ void ALScriptStudioChecking::checked(Doc& doc)
     mWindow.showOutline(doc);
     if (doc.check->fixAllAfterCheck && doc.check->analysisVersion == doc.editor->document().version())
     {
-        FixPick pick;
-        pick.key = *doc.check->fixAllAfterCheck;
+        const FixPick pick = *doc.check->fixAllAfterCheck;
         doc.check->fixAllAfterCheck.reset();
         askFixAll(doc, pick);
     }
@@ -1107,12 +1107,35 @@ void ALScriptStudioChecking::showProblems(Doc& doc)
     if (doc.language.lua)
     {
         explainRequires(doc);
+        notesAsProblems(doc);
     }
     else
     {
         explainTransformWords(doc);
     }
     mAnalysis.refreshProblems(doc);
+}
+
+void ALScriptStudioChecking::notesAsProblems(Doc& doc)
+{
+    // Those read before, gone with the text they were read in.
+    ALScriptProblems& analysis = doc.check->analysis;
+    analysis.erase(std::remove_if(analysis.begin(), analysis.end(), [](const ALScriptProblem& problem) { return problem.key == "SluaNote"; }),
+                   analysis.end());
+    if (doc.check->analysisVersion != doc.editor->document().version())
+    {
+        return;
+    }
+    const std::string text  = doc.editor->wholeText();
+    ALScriptProblems  notes = ALLSLToSLua::notesIn(text, alScriptKeyedWords);
+    if (notes.empty())
+    {
+        return;
+    }
+    ALLSLToSLua::linkNotes(notes, analysis, text);
+    // First: a Fix All takes a note's fix, which takes the note out with
+    // the lint's, before the lint's own, which would leave the note.
+    analysis.insert(analysis.begin(), std::make_move_iterator(notes.begin()), std::make_move_iterator(notes.end()));
 }
 
 void ALScriptStudioChecking::offerImports(Doc& doc)
@@ -1448,7 +1471,7 @@ void ALScriptStudioChecking::askFixAll(Doc& doc, const FixPick& pick)
     // than said to have nothing to fix.
     if (!pick.forSave && doc.loaded && !doc.notecard && doc.check->analysisVersion != doc.editor->document().version())
     {
-        doc.check->fixAllAfterCheck = pick.key;
+        doc.check->fixAllAfterCheck = pick;
         schedule(doc, true);
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
@@ -1458,6 +1481,14 @@ void ALScriptStudioChecking::askFixAll(Doc& doc, const FixPick& pick)
     mWindow.settleProblems(doc);
     size_t                                left  = 0;
     const std::vector<const ALScriptFix*> fixes = doc.pickFixes(pick, &left);
+    // What is left from LSL, where any of it could change what the script
+    // does: all of it seen first, beside the text as it is, and made by
+    // Apply.
+    if (pick.migration && std::any_of(fixes.begin(), fixes.end(), [](const ALScriptFix* fix) { return !fix->safe; }))
+    {
+        previewFixAll(doc, pick);
+        return;
+    }
     // What is not safe to make without a look, said to be left for one.
     const std::string left_said = left > 0 ? mServices.counted("FixesLeft", static_cast<S32>(left)) : std::string();
     if (fixes.size() < 2)

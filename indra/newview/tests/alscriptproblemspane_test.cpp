@@ -71,7 +71,7 @@ namespace
             fixed.push_back(doc.id + ":" + fix.title);
             return true;
         }
-        void fixAllOfKind(Doc& doc, const std::string& key) override { kinds.push_back(doc.id + ":" + key); }
+        void fixAll(Doc& doc, const Doc::FixPick& pick) override { kinds.push_back(doc.id + ":" + (pick.migration ? "from LSL" : pick.key)); }
         void refreshProblems(Doc& doc) override { refreshed.push_back(doc.id); }
         void runtimeCleared(Doc& doc) override { cleared.push_back(doc.id); }
         bool isLint(bool, const std::string& id) const override { return lints.count(id) > 0; }
@@ -821,5 +821,75 @@ namespace tut
         LLSD state;
         pane->saveState(state);
         ensure_equals("one object's is not kept", state["problem_scope"].asString(), std::string("all"));
+    }
+
+    template <>
+    template <>
+    void alscriptproblemspane_object::test<14>()
+    {
+        set_test_name("what a script moved from LSL is left with -- a converter's note, an LSL habit's lint, a call to llcompat -- listed as "
+                      "from LSL, counted, and the origin that lists them alone; not a performance lint, nor ll's own deprecation");
+        make();
+        Doc& d          = doc("door");
+        d.language.lua  = true;
+        using S         = ALScriptProblem::Source;
+        using V         = ALScriptProblem::Severity;
+        ALScriptProblem truth = problem(S::Lint, V::Warning, 1, "a number read as a truth");
+        truth.code            = "SlNumberTruth";
+        truth.key             = "LuauLintSlNumberTruth";
+        ALScriptProblem sleep = problem(S::Lint, V::Note, 2, "sleeps");
+        sleep.code            = "SlSleepingCall";
+        sleep.key             = "LuauLintSlSleepingCall";
+        ALScriptProblem compat = problem(S::Lint, V::Warning, 3, "llcompat.Say is deprecated");
+        compat.key             = "LuauLintDeprecatedMemberUse";
+        compat.args            = { "llcompat.Say" };
+        ALScriptProblem abs = problem(S::Lint, V::Warning, 4, "ll.Abs is deprecated");
+        abs.key             = "LuauLintDeprecatedMemberUseReason";
+        abs.args            = { "ll.Abs", "math.abs" };
+        ALScriptProblem note = problem(S::Assistant, V::Note, 0, "a note");
+        note.key             = "SluaNote";
+        d.check->analysis        = { note, truth, sleep, compat, abs };
+        d.check->analysisVersion = d.editor->document().version();
+        ALScriptProblemsPane::Made made = gather(d);
+        std::string from_lsl;
+        for (const Doc::Shown& row : made.rows)
+        {
+            if (row.migration)
+            {
+                ensure_equals("said to be from LSL", row.origin, services.words("OriginMigration"));
+                from_lsl += row.message.substr(0, 4) + ";";
+            }
+        }
+        ensure_equals("the three", from_lsl, std::string("a no;a nu;llco;"));
+        d.setShown(made.rows);
+        ensure_equals("counted", d.shownMigration, 3);
+        pane->showOrigin("OriginMigration");
+        LLComboBox* origins = window.find<LLComboBox>("problems_origin");
+        ensure("listed alone", origins && origins->getValue().asString() == services.words("OriginMigration"));
+    }
+
+    template <>
+    template <>
+    void alscriptproblemspane_object::test<15>()
+    {
+        set_test_name("the menu of a problem left from LSL offers what is left from LSL fixed, and makes it; another problem's does not");
+        ALScriptProblemsPane& out = make();
+        Doc&                  d   = doc("door");
+        d.language.lua            = true;
+        ALScriptProblem zero      = problem(ALScriptProblem::Source::Lint, ALScriptProblem::Severity::Warning, 2, "reads nothing at 0");
+        zero.code                 = "SlZeroIndex";
+        zero.fixes.push_back(fix("Write it t[1]", true, false, 2));
+        ALScriptProblem shadow = problem(ALScriptProblem::Source::Lint, ALScriptProblem::Severity::Warning, 4, "shadowed");
+        shadow.code            = "LocalShadow";
+        shadow.fixes.push_back(fix("Rename", true, true, 4));
+        d.check->analysis = { zero, shadow };
+        gather(d);
+        out.fill(&d);
+        choose("shadowed [LocalShadow]");
+        ensure("not of another", !out.fixShown("migration"));
+        choose("reads nothing at 0 [SlZeroIndex]");
+        ensure("offered", out.fixShown("migration"));
+        out.act("fix_migration");
+        ensure("asked", !studio.kinds.empty() && studio.kinds.back() == "door:from LSL");
     }
 }

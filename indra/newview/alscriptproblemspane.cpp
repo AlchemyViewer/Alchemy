@@ -184,9 +184,10 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
         const Doc::Shown said = Doc::analysisRow(problem, doc.language.lua, services);
         add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(said.level), said.level, said.origin, said.message,
             problem.file, said.lint);
-        made.rows.back().key      = problem.key;
-        made.rows.back().fixes    = problem.fixes;
-        made.rows.back().fixesFor = doc.check->analysisVersion;
+        made.rows.back().key       = problem.key;
+        made.rows.back().fixes     = problem.fixes;
+        made.rows.back().fixesFor  = doc.check->analysisVersion;
+        made.rows.back().migration = said.migration;
         // The gutter's word on what the line offers: a lightbulb where the
         // caret is, a round mark where a fix changes the script.
         if (analysis_current && problem.file.empty() && !problem.fixes.empty())
@@ -298,8 +299,8 @@ bool ALScriptProblemsPane::postBuild()
     mList->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showMenu(x, y); });
     // The pane's filters: whose, which levels, which source, which words.
     mOrigin->add(mServices->words("OriginAny"), LLSD(""));
-    for (const char* origin : { "OriginParser", "OriginTypes", "OriginLint", "OriginCompiler", "OriginPreprocessor", "OriginOptimizer", "OriginRuntime", "OriginDefinitions",
-                                "OriginWeight" })
+    for (const char* origin : { "OriginParser", "OriginTypes", "OriginLint", "OriginMigration", "OriginCompiler", "OriginPreprocessor", "OriginOptimizer",
+                                "OriginRuntime", "OriginDefinitions", "OriginWeight" })
     {
         mOrigin->add(mServices->words(origin), LLSD(mServices->words(origin)));
     }
@@ -473,6 +474,15 @@ void ALScriptProblemsPane::showEveryScript()
     if (!everyScript())
     {
         mScope->selectByValue("all");
+        mWindow->problemFiltersChanged();
+    }
+    fill(listed());
+}
+
+void ALScriptProblemsPane::showOrigin(const std::string& origin)
+{
+    if (mOrigin->selectByValue(LLSD(mServices->words(origin))))
+    {
         mWindow->problemFiltersChanged();
     }
     fill(listed());
@@ -1096,6 +1106,13 @@ bool ALScriptProblemsPane::fixShown(const std::string& which) const
         // with it: an empty kind would be every kind.
         return !shown->key.empty() && doc->pickFixes(Doc::FixPick{ shown->key }).size() > 1;
     }
+    if (which == "migration")
+    {
+        // All that is left from LSL, from one of it.
+        Doc::FixPick pick;
+        pick.migration = true;
+        return shown->migration && !doc->pickFixes(pick).empty();
+    }
     size_t left = 0;
     return which == "all" && doc->pickFixes(Doc::FixPick{}, &left).size() + left > 1;
 }
@@ -1233,12 +1250,17 @@ void ALScriptProblemsPane::act(const std::string& action)
     {
         if (const Doc::Shown* shown = chosenShown(); shown && !shown->key.empty())
         {
-            const std::string key = shown->key;
-            mWindow->fixAllOfKind(doc, key);
+            mWindow->fixAll(doc, Doc::FixPick{ shown->key });
         }
     }
     else if (action == "fix_all")
     {
-        mWindow->fixAllOfKind(doc, std::string());
+        mWindow->fixAll(doc, Doc::FixPick{});
+    }
+    else if (action == "fix_migration")
+    {
+        Doc::FixPick pick;
+        pick.migration = true;
+        mWindow->fixAll(doc, pick);
     }
 }

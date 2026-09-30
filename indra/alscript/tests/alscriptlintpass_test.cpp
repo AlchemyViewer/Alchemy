@@ -28,6 +28,7 @@
 #include "../allsltoslua.h"
 #include "../alluauservice.h"
 #include "../alscriptfixes.h"
+#include "../alscriptlintpass.h"
 
 #include "../test/lltut.h"
 
@@ -803,5 +804,28 @@ namespace tut
         ensure_equals("a pure one", fixed("default { state_entry() {\n    string s = \"a\";\n    llOwnerSay(llToUpper(s) + llToUpper(s));\n} }\n",
                                           "LSLSlRepeatedCall", "Keep llToUpper(s) in a local, toUpper", false, false),
                       std::string("default { state_entry() {\n    string s = \"a\";\n    string toUpper = llToUpper(s);\n    llOwnerSay(toUpper + toUpper);\n} }\n"));
+    }
+
+    template<> template<>
+    void object::test<21>()
+    {
+        set_test_name("migration: a migration rule's lint, a converter's note and a call to llcompat are left from LSL; a performance "
+                      "rule's lint and ll's own deprecation are not");
+        ALScriptProblem p;
+        p.source = ALScriptProblem::Source::Lint;
+        p.code   = "SlZeroIndex";
+        ensure("a migration rule's", ALScriptLintPass::migration(p));
+        p.code = "SlSleepingCall";
+        ensure("not a performance rule's", !ALScriptLintPass::migration(p));
+        p.code = "";
+        p.key  = "LuauLintDeprecatedMemberUse";
+        p.args = { "llcompat.Say" };
+        ensure("llcompat's", ALScriptLintPass::migration(p));
+        p.args = { "ll.SetPrimitiveParams" };
+        ensure("not ll's", !ALScriptLintPass::migration(p));
+        ALScriptProblem note;
+        note.source = ALScriptProblem::Source::Assistant;
+        note.key    = "SluaNote";
+        ensure("a note", ALScriptLintPass::migration(note));
     }
 }

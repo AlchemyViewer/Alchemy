@@ -1628,6 +1628,50 @@ namespace ALScriptFixes
         }
     }
 
+    std::optional<ALScriptFix> strictFix(std::string_view slua)
+    {
+        // The head's lines: comments and blanks before the first code,
+        // where Luau reads its --! directives.
+        S32 line = 0;
+        for (size_t start = 0; start < slua.size(); ++line)
+        {
+            const size_t     end  = std::min(slua.find('\n', start), slua.size());
+            std::string_view text = slua.substr(start, end - start);
+            if (!text.empty() && text.back() == '\r')
+            {
+                text.remove_suffix(1);
+            }
+            const size_t at   = text.find_first_not_of(" \t");
+            const auto   word = [&](std::string_view directive) {
+                return at != std::string_view::npos && text.substr(at, directive.size()) == directive &&
+                       text.substr(at + directive.size()).find_first_not_of(" \t") == std::string_view::npos;
+            };
+            if (word("--!strict"))
+            {
+                return std::nullopt;
+            }
+            for (std::string_view mode : { std::string_view("--!nonstrict"), std::string_view("--!nocheck") })
+            {
+                if (word(mode))
+                {
+                    ALScriptFix fix = titled("ScriptFixMakeStrict", "Make the script --!strict", {});
+                    fix.preferred   = true;
+                    fix.edits.push_back({ line, static_cast<S32>(at), line, static_cast<S32>(at + mode.size()), "--!strict" });
+                    return fix;
+                }
+            }
+            if (at != std::string_view::npos && text.substr(at, 2) != "--")
+            {
+                break;
+            }
+            start = end + 1;
+        }
+        ALScriptFix fix = titled("ScriptFixMakeStrict", "Make the script --!strict", {});
+        fix.preferred   = true;
+        fix.edits.push_back({ 0, 0, 0, 0, "--!strict\n" });
+        return fix;
+    }
+
     void offerRequire(ALScriptProblem& problem, std::string_view text, const std::string& module, bool field)
     {
         offerRequire(problem, Lines(text), module, field);

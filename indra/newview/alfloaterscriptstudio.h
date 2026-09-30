@@ -438,11 +438,17 @@ private:
     // --- problems and checks -----------------------------------------------------------
 
     // The caret to the next problem of the script after it, or the one
-    // before, round past the ends, with what it says in a card.
-    void                goToProblem(Doc& doc, S32 direction);
-    // The script's own problems' places, each once and in order; the caret
-    // taken to one; and to one by its number (ALScriptStudioVim::Window).
-    std::vector<ALTextPos> problemPlaces(const Doc& doc) const;
+    // before, round past the ends, with what it says in a card; of what is
+    // left from LSL alone, where asked, and once none is, a word that the
+    // script may be made --!strict.
+    void                goToProblem(Doc& doc, S32 direction, bool migration = false);
+    // The script's own problems' places, each once and in order -- those
+    // left from LSL, where asked; the caret taken to one; and to one by its
+    // number (ALScriptStudioVim::Window).
+    std::vector<ALTextPos> problemPlaces(const Doc& doc, bool migration = false) const;
+    // An SLua script with nothing left from LSL: said, with --!strict
+    // offered where it is not yet (make_strict).
+    void                   migrationDone(Doc& doc);
     void                   goToProblemAt(Doc& doc, const ALTextPos& to);
     bool                   goToProblemNumber(Doc& doc, S32 number) override;
     // A fix made, the script checked again (ALScriptStudioChecking).
@@ -857,7 +863,7 @@ private:
     void                 problemFiltersChanged() override { saveState(); }
     std::string          problemIcon(const Doc& doc, const std::string& include) const override;
     std::string          scriptIcon(bool lua, const std::string& include) const override;
-    void                 fixAllOfKind(Doc& doc, const std::string& key) override;
+    void                 fixAll(Doc& doc, const FixPick& pick) override;
     bool                 isLint(bool lua, const std::string& id) const override;
     ALScriptLints::Level lintLevel(bool lua, const std::string& id) const override;
     void                 setLintLevel(bool lua, const std::string& id, ALScriptLints::Level level) override;

@@ -121,9 +121,9 @@ public:
         virtual std::string scriptIcon(bool lua, const std::string& include) const        = 0;
         // A fix made over the text at `version`, whose places it is in.
         virtual bool applyFix(Doc& doc, const ALScriptFix& fix, U32 version) = 0;
-        // The preferred fix of every problem of a kind made -- of every
-        // kind, for none -- once asked.
-        virtual void fixAllOfKind(Doc& doc, const std::string& key) = 0;
+        // The preferred fix of every problem picked made -- of a kind, of
+        // every kind, or what is left from LSL -- once asked.
+        virtual void fixAll(Doc& doc, const Doc::FixPick& pick) = 0;
         // The tab's problems gathered again, with the next frame.
         virtual void refreshProblems(Doc& doc) = 0;
         // What the script said as it ran let go of, and not listed again
@@ -172,6 +172,8 @@ public:
     void forgetChecked(const ALScriptRef& ref);
     void clearChecked();
     void showEveryScript();
+    // The list brought to one origin, by its word's name: OriginMigration.
+    void showOrigin(const std::string& origin);
     // The list brought to one object's scripts -- those open, and those
     // its check read -- which an object's check lists.
     void showObject(const LLUUID& root);

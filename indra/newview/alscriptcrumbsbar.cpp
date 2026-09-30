@@ -143,6 +143,7 @@ ALScriptCrumbsBar::Steady ALScriptCrumbsBar::steadyOf(Doc& doc) const
     steady.indentFrom = static_cast<U8>(doc.editor->indentFrom());
     steady.checking   = doc.checkRunning(LLTimer::getTotalSeconds());
     mWindow->problemCounts(doc, steady.errors, steady.warnings);
+    steady.migration  = doc.shownMigration;
     steady.target     = mWindow->weightTarget(doc);
     steady.expandable = doc.expandedEditor != nullptr;
     steady.expanded   = doc.shownView() == Doc::View::Expanded;
@@ -241,6 +242,12 @@ void ALScriptCrumbsBar::problems(Doc& doc, std::vector<Part>& parts) const
     if (warnings > 0)
     {
         parts.push_back({ mServices->counted("ProblemWarnings", warnings), "problems", mTips.problems });
+        parts.back().drop = DROP_COUNTS;
+    }
+    // What a script moved from LSL has left to see to, whatever its level.
+    if (doc.shownMigration > 0)
+    {
+        parts.push_back({ mServices->counted("MigrationLeft", doc.shownMigration), "migration", mServices->words("TrailerMigrationTip") });
         parts.back().drop = DROP_COUNTS;
     }
 }

@@ -29,6 +29,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "../alscriptstudiochecking.h"
+#include "alscriptlintpass.h"
 
 #include "../alnotecardembedded.h"
 #include "../alscriptstudioweighing.h"
@@ -160,6 +161,8 @@ namespace
                 shown.key      = problem.key;
                 shown.fixes    = problem.fixes;
                 shown.fixesFor = doc.check->analysisVersion;
+                // As the pane's rows have it (ALScriptStudioDoc::analysisRow).
+                shown.migration = doc.language.lua && ALScriptLintPass::migration(problem);
                 doc.shown.push_back(std::move(shown));
             }
         }
@@ -1239,5 +1242,90 @@ namespace tut
         doc.editor->setText("default {}\n");
         ensure("changed since: not made", !checking.applyPreviewed(doc) && doc.editor->wholeText() == "default {}\n");
         ensure("said", services.statuses.back() == "FixAllChangedSince" && services.statusFailures.back());
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<22>()
+    {
+        set_test_name("each LSL comment in an SLua script a note to see to, before the check's own: Done, and the lint's fix of the line it "
+                      "stands over with it; read again, not twice; none in LSL");
+        ALScriptStudioChecking& checking = make();
+        const std::string       text     = "local s = \"abc\"\n"
+                                           "-- LSL: llcompat.GetSubString takes indexes from 0, as LSL did; ll.GetSubString takes them from 1.\n"
+                                           "print(llcompat.GetSubString(s, 0, 2))\n"
+                                           "-- LSL: something else\n"
+                                           "print(s)\n";
+        Doc& doc          = tab("a", text);
+        doc.language.lua  = true;
+        checking.schedule(doc, true);
+        checking.pump(1.0);
+        ALScriptProblem compat = problem(2, "llcompat.GetSubString is ll's", ALScriptProblem::Severity::Note);
+        compat.source          = ALScriptProblem::Source::Lint;
+        compat.code            = "SlCompatCall";
+        compat.fixes           = { fix("Write it ll.GetSubString(s, 1, 3)", 2, 6, 36, "ll.GetSubString(s, 1, 3)") };
+        studio.asks.back().answered(answer(doc, { compat }));
+        const ALScriptProblems& said = doc.check->analysis;
+        ensure_equals("two notes, then the lint", said.size(), size_t(3));
+        ensure("the notes first", said[0].key == "SluaNote" && said[0].line == 1 && said[1].key == "SluaNote" && said[1].line == 3 &&
+                                      said[2].code == "SlCompatCall");
+        ensure("the lint's fix with the note's", said[0].fixes.size() == 2 && said[0].fixes[0].preferred &&
+                                                     said[0].fixes[0].title == "Write it ll.GetSubString(s, 1, 3), and take the note out");
+        ensure("the other: Done alone", said[1].fixes.size() == 1 && !said[1].fixes[0].preferred);
+        ensure("made", checking.applyFix(doc, said[0].fixes[0], version(doc)) &&
+                           doc.editor->wholeText() == "local s = \"abc\"\nprint(ll.GetSubString(s, 1, 3))\n-- LSL: something else\nprint(s)\n");
+
+        checking.pump(2.0);
+        studio.asks.back().answered(answer(doc));
+        ensure("read again: the one left, once", doc.check->analysis.size() == 1 && doc.check->analysis[0].line == 2);
+
+        Doc& lsl = tab("b", "// -- LSL: not SLua\ndefault { state_entry() {} }\n");
+        checking.schedule(lsl, true);
+        checking.pump(3.0);
+        studio.asks.back().answered(answer(lsl));
+        ensure("none in LSL", lsl.check->analysis.empty());
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<23>()
+    {
+        set_test_name("what is left from LSL fixed: every preferred fix of it, not another problem's; seen first where any could change "
+                      "what the script does, asked as Fix All asks where none could");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        doc.language.lua                 = true;
+        checking.schedule(doc, true);
+        checking.pump(1.0);
+        const auto lint = [&](S32 line, const char* code, const ALScriptFix& with) {
+            ALScriptProblem out = problem(line, code, ALScriptProblem::Severity::Warning);
+            out.source          = ALScriptProblem::Source::Lint;
+            out.code            = code;
+            out.fixes           = { with };
+            return out;
+        };
+        const ALScriptProblem zero   = lint(0, "SlZeroIndex", fix("First", 0, 0, 7, "float", false));
+        const ALScriptProblem paren  = lint(3, "SlParenCondition", fix("Second", 3, 4, 15, "touch_start", true));
+        const ALScriptProblem shadow = lint(1, "LocalShadow", fix("Third", 1, 0, 1, "x", true));
+        studio.asks.back().answered(answer(doc, { zero, paren, shadow }));
+        Doc::FixPick pick;
+        pick.migration = true;
+        studio.preview = nullptr;
+        checking.askFixAll(doc, pick);
+        ensure("not asked: seen", !studio.preview);
+        const std::string& compared = studio.told.back();
+        ensure("the two from LSL, not the other: " + compared, compared.find("FixAllAfter [FIXES]=Fixes [COUNT]=2") != std::string::npos &&
+                                                                   compared.find("float count;") != std::string::npos);
+        ensure("Apply offered", services.reports.back().actions == Names{ "apply_fixes" });
+        ensure("made", checking.applyPreviewed(doc) && doc.editor->document().line(0) == "float count;");
+
+        Doc& safe       = tab("b");
+        safe.language.lua = true;
+        checking.schedule(safe, true);
+        checking.pump(2.0);
+        const ALScriptProblem first  = lint(0, "SlParenCondition", fix("First", 0, 0, 7, "float", true));
+        const ALScriptProblem second = lint(3, "SlCompoundAssign", fix("Second", 3, 4, 15, "touch_start", true));
+        studio.asks.back().answered(answer(safe, { first, second }));
+        studio.preview = nullptr;
+        checking.askFixAll(safe, pick);
+        ensure("all safe: asked as Fix All asks", (bool)studio.preview);
     }
 }

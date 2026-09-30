@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../allsltoslua.h"
+#include "../alscriptfixes.h"
 #include "../allslservice.h"
 #include "../alluauservice.h"
 
@@ -959,5 +960,52 @@ namespace tut
             }
             return false;
         }());
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<32>()
+    {
+        set_test_name("each LSL comment read back as a note: Done takes it out; one a lint finds too offers the lint's fix with it, read in "
+                      "the words it was written in");
+        ensure("the definitions", definitions);
+        const std::string lsl = "default { state_entry() { string s = \"abc\"; llOwnerSay(llGetSubString(s, 0, 2)); } }";
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
+        ensure("converted", r.converted);
+        ALScriptProblems notes = ALLSLToSLua::notesIn(r.text, nullptr);
+        ensure("as many as the converter noted: " + r.text, notes.size() == r.notes.size() && !notes.empty());
+        ALScriptProblem* index = nullptr;
+        for (ALScriptProblem& note : notes)
+        {
+            ensure("a note's", note.key == "SluaNote" && note.severity == ALScriptProblem::Severity::Note && note.fixes.size() == 1 &&
+                                   note.fixes[0].safe && note.fixes[0].removes && !note.fixes[0].preferred);
+            index = note.message.rfind("llcompat.GetSubString takes indexes", 0) == 0 ? &note : index;
+        }
+        ensure("the index's, the lint's: " + r.text, index && index->code == "SlCompatCall");
+        const size_t at = index - notes.data();
+        ALLSLToSLua::linkNotes(notes, service.check(r.text), r.text);
+        const ALScriptProblem& linked = notes[at];
+        ensure("the lint's fix first, then Done", linked.fixes.size() == 2 && linked.fixes[0].preferred &&
+                                                      linked.fixes[0].title == "Write it ll.GetSubString(s, 1, 3), and take the note out" &&
+                                                      linked.fixes[1].title == "Done: take the note out");
+        const std::optional<std::string> made = ALScriptFixes::apply(r.text, linked.fixes[0]);
+        ensure("made: ll's, the note gone", made && made->find("ll.GetSubString(s, 1, 3)") != std::string::npos &&
+                                                made->find("llcompat.GetSubString takes indexes") == std::string::npos);
+        const std::optional<std::string> done = ALScriptFixes::apply(r.text, linked.fixes[1]);
+        ensure("done: the line gone, the call kept", done && done->find("llcompat.GetSubString takes indexes") == std::string::npos &&
+                                                         done->find("llcompat.GetSubString(s, 0, 2)") != std::string::npos &&
+                                                         std::count(done->begin(), done->end(), '\n') + 1 == std::count(r.text.begin(), r.text.end(), '\n'));
+
+        // Written in the studio's words, read back in them.
+        ALLSLToSLua::Options close = ALLSLToSLua::Options::closeToLSL();
+        close.words = [](const std::string& key, const std::vector<std::string>& args, const std::string& english) {
+            return ALScriptProblem::fill(key == "SluaIndex" ? "Index de [1]" : english, args);
+        };
+        const ALLSLToSLua::Result said = ALLSLToSLua::convert(lsl, close);
+        ensure("written so", has(said, "-- LSL: Index de GetSubString\n"));
+        const auto linted = [](const ALScriptProblems& read) {
+            return std::count_if(read.begin(), read.end(), [](const ALScriptProblem& note) { return note.code == "SlCompatCall"; });
+        };
+        ensure("read in the studio's words", linted(ALLSLToSLua::notesIn(said.text, close.words)) == 1);
+        ensure("not in English's", linted(ALLSLToSLua::notesIn(said.text, nullptr)) == 0);
     }
 }
