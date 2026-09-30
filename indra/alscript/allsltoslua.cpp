@@ -288,6 +288,28 @@ namespace
         void prepareBody(LSLASTNode* body);
         void numericFor(LSLForStatement* f, const Counting& c);
 
+        // --- truth values ---------------------------------------------------------
+
+        // The integers the script uses only as truth values, and its
+        // functions that answer only one, which are written as Luau's
+        // booleans: never stepped or added to, and read only as a condition,
+        // an operand of !, && or ||, returned by such a function, copied into
+        // another such, or -- where only ever TRUE or FALSE -- compared with
+        // one of them.
+        void findBooleans();
+        // Whether an expression is only ever TRUE or FALSE, given those
+        // taken to be so far.
+        bool zeroOrOne(LSLExpression* e) const;
+        // Whether a read of a variable or a call is one a truth value stands
+        // for, given those taken as booleans so far.
+        bool readAsTruth(LSLASTNode* read) const;
+        // What a truth value is set to: true and false for whole numbers,
+        // else the value as a condition.
+        std::string truthOf(LSLExpression* e);
+        // A truth value compared with TRUE or FALSE: itself, or not it.
+        std::optional<Expr> truthAsked(LSLBinaryExpression* e);
+        bool        boolean(LSLSymbol* var) const { return var && mBooleans.contains(var); }
+
         // --- the script -------------------------------------------------------------
 
         void globals();
@@ -339,6 +361,10 @@ namespace
         // for, and the variables used by nothing else.
         boost::unordered_flat_map<LSLForStatement*, Counting> mNumeric;
         boost::unordered_flat_set<LSLSymbol*>                 mLoopOnly;
+        boost::unordered_flat_set<LSLSymbol*>                 mBooleans;
+        boost::unordered_flat_set<LSLSymbol*>                 mZeroOne;
+        // The function of the script's own being written.
+        LSLSymbol* mFunction = nullptr;
     };
 
     void Writer::note(LSLASTNode* at, const std::string& key, const std::string& said)
@@ -492,7 +518,7 @@ namespace
         {
             name += std::string(".") + static_cast<LSLIdentifier*>(member)->getName();
         }
-        return { name };
+        return { name, PRIMARY, isNull(member) && boolean(symbol) };
     }
 
     Expr Writer::value(LSLExpression* e)
@@ -816,7 +842,7 @@ namespace
         LSLParamList*  params = symbol ? symbol->getFunctionDecl() : nullptr;
         if (!symbol || symbol->getSubType() != SYM_BUILTIN)
         {
-            return { nameOf(id) + "(" + args(e->getArguments(), params) + ")" };
+            return { nameOf(id) + "(" + args(e->getArguments(), params) + ")", PRIMARY, boolean(symbol) };
         }
         const std::string lsl  = id->getName();
         const std::string bare = lsl.rfind("ll", 0) == 0 ? lsl.substr(2) : lsl;
@@ -990,6 +1016,10 @@ namespace
             case OP_EQ:
             case OP_NEQ:
             {
+                if (std::optional<Expr> asked = truthAsked(e))
+                {
+                    return *asked;
+                }
                 const bool eq = op == OP_EQ;
                 if (lt == LST_LIST && rt == LST_LIST)
                 {
@@ -1272,6 +1302,11 @@ namespace
                 default: break;
             }
         }
+        if (op == OP_ASSIGN && rhs && boolean(id->getSymbol()))
+        {
+            line(name + " = " + truthOf(rhs));
+            return;
+        }
         line(name + " = " + made(name, type));
     }
 
@@ -1388,13 +1423,18 @@ namespace
                 {
                     return;
                 }
+                if (boolean(id->getSymbol()))
+                {
+                    line("local " + name + (mOptions.types ? ": boolean" : "") + " = " + (isNull(init) ? std::string("false") : truthOf(init)));
+                    return;
+                }
                 line("local " + name + typed(type) + " = " + (isNull(init) ? defaultOf(type) : coerced(init, type).text));
                 return;
             }
             case NODE_RETURN_STATEMENT:
             {
                 LSLExpression*    e    = static_cast<LSLReturnStatement*>(s)->getExpr();
-                const std::string said = isNull(e) ? "return" : "return " + value(e).text;
+                const std::string said = isNull(e) ? "return" : "return " + (boolean(mFunction) ? truthOf(e) : value(e).text);
                 line(last ? said : "do " + said + " end");
                 return;
             }
@@ -1768,6 +1808,321 @@ namespace
         line("end");
     }
 
+    // --- truth values ----------------------------------------------------------------
+
+    namespace
+    {
+        // TRUE, FALSE, or 1 or 0 written out, and which.
+        bool truthConstant(LSLExpression* e, bool& truth)
+        {
+            int v = 0;
+            if (wholeNumber(e, v))
+            {
+                truth = v != 0;
+                return v == 0 || v == 1;
+            }
+            e = unwrapped(e);
+            if (e && e->getNodeSubType() == NODE_LVALUE_EXPRESSION)
+            {
+                LSLIdentifier* id = static_cast<LSLLValueExpression*>(e)->getIdentifier();
+                if (id->getSymbol() && id->getSymbol()->getSubType() == SYM_BUILTIN &&
+                    (std::string_view(id->getName()) == "TRUE" || std::string_view(id->getName()) == "FALSE"))
+                {
+                    truth = std::string_view(id->getName()) == "TRUE";
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // What a read reads: a variable, whole, or a function of the
+        // script's own that is called.
+        LSLSymbol* readOf(LSLASTNode* node)
+        {
+            if (node->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+            {
+                LSLSymbol* symbol = static_cast<LSLFunctionExpression*>(node)->getIdentifier()->getSymbol();
+                return symbol && symbol->getSubType() != SYM_BUILTIN ? symbol : nullptr;
+            }
+            return wholeVariable(static_cast<LSLExpression*>(node));
+        }
+
+        // Whether what an expression gives is used: not where it stands as
+        // a statement, or as a for's start or step.
+        bool valueUsed(LSLASTNode* node)
+        {
+            LSLASTNode* parent = node->getParent();
+            while (parent && parent->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+            {
+                parent = parent->getParent();
+            }
+            if (!parent || parent->getNodeSubType() == NODE_EXPRESSION_STATEMENT)
+            {
+                return false;
+            }
+            return !(parent->getNodeType() == NODE_AST_NODE_LIST && parent->getParent() &&
+                     parent->getParent()->getNodeSubType() == NODE_FOR_STATEMENT);
+        }
+
+        // Whether an assignment is what sets its variable, rather than a
+        // read of it.
+        bool assignedBy(LSLASTNode* read)
+        {
+            LSLASTNode* parent = read->getParent();
+            return parent && parent->getNodeSubType() == NODE_BINARY_EXPRESSION && read->getParentSlot() == 0 &&
+                   static_cast<LSLExpression*>(parent)->getOperation() == OP_ASSIGN;
+        }
+
+        // The function of the script's own a node stands in, if any.
+        LSLSymbol* enclosingFunction(LSLASTNode* node)
+        {
+            for (; node; node = node->getParent())
+            {
+                if (node->getNodeType() == NODE_GLOBAL_FUNCTION)
+                {
+                    return static_cast<LSLGlobalFunction*>(node)->getSymbol();
+                }
+            }
+            return nullptr;
+        }
+    }
+
+    bool Writer::zeroOrOne(LSLExpression* e) const
+    {
+        bool truth = false;
+        if (truthConstant(e, truth))
+        {
+            return true;
+        }
+        e = unwrapped(e);
+        if (!e)
+        {
+            return false;
+        }
+        switch (e->getNodeSubType())
+        {
+            case NODE_LVALUE_EXPRESSION:
+            case NODE_FUNCTION_EXPRESSION:
+                if (LSLSymbol* read = readOf(e))
+                {
+                    return mZeroOne.contains(read);
+                }
+                if (e->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+                {
+                    const ALLSLTraits::Trait* trait = ALLSLTraits::of(static_cast<LSLFunctionExpression*>(e)->getIdentifier()->getName());
+                    return trait && (trait->slua & ALLSLTraits::SluaBool);
+                }
+                return false;
+            case NODE_UNARY_EXPRESSION: return e->getOperation() == OP_BOOLEAN_NOT;
+            case NODE_BINARY_EXPRESSION:
+            {
+                const LSLOperator op = e->getOperation();
+                if (op == OP_NEQ)
+                {
+                    // != of two lists says how much longer the left one is.
+                    auto* b = static_cast<LSLBinaryExpression*>(e);
+                    return b->getLHS()->getIType() != LST_LIST || b->getRHS()->getIType() != LST_LIST;
+                }
+                return op == OP_EQ || op == OP_LESS || op == OP_LEQ || op == OP_GREATER || op == OP_GEQ || op == OP_BOOLEAN_AND ||
+                       op == OP_BOOLEAN_OR;
+            }
+            default: return false;
+        }
+    }
+
+    bool Writer::readAsTruth(LSLASTNode* read) const
+    {
+        // Up through brackets and the tree's own conversions to a truth.
+        LSLASTNode* node   = read;
+        LSLASTNode* parent = node->getParent();
+        while (parent && (parent->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION || parent->getNodeSubType() == NODE_BOOL_CONVERSION_EXPRESSION))
+        {
+            if (parent->getNodeSubType() == NODE_BOOL_CONVERSION_EXPRESSION)
+            {
+                return true;
+            }
+            node   = parent;
+            parent = parent->getParent();
+        }
+        if (!parent)
+        {
+            return false;
+        }
+        const int slot = node->getParentSlot();
+        switch (parent->getNodeSubType())
+        {
+            case NODE_IF_STATEMENT:
+            case NODE_WHILE_STATEMENT: return slot == 0;
+            case NODE_DO_STATEMENT: return slot == 1;
+            case NODE_FOR_STATEMENT: return slot == 1;
+            case NODE_RETURN_STATEMENT: return boolean(enclosingFunction(parent));
+            case NODE_UNARY_EXPRESSION: return static_cast<LSLExpression*>(parent)->getOperation() == OP_BOOLEAN_NOT;
+            case NODE_BINARY_EXPRESSION:
+            {
+                const LSLOperator op = static_cast<LSLExpression*>(parent)->getOperation();
+                auto*             b  = static_cast<LSLBinaryExpression*>(parent);
+                if (op == OP_BOOLEAN_AND || op == OP_BOOLEAN_OR)
+                {
+                    return true;
+                }
+                // Asked whether it is TRUE or FALSE, where it only ever is
+                // one or the other.
+                bool truth = false;
+                if ((op == OP_EQ || op == OP_NEQ) && truthConstant(slot == 0 ? b->getRHS() : b->getLHS(), truth))
+                {
+                    return mZeroOne.contains(readOf(read));
+                }
+                // Copied, whole, into another truth value.
+                return op == OP_ASSIGN && slot == 1 && boolean(wholeVariable(b->getLHS()));
+            }
+            case NODE_DECLARATION: return slot == 1 && boolean(static_cast<LSLDeclaration*>(parent)->getIdentifier()->getSymbol());
+            default:
+                if (parent->getNodeType() == NODE_GLOBAL_VARIABLE)
+                {
+                    return slot == 1 && boolean(static_cast<LSLGlobalVariable*>(parent)->getIdentifier()->getSymbol());
+                }
+                return false;
+        }
+    }
+
+    void Writer::findBooleans()
+    {
+        // Every integer the script declares and every function of its own
+        // that answers one, then each let go of that is stepped, added to or
+        // read as a number, until none is.
+        std::vector<LSLASTNode*>                           reads;
+        std::vector<std::pair<LSLSymbol*, LSLExpression*>> sets;
+        const auto candidate = [&](LSLIdentifier* id, LSLExpression* init) {
+            if (id->getIType() == LST_INTEGER && id->getSymbol())
+            {
+                mBooleans.insert(id->getSymbol());
+                if (!isNull(init))
+                {
+                    sets.emplace_back(id->getSymbol(), init);
+                }
+            }
+        };
+        walk(mScript, [&](LSLASTNode* node) {
+            if (node->getNodeType() == NODE_GLOBAL_VARIABLE)
+            {
+                auto* global = static_cast<LSLGlobalVariable*>(node);
+                candidate(global->getIdentifier(), global->getInitializer());
+            }
+            else if (node->getNodeType() == NODE_GLOBAL_FUNCTION)
+            {
+                auto* f = static_cast<LSLGlobalFunction*>(node);
+                if (f->getIdentifier()->getIType() == LST_INTEGER && f->getSymbol())
+                {
+                    mBooleans.insert(f->getSymbol());
+                }
+            }
+            else if (node->getNodeSubType() == NODE_DECLARATION)
+            {
+                auto* declaration = static_cast<LSLDeclaration*>(node);
+                candidate(declaration->getIdentifier(), declaration->getInitializer());
+            }
+            else if (node->getNodeSubType() == NODE_RETURN_STATEMENT)
+            {
+                LSLExpression* e = static_cast<LSLReturnStatement*>(node)->getExpr();
+                if (LSLSymbol* f = enclosingFunction(node); f && !isNull(e))
+                {
+                    sets.emplace_back(f, e);
+                }
+            }
+            else if ((node->getNodeSubType() == NODE_LVALUE_EXPRESSION || node->getNodeSubType() == NODE_FUNCTION_EXPRESSION) && readOf(node))
+            {
+                reads.push_back(node);
+            }
+        });
+        // Stepped, added to, or set where what the assignment gives is
+        // used: a number. After every declaration, which a function may
+        // come before.
+        walk(mScript, [&](LSLASTNode* node) {
+            if (LSLSymbol* var = setBy(node))
+            {
+                if (static_cast<LSLExpression*>(node)->getOperation() != OP_ASSIGN || valueUsed(node))
+                {
+                    mBooleans.erase(var);
+                }
+                else
+                {
+                    sets.emplace_back(var, static_cast<LSLBinaryExpression*>(node)->getRHS());
+                }
+            }
+        });
+        // Those only ever TRUE or FALSE, which may be asked which.
+        mZeroOne = mBooleans;
+        for (bool changed = true; changed;)
+        {
+            changed = false;
+            for (const auto& [symbol, e] : sets)
+            {
+                if (mZeroOne.contains(symbol) && !zeroOrOne(e))
+                {
+                    mZeroOne.erase(symbol);
+                    changed = true;
+                }
+            }
+        }
+        for (bool changed = true; changed;)
+        {
+            changed = false;
+            for (LSLASTNode* read : reads)
+            {
+                LSLSymbol* symbol = readOf(read);
+                if (boolean(symbol) && !assignedBy(read) && valueUsed(read) && !readAsTruth(read))
+                {
+                    mBooleans.erase(symbol);
+                    changed = true;
+                }
+            }
+        }
+        // Nothing to say of one never read: kept a number, as it was.
+        boost::unordered_flat_set<LSLSymbol*> readSome;
+        for (LSLASTNode* read : reads)
+        {
+            if (!assignedBy(read) && valueUsed(read))
+            {
+                readSome.insert(readOf(read));
+            }
+        }
+        boost::unordered::erase_if(mBooleans, [&readSome](LSLSymbol* symbol) { return !readSome.contains(symbol); });
+    }
+
+    std::optional<Expr> Writer::truthAsked(LSLBinaryExpression* e)
+    {
+        bool           truth = false;
+        LSLExpression* side  = nullptr;
+        if (boolean(readOf(unwrapped(e->getLHS()))) && truthConstant(e->getRHS(), truth))
+        {
+            side = e->getLHS();
+        }
+        else if (boolean(readOf(unwrapped(e->getRHS()))) && truthConstant(e->getLHS(), truth))
+        {
+            side = e->getRHS();
+        }
+        if (!side)
+        {
+            return std::nullopt;
+        }
+        const Expr is = expr(side);
+        if ((e->getOperation() == OP_EQ) == truth)
+        {
+            return Expr{ is.text, is.prec, true };
+        }
+        return Expr{ "not " + bracketed(is, UNARY), UNARY, true };
+    }
+
+    std::string Writer::truthOf(LSLExpression* e)
+    {
+        int v = 0;
+        if (wholeNumber(e, v))
+        {
+            return v != 0 ? "true" : "false";
+        }
+        return condition(e).text;
+    }
+
     // --- the script -------------------------------------------------------------------
 
     void Writer::globals()
@@ -1782,8 +2137,15 @@ namespace
             auto*          global = static_cast<LSLGlobalVariable*>(g);
             LSLIdentifier* id     = global->getIdentifier();
             LSLExpression* init   = global->getInitializer();
-            line("local " + nameOf(id) + typed(id->getIType()) + " = " +
-                 (isNull(init) ? defaultOf(id->getIType()) : coerced(init, id->getIType()).text));
+            if (boolean(id->getSymbol()))
+            {
+                line("local " + nameOf(id) + (mOptions.types ? ": boolean" : "") + " = " + (isNull(init) ? std::string("false") : truthOf(init)));
+            }
+            else
+            {
+                line("local " + nameOf(id) + typed(id->getIType()) + " = " +
+                     (isNull(init) ? defaultOf(id->getIType()) : coerced(init, id->getIType()).text));
+            }
             any = true;
         }
         if (any)
@@ -1838,12 +2200,14 @@ namespace
             {
                 params += (params.empty() ? "" : ", ") + nameOf(static_cast<LSLIdentifier*>(p)) + typed(p->getIType());
             }
+            mFunction = f->getSymbol();
             line(std::string(forward ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +
-                 typed(f->getIdentifier()->getIType()));
+                 (boolean(mFunction) ? std::string(mOptions.types ? ": boolean" : "") : typed(f->getIdentifier()->getIType())));
             ++mDepth;
             prepareBody(f->getStatements());
             block(f->getStatements());
             --mDepth;
+            mFunction = nullptr;
             line("end");
             line("");
         }
@@ -2122,6 +2486,7 @@ end
                 mTimers = true;
             }
         });
+        findBooleans();
         if (mManyStates)
         {
             statesPreamble();

@@ -357,4 +357,43 @@ namespace tut
         ensure("a counter read after keeps the while: " + r.text, has(r, "while f < 3 do") && has(r, "local f = 0"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<12>()
+    {
+        set_test_name("integers only ever truth values are booleans, and functions that answer one; each use that reads a number keeps it one");
+        const ALLSLToSLua::Result r = convert("integer gOn = FALSE;\n"
+                                              "integer gSeen;\n"
+                                              "integer isOwner(key k) { return k == llGetOwner(); }\n"
+                                              "integer anyOf(list l) { return llGetListLength(l); }\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    gOn = !gOn;\n"
+                                              "    if (gOn) llOwnerSay(\"on\"); else llOwnerSay(\"off\");\n"
+                                              "    if (gSeen == FALSE && isOwner(llDetectedKey(0))) gSeen = TRUE;\n"
+                                              "    integer busy = anyOf([1]);\n"
+                                              "    while (!busy) busy = TRUE;\n"
+                                              "    integer count; count++;\n"
+                                              "    integer shown = TRUE; llOwnerSay((string)shown);\n"
+                                              "    integer loose = 5; if (loose == TRUE) llOwnerSay(\"one\");\n"
+                                              "    integer y; integer z = (y = 5); if (y) llOwnerSay((string)z);\n"
+                                              "    if (count) llOwnerSay((string)count);\n"
+                                              "} }\n");
+        ensure("a global toggled: " + r.text, has(r, "local gOn = false") && has(r, "gOn = not gOn") && has(r, "if gOn then"));
+        ensure("compared with FALSE: " + r.text, has(r, "local gSeen = false") && has(r, "if not gSeen and isOwner(") && has(r, "gSeen = true"));
+        ensure("a function that answers one: " + r.text, has(r, "return k == ll.GetOwner()"));
+        ensure("a length, as a truth: " + r.text, has(r, "return #l ~= 0") && has(r, "local busy = anyOf({1})") && has(r, "while not busy do"));
+        ensure("stepped: " + r.text, has(r, "local count = 0") && has(r, "count += 1"));
+        ensure("printed: " + r.text, has(r, "local shown = 1"));
+        ensure("more than TRUE, compared with it: " + r.text, has(r, "local loose = 5") && has(r, "if loose == 1 then"));
+        ensure("set where the assignment is read: " + r.text, has(r, "local y = 0"));
+        checksClean(r);
+
+        ALLSLToSLua::Options typed;
+        typed.types = true;
+        const ALLSLToSLua::Result t = ALLSLToSLua::convert("integer ready(integer n) { return n > 2; }\n"
+                                                           "default { state_entry() { integer ok = ready(3); if (ok) llOwnerSay(\"yes\"); } }\n",
+                                                           typed);
+        ensure("typed boolean: " + t.text, has(t, "local function ready(n: number): boolean") && has(t, "local ok: boolean = ready(3)"));
+        checksClean(t);
+    }
 }
