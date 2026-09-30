@@ -1112,4 +1112,48 @@ namespace tut
         ensure("closed after the call, its own line: " + made, made.find("\"Hello, Avatar!\");\n    }\n\n    touch_start(") != std::string::npos);
         ensure("no error left", errors(check(made, false)) == 0);
     }
+
+    template<> template<>
+    void object::test<37>()
+    {
+        set_test_name("SlCompoundAssign's fix: x = x op y written x op= y, safe; a field and a join too");
+        ensure("definitions: " + error, luauLoaded);
+        const std::string made = fixed("local x = 1\nx = x + 2 * x\nprint(x)\n", true, "LuauLintSlCompoundAssign", "Write it x += ...");
+        ensure_equals("the text", made, std::string("local x = 1\nx += 2 * x\nprint(x)\n"));
+        const ALScriptProblems problems = check("local x = 1\nx = x + 2 * x\nprint(x)\n", true);
+        const ALScriptProblem* problem  = keyed(problems, "LuauLintSlCompoundAssign");
+        ensure("safe", problem && problem->fixes.front().safe);
+        ensure_equals("a field, joined", fixed("local t = { n = \"a\" }\nt.n = t.n ..\"b\" .. \"c\"\nprint(t.n)\n", true, "LuauLintSlCompoundAssign",
+                                               "Write it t.n ..= ..."),
+                      std::string("local t = { n = \"a\" }\nt.n ..= \"b\" .. \"c\"\nprint(t.n)\n"));
+    }
+
+    template<> template<>
+    void object::test<38>()
+    {
+        set_test_name("SlLoopInvariantCall's fix: the call in a local before the loop, named as nothing else is, and read in the check; not safe");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string script = "default { state_entry() {\n"
+                                   "    list l = [1, 2]; integer length = 3; integer i;\n"
+                                   "    for (i = 0; i < llGetListLength(l); ++i) llOwnerSay((string)(i + length));\n"
+                                   "} }\n";
+        const std::string made = fixed(script, false, "LSLSlLoopInvariantCall", "Work out llGetListLength once, before the loop");
+        ensure_equals("the text", made,
+                      std::string("default { state_entry() {\n"
+                                  "    list l = [1, 2]; integer length = 3; integer i;\n"
+                                  "    integer length2 = llGetListLength(l);\n"
+                                  "    for (i = 0; i < length2; ++i) llOwnerSay((string)(i + length));\n"
+                                  "} }\n"));
+        const ALScriptProblems problems = check(script, false);
+        const ALScriptProblem* problem  = keyed(problems, "LSLSlLoopInvariantCall");
+        ensure("not safe", problem && !problem->fixes.front().safe);
+        // Not where the loop is all its if has: a declaration may not be.
+        const ALScriptProblems in_if = check("default { state_entry() {\n"
+                                             "    list l; integer i;\n"
+                                             "    if (TRUE) while (i < llGetListLength(l)) ++i;\n"
+                                             "} }\n",
+                                             false);
+        const ALScriptProblem* alone = keyed(in_if, "LSLSlLoopInvariantCall");
+        ensure("said, with no fix", alone && alone->fixes.empty());
+    }
 }

@@ -840,7 +840,8 @@ namespace tut
         ensure_equals("three: each loop's once", said.size(), size_t(3));
         ensure("a note keyed as Tailslide's, by the function: " + said[0].message,
                said[0].key == "LSLSlLoopInvariantCall" && said[0].severity == ALScriptProblem::Severity::Note && said[0].line == 3 &&
-                   said[0].args == std::vector<std::string>{ "llGetListLength" } && said[0].source == ALScriptProblem::Source::Lint);
+                   said[0].args == std::vector<std::string>{ "llGetListLength", "integer", "3", "4" } &&
+                   said[0].source == ALScriptProblem::Source::Lint);
         ensure("the outer call of two: " + said[2].message, said[2].line == 5 && said[2].args[0] == "llGetListLength");
         ensure("a NOLINT answers to the rule's name",
                ALScriptFixes::suppressed(said[0], "    for (i = 0; i < llGetListLength(gL); ++i) // NOLINT(SlLoopInvariantCall)", "", false));

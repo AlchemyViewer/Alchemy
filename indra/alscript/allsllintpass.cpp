@@ -62,6 +62,21 @@ namespace
         }
     }
 
+    const char* typeName(LSLIType type)
+    {
+        switch (type)
+        {
+            case LST_INTEGER: return "integer";
+            case LST_FLOATINGPOINT: return "float";
+            case LST_STRING: return "string";
+            case LST_KEY: return "key";
+            case LST_VECTOR: return "vector";
+            case LST_QUATERNION: return "rotation";
+            case LST_LIST: return "list";
+            default: return nullptr;
+        }
+    }
+
     void problem(LSLASTNode* at, const char* key, const char* english, std::vector<std::string> args, const char* name, ALScriptProblems& out)
     {
         const ALScriptLintPass::Rule* rule = ALScriptLintPass::rule(name);
@@ -124,13 +139,25 @@ namespace
                 {
                     up = up->getParent();
                 }
-                if (steady && up == check)
+                if (!steady || up != check)
                 {
-                    problem(inner, "LSLSlLoopInvariantCall",
-                            "[1] is worked out again on every turn of the loop, though nothing in the loop changes what it is given: a "
-                            "local set before the loop works it out once",
-                            { symbol->getName() }, "SlLoopInvariantCall", out);
+                    return;
                 }
+                // For the fix, where the loop stands in a block: the local's
+                // type, and where the loop begins, before which it goes.
+                std::vector<std::string> args{ symbol->getName() };
+                const char*              type = typeName(inner->getIType());
+                if (type && node->getParent() && node->getParent()->getNodeSubType() == NODE_COMPOUND_STATEMENT)
+                {
+                    const YYLTYPE* loop = node->getLoc();
+                    args.emplace_back(type);
+                    args.push_back(std::to_string(zeroBased(loop->first_line)));
+                    args.push_back(std::to_string(zeroBased(loop->first_column)));
+                }
+                problem(inner, "LSLSlLoopInvariantCall",
+                        "[1] is worked out again on every turn of the loop, though nothing in the loop changes what it is given: a "
+                        "local set before the loop works it out once",
+                        std::move(args), "SlLoopInvariantCall", out);
             });
         });
     }

@@ -50,6 +50,7 @@
     X(LSLIntFloatMulAssign) \
     X(LSLInvalidOperator) \
     X(LSLParameterUntyped) \
+    X(LSLSlLoopInvariantCall) \
     X(LSLSyntaxMissing) \
     X(LSLUndeclaredWithSuggestion) \
     X(LSLWrongTypeInAssignment) \
@@ -68,6 +69,7 @@
     X(LuauLintGlobalUsedAsLocalLine) \
     X(LuauLintImportUnused) \
     X(LuauLintLocalUnused) \
+    X(LuauLintSlCompoundAssign) \
     X(LuauLintTableInsertZero) \
     X(LuauLintTableMoveZero) \
     X(LuauLintTableRemoveZero) \
@@ -1398,6 +1400,70 @@ namespace ALScriptFixes
                         }
                     }
                     fix.edits.push_back({ problem.line, problem.endColumn, problem.line, problem.endColumn, put });
+                    problem.fixes.push_back(std::move(fix));
+                }
+            }
+            else if (lua && is(key, Fixed::LuauLintSlCompoundAssign) && args.size() == 2 && problem.column >= 0)
+            {
+                // x = x op, written x op=: from the first x to what follows
+                // the operator, on the statement's first line, as the lint
+                // read it. Safe: Luau's x op= y is x = x op y.
+                const std::string_view line = lines.line(problem.line);
+                size_t                 at   = static_cast<size_t>(problem.column);
+                const auto             skip = [&] {
+                    while (at < line.size() && (line[at] == ' ' || line[at] == '\t'))
+                    {
+                        ++at;
+                    }
+                    return true;
+                };
+                const auto take = [&](std::string_view word) {
+                    if (line.substr(at, word.size()) != word)
+                    {
+                        return false;
+                    }
+                    at += word.size();
+                    return true;
+                };
+                if (take(args[0]) && skip() && take("=") && skip() && take(args[0]) && skip() && take(args[1]) && skip())
+                {
+                    ALScriptFix fix = titled("ScriptFixCompoundAssign", "Write it [1] [2]= ...", { args[0], args[1] });
+                    fix.preferred   = true;
+                    fix.safe        = true;
+                    fix.edits.push_back(
+                        { problem.line, problem.column, problem.line, static_cast<S32>(at), args[0] + " " + args[1] + "= " });
+                    problem.fixes.push_back(std::move(fix));
+                }
+            }
+            else if (!lua && is(key, Fixed::LSLSlLoopInvariantCall) && args.size() == 4 && problem.line == problem.endLine &&
+                     problem.column >= 0)
+            {
+                // A local before the loop, set to the call, which the check
+                // then reads: where the loop begins its line, in a block.
+                // Not safe: a jump into the loop from before it would pass
+                // the local by.
+                const S32              loop_line   = std::atoi(args[2].c_str());
+                const S32              loop_column = std::atoi(args[3].c_str());
+                const std::string_view loop        = lines.line(loop_line);
+                const std::string_view here        = lines.line(problem.line);
+                const bool             alone       = loop_column >= 0 && static_cast<size_t>(loop_column) <= loop.size() &&
+                                            loop.substr(0, loop_column).find_first_not_of(" \t") == std::string_view::npos;
+                if (alone && problem.endColumn <= static_cast<S32>(here.size()) && problem.endColumn > problem.column)
+                {
+                    const std::string_view call = here.substr(problem.column, problem.endColumn - problem.column);
+                    const bool             length = args[0] == "llGetListLength" || args[0] == "llStringLength";
+                    std::string            base   = length ? "length" : args[0].substr(2);
+                    if (!base.empty())
+                    {
+                        base[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(base[0])));
+                    }
+                    const std::string name = freshName(lines.text(), base);
+                    ALScriptFix       fix  = titled("ScriptFixHoistCall", "Work out [1] once, before the loop", { args[0] });
+                    fix.preferred          = true;
+                    const std::string declared =
+                        std::string(loop.substr(0, loop_column)) + args[1] + " " + name + " = " + std::string(call) + ";\n";
+                    fix.edits.push_back({ loop_line, 0, loop_line, 0, declared });
+                    fix.edits.push_back({ problem.line, problem.column, problem.line, problem.endColumn, name });
                     problem.fixes.push_back(std::move(fix));
                 }
             }
