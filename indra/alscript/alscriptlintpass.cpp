@@ -100,6 +100,8 @@ namespace
         { "SlFastTimer", Rule::Both, Severity::Note, true, false, nullptr },
         // A sensor repeat under 1 s.
         { "SlFastSensor", Rule::Both, Severity::Note, true, false, nullptr },
+        // s ..= x in a loop: a new string each time round.
+        { "SlStringBuild", Rule::Both, Severity::Note, true, true, nullptr },
     };
 
     const ALScriptLintPass::PrimParams PRIM_PARAMS[] = {
@@ -439,6 +441,52 @@ namespace
         }
     };
 
+    // What a loop's body does to strings, not looking into the functions
+    // it makes: each append, s ..= x or s = s .. x, what it appends and to
+    // what; every read of each local; and whether it returns.
+    class Appends final : public Luau::AstVisitor
+    {
+    public:
+        struct Append
+        {
+            Luau::AstStat* stat;
+            Luau::AstExpr* var;
+            Luau::AstExpr* piece;
+        };
+        std::vector<Append>                                   appends;
+        boost::unordered_flat_map<Luau::AstLocal*, size_t> reads;
+        bool                                                  returns = false;
+
+        bool visit(Luau::AstExprFunction*) override { return false; }
+        bool visit(Luau::AstStatReturn*) override
+        {
+            returns = true;
+            return true;
+        }
+        bool visit(Luau::AstExprLocal* node) override
+        {
+            ++reads[node->local];
+            return true;
+        }
+        bool visit(Luau::AstStatCompoundAssign* node) override
+        {
+            if (node->op == Luau::AstExprBinary::Concat)
+            {
+                appends.push_back({ node, node->var, node->value });
+            }
+            return true;
+        }
+        bool visit(Luau::AstStatAssign* node) override
+        {
+            const auto* join = node->vars.size == 1 && node->values.size == 1 ? node->values.data[0]->as<Luau::AstExprBinary>() : nullptr;
+            if (join && join->op == Luau::AstExprBinary::Concat && same(node->vars.data[0], join->left))
+            {
+                appends.push_back({ node, node->vars.data[0], join->right });
+            }
+            return true;
+        }
+    };
+
     // What the pass asks the check an expression is.
     enum class Kind : U8
     {
@@ -548,7 +596,136 @@ namespace
             {
                 mergeablePrimParams(node);
             }
+            if (on("SlStringBuild"))
+            {
+                for (size_t i = 0; i < node->body.size; ++i)
+                {
+                    stringBuild(node, i);
+                }
+            }
             return true;
+        }
+
+        // --- SlStringBuild: a string grown in a loop -------------------------
+
+        // A loop's body, where the statement is a loop.
+        static Luau::AstStatBlock* loopBody(Luau::AstStat* stat)
+        {
+            if (auto* loop = stat->as<Luau::AstStatFor>())
+            {
+                return loop->body;
+            }
+            if (auto* loop = stat->as<Luau::AstStatForIn>())
+            {
+                return loop->body;
+            }
+            if (auto* loop = stat->as<Luau::AstStatWhile>())
+            {
+                return loop->body;
+            }
+            if (auto* loop = stat->as<Luau::AstStatRepeat>())
+            {
+                return loop->body;
+            }
+            return nullptr;
+        }
+
+        // A name the text has nowhere, from `base`.
+        std::string freshName(const std::string& base) const
+        {
+            const auto taken = [&](const std::string& name) {
+                for (size_t at = mSource.find(name); at != std::string_view::npos; at = mSource.find(name, at + 1))
+                {
+                    const bool before = at > 0 && ALScriptLexicon::isNameByte(mSource[at - 1]);
+                    const bool after  = at + name.size() < mSource.size() && ALScriptLexicon::isNameByte(mSource[at + name.size()]);
+                    if (!before && !after)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            std::string name = base;
+            for (int n = 2; taken(name); ++n)
+            {
+                name = base + std::to_string(n);
+            }
+            return name;
+        }
+
+        // s ..= x in a loop, s from outside it: a new string each time round,
+        // which a table of the pieces, joined once, is not. Said once for
+        // each string, at the outermost loop. Fixed as the converter writes
+        // it, where s is a local declared in the same block before the loop,
+        // read in it only by its appends, and the loop never returns: a
+        // table before the loop, table.insert for each append, and s joined
+        // to table.concat of it after. Not safe: an error part way round
+        // leaves s without what the table holds.
+        void stringBuild(Luau::AstStatBlock* block, size_t index)
+        {
+            Luau::AstStat*      loop = block->body.data[index];
+            Luau::AstStatBlock* body = loopBody(loop);
+            if (!body)
+            {
+                return;
+            }
+            Appends appends;
+            body->visit(&appends);
+            for (const Appends::Append& each : appends.appends)
+            {
+                const auto*       local  = each.var->as<Luau::AstExprLocal>();
+                const auto*       global = each.var->as<Luau::AstExprGlobal>();
+                const bool        inside = local && !(local->local->location.begin < loop->location.begin);
+                const std::string name   = local ? local->local->name.value : global ? global->name.value : "";
+                if (name.empty() || inside || !mBuilt.insert(local ? static_cast<const void*>(local->local) : global->name.value).second)
+                {
+                    continue;
+                }
+                ALScriptProblem& said = problem(each.stat->location, "LuauLintSlStringBuild",
+                                                "[1] is joined to with .. in a loop, which makes a new string each time round. SLua's way is to put "
+                                                "the pieces in a table and join them once, with table.concat",
+                                                { name }, "SlStringBuild");
+                // A local, declared in this block before the loop, and read
+                // in it by its appends alone.
+                if (!local)
+                {
+                    continue;
+                }
+                bool here = false;
+                for (size_t i = 0; i < index; ++i)
+                {
+                    const auto* declared = block->body.data[i]->as<Luau::AstStatLocal>();
+                    here = here || (declared && std::find(declared->vars.begin(), declared->vars.end(), local->local) != declared->vars.end());
+                }
+                size_t mine = 0;
+                for (const Appends::Append& other : appends.appends)
+                {
+                    const auto* target = other.var->as<Luau::AstExprLocal>();
+                    mine += target && target->local == local->local ? (other.stat->is<Luau::AstStatAssign>() ? 2 : 1) : 0;
+                }
+                const auto reads = appends.reads.find(local->local);
+                if (!here || appends.returns || reads == appends.reads.end() || reads->second != mine || !startsLine(loop->location.begin))
+                {
+                    continue;
+                }
+                const std::string         parts  = freshName(name + "Parts");
+                const std::string         indent = text(Luau::Location(Luau::Position(loop->location.begin.line, 0), loop->location.begin));
+                std::vector<ALScriptEdit> edits  = { edit(Luau::Location(loop->location.begin, loop->location.begin), "local " + parts + " = {}\n" + indent) };
+                for (const Appends::Append& other : appends.appends)
+                {
+                    const auto* target = other.var->as<Luau::AstExprLocal>();
+                    if (target && target->local == local->local)
+                    {
+                        // A number as .. would write it, so that the table
+                        // is one of strings, which table.concat takes.
+                        const std::string piece = is(other.piece, Kind::Number) ? "tostring(" + text(other.piece->location) + ")"
+                                                                                : text(other.piece->location);
+                        edits.push_back(edit(other.stat->location, "table.insert(" + parts + ", " + piece + ")"));
+                    }
+                }
+                edits.push_back(edit(Luau::Location(loop->location.end, loop->location.end), "\n" + indent + name + " ..= table.concat(" + parts + ")"));
+                offerTitled(said, "ScriptFixStringParts", "Put [1]'s pieces in a table, joined once after the loop", { name }, std::move(edits), false);
+            }
         }
 
         // --- SlMergeablePrimParams: prim-params calls one call could make ----
@@ -2370,6 +2547,9 @@ namespace
         boost::unordered_flat_set<const Luau::AstExprCall*>               mStatements;
         // Loops' bodies, and timers' functions: where a call runs often.
         std::vector<Luau::Location>                                       mOften;
+        // Each string SlStringBuild has said, by its local or its global's
+        // name.
+        boost::unordered_flat_set<const void*>                            mBuilt;
         uint64_t                                                          mEnabled;
         uint64_t                                                          mFatal;
         bool                                                              mAllErrors;

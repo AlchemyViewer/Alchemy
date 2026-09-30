@@ -706,6 +706,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixDeclareFirst">Declare local [1] before it is first named</string>
 	<string name="ScriptFixUnbracket">Take out the brackets</string>
 	<string name="ScriptFixRemoveElse">Take out the empty else</string>
+	<string name="ScriptFixStringParts">Put [1]'s pieces in a table, joined once after the loop</string>
 	<string name="ScriptActionAnnotate">Declare it as '[1]'</string>
 	<string name="ScriptActionExtract">Put it in a local, '[1]'</string>
 	<string name="ScriptActionInterpolate">Write it as an interpolated string</string>
@@ -785,6 +786,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LSLSlCostlyListen">This listens on channel 0 for anyone, so the script wakes for every line of chat nearby. A name, a key, or another channel hears less</string>
 	<string name="LSLSlFastTimer">A timer every [1] s, under a tenth of a second, fires every few of the region's 45 frames a second, and the time it takes is time other scripts there wait for</string>
 	<string name="LSLSlFastSensor">A sensor sweeping every [1] s, under a second, searches round the object that often: once a second or less is plenty for most</string>
+	<string name="LSLSlStringBuild">[1] is joined to with + in a loop, which copies all of it each time round. In SLua the pieces put in a table and joined once, with table.concat, are quicker</string>
 	<string name="LuauLintUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauLintDeprecatedGlobal">Global '[1]' is deprecated, use '[2]' instead</string>
 	<string name="LuauLintDeprecatedGlobalPlain">Global '[1]' is deprecated</string>
@@ -909,6 +911,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlCostlyListen">This listens on channel 0 for anyone, so the script wakes for every line of chat nearby. A name, a key, or another channel hears less</string>
 	<string name="LuauLintSlFastTimer">A timer every [1] s, under a tenth of a second, fires every few of the region's 45 frames a second, and the time it takes is time other scripts there wait for</string>
 	<string name="LuauLintSlFastSensor">A sensor sweeping every [1] s, under a second, searches round the object that often: once a second or less is plenty for most</string>
+	<string name="LuauLintSlStringBuild">[1] is joined to with .. in a loop, which makes a new string each time round. SLua's way is to put the pieces in a table and join them once, with table.concat</string>
 	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
 	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauUnknownType">Unknown type '[1]'</string>

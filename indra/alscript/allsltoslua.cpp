@@ -4534,6 +4534,8 @@ const char* ALLSLToSLua::lintOf(std::string_view note)
         { "SluaDetected", "SlCompatCall" },
         { "SluaIndex", "SlCompatCall" },
         { "SluaIndexFound", "SlCompatCall" },
+        // A string built in a loop, which SlStringBuild puts in a table.
+        { "SluaStringBuild", "SlStringBuild" },
     };
     for (const auto& [key, lint] : LINTS)
     {

@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../allslservice.h"
+#include "../allsltoslua.h"
 #include "../alluauservice.h"
 #include "../alscriptfixes.h"
 
@@ -703,5 +704,55 @@ namespace tut
                       std::string("2 LSLSlCostlyListen\n"
                                   "4 LSLSlFastTimer|0.05\n"
                                   "6 LSLSlFastSensor|0.25\n"));
+    }
+
+    template<> template<>
+    void object::test<18>()
+    {
+        set_test_name("SlStringBuild: a string joined to in a loop, from outside it, once for each string at its outermost loop, in both "
+                      "languages; in SLua put in a table where it is a local of the block read in the loop by its appends alone");
+        ensure("definitions: " + error, loaded);
+        ensure("builtins: " + error, lslLoaded);
+        ensure_equals("SLua", found("local s = \"\"\n"
+                                    "for i = 1, 3 do s ..= tostring(i) end\n"
+                                    "local t = \"\"\n"
+                                    "for i = 1, 3 do t = t .. i; print(t) end\n"
+                                    "g = \"\"\n"
+                                    "while #g < 3 do g ..= \"x\" end\n"
+                                    "local u = \"\"\n"
+                                    "for i = 1, 2 do for j = 1, 2 do u ..= \"y\" end end\n"
+                                    "for i = 1, 2 do local v = \"\"; v ..= \"z\"; print(v) end\n"
+                                    "print(s, u)\n",
+                                    "SlStringBuild", ALScriptProblem::Severity::Note),
+                      std::string("1 LuauLintSlStringBuild|s\n"
+                                  "3 LuauLintSlStringBuild|t\n"
+                                  "5 LuauLintSlStringBuild|g\n"
+                                  "7 LuauLintSlStringBuild|u\n"));
+        ensure_equals("in a table", fixed("local s = \"\"\nfor i = 1, 3 do s ..= tostring(i) end\nprint(s)\n", "LuauLintSlStringBuild",
+                                          "Put s's pieces in a table, joined once after the loop", false),
+                      std::string("local s = \"\"\nlocal sParts = {}\nfor i = 1, 3 do table.insert(sParts, tostring(i)) end\ns ..= table.concat(sParts)\nprint(s)\n"));
+        ensure_equals("named anew, indented", fixed("local function f()\n    local s = \"\"\n    local sParts = 1\n    for i = 1, 3 do\n        s = s .. i\n    end\n"
+                                                    "    return s, sParts\nend\nprint(f())\n",
+                                                    "LuauLintSlStringBuild", "Put s's pieces in a table, joined once after the loop", false),
+                      std::string("local function f()\n    local s = \"\"\n    local sParts = 1\n    local sParts2 = {}\n    for i = 1, 3 do\n"
+                                  "        table.insert(sParts2, tostring(i))\n    end\n    s ..= table.concat(sParts2)\n    return s, sParts\nend\nprint(f())\n"));
+        unfixed("local t = \"\"\nfor i = 1, 3 do t = t .. i; print(t) end\n", "LuauLintSlStringBuild");
+        unfixed("local function f()\n    local s = \"\"\n    for i = 1, 3 do\n        s ..= i\n        if i > 1 then return s end\n    end\n    return s\nend\nprint(f())\n",
+                "LuauLintSlStringBuild");
+        ensure_equals("LSL", found("default {\n"
+                                   "    state_entry() {\n"
+                                   "        string s;\n"
+                                   "        integer i;\n"
+                                   "        for (i = 0; i < 3; ++i) s += (string)i;\n"
+                                   "        string t;\n"
+                                   "        while (llStringLength(t) < 3) t = t + \"x\";\n"
+                                   "        for (i = 0; i < 3; ++i) { string u; u += \"y\"; llOwnerSay(u); }\n"
+                                   "        llOwnerSay(s + t);\n"
+                                   "    }\n"
+                                   "}\n",
+                                   "SlStringBuild", ALScriptProblem::Severity::Note, false),
+                      std::string("4 LSLSlStringBuild|s\n"
+                                  "6 LSLSlStringBuild|t\n"));
+        ensure("the converter's note names it", std::string(ALLSLToSLua::lintOf("SluaStringBuild")) == "SlStringBuild");
     }
 }

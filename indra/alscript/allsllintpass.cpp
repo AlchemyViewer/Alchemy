@@ -529,6 +529,69 @@ namespace
         });
     }
 
+    // SlStringBuild: s += x, or s = s + x, in a loop, s a string from
+    // outside it: all of s copied each time round. Said once for each
+    // string. A note, and no fix: LSL has no better way; SLua's is a table
+    // of the pieces, joined once.
+    void stringBuilds(LSLScript* script, ALScriptProblems& out)
+    {
+        std::vector<LSLSymbol*> said;
+        walk(script, [&](LSLASTNode* node) {
+            if (node->getNodeSubType() != NODE_BINARY_EXPRESSION || node->getIType() != LST_STRING)
+            {
+                return;
+            }
+            auto*             b   = static_cast<LSLBinaryExpression*>(node);
+            const LSLOperator op  = b->getOperation();
+            LSLASTNode*       lhs = b->getLHS();
+            if (isNull(lhs) || lhs->getNodeSubType() != NODE_LVALUE_EXPRESSION)
+            {
+                return;
+            }
+            LSLSymbol* symbol = static_cast<LSLLValueExpression*>(lhs)->getIdentifier()->getSymbol();
+            bool       append = op == OP_ADD_ASSIGN;
+            if (op == OP_ASSIGN && !isNull(b->getRHS()) && b->getRHS()->getNodeSubType() == NODE_BINARY_EXPRESSION)
+            {
+                auto*       sum  = static_cast<LSLBinaryExpression*>(b->getRHS());
+                LSLASTNode* left = sum->getLHS();
+                append           = sum->getOperation() == OP_PLUS && !isNull(left) && left->getNodeSubType() == NODE_LVALUE_EXPRESSION &&
+                         static_cast<LSLLValueExpression*>(left)->getIdentifier()->getSymbol() == symbol;
+            }
+            if (!append || !symbol || std::find(said.begin(), said.end(), symbol) != said.end())
+            {
+                return;
+            }
+            // In a loop that s is not declared in, within its function.
+            bool looped = false;
+            for (LSLASTNode* up = node->getParent(); up && !looped; up = up->getParent())
+            {
+                if (up->getNodeType() == NODE_GLOBAL_FUNCTION || up->getNodeType() == NODE_EVENT_HANDLER)
+                {
+                    break;
+                }
+                const LSLNodeSubType kind = up->getNodeSubType();
+                if (kind == NODE_FOR_STATEMENT || kind == NODE_WHILE_STATEMENT || kind == NODE_DO_STATEMENT)
+                {
+                    bool declared = false;
+                    walk(up, [&](LSLASTNode* inner) {
+                        declared = declared || (inner->getNodeSubType() == NODE_DECLARATION &&
+                                                static_cast<LSLIdentifier*>(inner->getChild(0))->getSymbol() == symbol);
+                    });
+                    looped = !declared;
+                }
+            }
+            if (!looped)
+            {
+                return;
+            }
+            said.push_back(symbol);
+            problem(node, "LSLSlStringBuild",
+                    "[1] is joined to with + in a loop, which copies all of it each time round. In SLua the pieces put in a table and "
+                    "joined once, with table.concat, are quicker",
+                    { symbol->getName() }, "SlStringBuild", out);
+        });
+    }
+
     // SlLoopInvariantCall: a call in a loop's check to a function the
     // definitions call pure, whose arguments nothing in the loop changes --
     // llGetListLength(l) where the loop leaves l be -- worked out again on
@@ -610,4 +673,5 @@ void ALLSLLintPass::check(std::string_view source, LSLScript* script, ALScriptPr
     sleepingCalls(text, script, out);
     mergeablePrimParams(text, script, out);
     costlyEvents(script, out);
+    stringBuilds(script, out);
 }
