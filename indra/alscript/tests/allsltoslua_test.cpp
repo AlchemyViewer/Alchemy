@@ -30,7 +30,9 @@
 
 #include "../test/lltut.h"
 
+#include <filesystem>
 #include <fstream>
+#include <set>
 #include <sstream>
 
 namespace tut
@@ -631,5 +633,60 @@ namespace tut
         ensure("given to a string and a key: " + r.text, has(r, "local gName = tostring(NULL_KEY)") && has(r, "local gKey = NULL_KEY"));
         ensure("returned as a string function's: " + r.text, has(r, "return tostring(NULL_KEY)"));
         checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<21>()
+    {
+        set_test_name("Tailslide's own test scripts: every one it takes converts and checks as SLua, and each it refuses is refused");
+        // Those Tailslide says are wrong LSL, by design.
+        static const std::set<std::string> REFUSED = { "bad_globals.lsl", "bugs/0002.lsl", "bugs/0003.lsl", "bugs/0006.lsl", "bugs/0007.lsl",
+                                                          "bugs/0010.lsl", "bugs/0015.lsl", "bugs/0017.lsl", "bugs/0019.lsl", "bugs/bad-for-exprs.lsl",
+                                                          "bugs/typecast_builtin.lsl", "bugs/unary_minus_glob_bad_sym.lsl", "compound_assignment.lsl", "constants.lsl", "declaration_expressions.lsl",
+                                                          "error1.lsl", "events.lsl", "illegal_cast.lsl", "invalid_decl.lsl", "list_append_void.lsl",
+                                                          "logmessage_test.lsl", "nested_lists.lsl", "parserstackdepth3.lsl", "pathological_expression.lsl", "precluded_globals.lsl",
+                                                          "print_no_shadowing.lsl", "print_type_bug.lsl", "rvalue_assignments.lsl", "scope1.lsl", "scope2.lsl",
+                                                          "scope4.lsl", "type_error_no_assert.lsl", "void_return.lsl" };
+        const std::string dir = std::string(AL_ALSCRIPT_TEST_DIR) + "/tailslide/scripts";
+        std::vector<std::string> files;
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(dir))
+        {
+            if (entry.path().extension() == ".lsl")
+            {
+                files.push_back(std::filesystem::relative(entry.path(), dir).generic_string());
+            }
+        }
+        std::sort(files.begin(), files.end());
+        ensure("the scripts: " + dir, files.size() > 100);
+        std::string wrong;
+        size_t      converted = 0;
+        for (const std::string& name : files)
+        {
+            llifstream        in(dir + "/" + name, std::ios::binary);
+            std::stringstream text;
+            text << in.rdbuf();
+            const ALLSLToSLua::Result r = ALLSLToSLua::convert(text.str());
+            if (REFUSED.contains(name))
+            {
+                wrong += r.converted ? name + ": converted, and Tailslide refuses it\n" : "";
+                continue;
+            }
+            if (!r.converted)
+            {
+                wrong += name + ": not converted: " + (r.problems.empty() ? std::string() : r.problems.front().message) + "\n";
+                continue;
+            }
+            ++converted;
+            for (const ALScriptProblem& p : service.check(r.text))
+            {
+                if (p.severity == ALScriptProblem::Severity::Error)
+                {
+                    wrong += llformat("%s: [%d:%d] %s\n", name.c_str(), p.line + 1, p.column + 1, p.message.c_str());
+                    break;
+                }
+            }
+        }
+        ensure("every one as it should be:\n" + wrong, wrong.empty());
+        ensure_equals("those taken, converted", converted + REFUSED.size(), files.size());
     }
 }

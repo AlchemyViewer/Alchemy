@@ -208,12 +208,13 @@ if(AL_BUILD_TESTS)
     DEFINES ${definitions_defines} "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
   )
   # LSL written again as SLua, each result checked as SLua against the
-  # grid's definitions.
+  # grid's definitions; and Tailslide's own test scripts under
+  # tests/tailslide/, for their breadth.
   al_add_test(
     allsltoslua
     PROJECT alscript
     LIBRARIES alscript llcommon
-    DEFINES ${definitions_defines}
+    DEFINES ${definitions_defines} "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
   )
   # The golden files under tests/preprocessor/: every test_*.lsl beside
   # its expected output.
