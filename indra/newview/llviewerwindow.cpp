@@ -212,6 +212,9 @@
 
 #include "llwindowlistener.h"
 #include "llviewerwindowlistener.h"
+#include "alcutoutimage.h"
+#include "alrenderisolation.h"
+#include "alsnapshotcutout.h"
 #include "llstatslistener.h"
 #include "llcleanup.h"
 
@@ -5504,17 +5507,67 @@ namespace
 // Since the required size might be bigger than the available screen, this method rerenders the scene in parts (called subimages) and copy
 // the results over to the final raw image.
 bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_height,
-    bool keep_window_aspect, bool is_texture, bool show_ui, bool show_hud, bool do_rebuild, bool no_post, bool show_balance, LLSnapshotModel::ESnapshotLayerType type, S32 max_size)
+    bool keep_window_aspect, bool is_texture, bool show_ui, bool show_hud, bool do_rebuild, bool no_post, bool show_balance, LLSnapshotModel::ESnapshotLayerType type, S32 max_size,
+    const ALSnapshotCutout* cutout)
 {
     if (!raw)
     {
         return false;
     }
 
+    // A cutout is colour without the interface. It renders offscreen, always:
+    // the tiled path reads the window's back buffer, which may have no alpha
+    // or two bits of it. It renders a whole multiple larger than the image it
+    // makes, and averages down after (ALCutoutImage::resolve) -- its edges
+    // cannot come from anti-aliasing, which blends the subject into what is
+    // to be left empty without telling the coverage.
+    S32 cutout_width = 0;
+    S32 cutout_height = 0;
+    if (cutout)
+    {
+        show_ui = false;
+        show_hud = false;
+        show_balance = false;
+        type = LLSnapshotModel::SNAPSHOT_TYPE_COLOR;
+
+        // The image, within max_size as the rest of this function would keep it.
+        if (image_width > max_size || image_height > max_size)
+        {
+            const F32 fit = llmin((F32)max_size / image_width, (F32)max_size / image_height);
+            image_width = llmax(1, (S32)(image_width * fit));
+            image_height = llmax(1, (S32)(image_height * fit));
+        }
+        cutout_width = image_width;
+        cutout_height = image_height;
+
+        // Then the render, as many times larger as allowed, down to once: no
+        // side past what the GL can target, and no more pixels than the largest
+        // snapshot the floater offers anyway (MAX_SNAPSHOT_IMAGE_SIZE by 4320).
+        // Every one of them carries the whole G-buffer, and the read-back has to
+        // fit LLImageBase's 256 MB allocation cap besides.
+        const S32 max_side = (S32)gGLManager.mGLMaxTextureSize;
+        constexpr S64 MAX_CUTOUT_RENDER_PIXELS = (S64)MAX_SNAPSHOT_IMAGE_SIZE * 4320;
+        S32 supersample = (S32)cutout->mSupersample;
+        while (supersample > 1 && (image_width * supersample > max_side || image_height * supersample > max_side ||
+                                   (S64)image_width * image_height * supersample * supersample > MAX_CUTOUT_RENDER_PIXELS))
+        {
+            --supersample;
+        }
+        if (image_width > max_side || image_height > max_side)
+        {
+            LL_WARNS("Snapshot") << "A cutout at " << image_width << "x" << image_height
+                                 << " is larger than the GL can render in one pass." << LL_ENDL;
+            return false;
+        }
+        image_width *= supersample;
+        image_height *= supersample;
+        max_size = llmax(image_width, image_height);
+    }
+
     //check if there is enough memory for the snapshot image
     if(image_width * image_height > (1 << 22)) //if snapshot image is larger than 2K by 2K
     {
-        if(!LLMemory::tryToAlloc(NULL, image_width * image_height * 3))
+        if(!LLMemory::tryToAlloc(NULL, image_width * image_height * (cutout ? 4 : 3)))
         {
             LL_WARNS() << "No enough memory to take the snapshot with size (w : h): " << image_width << " : " << image_height << LL_ENDL ;
             return false ; //there is no enough memory for taking this snapshot.
@@ -5611,10 +5664,10 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     }
 
     F32 scale_factor = 1.0f ;
-    if (!keep_window_aspect || (image_width > window_width) || (image_height > window_height))
+    if (cutout || !keep_window_aspect || (image_width > window_width) || (image_height > window_height))
     {
         if ((image_width <= gGLManager.mGLMaxTextureSize && image_height <= gGLManager.mGLMaxTextureSize) &&
-            (image_width > window_width || image_height > window_height) && LLPipeline::sRenderDeferred && !show_ui)
+            (cutout || image_width > window_width || image_height > window_height) && LLPipeline::sRenderDeferred && !show_ui)
         {
             // GL_RGBA8, not GL_RGBA, and not GL_DEPTH_COMPONENT for the depth layers.
             //
@@ -5669,6 +5722,14 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             }
         }
 
+        if (!reset_deferred && cutout)
+        {
+            // No tiled fallback for a cutout: see above.
+            LL_WARNS("Snapshot") << "A cutout at " << image_width << "x" << image_height
+                                 << " could not get its offscreen target." << LL_ENDL;
+            return false;
+        }
+
         if (!reset_deferred)
         {
             // if image cropping or need to enlarge the scene, compute a scale_factor
@@ -5717,7 +5778,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
     if ((image_buffer_x > 0) && (image_buffer_y > 0))
     {
-        raw->resize(image_buffer_x, image_buffer_y, 3);
+        raw->resize(image_buffer_x, image_buffer_y, cutout ? 4 : 3);
     }
     else
     {
@@ -5769,6 +5830,12 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         return (snap_far * snap_near) / (snap_far - window_depth * (snap_far - snap_near));
     };
 
+    std::optional<ALRenderIsolation::Scope> isolation;
+    if (cutout)
+    {
+        isolation.emplace(cutout->mTarget, cutout->mIncludeSeated);
+    }
+
     // Subimages are in fact partial rendering of the final view. This happens when the final view is bigger than the screen.
     // In most common cases, scale_factor is 1 and there's no more than 1 iteration on x and y
     for (int subimage_y = 0; subimage_y < scale_factor; ++subimage_y)
@@ -5794,6 +5861,13 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             {
                 const U32 subfield = subimage_x+(subimage_y*llceil(scale_factor));
                 display(do_rebuild, scale_factor, subfield, true);
+
+                if (cutout)
+                {
+                    // The colour is the subject premultiplied by its coverage;
+                    // the coverage itself goes into alpha here.
+                    gPipeline.writeCutoutCoverage();
+                }
 
                 if (!LLPipeline::sRenderDeferred)
                 {
@@ -5826,7 +5900,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                             glReadPixels(
                                      subimage_x_offset, out_y + subimage_y_offset,
                                      read_width, 1,
-                                     GL_RGB, GL_UNSIGNED_BYTE,
+                                     cutout ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE,
                                      raw->getData() + output_buffer_offset
                                      );
                         }
@@ -5898,19 +5972,31 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         LLHUDObject::reshapeAll();
     }*/
 
-    // Pre-pad image to number of pixels such that the line length is a multiple of 4 bytes (for BMP encoding)
-    // Note: this formula depends on the number of components being 3.  Not obvious, but it's correct.
-    image_width += (image_width * 3) % 4;
-
     bool ret = true ;
-    // Resize image
-    if(llabs(image_width - image_buffer_x) > 4 || llabs(image_height - image_buffer_y) > 4)
+    if (cutout)
     {
-        ret = raw->scale( image_width, image_height );
+        // Three components come out padded as below; four always fill whole words.
+        if (!cutout->mKeepAlpha)
+        {
+            cutout_width += (cutout_width * 3) % 4;
+        }
+        ret = ALCutoutImage::resolve(*raw, cutout_width, cutout_height, cutout->mFill, cutout->mKeepAlpha);
     }
-    else if(image_width != image_buffer_x || image_height != image_buffer_y)
+    else
     {
-        ret = raw->scale( image_width, image_height, false );
+        // Pre-pad image to number of pixels such that the line length is a multiple of 4 bytes (for BMP encoding)
+        // Note: this formula depends on the number of components being 3.  Not obvious, but it's correct.
+        image_width += (image_width * 3) % 4;
+
+        // Resize image
+        if(llabs(image_width - image_buffer_x) > 4 || llabs(image_height - image_buffer_y) > 4)
+        {
+            ret = raw->scale( image_width, image_height );
+        }
+        else if(image_width != image_buffer_x || image_height != image_buffer_y)
+        {
+            ret = raw->scale( image_width, image_height, false );
+        }
     }
 
     if (do_rebuild)

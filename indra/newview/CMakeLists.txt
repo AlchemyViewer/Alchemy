@@ -146,6 +146,7 @@ if(AL_BUILD_VIEWER)
     alcolorwheelmodel.cpp
     alcurveeditorctrl.cpp
     alcurvemodel.cpp
+    alcutoutimage.cpp
     aldaycyclelandmarks.cpp
     alderenderlist.cpp
     aldroptarget.cpp
@@ -170,6 +171,7 @@ if(AL_BUILD_VIEWER)
     alfloatertransactionlog.cpp
     alrenderisolation.cpp
     alsceneexplorerpredicate.cpp
+    alsnapshotcutout.cpp
     alscopedata.cpp
     alscriptanalysis.cpp
     alscriptanalysislane.cpp
@@ -1019,6 +1021,7 @@ if(AL_BUILD_VIEWER)
     alcolorwheelmodel.h
     alcurveeditorctrl.h
     alcurvemodel.h
+    alcutoutimage.h
     aldaycyclelandmarks.h
     alderenderlist.h
     aldroptarget.h
@@ -1043,6 +1046,7 @@ if(AL_BUILD_VIEWER)
     alfloatertransactionlog.h
     alrenderisolation.h
     alsceneexplorerpredicate.h
+    alsnapshotcutout.h
     alscopedata.h
     alscriptanalysis.h
     alscriptanalysislane.h
@@ -2581,6 +2585,8 @@ if(AL_BUILD_TESTS)
     LIBRARIES ${test_libs}
     SOURCES alfeedback.cpp
   )
+  # A snapshot cutout's image arithmetic works on LLImageRaw.
+  al_add_test(alcutoutimage UNIT PROJECT ${test_project} LIBRARIES ${test_libs} llimage)
   al_add_test(
     lllogininstance
     UNIT
