@@ -478,4 +478,26 @@ namespace tut
                                               "SlEmptyBlock", ALScriptProblem::Severity::Warning),
                       std::string());
     }
+
+    template<> template<>
+    void object::test<11>()
+    {
+        set_test_name("SlIndexDivision: a / in what indexes a list, alone, bracketed or in a sum, read or written, a warning, fixed as //; "
+                      "not //, nor a table that is no list, nor a count");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local t = {1, 2, 3}\n"
+                                       "local n = #t\n"
+                                       "print(t[n / 2], t[(n + 1) / 2], t[n / 2 + 1], t[n // 2])\n"
+                                       "t[n / 2] = 5\n"
+                                       "local d = {a = 1}\n"
+                                       "print(d[n / 2], string.rep(\"x\", n / 2))\n",
+                                       "SlIndexDivision", ALScriptProblem::Severity::Warning);
+        ensure_equals("each", said,
+                      std::string("2 LuauLintSlIndexDivision|n / 2|n // 2\n"
+                                  "2 LuauLintSlIndexDivision|(n + 1) / 2|(n + 1) // 2\n"
+                                  "2 LuauLintSlIndexDivision|n / 2|n // 2\n"
+                                  "3 LuauLintSlIndexDivision|n / 2|n // 2\n"));
+        ensure_equals("rounded down", fixed("local t = {1}\nlocal n = #t\nprint(t[n / 2])\n", "LuauLintSlIndexDivision", "Write it n // 2", false),
+                      std::string("local t = {1}\nlocal n = #t\nprint(t[n // 2])\n"));
+    }
 }

@@ -83,6 +83,8 @@ namespace
         { "SlGeneralizedFor", true, Severity::Note, true, true, nullptr },
         // An if or a loop whose block is empty.
         { "SlEmptyBlock", true, Severity::Warning, true, true, "empty_if empty_loop" },
+        // t[n / 2]: Luau's / makes a fraction, which a list has nothing at.
+        { "SlIndexDivision", true, Severity::Warning, true, true, nullptr },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -626,6 +628,10 @@ namespace
 
         bool visit(Luau::AstExprIndexExpr* node) override
         {
+            if (on("SlIndexDivision") && is(node->expr, Kind::List))
+            {
+                indexDivision(node->index);
+            }
             const auto* table = node->expr->as<Luau::AstExprLocal>();
             if (on("SlZeroIndex") && constant(node->index, 0) && !mLocals.written.contains(node) &&
                 !(table && mLocals.zeroKeyed.contains(table->local)) && is(node->expr, Kind::List))
@@ -1736,6 +1742,52 @@ namespace
             {
                 problem(head, "LuauLintSlEmptyBlock", "This [1]'s block is empty: it does nothing", { keyword }, "SlEmptyBlock");
             }
+        }
+
+        // --- SlIndexDivision: a list indexed at a fraction --------------------
+
+        // Each / in what indexes a list, through the sums it is part of:
+        // Luau's / makes a float, where LSL's integers divided whole, and a
+        // list has nothing at 2.5. Fixed as //, which rounds down.
+        void indexDivision(Luau::AstExpr* index)
+        {
+            auto* e = unbracketed(index)->as<Luau::AstExprBinary>();
+            if (!e)
+            {
+                return;
+            }
+            using Op = Luau::AstExprBinary::Op;
+            if (e->op == Op::Add || e->op == Op::Sub || e->op == Op::Mul)
+            {
+                indexDivision(e->left);
+                indexDivision(e->right);
+                return;
+            }
+            if (e->op != Op::Div)
+            {
+                return;
+            }
+            // The / between its sides, in the text.
+            const Luau::Location        between(e->left->location.end, e->right->location.begin);
+            const std::optional<size_t> from  = offsetOf(between.begin);
+            const std::optional<size_t> to    = offsetOf(between.end);
+            const size_t                slash = from && to ? mSource.substr(*from, *to - *from).find('/') : std::string_view::npos;
+            if (slash == std::string_view::npos)
+            {
+                return;
+            }
+            Luau::Position at = between.begin;
+            for (size_t i = *from; i < *from + slash; ++i)
+            {
+                at = mSource[i] == '\n' ? Luau::Position(at.line + 1, 0) : Luau::Position(at.line, at.column + 1);
+            }
+            const std::string was  = text(e->location);
+            const std::string now  = text(Luau::Location(e->location.begin, at)) + "/" + text(Luau::Location(at, e->location.end));
+            ALScriptProblem&  said = problem(e->location, "LuauLintSlIndexDivision",
+                                             "[1] may be a fraction, which a list has nothing at: Luau's / divides as floats do, where LSL's "
+                                             "integers divided whole. [2] rounds down",
+                                             { was, now }, "SlIndexDivision");
+            offer(said, now, { edit(Luau::Location(at, at), "/") }, false);
         }
 
         // What a condition asks the truth of: itself, or each side of an
