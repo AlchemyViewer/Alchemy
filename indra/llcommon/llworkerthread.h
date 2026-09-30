@@ -26,6 +26,7 @@
 #ifndef LL_LLWORKERTHREAD_H
 #define LL_LLWORKERTHREAD_H
 
+#include <atomic>
 #include <list>
 #include <map>
 #include <queue>
@@ -174,11 +175,14 @@ protected:
     bool checkWork(bool aborting = false);
 
 private:
-    void setFlags(U32 flags) { mWorkFlags = mWorkFlags | flags; }
-    void clearFlags(U32 flags) { mWorkFlags = mWorkFlags & ~flags; }
-    U32  getFlags() { return mWorkFlags; }
+    // Each is one atomic read-modify-write. The flags are written from the work thread without
+    // mMutex (WorkRequest::finishRequest) and from the main thread with and without it, so a
+    // load and a separate store would drop whichever bit another thread wrote in between.
+    void setFlags(U32 flags) { mWorkFlags.fetch_or(flags); }
+    void clearFlags(U32 flags) { mWorkFlags.fetch_and(~flags); }
+    U32  getFlags() { return mWorkFlags.load(); }
 public:
-    bool getFlags(U32 flags) { return (mWorkFlags & flags) != 0; }
+    bool getFlags(U32 flags) { return (mWorkFlags.load() & flags) != 0; }
 
 private:
     // pure virtuals
@@ -192,7 +196,7 @@ protected:
 
 private:
     LLMutex mMutex;
-    LLAtomicU32 mWorkFlags;
+    std::atomic<U32> mWorkFlags;
 };
 
 //============================================================================
