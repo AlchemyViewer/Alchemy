@@ -265,9 +265,18 @@ namespace
         // A call whose answer is an index or -1, that ll can make with the
         // arguments it has.
         LSLFunctionExpression* findCall(LSLExpression* e);
-        // Whether each of a call's index arguments is a whole number
-        // written out, which ll takes moved on by one.
+        // Whether each of a call's index arguments is one ll can be given
+        // (llIndex).
         bool constantIndexes(LSLFunctionExpression* e, U16 indexes);
+        // An LSL index as ll takes it, where that is sure: a whole number
+        // written out, moved on by one where not below nought; a counter of
+        // a numeric for known not below nought (mNonNegative), or it plus
+        // a whole number not below nought, moved on by one -- or as it is,
+        // where the loop counts from 1 (mFromOne).
+        std::optional<std::string> llIndex(LSLExpression* e);
+        // Whether every read of a counter in a loop's body is an index that
+        // ll is given (llIndex), which the loop may count from 1 for.
+        bool onlyIndexes(LSLSymbol* var, LSLASTNode* body);
         // The call's arguments for ll: its index arguments moved on by one.
         std::string llArgs(LSLFunctionExpression* e, U16 indexes);
         // `: type` for an LSL type, where types are written.
@@ -480,6 +489,8 @@ namespace
         // The for loops of the body being written that are Luau's numeric
         // for, and the variables used by nothing else.
         boost::unordered_flat_map<LSLForStatement*, Counting> mNumeric;
+        boost::unordered_flat_set<LSLSymbol*>                 mNonNegative;
+        boost::unordered_flat_set<LSLSymbol*>                 mFromOne;
         boost::unordered_flat_set<LSLSymbol*>                 mLoopOnly;
         boost::unordered_flat_set<LSLSymbol*>                 mBooleans;
         boost::unordered_flat_set<LSLSymbol*>                 mZeroOne;
@@ -898,13 +909,54 @@ namespace
     {
         for (int i = 0; i < 16; ++i)
         {
-            int v = 0;
-            if ((indexes & (1 << i)) && !wholeNumber(argumentAt(e, i), v))
+            if ((indexes & (1 << i)) && !llIndex(argumentAt(e, i)))
             {
                 return false;
             }
         }
         return true;
+    }
+
+    std::optional<std::string> Writer::llIndex(LSLExpression* e)
+    {
+        int v = 0;
+        if (!e)
+        {
+            return std::nullopt;
+        }
+        if (wholeNumber(e, v))
+        {
+            return std::to_string(v >= 0 ? v + 1 : v);
+        }
+        while (e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
+        }
+        // A counter, alone or with a whole number added.
+        LSLExpression* counter = e;
+        int            added   = 0;
+        if (e->getNodeSubType() == NODE_BINARY_EXPRESSION && e->getOperation() == OP_PLUS)
+        {
+            auto* b = static_cast<LSLBinaryExpression*>(e);
+            counter = wholeNumber(b->getRHS(), added) ? b->getLHS() : wholeNumber(b->getLHS(), added) ? b->getRHS() : nullptr;
+        }
+        while (counter && counter->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            counter = static_cast<LSLParenthesisExpression*>(counter)->getChildExpr();
+        }
+        if (!counter || counter->getNodeSubType() != NODE_LVALUE_EXPRESSION || added < 0 ||
+            !isNull(static_cast<LSLLValueExpression*>(counter)->getMember()))
+        {
+            return std::nullopt;
+        }
+        LSLSymbol* var = static_cast<LSLLValueExpression*>(counter)->getIdentifier()->getSymbol();
+        if (!mNonNegative.contains(var))
+        {
+            return std::nullopt;
+        }
+        const int         moved = added + (mFromOne.contains(var) ? 0 : 1);
+        const std::string name  = lvalue(static_cast<LSLLValueExpression*>(counter)).text;
+        return moved ? name + " + " + std::to_string(moved) : name;
     }
 
     std::string Writer::llArgs(LSLFunctionExpression* e, U16 indexes)
@@ -918,11 +970,11 @@ namespace
         int           at = 0;
         for (LSLASTNode* arg = isNull(e->getArguments()) ? nullptr : e->getArguments()->getChild(0); arg; arg = arg->getNext(), ++at)
         {
-            int         v = 0;
-            std::string one;
-            if ((indexes & (1 << at)) && wholeNumber(static_cast<LSLExpression*>(arg), v))
+            std::string                one;
+            std::optional<std::string> index = (indexes & (1 << at)) ? llIndex(static_cast<LSLExpression*>(arg)) : std::nullopt;
+            if (index)
             {
-                one = std::to_string(v >= 0 ? v + 1 : v);
+                one = *index;
             }
             else
             {
@@ -2284,14 +2336,93 @@ namespace
             to = strict ? bracketed(bound, ADD) + (shift < 0 ? " - 1" : " + 1") : bound.text;
         }
         const std::string step = c.step == 1 ? std::string() : ", " + std::to_string(c.step);
-        line("for " + nameOf(c.id) + " = " + value(c.from).text + ", " + to + step + " do");
+        // A counter never below nought -- up from a whole number that is
+        // not, or down to one -- is an index ll may be given moved on by
+        // one; and where the body reads it as nothing else, it counts from 1.
+        int        from       = 0;
+        int        bound      = 0;
+        const bool up         = c.step > 0 && wholeNumber(c.from, from) && from >= 0;
+        const bool down       = c.step < 0 && wholeNumber(c.limit, bound) &&
+                          ((c.check == OP_GEQ && bound >= 0) || (c.check == OP_GREATER && bound >= -1));
+        const bool from_one   = up && onlyIndexes(c.var, f->getBody());
+        std::string start     = value(c.from).text;
+        if (from_one)
+        {
+            start = std::to_string(from + 1);
+            to    = wholeNumber(c.limit, limit) ? std::to_string(limit + shift + 1)
+                    : shift < 0 ? value(c.limit).text
+                                : bracketed(value(c.limit), ADD) + (shift > 0 ? " + 2" : " + 1");
+        }
+        line("for " + nameOf(c.id) + " = " + start + ", " + to + step + " do");
+        if (up || down)
+        {
+            mNonNegative.insert(c.var);
+        }
+        if (from_one)
+        {
+            mFromOne.insert(c.var);
+        }
         // A jump to its next turn is continue, its step Luau's own.
         mLoops.push_back(nullptr);
         ++mDepth;
         block(f->getBody());
         --mDepth;
         mLoops.pop_back();
+        mNonNegative.erase(c.var);
+        mFromOne.erase(c.var);
         line("end");
+    }
+
+    bool Writer::onlyIndexes(LSLSymbol* var, LSLASTNode* body)
+    {
+        if (!mOptions.sluaCalls)
+        {
+            return false;
+        }
+        bool any = false;
+        bool only = true;
+        walk(body, [&](LSLASTNode* node) {
+            if (!only || node->getNodeSubType() != NODE_LVALUE_EXPRESSION ||
+                static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol() != var)
+            {
+                return;
+            }
+            any = true;
+            // Up through a whole number added, to the argument list of a
+            // library call that ll is given, at an index's place.
+            LSLASTNode* arg = node;
+            while (arg->getParent() && arg->getParent()->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+            {
+                arg = arg->getParent();
+            }
+            int v = 0;
+            if (arg->getParent() && arg->getParent()->getNodeSubType() == NODE_BINARY_EXPRESSION &&
+                static_cast<LSLExpression*>(arg->getParent())->getOperation() == OP_PLUS)
+            {
+                auto* b = static_cast<LSLBinaryExpression*>(arg->getParent());
+                if (!wholeNumber(arg == b->getLHS() ? b->getRHS() : b->getLHS(), v) || v < 0)
+                {
+                    only = false;
+                    return;
+                }
+                arg = arg->getParent();
+            }
+            LSLASTNode* list = arg->getParent();
+            LSLASTNode* call = list ? list->getParent() : nullptr;
+            if (!call || list->getNodeType() != NODE_AST_NODE_LIST || call->getNodeSubType() != NODE_FUNCTION_EXPRESSION)
+            {
+                only = false;
+                return;
+            }
+            LSLIdentifier*            id      = static_cast<LSLFunctionExpression*>(call)->getIdentifier();
+            const bool                builtin = id->getSymbol() && id->getSymbol()->getSubType() == SYM_BUILTIN;
+            const ALLSLTraits::Trait* trait   = builtin ? ALLSLTraits::of(id->getName()) : nullptr;
+            const U8 not_ll = ALLSLTraits::SluaRemoved | ALLSLTraits::SluaBoolList | ALLSLTraits::SluaDeprecated | ALLSLTraits::SluaAbsent;
+            const std::string_view name = id->getName();
+            only = trait && (trait->slua & ALLSLTraits::SluaIndexArgs) && !(trait->slua & not_ll) &&
+                   (trait->sluaIndexArgs & (1 << arg->getParentSlot())) && name.rfind("llDetected", 0) != 0;
+        });
+        return any && only;
     }
 
     // --- truth values ----------------------------------------------------------------

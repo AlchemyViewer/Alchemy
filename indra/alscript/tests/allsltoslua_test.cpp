@@ -823,4 +823,25 @@ namespace tut
         ensure("the check itself: " + r.text, has(r, "    gOn = n > 1\n") && has(r, "    gOn = not (n > 5)\n"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<28>()
+    {
+        set_test_name("a counter never below nought is an index ll takes moved on by one, and a loop whose counter is only such an index counts from 1");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    integer n = llGetInventoryNumber(INVENTORY_SOUND);\n"
+                                              "    integer i; for (i = 0; i < n; ++i) llOwnerSay(llGetInventoryName(INVENTORY_SOUND, i));\n"
+                                              "    integer j; for (j = 0; j < n; ++j) llOwnerSay((string)j + llGetInventoryName(INVENTORY_SOUND, j));\n"
+                                              "    integer k; for (k = n - 1; k >= 0; --k) llOwnerSay(llGetInventoryName(INVENTORY_SOUND, k));\n"
+                                              "    string s = \"abcdef\";\n"
+                                              "    integer c; for (c = 0; c <= 2; ++c) llOwnerSay(llGetSubString(s, c, c + 1));\n"
+                                              "} }\n");
+        ensure("counting from 1: " + r.text, has(r, "for i = 1, n do\n    print(ll.GetInventoryName(INVENTORY_SOUND, i))"));
+        ensure("read as a number too, moved on by one: " + r.text,
+               has(r, "for j = 0, n - 1 do\n    print(tostring(j) .. ll.GetInventoryName(INVENTORY_SOUND, j + 1))"));
+        ensure("down to nought: " + r.text, has(r, "for k = n - 1, 0, -1 do\n    print(ll.GetInventoryName(INVENTORY_SOUND, k + 1))"));
+        ensure("to and with, a number added: " + r.text, has(r, "for c = 1, 3 do\n    print(ll.GetSubString(s, c, c + 1))"));
+        ensure("no llcompat: " + r.text, !has(r, "llcompat."));
+        checksClean(r);
+    }
 }
