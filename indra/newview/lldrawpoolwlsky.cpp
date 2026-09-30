@@ -435,8 +435,13 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
     bool can_use_vertex_shaders = gPipeline.shadersLoaded();
     bool can_use_windlight_shaders = gPipeline.canUseWindLightShaders();
 
+    // Environment probes leave the sun disc out. The punctual sun term owns the sun's light and
+    // gates it with the sun's shadow; captured into a probe as well, the disc came back through
+    // every environment lobe -- counted twice on a lit surface, and a sun highlight on one in
+    // shade. Mirrors keep it: they are a picture of the scene, not lighting for it.
+    const bool draw_sun = !gCubeSnapshot || gPipeline.mHeroProbeManager.isMirrorPass();
 
-    if (gSky.mVOSkyp->getSun().getDraw() && face && face->getGeomCount())
+    if (draw_sun && gSky.mVOSkyp->getSun().getDraw() && face && face->getGeomCount())
     {
         LLPointer<LLViewerTexture> tex_a = face->getTexture(LLRender::DIFFUSE_MAP);
         LLPointer<LLViewerTexture> tex_b = face->getTexture(LLRender::ALTERNATE_DIFFUSE_MAP);
