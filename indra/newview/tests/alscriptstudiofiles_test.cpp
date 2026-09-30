@@ -53,6 +53,9 @@ namespace
     // The window, faked: a record of what the files asked of it.
     struct FakeFilesWindow : public ALScriptStudioFiles::Window, public al_studio_test::QuietTabs, public al_studio_test::QuietAnalysis, public al_studio_test::QuietSaves
     {
+        // A tab, as each role this fakes names it.
+        typedef ALScriptStudioDoc Doc;
+
         Doc* openFileTab(const std::string& path, bool) override
         {
             opened.push_back(path);

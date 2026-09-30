@@ -46,6 +46,9 @@ namespace
     // The window, faked: a record of what saving asked of it.
     struct FakeSavingWindow : public ALScriptStudioSaving::Window, public al_studio_test::QuietTabs, public al_studio_test::QuietAnalysis
     {
+        // A tab, as each role this fakes names it.
+        typedef ALScriptStudioDoc Doc;
+
         struct Sent
         {
             std::string                    doc;

@@ -239,7 +239,7 @@ namespace tut
         constexpr S32 H = ll_test::HeadlessGL::HEIGHT;
         ll_test::installWhiteTexture();
         const auto drawn = [&](const LLRect& rect, F32 scale) {
-            gl().clearFramebuffer();
+            llrender2dutils_data::gl().clearFramebuffer();
             gGL.pushUIMatrix();
             gGL.scaleUI(scale, scale, 1.f);
             gl_rect_2d(rect, LLColor4::white, false);

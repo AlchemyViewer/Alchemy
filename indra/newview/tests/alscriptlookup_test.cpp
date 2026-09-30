@@ -52,6 +52,9 @@ namespace
     // asked, held for the test to answer.
     struct FakeLookupWindow : public ALScriptLookup::Window, public al_studio_test::QuietTabs, public al_studio_test::QuietAnalysis
     {
+        // A tab, as each role this fakes names it.
+        typedef ALScriptStudioDoc Doc;
+
         struct Load
         {
             ALScriptRef                                                          ref;

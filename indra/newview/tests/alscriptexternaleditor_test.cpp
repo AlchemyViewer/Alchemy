@@ -49,6 +49,9 @@ namespace
     // The window, faked: a record of what the external editor asked of it.
     struct FakeExternalWindow : public ALScriptExternalEditor::Window, public al_studio_test::QuietTabs, public al_studio_test::QuietSaves
     {
+        // A tab, as each role this fakes names it.
+        typedef ALScriptStudioDoc Doc;
+
         // As the window takes it: the tab's text replaced, one step to undo.
         void takeCarriedText(Doc& doc) override
         {

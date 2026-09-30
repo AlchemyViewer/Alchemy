@@ -45,6 +45,9 @@ namespace
     // The window, faked: a record of what vim asked of it.
     struct FakeVimWindow : public ALScriptStudioVim::Window, public al_studio_test::QuietTabs, public al_studio_test::QuietSaves
     {
+        // A tab, as each role this fakes names it.
+        typedef ALScriptStudioDoc Doc;
+
         void closeDocument(std::string_view id) override { asked.push_back(std::string(id)); }
         void letGoOf(Doc& doc) override { letGo.push_back(doc.id); }
         void saveToClose(const std::string& id) override { savedToClose.push_back(id); }

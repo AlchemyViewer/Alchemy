@@ -53,6 +53,9 @@ namespace
     // record of what was asked.
     struct FakeOrphansWindow : public Orphans::Window, public al_studio_test::QuietTabs, public al_studio_test::QuietSaves
     {
+        // A tab, as each role this fakes names it.
+        typedef ALScriptStudioDoc Doc;
+
         Reach reach(const Doc& doc) override { return reaches.count(doc.id) ? reaches[doc.id] : Reach(); }
         void  refreshPlace(Doc& doc) override { placed.push_back(doc.id); }
         void  loadScript(const ALScriptRef& ref) override { loads.push_back(ref); }

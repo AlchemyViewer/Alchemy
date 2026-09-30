@@ -603,9 +603,9 @@ namespace tut
         holds(id(20), { "blink.lsl", "open.lsl", "notes" });
         const auto choiceOf = [this](const LLUUID& prim, const std::string& name) {
             Model::Choice one;
-            for (const Model::Object& object : model.objects())
+            for (const auto& object : model.objects())
             {
-                for (const Model::Prim& part : object.prims)
+                for (const auto& part : object.prims)
                 {
                     if (part.id == prim)
                     {

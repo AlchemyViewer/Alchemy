@@ -118,6 +118,9 @@ namespace
     // was told. Its problems made as the Problems pane makes them.
     struct FakeCheckingWindow : public ALScriptStudioChecking::Window, public al_studio_test::QuietAnalysis, public al_studio_test::QuietSaves
     {
+        // A tab, as each role this fakes names it.
+        typedef ALScriptStudioDoc Doc;
+
         struct Ask
         {
             ALScriptAnalysis::Request                            request;

@@ -42,6 +42,9 @@ namespace
     // analyzers' questions held for a test to answer.
     struct FakeWeighingWindow : public ALScriptStudioWeighing::Window, public al_studio_test::QuietAnalysis, public al_studio_test::QuietSaves
     {
+        // A tab, as each role this fakes names it.
+        typedef ALScriptStudioDoc Doc;
+
         void askWeights(Doc& doc) override { asked.push_back(doc.id); }
         void askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)> answered) override
         {
