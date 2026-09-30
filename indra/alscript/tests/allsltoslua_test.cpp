@@ -820,6 +820,15 @@ namespace tut
                                               "    if (gOn) llOwnerSay(\"on\");\n"
                                               "} }\n");
         ensure("flipped: " + r.text, has(r, "if n ~= 2 then") && has(r, "if n == 3 then"));
+        const ALLSLToSLua::Result nots = convert("integer gOn;\n"
+                                                 "default { touch_start(integer n) {\n"
+                                                 "    if (!n) llOwnerSay(\"none\"); if (!(n & 4)) llOwnerSay(\"no four\"); if (!(n > 1)) llDie();\n"
+                                                 "    gOn = !gOn; if (gOn) llOwnerSay(\"on\");\n"
+                                                 "} }\n");
+        ensure("not a number: the other way round: " + nots.text,
+               has(nots, "if n == 0 then") && has(nots, "if bit32.band(n, 4) == 0 then") && has(nots, "if not (n > 1) then") &&
+                   has(nots, "gOn = not gOn"));
+        checksClean(nots);
         ensure("the check itself: " + r.text, has(r, "    gOn = n > 1\n") && has(r, "    gOn = not (n > 5)\n"));
         checksClean(r);
     }

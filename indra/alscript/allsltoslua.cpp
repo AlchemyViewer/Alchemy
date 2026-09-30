@@ -1518,6 +1518,23 @@ namespace
                     mFlipped.erase(inner);
                     return { flipped.text, flipped.prec, true };
                 }
+                // A whole number, the only thing LSL's ! takes, asked
+                // whether it is nought: n == 0, not not (n ~= 0). Not what
+                // condition() says its own way.
+                const bool plain = inner->getNodeSubType() != NODE_BOOL_CONVERSION_EXPRESSION && !uuidConstant(inner) &&
+                                   !(inner->getNodeSubType() == NODE_UNARY_EXPRESSION && inner->getOperation() == OP_BIT_NOT) &&
+                                   !(inner->getNodeSubType() == NODE_LVALUE_EXPRESSION &&
+                                     static_cast<LSLLValueExpression*>(inner)->getIdentifier()->getSymbol() &&
+                                     static_cast<LSLLValueExpression*>(inner)->getIdentifier()->getSymbol()->getSubType() == SYM_BUILTIN);
+                if (plain && inner->getIType() == LST_INTEGER)
+                {
+                    const Expr v = expr(inner);
+                    if (v.boolean)
+                    {
+                        return { "not " + bracketed(v, UNARY), UNARY, true };
+                    }
+                    return { bracketed(v, COMPARE + 1) + " == 0", COMPARE, true };
+                }
                 return { "not " + bracketed(condition(child), UNARY), UNARY, true };
             }
             case OP_BIT_NOT:
