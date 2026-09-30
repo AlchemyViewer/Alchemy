@@ -1434,7 +1434,7 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
     }
     if (lines.empty())
     {
-        mVim.say(ALVimKeymap::said("VimPatternNotFound", "E486: ALVimPattern not found: [PATTERN]", { { "[PATTERN]", pattern } }), true);
+        mVim.say(ALVimKeymap::said("VimPatternNotFound", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", pattern } }), true);
         return false;
     }
     if (command.empty())
@@ -1681,7 +1681,7 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
     {
         if (!quiet)
         {
-            mVim.say(ALVimKeymap::said("VimPatternNotFound", "E486: ALVimPattern not found: [PATTERN]", { { "[PATTERN]", pattern } }), true);
+            mVim.say(ALVimKeymap::said("VimPatternNotFound", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", pattern } }), true);
         }
         return false;
     }
