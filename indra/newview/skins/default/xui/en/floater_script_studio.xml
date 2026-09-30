@@ -454,6 +454,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="CompareNow">This tab now</floater.string>
     <floater.string name="CompareUnsaved">[TITLE] (unsaved)</floater.string>
     <floater.string name="FixAllAfter">After [FIXES]</floater.string>
+    <floater.string name="RenameAfter">Renamed to [NAME]</floater.string>
+    <floater.string name="RenameChangesNotHere">[SCRIPT] is not open here, or has changed since the lookup; its occurrences are listed in References.</floater.string>
     <floater.string name="FixAllPreviewed">[FIXES] for [NAME], shown beside the text. Apply makes them, as one step to undo.</floater.string>
     <floater.string name="FixAllChangedSince">The text changed after the preview, so its fixes were not made. Use Fix All again to see them for the text now.</floater.string>
     <floater.string name="ActionApplyFixes">Apply</floater.string>
@@ -2201,6 +2203,17 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                                 <pane_list.columns label="" name="role" width="76" />
                                 <pane_list.columns dynamic_width="true" label="Text" name="text" />
                             </pane_list>
+                            <button
+                             follows="top|right"
+                             height="20"
+                             label="Show Changes"
+                             layout="topleft"
+                             left="318"
+                             name="references_changes"
+                             tool_tip="Compare the chosen occurrence's script, as it is, with how the checked renames would change it."
+                             top="1"
+                             visible="false"
+                             width="100" />
                             <button
                              follows="top|right"
                              height="20"

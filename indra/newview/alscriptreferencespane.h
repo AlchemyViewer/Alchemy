@@ -99,13 +99,17 @@ public:
     // `said` over them. Rename makes it at the places still checked, by
     // their order in what was found; Cancel lists them as found. Anything
     // shown after lets it go.
-    void preview(Found found, const std::string& new_name, const std::string& said, std::function<void(const std::vector<size_t>& kept)> apply);
+    // Show Changes asks `changes` for the file of the row chosen -- the
+    // script it was looked up from where none is -- with the places kept.
+    void preview(Found found, const std::string& new_name, const std::string& said, std::function<void(const std::vector<size_t>& kept)> apply,
+                 std::function<void(const std::string& file, const std::vector<size_t>& kept)> changes = nullptr);
     bool previewing() const { return static_cast<bool>(mApply); }
     std::vector<size_t> kept() const;
     // A place's box turned, by its order in what was found.
     void setKept(size_t index, bool kept);
     void renamePreviewed();
     void cancelPreview();
+    void showChanges();
 
 private:
     // The places listed: each a row of its own by its number, made again
@@ -129,6 +133,7 @@ private:
     LLTextBox*              mHead     = nullptr;
     LLButton*               mRename   = nullptr;
     LLButton*               mCancel   = nullptr;
+    LLButton*               mChanges  = nullptr;
     Found                   mFound;
     // The rename previewed: the name, what is said of it, the places left
     // out by their numbers, and what makes it.
@@ -136,6 +141,7 @@ private:
     std::string             mSaid;
     std::set<U32>           mLeftOut;
     std::function<void(const std::vector<size_t>& kept)> mApply;
+    std::function<void(const std::string& file, const std::vector<size_t>& kept)> mShowChanges;
     // The head's width with no buttons beside it.
     S32                     mHeadRight = 0;
     // Whether an edit has moved the places since the list was filled.

@@ -138,8 +138,14 @@ public:
         // A rename shown before it is made: each place found, to be left
         // out or not, and `said` over them; `apply` with the places kept,
         // by their order in what was found.
+        // `changes` with a file of the places, and those kept: what the
+        // rename would make of that file shown.
         virtual void previewRename(Doc& doc, const Found& found, const std::string& new_name, const std::string& said,
-                                   std::function<void(const std::vector<size_t>& kept)> apply) = 0;
+                                   std::function<void(const std::vector<size_t>& kept)>                          apply,
+                                   std::function<void(const std::string& file, const std::vector<size_t>& kept)> changes) = 0;
+        // Two texts side by side in a tab's place, each under its title.
+        virtual void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
+                             const std::string& right_title) = 0;
 
     protected:
         ~Window() = default;
@@ -172,6 +178,13 @@ public:
     // The same shown in the References tab first, each place to be left
     // out or not.
     void previewRename(const std::string& id, U32 generation, const std::string& new_name);
+    // What that rename would make of one of its files -- the script it was
+    // looked up from where `file` is empty -- at the places `kept`, beside
+    // the file's text as it stands, in the file's tab. Only a tab the
+    // rename would change on the spot, open here and unchanged since it was
+    // read; false, said, for any other, whose places the tab lists.
+    bool showRenameChanges(const std::string& id, U32 generation, const std::string& new_name, const std::string& file,
+                           const std::vector<size_t>& kept);
     // Whether `name` stands in `text` as a name, outside its comments and
     // strings.
     static bool mentions(std::string_view text, std::string_view name, bool lua);

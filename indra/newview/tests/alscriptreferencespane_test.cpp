@@ -342,8 +342,30 @@ namespace tut
 
         applied = false;
         refs->preview(found(), "total", "Rename 3 places", [&](const std::vector<size_t>&) { applied = true; });
+        ensure("no Show Changes where none is given", !window.find<LLButton>("references_changes")->getVisible());
         window.find<LLButton>("references_cancel")->onCommit();
         ensure("Cancel makes nothing", !applied && !refs->previewing());
+
+        // Show Changes: the chosen row's file, or the script's own with
+        // none chosen, and the places kept.
+        std::vector<std::string> files;
+        std::vector<size_t>      shown;
+        refs->preview(found(), "total", "Rename 3 places", [](const std::vector<size_t>&) {},
+                      [&](const std::string& file, const std::vector<size_t>& kept) {
+                          files.push_back(file);
+                          shown = kept;
+                      });
+        LLButton* changes = window.find<LLButton>("references_changes");
+        ensure("Show Changes shown", changes && changes->getVisible());
+        changes->onCommit();
+        refs->list()->selectNthItem(2);
+        refs->setKept(1, false);
+        refs->list()->selectNthItem(2);
+        changes->onCommit();
+        ensure("its own, then the chosen row's", files == std::vector<std::string>({ std::string(), B }));
+        ensure("with the places kept", shown == std::vector<size_t>({ 0, 2 }));
+        window.find<LLButton>("references_cancel")->onCommit();
+        ensure("gone with the preview", !changes->getVisible());
         ensure("each row as found", cell(refs->list()->getAllData()[0], 3) == "integer count;" && refs->list()->getAllData()[0]->getColumn(2)->getValue().asString() != "1");
     }
 

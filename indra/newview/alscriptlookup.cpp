@@ -29,6 +29,7 @@
 #include "alscriptlexicon.h"
 #include "alscriptnavigation.h"
 #include "alscriptstudioanalysis.h"
+#include "alscriptfixes.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiotabs.h"
@@ -727,12 +728,82 @@ void ALScriptLookup::previewRename(const std::string& id, U32 generation, const 
     }
     std::string said = renameHint(doc, lookup.name, static_cast<S32>(lookup.places.size()), static_cast<S32>(files.size()), name, false);
     const std::weak_ptr<bool> alive = mAlive;
-    mWindow.previewRename(doc, shown, name, said, [this, alive, id, generation, name](const std::vector<size_t>& kept) {
-        if (alive.lock())
+    mWindow.previewRename(
+        doc, shown, name, said,
+        [this, alive, id, generation, name](const std::vector<size_t>& kept) {
+            if (alive.lock())
+            {
+                renameTo(id, generation, name, &kept);
+            }
+        },
+        [this, alive, id, generation, name](const std::string& file, const std::vector<size_t>& kept) {
+            if (alive.lock())
+            {
+                showRenameChanges(id, generation, name, file, kept);
+            }
+        });
+}
+
+bool ALScriptLookup::showRenameChanges(const std::string& id, U32 generation, const std::string& new_name, const std::string& file,
+                                       const std::vector<size_t>& kept)
+{
+    Doc* found = lookingIn(id, generation);
+    if (!found)
+    {
+        return false;
+    }
+    Doc&               doc    = *found;
+    const Doc::Lookup& lookup = *doc.lookup;
+    std::string        name   = new_name;
+    LLStringUtil::trim(name);
+    // The tab the file is in, as the rename reaches it on the spot, and
+    // the version its places were read at.
+    Doc*        target  = nullptr;
+    std::string called  = doc.name;
+    U32         version = lookup.version;
+    if (file.empty())
+    {
+        target = &doc;
+    }
+    else
+    {
+        ALScriptRef ref;
+        target             = ALScriptPreprocessor::refOf(file, ref) ? mServices.findDoc(ref) : mServices.findDoc(file);
+        const auto read_at = lookup.versions.find(file);
+        target             = read_at != lookup.versions.end() ? target : nullptr;
+        version            = read_at != lookup.versions.end() ? read_at->second : 0;
+        const auto named   = std::find_if(lookup.places.begin(), lookup.places.end(), [&file](const Doc::Place& place) { return place.file == file; });
+        called             = named != lookup.places.end() ? named->fileName : file;
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"]   = name;
+    args["[SCRIPT]"] = called;
+    if (!target || !target->loaded || target->editor->document().version() != version)
+    {
+        mServices.setStatus(mServices.words("RenameChangesNotHere", args), true);
+        return false;
+    }
+    // Each place kept in the file where the old name still stands, as the
+    // rename makes them there.
+    const ALTextDocument& text = target->editor->document();
+    ALScriptFix           all;
+    for (size_t index : kept)
+    {
+        const Doc::Place* place = index < lookup.places.size() ? &lookup.places[index] : nullptr;
+        if (place && place->file == file && place->span.line < text.lineCount() && text.text(rangeOf(place->span)) == lookup.name)
         {
-            renameTo(id, generation, name, &kept);
+            all.edits.emplace_back(place->span, name);
         }
-    });
+    }
+    const std::string                now   = target->editor->wholeText();
+    const std::optional<std::string> after = ALScriptFixes::apply(now, all);
+    if (!after)
+    {
+        return false;
+    }
+    mTabs.activate(*target);
+    mWindow.compare(*target, now, *after, mServices.words("CompareNow"), mServices.words("RenameAfter", args));
+    return true;
 }
 
 void ALScriptLookup::renameTo(const std::string& id, U32 generation, const std::string& new_name, const std::vector<size_t>* kept)

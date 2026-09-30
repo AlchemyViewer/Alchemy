@@ -4380,7 +4380,8 @@ void ALFloaterScriptStudio::askNewName(Doc& doc, std::function<std::string(const
 }
 
 void ALFloaterScriptStudio::previewRename(Doc& doc, const ALScriptLookup::Found& found, const std::string& new_name, const std::string& said,
-                                          std::function<void(const std::vector<size_t>& kept)> apply)
+                                          std::function<void(const std::vector<size_t>& kept)>                          apply,
+                                          std::function<void(const std::string& file, const std::vector<size_t>& kept)> changes)
 {
     std::vector<ALTextRange> lit;
     for (const Doc::Place& place : found.places)
@@ -4391,7 +4392,7 @@ void ALFloaterScriptStudio::previewRename(Doc& doc, const ALScriptLookup::Found&
         }
     }
     doc.editor->setHighlights(ALCodeEditor::Highlight::References, std::move(lit));
-    mReferencesPane->preview(found, new_name, said, std::move(apply));
+    mReferencesPane->preview(found, new_name, said, std::move(apply), std::move(changes));
     showBottom("references_tab");
     mReferencesPane->list()->setFocus(true);
 }

@@ -761,7 +761,8 @@ private:
     void askNewName(Doc& doc, std::function<std::string(const std::string& typed)> hint, std::function<void(const std::string& name)> chosen,
                     std::function<void(const std::string& name)> previewed) override;
     void previewRename(Doc& doc, const ALScriptLookup::Found& found, const std::string& new_name, const std::string& said,
-                       std::function<void(const std::vector<size_t>& kept)> apply) override;
+                       std::function<void(const std::vector<size_t>& kept)>                          apply,
+                       std::function<void(const std::string& file, const std::vector<size_t>& kept)> changes) override;
     void applyPendingEdits(Doc& doc) override { mLookup.applyPendingEdits(doc); }
     // What the external editor (ALScriptExternalEditor) asks of the
     // window: the bridge and the editor's launch, which are the window's --

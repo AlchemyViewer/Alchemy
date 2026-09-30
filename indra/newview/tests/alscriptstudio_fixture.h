@@ -441,9 +441,10 @@ namespace al_studio_test
             ++named;
         }
         void previewRename(ALScriptStudioDoc&, const ALScriptLookup::Found&, const std::string&, const std::string&,
-                           std::function<void(const std::vector<size_t>&)>) override
+                           std::function<void(const std::vector<size_t>&)>, std::function<void(const std::string&, const std::vector<size_t>&)>) override
         {
         }
+        void compare(ALScriptStudioDoc&, const std::string&, const std::string&, const std::string&, const std::string&) override {}
 
         QuietTabs      tabs;
         ALScriptLookup unit;
