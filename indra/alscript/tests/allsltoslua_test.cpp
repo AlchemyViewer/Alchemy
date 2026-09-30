@@ -90,7 +90,7 @@ namespace tut
         // SLua's way where it means the same, llcompat's where not.
         static bool unwanted(const ALScriptProblem& p)
         {
-            static const std::vector<std::string_view> OWN = { "SlCompoundAssign", "SlNumberTruth", "SlZeroIndex", "SlParenCondition" };
+            static const std::vector<std::string_view> OWN = { "SlCompoundAssign", "SlNumberTruth", "SlZeroIndex", "SlParenCondition", "SlGeneralizedFor" };
             return p.severity == ALScriptProblem::Severity::Error || std::find(OWN.begin(), OWN.end(), p.code) != OWN.end() ||
                    (p.key.rfind("LuauLintDeprecatedMember", 0) == 0 && !p.args.empty() && p.args[0].rfind("ll.", 0) == 0);
         }

@@ -415,4 +415,28 @@ namespace tut
         unfixed("local s = \"abc\"\nstring.len(s)\n", "LuauLintSlMustUse");
         unfixed("string.upper(\"abc\")\n", "LuauLintSlMustUse");
     }
+
+    template<> template<>
+    void object::test<9>()
+    {
+        set_test_name("SlGeneralizedFor: pairs, ipairs and next, t in a for, a note, fixed as the table itself, not safe; not a function "
+                      "of the script's, nor for over a table already");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local t = {1, 2}\n"
+                                       "for k, v in pairs(t) do print(k, v) end\n"
+                                       "for i, v in ipairs(t) do print(i, v) end\n"
+                                       "for k, v in next, t do print(k, v) end\n"
+                                       "local function walk(x) return next, x end\n"
+                                       "for k, v in walk(t) do print(k, v) end\n"
+                                       "for k, v in t do print(k, v) end\n",
+                                       "SlGeneralizedFor", ALScriptProblem::Severity::Note);
+        ensure_equals("each", said,
+                      std::string("1 LuauLintSlGeneralizedFor|t|pairs(t)\n"
+                                  "2 LuauLintSlGeneralizedForList|t|ipairs(t)\n"
+                                  "3 LuauLintSlGeneralizedFor|t|next, t\n"));
+        ensure_equals("pairs", fixed("local t = {1}\nfor k, v in pairs(t) do print(k, v) end\n", "LuauLintSlGeneralizedFor", "Write it in t", false),
+                      std::string("local t = {1}\nfor k, v in t do print(k, v) end\n"));
+        ensure_equals("next", fixed("local t = {1}\nfor k, v in next, t do print(k, v) end\n", "LuauLintSlGeneralizedFor", "Write it in t", false),
+                      std::string("local t = {1}\nfor k, v in t do print(k, v) end\n"));
+    }
 }

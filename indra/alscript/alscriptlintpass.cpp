@@ -79,6 +79,8 @@ namespace
         // string.upper(s) alone, ll.DeleteSubList(l, 1, 1) alone: an answer
         // thrown away from what does nothing else.
         { "SlMustUse", true, Severity::Warning, true, true, nullptr },
+        // for k, v in pairs(t), where Luau's for walks t itself.
+        { "SlGeneralizedFor", true, Severity::Note, true, true, nullptr },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -431,6 +433,48 @@ namespace
                     }
                 }
             }
+        }
+
+        // --- SlGeneralizedFor: pairs and ipairs where for walks a table -------
+
+        // for k, v in pairs(t), ipairs(t), or next, t: Luau's for walks a
+        // table given as it is. Not safe: ipairs stops at a list's first
+        // gap, and a table's own __iter is what for uses, pairs not.
+        bool visit(Luau::AstStatForIn* node) override
+        {
+            if (!on("SlGeneralizedFor") || node->values.size == 0)
+            {
+                return true;
+            }
+            Luau::AstExpr* first  = node->values.data[0];
+            Luau::AstExpr* walked = nullptr;
+            std::string    how;
+            if (const auto* call = first->as<Luau::AstExprCall>(); call && node->values.size == 1 && call->args.size == 1)
+            {
+                const auto* global = call->func->as<Luau::AstExprGlobal>();
+                how                = global ? global->name.value : "";
+                walked             = how == "pairs" || how == "ipairs" ? call->args.data[0] : nullptr;
+            }
+            else if (const auto* global = first->as<Luau::AstExprGlobal>();
+                     global && node->values.size == 2 && std::string_view(global->name.value) == "next")
+            {
+                how    = "next";
+                walked = node->values.data[1];
+            }
+            if (!walked)
+            {
+                return true;
+            }
+            const Luau::Location values(first->location.begin, node->values.data[node->values.size - 1]->location.end);
+            const std::string    table = text(walked->location);
+            ALScriptProblem&     said  = how == "ipairs"
+                                             ? problem(values, "LuauLintSlGeneralizedForList",
+                                                       "Luau's for walks a table given as it is: in [1] walks a list as in [2] does, where the list has no gaps",
+                                                       { table, text(values) }, "SlGeneralizedFor")
+                                             : problem(values, "LuauLintSlGeneralizedFor", "Luau's for walks a table given as it is: in [1] says what in [2] says",
+                                                       { table, text(values) }, "SlGeneralizedFor");
+            offer(said, "in " + table, { edit(values, table) }, false);
+            return true;
         }
 
         // --- SlGlobalAssign: a global made where a local would do ------------

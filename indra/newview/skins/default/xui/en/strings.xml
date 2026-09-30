@@ -886,6 +886,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlParenCondition">Luau's [1] needs no brackets round its condition, where LSL's did</string>
 	<string name="LuauLintSlAlmostSwapped">[1] = [2] and then [2] = [1] leave both [2]: a swap is [3]</string>
 	<string name="LuauLintSlMustUse">[1] changes nothing and only answers, and nothing reads its answer here</string>
+	<string name="LuauLintSlGeneralizedFor">Luau's for walks a table given as it is: in [1] says what in [2] says</string>
+	<string name="LuauLintSlGeneralizedForList">Luau's for walks a table given as it is: in [1] walks a list as in [2] does, where the list has no gaps</string>
 	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
 	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauUnknownType">Unknown type '[1]'</string>

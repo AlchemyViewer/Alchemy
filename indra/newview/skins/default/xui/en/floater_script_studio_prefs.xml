@@ -100,6 +100,7 @@
     <floater.string name="LintLuauSlParenCondition">A condition in brackets, as LSL's had to be (the studio's own)</floater.string>
     <floater.string name="LintLuauSlAlmostSwapped">a = b and then b = a, which is no swap (the studio's own)</floater.string>
     <floater.string name="LintLuauSlMustUse">A call that only answers, its answer thrown away (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlGeneralizedFor">for k, v in pairs(t), where Luau's for walks t itself (the studio's own)</floater.string>
     <floater.string name="LintLuauName">[DESCRIPTION]
 
 In a .luaurc: [NAME]</floater.string>
