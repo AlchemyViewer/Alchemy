@@ -32,6 +32,7 @@
 #include "alnotecardembedded.h"
 #include "alrecovery.h"
 #include "alsaid.h"
+#include "alscriptstudiohistory.h"
 #include "alscriptworkspace.h"
 #include "alsurface.h"
 #include "altextgotoline.h"
@@ -115,6 +116,9 @@ bool LLPreviewNotecard::postBuild()
 
     mEditBtn = getChild<LLButton>("Edit");
     mEditBtn->setCommitCallback([this](LLUICtrl*, const LLSD&) { openInExternalEditor(); });
+
+    mHistoryBtn = getChild<LLButton>("History");
+    mHistoryBtn->setCommitCallback([this](LLUICtrl*, const LLSD&) { showHistory(); });
 
     mStatus      = getChild<LLTextBox>("status");
     mNoticePanel = getChild<LLLayoutPanel>("notice_panel");
@@ -628,20 +632,142 @@ void LLPreviewNotecard::toggleCompare()
         mCompare->setOnEscape([this]() { toggleCompare(); });
         host->addChild(mCompare);
     }
-    const bool comparing = !mCompare->getVisible() && mSavedThere;
+    const bool comparing = !mCompare->getVisible() && (mSavedThere || mHistoryShown);
     if (comparing)
     {
         mCompare->setRect(mText->getRect());
-        mCompare->setTexts(*mSavedThere, mText->wholeText());
-        mCompare->setTitles(getString("CompareTheirs"), getString("CompareMine"));
+        if (mHistoryShown)
+        {
+            LLStringUtil::format_map_t args;
+            args["[WHEN]"] = ALRecoveryEntry::sayWhen(mHistoryShown->when);
+            mCompare->setTexts(mHistoryShown->text, mText->wholeText());
+            mCompare->setTitles(getString("HistorySavedAt", args), getString("CompareMine"));
+        }
+        else
+        {
+            mCompare->setTexts(*mSavedThere, mText->wholeText());
+            mCompare->setTitles(getString("CompareTheirs"), getString("CompareMine"));
+        }
+    }
+    else if (mHistoryShown)
+    {
+        // Leaving a save's comparison lets it go, and the notice offering
+        // it back.
+        mHistoryShown.reset();
+        hideNotice();
     }
     mCompare->setVisible(comparing);
     mText->setVisible(!comparing);
     (comparing ? static_cast<LLView*>(mCompare) : static_cast<LLView*>(mText))->setFocus(true);
-    if (mNoticePanel->getVisible())
+    if (mNoticePanel->getVisible() && !mHistoryShown)
     {
         mNoticeButtons[2]->setLabel(getString(comparing ? "BackToText" : "Compare"));
     }
+}
+
+void LLPreviewNotecard::showHistory()
+{
+    // Not over a question of whose text to keep, which is answered first.
+    if (!mLoaded || mSavedThere)
+    {
+        return;
+    }
+    std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
+    std::vector<ALSavedText>       saves;
+    if (history)
+    {
+        saves = history->list(ALRecoveryStore::keyOf(mObjectUUID, mItemUUID, std::string()));
+    }
+    if (saves.empty())
+    {
+        setStatus(getString("HistoryNone"));
+        return;
+    }
+    std::vector<ALQuickOpen::Candidate> candidates = ALScriptStudioHistory::candidatesOf(
+        saves, mAssetID,
+        [this](const char* name, std::optional<S32> count) {
+            if (!count)
+            {
+                return getString(name);
+            }
+            LLStringUtil::format_map_t args;
+            args["[COUNT]"]          = std::to_string(*count);
+            const std::string formed = std::string(name) + LLTrans::countForm(alSaidLanguage(), *count);
+            return getString(hasString(formed) ? formed : std::string(name), args);
+        },
+        [this](const std::vector<std::string>& items) {
+            std::string out;
+            for (const std::string& item : items)
+            {
+                LLStringUtil::format_map_t args;
+                args["[FIRST]"]  = out;
+                args["[SECOND]"] = item;
+                out              = out.empty() ? item : getString("HistoryJoin", args);
+            }
+            return out;
+        });
+    mQuickAsk.ask(std::move(candidates), getString("HistoryPlaceholder"), getString("HistoryTitle"),
+                  [this, saves](const std::string& value) {
+                      const size_t index = static_cast<size_t>(std::strtoul(value.c_str(), nullptr, 10));
+                      if (index < saves.size())
+                      {
+                          compareSave(saves[index]);
+                      }
+                  },
+                  mText);
+}
+
+void LLPreviewNotecard::compareSave(ALSavedText saved)
+{
+    std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
+    LLStringUtil::format_map_t     args;
+    args["[WHEN]"] = ALRecoveryEntry::sayWhen(saved.when);
+    if (!mLoaded || mSavedThere || (!saved.whole && (!history || !history->load(saved))))
+    {
+        setStatus(getString("HistoryUnreadable", args), true);
+        return;
+    }
+    // Another save in place of the one compared, or the first.
+    if (mCompare && mCompare->getVisible())
+    {
+        mHistoryShown.reset();
+        toggleCompare();
+    }
+    mHistoryShown = std::move(saved);
+    toggleCompare();
+    std::vector<NoticeButton> buttons;
+    if (mModifiable)
+    {
+        buttons.push_back({ getString("RestoreSave"), [this]() { restoreSave(); } });
+    }
+    buttons.push_back({ getString("BackToText"), [this]() { endHistory(); } });
+    showNotice(getString("HistoryShown", args), std::move(buttons));
+}
+
+void LLPreviewNotecard::restoreSave()
+{
+    if (!mHistoryShown || !mModifiable)
+    {
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[WHEN]"]         = ALRecoveryEntry::sayWhen(mHistoryShown->when);
+    const std::string text = mHistoryShown->text;
+    endHistory();
+    // In over the text as one step to undo, as Take Theirs puts its text.
+    const ALTextDocument& whole = mText->document();
+    mText->replaceAll({ { ALTextRange(whole.start(), whole.end()), text } });
+    setStatus(getString("HistoryRestored", args));
+}
+
+void LLPreviewNotecard::endHistory()
+{
+    if (mCompare && mCompare->getVisible())
+    {
+        toggleCompare();
+    }
+    mHistoryShown.reset();
+    hideNotice();
 }
 
 bool LLPreviewNotecard::handleSaveChangesDialog(const LLSD& notification, const LLSD& response)

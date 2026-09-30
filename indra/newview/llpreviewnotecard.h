@@ -29,6 +29,7 @@
 
 #include "alquickask.h"
 #include "alrecoverykeeper.h"
+#include "alsavehistory.h"
 #include "alscripttypes.h"
 #include "altextundo.h"
 #include "llpreview.h"
@@ -114,6 +115,8 @@ private:
     void heard(const ALScriptSaved& saved);
     void takeTheirs();
     void keepMine();
+    // The text compared with what was saved elsewhere, or with a save of
+    // its history; and back.
     void toggleCompare();
     bool handleSaveChangesDialog(const LLSD& notification, const LLSD& response);
     void deleteNotecard();
@@ -122,6 +125,16 @@ private:
     // Go to Line, as Script Studio's is, by the numbers a script reads a
     // notecard's lines by: from 0.
     void goToLine();
+
+    // --- what it was saved as before ------------------------------------------------------
+
+    // Its saves listed, as Script Studio's File > Local History lists a
+    // tab's (ALScriptStudioHistory); one chosen compared with the text now,
+    // and offered back as one step to undo; and let go of, with its notice.
+    void showHistory();
+    void compareSave(ALSavedText saved);
+    void restoreSave();
+    void endHistory();
 
     // --- what the window says ---------------------------------------------------------
 
@@ -160,6 +173,7 @@ private:
     LLButton*                            mSaveBtn     = nullptr;
     LLButton*                            mEditBtn     = nullptr;
     LLButton*                            mDeleteBtn   = nullptr;
+    LLButton*                            mHistoryBtn  = nullptr;
     LLUICtrl*                            mLockBtn     = nullptr;
     LLTextBox*                           mStatus      = nullptr;
     LLLayoutPanel*                       mNoticePanel = nullptr;
@@ -184,6 +198,8 @@ private:
     // Saved elsewhere while this had changes of its own: that text, until
     // it is taken or kept.
     std::optional<std::string> mSavedThere;
+    // A save of its history compared with it, until the comparison ends.
+    std::optional<ALSavedText> mHistoryShown;
     // The notecard loaded again for a Take Theirs, whose text goes in over
     // what was typed rather than as a fresh load.
     bool                       mTakingTheirs = false;

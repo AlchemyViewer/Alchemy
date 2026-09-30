@@ -45,6 +45,23 @@
     <floater.string name="Discard">Discard</floater.string>
     <floater.string name="Restored">The kept changes are back. Undo takes them out.</floater.string>
     <floater.string name="RecoveryWriteFailed">Your unsaved changes could not be kept in case the viewer closes.</floater.string>
+    <floater.string name="HistoryNone">No saves of this notecard are kept here yet. Each save from now on is kept for 30 days.</floater.string>
+    <floater.string name="HistoryTitle">Saves of this notecard</floater.string>
+    <floater.string name="HistoryPlaceholder">Type a date or time to find a save</floater.string>
+    <floater.string name="HistoryBytesA">1 byte</floater.string>
+    <floater.string name="HistoryBytesB">[COUNT] bytes</floater.string>
+    <floater.string name="HistoryLongerA">1 byte longer than the save before</floater.string>
+    <floater.string name="HistoryLongerB">[COUNT] bytes longer than the save before</floater.string>
+    <floater.string name="HistoryShorterA">1 byte shorter than the save before</floater.string>
+    <floater.string name="HistoryShorterB">[COUNT] bytes shorter than the save before</floater.string>
+    <floater.string name="HistorySameLength">as long as the save before</floater.string>
+    <floater.string name="HistoryCurrent">what is saved now</floater.string>
+    <floater.string name="HistoryJoin">[FIRST], [SECOND]</floater.string>
+    <floater.string name="HistorySavedAt">Saved [WHEN]</floater.string>
+    <floater.string name="HistoryShown">The save of [WHEN], beside the notecard now.</floater.string>
+    <floater.string name="HistoryUnreadable">The save from [WHEN] could not be read.</floater.string>
+    <floater.string name="HistoryRestored">The save from [WHEN] is back. Undo takes it out; it is not saved until you save.</floater.string>
+    <floater.string name="RestoreSave">Restore This Save</floater.string>
     <floater.string name="GoToLineTitle">Go to Line</floater.string>
     <floater.string name="GoToLinePlaceholder">Line, or line:column</floater.string>
     <floater.string name="GoToLineHint">Type a line number to go to (from [FIRST] to [COUNT]).</floater.string>
@@ -166,7 +183,17 @@
      name="status"
      top="312"
      use_ellipses="true"
-     width="388" />
+     width="300" />
+    <button
+     follows="right|bottom"
+     height="20"
+     label="History..."
+     layout="topleft"
+     left="312"
+     name="History"
+     tool_tip="Compare this notecard with an earlier save of it, and put one back"
+     top="309"
+     width="84" />
     <button
      follows="left|bottom"
      height="22"

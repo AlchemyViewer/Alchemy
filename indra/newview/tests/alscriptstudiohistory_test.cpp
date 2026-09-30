@@ -227,4 +227,36 @@ namespace tut
         doc.modifiable = false;
         ensure("not where it may not be changed", ALScriptStudioOrphans::noticeFor(&doc, services()).buttons[0].first.empty());
     }
+
+    template<> template<>
+    void alscriptstudiohistory_object::test<5>()
+    {
+        set_test_name("a list of saves in a window's own words: each asked by name, with a count where it has one, and joined as it joins");
+        std::vector<ALSavedText> saves(3);
+        saves[0].bytes = 10;
+        saves[0].asset = LLUUID::generateNewID();
+        saves[0].when  = LLDate(1.8e9 + 60.0);
+        saves[1].bytes = 10;
+        saves[1].when  = LLDate(1.8e9 + 30.0);
+        saves[2].bytes = 12;
+        saves[2].when  = LLDate(1.8e9);
+        const auto words = [](const char* name, std::optional<S32> count) {
+            return std::string(name) + (count ? "(" + std::to_string(*count) + ")" : std::string());
+        };
+        const auto joined = [](const std::vector<std::string>& items) {
+            std::string out;
+            for (const std::string& item : items)
+            {
+                out += (out.empty() ? "" : " + ") + item;
+            }
+            return out;
+        };
+        const std::vector<ALQuickOpen::Candidate> listed = ALScriptStudioHistory::candidatesOf(saves, saves[0].asset, words, joined);
+        ensure_equals("each", listed.size(), 3U);
+        ensure_equals("the newest", listed[0].detail, std::string("HistoryBytes(10) + HistorySameLength + HistoryCurrent"));
+        ensure_equals("shorter than the first", listed[1].detail, std::string("HistoryBytes(10) + HistoryShorter(2)"));
+        ensure_equals("the first says only its length", listed[2].detail, std::string("HistoryBytes(12)"));
+        ensure_equals("by when", listed[2].label, ALRecoveryEntry::sayWhen(saves[2].when));
+        ensure_equals("valued by place", listed[1].value, std::string("1"));
+    }
 }
