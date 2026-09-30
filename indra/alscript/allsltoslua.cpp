@@ -173,6 +173,29 @@ namespace
         }
     }
 
+    // NULL_KEY, a TEXTURE_ constant and the rest LSL types a string and
+    // SLua a uuid, as written.
+    bool uuidConstant(LSLExpression* e)
+    {
+        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
+        }
+        if (!e || e->getNodeSubType() != NODE_LVALUE_EXPRESSION)
+        {
+            return false;
+        }
+        LSLIdentifier* id = static_cast<LSLLValueExpression*>(e)->getIdentifier();
+        return id->getSymbol() && id->getSymbol()->getSubType() == SYM_BUILTIN && ALLSLTraits::uuidConstant(id->getName());
+    }
+
+    // An expression's type as SLua has what it is written as: LSL's, but
+    // a key for those constants.
+    LSLIType slType(LSLExpression* e)
+    {
+        return uuidConstant(e) ? LST_KEY : e->getIType();
+    }
+
     // Every node under one, and it, in the tree's order.
     void walk(LSLASTNode* node, const std::function<void(LSLASTNode*)>& each)
     {
@@ -642,6 +665,11 @@ namespace
         // LSL's truth: a number not nought, a string not empty, a key that
         // is one and not the null key, a vector or a rotation not zero, a list
         // with something in it. In Luau everything but nil and false is true.
+        // One of the constants SLua has as a uuid is LSL's string.
+        if (uuidConstant(e))
+        {
+            out = { "tostring(" + out.text + ")" };
+        }
         switch (e->getIType())
         {
             case LST_INTEGER:
@@ -658,7 +686,7 @@ namespace
     Expr Writer::coerced(LSLExpression* e, LSLIType to)
     {
         Expr           out  = value(e);
-        const LSLIType from = e->getIType();
+        const LSLIType from = slType(e);
         if (to == LST_KEY && from == LST_STRING)
         {
             return { "uuid(" + out.text + ")" };
@@ -1011,8 +1039,8 @@ namespace
         const LSLOperator op  = e->getOperation();
         LSLExpression*    lhs = e->getLHS();
         LSLExpression*    rhs = e->getRHS();
-        const LSLIType    lt  = lhs->getIType();
-        const LSLIType    rt  = rhs->getIType();
+        const LSLIType    lt  = slType(lhs);
+        const LSLIType    rt  = slType(rhs);
         const auto        infix = [&](const char* word, int prec, bool boolean = false, bool right_assoc = false) -> Expr {
             const Expr a = value(lhs);
             const Expr b = value(rhs);
@@ -1197,7 +1225,7 @@ namespace
     {
         LSLExpression* child = e->getChildExpr();
         const LSLIType to    = e->getIType();
-        const LSLIType from  = child->getIType();
+        const LSLIType from  = slType(child);
         const Expr     v     = value(child);
         if (to == from)
         {
@@ -1318,7 +1346,9 @@ namespace
                 std::string out;
                 for (LSLASTNode* item = e->getChild(0); item; item = item->getNext())
                 {
-                    out += (out.empty() ? "" : ", ") + value(static_cast<LSLExpression*>(item)).text;
+                    // As LSL typed it: NULL_KEY in a list is LSL's string.
+                    auto* each = static_cast<LSLExpression*>(item);
+                    out += (out.empty() ? "" : ", ") + coerced(each, each->getIType()).text;
                 }
                 return { "{" + out + "}" };
             }
@@ -1631,7 +1661,13 @@ namespace
             case NODE_RETURN_STATEMENT:
             {
                 LSLExpression*    e    = static_cast<LSLReturnStatement*>(s)->getExpr();
-                const std::string said = isNull(e) ? "return" : "return " + (boolean(mFunction) ? truthOf(e) : value(e).text);
+                // As the function's type: a string function's NULL_KEY is
+                // LSL's string.
+                const std::string given = isNull(e)             ? std::string()
+                                          : boolean(mFunction) ? truthOf(e)
+                                          : mFunction          ? coerced(e, mFunction->getIType()).text
+                                                               : value(e).text;
+                const std::string said  = isNull(e) ? "return" : "return " + given;
                 line(last ? said : "do " + said + " end");
                 return;
             }

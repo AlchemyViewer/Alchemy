@@ -609,4 +609,27 @@ namespace tut
         ensure("not a truth: " + r.text, !has(r, "if llcompat.GetPrimitiveParams"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<20>()
+    {
+        set_test_name("NULL_KEY and the constants LSL types a string and SLua a uuid: a key where compared with one or given as one, LSL's string where read as one");
+        const ALLSLToSLua::Result r = convert("string gName = NULL_KEY;\n"
+                                              "key gKey = NULL_KEY;\n"
+                                              "string nothing() { return NULL_KEY; }\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    key k = llDetectedKey(0);\n"
+                                              "    if (k != NULL_KEY) llOwnerSay(\"someone\");\n"
+                                              "    if (NULL_KEY != \"\") llOwnerSay(llGetSubString(NULL_KEY, 0, 7));\n"
+                                              "    list l = [NULL_KEY, TEXTURE_BLANK];\n"
+                                              "    if (NULL_KEY) llOwnerSay(gName + nothing() + (string)gKey + (string)llGetListLength(l));\n"
+                                              "} }\n");
+        ensure("a key against a key: " + r.text, has(r, "if k ~= NULL_KEY then"));
+        ensure("a string where LSL's string was: " + r.text, has(r, "tostring(NULL_KEY) ~= \"\"") && has(r, "ll.GetSubString(tostring(NULL_KEY), 1, 8)"));
+        ensure("in a list, as LSL had it: " + r.text, has(r, "{tostring(NULL_KEY), tostring(TEXTURE_BLANK)}"));
+        ensure("a string's truth: " + r.text, has(r, "if tostring(NULL_KEY) ~= \"\" then\n        print("));
+        ensure("given to a string and a key: " + r.text, has(r, "local gName = tostring(NULL_KEY)") && has(r, "local gKey = NULL_KEY"));
+        ensure("returned as a string function's: " + r.text, has(r, "return tostring(NULL_KEY)"));
+        checksClean(r);
+    }
 }
