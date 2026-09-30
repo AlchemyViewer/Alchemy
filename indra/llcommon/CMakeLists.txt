@@ -22,6 +22,7 @@ target_sources(
     alparamtype.cpp
     alrecoverystore.cpp
     alregex.cpp
+    alsavehistory.cpp
     alwatchedfile.cpp
     apply.cpp
     commoncontrol.cpp
@@ -125,6 +126,7 @@ target_sources(
         alparamtype.h
         alrecoverystore.h
         alregex.h
+        alsavehistory.h
         alsimd.h
         alwatchedfile.h
         always_return.h
@@ -299,6 +301,7 @@ if(AL_BUILD_TESTS)
     alfilewrite
     alrecoverystore
     alregex
+    alsavehistory
     alserialworker
     alwatchedfile
     apply
