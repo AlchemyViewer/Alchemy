@@ -669,6 +669,13 @@ namespace tut
     {
         set_test_name("a handler is offered for an event a SLua script asks for and does not hear, with the parameters the definitions give");
         ensure("definitions: " + error, luauLoaded);
+        // Nonstrict, as the grid compiles: the new solver checking strict
+        // cannot yet push an overloaded function's parameter types into a
+        // function given to it, so every LLEvents:on there is an error it
+        // is upstream's to put right.
+        ALLuauConfig grid;
+        grid.mode = "nonstrict";
+        luau.setConfig(grid);
         const std::string script = "ll.Listen(0, \"\", ll.GetOwner(), \"\")\n";
         std::string       made   = actedOn(script, true, "Listen", false, "Add a handler for 'listen'");
         ensure_equals("at the end", made,

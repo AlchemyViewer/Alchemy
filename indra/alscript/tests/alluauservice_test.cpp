@@ -59,20 +59,6 @@ namespace tut
             loaded      = service.loadDefinitions(definitions, error);
         }
 
-        // The new solver's nonstrict mode says only what is sure to fail
-        // as the script runs, which a wrong argument to ll.Say is not: a
-        // test of what the checker says of a type asks it in strict mode
-        // there.
-        void strictUnderNewSolver()
-        {
-            if (newSolver)
-            {
-                ALLuauConfig config;
-                config.mode = "strict";
-                service.setConfig(config);
-            }
-        }
-
         // Every problem on a line, for a failure message that says what
         // the analyzer actually said.
         static std::string said(const ALScriptProblems& problems)
@@ -139,7 +125,6 @@ namespace tut
     {
         set_test_name("a wrong argument type is a type error");
         ensure("definitions load: " + error, loaded);
-        strictUnderNewSolver();
         ALScriptProblems problems = service.check("ll.Say(\"zero\", 0)\n");
         ensure("an error: " + said(problems), errors(problems) > 0);
         ensure("from the type checker", problems.front().source == ALScriptProblem::Source::Types);
@@ -399,7 +384,6 @@ namespace tut
     {
         set_test_name("a key that is not there is named by what was written, with the nearest key there is");
         ensure("definitions loaded: " + error, loaded);
-        strictUnderNewSolver();
         ALScriptProblems problems = service.check("ll.ay(0, \"hi\")\n");
         ensure("one problem", !problems.empty());
         const std::string& message = problems.front().message;
@@ -526,7 +510,6 @@ namespace tut
     {
         set_test_name("the engine's commonest messages come back keyed, which an upgrade that rewords them would end");
         ensure("definitions loaded: " + error, loaded);
-        strictUnderNewSolver();
         // Each script says one thing the map has a row for; a Luau whose
         // wording moved on gives the message with no key, and this is
         // where that shows -- run check_script_strings.py then.
@@ -588,9 +571,10 @@ namespace tut
             ensure("the same hint: " + after_hover[i].text + " / " + after_check[i].text,
                    after_hover[i].text == after_check[i].text && after_hover[i].line == after_check[i].line);
         }
-        // Another configuration, or another text, is checked again.
+        // Another configuration, or another text, is checked again: one
+        // unlike either solver's default.
         ALLuauConfig strict;
-        strict.mode = "strict";
+        strict.mode = "nocheck";
         service.setConfig(strict);
         service.hover(script, 1, 6);
         ensure("another configuration, checked again", service.typeChecks() > checked);
@@ -1006,6 +990,13 @@ namespace tut
     {
         set_test_name("every template Script Studio offers for a new SLua script checks without an error");
         ensure("definitions loaded: " + error, loaded);
+        // Nonstrict, as the grid compiles: the new solver checking strict
+        // cannot yet push an overloaded function's parameter types into a
+        // function given to it, so every LLEvents:on there is an error it
+        // is upstream's to put right.
+        ALLuauConfig grid;
+        grid.mode = "nonstrict";
+        service.setConfig(grid);
         llifstream in(std::string(AL_SCRIPT_TEMPLATES_DIR) + "/slua.xml", std::ios::in | std::ios::binary);
         LLSD       templates;
         ensure("read", in.is_open() && LLSDSerialize::fromXML(templates, in) != LLSDParser::PARSE_FAILURE && templates.isArray());
@@ -1124,5 +1115,39 @@ namespace tut
         // The new solver types j a number still, and is taken at its word.
         ensure("a copy only: " + (given.empty() ? std::string() : given[0]),
                given.size() == (newSolver ? 2u : 1u) && given[0] == "LuauLintSlNumberTruth copy 7");
+    }
+
+    template<> template<>
+    void alluauservice_object::test<36>()
+    {
+        set_test_name("a configuration that says no mode is checked in the solver's own: the new one's strict, as strict as the old one's nonstrict; one that says nonstrict is nonstrict under either");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script = "local function f(): number? return nil end\nlocal x = f() + 1\nprint(x)\n";
+        const auto        nil_said = [&] {
+            for (const ALScriptProblem& p : service.check(script))
+            {
+                if (p.severity == ALScriptProblem::Severity::Error && p.line == 1)
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+        service.setConfig(ALLuauConfig());
+        const bool by_default = nil_said();
+        ALLuauConfig nonstrict;
+        nonstrict.mode = "nonstrict";
+        service.setConfig(nonstrict);
+        const bool asked_nonstrict = nil_said();
+        if (newSolver)
+        {
+            ensure("strict where nothing says", by_default);
+            ensure("nonstrict where asked", !asked_nonstrict);
+        }
+        else
+        {
+            ensure_equals("nonstrict, whether asked or not", by_default, asked_nonstrict);
+        }
+        service.setConfig(ALLuauConfig());
     }
 }

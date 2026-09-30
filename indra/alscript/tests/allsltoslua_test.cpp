@@ -61,6 +61,13 @@ namespace tut
             text << in.rdbuf();
             service.setNewSolver(newSolver, error);
             definitions = service.loadDefinitions(text.str(), error);
+            // Nonstrict, as the grid compiles: the new solver checking strict
+            // cannot yet push an overloaded function's parameter types into a
+            // function given to it, so every LLEvents:on there is an error it
+            // is upstream's to put right.
+            ALLuauConfig grid;
+            grid.mode = "nonstrict";
+            service.setConfig(grid);
         }
 
         // Written again, and it must have been.

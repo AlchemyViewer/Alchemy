@@ -555,18 +555,14 @@ namespace ALScriptLints
                     break;
             }
         }
-        // Left to the solver: the new one's nonstrict reports only a
-        // checked function called wrongly, so a script it checks is
-        // checked strict unless something says otherwise; the old one's
-        // nonstrict is how the grid compiles.
+        // A mode the scripter chose; else none, which the service reads as
+        // the solver's own (ALLuauService::setConfig): the old one's
+        // nonstrict, as the grid compiles, and the new one's strict, its
+        // nonstrict reporting only what is sure to fail.
         const std::string mode = gSavedSettings.getString("ALScriptLuauMode");
         if (mode == "strict" || mode == "nocheck" || mode == "nonstrict")
         {
             base.mode = mode;
-        }
-        else
-        {
-            base.mode = gSavedSettings.getString("ALScriptLuauSolver") == "new" ? "strict" : "nonstrict";
         }
         made = base;
         return base;

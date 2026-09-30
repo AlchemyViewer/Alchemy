@@ -1228,6 +1228,30 @@ struct ALLuauService::Impl
     // The studio's own lints on and fatal, as the last configuration said.
     uint64_t                        slLints      = ALScriptLintPass::defaults();
     uint64_t                        slFatalLints = 0;
+    // The mode each kept script's configuration asked for, where it asked
+    // for one; the mode it is checked in follows (checkedIn).
+    boost::unordered_flat_map<std::string, std::optional<Luau::Mode>, ll::string_hash, std::equal_to<>> askedModes;
+
+    // What a configuration asked for, as asked -- a scripter's choice, or a
+    // .luaurc's -- and where it asked for none, the solver's own default:
+    // nonstrict for the old one, as the grid compiles, and strict for the
+    // new, whose nonstrict says only what is sure to fail as the script
+    // runs, far less than the old one's.
+    Luau::Mode checkedIn(std::optional<Luau::Mode> asked) const
+    {
+        return asked.value_or(solver == Luau::SolverMode::New ? Luau::Mode::Strict : Luau::Mode::Nonstrict);
+    }
+    // Every kept script's mode, and the one a script with no configuration
+    // yet reads, again for the solver now in use.
+    void remode()
+    {
+        for (auto& [name, config] : configs.configs)
+        {
+            const auto asked = askedModes.find(name);
+            config.mode      = checkedIn(asked != askedModes.end() ? asked->second : std::nullopt);
+        }
+        configs.fallback.mode = checkedIn(std::nullopt);
+    }
     // The modules each kept script requires, by its module's name: what
     // lets a module go once no kept script requires it.
     boost::unordered_flat_map<std::string, std::vector<std::string>, ll::string_hash, std::equal_to<>> requiredBy;
@@ -1484,6 +1508,7 @@ bool ALLuauService::setNewSolver(bool use, std::string& error)
         return true;
     }
     mImpl->solver = solver;
+    mImpl->remode();
     const std::string source = mImpl->definitionsSource;
     // Loaded again whatever they are: into a front end for this solver.
     mImpl->definitions = false;
@@ -1589,8 +1614,14 @@ bool ALLuauService::hasDocs() const
 
 void ALLuauService::setConfig(const ALLuauConfig& config)
 {
-    Impl&            impl = *mImpl;
-    const Luau::Mode mode = config.mode == "strict" ? Luau::Mode::Strict : config.mode == "nocheck" ? Luau::Mode::NoCheck : Luau::Mode::Nonstrict;
+    Impl&                     impl  = *mImpl;
+    std::optional<Luau::Mode> asked;
+    if (!config.mode.empty())
+    {
+        asked = config.mode == "strict" ? Luau::Mode::Strict : config.mode == "nocheck" ? Luau::Mode::NoCheck : Luau::Mode::Nonstrict;
+    }
+    const Luau::Mode mode            = impl.checkedIn(asked);
+    impl.askedModes[impl.moduleName] = asked;
     // The script asked about now's own, told before every question whether
     // or not anything changed: the same configuration leaves what was
     // checked as it is, and another script's is its own.
@@ -1697,6 +1728,7 @@ void ALLuauService::setDocument(std::string_view id)
         std::vector<std::string> clear{ gone };
         impl.files.texts.erase(gone);
         impl.configs.configs.erase(gone);
+        impl.askedModes.erase(gone);
         // Its modules too, where no script kept requires them.
         if (const auto used = impl.requiredBy.find(gone); used != impl.requiredBy.end())
         {
@@ -1898,7 +1930,7 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     if (module_source)
     {
         ALScriptProblems own;
-        const Luau::Config& config = impl.configs.configs[impl.moduleName];
+        const Luau::Config& config = impl.configs.getConfig(impl.moduleName, {});
         ALScriptLintPass::check(source, *module_source, module.get(), impl.slLints, impl.slFatalLints, config.lintErrors, own);
         for (ALScriptProblem& problem : own)
         {

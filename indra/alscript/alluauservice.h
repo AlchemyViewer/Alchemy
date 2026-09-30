@@ -97,8 +97,10 @@ public:
 
     // What the `.luaurc` governing the script says, for every question
     // asked until told otherwise: the mode a check runs in -- "strict",
-    // "nonstrict" or "nocheck", else nonstrict, as the grid does, and a
-    // `--!strict` comment in the script overrides either -- which lints
+    // "nonstrict" or "nocheck", else the solver's own: the old one's
+    // nonstrict, as the grid does, and the new one's strict, its nonstrict
+    // reporting only what is sure to fail; a `--!strict` comment in the
+    // script overrides any of them -- which lints
     // are on and which are errors, and the globals the script may use
     // without declaring. A script with no configuration is given a
     // default-constructed one.

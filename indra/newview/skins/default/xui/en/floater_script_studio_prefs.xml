@@ -1157,10 +1157,10 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="luau_solver"
-             tool_tip="Luau type solver for SLua. New finds different mistakes, may be slower; some messages English only"
+             tool_tip="Luau type solver for SLua. Old is the grid's; New finds different mistakes, may be slower; some messages English only"
              top_delta="-3"
              width="210">
-                <combo_box.item label="Old" name="old" value="old" />
+                <combo_box.item label="Old, as the grid checks" name="old" value="old" />
                 <combo_box.item label="New" name="new" value="new" />
             </combo_box>
             <scroll_list
