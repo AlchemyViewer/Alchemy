@@ -141,6 +141,7 @@ if(AL_BUILD_VIEWER)
     alchattimestamp.cpp
     alcheatcodes.cpp
     alclassifieditem.cpp
+    alcolorpopover.cpp
     alcolorwheelctrl.cpp
     alcolorwheelmodel.cpp
     alcurveeditorctrl.cpp
@@ -1012,6 +1013,7 @@ if(AL_BUILD_VIEWER)
     alchatcommand.h
     alchattimestamp.h
     alclassifieditem.h
+    alcolorpopover.h
     alcolorwheelctrl.h
     alcolorwheelmodel.h
     alcurveeditorctrl.h
