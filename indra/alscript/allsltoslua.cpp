@@ -1236,6 +1236,29 @@ namespace
             {
                 noteOnce(e, "SluaBit32", "bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.");
             }
+            // An &, | or ^ of the same again, one call of them all: bit32's
+            // take as many as are given.
+            if (op == OP_BIT_AND || op == OP_BIT_OR || op == OP_BIT_XOR)
+            {
+                std::string                                   all;
+                const std::function<void(LSLExpression* one)> gather = [&](LSLExpression* one) {
+                    LSLExpression* inner = one;
+                    while (inner->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+                    {
+                        inner = static_cast<LSLParenthesisExpression*>(inner)->getChildExpr();
+                    }
+                    if (inner->getNodeSubType() == NODE_BINARY_EXPRESSION && inner->getOperation() == op)
+                    {
+                        gather(static_cast<LSLBinaryExpression*>(inner)->getLHS());
+                        gather(static_cast<LSLBinaryExpression*>(inner)->getRHS());
+                        return;
+                    }
+                    all += (all.empty() ? "" : ", ") + value(one).text;
+                };
+                gather(lhs);
+                gather(rhs);
+                return { std::string("bit32.") + fn + "(" + all + ")" };
+            }
             return { std::string("bit32.") + fn + "(" + value(lhs).text + ", " + value(rhs).text + ")" };
         };
         switch (op)
@@ -1259,7 +1282,9 @@ namespace
                 {
                     const Expr a = coerced(lhs, LST_STRING);
                     const Expr b = coerced(rhs, LST_STRING);
-                    return { bracketed(a, CONCAT + 1) + " .. " + bracketed(b, CONCAT), CONCAT };
+                    // Joining text is the same whichever way round it goes:
+                    // a chain unbracketed.
+                    return { bracketed(a, CONCAT) + " .. " + bracketed(b, CONCAT), CONCAT };
                 }
                 return infix("+", ADD);
             case OP_MINUS: return infix("-", ADD);
@@ -1581,7 +1606,7 @@ namespace
             std::string          piece;
             for (LSLExpression* part : appended(whole, var))
             {
-                piece += (piece.empty() ? "" : " .. ") + bracketed(coerced(part, LST_STRING), CONCAT + 1);
+                piece += (piece.empty() ? "" : " .. ") + bracketed(coerced(part, LST_STRING), CONCAT);
             }
             if (!piece.empty())
             {
@@ -1597,7 +1622,7 @@ namespace
                 std::string joined;
                 for (LSLExpression* part : parts)
                 {
-                    joined += (joined.empty() ? "" : " .. ") + bracketed(coerced(part, LST_STRING), CONCAT + 1);
+                    joined += (joined.empty() ? "" : " .. ") + bracketed(coerced(part, LST_STRING), CONCAT);
                 }
                 line(name + " ..= " + joined);
                 return;

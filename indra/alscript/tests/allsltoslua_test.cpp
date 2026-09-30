@@ -766,4 +766,20 @@ namespace tut
         ensure("the deprecated call's reason only: " + r.text, has(r, "-- LSL: SLua deprecates ll.List2String") && !has(r, "takes indexes from 0"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<25>()
+    {
+        set_test_name("flatter expressions: text joined in a chain without brackets, and an &, | or ^ of the same again one bit32 call");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    string b = \"b\"; integer n = 3; integer f = 5;\n"
+                                              "    llOwnerSay(\"a\" + b + \"c\" + (string)n);\n"
+                                              "    llSetTextureAnim(ANIM_ON | ROTATE | LOOP, ALL_SIDES, 0, 0, 0, TWO_PI, 1.0);\n"
+                                              "    llOwnerSay((string)((f | 2) & n));\n"
+                                              "} }\n");
+        ensure("a chain: " + r.text, has(r, "print(\"a\" .. b .. \"c\" .. tostring(n))"));
+        ensure("one call: " + r.text, has(r, "ll.SetTextureAnim(bit32.bor(ANIM_ON, ROTATE, LOOP), ALL_SIDES"));
+        ensure("not across operators: " + r.text, has(r, "bit32.band(bit32.bor(f, 2), n)"));
+        checksClean(r);
+    }
 }
