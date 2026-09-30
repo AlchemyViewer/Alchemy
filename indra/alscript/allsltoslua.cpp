@@ -324,6 +324,30 @@ namespace
         // is the append it meant.
         void forgetMemoryHacks();
 
+        // --- lists grown in place --------------------------------------------------
+
+        // The list variables no other holds, which may be grown in place:
+        // only ever given a new list, and never handed on whole -- to
+        // another variable, a function of the script's own that keeps it, or
+        // a return but a local's, which ends with it -- nor set where the
+        // assignment's value is used. Those that are not, with why, for the
+        // note. And the list parameters that only borrow: never set, and
+        // never handed on, so a list passed to one is not kept.
+        void findOwnedLists();
+        bool owned(LSLSymbol* var) const { return var && mOwned.contains(var); }
+        // What makes a list no other holds: [...], a library call, +, a cast
+        // to a list, a local list no other holds, or a call to a function of
+        // the script's own that only ever returns one of those.
+        bool fresh(LSLExpression* e) const;
+        // Why a read of a list hands the list itself on, or null where it
+        // does not.
+        const char* handedOn(LSLASTNode* read) const;
+        // l += x, l += [x, y], l += other, l = l + x and l = x + l written
+        // as table.insert or table.move on l; false where it is none of
+        // them, l is held elsewhere -- noted, with why -- or what is added
+        // could change l.
+        bool grow(LSLLValueExpression* target, const std::string& name, LSLOperator op, LSLExpression* rhs);
+
         // --- the script -------------------------------------------------------------
 
         void globals();
@@ -384,6 +408,11 @@ namespace
         // The assignments whose clearing was taken out, noted as each is
         // written.
         boost::unordered_flat_set<LSLASTNode*> mFreedFirst;
+        boost::unordered_flat_set<LSLSymbol*>  mOwned;
+        boost::unordered_flat_set<LSLSymbol*>  mFreshFunctions;
+        boost::unordered_flat_set<LSLSymbol*>  mBorrows;
+        // Why a list variable is not one of mOwned.
+        boost::unordered_flat_map<LSLSymbol*, const char*> mSharedWhy;
     };
 
     void Writer::note(LSLASTNode* at, const std::string& key, const std::string& said)
@@ -1311,6 +1340,10 @@ namespace
                 out += (i ? ", " : "") + (part == parts[i] ? made(each, LST_FLOATINGPOINT) : each);
             }
             line(name + " = " + out + ")");
+            return;
+        }
+        if (type == LST_LIST && (op == OP_ADD_ASSIGN || op == OP_ASSIGN) && grow(target, name, op, rhs))
+        {
             return;
         }
         // Luau's compound assignments where they mean LSL's.
@@ -2267,6 +2300,378 @@ namespace
         }
     }
 
+    // --- lists grown in place -----------------------------------------------------------
+
+    bool Writer::fresh(LSLExpression* e) const
+    {
+        e = unwrapped(e);
+        if (!e)
+        {
+            return false;
+        }
+        switch (e->getNodeSubType())
+        {
+            case NODE_LIST_EXPRESSION:
+            case NODE_CONSTANT_EXPRESSION: return true;
+            case NODE_BINARY_EXPRESSION: return e->getOperation() == OP_PLUS;
+            // The same type is written as the value itself.
+            case NODE_TYPECAST_EXPRESSION: return static_cast<LSLTypecastExpression*>(e)->getChildExpr()->getIType() != LST_LIST;
+            case NODE_FUNCTION_EXPRESSION:
+            {
+                LSLSymbol* symbol = static_cast<LSLFunctionExpression*>(e)->getIdentifier()->getSymbol();
+                return symbol && (symbol->getSubType() == SYM_BUILTIN || mFreshFunctions.contains(symbol));
+            }
+            case NODE_LVALUE_EXPRESSION:
+            {
+                LSLSymbol* var = wholeVariable(e);
+                return owned(var) && var->getSubType() == SYM_LOCAL;
+            }
+            default: return false;
+        }
+    }
+
+    const char* Writer::handedOn(LSLASTNode* read) const
+    {
+        // Up through brackets, and casts to what it already is.
+        LSLASTNode* node   = read;
+        LSLASTNode* parent = node->getParent();
+        while (parent && (parent->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION ||
+                          (parent->getNodeSubType() == NODE_TYPECAST_EXPRESSION && parent->getIType() == LST_LIST)))
+        {
+            node   = parent;
+            parent = parent->getParent();
+        }
+        if (!parent)
+        {
+            return nullptr;
+        }
+        const int slot = node->getParentSlot();
+        switch (parent->getNodeSubType())
+        {
+            case NODE_BINARY_EXPRESSION:
+                return static_cast<LSLExpression*>(parent)->getOperation() == OP_ASSIGN && slot == 1 ? "given to another variable"
+                                                                                                        : nullptr;
+            case NODE_DECLARATION: return slot == 1 ? "given to another variable" : nullptr;
+            case NODE_RETURN_STATEMENT:
+                return readOf(read) && readOf(read)->getSubType() == SYM_LOCAL ? nullptr : "returned by a function";
+            default:
+                if (parent->getNodeType() == NODE_GLOBAL_VARIABLE)
+                {
+                    return slot == 1 ? "given to another variable" : nullptr;
+                }
+                if (parent->getNodeType() == NODE_AST_NODE_LIST && parent->getParent() &&
+                    parent->getParent()->getNodeSubType() == NODE_FUNCTION_EXPRESSION && readOf(parent->getParent()))
+                {
+                    // Not where the parameter it is passed to only borrows it.
+                    LSLParamList* params = readOf(parent->getParent())->getFunctionDecl();
+                    LSLASTNode*   param  = params ? params->getChild(slot) : nullptr;
+                    if (!isNull(param) && mBorrows.contains(static_cast<LSLIdentifier*>(param)->getSymbol()))
+                    {
+                        return nullptr;
+                    }
+                    return "passed to a function of the script's that keeps it";
+                }
+                return nullptr;
+        }
+    }
+
+    void Writer::findOwnedLists()
+    {
+        // Every list the script declares and every function of its own that
+        // answers one, then each let go of that is given, or hands on, a
+        // list another may hold, until none is.
+        std::vector<LSLASTNode*>                           reads;
+        std::vector<std::pair<LSLSymbol*, LSLExpression*>> sets;
+        const auto candidate = [&](LSLIdentifier* id, LSLExpression* init) {
+            if (id->getIType() == LST_LIST && id->getSymbol())
+            {
+                mOwned.insert(id->getSymbol());
+                if (!isNull(init))
+                {
+                    sets.emplace_back(id->getSymbol(), init);
+                }
+            }
+        };
+        const auto letGo = [&](LSLSymbol* symbol, const char* why) {
+            mSharedWhy.emplace(symbol, why);
+            return mOwned.erase(symbol) + mFreshFunctions.erase(symbol) + mBorrows.erase(symbol) != 0;
+        };
+        walk(mScript, [&](LSLASTNode* node) {
+            if (node->getNodeType() == NODE_GLOBAL_VARIABLE)
+            {
+                auto* global = static_cast<LSLGlobalVariable*>(node);
+                candidate(global->getIdentifier(), global->getInitializer());
+            }
+            else if (node->getNodeType() == NODE_GLOBAL_FUNCTION)
+            {
+                auto* f = static_cast<LSLGlobalFunction*>(node);
+                if (f->getIdentifier()->getIType() == LST_LIST && f->getSymbol())
+                {
+                    mFreshFunctions.insert(f->getSymbol());
+                }
+                LSLASTNode* params = f->getArguments();
+                for (LSLASTNode* param = params ? params->getChild(0) : nullptr; !isNull(param); param = param->getNext())
+                {
+                    if (param->getIType() == LST_LIST && static_cast<LSLIdentifier*>(param)->getSymbol())
+                    {
+                        mBorrows.insert(static_cast<LSLIdentifier*>(param)->getSymbol());
+                    }
+                }
+            }
+            else if (node->getNodeSubType() == NODE_DECLARATION)
+            {
+                auto* declaration = static_cast<LSLDeclaration*>(node);
+                candidate(declaration->getIdentifier(), declaration->getInitializer());
+            }
+            else if (node->getNodeSubType() == NODE_RETURN_STATEMENT)
+            {
+                LSLExpression* e = static_cast<LSLReturnStatement*>(node)->getExpr();
+                if (LSLSymbol* f = enclosingFunction(node); f && !isNull(e))
+                {
+                    sets.emplace_back(f, e);
+                }
+            }
+            else if (node->getNodeSubType() == NODE_LVALUE_EXPRESSION && node->getIType() == LST_LIST &&
+                     wholeVariable(static_cast<LSLExpression*>(node)))
+            {
+                reads.push_back(node);
+            }
+        });
+        // After every declaration, which a function may come before.
+        walk(mScript, [&](LSLASTNode* node) {
+            LSLSymbol* var = setBy(node);
+            if (!var)
+            {
+                return;
+            }
+            // A parameter set holds a list of its own.
+            mBorrows.erase(var);
+            if (valueUsed(node))
+            {
+                letGo(var, "set where the assignment's value is used");
+            }
+            else if (static_cast<LSLExpression*>(node)->getOperation() == OP_ASSIGN)
+            {
+                sets.emplace_back(var, static_cast<LSLBinaryExpression*>(node)->getRHS());
+            }
+        });
+        // A global read where a call of the script's in the same statement
+        // may change it: Luau would hold the list itself, grown by the call,
+        // where LSL held a copy.
+        for (LSLASTNode* read : reads)
+        {
+            LSLSymbol* var = readOf(read);
+            if (!var || var->getSubType() != SYM_GLOBAL || assignedBy(read))
+            {
+                continue;
+            }
+            LSLASTNode* whole = read;
+            while (whole->getParent() && (whole->getParent()->getNodeType() == NODE_EXPRESSION ||
+                                          (whole->getParent()->getNodeType() == NODE_AST_NODE_LIST && whole->getParent()->getParent() &&
+                                           whole->getParent()->getParent()->getNodeType() == NODE_EXPRESSION)))
+            {
+                whole = whole->getParent();
+            }
+            bool changes = false;
+            walk(whole, [&](LSLASTNode* node) {
+                if (LSLSymbol* f = node->getNodeSubType() == NODE_FUNCTION_EXPRESSION ? readOf(node) : nullptr)
+                {
+                    changes = changes || mEffects.ofFunction(f).writes(var);
+                }
+            });
+            if (changes)
+            {
+                letGo(var, "read where a call of the script's in the same statement changes it");
+            }
+        }
+        for (bool changed = true; changed;)
+        {
+            changed = false;
+            for (const auto& [symbol, e] : sets)
+            {
+                if ((mOwned.contains(symbol) || mFreshFunctions.contains(symbol)) && !fresh(e))
+                {
+                    changed = letGo(symbol, "given a list another may hold") || changed;
+                }
+            }
+            for (LSLASTNode* read : reads)
+            {
+                LSLSymbol* var = readOf(read);
+                if ((owned(var) || mBorrows.contains(var)) && !assignedBy(read))
+                {
+                    if (const char* why = handedOn(read))
+                    {
+                        changed = letGo(var, why) || changed;
+                    }
+                }
+            }
+        }
+    }
+
+    bool Writer::grow(LSLLValueExpression* target, const std::string& name, LSLOperator op, LSLExpression* rhs)
+    {
+        LSLSymbol* var = target->getIdentifier()->getSymbol();
+        // What is added, in order, and whether before: l += more, l = l + a
+        // + b ..., l = more + l.
+        std::vector<LSLExpression*> parts;
+        bool                        before = false;
+        if (op == OP_ADD_ASSIGN)
+        {
+            parts.push_back(rhs);
+        }
+        else
+        {
+            LSLExpression* sum = unwrapped(rhs);
+            while (sum && sum->getNodeSubType() == NODE_BINARY_EXPRESSION && sum->getOperation() == OP_PLUS)
+            {
+                auto* b = static_cast<LSLBinaryExpression*>(sum);
+                parts.insert(parts.begin(), b->getRHS());
+                sum = unwrapped(b->getLHS());
+            }
+            if (wholeVariable(sum) != var)
+            {
+                parts.clear();
+                LSLExpression* one = unwrapped(rhs);
+                if (one && one->getNodeSubType() == NODE_BINARY_EXPRESSION && one->getOperation() == OP_PLUS &&
+                    wholeVariable(static_cast<LSLBinaryExpression*>(one)->getRHS()) == var)
+                {
+                    parts.push_back(static_cast<LSLBinaryExpression*>(one)->getLHS());
+                    before = true;
+                }
+            }
+        }
+        if (parts.empty())
+        {
+            return false;
+        }
+        if (!owned(var))
+        {
+            // Why each + makes a new list of it.
+            const auto why = mSharedWhy.find(var);
+            if (why != mSharedWhy.end() && mOnce.insert("SluaListCopy " + name).second)
+            {
+                note(target, "SluaListCopy",
+                     "LSL's lists were values, and " + name + " is " + why->second +
+                         ", so each + makes a new list of it, as LSL did. Where nothing else holds it, table.insert(" + name +
+                         ", x) grows it in place.");
+            }
+            return false;
+        }
+        const auto readsList = [&](LSLASTNode* e) {
+            bool reads = false;
+            walk(e, [&](LSLASTNode* node) { reads = reads || (node->getNodeSubType() == NODE_LVALUE_EXPRESSION && readOf(node) == var); });
+            return reads;
+        };
+        // What runs apart from the rest: changes nothing, and reads not l.
+        const auto apart = [&](LSLASTNode* e) { return ALLSLTraits::sideEffectFree(e) && !readsList(e); };
+
+        // Each part, as what it adds: one value, the items of a list
+        // written out, another list by its name, or any other list.
+        enum class Kind
+        {
+            Value,
+            Items,
+            Named,
+            Other
+        };
+        struct Part
+        {
+            Kind                     kind;
+            LSLExpression*           e;
+            std::vector<LSLASTNode*> items;
+            bool                     apart = true;
+        };
+        std::vector<Part> shaped;
+        for (LSLExpression* e : parts)
+        {
+            // What could set l itself would leave the insert on a list it
+            // no longer is; several parts must each run apart.
+            if (mEffects.of(e).writes(var) || (parts.size() > 1 && !apart(e)))
+            {
+                return false;
+            }
+            LSLExpression* m = unwrapped(e);
+            Part           part{ Kind::Other, e, {} };
+            if (e->getIType() != LST_LIST)
+            {
+                part.kind = Kind::Value;
+            }
+            else if (m->getNodeSubType() == NODE_LIST_EXPRESSION)
+            {
+                part.kind = Kind::Items;
+                for (LSLASTNode* item = m->getChild(0); !isNull(item); item = item->getNext())
+                {
+                    part.items.push_back(item);
+                    part.apart = part.apart && apart(item);
+                }
+            }
+            else if (m->getNodeSubType() == NODE_CONSTANT_EXPRESSION && m->getChild(0)->getNodeSubType() == NODE_LIST_CONSTANT)
+            {
+                part.kind = Kind::Items;
+                for (LSLConstant* item = static_cast<LSLListConstant*>(m->getChild(0))->getValue(); item;
+                     item = static_cast<LSLConstant*>(item->getNext()))
+                {
+                    part.items.push_back(item);
+                }
+            }
+            else if (wholeVariable(m))
+            {
+                part.kind = Kind::Named;
+            }
+            // Before l, only one value.
+            if ((part.kind == Kind::Items && part.items.empty()) ||
+                (before && !(part.kind == Kind::Value || (part.kind == Kind::Items && part.items.size() == 1))))
+            {
+                return false;
+            }
+            shaped.push_back(std::move(part));
+        }
+        const std::string at   = before ? ", 1, " : ", ";
+        const auto        text = [&](LSLASTNode* item) {
+            return item->getNodeType() == NODE_CONSTANT ? constant(static_cast<LSLConstant*>(item)).text
+                                                        : value(static_cast<LSLExpression*>(item)).text;
+        };
+        for (const Part& part : shaped)
+        {
+            switch (part.kind)
+            {
+                case Kind::Value: line("table.insert(" + name + at + value(part.e).text + ")"); break;
+                case Kind::Items:
+                    if (part.items.size() == 1 || part.apart)
+                    {
+                        for (LSLASTNode* item : part.items)
+                        {
+                            line("table.insert(" + name + at + text(item) + ")");
+                        }
+                    }
+                    else
+                    {
+                        line("table.move(" + expr(part.e).text + ", 1, " + std::to_string(part.items.size()) + ", #" + name + " + 1, " +
+                             name + ")");
+                    }
+                    break;
+                case Kind::Named:
+                {
+                    // Which may be l itself: table.move copies as memmove.
+                    const std::string other = expr(unwrapped(part.e)).text;
+                    line("table.move(" + other + ", 1, #" + other + ", #" + name + " + 1, " + name + ")");
+                    break;
+                }
+                case Kind::Other:
+                {
+                    const std::string each = name == "item" ? "value" : "item";
+                    line("for _, " + each + " in " + expr(part.e).text + " do");
+                    ++mDepth;
+                    line("table.insert(" + name + ", " + each + ")");
+                    --mDepth;
+                    line("end");
+                    break;
+                }
+            }
+        }
+        return true;
+    }
+
     // --- the script -------------------------------------------------------------------
 
     void Writer::globals()
@@ -2632,6 +3037,7 @@ end
         });
         forgetMemoryHacks();
         findBooleans();
+        findOwnedLists();
         if (mManyStates)
         {
             statesPreamble();

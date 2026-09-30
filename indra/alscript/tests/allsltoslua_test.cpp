@@ -145,7 +145,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<2>()
     {
-        set_test_name("expressions: conditions as LSL reads them, comparisons as 1 or 0 where they are numbers, integer division and remainder noted, lists joined and measured");
+        set_test_name("expressions: conditions as LSL reads them, comparisons as 1 or 0 where they are numbers, integer division and remainder noted, lists grown and measured");
         const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
                                               "    integer a = 7; integer b = 2; float f = 1.5; string s = \"x\"; list l = [1, 2];\n"
                                               "    integer same = a == b;\n"
@@ -167,7 +167,8 @@ namespace tut
         ensure("and: " + r.text, has(r, "if a > 1 and #l > 1 then"));
         ensure("integer division: " + r.text, has(r, "local q = a // b") && noted(r, "SluaIntegerDivision"));
         ensure("remainder: " + r.text, has(r, "local m = a % b") && noted(r, "SluaModulo"));
-        ensure("lists joined: " + r.text, has(r, "l = joinLists(l, {3})") && has(r, "local function joinLists"));
+        ensure("a list no other holds grown in place: " + r.text, has(r, "table.insert(l, 3)") && has(r, "table.insert(l, 4)") &&
+                                                                    has(r, "table.insert(l, \"five\")") && !has(r, "joinLists"));
         ensure("TRUE and FALSE: " + r.text, has(r, "local t = 1") && has(r, "if false then"));
         ensure("a float as LSL writes it: " + r.text, has(r, "string.format(\"%.6f\", f)"));
         ensure("a string as an integer: " + r.text, has(r, "lslInteger(\"12abc\")") && has(r, "local function lslInteger"));
@@ -418,8 +419,8 @@ namespace tut
                                               "    gLog = (gLog = \"\") + gLog + \"b\";\n"
                                               "    llOwnerSay(gLog + (string)llGetListLength(gItems));\n"
                                               "} }\n");
-        ensure("appended: " + r.text, has(r, "gItems = joinLists(gItems, {\"x\"})"));
-        ensure("prepended: " + r.text, has(r, "gItems = joinLists({\"y\"}, gItems)"));
+        ensure("appended: " + r.text, has(r, "table.insert(gItems, \"x\")"));
+        ensure("prepended: " + r.text, has(r, "table.insert(gItems, 1, \"y\")"));
         ensure("a string: " + r.text, has(r, "gLog = gLog .. \"b\""));
         ensure("nothing cleared first: " + r.text, !has(r, "gItems = {} return") && !has(r, "gLog = \"\" return"));
         ensure("noted once for each variable: " + r.text, noted(r, "SluaMemoryHack") && count(r, "-- LSL: (gItems = []) + gItems") == 1 &&
@@ -449,5 +450,56 @@ namespace tut
                                                   "} }\n");
         ensure("nothing either side changes the other reads: " + quiet.text, !noted(quiet, "SluaRightFirst"));
         checksClean(quiet);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<14>()
+    {
+        set_test_name("lists no other holds grown in place: appended, prepended, by a list's name, by a call, several at once, passed to a function that only reads it; a list handed on keeps LSL's copy, and says why");
+        const ALLSLToSLua::Result r = convert("list gAll;\n"
+                                              "list gSeen;\n"
+                                              "list gPassed;\n"
+                                              "list gStored;\n"
+                                              "list gGrown;\n"
+                                              "integer addOne() { gGrown += [1]; return 1; }\n"
+                                              "list gKept = [1];\n"
+                                              "list parts(string s) { list out = llParseString2List(s, [\",\"], []); out += [\"end\"]; return out; }\n"
+                                              "list kept() { return gKept; }\n"
+                                              "show(list l) { llOwnerSay(llDumpList2String(l, \",\")); }\n"
+                                              "showAll(list l) { show(l); }\n"
+                                              "keep(list l) { gStored = l; }\n"
+                                              "keepLater(list l) { keep(l); }\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    gAll = parts(\"a,b\");\n"
+                                              "    gAll += parts(\"c\");\n"
+                                              "    gAll = [\"first\"] + gAll;\n"
+                                              "    list more = [4, 5];\n"
+                                              "    gAll += more;\n"
+                                              "    gAll += [llGetTime(), llFrand(1.0)];\n"
+                                              "    gSeen += [n];\n"
+                                              "    showAll(gSeen);\n"
+                                              "    gPassed += [n];\n"
+                                              "    keepLater(gPassed);\n"
+                                              "    gKept += [2];\n"
+                                              "    list a = [1]; list b = a; a += [2];\n"
+                                              "    show(llListInsertList(gGrown, [addOne()], 0));\n"
+                                              "    show(kept() + b + a + gAll + gStored);\n"
+                                              "} }\n");
+        ensure("a local returned, grown in place: " + r.text, has(r, "local out = ll.ParseString2List(s, {\",\"}, {})") && has(r, "table.insert(out, \"end\")"));
+        ensure("a call's list, each put in: " + r.text, has(r, "gAll = parts(\"a,b\")") && has(r, "for _, item in parts(\"c\") do") &&
+                                                         has(r, "    table.insert(gAll, item)"));
+        ensure("prepended: " + r.text, has(r, "table.insert(gAll, 1, \"first\")"));
+        ensure("a list by its name: " + r.text, has(r, "table.move(more, 1, #more, #gAll + 1, gAll)"));
+        ensure("several that do not run apart: " + r.text, has(r, "table.move({ll.GetTime(), ll.Frand(1.0)}, 1, 2, #gAll + 1, gAll)"));
+        ensure("passed to a function that only reads it: " + r.text, has(r, "table.insert(gSeen, n)"));
+        ensure("passed to one that keeps it: " + r.text,
+               has(r, "gPassed = joinLists(gPassed, {n})") &&
+                   has(r, "-- LSL: LSL's lists were values, and gPassed is passed to a function of the script's that keeps it"));
+        ensure("returned: " + r.text, has(r, "gKept = joinLists(gKept, {2})") && has(r, "gKept is returned by a function"));
+        ensure("given to another: " + r.text, has(r, "a = joinLists(a, {2})") && has(r, "a is given to another variable"));
+        ensure("read where a call in the statement grows it: " + r.text,
+               has(r, "gGrown = joinLists(gGrown, {1})") && has(r, "gGrown is read where a call of the script's in the same statement changes it"));
+        ensure("said once for each: " + r.text, count(r, "and gPassed is") == 1);
+        checksClean(r);
     }
 }
