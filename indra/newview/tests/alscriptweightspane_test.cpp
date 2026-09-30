@@ -27,6 +27,7 @@
 #include "../alscriptweightspane.h"
 
 #include "alpanelist.h"
+#include "alrecoverystore.h"
 #include "llfloater.h"
 #include "llpanel.h"
 #include "llscrolllistitem.h"
@@ -330,5 +331,37 @@ namespace tut
         const std::string names = joined(column(list("weights_parts"), 0));
         ensure("the handler by its event: " + names, names.find("touch_start") != std::string::npos);
         ensure("the other with none: " + names, names.find(window.find<LLPanel>("weights_tab")->getString("WeightsPartUnnamed")) != std::string::npos);
+    }
+
+    // What the region reserves for the script's object, where it has said:
+    // after the code's size, for all of the object's scripts, with its URLs
+    // where it has any; and the tip saying how the region counts.
+    template<> template<>
+    void alscriptweightspane_object::test<7>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALScriptWeightsPane&       pane  = weights();
+        ALScriptWeightsPane::Shown shown = lsl();
+        LLTextBox*                 head  = floater->findChild<LLTextBox>("weights_head", true);
+        pane.show(shown);
+        ensure("nothing of the region", head->getText().find("region") == std::string::npos);
+        ALScriptRegionUsage::Usage reserved;
+        reserved.memory = 131072;
+        reserved.when   = LLDate(1.8e9);
+        shown.region    = reserved;
+        shown.id        = "script-2";
+        pane.show(shown);
+        const std::string said = head->getText();
+        ensure("reserved, in KB" + said, said.find("reserves 128 KB for all its scripts") != std::string::npos);
+        ensure("as of when" + said, said.find(ALRecoveryEntry::sayWhen(reserved.when)) != std::string::npos);
+        ensure("no URLs said where there are none" + said, said.find("URLs") == std::string::npos);
+        ensure("the tip says how it counts", head->getToolTip().find("64 KB for Mono") != std::string::npos);
+        shown.region->urls = 3;
+        shown.id           = "script-3";
+        pane.show(shown);
+        ensure("and URLs where there are" + head->getText(), head->getText().find("128 KB and 3 URLs") != std::string::npos);
     }
 }

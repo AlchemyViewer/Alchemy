@@ -653,6 +653,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="WeightsHeadBefore">Measured before the preprocessor's optimizer, which runs on save.</floater.string>
     <floater.string name="WeightsHeadSent">Measured before the preprocessor's optimizer. As saved, it is [SENT,number,1] KB.</floater.string>
     <floater.string name="WeightsHeadTip">Code size only, not counting the lists and strings the script builds while it runs.</floater.string>
+    <floater.string name="WeightsHeadRegion">In the region, its object reserves [RESERVED,number,0] KB for all its scripts, as of [WHEN].</floater.string>
+    <floater.string name="WeightsHeadRegionUrls">In the region, its object reserves [RESERVED,number,0] KB and [URLS] URLs for all its scripts, as of [WHEN].</floater.string>
+    <floater.string name="WeightsHeadRegionTip">Code size only, not counting the lists and strings the script builds while it runs. The region counts the memory of every script in the object, each at its limit (64 KB for Mono unless llSetMemoryLimit lowers it), not what it uses.</floater.string>
+    <floater.string name="ExplorerReserved">[RESERVED,number,0] KB reserved</floater.string>
     <floater.string name="WeightsTargetTip">[TARGET]: [BYTES] bytes of code, of [MAX] bytes of memory.</floater.string>
     <floater.string name="WeightsTargetEstimateTip">[TARGET]: about [BYTES] bytes of code, of [MAX] bytes of memory, estimated from the compiled code.</floater.string>
     <floater.string name="WeightsTargetFailedTip">Does not compile for [TARGET]: [ERROR]</floater.string>

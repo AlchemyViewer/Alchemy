@@ -27,6 +27,7 @@
 #include "alscriptweightspane.h"
 
 #include "alpanelist.h"
+#include "alrecoverystore.h"
 #include "llfloater.h"
 #include "llpanel.h"
 #include "llscrolllistitem.h"
@@ -306,8 +307,15 @@ void ALScriptWeightsPane::fillParts()
             head += " " + mStrings->getString("WeightsHeadBefore");
         }
     }
+    if (mShown.region)
+    {
+        args["[RESERVED]"] = llformat("%f", (F64)mShown.region->memory / 1024.0);
+        args["[URLS]"]     = std::to_string(mShown.region->urls);
+        args["[WHEN]"]     = ALRecoveryEntry::sayWhen(mShown.region->when);
+        head += " " + mStrings->getString(mShown.region->urls > 0 ? "WeightsHeadRegionUrls" : "WeightsHeadRegion", args);
+    }
     mHead->setText(head);
-    mHead->setToolTip(mStrings->getString("WeightsHeadTip"));
+    mHead->setToolTip(mStrings->getString(mShown.region ? "WeightsHeadRegionTip" : "WeightsHeadTip"));
 
     // Each part, with how it moved since the text was last saved, where it
     // was weighed for this target then.

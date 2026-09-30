@@ -42,6 +42,7 @@
 #include "alscriptinventoryindex.h"
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
+#include "alscriptregionusage.h"
 #include "alscriptweightspane.h"
 #include "alscriptstudiofileio.h"
 #include "alscriptstudioglue.h"
@@ -823,6 +824,9 @@ void ALFloaterScriptStudio::listenToWorkspace()
     mCompiledConnection =
         ALScriptWorkspace::instance().onCompiled([this](const ALScriptCompileResult& result) { mSaving.compiled(result); });
     mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptSaved& saved) { mSaving.savedElsewhere(saved); });
+    // What the region said an object reserves: the Weights tab says it
+    // again, with what came.
+    mRegionUsageConnection = ALScriptWorkspace::instance().regionUsage().onHeard([this]() { mWeighing.stale(); });
     // New definitions from the region: the analyzers reload, the words
     // are rebuilt, and every script is checked again.
     mDefinitionsConnection = LLSyntaxDefCache::instance().addSyntaxIDCallback([this]() {
@@ -6126,6 +6130,21 @@ void ALFloaterScriptStudio::compareItems(const ALScriptRef& first, const std::st
             studio->comparePending(*found);
         }
     });
+}
+
+std::optional<ALScriptRegionUsage::Usage> ALFloaterScriptStudio::regionOf(const Doc& doc)
+{
+    // Of the object the script is in, by its root, as the region counts.
+    const LLViewerObject* prim = doc.ref.inInventory() || !doc.file.empty() ? nullptr : gObjectList.findObject(doc.ref.object);
+    if (!prim)
+    {
+        return std::nullopt;
+    }
+    const LLViewerObject* root  = prim->getRootEdit() ? prim->getRootEdit() : prim;
+    ALScriptRegionUsage&  usage = ALScriptWorkspace::instance().regionUsage();
+    usage.ask({ root->getID() }, LLTimer::getTotalSeconds());
+    const ALScriptRegionUsage::Usage* said = usage.usageOf(root->getID());
+    return said ? std::optional<ALScriptRegionUsage::Usage>(*said) : std::nullopt;
 }
 
 void ALFloaterScriptStudio::showHistory(const ALScriptRef& ref, const std::string& name)

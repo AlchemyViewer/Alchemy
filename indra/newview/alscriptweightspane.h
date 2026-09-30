@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alscriptregionusage.h"
 #include "alscriptweight.h"
 #include "llpanel.h"
 #include "llstl.h"
@@ -72,6 +73,10 @@ public:
         // stands: the event a handler is put on, as the outline lists it,
         // by the line the function starts on.
         boost::unordered_flat_map<S32, std::string> handlers;
+        // What the region reserves for the script's object, as it last
+        // said: memory for all the object's scripts, not this one's alone,
+        // counted at their limits; and when it said so.
+        std::optional<ALScriptRegionUsage::Usage> region;
     };
     // Where a part is: in the script shown where `file` is empty, else in
     // that include.

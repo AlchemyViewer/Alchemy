@@ -26,6 +26,7 @@
 
 #include "alcodeeditor.h"
 #include "alscriptanalysis.h"
+#include "alscriptregionusage.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptweight.h"
 
@@ -100,6 +101,10 @@ public:
         // The Weights tab: whether it is looked at, and the pane.
         virtual bool                 weightsShown() const = 0;
         virtual ALScriptWeightsPane* weightsPane()        = 0;
+        // What the region reserves for a tab's script's object, as it last
+        // said, and asked again where that is old; nothing where it has not
+        // said, or the script is in no object.
+        virtual std::optional<ALScriptRegionUsage::Usage> regionOf(const Doc&) { return std::nullopt; }
 
     protected:
         ~Window() = default;

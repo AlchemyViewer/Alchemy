@@ -31,6 +31,7 @@
 #include "alobjectproperties.h"
 #include "alpanefolds.h"
 #include "alscriptexplorertree.h"
+#include "alscriptregionusage.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudiopane.h"
 #include "alscriptstudioservices.h"
@@ -273,6 +274,8 @@ bool ALScriptExplorerPane::postBuild()
     // window's.
     mHeardConnection = ALScriptWorkspace::instance().contentsIndex().onHeard(
         [this](const ALScriptContents& contents) { contentsHeard(contents); });
+    // What the region said the objects reserve, beside their names.
+    mRegionUsageConnection = ALScriptWorkspace::instance().regionUsage().onHeard([this]() { fillSoon(); });
     // An object it lists, or would list in sight, coming or going: a pin in
     // sight again after a teleport, one taken back into the inventory.
     mPresenceConnection = gObjectList.onPresence([this](const LLUUID& id, bool) {
@@ -519,7 +522,19 @@ void ALScriptExplorerPane::fill()
     const std::string running_no  = said("RunningNo");
     const std::string no_modify   = said("NoModifyMark");
     const std::string no_copy     = said("NoCopyMark");
-    const auto        look        = [&](const Model::Row& row) {
+    // What the region reserves for each object in sight, asked for as it
+    // is listed -- once a minute at most -- and said once it has answered.
+    ALScriptRegionUsage& usage = ALScriptWorkspace::instance().regionUsage();
+    std::vector<LLUUID>  roots;
+    for (const Model::Row& row : rows)
+    {
+        if (row.kind == Model::Row::Kind::Object && row.present)
+        {
+            roots.push_back(row.value["root"].asUUID());
+        }
+    }
+    usage.ask(roots, mFilled);
+    const auto look = [&](const Model::Row& row) {
         ALScriptExplorerTree::Look out;
         switch (row.kind)
         {
@@ -535,6 +550,12 @@ void ALScriptExplorerPane::fill()
                 out.suffix = row.present         ? LLStringUtil::null
                              : row.region.empty() ? away
                                                   : bracketed(mServices->words("KindAwayIn", where));
+                if (const ALScriptRegionUsage::Usage* reserved = row.present ? usage.usageOf(row.value["root"].asUUID()) : nullptr)
+                {
+                    LLStringUtil::format_map_t size;
+                    size["[RESERVED]"] = llformat("%f", (F64)reserved->memory / 1024.0);
+                    out.suffix += bracketed(mServices->words("ExplorerReserved", size));
+                }
                 out.icon   = row.many ? "Inv_Object_Multi" : "Inv_Object";
                 break;
             }

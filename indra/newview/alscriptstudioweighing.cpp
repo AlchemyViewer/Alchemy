@@ -494,6 +494,7 @@ void ALScriptStudioWeighing::refreshPane()
     shown.name    = doc->name;
     shown.weights = doc->weighing->all;
     shown.saved   = doc->weighing->saved;
+    shown.region  = mWindow.regionOf(*doc);
     for (const ALScriptOutlineEntry& entry : doc->outline)
     {
         if (entry.kind == ALScriptSymbolKind::Event)

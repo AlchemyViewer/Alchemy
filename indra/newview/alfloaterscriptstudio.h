@@ -718,6 +718,7 @@ private:
     bool        weightNotes() const override { return mWeightNotes; }
     bool        weightHeat() const override { return mWeightHeat; }
     ALScriptWeightsPane* weightsPane() override { return mWeightsPane; }
+    std::optional<ALScriptRegionUsage::Usage> regionOf(const Doc& doc) override;
     // What saving (ALScriptStudioSaving) asks of the window: how saves go,
     // as the settings say; a tab tidied, its text sent, and the Problems
     // tab shown.
@@ -1200,6 +1201,8 @@ private:
     ALScriptStudioRecovery             mRecovery{ *this, *this, *this };
     // What its items were saved as before, to compare and put back.
     ALScriptStudioHistory              mHistory{ *this, *this };
+    // What the region said an object reserves, heard.
+    boost::signals2::scoped_connection mRegionUsageConnection;
     // Saving and compiling the tabs.
     ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, mExternal, mWeighing, mRecovery, mFiles, mOrphans, *this };
     // The window's side of vim, over its editors.

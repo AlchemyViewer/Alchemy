@@ -247,5 +247,6 @@ private:
     boost::signals2::scoped_connection mSelectionConnection;
     boost::signals2::scoped_connection mRunningConnection;
     boost::signals2::scoped_connection mHeardConnection;
+    boost::signals2::scoped_connection mRegionUsageConnection;
     boost::signals2::scoped_connection mPresenceConnection;
 };
