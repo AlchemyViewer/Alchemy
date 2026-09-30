@@ -946,11 +946,21 @@ namespace
         const ALLSLTraits::Trait* trait   = ALLSLTraits::of(lsl.c_str());
         const U8                  slua    = trait ? trait->slua : 0;
         const U16                 indexes = trait ? trait->sluaIndexArgs : 0;
+        // One SLua has nowhere: said, and its type's empty value in its
+        // place where what it answered is read (Writer::effect leaves a
+        // call alone out).
+        if (slua & ALLSLTraits::SluaAbsent)
+        {
+            noteOnce(e, "SluaAbsent" + lsl, "SLua has no " + lsl + ", in ll or in llcompat: it is left out.");
+            return { defaultOf(e->getIType()) };
+        }
         // SLua's ll where it means the same: a boolean answer, which a
         // condition reads as it is and a number takes as 1 or 0; index
-        // arguments written out, moved on by one.
-        if (slua == 0 || (mOptions.sluaCalls && !(slua & (ALLSLTraits::SluaRemoved | ALLSLTraits::SluaIndexResult)) &&
-                          (!(slua & ALLSLTraits::SluaIndexArgs) || constantIndexes(e, indexes))))
+        // arguments written out, moved on by one. Not where the list it
+        // answers has booleans in LSL's 1 and 0's places.
+        const U8 compat_only = ALLSLTraits::SluaRemoved | ALLSLTraits::SluaIndexResult | ALLSLTraits::SluaBoolList;
+        if (slua == 0 ||
+            (mOptions.sluaCalls && !(slua & compat_only) && (!(slua & ALLSLTraits::SluaIndexArgs) || constantIndexes(e, indexes))))
         {
             if (trait && trait->sluaUse)
             {
@@ -983,6 +993,11 @@ namespace
         else if (slua & ALLSLTraits::SluaBool)
         {
             noteOnce(e, "SluaBool" + lsl, "llcompat." + bare + " answers 1 or 0, as LSL did; ll." + bare + " answers true or false.");
+        }
+        else if (slua & ALLSLTraits::SluaBoolList)
+        {
+            noteOnce(e, "SluaBoolList" + lsl, "llcompat." + bare + "'s list has 1 or 0 where LSL's did; ll." + bare +
+                                                  "'s has true or false there.");
         }
         if (trait && trait->sluaUse)
         {
@@ -1506,6 +1521,18 @@ namespace
                 break;
             }
             case NODE_FUNCTION_EXPRESSION:
+            {
+                // One SLua has nowhere, over a line of its own.
+                const ALLSLTraits::Trait* trait = ALLSLTraits::of(static_cast<LSLFunctionExpression*>(e)->getIdentifier()->getName());
+                if (trait && (trait->slua & ALLSLTraits::SluaAbsent))
+                {
+                    expr(e);
+                    line("-- " + std::string(trait->name) + ", left out");
+                    return;
+                }
+                line(expr(e).text);
+                return;
+            }
             case NODE_PRINT_EXPRESSION:
                 line(expr(e).text);
                 return;

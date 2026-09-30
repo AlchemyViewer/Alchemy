@@ -80,6 +80,15 @@ bool ALLSLTraits::pure(const char* name)
     return t && t->pure;
 }
 
+// static
+bool ALLSLTraits::uuidConstant(std::string_view name)
+{
+    static constexpr std::string_view UUIDS[] = {
+#include "allsluuids.inc"
+    };
+    return std::find(std::begin(UUIDS), std::end(UUIDS), name) != std::end(UUIDS);
+}
+
 namespace
 {
     // What changes nothing: no assignment, no print, no call but to a

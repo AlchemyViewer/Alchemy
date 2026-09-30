@@ -65,6 +65,7 @@ target_sources(
         almessagemap.h
         allsloptimizer.h
         allsltraits.inc
+        allsluuids.inc
         alluauconfig.h
         alluauexports.h
         alluauservice.h

@@ -593,4 +593,20 @@ namespace tut
                                                   has(r, "-- state_exit, left out"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<19>()
+    {
+        set_test_name("a function SLua has nowhere left out and said; one whose ll list has booleans for LSL's 1 and 0 kept on llcompat");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    llPointAt(ZERO_VECTOR);\n"
+                                              "    list e = llGetExperienceList(NULL_KEY);\n"
+                                              "    if (llList2Integer(llGetPrimitiveParams([PRIM_FULLBRIGHT, 0]), 0)) llOwnerSay((string)llGetListLength(e));\n"
+                                              "} }\n");
+        ensure("left out: " + r.text, !has(r, "PointAt(") && has(r, "-- llPointAt, left out") && noted(r, "SluaAbsentllPointAt"));
+        ensure("its empty value where read: " + r.text, has(r, "local e = {}") && noted(r, "SluaAbsentllGetExperienceList"));
+        ensure("llcompat, said: " + r.text, has(r, "llcompat.GetPrimitiveParams({PRIM_FULLBRIGHT, 0})") && noted(r, "SluaBoolListllGetPrimitiveParams"));
+        ensure("not a truth: " + r.text, !has(r, "if llcompat.GetPrimitiveParams"));
+        checksClean(r);
+    }
 }
