@@ -704,6 +704,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixAskFound">Write it [1] [2]</string>
 	<string name="ScriptFixWriteIt">Write it [1]</string>
 	<string name="ScriptFixDeclareFirst">Declare local [1] before it is first named</string>
+	<string name="ScriptFixUnbracket">Take out the brackets</string>
 	<string name="ScriptActionAnnotate">Declare it as '[1]'</string>
 	<string name="ScriptActionExtract">Put it in a local, '[1]'</string>
 	<string name="ScriptActionInterpolate">Write it as an interpolated string</string>
@@ -882,6 +883,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlGlobalAssign">This makes [1] a global. A local is quicker for Luau to read</string>
 	<string name="LuauLintSlGlobalFunction">function [1] makes a global. local function [1] is quicker for Luau to call</string>
 	<string name="LuauLintSlGlobalFunctionInScope">function [1] here makes a global, and only once this runs. local function [1] keeps it to this block</string>
+	<string name="LuauLintSlParenCondition">Luau's [1] needs no brackets round its condition, where LSL's did</string>
 	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
 	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauUnknownType">Unknown type '[1]'</string>

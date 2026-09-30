@@ -329,4 +329,33 @@ namespace tut
         unfixed("local function outer()\n    function shared() return 2 end\nend\nprint(outer, shared)\n", "LuauLintSlGlobalFunctionInScope");
         unfixed("print(_G)\ny = 2\n", "LuauLintSlGlobalAssign");
     }
+
+    template<> template<>
+    void object::test<6>()
+    {
+        set_test_name("SlParenCondition: if, elseif, while, until and an if-then-else bracketed whole, a note; not brackets round a part; "
+                      "the brackets taken out, a blank kept where a word would run on, safe; selene's name allows it");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local x = true\n"
+                                       "if (x) then print(1) elseif (not x) then print(2) end\n"
+                                       "while(x)do break end\n"
+                                       "repeat local y = 1 until (y > 0)\n"
+                                       "print(if (x) then 1 else 2)\n"
+                                       "if (x) and (x) then print(3) end\n"
+                                       "if x then print(4) end\n",
+                                       "SlParenCondition", ALScriptProblem::Severity::Note);
+        ensure_equals("each", said,
+                      std::string("1 LuauLintSlParenCondition|if\n"
+                                  "1 LuauLintSlParenCondition|elseif\n"
+                                  "2 LuauLintSlParenCondition|while\n"
+                                  "3 LuauLintSlParenCondition|until\n"
+                                  "4 LuauLintSlParenCondition|if\n"));
+        ensure_equals("spaced", fixed("local x = true\nif (x) then print(1) end\n", "LuauLintSlParenCondition", "Take out the brackets", true),
+                      std::string("local x = true\nif x then print(1) end\n"));
+        ensure_equals("run on", fixed("local x = true\nwhile(x)do break end\n", "LuauLintSlParenCondition", "Take out the brackets", true),
+                      std::string("local x = true\nwhile x do break end\n"));
+        ensure_equals("allowed by selene's name", found("local x = true\n-- selene: allow(parenthese_conditions)\nif (x) then print(1) end\n",
+                                                        "SlParenCondition", ALScriptProblem::Severity::Note),
+                      std::string());
+    }
 }

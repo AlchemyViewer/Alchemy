@@ -97,6 +97,7 @@
     <floater.string name="LintLuauSlCompatCall">llcompat's function where ll's means the same (the studio's own)</floater.string>
     <floater.string name="LintLuauSlBooleanNumber">A boolean compared with a number, as LSL's TRUE and FALSE were (the studio's own)</floater.string>
     <floater.string name="LintLuauSlGlobalAssign">A global made where a local would do, or a function made global inside a block (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlParenCondition">A condition in brackets, as LSL's had to be (the studio's own)</floater.string>
     <floater.string name="LintLuauName">[DESCRIPTION]
 
 In a .luaurc: [NAME]</floater.string>

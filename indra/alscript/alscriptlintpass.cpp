@@ -28,6 +28,7 @@
 
 #include "alscriptfixes.h"
 #include "allsltraits.h"
+#include "alscriptlexicon.h"
 
 #include "Luau/Ast.h"
 #include "Luau/Module.h"
@@ -70,6 +71,8 @@ namespace
         // x = 0 or function f() making a global; a function f() in a nested
         // scope, lute's global_function_in_scope.
         { "SlGlobalAssign", true, Severity::Warning, true, true, nullptr },
+        // if (x) then: LSL's brackets, which Luau's if needs none of.
+        { "SlParenCondition", true, Severity::Note, true, true, "parenthese_conditions" },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -409,21 +412,25 @@ namespace
         bool visit(Luau::AstStatIf* node) override
         {
             truth(node->condition);
+            bracketedCondition(node->condition, node->location);
             return true;
         }
         bool visit(Luau::AstStatWhile* node) override
         {
             truth(node->condition);
+            bracketedCondition(node->condition, node->location);
             return true;
         }
         bool visit(Luau::AstStatRepeat* node) override
         {
             truth(node->condition);
+            bracketedCondition(node->condition, std::nullopt);
             return true;
         }
         bool visit(Luau::AstExprIfElse* node) override
         {
             truth(node->condition);
+            bracketedCondition(node->condition, node->location);
             return true;
         }
         bool visit(Luau::AstExprUnary* node) override
@@ -1385,6 +1392,42 @@ namespace
             }
         }
 
+        // --- SlParenCondition: LSL's brackets round a condition -------------
+
+        // A condition bracketed whole, as LSL's had to be: the brackets taken
+        // out, a blank left where one would otherwise run into a word. The
+        // statement's first word -- if, elseif, while -- says whose it is;
+        // a repeat's is until's.
+        void bracketedCondition(Luau::AstExpr* condition, std::optional<Luau::Location> statement)
+        {
+            const auto* group = condition->as<Luau::AstExprGroup>();
+            if (!on("SlParenCondition") || !group)
+            {
+                return;
+            }
+            std::string keyword = "until";
+            if (statement)
+            {
+                const std::string head = text(Luau::Location(statement->begin, condition->location.begin));
+                keyword                = head.substr(0, head.find_first_not_of("abcdefghijklmnopqrstuvwxyz"));
+            }
+            const Luau::Location& at     = condition->location;
+            const auto            letter = [&](const Luau::Position& p) {
+                const std::optional<size_t> offset = offsetOf(p);
+                return offset && *offset < mSource.size() && ALScriptLexicon::isNameByte(mSource[*offset]);
+            };
+            const Luau::Position before(at.begin.line, at.begin.column > 0 ? at.begin.column - 1 : 0);
+            const Luau::Position close(at.end.line, at.end.column - 1);
+            const bool           spaced_before = at.begin.column > 0 && letter(before);
+            const bool           spaced_after  = letter(at.end);
+            ALScriptProblem&     said          = problem(at, "LuauLintSlParenCondition",
+                                                         "Luau's [1] needs no brackets round its condition, where LSL's did", { keyword }, "SlParenCondition");
+            offerTitled(said, "ScriptFixUnbracket", "Take out the brackets", {},
+                        { edit(Luau::Location(at.begin, Luau::Position(at.begin.line, at.begin.column + 1)), spaced_before ? " " : ""),
+                          edit(Luau::Location(close, at.end), spaced_after ? " " : "") },
+                        true);
+        }
+
         // What a condition asks the truth of: itself, or each side of an
         // and or an or, inside brackets or not.
         void truth(Luau::AstExpr* e)
@@ -1413,6 +1456,15 @@ namespace
                         "[1] is a number, and Luau counts every number true, 0 too: [1] ~= 0 asks whether it is not 0",
                         { text(e->location), e->is<Luau::AstExprIfElse>() ? "(" : "" }, "SlNumberTruth");
             }
+        }
+
+        std::optional<size_t> offsetOf(const Luau::Position& p) const
+        {
+            if (p.line >= mStarts.size())
+            {
+                return std::nullopt;
+            }
+            return std::min(mSource.size(), mStarts[p.line] + p.column);
         }
 
         // What the script says at a place, from its text.
