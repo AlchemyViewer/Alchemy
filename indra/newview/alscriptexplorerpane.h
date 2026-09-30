@@ -80,6 +80,9 @@ public:
         // as the region has it, each under its title.
         virtual void compareItems(const ALScriptRef& first, const std::string& name, const std::string& first_title, const ALScriptRef& second,
                                   const std::string& second_title) = 0;
+        // An item opened, or brought forward, and its saves offered to
+        // compare with it (ALScriptStudioHistory).
+        virtual void showHistory(const ALScriptRef& ref, const std::string& name) = 0;
         // A list to pick from, over the editors: what is chosen, and what
         // Shift-Return is pressed on.
         virtual void pick(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,

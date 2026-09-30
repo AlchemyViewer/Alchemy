@@ -443,6 +443,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="NoticeUnloaded">This could not be loaded ([ERROR]). The text in this tab is kept; try again, or save a copy to keep it permanently.</floater.string>
     <floater.string name="NoticeRestore">Restore Them</floater.string>
     <floater.string name="NoticeRestoreTip">Restore the unsaved changes as one undo step</floater.string>
+    <floater.string name="NoticeRestoreSave">Restore This Save</floater.string>
+    <floater.string name="NoticeRestoreSaveTip">Put this save in the tab as one undo step; it is not saved until you save</floater.string>
     <floater.string name="NoticeDiscard">Discard</floater.string>
     <floater.string name="NoticeCompiledDiffers">This script's saved preprocessed code does not match its source: it was edited directly, or an include changed. Saving replaces it.</floater.string>
     <floater.string name="NoticeKeepSource">Keep Source</floater.string>
@@ -451,6 +453,21 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="NoticeCompareTip">Show both texts side by side, with changes marked; Escape closes the comparison</floater.string>
     <floater.string name="CompareNow">This tab now</floater.string>
     <floater.string name="CompareUnsaved">[TITLE] (unsaved)</floater.string>
+    <floater.string name="HistoryNone">No saves of [NAME] are kept here yet. Each save from now on is kept for 30 days.</floater.string>
+    <floater.string name="HistoryTitle">Saves of [NAME]</floater.string>
+    <floater.string name="HistoryPlaceholder">Type a date or time to find a save</floater.string>
+    <floater.string name="HistoryBytesA">1 byte</floater.string>
+    <floater.string name="HistoryBytesB">[COUNT] bytes</floater.string>
+    <floater.string name="HistoryLongerA">1 byte longer than the save before</floater.string>
+    <floater.string name="HistoryLongerB">[COUNT] bytes longer than the save before</floater.string>
+    <floater.string name="HistoryShorterA">1 byte shorter than the save before</floater.string>
+    <floater.string name="HistoryShorterB">[COUNT] bytes shorter than the save before</floater.string>
+    <floater.string name="HistorySameLength">as long as the save before</floater.string>
+    <floater.string name="HistoryCurrent">what is saved now</floater.string>
+    <floater.string name="HistorySavedAt">Saved [WHEN]</floater.string>
+    <floater.string name="HistoryUnreadable">The save of [NAME] from [WHEN] could not be read.</floater.string>
+    <floater.string name="HistoryRestored">Put back the save of [NAME] from [WHEN]. Undo takes it back; it is not saved until you save.</floater.string>
+    <floater.string name="NoticeHistory">The save of [WHEN], beside this tab now.</floater.string>
     <floater.string name="CompareNotLoaded">Could not load [NAME] to compare: [ERROR]</floater.string>
     <floater.string name="ExplorerCompareTitle">Compare [NAME] with</floater.string>
     <floater.string name="ExplorerComparePlaceholder">Type a name to find a script or notecard</floater.string>
@@ -719,6 +736,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
              name="open_recent"
              tear_off="false"
              width="200" />
+            <menu_item_call label="Local History..." layout="topleft" name="local_history">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="local_history" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="local_history" />
+            </menu_item_call>
             <menu_item_call label="Recover Unsaved Changes..." layout="topleft" name="recover">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="recover" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="recover" />

@@ -119,7 +119,8 @@ namespace
     }
 }
 
-std::string ALRecoveryEntry::whenSaid() const
+// static
+std::string ALRecoveryEntry::sayWhen(const LLDate& when)
 {
     const time_t moment = static_cast<time_t>(when.secondsSinceEpoch());
     struct tm    local;

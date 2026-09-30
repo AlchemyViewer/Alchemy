@@ -16,6 +16,10 @@
     <menu_item_call.on_click function="Explorer.Action" parameter="compare_with" />
     <menu_item_call.on_enable function="Explorer.Enable" parameter="compare_with" />
   </menu_item_call>
+  <menu_item_call label="Local History..." layout="topleft" name="local_history">
+    <menu_item_call.on_click function="Explorer.Action" parameter="local_history" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="local_history" />
+  </menu_item_call>
   <menu_item_separator layout="topleft" />
   <menu_item_call label="New Script" layout="topleft" name="new_lsl">
     <menu_item_call.on_click function="Explorer.Action" parameter="new_lsl" />

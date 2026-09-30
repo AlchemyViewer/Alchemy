@@ -28,6 +28,7 @@
 #include "alluauservice.h"
 #include "alpreprocessor.h"
 #include "alrecoverystore.h"
+#include "alsavehistory.h"
 #include "alscriptenvelope.h"
 #include "alscriptproblem.h"
 #include "alscriptsaveflow.h"
@@ -567,6 +568,9 @@ struct ALScriptStudioDoc
         std::string ownTitle;
     };
     std::optional<PendingCompare>              pendingCompare;
+    // A save of its item compared with it (ALScriptStudioHistory), until
+    // the comparison ends: offered back by the notice.
+    std::optional<ALSavedText>                 historyShown;
     // The script held open in an external editor (ALScriptExternalEditor).
     struct External;
     Part<External>                             external;

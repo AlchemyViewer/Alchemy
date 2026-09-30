@@ -34,6 +34,7 @@
 #include "alscriptstudiocommands.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudiohistory.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudiosaving.h"
 #include "alscriptstudiotabs.h"
@@ -129,7 +130,7 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptReferencesPane::Window, public ALScriptOutlinePane::Window,
                                     public ALScriptCrumbsBar::Window, public ALScriptInspectorPane::Window,
                                     public ALScriptStudioCaret::Window, public ALScriptStudioChecking::Window,
-                                    public ALScriptObjectCheck::Window, public ALScriptRecompile::Window
+                                    public ALScriptObjectCheck::Window, public ALScriptRecompile::Window, public ALScriptStudioHistory::Window
 {
     friend class LLFloaterReg;
 
@@ -896,6 +897,7 @@ private:
     bool unsavedAnywhere(const ALScriptRef& ref) const override;
     void compareItems(const ALScriptRef& first, const std::string& name, const std::string& first_title, const ALScriptRef& second,
                       const std::string& second_title) override;
+    void showHistory(const ALScriptRef& ref, const std::string& name) override;
     // What the Search tab asks of the window (ALScriptSearchPane::Window).
     void listObjects(const LLUUID& only, std::function<void(std::vector<ALScriptSearchPane::Window::Object>)> told) override;
     std::string                                     objectName(const LLUUID& root) const override;
@@ -1195,6 +1197,8 @@ private:
     ALScriptStudioCommands             mCommands;
     // What is unsaved in the tabs, kept against the viewer going.
     ALScriptStudioRecovery             mRecovery{ *this, *this, *this };
+    // What its items were saved as before, to compare and put back.
+    ALScriptStudioHistory              mHistory{ *this, *this };
     // Saving and compiling the tabs.
     ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, mExternal, mWeighing, mRecovery, mFiles, mOrphans, *this };
     // The window's side of vim, over its editors.

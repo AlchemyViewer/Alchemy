@@ -2566,6 +2566,13 @@ void ALFloaterScriptStudio::showView(Doc& doc, Doc::View view, bool focus)
     const bool      had_keys = doc.hasKeyboard();
     const Doc::View was      = doc.shownView();
     doc.view                 = view;
+    // A save of its history compared is let go of with the comparison,
+    // and the notice offering it back with it.
+    if (was == Doc::View::Compare && view != Doc::View::Compare && doc.historyShown)
+    {
+        doc.historyShown.reset();
+        refreshNotice();
+    }
     if (&doc != active())
     {
         return;
@@ -6108,6 +6115,32 @@ void ALFloaterScriptStudio::compareItems(const ALScriptRef& first, const std::st
     });
 }
 
+void ALFloaterScriptStudio::showHistory(const ALScriptRef& ref, const std::string& name)
+{
+    size_t index = indexOf(ref);
+    if (ALFloaterScriptStudio* holder = index == NONE ? holderOf(ref, std::string()) : nullptr; holder && holder != this)
+    {
+        holder->openFloater(holder->getKey());
+        holder->setFocus(true);
+        holder->showHistory(ref, name);
+        return;
+    }
+    if (index == NONE)
+    {
+        openScript(ref, name);
+        index = indexOf(ref);
+        if (index == NONE)
+        {
+            return;
+        }
+    }
+    else
+    {
+        activate(index);
+    }
+    mHistory.show(*mDocs[index]);
+}
+
 void ALFloaterScriptStudio::comparePending(Doc& doc)
 {
     if (!doc.pendingCompare)
@@ -7772,6 +7805,18 @@ void ALFloaterScriptStudio::addFileCommands()
             return doc && revertible(*doc);
         });
     mCommands.add("open_file", [this]() { mFiles.openFromDisk(); });
+    mCommands.add(
+        "local_history",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                mHistory.show(*doc);
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && !ALScriptStudioHistory::keyOf(*doc).empty() && ALRecovery::history();
+        });
     mCommands.add(
         "recover", [this]() { mRecovery.show(); },
         []() {

@@ -833,7 +833,7 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
         const auto pair = Model::comparing(rows);
         return pair && readable(pair->first) && readable(pair->second);
     }
-    if (action == "compare_with")
+    if (action == "compare_with" || action == "local_history")
     {
         return rows.size() == 1 && rows.front().isItem() && readable(rows.front());
     }
@@ -999,6 +999,10 @@ void ALScriptExplorerPane::act(const std::string& action)
     else if (action == "compare_with")
     {
         compareWith(rows.front());
+    }
+    else if (action == "local_history")
+    {
+        mWindow->showHistory(rows.front().ref(), rows.front().name);
     }
     else if (action == "describe")
     {

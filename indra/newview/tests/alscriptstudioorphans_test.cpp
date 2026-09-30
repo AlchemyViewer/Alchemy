@@ -533,4 +533,30 @@ namespace tut
         Orphans::loadWentThrough(a);
         ensure("from the first try once one goes through", a.orphan->reattachTries == 0);
     }
+
+    template<> template<>
+    void alscriptstudioorphans_object::test<13>()
+    {
+        set_test_name("a save of the history offered back: restored as carried text, the comparison ended, said; or let go of with the notice");
+        Orphans& unit = make();
+        Doc&     a    = tab("a");
+        ALSavedText shown;
+        shown.text     = "default { }";
+        shown.when     = LLDate(1.8e9);
+        a.historyShown = shown;
+        unit.noticeAction("restore_saved");
+        ensure("the source back in front, then taken", studio.did == Names{ "source a", "carried a: default { }" } && !a.historyShown);
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = "a";
+        args["[WHEN]"] = ALRecoveryEntry::sayWhen(shown.when);
+        ensure_equals("and said", services().reports.back().text, services().words("HistoryRestored", args));
+
+        studio.did.clear();
+        a.historyShown = shown;
+        a.modifiable   = false;
+        unit.noticeAction("restore_saved");
+        ensure("not into a tab that may not be changed", studio.did.empty() && a.historyShown);
+        unit.noticeAction("close");
+        ensure("let go of with the notice", !a.historyShown);
+    }
 }

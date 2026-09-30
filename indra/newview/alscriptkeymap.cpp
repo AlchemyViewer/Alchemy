@@ -479,6 +479,7 @@ namespace ALScriptKeymap
             after_k("save_all", 'S'),
             { "revert", KEY_NONE, MASK_NONE },
             { "open_file", KEY_NONE, MASK_NONE },
+            { "local_history", KEY_NONE, MASK_NONE },
             { "recover", KEY_NONE, MASK_NONE },
             { "insert_file", KEY_NONE, MASK_NONE },
             { "load_file", KEY_NONE, MASK_NONE },

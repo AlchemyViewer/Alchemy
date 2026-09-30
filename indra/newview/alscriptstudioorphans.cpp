@@ -374,6 +374,17 @@ ALScriptNoticeBar::Notice ALScriptStudioOrphans::noticeFor(const Doc* doc, const
             buttons[i] = offered[i];
         }
     }
+    else if (doc && doc->historyShown)
+    {
+        // Offered back where it may be put in the tab.
+        LLStringUtil::format_map_t args;
+        args["[WHEN]"] = ALRecoveryEntry::sayWhen(doc->historyShown->when);
+        text           = services.words("NoticeHistory", args);
+        if (doc->modifiable)
+        {
+            buttons[0] = { "restore_saved", "NoticeRestoreSave" };
+        }
+    }
     else if (doc && doc->compiledDiffers)
     {
         text       = services.words("NoticeCompiledDiffers");
@@ -419,6 +430,7 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
         // Changes, once the notice is gone.
         doc->orphan->noticeDismissed = true;
         doc->recoverable.reset();
+        doc->historyShown.reset();
         // An offer of nothing but a copy or a file is what a tab gone or
         // out of reach says of itself: hidden with it, not said next.
         if (doc->offer && std::ranges::all_of(doc->offer->actions, [](const std::string& each) { return each == "copy" || each == "export"; }))
@@ -451,6 +463,16 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
         LLStringUtil::format_map_t when;
         when["[WHEN]"] = doc->recoverable->whenSaid();
         mWindow.compare(*doc, doc->editor->wholeText(), doc->recoverable->text, mServices.words("CompareNow"), mServices.words("CompareKept", when));
+    }
+    else if (action == "restore_saved" && doc->historyShown && doc->modifiable)
+    {
+        // The save in the tab as one step to undo, not saved until it is.
+        args["[WHEN]"]   = ALRecoveryEntry::sayWhen(doc->historyShown->when);
+        doc->carriedText = doc->historyShown->text;
+        doc->historyShown.reset();
+        mWindow.endCompare(*doc);
+        mTabs.takeCarriedText(*doc);
+        mServices.report(mServices.words("HistoryRestored", args), false, doc);
     }
     else if (action == "compare_compiled" && doc->compiledDiffers)
     {

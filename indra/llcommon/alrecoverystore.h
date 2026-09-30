@@ -114,8 +114,9 @@ struct ALRecoveryEntry
     // of each file and no more.
     std::string written() const;
     // When it was written, as a day and a time in the viewer's own time
-    // zone, for a person to read.
-    std::string whenSaid() const;
+    // zone, for a person to read; and any moment so.
+    std::string        whenSaid() const { return sayWhen(when); }
+    static std::string sayWhen(const LLDate& when);
 };
 
 // When a kept text's script is loaded again after loads that failed: a

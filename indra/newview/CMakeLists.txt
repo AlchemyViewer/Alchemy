@@ -212,6 +212,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiofiles.cpp
     alscriptstudioorphans.cpp
     alscriptstudioplaces.cpp
+    alscriptstudiohistory.cpp
     alscriptstudiorecovery.cpp
     alrecovery.cpp
     alrecoverykeeper.cpp
@@ -1054,6 +1055,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudioorphans.h
     alscriptstudiopane.h
     alscriptstudioplaces.h
+    alscriptstudiohistory.h
     alscriptstudiorecovery.h
     alrecovery.h
     alrecoverykeeper.h
@@ -2625,6 +2627,17 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES al_studio_test_common llui alscript ${test_libs}
     PCH al_studio_test_common
+  )
+
+  # A Script Studio window's saves kept in a history of the test's, listed,
+  # compared and put back over tabs of their own editors.
+  al_add_test(
+    alscriptstudiohistory
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    PCH al_studio_test_common
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
   # A Script Studio window's unsaved texts kept in a recovery store of the
