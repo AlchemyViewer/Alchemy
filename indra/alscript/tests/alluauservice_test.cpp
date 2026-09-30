@@ -33,6 +33,7 @@
 #include "../test/lltut.h"
 #include "llsdserialize.h"
 
+#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <sstream>
@@ -1149,5 +1150,68 @@ namespace tut
             ensure_equals("nonstrict, whether asked or not", by_default, asked_nonstrict);
         }
         service.setConfig(ALLuauConfig());
+    }
+
+    template<> template<>
+    void alluauservice_object::test<37>()
+    {
+        set_test_name("SlNilSentinel: a find against -1, or ordered against 0 or -1, on either side, a local given one, table's and string's; llcompat's against nil; not what can hold");
+        ensure("definitions loaded: " + error, loaded);
+        const auto found = [&](const std::string& text) {
+            std::vector<std::string> out;
+            for (const ALScriptProblem& p : service.check(text))
+            {
+                if (p.code == "SlNilSentinel")
+                {
+                    out.push_back(p.key + " " + p.args[0] + " " + p.args[4] + " " + std::to_string(p.line) +
+                                  (p.severity == ALScriptProblem::Severity::Error ? "" : " not an error"));
+                }
+            }
+            std::sort(out.begin(), out.end());
+            return out;
+        };
+        const std::vector<std::string> said = found("local l = {1, 2}\n"
+                                                    "if ll.ListFindList(l, {2}) == -1 then print(1) end\n"
+                                                    "if -1 ~= ll.SubStringIndex(\"ab\", \"b\") then print(2) end\n"
+                                                    "local i = ll.ListFindList(l, {1})\n"
+                                                    "if i < 0 or 0 <= i then print(3) end\n"
+                                                    "if table.find(l, 2) ~= -1 then print(4) end\n"
+                                                    "local s = \"abc\"\n"
+                                                    "if s:find(\"b\") == -1 or string.find(s, \"c\") > -1 then print(5) end\n"
+                                                    "local c = llcompat.ListFindList(l, {1})\n"
+                                                    "if c == nil or (llcompat.SubStringIndex(s, \"a\")) ~= nil then print(6) end\n");
+        const std::vector<std::string> expected = {
+            "LuauLintSlNilSentinel c == -1 9",
+            "LuauLintSlNilSentinel ll.ListFindList(...) == nil 1",
+            "LuauLintSlNilSentinel s:find(...) == nil 7",
+            "LuauLintSlNilSentinelAlways ll.SubStringIndex(...) ~= nil 2",
+            "LuauLintSlNilSentinelAlways llcompat.SubStringIndex(...) ~= -1 9",
+            "LuauLintSlNilSentinelAlways table.find(...) ~= nil 5",
+            "LuauLintSlNilSentinelOrder i == nil 4",
+            "LuauLintSlNilSentinelOrder i ~= nil 4",
+            "LuauLintSlNilSentinelOrder string.find(...) ~= nil 7",
+        };
+        std::string listed;
+        for (const std::string& each : said)
+        {
+            listed += each + "\n";
+        }
+        ensure("each, an error:\n" + listed, said == expected);
+        // What can hold: nil against SLua's, -1 and order against
+        // llcompat's, an order that asks where, a local given a number
+        // too, stepped, or nil before it is given llcompat's, a
+        // parameter, and a -1 that is no find's.
+        const std::vector<std::string> none = found("local l = {1}\n"
+                                                    "if ll.ListFindList(l, {1}) == nil or ll.ListFindList(l, {1}) > 0 then print(1) end\n"
+                                                    "if llcompat.ListFindList(l, {1}) == -1 or llcompat.ListFindList(l, {1}) < 0 then print(2) end\n"
+                                                    "local j = ll.ListFindList(l, {1})\n"
+                                                    "j = 5\n"
+                                                    "local n = ll.ListFindList(l, {1})\n"
+                                                    "n -= 2\n"
+                                                    "local m\n"
+                                                    "m = llcompat.SubStringIndex(\"a\", \"b\")\n"
+                                                    "local function f(p) return p == -1 end\n"
+                                                    "if j == -1 or n == -1 or m == nil or ll.GetInventoryType(\"x\") == -1 then print(f(3)) end\n");
+        ensure("none: " + (none.empty() ? std::string() : none[0]), none.empty());
     }
 }

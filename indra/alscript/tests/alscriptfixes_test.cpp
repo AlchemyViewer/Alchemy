@@ -1180,4 +1180,28 @@ namespace tut
         const ALScriptProblem* problem  = keyed(problems, "LuauLintSlNumberTruth");
         ensure("not safe", problem && !problem->fixes.front().safe);
     }
+
+    template<> template<>
+    void object::test<40>()
+    {
+        set_test_name("SlNilSentinel's fixes: nil where SLua's find answers it, -1 where llcompat's does; a find on the right put on the left; safe");
+        ensure("definitions: " + error, luauLoaded);
+        ensure_equals("never", fixed("local l = {1}\nif ll.ListFindList(l, {2}) == -1 then print(l) end\n", true, "LuauLintSlNilSentinel",
+                                     "Write it ll.ListFindList(...) == nil"),
+                      std::string("local l = {1}\nif ll.ListFindList(l, {2}) == nil then print(l) end\n"));
+        ensure_equals("on the right", fixed("local i = table.find({1}, 1)\nprint(-1 ~= i)\n", true, "LuauLintSlNilSentinelAlways", "Write it i ~= nil"),
+                      std::string("local i = table.find({1}, 1)\nprint(i ~= nil)\n"));
+        ensure_equals("ordered, bracketed", fixed("local i = ll.SubStringIndex(\"ab\", \"b\")\nprint((i) < 0)\n", true, "LuauLintSlNilSentinelOrder",
+                                                  "Write it i == nil"),
+                      std::string("local i = ll.SubStringIndex(\"ab\", \"b\")\nprint((i) == nil)\n"));
+        ensure_equals("ordered, on the right", fixed("local i = ll.SubStringIndex(\"ab\", \"b\")\nprint(0 <= i)\n", true,
+                                                     "LuauLintSlNilSentinelOrder", "Write it i ~= nil"),
+                      std::string("local i = ll.SubStringIndex(\"ab\", \"b\")\nprint(i ~= nil)\n"));
+        ensure_equals("llcompat's", fixed("print(llcompat.ListFindList({1}, {1}) ~= nil)\n", true, "LuauLintSlNilSentinelAlways",
+                                          "Write it llcompat.ListFindList(...) ~= -1"),
+                      std::string("print(llcompat.ListFindList({1}, {1}) ~= -1)\n"));
+        const ALScriptProblems problems = check("print(table.find({1}, 1) == -1)\n", true);
+        const ALScriptProblem* problem  = keyed(problems, "LuauLintSlNilSentinel");
+        ensure("safe", problem && !problem->fixes.empty() && problem->fixes.front().safe);
+    }
 }

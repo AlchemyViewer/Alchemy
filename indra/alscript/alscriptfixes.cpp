@@ -70,6 +70,9 @@
     X(LuauLintImportUnused) \
     X(LuauLintLocalUnused) \
     X(LuauLintSlCompoundAssign) \
+    X(LuauLintSlNilSentinel) \
+    X(LuauLintSlNilSentinelAlways) \
+    X(LuauLintSlNilSentinelOrder) \
     X(LuauLintSlNumberTruth) \
     X(LuauLintSlNumberTruthNot) \
     X(LuauLintTableInsertZero) \
@@ -1474,6 +1477,38 @@ namespace ALScriptFixes
                         fix.edits.push_back({ problem.endLine, problem.endColumn, problem.endLine, problem.endColumn, " == 0" });
                         problem.fixes.push_back(std::move(fix));
                     }
+                }
+            }
+            else if (lua &&
+                     (is(key, Fixed::LuauLintSlNilSentinel) || is(key, Fixed::LuauLintSlNilSentinelAlways) ||
+                      is(key, Fixed::LuauLintSlNilSentinelOrder)) &&
+                     args.size() == 9)
+            {
+                // The find compared with what it answers where it finds
+                // nothing: after it where it is on the left; else what is
+                // before it taken out, and the comparison put after. Safe
+                // (YD5): what was asked never held, always held, or was an
+                // error, so nothing the script did can have rested on it.
+                const S32 find_line       = std::atoi(args[5].c_str());
+                const S32 find_column     = std::atoi(args[6].c_str());
+                const S32 find_end_line   = std::atoi(args[7].c_str());
+                const S32 find_end_column = std::atoi(args[8].c_str());
+                if (lines.offsetOf(problem.line, problem.column) && lines.offsetOf(problem.endLine, problem.endColumn) &&
+                    lines.offsetOf(find_line, find_column) && lines.offsetOf(find_end_line, find_end_column))
+                {
+                    ALScriptFix fix = titled("ScriptFixAskFound", "Write it [1] [2]", { args[0], args[4] });
+                    fix.preferred   = true;
+                    fix.safe        = true;
+                    if (find_line == problem.line && find_column == problem.column)
+                    {
+                        fix.edits.push_back({ find_end_line, find_end_column, problem.endLine, problem.endColumn, " " + args[4] });
+                    }
+                    else
+                    {
+                        fix.edits.push_back({ problem.line, problem.column, find_line, find_column, "" });
+                        fix.edits.push_back({ problem.endLine, problem.endColumn, problem.endLine, problem.endColumn, " " + args[4] });
+                    }
+                    problem.fixes.push_back(std::move(fix));
                 }
             }
             else if (!lua && is(key, Fixed::LSLSlLoopInvariantCall) && args.size() == 4 && problem.line == problem.endLine &&

@@ -26,6 +26,8 @@
 
 #include "alscriptlintpass.h"
 
+#include "allsltraits.h"
+
 #include "Luau/Ast.h"
 #include "Luau/Module.h"
 #include "Luau/ParseResult.h"
@@ -35,6 +37,7 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
+#include <optional>
 
 namespace
 {
@@ -49,6 +52,9 @@ namespace
         { "SlLoopInvariantCall", false, Severity::Note, true, true, nullptr },
         // if n then, where n is a number: true at 0 as at anything.
         { "SlNumberTruth", true, Severity::Warning, true, true, nullptr },
+        // ll.ListFindList(l, x) == -1, where it answers nil; llcompat's
+        // against nil, where it answers -1.
+        { "SlNilSentinel", true, Severity::Error, true, true, nullptr },
     };
 
     // --- the pass -------------------------------------------------------------------
@@ -104,6 +110,10 @@ namespace
         // generic for's, one of several a call's values go to.
         boost::unordered_flat_set<Luau::AstLocal*> unknown;
         boost::unordered_flat_set<Luau::AstLocal*> counters;
+        // Declared with no value, so nil until given one.
+        boost::unordered_flat_set<Luau::AstLocal*> bare;
+        // Given x op= y: a number still, but not the one it was given.
+        boost::unordered_flat_set<Luau::AstLocal*> compounded;
 
         bool visit(Luau::AstStatLocal* node) override
         {
@@ -119,6 +129,10 @@ namespace
                 else if (node->values.size > 0)
                 {
                     unknown.insert(node->vars.data[i]);
+                }
+                else
+                {
+                    bare.insert(node->vars.data[i]);
                 }
             }
             return true;
@@ -144,9 +158,13 @@ namespace
         bool visit(Luau::AstStatCompoundAssign* node) override
         {
             // A number stays one but for .., which makes a string.
-            if (auto* local = node->var->as<Luau::AstExprLocal>(); local && node->op == Luau::AstExprBinary::Concat)
+            if (auto* local = node->var->as<Luau::AstExprLocal>())
             {
-                unknown.insert(local->local);
+                compounded.insert(local->local);
+                if (node->op == Luau::AstExprBinary::Concat)
+                {
+                    unknown.insert(local->local);
+                }
             }
             return true;
         }
@@ -246,14 +264,28 @@ namespace
             return true;
         }
 
+        // --- SlNilSentinel: a find's nothing asked as the other answers it ----
+
+        bool visit(Luau::AstExprBinary* node) override
+        {
+            if (on("SlNilSentinel"))
+            {
+                sentinel(node);
+            }
+            return true;
+        }
+
     private:
         bool on(std::string_view name) const { return (mEnabled & ALScriptLintPass::bit(name)) != 0; }
 
-        // Whether the check found an expression a number, and nothing else:
-        // not number?, whose nil is false. A local the check says is any --
-        // unannotated, in the old solver's nonstrict mode -- by what it is
-        // given.
-        bool number(Luau::AstExpr* e)
+        bool number(Luau::AstExpr* e) { return primitive(e, Luau::PrimitiveType::Number); }
+
+        // Whether the check found an expression of one primitive type, and
+        // nothing else: not number?, whose nil is false; a string's
+        // literal, typed as itself, is a string. A local the check says is
+        // any -- unannotated, in the old solver's nonstrict mode -- by what
+        // it is given.
+        bool primitive(Luau::AstExpr* e, Luau::PrimitiveType::Type want)
         {
             const Luau::TypeId* type = mChecked ? mChecked->astTypes.find(e) : nullptr;
             if (!type)
@@ -263,33 +295,258 @@ namespace
             const Luau::TypeId followed = Luau::follow(*type);
             if (const auto* prim = Luau::get<Luau::PrimitiveType>(followed))
             {
-                return prim->type == Luau::PrimitiveType::Number;
+                return prim->type == want;
+            }
+            if (const auto* single = Luau::get<Luau::SingletonType>(followed))
+            {
+                return want == Luau::PrimitiveType::String && Luau::get<Luau::StringSingleton>(single);
             }
             auto* local = e->as<Luau::AstExprLocal>();
-            return local && Luau::get<Luau::AnyType>(followed) && numberLocal(local->local);
+            return local && Luau::get<Luau::AnyType>(followed) && primitiveLocal(local->local, want);
         }
 
-        bool numberLocal(Luau::AstLocal* local)
+        bool primitiveLocal(Luau::AstLocal* local, Luau::PrimitiveType::Type want)
         {
-            if (const auto known = mNumberLocals.find(local); known != mNumberLocals.end())
+            const auto asked = std::make_pair(local, want);
+            if (const auto known = mPrimitiveLocals.find(asked); known != mPrimitiveLocals.end())
             {
                 return known->second;
             }
             // Taken as none while its own are asked about, which a loop of
             // locals given each other cannot then make one.
-            mNumberLocals[local] = false;
-            bool is = mLocals.counters.contains(local);
-            if (!is && !mLocals.unknown.contains(local) && !local->annotation)
+            mPrimitiveLocals[asked] = false;
+            bool is = want == Luau::PrimitiveType::Number && mLocals.counters.contains(local);
+            if (!is && !mLocals.unknown.contains(local) && !mLocals.counters.contains(local) && !local->annotation)
             {
                 const auto given = mLocals.given.find(local);
                 is = given != mLocals.given.end() && !given->second.empty();
                 for (size_t i = 0; is && i < given->second.size(); ++i)
                 {
-                    is = number(given->second[i]);
+                    is = primitive(given->second[i], want);
                 }
             }
-            mNumberLocals[local] = is;
+            mPrimitiveLocals[asked] = is;
             return is;
+        }
+
+        // What a find answers where it finds nothing: SLua's own answer
+        // nil -- ll's, table.find, string.find -- and llcompat's -1, as
+        // LSL's did.
+        struct Find
+        {
+            std::string function;
+            bool        nil;
+        };
+
+        // The find an expression is, inside brackets or not: a call to
+        // one, or a local given only calls to finds that answer alike --
+        // and, for one that answers -1, never nil before it is given one.
+        std::optional<Find> find(Luau::AstExpr* e)
+        {
+            while (auto* group = e->as<Luau::AstExprGroup>())
+            {
+                e = group->expr;
+            }
+            if (auto* local = e->as<Luau::AstExprLocal>())
+            {
+                return findLocal(local->local);
+            }
+            auto* call   = e->as<Luau::AstExprCall>();
+            auto* callee = call ? call->func->as<Luau::AstExprIndexName>() : nullptr;
+            if (!callee)
+            {
+                return std::nullopt;
+            }
+            const std::string_view name = callee->index.value;
+            const auto*            lib  = callee->expr->as<Luau::AstExprGlobal>();
+            const std::string_view from = lib && callee->op == '.' ? lib->name.value : "";
+            if (from == "ll" || from == "llcompat")
+            {
+                // LSL's that answer an index or -1, and whose ll answers one
+                // from 1 or nil: not llFindNotecardTextSync, whose indexes
+                // are in the list it answers.
+                const std::string lsl = "ll" + std::string(name);
+                const auto*       row = ALLSLTraits::of(lsl.c_str());
+                if (row && (row->slua & ALLSLTraits::SluaIndexResult) && ALLSLTraits::atLeastMinusOne(lsl.c_str()))
+                {
+                    return Find{ std::string(from) + "." + std::string(name), from == "ll" };
+                }
+                return std::nullopt;
+            }
+            if (name == "find" && (from == "table" || from == "string" || (callee->op == ':' && primitive(callee->expr, Luau::PrimitiveType::String))))
+            {
+                return Find{ from == "table" ? "table.find" : "string.find", true };
+            }
+            return std::nullopt;
+        }
+
+        std::optional<Find> findLocal(Luau::AstLocal* local)
+        {
+            if (const auto known = mFindLocals.find(local); known != mFindLocals.end())
+            {
+                return known->second;
+            }
+            mFindLocals[local] = std::nullopt;
+            const auto          given = mLocals.given.find(local);
+            std::optional<Find> out;
+            if (given != mLocals.given.end() && !mLocals.unknown.contains(local) && !mLocals.counters.contains(local) &&
+                !mLocals.compounded.contains(local))
+            {
+                for (Luau::AstExpr* value : given->second)
+                {
+                    const std::optional<Find> each = find(value);
+                    if (!each || (out && out->nil != each->nil))
+                    {
+                        out.reset();
+                        break;
+                    }
+                    out = out ? out : each;
+                }
+                if (out && !out->nil && mLocals.bare.contains(local))
+                {
+                    out.reset();
+                }
+            }
+            mFindLocals[local] = out;
+            return out;
+        }
+
+        // What the scripter wrote the find as, short: a local's name, or a
+        // call's function and (...).
+        std::string subject(Luau::AstExpr* e) const
+        {
+            while (auto* group = e->as<Luau::AstExprGroup>())
+            {
+                e = group->expr;
+            }
+            if (const auto* local = e->as<Luau::AstExprLocal>())
+            {
+                return local->local->name.value;
+            }
+            if (const auto* call = e->as<Luau::AstExprCall>())
+            {
+                return text(call->func->location) + "(...)";
+            }
+            return text(e->location);
+        }
+
+        static bool constant(Luau::AstExpr* e, double value)
+        {
+            while (auto* group = e->as<Luau::AstExprGroup>())
+            {
+                e = group->expr;
+            }
+            if (const auto* negated = e->as<Luau::AstExprUnary>(); negated && negated->op == Luau::AstExprUnary::Op::Minus)
+            {
+                return value != 0 && constant(negated->expr, -value);
+            }
+            const auto* number = e->as<Luau::AstExprConstantNumber>();
+            return number && number->value == value;
+        }
+
+        static bool isNil(Luau::AstExpr* e)
+        {
+            while (auto* group = e->as<Luau::AstExprGroup>())
+            {
+                e = group->expr;
+            }
+            return e->is<Luau::AstExprConstantNil>();
+        }
+
+        // A find compared with what it never answers: SLua's with -1 --
+        // equal, not equal, or LSL's order against 0 or -1, an error at
+        // nil -- and llcompat's with nil. The args after the words say
+        // where the find is, for the fix.
+        void sentinel(Luau::AstExprBinary* node)
+        {
+            using Op = Luau::AstExprBinary::Op;
+            Op op = node->op;
+            if (op != Op::CompareEq && op != Op::CompareNe && op != Op::CompareLt && op != Op::CompareLe && op != Op::CompareGt &&
+                op != Op::CompareGe)
+            {
+                return;
+            }
+            Luau::AstExpr*      side  = node->left;
+            Luau::AstExpr*      other = node->right;
+            std::optional<Find> found = find(side);
+            if (!found)
+            {
+                found = find(other);
+                if (!found)
+                {
+                    return;
+                }
+                std::swap(side, other);
+                // As though the find were on the left.
+                switch (op)
+                {
+                    case Op::CompareLt: op = Op::CompareGt; break;
+                    case Op::CompareGt: op = Op::CompareLt; break;
+                    case Op::CompareLe: op = Op::CompareGe; break;
+                    case Op::CompareGe: op = Op::CompareLe; break;
+                    default: break;
+                }
+            }
+            // Whether it asks if the find found nothing, else something;
+            // and whether it asks it by order, else by equality.
+            bool none  = false;
+            bool order = false;
+            bool asks  = false;
+            if (found->nil)
+            {
+                const bool minus_one = constant(other, -1);
+                const bool zero      = constant(other, 0);
+                if ((op == Op::CompareEq || op == Op::CompareNe) && minus_one)
+                {
+                    asks = true;
+                    none = op == Op::CompareEq;
+                }
+                else if ((op == Op::CompareLt && zero) || (op == Op::CompareLe && minus_one) || (op == Op::CompareGe && zero) ||
+                         (op == Op::CompareGt && minus_one))
+                {
+                    asks  = true;
+                    order = true;
+                    none  = op == Op::CompareLt || op == Op::CompareLe;
+                }
+            }
+            else if ((op == Op::CompareEq || op == Op::CompareNe) && isNil(other))
+            {
+                asks = true;
+                none = op == Op::CompareEq;
+            }
+            if (!asks)
+            {
+                return;
+            }
+            const char*           answers = found->nil ? "nil" : "-1";
+            const Luau::Location& at      = side->location;
+            std::vector<std::string> args = { subject(side),
+                                              found->function,
+                                              answers,
+                                              found->nil ? "-1" : "nil",
+                                              std::string(none ? "== " : "~= ") + answers,
+                                              std::to_string(at.begin.line),
+                                              std::to_string(at.begin.column),
+                                              std::to_string(at.end.line),
+                                              std::to_string(at.end.column) };
+            if (order)
+            {
+                problem(node->location, "LuauLintSlNilSentinelOrder",
+                        "Comparing [1] with a number is an error where [2] finds nothing: it answers nil there, not -1. [1] [5] asks the same",
+                        std::move(args), "SlNilSentinel");
+            }
+            else if (none)
+            {
+                problem(node->location, "LuauLintSlNilSentinel",
+                        "[1] == [4] never holds: [2] answers [3] where it finds nothing, not [4]. [1] == [3] asks whether it found nothing",
+                        std::move(args), "SlNilSentinel");
+            }
+            else
+            {
+                problem(node->location, "LuauLintSlNilSentinelAlways",
+                        "[1] ~= [4] always holds: [2] answers [3] where it finds nothing, not [4]. [1] ~= [3] asks whether it found something",
+                        std::move(args), "SlNilSentinel");
+            }
         }
 
         // What a condition asks the truth of: itself, or each side of an
@@ -353,7 +610,8 @@ namespace
         std::vector<size_t> mStarts;
         const Luau::Module* mChecked;
         const Locals&       mLocals;
-        boost::unordered_flat_map<Luau::AstLocal*, bool> mNumberLocals;
+        boost::unordered_flat_map<std::pair<Luau::AstLocal*, Luau::PrimitiveType::Type>, bool> mPrimitiveLocals;
+        boost::unordered_flat_map<Luau::AstLocal*, std::optional<Find>>                      mFindLocals;
         uint64_t            mEnabled;
         uint64_t            mFatal;
         bool                mAllErrors;
@@ -424,7 +682,7 @@ void ALScriptLintPass::check(std::string_view source, const Luau::SourceModule& 
         return;
     }
     Locals locals;
-    if (enabled & bit("SlNumberTruth"))
+    if (enabled & (bit("SlNumberTruth") | bit("SlNilSentinel")))
     {
         module.root->visit(&locals);
     }

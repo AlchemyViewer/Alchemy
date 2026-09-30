@@ -91,6 +91,7 @@
     <floater.string name="LintLuauRedundantNativeAttribute">A redundant @native attribute</floater.string>
     <floater.string name="LintLuauSlCompoundAssign">x = x + 1, where Luau has x += 1 (the studio's own)</floater.string>
     <floater.string name="LintLuauSlNumberTruth">A number read as true or false, which Luau counts true even at 0 (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlNilSentinel">A find compared with -1 where it answers nil, or llcompat's with nil where it answers -1 (the studio's own)</floater.string>
     <floater.string name="LintLuauName">[DESCRIPTION]
 
 In a .luaurc: [NAME]</floater.string>
