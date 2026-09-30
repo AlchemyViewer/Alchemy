@@ -29,6 +29,7 @@
 #include "allsleffects.h"
 #include "allsltraits.h"
 #include "alscriptfixes.h"
+#include "alscriptlexicon.h"
 #include "alscriptlintpass.h"
 
 #include <tailslide/tailslide.hh>
@@ -186,6 +187,36 @@ namespace
                 }
             }
             return std::string_view::npos;
+        }
+
+        // Whether nothing but blanks comes before an offset on its line.
+        bool startsLine(size_t offset) const
+        {
+            const size_t line = static_cast<size_t>(place(offset).first);
+            return mSource.substr(mStarts[line], offset - mStarts[line]).find_first_not_of(" \t") == std::string_view::npos;
+        }
+
+        // A name the text has nowhere, from `base`.
+        std::string fresh(const std::string& base) const
+        {
+            const auto taken = [&](const std::string& name) {
+                for (size_t at = mSource.find(name); at != std::string_view::npos; at = mSource.find(name, at + 1))
+                {
+                    const bool before = at > 0 && ALScriptLexicon::isNameByte(mSource[at - 1]);
+                    const bool after  = at + name.size() < mSource.size() && ALScriptLexicon::isNameByte(mSource[at + name.size()]);
+                    if (!before && !after)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            std::string name = base;
+            for (int n = 2; taken(name); ++n)
+            {
+                name = base + std::to_string(n);
+            }
+            return name;
         }
 
     private:
@@ -592,6 +623,168 @@ namespace
         });
     }
 
+    // SlRepeatedCall: the same call made more than once in one handler or
+    // function, whose answer cannot have changed between -- llGetOwner()
+    // and its kin, which answer the same throughout an event, and a pure
+    // function given only what the body never changes. A note, fixed as a
+    // local set before the body's first statement that calls it, which
+    // each call then reads; where what it is given is declared by then.
+    // Not safe: a jump past the local would read it unset.
+    void repeatedCalls(const Text& text, LSLScript* script, const ALLSLEffects& effects, ALScriptProblems& out)
+    {
+        static constexpr std::string_view RESERVED[] = { "key",     "list", "string", "integer", "float", "vector", "rotation", "quaternion",
+                                                         "state",   "default", "jump", "return", "if",    "else",   "for",      "do",
+                                                         "while",   "print",   "event" };
+        walk(script, [&](LSLASTNode* node) {
+            if (node->getNodeType() != NODE_EVENT_HANDLER && node->getNodeType() != NODE_GLOBAL_FUNCTION)
+            {
+                return;
+            }
+            LSLASTNode* body = node->getChild(2);
+            if (isNull(body) || body->getNodeSubType() != NODE_COMPOUND_STATEMENT)
+            {
+                return;
+            }
+            const ALLSLEffects::Writes written = effects.of(body);
+            // The body's own statement a node is in.
+            const auto topOf = [&](LSLASTNode* inner) {
+                while (inner && inner->getParent() != body)
+                {
+                    inner = inner->getParent();
+                }
+                return inner;
+            };
+            // Whether a local is declared by one of the body's own statements
+            // before `top`.
+            const auto declaredBefore = [&](LSLSymbol* symbol, LSLASTNode* top) {
+                for (LSLASTNode* stat = body->getChild(0); stat && stat != top; stat = stat->getNext())
+                {
+                    if (stat->getNodeSubType() == NODE_DECLARATION && static_cast<LSLIdentifier*>(stat->getChild(0))->getSymbol() == symbol)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            struct Made
+            {
+                LSLFunctionExpression* call;
+                CallText               parts;
+            };
+            std::vector<std::pair<std::string, std::vector<Made>>> groups;
+            std::vector<std::pair<std::string, std::vector<LSLSymbol*>>> locals;
+            walk(body, [&](LSLASTNode* inner) {
+                if (inner->getNodeSubType() != NODE_FUNCTION_EXPRESSION)
+                {
+                    return;
+                }
+                auto*       call   = static_cast<LSLFunctionExpression*>(inner);
+                LSLSymbol*  symbol = call->getIdentifier()->getSymbol();
+                const char* name   = symbol && symbol->getSubType() == SYM_BUILTIN ? symbol->getName() : nullptr;
+                if (!name)
+                {
+                    return;
+                }
+                const bool has_args = call->getArguments() && call->getArguments()->getChild(0);
+                const bool steady   = ALScriptLintPass::steadyName(name) && !has_args;
+                if (!steady && !(ALLSLTraits::pure(name) && has_args && ALLSLTraits::sideEffectFree(call)))
+                {
+                    return;
+                }
+                // What a pure one reads: nothing the body changes, and some
+                // variable -- a call of constants the optimizer folds.
+                std::vector<LSLSymbol*> own;
+                bool                    reads = false;
+                bool                    still = true;
+                walk(call, [&](LSLASTNode* read) {
+                    if (read->getNodeSubType() != NODE_LVALUE_EXPRESSION)
+                    {
+                        return;
+                    }
+                    LSLSymbol* variable = static_cast<LSLLValueExpression*>(read)->getIdentifier()->getSymbol();
+                    reads               = true;
+                    still               = still && variable && !written.writes(variable);
+                    if (variable && variable->getSubType() == SYM_LOCAL)
+                    {
+                        own.push_back(variable);
+                    }
+                });
+                if (!steady && (!reads || !still))
+                {
+                    return;
+                }
+                std::optional<CallText> parts = callText(text, call, name);
+                if (!parts)
+                {
+                    return;
+                }
+                std::string key = std::string(name) + "(";
+                for (size_t i = 0; i < parts->given.size(); ++i)
+                {
+                    key += (i ? ", " : "") + parts->given[i];
+                }
+                key += ")";
+                auto group = std::find_if(groups.begin(), groups.end(), [&](const auto& g) { return g.first == key; });
+                if (group == groups.end())
+                {
+                    groups.push_back({ key, {} });
+                    locals.push_back({ key, own });
+                    group = groups.end() - 1;
+                }
+                group->second.push_back({ call, std::move(*parts) });
+            });
+            for (size_t g = 0; g < groups.size(); ++g)
+            {
+                auto& [key, made] = groups[g];
+                if (made.size() < 2)
+                {
+                    continue;
+                }
+                std::sort(made.begin(), made.end(), [](const Made& a, const Made& b) { return a.parts.at < b.parts.at; });
+                const char*      name = static_cast<LSLFunctionExpression*>(made.front().call)->getIdentifier()->getSymbol()->getName();
+                ALScriptProblem& said = problem(made.front().call, "LSLSlRepeatedCall",
+                                                "[1] is called [2] times here, and answers the same each time: a local set once holds it",
+                                                { key, std::to_string(made.size()) }, "SlRepeatedCall", out);
+                LSLASTNode*      top  = topOf(made.front().call);
+                const char*      type = typeName(made.front().call->getIType());
+                const size_t     at   = top ? text.begin(top) : std::string_view::npos;
+                bool             ok   = type && at != std::string_view::npos && text.startsLine(at);
+                for (LSLSymbol* local : locals[g].second)
+                {
+                    ok = ok && declaredBefore(local, top);
+                }
+                if (!ok)
+                {
+                    continue;
+                }
+                // Its name: the steady one's own, a length's, else the
+                // function's without ll.
+                const std::string_view lsl  = name;
+                std::string            base = ALScriptLintPass::steadyName(lsl) ? ALScriptLintPass::steadyName(lsl)
+                                              : lsl == "llGetListLength" || lsl == "llStringLength" ? std::string("length")
+                                                                                                    : std::string(lsl.substr(2));
+                base[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(base[0])));
+                if (std::find(std::begin(RESERVED), std::end(RESERVED), base) != std::end(RESERVED))
+                {
+                    base += "Value";
+                }
+                const std::string         local  = text.fresh(base);
+                const auto [line, column]        = text.place(at);
+                const std::string         indent = std::string(text.source().substr(at - static_cast<size_t>(column), static_cast<size_t>(column)));
+                const std::string         call   = std::string(text.source().substr(made.front().parts.at, made.front().parts.close + 1 - made.front().parts.at));
+                std::vector<ALScriptEdit> edits  = { text.edit(at, at, std::string(type) + " " + local + " = " + call + ";\n" + indent) };
+                for (const Made& each : made)
+                {
+                    edits.push_back(text.edit(each.parts.at, each.parts.close + 1, local));
+                }
+                ALScriptFix fix = ALScriptFixes::titled("ScriptFixKeepCall", "Keep [1] in a local, [2]", { key, local });
+                fix.preferred   = true;
+                fix.edits       = std::move(edits);
+                said.fixes.push_back(std::move(fix));
+            }
+        });
+    }
+
     // SlLoopInvariantCall: a call in a loop's check to a function the
     // definitions call pure, whose arguments nothing in the loop changes --
     // llGetListLength(l) where the loop leaves l be -- worked out again on
@@ -674,4 +867,5 @@ void ALLSLLintPass::check(std::string_view source, LSLScript* script, ALScriptPr
     mergeablePrimParams(text, script, out);
     costlyEvents(script, out);
     stringBuilds(script, out);
+    repeatedCalls(text, script, effects, out);
 }

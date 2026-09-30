@@ -120,6 +120,11 @@ public:
     // on, with PRIM_LINK_TARGET and its link before them where it is not
     // the link the rules before it were for. Bracketed as `lua` writes it.
     static std::string mergedRules(const std::vector<PrimCall>& calls, bool lua);
+
+    // SlRepeatedCall's calls that answer the same throughout an event --
+    // llGetOwner, llGetKey -- by LSL's name, and the name a local holding
+    // the answer is given; null for any other.
+    static const char* steadyName(std::string_view lsl);
     static const Rule*              rule(std::string_view name);
     // A rule's bit, or 0 for a name that is none.
     static uint64_t bit(std::string_view name);

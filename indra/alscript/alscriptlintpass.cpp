@@ -102,6 +102,8 @@ namespace
         { "SlFastSensor", Rule::Both, Severity::Note, true, false, nullptr },
         // s ..= x in a loop: a new string each time round.
         { "SlStringBuild", Rule::Both, Severity::Note, true, true, nullptr },
+        // llGetOwner() asked again and again in one handler.
+        { "SlRepeatedCall", Rule::Both, Severity::Note, true, true, nullptr },
     };
 
     const ALScriptLintPass::PrimParams PRIM_PARAMS[] = {
@@ -487,6 +489,28 @@ namespace
         }
     };
 
+    // The calls a function's body makes that answer the same throughout
+    // an event -- ll.GetOwner() -- not looking into the functions it makes.
+    class SteadyCalls final : public Luau::AstVisitor
+    {
+    public:
+        std::vector<Luau::AstExprCall*> calls;
+
+        bool visit(Luau::AstExprFunction*) override { return false; }
+        bool visit(Luau::AstExprCall* node) override
+        {
+            const auto* callee = node->func->as<Luau::AstExprIndexName>();
+            const auto* lib    = callee && callee->op == '.' ? callee->expr->as<Luau::AstExprGlobal>() : nullptr;
+            const std::string_view from = lib ? lib->name.value : "";
+            if ((from == "ll" || from == "llcompat") && node->args.size == 0 &&
+                ALScriptLintPass::steadyName("ll" + std::string(callee->index.value)))
+            {
+                calls.push_back(node);
+            }
+            return true;
+        }
+    };
+
     // What the pass asks the check an expression is.
     enum class Kind : U8
     {
@@ -603,7 +627,78 @@ namespace
                     stringBuild(node, i);
                 }
             }
+            if (on("SlRepeatedCall") && node == mRoot)
+            {
+                repeatedCalls(node);
+            }
             return true;
+        }
+
+        bool visit(Luau::AstExprFunction* node) override
+        {
+            if (on("SlRepeatedCall") && node->body)
+            {
+                repeatedCalls(node->body);
+            }
+            return true;
+        }
+
+        // --- SlRepeatedCall: the same answer asked for again ----------------
+
+        // ll.GetOwner() and its kin called more than once in one function's
+        // body, which answer the same each time: a note, fixed as a local
+        // set before the first statement of the body that calls it, which
+        // each call then reads. Not safe: an event may run over several of
+        // the region's frames, and the owner change between them.
+        void repeatedCalls(Luau::AstStatBlock* body)
+        {
+            SteadyCalls steady;
+            for (Luau::AstStat* stat : body->body)
+            {
+                stat->visit(&steady);
+            }
+            std::vector<std::pair<std::string, std::vector<Luau::AstExprCall*>>> groups;
+            for (Luau::AstExprCall* call : steady.calls)
+            {
+                const std::string function = text(call->func->location);
+                auto group = std::find_if(groups.begin(), groups.end(), [&](const auto& g) { return g.first == function; });
+                if (group == groups.end())
+                {
+                    groups.push_back({ function, {} });
+                    group = groups.end() - 1;
+                }
+                group->second.push_back(call);
+            }
+            for (auto& [function, calls] : groups)
+            {
+                if (calls.size() < 2)
+                {
+                    continue;
+                }
+                std::sort(calls.begin(), calls.end(), [](Luau::AstExprCall* a, Luau::AstExprCall* b) { return a->location.begin < b->location.begin; });
+                ALScriptProblem& said = problem(calls.front()->location, "LuauLintSlRepeatedCall",
+                                                "[1] is called [2] times here, and answers the same each time: a local set once holds it",
+                                                { function + "()", std::to_string(calls.size()) }, "SlRepeatedCall");
+                // The body's statement that calls it first, before which the
+                // local goes.
+                const auto top = std::find_if(body->body.begin(), body->body.end(), [&](Luau::AstStat* stat) {
+                    return !(calls.front()->location.begin < stat->location.begin) && !(stat->location.end < calls.front()->location.end);
+                });
+                const auto* callee = calls.front()->func->as<Luau::AstExprIndexName>();
+                if (top == body->body.end() || !startsLine((*top)->location.begin))
+                {
+                    continue;
+                }
+                const std::string         name   = freshName(ALScriptLintPass::steadyName("ll" + std::string(callee->index.value)));
+                const Luau::Position      at     = (*top)->location.begin;
+                const std::string         indent = text(Luau::Location(Luau::Position(at.line, 0), at));
+                std::vector<ALScriptEdit> edits  = { edit(Luau::Location(at, at), "local " + name + " = " + function + "()\n" + indent) };
+                for (Luau::AstExprCall* call : calls)
+                {
+                    edits.push_back(edit(call->location, name));
+                }
+                offerTitled(said, "ScriptFixKeepCall", "Keep [1] in a local, [2]", { function + "()", name }, std::move(edits), false);
+            }
         }
 
         // --- SlStringBuild: a string grown in a loop -------------------------
@@ -2630,6 +2725,25 @@ std::optional<std::pair<std::string, std::string>> ALScriptLintPass::around(cons
         return out;
     };
     return std::make_pair(bracketed(args.substr(0, first)), bracketed(args.substr(end)));
+}
+
+// static
+const char* ALScriptLintPass::steadyName(std::string_view lsl)
+{
+    static constexpr std::pair<std::string_view, const char*> STEADY[] = {
+        { "llGetCreator", "creator" },
+        { "llGetKey", "primKey" },
+        { "llGetOwner", "owner" },
+        { "llGetScriptName", "scriptName" },
+    };
+    for (const auto& [name, local] : STEADY)
+    {
+        if (name == lsl)
+        {
+            return local;
+        }
+    }
+    return nullptr;
 }
 
 // static

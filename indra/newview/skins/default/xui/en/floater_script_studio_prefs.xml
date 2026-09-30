@@ -66,6 +66,7 @@
     <floater.string name="LintLSLSlFastTimer">A timer under a tenth of a second (the studio's own)</floater.string>
     <floater.string name="LintLSLSlFastSensor">A sensor repeat under a second (the studio's own)</floater.string>
     <floater.string name="LintLSLSlStringBuild">A string joined to in a loop, which makes it anew each time round (the studio's own)</floater.string>
+    <floater.string name="LintLSLSlRepeatedCall">The same answer asked for again in one handler, llGetOwner() and its kin (the studio's own)</floater.string>
     <floater.string name="LintLuauUnknownGlobal">An unknown global (the type checker also reports it)</floater.string>
     <floater.string name="LintLuauDeprecatedGlobal">A deprecated global</floater.string>
     <floater.string name="LintLuauGlobalUsedAsLocal">A global used only inside one function</floater.string>
@@ -116,6 +117,7 @@
     <floater.string name="LintLuauSlFastTimer">A timer under a tenth of a second (the studio's own)</floater.string>
     <floater.string name="LintLuauSlFastSensor">A sensor repeat under a second (the studio's own)</floater.string>
     <floater.string name="LintLuauSlStringBuild">A string joined to in a loop, which makes it anew each time round (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlRepeatedCall">The same answer asked for again in one handler, llGetOwner() and its kin (the studio's own)</floater.string>
     <floater.string name="LintLuauName">[DESCRIPTION]
 
 In a .luaurc: [NAME]</floater.string>

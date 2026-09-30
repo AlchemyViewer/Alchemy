@@ -755,4 +755,53 @@ namespace tut
                                   "6 LSLSlStringBuild|t\n"));
         ensure("the converter's note names it", std::string(ALLSLToSLua::lintOf("SluaStringBuild")) == "SlStringBuild");
     }
+
+    template<> template<>
+    void object::test<19>()
+    {
+        set_test_name("SlRepeatedCall in SLua: ll.GetOwner() and its kin called again in one function's body, not a nested one's; a "
+                      "note, fixed as a local before the body's first statement that calls it");
+        ensure("definitions: " + error, loaded);
+        ensure_equals("each", found("local function report()\n"
+                                    "    print(ll.GetOwner())\n"
+                                    "    if ll.GetOwner() == ll.GetKey() then print(ll.GetOwner()) end\n"
+                                    "    print(ll.GetKey())\n"
+                                    "end\n"
+                                    "print(ll.GetOwner(), llcompat.GetOwner())\n"
+                                    "LLEvents:on(\"touch_start\", function() print(ll.GetScriptName()) print(ll.GetScriptName()) end)\n"
+                                    "print(report)\n",
+                                    "SlRepeatedCall", ALScriptProblem::Severity::Note),
+                      std::string("1 LuauLintSlRepeatedCall|ll.GetOwner()|3\n"
+                                  "2 LuauLintSlRepeatedCall|ll.GetKey()|2\n"
+                                  "6 LuauLintSlRepeatedCall|ll.GetScriptName()|2\n"));
+        ensure_equals("kept", fixed("local function report()\n    print(ll.GetOwner())\n    print(ll.GetOwner())\nend\nprint(report)\n",
+                                    "LuauLintSlRepeatedCall", "Keep ll.GetOwner() in a local, owner", false),
+                      std::string("local function report()\n    local owner = ll.GetOwner()\n    print(owner)\n    print(owner)\nend\nprint(report)\n"));
+    }
+
+    template<> template<>
+    void object::test<20>()
+    {
+        set_test_name("SlRepeatedCall in LSL: a steady call, and a pure one given what the body never changes, declared by the body before; "
+                      "not one given a loop's counter");
+        ensure("builtins: " + error, lslLoaded);
+        ensure_equals("each", found("default {\n"
+                                    "    touch_start(integer n) {\n"
+                                    "        string s = llDetectedName(0);\n"
+                                    "        llOwnerSay((string)llGetOwner());\n"
+                                    "        if (llGetOwner() == llDetectedKey(0)) llOwnerSay(llToUpper(s) + llToUpper(s));\n"
+                                    "        integer i;\n"
+                                    "        for (i = 0; i < 2; ++i) llOwnerSay(llGetSubString(s, i, i) + llGetSubString(s, i, i));\n"
+                                    "    }\n"
+                                    "}\n",
+                                    "SlRepeatedCall", ALScriptProblem::Severity::Note, false),
+                      std::string("3 LSLSlRepeatedCall|llGetOwner()|2\n"
+                                  "4 LSLSlRepeatedCall|llToUpper(s)|2\n"));
+        ensure_equals("a steady one", fixed("default { touch_start(integer n) {\n    llOwnerSay((string)llGetOwner());\n    llOwnerSay((string)llGetOwner());\n} }\n",
+                                            "LSLSlRepeatedCall", "Keep llGetOwner() in a local, owner", false, false),
+                      std::string("default { touch_start(integer n) {\n    key owner = llGetOwner();\n    llOwnerSay((string)owner);\n    llOwnerSay((string)owner);\n} }\n"));
+        ensure_equals("a pure one", fixed("default { state_entry() {\n    string s = \"a\";\n    llOwnerSay(llToUpper(s) + llToUpper(s));\n} }\n",
+                                          "LSLSlRepeatedCall", "Keep llToUpper(s) in a local, toUpper", false, false),
+                      std::string("default { state_entry() {\n    string s = \"a\";\n    string toUpper = llToUpper(s);\n    llOwnerSay(toUpper + toUpper);\n} }\n"));
+    }
 }
