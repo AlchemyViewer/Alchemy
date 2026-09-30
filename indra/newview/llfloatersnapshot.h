@@ -115,6 +115,10 @@ public:
     LLSnapshotLivePreview* getPreviewView();
     virtual void updateControls(LLFloaterSnapshotBase* floater) = 0;
     virtual void updateLayout(LLFloaterSnapshotBase* floater);
+    // Puts back the toolset freeze frame replaced, once. updateLayout runs every
+    // draw, and LLToolMgr::setCurrentTool drops any transient tool, so restoring
+    // on every frame would cancel a picker the moment it was armed.
+    void restoreToolset();
     virtual void updateLivePreview();
     virtual void setStatus(EStatus status, bool ok = true, const std::string& msg = LLStringUtil::null);
     virtual EStatus getStatus() const { return mStatus; }

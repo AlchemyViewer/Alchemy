@@ -217,11 +217,17 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
             previewp->setEnabled(true);
         }
 
-        // RN: freeze all avatars
+        // RN: freeze all avatars, including any that arrived since the last
+        // frame. The new requests are taken before the old ones are dropped, so
+        // no avatar is ever unpaused in between, and the list stays one handle
+        // per avatar instead of growing by that much every frame.
+        std::vector<LLAnimPauseRequest> pause_handles;
+        pause_handles.reserve(LLCharacter::sInstances.size());
         for (LLCharacter* character : LLCharacter::sInstances)
         {
-            floaterp->impl->mAvatarPauseHandles.push_back(character->requestPause());
+            pause_handles.push_back(character->requestPause());
         }
+        floaterp->impl->mAvatarPauseHandles.swap(pause_handles);
 
         // freeze everything else
         gSavedSettings.setBOOL("FreezeTime", true);
@@ -250,10 +256,17 @@ void LLFloaterSnapshotBase::ImplBase::updateLayout(LLFloaterSnapshotBase* floate
         gSavedSettings.setBOOL("FreezeTime", false);
 
         // restore last tool (e.g. pie menu, etc)
-        if (floaterp->impl->mLastToolset)
-        {
-            LLToolMgr::getInstance()->setCurrentToolset(floaterp->impl->mLastToolset);
-        }
+        floaterp->impl->restoreToolset();
+    }
+}
+
+void LLFloaterSnapshotBase::ImplBase::restoreToolset()
+{
+    if (mLastToolset)
+    {
+        LLToolset* toolset = mLastToolset;
+        mLastToolset = nullptr;
+        LLToolMgr::getInstance()->setCurrentToolset(toolset);
     }
 }
 
@@ -979,10 +992,7 @@ LLFloaterSnapshotBase::~LLFloaterSnapshotBase()
     //unfreeze everything else
     gSavedSettings.setBOOL("FreezeTime", false);
 
-    if (impl->mLastToolset)
-    {
-        LLToolMgr::getInstance()->setCurrentToolset(impl->mLastToolset);
-    }
+    impl->restoreToolset();
 
     delete impl;
 }
@@ -1187,10 +1197,7 @@ void LLFloaterSnapshotBase::onClose(bool app_quitting)
     gSavedSettings.setBOOL("FreezeTime", false);
     impl->mAvatarPauseHandles.clear();
 
-    if (impl->mLastToolset)
-    {
-        LLToolMgr::getInstance()->setCurrentToolset(impl->mLastToolset);
-    }
+    impl->restoreToolset();
 }
 
 // virtual
