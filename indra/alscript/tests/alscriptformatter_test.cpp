@@ -259,4 +259,23 @@ namespace tut
                       std::string("1110000"));
         ensure_equals("an escaped quote", marked(ALScriptFormatter::breaksInStrings("string s = \"a\\\"\nb\";\n", false)), std::string("100"));
     }
+    template<> template<>
+    void alscriptformatter_object::test<9>()
+    {
+        set_test_name("a line holding nothing but a comment keeps it, indented as a statement there would be");
+        ensure_equals("LSL",
+                      lsl("// first\ndefault\n{\n// a note\nstate_entry()\n{\n/* over\n   lines */\nif (x)\n// why\nllSay(0, \"a\");\n}\n}\n"),
+                      std::string("// first\ndefault\n{\n    // a note\n    state_entry()\n    {\n        /* over\n   lines */\n        if (x)\n"
+                                  "            // why\n            llSay(0, \"a\");\n    }\n}\n"));
+        ensure_equals("Luau",
+                      lua("-- first\nlocal function f()\n-- a note\nreturn 1\nend\n--[[ over\n   lines ]]\n"),
+                      std::string("-- first\nlocal function f()\n    -- a note\n    return 1\nend\n--[[ over\n   lines ]]\n"));
+        // Some lines asked for, as the studio asks for all of a script's:
+        // every line kept, the comments too.
+        ALScriptFormatter::Options options;
+        ensure_equals("LSL, by lines", ALScriptFormatter::formatLines("{\n// note\n/* a\nb */\n}\n", options, 0, 5),
+                      std::string("{\n    // note\n    /* a\nb */\n}\n"));
+        options.lua = true;
+        ensure_equals("Luau, by lines", ALScriptFormatter::formatLines("do\n-- note\nend\n", options, 0, 3), std::string("do\n    -- note\nend\n"));
+    }
 }

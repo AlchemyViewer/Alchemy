@@ -368,7 +368,9 @@ namespace
                 at      = t.line + static_cast<S32>(t.text.size());
                 continue;
             }
-            if (significant(t))
+            // A comment is something on the line, though nothing of the
+            // structure: a line of one is kept, not emptied as a blank.
+            if (t.kind != Kind::Space)
             {
                 current.blank = false;
             }
