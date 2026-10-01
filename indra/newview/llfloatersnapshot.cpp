@@ -658,6 +658,25 @@ void LLFloaterSnapshot::Impl::setupCutout(LLFloaterSnapshot* floater)
         }
     }
 
+    // The eyedropper has no use over a frozen frame, where a click lands on
+    // the preview: freezing puts down a pick under way, and either way the
+    // row is told.
+    if (LLControlVariable* control = gSavedSettings.getControl("UseFreezeFrame"))
+    {
+        mCutoutSettings.emplace_back(control->getSignal()->connect([](LLControlVariable*, const LLSD& value, const LLSD&)
+        {
+            if (LLFloaterSnapshot* floater = LLFloaterSnapshot::findInstance())
+            {
+                Impl* impl = (Impl*)floater->impl;
+                if (value.asBoolean())
+                {
+                    impl->cancelCutoutPick();
+                }
+                impl->updateCutoutControls(floater);
+            }
+        }));
+    }
+
     // An object's name comes with its properties, whenever they arrive.
     mCutoutObjectName = ALObjectPropertiesCache::instance().setChangeCallback([](const LLUUID& id)
     {
