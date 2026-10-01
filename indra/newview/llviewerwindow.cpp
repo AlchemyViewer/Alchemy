@@ -3214,6 +3214,19 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
         return true;
     }
 
+    // Escape to a tool that holds the mouse -- an eyedropper waiting for its
+    // click, a drag under way -- before whatever has the keyboard: the window
+    // the tool was started from has it, and would take Escape only to drop
+    // its own focus, leaving the tool running.
+    if (key == KEY_ESCAPE && mask == MASK_NONE)
+    {
+        LLTool* tool = LLToolMgr::getInstance()->getCurrentTool();
+        if (tool && tool->hasMouseCapture() && tool->handleKey(key, mask))
+        {
+            return true;
+        }
+    }
+
     LLFocusableElement* keyboard_focus = gFocusMgr.getKeyboardFocus();
 
     if (keyboard_focus
