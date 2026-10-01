@@ -421,6 +421,12 @@ void LLColorSwatchCtrl::showClassicPicker(bool take_focus)
     {
         pickerp = new LLFloaterColorPicker(this, mCanApplyImmediately);
         LLFloater* parent = gFloaterView->getParentFloater(this);
+        if (!parent)
+        {
+            // A window in a floater view of its own, as the snapshot floater
+            // is: the picker goes beside it, and into that view with it.
+            parent = getParentByType<LLFloater>();
+        }
         if (parent)
         {
             parent->addDependentFloater(pickerp);
