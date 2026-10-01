@@ -6171,6 +6171,13 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
                     {
                         type = LLDrawPool::POOL_GLTF_PBR;
                     }
+                    else if (is_pbr && gltf_mat)
+                    {
+                        // Blended glTF. getPoolTypeFromTE returns 0 for PBR faces because their diffuse
+                        // texture slot is nulled above, so it never sees the blend mode. Without this the
+                        // face falls through to sPbrFaces instead of sAlphaFaces and loses its alpha ordering.
+                        type = LLDrawPool::POOL_ALPHA;
+                    }
                     else
                     if (type != LLDrawPool::POOL_ALPHA && force_simple)
                     {
@@ -6225,8 +6232,9 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
                             {
                                 alpha = te->getColor().mV[3];
                             }
-                            if (alpha > 0.f || te->getGlow() > 0.f)
+                            if (alpha > 0.f || (!is_pbr && te->getGlow() > 0.f))
                             { //only treat as alpha in the pipeline if < 100% transparent
+                              //(TE glow keeps a transparent legacy face alive; PBR uses emissive instead)
                                 drawablep->setState(LLDrawable::HAS_ALPHA);
                                 add_face(sAlphaFaces, alpha_count, facep);
                             }
