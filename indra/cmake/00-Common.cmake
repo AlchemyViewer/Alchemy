@@ -285,7 +285,9 @@ endif()
 # binary. Windows sets the format through CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
 # above, and links with full debug information unless the target opts out of
 # it for Release through AL_SKIP_RELEASE_DEBUG_INFO.
-if(LINUX OR DARWIN)
+if(LINUX)
+  target_compile_options(al_flags INTERFACE $<$<CONFIG:Release>:-g> -gz=zstd)
+elseif(DARWIN)
   target_compile_options(al_flags INTERFACE $<$<CONFIG:Release>:-g>)
 elseif(WINDOWS)
   target_link_options(

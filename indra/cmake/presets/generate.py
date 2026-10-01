@@ -39,6 +39,7 @@ bases = [
      'binaryDir': '${sourceParentDir}/build-${hostSystemName}-${presetName}'},
     {'name': 'windows', 'hidden': True, 'condition': host('Windows')},
     {'name': 'macos', 'hidden': True, 'condition': host('Darwin')},
+    {'name': 'linux', 'hidden': True, 'condition': host('Linux')},
     {'name': 'macos-arm64', 'hidden': True, 'cacheVariables': {'CMAKE_OSX_ARCHITECTURES': 'arm64'}},
     {'name': 'macos-x64', 'hidden': True, 'cacheVariables': {'CMAKE_OSX_ARCHITECTURES': 'x86_64'}},
     {'name': 'proprietary', 'hidden': True, 'cacheVariables': {'AL_ENABLE_PROPRIETARY': True}},
@@ -54,6 +55,7 @@ bases.append({'name': 'fullopt', 'hidden': True, 'cacheVariables': FULLOPT})
 build_bases = [
     {'name': 'windows', 'hidden': True, 'condition': host('Windows')},
     {'name': 'macos', 'hidden': True, 'condition': host('Darwin')},
+    {'name': 'linux', 'hidden': True, 'condition': host('Linux')},
 ]
 for short, name in CONFIGS.items():
     build_bases.append({'name': short, 'hidden': True, 'configuration': name})
@@ -84,6 +86,22 @@ def fullopt(generator, display, arch=False, mac_base=False, default_config=None)
     return out
 
 
+def linkers(generator, display):
+    """The Linux presets that pick the linker: the open-source and the
+    proprietary preset and their fullopt presets, once per linker."""
+    out = []
+    for parent, label in [(f'{generator}-os', display), (generator, f'{display} Proprietary')]:
+        for suffix, note in [('', ''), ('-fullopt', 'fully optimized, ')]:
+            for linker in ('lld', 'mold'):
+                p = {'name': f'{parent}{suffix}-{linker}',
+                     'displayName': f'{label} ({note}{linker})',
+                     'inherits': [f'{parent}{suffix}', 'linux', linker]}
+                if suffix and linker == 'lld':
+                    p['description'] = "LTO through lld needs Clang: lld cannot read GCC's LTO objects"
+                out.append(p)
+    return out
+
+
 # Per generator: the configure presets, and the hidden platform base each
 # one's build presets inherit (None for a preset that runs anywhere).
 GENERATORS = {
@@ -111,6 +129,7 @@ GENERATORS = {
         {'name': 'ninja-x64', 'displayName': 'Ninja Multi-Config Proprietary (x86_64)',
          'inherits': ['ninja', 'macos', 'macos-x64']},
         *fullopt('ninja', 'Ninja Multi-Config', arch=True, mac_base=True, default_config='Release'),
+        *linkers('ninja', 'Ninja Multi-Config'),
     ]),
     'xcode': ('macos', [
         {'name': 'xcode-os', 'displayName': 'Xcode',
@@ -131,9 +150,11 @@ GENERATORS = {
 
 
 def platform_of(preset, default):
-    """The Ninja presets that name a macOS architecture run only there."""
-    if 'macos' in preset.get('inherits', []):
-        return 'macos'
+    """The Ninja presets that name a macOS architecture or a Linux linker
+    run only there."""
+    for system in ('macos', 'linux'):
+        if system in preset.get('inherits', []):
+            return system
     return default
 
 

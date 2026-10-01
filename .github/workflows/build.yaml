@@ -247,7 +247,7 @@ jobs:
             libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
             libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
             libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
-            libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev mono-complete \
+            libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev mold \
             nasm ninja-build pkgconf tar tex-common texinfo unzip zip
 
           sudo locale-gen en_US.UTF-8
@@ -265,7 +265,7 @@ jobs:
       - name: macOS Homebrew Dependency Install
         if: runner.os == 'macOS'
         run: |
-          brew install autoconf autoconf-archive automake libtool mono nasm unzip zip
+          brew install autoconf autoconf-archive automake libtool nasm unzip zip
 
       - name: Checkout code
         uses: actions/checkout@v7
@@ -333,34 +333,6 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.VCPKG_R2_SECRET_ACCESS_KEY }}
         run: python scripts/vcpkg/configure_r2_cache.py
 
-      # - name: Set up vcpkg nuget caching
-      #   shell: bash
-      #   run: |
-      #     if [[ "$RUNNER_OS" == "Windows" ]]
-      #     then
-      #       $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
-      #         sources add \
-      #         -Source "${{ env.VCPKG_FEED_URL }}" \
-      #         -StorePasswordInClearText \
-      #         -Name GitHubPackages \
-      #         -UserName "${{ env.VCPKG_USERNAME }}" \
-      #         -Password "${{ secrets.GITHUB_TOKEN }}"
-      #       $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
-      #         setapikey "${{ secrets.GITHUB_TOKEN }}" \
-      #         -Source "${{ env.VCPKG_FEED_URL }}"
-      #     else
-      #       mono $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
-      #         sources add \
-      #         -Source "${{ env.VCPKG_FEED_URL }}" \
-      #         -StorePasswordInClearText \
-      #         -Name GitHubPackages \
-      #         -UserName "${{ env.VCPKG_USERNAME }}" \
-      #         -Password "${{ secrets.GITHUB_TOKEN }}"
-      #       mono $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
-      #         setapikey "${{ secrets.GITHUB_TOKEN }}" \
-      #         -Source "${{ env.VCPKG_FEED_URL }}"
-      #     fi
-
       - name: Cache Rust Dependencies
         uses: actions/cache@v6
         with:
@@ -401,7 +373,7 @@ jobs:
               vcpkg_triplet="$BUILD_ARCH-osx-alchemy-release"
               ;;
             Linux)
-              cmake_preset_name="ninja${cmake_preset_postfix}-fullopt"
+              cmake_preset_name="ninja${cmake_preset_postfix}-fullopt-mold"
               build_directory="build-Linux-$cmake_preset_name"
               if [[ "$BUILD_ARCH" == "arm64" ]]
               then
