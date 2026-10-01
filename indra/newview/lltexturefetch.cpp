@@ -285,7 +285,7 @@ class LLTextureFetchWorker : public LLWorkerClass, public LLCore::HttpHandler
     friend class LLTextureFetch;
 
 private:
-    class CacheReadResponder : public LLTextureCache::ReadResponder
+    class CacheReadResponder final : public LLTextureCache::ReadResponder
     {
     public:
 
@@ -297,7 +297,7 @@ private:
         }
 
         // Threads:  Ttc
-        virtual void completed(bool success)
+        void completed(bool success) override
         {
             LL_PROFILE_ZONE_SCOPED;
             LLTextureFetchWorker* worker = mFetcher->getWorker(mID);
@@ -311,7 +311,7 @@ private:
         LLUUID mID;
     };
 
-    class CacheWriteResponder : public LLTextureCache::WriteResponder
+    class CacheWriteResponder final : public LLTextureCache::WriteResponder
     {
     public:
 
@@ -322,7 +322,7 @@ private:
         }
 
         // Threads:  Ttc
-        virtual void completed(bool success)
+        void completed(bool success) override
         {
             LL_PROFILE_ZONE_SCOPED;
             LLTextureFetchWorker* worker = mFetcher->getWorker(mID);
@@ -336,7 +336,7 @@ private:
         LLUUID mID;
     };
 
-    class DecodeResponder : public LLImageDecodeThread::Responder
+    class DecodeResponder final : public LLImageDecodeThread::Responder
     {
     public:
 
@@ -356,7 +356,7 @@ private:
         }
 
         // Threads:  Tid
-        virtual void completed(bool success, const std::string& error_message, LLImageRaw* raw, LLImageRaw* aux, U32 request_id)
+        void completed(bool success, const std::string& error_message, LLImageRaw* raw, LLImageRaw* aux, U32 request_id) override
         {
             LL_PROFILE_ZONE_SCOPED;
             // A worker taken out of the fetcher is on its way to deletion and takes no result.
