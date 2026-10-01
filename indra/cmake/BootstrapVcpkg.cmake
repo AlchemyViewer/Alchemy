@@ -49,13 +49,16 @@ if(EXISTS "${VCPKG_BOOTSTRAP}")
   endif()
 endif()
 
-# The triplet, unless the caller named one: <arch>-<os>-alchemy[<tier>][-release].
-# The tier follows AL_ISA_TIER on the platforms that build ports per tier, and
-# a single-configuration tree that is not Debug takes the release-only ports.
+# The triplet, unless the caller named one:
+# <arch>-<os>-alchemy[-clang][<tier>][-release]. -clang is Linux's, for a
+# viewer built with Clang. The tier follows AL_ISA_TIER on the platforms that
+# build ports per tier, and a single-configuration tree that is not Debug
+# takes the release-only ports.
 get_property(LL_GENERATOR_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(NOT DEFINED VCPKG_TARGET_TRIPLET)
   include(${CMAKE_CURRENT_LIST_DIR}/AlchemyTarget.cmake)
 
+  set(triplet_compiler "")
   if(WIN32)
     set(triplet_system Windows)
     set(triplet_os windows)
@@ -82,6 +85,30 @@ if(NOT DEFINED VCPKG_TARGET_TRIPLET)
     else()
       set(triplet_arch x64)
     endif()
+
+    # GCC and Clang builds of some ports are not interchangeable, so a viewer
+    # built with Clang takes the triplets whose ports Clang builds. project()
+    # has not chosen the compiler yet: this reads the one it will choose, as
+    # CMake does -- the cache, then CXX, then c++ -- and through any symlink,
+    # since c++ may be Clang. al_vcpkg_check_triplet_compiler() checks the
+    # guess against the compiler project() found.
+    set(triplet_cxx c++)
+    if(CMAKE_CXX_COMPILER)
+      set(triplet_cxx "${CMAKE_CXX_COMPILER}")
+    elseif(NOT "$ENV{CXX}" STREQUAL "")
+      separate_arguments(triplet_cxx UNIX_COMMAND "$ENV{CXX}")
+    endif()
+    list(GET triplet_cxx 0 triplet_cxx)
+    get_filename_component(triplet_cxx_names "${triplet_cxx}" NAME)
+    find_program(triplet_cxx_path NAMES "${triplet_cxx}" NO_CACHE)
+    if(triplet_cxx_path)
+      file(REAL_PATH "${triplet_cxx_path}" triplet_cxx_path)
+      get_filename_component(triplet_cxx_real "${triplet_cxx_path}" NAME)
+      list(APPEND triplet_cxx_names "${triplet_cxx_real}")
+    endif()
+    if(triplet_cxx_names MATCHES "clang")
+      set(triplet_compiler "-clang")
+    endif()
   endif()
 
   al_isa_triplet_tier("${AL_ISA_TIER}" "${triplet_system}" "${triplet_arch}" triplet_tier)
@@ -91,8 +118,40 @@ if(NOT DEFINED VCPKG_TARGET_TRIPLET)
     set(triplet_release "-release")
   endif()
 
-  set(VCPKG_TARGET_TRIPLET "${triplet_arch}-${triplet_os}-alchemy${triplet_tier}${triplet_release}")
+  set(
+    VCPKG_TARGET_TRIPLET
+    "${triplet_arch}-${triplet_os}-alchemy${triplet_compiler}${triplet_tier}${triplet_release}"
+  )
 endif()
+
+# A Linux alchemy triplet names the compiler its ports were built with, and
+# the viewer has to be built with the same one. Called once project() has
+# found the compiler, which is after vcpkg has installed the ports.
+function(al_vcpkg_check_triplet_compiler)
+  if(NOT VCPKG_TARGET_TRIPLET MATCHES "-linux-alchemy")
+    return()
+  endif()
+  if(VCPKG_TARGET_TRIPLET MATCHES "-linux-alchemy-clang")
+    set(ports Clang)
+    string(REPLACE "-linux-alchemy-clang" "-linux-alchemy" matching "${VCPKG_TARGET_TRIPLET}")
+  else()
+    set(ports GCC)
+    string(REPLACE "-linux-alchemy" "-linux-alchemy-clang" matching "${VCPKG_TARGET_TRIPLET}")
+  endif()
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set(viewer Clang)
+  else()
+    set(viewer GCC)
+  endif()
+  if(NOT ports STREQUAL viewer)
+    message(
+      FATAL_ERROR
+      "The viewer is being built with ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER}), "
+      "but the ports of ${VCPKG_TARGET_TRIPLET} are built with ${ports}, and the two "
+      "are not interchangeable. Use the triplet ${matching}, or build the viewer with ${ports}."
+    )
+  endif()
+endfunction()
 
 # vcpkg's toolchain runs `vcpkg install` inside project() on every configure,
 # and a run that installs nothing still costs seconds. It runs only when
@@ -109,7 +168,11 @@ option(
 )
 set(AL_VCPKG_INSTALL_STAMP_FILE "${CMAKE_BINARY_DIR}/vcpkg-install.stamp")
 if(AL_VCPKG_INSTALL)
-  file(GLOB al_vcpkg_triplet_files "${CMAKE_SOURCE_DIR}/cmake/triplets/*.cmake")
+  file(
+    GLOB al_vcpkg_triplet_files
+    "${CMAKE_SOURCE_DIR}/cmake/triplets/*.cmake"
+    "${CMAKE_SOURCE_DIR}/cmake/toolchains/*.cmake"
+  )
   set(al_vcpkg_install_key "")
   foreach(
     input

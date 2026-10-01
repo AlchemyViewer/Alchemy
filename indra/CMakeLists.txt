@@ -333,6 +333,7 @@ project(${AL_PROJECT_NAME} LANGUAGES C CXX)
 if(DEFINED AL_VCPKG_INSTALL_KEY)
   file(WRITE "${AL_VCPKG_INSTALL_STAMP_FILE}" "${AL_VCPKG_INSTALL_KEY}")
 endif()
+al_vcpkg_check_triplet_compiler()
 
 # Location of indra directory
 set(INDRA_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")

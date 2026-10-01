@@ -43,6 +43,8 @@ bases = [
     {'name': 'macos-arm64', 'hidden': True, 'cacheVariables': {'CMAKE_OSX_ARCHITECTURES': 'arm64'}},
     {'name': 'macos-x64', 'hidden': True, 'cacheVariables': {'CMAKE_OSX_ARCHITECTURES': 'x86_64'}},
     {'name': 'proprietary', 'hidden': True, 'cacheVariables': {'AL_ENABLE_PROPRIETARY': True}},
+    {'name': 'clang', 'hidden': True,
+     'cacheVariables': {'CMAKE_C_COMPILER': 'clang', 'CMAKE_CXX_COMPILER': 'clang++'}},
     {'name': 'lld', 'hidden': True, 'cacheVariables': {'CMAKE_LINKER_TYPE': 'LLD'}},
     {'name': 'mold', 'hidden': True, 'cacheVariables': {'CMAKE_LINKER_TYPE': 'MOLD'}},
     {'name': 'ccache', 'hidden': True,
@@ -86,19 +88,26 @@ def fullopt(generator, display, arch=False, mac_base=False, default_config=None)
     return out
 
 
-def linkers(generator, display):
-    """The Linux presets that pick the linker: the open-source and the
-    proprietary preset and their fullopt presets, once per linker."""
+def toolchains(generator, display):
+    """The Linux presets that pick the compiler, the linker or both: the
+    open-source and the proprietary preset and their fullopt presets, once
+    per pairing but the default compiler with the default linker. Clang
+    builds the ports too, under the -clang triplets BootstrapVcpkg.cmake
+    picks when the viewer's compiler is Clang."""
     out = []
     for parent, label in [(f'{generator}-os', display), (generator, f'{display} Proprietary')]:
         for suffix, note in [('', ''), ('-fullopt', 'fully optimized, ')]:
-            for linker in ('lld', 'mold'):
-                p = {'name': f'{parent}{suffix}-{linker}',
-                     'displayName': f'{label} ({note}{linker})',
-                     'inherits': [f'{parent}{suffix}', 'linux', linker]}
-                if suffix and linker == 'lld':
-                    p['description'] = "LTO through lld needs Clang: lld cannot read GCC's LTO objects"
-                out.append(p)
+            for compiler in ('', 'clang'):
+                for linker in ('', 'lld', 'mold'):
+                    picks = [pick for pick in (compiler, linker) if pick]
+                    if not picks:
+                        continue
+                    p = {'name': '-'.join([f'{parent}{suffix}', *picks]),
+                         'displayName': f'{label} ({note}{", ".join(picks)})',
+                         'inherits': [f'{parent}{suffix}', 'linux', *picks]}
+                    if suffix and linker == 'lld' and not compiler:
+                        p['description'] = "LTO through lld needs Clang: lld cannot read GCC's LTO objects"
+                    out.append(p)
     return out
 
 
@@ -129,7 +138,7 @@ GENERATORS = {
         {'name': 'ninja-x64', 'displayName': 'Ninja Multi-Config Proprietary (x86_64)',
          'inherits': ['ninja', 'macos', 'macos-x64']},
         *fullopt('ninja', 'Ninja Multi-Config', arch=True, mac_base=True, default_config='Release'),
-        *linkers('ninja', 'Ninja Multi-Config'),
+        *toolchains('ninja', 'Ninja Multi-Config'),
     ]),
     'xcode': ('macos', [
         {'name': 'xcode-os', 'displayName': 'Xcode',

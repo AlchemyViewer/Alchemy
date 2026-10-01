@@ -206,6 +206,7 @@ Most contributors want the `-os` variants.
 | `vs2026-os`                                  | Windows  | Visual Studio      |
 | `ninja-os`                                   | Linux    | Ninja Multi-Config |
 | `ninja-os-lld`, `ninja-os-mold`              | Linux    | Ninja Multi-Config |
+| `ninja-os-clang`, `ninja-os-clang-lld`       | Linux    | Ninja Multi-Config |
 | `ninja-os-arm64`, `ninja-os-x64`             | macOS    | Ninja Multi-Config |
 | `xcode-os`, `xcode-os-arm64`, `xcode-os-x64` | macOS    | Xcode              |
 
@@ -227,8 +228,8 @@ access, retention, and rollout checks.
 
 - **macOS** — `xcode-os` and `ninja-os` (no arch suffix) pick the host architecture. Use the explicit `-arm64` / `-x64` preset to cross-build (e.g. an arm64 bundle from an Intel Mac).
 - **Linux linker** — `ninja[-os][-fullopt]-lld` and `ninja[-os][-fullopt]-mold` link with lld or mold instead of the toolchain's default, through `CMAKE_LINKER_TYPE`. LTO through lld needs Clang, because lld cannot read GCC's LTO objects; mold reads both.
-- **Linux with Clang** (faster builds): append `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++` to the configure command of `ninja-os-lld`. The hidden `lld` and `mold` presets set `CMAKE_LINKER_TYPE`, and `ccache` and `sccache` set the compiler launcher, for a preset of your own in `CMakeUserPresets.json`, for example `{"name": "mine", "inherits": ["ninja-os", "mold", "ccache"]}`. A compiler cache needs `/Z7`-style debug info on MSVC, which this tree does not use, so the launcher presets are for Linux and macOS.
-- **vcpkg triplet** — chosen from the generator, the architecture and `AL_ISA_TIER`: `<arch>-<os>-alchemy[-avx2|-avx512][-release]`, where `-release` means a single-configuration tree that is not Debug and skips the debug ports. Pass `-DVCPKG_TARGET_TRIPLET=<name>` to choose one yourself; CI does, to take release-only ports under a multi-config generator.
+- **Linux with Clang** — `ninja[-os][-fullopt]-clang`, with `-lld` or `-mold` after it to pick the linker too. GCC and Clang builds of some ports are not interchangeable, so a viewer built with Clang takes the `-clang` triplets, whose ports Clang builds as well, through [`cmake/toolchains/linux-clang.cmake`](../indra/cmake/toolchains/linux-clang.cmake); the first configure builds that dependency tree from scratch. The triplet follows the compiler however it was chosen — a preset, `-DCMAKE_CXX_COMPILER=clang++`, `CXX=clang++`, or a `c++` that is Clang — and a configure whose compiler and triplet disagree stops with an error. The ports are built with the `clang` and `clang++` on `PATH`. The hidden `clang`, `lld` and `mold` presets set the compiler and `CMAKE_LINKER_TYPE`, and `ccache` and `sccache` set the compiler launcher, for a preset of your own in `CMakeUserPresets.json`, for example `{"name": "mine", "inherits": ["ninja-os", "clang", "mold", "ccache"]}`. A compiler cache needs `/Z7`-style debug info on MSVC, which this tree does not use, so the launcher presets are for Linux and macOS.
+- **vcpkg triplet** — chosen from the generator, the architecture, `AL_ISA_TIER` and, on Linux, the compiler: `<arch>-<os>-alchemy[-clang][-avx2|-avx512][-release]`, where `-release` means a single-configuration tree that is not Debug and skips the debug ports. Pass `-DVCPKG_TARGET_TRIPLET=<name>` to choose one yourself; CI does, to take release-only ports under a multi-config generator.
 
 ### Workflow presets (one-shot configure + build)
 
