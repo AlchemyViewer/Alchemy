@@ -381,12 +381,18 @@ bool LLSpinCtrl::handleHover(S32 x, S32 y, MASK mask)
         {
             scrubTo(x, y, mask);
         }
-        getWindow()->setCursor(vertical ? UI_CURSOR_SIZENS : UI_CURSOR_SIZEWE);
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(vertical ? UI_CURSOR_SIZENS : UI_CURSOR_SIZEWE);
+        }
         return true;
     }
     if (inScrubZone(x, y))
     {
-        getWindow()->setCursor(vertical ? UI_CURSOR_SIZENS : UI_CURSOR_SIZEWE);
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(vertical ? UI_CURSOR_SIZENS : UI_CURSOR_SIZEWE);
+        }
         return true;
     }
     return LLF32UICtrl::handleHover(x, y, mask);

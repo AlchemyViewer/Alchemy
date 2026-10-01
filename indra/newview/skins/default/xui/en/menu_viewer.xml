@@ -77,8 +77,6 @@
         <menu_item_check.on_click
          function="Floater.Toggle"
          parameter="music_ticker" />
-        <menu_item_check.on_enable
-         function="EnableMusicTicker" />
       </menu_item_check>
       <menu_item_separator/>
       <menu_item_call
@@ -1492,8 +1490,8 @@ function="World.EnvPreset"
           <menu_item_call.on_click
              function="Tools.LookAtSelection"
              parameter="focus" />
-          <menu_item_call.on_enable
-             function="Tools.SomethingSelectedNoHUD" />
+          <!--<menu_item_call.on_enable
+             function="Tools.SomethingSelectedNoHUD" />-->
         </menu_item_call>
         <menu_item_call
            label="Zoom to Selection"
@@ -1502,8 +1500,8 @@ function="World.EnvPreset"
           <menu_item_call.on_click
              function="Tools.LookAtSelection"
              parameter="zoom" />
-          <menu_item_call.on_enable
-             function="Tools.SomethingSelectedNoHUD" />
+          <!--<menu_item_call.on_enable
+             function="Tools.SomethingSelectedNoHUD" />-->
         </menu_item_call>
 		 
         <menu_item_separator/>
@@ -3962,8 +3960,6 @@ function="World.EnvPreset"
             <menu_item_check.on_click
              function="Advanced.ClickRenderShadowOption"
              parameter="RenderShadowDetail" />
-            <menu_item_check.on_enable
-                 function="Advanced.EnableRenderDeferredOptions" />
           </menu_item_check>
           <menu_item_check
                    label="   SSAO and Shadow Smoothing"
@@ -3974,8 +3970,6 @@ function="World.EnvPreset"
             <menu_item_check.on_click
              function="ToggleControl"
              parameter="RenderDeferredSSAO" />
-            <menu_item_check.on_enable
-                 function="Advanced.EnableRenderDeferredOptions" />
           </menu_item_check>
           <menu_item_separator />
 

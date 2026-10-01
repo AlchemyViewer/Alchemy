@@ -596,12 +596,18 @@ bool ALCanvasView::handleHover(S32 x, S32 y, MASK mask)
     if (mPan.pressed())
     {
         panTo(x, y);
-        getWindow()->setCursor(UI_CURSOR_HAND);
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_HAND);
+        }
         return true;
     }
     if (panGesture())
     {
-        getWindow()->setCursor(UI_CURSOR_HAND);
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_HAND);
+        }
         return true;
     }
     toContent(x, y);
