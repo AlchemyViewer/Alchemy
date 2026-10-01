@@ -17,7 +17,7 @@
 
 include_guard()
 
-set(AL_MACOS_DEPLOYMENT_TARGET 14.0)
+set(AL_MACOS_DEPLOYMENT_TARGET 26.0)
 
 # al_isa_flags(<tier> <system> <architecture> <result>)
 #   system is Windows, Linux or Darwin; architecture is x64, x86_64 or arm64.

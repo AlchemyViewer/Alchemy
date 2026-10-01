@@ -9,7 +9,7 @@
 # file carries a revision, every triplet states the revision it was written
 # against, and the two must agree. Editing either file means bumping both,
 # which changes every triplet's hash and rebuilds the ports.
-set(ALCHEMY_TRIPLET_BASE_REVISION 4)
+set(ALCHEMY_TRIPLET_BASE_REVISION 5)
 if(NOT ALCHEMY_TRIPLET_REVISION EQUAL ALCHEMY_TRIPLET_BASE_REVISION)
   message(
     FATAL_ERROR
@@ -39,13 +39,15 @@ if(PORT STREQUAL "webrtc")
   set(VCPKG_BUILD_TYPE release)
 endif()
 
+set(VCPKG_CMAKE_CONFIGURE_OPTIONS "-DCMAKE_CXX_STANDARD=23")
+
 if(NOT DEFINED VCPKG_CMAKE_SYSTEM_NAME)
   # Windows. The CRT is static, as the viewer's is. MSVC reports the C++
   # standard it implements only when asked.
   set(VCPKG_CRT_LINKAGE static)
   al_isa_flags(${ALCHEMY_ISA_TIER} Windows ${VCPKG_TARGET_ARCHITECTURE} isa_flags)
   set(VCPKG_C_FLAGS "${isa_flags}")
-  set(VCPKG_CXX_FLAGS "${isa_flags} /std:c++20 /Zc:__cplusplus")
+  set(VCPKG_CXX_FLAGS "${isa_flags} /std:c++23 /Zc:__cplusplus")
 else()
   set(VCPKG_CRT_LINKAGE dynamic)
   al_isa_flags(
@@ -60,7 +62,7 @@ else()
   # line number on every platform; the strip and dSYM steps take them back
   # out of what ships.
   set(VCPKG_C_FLAGS "${isa_flags} -fvisibility=hidden")
-  set(VCPKG_CXX_FLAGS "${isa_flags} -fvisibility=hidden -fvisibility-inlines-hidden")
+  set(VCPKG_CXX_FLAGS "${isa_flags} -std=c++23 -fvisibility=hidden -fvisibility-inlines-hidden")
   if(VCPKG_CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(VCPKG_OSX_DEPLOYMENT_TARGET ${AL_MACOS_DEPLOYMENT_TARGET})
     if(VCPKG_TARGET_ARCHITECTURE STREQUAL "arm64")

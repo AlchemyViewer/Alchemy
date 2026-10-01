@@ -147,7 +147,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        runner: ["windows-2025-vs2026", "macos-26", "ubuntu-26.04"]
+        runner: ["windows-2025-vs2026", "xcode-27", "ubuntu-26.04"]
         configuration: [release]
         arch: [x64, arm64]
         build_variant: [Viewer, Tests]
@@ -158,13 +158,15 @@ jobs:
             arch: arm64
           - runner: windows-2025-vs2026
             arch: arm64
-          - build_variant: Viewer
+          - runner: xcode-27
             configuration: relwithdebinfo
-          - build_variant: Viewer
+          - runner: xcode-27
             configuration: optdebug
-          - runner: macos-26
+          - runner: xcode-27
+            arch: x64
+          - build_variant: Viewer
             configuration: relwithdebinfo
-          - runner: macos-26
+          - build_variant: Viewer
             configuration: optdebug
         include:
           # Linux on arm64: NEON is a first-class target, and this is the
@@ -200,7 +202,7 @@ jobs:
       velopack_mac_bundle_id:    ${{ steps.build.outputs.velopack_mac_bundle_id }}
     env:
       # Sets Xcode version used for build
-      DEVELOPER_DIR: "/Applications/Xcode_26.6.app/Contents/Developer"
+      DEVELOPER_DIR: "/Applications/Xcode.app/Contents/Developer"
       # Decide if we're building tests or the viewer
       AL_BUILD_VIEWER: ${{ matrix.build_variant == 'Viewer' }}
       AL_BUILD_APPEARANCE_UTILITY: false # ${{ startsWith(matrix.runner, 'ubuntu-') && matrix.build_variant == 'Viewer' }}
