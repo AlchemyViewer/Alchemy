@@ -21,9 +21,9 @@
   service adds the rest at runtime.
 
   indent: how the language indents. opens, a pattern found at the end
-  of the text before the caret, which sends a new line in a level -- or a
+  of the text before the caret, which sends a new line in a level - or a
   list of them, each a pattern or a map of one, regex, and unless, what
-  keeps it from opening a block if found anywhere from where it starts --
+  keeps it from opening a block if found anywhere from where it starts -
   and closes, one matched at the start of a line's text, which brings the
   line out to the level of what opened it as it is typed.
   pairs: the brackets and quotes typed in pairs, each its opener and
