@@ -3676,7 +3676,7 @@ bool LLAppViewer::initWindow()
     gViewerWindow->initBase();
 
     // show viewer window
-    //gViewerWindow->getWindow()->show();
+    gViewerWindow->getWindow()->show();
 
     LL_INFOS("AppInit") << "Window initialization done." << LL_ENDL;
 
