@@ -9,7 +9,7 @@
 # file carries a revision, every triplet states the revision it was written
 # against, and the two must agree. Editing either file means bumping both,
 # which changes every triplet's hash and rebuilds the ports.
-set(ALCHEMY_TRIPLET_BASE_REVISION 3)
+set(ALCHEMY_TRIPLET_BASE_REVISION 4)
 if(NOT ALCHEMY_TRIPLET_REVISION EQUAL ALCHEMY_TRIPLET_BASE_REVISION)
   message(
     FATAL_ERROR
@@ -61,8 +61,6 @@ else()
   # out of what ships.
   set(VCPKG_C_FLAGS "${isa_flags} -fvisibility=hidden")
   set(VCPKG_CXX_FLAGS "${isa_flags} -fvisibility=hidden -fvisibility-inlines-hidden")
-  set(VCPKG_C_FLAGS_RELEASE "-g1")
-  set(VCPKG_CXX_FLAGS_RELEASE "-g1")
   if(VCPKG_CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(VCPKG_OSX_DEPLOYMENT_TARGET ${AL_MACOS_DEPLOYMENT_TARGET})
     if(VCPKG_TARGET_ARCHITECTURE STREQUAL "arm64")
