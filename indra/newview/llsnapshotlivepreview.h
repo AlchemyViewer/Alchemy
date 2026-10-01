@@ -123,6 +123,9 @@ public:
     /// Sets size of preview thumbnail image and the surrounding rect.
     void setThumbnailPlaceholderRect(const LLRect& rect) {mThumbnailPlaceholderRect = rect; }
     bool setThumbnailImageSize() ;
+    /// True if the thumbnail is the preview made smaller, rather than a
+    /// screen grab of its own -- and so sized from the preview too.
+    bool thumbnailFromPreview() const;
     void generateThumbnailImage(bool force_update = false) ;
     void resetThumbnailImage() { mThumbnailImage = NULL ; }
     void drawPreviewRect(S32 offset_x, S32 offset_y, LLColor4 alpha_color = LLColor4(0.5f, 0.5f, 0.5f, 0.8f));

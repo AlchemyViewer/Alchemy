@@ -489,8 +489,9 @@ bool LLSnapshotLivePreview::setThumbnailImageSize()
     {
         return false ;
     }
-    S32 width  = (mThumbnailSubsampled ? mPreviewImage->getWidth()  : gViewerWindow->getWindowWidthRaw());
-    S32 height = (mThumbnailSubsampled ? mPreviewImage->getHeight() : gViewerWindow->getWindowHeightRaw()) ;
+    const bool from_preview = thumbnailFromPreview();
+    S32 width  = (from_preview ? mPreviewImage->getWidth()  : gViewerWindow->getWindowWidthRaw());
+    S32 height = (from_preview ? mPreviewImage->getHeight() : gViewerWindow->getWindowHeightRaw()) ;
 
     F32 aspect_ratio = ((F32)width) / ((F32)height);
 
@@ -511,7 +512,10 @@ bool LLSnapshotLivePreview::setThumbnailImageSize()
         mThumbnailWidth = ll_round((F32)max_height * aspect_ratio);
     }
 
-    if (mThumbnailWidth > width || mThumbnailHeight > height)
+    // A screen grab can be no bigger than the window, so a window smaller than
+    // the thumbnail skips updating it. One made from the preview is scaled,
+    // and a small preview -- a 128x128 texture -- is scaled up.
+    if (!from_preview && (mThumbnailWidth > width || mThumbnailHeight > height))
     {
         return false ;//if the window is too small, ignore thumbnail updating.
     }
@@ -538,6 +542,15 @@ bool LLSnapshotLivePreview::setThumbnailImageSize()
     mPreviewRect.set(left - 1, top + 1, right + 1, bottom - 1) ;
 
     return true ;
+}
+
+bool LLSnapshotLivePreview::thumbnailFromPreview() const
+{
+    // A cutout's thumbnail is the cutout made smaller, not a render of its
+    // own: that would reallocate every screen buffer a second time for the
+    // same frame. Its shape is the cutout's, then, not the window's -- a
+    // square texture's preview drawn to the window's shape is stretched.
+    return mThumbnailSubsampled || (mCutout && mPreviewImage.notNull());
 }
 
 void LLSnapshotLivePreview::generateThumbnailImage(bool force_update)
@@ -575,10 +588,7 @@ void LLSnapshotLivePreview::generateThumbnailImage(bool force_update)
 
     LLPointer<LLImageRaw> raw = new LLImageRaw;
 
-    // A cutout's thumbnail is the cutout made smaller, not a render of its
-    // own: that would reallocate every screen buffer a second time for the
-    // same frame.
-    if (mThumbnailSubsampled || (mCutout && mPreviewImage.notNull()))
+    if (thumbnailFromPreview())
     {
         // The thumbnail is be a subsampled version of the preview (used in SL Share previews, i.e. Flickr, Twitter)
         raw->resize( mPreviewImage->getWidth(),
