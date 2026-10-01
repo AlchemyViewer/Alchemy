@@ -1090,6 +1090,7 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
             render_hud = false;
         }
 
+        bool cutout_drawn = true;
         if (gViewerWindow->rawSnapshot(raw,
                                        width,
                                        height,
@@ -1102,8 +1103,17 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
                                        render_balance,
                                        LLSnapshotModel::SNAPSHOT_TYPE_COLOR,
                                        high_res ? S32_MAX : MAX_SNAPSHOT_IMAGE_SIZE, //per side
-                                       cutout ? &*cutout : nullptr))
+                                       cutout ? &*cutout : nullptr,
+                                       &cutout_drawn))
         {
+            if (cutout && !cutout_drawn)
+            {
+                // There, but out of the frame or past the draw distance: the
+                // image would be the fill alone.
+                LLNotificationsUtil::add("CutoutTargetMissing");
+                return true;
+            }
+
             LLPointer<LLImageFormatted> formatted = LLSnapshotLivePreview::createFormattedImage(fmt, gSavedSettings.getS32("SnapshotQuality"));
             formatted->enableOverSize() ;
             formatted->encode(raw, 0);

@@ -38,7 +38,7 @@ namespace
     }
 }
 
-bool ALCutoutImage::resolve(LLImageRaw& raw, S32 width, S32 height, const LLColor4& fill, bool keep_alpha)
+bool ALCutoutImage::resolve(LLImageRaw& raw, S32 width, S32 height, const LLColor4& fill, bool keep_alpha, bool* drawn)
 {
     LLImageDataLock lock(&raw);
 
@@ -47,16 +47,24 @@ bool ALCutoutImage::resolve(LLImageRaw& raw, S32 width, S32 height, const LLColo
         return false;
     }
 
-    // A premultiplied texel is never brighter than it is opaque.
+    // A premultiplied texel is never brighter than it is opaque. And at full
+    // size, before anything is averaged away, any texel covered at all is the
+    // subject drawn.
     {
         U8* data = raw.getData();
         const S32 texels = raw.getWidth() * raw.getHeight();
+        U8 covered = 0;
         for (S32 i = 0; i < texels; ++i, data += 4)
         {
             const U8 alpha = data[3];
             data[0] = std::min(data[0], alpha);
             data[1] = std::min(data[1], alpha);
             data[2] = std::min(data[2], alpha);
+            covered |= alpha;
+        }
+        if (drawn)
+        {
+            *drawn = covered != 0;
         }
     }
 

@@ -56,8 +56,11 @@ namespace ALCutoutImage
     ///   by it. Without, it is RGB over the fill taken as opaque, for formats
     ///   that have nowhere to put alpha.
     ///
+    /// With @a drawn, it is told whether any of @a raw is covered at all: a
+    /// read-back of nothing is the fill alone, the subject nowhere in view.
+    ///
     /// False where @a raw is not four components or cannot be resized.
-    bool resolve(LLImageRaw& raw, S32 width, S32 height, const LLColor4& fill, bool keep_alpha);
+    bool resolve(LLImageRaw& raw, S32 width, S32 height, const LLColor4& fill, bool keep_alpha, bool* drawn = nullptr);
 
     /// Scales @a raw -- straight RGBA, as a resolved cutout is -- to @a width
     /// by @a height without darkening its edges: premultiplied, averaged, and

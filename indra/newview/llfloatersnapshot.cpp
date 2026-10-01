@@ -951,6 +951,14 @@ void LLFloaterSnapshot::Impl::updateCutoutControls(LLFloaterSnapshotBase* floate
             args["[NAME]"] = text;
             text = floater->getString("cutout_mouselook", args);
         }
+        else if (LLSnapshotLivePreview* previewp = getPreviewView(); previewp && previewp->cutoutDrewNothing())
+        {
+            // There, but out of the frame or past the draw distance: the
+            // preview is the fill alone.
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = text;
+            text = floater->getString("cutout_not_drawn", args);
+        }
     }
 
     LLUICtrl* target_text = floater->getChild<LLUICtrl>("cutout_target_text");

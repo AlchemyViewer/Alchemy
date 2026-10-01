@@ -160,6 +160,8 @@ void LLSnapshotLivePreview::setCutout(const std::optional<ALSnapshotCutout>& cut
     if (cutout != mCutout)
     {
         mCutout = cutout;
+        // Nothing is known of a cutout until it is drawn.
+        mCutoutDrawn = true;
         // A little later rather than now: a colour dragged across the fill's
         // wheel is many changes a second, and each is a whole render.
         constexpr F32 CUTOUT_CHANGE_DELAY = 0.25f;
@@ -782,7 +784,8 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
                 render_balance,
                 previewp->mSnapshotBufferType,
                 previewp->getMaxImageSize(),
-                previewp->mCutout ? &*previewp->mCutout : nullptr))
+                previewp->mCutout ? &*previewp->mCutout : nullptr,
+                &previewp->mCutoutDrawn))
         {
             // Invalidate/delete any existing encoded image
             previewp->mPreviewImageEncoded = NULL;

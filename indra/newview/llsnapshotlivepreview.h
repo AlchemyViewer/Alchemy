@@ -112,6 +112,8 @@ public:
     /// other floaters share the list and the settings.
     void setCutout(const std::optional<ALSnapshotCutout>& cutout);
     bool hasCutout() const { return mCutout.has_value(); }
+    /// The last cutout drawn was its fill alone: the subject nowhere in view.
+    bool cutoutDrewNothing() const { return mCutout.has_value() && !mCutoutDrawn; }
     void updateSnapshot(bool new_snapshot, bool new_thumbnail = false, F32 delay = 0.f);
     void saveTexture(bool outfit_snapshot = false, std::string name = "");
     void saveLocal(const snapshot_saved_signal_t::slot_type& success_cb, const snapshot_saved_signal_t::slot_type& failure_cb);
@@ -189,6 +191,7 @@ private:
     LLSnapshotModel::ESnapshotLayerType mSnapshotBufferType;
     std::string                 mFilterName;
     std::optional<ALSnapshotCutout> mCutout;
+    bool                        mCutoutDrawn = true;
 
     static LLPointer<LLImageFormatted> sSaveLocalImage;
 

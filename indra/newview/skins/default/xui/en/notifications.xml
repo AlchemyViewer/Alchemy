@@ -9758,7 +9758,7 @@ That snapshot was a cutout: only what Cutout is set to was drawn. It stays on un
 
   <notification icon="notifytip.tga"
     name="CutoutTargetMissing" type="notifytip">
-No snapshot was saved: what Cutout is set to is not in the scene. Pick it again, or uncheck Cutout in the snapshot window.
+No snapshot was saved: what Cutout is set to is not in view. Turn the camera to it, pick it again, or uncheck Cutout in the snapshot window.
   </notification>
 
   <notification icon="notifytip.tga"

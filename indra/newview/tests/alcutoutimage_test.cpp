@@ -185,4 +185,21 @@ namespace tut
         close_to("no green from the empty texel", edge[1], 0, 3);
         close_to("edge is half covered", edge[3], 128, 3);
     }
+
+    // A read-back with nothing covered is the subject out of view -- colour
+    // in its empty texels or not -- and one covered texel, however faint and
+    // however much it is averaged away, is the subject drawn.
+    template<> template<>
+    void cutout_object::test<9>()
+    {
+        bool drawn = true;
+        LLPointer<LLImageRaw> empty = image(2, 2, { { 10, 10, 10, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 255, 255, 255, 0 } });
+        ensure("resolves empty", ALCutoutImage::resolve(*empty, 1, 1, LLColor4(1.f, 1.f, 1.f, 1.f), false, &drawn));
+        ensure("nothing covered: not drawn", !drawn);
+
+        drawn = false;
+        LLPointer<LLImageRaw> faint = image(2, 2, { { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 1, 0, 0, 1 } });
+        ensure("resolves faint", ALCutoutImage::resolve(*faint, 1, 1, LLColor4(0.f, 0.f, 0.f, 0.f), true, &drawn));
+        ensure("one faint texel: drawn", drawn);
+    }
 }

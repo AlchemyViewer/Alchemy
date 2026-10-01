@@ -5521,7 +5521,7 @@ namespace
 // the results over to the final raw image.
 bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_height,
     bool keep_window_aspect, bool is_texture, bool show_ui, bool show_hud, bool do_rebuild, bool no_post, bool show_balance, LLSnapshotModel::ESnapshotLayerType type, S32 max_size,
-    const ALSnapshotCutout* cutout)
+    const ALSnapshotCutout* cutout, bool* cutout_drawn)
 {
     if (!raw)
     {
@@ -5996,7 +5996,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         {
             cutout_width += (cutout_width * 3) % 4;
         }
-        ret = ALCutoutImage::resolve(*raw, cutout_width, cutout_height, cutout->mFill, cutout->mKeepAlpha);
+        ret = ALCutoutImage::resolve(*raw, cutout_width, cutout_height, cutout->mFill, cutout->mKeepAlpha, cutout_drawn);
     }
     else
     {
