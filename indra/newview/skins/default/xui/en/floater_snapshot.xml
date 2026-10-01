@@ -71,9 +71,9 @@
     <string name="cutout_picking">Click an avatar or object</string>
     <string name="cutout_retrieving">Retrieving...</string>
     <string name="cutout_not_found">Not in view</string>
-    <string name="cutout_not_drawn">[NAME] (not in view)</string>
-    <string name="cutout_muted">[NAME] (not drawn in full)</string>
-    <string name="cutout_mouselook">[NAME] (not drawn in mouselook)</string>
+    <string name="cutout_not_drawn">Not in view: [NAME]</string>
+    <string name="cutout_muted">Not drawn in full: [NAME]</string>
+    <string name="cutout_mouselook">Not drawn in mouselook: [NAME]</string>
     <string name="cutout_rlv">Unavailable while vision is restricted</string>
     <string name="cutout_fill_title">Cutout fill</string>
     <string name="cutout_full_picker">More...</string>
