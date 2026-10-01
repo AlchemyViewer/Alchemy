@@ -304,12 +304,16 @@ if(TARGET media_plugin_cef)
       DESTINATION "${AL_INSTALL_PLUGINDIR}"
       COMPONENT cef
     )
+    # The DirectX shader compiler is in CEF's x64 distribution only.
+    set(cef_dxc_files "")
+    if(BUILD_TARGET_IS_X86_64)
+      set(cef_dxc_files "${cef_binary_dir}/dxcompiler.dll" "${cef_binary_dir}/dxil.dll")
+    endif()
     install(
       FILES
         "${cef_binary_dir}/chrome_elf.dll"
         "${cef_binary_dir}/d3dcompiler_47.dll"
-        "${cef_binary_dir}/dxcompiler.dll"
-        "${cef_binary_dir}/dxil.dll"
+        ${cef_dxc_files}
         "${cef_binary_dir}/libEGL.dll"
         "${cef_binary_dir}/libGLESv2.dll"
         "${cef_binary_dir}/v8_context_snapshot.bin"

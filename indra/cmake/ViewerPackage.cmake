@@ -21,6 +21,16 @@ if(DARWIN)
 else()
   set(al_velopack_title "${AL_APP_NAME_ONEWORD}")
   set(al_velopack_main_exe "${OUTPUT_BINARY_NAME}.exe")
+  # An installed viewer updates from releases.<channel>.json, so each
+  # architecture has a channel of its own, named for its runtime. The
+  # channel also names the installer, the portable archive and the packages
+  # vpk writes.
+  if(BUILD_TARGET_IS_ARM64)
+    set(al_velopack_runtime win-arm64)
+  else()
+    set(al_velopack_runtime win-x64)
+  endif()
+  set(al_velopack_channel ${al_velopack_runtime})
 endif()
 
 # What the hosted build's packaging and signing steps need to know, one
@@ -47,6 +57,8 @@ velopack_icon=install_icon.ico
 velopack_splash=install_splash.gif
 velopack_splash_color=${al_velopack_splash_color}
 velopack_installer_base=${AL_PACKAGE_NAME}
+velopack_channel=${al_velopack_channel}
+velopack_runtime=${al_velopack_runtime}
 "
   )
 else()
@@ -147,6 +159,10 @@ if(AL_USE_VELOPACK)
       "${al_velopack_splash_color}"
       --shortcuts
       ""
+      --channel
+      "${al_velopack_channel}"
+      --runtime
+      "${al_velopack_runtime}"
     )
     set(
       velopack_rename
@@ -154,13 +170,13 @@ if(AL_USE_VELOPACK)
       ${CMAKE_COMMAND}
       -E
       rename
-      "${velopack_releases}/${AL_APP_NAME_ONEWORD}-win-Setup.exe"
+      "${velopack_releases}/${AL_APP_NAME_ONEWORD}-${al_velopack_channel}-Setup.exe"
       "${velopack_releases}/${AL_PACKAGE_NAME}_Setup.exe"
       COMMAND
       ${CMAKE_COMMAND}
       -E
       rename
-      "${velopack_releases}/${AL_APP_NAME_ONEWORD}-win-Portable.zip"
+      "${velopack_releases}/${AL_APP_NAME_ONEWORD}-${al_velopack_channel}-Portable.zip"
       "${velopack_releases}/${AL_PACKAGE_NAME}_Portable.zip"
     )
   endif()

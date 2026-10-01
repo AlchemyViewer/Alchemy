@@ -191,7 +191,7 @@ jobs:
 
     runs-on: ${{ matrix.runner }}
     # Windows arm64 is allowed to fail, without cancelling the other rows,
-    # until the cef-bin and vlc-bin ports have arm64 Windows builds.
+    # until the vlc-bin port has an arm64 Windows build.
     continue-on-error: ${{ startsWith(matrix.runner, 'windows-') && matrix.arch == 'arm64' }}
     outputs:
       viewer_version: ${{ steps.build.outputs.viewer_version }}
@@ -206,6 +206,8 @@ jobs:
       velopack_splash:        ${{ steps.build.outputs.velopack_splash }}
       velopack_splash_color:  ${{ steps.build.outputs.velopack_splash_color }}
       velopack_installer_base: ${{ steps.build.outputs.velopack_installer_base }}
+      velopack_channel:       ${{ steps.build.outputs.velopack_channel }}
+      velopack_runtime:       ${{ steps.build.outputs.velopack_runtime }}
       # macOS Velopack outputs (passed to sign-pkg-mac)
       velopack_mac_pack_id:      ${{ steps.build.outputs.velopack_mac_pack_id }}
       velopack_mac_pack_version: ${{ steps.build.outputs.velopack_mac_pack_version }}
@@ -238,9 +240,6 @@ jobs:
       VIEWER_GRID: "agni"
       # Link Time Optimization
       AL_USE_LTO: ${{ matrix.configuration == 'release' }}
-      # The Velopack update client. Its port has no arm64 Windows build, and
-      # the Windows signing job packages the x64 tree only.
-      AL_USE_VELOPACK: ${{ !(startsWith(matrix.runner, 'windows-') && matrix.arch == 'arm64') }}
       # Setting this variable directs Linden's TUT test driver code to capture
       # test-program log output at the specified level, but to display it only if
       # the individual test fails.
@@ -416,7 +415,7 @@ jobs:
             -DAL_BUILD_TESTS:BOOL="$BUILD_TESTS" \
             -DAL_ENABLE_GL_TESTS:BOOL="$AL_ENABLE_GL_TESTS" \
             -DAL_BUILD_PACKAGE:BOOL=ON \
-            -DAL_USE_VELOPACK:BOOL="$AL_USE_VELOPACK" \
+            -DAL_USE_VELOPACK:BOOL=ON \
             -DAL_USE_LTO:BOOL="$AL_USE_LTO" \
             -DAL_ENABLE_RELEASE_DEBUG_LOGGING:BOOL=OFF \
             -DAL_ENABLE_CRASH_REPORTING:BOOL="$AL_ENABLE_CRASH_REPORTING" \
@@ -495,7 +494,7 @@ jobs:
             esac
             # The job's outputs come from whichever row sets them last, and
             # the Windows signing job packages the x64 tree: an arm64 row's
-            # installer name, which carries its architecture, must not win.
+            # installer name and Velopack channel must not win.
             if [[ "$RUNNER_OS" != "Windows" || "$BUILD_ARCH" == "x64" ]]
             then
               cat "$BUILD_DIRECTORY/newview/package.env" >> "$GITHUB_OUTPUT"
@@ -669,6 +668,9 @@ jobs:
           SPLASH_IMAGE: ${{ needs.build.outputs.velopack_splash }}
           SPLASH_COLOR: ${{ needs.build.outputs.velopack_splash_color }}
           INSTALLER_BASE: ${{ needs.build.outputs.velopack_installer_base }}
+          # Per architecture: an installed viewer updates from its channel's feed.
+          PACK_CHANNEL: ${{ needs.build.outputs.velopack_channel }}
+          PACK_RUNTIME: ${{ needs.build.outputs.velopack_runtime }}
         run: |
           set -x
 
@@ -682,6 +684,8 @@ jobs:
             --packTitle "$PACK_TITLE"
             --shortcuts ''
             --splashProgressColor "$SPLASH_COLOR"
+            --channel "$PACK_CHANNEL"
+            --runtime "$PACK_RUNTIME"
           )
 
           # Add icon if provided
@@ -701,16 +705,17 @@ jobs:
         env:
           PACK_ID: ${{ needs.build.outputs.velopack_pack_id }}
           INSTALLER_BASE: ${{ needs.build.outputs.velopack_installer_base }}
+          PACK_CHANNEL: ${{ needs.build.outputs.velopack_channel }}
         run: |
           # Move Setup.exe into .app for the installer upload step
-          setup="Releases/${PACK_ID}-win-Setup.exe"
+          setup="Releases/${PACK_ID}-${PACK_CHANNEL}-Setup.exe"
           if [[ -f "$setup" ]]; then
             mv "$setup" ".app/${INSTALLER_BASE}_Setup.exe"
             echo "Moved $setup to .app/${INSTALLER_BASE}_Setup.exe"
           fi
 
           # Rename Portable.zip to include version
-          portable="Releases/${PACK_ID}-win-Portable.zip"
+          portable="Releases/${PACK_ID}-${PACK_CHANNEL}-Portable.zip"
           if [[ -f "$portable" ]]; then
             mv "$portable" "Releases/${INSTALLER_BASE}_Portable.zip"
             echo "Moved $portable to Releases/${INSTALLER_BASE}_Portable.zip"
