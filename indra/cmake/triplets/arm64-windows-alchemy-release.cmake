@@ -1,0 +1,5 @@
+set(VCPKG_TARGET_ARCHITECTURE arm64)
+set(VCPKG_BUILD_TYPE release)
+set(ALCHEMY_ISA_TIER baseline)
+set(ALCHEMY_TRIPLET_REVISION 5)
+include("${CMAKE_CURRENT_LIST_DIR}/alchemy-base.cmake")

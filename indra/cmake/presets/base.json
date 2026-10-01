@@ -49,6 +49,22 @@
       }
     },
     {
+      "name": "windows-arm64",
+      "hidden": true,
+      "architecture": {
+        "value": "ARM64",
+        "strategy": "set"
+      }
+    },
+    {
+      "name": "windows-x64",
+      "hidden": true,
+      "architecture": {
+        "value": "x64",
+        "strategy": "set"
+      }
+    },
+    {
       "name": "proprietary",
       "hidden": true,
       "cacheVariables": {

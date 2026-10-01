@@ -14,8 +14,14 @@ include_guard()
 # Location of scripts directory
 set(SCRIPTS_DIR ${INDRA_SOURCE_DIR}/../scripts)
 
-# Select arch based on requested target processor
-string(TOLOWER ${CMAKE_SYSTEM_PROCESSOR} processor_lower)
+# Select arch based on requested target processor. On Windows that is the
+# compiler's: CMAKE_SYSTEM_PROCESSOR stays the host's when Visual Studio's
+# platform or a cross-compiling Developer Command Prompt targets another.
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID)
+  string(TOLOWER ${CMAKE_CXX_COMPILER_ARCHITECTURE_ID} processor_lower)
+else()
+  string(TOLOWER ${CMAKE_SYSTEM_PROCESSOR} processor_lower)
+endif()
 set(BUILD_TARGET_IS_ARM64 OFF)
 set(BUILD_TARGET_IS_X86_64 OFF)
 if(processor_lower STREQUAL "arm64" OR processor_lower STREQUAL "aarch64")

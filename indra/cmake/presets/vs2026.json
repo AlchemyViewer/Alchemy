@@ -33,6 +33,38 @@
       }
     },
     {
+      "name": "vs2026-os-arm64",
+      "displayName": "Visual Studio 2026 (arm64)",
+      "inherits": [
+        "vs2026-os",
+        "windows-arm64"
+      ]
+    },
+    {
+      "name": "vs2026-os-x64",
+      "displayName": "Visual Studio 2026 (x86_64)",
+      "inherits": [
+        "vs2026-os",
+        "windows-x64"
+      ]
+    },
+    {
+      "name": "vs2026-arm64",
+      "displayName": "Visual Studio 2026 Proprietary (arm64)",
+      "inherits": [
+        "vs2026",
+        "windows-arm64"
+      ]
+    },
+    {
+      "name": "vs2026-x64",
+      "displayName": "Visual Studio 2026 Proprietary (x86_64)",
+      "inherits": [
+        "vs2026",
+        "windows-x64"
+      ]
+    },
+    {
       "name": "vs2026-os-fullopt",
       "displayName": "Visual Studio 2026 (fully optimized)",
       "description": "The optimizations of a shipped build on any channel: LTO on, Tracy and Release debug logging off",
@@ -42,12 +74,44 @@
       ]
     },
     {
+      "name": "vs2026-os-fullopt-arm64",
+      "displayName": "Visual Studio 2026 (fully optimized, arm64)",
+      "inherits": [
+        "vs2026-os-fullopt",
+        "windows-arm64"
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-x64",
+      "displayName": "Visual Studio 2026 (fully optimized, x86_64)",
+      "inherits": [
+        "vs2026-os-fullopt",
+        "windows-x64"
+      ]
+    },
+    {
       "name": "vs2026-fullopt",
       "displayName": "Visual Studio 2026 Proprietary (fully optimized)",
       "description": "The optimizations of a shipped build on any channel: LTO on, Tracy and Release debug logging off",
       "inherits": [
         "vs2026",
         "fullopt"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-arm64",
+      "displayName": "Visual Studio 2026 Proprietary (fully optimized, arm64)",
+      "inherits": [
+        "vs2026-fullopt",
+        "windows-arm64"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-x64",
+      "displayName": "Visual Studio 2026 Proprietary (fully optimized, x86_64)",
+      "inherits": [
+        "vs2026-fullopt",
+        "windows-x64"
       ]
     }
   ],
@@ -149,6 +213,134 @@
       ]
     },
     {
+      "name": "vs2026-os-arm64-debug",
+      "configurePreset": "vs2026-os-arm64",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-os-arm64-optdebug",
+      "configurePreset": "vs2026-os-arm64",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-os-arm64-relwithdebinfo",
+      "configurePreset": "vs2026-os-arm64",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-os-arm64-release",
+      "configurePreset": "vs2026-os-arm64",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
+      "name": "vs2026-os-x64-debug",
+      "configurePreset": "vs2026-os-x64",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-os-x64-optdebug",
+      "configurePreset": "vs2026-os-x64",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-os-x64-relwithdebinfo",
+      "configurePreset": "vs2026-os-x64",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-os-x64-release",
+      "configurePreset": "vs2026-os-x64",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
+      "name": "vs2026-arm64-debug",
+      "configurePreset": "vs2026-arm64",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-arm64-optdebug",
+      "configurePreset": "vs2026-arm64",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-arm64-relwithdebinfo",
+      "configurePreset": "vs2026-arm64",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-arm64-release",
+      "configurePreset": "vs2026-arm64",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
+      "name": "vs2026-x64-debug",
+      "configurePreset": "vs2026-x64",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-x64-optdebug",
+      "configurePreset": "vs2026-x64",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-x64-relwithdebinfo",
+      "configurePreset": "vs2026-x64",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-x64-release",
+      "configurePreset": "vs2026-x64",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
       "name": "vs2026-os-fullopt-debug",
       "configurePreset": "vs2026-os-fullopt",
       "inherits": [
@@ -181,6 +373,70 @@
       ]
     },
     {
+      "name": "vs2026-os-fullopt-arm64-debug",
+      "configurePreset": "vs2026-os-fullopt-arm64",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-arm64-optdebug",
+      "configurePreset": "vs2026-os-fullopt-arm64",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-arm64-relwithdebinfo",
+      "configurePreset": "vs2026-os-fullopt-arm64",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-arm64-release",
+      "configurePreset": "vs2026-os-fullopt-arm64",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-x64-debug",
+      "configurePreset": "vs2026-os-fullopt-x64",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-x64-optdebug",
+      "configurePreset": "vs2026-os-fullopt-x64",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-x64-relwithdebinfo",
+      "configurePreset": "vs2026-os-fullopt-x64",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-x64-release",
+      "configurePreset": "vs2026-os-fullopt-x64",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
       "name": "vs2026-fullopt-debug",
       "configurePreset": "vs2026-fullopt",
       "inherits": [
@@ -207,6 +463,70 @@
     {
       "name": "vs2026-fullopt-release",
       "configurePreset": "vs2026-fullopt",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-arm64-debug",
+      "configurePreset": "vs2026-fullopt-arm64",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-arm64-optdebug",
+      "configurePreset": "vs2026-fullopt-arm64",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-arm64-relwithdebinfo",
+      "configurePreset": "vs2026-fullopt-arm64",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-arm64-release",
+      "configurePreset": "vs2026-fullopt-arm64",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-x64-debug",
+      "configurePreset": "vs2026-fullopt-x64",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-x64-optdebug",
+      "configurePreset": "vs2026-fullopt-x64",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-x64-relwithdebinfo",
+      "configurePreset": "vs2026-fullopt-x64",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-x64-release",
+      "configurePreset": "vs2026-fullopt-x64",
       "inherits": [
         "windows",
         "release"

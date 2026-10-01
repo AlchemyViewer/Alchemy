@@ -152,8 +152,8 @@ jobs:
         arch: [x64, arm64]
         build_variant: [Viewer, Tests]
         exclude:
-          # The x86-64 Linux runner cannot build arm64; the arm64 rows below
-          # bring their own runner.
+          # The x86-64 Linux and Windows runners do not build arm64; the arm64
+          # rows below bring their own runner.
           - runner: ubuntu-26.04
             arch: arm64
           - runner: windows-2025-vs2026
@@ -179,8 +179,20 @@ jobs:
             configuration: release
             arch: arm64
             build_variant: Tests
+          # Windows on arm64, built and tested natively.
+          - runner: windows-11-vs2026-arm
+            configuration: release
+            arch: arm64
+            build_variant: Viewer
+          - runner: windows-11-vs2026-arm
+            configuration: release
+            arch: arm64
+            build_variant: Tests
 
     runs-on: ${{ matrix.runner }}
+    # Windows arm64 is allowed to fail, without cancelling the other rows,
+    # until the cef-bin and vlc-bin ports have arm64 Windows builds.
+    continue-on-error: ${{ startsWith(matrix.runner, 'windows-') && matrix.arch == 'arm64' }}
     outputs:
       viewer_version: ${{ steps.build.outputs.viewer_version }}
       imagename: ${{ steps.build.outputs.imagename }}
@@ -226,6 +238,9 @@ jobs:
       VIEWER_GRID: "agni"
       # Link Time Optimization
       AL_USE_LTO: ${{ matrix.configuration == 'release' }}
+      # The Velopack update client. Its port has no arm64 Windows build, and
+      # the Windows signing job packages the x64 tree only.
+      AL_USE_VELOPACK: ${{ !(startsWith(matrix.runner, 'windows-') && matrix.arch == 'arm64') }}
       # Setting this variable directs Linden's TUT test driver code to capture
       # test-program log output at the specified level, but to display it only if
       # the individual test fails.
@@ -365,9 +380,14 @@ jobs:
           SIGNING=()
           case "$RUNNER_OS" in
             Windows)
-              cmake_preset_name="vs2026${cmake_preset_postfix}-fullopt"
+              cmake_preset_name="vs2026${cmake_preset_postfix}-fullopt-$BUILD_ARCH"
               build_directory="build-Windows-$cmake_preset_name"
-              vcpkg_triplet="x64-windows-alchemy-avx2-release"
+              if [[ "$BUILD_ARCH" == "arm64" ]]
+              then
+                vcpkg_triplet="arm64-windows-alchemy-release"
+              else
+                vcpkg_triplet="x64-windows-alchemy-avx2-release"
+              fi
               ;;
             macOS)
               cmake_preset_name="ninja${cmake_preset_postfix}-fullopt-$BUILD_ARCH"
@@ -396,7 +416,7 @@ jobs:
             -DAL_BUILD_TESTS:BOOL="$BUILD_TESTS" \
             -DAL_ENABLE_GL_TESTS:BOOL="$AL_ENABLE_GL_TESTS" \
             -DAL_BUILD_PACKAGE:BOOL=ON \
-            -DAL_USE_VELOPACK:BOOL=ON \
+            -DAL_USE_VELOPACK:BOOL="$AL_USE_VELOPACK" \
             -DAL_USE_LTO:BOOL="$AL_USE_LTO" \
             -DAL_ENABLE_RELEASE_DEBUG_LOGGING:BOOL=OFF \
             -DAL_ENABLE_CRASH_REPORTING:BOOL="$AL_ENABLE_CRASH_REPORTING" \
@@ -473,7 +493,13 @@ jobs:
               optdebug) cmake_config=OptDebug ;;
               *) cmake_config=Debug ;;
             esac
-            cat "$BUILD_DIRECTORY/newview/package.env" >> "$GITHUB_OUTPUT"
+            # The job's outputs come from whichever row sets them last, and
+            # the Windows signing job packages the x64 tree: an arm64 row's
+            # installer name, which carries its architecture, must not win.
+            if [[ "$RUNNER_OS" != "Windows" || "$BUILD_ARCH" == "x64" ]]
+            then
+              cat "$BUILD_DIRECTORY/newview/package.env" >> "$GITHUB_OUTPUT"
+            fi
             case "$RUNNER_OS" in
               Windows)
                 cmake --install "$BUILD_DIRECTORY" --config "$cmake_config" --prefix "$RUNNER_TEMP/app"

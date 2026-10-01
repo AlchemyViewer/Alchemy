@@ -41,6 +41,8 @@ if(AL_USE_FMODSTUDIO)
 
     if(DARWIN)
       set(fmod_lib_paths "${AL_FMODSTUDIO_SDK_DIR}/api/core/lib")
+    elseif(WINDOWS AND BUILD_TARGET_IS_ARM64)
+      set(fmod_lib_paths "${AL_FMODSTUDIO_SDK_DIR}/api/core/lib/arm64")
     else()
       set(fmod_lib_paths "${AL_FMODSTUDIO_SDK_DIR}/api/core/lib/x64")
     endif()

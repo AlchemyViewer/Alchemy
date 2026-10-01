@@ -42,6 +42,8 @@ bases = [
     {'name': 'linux', 'hidden': True, 'condition': host('Linux')},
     {'name': 'macos-arm64', 'hidden': True, 'cacheVariables': {'CMAKE_OSX_ARCHITECTURES': 'arm64'}},
     {'name': 'macos-x64', 'hidden': True, 'cacheVariables': {'CMAKE_OSX_ARCHITECTURES': 'x86_64'}},
+    {'name': 'windows-arm64', 'hidden': True, 'architecture': {'value': 'ARM64', 'strategy': 'set'}},
+    {'name': 'windows-x64', 'hidden': True, 'architecture': {'value': 'x64', 'strategy': 'set'}},
     {'name': 'proprietary', 'hidden': True, 'cacheVariables': {'AL_ENABLE_PROPRIETARY': True}},
     {'name': 'clang', 'hidden': True,
      'cacheVariables': {'CMAKE_C_COMPILER': 'clang', 'CMAKE_CXX_COMPILER': 'clang++'}},
@@ -63,10 +65,11 @@ for short, name in CONFIGS.items():
     build_bases.append({'name': short, 'hidden': True, 'configuration': name})
 
 
-def fullopt(generator, display, arch=False, mac_base=False, default_config=None):
+def fullopt(generator, display, platform=None, archs=(), platform_base=False, default_config=None):
     """The fullopt presets of one generator: the open-source and the
-    proprietary preset plus fullopt, and the two macOS architectures
-    where the generator has them."""
+    proprietary preset plus fullopt, and one per architecture in archs
+    through the hidden <platform>-<arch> base, with the platform's own base
+    where the generator runs on more than one platform."""
     out = []
     for parent, label in [(f'{generator}-os', display), (generator, f'{display} Proprietary')]:
         p = {'name': f'{parent}-fullopt', 'displayName': f'{label} (fully optimized)',
@@ -76,15 +79,14 @@ def fullopt(generator, display, arch=False, mac_base=False, default_config=None)
         if default_config:
             p['cacheVariables'] = {'CMAKE_DEFAULT_BUILD_TYPE': default_config}
         out.append(p)
-        if arch:
-            for arch_name, arch_label in ARCHS.items():
-                inherits = [f'{parent}-fullopt']
-                if mac_base:
-                    inherits.append('macos')
-                inherits.append(f'macos-{arch_name}')
-                out.append({'name': f'{parent}-fullopt-{arch_name}',
-                            'displayName': f'{label} (fully optimized, {arch_label})',
-                            'inherits': inherits})
+        for arch_name in archs:
+            inherits = [f'{parent}-fullopt']
+            if platform_base:
+                inherits.append(platform)
+            inherits.append(f'{platform}-{arch_name}')
+            out.append({'name': f'{parent}-fullopt-{arch_name}',
+                        'displayName': f'{label} (fully optimized, {ARCHS[arch_name]})',
+                        'inherits': inherits})
     return out
 
 
@@ -121,7 +123,15 @@ GENERATORS = {
          'inherits': ['vs2026-os', 'proprietary']},
         {'name': 'vs2026-os-sdl', 'displayName': 'Visual Studio 2026 (SDL window)',
          'inherits': ['vs2026-os'], 'cacheVariables': {'AL_USE_SDL_WINDOW': True}},
-        *fullopt('vs2026', 'Visual Studio 2026'),
+        {'name': 'vs2026-os-arm64', 'displayName': 'Visual Studio 2026 (arm64)',
+         'inherits': ['vs2026-os', 'windows-arm64']},
+        {'name': 'vs2026-os-x64', 'displayName': 'Visual Studio 2026 (x86_64)',
+         'inherits': ['vs2026-os', 'windows-x64']},
+        {'name': 'vs2026-arm64', 'displayName': 'Visual Studio 2026 Proprietary (arm64)',
+         'inherits': ['vs2026', 'windows-arm64']},
+        {'name': 'vs2026-x64', 'displayName': 'Visual Studio 2026 Proprietary (x86_64)',
+         'inherits': ['vs2026', 'windows-x64']},
+        *fullopt('vs2026', 'Visual Studio 2026', 'windows', ARCHS),
     ]),
     'ninja': (None, [
         {'name': 'ninja-os', 'displayName': 'Ninja Multi-Config',
@@ -137,7 +147,7 @@ GENERATORS = {
          'inherits': ['ninja', 'macos', 'macos-arm64']},
         {'name': 'ninja-x64', 'displayName': 'Ninja Multi-Config Proprietary (x86_64)',
          'inherits': ['ninja', 'macos', 'macos-x64']},
-        *fullopt('ninja', 'Ninja Multi-Config', arch=True, mac_base=True, default_config='Release'),
+        *fullopt('ninja', 'Ninja Multi-Config', 'macos', ARCHS, platform_base=True, default_config='Release'),
         *toolchains('ninja', 'Ninja Multi-Config'),
     ]),
     'xcode': ('macos', [
@@ -153,7 +163,7 @@ GENERATORS = {
          'inherits': ['xcode', 'macos-arm64']},
         {'name': 'xcode-x64', 'displayName': 'Xcode Proprietary (x86_64)',
          'inherits': ['xcode', 'macos-x64']},
-        *fullopt('xcode', 'Xcode', arch=True),
+        *fullopt('xcode', 'Xcode', 'macos', ARCHS),
     ]),
 }
 

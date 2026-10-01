@@ -62,7 +62,26 @@ if(NOT DEFINED VCPKG_TARGET_TRIPLET)
   if(WIN32)
     set(triplet_system Windows)
     set(triplet_os windows)
-    set(triplet_arch x64)
+    # The target's, which project() has not found yet: Visual Studio's
+    # platform (-A, or a preset's architecture), else what a Developer
+    # Command Prompt's compiler targets, else the host's, which is Visual
+    # Studio's default. al_vcpkg_check_triplet_architecture() checks the
+    # guess against the compiler project() found.
+    if(CMAKE_GENERATOR_PLATFORM)
+      set(triplet_arch "${CMAKE_GENERATOR_PLATFORM}")
+    elseif(
+      NOT CMAKE_GENERATOR MATCHES "^Visual Studio"
+      AND NOT "$ENV{VSCMD_ARG_TGT_ARCH}" STREQUAL ""
+    )
+      set(triplet_arch "$ENV{VSCMD_ARG_TGT_ARCH}")
+    else()
+      cmake_host_system_information(RESULT triplet_arch QUERY OS_PLATFORM)
+    endif()
+    if(triplet_arch MATCHES "^[Aa][Rr][Mm]64$")
+      set(triplet_arch arm64)
+    else()
+      set(triplet_arch x64)
+    endif()
   elseif(APPLE)
     set(triplet_system Darwin)
     set(triplet_os osx)
@@ -151,6 +170,28 @@ function(al_vcpkg_check_triplet_compiler)
       "are not interchangeable. Use the triplet ${matching}, or build the viewer with ${ports}."
     )
   endif()
+endfunction()
+
+# A Windows alchemy triplet names the architecture its ports were built for,
+# chosen before project() could ask the compiler, and the viewer has to be
+# built for the same one. Called once project() has found the compiler.
+function(al_vcpkg_check_triplet_architecture)
+  if(NOT VCPKG_TARGET_TRIPLET MATCHES "-windows-alchemy")
+    return()
+  endif()
+  string(REGEX MATCH "^[^-]+" ports "${VCPKG_TARGET_TRIPLET}")
+  string(TOLOWER "${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" viewer)
+  if(viewer STREQUAL "" OR viewer STREQUAL ports)
+    return()
+  endif()
+  al_isa_triplet_tier("${AL_ISA_TIER}" Windows "${viewer}" tier)
+  string(REGEX MATCH "-release$" release "${VCPKG_TARGET_TRIPLET}")
+  message(
+    FATAL_ERROR
+    "The viewer is being built for ${viewer} (${CMAKE_CXX_COMPILER}), but the ports of "
+    "${VCPKG_TARGET_TRIPLET} are built for ${ports}. Use the triplet "
+    "${viewer}-windows-alchemy${tier}${release}, or build the viewer for ${ports}."
+  )
 endfunction()
 
 # vcpkg's toolchain runs `vcpkg install` inside project() on every configure,
