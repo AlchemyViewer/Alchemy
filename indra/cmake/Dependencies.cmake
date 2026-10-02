@@ -105,12 +105,7 @@ al_import(ll::tut          INCLUDE ${INDRA_SOURCE_DIR}/externals/tut/)
 
 # Per platform, and per option. The target is empty where the condition is
 # false, so the option gates sources at the consumer and nothing else.
-# NVAPI exists for x64 only, which is where vcpkg.json installs it.
-set(al_nvapi OFF)
-if(WINDOWS AND BUILD_TARGET_IS_X86_64)
-  set(al_nvapi ON)
-endif()
-al_import(ll::nvapi        PACKAGE unofficial-nvapi    CONFIG TARGETS unofficial::nvapi::nvapi       WHEN al_nvapi)
+al_import(ll::nvapi        PACKAGE unofficial-nvapi    CONFIG TARGETS unofficial::nvapi::nvapi       WHEN WINDOWS)
 al_import(ll::fontconfig   PACKAGE Fontconfig                 TARGETS Fontconfig::Fontconfig        WHEN LINUX)
 al_import(ll::faudio       PACKAGE FAudio              CONFIG TARGETS FAudio::FAudio DEFINES LL_FAUDIO=1     WHEN AL_USE_FAUDIO)
 al_import(ll::openal       PACKAGE OpenAL              CONFIG TARGETS OpenAL::OpenAL DEFINES LL_OPENAL=1     WHEN AL_USE_OPENAL)
