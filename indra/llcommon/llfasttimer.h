@@ -32,12 +32,10 @@
 #include "lltreeiterators.h"
 #include "llprocessor.h"
 
-#if LL_X86 || LL_X86_64
 #if LL_WINDOWS
 #include <intrin.h>
-#else
+#elif LL_X86 || LL_X86_64
 #include <x86intrin.h>
-#endif
 #endif
 
 #define LL_FAST_TIMER_ON 1
@@ -73,7 +71,27 @@ public:
     //
     // Windows implementation of CPU clock
     //
-#if LL_FASTTIMER_USE_RDTSC
+#if LL_ARM64
+
+    // The generic timer's virtual count, CNTVCT_EL0: constant rate and shared
+    // by every core, ticking at the CNTFRQ_EL0 frequency countsPerSecond()
+    // reports rather than at the core clock. Not PMCCNTR_EL0, which winnt.h's
+    // ReadTimeStampCounter() reads: that counts core cycles, so it moves with
+    // the clock speed. The architecture lets a counter read run ahead of the
+    // instructions before it; the ISB stops that, as Linux's and macOS's own
+    // counter reads do.
+    static U64 getCPUClockCount64()
+    {
+        __isb(_ARM64_BARRIER_SY);
+        return static_cast<U64>(_ReadStatusReg(ARM64_SYSREG(3, 3, 14, 0, 2)));
+    }
+
+    static U32 getCPUClockCount32()
+    {
+        return (U32)(getCPUClockCount64() >> 8);
+    }
+
+#elif LL_FASTTIMER_USE_RDTSC
 
     // shift off lower 8 bits for lower resolution but longer term timing
     // on 1Ghz machine, a 32-bit word will hold ~1000 seconds of timing

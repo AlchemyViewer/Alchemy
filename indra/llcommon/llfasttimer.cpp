@@ -156,7 +156,13 @@ U64 BlockTimer::countsPerSecond()
 {
     return sClockResolution;
 }
-#else // windows or x86-mac or x86-linux
+#elif LL_WINDOWS && LL_ARM64
+U64 BlockTimer::countsPerSecond()
+{
+    // CNTFRQ_EL0, the rate getCPUClockCount64()'s CNTVCT_EL0 counts at
+    return static_cast<U64>(_ReadStatusReg(ARM64_SYSREG(3, 3, 14, 0, 0)));
+}
+#else // x86 windows, x86-mac or x86-linux
 U64 BlockTimer::countsPerSecond()
 {
 #if LL_FASTTIMER_USE_RDTSC || !LL_WINDOWS
