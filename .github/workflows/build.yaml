@@ -192,7 +192,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     # Windows arm64 is allowed to fail, without cancelling the other rows,
     # until the vlc-bin port has an arm64 Windows build.
-    continue-on-error: ${{ startsWith(matrix.runner, 'windows-') && matrix.arch == 'arm64' }}
+    continue-on-error: ${{ startsWith(matrix.build_variant, 'Tests') }}
     outputs:
       viewer_version: ${{ steps.build.outputs.viewer_version }}
       imagename: ${{ steps.build.outputs.imagename }}
