@@ -76,7 +76,7 @@
     "minizip",
     {
       "name": "nvapi",
-      "platform": "windows & x64"
+      "platform": "windows"
     },
     {
       "name": "open-libndofdev",
