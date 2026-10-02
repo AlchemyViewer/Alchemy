@@ -11,6 +11,7 @@
         "alchemy-fonts",
         "alsa",
         "apr",
+        "boost-fiber",
         "cef-bin",
         "collada-dom",
         "curl",
