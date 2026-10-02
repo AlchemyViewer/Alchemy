@@ -432,6 +432,7 @@ private:
 // LL_MSVC and not LLWINDOWS because some of the following code
 // uses the MSVC compiler intrinsics __cpuid() and __rdtsc().
 
+#ifndef LL_ARM64
 // Delays for the specified amount of milliseconds
 static void _Delay(unsigned int ms)
 {
@@ -524,6 +525,16 @@ static F64 calculate_cpu_frequency(U32 measure_msecs)
     // member var uqwFrequency - converted to MHz
     return frequency  / (F64)1000000;
 }
+#else
+// Feature numbers newer than some of the SDKs this builds with. A Windows
+// older than the feature reports FALSE for it.
+#ifndef PF_ARM_SVE_INSTRUCTIONS_AVAILABLE
+#define PF_ARM_SVE_INSTRUCTIONS_AVAILABLE 46
+#endif
+#ifndef PF_ARM_V82_FP16_INSTRUCTIONS_AVAILABLE
+#define PF_ARM_V82_FP16_INSTRUCTIONS_AVAILABLE 67
+#endif
+#endif // !LL_ARM64
 
 // Windows implementation
 class LLProcessorInfoWindowsImpl : public LLProcessorInfoImpl
@@ -532,10 +543,99 @@ public:
     LLProcessorInfoWindowsImpl()
     {
         getCPUIDInfo();
+#ifndef LL_ARM64
         setInfo(eFrequency, calculate_cpu_frequency(50));
+#endif
     }
 
 private:
+#if LL_ARM64
+    // Windows on Arm has no CPUID. Windows describes each processor under
+    // this registry key, and reports the instruction set extensions through
+    // IsProcessorFeaturePresent.
+    void getCPUIDInfo()
+    {
+        const wchar_t* cpu_key = L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0";
+
+        std::string vendor = getRegistryString(cpu_key, L"VendorIdentifier");
+        if (vendor.empty())
+        {
+            vendor = "ARM64";
+        }
+        const std::string brand = getRegistryString(cpu_key, L"ProcessorNameString");
+        setInfo(eVendor, vendor);
+        setInfo(eBrandName, brand.empty() ? vendor + " ARM64" : brand);
+        setInfo(eFamilyName, vendor + " ARMv8");
+        setInfo(eType, 0);
+
+        // The rated clock Windows records for the part, where x86 times its TSC
+        DWORD mhz = 0;
+        DWORD size = sizeof(mhz);
+        if (RegGetValueW(HKEY_LOCAL_MACHINE, cpu_key, L"~MHz", RRF_RT_REG_DWORD, nullptr, &mhz, &size) == ERROR_SUCCESS
+            && mhz != 0)
+        {
+            setInfo(eFrequency, (F64)mhz);
+        }
+
+        // The Windows ARM64 ABI presumes AdvSIMD, so every machine it runs on
+        // has it.
+        setExtension(cpu_feature_names[eNEON_Features]);
+        if (IsProcessorFeaturePresent(PF_ARM_V82_DP_INSTRUCTIONS_AVAILABLE))
+        {
+            setExtension(cpu_feature_names[eNEON_DotProd_Features]);
+        }
+        if (IsProcessorFeaturePresent(PF_ARM_V82_FP16_INSTRUCTIONS_AVAILABLE))
+        {
+            setExtension(cpu_feature_names[eNEON_FP16_Features]);
+        }
+        if (IsProcessorFeaturePresent(PF_ARM_SVE_INSTRUCTIONS_AVAILABLE))
+        {
+            setExtension(cpu_feature_names[eSVE_Features]);
+        }
+
+        // Level 1 data cache line, and the largest level 2: big and little
+        // cores' level 2 caches differ.
+        DWORD bytes = 0;
+        GetLogicalProcessorInformation(nullptr, &bytes);
+        std::vector<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> infos(bytes / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION));
+        if (!infos.empty() && GetLogicalProcessorInformation(infos.data(), &bytes))
+        {
+            DWORD l2_size = 0;
+            for (const SYSTEM_LOGICAL_PROCESSOR_INFORMATION& info : infos)
+            {
+                if (info.Relationship != RelationCache)
+                {
+                    continue;
+                }
+                if (info.Cache.Level == 1 && info.Cache.Type == CacheData)
+                {
+                    setConfig(eCacheLineSize, (S32)info.Cache.LineSize);
+                }
+                else if (info.Cache.Level == 2)
+                {
+                    l2_size = llmax(l2_size, info.Cache.Size);
+                }
+            }
+            if (l2_size != 0)
+            {
+                setConfig(eCacheSizeK, (S32)(l2_size / 1024));
+            }
+        }
+    }
+
+    static std::string getRegistryString(const wchar_t* key, const wchar_t* value)
+    {
+        wchar_t buffer[256] = {};
+        DWORD size = sizeof(buffer);
+        if (RegGetValueW(HKEY_LOCAL_MACHINE, key, value, RRF_RT_REG_SZ, nullptr, buffer, &size) != ERROR_SUCCESS)
+        {
+            return std::string();
+        }
+        std::string result = ll_convert_wide_to_string(buffer);
+        LLStringUtil::trim(result);
+        return result;
+    }
+#else
     void getCPUIDInfo()
     {
         // http://msdn.microsoft.com/en-us/library/hskdteyh(VS.80).aspx
@@ -701,6 +801,7 @@ private:
             }
         }
     }
+#endif // LL_ARM64
 };
 
 #elif LL_DARWIN
