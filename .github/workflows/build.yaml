@@ -447,15 +447,15 @@ jobs:
           if $BUILD_TESTS
           then
             # Now build the tests. We want to build them in a separate step before running them.
-            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config"
+            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config" --parallel $(nproc)
 
             # Now that we've built the tests, we can run them to validate the build.
             # If the tests fail, their output will be visible in the logs due to
             # CTEST_OUTPUT_ON_FAILURE above, and the build step will be marked as failed.
-            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config" --target BUILD_AND_RUN_TESTS
+            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config" --target BUILD_AND_RUN_TESTS --parallel $(nproc)
           elif $AL_BUILD_VIEWER
           then
-            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config"
+            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config" --parallel $(nproc)
           else
             echo "::notice::Skipping build due to both viewer and tests being disabled"
           fi
