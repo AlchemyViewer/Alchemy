@@ -43,6 +43,11 @@
 #include "alaudioechobuffer.h"
 #include <cstdint>
 #include <memory>
+
+// Work around webrtc on gcc 16 libstdc++ headers
+#include <cstddef>
+using std::nullptr_t;
+
 // WebRTC Includes
 #ifdef WEBRTC_WIN
 #pragma warning(push)

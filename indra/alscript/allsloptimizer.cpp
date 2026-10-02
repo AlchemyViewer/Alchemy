@@ -649,6 +649,8 @@ namespace
     // way -- duplicate keys, numbers with a fraction or an exponent,
     // escapes outside ASCII, and the JSON_* answers, which are
     // characters no string literal here may hold -- is left to it.
+    struct JsonField;
+
     struct JsonValue
     {
         enum class Kind : U8
@@ -661,10 +663,16 @@ namespace
             Array,
             Object
         };
-        Kind                                           kind = Kind::Null;
-        std::string                                    text;  // a number as written, a string unescaped
-        std::vector<JsonValue>                         items;
-        std::vector<std::pair<std::string, JsonValue>> fields;
+        Kind                    kind = Kind::Null;
+        std::string             text;  // a number as written, a string unescaped
+        std::vector<JsonValue>  items;
+        std::vector<JsonField>  fields;
+    };
+
+    struct JsonField
+    {
+        std::string first;
+        JsonValue   second;
     };
 
     struct JsonReader

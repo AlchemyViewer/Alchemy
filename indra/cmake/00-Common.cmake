@@ -271,7 +271,7 @@ if(WINDOWS)
       /Zc:inline
   )
 elseif(LINUX)
-  target_compile_options(al_flags INTERFACE -fsigned-char)
+  target_compile_options(al_flags INTERFACE -fsigned-char -pthread)
 elseif(DARWIN)
   # The Xcode attribute is what the Xcode generator honours; the compile
   # option covers Ninja and Makefile generators.
