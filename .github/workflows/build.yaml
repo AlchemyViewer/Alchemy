@@ -239,7 +239,7 @@ jobs:
       AL_CHANNEL: ${{ needs.setup.outputs.viewer_channel }}
       VIEWER_GRID: "agni"
       # Link Time Optimization
-      AL_USE_LTO: ${{ matrix.configuration == 'release' }}
+      AL_USE_LTO: ${{ matrix.configuration == 'release' && startsWith(matrix.build_variant, 'Viewer' }}
       # Setting this variable directs Linden's TUT test driver code to capture
       # test-program log output at the specified level, but to display it only if
       # the individual test fails.
@@ -379,7 +379,7 @@ jobs:
           SIGNING=()
           case "$RUNNER_OS" in
             Windows)
-              cmake_preset_name="vs2026${cmake_preset_postfix}-fullopt-$BUILD_ARCH"
+              cmake_preset_name="vs2026${cmake_preset_postfix}-$BUILD_ARCH"
               build_directory="build-Windows-$cmake_preset_name"
               if [[ "$BUILD_ARCH" == "arm64" ]]
               then
@@ -389,12 +389,12 @@ jobs:
               fi
               ;;
             macOS)
-              cmake_preset_name="ninja${cmake_preset_postfix}-fullopt-$BUILD_ARCH"
+              cmake_preset_name="ninja${cmake_preset_postfix}-$BUILD_ARCH"
               build_directory="build-Darwin-$cmake_preset_name"
               vcpkg_triplet="$BUILD_ARCH-osx-alchemy-release"
               ;;
             Linux)
-              cmake_preset_name="ninja${cmake_preset_postfix}-fullopt-mold"
+              cmake_preset_name="ninja${cmake_preset_postfix}-mold"
               build_directory="build-Linux-$cmake_preset_name"
               if [[ "$BUILD_ARCH" == "arm64" ]]
               then
@@ -416,6 +416,7 @@ jobs:
             -DAL_BUILD_PACKAGE:BOOL=ON \
             -DAL_USE_VELOPACK:BOOL=ON \
             -DAL_USE_LTO:BOOL="$AL_USE_LTO" \
+            -DAL_USE_TRACY:BOOL=OFF \
             -DAL_ENABLE_RELEASE_DEBUG_LOGGING:BOOL=OFF \
             -DAL_ENABLE_CRASH_REPORTING:BOOL="$AL_ENABLE_CRASH_REPORTING" \
             -DAL_USE_SENTRY:BOOL="$AL_USE_SENTRY" \
