@@ -49,8 +49,6 @@ target_link_libraries(
   PRIVATE al::flags llcharacter llinventory llappearance llwindow llrender llxml
 )
 
-target_precompile_headers(appearance-utility-bin REUSE_FROM llprecompiled_exe)
-
 # What the utility reads at run time, beside the executable as the viewer
 # has it: the avatar definitions and the baking shaders, from the viewer's
 # own source tree.

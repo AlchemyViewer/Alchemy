@@ -37,8 +37,3 @@ add_library(llprecompiled STATIC)
 target_sources(llprecompiled PRIVATE cmake_dummy.cpp)
 target_link_libraries(llprecompiled PRIVATE al::flags PUBLIC ${llprecompiled_LIBRARIES})
 target_precompile_headers(llprecompiled PRIVATE ${llprecompiled_HEADERS})
-
-add_executable(llprecompiled_exe)
-target_sources(llprecompiled_exe PRIVATE cmake_dummy.cpp)
-target_link_libraries(llprecompiled_exe PRIVATE al::flags ${llprecompiled_LIBRARIES})
-target_precompile_headers(llprecompiled_exe PRIVATE ${llprecompiled_HEADERS})
