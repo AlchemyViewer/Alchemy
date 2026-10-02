@@ -406,7 +406,6 @@ jobs:
           esac
 
           echo "build_directory=$build_directory" >> "$GITHUB_OUTPUT"
-          echo "cmake_preset=$cmake_preset_name" >> "$GITHUB_OUTPUT"
 
           cmake -S indra --preset $cmake_preset_name \
             -DVCPKG_TARGET_TRIPLET="$vcpkg_triplet" \
@@ -431,27 +430,32 @@ jobs:
         shell: bash
         env:
           BUILD_DIRECTORY: ${{ steps.configure.outputs.build_directory }}
-          CMAKE_PRESET_NAME: ${{ steps.configure.outputs.cmake_preset }}
           CTEST_OUTPUT_ON_FAILURE: 1 # Output log on test failure
-        working-directory: "${{ github.workspace }}/indra"
         run: |
           set -x
 
           # Set VCPKG root
           export VCPKG_ROOT=$VCPKG_INSTALLATION_ROOT
 
+          case "$BUILD_CONFIG" in
+            release) cmake_config=Release ;;
+            relwithdebinfo) cmake_config=RelWithDebInfo ;;
+            optdebug) cmake_config=OptDebug ;;
+            *) cmake_config=Debug ;;
+          esac
+
           if $BUILD_TESTS
           then
             # Now build the tests. We want to build them in a separate step before running them.
-            cmake --build --preset $CMAKE_PRESET_NAME-$BUILD_CONFIG
+            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config"
 
             # Now that we've built the tests, we can run them to validate the build.
             # If the tests fail, their output will be visible in the logs due to
             # CTEST_OUTPUT_ON_FAILURE above, and the build step will be marked as failed.
-            cmake --build --preset $CMAKE_PRESET_NAME-$BUILD_CONFIG --target BUILD_AND_RUN_TESTS
+            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config" --target BUILD_AND_RUN_TESTS
           elif $AL_BUILD_VIEWER
           then
-            cmake --build --preset $CMAKE_PRESET_NAME-$BUILD_CONFIG || fatal "failed building $BUILD_CONFIG viewer"
+            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config"
           else
             echo "::notice::Skipping build due to both viewer and tests being disabled"
           fi
@@ -486,12 +490,6 @@ jobs:
           # the packaging steps need come from the configure.
           if $AL_BUILD_VIEWER
           then
-            case "$BUILD_CONFIG" in
-              release) cmake_config=Release ;;
-              relwithdebinfo) cmake_config=RelWithDebInfo ;;
-              optdebug) cmake_config=OptDebug ;;
-              *) cmake_config=Debug ;;
-            esac
             # The job's outputs come from whichever row sets them last, and
             # the Windows signing job packages the x64 tree: an arm64 row's
             # installer name and Velopack channel must not win.
