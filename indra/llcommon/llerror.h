@@ -336,7 +336,6 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
 
 #define lllog(level, once, ...)                                         \
     do {                                                                \
-        LL_PROFILE_ZONE_NAMED("lllog");                                 \
         const char* tags[] = {"", ##__VA_ARGS__};                       \
         static LLError::CallSite _site(lllog_site_args_(level, once, tags)); \
         lllog_test_()
