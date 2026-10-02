@@ -54,8 +54,35 @@ class LLMediaCtrl;
 class LLMenuButton;
 class LLRadioGroup;
 
-class PBRPickerAgentListener;
-class PBRPickerObjectListener;
+// One-off listener that updates the build floater UI when the agent inventory adds or removes an item
+class PBRPickerAgentListener : public LLInventoryObserver
+{
+protected:
+    bool mChangePending = true;
+
+public:
+    PBRPickerAgentListener();
+    ~PBRPickerAgentListener() override;
+
+    const bool isListening() { return mChangePending; }
+
+    void changed(U32 mask) override;
+};
+
+// One-off listener that updates the build floater UI when the prim inventory updates
+class PBRPickerObjectListener : public LLVOInventoryListener
+{
+protected:
+    LLViewerObject* mObjectp;
+    bool            mChangePending = true;
+
+public:
+    PBRPickerObjectListener(LLViewerObject* object);
+    ~PBRPickerObjectListener() override;
+
+    const bool isListeningFor(const LLViewerObject* objectp) const;
+    void inventoryChanged(LLViewerObject* object, LLInventoryObject::object_list_t* inventory, S32 serial_num, void* user_data) override;
+};
 
 // Represents an edit for use in replicating the op across one or more materials in the selection set.
 //
