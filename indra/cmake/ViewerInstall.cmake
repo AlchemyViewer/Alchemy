@@ -314,8 +314,6 @@ if(TARGET media_plugin_cef)
         "${cef_binary_dir}/chrome_elf.dll"
         "${cef_binary_dir}/d3dcompiler_47.dll"
         ${cef_dxc_files}
-        "${cef_binary_dir}/libEGL.dll"
-        "${cef_binary_dir}/libGLESv2.dll"
         "${cef_binary_dir}/v8_context_snapshot.bin"
         "${cef_binary_dir}/vk_swiftshader.dll"
         "${cef_binary_dir}/vk_swiftshader_icd.json"
