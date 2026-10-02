@@ -239,7 +239,7 @@ jobs:
       AL_CHANNEL: ${{ needs.setup.outputs.viewer_channel }}
       VIEWER_GRID: "agni"
       # Link Time Optimization
-      AL_USE_LTO: ${{ matrix.configuration == 'release' && startsWith(matrix.build_variant, 'Viewer' }}
+      AL_USE_LTO: ${{ matrix.configuration == 'release' && startsWith(matrix.build_variant, 'Viewer') }}
       # Setting this variable directs Linden's TUT test driver code to capture
       # test-program log output at the specified level, but to display it only if
       # the individual test fails.
