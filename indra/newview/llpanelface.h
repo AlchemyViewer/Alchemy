@@ -28,12 +28,14 @@
 #define LL_LLPANELFACE_H
 
 #include "v4color.h"
+#include "llinventoryobserver.h"
 #include "llpanel.h"
 #include "llgltfmaterial.h"
 #include "llmaterial.h"
 #include "llmaterialmgr.h"
 #include "lltextureentry.h"
 #include "llselectmgr.h"
+#include "llvoinventorylistener.h"
 
 #include <memory>
 
