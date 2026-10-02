@@ -504,7 +504,11 @@ jobs:
                 ;;
               *)
                 cpack --config "$BUILD_DIRECTORY/CPackConfig.cmake" -C "$cmake_config" -B "$RUNNER_TEMP/package"
-                viewer_app="$(ls "$RUNNER_TEMP"/package/*.tar.xz "$RUNNER_TEMP"/package/*.dmg 2>/dev/null | head -n 1)"
+                viewer_app="$(ls "$RUNNER_TEMP"/package/*.tar.xz "$RUNNER_TEMP"/package/*.dmg 2>/dev/null | head -n 1 || true)"
+                if [[ -z "$viewer_app" ]]; then
+                  echo "::error::No .tar.xz or .dmg package under $RUNNER_TEMP/package"
+                  exit 1
+                fi
                 echo "viewer_app=$viewer_app" >> "$GITHUB_OUTPUT"
                 ;;
             esac
