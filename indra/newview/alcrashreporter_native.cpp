@@ -145,7 +145,7 @@ namespace
     // Runs in the crashing process under crashpad, once the scope is on the
     // event: what is only known now goes on the event itself, and the marker
     // the next launch reads is written here.
-    sentry_value_t on_crash(const sentry_ucontext_t*, sentry_value_t event, void*)
+    sentry_value_t on_crash(const sentry_ucontext_t*, sentry_value_t event, sentry_hint_t*, void*)
     {
         LLAppViewer* app = LLAppViewer::instance();
 
