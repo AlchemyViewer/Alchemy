@@ -31,12 +31,16 @@
 #include "alluauservice.h"
 #include "alsourcemap.h"
 
+#include "Luau/Ast.h"
 #include "Luau/Bytecode.h"
 #include "Luau/BytecodeHeader.h"
+#include "Luau/BytecodeUtils.h"
 #include "Luau/Compiler.h"
 #include "Luau/LSLCompiler.h"
 #include "Luau/ParseResult.h"
+#include "Luau/Parser.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <tailslide/tailslide.hh>
 #include <tailslide/passes/lso/bytecode_compiler.hh>
 #include <tailslide/passes/lso/script_compiler.hh>
@@ -196,18 +200,36 @@ namespace
         bool             mOk = true;
     };
 
+    // An entry of a prototype's constant table: what kind, what it takes
+    // up there, and the strings it names -- a string's own, an import's
+    // path, a table template's keys -- by their places in the string
+    // table, from 0.
+    struct Constant
+    {
+        uint8_t               type  = 0;
+        size_t                bytes = 0;
+        std::vector<uint64_t> strings;
+        // What it names by other constants of the same table: an import's
+        // path, a template's keys, each to be read as a string once all are.
+        std::vector<uint64_t> constants;
+    };
+
     struct Proto
     {
-        size_t           begin = 0;
-        size_t           end   = 0;
-        uint64_t         lineDefined = 0;
-        uint64_t         name = 0;       // into the string table, from one
-        std::vector<S32> lines;          // one-based, per code word; empty without line info
+        size_t                begin = 0;
+        size_t                end   = 0;
+        uint64_t              lineDefined = 0;
+        uint64_t              name = 0;       // into the string table, from one
+        std::vector<S32>      lines;          // one-based, per code word; empty without line info
+        std::vector<uint32_t> code;
+        std::vector<Constant> constants;
     };
 
     struct Bytecode
     {
         std::vector<std::string> strings;
+        // What each string takes up in the table: its length and itself.
+        std::vector<size_t>      stringBytes;
         size_t                   stringsBegin = 0;
         size_t                   stringsEnd   = 0;
         std::vector<Proto>       protos;
@@ -227,12 +249,14 @@ namespace
         const uint64_t count = in.varint();
         for (uint64_t i = 0; i < count && in.ok(); ++i)
         {
+            const size_t   entry  = in.at();
             const uint64_t length = in.varint();
             const size_t   from   = in.at();
             in.skip(length);
             if (in.ok())
             {
                 out.strings.emplace_back(data.substr(from, static_cast<size_t>(length)));
+                out.stringBytes.push_back(in.at() - entry);
             }
         }
         out.stringsEnd = in.at();
@@ -261,11 +285,17 @@ namespace
                 }
             }
             const uint64_t sizecode = in.varint();
-            in.skip(sizecode * 4);
+            for (uint64_t j = 0; j < sizecode && in.ok(); ++j)
+            {
+                p.code.push_back(static_cast<uint32_t>(in.int32()));
+            }
             const uint64_t sizek = in.varint();
             for (uint64_t k = 0; k < sizek && in.ok(); ++k)
             {
-                switch (in.byte())
+                Constant     constant;
+                const size_t entry = in.at();
+                constant.type      = in.byte();
+                switch (constant.type)
                 {
                     case LBC_CONSTANT_NIL:
                         break;
@@ -282,18 +312,33 @@ namespace
                         in.skip(32);
                         break;
                     case LBC_CONSTANT_STRING:
+                        // From one; nought is no string.
+                        if (const uint64_t id = in.varint(); id > 0)
+                        {
+                            constant.strings.push_back(id - 1);
+                        }
+                        break;
                     case LBC_CONSTANT_CLOSURE:
                         in.varint();
                         break;
                     case LBC_CONSTANT_IMPORT:
-                        in.skip(4);
+                    {
+                        // Up to three of the table's strings, ten bits each,
+                        // their count in the top two.
+                        const uint32_t id    = static_cast<uint32_t>(in.int32());
+                        const uint32_t names = id >> 30;
+                        for (uint32_t j = 0; j < names; ++j)
+                        {
+                            constant.constants.push_back((id >> (20 - 10 * j)) & 1023);
+                        }
                         break;
+                    }
                     case LBC_CONSTANT_TABLE:
                     {
                         const uint64_t keys = in.varint();
                         for (uint64_t j = 0; j < keys && in.ok(); ++j)
                         {
-                            in.varint();
+                            constant.constants.push_back(in.varint());
                         }
                         break;
                     }
@@ -302,7 +347,7 @@ namespace
                         const uint64_t keys = in.varint();
                         for (uint64_t j = 0; j < keys && in.ok(); ++j)
                         {
-                            in.varint();
+                            constant.constants.push_back(in.varint());
                             in.skip(4);
                         }
                         break;
@@ -324,6 +369,8 @@ namespace
                     default:
                         return false;
                 }
+                constant.bytes = in.at() - entry;
+                p.constants.push_back(std::move(constant));
             }
             const uint64_t children = in.varint();
             for (uint64_t c = 0; c < children && in.ok(); ++c)
@@ -410,6 +457,59 @@ namespace
         p.bytes = bytes;
         return p;
     }
+
+    // The constants an instruction names, by their places in its
+    // prototype's table: where each opcode keeps the index, as Bytecode.h
+    // documents it.
+    template <typename Use>
+    void constantsOf(uint32_t insn, uint32_t aux, Use use)
+    {
+        switch (static_cast<LuauOpcode>(LUAU_INSN_OP(insn)))
+        {
+            case LOP_LOADK:
+            case LOP_GETIMPORT:
+            case LOP_DUPTABLE:
+            case LOP_DUPCLOSURE:
+                use(static_cast<uint32_t>(LUAU_INSN_D(insn)));
+                break;
+            case LOP_LOADKX:
+            case LOP_GETGLOBAL:
+            case LOP_SETGLOBAL:
+            case LOP_GETTABLEKS:
+            case LOP_SETTABLEKS:
+            case LOP_NAMECALL:
+            case LOP_FASTCALL2K:
+            case LOP_NEWCLASSMEMBER:
+                use(aux);
+                break;
+            case LOP_JUMPXEQKN:
+            case LOP_JUMPXEQKS:
+                use(LUAU_INSN_AUX_KV(aux));
+                break;
+            case LOP_GETUDATAKS:
+            case LOP_SETUDATAKS:
+            case LOP_NAMECALLUDATA:
+                use(LUAU_INSN_AUX_KV16(aux));
+                break;
+            case LOP_ADDK:
+            case LOP_SUBK:
+            case LOP_MULK:
+            case LOP_DIVK:
+            case LOP_MODK:
+            case LOP_POWK:
+            case LOP_ANDK:
+            case LOP_ORK:
+            case LOP_IDIVK:
+                use(LUAU_INSN_C(insn));
+                break;
+            case LOP_SUBRK:
+            case LOP_DIVRK:
+                use(LUAU_INSN_B(insn));
+                break;
+            default:
+                break;
+        }
+    }
 }
 
 namespace
@@ -421,6 +521,12 @@ namespace
     // a function, `_e<state>/<event>` a handler of the state so numbered --
     // and where each is in the script.
     void nameLSLParts(ALScriptWeight& weight, std::string_view source);
+    // SLua's prototypes where the script has them, from `function` to its
+    // `end`, and named as the script means them where the compiler gives
+    // no name or not that one: a handler LLEvents is given, by its event --
+    // and its state's, in a table of a state's handlers as the assistant
+    // writes them -- and what LLTimers calls, by how it is set going.
+    void nameSLuaParts(ALScriptWeight& weight, std::string_view source);
 }
 
 namespace ALScriptWeigh
@@ -447,6 +553,10 @@ namespace ALScriptWeigh
             return weight;
         }
         weighAsset(weight, asset);
+        if (weight.compiled)
+        {
+            nameSLuaParts(weight, source);
+        }
         return weight;
     }
 
@@ -507,6 +617,8 @@ namespace
         weight.compiled = true;
         weight.parts.push_back(part(ALScriptWeight::Part::Kind::Constant, "strings", read.stringsEnd - read.stringsBegin));
         std::map<S32, size_t> by_line;
+        // The first line, from one, that names each string; nought for none.
+        std::vector<S32>      string_at(read.strings.size(), 0);
         for (size_t i = 0; i < read.protos.size(); ++i)
         {
             const Proto& p   = read.protos[i];
@@ -531,6 +643,53 @@ namespace
                     last = std::max(last, line);
                 }
             }
+            // Each constant of the prototype the first line of it that
+            // names it, and each string the first line of the script.
+            if (!p.lines.empty())
+            {
+                std::vector<S32> constant_at(p.constants.size(), 0);
+                for (size_t pc = 0; pc < p.code.size();)
+                {
+                    const uint32_t insn = p.code[pc];
+                    const uint32_t aux  = pc + 1 < p.code.size() ? p.code[pc + 1] : 0;
+                    const S32      line = pc < p.lines.size() ? p.lines[pc] : 0;
+                    constantsOf(insn, aux, [&](uint32_t k) {
+                        if (line > 0 && k < constant_at.size() && (constant_at[k] == 0 || line < constant_at[k]))
+                        {
+                            constant_at[k] = line;
+                        }
+                    });
+                    pc += static_cast<size_t>(std::max(1, Luau::getOpLength(static_cast<LuauOpcode>(LUAU_INSN_OP(insn)))));
+                }
+                // What an import's path and a template's keys name, with
+                // the constant that names them: no instruction does.
+                for (size_t k = 0; k < p.constants.size(); ++k)
+                {
+                    for (const uint64_t other : p.constants[k].constants)
+                    {
+                        if (constant_at[k] > 0 && other < constant_at.size() && (constant_at[other] == 0 || constant_at[k] < constant_at[other]))
+                        {
+                            constant_at[other] = constant_at[k];
+                        }
+                    }
+                }
+                for (size_t k = 0; k < p.constants.size(); ++k)
+                {
+                    const S32 line = constant_at[k];
+                    if (line <= 0)
+                    {
+                        continue;
+                    }
+                    by_line[line - 1] += p.constants[k].bytes;
+                    for (const uint64_t s : p.constants[k].strings)
+                    {
+                        if (s < string_at.size() && (string_at[s] == 0 || line < string_at[s]))
+                        {
+                            string_at[s] = line;
+                        }
+                    }
+                }
+            }
             if (!top && first > 0)
             {
                 one.line    = first - 1;
@@ -539,9 +698,194 @@ namespace
             }
             weight.parts.push_back(std::move(one));
         }
+        for (size_t s = 0; s < string_at.size(); ++s)
+        {
+            if (string_at[s] > 0 && s < read.stringBytes.size())
+            {
+                by_line[string_at[s] - 1] += read.stringBytes[s];
+            }
+        }
         for (const auto& [line, bytes] : by_line)
         {
             weight.lines.push_back({ line, bytes });
+        }
+    }
+}
+
+namespace
+{
+    // Every function of an SLua script, where it is, and what the script
+    // means it as where that is more than the compiler's name for it.
+    class SLuaFunctions final : public Luau::AstVisitor
+    {
+    public:
+        struct Meant
+        {
+            std::string name;
+            std::string within;
+            bool        handler = false;
+        };
+        std::vector<const Luau::AstExprFunction*>                         all;
+        boost::unordered_flat_map<const Luau::AstExprFunction*, Meant> meant;
+
+        bool visit(Luau::AstExprFunction* node) override
+        {
+            all.push_back(node);
+            return true;
+        }
+
+        // LLEvents:on("touch_start", function ...), LLEvents:once, and what
+        // LLTimers is given to call.
+        bool visit(Luau::AstExprCall* node) override
+        {
+            const auto* method = node->func->as<Luau::AstExprIndexName>();
+            const auto* object = method ? method->expr->as<Luau::AstExprGlobal>() : nullptr;
+            if (!object || node->args.size == 0)
+            {
+                return true;
+            }
+            const std::string_view on   = object->name.value;
+            const std::string_view what = method->index.value;
+            const auto* callback = node->args.data[node->args.size - 1]->as<Luau::AstExprFunction>();
+            if (!callback)
+            {
+                return true;
+            }
+            if (on == "LLEvents" && (what == "on" || what == "once"))
+            {
+                if (const auto* event = node->args.data[0]->as<Luau::AstExprConstantString>())
+                {
+                    meant[callback] = Meant{ std::string(event->value.data, event->value.size), std::string(), true };
+                }
+            }
+            else if (on == "LLTimers")
+            {
+                meant[callback] = Meant{ "LLTimers:" + std::string(what), std::string(), false };
+            }
+            return true;
+        }
+
+        // LLEvents.touch_start = function ..., and a state's handlers in a
+        // table: states.default = { touch_start = function ... }, or
+        // states["name"] = { ... }.
+        bool visit(Luau::AstStatAssign* node) override
+        {
+            for (size_t i = 0; i < node->vars.size && i < node->values.size; ++i)
+            {
+                Luau::AstExpr* var   = node->vars.data[i];
+                Luau::AstExpr* value = node->values.data[i];
+                if (const auto* field = var->as<Luau::AstExprIndexName>())
+                {
+                    const auto* object = field->expr->as<Luau::AstExprGlobal>();
+                    if (const auto* handler = value->as<Luau::AstExprFunction>(); handler && object && std::string_view(object->name.value) == "LLEvents")
+                    {
+                        meant[handler] = Meant{ field->index.value, std::string(), true };
+                    }
+                    if (named(field->expr, "states"))
+                    {
+                        stateTable(field->index.value, value);
+                    }
+                }
+                else if (const auto* index = var->as<Luau::AstExprIndexExpr>(); index && named(index->expr, "states"))
+                {
+                    if (const auto* key = index->index->as<Luau::AstExprConstantString>())
+                    {
+                        stateTable(std::string(key->value.data, key->value.size), value);
+                    }
+                }
+            }
+            return true;
+        }
+
+    private:
+        static bool named(Luau::AstExpr* expr, std::string_view name)
+        {
+            if (const auto* local = expr->as<Luau::AstExprLocal>())
+            {
+                return std::string_view(local->local->name.value) == name;
+            }
+            const auto* global = expr->as<Luau::AstExprGlobal>();
+            return global && std::string_view(global->name.value) == name;
+        }
+
+        void stateTable(const std::string& state, Luau::AstExpr* value)
+        {
+            const auto* table = value->as<Luau::AstExprTable>();
+            if (!table)
+            {
+                return;
+            }
+            for (const Luau::AstExprTable::Item& item : table->items)
+            {
+                const auto* key     = item.key ? item.key->as<Luau::AstExprConstantString>() : nullptr;
+                const auto* handler = item.value ? item.value->as<Luau::AstExprFunction>() : nullptr;
+                if (key && handler)
+                {
+                    meant[handler] = Meant{ std::string(key->value.data, key->value.size), state, true };
+                }
+            }
+        }
+    };
+
+    void nameSLuaParts(ALScriptWeight& weight, std::string_view source)
+    {
+        Luau::Allocator    allocator;
+        Luau::AstNameTable names(allocator);
+        Luau::ParseOptions options;
+        Luau::ParseResult  parsed = Luau::Parser::parse(source.data(), source.size(), names, allocator, options);
+        if (!parsed.root)
+        {
+            return;
+        }
+        SLuaFunctions found;
+        parsed.root->visit(&found);
+        // Each line's functions in the order the compiler finishes them --
+        // one inside another first -- which is the order they end; and each
+        // line's prototypes in the order the bytecode has them.
+        std::map<S32, std::vector<const Luau::AstExprFunction*>> on_line;
+        for (const Luau::AstExprFunction* function : found.all)
+        {
+            on_line[static_cast<S32>(function->location.begin.line)].push_back(function);
+        }
+        for (auto& [line, functions] : on_line)
+        {
+            std::stable_sort(functions.begin(), functions.end(),
+                             [](const Luau::AstExprFunction* a, const Luau::AstExprFunction* b) { return a->location.end < b->location.end; });
+        }
+        std::map<S32, std::vector<ALScriptWeight::Part*>> parts_on;
+        for (ALScriptWeight::Part& part : weight.parts)
+        {
+            if (part.kind == ALScriptWeight::Part::Kind::Function && part.line >= 0)
+            {
+                parts_on[part.line].push_back(&part);
+            }
+        }
+        for (auto& [line, parts] : parts_on)
+        {
+            const auto functions = on_line.find(line);
+            // Only where the two agree on how many there are.
+            if (functions == on_line.end() || functions->second.size() != parts.size())
+            {
+                continue;
+            }
+            for (size_t i = 0; i < parts.size(); ++i)
+            {
+                ALScriptWeight::Part&          part     = *parts[i];
+                const Luau::AstExprFunction* function = functions->second[i];
+                part.line                             = static_cast<S32>(function->location.begin.line);
+                part.column                           = static_cast<S32>(function->location.begin.column);
+                part.endLine                          = static_cast<S32>(function->location.end.line);
+                part.endColumn                        = static_cast<S32>(function->location.end.column);
+                if (const auto meant = found.meant.find(function); meant != found.meant.end())
+                {
+                    part.name   = meant->second.name;
+                    part.within = meant->second.within;
+                    if (meant->second.handler)
+                    {
+                        part.kind = ALScriptWeight::Part::Kind::Handler;
+                    }
+                }
+            }
         }
     }
 }

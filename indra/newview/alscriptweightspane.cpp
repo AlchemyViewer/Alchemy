@@ -294,6 +294,13 @@ void ALScriptWeightsPane::fillParts()
     {
         head += " " + mStrings->getString("WeightsHeadError", args);
     }
+    // A compiler that records no lines -- LSL's for Luau -- leaves the
+    // heat beside the text with nothing to show: said, rather than left to
+    // look like a script whose lines weigh nothing.
+    if (weight->target == ALScriptWeight::Target::LSLLuau && weight->compiled && weight->total > 0 && weight->lines.empty())
+    {
+        head += " " + mStrings->getString("WeightsHeadNoLines", args);
+    }
     if (mShown.beforeOptimizer)
     {
         const bool own = !mShown.weights.empty() && weight->target == mShown.weights.front().target;

@@ -493,4 +493,60 @@ namespace tut
         ensure("the second less than the string" + lined(two), two.total - one.total < 20);
         ensure("the string is the first line's" + lined(two), at(two, 4) > at(two, 5) + 80);
     }
+
+    // SLua's handlers and callbacks are named as the script means them, a
+    // state's with its state, each part from its function to its end; and
+    // a line carries the strings and constants it is first to name.
+    template<> template<>
+    void alscriptweight_object::test<12>()
+    {
+        const std::string script = "local greeting = \"a sentence of some length, said to the owner as the script starts up\"\n"
+                                   "local function twice(n: number): number\n"
+                                   "    return n * 2\n"
+                                   "end\n"
+                                   "local states = {}\n"
+                                   "states.default = {\n"
+                                   "    state_entry = function()\n"
+                                   "        ll.OwnerSay(greeting)\n"
+                                   "    end,\n"
+                                   "}\n"
+                                   "states[\"other place\"] = { touch_start = function(events) print(twice(1)) end }\n"
+                                   "LLEvents:on(\"touch_start\", function(events)\n"
+                                   "    print(\"touched\")\n"
+                                   "end)\n"
+                                   "LLTimers:every(1, function()\n"
+                                   "    print(\"tick\")\n"
+                                   "end)\n";
+        const ALScriptWeight weight = ALScriptWeigh::slua(script);
+        ensure("compiled: " + weight.error, weight.compiled);
+        const auto find = [&](const std::string& name, const std::string& within) -> const ALScriptWeight::Part* {
+            for (const ALScriptWeight::Part& part : weight.parts)
+            {
+                if (part.name == name && part.within == within)
+                {
+                    return &part;
+                }
+            }
+            return nullptr;
+        };
+        const ALScriptWeight::Part* twice = find("twice", "");
+        ensure("a local function, from its function to its end:" + listed(weight), twice && twice->line == 1 && twice->endLine == 3 && twice->endColumn == 3);
+        ensure("not a handler", twice->kind == ALScriptWeight::Part::Kind::Function);
+        const ALScriptWeight::Part* entry = find("state_entry", "default");
+        ensure("a state's handler, with its state:" + listed(weight), entry && entry->kind == ALScriptWeight::Part::Kind::Handler);
+        ensure("from its function to its end", entry->line == 6 && entry->column == 18 && entry->endLine == 8);
+        ensure("a state named by a string:" + listed(weight), find("touch_start", "other place") != nullptr);
+        const ALScriptWeight::Part* touched = find("touch_start", "");
+        ensure("LLEvents' handler by its event:" + listed(weight), touched && touched->kind == ALScriptWeight::Part::Kind::Handler && touched->line == 11);
+        const ALScriptWeight::Part* tick = find("LLTimers:every", "");
+        ensure("what LLTimers calls, by how it is set going:" + listed(weight), tick && tick->kind == ALScriptWeight::Part::Kind::Function);
+
+        // The greeting, a constant the compiler puts where it is used, is
+        // that line's; the strings every line names are counted on some
+        // line, so that the lines come to most of the whole.
+        ensure("the long string on the line that says it:" + lined(weight), at(weight, 7) > 80);
+        ensure("a short one on its own line:" + lined(weight), at(weight, 12) > 4 + std::string("touched").size());
+        const size_t lines = within(weight, 0, 100);
+        ensure("most of the whole on some line: " + std::to_string(lines) + " of " + std::to_string(weight.total), lines * 3 > weight.total * 2);
+    }
 }

@@ -364,4 +364,29 @@ namespace tut
         pane.show(shown);
         ensure("and URLs where there are" + head->getText(), head->getText().find("128 KB and 3 URLs") != std::string::npos);
     }
+
+    // LSL on Luau's compiler records no lines, so its lines are not
+    // weighed one by one: said, where its heat would show nothing; not of
+    // a target whose lines merely weigh nothing.
+    template<> template<>
+    void alscriptweightspane_object::test<8>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ensure("the studio's window builds with its Weights tab", tab() != nullptr);
+        ALScriptWeightsPane& pane = weights();
+        ALScriptWeightsPane::Shown shown = lsl();
+        shown.weights[2].compiled = true;
+        shown.weights[2].error.clear();
+        shown.weights[2].total = 2048;
+        std::swap(shown.weights[0], shown.weights[2]);
+        pane.show(shown);
+        const std::string luau = floater->findChild<LLTextBox>("weights_head", true)->getText();
+        ensure("said for LSL on Luau: " + luau, luau.find("records no lines") != std::string::npos);
+        pane.show(lsl());
+        const std::string lso = floater->findChild<LLTextBox>("weights_head", true)->getText();
+        ensure("not for LSO: " + lso, lso.find("records no lines") == std::string::npos);
+    }
 }

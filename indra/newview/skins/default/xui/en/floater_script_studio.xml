@@ -671,6 +671,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="WeightsHeadEstimate">[NAME] on [TARGET]: about [SIZE,number,1] of [LIMIT] KB used, [SHARE].</floater.string>
     <floater.string name="WeightsHeadFailed">[NAME] does not compile for [TARGET]: [ERROR]</floater.string>
     <floater.string name="WeightsHeadError">Currently, [ERROR].</floater.string>
+    <floater.string name="WeightsHeadNoLines">Its lines are not weighed one by one: the compiler for [TARGET] records no lines.</floater.string>
     <floater.string name="WeightsHeadBefore">Measured before the preprocessor's optimizer, which runs on save.</floater.string>
     <floater.string name="WeightsHeadSent">Measured before the preprocessor's optimizer. As saved, it is [SENT,number,1] KB.</floater.string>
     <floater.string name="WeightsHeadTip">Code size only, not counting the lists and strings the script builds while it runs.</floater.string>
