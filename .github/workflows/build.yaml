@@ -95,7 +95,7 @@ jobs:
             echo 'build_type=opensource' >> $GITHUB_OUTPUT
             echo 'build_suffix=-OS' >> $GITHUB_OUTPUT
           else
-            echo 'build_type=proprietary' >> $GITHUB_OUTPUT
+            echo 'build_type=opensource' >> $GITHUB_OUTPUT
             echo "build_suffix=" >> $GITHUB_OUTPUT
           fi
 
@@ -351,9 +351,6 @@ jobs:
         run: |
           set -x
 
-          # Set VCPKG root
-          export VCPKG_ROOT=$VCPKG_INSTALLATION_ROOT
-
           [ -n "$master_message_template_checkout" ] \
           && [ -r "$master_message_template_checkout/message_template.msg" ] \
           && template_verifier_master_url="-DAL_TEMPLATE_VERIFIER_MASTER_URL=file://$master_message_template_checkout/message_template.msg"
@@ -422,9 +419,6 @@ jobs:
           CTEST_OUTPUT_ON_FAILURE: 1 # Output log on test failure
         run: |
           set -x
-
-          # Set VCPKG root
-          export VCPKG_ROOT=$VCPKG_INSTALLATION_ROOT
 
           case "$BUILD_CONFIG" in
             release) cmake_config=Release ;;
