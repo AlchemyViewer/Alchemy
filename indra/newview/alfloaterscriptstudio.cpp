@@ -154,13 +154,9 @@ namespace
             return lua ? LLSyntaxDefCache::instance().getLuaKeywords() : LLSyntaxDefCache::instance().getLSLKeywords();
         }
         std::string definitionsVersion() override { return LLSyntaxDefCache::instance().getSyntaxID().asString(); }
-        std::string definitionsYaml() override
-        {
-            llifstream        in(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "syntax_default", "lsl_definitions.yaml"), std::ios::binary);
-            std::stringstream text;
-            text << in.rdbuf();
-            return text.str();
-        }
+        // The region's, where it delivered them, as the keywords are; else
+        // those shipped.
+        std::string definitionsYaml() override { return LLSyntaxDefCache::instance().loadCacheFile("lsl_definitions.yaml"); }
         std::vector<std::string> preprocessorWords() override
         {
             std::vector<std::string> words;
