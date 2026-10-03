@@ -1331,4 +1331,29 @@ namespace tut
         checking.askFixAll(safe, pick);
         ensure("all safe: asked as Fix All asks", (bool)studio.preview);
     }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<24>()
+    {
+        set_test_name("what is left from LSL put right where a fix could change the script: previewed beside the text, and made by Apply");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a", "local t = {}\nif #t then print(1) end\n");
+        doc.language.lua                 = true;
+        checking.schedule(doc, true);
+        checking.pump(1.0);
+        ALScriptProblem truth = problem(1, "#t is a number", ALScriptProblem::Severity::Warning);
+        truth.source          = ALScriptProblem::Source::Lint;
+        truth.code            = "SlNumberTruth";
+        truth.fixes           = { fix("Compare it: #t ~= 0", 1, 3, 5, "#t ~= 0", false) };
+        studio.asks.back().answered(answer(doc, { truth }));
+        Doc::FixPick pick;
+        pick.migration = true;
+        checking.askFixAll(doc, pick);
+        ensure("previewed, not asked", !studio.preview && studio.told.back().rfind("compare a: ", 0) == 0);
+        ensure("Apply offered", services.reports.back().actions == Names{ "apply_fixes" });
+        ensure("made by Apply", checking.applyPreviewed(doc));
+        ensure_equals("put right", doc.editor->document().line(1), std::string("if #t ~= 0 then print(1) end"));
+        ensure("Apply again: nothing waiting, and said", !checking.applyPreviewed(doc) && services.statuses.back() == "FixAllNotPreviewed" &&
+                                                            services.statusFailures.back());
+    }
 }

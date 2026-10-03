@@ -469,6 +469,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="RenameAfter">Renamed to [NAME]</floater.string>
     <floater.string name="RenameChangesNotHere">[SCRIPT] is not open here, or has changed since the lookup; its occurrences are listed in References.</floater.string>
     <floater.string name="FixAllPreviewed">[FIXES] for [NAME], shown beside the text. Apply makes them, as one step to undo.</floater.string>
+    <floater.string name="FixAllNotPreviewed">Nothing previewed is waiting to be applied. Ask for the fixes again to see them.</floater.string>
+    <floater.string name="FixAllNotMade">The fixes were not made: the text would not take them.</floater.string>
     <floater.string name="FixAllChangedSince">The text changed after the preview, so its fixes were not made. Use Fix All again to see them for the text now.</floater.string>
     <floater.string name="ActionApplyFixes">Apply</floater.string>
     <floater.string name="ActionApplyFixesTip">Make the fixes previewed in [NAME], as one step to undo</floater.string>

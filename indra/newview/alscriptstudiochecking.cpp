@@ -1562,8 +1562,10 @@ void ALScriptStudioChecking::previewFixAll(Doc& doc, const FixPick& pick)
 
 bool ALScriptStudioChecking::applyPreviewed(Doc& doc)
 {
+    // Never nothing said: Apply that makes nothing says why.
     if (!doc.check->fixAllPreviewed)
     {
+        mServices.setStatus(mServices.words("FixAllNotPreviewed"), true);
         return false;
     }
     const Doc::Check::FixAllPreview previewed = *doc.check->fixAllPreviewed;
@@ -1599,9 +1601,24 @@ bool ALScriptStudioChecking::fixAll(Doc& doc, const FixPick& pick)
         }
     }
     // Every one of them one step to undo: they were made over one check,
-    // and none meets another.
-    if (edits.empty() || !source.replaceAll(std::move(edits)))
+    // and none meets another. Asked for and none made, said: the problems
+    // they were for gone since, which a check says again, or the text
+    // refusing them.
+    if (edits.empty())
     {
+        if (!pick.forSave)
+        {
+            mServices.setStatus(mServices.words("FixStale"), true);
+            schedule(doc, true);
+        }
+        return false;
+    }
+    if (!source.replaceAll(std::move(edits)))
+    {
+        if (!pick.forSave)
+        {
+            mServices.setStatus(mServices.words("FixAllNotMade"), true);
+        }
         return false;
     }
     source.undoJournal().label("fix");
