@@ -9,10 +9,19 @@
 	<floater.string name="copy_name">
 		Копия [COPY_NAME]
 	</floater.string>
+	<floater.string name="never_used">---</floater.string>
+	<floater.string name="last_used_seconds">[COUNT]с</floater.string>
+	<floater.string name="last_used_minutes">[COUNT]мин</floater.string>
+	<floater.string name="last_used_hours">[COUNT]ч</floater.string>
+	<floater.string name="last_used_days">[COUNT]д</floater.string>
+	<floater.string name="no_gestures">Нет жестов</floater.string>
+	<floater.string name="no_matching_gestures">Нет подходящих жестов</floater.string>
+	<filter_editor label="Фильтр по названию, чату или клавише" name="gesture_filter" tool_tip="Фильтр жестов по названию, фразе активации в чате или сочетанию клавиш"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Название" name="name"/>
 		<scroll_list.columns label="Чат" name="trigger"/>
 		<scroll_list.columns label="Клавиша" name="shortcut"/>
+		<scroll_list.columns label="Посл." name="last_used" tool_tip="Время с последнего использования в этом сеансе. Запоминаются 1 024 последних использованных жеста. Нажмите для сортировки."/>
 	</scroll_list>
 	<panel label="bottom_panel" name="bottom_panel">
 		<menu_button name="gear_btn" tool_tip="Дополнительные параметры"/>

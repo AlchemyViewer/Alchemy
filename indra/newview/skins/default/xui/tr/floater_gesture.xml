@@ -9,10 +9,19 @@
 	<floater.string name="copy_name">
 		[COPY_NAME] kopyası
 	</floater.string>
+	<floater.string name="never_used">---</floater.string>
+	<floater.string name="last_used_seconds">[COUNT]sn</floater.string>
+	<floater.string name="last_used_minutes">[COUNT]dk</floater.string>
+	<floater.string name="last_used_hours">[COUNT]sa</floater.string>
+	<floater.string name="last_used_days">[COUNT]g</floater.string>
+	<floater.string name="no_gestures">Mimik yok</floater.string>
+	<floater.string name="no_matching_gestures">Eşleşen mimik yok</floater.string>
+	<filter_editor label="Ada, sohbete veya tuşa göre filtrele" name="gesture_filter" tool_tip="Mimikleri ada, sohbet tetikleyicisine veya kısayol tuşuna göre filtrele"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Ad" name="name"/>
 		<scroll_list.columns label="Sohbet" name="trigger"/>
 		<scroll_list.columns label="Anahtar" name="shortcut"/>
+		<scroll_list.columns label="Son" name="last_used" tool_tip="Bu oturumdaki son kullanımdan bu yana geçen süre. En son kullanılan 1.024 mimiği hatırlar. Sıralamak için tıklayın."/>
 	</scroll_list>
 	<panel label="bottom_panel" name="bottom_panel">
 		<menu_button name="gear_btn" tool_tip="İlave seçenekler"/>

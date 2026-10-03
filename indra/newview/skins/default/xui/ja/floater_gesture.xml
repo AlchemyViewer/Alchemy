@@ -9,10 +9,19 @@
 	<floater.string name="copy_name">
 		[COPY_NAME]のコピー
 	</floater.string>
+	<floater.string name="never_used">---</floater.string>
+	<floater.string name="last_used_seconds">[COUNT]秒</floater.string>
+	<floater.string name="last_used_minutes">[COUNT]分</floater.string>
+	<floater.string name="last_used_hours">[COUNT]時間</floater.string>
+	<floater.string name="last_used_days">[COUNT]日</floater.string>
+	<floater.string name="no_gestures">ジェスチャーがありません</floater.string>
+	<floater.string name="no_matching_gestures">一致するジェスチャーがありません</floater.string>
+	<filter_editor label="名前、チャット、キーで絞り込み" name="gesture_filter" tool_tip="名前、チャットのトリガー、ショートカットキーでジェスチャーを絞り込みます"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="名前" name="name"/>
 		<scroll_list.columns label="チャット" name="trigger"/>
 		<scroll_list.columns label="キー" name="shortcut"/>
+		<scroll_list.columns label="最終" name="last_used" tool_tip="このセッションで最後に使用してからの経過時間です。最近使用した1,024件のジェスチャーを記憶します。クリックして並べ替えます。"/>
 	</scroll_list>
 	<panel label="bottom_panel" name="bottom_panel">
 		<menu_button name="gear_btn" tool_tip="詳細オプションを表示します。"/>

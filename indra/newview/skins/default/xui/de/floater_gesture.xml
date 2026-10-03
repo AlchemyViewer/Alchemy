@@ -9,11 +9,20 @@
 	<floater.string name="copy_name">
 		Kopie von [COPY_NAME]
 	</floater.string>
+	<floater.string name="never_used">---</floater.string>
+	<floater.string name="last_used_seconds">[COUNT]s</floater.string>
+	<floater.string name="last_used_minutes">[COUNT]min</floater.string>
+	<floater.string name="last_used_hours">[COUNT]h</floater.string>
+	<floater.string name="last_used_days">[COUNT]T</floater.string>
+	<floater.string name="no_gestures">Keine Gesten</floater.string>
+	<floater.string name="no_matching_gestures">Keine passenden Gesten</floater.string>
+	<filter_editor label="Nach Name, Chat oder Taste filtern" name="gesture_filter" tool_tip="Gesten nach Name, Chat-Auslöser oder Tastenkürzel filtern"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Name" name="name"/>
 		<scroll_list.columns label="Chat" name="trigger"/>
 		<scroll_list.columns label="" name="key"/>
 		<scroll_list.columns label="Key" name="shortcut"/>
+		<scroll_list.columns label="Zuletzt" name="last_used" tool_tip="Zeit seit der letzten Verwendung in dieser Sitzung. Merkt sich die 1.024 zuletzt verwendeten Gesten. Zum Sortieren klicken."/>
 	</scroll_list>
 	<panel label="bottom_panel" name="bottom_panel">
 		<menu_button name="gear_btn" tool_tip="Mehr Möglichkeiten"/>

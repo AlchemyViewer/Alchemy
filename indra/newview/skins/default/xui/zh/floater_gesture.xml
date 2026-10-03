@@ -9,10 +9,19 @@
 	<floater.string name="copy_name">
 		[COPY_NAME] 複本
 	</floater.string>
+	<floater.string name="never_used">---</floater.string>
+	<floater.string name="last_used_seconds">[COUNT]秒</floater.string>
+	<floater.string name="last_used_minutes">[COUNT]分</floater.string>
+	<floater.string name="last_used_hours">[COUNT]小時</floater.string>
+	<floater.string name="last_used_days">[COUNT]天</floater.string>
+	<floater.string name="no_gestures">沒有姿勢</floater.string>
+	<floater.string name="no_matching_gestures">沒有符合條件的姿勢</floater.string>
+	<filter_editor label="依名稱、聊天或按鍵篩選" name="gesture_filter" tool_tip="依名稱、聊天觸發文字或快捷鍵篩選姿勢"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="名稱" name="name"/>
 		<scroll_list.columns label="聊天" name="trigger"/>
 		<scroll_list.columns label="鍵" name="shortcut"/>
+		<scroll_list.columns label="上次" name="last_used" tool_tip="本次工作階段中距離上次使用的時間。保留最近使用的 1,024 個姿勢記錄。按一下即可排序。"/>
 	</scroll_list>
 	<panel label="bottom_panel" name="bottom_panel">
 		<menu_button name="gear_btn" tool_tip="更多選項"/>

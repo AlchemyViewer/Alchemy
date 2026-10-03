@@ -9,11 +9,20 @@
 	<floater.string name="copy_name">
 		Kopi af [COPY_NAME]
 	</floater.string>
+	<floater.string name="never_used">---</floater.string>
+	<floater.string name="last_used_seconds">[COUNT]s</floater.string>
+	<floater.string name="last_used_minutes">[COUNT]min</floater.string>
+	<floater.string name="last_used_hours">[COUNT]t</floater.string>
+	<floater.string name="last_used_days">[COUNT]d</floater.string>
+	<floater.string name="no_gestures">Ingen bevægelser</floater.string>
+	<floater.string name="no_matching_gestures">Ingen matchende bevægelser</floater.string>
+	<filter_editor label="Filtrér efter navn, chat eller tast" name="gesture_filter" tool_tip="Filtrér bevægelser efter navn, chatudløser eller genvejstast"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Navn" name="name"/>
 		<scroll_list.columns label="Chat" name="trigger"/>
 		<scroll_list.columns label="" name="key"/>
 		<scroll_list.columns label="Taste" name="shortcut"/>
+		<scroll_list.columns label="Sidst" name="last_used" tool_tip="Tid siden seneste brug i denne session. Husker de 1.024 senest brugte bevægelser. Klik for at sortere."/>
 	</scroll_list>
 	<panel label="bottom_panel" name="bottom_panel">
 		<menu_button name="gear_btn" tool_tip="Flere muligheder"/>
