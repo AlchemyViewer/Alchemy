@@ -2,7 +2,7 @@
   "registries": [
     {
       "kind": "git",
-      "baseline": "626b721b1dd0aef56310c74b62baf227fb317bb7",
+      "baseline": "89a3892bd4404e50c7e4a1bdc2f9d810e4cdec32",
       "reference": "main",
       "repository": "https://github.com/AlchemyViewer/alchemy-registry",
       "packages": [
