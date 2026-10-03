@@ -953,13 +953,15 @@ namespace
         int         at    = 0;
         for (LSLASTNode* arg = isNull(list) ? nullptr : list->getChild(0); arg; arg = arg->getNext(), ++at)
         {
-            auto*    given = static_cast<LSLExpression*>(arg);
-            LSLIType to    = param ? varType(static_cast<LSLIdentifier*>(param)->getSymbol(), param->getIType()) : given->getIType();
+            auto*      given = static_cast<LSLExpression*>(arg);
+            LSLSymbol* taken = param ? static_cast<LSLIdentifier*>(param)->getSymbol() : nullptr;
+            LSLIType   to    = param ? varType(taken, param->getIType()) : given->getIType();
             if ((text & (1 << at)) && (slType(given) == LST_STRING || slType(given) == LST_KEY))
             {
                 to = slType(given);
             }
-            out += (out.empty() ? "" : ", ") + coerced(given, to).text;
+            // A parameter the script only reads as a truth is given one.
+            out += (out.empty() ? "" : ", ") + (boolean(taken) ? truthOf(given) : coerced(given, to).text);
             param = param ? param->getNext() : nullptr;
         }
         return out;
@@ -2860,6 +2862,30 @@ namespace
                 {
                     mBooleans.insert(f->getSymbol());
                 }
+                // Its integer parameters, each set by what its calls give
+                // it. An event's are the grid's, typed as numbers there,
+                // and stay numbers.
+                for (LSLASTNode* param = f->getArguments() ? f->getArguments()->getChild(0) : nullptr; !isNull(param); param = param->getNext())
+                {
+                    candidate(static_cast<LSLIdentifier*>(param), nullptr);
+                }
+            }
+            else if (node->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+            {
+                // A call of the script's own function: each argument what
+                // its parameter is set to.
+                auto*         call   = static_cast<LSLFunctionExpression*>(node);
+                LSLSymbol*    symbol = call->getIdentifier()->getSymbol();
+                LSLParamList* params = symbol && symbol->getSubType() != SYM_BUILTIN ? symbol->getFunctionDecl() : nullptr;
+                LSLASTNode*   param  = params ? params->getChild(0) : nullptr;
+                for (LSLASTNode* arg = isNull(call->getArguments()) ? nullptr : call->getArguments()->getChild(0); arg && !isNull(param);
+                     arg = arg->getNext(), param = param->getNext())
+                {
+                    if (LSLSymbol* set = static_cast<LSLIdentifier*>(param)->getSymbol(); set && param->getIType() == LST_INTEGER)
+                    {
+                        sets.emplace_back(set, static_cast<LSLExpression*>(arg));
+                    }
+                }
             }
             else if (node->getNodeSubType() == NODE_DECLARATION)
             {
@@ -2874,7 +2900,7 @@ namespace
                     sets.emplace_back(f, e);
                 }
             }
-            else if ((node->getNodeSubType() == NODE_LVALUE_EXPRESSION || node->getNodeSubType() == NODE_FUNCTION_EXPRESSION) && readOf(node))
+            if ((node->getNodeSubType() == NODE_LVALUE_EXPRESSION || node->getNodeSubType() == NODE_FUNCTION_EXPRESSION) && readOf(node))
             {
                 reads.push_back(node);
             }
@@ -4271,8 +4297,9 @@ namespace
             std::string params;
             for (LSLASTNode* p = f->getArguments() ? f->getArguments()->getChild(0) : nullptr; p; p = p->getNext())
             {
+                LSLSymbol* param = static_cast<LSLIdentifier*>(p)->getSymbol();
                 params += (params.empty() ? "" : ", ") + nameOf(static_cast<LSLIdentifier*>(p)) +
-                          typed(varType(static_cast<LSLIdentifier*>(p)->getSymbol(), p->getIType()));
+                          (boolean(param) ? std::string(mOptions.types ? ": boolean" : "") : typed(varType(param, p->getIType())));
             }
             mFunction = f->getSymbol();
             line(std::string(forward ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +

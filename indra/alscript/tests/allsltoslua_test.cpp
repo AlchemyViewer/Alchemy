@@ -1008,4 +1008,41 @@ namespace tut
         ensure("read in the studio's words", linted(ALLSLToSLua::notesIn(said.text, close.words)) == 1);
         ensure("not in English's", linted(ALLSLToSLua::notesIn(said.text, nullptr)) == 0);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<33>()
+    {
+        set_test_name("a parameter the script only reads as a truth is a boolean, each call giving one; one read as a number, or given more than TRUE where it is asked about TRUE, stays a number; an event's stay the grid's numbers");
+        const ALLSLToSLua::Result r = convert("say(integer loud, string text) { if (loud) llShout(0, text); else llSay(0, text); }\n"
+                                              "glow(integer on) { if (!on) return; llOwnerSay(\"glow\"); }\n"
+                                              "integer next(integer n) { return n + 1; }\n"
+                                              "integer exactly(integer f) { return f == TRUE; }\n"
+                                              "default {\n"
+                                              "    touch_start(integer n) {\n"
+                                              "        say(TRUE, \"hi\");\n"
+                                              "        say(n > 1, \"many\");\n"
+                                              "        say(n, \"some\");\n"
+                                              "        glow(FALSE);\n"
+                                              "        llOwnerSay((string)next(n));\n"
+                                              "        exactly(1); exactly(5);\n"
+                                              "    }\n"
+                                              "    on_rez(integer p) { if (p) llOwnerSay(\"rezzed\"); }\n"
+                                              "}\n");
+        ensure("read only as a truth: a boolean: " + r.text, has(r, "local function say(loud, text)") && has(r, "if loud then"));
+        ensure("each call giving one, a number as its truth: " + r.text,
+               has(r, "say(true, \"hi\")") && has(r, "say(n > 1, \"many\")") && has(r, "say(n ~= 0, \"some\")"));
+        ensure("not, as a truth: " + r.text, has(r, "if not on then") && has(r, "glow(false)"));
+        ensure("read as a number: kept one: " + r.text, has(r, "return n + 1") && has(r, "next_(n)"));
+        ensure("given 5 where asked about TRUE: kept a number: " + r.text, has(r, "f == 1") && has(r, "exactly(5)"));
+        ensure("an event's: the grid's number: " + r.text, has(r, "if p ~= 0 then"));
+        checksClean(r);
+
+        ALLSLToSLua::Options typed;
+        typed.types = true;
+        const ALLSLToSLua::Result t = ALLSLToSLua::convert("say(integer loud, string text) { if (loud) llSay(0, text); }\n"
+                                                           "default { state_entry() { say(TRUE, \"hi\"); } }\n",
+                                                           typed);
+        ensure("typed: " + t.text, has(t, "local function say(loud: boolean, text: string)"));
+        checksClean(t);
+    }
 }
