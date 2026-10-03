@@ -48,6 +48,7 @@
 #include "alscriptstudiofileio.h"
 #include "alscriptstudioglue.h"
 #include "alscriptstudioplaces.h"
+#include "alscriptstudiosnippetnotecard.h"
 #include "alscriptstudiovimrc.h"
 #include "alscriptworkspace.h"
 #include "alemptystate.h"
@@ -1472,6 +1473,8 @@ void ALFloaterScriptStudio::draw()
     {
         ALScriptStudioVimrc::instance().check();
     }
+    // The followed snippet notecard's, fetched again where it is saved.
+    ALScriptStudioSnippetNotecard::instance().check();
     mSearchPane->pump();
     mNavigation.pumpSettle();
     refreshUndoLabels();

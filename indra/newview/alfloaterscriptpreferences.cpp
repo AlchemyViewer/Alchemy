@@ -32,6 +32,7 @@
 #include "alcodeeditor.h"
 #include "alscriptstudio.h"
 #include "alscriptanalysis.h"
+#include "alscriptstudiosnippetnotecard.h"
 #include "alscriptstudiovimrc.h"
 #include "alscriptstudiowords.h"
 #include "alfontfield.h"
@@ -65,7 +66,9 @@
 #include "llviewerassettype.h"
 
 #include <algorithm>
+#include <functional>
 #include <sstream>
+#include <string_view>
 
 namespace
 {
@@ -102,6 +105,16 @@ namespace
 
     // How long after the last keystroke an edited snippet is written.
     const F32 SNIPPET_SETTLE = 0.5f;
+
+    // The notecard of the agent's own that a drop carries, a link as what
+    // it links to -- the notecard's asset is what changes as it is edited;
+    // null where it carries anything else.
+    const LLViewerInventoryItem* droppedNotecard(EDragAndDropType cargo_type, void* cargo_data)
+    {
+        const LLInventoryItem*       item = static_cast<LLInventoryItem*>(cargo_data);
+        const LLViewerInventoryItem* held = item ? gInventory.getItem(item->getLinkedUUID()) : nullptr;
+        return cargo_type == DAD_NOTECARD && held && held->getType() == LLAssetType::AT_NOTECARD ? held : nullptr;
+    }
 
     const S32 SWATCH_ROW    = 24;
     const S32 SWATCH_WIDTH  = 48;
@@ -150,6 +163,14 @@ bool ALFloaterScriptPreferences::postBuild()
         [](LLUICtrl*, const LLSD&) { ALScriptStudioVimrc::instance().useNotecard(LLUUID::null); });
     mVimrcChanged = ALScriptStudioVimrc::instance().onChanged([this]() { refreshVimrc(); });
     refreshVimrc();
+    mSnippetNotecard = getChild<LLLineEditor>("snippet_notecard");
+    getChild<LLButton>("snippet_notecard_clear")->setCommitCallback(
+        [](LLUICtrl*, const LLSD&) { ALScriptStudioSnippetNotecard::instance().useNotecard(LLUUID::null); });
+    mSnippetNotecardChanged = ALScriptStudioSnippetNotecard::instance().onChanged([this]() {
+        refreshSnippetNotecard();
+        fillSnippets(false);
+    });
+    refreshSnippetNotecard();
     getChild<LLButton>("scripting_settings")->setCommitCallback([](LLUICtrl*, const LLSD&) { LLFloaterReg::showInstance("scripting_settings"); });
     getChild<LLButton>("snippet_xml")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         flushSnippets();
@@ -459,8 +480,9 @@ void ALFloaterScriptPreferences::remember()
             mWasSettings[setting] = control->getValue();
         }
     }
-    // The account's, as the notecard is.
-    mWasVimrc = ALScriptStudioVimrc::instance().notecard().asString();
+    // The account's, as the notecards are.
+    mWasVimrc           = ALScriptStudioVimrc::instance().notecard().asString();
+    mWasSnippetNotecard = ALScriptStudioSnippetNotecard::instance().notecard().asString();
 }
 
 void ALFloaterScriptPreferences::revert()
@@ -489,6 +511,10 @@ void ALFloaterScriptPreferences::revert()
     {
         ALScriptStudioVimrc::instance().useNotecard(LLUUID(mWasVimrc));
     }
+    if (ALScriptStudioSnippetNotecard::instance().notecard().asString() != mWasSnippetNotecard)
+    {
+        ALScriptStudioSnippetNotecard::instance().useNotecard(LLUUID(mWasSnippetNotecard));
+    }
     // The snippets as they were, where they were changed here.
     for (bool lua : { false, true })
     {
@@ -504,7 +530,8 @@ void ALFloaterScriptPreferences::revert()
 
 bool ALFloaterScriptPreferences::changed() const
 {
-    if (mSnippetsUnsaved || ALScriptStudioVimrc::instance().notecard().asString() != mWasVimrc)
+    if (mSnippetsUnsaved || ALScriptStudioVimrc::instance().notecard().asString() != mWasVimrc ||
+        ALScriptStudioSnippetNotecard::instance().notecard().asString() != mWasSnippetNotecard)
     {
         return true;
     }
@@ -871,50 +898,56 @@ void ALFloaterScriptPreferences::refreshVimrc()
     where->setText(!vimrc.error().empty() ? vimrc.error() : getString(notecard ? "VimrcFromNotecard" : "VimrcFromFile", args));
 }
 
+void ALFloaterScriptPreferences::refreshSnippetNotecard()
+{
+    const ALScriptStudioSnippetNotecard& followed = ALScriptStudioSnippetNotecard::instance();
+    const bool                           notecard = followed.notecard().notNull();
+    const std::string                    name     = followed.notecardName();
+    // Empty with none: the box's label asks for one.
+    mSnippetNotecard->setText(!notecard ? std::string() : name.empty() ? getString("SnippetNotecardUnknown") : name);
+    mSnippetNotecard->setToolTip(!followed.error().empty() ? followed.error() : getString("SnippetNotecardTip"));
+    getChildView("snippet_notecard_clear")->setEnabled(notecard);
+}
+
 bool ALFloaterScriptPreferences::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data,
                                                    EAcceptance* accept, std::string& tooltip_msg)
 {
-    S32 local_x = 0;
-    S32 local_y = 0;
-    if (mVimrcNotecard && mVimrcNotecard->isInVisibleChain() && localPointToOtherView(x, y, &local_x, &local_y, mVimrcNotecard) &&
-        mVimrcNotecard->pointInView(local_x, local_y))
-    {
-        // A notecard of the agent's own, a link as what it links to: the
-        // notecard's asset is what changes as it is edited.
-        const LLInventoryItem*       item = static_cast<LLInventoryItem*>(cargo_data);
-        const LLViewerInventoryItem* held = item ? gInventory.getItem(item->getLinkedUUID()) : nullptr;
-        if (cargo_type != DAD_NOTECARD || !held || held->getType() != LLAssetType::AT_NOTECARD)
+    // Which box it is over, and what a notecard dropped there does; each
+    // takes a notecard of the agent's own alone.
+    const auto over = [this, x, y](LLView* view) {
+        S32 local_x = 0;
+        S32 local_y = 0;
+        return view && view->isInVisibleChain() && localPointToOtherView(x, y, &local_x, &local_y, view) && view->pointInView(local_x, local_y);
+    };
+    const auto take = [&](const char* only, const std::function<void(const LLViewerInventoryItem&)>& use) {
+        const LLViewerInventoryItem* held = droppedNotecard(cargo_type, cargo_data);
+        if (!held)
         {
             *accept     = ACCEPT_NO;
-            tooltip_msg = getString("VimrcOnlyNotecards");
+            tooltip_msg = getString(only);
             return true;
         }
         *accept = ACCEPT_YES_SINGLE;
         if (drop)
         {
-            ALScriptStudioVimrc::instance().useNotecard(held->getUUID());
+            use(*held);
         }
         return true;
+    };
+    if (over(mVimrcNotecard))
+    {
+        return take("VimrcOnlyNotecards", [](const LLViewerInventoryItem& held) { ALScriptStudioVimrc::instance().useNotecard(held.getUUID()); });
     }
-    if (mSnippetList && mSnippetList->isInVisibleChain() && localPointToOtherView(x, y, &local_x, &local_y, mSnippetList) &&
-        mSnippetList->pointInView(local_x, local_y))
+    if (over(mSnippetNotecard))
     {
-        // A notecard of the agent's own, whose snippets come in beside
-        // theirs.
-        const LLInventoryItem*       item = static_cast<LLInventoryItem*>(cargo_data);
-        const LLViewerInventoryItem* held = item ? gInventory.getItem(item->getLinkedUUID()) : nullptr;
-        if (cargo_type != DAD_NOTECARD || !held || held->getType() != LLAssetType::AT_NOTECARD)
-        {
-            *accept     = ACCEPT_NO;
-            tooltip_msg = getString("SnippetsOnlyNotecards");
-            return true;
-        }
-        *accept = ACCEPT_YES_SINGLE;
-        if (drop)
-        {
-            addSnippetsFrom(*held);
-        }
-        return true;
+        // Followed: its snippets offered as it stands.
+        return take("SnippetsFollowOnlyNotecards",
+                    [](const LLViewerInventoryItem& held) { ALScriptStudioSnippetNotecard::instance().useNotecard(held.getUUID()); });
+    }
+    if (over(mSnippetList))
+    {
+        // Its snippets come in beside the scripter's own.
+        return take("SnippetsOnlyNotecards", [this](const LLViewerInventoryItem& held) { addSnippetsFrom(held); });
     }
     return LLFloater::handleDragAndDrop(x, y, mask, drop, cargo_type, cargo_data, accept, tooltip_msg);
 }
@@ -1093,7 +1126,7 @@ bool ALFloaterScriptPreferences::snippetLua() const
 S32 ALFloaterScriptPreferences::chosenOwnSnippet() const
 {
     // A row's value says whose it is and where, as the list compares
-    // values by their words: "own:2", "builtin:5".
+    // values by their words: "own:2", "followed:0", "builtin:5".
     const LLScrollListItem* item  = mSnippetList->getFirstSelected();
     const std::string       value = item ? item->getValue().asString() : std::string();
     if (value.compare(0, 4, "own:") != 0)
@@ -1130,17 +1163,22 @@ void ALFloaterScriptPreferences::fillSnippets(bool reread)
     const S32  scrolled = mSnippetList->getScrollPos();
     mSnippetList->deleteAllItems();
     const LLUIColor& theirs = ALSurface::quiet();
-    const auto add = [this, &theirs](const ALScriptSnippets::Snippet& one, bool own, S32 index) {
+    LLStringUtil::format_map_t args;
+    args["[NAME]"]               = ALScriptStudioSnippetNotecard::instance().notecardName();
+    const std::string followed   = getString("SnippetFollowed", args);
+    const auto add = [this, &theirs, &followed](const ALScriptSnippets::Snippet& one, const char* whose, S32 index) {
+        const bool own = std::string_view(whose) == "own";
         LLSD row;
-        row["value"]                  = (own ? "own:" : "builtin:") + std::to_string(index);
+        row["value"]                  = std::string(whose) + ":" + std::to_string(index);
         row["columns"][0]["column"]   = "name";
         row["columns"][0]["value"]    = one.name.empty() ? getString("SnippetUnnamed") : one.name;
-        row["columns"][0]["tool_tip"] = own ? one.detail : getString("SnippetBuiltin");
+        row["columns"][0]["tool_tip"] = own ? one.detail : one.followed ? followed : getString("SnippetBuiltin");
         row["columns"][1]["column"]   = "prefix";
         row["columns"][1]["value"]    = one.prefix;
         if (!own)
         {
-            // The viewer's, quieter than the scripter's own.
+            // The viewer's and the notecard's, quieter than the scripter's
+            // own.
             row["columns"][0]["color"] = theirs.get().getValue();
             row["columns"][1]["color"] = theirs.get().getValue();
         }
@@ -1148,14 +1186,19 @@ void ALFloaterScriptPreferences::fillSnippets(bool reread)
     };
     for (size_t i = 0; i < mOwnSnippets.size(); ++i)
     {
-        add(mOwnSnippets[i], true, static_cast<S32>(i));
+        add(mOwnSnippets[i], "own", static_cast<S32>(i));
+    }
+    const std::vector<ALScriptSnippets::Snippet>& notecard = ALScriptSnippets::followed(lua);
+    for (size_t i = 0; i < notecard.size(); ++i)
+    {
+        add(notecard[i], "followed", static_cast<S32>(i));
     }
     S32 builtin = 0;
     for (const ALScriptSnippets::Snippet& one : ALScriptSnippets::all(lua))
     {
         if (one.builtin)
         {
-            add(one, false, builtin++);
+            add(one, "builtin", builtin++);
         }
     }
     if (chosen.isString())
@@ -1179,14 +1222,24 @@ void ALFloaterScriptPreferences::showSnippet()
     }
     else if (item)
     {
-        // One of the viewer's, by its place among them.
-        S32 builtin = 0;
-        for (const ALScriptSnippets::Snippet& one : ALScriptSnippets::all(snippetLua()))
+        // The followed notecard's, or the viewer's, by its place among them.
+        const std::string                             value    = item->getValue().asString();
+        const std::vector<ALScriptSnippets::Snippet>& notecard = ALScriptSnippets::followed(snippetLua());
+        if (value.compare(0, 9, "followed:") == 0)
         {
-            if (one.builtin && builtin++ == atoi(item->getValue().asString().c_str() + 8))
+            const S32 index = atoi(value.c_str() + 9);
+            shown           = index >= 0 && index < static_cast<S32>(notecard.size()) ? &notecard[static_cast<size_t>(index)] : nullptr;
+        }
+        else if (value.compare(0, 8, "builtin:") == 0)
+        {
+            S32 builtin = 0;
+            for (const ALScriptSnippets::Snippet& one : ALScriptSnippets::all(snippetLua()))
             {
-                shown = &one;
-                break;
+                if (one.builtin && builtin++ == atoi(value.c_str() + 8))
+                {
+                    shown = &one;
+                    break;
+                }
             }
         }
     }
@@ -1200,7 +1253,8 @@ void ALFloaterScriptPreferences::showSnippet()
         mSnippetBody->setText(body);
     }
     mSettingSnippet = false;
-    // The scripter's own are edited here; the viewer's are read, and copied.
+    // The scripter's own are edited here; the viewer's and the notecard's
+    // are read, and copied.
     const bool editable = own >= 0;
     mSnippetName->setEnabled(editable);
     mSnippetPrefix->setEnabled(editable);

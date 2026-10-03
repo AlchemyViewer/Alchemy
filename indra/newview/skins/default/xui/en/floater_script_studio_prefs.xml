@@ -42,6 +42,10 @@
     <floater.string name="SnippetsNotecardName">Script snippets</floater.string>
     <floater.string name="SnippetsNotecardNotMade">the notecard could not be made</floater.string>
     <floater.string name="SnippetsOnlyNotecards">Only a notecard in your inventory can bring snippets in</floater.string>
+    <floater.string name="SnippetsFollowOnlyNotecards">Only a notecard in your inventory can be followed for snippets</floater.string>
+    <floater.string name="SnippetFollowed">From [NAME], the notecard you follow. Copy it to make a version of your own, or change it in the notecard.</floater.string>
+    <floater.string name="SnippetNotecardUnknown">(a notecard not in inventory yet)</floater.string>
+    <floater.string name="SnippetNotecardTip">Drop a snippets notecard here to follow it: its snippets are offered beside yours, as the notecard stands whoever changes it. Cached until it changes</floater.string>
     <floater.string name="LintLSL20001">A declaration that hides one in an outer scope</floater.string>
     <floater.string name="LintLSL20002">An assignment used as a condition</floater.string>
     <floater.string name="LintLSL20003">Changing to the current state</floater.string>
@@ -1258,7 +1262,7 @@ end</floater.string>
              left="12"
              multi_select="false"
              name="snippet_list"
-             tool_tip="Your snippets, then the viewer's built-in ones (copy one to change it). Drop a snippets notecard here to add its snippets to yours."
+             tool_tip="Your snippets, then the followed notecard's, then the viewer's built-in ones (copy one to change it). Drop a snippets notecard here to add its snippets to yours."
              top_pad="8"
              width="280">
                 <scroll_list.columns dynamic_width="true" label="Snippet" name="name" />
@@ -1305,6 +1309,38 @@ end</floater.string>
              top_pad="4"
              width="140" />
 
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="306"
+             name="snippet_notecard_label"
+             top="13"
+             width="100">
+                Follow notecard:
+            </text>
+            <line_editor
+             enabled="false"
+             follows="left|top|right"
+             height="22"
+             label="Drop a notecard here"
+             layout="topleft"
+             left_pad="4"
+             max_length_bytes="255"
+             name="snippet_notecard"
+             tool_tip="Drop a snippets notecard here to follow it"
+             top_delta="-3"
+             width="314" />
+            <button
+             follows="top|right"
+             height="22"
+             label="Clear"
+             layout="topleft"
+             left_pad="4"
+             name="snippet_notecard_clear"
+             tool_tip="Stop following the notecard: its snippets are no longer offered"
+             top_delta="0"
+             width="64" />
             <text
              follows="left|top"
              height="16"

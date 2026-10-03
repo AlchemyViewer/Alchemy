@@ -538,6 +538,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimrcLine">line [NUMBER]: [ERROR]</string>
 	<string name="VimrcTooLarge">The vimrc is too large to read.</string>
 	<string name="VimrcNotNotecard">The vimrc item is not a readable notecard.</string>
+	<string name="SnippetsFollowedNotNotecard">The followed snippets item is not a readable notecard.</string>
+	<string name="SnippetsFollowedNotSnippets">The followed notecard holds no snippets Script Studio can read.</string>
 
 	<!-- Script Studio's own words about a script, from the alscript
 	     library: each problem carries a key and the words it is about,
