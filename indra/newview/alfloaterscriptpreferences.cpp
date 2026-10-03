@@ -1159,8 +1159,16 @@ void ALFloaterScriptPreferences::fillSnippets(bool reread)
         mSnippetsLua = lua;
         mOwnSnippets = ALScriptSnippets::own(lua);
     }
-    const LLSD chosen   = mSnippetList->getFirstSelected() ? mSnippetList->getFirstSelected()->getValue() : LLSD();
-    const S32  scrolled = mSnippetList->getScrollPos();
+    const LLScrollListItem* first    = mSnippetList->getFirstSelected();
+    const LLSD              chosen   = first ? first->getValue() : LLSD();
+    const S32               scrolled = mSnippetList->getScrollPos();
+    // One of the notecard's is found again by its name: the notecard may
+    // have changed under it, and its place with it.
+    std::string chosen_followed;
+    if (first && chosen.asString().compare(0, 9, "followed:") == 0 && first->getColumn(0))
+    {
+        chosen_followed = first->getColumn(0)->getValue().asString();
+    }
     mSnippetList->deleteAllItems();
     const LLUIColor& theirs = ALSurface::quiet();
     LLStringUtil::format_map_t args;
@@ -1193,6 +1201,19 @@ void ALFloaterScriptPreferences::fillSnippets(bool reread)
     {
         add(notecard[i], "followed", static_cast<S32>(i));
     }
+    // Why the notecard's are not there, or not as it stands, where they
+    // would be: a row that cannot be chosen.
+    if (const std::string& error = ALScriptStudioSnippetNotecard::instance().error(); !error.empty())
+    {
+        LLSD row;
+        row["value"]                  = "followed:error";
+        row["enabled"]                = false;
+        row["columns"][0]["column"]   = "name";
+        row["columns"][0]["value"]    = error;
+        row["columns"][0]["tool_tip"] = error;
+        row["columns"][0]["color"]    = LLUIColorTable::instance().getColor("ScriptErrorColor").get().getValue();
+        mSnippetList->addElement(row);
+    }
     S32 builtin = 0;
     for (const ALScriptSnippets::Snippet& one : ALScriptSnippets::all(lua))
     {
@@ -1201,7 +1222,19 @@ void ALFloaterScriptPreferences::fillSnippets(bool reread)
             add(one, "builtin", builtin++);
         }
     }
-    if (chosen.isString())
+    if (!chosen_followed.empty())
+    {
+        for (const LLScrollListItem* row : mSnippetList->getAllData())
+        {
+            if (row->getValue().asString().compare(0, 9, "followed:") == 0 && row->getColumn(0) &&
+                row->getColumn(0)->getValue().asString() == chosen_followed)
+            {
+                mSnippetList->selectByValue(row->getValue());
+                break;
+            }
+        }
+    }
+    else if (chosen.isString())
     {
         mSnippetList->selectByValue(chosen);
     }
