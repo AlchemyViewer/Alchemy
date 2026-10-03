@@ -421,6 +421,9 @@ void ALTextView::setText(std::string_view text)
     mPreeditSegmentEnds.clear();
     mPreeditStandouts.clear();
     mPreeditOverwritten.clear();
+    // One caret in a new text, before the edit that puts it in slides the
+    // others to its start for nothing.
+    mCarets.clear();
     mDocument.setText(text);
     mUndo.clear();
     // A new text has no changes to go back to.
@@ -899,6 +902,16 @@ void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret)
     const ALTextRange was = selection();
     mAnchor               = mDocument.clamp(anchor);
     mCaret                = snapped(mDocument.clamp(caret), was.end);
+    // The others it now meets become part of it.
+    if (!mCarets.empty())
+    {
+        ALTextRange main(mAnchor, mCaret);
+        if (mCarets.merge(main))
+        {
+            mAnchor = main.begin;
+            mCaret  = main.end;
+        }
+    }
     if (mLayout.hidden(mCaret.line))
     {
         if (mFeatures)
@@ -954,6 +967,41 @@ void ALTextView::setSelection(const ALTextRange& range)
     placeSelection(range.begin, range.end);
     mDesiredX = -1.f;
     scrollToCaret();
+}
+
+// --- several carets ------------------------------------------------------------
+
+std::vector<ALTextRange> ALTextView::clamped(std::vector<ALTextRange> selections) const
+{
+    for (ALTextRange& one : selections)
+    {
+        one = ALTextRange(mDocument.clamp(one.begin), mDocument.clamp(one.end));
+    }
+    return selections;
+}
+
+void ALTextView::addSelection(const ALTextRange& range)
+{
+    mCarets.add(ALTextRange(mDocument.clamp(range.begin), mDocument.clamp(range.end)));
+    // Put where it is again, to take in the new one where they meet.
+    placeSelection(mAnchor, mCaret);
+}
+
+void ALTextView::setSelections(const ALTextRange& main, std::vector<ALTextRange> others)
+{
+    mCarets.assign(clamped(std::move(others)));
+    setSelection(main);
+}
+
+bool ALTextView::singleSelection()
+{
+    if (mCarets.empty())
+    {
+        return false;
+    }
+    mCarets.clear();
+    mBlink.reset();
+    return true;
 }
 
 std::string ALTextView::wordBeforeCaret() const
@@ -1782,8 +1830,10 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
     // drawn; the ones below slide.
     mSpelling.edited(edit, mDocument.lineCount());
     mSpellTimer.reset();
-    // What the find bar found slides with the text.
+    // What the find bar found slides with the text, and so do the carets
+    // besides the main one, which whoever made the edit puts.
     mFind.edited(edit);
+    mCarets.apply(edit);
 
     // The layers: what is after the edit slides with the text, what it
     // cut through goes.
@@ -1910,14 +1960,15 @@ ALTextDocument::Edit ALTextView::edit(const ALTextRange& range_in, std::string_v
         range = withoutComposition(range_in);
         resetPreedit();
     }
-    const ALTextRange    before = selection();
-    ALTextDocument::Edit done   = mDocument.replace(range, fitting(range, text));
+    const ALTextRange        before = selection();
+    std::vector<ALTextRange> others = mCarets.selections();
+    ALTextDocument::Edit     done   = mDocument.replace(range, fitting(range, text));
     if (done.nothing())
     {
         return done;
     }
     const ALTextPos after = mDocument.clamp(done.endAfter());
-    mUndo.record(done, before, after, LLTimer::getElapsedSeconds());
+    mUndo.record(done, before, after, LLTimer::getElapsedSeconds(), std::move(others));
     placeCaret(after, false);
     return done;
 }
@@ -1936,14 +1987,15 @@ ALTextDocument::Edit ALTextView::editMany(std::vector<std::pair<ALTextRange, std
     {
         return ALTextDocument::Edit();
     }
-    const ALTextRange    before = selection();
-    ALTextDocument::Edit done   = mDocument.replaceMany(std::move(edits));
+    const ALTextRange        before = selection();
+    std::vector<ALTextRange> others = mCarets.selections();
+    ALTextDocument::Edit     done   = mDocument.replaceMany(std::move(edits));
     if (done.nothing())
     {
         return done;
     }
     const ALTextPos after = mDocument.clamp(caret);
-    mUndo.record(done, before, after, LLTimer::getElapsedSeconds());
+    mUndo.record(done, before, after, LLTimer::getElapsedSeconds(), std::move(others));
     placeCaret(after, false);
     return done;
 }
@@ -2002,9 +2054,9 @@ void ALTextView::full()
 void ALTextView::afterEdit()
 {
     editsDone();
-    // Where the change left the selection, for a redo to put it back
+    // Where the change left the selections, for a redo to put them back
     // there; nothing once a step has been taken back or forward.
-    mUndo.settle(selection());
+    mUndo.settle(selection(), mCarets.selections());
     mDesiredX          = -1.f;
     mChangedSinceFocus = true;
     mBlink.reset();
@@ -2678,8 +2730,10 @@ void ALTextView::undo()
     {
         resetPreedit();
     }
-    if (std::optional<ALTextRange> selected = mUndo.undo())
+    std::vector<ALTextRange> others;
+    if (std::optional<ALTextRange> selected = mUndo.undo(&others))
     {
+        mCarets.assign(clamped(std::move(others)));
         placeSelection(selected->begin, selected->end);
         afterEdit();
     }
@@ -2695,8 +2749,10 @@ void ALTextView::redo()
     {
         resetPreedit();
     }
-    if (std::optional<ALTextRange> selected = mUndo.redo())
+    std::vector<ALTextRange> others;
+    if (std::optional<ALTextRange> selected = mUndo.redo(&others))
     {
+        mCarets.assign(clamped(std::move(others)));
         placeSelection(selected->begin, selected->end);
         afterEdit();
     }
@@ -3869,9 +3925,6 @@ void ALTextView::drawRows(const LLRect& text)
     const F32  blink       = mBlink.getElapsedTimeF32();
     const bool caret_on    = show_caret && (!mCaretBlink || blink < BLINK_DELAY || (static_cast<S32>(blink * 2.f) & 1));
     const ALTextRange sel  = selection().normalised();
-    const bool has_sel     = !sel.empty();
-    S32        caret_row   = 0;
-    const F32  caret_x     = mLayout.xOf(mCaret.line, mCaret.column, &caret_row);
     const F32  space       = mLayout.xOf(0, 0) + 6.f;  // what a selected line end is drawn as
 
     const F32  left        = static_cast<F32>(text.mLeft) - mScrollX;
@@ -3913,8 +3966,9 @@ void ALTextView::drawRows(const LLRect& text)
         }
     }
 
-    // Behind the text: the selection and what the find bar found.
-    const std::vector<ALTextRange>& matches = mFind.matches();
+    // Behind the text: the selections and what the find bar found.
+    const std::vector<ALTextRange>& matches   = mFind.matches();
+    const LLColor4                  sel_color = selectionDrawColor() % alpha;
     gGL.getTextureSlot(0)->unbind();
     gGL.begin(LLRender::TRIANGLES);
     for (const RowSeen& seen : mRowsSeen)
@@ -3923,10 +3977,16 @@ void ALTextView::drawRows(const LLRect& text)
         const ALTextLayout::Line& laid   = mLayout.line(line);
         const ALTextLayout::Row&  row    = laid.rows[static_cast<size_t>(seen.row)];
         const S32                 length = mDocument.lineLength(line);
-        if (has_sel && sel.begin.line <= line && line <= sel.end.line)
-        {
-            const S32  sel_begin = sel.begin.line < line ? 0 : sel.begin.column;
-            const S32  sel_end   = sel.end.line > line ? length + 1 : sel.end.column;
+        // A selection's band on the row, in order, from its start or the
+        // row's to its end or the row's; past the line's end where it goes
+        // on to the next.
+        const auto band = [&](const ALTextRange& range) {
+            if (range.empty() || line < range.begin.line || range.end.line < line)
+            {
+                return;
+            }
+            const S32  sel_begin = range.begin.line < line ? 0 : range.begin.column;
+            const S32  sel_end   = range.end.line > line ? length + 1 : range.end.column;
             const S32  lo        = llmax(sel_begin, row.begin);
             const bool last_row  = (static_cast<size_t>(seen.row) + 1 == laid.rows.size());
             const S32  hi        = llmin(sel_end, last_row ? length + 1 : row.end);
@@ -3935,8 +3995,13 @@ void ALTextView::drawRows(const LLRect& text)
                 const F32 x0 = mLayout.xOf(line, lo);
                 const F32 x1 = hi > length ? row.width + space : (hi >= row.end && !last_row ? row.width : mLayout.xOf(line, hi));
                 gl_rect_2d_in_batch(static_cast<S32>(left + x0), seen.rowScreenTop, static_cast<S32>(left + x1), seen.rowScreenTop - row.height,
-                                    selectionDrawColor() % alpha);
+                                    sel_color);
             }
+        };
+        band(sel);
+        for (auto [it, end] = mCarets.onLine(line); it != end; ++it)
+        {
+            band(it->normalised());
         }
         if (!matches.empty())
         {
@@ -4000,38 +4065,68 @@ void ALTextView::drawRows(const LLRect& text)
         drawLayers(line, laid, static_cast<S32>(r), text, row_screen_top, left, alpha);
         drawRowExtras(line, static_cast<S32>(r), text, screen_top, left, alpha);
 
-        // The caret.
-        if (caret_on && line == mCaret.line && static_cast<S32>(r) == caret_row)
+        // The carets on the row, every one as the main one is.
+        if (caret_on)
         {
-            const S32  x     = static_cast<S32>(left + caret_x);
-            const bool modal = mModal && !mModal->inserting();
-            if (modal || mCaretStyle != CaretStyle::Line)
-            {
-                // A block over the cluster the caret is on, as a modal
-                // editor's is; a space's width past the line's end.
-                const ALTextPos next  = mDocument.nextCluster(mCaret);
-                const F32       cell  = llmax(4.f, mLayout.columnWidth());
-                F32             right = next.line == mCaret.line && next != mCaret ? mLayout.xOf(mCaret.line, next.column) : caret_x + cell;
-                if (right <= caret_x)
+            const auto caret = [&](const ALTextPos& at) {
+                if (at.line != line)
                 {
-                    right = caret_x + cell;
+                    return;
                 }
-                if (!modal && mCaretStyle == CaretStyle::Underline)
+                S32       at_row = 0;
+                const F32 at_x   = mLayout.xOf(at.line, at.column, &at_row);
+                if (at_row != static_cast<S32>(r))
                 {
-                    // A bar under the cluster, as thick as the line caret is wide.
-                    gl_rect_2d(x, row_screen_top - row.height + CARET_WIDTH, static_cast<S32>(left + right), row_screen_top - row.height,
-                               mCursorColor.get() % alpha);
+                    return;
+                }
+                const S32  x     = static_cast<S32>(left + at_x);
+                const bool modal = mModal && !mModal->inserting();
+                if (modal || mCaretStyle != CaretStyle::Line)
+                {
+                    // A block over the cluster the caret is on, as a modal
+                    // editor's is; a space's width past the line's end.
+                    const ALTextPos next  = mDocument.nextCluster(at);
+                    const F32       cell  = llmax(4.f, mLayout.columnWidth());
+                    F32             right = next.line == at.line && next != at ? mLayout.xOf(at.line, next.column) : at_x + cell;
+                    if (right <= at_x)
+                    {
+                        right = at_x + cell;
+                    }
+                    if (!modal && mCaretStyle == CaretStyle::Underline)
+                    {
+                        // A bar under the cluster, as thick as the line caret is wide.
+                        mCaretBoxes.push_back({ LLRect(x, row_screen_top - row.height + CARET_WIDTH, static_cast<S32>(left + right), row_screen_top - row.height),
+                                                mCursorColor.get() % alpha });
+                    }
+                    else
+                    {
+                        mCaretBoxes.push_back({ LLRect(x, row_screen_top, static_cast<S32>(left + right), row_screen_top - row.height),
+                                                mCursorColor.get() % (0.55f * alpha) });
+                    }
                 }
                 else
                 {
-                    gl_rect_2d(x, row_screen_top, static_cast<S32>(left + right), row_screen_top - row.height, mCursorColor.get() % (0.55f * alpha));
+                    mCaretBoxes.push_back({ LLRect(x, row_screen_top, x + CARET_WIDTH, row_screen_top - row.height), mCursorColor.get() % alpha });
                 }
-            }
-            else
+            };
+            caret(mCaret);
+            for (auto [it, end] = mCarets.onLine(line); it != end; ++it)
             {
-                gl_rect_2d(x, row_screen_top, x + CARET_WIDTH, row_screen_top - row.height, mCursorColor.get() % alpha);
+                caret(it->end);
             }
         }
+    }
+    // The carets together, over every row's layers.
+    if (!mCaretBoxes.empty())
+    {
+        gGL.getTextureSlot(0)->unbind();
+        gGL.begin(LLRender::TRIANGLES);
+        for (const CaretBox& box : mCaretBoxes)
+        {
+            gl_rect_2d_in_batch(box.rect.mLeft, box.rect.mTop, box.rect.mRight, box.rect.mBottom, box.color);
+        }
+        gGL.end();
+        mCaretBoxes.clear();
     }
     mQueueSquiggles = false;
     drawSquiggles(mSquiggles.data(), mSquiggles.size());

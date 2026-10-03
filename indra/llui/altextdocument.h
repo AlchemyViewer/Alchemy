@@ -176,8 +176,10 @@ public:
         // A place kept beside the text -- a mark -- as a keeper of marks has
         // it: before what was replaced it stays, inside it lands where that
         // began, after it moves along. For a batch, by the stretch it is in
-        // or the ones before it.
-        ALTextPos placed(const ALTextPos& pos) const;
+        // or the ones before it. Text put in right at it pushes it along,
+        // as typing pushes a caret, unless not `pushed`: the end of a
+        // selection, which what is put in right after it is not part of.
+        ALTextPos placed(const ALTextPos& pos, bool pushed = true) const;
         // Where a line is after, or -1 for one the edit replaced: one of a
         // run of lines, a line typed in included, is not the line it was.
         S32       lineAfter(S32 line) const;

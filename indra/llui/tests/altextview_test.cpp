@@ -1927,4 +1927,84 @@ namespace tut
         ensure("let go", gFocusMgr.getMouseCapture() == nullptr && !ruler->dragging());
         ensure("no tip on the map", v.handleToolTip(360, 100, MASK_NONE));
     }
+
+    // Ranges as text, for a failure to say what it found.
+    static std::string rangesSaid(const std::vector<ALTextRange>& all)
+    {
+        std::string out;
+        for (const ALTextRange& r : all)
+        {
+            out += llformat("%d:%d-%d:%d ", r.begin.line, r.begin.column, r.end.line, r.end.column);
+        }
+        return out;
+    }
+
+    static ALTextRange caretRange(S32 line, S32 column)
+    {
+        return ALTextRange(ALTextPos(line, column), ALTextPos(line, column));
+    }
+
+    template<> template<>
+    void altextview_object::test<61>()
+    {
+        set_test_name("the selections besides the main one slide with an edit at the main caret, are taken in where it meets them, and go with a new text");
+        ALTextView& v = make("alpha beta\ngamma delta\n");
+        v.setCaret(ALTextPos(0, 0));
+        v.addSelection(caretRange(1, 0));
+        v.addSelection(ALTextRange(ALTextPos(1, 6), ALTextPos(1, 11)));
+        ensure_equals("two besides it", rangesSaid(v.otherSelections()), rangesSaid({ caretRange(1, 0), ALTextRange(ALTextPos(1, 6), ALTextPos(1, 11)) }));
+        ensure("the main one where it was", v.selection() == caretRange(0, 0));
+
+        type("xy");
+        key(KEY_RETURN);
+        ensure_equals("typed at the main caret only", v.text(), std::string("xy\nalpha beta\ngamma delta\n"));
+        ensure_equals("the others a line down", rangesSaid(v.otherSelections()),
+                      rangesSaid({ caretRange(2, 0), ALTextRange(ALTextPos(2, 6), ALTextPos(2, 11)) }));
+
+        // The main one selected backwards over part of the other selection:
+        // one selection over both, run the main one's way.
+        v.setSelection(ALTextRange(ALTextPos(2, 8), ALTextPos(2, 3)));
+        ensure_equals("the main one over both, backwards", rangesSaid({ v.selection() }), rangesSaid({ ALTextRange(ALTextPos(2, 11), ALTextPos(2, 3)) }));
+        ensure_equals("the caret it does not reach left", rangesSaid(v.otherSelections()), rangesSaid({ caretRange(2, 0) }));
+
+        // One added where the main one is: nothing more.
+        v.addSelection(caretRange(2, 5));
+        ensure_equals("taken in", v.otherSelections().size(), static_cast<size_t>(1));
+        ensure("one caret again", v.singleSelection() && !v.hasOtherSelections());
+        ensure("and nothing to let go of now", !v.singleSelection());
+
+        v.setSelections(caretRange(0, 0), { caretRange(1, 1) });
+        v.setText("new");
+        ensure("none with a new text", !v.hasOtherSelections());
+    }
+
+    template<> template<>
+    void altextview_object::test<62>()
+    {
+        set_test_name("undo puts the other selections back as they were before the step, and redo as they were after it");
+        ALTextView& v = make("one\ntwo\nthree\n");
+        const std::vector<ALTextRange> before = { caretRange(1, 3), ALTextRange(ALTextPos(2, 5), ALTextPos(2, 0)) };
+        v.setSelections(caretRange(0, 3), before);
+        v.insertText("X\n");
+        const std::vector<ALTextRange> after = { caretRange(2, 3), ALTextRange(ALTextPos(3, 5), ALTextPos(3, 0)) };
+        ensure_equals("slid down a line", rangesSaid(v.otherSelections()), rangesSaid(after));
+
+        v.undo();
+        ensure_equals("the text back", v.text(), std::string("one\ntwo\nthree\n"));
+        ensure("the main caret back", v.selection() == caretRange(0, 3));
+        ensure_equals("the others as they were before", rangesSaid(v.otherSelections()), rangesSaid(before));
+        v.redo();
+        ensure("the main caret after", v.selection() == caretRange(1, 0));
+        ensure_equals("the others as they were after", rangesSaid(v.otherSelections()), rangesSaid(after));
+
+        // A step made with none: undone, none; the one before it, the
+        // others it had.
+        v.singleSelection();
+        v.undoJournal().breakRun();
+        v.insertText("Y");
+        v.undo();
+        ensure("none before a step made with none", !v.hasOtherSelections());
+        v.undo();
+        ensure_equals("and the step before puts its own back", rangesSaid(v.otherSelections()), rangesSaid(before));
+    }
 }

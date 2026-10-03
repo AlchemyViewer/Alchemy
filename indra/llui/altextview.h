@@ -27,6 +27,7 @@
 #include "alanchoredranges.h"
 #include "alkeymap.h"
 #include "alsyntaxhighlighter.h"
+#include "altextcarets.h"
 #include "altextdocument.h"
 #include "altextediting.h"
 #include "altextfind.h"
@@ -58,8 +59,9 @@ class ALVimHost;
 class LLContextMenu;
 
 // A view of a document: the lines laid out and drawn, only the ones in
-// sight, a caret and a selection in them, a keymap that turns keys into
-// commands, and a grammar that colours what it shows. Text is drawn from
+// sight, a caret and a selection in them -- and others beside those,
+// where something made them -- a keymap that turns keys into commands,
+// and a grammar that colours what it shows. Text is drawn from
 // glyph runs the layout shaped once, so a frame costs the rows on screen
 // and nothing that is not. The document, the undo journal, the highlighter
 // and the layout are its own, and reachable, for whatever is built over it
@@ -344,6 +346,21 @@ public:
     // The identifier the caret is at the end of: letters, digits and
     // underscores back from the caret. Empty at anything else.
     std::string wordBeforeCaret() const;
+
+    // --- several carets ---------------------------------------------------------
+
+    // The selections besides the main one, each anchor to caret, in the
+    // order they begin (ALTextCarets). Drawn as the main one is, slid along
+    // by every edit, and kept by each step to undo; merged with each other
+    // and with the main one where they meet.
+    const std::vector<ALTextRange>& otherSelections() const { return mCarets.selections(); }
+    bool                            hasOtherSelections() const { return !mCarets.empty(); }
+    // One more beside the main one, which stays main.
+    void                            addSelection(const ALTextRange& range);
+    // The main selection and the others at once.
+    void                            setSelections(const ALTextRange& main, std::vector<ALTextRange> others);
+    // The main selection alone again; whether there were others.
+    bool                            singleSelection();
 
     // --- editing, through the undo journal -----------------------------------
 
@@ -1071,6 +1088,10 @@ private:
 
     ALTextPos mCaret;
     ALTextPos mAnchor;
+    // The selections besides that one.
+    ALTextCarets mCarets;
+    // Each into the text, as the main one is put.
+    std::vector<ALTextRange> clamped(std::vector<ALTextRange> selections) const;
     // The x the caret wants when it moves between rows, or negative.
     F32          mDesiredX = -1.f;
     S32          mScrollY  = 0;
@@ -1167,6 +1188,13 @@ private:
     std::vector<LLColor4U>          mRunColours;
     std::vector<size_t>             mRunColourAt;
     std::vector<Squiggle>           mSquiggles;
+    // A frame's carets, drawn together once the rows are.
+    struct CaretBox
+    {
+        LLRect   rect;
+        LLColor4 color;
+    };
+    std::vector<CaretBox>           mCaretBoxes;
     // What the band under the text shows and where its pieces go, as the
     // keymap had it at its generation in this font: read and measured
     // again only when the keymap has moved on.

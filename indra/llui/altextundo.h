@@ -36,7 +36,8 @@
 
 // A document's edits as steps a person can take back: each one the edits
 // it was made of, in order, with the selection -- its anchor and its caret
-// -- as it stood before and after.
+// -- as it stood before and after, and the other selections a view with
+// several had besides it.
 // A run of typing is one step -- characters typed one after the other, each
 // where the last ended, within a moment of each other -- and so is a run of
 // backspaces or deletes; anything recorded while a group is open is one
@@ -61,6 +62,10 @@ public:
         // where nothing was selected.
         ALTextPos                         anchorBefore;
         ALTextPos                         anchorAfter;
+        // The selections besides that one, each anchor to caret
+        // (ALTextCarets): none where there was only the one.
+        std::vector<ALTextRange>          othersBefore;
+        std::vector<ALTextRange>          othersAfter;
         std::string                       mLabel;
         // Which step this is, for a save point to find it by; a run
         // joined to it keeps the number it began with.
@@ -100,16 +105,20 @@ public:
     explicit ALTextUndo(ALTextDocument& document);
 
     // A change made through the document, with where the caret was and
-    // is -- or the selection it was made over, anchor to caret. `now` is in
-    // seconds from any clock, and the window is how close two changes have
-    // to be to join a run.
+    // is -- or the selection it was made over, anchor to caret, and the
+    // others beside it. `now` is in seconds from any clock, and the window
+    // is how close two changes have to be to join a run.
     void record(const ALTextDocument::Edit& edit, const ALTextPos& before, const ALTextPos& after, F64 now);
-    void record(const ALTextDocument::Edit& edit, const ALTextRange& before, const ALTextPos& after, F64 now);
+    void record(const ALTextDocument::Edit& edit, const ALTextRange& before, const ALTextPos& after, F64 now,
+                std::vector<ALTextRange> others_before = {});
     // Where the selection ends up once the change that was just recorded is
     // done -- a replace-all putting the caret back where it was, a line
-    // moved with its selection -- for a redo to put it there. Nothing once
-    // a step has been taken back or forward since.
+    // moved with its selection -- for a redo to put it there; and the others
+    // with it, where they are given, else as they were last said. Until
+    // they are said, a redo leaves only the caret. Nothing once a step has
+    // been taken back or forward since.
     void settle(const ALTextRange& selection);
+    void settle(const ALTextRange& selection, std::vector<ALTextRange> others);
     void setRunWindow(F64 seconds) { mWindow = seconds; }
 
     // What one key typed does -- a character, a pair and its closer, a
@@ -141,9 +150,10 @@ public:
     bool inGroup() const { return mSteps.inGroup(); }
 
     // The step back and the step forward, applied. The selection it puts
-    // back, anchor to caret, or nothing where there was nothing to do.
-    std::optional<ALTextRange> undo();
-    std::optional<ALTextRange> redo();
+    // back, anchor to caret, or nothing where there was nothing to do; and
+    // the others it puts back beside it, where they are asked for.
+    std::optional<ALTextRange> undo(std::vector<ALTextRange>* others = nullptr);
+    std::optional<ALTextRange> redo(std::vector<ALTextRange>* others = nullptr);
     bool                     canUndo() const { return mSteps.canUndo(); }
     bool                     canRedo() const { return mSteps.canRedo(); }
     // Nothing to step back or forward to, and the text as it stands taken

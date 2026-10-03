@@ -189,12 +189,14 @@ const std::vector<ALTextDocument::Edit::LineSpan>& ALTextDocument::Edit::lineSpa
     return out;
 }
 
-ALTextPos ALTextDocument::Edit::placed(const ALTextPos& pos) const
+ALTextPos ALTextDocument::Edit::placed(const ALTextPos& pos, bool pushed) const
 {
     if (parts.empty())
     {
         const ALTextRange removed = range.normalised();
-        if (pos < removed.begin)
+        // Text put in right at it, and nothing taken, leaves it where it
+        // was unless it is pushed.
+        if (pos < removed.begin || (!pushed && pos == removed.begin))
         {
             return pos;
         }
@@ -205,7 +207,7 @@ ALTextPos ALTextDocument::Edit::placed(const ALTextPos& pos) const
     {
         return in->after.begin;
     }
-    return mapped(pos, true);
+    return mapped(pos, pushed);
 }
 
 S32 ALTextDocument::Edit::lineAfter(S32 line) const

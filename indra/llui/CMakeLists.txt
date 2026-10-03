@@ -164,6 +164,7 @@ target_sources(
     alsyntaxgrammar.cpp
     alsyntaxhighlighter.cpp
     altabstrip.cpp
+    altextcarets.cpp
     altextdiff.cpp
     altextdocument.cpp
     altextediting.cpp
@@ -387,6 +388,7 @@ target_sources(
         alsyntaxgrammar.h
         alsyntaxhighlighter.h
         altabstrip.h
+        altextcarets.h
         altextdiff.h
         altextdocument.h
         altextediting.h
@@ -500,6 +502,7 @@ if(AL_BUILD_TESTS)
   al_add_test(alfenwicktree PROJECT llui LIBRARIES ${test_libs})
   al_add_test(allinetable PROJECT llui LIBRARIES ${test_libs})
   al_add_test(altextdocument UNIT PROJECT llui LIBRARIES ${test_libs})
+  al_add_test(altextcarets UNIT PROJECT llui SOURCES altextdocument.cpp LIBRARIES ${test_libs})
   al_add_test(altextundo UNIT PROJECT llui SOURCES altextdocument.cpp LIBRARIES ${test_libs})
   al_add_test(alnotecarditems UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(
