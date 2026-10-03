@@ -328,7 +328,9 @@ LLViewerJoystick::LLViewerJoystick()
     memset(mBtn, 0, sizeof(mBtn));
 
     // factor in bandwidth? bandwidth = gViewerStats->mKBitStat
-    mPerfScale = 4000.f / (F32)gSysCPU.getMHz(); // hmm.  why?
+    // An unknown clock (0) leaves the scale alone rather than infinite.
+    const F64 cpu_mhz = gSysCPU.getMHz();
+    mPerfScale = cpu_mhz > 0.0 ? 4000.f / (F32)cpu_mhz : 1.f; // hmm.  why?
 
     mLastDeviceUUID = LLSD::Integer(1);
 }

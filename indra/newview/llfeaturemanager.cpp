@@ -678,7 +678,8 @@ bool LLFeatureManager::loadGPUClass()
         // bias by CPU speed
         F32 cpu_basis_mhz = gSavedSettings.getF32("RenderCPUBasis");
         F32 cpu_mhz = (F32) gSysCPU.getMHz();
-        F32 cpu_bias = llclamp(cpu_mhz / cpu_basis_mhz, 0.5f, 1.f);
+        // A clock the system would not report is unknown, not slow.
+        F32 cpu_bias = cpu_mhz > 0.f ? llclamp(cpu_mhz / cpu_basis_mhz, 0.5f, 1.f) : 1.f;
         gbps *= cpu_bias;
 
         if (gbps < 0.f)
