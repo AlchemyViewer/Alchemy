@@ -486,6 +486,57 @@ namespace
         }
     };
 
+    // Every global the script sets, by name: where it is first set, and
+    // whether it is ever set by a statement of the script's top itself.
+    class GlobalSets final : public Luau::AstVisitor
+    {
+    public:
+        struct Set
+        {
+            Luau::Location first;
+            bool           atTop = false;
+        };
+        explicit GlobalSets(const Luau::AstStatBlock* root)
+        {
+            for (Luau::AstStat* stat : root->body)
+            {
+                mTop.insert(stat);
+            }
+        }
+        boost::unordered_flat_map<std::string, Set> sets;
+
+        bool visit(Luau::AstStatAssign* node) override
+        {
+            for (Luau::AstExpr* var : node->vars)
+            {
+                took(var, node);
+            }
+            return true;
+        }
+        bool visit(Luau::AstStatCompoundAssign* node) override
+        {
+            took(node->var, node);
+            return true;
+        }
+
+    private:
+        void took(Luau::AstExpr* var, Luau::AstStat* stat)
+        {
+            const auto* global = var->as<Luau::AstExprGlobal>();
+            if (!global)
+            {
+                return;
+            }
+            const auto [it, added] = sets.try_emplace(global->name.value, Set{ global->location, false });
+            if (!added && global->location.begin < it->second.first.begin)
+            {
+                it->second.first = global->location;
+            }
+            it->second.atTop = it->second.atTop || mTop.contains(stat);
+        }
+        boost::unordered_flat_set<const Luau::AstStat*> mTop;
+    };
+
     // What a loop's body does to strings, not looking into the functions
     // it makes: each append, s ..= x or s = s .. x, what it appends and to
     // what; every read of each local; and whether it returns.
@@ -657,6 +708,10 @@ namespace
                     {
                         nestedFunction(node, stat);
                     }
+                }
+                if (node == mRoot && on("SlGlobalAssign"))
+                {
+                    globalsSetInFunctions();
                 }
             }
             if (on("SlAlmostSwapped"))
@@ -2114,6 +2169,66 @@ namespace
                                 { edit(Luau::Location(top->location.begin, top->location.begin), "local " + names + "\n" + indent) }, false);
                 }
                 return;
+            }
+        }
+
+        // A global the script first sets inside a function, never at its top,
+        // and names in more than one of its top's statements: a note, fixed
+        // by a local of the script's before the first of them, which every
+        // function there still shares. Where one function alone names it,
+        // Luau's own GlobalUsedAsLocal says so.
+        void globalsSetInFunctions()
+        {
+            if (mGlobals.viaG)
+            {
+                return;
+            }
+            GlobalSets sets(mRoot);
+            const_cast<Luau::AstStatBlock*>(mRoot)->visit(&sets);
+            std::vector<std::pair<std::string, GlobalSets::Set>> ordered(sets.sets.begin(), sets.sets.end());
+            std::sort(ordered.begin(), ordered.end(), [](const auto& a, const auto& b) { return a.second.first.begin < b.second.first.begin; });
+            for (const auto& [name, set] : ordered)
+            {
+                if (set.atTop || mTopMade.contains(name) || mGiven.contains(name) || name == "_G")
+                {
+                    continue;
+                }
+                const auto named_at = mGlobals.named.find(name);
+                if (named_at == mGlobals.named.end())
+                {
+                    continue;
+                }
+                // The statements of the top that name it, in order.
+                std::vector<Luau::AstStat*> tops;
+                for (const Luau::Location& at : named_at->second)
+                {
+                    for (Luau::AstStat* top : mRoot->body)
+                    {
+                        if (top->location.encloses(at))
+                        {
+                            if (tops.empty() || tops.back() != top)
+                            {
+                                tops.push_back(top);
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (tops.size() < 2)
+                {
+                    continue;
+                }
+                ALScriptProblem& said = problem(set.first, "LuauLintSlGlobalInFunction",
+                                                "[1] is made a global inside a function. A local of the script's, declared before the first "
+                                                "function that names it, is shared the same and quicker for Luau to read",
+                                                { name }, "SlGlobalAssign", Severity::Note);
+                if (startsLine(tops.front()->location.begin))
+                {
+                    const std::string indent(tops.front()->location.begin.column, ' ');
+                    offerTitled(said, "ScriptFixDeclareFirst", "Declare local [1] before it is first named", { name },
+                                { edit(Luau::Location(tops.front()->location.begin, tops.front()->location.begin), "local " + name + "\n" + indent) },
+                                false);
+                }
             }
         }
 

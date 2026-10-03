@@ -321,6 +321,7 @@ namespace tut
         const std::string said = found(script, "SlGlobalAssign", ALScriptProblem::Severity::Warning);
         ensure_equals("each", said,
                       std::string("0 LuauLintSlGlobalAssign|count (another severity)\n"
+                                  "1 LuauLintSlGlobalInFunction|total (another severity)\n"
                                   "3 LuauLintSlGlobalAssign|later (another severity)\n"
                                   "6 LuauLintSlGlobalFunctionInScope|inner\n"
                                   "7 LuauLintSlGlobalFunctionInScope|shared\n"
@@ -329,6 +330,7 @@ namespace tut
                       std::string("1 LuauLintSlGlobalFunction|bump\n"));
         ensure_equals("off on its own: the rest still said", found("--!nolint SlGlobalFunction\n" + script, "SlGlobalAssign", ALScriptProblem::Severity::Warning),
                       std::string("1 LuauLintSlGlobalAssign|count (another severity)\n"
+                                  "2 LuauLintSlGlobalInFunction|total (another severity)\n"
                                   "4 LuauLintSlGlobalAssign|later (another severity)\n"
                                   "7 LuauLintSlGlobalFunctionInScope|inner\n"
                                   "8 LuauLintSlGlobalFunctionInScope|shared\n"
@@ -871,5 +873,34 @@ namespace tut
                                   "7 LuauLintSlForIndexAssign|i\n"
                                   "8 LuauLintSlForIndexAssign|i\n"));
         unfixed("for i = 1, 3 do i = 2 end\n", "LuauLintSlForIndexAssign");
+    }
+
+    template<> template<>
+    void object::test<23>()
+    {
+        set_test_name("SlGlobalAssign: a global first set inside a function and named by more than one statement of the top, a note, "
+                      "declared local before the first; one function alone naming it left to Luau's GlobalUsedAsLocal; one set at the top "
+                      "said as before");
+        ensure("definitions: " + error, loaded);
+        const std::string shared = "function init()\n"
+                                   "    count = 0\n"
+                                   "end\n"
+                                   "LLEvents:on(\"touch_start\", function(detected)\n"
+                                   "    count += 1\n"
+                                   "    print(count)\n"
+                                   "end)\n"
+                                   "init()\n";
+        ensure_equals("set in one, named in another", found(shared, "SlGlobalAssign", ALScriptProblem::Severity::Note),
+                      std::string("1 LuauLintSlGlobalInFunction|count\n"));
+        ensure_equals("declared before the first that names it", fixed(shared, "LuauLintSlGlobalInFunction", "Declare local count before it is first named", false),
+                      std::string("local count\n") + shared);
+        ensure("one function alone: Luau's",
+               found("LLEvents:on(\"touch_start\", function(detected)\n    total = 1\n    print(total)\nend)\n", "SlGlobalAssign", ALScriptProblem::Severity::Note)
+                   .find("LuauLintSlGlobalInFunction") == std::string::npos);
+        ensure("set at the top too: said there, not here",
+               found("count = 0\nfunction bump() count += 1 end\nbump()\n", "SlGlobalAssign", ALScriptProblem::Severity::Note).find("LuauLintSlGlobalInFunction") ==
+                   std::string::npos);
+        ensure("not where _G is",
+               found(std::string("print(_G)\n") + shared, "SlGlobalAssign", ALScriptProblem::Severity::Note).find("LuauLintSlGlobalInFunction") == std::string::npos);
     }
 }
