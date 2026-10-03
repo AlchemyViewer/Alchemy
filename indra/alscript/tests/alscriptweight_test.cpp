@@ -177,7 +177,38 @@ namespace tut
         const ALScriptWeight light = ALScriptWeigh::slua("local s = \"x\"\nprint(s)\n");
         ensure("both compiled", heavy.compiled && light.compiled);
         ensure("the string weighs", heavy.total >= light.total + 2000);
-        ensure("in the strings", named(heavy, "strings") && named(heavy, "strings")->bytes >= 2000);
+        // Heavy, it is a part of its own, and no longer the table of
+        // strings'.
+        const ALScriptWeight::Part* constant = nullptr;
+        for (const ALScriptWeight::Part& one : heavy.parts)
+        {
+            constant = one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings" ? &one : constant;
+        }
+        // At the line that loads it: a local never set again is folded into
+        // where it is used, print(s), as -O1 compiles it.
+        ensure("a part of its own:" + listed(heavy), constant && constant->bytes >= 2000 && constant->line == 1);
+        ensure("named by its start: " + (constant ? constant->name : std::string()), constant && constant->name.rfind("\"xxxx", 0) == 0);
+        ensure("not the strings' too", named(heavy, "strings") && named(heavy, "strings")->bytes < 100);
+        ensure("a light one stays the strings'", std::none_of(light.parts.begin(), light.parts.end(), [](const ALScriptWeight::Part& one) {
+                   return one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings";
+               }));
+        // And for the LSL targets: LSO's in its code, Mono's in its strings,
+        // LSL on Luau's in its table; each a part of its own, out of the
+        // handler that held it, the whole as it was.
+        const std::string lsl = "default { state_entry() { llOwnerSay(\"" + words + "\"); } }\n";
+        for (const ALScriptWeight& one : { ALScriptWeigh::lso(lsl), ALScriptWeigh::mono(lsl), ALScriptWeigh::lslLuau(lsl) })
+        {
+            const ALScriptWeight::Part* found = nullptr;
+            size_t                      sum   = 0;
+            for (const ALScriptWeight::Part& part : one.parts)
+            {
+                found = part.kind == ALScriptWeight::Part::Kind::Constant && part.name != "strings" ? &part : found;
+                sum += part.bytes;
+            }
+            const std::string target = ALScriptWeight::nameOf(one.target);
+            ensure(target + ": a part of its own:" + listed(one), one.compiled && found && found->bytes >= 2000 && found->line == 0);
+            ensure(target + ": counted once", sum <= one.total);
+        }
         const ALScriptWeight broken = ALScriptWeigh::slua("local function (\n");
         ensure("a script that does not compile", !broken.compiled && !broken.error.empty());
     }

@@ -41,6 +41,7 @@
 #include "Luau/Parser.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <tailslide/tailslide.hh>
 #include <tailslide/passes/lso/bytecode_compiler.hh>
 #include <tailslide/passes/lso/script_compiler.hh>
@@ -458,6 +459,44 @@ namespace
         return p;
     }
 
+    // A string the script keeps that weighs this much or more is a part of
+    // its own -- a key, a table of names, a notecard's worth of text -- each
+    // target's bytes for it taken out of what held them, so that no byte is
+    // counted twice.
+    constexpr size_t HEAVY_CONSTANT = 256;
+
+    // A heavy string as a row names it: the start of its text, quoted, on
+    // one line.
+    std::string constantName(std::string_view text)
+    {
+        constexpr size_t SHOWN = 32;
+        std::string      out   = "\"";
+        size_t           taken = 0;
+        for (size_t i = 0; i < text.size() && taken < SHOWN; ++i, ++taken)
+        {
+            const char c = text[i];
+            out += c == '\n' ? std::string("\\n") : c == '\t' ? std::string("\\t") : std::string(1, c);
+        }
+        // Not cut inside a character.
+        while (taken < text.size() && !out.empty() && (static_cast<unsigned char>(out.back()) & 0xC0) == 0x80)
+        {
+            out.pop_back();
+        }
+        return out + (taken < text.size() ? "\xE2\x80\xA6\"" : "\"");
+    }
+
+    ALScriptWeight::Part heavyConstant(std::string_view text, size_t bytes, S32 line)
+    {
+        ALScriptWeight::Part p = part(ALScriptWeight::Part::Kind::Constant, constantName(text), bytes);
+        if (line >= 0)
+        {
+            p.line    = line;
+            p.column  = 0;
+            p.endLine = line;
+        }
+        return p;
+    }
+
     // The constants an instruction names, by their places in its
     // prototype's table: where each opcode keeps the index, as Bytecode.h
     // documents it.
@@ -598,6 +637,22 @@ namespace ALScriptWeigh
             ALScriptWeight by_line;
             weighAsset(by_line, lined);
             weight.lines = std::move(by_line.lines);
+            // The heavy strings likewise, which only lines place: out of the
+            // table of strings, which is the same in both.
+            const size_t strings = static_cast<size_t>(std::find_if(weight.parts.begin(), weight.parts.end(),
+                                                                   [](const ALScriptWeight::Part& one) {
+                                                                       return one.kind == ALScriptWeight::Part::Kind::Constant && one.name == "strings";
+                                                                   }) -
+                                                      weight.parts.begin());
+            for (ALScriptWeight::Part& one : by_line.parts)
+            {
+                if (one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings" && strings < weight.parts.size() &&
+                    one.bytes <= weight.parts[strings].bytes)
+                {
+                    weight.parts[strings].bytes -= one.bytes;
+                    weight.parts.push_back(std::move(one));
+                }
+            }
         }
         nameLSLParts(weight, source);
         return weight;
@@ -626,6 +681,7 @@ namespace
             return;
         }
         weight.compiled = true;
+        const size_t strings_part = weight.parts.size();
         weight.parts.push_back(part(ALScriptWeight::Part::Kind::Constant, "strings", read.stringsEnd - read.stringsBegin));
         std::map<S32, size_t> by_line;
         // The first line, from one, that names each string; nought for none.
@@ -709,11 +765,27 @@ namespace
             }
             weight.parts.push_back(std::move(one));
         }
+        // The table of strings is a part; each heavy string in it a part of
+        // its own, at the first line that names it, and no longer the
+        // table's. The functions' names are the table's.
+        boost::unordered_flat_set<size_t> names;
+        for (const Proto& p : read.protos)
+        {
+            if (p.name > 0)
+            {
+                names.insert(static_cast<size_t>(p.name - 1));
+            }
+        }
         for (size_t s = 0; s < string_at.size(); ++s)
         {
             if (string_at[s] > 0 && s < read.stringBytes.size())
             {
                 by_line[string_at[s] - 1] += read.stringBytes[s];
+                if (read.stringBytes[s] >= HEAVY_CONSTANT && !names.contains(s) && read.stringBytes[s] <= weight.parts[strings_part].bytes)
+                {
+                    weight.parts[strings_part].bytes -= read.stringBytes[s];
+                    weight.parts.push_back(heavyConstant(read.strings[s], read.stringBytes[s], string_at[s] - 1));
+                }
             }
         }
         for (const auto& [line, bytes] : by_line)
@@ -1008,12 +1080,26 @@ namespace
         explicit LinedLSO(Tailslide::LSOSymbolDataMap& symbols) : LSOBytecodeCompiler(symbols) {}
 
         LineMarks marks;
+        // Each heavy string written, as a part of its own at its line.
+        std::vector<ALScriptWeight::Part> heavy;
 
         bool visitSpecific(Tailslide::LSLASTNode* node) override
         {
-            marks.enter(node, mCodeBS.size());
+            const size_t before = mCodeBS.size();
+            marks.enter(node, before);
             const bool descend = LSOBytecodeCompiler::visitSpecific(node);
             marks.leave(mCodeBS.size());
+            // A string written out where it is used, in the code.
+            if (node->getNodeSubType() == Tailslide::NODE_CONSTANT_EXPRESSION && mCodeBS.size() >= before + HEAVY_CONSTANT)
+            {
+                Tailslide::LSLConstant* value = static_cast<Tailslide::LSLConstantExpression*>(node)->getConstantValue();
+                if (value && value->getNodeSubType() == Tailslide::NODE_STRING_CONSTANT)
+                {
+                    const Tailslide::YYLTYPE* at = node->getLoc();
+                    heavy.push_back(heavyConstant(static_cast<Tailslide::LSLStringConstant*>(value)->getValue(), mCodeBS.size() - before,
+                                                  at && at->first_line > 0 ? zeroBased(at->first_line) : -1));
+                }
+            }
             return descend;
         }
     };
@@ -1098,6 +1184,20 @@ namespace
             LinedLSO lined(_mSymData);
             node->visit(&lined);
             lined.marks.spread(lined.mCodeBS.size(), lines);
+            // Its heavy strings parts of their own after it, no longer its.
+            if (parts.empty())
+            {
+                return;
+            }
+            const size_t holder = parts.size() - 1;
+            for (ALScriptWeight::Part& constant : lined.heavy)
+            {
+                if (constant.bytes <= parts[holder].bytes)
+                {
+                    parts[holder].bytes -= constant.bytes;
+                    parts.push_back(std::move(constant));
+                }
+            }
         }
 
         static std::string nameOf(Tailslide::LSLASTNode* node)
@@ -1363,6 +1463,8 @@ namespace ALScriptWeigh
         std::set<std::string> strings;
         size_t                shared = MONO_BASE_BYTES;
         ALScriptWeight::Part* method = nullptr;
+        // Heavy strings, parts of their own once every method is in.
+        std::vector<ALScriptWeight::Part> heavy;
         ALScriptWeight::Part  globals;
         globals.kind = ALScriptWeight::Part::Kind::Frame;
         globals.name = "globals";
@@ -1441,8 +1543,29 @@ namespace ALScriptWeigh
             const size_t      cut  = line.find(' ');
             const std::string op   = line.substr(0, cut);
             const std::string rest = cut == std::string::npos ? std::string() : line.substr(cut + 1);
-            // A string is the first load's, whose line and method made it.
-            const size_t      bytes = ilBytes(op, rest) + (op == "ldstr" && strings.insert(rest).second ? userStringBytes(rest) : 0);
+            // A string is the first load's, whose line and method made it;
+            // a heavy one a part of its own, at that line.
+            size_t bytes = ilBytes(op, rest);
+            if (op == "ldstr" && strings.insert(rest).second)
+            {
+                const size_t text = userStringBytes(rest);
+                if (text >= HEAVY_CONSTANT)
+                {
+                    const size_t open  = rest.find('"');
+                    const size_t close = rest.rfind('"');
+                    heavy.push_back(heavyConstant(open != std::string::npos && close > open ? std::string_view(rest).substr(open + 1, close - open - 1)
+                                                                                         : std::string_view(rest),
+                                                  text, source));
+                    if (source >= 0)
+                    {
+                        by_line[source] += text;
+                    }
+                }
+                else
+                {
+                    bytes += text;
+                }
+            }
             method->bytes += bytes;
             if (source >= 0)
             {
@@ -1460,6 +1583,7 @@ namespace ALScriptWeigh
         }
         weight.parts.insert(weight.parts.begin(), globals);
         weight.parts.insert(weight.parts.begin(), part(ALScriptWeight::Part::Kind::Frame, "assembly", shared));
+        weight.parts.insert(weight.parts.end(), heavy.begin(), heavy.end());
         for (const ALScriptWeight::Part& one : weight.parts)
         {
             weight.total += one.bytes;
