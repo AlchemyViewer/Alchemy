@@ -569,12 +569,8 @@ bool LLAppViewerWin32::init()
 
     bool success = LLAppViewer::init();
 
-#if ! AL_SENTRY
-    // Without a crash reporter, Windows Error Reporting is kept away from the
-    // viewer's crashes; with one, the reporter decides, since WER is how its
-    // handler receives fast-fail crashes.
-    setWinErrorReportingExcluded(true);
-#endif
+    // Enable WER for this process. This is a no-op if WER is not available.
+    setWinErrorReportingExcluded(false);
 
     return success;
 }
