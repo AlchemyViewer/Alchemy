@@ -167,7 +167,9 @@ namespace
             set_event_tag(event, "mem_allocated_kb", std::to_string(LLMemory::getAllocatedMemKB().value()));
             set_event_tag(event, "mem_available_kb", std::to_string(available_kb));
             set_event_tag(event, "mem_max_physical_kb", std::to_string(LLMemory::getMaxMemKB().value()));
+#if LL_WINDOWS
             set_event_tag(event, "mem_available_commit_mb", std::to_string(LLMemory::getAvailableCommitMemMB().value()));
+#endif
         }
 
         if (!app->isSecondInstance() && !app->errorMarkerExists())
