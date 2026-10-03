@@ -129,7 +129,9 @@ void LLFloaterTopObjects::setMode(U32 mode)
 // static
 void LLFloaterTopObjects::handle_land_reply(LLMessageSystem* msg, void** data)
 {
-    LLFloaterTopObjects* instance = LLFloaterReg::getTypedInstance<LLFloaterTopObjects>("top_objects");
+    // Found, not built: an answer can come while neither window is open
+    // (one of Script Studio's asks, given up on before it came).
+    LLFloaterTopObjects* instance = LLFloaterReg::findTypedInstance<LLFloaterTopObjects>("top_objects");
     if(instance && instance->isInVisibleChain())
     {
         instance->handleReply(msg, data);
@@ -143,7 +145,7 @@ void LLFloaterTopObjects::handle_land_reply(LLMessageSystem* msg, void** data)
     }
     else
     {
-        LLFloaterRegionInfo* region_info_floater = LLFloaterReg::getTypedInstance<LLFloaterRegionInfo>("region_info");
+        LLFloaterRegionInfo* region_info_floater = LLFloaterReg::findTypedInstance<LLFloaterRegionInfo>("region_info");
         if(region_info_floater)
         {
             region_info_floater->enableTopButtons();
