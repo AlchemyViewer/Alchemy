@@ -567,6 +567,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocExpectedValue">expected a value in preprocessor expression</string>
 	<string name="PreprocIfNeedsExpression">#if with no expression</string>
 	<string name="PreprocIfWithoutEndif">#if without #endif at the end of the file</string>
+	<string name="PreprocBackslashSpace">backslash and newline separated by space</string>
 	<string name="PreprocIntegerTooLarge">integer constant '[1]' is too large for its type</string>
 	<string name="PreprocBadCharacter">'[1]' is not a character constant</string>
 	<string name="PreprocVaArgsNotAName">'__VA_ARGS__' cannot be used as a macro name</string>

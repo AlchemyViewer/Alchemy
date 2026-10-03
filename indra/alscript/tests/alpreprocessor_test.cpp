@@ -1587,4 +1587,48 @@ namespace tut
         const std::vector<ALPreprocessor::Token> tokens = ALPreprocessor::tokenize("--#define A 1\n#a\n", true);
         ensure("the mark, then the directive's words", tokens.size() > 2 && tokens[0].text == "--#" && tokens[1].text == "define");
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<42>()
+    {
+        set_test_name("SLua: a --#define goes on over a backslash at its line's end, before LF, CRLF or a lone CR, and past blanks with a warning; an include's CRLF lines read as LF");
+        const std::string lf = "--#define SAY(x) \\\n"
+                               "    ll.OwnerSay(x) \\\n"
+                               "    print(x)\n"
+                               "SAY(\"hi\")\n";
+        ALPreprocessor::Result r = ALPreprocessor::run(lf, options(true));
+        ensure_equals("nothing wrong", messages(r), std::string());
+        const std::string joined = r.text;
+        const size_t      used   = joined.find("ll.OwnerSay(\"hi\")");
+        ensure("the body on the line that uses it: " + joined,
+               used != std::string::npos && joined.find("print(\"hi\")") > used && joined.find('\n', used) > joined.find("print(\"hi\")") &&
+                   joined.find('\\') == std::string::npos);
+        const auto ended = [](const std::string& text, const char* end) {
+            std::string out;
+            for (char c : text)
+            {
+                out += c == '\n' ? std::string(end) : std::string(1, c);
+            }
+            return out;
+        };
+        r = ALPreprocessor::run(ended(lf, "\r\n"), options(true));
+        ensure_equals("CRLF said nothing", messages(r), std::string());
+        ensure_equals("CRLF", r.text, joined);
+        r = ALPreprocessor::run(ended(lf, "\r"), options(true));
+        ensure_equals("a lone CR", r.text, joined);
+
+        r = ALPreprocessor::run("--#define SAY(x) \\  \n"
+                                "    ll.OwnerSay(x) \\\t\n"
+                                "    print(x)\n"
+                                "SAY(\"hi\")\n",
+                                options(true));
+        ensure_equals("blanks after the backslash", r.text, joined);
+        ensure_equals("said of each", messages(r),
+                      std::string("W 0: backslash and newline separated by space\nW 1: backslash and newline separated by space\n"));
+
+        add("say.luau", "--#define SAY(x) \\\r\n    print(x)\r\n");
+        r = ALPreprocessor::run("--#include \"say.luau\"\nSAY(1)\n", options(true));
+        ensure_equals("an include with CRLF said nothing", messages(r), std::string());
+        ensure("and its macro goes on over its lines: " + r.text, r.text.find("print(1)") != std::string::npos);
+    }
 }

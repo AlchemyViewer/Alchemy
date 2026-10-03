@@ -853,9 +853,16 @@ namespace
             }
             if (!lua && line.front() == '#')
             {
-                // With the lines a backslash carries it on to.
+                // With the lines a backslash carries it on to, blanks after
+                // it let by as the preprocessor lets them by on a directive's
+                // line.
+                const auto carried = [&lines](S32 at) {
+                    const std::string_view text = lines.line(at);
+                    const size_t           last = text.find_last_not_of(" \t\r\f\v");
+                    return last != std::string_view::npos && text[last] == '\\';
+                };
                 last_kind = i;
-                while (!lines.line(last_kind).empty() && lines.line(last_kind).back() == '\\' && last_kind + 1 < lines.count())
+                while (carried(last_kind) && last_kind + 1 < lines.count())
                 {
                     ++last_kind;
                 }
