@@ -3782,6 +3782,9 @@ void ALVimKeymap::enterInsert(ALTextView& view, S32 count, bool grouped)
 
 void ALVimKeymap::leaveInsert(ALTextView& view)
 {
+    // Vim has one caret: the others typing went in at go, before a count
+    // or a block puts in again at the main one.
+    view.singleSelection();
     const ALTextDocument& d = view.document();
     // What was typed, again as many times as the count said: made once and
     // put in as one edit, not an edit a time.

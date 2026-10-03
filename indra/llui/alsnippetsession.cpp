@@ -327,12 +327,10 @@ void ALSnippetSession::start(std::vector<ALTextRange> stops, const ALTextPos& af
     mMirrors = std::move(mirrors);
     mLanding = landing;
     mSyncing = -1;
-    mLive    = false;
 }
 
 void ALSnippetSession::clear()
 {
-    mLive = false;
     mMirrors.clear();
     mLanding = 0;
     mStops.clear();

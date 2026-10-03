@@ -58,22 +58,6 @@ static LLDefaultChildRegistry::Register<ALCodeEditor> r("code_editor");
 
 namespace
 {
-    // What is left to do as a scope ends, whichever way it ends.
-    template <typename F>
-    struct AtScopeEnd
-    {
-        F f;
-        ~AtScopeEnd() { f(); }
-    };
-    template <typename F>
-    AtScopeEnd<F> atScopeEnd(F f)
-    {
-        return AtScopeEnd<F>{ std::move(f) };
-    }
-}
-
-namespace
-{
     const S32 GUTTER_PAD  = 6;
     const S32 MARK_SIZE   = 10;
     // A warning's underline: dashes; a note's: dots.
@@ -1708,19 +1692,6 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             if (spanOnRow(line, row, *it, x0, x1))
             {
                 gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, ink);
-            }
-        }
-    }
-    // The places of a text being changed at once, as its stop is.
-    if (mSnippet.live())
-    {
-        for (const ALSnippetSession::Mirror& mirror : mSnippet.mirrors())
-        {
-            F32 x0, x1;
-            if (mirror.range.begin.line <= line && line <= mirror.range.end.line && spanOnRow(line, row, mirror.range, x0, x1))
-            {
-                gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, highlightColor() % alpha);
-                gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, mBracketMatchColor.get() % alpha, false);
             }
         }
     }
@@ -3452,10 +3423,9 @@ void ALCodeEditor::insertSnippet(std::string_view body)
     setSelection(mSnippet.stops()[0]);
 }
 
-void ALCodeEditor::syncMirrors(S32 index, bool grouped)
+void ALCodeEditor::syncMirrors(S32 index)
 {
-    // As one edit, one step to undo -- or part of the key's -- and the
-    // selection as it was.
+    // As one edit, one step to undo, and the selection as it was.
     std::string            wanted;
     const std::vector<S32> order = mSnippet.staleMirrors(index, document(), wanted);
     if (order.empty())
@@ -3470,17 +3440,11 @@ void ALCodeEditor::syncMirrors(S32 index, bool grouped)
         edits.emplace_back(mSnippet.mirrors()[static_cast<size_t>(k)].range, wanted);
     }
     // All of them as one edit.
-    if (grouped)
-    {
-        undoJournal().beginGroup();
-    }
+    undoJournal().beginGroup();
     mSnippet.syncingAll();
     editMany(std::move(edits), was.end);
     mSnippet.syncing(-1);
-    if (grouped)
-    {
-        undoJournal().endGroup();
-    }
+    undoJournal().endGroup();
     placeSelection(document().clamp(was.begin), document().clamp(was.end));
     afterEdit();
 }
@@ -3603,26 +3567,6 @@ bool ALCodeEditor::changeAllOccurrences()
     placeSelections(all, all.size() - 1);
     setSelection(selection());
     return true;
-}
-
-void ALCodeEditor::undo()
-{
-    // A step back is the text as it was, the places with it: nothing to
-    // bring up to what the stop holds.
-    if (mSnippet.live())
-    {
-        clearPlaceholders();
-    }
-    ALTextView::undo();
-}
-
-void ALCodeEditor::redo()
-{
-    if (mSnippet.live())
-    {
-        clearPlaceholders();
-    }
-    ALTextView::redo();
 }
 
 void ALCodeEditor::dropPlaceholdersLeft()
@@ -4202,25 +4146,6 @@ void ALCodeEditor::dropTyping()
 
 bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 {
-    // Every place of a text being changed at once: what the key did, and
-    // the places brought up to it, one step with the typing around it --
-    // but for a step back or forward, which ends it.
-    const ALEditorCommand command = keymap().lookup(key, mask);
-    const bool            live    = mSnippet.live() && command != ALEditorCommand::Undo && command != ALEditorCommand::Redo;
-    if (live)
-    {
-        undoJournal().beginTyping(selection());
-    }
-    const auto keep_up = atScopeEnd([this, live]() {
-        if (live)
-        {
-            if (mSnippet.live())
-            {
-                syncMirrors(mSnippet.at(), false);
-            }
-            undoJournal().endTyping();
-        }
-    });
     hideCard();
     // At several carets the signature and a snippet's stops are not in
     // play, each being about one place; the list is the main caret's.
@@ -4417,16 +4342,11 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
         clearPlaceholders();
     }
     // The pair, the character and its outdent one key typed, one with the
-    // typing around it -- and every place of a text being changed at once
-    // brought up to it in the same step.
+    // typing around it.
     undoJournal().beginTyping(selection());
     const bool paired = typing && mAutoClose && uni_char < 0x80 && !isReadOnly() &&
                         (several ? typePairs(static_cast<char>(uni_char)) : typePair(static_cast<char>(uni_char)));
     const bool typed  = paired || ALTextView::handleUnicodeCharHere(uni_char);
-    if (typed && mSnippet.live())
-    {
-        syncMirrors(mSnippet.at(), false);
-    }
     undoJournal().endTyping();
     if (!typed)
     {

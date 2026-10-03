@@ -2355,4 +2355,38 @@ namespace tut
         v.setReadOnly(true);
         ensure("none in a read-only text", !v.canPerform(ALEditorCommand::ColumnSelectDown) && !v.perform(ALEditorCommand::ColumnSelectDown));
     }
+
+    template<> template<>
+    void altextview_object::test<74>()
+    {
+        set_test_name("with several carets a composition stands at the main one only, the others moving aside for it and back, and what it commits is typed at each");
+        ALTextView& v = make("abcd\nabcd");
+        v.setSelections(caretRange(0, 1), { caretRange(0, 3), caretRange(1, 1) });
+        LLPreeditor& ime = v.preeditor();
+        ime.updatePreedit("XY", { 2 }, { false }, 2);
+        ensure_equals("at the main caret only", v.text(), std::string("aXYbcd\nabcd"));
+        ensure_equals("the others moved aside for it", rangesSaid(v.otherSelections()), rangesSaid({ caretRange(0, 5), caretRange(1, 1) }));
+        ime.resetPreedit();
+        ensure_equals("gone", v.text(), std::string("abcd\nabcd"));
+        ensure_equals("and they back", rangesSaid(v.otherSelections()), rangesSaid({ caretRange(0, 3), caretRange(1, 1) }));
+        ensure("the main one where it began", v.selection() == caretRange(0, 1));
+        ensure("none of it an edit", !v.isDirty());
+        // What the input method commits comes as typed characters.
+        type("Z");
+        ensure_equals("committed: typed at each", v.text(), std::string("aZbcZd\naZbcd"));
+    }
+
+    template<> template<>
+    void altextview_object::test<75>()
+    {
+        set_test_name("with several selections the find bar is seeded from the main one");
+        ALTextView& v = make("cat dog\nbird cat");
+        v.setSelections(spanRange(0, 4, 7), { spanRange(1, 0, 4) });
+        v.showFind(false);
+        ensure_equals("the main selection's text", v.findBar()->query(), std::string("dog"));
+        v.hideFind();
+        v.setSelections(caretRange(1, 6), { spanRange(0, 4, 7) });
+        v.showFind(false);
+        ensure_equals("the word at the main caret, not another's selection", v.findBar()->query(), std::string("cat"));
+    }
 }

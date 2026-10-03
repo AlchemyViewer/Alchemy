@@ -2818,4 +2818,22 @@ namespace tut
         ensure_equals("gone to", e.caret().line, 44);
         ensure("and below them there: " + std::to_string(below) + " of " + std::to_string(row_h), below >= 2 * row_h);
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<95>()
+    {
+        set_test_name("vim has one caret: what insert mode typed at several stays, Escape leaves the main caret alone, stepped back onto it, and a count types again there only");
+        ALCodeEditor& e = make("one\ntwo\nthree");
+        e.setSelections(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)) });
+        keys("iab");
+        ensure_equals("typed at each", e.text(), std::string("abone\nabtwo\nabthree"));
+        ensure("still several while inserting", e.hasOtherSelections());
+        keys("<Esc>");
+        ensure("one caret in normal mode", !e.hasOtherSelections());
+        ensure("the main one, on the last character it typed", e.caret() == ALTextPos(2, 1));
+        e.setSelections(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)) });
+        keys("3iX<Esc>");
+        ensure_equals("once at each, the count's again at the main one only", e.text(), std::string("Xabone\nXabtwo\nXXXabthree"));
+        ensure("one caret", !e.hasOtherSelections());
+    }
 }

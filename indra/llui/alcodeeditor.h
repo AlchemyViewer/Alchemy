@@ -552,8 +552,6 @@ public:
     // names only.
     bool                            selectNextOccurrence();
     bool                            changeAllOccurrences();
-    void                            undo() override;
-    void                            redo() override;
     // The names of a signature's parameters, and where their list opens
     // (ALSnippetSession).
     static std::vector<std::string> parameterNames(std::string_view detail, std::string_view name = std::string_view())
@@ -1076,9 +1074,9 @@ private:
     bool                    mCompletionMoved = false;
     // The stops of a snippet or a call being filled in (ALSnippetSession).
     ALSnippetSession         mSnippet;
-    // Each placeholder's mirrors made what it holds: as one step of its
-    // own, or as part of the key being typed.
-    void                     syncMirrors(S32 index, bool grouped = true);
+    // Each placeholder's mirrors made what it holds, as one step of its
+    // own.
+    void                     syncMirrors(S32 index);
     // The places after `from` that read as `wanted`, going round, whole
     // names only where asked, none over any of `taken` -- the selections
     // there are; at most `most` of them.
