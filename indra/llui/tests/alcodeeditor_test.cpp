@@ -2689,4 +2689,27 @@ namespace tut
         e.undo();
         ensure_equals("one step", e.text(), std::string("myC\n  myC"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<75>()
+    {
+        set_test_name("a caret besides the main one put on a line folded away opens it, as the main one does; folding moves the others out to the fold's line, as it does the main one");
+        ALCodeEditor& e = make("default\n{\n    state_entry()\n    {\n        llSay(0, \"a\");\n        llSay(0, \"b\");\n    }\n}\nx");
+        const auto caretAt = [](S32 line, S32 column) { return ALTextRange(ALTextPos(line, column), ALTextPos(line, column)); };
+        ensure("folds", e.foldAt(2));
+        e.setSelections(caretAt(8, 0), { caretAt(4, 8) });
+        ensure("the other caret's line opened", !e.isFolded(2) && !e.layout().hidden(4));
+
+        e.setSelections(caretAt(8, 0), { caretAt(4, 8), ALTextRange(ALTextPos(5, 8), ALTextPos(5, 13)) });
+        ensure("folds again", e.foldAt(2));
+        ensure("the main one where it was", e.selection() == caretAt(8, 0));
+        ensure("the others out of the fold, at the end of its line, as one", e.otherSelections().size() == 1 && e.otherSelections()[0] == caretAt(2, 17));
+        ensure("and the fold kept", e.isFolded(2));
+
+        e.unfoldAll();
+        e.setSelections(caretAt(8, 0), { caretAt(4, 8) });
+        e.foldAll();
+        ensure("folding all moves them out as well", e.otherSelections().size() == 1 && !e.layout().hidden(e.otherSelections()[0].end.line));
+        ensure("into sight above", e.otherSelections()[0] == caretAt(0, 7));
+    }
 }

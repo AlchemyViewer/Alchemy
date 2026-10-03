@@ -1077,6 +1077,9 @@ private:
     // Each placeholder's mirrors made what it holds, as one step of its
     // own.
     void                     syncMirrors(S32 index);
+    // The selections besides the main one that folding has hidden, each a
+    // caret at the end of the fold's line, as the main one is put.
+    void                     othersOutOfFolds();
     // The places after `from` that read as `wanted`, going round, whole
     // names only where asked, none over any of `taken` -- the selections
     // there are; at most `most` of them.

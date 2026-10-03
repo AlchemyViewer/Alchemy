@@ -1976,7 +1976,40 @@ bool ALCodeEditor::foldAt(S32 line)
         setCaret(document().lineEnd(chosen->start));
     }
     applyFolds();
+    othersOutOfFolds();
     return true;
+}
+
+void ALCodeEditor::othersOutOfFolds()
+{
+    if (!hasOtherSelections() || !layout().anyHidden())
+    {
+        return;
+    }
+    // Each one in what is folded away a caret at the end of the line above
+    // it that shows -- the fold's own line -- as the main one is put; those
+    // that meet there become one.
+    size_t                   main  = 0;
+    std::vector<ALTextRange> all   = selectionsInOrder(&main);
+    bool                     moved = false;
+    for (size_t i = 0; i < all.size(); ++i)
+    {
+        const ALTextRange range = all[i].normalised();
+        if (i == main || (!layout().hidden(range.begin.line) && !layout().hidden(range.end.line)))
+        {
+            continue;
+        }
+        const S32 hidden = layout().hidden(range.begin.line) ? range.begin.line : range.end.line;
+        const S32 above  = layout().visibleFrom(hidden, -1);
+        const S32 below  = layout().visibleFrom(hidden, 1);
+        const ALTextPos to = above >= 0 ? document().lineEnd(above) : ALTextPos(below >= 0 ? below : 0, 0);
+        all[i]             = ALTextRange(to, to);
+        moved              = true;
+    }
+    if (moved)
+    {
+        placeSelections(all, main);
+    }
 }
 
 bool ALCodeEditor::unfoldAt(S32 line)
@@ -1997,6 +2030,7 @@ void ALCodeEditor::foldAll()
     {
         setCaret(document().lineEnd(layout().visibleFrom(caret().line, -1)));
     }
+    othersOutOfFolds();
 }
 
 void ALCodeEditor::unfoldAll()

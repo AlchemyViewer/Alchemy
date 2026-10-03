@@ -918,15 +918,34 @@ void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret)
             mCaret  = main.end;
         }
     }
-    if (mLayout.hidden(mCaret.line))
-    {
+    // A caret on a line folded away is not drawn: its line is shown, the
+    // others' as the main one's, where any line is hidden at all.
+    const auto reveal = [this](S32 line) {
+        if (!mLayout.hidden(line))
+        {
+            return;
+        }
         if (mFeatures)
         {
-            mFeatures->revealLine(mCaret.line);
+            mFeatures->revealLine(line);
         }
         else
         {
-            mLayout.setHidden(mCaret.line, mCaret.line, false);
+            mLayout.setHidden(line, line, false);
+        }
+    };
+    reveal(mCaret.line);
+    if (!mCarets.empty() && mLayout.anyHidden())
+    {
+        std::vector<S32> lines;
+        lines.reserve(mCarets.size());
+        for (const ALTextRange& other : mCarets)
+        {
+            lines.push_back(other.end.line);
+        }
+        for (const S32 line : lines)
+        {
+            reveal(line);
         }
     }
     mBlink.reset();
