@@ -677,10 +677,11 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="WeightsHeadTip">Code size only, not counting the lists and strings the script builds while it runs.</floater.string>
     <floater.string name="WeightsHeadRegion">In the region, its object reserves [RESERVED,number,0] KB for all its scripts, as of [WHEN].</floater.string>
     <floater.string name="WeightsHeadRegionUrls">In the region, its object reserves [RESERVED,number,0] KB and [URLS] URLs for all its scripts, as of [WHEN].</floater.string>
-    <floater.string name="WeightsHeadRegionTip">Code size only, not counting the lists and strings the script builds while it runs. The region counts the memory of every script in the object, each at its limit (64 KB for Mono unless llSetMemoryLimit lowers it), not what it uses.</floater.string>
+    <floater.string name="WeightsHeadRegionTip">The region counts the memory of every script in the object, each at its limit (64 KB for Mono unless llSetMemoryLimit lowers it), not what it uses.</floater.string>
     <floater.string name="ExplorerReserved">[RESERVED,number,0] KB reserved</floater.string>
     <floater.string name="ExplorerTime">[TIME] ms a frame</floater.string>
     <floater.string name="WeightsHeadRegionTime">Its scripts take [TIME] ms of the region's time a frame, as of [WHEN].</floater.string>
+    <floater.string name="WeightsHeadRegionTimeTip">The time is the region's own count for all the object's scripts, on average, as its Top Scripts list shows an estate manager.</floater.string>
     <floater.string name="WeightsTargetTip">[TARGET]: [BYTES] bytes of code, of [MAX] bytes of memory.</floater.string>
     <floater.string name="WeightsTargetEstimateTip">[TARGET]: about [BYTES] bytes of code, of [MAX] bytes of memory, estimated from the compiled code.</floater.string>
     <floater.string name="WeightsTargetFailedTip">Does not compile for [TARGET]: [ERROR]</floater.string>

@@ -335,7 +335,8 @@ namespace tut
 
     // What the region reserves for the script's object, where it has said:
     // after the code's size, for all of the object's scripts, with its URLs
-    // where it has any; and the tip saying how the region counts.
+    // where it has any; its time, where it told an estate manager; and the
+    // tip saying how the region counts each.
     template<> template<>
     void alscriptweightspane_object::test<7>()
     {
@@ -359,6 +360,7 @@ namespace tut
         ensure("as of when" + said, said.find(ALRecoveryEntry::sayWhen(reserved.when)) != std::string::npos);
         ensure("no URLs said where there are none" + said, said.find("URLs") == std::string::npos);
         ensure("the tip says how it counts", head->getToolTip().find("64 KB for Mono") != std::string::npos);
+        ensure("and nothing of time unasked", head->getToolTip().find("Top Scripts") == std::string::npos);
         shown.region->urls = 3;
         shown.id           = "script-3";
         pane.show(shown);
@@ -369,6 +371,7 @@ namespace tut
         shown.id               = "script-4";
         pane.show(shown);
         ensure("its time, said to an estate manager" + head->getText(), head->getText().find("take 0.125 ms of the region's time") != std::string::npos);
+        ensure("the tip says how both are counted", head->getToolTip().find("64 KB for Mono") != std::string::npos && head->getToolTip().find("Top Scripts") != std::string::npos);
         ALScriptRegionUsage::Usage timed;
         timed.time     = 0.5f;
         timed.timeWhen = LLDate(1.8e9);
@@ -377,6 +380,7 @@ namespace tut
         pane.show(shown);
         ensure("time alone: no memory said" + head->getText(),
                head->getText().find("reserves") == std::string::npos && head->getText().find("take 0.500 ms") != std::string::npos);
+        ensure("and the tip of the time alone", head->getToolTip().find("64 KB for Mono") == std::string::npos && head->getToolTip().find("Top Scripts") != std::string::npos);
     }
 
     // LSL on Luau's compiler records no lines, so its lines are not

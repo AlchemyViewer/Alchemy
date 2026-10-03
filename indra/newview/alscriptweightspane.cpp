@@ -330,7 +330,17 @@ void ALScriptWeightsPane::fillParts()
         head += " " + mStrings->getString("WeightsHeadRegionTime", args);
     }
     mHead->setText(head);
-    mHead->setToolTip(mStrings->getString(mShown.region ? "WeightsHeadRegionTip" : "WeightsHeadTip"));
+    // The tip says how each of what the head says is counted.
+    std::string tip = mStrings->getString("WeightsHeadTip");
+    if (mShown.region && mShown.region->hasMemory())
+    {
+        tip += " " + mStrings->getString("WeightsHeadRegionTip");
+    }
+    if (mShown.region && mShown.region->hasTime())
+    {
+        tip += " " + mStrings->getString("WeightsHeadRegionTimeTip");
+    }
+    mHead->setToolTip(tip);
 
     // Each part, with how it moved since the text was last saved, where it
     // was weighed for this target then.
