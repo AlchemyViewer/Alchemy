@@ -77,12 +77,18 @@ else()
   message(FATAL_ERROR "AlSimdAsmCheck: SYNTAX is gnu or masm, not ${SYNTAX}")
 endif()
 
+# A branch target landing pad is not part of the operation: a compiler that
+# hardens control flow by default, as Ubuntu's GCC does, puts one at the
+# entry of every function -- endbr64 on x86 under -fcf-protection, bti c
+# (which GCC writes as hint 34) on arm64 under -mbranch-protection.
 if(ARCH STREQUAL "x86")
   set(call "^\t(call|callq)[ \t]")
   set(table "^$")
+  set(landing_pad "^\tendbr(32|64)([ \t]|$)")
 elseif(ARCH STREQUAL "arm64")
   set(call "^\t(bl|blr)[ \t]")
   set(table "^\t(tbl|tbx)[0-9]?[ \t]")
+  set(landing_pad "^\t(bti([ \t]|$)|hint[ \t]+(34|36|38)([ \t]|$))")
 else()
   message(FATAL_ERROR "AlSimdAsmCheck: ARCH is x86 or arm64, not ${ARCH}")
 endif()
@@ -133,6 +139,7 @@ foreach(line IN LISTS lines)
     line MATCHES "${instruction}"
     AND NOT line MATCHES "${directive}"
     AND NOT line MATCHES "^\t(ret|retq)([ \t]|$)"
+    AND NOT line MATCHES "${landing_pad}"
   )
     math(EXPR count "${count} + 1")
     if(line MATCHES "${call}")
