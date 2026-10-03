@@ -33,6 +33,8 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
 // What the region reserves for the scripts of the objects a studio has in
@@ -118,6 +120,17 @@ public:
     // and time each keep what the other said.
     void heard(const usages_t& usages);
     void heardTimes(const times_t& times, const LLDate& when);
+
+    // Which of the asks for time waiting, oldest first, by owner, an answer
+    // of Top Scripts by owner is for, the owners its rows name given: the
+    // oldest one whose owner they name; else, where nothing else could
+    // have asked -- Top Objects closed -- the oldest; else none, and the
+    // answer is Top Objects'. The region's answer says neither who asked
+    // nor what for. Names compared by ownerKey.
+    static std::optional<size_t> answering(const std::vector<std::string>& waiting, const std::vector<std::string>& named, bool topObjectsOpen);
+    // An owner's name as a username, lowered, whichever form it came in:
+    // "First Resident" and "first" alike.
+    static std::string ownerKey(std::string name);
     typedef boost::signals2::signal<void()> heard_signal_t;
     boost::signals2::connection onHeard(const heard_signal_t::slot_type& slot) { return mHeard.connect(slot); }
 

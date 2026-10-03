@@ -242,4 +242,22 @@ namespace tut
         landAsks[0].second(details);
         ensure("time kept through memory", usage.usageOf(id(1))->time == 0.125f);
     }
+
+    template<> template<>
+    void alscriptregionusage_object::test<5>()
+    {
+        set_test_name("an answer of Top Scripts by owner is the oldest ask's whose owner its rows name; else the oldest's while Top Objects is closed, and Top Objects' while it is open");
+        typedef std::optional<size_t> Whose;
+        ensure_equals("a name in either form, lowered", ALScriptRegionUsage::ownerKey("Ann Resident  "), std::string("ann"));
+        ensure_equals("a last name kept", ALScriptRegionUsage::ownerKey("Bo Smith"), std::string("bo.smith"));
+        ensure_equals("a username as it is", ALScriptRegionUsage::ownerKey("Bo.Smith"), std::string("bo.smith"));
+        const std::vector<std::string> waiting = { "Ann Resident", "Bo Smith", "Ann Resident" };
+        ensure("the oldest it names", ALScriptRegionUsage::answering(waiting, { "ann ", "ann " }, true) == Whose(0));
+        ensure("not the oldest where it names a later one", ALScriptRegionUsage::answering(waiting, { "Bo Smith" }, true) == Whose(1));
+        ensure("one it does not name, with Top Objects open: Top Objects'", !ALScriptRegionUsage::answering(waiting, { "Cy Resident" }, true));
+        ensure("no rows, with Top Objects open: Top Objects'", !ALScriptRegionUsage::answering(waiting, {}, true));
+        ensure("no rows, with it closed: the oldest's", ALScriptRegionUsage::answering(waiting, {}, false) == Whose(0));
+        ensure("named otherwise, with it closed: the oldest's still", ALScriptRegionUsage::answering(waiting, { "Cy Resident" }, false) == Whose(0));
+        ensure("none waiting: none", !ALScriptRegionUsage::answering({}, { "Ann Resident" }, false));
+    }
 }

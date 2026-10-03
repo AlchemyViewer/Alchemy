@@ -46,6 +46,7 @@
 #include "lleventtimer.h"
 #include "llfilesystem.h"
 #include "llfloaterperms.h"
+#include "llfloaterreg.h"
 #include "llfloatertopobjects.h"
 #include "llinventory.h"
 #include "llinventorydefines.h"
@@ -270,14 +271,16 @@ namespace
     }
 
     // What the region reserves, asked of the viewer's world.
-    // Top Scripts asked for by the studio, oldest first, each given up once
-    // its answer has had time to come. The region's answer, LandStatReply,
-    // says neither who asked nor what for: one of top scripts filtered by
-    // owner while one of these waits is the studio's, and any other the Top
-    // Objects floater's, as before.
+    // Top Scripts asked for by the studio, oldest first, by owner, each
+    // given up once its answer has had time to come. The region's answer,
+    // LandStatReply, says neither who asked nor what for: which of these an
+    // answer of top scripts by owner is for, if any, is
+    // ALScriptRegionUsage::answering's to say, and any other answer is the
+    // Top Objects floater's, as before.
     struct TimeAsked
     {
         F64                                                     until = 0.0;
+        std::string                                             owner;
         std::function<void(const ALScriptRegionUsage::times_t&)> told;
     };
     std::deque<TimeAsked>& timesAsked()
@@ -366,7 +369,7 @@ namespace
             {
                 return;
             }
-            timesAsked().push_back({ LLTimer::getTotalSeconds() + TIME_ANSWER_WITHIN, std::move(told) });
+            timesAsked().push_back({ LLTimer::getTotalSeconds() + TIME_ANSWER_WITHIN, owner, std::move(told) });
             LLMessageSystem* msg = gMessageSystem;
             msg->newMessageFast(_PREHASH_LandStatRequest);
             msg->nextBlockFast(_PREHASH_AgentData);
@@ -1814,8 +1817,8 @@ bool ALScriptWorkspace::askRunning(const ALScriptRef& ref)
 // static
 void ALScriptWorkspace::processLandStatReply(LLMessageSystem* msg, void** data)
 {
-    // Those given up on gone; then the oldest still waiting takes an answer
-    // of top scripts by owner, and anything else is Top Objects'.
+    // Those given up on gone; then an answer of top scripts by owner is the
+    // studio's where answering says whose, and anything else Top Objects'.
     std::deque<TimeAsked>& asked = timesAsked();
     const F64              now   = LLTimer::getTotalSeconds();
     while (!asked.empty() && asked.front().until < now)
@@ -1831,21 +1834,37 @@ void ALScriptWorkspace::processLandStatReply(LLMessageSystem* msg, void** data)
         LLFloaterTopObjects::handle_land_reply(msg, data);
         return;
     }
-    const auto told = std::move(asked.front().told);
-    asked.pop_front();
     ALScriptRegionUsage::times_t times;
+    std::vector<std::string>     named;
     const S32                    count = msg->getNumberOfBlocksFast(_PREHASH_ReportData);
     for (S32 block = 0; block < count; ++block)
     {
-        LLUUID task;
-        F32    score = 0.f;
+        LLUUID      task;
+        F32         score = 0.f;
+        std::string owner;
         msg->getUUIDFast(_PREHASH_ReportData, _PREHASH_TaskID, task, block);
         msg->getF32Fast(_PREHASH_ReportData, _PREHASH_Score, score, block);
+        msg->getStringFast(_PREHASH_ReportData, _PREHASH_OwnerName, owner, block);
+        named.push_back(std::move(owner));
         if (task.notNull())
         {
             times[task] = score;
         }
     }
+    std::vector<std::string> waiting;
+    for (const TimeAsked& one : asked)
+    {
+        waiting.push_back(one.owner);
+    }
+    const LLFloaterTopObjects*  top   = LLFloaterReg::findTypedInstance<LLFloaterTopObjects>("top_objects");
+    const std::optional<size_t> whose = ALScriptRegionUsage::answering(waiting, named, top && top->isInVisibleChain());
+    if (!whose)
+    {
+        LLFloaterTopObjects::handle_land_reply(msg, data);
+        return;
+    }
+    const auto told = std::move(asked[*whose].told);
+    asked.erase(asked.begin() + static_cast<std::ptrdiff_t>(*whose));
     if (told)
     {
         told(times);

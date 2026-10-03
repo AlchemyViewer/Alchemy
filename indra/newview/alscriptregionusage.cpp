@@ -26,6 +26,8 @@
 
 #include "alscriptregionusage.h"
 
+#include "llcachename.h"
+
 #include <algorithm>
 
 namespace
@@ -200,4 +202,38 @@ void ALScriptRegionUsage::heardTimes(const times_t& times, const LLDate& when)
         kept.timeWhen = when;
     }
     mHeard();
+}
+
+// static
+std::optional<size_t> ALScriptRegionUsage::answering(const std::vector<std::string>& waiting, const std::vector<std::string>& named,
+                                                     bool topObjectsOpen)
+{
+    std::vector<std::string> keys;
+    keys.reserve(named.size());
+    for (const std::string& name : named)
+    {
+        keys.push_back(ownerKey(name));
+    }
+    for (size_t i = 0; i < waiting.size(); ++i)
+    {
+        if (std::find(keys.begin(), keys.end(), ownerKey(waiting[i])) != keys.end())
+        {
+            return i;
+        }
+    }
+    if (!waiting.empty() && !topObjectsOpen)
+    {
+        return 0;
+    }
+    return std::nullopt;
+}
+
+// static
+std::string ALScriptRegionUsage::ownerKey(std::string name)
+{
+    // The region sends names with spaces after, at times.
+    LLStringUtil::trim(name);
+    name = LLCacheName::buildUsername(name);
+    LLStringUtil::toLower(name);
+    return name;
 }
