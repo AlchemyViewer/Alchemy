@@ -32,55 +32,64 @@
 
 namespace
 {
+    // The forward map is evaluated in double precision and rounded to float
+    // once, at the end. The tangent below is the difference of two points on
+    // the locus 2K apart, and in single precision that difference keeps
+    // almost no significant digits: at the cool end the gain jumped by up to
+    // 4e-3 in log terms between offsets 0.1K apart, which is noise in the
+    // colour the renderer applies and leaves the eyedropper's inverse no
+    // smooth function to converge on. In double the same steps move it by
+    // the steady few 1e-6 the locus actually changes by.
+
     // Port of the Kim et al. 2002 Planckian-locus polynomial used by the
     // original white-balance shader. Valid 1667K..25000K to ~1% of the true
     // locus. Output is CIE xy chromaticity at Y = 1.
-    inline void cct_to_xy(F32 cct, F32& out_x, F32& out_y)
+    inline void cct_to_xy(F64 cct, F64& out_x, F64& out_y)
     {
-        F32 t = cct, t2 = t * t, t3 = t2 * t;
-        if (t <= 4000.0f)
-            out_x = -0.2661239e9f / t3 - 0.2343589e6f / t2 + 0.8776956e3f / t + 0.179910f;
+        F64 t = cct, t2 = t * t, t3 = t2 * t;
+        if (t <= 4000.0)
+            out_x = -0.2661239e9 / t3 - 0.2343589e6 / t2 + 0.8776956e3 / t + 0.179910;
         else
-            out_x = -3.0258469e9f / t3 + 2.1070379e6f / t2 + 0.2226347e3f / t + 0.240390f;
+            out_x = -3.0258469e9 / t3 + 2.1070379e6 / t2 + 0.2226347e3 / t + 0.240390;
 
-        F32 x2 = out_x * out_x, x3 = x2 * out_x;
-        if (t <= 2222.0f)
-            out_y = -1.1063814f  * x3 - 1.34811020f * x2 + 2.18555832f * out_x - 0.20219683f;
-        else if (t <= 4000.0f)
-            out_y = -0.9549476f  * x3 - 1.37418593f * x2 + 2.09137015f * out_x - 0.16748867f;
+        F64 x2 = out_x * out_x, x3 = x2 * out_x;
+        if (t <= 2222.0)
+            out_y = -1.1063814  * x3 - 1.34811020 * x2 + 2.18555832 * out_x - 0.20219683;
+        else if (t <= 4000.0)
+            out_y = -0.9549476  * x3 - 1.37418593 * x2 + 2.09137015 * out_x - 0.16748867;
         else
-            out_y =  3.0817580f  * x3 - 5.87338670f * x2 + 3.75112997f * out_x - 0.37001483f;
+            out_y =  3.0817580  * x3 - 5.87338670 * x2 + 3.75112997 * out_x - 0.37001483;
     }
 
     // Apply a Duv offset perpendicular to the Planckian locus via a central-
     // difference tangent in CIE 1960 u,v space (O(h²) accurate). Returns the
     // new CIE xy chromaticity.
-    inline void apply_duv(F32 cct, F32 duv, F32& out_x, F32& out_y)
+    inline void apply_duv(F64 cct, F64 duv, F64& out_x, F64& out_y)
     {
-        F32 xA, yA, xB, yB;
-        cct_to_xy(cct - 1.0f, xA, yA);
-        cct_to_xy(cct + 1.0f, xB, yB);
+        F64 xA, yA, xB, yB;
+        cct_to_xy(cct - 1.0, xA, yA);
+        cct_to_xy(cct + 1.0, xB, yB);
 
-        F32 dA  = -2.0f * xA + 12.0f * yA + 3.0f;
-        F32 uA  = 4.0f * xA / dA;
-        F32 vA  = 6.0f * yA / dA;
-        F32 dB  = -2.0f * xB + 12.0f * yB + 3.0f;
-        F32 uB  = 4.0f * xB / dB;
-        F32 vB  = 6.0f * yB / dB;
+        F64 dA  = -2.0 * xA + 12.0 * yA + 3.0;
+        F64 uA  = 4.0 * xA / dA;
+        F64 vA  = 6.0 * yA / dA;
+        F64 dB  = -2.0 * xB + 12.0 * yB + 3.0;
+        F64 uB  = 4.0 * xB / dB;
+        F64 vB  = 6.0 * yB / dB;
 
-        F32 uMid = 0.5f * (uA + uB);
-        F32 vMid = 0.5f * (vA + vB);
-        F32 tx = uB - uA;
-        F32 ty = vB - vA;
-        F32 tlen = sqrtf(tx * tx + ty * ty);
-        if (tlen > 1e-12f) { tx /= tlen; ty /= tlen; }
+        F64 uMid = 0.5 * (uA + uB);
+        F64 vMid = 0.5 * (vA + vB);
+        F64 tx = uB - uA;
+        F64 ty = vB - vA;
+        F64 tlen = sqrt(tx * tx + ty * ty);
+        if (tlen > 1e-12) { tx /= tlen; ty /= tlen; }
 
-        F32 u = uMid + (-ty) * duv;  // perp = (-tangent.y, tangent.x)
-        F32 v = vMid + ( tx) * duv;
+        F64 u = uMid + (-ty) * duv;  // perp = (-tangent.y, tangent.x)
+        F64 v = vMid + ( tx) * duv;
 
-        F32 dBack = 2.0f * u - 8.0f * v + 4.0f;
-        out_x = 3.0f * u / dBack;
-        out_y = 2.0f * v / dBack;
+        F64 dBack = 2.0 * u - 8.0 * v + 4.0;
+        out_x = 3.0 * u / dBack;
+        out_y = 2.0 * v / dBack;
     }
 
     /// Log of a gain component, floored. Gains are ratios, so a factor-of-two
@@ -107,19 +116,19 @@ LLVector3 ALWhiteBalanceSolver::gain(F32 cct_offset, F32 duv)
     constexpr F32 D65_CCT = 6504.0f;
     F32 target_cct = llclamp(D65_CCT + cct_clamped, 1667.0f, 25000.0f);
 
-    F32 x, y;
+    F64 x, y;
     apply_duv(target_cct, -duv_uv, x, y);
 
-    F32 X = x / y;
-    F32 Y = 1.0f;
-    F32 Z = (1.0f - x - y) / y;
+    F64 X = x / y;
+    F64 Y = 1.0;
+    F64 Z = (1.0 - x - y) / y;
 
-    F32 r =  3.2404542f * X - 1.5371385f * Y - 0.4985314f * Z;
-    F32 g = -0.9692660f * X + 1.8760108f * Y + 0.0415560f * Z;
-    F32 b =  0.0556434f * X - 0.2040259f * Y + 1.0572252f * Z;
+    F64 r =  3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z;
+    F64 g = -0.9692660 * X + 1.8760108 * Y + 0.0415560 * Z;
+    F64 b =  0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z;
 
-    F32 inv_g = 1.0f / llmax(g, 1e-6f);
-    return LLVector3(r * inv_g, 1.0f, b * inv_g);
+    F64 inv_g = 1.0 / llmax(g, 1e-6);
+    return LLVector3((F32)(r * inv_g), 1.0f, (F32)(b * inv_g));
 }
 
 // static
