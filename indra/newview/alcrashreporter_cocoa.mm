@@ -161,8 +161,6 @@ namespace
             options.enableMetricKit = NO;
             options.enableLogs = NO;
             options.enableMetrics = NO;
-            options.attachScreenshot = NO;
-            options.attachViewHierarchy = NO;
         }];
 
         if (![SentryObjCSDK isEnabled])

@@ -234,7 +234,22 @@
         },
         {
           "name": "sentry-native",
-          "platform": "windows | linux"
+          "features": [
+            "backend",
+            "compression",
+            "transport"
+          ],
+          "platform": "linux"
+        },
+        {
+          "name": "sentry-native",
+          "features": [
+            "backend",
+            "compression",
+            "transport",
+            "wer"
+          ],
+          "platform": "windows"
         }
       ]
     },
