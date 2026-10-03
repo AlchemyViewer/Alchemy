@@ -423,4 +423,37 @@ namespace tut
                       std::string("a\n\n\nb\n  c"));
         ensure_equals("out by two", applied(ALTextIndent::shiftLines(doc, 0, 4, 2, false, hard)), std::string("a\n\n\nb\nc"));
     }
+
+    template<> template<>
+    void altextindent_object::test<13>()
+    {
+        set_test_name("lines in and out at several selections: once for those over the same lines, each selection moved with its lines");
+        const std::string    text = "a\nb\nc\n    d";
+        const ALTextDocument doc(text);
+        const auto           made = [](const std::string& before, const std::vector<ALTextEditing::Group>& groups, std::string& placed) {
+            ALTextEditing::Combined combined = ALTextEditing::combine(groups, 3);
+            ALTextDocument          after(before);
+            std::vector<std::pair<ALTextRange, std::string>> edits;
+            for (const ALTextEditing::Replacement& one : combined.replacements)
+            {
+                edits.emplace_back(one.range, one.text);
+            }
+            after.replaceMany(std::move(edits));
+            placed.clear();
+            for (const std::optional<ALTextRange>& one : combined.selections)
+            {
+                placed += one ? llformat("%d:%d-%d:%d ", one->begin.line, one->begin.column, one->end.line, one->end.column) : std::string("- ");
+            }
+            return after.text();
+        };
+        std::string placed;
+        // Two selections over lines 0 and 1, which share line 1, and one on
+        // line 3.
+        const std::vector<ALTextRange> selections = { ALTextRange(ALTextPos(0, 0), ALTextPos(1, 1)), ALTextRange(ALTextPos(1, 1), ALTextPos(1, 0)),
+                                                      ALTextRange(ALTextPos(3, 5), ALTextPos(3, 4)) };
+        ensure_equals("each line in once", made(text, indentLines(doc, selections, true, spaces), placed), std::string("    a\n    b\nc\n        d"));
+        ensure_equals("each selection moved with its lines", placed, std::string("0:4-1:5 1:5-1:4 3:9-3:8 "));
+        ensure_equals("and out", made(text, indentLines(doc, selections, false, spaces), placed), std::string("a\nb\nc\nd"));
+        ensure_equals("those with nothing to take left to slide; the other moved", placed, std::string("- - 3:1-3:0 "));
+    }
 }

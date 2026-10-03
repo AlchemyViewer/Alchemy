@@ -210,6 +210,17 @@ ALTextPos ALTextDocument::Edit::placed(const ALTextPos& pos, bool pushed) const
     return mapped(pos, pushed);
 }
 
+std::optional<ALTextRange> ALTextDocument::Edit::replacedAround(const ALTextPos& pos) const
+{
+    if (parts.empty())
+    {
+        const ALTextRange removed = range.normalised();
+        return removed.begin <= pos && pos < removed.end ? std::optional<ALTextRange>(removed) : std::nullopt;
+    }
+    const auto in = std::upper_bound(parts.begin(), parts.end(), pos, [](const ALTextPos& p, const Part& part) { return p < part.before.end; });
+    return in != parts.end() && in->before.begin <= pos ? std::optional<ALTextRange>(in->before) : std::nullopt;
+}
+
 S32 ALTextDocument::Edit::lineAfter(S32 line) const
 {
     const std::vector<LineSpan>& spans = lineSpans();

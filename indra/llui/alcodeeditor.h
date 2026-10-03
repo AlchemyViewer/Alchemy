@@ -838,11 +838,29 @@ private:
     bool hoverCardAt(S32 x, S32 y);
     // A pair typed as it was typed: the opener closed, the closer typed
     // over, a selection wrapped. False where the character is for the
-    // text as ever.
+    // text as ever. At every selection where there are several, each as
+    // it would be on its own, a character as ever at those it pairs
+    // nothing at; false where it pairs nothing at any.
     bool typePair(char c);
+    bool typePairs(char c);
+    // What a character typed at a selection does as a pair: what it
+    // replaces and where the selection goes, as a change; whether that
+    // goes over a closer typing put in, or puts one in at the caret after.
+    // Nothing where the character is for the text as ever.
+    struct Paired
+    {
+        ALTextEditing::Change change;
+        bool                  over   = false;
+        bool                  closes = false;
+    };
+    std::optional<Paired> pairAt(const ALTextRange& selection, char c);
     // The pair around the caret that one Backspace takes away, if the
-    // closer is one typing put in.
+    // closer is one typing put in: at the caret, or as one Backspace at
+    // every caret where there are several, the pairs at those it finds
+    // one at. False where it finds none.
     bool deletePair();
+    bool deletePairs();
+    std::optional<ALTextRange> pairAround(const ALTextPos& at);
     // The problems squiggled under a position, and the stretch they span.
     std::vector<CardProblem> problemsUnder(const ALTextPos& at, ALTextRange& about) const;
     void vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out);

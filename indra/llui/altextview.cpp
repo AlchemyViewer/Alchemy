@@ -1871,20 +1871,19 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
     }
 }
 
-void ALTextView::moveVertically(S32 rows, bool extend)
+ALTextPos ALTextView::rowsFrom(const ALTextPos& from, S32 rows, F32& desired_x)
 {
-    const S32 row_h = mLayout.rowHeight();
-    if (row_h <= 0)
+    if (mLayout.rowHeight() <= 0)
     {
-        return;
+        return from;
     }
     S32       row;
-    const F32 x = mLayout.xOf(mCaret.line, mCaret.column, &row);
-    if (mDesiredX < 0.f)
+    const F32 x = mLayout.xOf(from.line, from.column, &row);
+    if (desired_x < 0.f)
     {
-        mDesiredX = x;
+        desired_x = x;
     }
-    S32 line = mCaret.line;
+    S32 line = from.line;
     for (; rows < 0; ++rows)
     {
         if (row > 0)
@@ -1898,10 +1897,8 @@ void ALTextView::moveVertically(S32 rows, bool extend)
         }
         else
         {
-            placeCaret(mDocument.start(), extend);
-            mDesiredX = -1.f;
-            scrollToCaret();
-            return;
+            desired_x = -1.f;
+            return mDocument.start();
         }
     }
     for (; rows > 0; --rows)
@@ -1917,14 +1914,129 @@ void ALTextView::moveVertically(S32 rows, bool extend)
         }
         else
         {
-            placeCaret(mDocument.end(), extend);
-            mDesiredX = -1.f;
-            scrollToCaret();
-            return;
+            desired_x = -1.f;
+            return mDocument.end();
         }
     }
-    placeCaret(ALTextPos(line, mLayout.columnAt(line, row, mDesiredX, true)), extend);
-    scrollToCaret();
+    return ALTextPos(line, mLayout.columnAt(line, row, desired_x, true));
+}
+
+namespace
+{
+    bool isMotion(ALEditorCommand command)
+    {
+        typedef ALEditorCommand C;
+        return (command >= C::MoveLeft && command <= C::MovePageDown) || (command >= C::SelectLeft && command <= C::SelectPageDown) ||
+               (command >= C::MoveSubwordLeft && command <= C::SelectSubwordRight);
+    }
+
+    bool isVertical(ALEditorCommand command)
+    {
+        typedef ALEditorCommand C;
+        switch (command)
+        {
+            case C::MoveUp:
+            case C::MoveDown:
+            case C::MovePageUp:
+            case C::MovePageDown:
+            case C::SelectUp:
+            case C::SelectDown:
+            case C::SelectPageUp:
+            case C::SelectPageDown:
+                return true;
+            default:
+                return false;
+        }
+    }
+}
+
+ALTextRange ALTextView::moved(ALEditorCommand command, const ALTextRange& selection, F32& desired_x)
+{
+    typedef ALEditorCommand C;
+    const bool        extend = (command >= C::SelectLeft && command <= C::SelectPageDown) || command == C::SelectSubwordLeft ||
+                               command == C::SelectSubwordRight;
+    const ALTextPos&  caret  = selection.end;
+    const ALTextRange range  = selection.normalised();
+    // An arrow with a selection and no shift collapses it to that end.
+    const bool        collapse = !extend && !range.empty();
+    ALTextPos         to       = caret;
+    switch (command)
+    {
+        case C::MoveLeft:
+        case C::SelectLeft:
+            to = collapse ? range.begin : mDocument.prevCluster(caret);
+            break;
+        case C::MoveRight:
+        case C::SelectRight:
+            to = collapse ? range.end : mDocument.nextCluster(caret);
+            break;
+        case C::MoveUp:
+        case C::SelectUp:
+            to = rowsFrom(caret, -1, desired_x);
+            break;
+        case C::MoveDown:
+        case C::SelectDown:
+            to = rowsFrom(caret, 1, desired_x);
+            break;
+        case C::MovePageUp:
+        case C::SelectPageUp:
+            to = rowsFrom(caret, -rowsPerPage(), desired_x);
+            break;
+        case C::MovePageDown:
+        case C::SelectPageDown:
+            to = rowsFrom(caret, rowsPerPage(), desired_x);
+            break;
+        case C::MoveWordLeft:
+        case C::SelectWordLeft:
+            to = wordStep(caret, false, false);
+            break;
+        case C::MoveWordRight:
+        case C::SelectWordRight:
+            to = wordStep(caret, true, false);
+            break;
+        case C::MoveSubwordLeft:
+        case C::SelectSubwordLeft:
+            to = wordStep(caret, false, true);
+            break;
+        case C::MoveSubwordRight:
+        case C::SelectSubwordRight:
+            to = wordStep(caret, true, true);
+            break;
+        case C::MoveLineStart:
+        case C::SelectLineStart:
+        {
+            // To the first thing on the line, or to the line's start from
+            // there.
+            const std::string& line   = mDocument.line(caret.line);
+            S32                indent = 0;
+            while (indent < static_cast<S32>(line.size()) && (line[indent] == ' ' || line[indent] == '\t'))
+            {
+                ++indent;
+            }
+            to = ALTextPos(caret.line, caret.column == indent ? 0 : indent);
+            break;
+        }
+        case C::MoveLineEnd:
+        case C::SelectLineEnd:
+            to = mDocument.lineEnd(caret.line);
+            break;
+        case C::MoveDocStart:
+        case C::SelectDocStart:
+            to = mDocument.start();
+            break;
+        case C::MoveDocEnd:
+        case C::SelectDocEnd:
+            to = mDocument.end();
+            break;
+        default:
+            return selection;
+    }
+    if (!isVertical(command))
+    {
+        desired_x = -1.f;
+    }
+    to = snapped(mDocument.clamp(to), caret);
+    return ALTextRange(extend ? selection.begin : to, to);
 }
 
 // --- editing -------------------------------------------------------------------
@@ -2251,6 +2363,505 @@ std::string ALTextView::tabText(const ALTextPos& at) const
     return ALTextIndent::tabText(mDocument, at, editingOptions());
 }
 
+bool ALTextView::commentBefore(const ALTextPos& at)
+{
+    if (!mHighlighter.grammar() || at.column <= 0)
+    {
+        return false;
+    }
+    for (const ALSyntaxToken& token : mHighlighter.tokens(at.line))
+    {
+        if (token.begin < at.column && at.column <= token.end)
+        {
+            return token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment;
+        }
+    }
+    return false;
+}
+
+// --- at every selection ------------------------------------------------------------
+
+std::vector<ALTextRange> ALTextView::selectionsInOrder(size_t* main) const
+{
+    const ALTextRange              mine  = selection();
+    const ALTextPos                begin = mine.normalised().begin;
+    const std::vector<ALTextRange>& others = mCarets.selections();
+    // Where the main one goes among the others: none of them begins where
+    // it does, or they would be one.
+    const auto at = std::lower_bound(others.begin(), others.end(), begin,
+                                     [](const ALTextRange& other, const ALTextPos& p) { return other.normalised().begin < p; });
+    std::vector<ALTextRange> all;
+    all.reserve(others.size() + 1);
+    all.insert(all.end(), others.begin(), at);
+    if (main)
+    {
+        *main = all.size();
+    }
+    all.push_back(mine);
+    all.insert(all.end(), at, others.end());
+    return all;
+}
+
+bool ALTextView::anySelected() const
+{
+    return hasSelection() || std::any_of(mCarets.begin(), mCarets.end(), [](const ALTextRange& other) { return !other.empty(); });
+}
+
+void ALTextView::placeSelections(const std::vector<ALTextRange>& selections, size_t main)
+{
+    std::vector<ALTextRange> others;
+    others.reserve(selections.size());
+    for (size_t i = 0; i < selections.size(); ++i)
+    {
+        if (i != main)
+        {
+            others.push_back(selections[i]);
+        }
+    }
+    mCarets.assign(clamped(std::move(others)));
+    placeSelection(selections[main].begin, selections[main].end);
+}
+
+bool ALTextView::applyGroups(const std::vector<ALTextRange>& selections, size_t main, std::vector<ALTextEditing::Group> groups)
+{
+    ALTextEditing::Combined combined = ALTextEditing::combine(std::move(groups), selections.size());
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    edits.reserve(combined.replacements.size());
+    for (ALTextEditing::Replacement& one : combined.replacements)
+    {
+        edits.emplace_back(one.range, std::move(one.text));
+    }
+    // Made whole or not at all: a change of several stretches that the text
+    // has no room for is not made.
+    ALTextDocument::Edit done;
+    if (!edits.empty())
+    {
+        if (!fits(edits))
+        {
+            return false;
+        }
+        done = editMany(std::move(edits), combined.selections[main] ? combined.selections[main]->end : mCaret);
+    }
+    std::vector<ALTextRange> placed(selections.size());
+    for (size_t i = 0; i < selections.size(); ++i)
+    {
+        if (combined.selections[i])
+        {
+            placed[i] = *combined.selections[i];
+        }
+        else
+        {
+            placed[i] = done.nothing() ? selections[i] : ALTextCarets::slid(selections[i], done);
+        }
+    }
+    if (!edits.empty() && done.nothing())
+    {
+        // Nothing changed: each where it was.
+        return false;
+    }
+    placeSelections(placed, main);
+    if (done.nothing())
+    {
+        mDesiredX = -1.f;
+        scrollToCaret();
+        return false;
+    }
+    afterEdit();
+    return true;
+}
+
+bool ALTextView::editEach(const each_change_t& change)
+{
+    // The steps are of the text without a composition in it, and so are
+    // the selections each is worked out at.
+    if (hasPreedit())
+    {
+        resetPreedit();
+    }
+    size_t                         main = 0;
+    const std::vector<ALTextRange> all  = selectionsInOrder(&main);
+    std::vector<ALTextEditing::Group> groups;
+    for (size_t i = 0; i < all.size(); ++i)
+    {
+        std::optional<ALTextEditing::Change> one = change(i, all[i]);
+        if (!one)
+        {
+            continue;
+        }
+        ALTextEditing::Group group;
+        group.replacements = std::move(one->replacements);
+        group.placed.emplace_back(i, one->selects ? ALTextRange(one->anchor, one->caret) : ALTextRange(one->caret, one->caret));
+        groups.push_back(std::move(group));
+    }
+    return applyGroups(all, main, std::move(groups));
+}
+
+bool ALTextView::editGroups(const groups_t& groups)
+{
+    if (hasPreedit())
+    {
+        resetPreedit();
+    }
+    size_t                         main = 0;
+    const std::vector<ALTextRange> all  = selectionsInOrder(&main);
+    mUndo.beginGroup();
+    const bool done = applyGroups(all, main, groups(all));
+    mUndo.endGroup();
+    return done;
+}
+
+std::optional<ALTextRange> ALTextView::erasedBy(ALEditorCommand command, const ALTextRange& selection) const
+{
+    typedef ALEditorCommand C;
+    if (!selection.empty())
+    {
+        return selection.normalised();
+    }
+    const ALTextPos& at = selection.end;
+    switch (command)
+    {
+        case C::DeleteLeft:
+            if (at != mDocument.start())
+            {
+                // In a line's indentation, a level's spaces at once.
+                const std::optional<ALTextPos> level = ALTextIndent::backspaceFrom(mDocument, at, editingOptions());
+                return ALTextRange(level ? *level : mDocument.prevCluster(at), at);
+            }
+            break;
+        case C::DeleteRight:
+            if (at != mDocument.end())
+            {
+                return ALTextRange(at, mDocument.nextCluster(at));
+            }
+            break;
+        case C::DeleteWordLeft:
+            return ALTextRange(wordStep(at, false, false), at);
+        case C::DeleteWordRight:
+            return ALTextRange(at, wordStep(at, true, false));
+        case C::DeleteToLineStart:
+            // Back to the line's start, or the break before it from there.
+            if (at.column > 0)
+            {
+                return ALTextRange(ALTextPos(at.line, 0), at);
+            }
+            if (at != mDocument.start())
+            {
+                return ALTextRange(mDocument.prevCluster(at), at);
+            }
+            break;
+        case C::DeleteToLineEnd:
+            // On to the line's end, or the break after it from there.
+            if (at != mDocument.lineEnd(at.line))
+            {
+                return ALTextRange(at, mDocument.lineEnd(at.line));
+            }
+            if (at != mDocument.end())
+            {
+                return ALTextRange(at, mDocument.nextCluster(at));
+            }
+            break;
+        default:
+            break;
+    }
+    return std::nullopt;
+}
+
+void ALTextView::typeAtEach(std::string_view text, llwchar typed)
+{
+    const std::string put(text);
+    editEach([&put](size_t, const ALTextRange& selection) {
+        const ALTextRange     over = selection.normalised();
+        ALTextEditing::Change one;
+        one.replacements.push_back({ over, put });
+        one.caret = ALTextEditing::endOf(over.begin, put);
+        return std::optional<ALTextEditing::Change>(std::move(one));
+    });
+    if (!typed)
+    {
+        return;
+    }
+    // What the character finishes brought out at each caret; a word so
+    // brought out is not kept to be put back, as one caret's is.
+    mAutoOutdent = ALTextIndent::AutoOutdent();
+    const ALSyntaxGrammar* grammar = mHighlighter.grammar().get();
+    editEach([&](size_t, const ALTextRange& selection) -> std::optional<ALTextEditing::Change> {
+        if (!selection.empty())
+        {
+            return std::nullopt;
+        }
+        const ALTextIndent::Outdent outdent = ALTextIndent::outdentAsTyped(mDocument, selection.begin, selection.end, typed, grammar, openerOf(),
+                                                                           ALTextIndent::AutoOutdent(), editingOptions());
+        if (!outdent.replacement)
+        {
+            return std::nullopt;
+        }
+        ALTextEditing::Change one;
+        one.replacements.push_back(*outdent.replacement);
+        one.caret = ALTextEditing::placedThrough(one.replacements, selection.end);
+        return one;
+    });
+}
+
+std::optional<bool> ALTextView::performAtEach(ALEditorCommand command)
+{
+    typedef ALEditorCommand C;
+    if (isMotion(command))
+    {
+        return moveEach(command);
+    }
+    switch (command)
+    {
+        case C::DeleteLeft:
+        case C::DeleteRight:
+        case C::DeleteWordLeft:
+        case C::DeleteWordRight:
+        case C::DeleteToLineStart:
+        case C::DeleteToLineEnd:
+            return deleteEach(command);
+        case C::NewLine:
+            newLineEach();
+            return true;
+        case C::Indent:
+            // A selection, however small, indents its lines; a caret puts a
+            // tab in.
+            editGroups([this](const std::vector<ALTextRange>& all) {
+                std::vector<ALTextRange> selected;
+                std::vector<size_t>      at;
+                for (size_t i = 0; i < all.size(); ++i)
+                {
+                    if (!all[i].empty())
+                    {
+                        selected.push_back(all[i]);
+                        at.push_back(i);
+                    }
+                }
+                std::vector<ALTextEditing::Group> groups = ALTextIndent::indentLines(mDocument, selected, true, editingOptions());
+                for (ALTextEditing::Group& group : groups)
+                {
+                    for (auto& placed : group.placed)
+                    {
+                        placed.first = at[placed.first];
+                    }
+                }
+                for (size_t i = 0; i < all.size(); ++i)
+                {
+                    if (all[i].empty())
+                    {
+                        const std::string    tab = tabText(all[i].end);
+                        const ALTextPos      end = ALTextEditing::endOf(all[i].end, tab);
+                        ALTextEditing::Group group;
+                        group.replacements.push_back({ all[i], tab });
+                        group.placed.emplace_back(i, ALTextRange(end, end));
+                        groups.push_back(std::move(group));
+                    }
+                }
+                return groups;
+            });
+            return true;
+        case C::Unindent:
+            editGroups([this](const std::vector<ALTextRange>& all) { return ALTextIndent::indentLines(mDocument, all, false, editingOptions()); });
+            return true;
+        case C::DuplicateLine:
+            editGroups([this](const std::vector<ALTextRange>& all) { return ALTextEditing::duplicateLines(mDocument, all); });
+            return true;
+        case C::MoveLineUp:
+        case C::MoveLineDown:
+        {
+            const S32 direction = command == C::MoveLineUp ? -1 : 1;
+            editGroups([this, direction](const std::vector<ALTextRange>& all) { return ALTextEditing::moveLines(mDocument, all, direction); });
+            return true;
+        }
+        case C::DeleteLine:
+            editGroups([this](const std::vector<ALTextRange>& all) { return ALTextEditing::deleteLines(mDocument, all); });
+            return true;
+        case C::JoinLines:
+            return editGroups([this](const std::vector<ALTextRange>& all) { return ALTextEditing::joinLines(mDocument, all); });
+        case C::InsertLineAbove:
+            // A line above each line a caret is on, as far in as that line,
+            // however many carets are on it.
+            editGroups([this](const std::vector<ALTextRange>& all) {
+                std::vector<std::pair<S32, size_t>> lines;
+                for (size_t i = 0; i < all.size(); ++i)
+                {
+                    lines.emplace_back(all[i].end.line, i);
+                }
+                std::sort(lines.begin(), lines.end());
+                std::vector<ALTextEditing::Group> groups;
+                S32                               indent = 0;
+                for (size_t k = 0; k < lines.size(); ++k)
+                {
+                    const S32 line = lines[k].first;
+                    if (k == 0 || line != lines[k - 1].first)
+                    {
+                        const std::string blanks = ALTextIndent::leadingBlanks(mDocument, line);
+                        const ALTextPos   start  = mDocument.lineStart(line);
+                        indent                   = static_cast<S32>(blanks.size());
+                        groups.emplace_back();
+                        groups.back().replacements.push_back({ ALTextRange(start, start), blanks + "\n" });
+                    }
+                    const ALTextPos caret(line, indent);
+                    groups.back().placed.emplace_back(lines[k].second, ALTextRange(caret, caret));
+                }
+                return groups;
+            });
+            scrollToCaret();
+            return true;
+        case C::InsertLineBelow:
+        {
+            // As Return at each line's end would make it.
+            size_t                   main = 0;
+            std::vector<ALTextRange> all  = selectionsInOrder(&main);
+            for (ALTextRange& one : all)
+            {
+                const ALTextPos end = mDocument.lineEnd(one.end.line);
+                one                 = ALTextRange(end, end);
+            }
+            placeSelections(all, main);
+            newLineEach();
+            scrollToCaret();
+            return true;
+        }
+        case C::SelectLine:
+        {
+            // Each selection's lines whole, with their breaks.
+            size_t                   main = 0;
+            std::vector<ALTextRange> all  = selectionsInOrder(&main);
+            for (ALTextRange& one : all)
+            {
+                const ALTextRange range = one.normalised();
+                const S32         past  = range.end.line + 1;
+                one = ALTextRange(mDocument.lineStart(range.begin.line),
+                                  past < mDocument.lineCount() ? mDocument.lineStart(past) : mDocument.lineEnd(mDocument.lineCount() - 1));
+            }
+            placeSelections(all, main);
+            mDesiredX = -1.f;
+            scrollToCaret();
+            return true;
+        }
+        // Done as they always are: the clipboard's and the comment's know of
+        // the others; select all, undo and redo put them as they put the
+        // main one; folding and the find bar shown leave them be.
+        case C::None:
+        case C::COUNT:
+        case C::ToggleComment:
+        case C::Cut:
+        case C::Copy:
+        case C::Paste:
+        case C::Delete:
+        case C::SelectAll:
+        case C::Undo:
+        case C::Redo:
+        case C::Fold:
+        case C::Unfold:
+        case C::FoldAll:
+        case C::UnfoldAll:
+        case C::Find:
+        case C::Replace:
+            return std::nullopt;
+        default:
+            // At the main one alone: the others let go.
+            singleSelection();
+            return std::nullopt;
+    }
+}
+
+bool ALTextView::moveEach(ALEditorCommand command)
+{
+    size_t                         main = 0;
+    const std::vector<ALTextRange> all  = selectionsInOrder(&main);
+    // The x each caret keeps between rows, where the last motion left them
+    // and they have not moved since; else each from where it is.
+    const bool       vertical = isVertical(command);
+    std::vector<F32> xs       = vertical && mEachDesired.selections == all ? mEachDesired.xs : std::vector<F32>(all.size(), -1.f);
+    std::vector<ALTextRange> placed(all.size());
+    for (size_t i = 0; i < all.size(); ++i)
+    {
+        placed[i] = moved(command, all[i], xs[i]);
+    }
+    placeSelections(placed, main);
+    mDesiredX    = xs[main];
+    mEachDesired = EachDesired();
+    if (vertical)
+    {
+        std::vector<ALTextRange> now = selectionsInOrder();
+        // Kept only while each is the one it was: none merged.
+        if (now.size() == all.size())
+        {
+            mEachDesired.selections = std::move(now);
+            mEachDesired.xs         = std::move(xs);
+        }
+    }
+    scrollToCaret();
+    return true;
+}
+
+bool ALTextView::deleteEach(ALEditorCommand command)
+{
+    // A key that erases, as one: a run of them one step to undo.
+    mUndo.beginTyping(selection(), true);
+    editEach([this, command](size_t, const ALTextRange& selection) -> std::optional<ALTextEditing::Change> {
+        const std::optional<ALTextRange> range = erasedBy(command, selection);
+        if (!range || range->empty())
+        {
+            return std::nullopt;
+        }
+        ALTextEditing::Change one;
+        one.replacements.push_back({ range->normalised(), std::string() });
+        one.caret = range->normalised().begin;
+        return one;
+    });
+    mUndo.endTyping();
+    return true;
+}
+
+bool ALTextView::deleteSelectedEach()
+{
+    mUndo.beginGroup();
+    const bool done = editEach([](size_t, const ALTextRange& selection) -> std::optional<ALTextEditing::Change> {
+        if (selection.empty())
+        {
+            return std::nullopt;
+        }
+        ALTextEditing::Change one;
+        one.replacements.push_back({ selection.normalised(), std::string() });
+        one.caret = selection.normalised().begin;
+        return one;
+    });
+    mUndo.endGroup();
+    return done;
+}
+
+void ALTextView::newLineEach()
+{
+    const ALSyntaxGrammar* grammar = mHighlighter.grammar().get();
+    // A key typed, whatever it takes: one with the typing around it.
+    mUndo.beginTyping(selection());
+    // First what the Return finishes, brought out at each caret.
+    editEach([&](size_t, const ALTextRange& selection) -> std::optional<ALTextEditing::Change> {
+        const std::optional<ALTextEditing::Replacement> closing =
+            ALTextIndent::closingBeforeReturn(mDocument, selection.begin, selection.end, grammar, openerOf(), editingOptions());
+        if (!closing)
+        {
+            return std::nullopt;
+        }
+        ALTextEditing::Change one;
+        one.replacements.push_back(*closing);
+        one.caret = ALTextEditing::placedThrough(one.replacements, selection.end);
+        return one;
+    });
+    // Then each line split there.
+    editEach([&](size_t, const ALTextRange& selection) {
+        const bool                in_comment = selection.empty() && commentBefore(selection.end);
+        const ALTextIndent::Split split      = ALTextIndent::splitLine(mDocument, selection, grammar, editingOptions(), in_comment);
+        const ALTextRange         over       = split.range.normalised();
+        ALTextEditing::Change     one;
+        one.replacements.push_back({ over, split.text });
+        one.caret = split.caret ? *split.caret : ALTextEditing::endOf(over.begin, split.text);
+        return std::optional<ALTextEditing::Change>(std::move(one));
+    });
+    mUndo.endTyping();
+}
+
 void ALTextView::newLine()
 {
     const ALSyntaxGrammar* grammar = mHighlighter.grammar().get();
@@ -2263,19 +2874,8 @@ void ALTextView::newLine()
     }
     // In a comment, as the token before the caret says: one that goes on
     // begins the new line as its lines do.
-    bool in_comment = false;
-    if (grammar && mCaret.column > 0 && !hasSelection())
-    {
-        for (const ALSyntaxToken& token : mHighlighter.tokens(mCaret.line))
-        {
-            if (token.begin < mCaret.column && mCaret.column <= token.end)
-            {
-                in_comment = token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment;
-                break;
-            }
-        }
-    }
-    const ALTextIndent::Split split = ALTextIndent::splitLine(mDocument, selection(), grammar, editingOptions(), in_comment);
+    const bool                in_comment = !hasSelection() && commentBefore(mCaret);
+    const ALTextIndent::Split split      = ALTextIndent::splitLine(mDocument, selection(), grammar, editingOptions(), in_comment);
     setSelection(split.range);
     insertText(split.text);
     if (split.caret)
@@ -2303,6 +2903,13 @@ bool ALTextView::toggleComment()
     {
         return false;
     }
+    if (hasOtherSelections())
+    {
+        // In or out the same way at every selection.
+        const std::string token = mHighlighter.grammar()->lineComment();
+        editGroups([this, &token](const std::vector<ALTextRange>& all) { return ALTextEditing::toggleComment(mDocument, all, token); });
+        return true;
+    }
     if (const std::optional<ALTextEditing::Change> change = ALTextEditing::toggleComment(mDocument, mAnchor, mCaret, mHighlighter.grammar()->lineComment()))
     {
         apply(*change);
@@ -2313,25 +2920,17 @@ bool ALTextView::toggleComment()
 bool ALTextView::perform(ALEditorCommand command)
 {
     typedef ALEditorCommand C;
-    const bool extend = command >= C::SelectLeft && command <= C::SelectPageDown;
-    auto move = [&](const ALTextPos& to) {
-        placeCaret(to, extend);
-        mDesiredX = -1.f;
-        scrollToCaret();
-        return true;
-    };
-    // An arrow with a selection and no shift collapses it to that end.
-    auto collapse = [&](bool to_begin) {
-        if (!hasSelection() || extend)
-        {
-            return false;
-        }
-        const ALTextRange range = selection().normalised();
-        return move(to_begin ? range.begin : range.end);
-    };
     if (mReadOnly && editsText(command))
     {
         return false;
+    }
+    // At every selection, where there are several.
+    if (hasOtherSelections())
+    {
+        if (const std::optional<bool> done = performAtEach(command))
+        {
+            return *done;
+        }
     }
     switch (command)
     {
@@ -2339,66 +2938,39 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::COUNT:
             return false;
         case C::MoveLeft:
-        case C::SelectLeft:
-            return collapse(true) || move(mDocument.prevCluster(mCaret));
         case C::MoveRight:
-        case C::SelectRight:
-            return collapse(false) || move(mDocument.nextCluster(mCaret));
         case C::MoveUp:
-        case C::SelectUp:
-            moveVertically(-1, extend);
-            return true;
         case C::MoveDown:
-        case C::SelectDown:
-            moveVertically(1, extend);
-            return true;
         case C::MoveWordLeft:
-        case C::SelectWordLeft:
-            return move(wordStep(mCaret, false, false));
         case C::MoveWordRight:
+        case C::MoveLineStart:
+        case C::MoveLineEnd:
+        case C::MoveDocStart:
+        case C::MoveDocEnd:
+        case C::MovePageUp:
+        case C::MovePageDown:
+        case C::SelectLeft:
+        case C::SelectRight:
+        case C::SelectUp:
+        case C::SelectDown:
+        case C::SelectWordLeft:
         case C::SelectWordRight:
-            return move(wordStep(mCaret, true, false));
+        case C::SelectLineStart:
+        case C::SelectLineEnd:
+        case C::SelectDocStart:
+        case C::SelectDocEnd:
+        case C::SelectPageUp:
+        case C::SelectPageDown:
         case C::MoveSubwordLeft:
-        case C::SelectSubwordLeft:
         case C::MoveSubwordRight:
+        case C::SelectSubwordLeft:
         case C::SelectSubwordRight:
         {
-            const bool forward = command == C::MoveSubwordRight || command == C::SelectSubwordRight;
-            placeCaret(wordStep(mCaret, forward, true), command == C::SelectSubwordLeft || command == C::SelectSubwordRight);
-            mDesiredX = -1.f;
+            const ALTextRange to = moved(command, selection(), mDesiredX);
+            placeSelection(to.begin, to.end);
             scrollToCaret();
             return true;
         }
-        case C::MoveLineStart:
-        case C::SelectLineStart:
-        {
-            // To the first thing on the line, or to the line's start from
-            // there.
-            const std::string& line   = mDocument.line(mCaret.line);
-            S32                indent = 0;
-            while (indent < static_cast<S32>(line.size()) && (line[indent] == ' ' || line[indent] == '\t'))
-            {
-                ++indent;
-            }
-            return move(ALTextPos(mCaret.line, mCaret.column == indent ? 0 : indent));
-        }
-        case C::MoveLineEnd:
-        case C::SelectLineEnd:
-            return move(mDocument.lineEnd(mCaret.line));
-        case C::MoveDocStart:
-        case C::SelectDocStart:
-            return move(mDocument.start());
-        case C::MoveDocEnd:
-        case C::SelectDocEnd:
-            return move(mDocument.end());
-        case C::MovePageUp:
-        case C::SelectPageUp:
-            moveVertically(-rowsPerPage(), extend);
-            return true;
-        case C::MovePageDown:
-        case C::SelectPageDown:
-            moveVertically(rowsPerPage(), extend);
-            return true;
         case C::SelectAll:
             selectAll();
             return true;
@@ -2768,6 +3340,20 @@ void ALTextView::cut()
         return;
     }
     copy();
+    if (hasOtherSelections())
+    {
+        // What each selected; or where none selected anything, each caret's
+        // line whole.
+        if (anySelected())
+        {
+            deleteSelectedEach();
+        }
+        else
+        {
+            editGroups([this](const std::vector<ALTextRange>& all) { return ALTextEditing::deleteLines(mDocument, all); });
+        }
+        return;
+    }
     if (!hasSelection())
     {
         // The whole line, the caret on the one that takes its place.
@@ -2779,6 +3365,32 @@ void ALTextView::cut()
 
 void ALTextView::copy()
 {
+    if (hasOtherSelections())
+    {
+        // Each selection's text, one to a line in the order they begin: or
+        // a caret's whole line where lines are clipped, else nothing of it.
+        std::string text;
+        bool        any = false;
+        for (const ALTextRange& one : selectionsInOrder())
+        {
+            if (one.empty() && !mClipsLines)
+            {
+                continue;
+            }
+            if (any)
+            {
+                text += '\n';
+            }
+            text += one.empty() ? mDocument.line(one.end.line) : mDocument.text(one);
+            any = true;
+        }
+        if (any)
+        {
+            sClippedLine.clear();
+            LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
+        }
+        return;
+    }
     if (!hasSelection())
     {
         if (!mClipsLines)
@@ -2809,6 +3421,43 @@ void ALTextView::paste()
     std::string text;
     if (!LLClipboard::instance().pasteFromClipboard(text))
     {
+        return;
+    }
+    if (hasOtherSelections())
+    {
+        // Its lines, as the text will have them.
+        LLStringUtil::replaceString(text, "\r\n", "\n");
+        LLStringUtil::replaceChar(text, '\r', '\n');
+        std::vector<std::string> lines;
+        for (size_t from = 0;;)
+        {
+            const size_t end = text.find('\n', from);
+            lines.push_back(text.substr(from, end == std::string::npos ? std::string::npos : end - from));
+            if (end == std::string::npos)
+            {
+                break;
+            }
+            from = end + 1;
+        }
+        // One line to each selection where there is a line for each -- a
+        // break after the last not counted -- and the whole to each
+        // otherwise.
+        const size_t count = mCarets.size() + 1;
+        if (lines.size() == count + 1 && lines.back().empty())
+        {
+            lines.pop_back();
+        }
+        const bool one_each = lines.size() == count;
+        mUndo.beginGroup();
+        editEach([&](size_t index, const ALTextRange& selection) {
+            const std::string&    put  = one_each ? lines[index] : text;
+            const ALTextRange     over = selection.normalised();
+            ALTextEditing::Change one;
+            one.replacements.push_back({ over, put });
+            one.caret = ALTextEditing::endOf(over.begin, put);
+            return std::optional<ALTextEditing::Change>(std::move(one));
+        });
+        mUndo.endGroup();
         return;
     }
     // A line copied whole goes in as a line, above the caret's, the caret
@@ -2846,10 +3495,16 @@ void ALTextView::paste()
 
 void ALTextView::doDelete()
 {
-    if (canDoDelete())
+    if (!canDoDelete())
     {
-        deleteRange(selection());
+        return;
     }
+    if (hasOtherSelections())
+    {
+        deleteSelectedEach();
+        return;
+    }
+    deleteRange(selection());
 }
 
 void ALTextView::selectAll()
@@ -4499,8 +5154,15 @@ bool ALTextView::handleUnicodeCharHere(llwchar uni_char)
         return false;
     }
     mUndo.beginTyping(selection());
-    insertText(utf8str_from_cp(uni_char));
-    outdentAsTyped(uni_char);
+    if (hasOtherSelections())
+    {
+        typeAtEach(utf8str_from_cp(uni_char), uni_char);
+    }
+    else
+    {
+        insertText(utf8str_from_cp(uni_char));
+        outdentAsTyped(uni_char);
+    }
     mUndo.endTyping();
     if (LLWindow* window = getWindow())
     {

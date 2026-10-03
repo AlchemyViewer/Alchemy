@@ -2615,4 +2615,33 @@ namespace tut
         key(KEY_ESCAPE);
         ensure("and the box goes with the list", !fixes->sideShown() && !fixes->getVisible());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<73>()
+    {
+        set_test_name("pairs at every caret: closed, typed over and taken away together at each, a selection wrapped; a character typed as ever where it pairs nothing");
+        ALCodeEditor& e = make("a\nb\nc");
+        e.setAutoClose(true);
+        e.setSelections(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 1)), { ALTextRange(ALTextPos(1, 1), ALTextPos(1, 1)), ALTextRange(ALTextPos(2, 1), ALTextPos(2, 1)) });
+        type("(");
+        ensure_equals("closed at each", e.text(), std::string("a()\nb()\nc()"));
+        ensure("the main caret between", e.caret() == ALTextPos(0, 2));
+        type("x)");
+        ensure_equals("each closer typed over", e.text(), std::string("a(x)\nb(x)\nc(x)"));
+        ensure("past it", e.caret() == ALTextPos(0, 4));
+        type("[");
+        key(KEY_BACKSPACE);
+        ensure_equals("one Backspace takes each pair", e.text(), std::string("a(x)\nb(x)\nc(x)"));
+        e.undo();
+        ensure_equals("the Backspace undone", e.text(), std::string("a(x)[]\nb(x)[]\nc(x)[]"));
+
+        e.setText("one two");
+        e.setSelections(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)), { ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)) });
+        type("\"");
+        ensure_equals("each selection wrapped", e.text(), std::string("\"one\" \"two\""));
+        e.setText("x\n// y");
+        e.setSelections(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 1)), { ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)) });
+        type("(");
+        ensure_equals("closed where it is code, typed as ever in the comment", e.text(), std::string("x()\n// y("));
+    }
 }

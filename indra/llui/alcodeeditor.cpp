@@ -267,7 +267,6 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
 
     // Decorations and highlights after the edit move along with the text;
     // the ones it cut into go.
-    const ALTextRange removed = edit.range.normalised();
     mDecorations.apply(edit);
     for (auto& layer : mHighlights)
     {
@@ -279,23 +278,16 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     // is typed is the start of that text; one after the text before it
     // moves along, since what is typed extends that text. An edit that
     // takes the position with it takes the inlay.
+    // A batch's stretches each so, the text between them untouched.
     mInlays.apply(
         edit,
-        [&removed](InlayHint& h, const ALTextDocument::Edit& e) {
-            if (removed.empty())
+        [](InlayHint& h, const ALTextDocument::Edit& e) {
+            if (const std::optional<ALTextRange> taken = e.replacedAround(h.at); taken && taken->begin < h.at)
             {
-                if (removed.begin < h.at || (removed.begin == h.at && !h.before))
-                {
-                    h.at = e.slidPast(h.at);
-                }
-                return true;
+                return false;
             }
-            if (removed.end <= h.at)
-            {
-                h.at = e.slidPast(h.at);
-                return true;
-            }
-            return h.at <= removed.begin;
+            h.at = e.placed(h.at, !h.before);
+            return true;
         },
         [](InlayHint&) {});
     // The stops of a snippet or a call being filled in move with the text.
@@ -320,13 +312,13 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     // an edit that takes it.
     mAutoClosed.apply(
         edit,
-        [&removed](ALTextPos& at, const ALTextDocument::Edit& e) {
-            if (removed.end <= at)
+        [](ALTextPos& at, const ALTextDocument::Edit& e) {
+            if (e.replacedAround(at))
             {
-                at = e.slidPast(at);
-                return true;
+                return false;
             }
-            return at < removed.begin;
+            at = e.placed(at);
+            return true;
         },
         [](ALTextPos&) {});
 
@@ -4157,6 +4149,12 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
         }
     });
     hideCard();
+    // At several carets, nothing the typing puts up -- the list, the
+    // signature, a snippet's stops -- is in play: each is about one place.
+    if (hasOtherSelections() && typingText())
+    {
+        dropTyping();
+    }
     // The fixes listed take the keys that walk them and take one, in any
     // mode a modal keymap is in -- the list was asked for; any other key
     // lets them go and is the text's.
@@ -4309,7 +4307,7 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
         taking                  = at >= 0 && at < static_cast<S32>(line.size()) ? line[static_cast<size_t>(at)] : 0;
     }
     const bool call_changes = hasSelection() || taking == '(' || taking == ',' || taking == ')';
-    if (key == KEY_BACKSPACE && mask == MASK_NONE && mAutoClose && deletePair())
+    if (key == KEY_BACKSPACE && mask == MASK_NONE && mAutoClose && (hasOtherSelections() ? deletePairs() : deletePair()))
     {
         if (mCards.signature() && mSignatureRequest && call_changes)
         {
@@ -4334,6 +4332,17 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
 {
     const bool typing   = typingText();
+    if (typing && hasOtherSelections())
+    {
+        // At every caret: the list, the signature and a snippet's stops are
+        // each about one place, and go.
+        dropTyping();
+        undoJournal().beginTyping(selection());
+        const bool typed =
+            (mAutoClose && uni_char < 0x80 && !isReadOnly() && typePairs(static_cast<char>(uni_char))) || ALTextView::handleUnicodeCharHere(uni_char);
+        undoJournal().endTyping();
+        return typed;
+    }
     const bool was_open = completionOpen();
     // The pair, the character and its outdent one key typed, one with the
     // typing around it -- and every place of a text being changed at once
@@ -4388,33 +4397,28 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
     return true;
 }
 
-bool ALCodeEditor::typePair(char c)
+std::optional<ALCodeEditor::Paired> ALCodeEditor::pairAt(const ALTextRange& selection, char c)
 {
     const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar();
     if (!grammar || grammar->pairs().empty())
     {
-        return false;
+        return std::nullopt;
     }
     const auto&        pairs = grammar->pairs();
-    const ALTextPos    at    = caret();
+    const ALTextPos    at    = selection.end;
     const std::string& line  = document().line(at.line);
     const char         next  = at.column < static_cast<S32>(line.size()) ? line[at.column] : '\0';
     // Over the closer typing put in, rather than a second one.
-    if (!hasSelection() && next == c)
+    if (selection.empty() && next == c && std::find(mAutoClosed.begin(), mAutoClosed.end(), at) != mAutoClosed.end())
     {
-        const auto put = std::find(mAutoClosed.begin(), mAutoClosed.end(), at);
-        if (put != mAutoClosed.end())
+        for (const auto& [open, close] : pairs)
         {
-            for (const auto& [open, close] : pairs)
+            if (close == c)
             {
-                if (close == c)
-                {
-                    // Where the typing goes on from, for the key after.
-                    mAutoClosed.erase(put);
-                    setCaret(ALTextPos(at.line, at.column + 1));
-                    undoJournal().settle(selection());
-                    return true;
-                }
+                Paired paired;
+                paired.over         = true;
+                paired.change.caret = ALTextPos(at.line, at.column + 1);
+                return paired;
             }
         }
     }
@@ -4424,23 +4428,24 @@ bool ALCodeEditor::typePair(char c)
         {
             continue;
         }
-        if (hasSelection())
+        if (!selection.empty())
         {
             // The selection wrapped in the pair, and still chosen inside it.
-            const ALTextRange sel   = selection().normalised();
-            const std::string inner = document().text(sel);
-            insertText(std::string(1, open) + inner + std::string(1, close));
-            const ALTextPos end = caret();
-            setSelection(ALTextRange(ALTextPos(sel.begin.line, sel.begin.column + 1), ALTextPos(end.line, end.column - 1)));
-            undoJournal().settle(selection());
-            return true;
+            const ALTextRange sel   = selection.normalised();
+            const std::string inner = std::string(1, open) + document().text(sel);
+            Paired            paired;
+            paired.change.replacements.push_back({ sel, inner + std::string(1, close) });
+            paired.change.selects = true;
+            paired.change.anchor  = ALTextPos(sel.begin.line, sel.begin.column + 1);
+            paired.change.caret   = ALTextEditing::endOf(sel.begin, inner);
+            return paired;
         }
         // Not in a comment or a string, where it is prose; and only before
         // a blank, the line's end, or what closes or ends -- a bracket
         // opened before a word is about that word.
         if (inProse(at))
         {
-            return false;
+            return std::nullopt;
         }
         bool room = next == '\0' || isspace(static_cast<unsigned char>(next)) || strchr(";,", next) != nullptr;
         for (const auto& [o, closer] : pairs)
@@ -4449,49 +4454,180 @@ bool ALCodeEditor::typePair(char c)
         }
         if (!room)
         {
-            return false;
+            return std::nullopt;
         }
         // A quote after a letter is an apostrophe, and after itself is the
         // end of an empty string.
         if (open == close && at.column > 0 && (alIdentifierByte(line[at.column - 1]) || line[at.column - 1] == open))
         {
-            return false;
+            return std::nullopt;
         }
-        insertText(std::string(1, open) + std::string(1, close));
-        const ALTextPos inside(at.line, at.column + 1);
-        setCaret(inside);
-        undoJournal().settle(selection());
-        mAutoClosed.insert(inside);
-        return true;
+        Paired paired;
+        paired.change.replacements.push_back({ ALTextRange(at, at), std::string(1, open) + std::string(1, close) });
+        paired.change.caret = ALTextPos(at.line, at.column + 1);
+        paired.closes       = true;
+        return paired;
     }
-    return false;
+    return std::nullopt;
 }
 
-bool ALCodeEditor::deletePair()
+bool ALCodeEditor::typePair(char c)
 {
-    const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar();
-    const ALTextPos                              at      = caret();
-    const auto                                   put     = std::find(mAutoClosed.begin(), mAutoClosed.end(), at);
-    if (!grammar || hasSelection() || put == mAutoClosed.end() || at.column == 0)
+    const std::optional<Paired> paired = pairAt(selection(), c);
+    if (!paired)
     {
         return false;
+    }
+    if (paired->over)
+    {
+        // Where the typing goes on from, for the key after.
+        mAutoClosed.eraseIf([at = caret()](const ALTextPos& closer) { return closer == at; });
+        setCaret(paired->change.caret);
+        undoJournal().settle(selection());
+        return true;
+    }
+    insertText(paired->change.replacements.front().text);
+    if (paired->change.selects)
+    {
+        setSelection(ALTextRange(paired->change.anchor, paired->change.caret));
+    }
+    else
+    {
+        setCaret(paired->change.caret);
+    }
+    undoJournal().settle(selection());
+    if (paired->closes)
+    {
+        mAutoClosed.insert(caret());
+    }
+    return true;
+}
+
+bool ALCodeEditor::typePairs(char c)
+{
+    // Worked out at each before any is made.
+    const std::vector<ALTextRange>     all = selectionsInOrder();
+    std::vector<std::optional<Paired>> paired;
+    paired.reserve(all.size());
+    bool any = false;
+    for (const ALTextRange& one : all)
+    {
+        paired.push_back(pairAt(one, c));
+        any = any || paired.back().has_value();
+    }
+    if (!any)
+    {
+        return false;
+    }
+    // The closers typed over are let go of before the edit moves them.
+    for (size_t i = 0; i < all.size(); ++i)
+    {
+        if (paired[i] && paired[i]->over)
+        {
+            mAutoClosed.eraseIf([at = all[i].end](const ALTextPos& closer) { return closer == at; });
+        }
+    }
+    const std::string plain(1, c);
+    editEach([&](size_t i, const ALTextRange& selection) {
+        if (paired[i])
+        {
+            return std::optional<ALTextEditing::Change>(paired[i]->change);
+        }
+        const ALTextRange     over = selection.normalised();
+        ALTextEditing::Change one;
+        one.replacements.push_back({ over, plain });
+        one.caret = ALTextEditing::endOf(over.begin, plain);
+        return std::optional<ALTextEditing::Change>(std::move(one));
+    });
+    // Each closer put in, before the caret that was put inside its pair.
+    const std::vector<ALTextRange> now = selectionsInOrder();
+    if (now.size() == all.size())
+    {
+        for (size_t i = 0; i < now.size(); ++i)
+        {
+            if (paired[i] && paired[i]->closes)
+            {
+                mAutoClosed.insert(now[i].end);
+            }
+        }
+    }
+    return true;
+}
+
+std::optional<ALTextRange> ALCodeEditor::pairAround(const ALTextPos& at)
+{
+    const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar();
+    if (!grammar || at.column == 0 || std::find(mAutoClosed.begin(), mAutoClosed.end(), at) == mAutoClosed.end())
+    {
+        return std::nullopt;
     }
     const std::string& line = document().line(at.line);
     if (at.column >= static_cast<S32>(line.size()))
     {
-        return false;
+        return std::nullopt;
     }
     for (const auto& [open, close] : grammar->pairs())
     {
         if (line[at.column - 1] == open && line[at.column] == close)
         {
-            mAutoClosed.erase(put);
-            setSelection(ALTextRange(ALTextPos(at.line, at.column - 1), ALTextPos(at.line, at.column + 1)));
-            insertText(std::string());
-            return true;
+            return ALTextRange(ALTextPos(at.line, at.column - 1), ALTextPos(at.line, at.column + 1));
         }
     }
-    return false;
+    return std::nullopt;
+}
+
+bool ALCodeEditor::deletePair()
+{
+    if (hasSelection())
+    {
+        return false;
+    }
+    const std::optional<ALTextRange> pair = pairAround(caret());
+    if (!pair)
+    {
+        return false;
+    }
+    mAutoClosed.eraseIf([at = caret()](const ALTextPos& closer) { return closer == at; });
+    setSelection(*pair);
+    insertText(std::string());
+    return true;
+}
+
+bool ALCodeEditor::deletePairs()
+{
+    const std::vector<ALTextRange>          all = selectionsInOrder();
+    std::vector<std::optional<ALTextRange>> pairs;
+    pairs.reserve(all.size());
+    bool any = false;
+    for (const ALTextRange& one : all)
+    {
+        pairs.push_back(one.empty() ? pairAround(one.end) : std::nullopt);
+        any = any || pairs.back().has_value();
+        if (pairs.back())
+        {
+            mAutoClosed.eraseIf([at = one.end](const ALTextPos& closer) { return closer == at; });
+        }
+    }
+    if (!any)
+    {
+        return false;
+    }
+    // One Backspace at each: the pair where there is one, else what a
+    // Backspace takes there.
+    undoJournal().beginTyping(selection(), true);
+    editEach([&](size_t i, const ALTextRange& selection) -> std::optional<ALTextEditing::Change> {
+        const std::optional<ALTextRange> range = pairs[i] ? pairs[i] : erasedBy(ALEditorCommand::DeleteLeft, selection);
+        if (!range || range->empty())
+        {
+            return std::nullopt;
+        }
+        ALTextEditing::Change one;
+        one.replacements.push_back({ range->normalised(), std::string() });
+        one.caret = range->normalised().begin;
+        return one;
+    });
+    undoJournal().endTyping();
+    return true;
 }
 
 bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
@@ -4818,8 +4954,15 @@ void ALCodeEditor::draw()
     {
         hideSignature();
     }
-    // A closer put in is typed over only on its own line.
-    mAutoClosed.eraseIf([this](const ALTextPos& at) { return at.line != caret().line; });
+    // A closer put in is typed over only on its own line: a caret's.
+    mAutoClosed.eraseIf([this](const ALTextPos& at) {
+        if (at.line == caret().line)
+        {
+            return false;
+        }
+        const std::vector<ALTextRange>& others = otherSelections();
+        return std::none_of(others.begin(), others.end(), [&at](const ALTextRange& other) { return other.end.line == at.line; });
+    });
     // The name under the caret lit once the caret has rested, and again
     // where the view has scrolled past the lines it was lit over.
     if (mLightsOccurrences &&

@@ -352,7 +352,11 @@ public:
     // The selections besides the main one, each anchor to caret, in the
     // order they begin (ALTextCarets). Drawn as the main one is, slid along
     // by every edit, and kept by each step to undo; merged with each other
-    // and with the main one where they meet.
+    // and with the main one where they meet. Keys act at every one of them
+    // -- typing, deleting, Return and Tab, the commands over lines, the
+    // clipboard, and the caret's motions -- each as at the main one, as one
+    // edit and one step to undo; a command that can act only at one acts at
+    // the main one and lets the others go.
     const std::vector<ALTextRange>& otherSelections() const { return mCarets.selections(); }
     bool                            hasOtherSelections() const { return !mCarets.empty(); }
     // One more beside the main one, which stays main.
@@ -712,13 +716,13 @@ public:
     void    redo() override;
     bool    canRedo() const override { return !mReadOnly && mUndo.canRedo(); }
     void    cut() override;
-    bool    canCut() const override { return !mReadOnly && (hasSelection() || mClipsLines); }
+    bool    canCut() const override { return !mReadOnly && (anySelected() || mClipsLines); }
     void    copy() override;
-    bool    canCopy() const override { return hasSelection() || mClipsLines; }
+    bool    canCopy() const override { return anySelected() || mClipsLines; }
     void    paste() override;
     bool    canPaste() const override;
     void    doDelete() override;
-    bool    canDoDelete() const override { return !mReadOnly && hasSelection(); }
+    bool    canDoDelete() const override { return !mReadOnly && anySelected(); }
     void    selectAll() override;
     bool    canSelectAll() const override { return !mDocument.empty(); }
     void    deselect() override;
@@ -913,6 +917,39 @@ protected:
     // as though it were not.
     ALTextRange          withoutComposition(const ALTextRange& range) const;
 
+    // --- at every selection -------------------------------------------------------
+
+    // Every selection, the main one among them, in the order they begin;
+    // and where among them the main one is.
+    std::vector<ALTextRange> selectionsInOrder(size_t* main = nullptr) const;
+    // Whether any selection, the main one or another, has something in it.
+    bool                     anySelected() const;
+    // Selections put at once, the one at `main` the main one: where a
+    // command at every selection leaves them.
+    void                     placeSelections(const std::vector<ALTextRange>& selections, size_t main);
+    // A command at every selection (selectionsInOrder), in the groups it was
+    // worked out in over the text as it stands (ALTextEditing::combine):
+    // made as one edit -- one notification, and one step to undo with the
+    // journal's scope around it -- and each selection put where its group
+    // leaves it, any no group places slid along with the text. False where
+    // the text did not change: nothing would, or it has no room.
+    bool                     applyGroups(const std::vector<ALTextRange>& selections, size_t main, std::vector<ALTextEditing::Group> groups);
+    // The same, worked out at each selection on its own: what `change`
+    // makes of the one at an index, or nothing for one it leaves as it is.
+    typedef std::function<std::optional<ALTextEditing::Change>(size_t index, const ALTextRange& selection)> each_change_t;
+    bool                     editEach(const each_change_t& change);
+    // Groups worked out over every selection at once, made as one step to
+    // undo of its own: the commands over whole lines.
+    typedef std::function<std::vector<ALTextEditing::Group>(const std::vector<ALTextRange>& selections)> groups_t;
+    bool                     editGroups(const groups_t& groups);
+    // What a delete command takes at a selection: the selection, or from a
+    // caret what the command reaches; nothing where it reaches nothing.
+    std::optional<ALTextRange> erasedBy(ALEditorCommand command, const ALTextRange& selection) const;
+    // Typed at every selection: the text in place of each, and then, where
+    // it was a character that finishes what closes a block, that line
+    // brought out at each (outdentAsTyped) -- one key typed.
+    void                     typeAtEach(std::string_view text, llwchar typed);
+
     // --- LLPreeditor ---------------------------------------------------------
 
     void resetPreedit() override;
@@ -926,7 +963,35 @@ protected:
     const std::string& getPreeditStringUtf8() const override;
 
 private:
-    void                 moveVertically(S32 rows, bool extend);
+    // A motion of the caret at a selection: where the caret goes, the
+    // anchor kept where the motion extends, and an arrow with no shift
+    // collapsing what is selected to that end; the x a caret keeps between
+    // rows in `desired_x`, which every other motion lets go of.
+    ALTextRange          moved(ALEditorCommand command, const ALTextRange& selection, F32& desired_x);
+    // Where a caret goes so many rows down, or up below zero, keeping to an
+    // x -- taken from where it is, where that is negative -- or to the
+    // text's start or end past its first or last row, letting the x go.
+    ALTextPos            rowsFrom(const ALTextPos& from, S32 rows, F32& desired_x);
+    // Whether the token a caret is at the end of is a comment's.
+    bool                 commentBefore(const ALTextPos& at);
+    // A command where there are several selections: done at every one and
+    // whether it was, as perform() says; or nothing for one perform() does
+    // as it would, having let the others go where it acts at the main one
+    // alone.
+    std::optional<bool>  performAtEach(ALEditorCommand command);
+    bool                 moveEach(ALEditorCommand command);
+    bool                 deleteEach(ALEditorCommand command);
+    void                 newLineEach();
+    // Each selection with something in it gone, as one step to undo.
+    bool                 deleteSelectedEach();
+    // The x each caret keeps between rows, as a vertical motion of several
+    // left them, for as long as they are where it left them.
+    struct EachDesired
+    {
+        std::vector<ALTextRange> selections;
+        std::vector<F32>         xs;
+    };
+    EachDesired          mEachDesired;
     // Return: the line split with the new one indented as the grammar
     // says, and a closing word before the caret brought out first.
     void                 newLine();

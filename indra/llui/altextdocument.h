@@ -29,6 +29,7 @@
 
 #include <boost/signals2.hpp>
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -180,6 +181,11 @@ public:
         // as typing pushes a caret, unless not `pushed`: the end of a
         // selection, which what is put in right after it is not part of.
         ALTextPos placed(const ALTextPos& pos, bool pushed = true) const;
+        // The stretch, as it was, whose text the character at a position
+        // stood in -- what was replaced from at or before it to past it --
+        // or nothing. For a batch, its own stretch only, not the text
+        // between them.
+        std::optional<ALTextRange> replacedAround(const ALTextPos& pos) const;
         // Where a line is after, or -1 for one the edit replaced: one of a
         // run of lines, a line typed in included, is not the line it was.
         S32       lineAfter(S32 line) const;

@@ -361,7 +361,7 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
         // the key was typed where the run left the caret, or its text
         // ended, with nothing selected; the rest of what the key does is
         // one with the first, at the same moment.
-        key = keyOf(Kind::Typing);
+        key = keyOf(mTypingErases ? Kind::Erasing : Kind::Typing);
         if (!mTypingNoted)
         {
             mTypingNoted                    = true;
@@ -387,12 +387,13 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
     forgetOverBudget();
 }
 
-void ALTextUndo::beginTyping(const ALTextRange& selection)
+void ALTextUndo::beginTyping(const ALTextRange& selection, bool erasing)
 {
     if (mTypingDepth++ == 0)
     {
-        mTypingAt    = selection;
-        mTypingNoted = false;
+        mTypingAt     = selection;
+        mTypingNoted  = false;
+        mTypingErases = erasing;
     }
 }
 

@@ -126,8 +126,10 @@ public:
     // before it where the key was typed, nothing selected, where the run
     // left the caret or its text, within the window; else it starts a
     // run. Given the selection the key was typed at. Scopes nest, as a
-    // key's handlers do; a group open takes precedence.
-    void beginTyping(const ALTextRange& selection);
+    // key's handlers do; a group open takes precedence. A key that erases
+    // -- Backspace at several carets, which is one edit of many stretches
+    // and so no run of its own kind -- is a run of erasing keys instead.
+    void beginTyping(const ALTextRange& selection, bool erasing = false);
     void endTyping();
 
     // Everything recorded until endGroup() is one step.
@@ -266,6 +268,7 @@ private:
     // for has recorded an edit yet: the rest of what it does joins that.
     S32               mTypingDepth  = 0;
     bool              mTypingNoted  = false;
+    bool              mTypingErases = false;
     // The selection the key was typed at, anchor to caret.
     ALTextRange       mTypingAt;
     // What the steps back weigh together, kept as they change rather than
