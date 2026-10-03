@@ -95,6 +95,72 @@ namespace tut
             return out;
         }
 
+        static std::string readFile(const std::filesystem::path& path)
+        {
+            llifstream        in(path, std::ios::binary);
+            std::stringstream buffer;
+            buffer << in.rdbuf();
+            return buffer.str();
+        }
+
+        // Every newline in a text made `ending`.
+        static std::string ended(const std::string& text, std::string_view ending)
+        {
+            if (ending == "\n")
+            {
+                return text;
+            }
+            std::string out;
+            out.reserve(text.size() + text.size() / 16);
+            for (char c : text)
+            {
+                if (c == '\n')
+                {
+                    out += ending;
+                }
+                else
+                {
+                    out += c;
+                }
+            }
+            return out;
+        }
+
+        // A golden file under tests/preprocessor/ run as the golden test runs
+        // it -- its includes from include/, the transforms its first line asks
+        // for -- with its text and its includes' ending their lines in
+        // `ending`.
+        ALPreprocessor::Result runGolden(const std::filesystem::path& file, std::string_view ending)
+        {
+            namespace fs                = std::filesystem;
+            const fs::path    dir       = file.parent_path();
+            const std::string source    = readFile(file);
+            const bool              lua = file.extension() == ".luau";
+            ALPreprocessor::Options o   = options(lua);
+            o.fileName                  = file.filename().string();
+            o.resolve                   = [dir, ending](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
+                // A require names its module without the extension.
+                for (const char* ext : { "", ".luau", ".lsl" })
+                {
+                    const fs::path path = dir / "include" / (ask.name + ext);
+                    if (fs::exists(path))
+                    {
+                        out.text = ended(readFile(path), ending);
+                        out.name = path.filename().string();
+                        out.path = out.name;
+                        return ALPreprocessor::Found::Yes;
+                    }
+                }
+                return ALPreprocessor::Found::No;
+            };
+            // The first line may ask for the transforms.
+            const std::string first = source.substr(0, source.find('\n'));
+            o.switches              = first.find("switches") != std::string::npos;
+            o.lazyLists             = first.find("lazylists") != std::string::npos;
+            o.compress              = first.find("compress") != std::string::npos;
+            return ALPreprocessor::run(ended(source, ending), o);
+        }
+
         static std::string messages(const ALPreprocessor::Result& r)
         {
             std::string out;
@@ -596,37 +662,7 @@ namespace tut
             }
             const std::string stem     = entry.path().stem().string();
             const fs::path    expected = dir / (stem + "_expected" + entry.path().extension().string());
-            const auto        read     = [](const fs::path& path) {
-                llifstream        in(path, std::ios::binary);
-                std::stringstream buffer;
-                buffer << in.rdbuf();
-                return buffer.str();
-            };
-            const std::string source = read(entry.path());
-            const bool              lua = entry.path().extension() == ".luau";
-            ALPreprocessor::Options o   = options(lua);
-            o.fileName                  = name;
-            o.resolve                   = [&](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
-                // A require names its module without the extension.
-                for (const char* ext : { "", ".luau", ".lsl" })
-                {
-                    const fs::path path = dir / "include" / (ask.name + ext);
-                    if (fs::exists(path))
-                    {
-                        out.text = read(path);
-                        out.name = path.filename().string();
-                        out.path = out.name;
-                        return ALPreprocessor::Found::Yes;
-                    }
-                }
-                return ALPreprocessor::Found::No;
-            };
-            // The first line may ask for the transforms.
-            const std::string first = source.substr(0, source.find('\n'));
-            o.switches              = first.find("switches") != std::string::npos;
-            o.lazyLists             = first.find("lazylists") != std::string::npos;
-            o.compress              = first.find("compress") != std::string::npos;
-            ALPreprocessor::Result r = ALPreprocessor::run(source, o);
+            ALPreprocessor::Result r   = runGolden(entry.path(), "\n");
             ensure_equals("problems in " + name, messages(r), std::string());
             // With AL_PREPROCESSOR_WRITE_EXPECTED set, the run writes the
             // expected files instead of checking them: for a new golden
@@ -639,7 +675,7 @@ namespace tut
                 continue;
             }
             ensure("expected file for " + name, fs::exists(expected));
-            ensure_equals("output of " + name, r.text, read(expected));
+            ensure_equals("output of " + name, r.text, readFile(expected));
             ++checked;
         }
         ensure("some golden files", checked > 0 || std::getenv("AL_PREPROCESSOR_WRITE_EXPECTED"));
@@ -1630,5 +1666,33 @@ namespace tut
         r = ALPreprocessor::run("--#include \"say.luau\"\nSAY(1)\n", options(true));
         ensure_equals("an include with CRLF said nothing", messages(r), std::string());
         ensure("and its macro goes on over its lines: " + r.text, r.text.find("print(1)") != std::string::npos);
+    }
+
+    template<> template<>
+    void alpreprocessor_object::test<43>()
+    {
+        set_test_name("every golden file and its includes, their lines ended in CRLF or in a lone CR as a Windows checkout or an old Mac would, come out as their expected text, saying nothing");
+        namespace fs = std::filesystem;
+        const fs::path dir     = fsyspath(AL_ALSCRIPT_TEST_DIR) / "preprocessor";
+        S32            checked = 0;
+        for (const fs::directory_entry& entry : fs::directory_iterator(dir))
+        {
+            const std::string name = entry.path().filename().string();
+            if (name.compare(0, 5, "test_") != 0 || name.find("_expected") != std::string::npos)
+            {
+                continue;
+            }
+            const fs::path    expected = dir / (entry.path().stem().string() + "_expected" + entry.path().extension().string());
+            const std::string want     = readFile(expected);
+            for (const char* ending : { "\r\n", "\r" })
+            {
+                const std::string      said = ending[1] ? " with CRLF" : " with a lone CR";
+                ALPreprocessor::Result r    = runGolden(entry.path(), ending);
+                ensure_equals("problems in " + name + said, messages(r), std::string());
+                ensure_equals("output of " + name + said, r.text, want);
+            }
+            ++checked;
+        }
+        ensure("some golden files", checked > 0);
     }
 }
