@@ -2087,10 +2087,17 @@ bool LLKeyframeMotion::serialize(LLDataPacker& dp) const
             << " name: " << joint_motionp->mJointName
             << " Rotation keys: " << rot_curve.getNumKeys()
             << " Position keys: " << pos_curve.getNumKeys() << LL_ENDL;
+        // Keys are rounded to the nearest step, once. Flooring -- and before
+        // that flooring a second time through quantize16 -- sends a value
+        // read from a file a hair under its own step back one step lower,
+        // which float error does to between an eighth and a quarter of the
+        // codes depending on how the build contracts and reassociates. A
+        // rounded step reads back as itself, so saving what was loaded
+        // changes nothing.
         for (U32 k = 0; k < rot_curve.getNumKeys(); ++k)
         {
             const F32 key_time = rot_curve.getKeyTime(k);
-            U16 time_short = F32_to_U16(key_time, 0.f, mJointMotionList->mDuration);
+            U16 time_short = F32_to_U16_ROUND(key_time, 0.f, mJointMotionList->mDuration);
             success &= dp.packU16(time_short, "time");
 
             LLQuaternion key_rotation;
@@ -2098,10 +2105,9 @@ bool LLKeyframeMotion::serialize(LLDataPacker& dp) const
             LLVector3 rot_angles = key_rotation.packToVector3();
 
             U16 x, y, z;
-            rot_angles.quantize16(-1.f, 1.f, -1.f, 1.f);
-            x = F32_to_U16(rot_angles.mV[VX], -1.f, 1.f);
-            y = F32_to_U16(rot_angles.mV[VY], -1.f, 1.f);
-            z = F32_to_U16(rot_angles.mV[VZ], -1.f, 1.f);
+            x = F32_to_U16_ROUND(rot_angles.mV[VX], -1.f, 1.f);
+            y = F32_to_U16_ROUND(rot_angles.mV[VY], -1.f, 1.f);
+            z = F32_to_U16_ROUND(rot_angles.mV[VZ], -1.f, 1.f);
             success &= dp.packU16(x, "rot_angle_x");
             success &= dp.packU16(y, "rot_angle_y");
             success &= dp.packU16(z, "rot_angle_z");
@@ -2113,15 +2119,14 @@ bool LLKeyframeMotion::serialize(LLDataPacker& dp) const
         for (U32 k = 0; k < pos_curve.getNumKeys(); ++k)
         {
             const F32 key_time = pos_curve.getKeyTime(k);
-            U16 time_short = F32_to_U16(key_time, 0.f, mJointMotionList->mDuration);
+            U16 time_short = F32_to_U16_ROUND(key_time, 0.f, mJointMotionList->mDuration);
             success &= dp.packU16(time_short, "time");
 
             U16 x, y, z;
             LLVector3 position(pos_curve.getKeyValue(k).getF32ptr());
-            position.quantize16(-LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET, -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-            x = F32_to_U16(position.mV[VX], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-            y = F32_to_U16(position.mV[VY], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
-            z = F32_to_U16(position.mV[VZ], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+            x = F32_to_U16_ROUND(position.mV[VX], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+            y = F32_to_U16_ROUND(position.mV[VY], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
+            z = F32_to_U16_ROUND(position.mV[VZ], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
             success &= dp.packU16(x, "pos_x");
             success &= dp.packU16(y, "pos_y");
             success &= dp.packU16(z, "pos_z");
