@@ -39,6 +39,7 @@ jobs:
       relnotes: ${{ steps.which-branch.outputs.relnotes }}
       release_run: ${{ steps.setvar.outputs.release_run }}
       build_type: ${{ steps.setvar.outputs.build_type }}
+      build_suffix: ${{ steps.setvar.outputs.build_suffix }}
       sentry_dsn: ${{ steps.setvar.outputs.sentry_dsn }}
       viewer_channel: ${{ steps.setvar.outputs.viewer_channel }}
       is_private_build: ${{ steps.setvar.outputs.is_private_build }}
@@ -85,14 +86,17 @@ jobs:
             echo 'is_private_build=false' >> $GITHUB_OUTPUT
           fi
 
-          if [[ "x$GITHUB_REPOSITORY" != "xAlchemyViewer/Alchemy" || "x$GITHUB_REPOSITORY" != "xAlchemyViewer/AlchemyInternal" ]]; then
+          if [[ "x$GITHUB_REPOSITORY" != "xAlchemyViewer/Alchemy" && "x$GITHUB_REPOSITORY" != "xAlchemyViewer/AlchemyInternal" ]]; then
             # Non-linden viewer repository run OSS build
             echo 'build_type=opensource' >> $GITHUB_OUTPUT
+            echo 'build_suffix=-OS' >> $GITHUB_OUTPUT
           elif [[ "$FROM_FORK" == "true" ]]; then
             # PR from fork; don't build with proprietary libs
             echo 'build_type=opensource' >> $GITHUB_OUTPUT
+            echo 'build_suffix=-OS' >> $GITHUB_OUTPUT
           else
             echo 'build_type=proprietary' >> $GITHUB_OUTPUT
+            echo "build_suffix=" >> $GITHUB_OUTPUT
           fi
 
           # Crash reports go to Sentry on every platform and build type once
@@ -196,24 +200,6 @@ jobs:
     outputs:
       viewer_version: ${{ steps.build.outputs.viewer_version }}
       imagename: ${{ steps.build.outputs.imagename }}
-      # Windows Velopack outputs (passed to sign-pkg-windows)
-      velopack_pack_id:       ${{ steps.build.outputs.velopack_pack_id }}
-      velopack_pack_version:  ${{ steps.build.outputs.velopack_pack_version }}
-      velopack_pack_authors:  ${{ steps.build.outputs.velopack_pack_authors }}
-      velopack_pack_title:    ${{ steps.build.outputs.velopack_pack_title }}
-      velopack_main_exe:      ${{ steps.build.outputs.velopack_main_exe }}
-      velopack_icon:          ${{ steps.build.outputs.velopack_icon }}
-      velopack_splash:        ${{ steps.build.outputs.velopack_splash }}
-      velopack_splash_color:  ${{ steps.build.outputs.velopack_splash_color }}
-      velopack_installer_base: ${{ steps.build.outputs.velopack_installer_base }}
-      velopack_channel:       ${{ steps.build.outputs.velopack_channel }}
-      velopack_runtime:       ${{ steps.build.outputs.velopack_runtime }}
-      # macOS Velopack outputs (passed to sign-pkg-mac)
-      velopack_mac_pack_id:      ${{ steps.build.outputs.velopack_mac_pack_id }}
-      velopack_mac_pack_version: ${{ steps.build.outputs.velopack_mac_pack_version }}
-      velopack_mac_pack_title:   ${{ steps.build.outputs.velopack_mac_pack_title }}
-      velopack_mac_main_exe:     ${{ steps.build.outputs.velopack_mac_main_exe }}
-      velopack_mac_bundle_id:    ${{ steps.build.outputs.velopack_mac_bundle_id }}
     env:
       # Sets Xcode version used for build
       DEVELOPER_DIR: "/Applications/Xcode.app/Contents/Developer"
@@ -231,6 +217,7 @@ jobs:
       BUILD_ARCH: ${{ matrix.arch }}
       BUILD_CONFIG: ${{ matrix.configuration }}
       BUILD_TYPE: ${{ needs.setup.outputs.build_type }}
+      CFG_SUFFIX: ${{ needs.setup.outputs.build_suffix }}
       # Crash reporting: Sentry, wherever the setup job found a DSN
       AL_USE_SENTRY: ${{ needs.setup.outputs.sentry_dsn != '' }}
       AL_SENTRY_DSN: ${{ needs.setup.outputs.sentry_dsn }}
@@ -473,11 +460,7 @@ jobs:
           # platform, we must disambiguate on more than the platform name.
           # e.g. if we were still running Windows 32-bit builds, we'd need to
           # qualify the artifact with bit width.
-          if [[ "$BUILD_TYPE" != "proprietary" ]]
-          then cfg_suffix='-OS'
-          else cfg_suffix=''
-          fi
-          echo "artifact=$RUNNER_OS$cfg_suffix-$BUILD_ARCH" >> $GITHUB_OUTPUT
+          echo "artifact=$RUNNER_OS$CFG_SUFFIX-$BUILD_ARCH" >> $GITHUB_OUTPUT
 
           # Gather version metadata
           if [ -r "$BUILD_DIRECTORY/newview/viewer_version.txt" ]
@@ -491,9 +474,9 @@ jobs:
           # the packaging steps need come from the configure.
           if $AL_BUILD_VIEWER
           then
-            # The job's outputs come from whichever row sets them last, and
-            # the Windows signing job packages the x64 tree: an arm64 row's
-            # installer name and Velopack channel must not win.
+            # The job's outputs come from whichever row sets them last.
+            # Keep the shared Velopack outputs on x64; Windows packaging
+            # reads per-architecture metadata artifacts below.
             if [[ "$RUNNER_OS" != "Windows" || "$BUILD_ARCH" == "x64" ]]
             then
               cat "$BUILD_DIRECTORY/newview/package.env" >> "$GITHUB_OUTPUT"
@@ -514,6 +497,14 @@ jobs:
                 ;;
             esac
           fi
+
+      - name: Upload Windows package metadata
+        uses: actions/upload-artifact@v7
+        if: runner.os == 'Windows' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
+        with:
+          name: "${{ steps.build.outputs.artifact }}-metadata"
+          path: ${{ steps.configure.outputs.build_directory }}/newview/package.env
+          if-no-files-found: error
 
       - name: Upload executable
         uses: actions/upload-artifact@v7
@@ -553,16 +544,6 @@ jobs:
           if-no-files-found: error
           path: |
             ${{ steps.configure.outputs.build_directory }}/symbols/Release/${{ needs.setup.outputs.viewer_channel }}.sym.tar.xz
-
-      - name: Upload metadata
-        uses: actions/upload-artifact@v7
-        if: matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
-        with:
-          name: "${{ steps.build.outputs.artifact }}-metadata"
-          if-no-files-found: error
-          compression-level: 9
-          path: |
-            ${{ steps.configure.outputs.build_directory }}/newview/viewer_version.txt
 
       # Sentry symbolicates a crash report with the debug files of the
       # binaries that shipped, in pairs: PE and PDB, Mach-O and dSYM, ELF and
@@ -628,7 +609,10 @@ jobs:
 
   sign-and-package-windows:
     needs: [setup, build]
-    runs-on: windows-2025
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+    runs-on: windows-2025-vs2026
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -647,81 +631,71 @@ jobs:
 
       - name: Fetch Windows app
         uses: actions/download-artifact@v8
-        if: needs.setup.outputs.build_type == 'proprietary'
         with:
-          name: Windows-x64-app
+          name: Windows${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-app
           path: .app
 
-      - name: Fetch Windows OS app
+      - name: Fetch Windows package metadata
         uses: actions/download-artifact@v8
-        if: needs.setup.outputs.build_type != 'proprietary'
         with:
-          name: Windows-OS-x64-app
-          path: .app
+          name: Windows${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-metadata
+          path: .metadata
+
+      - name: Load Velopack metadata
+        shell: bash
+        run: |
+          while IFS='=' read -r key value; do
+            if [[ "$key" == velopack_* ]]; then
+              printf '%s=%s\n' "${key^^}" "$value" >> "$GITHUB_ENV"
+            fi
+          done < .metadata/package.env
 
       - name: Build and sign Velopack package
         shell: bash
-        env:
-          PACK_ID: ${{ needs.build.outputs.velopack_pack_id }}
-          PACK_VERSION: ${{ needs.build.outputs.velopack_pack_version }}
-          PACK_TITLE: ${{ needs.build.outputs.velopack_pack_title }}
-          PACK_AUTHORS: ${{ needs.build.outputs.velopack_pack_authors }}
-          MAIN_EXE: ${{ needs.build.outputs.velopack_main_exe }}
-          ICON: ${{ needs.build.outputs.velopack_icon }}
-          SPLASH_IMAGE: ${{ needs.build.outputs.velopack_splash }}
-          SPLASH_COLOR: ${{ needs.build.outputs.velopack_splash_color }}
-          INSTALLER_BASE: ${{ needs.build.outputs.velopack_installer_base }}
-          # Per architecture: an installed viewer updates from its channel's feed.
-          PACK_CHANNEL: ${{ needs.build.outputs.velopack_channel }}
-          PACK_RUNTIME: ${{ needs.build.outputs.velopack_runtime }}
         run: |
           set -x
 
           vpk_args=(
             dotnet vpk pack
-            --packId "$PACK_ID"
-            --packVersion "$PACK_VERSION"
-            --packAuthors "$PACK_AUTHORS"
+            --packId "$VELOPACK_PACK_ID"
+            --packVersion "$VELOPACK_PACK_VERSION"
+            --packAuthors "$VELOPACK_PACK_AUTHORS"
             --packDir .app
-            --mainExe "$MAIN_EXE"
-            --packTitle "$PACK_TITLE"
+            --mainExe "$VELOPACK_MAIN_EXE"
+            --packTitle "$VELOPACK_PACK_TITLE"
             --shortcuts ''
-            --splashProgressColor "$SPLASH_COLOR"
-            --channel "$PACK_CHANNEL"
-            --runtime "$PACK_RUNTIME"
+            --splashProgressColor "$VELOPACK_SPLASH_COLOR"
+            --channel "$VELOPACK_CHANNEL"
+            --runtime "$VELOPACK_RUNTIME"
           )
 
           # Add icon if provided
-          if [[ -n "$ICON" && -f ".app/$ICON" ]]; then
-            vpk_args+=(--icon ".app/$ICON")
+          if [[ -n "$VELOPACK_ICON" && -f ".app/$VELOPACK_ICON" ]]; then
+            vpk_args+=(--icon ".app/$VELOPACK_ICON")
           fi
 
           # Add splash if provided
-          if [[ -n "$SPLASH_IMAGE" && -f ".app/$SPLASH_IMAGE" ]]; then
-            vpk_args+=(--splashImage ".app/$SPLASH_IMAGE")
+          if [[ -n "$VELOPACK_SPLASH" && -f ".app/$VELOPACK_SPLASH" ]]; then
+            vpk_args+=(--splashImage ".app/$VELOPACK_SPLASH")
           fi
 
           "${vpk_args[@]}"
 
       - name: Rename Velopack outputs
         shell: bash
-        env:
-          PACK_ID: ${{ needs.build.outputs.velopack_pack_id }}
-          INSTALLER_BASE: ${{ needs.build.outputs.velopack_installer_base }}
-          PACK_CHANNEL: ${{ needs.build.outputs.velopack_channel }}
         run: |
           # Move Setup.exe into .app for the installer upload step
-          setup="Releases/${PACK_ID}-${PACK_CHANNEL}-Setup.exe"
+          setup="Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}-Setup.exe"
           if [[ -f "$setup" ]]; then
-            mv "$setup" ".app/${INSTALLER_BASE}_Setup.exe"
-            echo "Moved $setup to .app/${INSTALLER_BASE}_Setup.exe"
+            mv "$setup" ".app/${VELOPACK_INSTALLER_BASE}_Setup.exe"
+            echo "Moved $setup to .app/${VELOPACK_INSTALLER_BASE}_Setup.exe"
           fi
 
           # Rename Portable.zip to include version
-          portable="Releases/${PACK_ID}-${PACK_CHANNEL}-Portable.zip"
+          portable="Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}-Portable.zip"
           if [[ -f "$portable" ]]; then
-            mv "$portable" "Releases/${INSTALLER_BASE}_Portable.zip"
-            echo "Moved $portable to Releases/${INSTALLER_BASE}_Portable.zip"
+            mv "$portable" "Releases/${VELOPACK_INSTALLER_BASE}_Portable.zip"
+            echo "Moved $portable to Releases/${VELOPACK_INSTALLER_BASE}_Portable.zip"
           fi
 
       - name: Find Velopack installer
@@ -738,14 +712,14 @@ jobs:
       - name: Post the installer
         uses: actions/upload-artifact@v7
         with:
-          name: "Windows-installer"
+          name: "Windows${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-installer"
           path: ${{ steps.find-installer.outputs.installer }}
           if-no-files-found: error
 
       - name: Upload Velopack releases
         uses: actions/upload-artifact@v7
         with:
-          name: "Windows-releases"
+          name: "Windows${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-releases"
           path: Releases/
           if-no-files-found: error
 
@@ -809,11 +783,11 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: "Linux-x64-app"
+          name: "Linux${{ needs.setup.outputs.build_suffix }}-x64-app"
 
       - uses: actions/download-artifact@v8
         with:
-          name: "Linux-arm64-app"
+          name: "Linux${{ needs.setup.outputs.build_suffix }}-arm64-app"
 
       # forked from softprops/action-gh-release
       - name: Create GitHub release
@@ -829,9 +803,9 @@ jobs:
           append_body: true
           fail_on_unmatched_files: true
           files: |
-            Windows-installer/*.exe
+            Windows*-installer/*.exe
             *.tar.xz
-            Windows-releases/*
+            Windows*-releases/*
 
       - name: post release URL
         run: |
