@@ -47,7 +47,7 @@ const char* alEditorCommandName(ALEditorCommand command)
         "join_lines",    "previous_change", "next_change",     "next_function",   "previous_function", "select_function",
         "go_to_bracket", "insert_line_below", "insert_line_above", "select_line", "move_subword_left",
         "move_subword_right", "select_subword_left", "select_subword_right", "expand_selection", "shrink_selection",
-        "select_next_occurrence", "change_all_occurrences",
+        "select_next_occurrence", "change_all_occurrences", "add_caret_above", "add_caret_below",
     };
     static_assert(sizeof(NAMES) / sizeof(NAMES[0]) == static_cast<size_t>(ALEditorCommand::COUNT), "every command has a name");
     const size_t index = static_cast<size_t>(command);
@@ -282,6 +282,9 @@ ALKeymap ALKeymap::standard()
     map.bind('D', MASK_CONTROL, C::SelectNextOccurrence);
     map.bind('L', MASK_CONTROL | MASK_SHIFT, C::ChangeAllOccurrences);
     map.bind(KEY_F2, MASK_CONTROL, C::ChangeAllOccurrences);
+    // As Visual Studio Code has them: Command and Option on a Mac.
+    map.bind(KEY_UP, MASK_CONTROL | MASK_ALT, C::AddCaretAbove);
+    map.bind(KEY_DOWN, MASK_CONTROL | MASK_ALT, C::AddCaretBelow);
 #if LL_DARWIN
     // The Mac's own, where MASK_CONTROL is Command: Command with an arrow
     // goes to the ends of the line and of the text, Option with one by

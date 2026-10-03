@@ -8130,6 +8130,8 @@ void ALFloaterScriptStudio::addEditCommands()
     addEditorCommand("shrink_selection", ALEditorCommand::ShrinkSelection, false);
     addEditorCommand("select_next_occurrence", ALEditorCommand::SelectNextOccurrence, true);
     addEditorCommand("change_all_occurrences", ALEditorCommand::ChangeAllOccurrences, true);
+    addEditorCommand("add_caret_above", ALEditorCommand::AddCaretAbove, false);
+    addEditorCommand("add_caret_below", ALEditorCommand::AddCaretBelow, false);
     mCommands.add(
         "convert_slua",
         [this]() {

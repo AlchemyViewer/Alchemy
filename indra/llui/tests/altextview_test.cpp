@@ -2183,4 +2183,65 @@ namespace tut
         v.selectAll();
         ensure("select all takes them in", !v.hasOtherSelections() && v.selection().normalised() == ALTextRange(ALTextPos(0, 0), ALTextPos(2, 5)));
     }
+
+    template<> template<>
+    void altextview_object::test<70>()
+    {
+        set_test_name("Alt-click adds a caret or takes the one there away, any other click is one caret; Escape is one caret before it lets the selection go; Control-Alt with up and down adds carets, each keeping its column");
+        ALTextView& v = make("hello world\nhi\nhello world\nx\nhello world");
+        const auto click = [&](S32 line, S32 column, MASK mask) {
+            S32 x = 0, y = 0;
+            pointOf(line, column, x, y);
+            v.handleMouseDown(x, y, mask);
+            v.handleMouseUp(x, y, mask);
+        };
+        click(0, 3, MASK_NONE);
+        click(2, 3, MASK_ALT);
+        ensure("the new caret the main one", v.selection() == caretRange(2, 3));
+        ensure_equals("the first beside it", rangesSaid(v.otherSelections()), rangesSaid({ caretRange(0, 3) }));
+        click(2, 3, MASK_ALT);
+        ensure("taken away again, the one before it main", v.selection() == caretRange(0, 3) && !v.hasOtherSelections());
+        click(0, 3, MASK_ALT);
+        ensure("the last is not taken away", v.selection() == caretRange(0, 3));
+        click(4, 5, MASK_ALT);
+        click(1, 1, MASK_NONE);
+        ensure("a plain click: one caret", v.selection() == caretRange(1, 1) && !v.hasOtherSelections());
+
+        v.setSelections(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 5)), { caretRange(2, 0) });
+        key(KEY_ESCAPE);
+        ensure("Escape: one caret, its selection kept", !v.hasOtherSelections() && v.hasSelection());
+        key(KEY_ESCAPE);
+        ensure("and then the selection let go", !v.hasSelection());
+
+        v.setCaret(ALTextPos(0, 8));
+        key(KEY_DOWN, MASK_CONTROL | MASK_ALT);
+        ensure("a caret below, at the short line's end, the main one", v.selection() == caretRange(1, 2));
+        key(KEY_DOWN, MASK_CONTROL | MASK_ALT);
+        ensure("and below that, back in its column", v.selection() == caretRange(2, 8));
+        ensure_equals("each kept", rangesSaid(v.otherSelections()), rangesSaid({ caretRange(0, 8), caretRange(1, 2) }));
+        type("!");
+        ensure_equals("typed at each", v.text(), std::string("hello wo!rld\nhi!\nhello wo!rld\nx\nhello world"));
+        v.setCaret(ALTextPos(4, 2));
+        v.singleSelection();
+        ensure("nothing below the last line", !v.perform(ALEditorCommand::AddCaretBelow));
+        key(KEY_UP, MASK_CONTROL | MASK_ALT);
+        ensure("one above it", v.selection() == caretRange(3, 1) && v.otherSelections().size() == 1);
+        v.setReadOnly(true);
+        ensure("none in a read-only text", !v.perform(ALEditorCommand::AddCaretAbove) && !v.canPerform(ALEditorCommand::AddCaretAbove));
+    }
+
+    template<> template<>
+    void altextview_object::test<71>()
+    {
+        set_test_name("Alt-Return in the find bar selects every match, each a selection, the current one the main one, the keyboard back on the text");
+        ALTextView& v = make("cat dog cat bird cat");
+        v.showFind(false);
+        v.findBar()->setQuery("cat");
+        ensure("three found", v.findMatches().size() == 3);
+        ensure("taken", v.findBar()->handleKeyHere(KEY_RETURN, MASK_ALT));
+        ensure_equals("each a selection", ll_test::TextViewProbe::selections(v).size(), static_cast<size_t>(3));
+        ensure("the keyboard on the text", v.keyboardOnText());
+        type("cow");
+        ensure_equals("typed over each", v.text(), std::string("cow dog cow bird cow"));
+    }
 }

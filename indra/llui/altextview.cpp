@@ -175,6 +175,8 @@ namespace
             case ALEditorCommand::ShrinkSelection:
             case ALEditorCommand::SelectNextOccurrence:
             case ALEditorCommand::ChangeAllOccurrences:
+            case ALEditorCommand::AddCaretAbove:
+            case ALEditorCommand::AddCaretBelow:
             case ALEditorCommand::FindNext:
             case ALEditorCommand::FindPrevious:
             case ALEditorCommand::COUNT:
@@ -1002,6 +1004,107 @@ bool ALTextView::singleSelection()
     mCarets.clear();
     mBlink.reset();
     return true;
+}
+
+void ALTextView::toggleCaret(const ALTextPos& pos)
+{
+    const ALTextPos          at   = mDocument.clamp(pos);
+    size_t                   main = 0;
+    std::vector<ALTextRange> all  = selectionsInOrder(&main);
+    // The one there -- a caret at it, or a selection over it -- taken
+    // away, but for the last; the main one, the one before it then.
+    for (size_t i = 0; i < all.size(); ++i)
+    {
+        const ALTextRange range = all[i].normalised();
+        if (range.begin <= at && at <= range.end)
+        {
+            if (all.size() == 1)
+            {
+                return;
+            }
+            all.erase(all.begin() + static_cast<std::ptrdiff_t>(i));
+            placeSelections(all, main == i ? (i > 0 ? i - 1 : 0) : (main > i ? main - 1 : main));
+            return;
+        }
+    }
+    all.emplace_back(at, at);
+    placeSelections(all, all.size() - 1);
+}
+
+bool ALTextView::addCarets(S32 direction)
+{
+    size_t                         main = 0;
+    const std::vector<ALTextRange> all  = selectionsInOrder(&main);
+    // Each caret's x where a motion or this left them, else where it is:
+    // a column grown past a short line keeps to its column.
+    std::vector<F32> xs = mEachDesired.selections == all ? mEachDesired.xs : std::vector<F32>(all.size(), -1.f);
+    std::vector<ALTextRange> placed = all;
+    for (size_t i = 0; i < all.size(); ++i)
+    {
+        F32             x  = xs[i];
+        const ALTextPos to = rowsFrom(all[i].end, direction, x);
+        xs[i]              = x >= 0.f ? x : xs[i];
+        // Past the first or the last row there is nothing to add.
+        if (x >= 0.f)
+        {
+            placed.emplace_back(to, to);
+            xs.push_back(x);
+        }
+    }
+    if (placed.size() == all.size())
+    {
+        return false;
+    }
+    // The furthest that way the main one, for the view to follow.
+    size_t furthest = 0;
+    for (size_t i = 1; i < placed.size(); ++i)
+    {
+        if (direction < 0 ? placed[i].end < placed[furthest].end : placed[furthest].end < placed[i].end)
+        {
+            furthest = i;
+        }
+    }
+    placeSelections(placed, furthest);
+    // Each keeps its x, those that met another the first's.
+    std::vector<ALTextRange> now = selectionsInOrder();
+    std::vector<F32>         now_xs(now.size(), -1.f);
+    for (size_t i = 0; i < now.size(); ++i)
+    {
+        for (size_t k = 0; k < placed.size(); ++k)
+        {
+            if (placed[k].end == now[i].end)
+            {
+                now_xs[i] = xs[k];
+                break;
+            }
+        }
+    }
+    mEachDesired.selections = std::move(now);
+    mEachDesired.xs         = std::move(now_xs);
+    mDesiredX               = xs[furthest];
+    scrollToCaret();
+    return true;
+}
+
+S32 ALTextView::selectAllMatches()
+{
+    settleFind();
+    const std::vector<ALTextRange>& matches = mFind.matches();
+    if (matches.empty())
+    {
+        return 0;
+    }
+    // Every match selected, the current one the main one, and the
+    // keyboard to the text to type over them.
+    const S32 current = llclamp(mFind.current(), 0, static_cast<S32>(matches.size()) - 1);
+    placeSelections(std::vector<ALTextRange>(matches.begin(), matches.end()), static_cast<size_t>(current));
+    mDesiredX = -1.f;
+    scrollToCaret();
+    if (mTakesFocus)
+    {
+        setFocus(true);
+    }
+    return static_cast<S32>(matches.size());
 }
 
 std::string ALTextView::wordBeforeCaret() const
@@ -2281,11 +2384,13 @@ bool ALTextView::replaceAll(std::vector<std::pair<ALTextRange, std::string>> edi
 
 void ALTextView::goTo(const ALTextPos& pos)
 {
+    singleSelection();
     setCaret(mDocument.clamp(pos));
 }
 
 void ALTextView::goTo(const ALTextRange& range)
 {
+    singleSelection();
     setSelection(ALTextRange(mDocument.clamp(range.begin), mDocument.clamp(range.end)));
 }
 
@@ -2738,11 +2843,17 @@ std::optional<bool> ALTextView::performAtEach(ALEditorCommand command)
             scrollToCaret();
             return true;
         }
-        // Done as they always are: the clipboard's and the comment's know of
-        // the others; select all, undo and redo put them as they put the
-        // main one; folding and the find bar shown leave them be.
+        // Done as they always are: those that add carets, the clipboard's,
+        // the comment's and completion know of the others; select all, undo
+        // and redo put them as they put the main one; folding and the find
+        // bar shown leave them be.
         case C::None:
         case C::COUNT:
+        case C::AddCaretAbove:
+        case C::AddCaretBelow:
+        case C::SelectNextOccurrence:
+        case C::ChangeAllOccurrences:
+        case C::Complete:
         case C::ToggleComment:
         case C::Cut:
         case C::Copy:
@@ -3154,6 +3265,9 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::NextMisspelling:
         case C::PreviousMisspelling:
             return goToMisspelling(command == C::NextMisspelling);
+        case C::AddCaretAbove:
+        case C::AddCaretBelow:
+            return !mReadOnly && addCarets(command == C::AddCaretAbove ? -1 : 1);
         case C::Find:
             showFind(false);
             return true;
@@ -3211,6 +3325,10 @@ bool ALTextView::canPerform(ALEditorCommand command) const
         case C::SelectNextOccurrence:
         case C::ChangeAllOccurrences:
             return mFeatures && mFeatures->canPerformFeature(command);
+        case C::AddCaretAbove:
+        case C::AddCaretBelow:
+            // A read-only text shows no caret to add to.
+            return !mReadOnly;
         case C::PreviousChange:
             return mChangeAt > 0;
         case C::NextChange:
@@ -3901,6 +4019,7 @@ void ALTextView::showFind(bool with_replace)
         mFindBar->onPrevious([this]() { findNext(false); });
         mFindBar->onReplace([this]() { replaceMatch(); });
         mFindBar->onReplaceAll([this]() { replaceAllMatches(); });
+        mFindBar->onSelectAll([this]() { selectAllMatches(); });
         mFindBar->onClose([this]() { hideFind(); });
     }
     // Seeded with what is selected, when that is a line's worth or less,
@@ -5108,6 +5227,11 @@ bool ALTextView::handleKeyHere(KEY key, MASK mask)
         // the keyboard away, out into the world, where the arrows walk.
         if (key == KEY_ESCAPE && mask == MASK_NONE)
         {
+            // Back to one caret first, its selection kept; then that let go.
+            if (singleSelection())
+            {
+                return true;
+            }
             const bool selected = hasSelection();
             if (selected)
             {
@@ -5211,6 +5335,19 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
         return true;
     }
     mTripleClick.stop();
+    // Alt-click -- Option on a Mac -- a caret more, or the one there taken
+    // away; any other click one caret again.
+    if (mask == MASK_ALT && !mReadOnly)
+    {
+        toggleCaret(posAtLocal(x, y, true));
+        mDesiredX = -1.f;
+        if (mModal)
+        {
+            mModal->mouseChanged(*this);
+        }
+        return true;
+    }
+    singleSelection();
     // A link or an atom under the press is followed on the release, if
     // the release is on it too.
     mPressedLink = -1;
@@ -5262,7 +5399,8 @@ bool ALTextView::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
     }
     // Where the press is, leaving what is selected in place rather than
     // replacing it, as X11 does: the selection goes, the text it had stays
-    // the primary one.
+    // the primary one; and one caret.
+    singleSelection();
     placeCaret(posAtLocal(x, y, true), false);
     mDesiredX = -1.f;
     mUndo.beginGroup();

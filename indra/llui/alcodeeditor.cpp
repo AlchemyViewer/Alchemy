@@ -51,6 +51,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <optional>
 
 static LLDefaultChildRegistry::Register<ALCodeEditor> r("code_editor");
@@ -3288,6 +3289,31 @@ bool ALCodeEditor::acceptCompletion()
 
 void ALCodeEditor::complete(const Completion& chosen, const ALTextRange& range)
 {
+    if (hasOtherSelections())
+    {
+        // What it replaces either side of the main caret, which each other
+        // caret has replaced where its text reads the same.
+        const ALTextPos   at     = caret();
+        const std::string before = range.begin < at ? document().text(ALTextRange(range.begin, at)) : std::string();
+        const std::string after  = at < range.end ? document().text(ALTextRange(at, range.end)) : std::string();
+        undoJournal().beginGroup();
+        editEach([&](size_t, const ALTextRange& selection) {
+            ALTextRange over = selection.normalised();
+            if (over.empty())
+            {
+                const ALTextPos from(over.end.line, over.end.column - static_cast<S32>(before.size()));
+                const ALTextPos to(over.end.line, over.end.column + static_cast<S32>(after.size()));
+                if (from.column >= 0 && document().text(ALTextRange(from, over.end)) == before && document().text(ALTextRange(over.end, to)) == after)
+                {
+                    over = ALTextRange(from, to);
+                }
+            }
+            return std::optional<ALTextEditing::Change>(completionAt(chosen, over));
+        });
+        undoJournal().endGroup();
+        setFocus(true);
+        return;
+    }
     setSelection(range);
     if (!chosen.snippet.empty())
     {
@@ -3341,6 +3367,60 @@ void ALCodeEditor::complete(const Completion& chosen, const ALTextRange& range)
         }
     }
     setFocus(true);
+}
+
+ALTextEditing::Change ALCodeEditor::completionAt(const Completion& chosen, const ALTextRange& over)
+{
+    ALTextEditing::Change one;
+    if (!chosen.snippet.empty())
+    {
+        // Indented as the line it goes into, as insertSnippet has it; the
+        // caret on its first stop.
+        const std::string&                line     = document().line(over.begin.line);
+        const std::string                 indent   = line.substr(0, std::min(line.size(), line.find_first_not_of(" \t")));
+        const ALSnippetSession::Expansion expanded = ALSnippetSession::expand(chosen.snippet, over.begin, indent,
+                                                                              ALTextIndent::indentUnit(indent, { getTabWidth(), getSoftTabs() }));
+        const ALTextRange                 land     = expanded.stops.empty() ? expanded.landing : expanded.stops.front();
+        one.replacements.push_back({ over, expanded.text });
+        one.selects = true;
+        one.anchor  = land.begin;
+        one.caret   = land.end;
+        return one;
+    }
+    // A function called, as complete() calls it: its first parameter
+    // chosen, else the caret between its brackets where it takes anything.
+    const std::string& line   = document().line(over.end.line);
+    const bool         called = chosen.kind == ALSyntaxKind::Function && !(over.end.column < static_cast<S32>(line.size()) && line[over.end.column] == '(');
+    if (!called)
+    {
+        one.replacements.push_back({ over, chosen.text });
+        one.caret = ALTextEditing::endOf(over.begin, chosen.text);
+        return one;
+    }
+    const std::vector<std::string> names = parameterNames(chosen.detail, chosen.text);
+    const size_t                   open  = parameterListAt(chosen.detail, chosen.text);
+    const size_t after = open == std::string::npos ? std::string::npos : chosen.detail.find_first_not_of(' ', open + 1);
+    const bool   takes = open == std::string::npos || after == std::string::npos || chosen.detail[after] != ')';
+    std::string  call  = chosen.text + "(";
+    for (size_t i = 0; i < names.size(); ++i)
+    {
+        call += (i > 0 ? ", " : "") + names[i];
+    }
+    call += ")";
+    one.replacements.push_back({ over, call });
+    const ALTextPos end = ALTextEditing::endOf(over.begin, call);
+    if (!names.empty())
+    {
+        const S32 from = over.begin.column + static_cast<S32>(chosen.text.size()) + 1;
+        one.selects    = true;
+        one.anchor     = ALTextPos(over.begin.line, from);
+        one.caret      = ALTextPos(over.begin.line, from + static_cast<S32>(names.front().size()));
+    }
+    else
+    {
+        one.caret = takes ? ALTextPos(end.line, end.column - 1) : end;
+    }
+    return one;
 }
 
 // --- snippets ------------------------------------------------------------------------
@@ -3405,7 +3485,8 @@ void ALCodeEditor::syncMirrors(S32 index, bool grouped)
     afterEdit();
 }
 
-std::vector<ALTextRange> ALCodeEditor::placesOf(const std::string& wanted, bool whole, const ALTextPos& from, size_t most) const
+std::vector<ALTextRange> ALCodeEditor::placesOf(const std::string& wanted, bool whole, const ALTextPos& from, size_t most,
+                                                const std::vector<ALTextRange>& taken_in) const
 {
     std::vector<ALTextRange> out;
     const ALTextDocument&    doc   = document();
@@ -3414,23 +3495,12 @@ std::vector<ALTextRange> ALCodeEditor::placesOf(const std::string& wanted, bool 
     {
         return out;
     }
-    // Taken already: the stop and its mirrors.
-    const auto taken = [this](const ALTextRange& range) {
-        for (const ALTextRange& stop : mSnippet.stops())
-        {
-            if (range.begin < stop.end && stop.begin < range.end)
-            {
-                return true;
-            }
-        }
-        for (const ALSnippetSession::Mirror& mirror : mSnippet.mirrors())
-        {
-            if (range.begin < mirror.range.end && mirror.range.begin < range.end)
-            {
-                return true;
-            }
-        }
-        return false;
+    // Taken already: any over one of the selections.
+    const auto taken = [&taken_in](const ALTextRange& range) {
+        return std::any_of(taken_in.begin(), taken_in.end(), [&range](const ALTextRange& one) {
+            const ALTextRange r = one.normalised();
+            return range.begin < r.end && r.begin < range.end;
+        });
     };
     // Each line once, from `from` round to it again.
     for (S32 step = 0; step <= count && out.size() < most; ++step)
@@ -3472,7 +3542,20 @@ bool ALCodeEditor::selectNextOccurrence()
         {
             return false;
         }
-        setSelection(name);
+        // And at every other caret, its own.
+        size_t                   main = 0;
+        std::vector<ALTextRange> all  = selectionsInOrder(&main);
+        for (ALTextRange& one : all)
+        {
+            if (one.empty())
+            {
+                const ALTextRange word = identifierAt(one.end);
+                one                    = word.empty() ? document().wordAt(one.end) : word;
+            }
+        }
+        all[main] = name;
+        placeSelections(all, main);
+        setSelection(selection());
         mOccurrenceName = selection().normalised();
         return true;
     }
@@ -3480,26 +3563,19 @@ bool ALCodeEditor::selectNextOccurrence()
     {
         return false;
     }
-    const bool going = mSnippet.live() && mSnippet.stops().size() == 1 && mSnippet.stops()[0] == taken;
-    if (!going)
-    {
-        mSnippet.start({ taken }, taken.end);
-        mSnippet.setLive(true);
-    }
-    // After the last place taken, going round: they are taken in turn.
-    const ALTextPos                from = mSnippet.mirrors().empty() ? taken.end : mSnippet.mirrors().back().range.end;
-    const std::vector<ALTextRange> next = placesOf(document().text(taken), taken == mOccurrenceName, from, 1);
+    // After the main selection, going round, past those taken: the next
+    // one the main one, so that they are taken in turn.
+    std::vector<ALTextRange>       all   = selectionsInOrder();
+    const bool                     whole = taken == mOccurrenceName;
+    const std::vector<ALTextRange> next  = placesOf(document().text(taken), whole, taken.end, 1, all);
     if (next.empty())
     {
-        if (!going)
-        {
-            mSnippet.clear();
-        }
         return false;
     }
-    mSnippet.addMirror({ 0, next.front() });
-    setSelection(taken);
-    scrollToShow(next.front().begin);
+    all.push_back(next.front());
+    placeSelections(all, all.size() - 1);
+    setSelection(selection());
+    mOccurrenceName = whole ? selection().normalised() : ALTextRange();
     return true;
 }
 
@@ -3516,19 +3592,16 @@ bool ALCodeEditor::changeAllOccurrences()
     {
         return false;
     }
-    mSnippet.start({ taken }, taken.end);
-    const std::vector<ALTextRange> places = placesOf(document().text(taken), whole, taken.end, 1000);
-    if (places.empty())
+    // Every place, the one taken the main selection; the others there
+    // were let go of.
+    std::vector<ALTextRange> all = placesOf(document().text(taken), whole, taken.end, std::numeric_limits<size_t>::max(), { taken });
+    if (all.empty())
     {
-        mSnippet.clear();
         return false;
     }
-    for (const ALTextRange& place : places)
-    {
-        mSnippet.addMirror({ 0, place });
-    }
-    mSnippet.setLive(true);
-    setSelection(taken);
+    all.push_back(taken);
+    placeSelections(all, all.size() - 1);
+    setSelection(selection());
     return true;
 }
 
@@ -4149,11 +4222,12 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
         }
     });
     hideCard();
-    // At several carets, nothing the typing puts up -- the list, the
-    // signature, a snippet's stops -- is in play: each is about one place.
+    // At several carets the signature and a snippet's stops are not in
+    // play, each being about one place; the list is the main caret's.
     if (hasOtherSelections() && typingText())
     {
-        dropTyping();
+        hideSignature();
+        clearPlaceholders();
     }
     // The fixes listed take the keys that walk them and take one, in any
     // mode a modal keymap is in -- the list was asked for; any other key
@@ -4332,23 +4406,22 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
 {
     const bool typing   = typingText();
-    if (typing && hasOtherSelections())
-    {
-        // At every caret: the list, the signature and a snippet's stops are
-        // each about one place, and go.
-        dropTyping();
-        undoJournal().beginTyping(selection());
-        const bool typed =
-            (mAutoClose && uni_char < 0x80 && !isReadOnly() && typePairs(static_cast<char>(uni_char))) || ALTextView::handleUnicodeCharHere(uni_char);
-        undoJournal().endTyping();
-        return typed;
-    }
     const bool was_open = completionOpen();
+    // At several carets the signature and a snippet's stops, each about
+    // one place, go; the list stays, the main caret's, and what is chosen
+    // from it goes in at each.
+    const bool several = typing && hasOtherSelections();
+    if (several)
+    {
+        hideSignature();
+        clearPlaceholders();
+    }
     // The pair, the character and its outdent one key typed, one with the
     // typing around it -- and every place of a text being changed at once
     // brought up to it in the same step.
     undoJournal().beginTyping(selection());
-    const bool paired = typing && mAutoClose && uni_char < 0x80 && !isReadOnly() && typePair(static_cast<char>(uni_char));
+    const bool paired = typing && mAutoClose && uni_char < 0x80 && !isReadOnly() &&
+                        (several ? typePairs(static_cast<char>(uni_char)) : typePair(static_cast<char>(uni_char)));
     const bool typed  = paired || ALTextView::handleUnicodeCharHere(uni_char);
     if (typed && mSnippet.live())
     {
@@ -4390,7 +4463,7 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
     // A call begins, moves on to its next argument, or ends: asked again
     // then, and only then -- within an argument, the parameter shown
     // follows the caret here.
-    if (mSignatureRequest && (uni_char == '(' || uni_char == ',' || uni_char == ')'))
+    if (!several && mSignatureRequest && (uni_char == '(' || uni_char == ',' || uni_char == ')'))
     {
         mSignatureRequest(caret());
     }
@@ -4694,6 +4767,7 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
         const ALTextPos from(line, 0);
         const ALTextPos to = line < last ? ALTextPos(line + 1, 0) : ALTextPos(line, static_cast<S32>(document().line(line).size()));
         setFocus(true);
+        singleSelection();
         if ((mask & MASK_SHIFT) && hasSelection())
         {
             const ALTextRange was = selection();
@@ -4719,6 +4793,7 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     if (mask == MASK_CONTROL && (mSymbolRequest || mLinkRequest) && text.pointInRect(x, y))
     {
         const ALTextPos at = posAtLocal(x, y, false);
+        singleSelection();
         if (mLinkRequest && !mLinkRequest(at, false).empty())
         {
             setFocus(true);

@@ -2305,7 +2305,7 @@ namespace tut
     template<> template<>
     void alcodeeditor_object::test<65>()
     {
-        set_test_name("Select Next Occurrence takes the name, then its places in turn, going round; what is typed goes into every place taken, one step; Change All takes every place");
+        set_test_name("Select Next Occurrence takes the name, then its places in turn, going round, each a selection; what is typed goes into every place taken, one step; Change All selects every place");
         ALCodeEditor& e = make("local x = 1\nx = x + xy\nprint(x)", "slua");
         e.setAutoComplete(false);
         e.setAutoClose(false);
@@ -2313,29 +2313,31 @@ namespace tut
         key('D', MASK_CONTROL);
         ensure_equals("the name", e.selectedText(), std::string("x"));
         key('D', MASK_CONTROL);
-        ensure("the next place taken, the selection kept", e.selection().normalised() == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 1)));
+        ensure("the next place taken, the main selection now", e.selection().normalised() == ALTextRange(ALTextPos(1, 4), ALTextPos(1, 5)));
+        ensure("the first kept beside it", e.otherSelections().size() == 1 && e.otherSelections()[0] == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 1)));
         type("count");
         ensure_equals("typed into both, not into the longer name", e.text(), std::string("local x = 1\ncount = count + xy\nprint(x)"));
         e.undo();
         ensure_equals("one step back takes back both", e.text(), std::string("local x = 1\nx = x + xy\nprint(x)"));
-        ensure("and ends it", e.placeholders().empty());
 
         e.setCaret(ALTextPos(2, 6));
+        e.singleSelection();
         key('D', MASK_CONTROL);
         key('D', MASK_CONTROL);
         key('D', MASK_CONTROL);
         type("n");
         ensure_equals("going round from the last to the first", e.text(), std::string("local n = 1\nn = x + xy\nprint(n)"));
         key(KEY_ESCAPE);
-        ensure("Escape lets go", e.placeholders().empty());
+        ensure("Escape lets go", !e.hasOtherSelections());
 
         e.setText("local x = 1\nx = x + xy\nprint(\"x\")");
         e.setCaret(ALTextPos(0, 6));
         key('L', MASK_CONTROL | MASK_SHIFT);
+        ensure_equals("Change All: every place selected", e.otherSelections().size(), static_cast<size_t>(3));
         type("n");
-        ensure_equals("Change All: every place of the name, as written", e.text(), std::string("local n = 1\nn = n + xy\nprint(\"n\")"));
-        e.setCaret(ALTextPos(2, 0));
-        ensure("the caret off the line: let go", e.placeholders().empty());
+        ensure_equals("every place of the name, as written", e.text(), std::string("local n = 1\nn = n + xy\nprint(\"n\")"));
+        e.goTo(ALTextPos(2, 0));
+        ensure("gone elsewhere: one caret", !e.hasOtherSelections());
         type("-- ");
         ensure_equals("and typing is typing again", e.document().line(2), std::string("-- print(\"n\")"));
     }
@@ -2643,5 +2645,42 @@ namespace tut
         e.setSelections(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 1)), { ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)) });
         type("(");
         ensure_equals("closed where it is code, typed as ever in the comment", e.text(), std::string("x()\n// y("));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<74>()
+    {
+        set_test_name("Select Next Occurrence at several carets takes the word at each, then the next place as the main one; a completion accepted goes in at each caret, its first parameter chosen at each");
+        ALCodeEditor& e = make("one\none two\none", "slua");
+        e.setAutoComplete(false);
+        e.setAutoClose(false);
+        const auto at = [](S32 line, S32 column) { return ALTextRange(ALTextPos(line, column), ALTextPos(line, column)); };
+        e.setSelections(at(0, 1), { at(2, 1) });
+        key('D', MASK_CONTROL);
+        ensure("the word at the main caret", e.selection() == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
+        ensure("and at the other", e.otherSelections().size() == 1 && e.otherSelections()[0] == ALTextRange(ALTextPos(2, 0), ALTextPos(2, 3)));
+        key('D', MASK_CONTROL);
+        ensure("the next place not taken, the main one", e.selection() == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 3)) && e.otherSelections().size() == 2);
+        type("1");
+        ensure_equals("typed at each", e.text(), std::string("1\n1 two\n1"));
+
+        e.setText("myC\n  myC");
+        e.setCompletionProvider([](const ALTextPos&, std::string_view, std::vector<ALCodeEditor::Completion>& out) {
+            ALCodeEditor::Completion c;
+            c.text   = "myCall";
+            c.kind   = ALSyntaxKind::Function;
+            c.detail = "myCall(integer channel, string msg)";
+            out.push_back(c);
+        });
+        e.setSelections(at(0, 3), { at(1, 5) });
+        key(' ', MASK_CONTROL);
+        ensure("the list at the main caret, the other kept", e.completionOpen() && e.hasOtherSelections());
+        ensure("the call offered", !e.completions().empty() && e.completions()[0].text == "myCall");
+        key(KEY_RETURN);
+        ensure_equals("in at each, over what was typed", e.text(), std::string("myCall(channel, msg)\n  myCall(channel, msg)"));
+        ensure("the first parameter chosen at the main caret", e.selection() == ALTextRange(ALTextPos(0, 7), ALTextPos(0, 14)));
+        ensure("and at the other", e.otherSelections().size() == 1 && e.otherSelections()[0] == ALTextRange(ALTextPos(1, 9), ALTextPos(1, 16)));
+        e.undo();
+        ensure_equals("one step", e.text(), std::string("myC\n  myC"));
     }
 }

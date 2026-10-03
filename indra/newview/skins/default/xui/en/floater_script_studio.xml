@@ -974,6 +974,15 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="change_all_occurrences" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="change_all_occurrences" />
             </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Add Caret Above" layout="topleft" name="add_caret_above">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="add_caret_above" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="add_caret_above" />
+            </menu_item_call>
+            <menu_item_call label="Add Caret Below" layout="topleft" name="add_caret_below">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="add_caret_below" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="add_caret_below" />
+            </menu_item_call>
         </menu>
         <menu
          label="Code"

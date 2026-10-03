@@ -123,9 +123,14 @@ enum class ALEditorCommand : U8
     // The selection grown to what holds it as code reads it, and back.
     ExpandSelection,
     ShrinkSelection,
-    // Every place of a text changed at once: the next place taken, or all.
+    // Every place of a text changed at once: the next place taken, or all,
+    // each a selection of its own.
     SelectNextOccurrence,
     ChangeAllOccurrences,
+    // A caret more on the row above each caret, or below it: a column of
+    // them grown by a row.
+    AddCaretAbove,
+    AddCaretBelow,
     COUNT
 };
 
@@ -160,7 +165,8 @@ public:
     // own: control-slash comments, alt-up and alt-down move lines,
     // control-shift-D duplicates one and control-shift-K deletes one,
     // control-shift with a square bracket folds and unfolds,
-    // control-space completes, F12 goes to a definition, shift-F12 finds
+    // control-space completes, control-alt with up or down adds a caret
+    // above or below, F12 goes to a definition, shift-F12 finds
     // the references, F2 renames, control-F finds, control-H (and on a
     // Mac, which keeps command-H, command-option-F) replaces, and F3 and
     // shift-F3 go to the next and the previous match. Backspace and Return

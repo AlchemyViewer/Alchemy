@@ -365,6 +365,17 @@ public:
     void                            setSelections(const ALTextRange& main, std::vector<ALTextRange> others);
     // The main selection alone again; whether there were others.
     bool                            singleSelection();
+    // A caret put at a place as the main one, the others kept -- or, where
+    // a caret or a selection is there, that one taken away, unless it is
+    // the last: what Alt-click does.
+    void                            toggleCaret(const ALTextPos& pos);
+    // A caret more on the row above each caret, or below, each keeping
+    // its column as a motion between rows does; the furthest the main
+    // one. False where every caret is on the first or the last row.
+    bool                            addCarets(S32 direction);
+    // Every match the find bar has selected, the current one the main
+    // one, and the keyboard to the text; how many.
+    S32                             selectAllMatches();
 
     // --- editing, through the undo journal -----------------------------------
 
@@ -397,7 +408,7 @@ public:
     bool           typingText() const { return !mModal || mModal->inserting(); }
 
     // The caret put at a place, or a stretch selected, and brought into
-    // view: where a list of places sends it.
+    // view, one caret: where a list of places sends it.
     void goTo(const ALTextPos& pos);
     void goTo(const ALTextRange& range);
 

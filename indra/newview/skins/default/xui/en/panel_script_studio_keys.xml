@@ -105,6 +105,8 @@
     <panel.string name="cmd_shrink_selection">Shrink the selection</panel.string>
     <panel.string name="cmd_select_next_occurrence">Select next occurrence</panel.string>
     <panel.string name="cmd_change_all_occurrences">Change all occurrences</panel.string>
+    <panel.string name="cmd_add_caret_above">Add a caret above</panel.string>
+    <panel.string name="cmd_add_caret_below">Add a caret below</panel.string>
     <panel.string name="cmd_previous_misspelling">Previous misspelling</panel.string>
     <text
      follows="left|top"
