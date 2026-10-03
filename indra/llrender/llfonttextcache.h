@@ -101,11 +101,26 @@ public:
         const size_t print = fingerprint(text);
         if (!mTextHashed)
         {
-            mTextHash = print;
+            #ifdef LL_DEBUG
+            mRecordedLength = text.size();
+            #endif
+            mTextHash  = print;
             mTextHashed = true;
             return true;
         }
-        return print == mTextHash;
+        if (print != mTextHash)
+        {
+            #ifdef LL_DEBUG
+            LL_WARNS() << "sameTextAsRecorded mismatch!"
+                       << " recorded length: " << mRecordedLength
+                       << " recorded hash: "   << mTextHash
+                       << " new length: "      << text.size()
+                       << " new hash: "        << print
+                       << LL_ENDL;
+            #endif
+            return false;
+        }
+        return true;
     }
 
 private:
@@ -138,6 +153,9 @@ private:
     U32             mVersion = 0;
     size_t          mTextHash = 0;
     bool            mTextHashed = false;
+    #ifdef LL_DEBUG
+        size_t mRecordedLength = 0;
+    #endif
 
     const LLFontGL* mFont = nullptr;
     F32             mScaleX = 1.f;
