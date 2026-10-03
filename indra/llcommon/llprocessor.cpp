@@ -1062,6 +1062,58 @@ private:
         return mhz;
     }
 
+#if LL_ARM64
+    // A virtual machine, and a kernel without a cpufreq driver for its
+    // board, leave sysfs with no clock at all, and an arm64 cpuinfo has no
+    // MHz line to fall back on. Every ARMv8 core retires one dependent
+    // integer add a cycle, so a timed chain of them reads the clock the core
+    // runs at. The fastest of ten short passes is kept, which is the core
+    // after it has woken up and without a pass the scheduler interrupted.
+    // Timed on the generic timer, read directly: a 2.6 GHz Neoverse V1
+    // under a hypervisor measured 2592 MHz this way.
+    static F64 measureCPUMHz()
+    {
+        constexpr U64 ADDS_PER_PASS = 1u << 22;
+        U64 frequency = 0;
+        asm volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+        if (frequency == 0)
+        {
+            return 0.0;
+        }
+
+        U64 fastest = 0;
+        for (int pass = 0; pass < 10; ++pass)
+        {
+            U64 count = ADDS_PER_PASS / 8;
+            U64 chain = 0;
+            U64 start = 0;
+            U64 end = 0;
+            asm volatile("isb\n\tmrs %0, cntvct_el0" : "=r"(start));
+            asm volatile(
+                "1:\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "add %[chain], %[chain], #1\n\t"
+                "subs %[count], %[count], #1\n\t"
+                "b.ne 1b"
+                : [chain] "+r"(chain), [count] "+r"(count)
+                :
+                : "cc");
+            asm volatile("isb\n\tmrs %0, cntvct_el0" : "=r"(end));
+            if (end > start && (fastest == 0 || end - start < fastest))
+            {
+                fastest = end - start;
+            }
+        }
+        return fastest ? (F64)ADDS_PER_PASS * (F64)frequency / (F64)fastest / 1e6 : 0.0;
+    }
+#endif
+
     void get_proc_cpuinfo()
     {
         std::map< std::string, std::string > cpuinfo;
@@ -1191,10 +1243,14 @@ private:
 
 # elif LL_ARM64
 
-        const F64 mhzFromSys = getCPUMaxMHZ();
-        if (mhzFromSys > 1.0)
+        F64 mhz = getCPUMaxMHZ();
+        if (mhz <= 1.0)
         {
-            setInfo(eFrequency, mhzFromSys);
+            mhz = measureCPUMHz();
+        }
+        if (mhz > 1.0)
+        {
+            setInfo(eFrequency, mhz);
         }
 
         // An arm64 cpuinfo names the part by implementer and part number,
