@@ -34,7 +34,9 @@
 //   the compiler's vector extensions, on GCC and Clang on either
 //   architecture: the register is the compiler's own vector type, so
 //   arithmetic is the operators and a permutation is
-//   __builtin_shufflevector, and the compiler chooses the instructions;
+//   __builtin_shufflevector, and the compiler chooses the instructions --
+//   except GCC on aarch64, which would choose a table lookup for most of
+//   them, and is handed a planned sequence instead (see permute::run);
 //
 //   the x86 intrinsics, on MSVC for x86-64, from SSE2 up to the level the
 //   build was given;
@@ -62,6 +64,8 @@
 //   AL_SIMD_AVX512                F, VL, BW and DQ together
 //   AL_SIMD_WIDTH                 floats in the widest register: 4, 8 or 16
 //   AL_SIMD_VEXT                  the vector-extension backend is in use
+//   AL_SIMD_PLANNED_PERMUTE       it is GCC on aarch64, and permutations are
+//                                 planned here rather than left to it
 
 #include <stddef.h>
 #include <stdint.h>
@@ -135,6 +139,12 @@
     #define AL_SIMD_VEXT 1
 #else
     #define AL_SIMD_VEXT 0
+#endif
+
+#if AL_SIMD_VEXT && AL_SIMD_NEON && !defined(__clang__)
+    #define AL_SIMD_PLANNED_PERMUTE 1
+#else
+    #define AL_SIMD_PLANNED_PERMUTE 0
 #endif
 
 #if AL_SIMD_X86
@@ -374,12 +384,302 @@ AL_SIMD_INLINE f32x4 splat(f32x4 v)
 #endif
 }
 
+#if AL_SIMD_PLANNED_PERMUTE
+// GCC for aarch64 lowers a constant permutation it cannot do in one
+// instruction to a byte table lookup: a constant-pool load and a tbl, where
+// Clang chains two or three single-instruction permutes. Writing the chain
+// out does not help, in intrinsics or in __builtin_shufflevector: GCC folds
+// consecutive permutes into one and looks that up in a table again. So the
+// chain is planned here, at compile time, and an empty asm statement after
+// each step keeps GCC from merging it with its neighbours.
+//
+// A plan is up to two permutes from the list below, then an ins for each
+// lane still wrong. The input itself with every lane inserted is always a
+// plan, so none is longer than four instructions; none of the 512 shuffle
+// and shuffle2 patterns needs more than three, and most take two. The
+// search is exhaustive, and every translation unit that instantiates a
+// pattern pays for it again in GCC's constant evaluator, so it is kept
+// small: lanes packed into an int, a permute that reads one register not
+// tried against every second operand, and a stop at the first plan of two
+// permutes with nothing to insert, which nothing longer can beat.
+namespace permute
+{
+    // Four lanes, four bits each, lane 0 lowest. Each names where the lane
+    // came from: 0 to 3 the first input, 4 to 7 the second.
+    constexpr int pack(int l0, int l1, int l2, int l3)
+    {
+        return l0 | l1 << 4 | l2 << 8 | l3 << 12;
+    }
+
+    constexpr int lane_of(int lanes, int i)
+    {
+        return (lanes >> (4 * i)) & 15;
+    }
+
+    // The single-instruction permutes of two registers x and y, as the
+    // __builtin_shufflevector mask GCC recognises for each. The first
+    // BINARY_OPS read both registers; the rest read x alone.
+    inline constexpr int OPS[] = {
+        pack(0, 4, 1, 5), pack(2, 6, 3, 7), // zip1, zip2
+        pack(0, 2, 4, 6), pack(1, 3, 5, 7), // uzp1, uzp2
+        pack(0, 4, 2, 6), pack(1, 5, 3, 7), // trn1, trn2
+        pack(0, 1, 4, 5), pack(2, 3, 6, 7), // zip1, zip2 on 64-bit lanes
+        pack(1, 2, 3, 4), pack(2, 3, 4, 5), pack(3, 4, 5, 6), // ext by 1, 2, 3 lanes
+        pack(1, 0, 3, 2), // rev64
+        pack(0, 0, 0, 0), pack(1, 1, 1, 1), pack(2, 2, 2, 2), pack(3, 3, 3, 3), // dup
+    };
+    inline constexpr int OP_COUNT = 16;
+    inline constexpr int BINARY_OPS = 11;
+
+    // ins: x with lane `at` replaced by lane `from` (0 to 3) of y.
+    constexpr int ins_mask(int at, int from)
+    {
+        return (pack(0, 1, 2, 3) & ~(15 << (4 * at))) | (4 + from) << (4 * at);
+    }
+
+    constexpr int apply(int mask, int x, int y)
+    {
+        int out = 0;
+        for (int i = 0; i < 4; ++i)
+        {
+            const int from = lane_of(mask, i);
+            out |= (from < 4 ? lane_of(x, from) : lane_of(y, from - 4)) << (4 * i);
+        }
+        return out;
+    }
+
+    struct Plan
+    {
+        // Up to two permutes, as indices into OPS. Operands are 0 for the
+        // first input, 1 for the second and 2 for the first permute's result.
+        int steps = 0;
+        int base = 0; // with no permutes, the input the inserts start from
+        int op1 = 0, lhs1 = 0, rhs1 = 0;
+        int op2 = 0, lhs2 = 0, rhs2 = 0;
+        // Then an ins for each lane still wrong, from lane 0 to 7 of the inputs.
+        int inserts = 0;
+        int insert_at[4] = {};
+        int insert_from[4] = {};
+        // Lower is better; see score().
+        int score = 1 << 30;
+
+        constexpr int length() const { return steps + inserts; }
+    };
+
+    // How many lanes of `got` differ from `want`.
+    constexpr int wrong_lanes(int got, int want)
+    {
+        int n = 0;
+        for (int i = 0; i < 4; ++i)
+        {
+            n += lane_of(got, i) != lane_of(want, i);
+        }
+        return n;
+    }
+
+    // A single instruction goes to GCC as it is, and GCC places it well.
+    // Past that, the count is the instructions plus one for a register copy
+    // when an ins overwrites an input that a later ins still reads. Ties go
+    // to the plan with fewer ins: it ends in a three-operand permute, which
+    // writes wherever the result is wanted rather than where the ins was.
+    constexpr int score(int length, int inserts, bool copy)
+    {
+        return length <= 1 ? 8 * length : 8 * (length + copy) + inserts;
+    }
+
+    // `p` finished with the inserts that turn `got` into `want`.
+    constexpr Plan with_inserts(Plan p, int got, int want, bool one_input)
+    {
+        for (int i = 0; i < 4; ++i)
+        {
+            if (lane_of(got, i) != lane_of(want, i))
+            {
+                p.insert_at[p.inserts] = i;
+                p.insert_from[p.inserts] = lane_of(want, i);
+                ++p.inserts;
+            }
+        }
+        bool copy = false;
+        for (int i = 1; p.steps == 0 && i < p.inserts; ++i)
+        {
+            copy = copy || one_input || (p.insert_from[i] < 4) == (p.base == 0);
+        }
+        p.score = score(p.length(), p.inserts, copy);
+        return p;
+    }
+
+    // The best plan for the lanes `want`, from one input or two. A candidate
+    // is scored from its count of wrong lanes, and only one that beats the
+    // best so far is built.
+    constexpr Plan plan(int want, bool one_input)
+    {
+        const int inputs = one_input ? 1 : 2;
+        const int input[2] = {pack(0, 1, 2, 3), one_input ? pack(0, 1, 2, 3) : pack(4, 5, 6, 7)};
+
+        Plan best = with_inserts(Plan{}, input[0], want, one_input);
+        if (!one_input)
+        {
+            Plan from_b;
+            from_b.base = 1;
+            from_b = with_inserts(from_b, input[1], want, one_input);
+            best = from_b.score < best.score ? from_b : best;
+        }
+
+        for (int op1 = 0; op1 < OP_COUNT; ++op1)
+        {
+            for (int lhs1 = 0; lhs1 < inputs; ++lhs1)
+            {
+                for (int rhs1 = 0; rhs1 < (op1 < BINARY_OPS ? inputs : 1); ++rhs1)
+                {
+                    const int r = op1 < BINARY_OPS ? rhs1 : lhs1;
+                    const int t = apply(OPS[op1], input[lhs1], input[r]);
+                    const int wrong = wrong_lanes(t, want);
+                    if (score(1 + wrong, wrong, false) < best.score)
+                    {
+                        Plan p;
+                        p.steps = 1;
+                        p.op1 = op1;
+                        p.lhs1 = lhs1;
+                        p.rhs1 = r;
+                        best = with_inserts(p, t, want, one_input);
+                    }
+                }
+            }
+        }
+        if (best.score <= 8)
+        {
+            return best;
+        }
+
+        for (int op1 = 0; op1 < OP_COUNT; ++op1)
+        {
+            for (int lhs1 = 0; lhs1 < inputs; ++lhs1)
+            {
+                for (int rhs1 = 0; rhs1 < (op1 < BINARY_OPS ? inputs : 1); ++rhs1)
+                {
+                    const int r1 = op1 < BINARY_OPS ? rhs1 : lhs1;
+                    const int t = apply(OPS[op1], input[lhs1], input[r1]);
+                    // A dup of the first permute's result is a dup of an
+                    // input, which the first permute already tried.
+                    for (int op2 = 0; op2 < OP_COUNT - 4; ++op2)
+                    {
+                        // The second permute reads the first one's result:
+                        // (t, t), then (t, input), then (input, t).
+                        for (int k = 0; k < (op2 < BINARY_OPS ? 1 + 2 * inputs : 1); ++k)
+                        {
+                            const int lhs2 = k == 0 || k <= inputs ? 2 : k - inputs - 1;
+                            const int rhs2 = k == 0 || k > inputs ? 2 : k - 1;
+                            const int got = apply(OPS[op2], lhs2 == 2 ? t : input[lhs2], rhs2 == 2 ? t : input[rhs2]);
+                            const int wrong = wrong_lanes(got, want);
+                            if (score(2 + wrong, wrong, false) < best.score)
+                            {
+                                Plan p;
+                                p.steps = 2;
+                                p.op1 = op1;
+                                p.lhs1 = lhs1;
+                                p.rhs1 = r1;
+                                p.op2 = op2;
+                                p.lhs2 = lhs2;
+                                p.rhs2 = rhs2;
+                                best = with_inserts(p, got, want, one_input);
+                                if (best.score == 16)
+                                {
+                                    return best; // two permutes, nothing to insert
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    template <int Id>
+    AL_SIMD_INLINE f32x4 pick(f32x4 a, f32x4 b, f32x4 t)
+    {
+        if constexpr (Id == 0)
+        {
+            return a;
+        }
+        else if constexpr (Id == 1)
+        {
+            return b;
+        }
+        else
+        {
+            return t;
+        }
+    }
+
+    // One permute, and the fence that keeps it one.
+    template <int Mask>
+    AL_SIMD_INLINE f32x4 step(f32x4 x, f32x4 y)
+    {
+        f32x4 r = __builtin_shufflevector(x, y, lane_of(Mask, 0), lane_of(Mask, 1), lane_of(Mask, 2), lane_of(Mask, 3));
+        __asm__("" : "+w"(r));
+        return r;
+    }
+
+    template <bool Use, int At, int From>
+    AL_SIMD_INLINE f32x4 insert(f32x4 r, f32x4 a, f32x4 b)
+    {
+        if constexpr (Use)
+        {
+            return step<ins_mask(At, From % 4)>(r, From < 4 ? a : b);
+        }
+        else
+        {
+            return r;
+        }
+    }
+
+    // { a, b }[M0], ..., { a, b }[M3], lanes 0 to 3 from a and 4 to 7 from b.
+    template <int M0, int M1, int M2, int M3, bool OneInput>
+    AL_SIMD_INLINE f32x4 run(f32x4 a, f32x4 b)
+    {
+        constexpr Plan p = plan(pack(M0, M1, M2, M3), OneInput);
+        static_assert(p.length() <= 4, "permute: no plan within four instructions");
+        if constexpr (p.length() <= 1)
+        {
+            // Nothing to do, or one instruction GCC finds for itself -- and
+            // can fold into what uses it, as it folds a dup into an fmla.
+            return __builtin_shufflevector(a, b, M0, M1, M2, M3);
+        }
+        else
+        {
+            // Fenced on the way in too, so the first step does not merge
+            // with a permute that produced its input.
+            __asm__("" : "+w"(a));
+            __asm__("" : "+w"(b));
+            f32x4 t = pick<p.base>(a, b, a);
+            if constexpr (p.steps >= 1)
+            {
+                t = step<OPS[p.op1]>(pick<p.lhs1>(a, b, a), pick<p.rhs1>(a, b, a));
+            }
+            f32x4 r = t;
+            if constexpr (p.steps >= 2)
+            {
+                r = step<OPS[p.op2]>(pick<p.lhs2>(a, b, t), pick<p.rhs2>(a, b, t));
+            }
+            r = insert<(p.inserts > 0), p.insert_at[0], p.insert_from[0]>(r, a, b);
+            r = insert<(p.inserts > 1), p.insert_at[1], p.insert_from[1]>(r, a, b);
+            r = insert<(p.inserts > 2), p.insert_at[2], p.insert_from[2]>(r, a, b);
+            r = insert<(p.inserts > 3), p.insert_at[3], p.insert_from[3]>(r, a, b);
+            return r;
+        }
+    }
+} // namespace permute
+#endif
+
 // { v[A], v[B], v[C], v[D] }.
 template <int A, int B, int C, int D>
 AL_SIMD_INLINE f32x4 shuffle(f32x4 v)
 {
     static_assert(A >= 0 && A < 4 && B >= 0 && B < 4 && C >= 0 && C < 4 && D >= 0 && D < 4, "shuffle: lanes are 0 to 3");
-#if AL_SIMD_VEXT
+#if AL_SIMD_PLANNED_PERMUTE
+    return permute::run<A, B, C, D, true>(v, v);
+#elif AL_SIMD_VEXT
     return __builtin_shufflevector(v, v, A, B, C, D);
 #elif AL_SIMD_X86
     return _mm_shuffle_ps(v, v, _MM_SHUFFLE(D, C, B, A));
@@ -407,9 +707,10 @@ AL_SIMD_INLINE f32x4 shuffle(f32x4 v)
     }
     else
     {
-        // The general case is a byte table lookup. The compiler backends
-        // above choose an ext, zip, uzp or rev sequence for the pattern
-        // instead; this one is only compiled for a target that does not ship.
+        // The general case is a byte table lookup. Under the compiler
+        // backends above an ext, zip, uzp or rev sequence is chosen instead,
+        // by Clang itself and for GCC by the permute planner; this one is
+        // only compiled for a target that does not ship.
         alignas(16) static const uint8_t table[16] = {
             uint8_t(A * 4), uint8_t(A * 4 + 1), uint8_t(A * 4 + 2), uint8_t(A * 4 + 3),
             uint8_t(B * 4), uint8_t(B * 4 + 1), uint8_t(B * 4 + 2), uint8_t(B * 4 + 3),
@@ -426,7 +727,9 @@ template <int A, int B, int C, int D>
 AL_SIMD_INLINE f32x4 shuffle2(f32x4 a, f32x4 b)
 {
     static_assert(A >= 0 && A < 4 && B >= 0 && B < 4 && C >= 0 && C < 4 && D >= 0 && D < 4, "shuffle2: lanes are 0 to 3");
-#if AL_SIMD_VEXT
+#if AL_SIMD_PLANNED_PERMUTE
+    return permute::run<A, B, 4 + C, 4 + D, false>(a, b);
+#elif AL_SIMD_VEXT
     return __builtin_shufflevector(a, b, A, B, 4 + C, 4 + D);
 #elif AL_SIMD_X86
     return _mm_shuffle_ps(a, b, _MM_SHUFFLE(D, C, B, A));
