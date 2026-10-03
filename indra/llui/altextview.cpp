@@ -4312,6 +4312,9 @@ bool ALTextView::findNext(bool forward)
     // one at or after it.
     const S32 wrapped = forward ? (match.begin < from ? 1 : 0) : (match.begin < from ? 0 : -1);
     mFind.setCurrent(index);
+    // The match alone, the other carets let go, from the bar's buttons as
+    // from the keys.
+    singleSelection();
     setSelection(match);
     mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error(), mFind.capped(), wrapped);
     return true;

@@ -2389,4 +2389,20 @@ namespace tut
         v.showFind(false);
         ensure_equals("the word at the main caret, not another's selection", v.findBar()->query(), std::string("cat"));
     }
+
+    template<> template<>
+    void altextview_object::test<76>()
+    {
+        set_test_name("the find bar's next and previous let the other carets go, as F3 does");
+        ALTextView& v = make("cat dog\nbird cat");
+        v.setSelections(spanRange(0, 0, 3), { caretRange(1, 2) });
+        v.showFind(false);
+        ensure("found from the bar", v.findNext(true));
+        ensure("the other caret let go", !v.hasOtherSelections());
+        ensure("at the next match", v.selection().normalised() == spanRange(1, 5, 8));
+        v.setSelections(spanRange(1, 5, 8), { caretRange(0, 5) });
+        ensure("found back from the bar", v.findNext(false));
+        ensure("the other caret let go going back", !v.hasOtherSelections());
+        ensure("at the match before", v.selection().normalised() == spanRange(0, 0, 3));
+    }
 }
