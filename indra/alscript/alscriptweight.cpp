@@ -573,9 +573,14 @@ namespace ALScriptWeigh
         }
         AL_SCRIPT_ENGINE_HELD;
         std::string asset;
+        std::string lined;
         try
         {
             asset = compileLSLAssetOrThrow(std::string(source), 0);
+            // Again with each instruction's line, which the server's asset
+            // has not: what each line comes to is read off this one, the
+            // rest off the server's.
+            lined = compileLSLAssetOrThrow(std::string(source), 0, true);
         }
         catch (const Luau::ParseErrors& e)
         {
@@ -588,6 +593,12 @@ namespace ALScriptWeigh
             return weight;
         }
         weighAsset(weight, asset);
+        if (weight.compiled && !lined.empty())
+        {
+            ALScriptWeight by_line;
+            weighAsset(by_line, lined);
+            weight.lines = std::move(by_line.lines);
+        }
         nameLSLParts(weight, source);
         return weight;
     }

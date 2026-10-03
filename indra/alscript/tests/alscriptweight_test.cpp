@@ -303,7 +303,8 @@ namespace tut
     }
 
     // LSL on Luau: the fork's own compiler, the asset as the server makes
-    // it, the bytecode read back as SLua's is.
+    // it, the bytecode read back as SLua's is; and again with its lines,
+    // for what each comes to.
     template<> template<>
     void alscriptweight_object::test<6>()
     {
@@ -335,6 +336,11 @@ namespace tut
         const ALScriptWeight::Part* touch = named(weight, "touch_start");
         ensure("a handler in its state:" + listed(weight), touch && touch->within == "default" && touch->kind == ALScriptWeight::Part::Kind::Handler);
         ensure_equals("where it is", touch->line, 11);
+        // Its lines, read off the compiler's lined bytecode, which the
+        // server's is not: the total stays what the server charges.
+        ensure("each line weighed:" + lined(weight), at(weight, 9) > 0 && at(weight, 13) > 0 && at(weight, 3) > 0);
+        ensure("the handler's long line its own:" + lined(weight), at(weight, 13) > at(weight, 9));
+        ensure("nothing past the script's lines:" + lined(weight), within(weight, 16, 1000) == 0);
         const ALScriptWeight broken = ALScriptWeigh::lslLuau("default { state_entry() { integer x = ; } }\n");
         ensure("a script that does not compile", !broken.compiled && !broken.error.empty());
     }
