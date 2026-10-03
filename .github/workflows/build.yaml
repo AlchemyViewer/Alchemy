@@ -76,7 +76,7 @@ jobs:
           VIEWER_CHANNEL_BASE: "Alchemy"
           # The Sentry project crash reports go to; unset, the viewer is
           # built without a crash reporter.
-          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           echo "release_run=$RELEASE_RUN" >> "$GITHUB_OUTPUT"
 
