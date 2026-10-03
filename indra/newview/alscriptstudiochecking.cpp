@@ -1583,6 +1583,10 @@ bool ALScriptStudioChecking::fixAll(Doc& doc, const FixPick& pick)
 {
     if (!doc.loaded || !doc.modifiable)
     {
+        if (!pick.forSave)
+        {
+            mServices.setStatus(mServices.words("FixAllNotMade"), true);
+        }
         return false;
     }
     // Only the fixes made over the text as it stands (pickFixes). Made on
