@@ -501,7 +501,14 @@ struct ALScriptStudioDoc
         // (ALScriptLintPass::migration).
         bool                     migration = false;
     };
-    std::vector<Shown>                         shown;
+    // The rows, shared with the Problems pane's store, which holds them
+    // as they are without a copy; never changed once put, only put again.
+    std::shared_ptr<const std::vector<Shown>>  shownRows;
+    const std::vector<Shown>&                  shown() const
+    {
+        static const std::vector<Shown> none;
+        return shownRows ? *shownRows : none;
+    }
     // How many of them are errors and warnings, counted as they are put
     // in: the tab's dot and the trailer ask on every key.
     S32                                        shownErrors    = 0;

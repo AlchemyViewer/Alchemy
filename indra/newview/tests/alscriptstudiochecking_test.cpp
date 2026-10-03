@@ -153,7 +153,7 @@ namespace
             {
                 return;
             }
-            doc.shown.clear();
+            std::vector<Doc::Shown> rows;
             for (const ALScriptProblem& problem : doc.check->analysis)
             {
                 Doc::Shown shown;
@@ -166,8 +166,9 @@ namespace
                 shown.fixesFor = doc.check->analysisVersion;
                 // As the pane's rows have it (ALScriptStudioDoc::analysisRow).
                 shown.migration = doc.language.lua && ALScriptLintPass::migration(problem);
-                doc.shown.push_back(std::move(shown));
+                rows.push_back(std::move(shown));
             }
+            doc.setShown(std::move(rows));
         }
         void showOutline(Doc& doc) override { told.push_back("outline " + doc.id); }
         void                                save(Doc& doc) override { told.push_back("save " + doc.id); }
@@ -847,7 +848,7 @@ namespace tut
         one.fixes                        = { fix("First", 0, 0, 7, "float") };
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks[0].answered(answer(doc, { one, problem(2, "two") }));
-        ensure("asked for, made with the next frame", studio.waiting.count("a") == 1 && doc.shown.empty());
+        ensure("asked for, made with the next frame", studio.waiting.count("a") == 1 && doc.shown().empty());
         std::vector<ALCodeEditor::Fix> fixes;
         checking.fixesOn(doc, 0, fixes);
         ensure("made first: one", studio.waiting.empty() && fixes.size() == 1 && fixes[0].title == "First" &&

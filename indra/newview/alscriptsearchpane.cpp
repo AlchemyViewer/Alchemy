@@ -250,16 +250,45 @@ void ALScriptSearchPane::searchIncludes(const ALScriptRef& ref, const std::strin
     }
     for (const Window::Included& one : mWindow->includesOf(ref, file, name, text, lua))
     {
-        if (mIncludesSearched.insert(one.path).second)
+        if (!mIncludesSearched.insert(one.path).second)
         {
-            const ALScriptSearch::Kept kept = mSearch.search(ALScriptRef(), one.name, mServices->words("SearchIncluded"), ALTextDocument(one.text), 0,
-                                                             std::string(), false, false, one.path);
-            if (kept == ALScriptSearch::Kept::Added)
-            {
-                addRows(mSearch.found().size() - 1);
-            }
+            continue;
         }
+        // Sought away from the main thread, as a script not open is, and
+        // counted as to come until the answer is back: an include can be a
+        // library many times the script's size.
+        mSearch.asked();
+        const U32               generation = mSearch.generation();
+        const LLHandle<LLPanel> handle     = getHandle();
+        const std::string       where      = mServices->words("SearchIncluded");
+        mWindow->matchApart(std::make_shared<const std::string>(one.text), mSearch.query(), mSearch.options(),
+                            [handle, generation, where, name = one.name, path = one.path](ALScriptSearch::Matched found) {
+                                if (ALScriptSearchPane* pane = ALViewType::as<ALScriptSearchPane>(handle.get()))
+                                {
+                                    pane->includeMatched(generation, where, name, path, std::move(found));
+                                }
+                            });
     }
+}
+
+void ALScriptSearchPane::includeMatched(U32 generation, const std::string& where, const std::string& name, const std::string& path,
+                                        ALScriptSearch::Matched found)
+{
+    if (!mSearch.answered(generation))
+    {
+        return;
+    }
+    // Kept as its own, without its text: Replace All leaves an include be.
+    const ALScriptSearch::Kept kept = mSearch.keep(ALScriptRef(), name, where, std::move(found), 0, std::string(), nullptr, false, path);
+    if (mSearch.badPattern())
+    {
+        mCount->setToolTip(mSearch.patternError());
+    }
+    else if (kept == ALScriptSearch::Kept::Added)
+    {
+        addRows(mSearch.found().size() - 1);
+    }
+    settled();
 }
 
 void ALScriptSearchPane::run()
@@ -771,6 +800,8 @@ void ALScriptSearchPane::replaceAll()
     // since the search is left alone, and said so.
     const std::vector<ALScriptSearch::Found> found = mSearch.found();
     S32                                      places = 0, scripts = 0, opened = 0, left = 0;
+    // The tabs it opens made once, as the last is opened.
+    ALScriptStudioServices::TabsHeld held(*mServices);
     for (const ALScriptSearch::Found& one : found)
     {
         Doc*                here  = tabOf(one);

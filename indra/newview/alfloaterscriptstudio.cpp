@@ -614,6 +614,7 @@ bool ALFloaterScriptStudio::postBuild()
     // wanted and goes when closed. Said here, since building from the
     // skin sets both from the file, which cannot say which this is.
     setIsSingleInstance(mMain);
+    mTabTips = { getString("TabNotecardTip"), getString("TabInventoryTip"), getString("TabObjectTip"), getString("TabReadOnlyTip") };
     if (!mMain)
     {
         // No saved rect: a popped-out window is placed beside the one it
@@ -3295,14 +3296,14 @@ ALTabStrip::Tab ALFloaterScriptStudio::tabOf(const Doc& doc, const TabFacts& fac
     // does not fit, and the name it cut is the one thing you hover a
     // cut tab to read; saying only where the script lives answered a
     // question nobody had asked.
-    const std::string where = !doc.file.empty()      ? doc.file
-                              : doc.notecard          ? getString("TabNotecardTip")
-                              : doc.ref.inInventory() ? getString("TabInventoryTip")
-                                                      : getString("TabObjectTip");
+    const std::string& where = !doc.file.empty()      ? doc.file
+                               : doc.notecard          ? mTabTips.notecard
+                               : doc.ref.inInventory() ? mTabTips.inventory
+                                                       : mTabTips.object;
     tab.toolTip = doc.name + "\n" + where;
     if (facts.readOnly)
     {
-        tab.toolTip += "\n" + getString("TabReadOnlyTip");
+        tab.toolTip += "\n" + mTabTips.readOnly;
     }
     return tab;
 }
@@ -3900,7 +3901,7 @@ std::vector<ALTextPos> ALFloaterScriptStudio::problemPlaces(const Doc& doc, bool
     const std::string      definitions = getString("OriginDefinitions");
     const std::string      weight      = getString("OriginWeight");
     std::vector<ALTextPos> places;
-    for (const Doc::Shown& row : doc.shown)
+    for (const Doc::Shown& row : doc.shown())
     {
         if (row.file.empty() && row.origin != definitions && row.origin != weight && (!migration || row.migration))
         {
@@ -4898,11 +4899,11 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteScripts(std::v
         for (const std::unique_ptr<Doc>& each : window->mDocs)
         {
             const Doc&        doc   = *each;
-            const std::string where = !doc.file.empty()         ? doc.file
-                                      : doc.notecard            ? getString("TabNotecardTip")
-                                      : doc.ref.inInventory()   ? getString("TabInventoryTip")
-                                      : !doc.objectName.empty() ? doc.objectName
-                                                                : getString("TabObjectTip");
+            const std::string& where = !doc.file.empty()         ? doc.file
+                                       : doc.notecard            ? mTabTips.notecard
+                                       : doc.ref.inInventory()   ? mTabTips.inventory
+                                       : !doc.objectName.empty() ? doc.objectName
+                                                                 : mTabTips.object;
             GoTo target;
             target.kind   = GoTo::Kind::Tab;
             target.window = window->getHandle();
@@ -8339,7 +8340,7 @@ void ALFloaterScriptStudio::addGoCommands()
             },
             [this]() {
                 Doc* doc = active();
-                return doc && doc->loaded && !doc->shown.empty();
+                return doc && doc->loaded && !doc->shown().empty();
             });
     }
     mCommands.add("next_tab", [this]() { cycleTab(1); });

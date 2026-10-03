@@ -441,6 +441,7 @@ void ALScriptExplorerPane::contentsHeard(const ALScriptContents& contents)
         mWindow->explorerPinsChanged();
     }
     mStale = true;
+    ALScriptStudioServices::TabsHeld held(*mServices);
     for (Model::Opening& one : heard.opening)
     {
         mServices->openScript(one.ref, one.name, std::move(one.text));
@@ -676,7 +677,8 @@ void ALScriptExplorerPane::onChosen()
 {
     // A script or notecard opened; an object, a prim or a linkset's row of
     // prims holding nothing opened where it is folded, folded where it is
-    // open.
+    // open. The tabs made once, as the last is opened.
+    ALScriptStudioServices::TabsHeld held(*mServices);
     for (const LLSD& value : mTree->chosen())
     {
         const std::optional<Choice> row = Choice::of(value);

@@ -1637,7 +1637,7 @@ void ALScriptStudioChecking::fixesOn(Doc& doc, S32 line, std::vector<ALCodeEdito
     // Only over the text they were made in: a text typed in since has other
     // places, and is checked again a moment later.
     const U32 now = doc.editor->document().version();
-    for (const Doc::Shown& shown : doc.shown)
+    for (const Doc::Shown& shown : doc.shown())
     {
         if (!shown.file.empty() || shown.line != line || shown.fixesFor != now)
         {
