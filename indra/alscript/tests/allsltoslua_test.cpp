@@ -554,8 +554,10 @@ namespace tut
         ensure("the pieces put in: " + r.text, has(r, "table.insert(outParts2, names[i] .. row)"));
         ensure("joined after: " + r.text, has(r, "    end\n    out ..= table.concat(outParts2)"));
         ensure("the inner loop's, declared in the outer: " + r.text,
-               has(r, "        local rowParts = {}\n        for j = 0, 2 do\n            table.insert(rowParts, tostring(j))") &&
-                   has(r, "        row ..= table.concat(rowParts)"));
+               has(r, "        local rowParts = {}\n        for j = 0, 2 do\n            table.insert(rowParts, tostring(j))"));
+        ensure("declared empty just before it: declared where it is joined: " + r.text,
+               has(r, "        end\n        local row = table.concat(rowParts)") && !has(r, "local row = \"\""));
+        ensure("declared with words of its own: added to: " + r.text, has(r, "local out = \"Names: \"") && has(r, "out ..= table.concat(outParts2)"));
         ensure("read in its loop: noted: " + r.text, has(r, "seen ..= \"x\"") && has(r, "-- LSL: seen is built with .. in a loop"));
         ensure("a global: noted: " + r.text, has(r, "gReport ..= \"y\"") && has(r, "-- LSL: gReport is built with .. in a loop"));
         checksClean(r);
@@ -564,8 +566,12 @@ namespace tut
         typed.types = true;
         const ALLSLToSLua::Result t = ALLSLToSLua::convert("default { state_entry() { string s; integer i; for (i = 0; i < 3; ++i) s += \"z\"; llOwnerSay(s); } }\n",
                                                            typed);
-        ensure("typed: " + t.text, has(t, "local sParts: { string } = {}"));
+        ensure("typed: " + t.text, has(t, "local sParts: { string } = {}") && has(t, "local s: string = table.concat(sParts)"));
         checksClean(t);
+
+        const ALLSLToSLua::Result read = convert("default { state_entry() { string t = \"\"; llOwnerSay(t); integer i; for (i = 0; i < 3; ++i) t += \"q\"; llOwnerSay(t); } }\n");
+        ensure("read between: declared where it was: " + read.text, has(read, "local t = \"\"") && has(read, "t ..= table.concat(tParts)"));
+        checksClean(read);
     }
 
     template<> template<>

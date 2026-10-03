@@ -651,6 +651,11 @@ namespace
         // The strings each loop builds, and those being built, by the
         // table of their pieces.
         boost::unordered_flat_map<LSLASTNode*, std::vector<LSLSymbol*>> mBuilds;
+        // A string a loop builds, declared empty in the loop's own block
+        // with nothing between that touches it: declared where its pieces
+        // are joined instead, its declaration not written.
+        boost::unordered_flat_set<LSLASTNode*>                          mJoinedDeclarations;
+        boost::unordered_flat_set<LSLSymbol*>                           mDeclaredAtJoin;
         boost::unordered_flat_map<LSLSymbol*, std::string>              mBuilding;
         // Appends in loops that are noted rather than built.
         boost::unordered_flat_set<LSLASTNode*> mUnbuilt;
@@ -2154,6 +2159,11 @@ namespace
                 const std::string name = nameOf(id);
                 // A counter that only numeric fors use, each with its own.
                 if (mLoopOnly.contains(id->getSymbol()) && (isNull(init) || init->getNodeSubType() == NODE_CONSTANT_EXPRESSION))
+                {
+                    return;
+                }
+                // A string declared where the loop building it joins it.
+                if (mJoinedDeclarations.contains(d))
                 {
                     return;
                 }
@@ -3687,6 +3697,46 @@ namespace
                 }
             }
         });
+        // Declared empty just before the loop that builds it, in the same
+        // block, nothing between reading or setting it: declared at the join.
+        const auto touches = [](LSLASTNode* statement, LSLSymbol* var) {
+            bool seen = false;
+            walk(statement, [&](LSLASTNode* inner) {
+                seen = seen || (inner->getNodeSubType() == NODE_LVALUE_EXPRESSION &&
+                                static_cast<LSLLValueExpression*>(inner)->getIdentifier()->getSymbol() == var);
+            });
+            return seen;
+        };
+        for (const auto& [built_by, vars] : mBuilds)
+        {
+            LSLASTNode* block = built_by->getParent();
+            if (!block || block->getNodeSubType() != NODE_COMPOUND_STATEMENT)
+            {
+                continue;
+            }
+            for (LSLSymbol* var : vars)
+            {
+                LSLDeclaration* declared = nullptr;
+                bool            touched  = false;
+                for (LSLASTNode* statement = block->getChild(0); statement && statement != built_by; statement = statement->getNext())
+                {
+                    if (statement->getNodeSubType() == NODE_DECLARATION && static_cast<LSLDeclaration*>(statement)->getIdentifier()->getSymbol() == var)
+                    {
+                        declared = static_cast<LSLDeclaration*>(statement);
+                        touched  = false;
+                    }
+                    else if (declared && touches(statement, var))
+                    {
+                        touched = true;
+                    }
+                }
+                if (declared && !touched && (isNull(declared->getInitializer()) || emptyValue(declared->getInitializer())))
+                {
+                    mJoinedDeclarations.insert(declared);
+                    mDeclaredAtJoin.insert(var);
+                }
+            }
+        }
         // An append an outer loop builds after all is not noted.
         boost::unordered::erase_if(mUnbuilt, [&](LSLASTNode* append) {
             LSLSymbol* var = nullptr;
@@ -3705,23 +3755,30 @@ namespace
     {
         const std::vector<LSLSymbol*> vars = std::move(mBuilds[loop]);
         mBuilds.erase(loop);
-        std::vector<std::pair<std::string, std::string>> joins;
+        struct Join
+        {
+            std::string name;
+            std::string parts;
+            bool        declared = false;
+        };
+        std::vector<Join> joins;
         for (LSLSymbol* var : vars)
         {
             const std::string name  = mNames.contains(var) ? mNames[var] : nameOf(var->getName());
             const std::string parts = freshName(name + "Parts");
             line("local " + parts + (mOptions.types ? ": { string }" : "") + " = {}");
             mBuilding[var] = parts;
-            joins.emplace_back(name, parts);
+            joins.push_back({ name, parts, mDeclaredAtJoin.contains(var) });
         }
         statement(loop, last);
         for (LSLSymbol* var : vars)
         {
             mBuilding.erase(var);
         }
-        for (const auto& [name, parts] : joins)
+        for (const Join& join : joins)
         {
-            line(name + " ..= table.concat(" + parts + ")");
+            line(join.declared ? "local " + join.name + (mOptions.types ? ": string" : "") + " = table.concat(" + join.parts + ")"
+                               : join.name + " ..= table.concat(" + join.parts + ")");
         }
     }
 
