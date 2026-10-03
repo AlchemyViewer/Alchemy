@@ -80,8 +80,10 @@ inline void LLQuaternion2::setAxisAngle(const LLVector4a& axis, F32 radians)
 // Set this quaternion to the conjugate of src
 inline void LLQuaternion2::setConjugate(const LLQuaternion2& src)
 {
-    // flip the sign of x, y and z; leave w
-    mQ = alsimd::xor_(src.mQ, alsimd::set(-0.f, -0.f, -0.f, 0.f));
+    // flip the sign of x, y and z; leave w. The sign bits are built as bits,
+    // not as -0.f: /fp:fast lets the compiler take -0.f for 0.f, and MSVC for
+    // arm64 does, leaving a mask that flips nothing.
+    mQ = alsimd::xor_(src.mQ, alsimd::and_(alsimd::set1_bits(0x80000000u), alsimd::mask_xyz()));
 }
 
 // Set this quaternion to the inverse of src
@@ -114,7 +116,8 @@ inline void LLQuaternion2::setMul(const LLQuaternion2& a, const LLQuaternion2& b
     const LLQuad p = b.mQ;
     const LLQuad q = a.mQ;
 
-    const LLQuad negate_w = alsimd::set(0.f, 0.f, 0.f, -0.f);
+    // w's sign bit, built as bits for the reason setConjugate gives
+    const LLQuad negate_w = alsimd::and_(alsimd::set1_bits(0x80000000u), alsimd::mask_lane<3>());
 
     const LLQuad q_wwwx = alsimd::xor_(alsimd::shuffle<3, 3, 3, 0>(q), negate_w);
     const LLQuad q_zxyy = alsimd::xor_(alsimd::shuffle<2, 0, 1, 1>(q), negate_w);
