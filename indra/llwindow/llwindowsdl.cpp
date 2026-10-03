@@ -1367,9 +1367,10 @@ namespace
     // What was last copied, held here rather than by SDL. SDL frees the text
     // it was given when it decides another client has the clipboard, while
     // the Wayland source or X11 owner it handed that text to can go on
-    // serving it (SDL issues 16037 and 16245; 3.4.18 decides so on Wayland
-    // each time keyboard focus leaves with an offer held), and another
-    // application pasted whatever had since been allocated there. SDL's
+    // serving it (SDL issues 16037 and 16245), and another application
+    // pasted whatever had since been allocated there. The registry's sdl3
+    // patches the wrong decisions known on 3.4.18
+    // (clipboard-keep-own-selection.patch); this stands for any left. SDL's
     // cleanup does nothing, so whatever still serves the text reads this.
     std::string sClipboardText;
 
