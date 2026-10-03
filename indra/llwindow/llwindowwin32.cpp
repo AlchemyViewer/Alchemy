@@ -749,6 +749,13 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
     {
         current_refresh = 60;
     }
+    // 0 and 1 mean "the display hardware's default rate", which is what a
+    // virtual machine's display or a remote session reports. Taken as a rate
+    // they would cap TargetFPS at 1 the moment vsync is turned on.
+    if (current_refresh <= 1)
+    {
+        current_refresh = 60;
+    }
     mRefreshRate = current_refresh;
     //-----------------------------------------------------------------------
     // Drop resolution and go fullscreen
@@ -1255,6 +1262,11 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
         current_refresh = dev_mode.dmDisplayFrequency;
     }
     else
+    {
+        current_refresh = 60;
+    }
+    // The hardware default, as above.
+    if (current_refresh <= 1)
     {
         current_refresh = 60;
     }
