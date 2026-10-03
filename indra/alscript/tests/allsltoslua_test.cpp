@@ -384,7 +384,7 @@ namespace tut
                                               "    integer f; for (f = 0; f < 3; ++f) total += f;\n"
                                               "    llOwnerSay((string)(total + f));\n"
                                               "} }\n");
-        ensure("up to a length: " + r.text, has(r, "for a = 1, #l do\n    total += l[a]"));
+        ensure("up to a length, walking its items: " + r.text, has(r, "for _, item in l do\n    total += item"));
         ensure("down by a step: " + r.text, has(r, "for b = 10, 0, -2 do"));
         ensure("up to and with: " + r.text, has(r, "for c = 1, n do"));
         ensure("a counter set in its body keeps the while: " + r.text, has(r, "while d < n do"));
@@ -550,8 +550,8 @@ namespace tut
                                               "    for (k = 0; k < 2; ++k) gReport += \"y\";\n"
                                               "    llOwnerSay(out + seen + gReport + (string)outParts);\n"
                                               "} }\n");
-        ensure("the outer loop's table, a name of its own: " + r.text, has(r, "local outParts2 = {}\n    for i = 1, #names do"));
-        ensure("the pieces put in: " + r.text, has(r, "table.insert(outParts2, names[i] .. row)"));
+        ensure("the outer loop's table, a name of its own: " + r.text, has(r, "local outParts2 = {}\n    for _, item in names do"));
+        ensure("the pieces put in: " + r.text, has(r, "table.insert(outParts2, item .. row)"));
         ensure("joined after: " + r.text, has(r, "    end\n    out ..= table.concat(outParts2)"));
         ensure("the inner loop's, declared in the outer: " + r.text,
                has(r, "        local rowParts = {}\n        for j = 0, 2 do\n            table.insert(rowParts, tostring(j))"));
@@ -878,7 +878,7 @@ namespace tut
                                               "    integer n = 1;\n"
                                               "    llOwnerSay(llList2String(gNames, 0) + llList2String(p, -1) + llList2String(keys, 1));\n"
                                               "    llOwnerSay(llList2String(mixed, 2) + (string)llList2Integer(mixed, 0) + llList2String(gNames, n));\n"
-                                              "    integer i; for (i = 0; i < llGetListLength(p); ++i) llOwnerSay(llList2String(p, i));\n"
+                                              "    integer i; for (i = 0; i < llGetListLength(p); ++i) llOwnerSay(llList2String(p, i) + llGetSubString(\"abc\", i, i));\n"
                                               "} }\n");
         ensure("from the start, empty past the end: " + r.text, has(r, "(gNames[1] or \"\")"));
         ensure("back from the end, through a function's list: " + r.text, has(r, "(p[#p] or \"\")"));
@@ -886,7 +886,7 @@ namespace tut
         ensure("a float's text is not tostring's, and an index not known: llcompat: " + r.text,
                has(r, "llcompat.List2String(mixed, 2)") && has(r, "llcompat.List2String(gNames, n)"));
         ensure("mixed items for a number: llcompat: " + r.text, has(r, "llcompat.List2Integer(mixed, 0)"));
-        ensure("within its length, as it is, counting from 1: " + r.text, has(r, "for i = 1, #p do\n    print(p[i])"));
+        ensure("within its length, as it is, counting from 1: " + r.text, has(r, "for i = 1, #p do\n    print(p[i] .. ll.GetSubString(\"abc\", i, i))"));
         checksClean(r);
     }
 
@@ -1050,5 +1050,41 @@ namespace tut
                                                            typed);
         ensure("typed: " + t.text, has(t, "local function say(loud: boolean, text: string)"));
         checksClean(t);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<34>()
+    {
+        set_test_name("a counting loop over a list's items, its counter read as nothing else, walks the items; from another start, or read otherwise, it counts");
+        const ALLSLToSLua::Result r = convert("list gNames = [\"a\", \"b\"];\n"
+                                              "default { state_entry() {\n"
+                                              "    list keys = [llGetOwner()];\n"
+                                              "    integer i;\n"
+                                              "    for (i = 0; i < llGetListLength(gNames); ++i) llOwnerSay(llList2String(gNames, i));\n"
+                                              "    integer j;\n"
+                                              "    for (j = 0; j < llGetListLength(gNames); ++j) {\n"
+                                              "        integer k;\n"
+                                              "        for (k = 0; k < llGetListLength(keys); ++k) llOwnerSay(llList2String(gNames, j) + llList2String(keys, k));\n"
+                                              "    }\n"
+                                              "    integer m;\n"
+                                              "    for (m = 1; m < llGetListLength(gNames); ++m) llOwnerSay(llList2String(gNames, m));\n"
+                                              "    integer n;\n"
+                                              "    for (n = 0; n < llGetListLength(gNames); ++n) llOwnerSay(llList2String(gNames, n) + (string)n);\n"
+                                              "} }\n");
+        ensure("walked: " + r.text, has(r, "for _, item in gNames do\n    print(item)\n"));
+        ensure("one inside another, each its own name, a key's made text: " + r.text,
+               has(r, "for _, item2 in keys do\n        print(item .. tostring(item2))"));
+        ensure("from the second: counted: " + r.text, has(r, "for m = 2, #gNames do\n    print(gNames[m])"));
+        ensure("its counter read as a number too: counted: " + r.text, has(r, "for n = 0, #gNames - 1 do"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result named = convert("list gNames = [\"a\"];\n"
+                                                  "integer _ = 2;\n"
+                                                  "default { state_entry() {\n"
+                                                  "    integer i;\n"
+                                                  "    for (i = 0; i < llGetListLength(gNames); ++i) llOwnerSay(llList2String(gNames, i) + (string)_);\n"
+                                                  "} }\n");
+        ensure("an index that would hide the script's _ named afresh: " + named.text, has(named, "for _2, item in gNames do"));
+        checksClean(named);
     }
 }

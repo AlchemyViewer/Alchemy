@@ -386,6 +386,10 @@ namespace
         // Whether every read of a counter in a loop's body is an index that
         // ll is given (llIndex), which the loop may count from 1 for.
         bool onlyIndexes(LSLSymbol* var, LSLASTNode* body);
+        // Whether every read of a counter in a loop's body is of one list's
+        // item at it, as it is (listItemFits): the loop may walk the list's
+        // items instead (mEach).
+        bool onlyItemsOf(LSLSymbol* var, LSLSymbol* list, LSLASTNode* body);
         // The call's arguments for ll: its index arguments moved on by one.
         std::string llArgs(LSLFunctionExpression* e, U16 indexes);
         // `: type` for an LSL type, where types are written.
@@ -510,6 +514,8 @@ namespace
         static std::vector<LSLExpression*> appended(LSLASTNode* node, LSLSymbol*& var);
         // A name no other in the script has, nor SLua holds.
         std::string freshName(const std::string& base);
+        // Every name the script has, and those made fresh, in mTaken.
+        void takeNames();
 
         // --- steps as statements -----------------------------------------------------
 
@@ -634,6 +640,11 @@ namespace
         boost::unordered_flat_set<LSLSymbol*>                 mFromOne;
         // Counters within a list's length, i < llGetListLength(l): the list.
         boost::unordered_flat_map<LSLSymbol*, LSLSymbol*>     mWithin;
+        // Counters whose loop walks their list's items instead: the item's
+        // name. A name for each depth of such loops, made once.
+        boost::unordered_flat_map<LSLSymbol*, std::string>    mEach;
+        std::vector<std::string>                              mItemNames;
+        std::string                                           mUnread;
         boost::unordered_flat_map<LSLSymbol*, U8>             mListTypes;
         boost::unordered_flat_set<LSLSymbol*>                 mLoopOnly;
         boost::unordered_flat_set<LSLSymbol*>                 mBooleans;
@@ -2580,20 +2591,46 @@ namespace
                     : shift < 0 ? value(c.limit).text
                                 : bracketed(value(c.limit), ADD) + (shift > 0 ? " + 2" : " + 1");
         }
-        line("for " + nameOf(c.id) + " = " + start + ", " + to + step + " do");
+        // Up by one, below a list's length: within the list.
+        LSLExpression* limit_call = unwrapped(c.limit);
+        LSLExpression* listed     = nullptr;
+        if (up && c.step == 1 && c.check == OP_LESS && limit_call->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
+            std::string_view(static_cast<LSLFunctionExpression*>(limit_call)->getIdentifier()->getName()) == "llGetListLength")
+        {
+            listed = argumentAt(static_cast<LSLFunctionExpression*>(limit_call), 0);
+        }
+        LSLSymbol* within = listed ? wholeVariable(listed) : nullptr;
+        // From its first item, the counter read as nothing but the list's
+        // items: Luau's walk over them, each by name.
+        const bool each = from_one && within && from == 0 && onlyItemsOf(c.var, within, f->getBody());
+        if (each)
+        {
+            const size_t depth = mEach.size();
+            if (depth == mItemNames.size())
+            {
+                mItemNames.push_back(freshName("item"));
+            }
+            // The index unread, as Luau writes one, unless the script has
+            // a name that would be hidden by it.
+            if (mUnread.empty())
+            {
+                takeNames();
+                mUnread = mTaken.contains("_") ? freshName("_") : std::string("_");
+            }
+            line("for " + mUnread + ", " + mItemNames[depth] + " in " + lvalue(static_cast<LSLLValueExpression*>(unwrapped(listed))).text + " do");
+            mEach[c.var] = mItemNames[depth];
+        }
+        else
+        {
+            line("for " + nameOf(c.id) + " = " + start + ", " + to + step + " do");
+        }
         if (up || down)
         {
             mNonNegative.insert(c.var);
         }
-        // Up by one, below a list's length: within the list.
-        LSLExpression* limit_call = unwrapped(c.limit);
-        if (up && c.step == 1 && c.check == OP_LESS && limit_call->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
-            std::string_view(static_cast<LSLFunctionExpression*>(limit_call)->getIdentifier()->getName()) == "llGetListLength")
+        if (within)
         {
-            if (LSLSymbol* list = wholeVariable(argumentAt(static_cast<LSLFunctionExpression*>(limit_call), 0)))
-            {
-                mWithin[c.var] = list;
-            }
+            mWithin[c.var] = within;
         }
         if (from_one)
         {
@@ -2608,6 +2645,7 @@ namespace
         mNonNegative.erase(c.var);
         mFromOne.erase(c.var);
         mWithin.erase(c.var);
+        mEach.erase(c.var);
         line("end");
     }
 
@@ -2661,6 +2699,39 @@ namespace
             const bool item = builtin && arg->getParentSlot() == 1 && listItemFits(static_cast<LSLFunctionExpression*>(call));
             only = item || (trait && (trait->slua & ALLSLTraits::SluaIndexArgs) && !(trait->slua & not_ll) &&
                             (trait->sluaIndexArgs & (1 << arg->getParentSlot())) && name.rfind("llDetected", 0) != 0);
+        });
+        return any && only;
+    }
+
+    bool Writer::onlyItemsOf(LSLSymbol* var, LSLSymbol* list, LSLASTNode* body)
+    {
+        bool any  = false;
+        bool only = true;
+        walk(body, [&](LSLASTNode* node) {
+            if (!only || node->getNodeSubType() != NODE_LVALUE_EXPRESSION ||
+                static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol() != var)
+            {
+                return;
+            }
+            any = true;
+            // As it is, the index of a library call reading an item of the
+            // list.
+            LSLASTNode* arg = node;
+            while (arg->getParent() && arg->getParent()->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+            {
+                arg = arg->getParent();
+            }
+            LSLASTNode* args = arg->getParent();
+            LSLASTNode* call = args ? args->getParent() : nullptr;
+            if (!call || args->getNodeType() != NODE_AST_NODE_LIST || call->getNodeSubType() != NODE_FUNCTION_EXPRESSION ||
+                arg->getParentSlot() != 1)
+            {
+                only = false;
+                return;
+            }
+            auto*      read    = static_cast<LSLFunctionExpression*>(call);
+            LSLSymbol* fn      = read->getIdentifier()->getSymbol();
+            only               = fn && fn->getSubType() == SYM_BUILTIN && wholeVariable(argumentAt(read, 0)) == list && listItemFits(read);
         });
         return any && only;
     }
@@ -3824,7 +3895,7 @@ namespace
         return true;
     }
 
-    std::string Writer::freshName(const std::string& base)
+    void Writer::takeNames()
     {
         if (mTaken.empty())
         {
@@ -3836,6 +3907,11 @@ namespace
                 }
             });
         }
+    }
+
+    std::string Writer::freshName(const std::string& base)
+    {
+        takeNames();
         std::string name = base;
         for (int n = 2; mTaken.contains(name) || reservedName(name); ++n)
         {
@@ -4151,7 +4227,9 @@ namespace
         LSLSymbol*        counter = wholeVariable(index);
         const auto        within  = counter ? mWithin.find(counter) : mWithin.end();
         const bool        found   = within != mWithin.end() && within->second == var;
-        const std::string item    = name + "[" + at + "]";
+        // And where its loop walks the list's items, the item by name.
+        const auto        walked  = found ? mEach.find(counter) : mEach.end();
+        const std::string item    = walked != mEach.end() ? walked->second : name + "[" + at + "]";
         const Expr        read    = found ? Expr{ item } : Expr{ item + " or " + kind->second.empty, OR };
         return as_is ? read : Expr{ "tostring(" + read.text + ")" };
     }
