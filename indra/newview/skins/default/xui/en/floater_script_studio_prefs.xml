@@ -103,7 +103,9 @@
     <floater.string name="LintLuauSlZeroIndex">A list, a string or ll counted from 0, as LSL counted (the studio's own)</floater.string>
     <floater.string name="LintLuauSlCompatCall">llcompat's function where ll's means the same (the studio's own)</floater.string>
     <floater.string name="LintLuauSlBooleanNumber">A boolean compared with a number, as LSL's TRUE and FALSE were (the studio's own)</floater.string>
-    <floater.string name="LintLuauSlGlobalAssign">A global made where a local would do, or a function made global inside a block (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlGlobalAssign">A global given a value at the top where a local would do, or a function made global inside a block (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlForIndexAssign">A for loop's own variable set inside it, which Luau's for does not go on from as LSL's did (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlGlobalFunction">A function at the top made global where a local function would do (the studio's own)</floater.string>
     <floater.string name="LintLuauSlParenCondition">A condition in brackets, as LSL's had to be (the studio's own)</floater.string>
     <floater.string name="LintLuauSlAlmostSwapped">a = b and then b = a, which is no swap (the studio's own)</floater.string>
     <floater.string name="LintLuauSlMustUse">A call that only answers, its answer thrown away (the studio's own)</floater.string>

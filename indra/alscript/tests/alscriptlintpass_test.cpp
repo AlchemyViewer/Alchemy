@@ -301,30 +301,41 @@ namespace tut
     template<> template<>
     void object::test<5>()
     {
-        set_test_name("SlGlobalAssign: a global made at the top, once, a note; a function made global in a block, a warning; not a name the "
-                      "script is given; each made local, in place or declared before it is first named, and not where _G is");
+        set_test_name("SlGlobalAssign: a global made at the top, once, a note; a function made global in a block, a warning; a function "
+                      "at the top SlGlobalFunction's, a note, off on its own; not a name the script is given; each made local, in place or "
+                      "declared before it is first named, and not where _G is");
         ensure("definitions: " + error, loaded);
-        const std::string said = found("count = 0\n"
-                                       "function bump() count += 1; total = count end\n"
-                                       "local function early() return later end\n"
-                                       "later = 5\n"
-                                       "print = print\n"
-                                       "local function outer()\n"
-                                       "    function inner() return 1 end\n"
-                                       "    function shared() return 2 end\n"
-                                       "    return inner()\n"
-                                       "end\n"
-                                       "x, y = 1, 2\n"
-                                       "print(bump, early, outer, shared, total, x, y)\n"
-                                       "count = 1\n",
-                                       "SlGlobalAssign", ALScriptProblem::Severity::Warning);
+        const std::string script = "count = 0\n"
+                                   "function bump() count += 1; total = count end\n"
+                                   "local function early() return later end\n"
+                                   "later = 5\n"
+                                   "print = print\n"
+                                   "local function outer()\n"
+                                   "    function inner() return 1 end\n"
+                                   "    function shared() return 2 end\n"
+                                   "    return inner()\n"
+                                   "end\n"
+                                   "x, y = 1, 2\n"
+                                   "print(bump, early, outer, shared, total, x, y)\n"
+                                   "count = 1\n";
+        const std::string said = found(script, "SlGlobalAssign", ALScriptProblem::Severity::Warning);
         ensure_equals("each", said,
                       std::string("0 LuauLintSlGlobalAssign|count (another severity)\n"
-                                  "1 LuauLintSlGlobalFunction|bump (another severity)\n"
                                   "3 LuauLintSlGlobalAssign|later (another severity)\n"
                                   "6 LuauLintSlGlobalFunctionInScope|inner\n"
                                   "7 LuauLintSlGlobalFunctionInScope|shared\n"
                                   "10 LuauLintSlGlobalAssign|x, y (another severity)\n"));
+        ensure_equals("the function at the top", found(script, "SlGlobalFunction", ALScriptProblem::Severity::Note),
+                      std::string("1 LuauLintSlGlobalFunction|bump\n"));
+        ensure_equals("off on its own: the rest still said", found("--!nolint SlGlobalFunction\n" + script, "SlGlobalAssign", ALScriptProblem::Severity::Warning),
+                      std::string("1 LuauLintSlGlobalAssign|count (another severity)\n"
+                                  "4 LuauLintSlGlobalAssign|later (another severity)\n"
+                                  "7 LuauLintSlGlobalFunctionInScope|inner\n"
+                                  "8 LuauLintSlGlobalFunctionInScope|shared\n"
+                                  "11 LuauLintSlGlobalAssign|x, y (another severity)\n"));
+        ensure("and it not", found("--!nolint SlGlobalFunction\n" + script, "SlGlobalFunction", ALScriptProblem::Severity::Note).empty());
+        ensure("nor the function where SlGlobalAssign alone is off",
+               found("--!nolint SlGlobalAssign\n" + script, "SlGlobalFunction", ALScriptProblem::Severity::Note) == "2 LuauLintSlGlobalFunction|bump\n");
         ensure_equals("in place", fixed("count = 0\nprint(count)\n", "LuauLintSlGlobalAssign", "Write it local count", false),
                       std::string("local count = 0\nprint(count)\n"));
         ensure_equals("declared first", fixed("local function early() return later end\nlater = 5\nprint(early())\n", "LuauLintSlGlobalAssign",
@@ -827,5 +838,38 @@ namespace tut
         note.source = ALScriptProblem::Source::Assistant;
         note.key    = "SluaNote";
         ensure("a note", ALScriptLintPass::migration(note));
+    }
+
+    template<> template<>
+    void object::test<22>()
+    {
+        set_test_name("SlForIndexAssign: a numeric for's variable set in its body, plainly or by +=, a warning at each, in a function it makes "
+                      "too; not a local of the same name in it, not a generic for's, not a while's; no fix");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local list = {\"a\", \"a\", \"b\"}\n"
+                                       "local start = 1\n"
+                                       "for i = 1, #list - 1 do\n"
+                                       "    if list[i] ~= list[start] then\n"
+                                       "        start += 1\n"
+                                       "        i = start\n"
+                                       "    end\n"
+                                       "    i += 1\n"
+                                       "    local function later() i = 0 end\n"
+                                       "    later()\n"
+                                       "end\n"
+                                       "for i = 1, 2 do\n"
+                                       "    local i = 5\n"
+                                       "    i = 6\n"
+                                       "    print(i)\n"
+                                       "end\n"
+                                       "for k, v in list do k = 2; print(k, v) end\n"
+                                       "local n = 1\n"
+                                       "while n < 3 do n = n + 1 end\n",
+                                       "SlForIndexAssign", ALScriptProblem::Severity::Warning);
+        ensure_equals("each", said,
+                      std::string("5 LuauLintSlForIndexAssign|i\n"
+                                  "7 LuauLintSlForIndexAssign|i\n"
+                                  "8 LuauLintSlForIndexAssign|i\n"));
+        unfixed("for i = 1, 3 do i = 2 end\n", "LuauLintSlForIndexAssign");
     }
 }

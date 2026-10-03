@@ -898,6 +898,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintSlBooleanNumberChoice">[1] asks no more than [2]: its 1 or 0 is made only to be compared</string>
 	<string name="LuauLintSlGlobalAssign">This makes [1] a global. A local is quicker for Luau to read</string>
 	<string name="LuauLintSlGlobalFunction">function [1] makes a global. local function [1] is quicker for Luau to call</string>
+	<string name="LuauLintSlForIndexAssign">[1] is set here, but the for gives [1] its own next value each time round, whatever it was set to: LSL's for went on from it. A while loop does</string>
 	<string name="LuauLintSlGlobalFunctionInScope">function [1] here makes a global, and only once this runs. local function [1] keeps it to this block</string>
 	<string name="LuauLintSlParenCondition">Luau's [1] needs no brackets round its condition, where LSL's did</string>
 	<string name="LuauLintSlAlmostSwapped">[1] = [2] and then [2] = [1] leave both [2]: a swap is [3]</string>
