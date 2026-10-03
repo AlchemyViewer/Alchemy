@@ -363,6 +363,20 @@ namespace tut
         shown.id           = "script-3";
         pane.show(shown);
         ensure("and URLs where there are" + head->getText(), head->getText().find("128 KB and 3 URLs") != std::string::npos);
+        ensure("no time where the region said none" + head->getText(), head->getText().find("ms of the region") == std::string::npos);
+        shown.region->time     = 0.125f;
+        shown.region->timeWhen = LLDate(1.8e9);
+        shown.id               = "script-4";
+        pane.show(shown);
+        ensure("its time, said to an estate manager" + head->getText(), head->getText().find("take 0.125 ms of the region's time") != std::string::npos);
+        ALScriptRegionUsage::Usage timed;
+        timed.time     = 0.5f;
+        timed.timeWhen = LLDate(1.8e9);
+        shown.region   = timed;
+        shown.id       = "script-5";
+        pane.show(shown);
+        ensure("time alone: no memory said" + head->getText(),
+               head->getText().find("reserves") == std::string::npos && head->getText().find("take 0.500 ms") != std::string::npos);
     }
 
     // LSL on Luau's compiler records no lines, so its lines are not

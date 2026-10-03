@@ -3237,7 +3237,7 @@ void register_viewer_callbacks(LLMessageSystem* msg)
     msg->setHandlerFuncFast(_PREHASH_ParcelObjectOwnersReply,       LLPanelLandObjects::processParcelObjectOwnersReply);
 
     msg->setHandlerFuncFast(_PREHASH_InitiateDownload,              process_initiate_download);
-    msg->setHandlerFuncFast(_PREHASH_LandStatReply,                 LLFloaterTopObjects::handle_land_reply);
+    msg->setHandlerFuncFast(_PREHASH_LandStatReply,                 ALScriptWorkspace::processLandStatReply);
     msg->setHandlerFuncFast(_PREHASH_GenericMessage,                process_generic_message);
     msg->setHandlerFuncFast(_PREHASH_GenericStreamingMessage,       process_generic_streaming_message);
     msg->setHandlerFuncFast(_PREHASH_LargeGenericMessage,           process_large_generic_message);

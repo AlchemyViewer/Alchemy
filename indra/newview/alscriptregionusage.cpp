@@ -26,6 +26,8 @@
 
 #include "alscriptregionusage.h"
 
+#include <algorithm>
+
 namespace
 {
     // The objects of a list of groups -- an answer's attachment points, or
@@ -118,6 +120,38 @@ void ALScriptRegionUsage::ask(const std::vector<LLUUID>& roots, F64 now)
             }
         });
     }
+    // Time, of an estate manager: each owner's objects at once, an owner at
+    // most once a minute, whatever was asked of memory.
+    if (!mWorld.mayAskTime || !mWorld.askTime || !mWorld.ownerOf || !mWorld.mayAskTime())
+    {
+        return;
+    }
+    std::vector<std::string> owners;
+    for (const LLUUID& root : roots)
+    {
+        if (!mWorld.kindOf || mWorld.kindOf(root) == World::Kind::None)
+        {
+            continue;
+        }
+        const std::string owner = mWorld.ownerOf(root);
+        const auto        asked = mTimeAsked.find(owner);
+        if (owner.empty() || (asked != mTimeAsked.end() && now - asked->second < ASK_EVERY) ||
+            std::find(owners.begin(), owners.end(), owner) != owners.end())
+        {
+            continue;
+        }
+        mTimeAsked[owner] = now;
+        owners.push_back(owner);
+    }
+    for (const std::string& owner : owners)
+    {
+        mWorld.askTime(owner, [this, alive](const times_t& times) {
+            if (alive.lock())
+            {
+                heardTimes(times, LLDate::now());
+            }
+        });
+    }
 }
 
 // static
@@ -139,12 +173,31 @@ void ALScriptRegionUsage::heard(const usages_t& usages)
         return;
     }
     // Each object named is answered for as of the last asking, asked with
-    // the others or not: a parcel's answer is every object on it.
+    // the others or not: a parcel's answer is every object on it. Its time,
+    // where said, stays.
     for (const auto& [id, usage] : usages)
     {
-        mUsages[id]      = usage;
+        Usage& kept      = mUsages[id];
+        kept.memory      = usage.memory;
+        kept.urls        = usage.urls;
+        kept.when        = usage.when;
         const auto asked = mAsked.find(id);
         mAsked[id]       = asked != mAsked.end() ? std::max(asked->second, mNow) : mNow;
+    }
+    mHeard();
+}
+
+void ALScriptRegionUsage::heardTimes(const times_t& times, const LLDate& when)
+{
+    if (times.empty())
+    {
+        return;
+    }
+    for (const auto& [id, time] : times)
+    {
+        Usage& kept   = mUsages[id];
+        kept.time     = time;
+        kept.timeWhen = when;
     }
     mHeard();
 }

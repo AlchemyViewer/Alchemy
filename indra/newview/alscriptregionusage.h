@@ -39,7 +39,8 @@
 // hand, as it tells the Script Limits and My Scripts floaters: memory and
 // URLs for each object, by its root. Never for each script, and never what
 // a script uses: the region counts a Mono script at its limit, 64 KB unless
-// llSetMemoryLimit says less. Time it tells only an estate manager.
+// llSetMemoryLimit says less. Time it tells only an estate manager, by Top
+// Scripts: each object's, asked for by its owner's name.
 //
 // An attachment of the agent's is asked of AttachmentResources, which
 // answers for all of them at once; an object on land, of LandResources,
@@ -52,11 +53,20 @@ class ALScriptRegionUsage
 public:
     struct Usage
     {
-        // Bytes.
+        // Bytes; and when the region said so, an epoch's nought where it has
+        // not.
         S64    memory = 0;
         S32    urls   = 0;
-        LLDate when;
+        LLDate when   = LLDate(0.0);
+        // The time its scripts take, in milliseconds a frame, as Top Scripts
+        // says it to an estate manager; negative where it has not said.
+        F32    time     = -1.f;
+        LLDate timeWhen = LLDate(0.0);
+        bool   hasMemory() const { return when.secondsSinceEpoch() > 0.0; }
+        bool   hasTime() const { return time >= 0.f; }
     };
+    // Time said, by each object's id.
+    typedef boost::unordered_flat_map<LLUUID, F32> times_t;
 
     struct World
     {
@@ -76,6 +86,15 @@ public:
         // The parcel an object stands on asked about, its details' answer
         // to `told` the same way.
         std::function<void(const LLUUID& root, std::function<void(const LLSD& answer)> told)> askLand;
+        // Whether the region would tell the agent its scripts' time: an
+        // estate manager of it.
+        std::function<bool()> mayAskTime;
+        // The name Top Scripts knows an object's owner by; empty where it
+        // is not known, and the object's time is not asked for.
+        std::function<std::string(const LLUUID& root)> ownerOf;
+        // Top Scripts asked for, of one owner's objects; `told` with each
+        // one's time, once, or not at all.
+        std::function<void(const std::string& owner, std::function<void(const times_t& times)> told)> askTime;
     };
 
     // How long an answer stands before an object is asked about again.
@@ -95,8 +114,10 @@ public:
     static void readAttachments(const LLSD& answer, const LLDate& when, usages_t& out);
     static void readDetails(const LLSD& answer, const LLDate& when, usages_t& out);
 
-    // What an answer said kept, and heard: the objects it named.
+    // What an answer said kept, and heard: the objects it named. Memory
+    // and time each keep what the other said.
     void heard(const usages_t& usages);
+    void heardTimes(const times_t& times, const LLDate& when);
     typedef boost::signals2::signal<void()> heard_signal_t;
     boost::signals2::connection onHeard(const heard_signal_t::slot_type& slot) { return mHeard.connect(slot); }
 
@@ -106,6 +127,8 @@ private:
     // When each object, and the attachments, were last asked about.
     boost::unordered_flat_map<LLUUID, F64> mAsked;
     F64                                    mAttachmentsAsked = -ASK_EVERY;
+    // When each owner's objects' time was last asked for.
+    boost::unordered_flat_map<std::string, F64> mTimeAsked;
     // The clock as the last asking said it, which an answer is counted by.
     F64                                    mNow = 0.0;
     heard_signal_t                         mHeard;

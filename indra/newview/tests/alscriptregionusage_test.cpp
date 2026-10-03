@@ -44,6 +44,11 @@ namespace tut
         std::map<LLUUID, Kind>          kinds;
         std::vector<Told>               attachmentAsks;
         std::vector<std::pair<LLUUID, Told>> landAsks;
+        // Time: whether the agent manages the estate, each object's owner,
+        // and the askings of Top Scripts not answered yet.
+        bool                                 estateManager = false;
+        std::map<LLUUID, std::string>        owners;
+        std::vector<std::pair<std::string, std::function<void(const Usage::times_t&)>>> timeAsks;
         Usage                           usage;
         S32                             heard = 0;
         boost::signals2::scoped_connection heardConnection;
@@ -62,6 +67,14 @@ namespace tut
             };
             out.askAttachments = [this](Told told) { attachmentAsks.push_back(std::move(told)); };
             out.askLand        = [this](const LLUUID& root, Told told) { landAsks.emplace_back(root, std::move(told)); };
+            out.mayAskTime     = [this]() { return estateManager; };
+            out.ownerOf        = [this](const LLUUID& root) {
+                const auto found = owners.find(root);
+                return found != owners.end() ? found->second : std::string();
+            };
+            out.askTime = [this](const std::string& owner, std::function<void(const Usage::times_t&)> told) {
+                timeAsks.emplace_back(owner, std::move(told));
+            };
             return out;
         }
 
@@ -185,5 +198,48 @@ namespace tut
         orphaned(parcel);
         late(parcel);
         ensure("the one still here heard", usage.usageOf(id(3)) != nullptr);
+    }
+
+    template<> template<>
+    void alscriptregionusage_object::test<4>()
+    {
+        set_test_name("time, of an estate manager only: each owner's objects asked for at once, once a minute, an owner unknown not at all; kept with what memory said, and memory kept with it");
+        kinds[id(1)] = Kind::Land;
+        kinds[id(2)] = Kind::Land;
+        kinds[id(3)] = Kind::Attachment;
+        kinds[id(4)] = Kind::Land;
+        owners[id(1)] = "Ann Resident";
+        owners[id(2)] = "Ann Resident";
+        owners[id(3)] = "Bo Smith";
+        usage.ask({ id(1), id(2), id(3), id(4) }, 100.0);
+        ensure("not an estate manager: not asked", timeAsks.empty());
+
+        estateManager = true;
+        attachmentAsks.clear();
+        landAsks.clear();
+        usage.ask({ id(1), id(2), id(3), id(4) }, 100.0);
+        ensure_equals("an asking an owner", timeAsks.size(), 2U);
+        ensure("each owner once, none for one unknown", timeAsks[0].first == "Ann Resident" && timeAsks[1].first == "Bo Smith");
+        usage.ask({ id(1) }, 130.0);
+        ensure("not again within a minute", timeAsks.size() == 2);
+        usage.ask({ id(1) }, 161.0);
+        ensure("again after it", timeAsks.size() == 3 && timeAsks[2].first == "Ann Resident");
+
+        // Memory first, then time: both kept.
+        LLSD details;
+        details["parcels"][0]["objects"].append(object(id(1), 65536, 0));
+        landAsks[0].second(details);
+        Usage::times_t times;
+        times[id(1)] = 0.125f;
+        times[id(5)] = 2.0f;
+        const S32 before = heard;
+        timeAsks[0].second(times);
+        ensure("heard", heard == before + 1);
+        const ALScriptRegionUsage::Usage* one = usage.usageOf(id(1));
+        ensure("its time and its memory", one && one->hasTime() && one->time == 0.125f && one->hasMemory() && one->memory == 65536);
+        ensure("an object not asked about kept too, time alone", usage.usageOf(id(5)) && !usage.usageOf(id(5))->hasMemory());
+        // Memory again: the time stays.
+        landAsks[0].second(details);
+        ensure("time kept through memory", usage.usageOf(id(1))->time == 0.125f);
     }
 }

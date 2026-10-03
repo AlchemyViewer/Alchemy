@@ -177,6 +177,10 @@ public:
     // The region's answer, registered for the message; the legacy live
     // editor hears it through here.
     static void processScriptRunningReply(LLMessageSystem* msg, void** data);
+    // The region's answer to Top Scripts and Top Colliders, registered for
+    // the message: the studio's where it asked for its objects' time
+    // (ALScriptRegionUsage), else the Top Objects floater's.
+    static void processLandStatReply(LLMessageSystem* msg, void** data);
 
     // The experience a script in an object runs under, asked of its
     // region: the null one for none -- and for a script in the inventory,
