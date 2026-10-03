@@ -107,6 +107,10 @@
     <panel.string name="cmd_change_all_occurrences">Change all occurrences</panel.string>
     <panel.string name="cmd_add_caret_above">Add a caret above</panel.string>
     <panel.string name="cmd_add_caret_below">Add a caret below</panel.string>
+    <panel.string name="cmd_column_select_left">Grow the column selection left</panel.string>
+    <panel.string name="cmd_column_select_right">Grow the column selection right</panel.string>
+    <panel.string name="cmd_column_select_up">Grow the column selection up</panel.string>
+    <panel.string name="cmd_column_select_down">Grow the column selection down</panel.string>
     <panel.string name="cmd_previous_misspelling">Previous misspelling</panel.string>
     <text
      follows="left|top"

@@ -2230,8 +2230,14 @@ namespace tut
         e.setCaret(ALTextPos(0, 10));
         key(KEY_RIGHT, part);
         ensure("a part", e.caret() == ALTextPos(0, 12));
+#if LL_DARWIN
         key(KEY_RIGHT, part | MASK_SHIFT);
-        ensure("and a part selected", e.selection().normalised() == ALTextRange(ALTextPos(0, 12), ALTextPos(0, 15)));
+#else
+        // A key of its own only on the Mac: Control-Shift-Alt with an
+        // arrow grows a column elsewhere.
+        e.perform(ALEditorCommand::SelectSubwordRight);
+#endif
+        ensure("and a part selected",e.selection().normalised() == ALTextRange(ALTextPos(0, 12), ALTextPos(0, 15)));
         e.setCaret(ALTextPos(0, 18));
         key(KEY_BACKSPACE, word);
         ensure_equals("a word taken back is the name", e.text(), std::string("ll.Say(0, );"));

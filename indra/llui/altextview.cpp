@@ -177,6 +177,10 @@ namespace
             case ALEditorCommand::ChangeAllOccurrences:
             case ALEditorCommand::AddCaretAbove:
             case ALEditorCommand::AddCaretBelow:
+            case ALEditorCommand::ColumnSelectLeft:
+            case ALEditorCommand::ColumnSelectRight:
+            case ALEditorCommand::ColumnSelectUp:
+            case ALEditorCommand::ColumnSelectDown:
             case ALEditorCommand::FindNext:
             case ALEditorCommand::FindPrevious:
             case ALEditorCommand::COUNT:
@@ -1086,6 +1090,123 @@ bool ALTextView::addCarets(S32 direction)
     return true;
 }
 
+ALTextView::ColumnCorner ALTextView::cornerAt(const ALTextPos& pos)
+{
+    ColumnCorner corner;
+    corner.line = pos.line;
+    corner.x    = mLayout.xOf(pos.line, pos.column, &corner.row);
+    return corner;
+}
+
+ALTextView::ColumnCorner ALTextView::cornerAtLocal(S32 x, S32 y)
+{
+    const LLRect text = textRect();
+    ColumnCorner corner;
+    if (mLayout.rowHeight() <= 0 || mDocument.lineCount() == 0)
+    {
+        return corner;
+    }
+    const S32 doc_y = (text.mTop - y) + mScrollY;
+    corner.line     = mLayout.lineAtY(llmax(0, doc_y));
+    corner.row      = mLayout.rowAtY(corner.line, doc_y - mLayout.lineTop(corner.line));
+    corner.x        = llmax(0.f, static_cast<F32>(x - text.mLeft) + mScrollX);
+    return corner;
+}
+
+bool ALTextView::stepRow(S32& line, S32& row, S32 direction)
+{
+    if (direction < 0)
+    {
+        if (row > 0)
+        {
+            --row;
+            return true;
+        }
+        const S32 above = mLayout.visibleFrom(line - 1, -1);
+        if (above < 0)
+        {
+            return false;
+        }
+        line = above;
+        row  = mLayout.rowCount(line) - 1;
+        return true;
+    }
+    if (row + 1 < mLayout.rowCount(line))
+    {
+        ++row;
+        return true;
+    }
+    const S32 below = mLayout.visibleFrom(line + 1, 1);
+    if (below < 0)
+    {
+        return false;
+    }
+    line = below;
+    row  = 0;
+    return true;
+}
+
+std::pair<ALTextView::ColumnCorner, ALTextView::ColumnCorner> ALTextView::columnCorners()
+{
+    if (!mColumn.selections.empty() && selectionsInOrder() == mColumn.selections)
+    {
+        return { mColumn.from, mColumn.to };
+    }
+    return { cornerAt(mAnchor), cornerAt(mCaret) };
+}
+
+void ALTextView::selectColumn(const ColumnCorner& from, const ColumnCorner& to)
+{
+    const bool down = from.line < to.line || (from.line == to.line && from.row <= to.row);
+    // From the higher corner's row down to the lower's, each row's columns
+    // at the two x's, nearest as drawn: past a row's end, its end.
+    S32 line = down ? from.line : to.line;
+    S32 row  = down ? from.row : to.row;
+    const ColumnCorner& last = down ? to : from;
+    std::vector<ALTextRange> rows;
+    while (true)
+    {
+        row = llclamp(row, 0, llmax(0, mLayout.rowCount(line) - 1));
+        rows.emplace_back(ALTextPos(line, mLayout.columnAt(line, row, from.x, true)), ALTextPos(line, mLayout.columnAt(line, row, to.x, true)));
+        if (line > last.line || (line == last.line && row >= last.row) || !stepRow(line, row, 1))
+        {
+            break;
+        }
+    }
+    placeSelections(rows, down ? rows.size() - 1 : 0);
+    mColumn.from       = from;
+    mColumn.to         = to;
+    mColumn.selections = selectionsInOrder();
+    // Each caret keeps the column's x between rows, as carets added above
+    // and below do, so that moving them keeps the column past short rows.
+    mEachDesired.selections = mColumn.selections;
+    mEachDesired.xs.assign(mColumn.selections.size(), to.x);
+    mDesiredX = to.x;
+    scrollToCaret();
+}
+
+bool ALTextView::growColumn(S32 columns, S32 rows)
+{
+    if (mLayout.rowHeight() <= 0 || mDocument.lineCount() == 0)
+    {
+        return false;
+    }
+    auto [from, to] = columnCorners();
+    if (rows != 0 && !stepRow(to.line, to.row, rows))
+    {
+        return false;
+    }
+    if (columns < 0 && to.x <= 0.f && rows == 0)
+    {
+        return false;
+    }
+    // A column is a space's advance: a tab or a wide character is crossed
+    // in as many steps as it is drawn wide, its edge the nearest.
+    to.x = llmax(0.f, to.x + static_cast<F32>(columns) * mLayout.columnWidth());
+    selectColumn(from, to);
+    return true;
+}
+
 S32 ALTextView::selectAllMatches()
 {
     settleFind();
@@ -1987,38 +2108,12 @@ ALTextPos ALTextView::rowsFrom(const ALTextPos& from, S32 rows, F32& desired_x)
         desired_x = x;
     }
     S32 line = from.line;
-    for (; rows < 0; ++rows)
+    for (; rows != 0; rows += rows < 0 ? 1 : -1)
     {
-        if (row > 0)
-        {
-            --row;
-        }
-        else if (const S32 above = mLayout.visibleFrom(line - 1, -1); above >= 0)
-        {
-            line = above;
-            row  = mLayout.rowCount(line) - 1;
-        }
-        else
+        if (!stepRow(line, row, rows))
         {
             desired_x = -1.f;
-            return mDocument.start();
-        }
-    }
-    for (; rows > 0; --rows)
-    {
-        if (row + 1 < mLayout.rowCount(line))
-        {
-            ++row;
-        }
-        else if (const S32 below = mLayout.visibleFrom(line + 1, 1); below >= 0)
-        {
-            line = below;
-            row  = 0;
-        }
-        else
-        {
-            desired_x = -1.f;
-            return mDocument.end();
+            return rows < 0 ? mDocument.start() : mDocument.end();
         }
     }
     return ALTextPos(line, mLayout.columnAt(line, row, desired_x, true));
@@ -2843,14 +2938,18 @@ std::optional<bool> ALTextView::performAtEach(ALEditorCommand command)
             scrollToCaret();
             return true;
         }
-        // Done as they always are: those that add carets, the clipboard's,
-        // the comment's and completion know of the others; select all, undo
-        // and redo put them as they put the main one; folding and the find
-        // bar shown leave them be.
+        // Done as they always are: those that add carets or grow a column,
+        // the clipboard's, the comment's and completion know of the others;
+        // select all, undo and redo put them as they put the main one;
+        // folding and the find bar shown leave them be.
         case C::None:
         case C::COUNT:
         case C::AddCaretAbove:
         case C::AddCaretBelow:
+        case C::ColumnSelectLeft:
+        case C::ColumnSelectRight:
+        case C::ColumnSelectUp:
+        case C::ColumnSelectDown:
         case C::SelectNextOccurrence:
         case C::ChangeAllOccurrences:
         case C::Complete:
@@ -3268,6 +3367,14 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::AddCaretAbove:
         case C::AddCaretBelow:
             return !mReadOnly && addCarets(command == C::AddCaretAbove ? -1 : 1);
+        case C::ColumnSelectLeft:
+            return !mReadOnly && growColumn(-1, 0);
+        case C::ColumnSelectRight:
+            return !mReadOnly && growColumn(1, 0);
+        case C::ColumnSelectUp:
+            return !mReadOnly && growColumn(0, -1);
+        case C::ColumnSelectDown:
+            return !mReadOnly && growColumn(0, 1);
         case C::Find:
             showFind(false);
             return true;
@@ -3327,7 +3434,11 @@ bool ALTextView::canPerform(ALEditorCommand command) const
             return mFeatures && mFeatures->canPerformFeature(command);
         case C::AddCaretAbove:
         case C::AddCaretBelow:
-            // A read-only text shows no caret to add to.
+        case C::ColumnSelectLeft:
+        case C::ColumnSelectRight:
+        case C::ColumnSelectUp:
+        case C::ColumnSelectDown:
+            // A read-only text shows no caret to add to or grow from.
             return !mReadOnly;
         case C::PreviousChange:
             return mChangeAt > 0;
@@ -4923,6 +5034,20 @@ void ALTextView::dragSelectTo(S32 x, S32 y)
         const S32 rows  = 1 + past / row_h;
         setScrollY(mScrollY + (y > text.mTop ? -rows : rows) * row_h);
     }
+    if (mColumnDragging)
+    {
+        const ColumnCorner corner = cornerAtLocal(x, y);
+        if (corner == mColumn.to)
+        {
+            return;
+        }
+        selectColumn(mColumn.from, corner);
+        if (mModal)
+        {
+            mModal->mouseChanged(*this);
+        }
+        return;
+    }
     const ALTextPos at        = posAtLocal(x, y, true);
     const ALTextPos character = posAtLocal(x, y, false);
     if (at == mDragAt && character == mDragToChar)
@@ -5347,6 +5472,25 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
         }
         return true;
     }
+    // Shift-Alt -- Shift-Option on a Mac -- a column from the anchor to the
+    // press, as Shift-click takes a selection from it, grown as the mouse
+    // is dragged.
+    if (mask == (MASK_SHIFT | MASK_ALT) && !mReadOnly)
+    {
+        mPressedLink = -1;
+        mPressedAtom = -1;
+        selectColumn(columnCorners().first, cornerAtLocal(x, y));
+        mColumnDragging = true;
+        mSelecting      = true;
+        mDragX          = x;
+        mDragY          = y;
+        gFocusMgr.setMouseCapture(this);
+        if (mModal)
+        {
+            mModal->mouseChanged(*this);
+        }
+        return true;
+    }
     singleSelection();
     // A link or an atom under the press is followed on the release, if
     // the release is on it too.
@@ -5526,7 +5670,8 @@ bool ALTextView::handleMouseUp(S32 x, S32 y, MASK mask)
     }
     if (mSelecting)
     {
-        mSelecting = false;
+        mSelecting      = false;
+        mColumnDragging = false;
         gFocusMgr.setMouseCapture(nullptr);
         if (mPrimaryStale)
         {
@@ -5580,8 +5725,9 @@ bool ALTextView::handleDoubleClick(S32 x, S32 y, MASK mask)
     setFocus(true);
     const ALTextRange word = mDocument.wordAt(posAtLocal(x, y, false));
     placeSelection(word.begin, word.end);
-    mDesiredX  = -1.f;
-    mSelecting = false;
+    mDesiredX       = -1.f;
+    mSelecting      = false;
+    mColumnDragging = false;
     armTripleClick();
     if (mModal)
     {
@@ -5642,8 +5788,9 @@ bool ALTextView::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 
 void ALTextView::onMouseCaptureLost()
 {
-    mSelecting   = false;
-    mDraggingBar = false;
+    mSelecting      = false;
+    mColumnDragging = false;
+    mDraggingBar    = false;
 }
 
 bool ALTextView::handleToolTip(S32 x, S32 y, MASK mask)

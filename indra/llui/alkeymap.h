@@ -131,6 +131,13 @@ enum class ALEditorCommand : U8
     // them grown by a row.
     AddCaretAbove,
     AddCaretBelow,
+    // A column selection grown at its moving corner by a column either
+    // way or a row up or down: begun from the selection there is where
+    // there is no column.
+    ColumnSelectLeft,
+    ColumnSelectRight,
+    ColumnSelectUp,
+    ColumnSelectDown,
     COUNT
 };
 

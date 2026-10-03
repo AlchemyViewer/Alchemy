@@ -8132,6 +8132,12 @@ void ALFloaterScriptStudio::addEditCommands()
     addEditorCommand("change_all_occurrences", ALEditorCommand::ChangeAllOccurrences, true);
     addEditorCommand("add_caret_above", ALEditorCommand::AddCaretAbove, false);
     addEditorCommand("add_caret_below", ALEditorCommand::AddCaretBelow, false);
+    // Keys a step at a time rather than menu items: Shift-Alt-drag puts a
+    // column with the mouse.
+    addEditorCommand("column_select_left", ALEditorCommand::ColumnSelectLeft, false);
+    addEditorCommand("column_select_right", ALEditorCommand::ColumnSelectRight, false);
+    addEditorCommand("column_select_up", ALEditorCommand::ColumnSelectUp, false);
+    addEditorCommand("column_select_down", ALEditorCommand::ColumnSelectDown, false);
     mCommands.add(
         "convert_slua",
         [this]() {

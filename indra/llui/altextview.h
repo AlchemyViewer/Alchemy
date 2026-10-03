@@ -373,6 +373,15 @@ public:
     // its column as a motion between rows does; the furthest the main
     // one. False where every caret is on the first or the last row.
     bool                            addCarets(S32 direction);
+    // A column selection grown at its moving corner by so many columns
+    // sideways and rows down, or up below zero; begun from the main
+    // selection's anchor and caret where the selections are not a column's.
+    // Each row between the corners has a selection from the x of the corner
+    // that stays to the x of the one that moves, so that a tab or a wide
+    // character counts as it is drawn and a row too short has a caret at
+    // its end; the one on the moving corner's row is the main one. False
+    // where it cannot go further that way.
+    bool                            growColumn(S32 columns, S32 rows);
     // Every match the find bar has selected, the current one the main
     // one, and the keyboard to the text; how many.
     S32                             selectAllMatches();
@@ -1003,6 +1012,36 @@ private:
         std::vector<F32>         xs;
     };
     EachDesired          mEachDesired;
+    // One row on from a row of a line, down or up below zero, past the
+    // lines folded away; false at the first or the last.
+    bool                 stepRow(S32& line, S32& row, S32 direction);
+    // A corner of a column selection: a row of a line, and an x from the
+    // row's start that may lie past its end.
+    struct ColumnCorner
+    {
+        S32 line = 0;
+        S32 row  = 0;
+        F32 x    = 0.f;
+        bool operator==(const ColumnCorner&) const = default;
+    };
+    ColumnCorner         cornerAt(const ALTextPos& pos);
+    ColumnCorner         cornerAtLocal(S32 x, S32 y);
+    // The selections from one corner to the other (growColumn), kept as
+    // the column for as long as they stand as they were put.
+    void                 selectColumn(const ColumnCorner& from, const ColumnCorner& to);
+    // The corners the column grows from now: its own while the selections
+    // are the ones it put, else the main selection's anchor and caret.
+    std::pair<ColumnCorner, ColumnCorner> columnCorners();
+    struct Column
+    {
+        ColumnCorner             from;
+        ColumnCorner             to;
+        std::vector<ALTextRange> selections;
+    };
+    Column               mColumn;
+    // A drag begun with Shift-Alt, which puts a column rather than a
+    // selection.
+    bool                 mColumnDragging = false;
     // Return: the line split with the new one indented as the grammar
     // says, and a closing word before the caret brought out first.
     void                 newLine();

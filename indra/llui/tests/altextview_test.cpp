@@ -2244,4 +2244,115 @@ namespace tut
         type("cow");
         ensure_equals("typed over each", v.text(), std::string("cow dog cow bird cow"));
     }
+
+    static ALTextRange spanRange(S32 line, S32 anchor, S32 caret)
+    {
+        return ALTextRange(ALTextPos(line, anchor), ALTextPos(line, caret));
+    }
+
+    template<> template<>
+    void altextview_object::test<72>()
+    {
+        set_test_name("Shift-Alt-drag selects a column from the anchor's x to the mouse's on each row, a tab counted as drawn and a short row a caret at its end, the mouse's row the main one; typing goes in at each, as one step");
+        ALTextView& v = make("abcdefgh\nab\n\tcdefgh\nabcdefgh");
+        S32 x, y;
+        pointOf(0, 3, x, y);
+        v.handleMouseDown(x, y, MASK_NONE);
+        v.handleMouseUp(x, y, MASK_NONE);
+        // Six columns in, on the line whose tab is four wide: after "cd".
+        S32 x6, y6, x_line2, y_line2;
+        pointOf(0, 6, x6, y6);
+        pointOf(2, 0, x_line2, y_line2);
+        ensure("pressed", v.handleMouseDown(x6, y_line2, MASK_SHIFT | MASK_ALT));
+        ensure_equals("from column three to six on each row", rangesSaid(ll_test::TextViewProbe::selections(v)),
+                      rangesSaid({ spanRange(0, 3, 6), caretRange(1, 2), spanRange(2, 1, 3) }));
+        ensure("the mouse's row the main one", v.selection() == spanRange(2, 1, 3));
+        // Dragged back over the short row, to column one.
+        S32 x1, y1, x_line1, y_line1;
+        pointOf(0, 1, x1, y1);
+        pointOf(1, 0, x_line1, y_line1);
+        ensure("dragged", v.handleHover(x1, y_line1, MASK_SHIFT | MASK_ALT));
+        ensure_equals("each from three back to one", rangesSaid(ll_test::TextViewProbe::selections(v)),
+                      rangesSaid({ spanRange(0, 3, 1), spanRange(1, 2, 1) }));
+        v.handleMouseUp(x1, y_line1, MASK_SHIFT | MASK_ALT);
+        ensure("capture released", !v.hasMouseCapture());
+        type("X");
+        ensure_equals("typed at each", v.text(), std::string("aXdefgh\naX\n\tcdefgh\nabcdefgh"));
+        v.undo();
+        ensure_equals("one step", v.text(), std::string("abcdefgh\nab\n\tcdefgh\nabcdefgh"));
+
+        pointOf(3, 2, x, y);
+        v.handleMouseDown(x, y, MASK_NONE);
+        v.handleMouseUp(x, y, MASK_NONE);
+        ensure("a plain click is one caret again", !v.hasOtherSelections());
+        v.setReadOnly(true);
+        v.handleMouseDown(x6, y_line2, MASK_SHIFT | MASK_ALT);
+        v.handleMouseUp(x6, y_line2, MASK_SHIFT | MASK_ALT);
+        ensure("no column in a read-only text", !v.hasOtherSelections());
+    }
+
+    template<> template<>
+    void altextview_object::test<73>()
+    {
+        set_test_name("Control-Shift-Alt with an arrow grows a column a column or a row at a time from the selection there is, past a short row and over a tab and a wide character as drawn; a row further than the text is refused");
+        ALTextView& v = make("abcdefgh\nab\n\tcdefgh\nabcdefgh");
+        const MASK column = MASK_CONTROL | MASK_SHIFT | MASK_ALT;
+        v.setCaret(ALTextPos(0, 3));
+        key(KEY_RIGHT, column);
+        key(KEY_RIGHT, column);
+        key(KEY_RIGHT, column);
+        ensure("three columns on its row", v.selection() == spanRange(0, 3, 6) && !v.hasOtherSelections());
+        key(KEY_DOWN, column);
+        key(KEY_DOWN, column);
+        ensure_equals("and two rows down", rangesSaid(ll_test::TextViewProbe::selections(v)),
+                      rangesSaid({ spanRange(0, 3, 6), caretRange(1, 2), spanRange(2, 1, 3) }));
+        type("X");
+        ensure_equals("typed at each", v.text(), std::string("abcXgh\nabX\n\tXefgh\nabcdefgh"));
+        v.undo();
+        ensure_equals("one step", v.text(), std::string("abcdefgh\nab\n\tcdefgh\nabcdefgh"));
+
+        // One caret first: the undone column's selections are back, and a
+        // caret put among them would be taken into the one it touches.
+        v.singleSelection();
+        v.setCaret(ALTextPos(0, 3));
+        key(KEY_DOWN, column);
+        key(KEY_RIGHT, column);
+        key(KEY_RIGHT, column);
+        key(KEY_RIGHT, column);
+        key(KEY_LEFT, column);
+        ensure_equals("a row, then two columns", rangesSaid(ll_test::TextViewProbe::selections(v)),
+                      rangesSaid({ spanRange(0, 3, 5), caretRange(1, 2) }));
+        key(KEY_UP, column);
+        key(KEY_LEFT, column);
+        key(KEY_LEFT, column);
+        key(KEY_LEFT, column);
+        ensure("back to its row and past where it began", v.selection() == spanRange(0, 3, 2) && !v.hasOtherSelections());
+        ensure("no row above the first", !v.perform(ALEditorCommand::ColumnSelectUp));
+
+        // From a selection that is not a column: its anchor and caret the
+        // corners. Column one is nearer the tab's start than its end.
+        v.setSelection(spanRange(3, 1, 4));
+        key(KEY_UP, column);
+        ensure_equals("the tab, as drawn, above three columns", rangesSaid(ll_test::TextViewProbe::selections(v)),
+                      rangesSaid({ spanRange(2, 0, 1), spanRange(3, 1, 4) }));
+        ensure("the moving corner's row the main one", v.selection() == spanRange(2, 0, 1));
+
+        // Wide characters count as wide as the font draws them: the two of
+        // them selected, the row below gets as many columns as they are
+        // drawn across, to the nearest -- not one a character, nor a byte.
+        v.setText("\xe4\xb8\xad\xe6\x96\x87xy\nabcdefgh");
+        const F32 width   = v.layout().columnWidth();
+        const F32 columns = v.layout().xOf(0, 6) / width;
+        if (llabs(columns - std::floor(columns) - 0.5f) > 0.1f)
+        {
+            v.singleSelection();
+            v.setSelection(spanRange(0, 0, 6));
+            key(KEY_DOWN, column);
+            ensure_equals("as many columns as they are drawn across", rangesSaid({ v.selection() }),
+                          rangesSaid({ spanRange(1, 0, llround(columns)) }));
+        }
+
+        v.setReadOnly(true);
+        ensure("none in a read-only text", !v.canPerform(ALEditorCommand::ColumnSelectDown) && !v.perform(ALEditorCommand::ColumnSelectDown));
+    }
 }
