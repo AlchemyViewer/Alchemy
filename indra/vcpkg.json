@@ -153,6 +153,13 @@
     "xxhash",
     "zlib"
   ],
+  "overrides": [
+    {
+      "$comment": "HarfBuzz 14.5 is Unicode 18 and ICU 78 is Unicode 17; alfontshaping test 35 holds the two to one Unicode. Lift this with ICU's move to Unicode 18.",
+      "name": "harfbuzz",
+      "version": "14.4.0"
+    }
+  ],
   "features": {
     "dullahan-example": {
       "description": "Build with support for Dullahan OpenGL example application",
