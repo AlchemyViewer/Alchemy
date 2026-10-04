@@ -37,6 +37,7 @@
 
 #include <cmath>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -74,6 +75,18 @@ namespace ALLSLPasses
         }
         return true;
     }
+
+    // What a number can be, the least and the most, where something
+    // says: a constant; a library function's answer (ALLSLTraits::bounds),
+    // llFrand's of a magnitude whose sign is known; a truth; an & with a
+    // number not below nought; a list's length as l != []; a local set
+    // to one of these where it is declared and never after.
+    struct Range
+    {
+        double least = 0.0;
+        double most  = 0.0;
+    };
+    std::optional<Range> rangeOf(LSLExpression* e, int depth = 0);
 
     // ---- notes ---------------------------------------------------------------------------
 
@@ -195,6 +208,43 @@ namespace ALLSLPasses
         ScriptContext& mContext;
         const bool     mWas;
     };
+
+    // Every node of a subtree, the root first.
+    template <class F> void eachNode(LSLASTNode* root, const F& f)
+    {
+        std::vector<LSLASTNode*> stack{ root };
+        while (!stack.empty())
+        {
+            LSLASTNode* node = stack.back();
+            stack.pop_back();
+            if (!node)
+            {
+                continue;
+            }
+            f(node);
+            for (LSLASTNode* child = node->getChild(0); child; child = child->getNext())
+            {
+                stack.push_back(child);
+            }
+        }
+    }
+
+    // How many labels of a name the function or event a node is in has.
+    // A jump goes to the last of them; the compiler finds it among those
+    // in scope.
+    int labelsNamed(LSLASTNode* node, const char* name);
+
+    // Whether what follows a statement never runs by running on from it:
+    // it returns, changes state or jumps; resets the script; is an if
+    // every way of which does so, or a loop that never ends.
+    bool stops(LSLASTNode* stmt);
+
+    // Whether a label stands anywhere in a subtree.
+    bool holdsLabel(LSLASTNode* root);
+
+    // A block's statements made `statements`, in that order: those it had
+    // and those moved in from elsewhere, none counted again.
+    void setStatements(LSLASTNode* block, const std::vector<LSLASTNode*>& statements, ScriptContext& context);
 
     // What a text weighs on the target's compiler, and the weigher's name
     // for the target.

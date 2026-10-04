@@ -386,34 +386,6 @@ namespace
             }
         }
 
-        // How many labels of a name the function or event a node is in has.
-        // A jump goes to the last of them; the compiler finds it among
-        // those in scope.
-        static int labelsNamed(LSLASTNode* node, const char* name)
-        {
-            LSLASTNode* callable = node;
-            while (callable && callable->getNodeType() != NODE_GLOBAL_FUNCTION && callable->getNodeType() != NODE_EVENT_HANDLER)
-            {
-                callable = callable->getParent();
-            }
-            int                                    named = 0;
-            const std::function<void(LSLASTNode*)> count = [&](LSLASTNode* n) {
-                if (n->getNodeType() == NODE_STATEMENT && n->getNodeSubType() == NODE_LABEL && !strcmp(static_cast<LSLLabel*>(n)->getIdentifier()->getName(), name))
-                {
-                    ++named;
-                }
-                for (LSLASTNode* child = n->getChild(0); child; child = child->getNext())
-                {
-                    count(child);
-                }
-            };
-            if (callable)
-            {
-                count(callable);
-            }
-            return named;
-        }
-
         // Whether a jump goes where running on would go anyway: its label
         // is the next statement to run -- after the jump, or after the
         // blocks and the if branches it is the end of -- and the only
@@ -888,57 +860,6 @@ namespace
 
         boost::unordered_flat_map<LSLSymbol*, LSLGlobalFunction*> mFunctions;
         boost::unordered_flat_map<LSLASTNode*, boost::unordered_flat_map<std::string_view, int>> mNames;
-
-        // Whether what follows a statement never runs by running on from it:
-        // it returns, changes state or jumps; resets the script; is an if
-        // every way of which does so, or a loop that never ends. A label
-        // jumped to after it is the dead code's own business (above).
-        static bool stops(LSLASTNode* stmt)
-        {
-            if (!stmt || stmt->getNodeType() != NODE_STATEMENT)
-            {
-                return false;
-            }
-            const auto forever = [](LSLExpression* check) {
-                LSLConstant* cv = check ? check->getConstantValue() : nullptr;
-                return cv && cv->getNodeSubType() == NODE_INTEGER_CONSTANT && static_cast<LSLIntegerConstant*>(cv)->getValue() != 0;
-            };
-            switch (stmt->getNodeSubType())
-            {
-                case NODE_RETURN_STATEMENT:
-                case NODE_STATE_STATEMENT:
-                case NODE_JUMP_STATEMENT:
-                    return true;
-                case NODE_EXPRESSION_STATEMENT:
-                {
-                    LSLExpression* expr = bare(static_cast<LSLExpressionStatement*>(stmt)->getExpr());
-                    LSLSymbol*     sym  = expr && expr->getNodeSubType() == NODE_FUNCTION_EXPRESSION ? expr->getSymbol() : nullptr;
-                    return sym && sym->getSubType() == SYM_BUILTIN && !strcmp(sym->getName(), "llResetScript");
-                }
-                case NODE_COMPOUND_STATEMENT:
-                {
-                    LSLASTNode* last = nullptr;
-                    for (LSLASTNode* child = stmt->getChild(0); child; child = child->getNext())
-                    {
-                        last = child;
-                    }
-                    return stops(last);
-                }
-                case NODE_IF_STATEMENT:
-                {
-                    auto* branch = static_cast<LSLIfStatement*>(stmt);
-                    return branch->getFalseBranch() && stops(branch->getTrueBranch()) && stops(branch->getFalseBranch());
-                }
-                case NODE_WHILE_STATEMENT:
-                    return forever(static_cast<LSLWhileStatement*>(stmt)->getCheckExpr());
-                case NODE_DO_STATEMENT:
-                    return forever(static_cast<LSLDoStatement*>(stmt)->getCheckExpr());
-                case NODE_FOR_STATEMENT:
-                    return forever(static_cast<LSLForStatement*>(stmt)->getCheckExpr());
-                default:
-                    return false;
-            }
-        }
 
         // Every node of a subtree, the root first.
         template <class F> static void each(LSLASTNode* root, const F& f)

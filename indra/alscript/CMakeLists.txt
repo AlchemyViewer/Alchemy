@@ -39,6 +39,7 @@ target_sources(
     lsl/allsltraits.cpp
     lsl/allslvalues.cpp
     lsl/optimizer/allslcosts.cpp
+    lsl/optimizer/allslbranches.cpp
     lsl/optimizer/allsldeadcode.cpp
     lsl/optimizer/allslflowvalues.cpp
     lsl/optimizer/allslfolder.cpp
@@ -99,6 +100,7 @@ target_sources(
         lsl/allsluuids.inc
         lsl/allslvalues.h
         lsl/optimizer/allslcosts.h
+        lsl/optimizer/allslbranches.h
         lsl/optimizer/allsldeadcode.h
         lsl/optimizer/allslflowvalues.h
         lsl/optimizer/allslfolder.h
@@ -155,6 +157,7 @@ else()
 endif()
 set_source_files_properties(
   lsl/allslvalues.cpp
+  lsl/optimizer/allslbranches.cpp
   lsl/optimizer/allsldeadcode.cpp
   lsl/optimizer/allslflowvalues.cpp
   lsl/optimizer/allslfolder.cpp

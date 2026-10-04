@@ -32,7 +32,7 @@ default
             llSay(0, "Thanks!");
             return;
         }
-        else if (message == "Info")
+        if (message == "Info")
             llSay(0, describe());
         llListenRemove(listener);
         llSetTimerEvent(0);

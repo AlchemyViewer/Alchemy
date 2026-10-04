@@ -64,6 +64,21 @@ namespace
         c.castForDetail                = true;
         c.castForWholeFloat            = false;
         c.bitTestsMerged               = true;
+        // An && costs what an & does; two ifs one jump more than one; and
+        // a do's check one jump less than a for's.
+        c.bitAndForAnd                 = false;
+        c.plusForMinus                 = false;
+        c.productForShift              = false;
+        c.complementForMinusOneLess    = true;
+        c.sumForDouble                 = false;
+        c.productForQuotient           = false;
+        c.remainderForOddTest          = false;
+        c.differenceForNotEqual        = false;
+        c.quotientForShift             = false;
+        c.andForNestedIf               = true;
+        c.bitAndForNestedTruths        = true;
+        c.arithmeticForSelect          = true;
+        c.doForKnownFirst              = true;
 
         c.local         = 11;
         c.jump          = 5;
@@ -131,6 +146,23 @@ namespace
         c.castForDetail                = false;
         c.castForWholeFloat            = true;
         c.bitTestsMerged               = true;
+        // An && is a branch, where & is one instruction; a subtraction, a
+        // shift and a division by a float each a call into the helpers,
+        // where an add, a product and a product are one; a constant five
+        // bytes, a local's read two; and a do's check one jump less.
+        c.bitAndForAnd                 = true;
+        c.plusForMinus                 = true;
+        c.productForShift              = true;
+        c.complementForMinusOneLess    = true;
+        c.sumForDouble                 = true;
+        c.productForQuotient           = true;
+        c.remainderForOddTest          = false;
+        c.differenceForNotEqual        = false;
+        c.quotientForShift             = false;
+        c.andForNestedIf               = false;
+        c.bitAndForNestedTruths        = true;
+        c.arithmeticForSelect          = true;
+        c.doForKnownFirst              = true;
 
         c.local         = 6;
         c.jump          = 5;
@@ -195,6 +227,21 @@ namespace
         c.castForDetail                = false;
         c.castForWholeFloat            = false;
         c.bitTestsMerged               = true;
+        // Its bitwise operators are calls into bit32, its arithmetic one
+        // instruction each.
+        c.bitAndForAnd                 = false;
+        c.plusForMinus                 = false;
+        c.productForShift              = true;
+        c.complementForMinusOneLess    = false;
+        c.sumForDouble                 = true;
+        c.productForQuotient           = false;
+        c.remainderForOddTest          = true;
+        c.differenceForNotEqual        = true;
+        c.quotientForShift             = true;
+        c.andForNestedIf               = false;
+        c.bitAndForNestedTruths        = false;
+        c.arithmeticForSelect          = false;
+        c.doForKnownFirst              = false;
 
         c.local         = 4;
         c.jump          = 92;

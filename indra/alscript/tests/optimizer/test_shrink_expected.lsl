@@ -20,10 +20,8 @@ default
             c((string)b);
         }
         @g;
-        if (b > 100)
-            jump h;
-        jump g;
-        @h;
+        if (b < 101)
+            jump g;
         state a;
     }
 }

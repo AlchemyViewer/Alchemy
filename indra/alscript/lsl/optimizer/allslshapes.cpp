@@ -27,12 +27,14 @@
 #include "allslshapes.h"
 
 #include "allslcosts.h"
+#include "allsleffects.h"
 
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <functional>
 #include <optional>
+#include <string_view>
 
 namespace ALLSLPasses
 {
@@ -133,6 +135,24 @@ namespace
             {
                 return false;
             }
+            nestedIf(stmt);
+            if (keyTest(stmt, 0) < 0)
+            {
+                // k == NULL_KEY as k, its ways the other way round.
+                LSLASTNode* yes = stmt->takeChild(1);
+                LSLASTNode* no  = stmt->getFalseBranch();
+                if (no && no->getNodeType() != NODE_NULL)
+                {
+                    stmt->setChild(1, stmt->takeChild(2));
+                }
+                else
+                {
+                    auto* nop = ctx.allocator->newTracked<LSLNopStatement>();
+                    nop->setLoc(stmt->getLoc());
+                    stmt->setChild(1, nop);
+                }
+                stmt->setChild(2, yes);
+            }
             truth(stmt, 0);
             LSLExpression* cond = bare(stmt->getCheckExpr());
             LSLStatement*  yes  = stmt->getTrueBranch();
@@ -170,6 +190,7 @@ namespace
             visitChildren(stmt);
             if (mStage == Stage::Values)
             {
+                keyTest(stmt, 0, false);
                 truth(stmt, 0);
             }
             return false;
@@ -179,6 +200,7 @@ namespace
             visitChildren(stmt);
             if (mStage == Stage::Values)
             {
+                keyTest(stmt, 1, false);
                 truth(stmt, 1);
             }
             return false;
@@ -190,6 +212,7 @@ namespace
             {
                 return false;
             }
+            keyTest(stmt, 1, false);
             truth(stmt, 1);
             if (LSLASTNode* steps = stmt->getIncrExprs())
             {
@@ -247,7 +270,12 @@ namespace
             {
                 return false;
             }
+            const int before = changes;
             integers(expr);
+            if (changes == before)
+            {
+                operators(expr);
+            }
             return false;
         }
 
@@ -394,7 +422,7 @@ namespace
                 x = parens;
             }
             auto* made = uncounted.made(ctx.allocator->newTracked<LSLUnaryExpression>(x, op));
-            made->setType(TYPE(LST_INTEGER));
+            made->setType(op == OP_MINUS ? x->getType() : TYPE(LST_INTEGER));
             made->setLoc(x->getLoc());
             return made;
         }
@@ -750,17 +778,29 @@ namespace
                     }
                     return;
                 case OP_PLUS:
-                    for (int slot = 0; slot < 2 && mCosts.negateComplementForIncrement; ++slot)
+                    for (int slot = 0; slot < 2; ++slot)
                     {
                         LSLExpression* other = slot == 0 ? right : left;
-                        if (isInteger(other, 1))
+                        if (mCosts.negateComplementForIncrement && isInteger(other, 1))
                         {
                             over(expr, slot, { OP_BIT_NOT, OP_MINUS });
                             return;
                         }
-                        if (isInteger(other, 2))
+                        if (mCosts.negateComplementForIncrement && isInteger(other, 2))
                         {
                             over(expr, slot, { OP_BIT_NOT, OP_MINUS, OP_BIT_NOT, OP_MINUS });
+                            return;
+                        }
+                        // x + -1 and x + -2, which a target with a + -b the
+                        // smaller (plusForMinus) leaves as they are.
+                        if (mCosts.complementNegateForDecrement && isInteger(other, -1))
+                        {
+                            over(expr, slot, { OP_MINUS, OP_BIT_NOT });
+                            return;
+                        }
+                        if (mCosts.complementNegateForDecrement && isInteger(other, -2))
+                        {
+                            over(expr, slot, { OP_MINUS, OP_BIT_NOT, OP_MINUS, OP_BIT_NOT });
                             return;
                         }
                     }
@@ -778,6 +818,496 @@ namespace
                 default:
                     return;
             }
+        }
+
+        // Whether a value is only ever 1 or 0: a comparison, a !, an && or an
+        // ||, as rangeOf() reads them.
+        static bool truthValue(LSLExpression* x)
+        {
+            const std::optional<Range> r = x && x->getIType() == LST_INTEGER ? rangeOf(x) : std::nullopt;
+            return r && r->least >= 0.0 && r->most <= 1.0;
+        }
+
+        // A number written where `expr`'s operand in `slot` was.
+        void renumber(LSLBinaryExpression* expr, int slot, LSLConstant* cv)
+        {
+            LSLASTNode* side = expr->getChild(slot);
+            LSLASTNode::replaceNode(side, constant(cv, side));
+        }
+
+        // An integer's constant value, where it has one.
+        static std::optional<S32> integerValue(LSLASTNode* n)
+        {
+            LSLConstant* cv = n ? n->getConstantValue() : nullptr;
+            return cv && cv->getNodeSubType() == NODE_INTEGER_CONSTANT ? std::optional<S32>(static_cast<LSLIntegerConstant*>(cv)->getValue())
+                                                                        : std::nullopt;
+        }
+
+        // The power of two an integer is, 1 to 30.
+        static std::optional<S32> powerOfTwo(S32 v)
+        {
+            for (S32 k = 1; k <= 30; ++k)
+            {
+                if (v == (S32(1) << k))
+                {
+                    return k;
+                }
+            }
+            return std::nullopt;
+        }
+
+        // `a - b` made `a + -b`, and `a -= b` `a += -b`, the right side a
+        // constant negated where it is one: the same value, and the right
+        // run first as before.
+        void plus(LSLBinaryExpression* expr)
+        {
+            const std::string before = report.wanted() ? render(expr) : std::string();
+            LSLExpression*    right  = expr->getRHS();
+            LSLConstant*      cv     = right->getConstantValue();
+            if (cv && cv->getNodeSubType() == NODE_INTEGER_CONSTANT)
+            {
+                renumber(expr, 1, ctx.integer(-static_cast<LSLIntegerConstant*>(cv)->getValue()));
+            }
+            else if (cv && cv->getNodeSubType() == NODE_FLOAT_CONSTANT)
+            {
+                renumber(expr, 1, ctx.allocator->newTracked<LSLFloatConstant>(-static_cast<LSLFloatConstant*>(cv)->getValue()));
+            }
+            else
+            {
+                auto*          x    = static_cast<LSLExpression*>(expr->takeChild(1));
+                LSLExpression* made = nullptr;
+                {
+                    const Uncounted uncounted(*ctx.context);
+                    made = unary(uncounted, OP_MINUS, x);
+                }
+                expr->setChild(1, made);
+            }
+            expr->setOperation(expr->getOperation() == OP_SUB_ASSIGN ? OP_ADD_ASSIGN : OP_PLUS);
+            wrote(expr, expr, before);
+        }
+
+        // `a - b` where only whether a and b differ counts, and as the ! of
+        // that for a == b: a negative constant on the right added instead.
+        LSLExpression* difference(LSLBinaryExpression* expr)
+        {
+            const std::optional<S32> c = integerValue(expr->getRHS());
+            if (c && *c < 0 && *c != INT32_MIN)
+            {
+                renumber(expr, 1, ctx.integer(-*c));
+                expr->setOperation(OP_PLUS);
+            }
+            else
+            {
+                expr->setOperation(OP_MINUS);
+            }
+            return expr;
+        }
+
+        // Operators the target has smaller another way (ALLSLCosts): an &&
+        // of truths as &, -1 - x as ~x, a - b as a + -b, a shift left as a product, a
+        // doubling as a sum, a float divided by a power of two as a product,
+        // a == as the ! of a difference; and of what is never below nought,
+        // a shift right as a quotient and a mask as a remainder.
+        void operators(LSLBinaryExpression* expr)
+        {
+            LSLExpression* left  = expr->getLHS();
+            LSLExpression* right = expr->getRHS();
+            if (!left || !right)
+            {
+                return;
+            }
+            const LSLIType type    = expr->getIType();
+            const bool     numeric = (type == LST_INTEGER || type == LST_FLOATINGPOINT) && left->getIType() == type && right->getIType() == type;
+            const auto     read    = [](LSLExpression* x) {
+                LSLSymbol* sym = x->getNodeSubType() == NODE_LVALUE_EXPRESSION && !static_cast<LSLLValueExpression*>(x)->getMember() ? x->getSymbol() : nullptr;
+                return sym && (sym->getSubType() == SYM_LOCAL || sym->getSubType() == SYM_FUNCTION_PARAMETER || sym->getSubType() == SYM_EVENT_PARAMETER);
+            };
+            switch (expr->getOperation())
+            {
+                case OP_BOOLEAN_AND:
+                    if (mCosts.bitAndForAnd && integerOperands(expr) && truthValue(left) && truthValue(right))
+                    {
+                        const std::string before = report.wanted() ? render(expr) : std::string();
+                        expr->setOperation(OP_BIT_AND);
+                        wrote(expr, expr, before);
+                    }
+                    return;
+                case OP_MINUS:
+                case OP_SUB_ASSIGN:
+                {
+                    // -1 - x as ~x.
+                    if (mCosts.complementForMinusOneLess && expr->getOperation() == OP_MINUS && integerOperands(expr) && isInteger(left, -1) &&
+                        !right->getConstantValue())
+                    {
+                        over(expr, 1, { OP_BIT_NOT });
+                        return;
+                    }
+                    // Not of a constant the folder would have, nor of the
+                    // one number that negated is itself.
+                    const std::optional<S32> c = integerValue(right);
+                    if (mCosts.plusForMinus && numeric && !(left->getConstantValue() && right->getConstantValue()) && !(c && *c == INT32_MIN))
+                    {
+                        plus(expr);
+                    }
+                    return;
+                }
+                case OP_SHIFT_LEFT:
+                {
+                    const std::optional<S32> c = integerValue(right);
+                    if (mCosts.productForShift && integerOperands(expr) && c && *c >= 1 && *c <= 30 && !left->getConstantValue())
+                    {
+                        const std::string before = report.wanted() ? render(expr) : std::string();
+                        renumber(expr, 1, ctx.integer(S32(1) << *c));
+                        expr->setOperation(OP_MUL);
+                        wrote(expr, expr, before);
+                    }
+                    return;
+                }
+                case OP_SHIFT_RIGHT:
+                {
+                    const std::optional<S32> c     = integerValue(right);
+                    const std::optional<Range> r   = integerOperands(expr) ? rangeOf(left) : std::nullopt;
+                    if (mCosts.quotientForShift && c && *c >= 1 && *c <= 30 && r && r->least >= 0.0 && !left->getConstantValue())
+                    {
+                        const std::string before = report.wanted() ? render(expr) : std::string();
+                        renumber(expr, 1, ctx.integer(S32(1) << *c));
+                        expr->setOperation(OP_DIV);
+                        wrote(expr, expr, before);
+                    }
+                    return;
+                }
+                case OP_BIT_AND:
+                {
+                    if (!mCosts.quotientForShift || !integerOperands(expr))
+                    {
+                        return;
+                    }
+                    for (int slot = 0; slot < 2; ++slot)
+                    {
+                        auto*                      x    = static_cast<LSLExpression*>(expr->getChild(1 - slot));
+                        const std::optional<S32>   mask = integerValue(expr->getChild(slot));
+                        const std::optional<S32>   k    = mask && *mask > 0 && *mask < INT32_MAX ? powerOfTwo(*mask + 1) : std::nullopt;
+                        const std::optional<Range> r    = k && !x->getConstantValue() ? rangeOf(x) : std::nullopt;
+                        if (r && r->least >= 0.0)
+                        {
+                            // x % 2^k, x on the left.
+                            const std::string before = report.wanted() ? render(expr) : std::string();
+                            if (slot == 0)
+                            {
+                                LSLASTNode* m = expr->takeChild(0);
+                                LSLASTNode* v = expr->takeChild(1);
+                                expr->setChild(0, v);
+                                expr->setChild(1, m);
+                            }
+                            renumber(expr, 1, ctx.integer(*mask + 1));
+                            expr->setOperation(OP_MOD);
+                            wrote(expr, expr, before);
+                            return;
+                        }
+                    }
+                    return;
+                }
+                case OP_MUL:
+                {
+                    if (!mCosts.sumForDouble || !numeric)
+                    {
+                        return;
+                    }
+                    for (int slot = 0; slot < 2; ++slot)
+                    {
+                        auto* x   = static_cast<LSLExpression*>(expr->getChild(1 - slot));
+                        auto* two = expr->getChild(slot);
+                        if (read(x) && (isInteger(two, 2) || (type == LST_FLOATINGPOINT && isFloat(two, 2.0))))
+                        {
+                            const std::string before = report.wanted() ? render(expr) : std::string();
+                            LSLExpression*    again  = static_cast<LSLLValueExpression*>(x)->clone();
+                            again->setType(x->getType());
+                            again->setLoc(x->getLoc());
+                            LSLASTNode::replaceNode(two, again);
+                            expr->setOperation(OP_PLUS);
+                            wrote(expr, expr, before);
+                            return;
+                        }
+                    }
+                    return;
+                }
+                case OP_DIV:
+                {
+                    LSLConstant* cv = right->getConstantValue();
+                    if (!mCosts.productForQuotient || type != LST_FLOATINGPOINT || !cv || left->getConstantValue())
+                    {
+                        return;
+                    }
+                    double v = 0.0;
+                    if (cv->getNodeSubType() == NODE_FLOAT_CONSTANT)
+                    {
+                        v = static_cast<LSLFloatConstant*>(cv)->getValue();
+                    }
+                    else if (cv->getNodeSubType() == NODE_INTEGER_CONSTANT)
+                    {
+                        v = static_cast<LSLIntegerConstant*>(cv)->getValue();
+                    }
+                    int        k     = 0;
+                    const bool power = std::isfinite(v) && v != 0.0 && std::frexp(std::fabs(v), &k) == 0.5;
+                    // A power of two from 2^-126 to 2^126, but for one, whose
+                    // reciprocal is as exact.
+                    if (!power || k - 1 < -126 || k - 1 > 126 || k == 1)
+                    {
+                        return;
+                    }
+                    LSLConstant* reciprocal = ctx.number(1.0 / v);
+                    if (!reciprocal)
+                    {
+                        return;
+                    }
+                    const std::string before = report.wanted() ? render(expr) : std::string();
+                    renumber(expr, 1, reciprocal);
+                    expr->setOperation(OP_MUL);
+                    wrote(expr, expr, before);
+                    return;
+                }
+                case OP_EQ:
+                    if (mCosts.differenceForNotEqual && integerOperands(expr) && !left->getConstantValue())
+                    {
+                        // !(a - b), made of its operands.
+                        const std::string before = report.wanted() ? render(expr) : std::string();
+                        auto*             a      = static_cast<LSLExpression*>(expr->takeChild(0));
+                        auto*             b      = static_cast<LSLExpression*>(expr->takeChild(1));
+                        LSLExpression*    made   = nullptr;
+                        {
+                            const Uncounted uncounted(*ctx.context);
+                            auto*           apart = uncounted.made(ctx.allocator->newTracked<LSLBinaryExpression>(a, OP_MINUS, b));
+                            apart->setType(TYPE(LST_INTEGER));
+                            apart->setLoc(expr->getLoc());
+                            made = unary(uncounted, OP_BOOLEAN_NOT, difference(apart));
+                        }
+                        made->setLoc(expr->getLoc());
+                        LSLASTNode::replaceNode(expr, made);
+                        wrote(expr, made, before);
+                    }
+                    return;
+                default:
+                    return;
+            }
+        }
+
+        // Whether a key is never anything but a key that is, or NULL_KEY:
+        // what a library function gives for one it found or did not, an
+        // event's key that names who or what was there, or a local only
+        // ever set to one of those. `if (k)` is then `k != NULL_KEY`, where
+        // of any other string the two differ.
+        bool validKey(LSLExpression* e, int depth = 0) const
+        {
+            static const char* const FOUND[] = { "llGetOwner", "llGetKey", "llGetCreator", "llDetectedKey", "llDetectedOwner",
+                                                 "llAvatarOnSitTarget", "llAvatarOnLinkSitTarget", "llGetLinkKey", "llGetPermissionsKey",
+                                                 "llGetInventoryKey", "llGetInventoryCreator", "llGetLandOwnerAt", "llGenerateKey",
+                                                 "llHTTPRequest", "llRequestAgentData", "llRequestInventoryData", "llRequestSimulatorData",
+                                                 "llRequestDisplayName", "llRequestUsername", "llRequestUserKey", "llName2Key",
+                                                 "llGetNotecardLine", "llGetNumberOfNotecardLines", "llTransferLindenDollars",
+                                                 "llReadKeyValue", "llCreateKeyValue", "llUpdateKeyValue", "llDeleteKeyValue",
+                                                 "llDataSizeKeyValue", "llKeysKeyValue", "llRezObjectWithParams" };
+            static const char* const NAMED[] = { "listen", "money", "object_rez", "attach", "control", "dataserver", "http_request",
+                                                 "http_response", "transaction_result", "experience_permissions",
+                                                 "experience_permissions_denied", "game_control" };
+            e = bare(e);
+            if (!e || e->getIType() != LST_KEY || depth > 4)
+            {
+                return false;
+            }
+            if (e->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+            {
+                LSLSymbol* sym = e->getSymbol();
+                return sym && sym->getSubType() == SYM_BUILTIN &&
+                       std::any_of(std::begin(FOUND), std::end(FOUND), [sym](const char* f) { return !strcmp(f, sym->getName()); });
+            }
+            if (e->getNodeSubType() != NODE_LVALUE_EXPRESSION || static_cast<LSLLValueExpression*>(e)->getMember())
+            {
+                return false;
+            }
+            LSLSymbol* sym = e->getSymbol();
+            if (!sym)
+            {
+                return false;
+            }
+            if (sym->getSubType() == SYM_EVENT_PARAMETER)
+            {
+                // The handler the read is in, whose parameter it is.
+                LSLASTNode* handler = e;
+                while (handler && handler->getNodeType() != NODE_EVENT_HANDLER)
+                {
+                    handler = handler->getParent();
+                }
+                LSLSymbol* event = handler ? handler->getSymbol() : nullptr;
+                return event && sym->getAssignments() == 0 &&
+                       std::any_of(std::begin(NAMED), std::end(NAMED), [event](const char* n) { return !strcmp(n, event->getName()); });
+            }
+            if (sym->getSubType() != SYM_LOCAL)
+            {
+                return false;
+            }
+            // Declared as one, and set to nothing else after.
+            LSLASTNode* decl = sym->getVarDecl();
+            LSLASTNode* init = decl ? decl->getChild(1) : nullptr;
+            if (!init || init->getNodeType() != NODE_EXPRESSION || !validKey(static_cast<LSLExpression*>(init), depth + 1))
+            {
+                return false;
+            }
+            LSLASTNode* owner = decl;
+            while (owner && owner->getNodeType() != NODE_GLOBAL_FUNCTION && owner->getNodeType() != NODE_EVENT_HANDLER)
+            {
+                owner = owner->getParent();
+            }
+            bool valid = owner != nullptr;
+            eachNode(owner, [&](LSLASTNode* n) {
+                if (!valid || n->getNodeType() != NODE_EXPRESSION || n->getNodeSubType() != NODE_LVALUE_EXPRESSION || n->getSymbol() != sym)
+                {
+                    return;
+                }
+                LSLASTNode* parent = n->getParent();
+                if (parent && parent->getNodeType() == NODE_EXPRESSION && operation_mutates(static_cast<LSLExpression*>(parent)->getOperation()) &&
+                    parent->getChild(0) == n)
+                {
+                    valid = static_cast<LSLExpression*>(parent)->getOperation() == OP_ASSIGN && parent->getChild(1)->getNodeType() == NODE_EXPRESSION &&
+                            validKey(static_cast<LSLExpression*>(parent->getChild(1)), depth + 1);
+                }
+            });
+            return valid;
+        }
+
+        // A condition `k != NULL_KEY` of such a key made `k`, and, where
+        // `turned` lets it, `k == NULL_KEY` too, for its if's ways to be
+        // turned around: 1 where it was a !=, -1 a ==, 0 where nothing.
+        int keyTest(LSLASTNode* parent, int slot, bool turned = true)
+        {
+            LSLASTNode* child = parent->getChild(slot);
+            if (!child || child->getNodeType() != NODE_EXPRESSION)
+            {
+                return 0;
+            }
+            LSLExpression* cond = bare(static_cast<LSLExpression*>(child));
+            if (!cond || cond->getNodeSubType() != NODE_BINARY_EXPRESSION || (cond->getOperation() != OP_NEQ && (cond->getOperation() != OP_EQ || !turned)))
+            {
+                return 0;
+            }
+            static constexpr std::string_view NULL_TEXT = "00000000-0000-0000-0000-000000000000";
+            const auto isNull = [](LSLASTNode* n) {
+                LSLConstant* cv = n ? n->getConstantValue() : nullptr;
+                if (!cv || (cv->getIType() != LST_KEY && cv->getIType() != LST_STRING))
+                {
+                    return false;
+                }
+                const char* text = cv->getIType() == LST_KEY ? static_cast<LSLKeyConstant*>(cv)->getValue() : static_cast<LSLStringConstant*>(cv)->getValue();
+                return text && NULL_TEXT == text;
+            };
+            for (int side = 0; side < 2; ++side)
+            {
+                auto* k = static_cast<LSLExpression*>(cond->getChild(side));
+                if (!isNull(cond->getChild(1 - side)) || !validKey(k))
+                {
+                    continue;
+                }
+                const bool        equal  = cond->getOperation() == OP_EQ;
+                const std::string before = report.wanted() ? render(cond) : std::string();
+                cond->takeChild(side);
+                LSLASTNode::replaceNode(child, k);
+                if (report.wanted())
+                {
+                    report.note(k->getLoc(), "OptimizerKeyAsTruth", "wrote [1] as the key itself, which is a key found or NULL_KEY", { before });
+                }
+                ++changes;
+                return equal ? -1 : 1;
+            }
+            return 0;
+        }
+
+        // Whether running an expression could stop the script: a division
+        // or a remainder by anything but a constant other than nought.
+        static bool mayFault(LSLASTNode* root)
+        {
+            bool fault = false;
+            eachNode(root, [&](LSLASTNode* n) {
+                if (fault || n->getNodeType() != NODE_EXPRESSION || n->getNodeSubType() != NODE_BINARY_EXPRESSION)
+                {
+                    return;
+                }
+                const LSLOperator op = static_cast<LSLExpression*>(n)->getOperation();
+                if (op != OP_DIV && op != OP_MOD && op != OP_DIV_ASSIGN && op != OP_MOD_ASSIGN)
+                {
+                    return;
+                }
+                LSLConstant* cv = n->getChild(1)->getConstantValue();
+                fault           = !cv || (cv->getNodeSubType() == NODE_INTEGER_CONSTANT && !static_cast<LSLIntegerConstant*>(cv)->getValue()) ||
+                        (cv->getNodeSubType() == NODE_FLOAT_CONSTANT && static_cast<LSLFloatConstant*>(cv)->getValue() == 0.0) ||
+                        (cv->getNodeSubType() != NODE_INTEGER_CONSTANT && cv->getNodeSubType() != NODE_FLOAT_CONSTANT);
+            });
+            return fault;
+        }
+
+        // An operand of a new && or &, bracketed where it is an operation.
+        LSLExpression* operand(LSLExpression* x)
+        {
+            if (x->getNodeSubType() != NODE_BINARY_EXPRESSION)
+            {
+                return x;
+            }
+            auto* parens = ctx.allocator->newTracked<LSLParenthesisExpression>(x);
+            parens->setType(x->getType());
+            parens->setLoc(x->getLoc());
+            return parens;
+        }
+
+        // `if (a) if (b) S`, neither with an else, as `if (a && b) S`, or
+        // `if (a & b) S` where both are only ever 1 or 0: where b may run
+        // whatever a is -- it changes nothing, reads nothing of the world,
+        // nothing a writes, and cannot stop the script -- since LSL runs
+        // both sides, b first.
+        void nestedIf(LSLIfStatement* stmt)
+        {
+            LSLStatement* yes   = stmt->getTrueBranch();
+            LSLASTNode*   no    = stmt->getFalseBranch();
+            LSLASTNode*   inner = yes && yes->getNodeSubType() == NODE_COMPOUND_STATEMENT && yes->getNumChildren() == 1 ? yes->getChild(0) : yes;
+            if ((no && no->getNodeType() != NODE_NULL) || !inner || inner->getNodeType() != NODE_STATEMENT || inner->getNodeSubType() != NODE_IF_STATEMENT)
+            {
+                return;
+            }
+            auto*       then  = static_cast<LSLIfStatement*>(inner);
+            LSLASTNode* other = then->getFalseBranch();
+            LSLExpression* a  = stmt->getCheckExpr();
+            LSLExpression* b  = then->getCheckExpr();
+            if ((other && other->getNodeType() != NODE_NULL) || !a || !b || a->getIType() != LST_INTEGER || b->getIType() != LST_INTEGER)
+            {
+                return;
+            }
+            const bool  truths = truthValue(a) && truthValue(b);
+            LSLOperator op     = truths && mCosts.bitAndForNestedTruths ? OP_BIT_AND : mCosts.andForNestedIf ? OP_BOOLEAN_AND : OP_NONE;
+            if (op == OP_NONE || !sideEffectFree(b) || mayFault(b))
+            {
+                return;
+            }
+            const ALLSLEffects::Writes writes = ctx.effects->of(a);
+            bool                       read   = false;
+            eachNode(b, [&](LSLASTNode* n) {
+                read = read || (n->getNodeType() == NODE_EXPRESSION && n->getNodeSubType() == NODE_LVALUE_EXPRESSION && writes.writes(n->getSymbol()));
+            });
+            if (read)
+            {
+                return;
+            }
+            const std::string before = report.wanted() ? render(a) + ") if (" + render(b) : std::string();
+            const Uncounted   uncounted(*ctx.context);
+            auto*             left   = static_cast<LSLExpression*>(stmt->takeChild(0));
+            auto*             right  = static_cast<LSLExpression*>(then->takeChild(0));
+            auto*             body   = then->takeChild(1);
+            auto*             both   = uncounted.made(ctx.allocator->newTracked<LSLBinaryExpression>(operand(left), op, operand(right)));
+            both->setType(TYPE(LST_INTEGER));
+            both->setLoc(left->getLoc());
+            stmt->setChild(0, both);
+            stmt->setChild(1, body);
+            if (report.wanted())
+            {
+                report.note(stmt->getLoc(), "OptimizerMergedIfs", "wrote if ([1]) as one if", { before });
+            }
+            ++changes;
         }
 
         // What only counts as true or false -- a condition, an operand of
@@ -849,14 +1379,41 @@ namespace
             }
             if (expr->getOperation() == OP_NEQ && !isInteger(right, -1) && !isInteger(left, -1))
             {
-                // Different is the bits differing.
+                // Different is the bits differing, or the difference.
                 if (mCosts.xorForNotEqual)
                 {
                     const std::string before = report.wanted() ? render(expr) : std::string();
                     expr->setOperation(OP_BIT_XOR);
                     wrote(expr, expr, before);
                 }
+                else if (mCosts.differenceForNotEqual && !left->getConstantValue())
+                {
+                    const std::string before = report.wanted() ? render(expr) : std::string();
+                    wrote(expr, difference(expr), before);
+                }
                 return;
+            }
+            // Odd is what is left over of a half.
+            if (expr->getOperation() == OP_BIT_AND && mCosts.remainderForOddTest)
+            {
+                for (int slot = 0; slot < 2; ++slot)
+                {
+                    if (isInteger(expr->getChild(slot), 1) && !expr->getChild(1 - slot)->getConstantValue())
+                    {
+                        const std::string before = report.wanted() ? render(expr) : std::string();
+                        if (slot == 0)
+                        {
+                            LSLASTNode* one = expr->takeChild(0);
+                            LSLASTNode* x   = expr->takeChild(1);
+                            expr->setChild(0, x);
+                            expr->setChild(1, one);
+                        }
+                        renumber(expr, 1, ctx.integer(2));
+                        expr->setOperation(OP_MOD);
+                        wrote(expr, expr, before);
+                        return;
+                    }
+                }
             }
             if (!mCosts.complementForNotMinusOne)
             {

@@ -53,6 +53,7 @@
 
 #include "alscriptengine.h"
 
+#include "allslbranches.h"
 #include "allslcosts.h"
 #include "allsldeadcode.h"
 #include "allsleffects.h"
@@ -465,6 +466,18 @@ namespace
                     if (removed)
                     {
                         changes += removed;
+                        refresh();
+                    }
+                }
+                // Branches and loops in fewer jumps, once what can never run
+                // is gone.
+                if (options.constfold)
+                {
+                    const int restructured = restructure(ctx, report, options, script);
+                    walks(1);
+                    if (restructured)
+                    {
+                        changes += restructured;
                         refresh();
                     }
                 }

@@ -122,6 +122,43 @@ struct ALLSLCosts
     // `!~(x | -13)`, `!(x & 4) && !(x & 8)` as `!(x & 12)`, `(x & 4) | (x & 8)`
     // as `x & 12`, and an || of them as that where only truth counts.
     bool bitTestsMerged = false;
+    // `a && b` as `a & b` where each side is only ever 1 or 0: a
+    // comparison, a !, or an && or || of its own. LSL runs both sides of
+    // either, the right first.
+    bool bitAndForAnd = false;
+    // `a - b` as `a + -b`, and `a - 5` as `a + -5`, of integers and floats:
+    // the same value, the operands run in the same order -- the right
+    // first -- and on Mono an add in place of a call to subtract.
+    bool plusForMinus = false;
+    // `x << 3` as `x * 8`, a shift by 0 to 30: the two wrap alike.
+    bool productForShift = false;
+    // `-1 - x` as `~x`, which two's complement makes the same.
+    bool complementForMinusOneLess = false;
+    // `x * 2` as `x + x`, where x is a local's or a parameter's read.
+    bool sumForDouble = false;
+    // `f / 4` as `f * 0.25`, a float divided by a power of two, whose
+    // reciprocal is exact: the same value to the last bit.
+    bool productForQuotient = false;
+    // Where only truth counts, `x & 1` as `x % 2`, and `a != b` as `a - b`;
+    // and `a == b` as `!(a - b)`: Luau's bitwise operators are calls, its
+    // arithmetic one instruction.
+    bool remainderForOddTest     = false;
+    bool differenceForNotEqual   = false;
+    // Of a value never below nought, `x >> 2` as `x / 4`, and `x & 7` as
+    // `x % 8`.
+    bool quotientForShift = false;
+    // `if (a) if (b) S`, neither with an else, as `if (a && b) S` -- where b
+    // is safe to run whatever a is -- and as `if (a & b) S` where both are
+    // only ever 1 or 0.
+    bool andForNestedIf       = false;
+    bool bitAndForNestedTruths = false;
+    // `if (c) x = 5; else x = 7;` as `x = !!c * -2 + 7`, of a c that is not
+    // only ever 1 or 0: integer constants either way. Of one that is, the
+    // arithmetic is smaller on every target, and made wherever it can be.
+    bool arithmeticForSelect = false;
+    // A for or a while whose first check is known to pass run as a do:
+    // `for (i = 0; i < 10; ++i) S` as `i = 0; do S while (++i < 10);`.
+    bool doForKnownFirst = false;
 
     // ---- functions, for whether putting one in place saves
 
