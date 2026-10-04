@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <cmath>
 #include <cstdlib>
 #include <functional>
@@ -420,6 +421,15 @@ namespace
         // it no other way there. Tailslide's constants are where the
         // parser's next token was, not where they were.
         std::optional<std::string> hexAsWritten(LSLConstant* c, int v);
+        // The numbers written on a constant's line, or the one before where
+        // its own has none: each as written, and its value.
+        std::vector<std::pair<std::string, unsigned long long>> numbersNear(LSLConstant* c);
+        // The variables declared hexadecimal past 0x7FFFFFFF and never set
+        // that nothing but bit32 reads, which takes 0xF0000000 as the
+        // -268435456 LSL wrapped it to: their declarations, whose
+        // hexadecimal stays.
+        void                                   findBitsOnly();
+        boost::unordered_flat_set<LSLASTNode*> mBitsOnly;
         // Where each of the LSL's lines starts, from the first.
         const std::vector<size_t>& lineStarts();
         std::vector<size_t>        mLineStarts;
@@ -1392,6 +1402,11 @@ namespace
     // --- expressions ------------------------------------------------------------------
 
     bool intoBit32(LSLASTNode* e);
+    bool wholeNumber(LSLExpression* e, int& v);
+    namespace
+    {
+        LSLSymbol* setBy(LSLASTNode* node);
+    }
 
     Expr Writer::constant(LSLConstant* c)
     {
@@ -1406,10 +1421,31 @@ namespace
                 // it, which bit32.s32 of the hexadecimal would make a call
                 // that SLua's compiler does not fold.
                 const int v = static_cast<LSLIntegerConstant*>(c)->getValue();
+                // What it is the value of: a declaration of a variable only
+                // bit32 reads, or what bit32 takes.
+                LSLASTNode* holder = c->getParent();
+                while (holder && (holder->getNodeSubType() == NODE_CONSTANT_EXPRESSION || holder->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION))
+                {
+                    holder = holder->getParent();
+                }
                 if (std::optional<std::string> hex = hexAsWritten(c, v);
-                    hex && (v >= 0 || (c->getParent() && intoBit32(c->getParent()))))
+                    hex && (v >= 0 || mBitsOnly.contains(holder) || (c->getParent() && intoBit32(c->getParent()))))
                 {
                     return { *hex, PRIMARY };
+                }
+                // A number past 0xFFFFFFFF, which the grid's 32-bit hosts
+                // stop at: -1 once signed, as written here.
+                if (v == -1 && !static_cast<LSLIntegerConstant*>(c)->wasNegated())
+                {
+                    for (const auto& [word, value] : numbersNear(c))
+                    {
+                        if (value > 0xFFFFFFFFull)
+                        {
+                            noteOnce(c, "SluaIntegerPast32Bits", "LSL reads [1] as -1: past 0xFFFFFFFF, the most its 32 bits hold, a number stops there.",
+                                     { word });
+                            break;
+                        }
+                    }
                 }
                 return { std::to_string(v), v < 0 ? UNARY : PRIMARY };
             }
@@ -1462,25 +1498,23 @@ namespace
         return mLineStarts;
     }
 
-    std::optional<std::string> Writer::hexAsWritten(LSLConstant* c, int v)
+    std::vector<std::pair<std::string, unsigned long long>> Writer::numbersNear(LSLConstant* c)
     {
-        const auto* loc = c->getLoc();
+        std::vector<std::pair<std::string, unsigned long long>> found;
+        const auto*                                             loc = c->getLoc();
         if (!loc || loc->first_line < 1)
         {
-            return std::nullopt;
+            return found;
         }
         lineStarts();
-        // Each number on a line, past strings and comments: hexadecimal of
-        // the value, and whether the value is there another way.
-        bool       other  = false;
-        const auto onLine = [&](S32 line) -> std::optional<std::string> {
+        // Each number on a line, past strings and comments.
+        const auto onLine = [&](S32 line) {
             if (line < 1 || static_cast<size_t>(line) > mLineStarts.size())
             {
-                return std::nullopt;
+                return;
             }
             const size_t           from = mLineStarts[static_cast<size_t>(line) - 1];
             const std::string_view text = mSource.substr(from, std::min(mSource.find('\n', from), mSource.size()) - from);
-            std::optional<std::string> hex;
             for (size_t i = 0; i < text.size();)
             {
                 const char ch = text[i];
@@ -1510,31 +1544,89 @@ namespace
                     ++end;
                 }
                 const std::string word(text.substr(i, end - i));
-                if (word.size() > 2 && word[0] == '0' && (word[1] == 'x' || word[1] == 'X') &&
-                    word.find_first_not_of("0123456789abcdefABCDEF", 2) == std::string::npos)
+                const bool        hex = word.size() > 2 && word[0] == '0' && (word[1] == 'x' || word[1] == 'X') &&
+                                 word.find_first_not_of("0123456789abcdefABCDEF", 2) == std::string::npos;
+                if (hex || word.find_first_not_of("0123456789") == std::string::npos)
                 {
-                    // Of 32 bits at most: LSL's integer of it, as its own
-                    // reading wraps one.
-                    const size_t digits = word.size() - std::min(word.find_first_not_of('0', 2), word.size());
-                    if (digits <= 8 && static_cast<U32>(std::strtoull(word.c_str(), nullptr, 16)) == static_cast<U32>(v))
-                    {
-                        hex = word;
-                    }
-                }
-                else if (word.find_first_not_of("0123456789") == std::string::npos &&
-                         std::llabs(std::strtoll(word.c_str(), nullptr, 10)) == std::llabs(static_cast<long long>(v)))
-                {
-                    other = true;
+                    // Past what strtoull holds: past 32 bits all the same.
+                    errno                          = 0;
+                    const unsigned long long value = std::strtoull(word.c_str(), nullptr, hex ? 16 : 10);
+                    found.emplace_back(word, errno == ERANGE ? ~0ull : value);
                 }
                 i = end;
             }
-            return other ? std::nullopt : hex;
         };
-        if (std::optional<std::string> hex = onLine(loc->first_line))
+        onLine(loc->first_line);
+        if (found.empty())
         {
-            return hex;
+            onLine(loc->first_line - 1);
         }
-        return other ? std::nullopt : onLine(loc->first_line - 1);
+        return found;
+    }
+
+    std::optional<std::string> Writer::hexAsWritten(LSLConstant* c, int v)
+    {
+        // Hexadecimal of 32 bits at most whose bits are the value, LSL's
+        // own reading of it, where no number written another way is.
+        std::optional<std::string> hex;
+        for (const auto& [word, value] : numbersNear(c))
+        {
+            const bool is_hex = word.size() > 2 && (word[1] == 'x' || word[1] == 'X');
+            if (is_hex && value <= 0xFFFFFFFFull && static_cast<U32>(value) == static_cast<U32>(v))
+            {
+                hex = word;
+            }
+            else if (!is_hex && (value == static_cast<unsigned long long>(std::llabs(static_cast<long long>(v)))))
+            {
+                return std::nullopt;
+            }
+        }
+        return hex;
+    }
+
+    void Writer::findBitsOnly()
+    {
+        // The declarations of integers given such a number.
+        boost::unordered_flat_map<LSLSymbol*, LSLASTNode*> given;
+        walk(mScript, [&](LSLASTNode* node) {
+            LSLIdentifier* id   = nullptr;
+            LSLExpression* init = nullptr;
+            if (node->getNodeType() == NODE_GLOBAL_VARIABLE)
+            {
+                id   = static_cast<LSLGlobalVariable*>(node)->getIdentifier();
+                init = static_cast<LSLGlobalVariable*>(node)->getInitializer();
+            }
+            else if (node->getNodeSubType() == NODE_DECLARATION)
+            {
+                id   = static_cast<LSLDeclaration*>(node)->getIdentifier();
+                init = static_cast<LSLDeclaration*>(node)->getInitializer();
+            }
+            int v = 0;
+            if (id && id->getSymbol() && id->getIType() == LST_INTEGER && wholeNumber(init, v) && v < 0)
+            {
+                given.emplace(id->getSymbol(), node);
+            }
+        });
+        if (given.empty())
+        {
+            return;
+        }
+        // Each read of one by anything but bit32, and each that sets one,
+        // takes it out.
+        walk(mScript, [&](LSLASTNode* node) {
+            if (LSLSymbol* set = setBy(node))
+            {
+                given.erase(set);
+            }
+            if (node->getNodeSubType() == NODE_LVALUE_EXPRESSION && !intoBit32(node))
+            {
+                given.erase(static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol());
+            }
+        });
+        for (const auto& [symbol, declaration] : given)
+        {
+            mBitsOnly.insert(declaration);
+        }
     }
 
     Expr Writer::lvalue(LSLLValueExpression* e)
@@ -5899,6 +5991,7 @@ end
                 }
             }
         }
+        findBitsOnly();
         globals();
         functions();
         states();

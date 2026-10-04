@@ -1287,6 +1287,7 @@ namespace tut
                       "the null key; and hexadecimal as written where SLua reads the same number");
         const ALLSLToSLua::Result r = convert("integer MASK = 0x0000FF00;\n"
                                               "integer HIGH = 0xF0000000;\n"
+                                              "integer S_MASK = 0xF0000000;\n"
                                               "integer BIG = 4294967296;\n"
                                               "integer BIG_HEX = 0x100000000;\n"
                                               "integer WRAPPED = 2147483648;\n"
@@ -1298,12 +1299,14 @@ namespace tut
                                               "    if ((flags & 4) == 0) llOwnerSay(\"no 4\");\n"
                                               "    integer masked = flags & MASK;\n"
                                               "    integer top = flags & 0x80000000;\n"
+                                              "    integer sign = flags & S_MASK; if (flags & ~S_MASK) sign = 0;\n"
+                                              "    integer low = 0xFFFF0000; sign = sign | low;\n"
                                               "    list params = [PRIM_NAME, \"a\"];\n"
                                               "    params += [PRIM_LINK_TARGET, LINK_ROOT, PRIM_POSITION, llGetPos()];\n"
                                               "    params += n;\n"
                                               "    llSetLinkPrimitiveParamsFast(LINK_THIS, params);\n"
                                               "    float f = (float)\"1.5\";\n"
-                                              "    llOwnerSay((string)(masked + HIGH + top + BIG + BIG_HEX + WRAPPED) + (string)f + (string)gSitter);\n"
+                                              "    llOwnerSay((string)(masked + HIGH + top + BIG + BIG_HEX + WRAPPED + sign) + (string)f + (string)gSitter);\n"
                                               "} }\n");
         ensure("an & as a condition: " + r.text, has(r, "if bit32.btest(flags, PARCEL_FLAG_ALLOW_CREATE_OBJECTS) then"));
         ensure("not of one, an & of &s one call: " + r.text, has(r, "if not bit32.btest(flags, MASK, 0x300) then"));
@@ -1318,6 +1321,11 @@ namespace tut
         ensure("past 0x7FFFFFFF, which SLua reads as another number, as LSL had it: " + r.text, has(r, "local HIGH = -268435456"));
         // As the grid's 32-bit hosts read them: strtoul stops at 0xFFFFFFFF.
         ensure("past 32 bits, -1: " + r.text, has(r, "local BIG = -1\n") && has(r, "local BIG_HEX = -1\n"));
+        ensure("and said: " + r.text, noted(r, "SluaIntegerPast32Bits", "4294967296") && noted(r, "SluaIntegerPast32Bits", "0x100000000"));
+        ensure("a global only bit32 reads keeps its hexadecimal: " + r.text, has(r, "local S_MASK = 0xF0000000\n") &&
+                                                                               has(r, "bit32.band(flags, S_MASK)"));
+        ensure("one read as a number does not: " + r.text, has(r, "local HIGH = -268435456"));
+        ensure("nor a local, never set, only bit32 reads: " + r.text, has(r, "local low = 0xFFFF0000\n"));
         ensure("within them, wrapped: " + r.text, has(r, "local WRAPPED = -2147483648\n"));
         checksClean(r);
     }
