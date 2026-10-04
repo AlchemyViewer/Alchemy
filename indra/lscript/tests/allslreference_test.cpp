@@ -1,6 +1,6 @@
 /**
  * @file allslreference_test.cpp
- * @brief LL's LSL compiler over a handful of scripts, each to LSO and to CIL: the grid's definitions, its new events, and what it rejects.
+ * @brief LL's LSL compiler over a handful of scripts, each to LSO and to CIL: the grid's definitions, its new events, and what it rejects; and LL's VM running one.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -25,6 +25,10 @@
 #include "linden_common.h"
 
 #include "../allslreference.h"
+
+#include "../lscript_execute.h"
+#include "../lscript_library.h"
+#include "lltimer.h"
 
 #include "../test/lltut.h"
 
@@ -53,6 +57,13 @@ namespace
     bool has(const std::string& text, const std::string& part)
     {
         return text.find(part) != std::string::npos;
+    }
+
+    // What a script said on a channel, as llSay's stand-in heard it.
+    std::vector<std::string> gSaid;
+    void heardSay(LLScriptLibData* retval, LLScriptLibData* args, const LLUUID& id)
+    {
+        gSaid.emplace_back(args[1].mString ? args[1].mString : "");
     }
 
     // Where LSO keeps the version, the top of memory and the default
@@ -195,5 +206,35 @@ namespace tut
                !unset_lso.ok && has(unset_lso.messages, "Unitialized variables can't be included in lists"));
         const ALLSLReference::Result unset_cil = ALLSLReference::compile(unset, Target::CIL);
         ensure("CIL takes it: " + unset_cil.messages, unset_cil.ok);
+    }
+
+    template<> template<>
+    void allslreference_object::test<6>()
+    {
+        set_test_name("LL's VM runs a compiled image's state_entry, a global, a function and a cast in it, its library call answered by a stand-in");
+        const std::string text = "integer g = 6;\n"
+                                 "integer twice(integer n) { return n * 2; }\n"
+                                 "default { state_entry() { llSay(0, (string)(twice(g) * 3 + 6)); } }\n";
+        const ALLSLReference::Result lso = ALLSLReference::compile(text, Target::LSO);
+        ensure("LSO: " + lso.messages, lso.ok);
+
+        // llSay is function 23: heard here for the test, as it was.
+        LLScriptLibraryFunction& say  = gScriptLibrary.mFunctions[23];
+        const auto               was  = say.mExecFunc;
+        say.mExecFunc                 = heardSay;
+        gSaid.clear();
+        LLScriptExecuteLSL2 vm(lso.image.data(), static_cast<U32>(lso.image.size()));
+        LLTimer             timer;
+        const char*         error  = nullptr;
+        U32                 events = 0;
+        for (S32 quanta = 0; quanta < 100 && gSaid.empty() && !error; ++quanta)
+        {
+            vm.runQuanta(FALSE, LLUUID::null, &error, 1.f, events, timer);
+        }
+        say.mExecFunc = was;
+        ensure("no fault: " + std::string(error ? error : ""), !error);
+        ensure_equals("one handler run", events, (U32)1);
+        ensure_equals("said once", gSaid.size(), (size_t)1);
+        ensure_equals("what it worked out", gSaid[0], std::string("42"));
     }
 }

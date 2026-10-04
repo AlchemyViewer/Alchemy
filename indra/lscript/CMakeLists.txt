@@ -1,8 +1,9 @@
 # -*- cmake -*-
 #
-# LL's LSL compiler, restored from before ca08bd5aba removed it: what emits
-# LSO bytecode and CIL as LL's own does, a reference for the script tests
-# and tools, never linked into the viewer. The parts that follow from the
+# LL's LSL compiler and LSO VM, restored from before ca08bd5aba removed
+# them: what emits LSO bytecode and CIL as LL's own does, and what runs the
+# LSO, a reference for the script tests and tools, never linked into the
+# viewer. The VM's library calls are answered by stand-ins a test gives. The parts that follow from the
 # grid's definitions -- the lexer's constants and events, the grammar's
 # events, the newer event nodes and the library table -- are written by
 # LL's own generator from lsl-definitions, as LL's build writes them, then
@@ -89,6 +90,12 @@ set(
   lscript_compile/lscript_scope.cpp
   lscript_compile/lscript_tree.cpp
   lscript_compile/lscript_typecheck.cpp
+  lscript_execute/llscriptresource.cpp
+  lscript_execute/llscriptresourceconsumer.cpp
+  lscript_execute/llscriptresourcepool.cpp
+  lscript_execute/lscript_execute.cpp
+  lscript_execute/lscript_heapruntime.cpp
+  lscript_execute/lscript_readlso.cpp
   lscript_library/lscript_alloc.cpp
   lscript_library/lscript_library.cpp
   ${BISON_indra_parser_OUTPUT_SOURCE}
@@ -109,9 +116,13 @@ target_sources(
     FILE_SET HEADERS
       FILES
         allslreference.h
+        llscriptresource.h
+        llscriptresourceconsumer.h
+        llscriptresourcepool.h
         lscript_alloc.h
         lscript_byteconvert.h
         lscript_byteformat.h
+        lscript_execute.h
         lscript_export.h
         lscript_http.h
         lscript_library.h
@@ -123,11 +134,17 @@ target_sources(
         lscript_compile/lscript_scope.h
         lscript_compile/lscript_tree.h
         lscript_compile/lscript_typecheck.h
+        lscript_execute/lscript_heapruntime.h
+        lscript_execute/lscript_readlso.h
 )
 
 target_include_directories(
   lscript
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/lscript_compile ${generated}
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/lscript_compile
+    ${CMAKE_CURRENT_SOURCE_DIR}/lscript_execute
+    ${generated}
 )
 target_link_libraries(lscript PRIVATE al::flags PUBLIC llcommon llmath)
 
