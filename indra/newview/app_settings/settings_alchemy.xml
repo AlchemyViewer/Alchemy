@@ -313,7 +313,7 @@
         <key>ALScriptPreprocEnabled</key>
         <map>
             <key>Comment</key>
-            <string>Script Studio runs the preprocessor over every script it saves, uploading the expanded code with the source kept in Firestorm's envelope. A script that came wrapped is preprocessed on saving whatever this says.</string>
+            <string>Script Studio runs the preprocessor over every script it saves, uploading the expanded code with the source kept in Firestorm's envelope. A script that came wrapped, or that has a directive of the preprocessor's, is preprocessed on saving whatever this says.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

@@ -178,6 +178,11 @@ namespace ALTextIndent
     // Each line a level in, where it has anything on it, or out by what a
     // level is; the caret and the anchor moved with their lines' starts.
     Change indentLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, bool in, const Options& options);
+    // The same at several selections in the order they begin: each run of
+    // them over the same lines a level in or out once, and each selection
+    // moved with its lines as the one is.
+    std::vector<ALTextEditing::Group> indentLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections, bool in,
+                                                  const Options& options);
     // Lines first through last so many levels in, those that are not
     // empty -- a tab a level, or a tab's width of spaces where tabs are
     // soft -- or out, each level a tab or up to a tab's width of spaces:

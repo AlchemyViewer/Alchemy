@@ -27,14 +27,10 @@
 #include "alscriptstudiovimrc.h"
 
 #include "alfilewrite.h"
-#include "alscriptworkspace.h"
+#include "alfollowednotecard.h"
 #include "alwatchedfile.h"
 #include "llfile.h"
-#include "llinventorymodel.h"
-#include "llsdserialize.h"
 #include "lltrans.h"
-#include "llviewercontrol.h"
-#include "llviewerinventory.h"
 
 namespace
 {
@@ -45,15 +41,16 @@ namespace
 ALScriptStudioVimrc::~ALScriptStudioVimrc() = default;
 
 ALScriptStudioVimrc::ALScriptStudioVimrc()
+    : mNotecard(std::make_unique<ALFollowedNotecard>(SETTING, "script_studio_vimrc.xml", "VimrcNotNotecard"))
 {
-    if (LLControlVariable* control = gSavedPerAccountSettings.getControl(SETTING))
-    {
-        mSettingChanged = control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) {
-            refresh();
+    mNotecardChanged = mNotecard->onChanged([this](bool moved) {
+        refresh();
+        if (moved)
+        {
             // Where it comes from changed, whatever the text.
             mChanged();
-        });
-    }
+        }
+    });
     refresh();
 }
 
@@ -63,35 +60,19 @@ std::string ALScriptStudioVimrc::filePath()
     return gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "vimrc");
 }
 
-// static
-std::string ALScriptStudioVimrc::cachePath()
-{
-    return gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "script_studio_vimrc.xml");
-}
-
 LLUUID ALScriptStudioVimrc::notecard() const
 {
-    const LLControlVariable* control = gSavedPerAccountSettings.getControl(SETTING);
-    return control ? LLUUID(control->getValue().asString()) : LLUUID::null;
+    return mNotecard->item();
 }
 
 std::string ALScriptStudioVimrc::notecardName() const
 {
-    const LLUUID item = notecard();
-    if (item.isNull())
-    {
-        return std::string();
-    }
-    if (const LLViewerInventoryItem* held = gInventory.getItem(item))
-    {
-        return held->getName();
-    }
-    return mCacheItem == item ? mCacheName : std::string();
+    return mNotecard->name();
 }
 
 void ALScriptStudioVimrc::useNotecard(const LLUUID& item)
 {
-    gSavedPerAccountSettings.setString(SETTING, item.isNull() ? std::string() : item.asString());
+    mNotecard->use(item);
 }
 
 void ALScriptStudioVimrc::check(bool now)
@@ -101,8 +82,7 @@ void ALScriptStudioVimrc::check(bool now)
         return;
     }
     mSinceCheck.reset();
-    const LLUUID item = notecard();
-    if (item.isNull())
+    if (notecard().isNull())
     {
         // Watched, and read as it changes; read now where asked, or where
         // it has yet to be watched.
@@ -112,35 +92,19 @@ void ALScriptStudioVimrc::check(bool now)
         }
         return;
     }
-    const LLViewerInventoryItem* held = gInventory.getItem(item);
-    if (held && (mCacheItem != item || held->getAssetUUID() != mCacheAsset) && held->getAssetUUID() != mFetching)
-    {
-        refresh();
-    }
+    mNotecard->check();
 }
 
 void ALScriptStudioVimrc::refresh()
 {
-    const LLUUID item = notecard();
-    if (item.isNull())
+    if (notecard().isNull())
     {
         readFile();
         return;
     }
     // Not the vimrc while the notecard is.
     mWatch.reset();
-    loadCache();
-    const bool                   kept = mCacheItem == item;
-    const LLViewerInventoryItem* held = gInventory.getItem(item);
-    // The copy while it is this notecard's: the notecard as it stands
-    // where the item's asset is the one kept, or the last known while
-    // inventory has not come as far as the item; standing in, where the
-    // asset is another, until that comes.
-    take(kept ? mCacheText : std::string(), std::string());
-    if (held && (!kept || held->getAssetUUID() != mCacheAsset))
-    {
-        fetch(item);
-    }
+    take(mNotecard->text(), mNotecard->error());
 }
 
 void ALScriptStudioVimrc::readFile()
@@ -169,74 +133,6 @@ void ALScriptStudioVimrc::readFile()
         text.clear();
     }
     take(text, std::string());
-}
-
-void ALScriptStudioVimrc::fetch(const LLUUID& item)
-{
-    const LLViewerInventoryItem* held = gInventory.getItem(item);
-    if (!held || held->getAssetUUID() == mFetching)
-    {
-        return;
-    }
-    mFetching = held->getAssetUUID();
-    ALScriptWorkspace::getInstance()->load(ALScriptRef(LLUUID::null, item), [item](const ALScriptLoaded& loaded) {
-        if (!ALScriptStudioVimrc::instanceExists())
-        {
-            return;
-        }
-        ALScriptStudioVimrc& self = ALScriptStudioVimrc::instance();
-        self.mFetching.setNull();
-        if (self.notecard() != item)
-        {
-            // Another since.
-            return;
-        }
-        if (!loaded.error.empty() || !loaded.notecard)
-        {
-            // What was there stays; why it is not the notecard is said.
-            self.take(self.mText, loaded.error.empty() ? LLTrans::getString("VimrcNotNotecard") : loaded.error);
-            return;
-        }
-        self.mCacheItem  = item;
-        self.mCacheAsset = loaded.assetId;
-        self.mCacheName  = loaded.name;
-        self.mCacheText  = loaded.text;
-        self.saveCache();
-        self.take(loaded.text, std::string());
-    });
-}
-
-void ALScriptStudioVimrc::loadCache()
-{
-    if (mCacheLoaded)
-    {
-        return;
-    }
-    mCacheLoaded = true;
-    llifstream in(cachePath());
-    LLSD       kept;
-    if (!in.is_open() || LLSDSerialize::fromXML(kept, in) <= 0 || !kept.isMap())
-    {
-        return;
-    }
-    mCacheItem  = kept["item"].asUUID();
-    mCacheAsset = kept["asset"].asUUID();
-    mCacheName  = kept["name"].asString();
-    mCacheText  = kept["text"].asString();
-}
-
-void ALScriptStudioVimrc::saveCache()
-{
-    LLSD kept;
-    kept["item"]  = mCacheItem;
-    kept["asset"] = mCacheAsset;
-    kept["name"]  = mCacheName;
-    kept["text"]  = mCacheText;
-    llofstream out(cachePath());
-    if (out.is_open())
-    {
-        LLSDSerialize::toPrettyXML(kept, out);
-    }
 }
 
 void ALScriptStudioVimrc::take(const std::string& text, const std::string& error)

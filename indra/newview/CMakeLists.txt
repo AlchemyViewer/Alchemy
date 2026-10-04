@@ -230,6 +230,8 @@ if(AL_BUILD_VIEWER)
     alscriptstudiosaving.cpp
     alscriptstudioviewer.cpp
     alscriptstudiovim.cpp
+    alfollowednotecard.cpp
+    alscriptstudiosnippetnotecard.cpp
     alscriptstudiovimrc.cpp
     alscriptstudioweighing.cpp
     alscriptstudiowords.cpp
@@ -1074,6 +1076,8 @@ if(AL_BUILD_VIEWER)
     alrecoverykeeper.h
     alscriptstudiosaving.h
     alscriptstudiovim.h
+    alfollowednotecard.h
+    alscriptstudiosnippetnotecard.h
     alscriptstudiovimrc.h
     alscriptstudioweighing.h
     alscriptstudiowords.h

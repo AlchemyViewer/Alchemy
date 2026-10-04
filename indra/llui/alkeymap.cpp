@@ -47,7 +47,8 @@ const char* alEditorCommandName(ALEditorCommand command)
         "join_lines",    "previous_change", "next_change",     "next_function",   "previous_function", "select_function",
         "go_to_bracket", "insert_line_below", "insert_line_above", "select_line", "move_subword_left",
         "move_subword_right", "select_subword_left", "select_subword_right", "expand_selection", "shrink_selection",
-        "select_next_occurrence", "change_all_occurrences",
+        "select_next_occurrence", "change_all_occurrences", "add_caret_above", "add_caret_below",
+        "column_select_left", "column_select_right", "column_select_up", "column_select_down",
     };
     static_assert(sizeof(NAMES) / sizeof(NAMES[0]) == static_cast<size_t>(ALEditorCommand::COUNT), "every command has a name");
     const size_t index = static_cast<size_t>(command);
@@ -268,8 +269,13 @@ ALKeymap ALKeymap::standard()
 #endif
     map.bind(KEY_LEFT, part, C::MoveSubwordLeft);
     map.bind(KEY_RIGHT, part, C::MoveSubwordRight);
+#if LL_DARWIN
     map.bind(KEY_LEFT, part | MASK_SHIFT, C::SelectSubwordLeft);
     map.bind(KEY_RIGHT, part | MASK_SHIFT, C::SelectSubwordRight);
+#endif
+    // Elsewhere Control-Shift-Alt with an arrow grows a column (below), as
+    // Visual Studio Code has it; selecting by parts there takes a key
+    // given it by hand.
 #if LL_DARWIN
     // Control-Shift-Command with an arrow there, Shift-Option being words.
     const MASK grow = MASK_MAC_CONTROL | MASK_SHIFT | MASK_CONTROL;
@@ -282,6 +288,15 @@ ALKeymap ALKeymap::standard()
     map.bind('D', MASK_CONTROL, C::SelectNextOccurrence);
     map.bind('L', MASK_CONTROL | MASK_SHIFT, C::ChangeAllOccurrences);
     map.bind(KEY_F2, MASK_CONTROL, C::ChangeAllOccurrences);
+    // As Visual Studio Code has them: Command and Option on a Mac.
+    map.bind(KEY_UP, MASK_CONTROL | MASK_ALT, C::AddCaretAbove);
+    map.bind(KEY_DOWN, MASK_CONTROL | MASK_ALT, C::AddCaretBelow);
+    // As Visual Studio Code has them: Command-Shift-Option on a Mac.
+    const MASK column = MASK_CONTROL | MASK_SHIFT | MASK_ALT;
+    map.bind(KEY_LEFT, column, C::ColumnSelectLeft);
+    map.bind(KEY_RIGHT, column, C::ColumnSelectRight);
+    map.bind(KEY_UP, column, C::ColumnSelectUp);
+    map.bind(KEY_DOWN, column, C::ColumnSelectDown);
 #if LL_DARWIN
     // The Mac's own, where MASK_CONTROL is Command: Command with an arrow
     // goes to the ends of the line and of the text, Option with one by

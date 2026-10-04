@@ -90,4 +90,64 @@ namespace ALTextEditing
     // `keep_blanks`, the break alone, as its gJ. The caret where the first
     // join is. Nothing where last is not past first.
     std::optional<Change> joinLines(const ALTextDocument& doc, S32 first, S32 last, bool keep_blanks);
+
+    // Where text put in at a place ends: past its last line break, or along
+    // the place's own line.
+    ALTextPos endOf(const ALTextPos& at, const std::string& text);
+    // A place in a text moved by replacements of it, in order and none over
+    // another, as a mark is (ALTextDocument::Edit::placed): pushed along by
+    // text put in right at it, unless not `pushed`.
+    ALTextPos placedThrough(const std::vector<Replacement>& replacements, const ALTextPos& pos, bool pushed = true);
+
+    // --- several selections at once ---------------------------------------------
+
+    // A command done at several selections at once is worked out in groups:
+    // a selection on its own, or those that share the lines a command over
+    // whole lines does once. A group says what it replaces, over the text as
+    // it stands, in order and none over another; and where each selection it
+    // is for is after -- by its index among the selections the command was
+    // given, anchor to caret -- in the text as the group's own replacements
+    // leave it, as a Change says of its one selection.
+    struct Group
+    {
+        std::vector<Replacement>                    replacements;
+        std::vector<std::pair<size_t, ALTextRange>> placed;
+    };
+    // Groups made one change of the text: every replacement in order, and
+    // each selection where its group leaves it in the text as all of them
+    // do, the groups before it having moved it along. A group whose
+    // replacements land over one's before it is left out, and its selections
+    // with it: those, and any no group placed, are nothing here, for
+    // whoever makes the change to slide along with the text.
+    struct Combined
+    {
+        std::vector<Replacement>                replacements;
+        std::vector<std::optional<ALTextRange>> selections;
+    };
+    Combined combine(std::vector<Group> groups, size_t count);
+
+    // Selections, in the order they begin, gathered into runs over the same
+    // lines -- or over lines next to each other too, where `touching` --
+    // each run's lines, first to last, and the selections in it.
+    struct LineRun
+    {
+        S32                 first = 0;
+        S32                 last  = 0;
+        std::vector<size_t> selections;
+    };
+    std::vector<LineRun> lineRuns(const std::vector<ALTextRange>& selections, bool touching);
+
+    // The commands over whole lines, at several selections in the order
+    // they begin: each run of them over the same lines done once, each
+    // selection going as the one selection goes. Moving lines takes runs on
+    // lines next to each other as one, as does deleting them, and moves
+    // nothing where any run is at the top or the bottom already; joining
+    // puts every caret of a run where its first join is. Comments go in, or
+    // out, the same way for all of them: out where every line any of them
+    // reaches that says anything is commented.
+    std::vector<Group> duplicateLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections);
+    std::vector<Group> moveLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections, S32 direction);
+    std::vector<Group> deleteLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections);
+    std::vector<Group> toggleComment(const ALTextDocument& doc, const std::vector<ALTextRange>& selections, const std::string& token);
+    std::vector<Group> joinLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections);
 }

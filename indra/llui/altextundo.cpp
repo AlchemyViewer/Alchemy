@@ -96,6 +96,29 @@ namespace
     // counts, so that a history of many small edits is held to it too.
     constexpr size_t STEP_WRITTEN = 48;
     constexpr size_t EDIT_WRITTEN = 16;
+    // And each other selection a step keeps, before or after.
+    constexpr size_t RANGE_WRITTEN = 20;
+
+    LLSD rangesAsLLSD(const std::vector<ALTextRange>& ranges)
+    {
+        LLSD out = LLSD::emptyArray();
+        for (const ALTextRange& range : ranges)
+        {
+            out.append(LLSD::emptyArray().with(0, range.begin.line).with(1, range.begin.column).with(2, range.end.line).with(3, range.end.column));
+        }
+        return out;
+    }
+
+    std::vector<ALTextRange> rangesFrom(const LLSD& sd)
+    {
+        std::vector<ALTextRange> out;
+        for (LLSD::array_const_iterator it = sd.beginArray(); it != sd.endArray(); ++it)
+        {
+            const LLSD& one = *it;
+            out.emplace_back(ALTextPos(one[0].asInteger(), one[1].asInteger()), ALTextPos(one[2].asInteger(), one[3].asInteger()));
+        }
+        return out;
+    }
 
     // An edit as it is written: where it begins and ends, what it took and
     // what it put -- an array rather than a map, since a history is mostly
@@ -249,6 +272,8 @@ void ALTextUndo::join(Step& last, Step&& next)
     }
     last.caretAfter  = next.caretAfter;
     last.anchorAfter = next.anchorAfter;
+    last.bytes       = last.bytes - RANGE_WRITTEN * last.othersAfter.size() + RANGE_WRITTEN * next.othersAfter.size();
+    last.othersAfter = std::move(next.othersAfter);
     last.written.clear();
 }
 
@@ -270,6 +295,21 @@ void ALTextUndo::settle(const ALTextRange& selection)
     newest.written.clear();
 }
 
+void ALTextUndo::settle(const ALTextRange& selection, std::vector<ALTextRange> others)
+{
+    if (!mSettling || mSteps.undone().empty())
+    {
+        return;
+    }
+    settle(selection);
+    Step& newest       = mSteps.newest();
+    // What the others weigh, with the step and with the steps back.
+    const size_t was   = newest.bytes;
+    newest.bytes       = newest.bytes - RANGE_WRITTEN * newest.othersAfter.size() + RANGE_WRITTEN * others.size();
+    newest.othersAfter = std::move(others);
+    mUndoneBytes       = mUndoneBytes - was + newest.bytes;
+}
+
 void ALTextUndo::label(std::string_view text)
 {
     ++mRevision;
@@ -281,7 +321,8 @@ void ALTextUndo::label(std::string_view text)
     mSteps.label(text);
 }
 
-void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& before_in, const ALTextPos& after, F64 now)
+void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& before_in, const ALTextPos& after, F64 now,
+                        std::vector<ALTextRange> others_before)
 {
     if (edit.nothing())
     {
@@ -304,8 +345,9 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
     step.anchorBefore = before_in.begin;
     step.caretAfter   = after;
     step.anchorAfter  = after;
+    step.othersBefore = std::move(others_before);
     step.serial       = ++mNextSerial;
-    step.bytes        = STEP_WRITTEN + EDIT_WRITTEN + edit.removed.size() + edit.inserted.size();
+    step.bytes        = STEP_WRITTEN + EDIT_WRITTEN + edit.removed.size() + edit.inserted.size() + RANGE_WRITTEN * step.othersBefore.size();
     step.typed        = mTypingDepth > 0 && !mSteps.inGroup();
 
     // The key a run is joined by: the kind of change, where it carries on
@@ -319,7 +361,7 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
         // the key was typed where the run left the caret, or its text
         // ended, with nothing selected; the rest of what the key does is
         // one with the first, at the same moment.
-        key = keyOf(Kind::Typing);
+        key = keyOf(mTypingErases ? Kind::Erasing : Kind::Typing);
         if (!mTypingNoted)
         {
             mTypingNoted                    = true;
@@ -345,12 +387,13 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
     forgetOverBudget();
 }
 
-void ALTextUndo::beginTyping(const ALTextRange& selection)
+void ALTextUndo::beginTyping(const ALTextRange& selection, bool erasing)
 {
     if (mTypingDepth++ == 0)
     {
-        mTypingAt    = selection;
-        mTypingNoted = false;
+        mTypingAt     = selection;
+        mTypingNoted  = false;
+        mTypingErases = erasing;
     }
 }
 
@@ -434,7 +477,7 @@ void ALTextUndo::closeGroups()
     forgetOverBudget();
 }
 
-std::optional<ALTextRange> ALTextUndo::undo()
+std::optional<ALTextRange> ALTextUndo::undo(std::vector<ALTextRange>* others)
 {
     mResumeStep = 0;
     std::optional<Step> step = mSteps.takeUndo();
@@ -451,11 +494,15 @@ std::optional<ALTextRange> ALTextUndo::undo()
         mDocument.replace(back.range, back.inserted, back.parts);
     }
     const ALTextRange selection(step->anchorBefore, step->caretBefore);
+    if (others)
+    {
+        *others = step->othersBefore;
+    }
     mSteps.pushRedo(std::move(*step));
     return selection;
 }
 
-std::optional<ALTextRange> ALTextUndo::redo()
+std::optional<ALTextRange> ALTextUndo::redo(std::vector<ALTextRange>* others)
 {
     mResumeStep = 0;
     std::optional<Step> step = mSteps.takeRedo();
@@ -471,6 +518,10 @@ std::optional<ALTextRange> ALTextUndo::redo()
         mDocument.replace(edit.range, edit.inserted, edit.parts);
     }
     const ALTextRange selection(step->anchorAfter, step->caretAfter);
+    if (others)
+    {
+        *others = step->othersAfter;
+    }
     mSteps.pushUndo(std::move(*step));
     return selection;
 }
@@ -512,6 +563,15 @@ namespace
         if (step.anchorAfter != step.caretAfter)
         {
             out["anchor_after"] = posAsLLSD(step.anchorAfter);
+        }
+        // The other selections only where there were any.
+        if (!step.othersBefore.empty())
+        {
+            out["others_before"] = rangesAsLLSD(step.othersBefore);
+        }
+        if (!step.othersAfter.empty())
+        {
+            out["others_after"] = rangesAsLLSD(step.othersAfter);
         }
         LLSD                                edits = LLSD::emptyArray();
         std::optional<ALTextDocument::Edit> pending;
@@ -660,7 +720,9 @@ std::optional<ALTextUndo::History> ALTextUndo::historyFrom(const LLSD& sd, std::
         step.caretAfter   = posFrom(one["after"]);
         step.anchorBefore = one.has("anchor_before") ? posFrom(one["anchor_before"]) : step.caretBefore;
         step.anchorAfter  = one.has("anchor_after") ? posFrom(one["anchor_after"]) : step.caretAfter;
-        step.bytes        = STEP_WRITTEN;
+        step.othersBefore = rangesFrom(one["others_before"]);
+        step.othersAfter  = rangesFrom(one["others_after"]);
+        step.bytes        = STEP_WRITTEN + RANGE_WRITTEN * (step.othersBefore.size() + step.othersAfter.size());
         for (LLSD::array_const_iterator it = one["edits"].beginArray(); it != one["edits"].endArray(); ++it)
         {
             ALTextDocument::Edit edit;

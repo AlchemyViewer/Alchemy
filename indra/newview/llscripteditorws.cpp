@@ -1896,8 +1896,9 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     if (region_of(prim)->getCapability("UpdateScriptTask").empty())
         throw LLJSONRPCConnection::InternalError("UpdateScriptTask capability not available");
 
-    // Sent as the studio sends it: expanded afresh where the preprocessor
-    // is on, or where the script is in its envelope, so that its includes
+    // Sent as the studio sends it: expanded afresh where a save runs the
+    // preprocessor (ALPreprocessor::wanted) -- it is on, the script is in
+    // its envelope, or it has a directive -- so that its includes
     // are current -- sent whatever the preprocessor found, since a save is
     // someone's work, with what it found said. But an envelope whose
     // compiled half was edited here, its source as it was, goes up as it
@@ -1912,7 +1913,7 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
         const std::optional<ALScriptEnvelope> held = ALScriptEnvelope::parse(fetch_item_asset(prim, item, LLAssetType::AT_LSL_TEXT));
         as_is = held && held->source == was->source && held->expanded != was->expanded;
     }
-    if (!as_is && (was || ALScriptPreprocessor::enabled()))
+    if (!as_is && ALPreprocessor::wanted(content, lua, was.has_value(), ALScriptPreprocessor::enabled()) != ALPreprocessor::Wanted::No)
     {
         auto prepared = std::make_shared<ALScriptPrepared>();
         await_async_result(

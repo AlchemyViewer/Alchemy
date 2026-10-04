@@ -27,6 +27,7 @@
 #include "alanchoredranges.h"
 #include "alkeymap.h"
 #include "alsyntaxhighlighter.h"
+#include "altextcarets.h"
 #include "altextdocument.h"
 #include "altextediting.h"
 #include "altextfind.h"
@@ -58,8 +59,9 @@ class ALVimHost;
 class LLContextMenu;
 
 // A view of a document: the lines laid out and drawn, only the ones in
-// sight, a caret and a selection in them, a keymap that turns keys into
-// commands, and a grammar that colours what it shows. Text is drawn from
+// sight, a caret and a selection in them -- and others beside those,
+// where something made them -- a keymap that turns keys into commands,
+// and a grammar that colours what it shows. Text is drawn from
 // glyph runs the layout shaped once, so a frame costs the rows on screen
 // and nothing that is not. The document, the undo journal, the highlighter
 // and the layout are its own, and reachable, for whatever is built over it
@@ -345,10 +347,53 @@ public:
     // underscores back from the caret. Empty at anything else.
     std::string wordBeforeCaret() const;
 
+    // --- several carets ---------------------------------------------------------
+
+    // The selections besides the main one, each anchor to caret, in the
+    // order they begin (ALTextCarets). Drawn as the main one is, slid along
+    // by every edit, and kept by each step to undo; merged with each other
+    // and with the main one where they meet. Keys act at every one of them
+    // -- typing, deleting, Return and Tab, the commands over lines, the
+    // clipboard, and the caret's motions -- each as at the main one, as one
+    // edit and one step to undo; a command that can act only at one acts at
+    // the main one and lets the others go.
+    const std::vector<ALTextRange>& otherSelections() const { return mCarets.selections(); }
+    bool                            hasOtherSelections() const { return !mCarets.empty(); }
+    // One more beside the main one, which stays main.
+    void                            addSelection(const ALTextRange& range);
+    // The main selection and the others at once.
+    void                            setSelections(const ALTextRange& main, std::vector<ALTextRange> others);
+    // The main selection alone again; whether there were others.
+    bool                            singleSelection();
+    // A caret put at a place as the main one, the others kept -- or, where
+    // a caret or a selection is there, that one taken away, unless it is
+    // the last: what Alt-click does.
+    void                            toggleCaret(const ALTextPos& pos);
+    // A caret more on the row above each caret, or below, each keeping
+    // its column as a motion between rows does; the furthest the main
+    // one. False where every caret is on the first or the last row.
+    bool                            addCarets(S32 direction);
+    // A column selection grown at its moving corner by so many columns
+    // sideways and rows down, or up below zero; begun from the main
+    // selection's anchor and caret where the selections are not a column's.
+    // Each row between the corners has a selection from the x of the corner
+    // that stays to the x of the one that moves, so that a tab or a wide
+    // character counts as it is drawn and a row too short has a caret at
+    // its end; the one on the moving corner's row is the main one. False
+    // where it cannot go further that way.
+    bool                            growColumn(S32 columns, S32 rows);
+    // Every match the find bar has selected, the current one the main
+    // one, and the keyboard to the text; how many.
+    S32                             selectAllMatches();
+
     // --- editing, through the undo journal -----------------------------------
 
     // In place of the selection, or at the caret.
     void insertText(std::string_view text);
+    // As typed: at every selection where there are several, else as
+    // insertText -- what a keymap that holds keys back puts in when it
+    // lets them go.
+    void typeText(std::string_view text);
     void deleteRange(const ALTextRange& range);
     // Several ranges of the text as it stands, each replaced by its
     // string, as one step to undo: what a rename is. The ranges must not
@@ -376,7 +421,7 @@ public:
     bool           typingText() const { return !mModal || mModal->inserting(); }
 
     // The caret put at a place, or a stretch selected, and brought into
-    // view: where a list of places sends it.
+    // view, one caret: where a list of places sends it.
     void goTo(const ALTextPos& pos);
     void goTo(const ALTextRange& range);
 
@@ -695,13 +740,13 @@ public:
     void    redo() override;
     bool    canRedo() const override { return !mReadOnly && mUndo.canRedo(); }
     void    cut() override;
-    bool    canCut() const override { return !mReadOnly && (hasSelection() || mClipsLines); }
+    bool    canCut() const override { return !mReadOnly && (anySelected() || mClipsLines); }
     void    copy() override;
-    bool    canCopy() const override { return hasSelection() || mClipsLines; }
+    bool    canCopy() const override { return anySelected() || mClipsLines; }
     void    paste() override;
     bool    canPaste() const override;
     void    doDelete() override;
-    bool    canDoDelete() const override { return !mReadOnly && hasSelection(); }
+    bool    canDoDelete() const override { return !mReadOnly && anySelected(); }
     void    selectAll() override;
     bool    canSelectAll() const override { return !mDocument.empty(); }
     void    deselect() override;
@@ -896,6 +941,42 @@ protected:
     // as though it were not.
     ALTextRange          withoutComposition(const ALTextRange& range) const;
 
+    // --- at every selection -------------------------------------------------------
+
+    // Every selection, the main one among them, in the order they begin;
+    // and where among them the main one is.
+    std::vector<ALTextRange> selectionsInOrder(size_t* main = nullptr) const;
+    // Whether any selection, the main one or another, has something in it.
+    bool                     anySelected() const;
+    // Selections put at once, the one at `main` the main one: where a
+    // command at every selection leaves them.
+    void                     placeSelections(const std::vector<ALTextRange>& selections, size_t main);
+    // A command at every selection (selectionsInOrder), in the groups it was
+    // worked out in over the text as it stands (ALTextEditing::combine):
+    // made as one edit -- one notification, and one step to undo with the
+    // journal's scope around it -- and each selection put where its group
+    // leaves it, any no group places slid along with the text. False where
+    // the text did not change: nothing would, or it has no room.
+    bool                     applyGroups(const std::vector<ALTextRange>& selections, size_t main, std::vector<ALTextEditing::Group> groups);
+    // The same, worked out at each selection on its own: what `change`
+    // makes of the one at an index, or nothing for one it leaves as it is.
+    typedef std::function<std::optional<ALTextEditing::Change>(size_t index, const ALTextRange& selection)> each_change_t;
+    bool                     editEach(const each_change_t& change);
+    // Groups worked out over every selection at once, made as one step to
+    // undo of its own: the commands over whole lines.
+    typedef std::function<std::vector<ALTextEditing::Group>(const std::vector<ALTextRange>& selections)> groups_t;
+    bool                     editGroups(const groups_t& groups);
+    // What a delete command takes at a selection: the selection, or from a
+    // caret what the command reaches; nothing where it reaches nothing.
+    std::optional<ALTextRange> erasedBy(ALEditorCommand command, const ALTextRange& selection) const;
+    // Typed at every selection: the text in place of each, and then, where
+    // it was a character that finishes what closes a block, that line
+    // brought out at each (outdentAsTyped) -- one key typed.
+    void                     typeAtEach(std::string_view text, llwchar typed);
+    // What a character just typed finishes brought out at each caret, or
+    // at those `at` says by their place in order (outdentAsTyped).
+    void                     outdentEach(llwchar typed, const std::function<bool(size_t)>& at = nullptr);
+
     // --- LLPreeditor ---------------------------------------------------------
 
     void resetPreedit() override;
@@ -909,7 +990,79 @@ protected:
     const std::string& getPreeditStringUtf8() const override;
 
 private:
-    void                 moveVertically(S32 rows, bool extend);
+    // A motion of the caret at a selection: where the caret goes, the
+    // anchor kept where the motion extends, and an arrow with no shift
+    // collapsing what is selected to that end; the x a caret keeps between
+    // rows in `desired_x`, which every other motion lets go of.
+    ALTextRange          moved(ALEditorCommand command, const ALTextRange& selection, F32& desired_x);
+    // Where a caret goes so many rows down, or up below zero, keeping to an
+    // x -- taken from where it is, where that is negative -- or to the
+    // text's start or end past its first or last row, letting the x go.
+    ALTextPos            rowsFrom(const ALTextPos& from, S32 rows, F32& desired_x);
+    // Whether the token a caret is at the end of is a comment's.
+    bool                 commentBefore(const ALTextPos& at);
+    // A command where there are several selections: done at every one and
+    // whether it was, as perform() says; or nothing for one perform() does
+    // as it would, having let the others go where it acts at the main one
+    // alone.
+    std::optional<bool>  performAtEach(ALEditorCommand command);
+    bool                 moveEach(ALEditorCommand command);
+    bool                 deleteEach(ALEditorCommand command);
+    void                 newLineEach();
+    // Each selection with something in it gone, as one step to undo.
+    bool                 deleteSelectedEach();
+    // The x each caret keeps between rows, as a vertical motion of several
+    // left them, for as long as they are where it left them.
+    // An x is the layout's, in pixels: kept under the layout it was taken
+    // in, wrapped as wide and its characters as wide, and no other.
+    struct LaidOut
+    {
+        S32  wrap   = -1;
+        F32  column = -1.f;
+        bool operator==(const LaidOut&) const = default;
+    };
+    LaidOut              laidOut();
+    struct EachDesired
+    {
+        std::vector<ALTextRange> selections;
+        std::vector<F32>         xs;
+        LaidOut                  under;
+    };
+    EachDesired          mEachDesired;
+    // The xs kept for `all`, where they are still those selections' and
+    // the layout's; none (-1) otherwise.
+    std::vector<F32>     desiredXs(const std::vector<ALTextRange>& all);
+    // One row on from a row of a line, down or up below zero, past the
+    // lines folded away; false at the first or the last.
+    bool                 stepRow(S32& line, S32& row, S32 direction);
+    // A corner of a column selection: a row of a line, and an x from the
+    // row's start that may lie past its end.
+    struct ColumnCorner
+    {
+        S32 line = 0;
+        S32 row  = 0;
+        F32 x    = 0.f;
+        bool operator==(const ColumnCorner&) const = default;
+    };
+    ColumnCorner         cornerAt(const ALTextPos& pos);
+    ColumnCorner         cornerAtLocal(S32 x, S32 y);
+    // The selections from one corner to the other (growColumn), kept as
+    // the column for as long as they stand as they were put.
+    void                 selectColumn(const ColumnCorner& from, const ColumnCorner& to);
+    // The corners the column grows from now: its own while the selections
+    // are the ones it put, else the main selection's anchor and caret.
+    std::pair<ColumnCorner, ColumnCorner> columnCorners();
+    struct Column
+    {
+        ColumnCorner             from;
+        ColumnCorner             to;
+        std::vector<ALTextRange> selections;
+        LaidOut                  under;
+    };
+    Column               mColumn;
+    // A drag begun with Shift-Alt, which puts a column rather than a
+    // selection.
+    bool                 mColumnDragging = false;
     // Return: the line split with the new one indented as the grammar
     // says, and a closing word before the caret brought out first.
     void                 newLine();
@@ -1071,6 +1224,10 @@ private:
 
     ALTextPos mCaret;
     ALTextPos mAnchor;
+    // The selections besides that one.
+    ALTextCarets mCarets;
+    // Each into the text, as the main one is put.
+    std::vector<ALTextRange> clamped(std::vector<ALTextRange> selections) const;
     // The x the caret wants when it moves between rows, or negative.
     F32          mDesiredX = -1.f;
     S32          mScrollY  = 0;
@@ -1167,6 +1324,13 @@ private:
     std::vector<LLColor4U>          mRunColours;
     std::vector<size_t>             mRunColourAt;
     std::vector<Squiggle>           mSquiggles;
+    // A frame's carets, drawn together once the rows are.
+    struct CaretBox
+    {
+        LLRect   rect;
+        LLColor4 color;
+    };
+    std::vector<CaretBox>           mCaretBoxes;
     // What the band under the text shows and where its pieces go, as the
     // keymap had it at its generation in this font: read and measured
     // again only when the keymap has moved on.

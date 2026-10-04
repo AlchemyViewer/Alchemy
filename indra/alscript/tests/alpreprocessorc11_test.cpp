@@ -946,4 +946,43 @@ namespace tut
             ensure_equals("taken", flat(r.text), std::string("one two three four"));
         }
     }
+
+    template<> template<>
+    void alpreprocessorc11_object::test<37>()
+    {
+        set_test_name("5.1.1.2: a line ends at CRLF and at a lone CR as at LF, so a backslash before either joins; on a directive's line blanks between the backslash and the newline are let by with a warning, elsewhere they join nothing");
+        const auto ended = [](std::string text, const char* end) {
+            std::string out;
+            for (char c : text)
+            {
+                out += c == '\n' ? std::string(end) : std::string(1, c);
+            }
+            return out;
+        };
+        const std::string lf = "#define SAY(x) \\\n"
+                               "    llOwnerSay(x); \\\n"
+                               "    llSay(0, x)\n"
+                               "default { state_entry() { SAY(\"hi\"); } }\n";
+        const std::string joined = pp(lf);
+        ensure("the macro's lines are its body: " + joined, joined.find("PROBLEMS") == std::string::npos && joined.find("llSay") != std::string::npos &&
+                                                                 joined.find('\\') == std::string::npos && joined.find("default") == 0);
+        ensure_equals("CRLF", pp(ended(lf, "\r\n")), joined);
+        ensure_equals("a lone CR", pp(ended(lf, "\r")), joined);
+        ensure_equals("the lines after keep their numbers", pp(ended("#define A 1 \\\n + 2\nA __LINE__\n", "\r\n")), std::string("1 + 2 3"));
+
+        {
+            const ALPreprocessor::Result r = run("#define SAY(x) \\ \t\n"
+                                                 "    llOwnerSay(x); \\  \n"
+                                                 "    llSay(0, x)\n"
+                                                 "default { state_entry() { SAY(\"hi\"); } }\n");
+            ensure_equals("blanks after a directive's backslash", flat(r.text), joined);
+            ensure_equals("said of each", messages(r),
+                          std::string("W 0: backslash and newline separated by space\nW 1: backslash and newline separated by space\n"));
+        }
+        {
+            const ALPreprocessor::Result r = run("// a note \\ \nint shown;\n");
+            ensure("a note's backslash and a blank take no line: " + r.text, r.text.find("int shown;") != std::string::npos);
+            ensure_equals("nothing said", messages(r), std::string());
+        }
+    }
 }

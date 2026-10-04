@@ -96,7 +96,7 @@ namespace tut
         // A file with nothing to say is still a file that was looked at, and
         // that is not the same answer as one nobody has checked.
         ensure("one nobody checked", !store.checked("three.xml"));
-        store.replace("three.xml", {});
+        store.replace("three.xml", std::vector<ALXUILint::Finding>());
         ensure("one that was", store.checked("three.xml"));
         ensure_equals("with nothing in it", store.countIn("three.xml"), 0);
         ensure_equals("and nothing added to the whole", store.size(), 4u);
@@ -241,7 +241,7 @@ namespace tut
 
         // Let go of and checked again, it is a file checked anew, at the end.
         store.forget("one.xml");
-        store.replace("one.xml", {});
+        store.replace("one.xml", std::vector<ALXUILint::Finding>());
         ensure("at the end", store.files() == std::vector<std::string>({ "two.xml", "three.xml", "one.xml" }));
         ensure_equals("counted once", store.files().size(), size_t(3));
     }

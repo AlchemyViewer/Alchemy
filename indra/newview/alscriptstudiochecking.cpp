@@ -112,7 +112,25 @@ ALScriptStudioChecking::ALScriptStudioChecking(ALScriptStudioServices& services,
 
 bool ALScriptStudioChecking::preprocessed(const Doc& doc) const
 {
-    return doc.loaded && !doc.notecard && (doc.envelope.has_value() || ALScriptStudioViewer::get().preprocessing());
+    return preprocessedWhy(doc) != ALPreprocessor::Wanted::No;
+}
+
+ALPreprocessor::Wanted ALScriptStudioChecking::preprocessedWhy(const Doc& doc) const
+{
+    if (!doc.loaded || doc.notecard)
+    {
+        return ALPreprocessor::Wanted::No;
+    }
+    const auto directives = [&doc]() {
+        const ALTextDocument& text = doc.editor->document();
+        if (doc.directivesOf != text.version())
+        {
+            doc.directives   = ALPreprocessor::usesDirectives([&text](S32 i) { return std::string_view(text.line(i)); }, text.lineCount(), doc.language.lua);
+            doc.directivesOf = text.version();
+        }
+        return doc.directives;
+    };
+    return ALPreprocessor::wanted(doc.envelope.has_value(), directives, ALScriptStudioViewer::get().preprocessing());
 }
 
 ALScriptPreprocessor::Request ALScriptStudioChecking::preprocessRequest(const Doc& doc, bool with_source) const
@@ -1285,16 +1303,32 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
 void ALScriptStudioChecking::explainTransformWords(Doc& doc)
 {
     // A parse error on one of the preprocessor's words, with its transform
-    // off, is the transform's to explain (ALPreprocessor::transformAt).
+    // off, is the transform's to explain (ALPreprocessor::transformAt); one
+    // on a directive, with the script not preprocessed, the preprocessor's.
     using Transform                     = ALPreprocessor::Transform;
-    const bool            preprocessing = ALScriptStudioViewer::get().preprocessing();
+    const bool            preprocessing = preprocessed(doc);
     const ALTextDocument& text          = doc.editor->document();
     const auto            line          = [&text](S32 index) { return std::string_view(text.line(index)); };
+    const bool expanded = preprocessing;
     for (ALScriptProblem& problem : doc.check->analysis)
     {
         if (problem.severity != ALScriptProblem::Severity::Error || !problem.file.empty())
         {
             continue;
+        }
+        // A directive read as code, the script not preprocessed: the
+        // parser's complaint is the preprocessor's to explain, and what it
+        // would put in is nothing the line wants.
+        if (!expanded && problem.line >= 0 && problem.line < text.lineCount())
+        {
+            const std::string_view at   = line(problem.line);
+            const size_t           code = at.find_first_not_of(" \t");
+            if (code != std::string_view::npos && at[code] == '#')
+            {
+                problem.message += " " + mServices.words("PreprocHintDirective");
+                problem.fixes.clear();
+                continue;
+            }
         }
         std::string     word;
         const Transform transform = ALPreprocessor::transformAt(line, text.lineCount(), problem.line, word);
@@ -1562,8 +1596,10 @@ void ALScriptStudioChecking::previewFixAll(Doc& doc, const FixPick& pick)
 
 bool ALScriptStudioChecking::applyPreviewed(Doc& doc)
 {
+    // Never nothing said: Apply that makes nothing says why.
     if (!doc.check->fixAllPreviewed)
     {
+        mServices.setStatus(mServices.words("FixAllNotPreviewed"), true);
         return false;
     }
     const Doc::Check::FixAllPreview previewed = *doc.check->fixAllPreviewed;
@@ -1581,6 +1617,10 @@ bool ALScriptStudioChecking::fixAll(Doc& doc, const FixPick& pick)
 {
     if (!doc.loaded || !doc.modifiable)
     {
+        if (!pick.forSave)
+        {
+            mServices.setStatus(mServices.words("FixAllNotMade"), true);
+        }
         return false;
     }
     // Only the fixes made over the text as it stands (pickFixes). Made on
@@ -1599,9 +1639,24 @@ bool ALScriptStudioChecking::fixAll(Doc& doc, const FixPick& pick)
         }
     }
     // Every one of them one step to undo: they were made over one check,
-    // and none meets another.
-    if (edits.empty() || !source.replaceAll(std::move(edits)))
+    // and none meets another. Asked for and none made, said: the problems
+    // they were for gone since, which a check says again, or the text
+    // refusing them.
+    if (edits.empty())
     {
+        if (!pick.forSave)
+        {
+            mServices.setStatus(mServices.words("FixStale"), true);
+            schedule(doc, true);
+        }
+        return false;
+    }
+    if (!source.replaceAll(std::move(edits)))
+    {
+        if (!pick.forSave)
+        {
+            mServices.setStatus(mServices.words("FixAllNotMade"), true);
+        }
         return false;
     }
     source.undoJournal().label("fix");
@@ -1616,7 +1671,7 @@ void ALScriptStudioChecking::fixesOn(Doc& doc, S32 line, std::vector<ALCodeEdito
     // Only over the text they were made in: a text typed in since has other
     // places, and is checked again a moment later.
     const U32 now = doc.editor->document().version();
-    for (const Doc::Shown& shown : doc.shown)
+    for (const Doc::Shown& shown : doc.shown())
     {
         if (!shown.file.empty() || shown.line != line || shown.fixesFor != now)
         {

@@ -384,7 +384,7 @@ namespace tut
                                               "    integer f; for (f = 0; f < 3; ++f) total += f;\n"
                                               "    llOwnerSay((string)(total + f));\n"
                                               "} }\n");
-        ensure("up to a length: " + r.text, has(r, "for a = 1, #l do\n    total += l[a]"));
+        ensure("up to a length, walking its items: " + r.text, has(r, "for _, item in l do\n    total += item"));
         ensure("down by a step: " + r.text, has(r, "for b = 10, 0, -2 do"));
         ensure("up to and with: " + r.text, has(r, "for c = 1, n do"));
         ensure("a counter set in its body keeps the while: " + r.text, has(r, "while d < n do"));
@@ -550,12 +550,14 @@ namespace tut
                                               "    for (k = 0; k < 2; ++k) gReport += \"y\";\n"
                                               "    llOwnerSay(out + seen + gReport + (string)outParts);\n"
                                               "} }\n");
-        ensure("the outer loop's table, a name of its own: " + r.text, has(r, "local outParts2 = {}\n    for i = 1, #names do"));
-        ensure("the pieces put in: " + r.text, has(r, "table.insert(outParts2, names[i] .. row)"));
+        ensure("the outer loop's table, a name of its own: " + r.text, has(r, "local outParts2 = {}\n    for _, item in names do"));
+        ensure("the pieces put in: " + r.text, has(r, "table.insert(outParts2, item .. row)"));
         ensure("joined after: " + r.text, has(r, "    end\n    out ..= table.concat(outParts2)"));
         ensure("the inner loop's, declared in the outer: " + r.text,
-               has(r, "        local rowParts = {}\n        for j = 0, 2 do\n            table.insert(rowParts, tostring(j))") &&
-                   has(r, "        row ..= table.concat(rowParts)"));
+               has(r, "        local rowParts = {}\n        for j = 0, 2 do\n            table.insert(rowParts, tostring(j))"));
+        ensure("declared empty just before it: declared where it is joined: " + r.text,
+               has(r, "        end\n        local row = table.concat(rowParts)") && !has(r, "local row = \"\""));
+        ensure("declared with words of its own: added to: " + r.text, has(r, "local out = \"Names: \"") && has(r, "out ..= table.concat(outParts2)"));
         ensure("read in its loop: noted: " + r.text, has(r, "seen ..= \"x\"") && has(r, "-- LSL: seen is built with .. in a loop"));
         ensure("a global: noted: " + r.text, has(r, "gReport ..= \"y\"") && has(r, "-- LSL: gReport is built with .. in a loop"));
         checksClean(r);
@@ -564,8 +566,12 @@ namespace tut
         typed.types = true;
         const ALLSLToSLua::Result t = ALLSLToSLua::convert("default { state_entry() { string s; integer i; for (i = 0; i < 3; ++i) s += \"z\"; llOwnerSay(s); } }\n",
                                                            typed);
-        ensure("typed: " + t.text, has(t, "local sParts: { string } = {}"));
+        ensure("typed: " + t.text, has(t, "local sParts: { string } = {}") && has(t, "local s: string = table.concat(sParts)"));
         checksClean(t);
+
+        const ALLSLToSLua::Result read = convert("default { state_entry() { string t = \"\"; llOwnerSay(t); integer i; for (i = 0; i < 3; ++i) t += \"q\"; llOwnerSay(t); } }\n");
+        ensure("read between: declared where it was: " + read.text, has(read, "local t = \"\"") && has(read, "t ..= table.concat(tParts)"));
+        checksClean(read);
     }
 
     template<> template<>
@@ -872,7 +878,7 @@ namespace tut
                                               "    integer n = 1;\n"
                                               "    llOwnerSay(llList2String(gNames, 0) + llList2String(p, -1) + llList2String(keys, 1));\n"
                                               "    llOwnerSay(llList2String(mixed, 2) + (string)llList2Integer(mixed, 0) + llList2String(gNames, n));\n"
-                                              "    integer i; for (i = 0; i < llGetListLength(p); ++i) llOwnerSay(llList2String(p, i));\n"
+                                              "    integer i; for (i = 0; i < llGetListLength(p); ++i) llOwnerSay(llList2String(p, i) + llGetSubString(\"abc\", i, i));\n"
                                               "} }\n");
         ensure("from the start, empty past the end: " + r.text, has(r, "(gNames[1] or \"\")"));
         ensure("back from the end, through a function's list: " + r.text, has(r, "(p[#p] or \"\")"));
@@ -880,7 +886,7 @@ namespace tut
         ensure("a float's text is not tostring's, and an index not known: llcompat: " + r.text,
                has(r, "llcompat.List2String(mixed, 2)") && has(r, "llcompat.List2String(gNames, n)"));
         ensure("mixed items for a number: llcompat: " + r.text, has(r, "llcompat.List2Integer(mixed, 0)"));
-        ensure("within its length, as it is, counting from 1: " + r.text, has(r, "for i = 1, #p do\n    print(p[i])"));
+        ensure("within its length, as it is, counting from 1: " + r.text, has(r, "for i = 1, #p do\n    print(p[i] .. ll.GetSubString(\"abc\", i, i))"));
         checksClean(r);
     }
 
@@ -1007,5 +1013,102 @@ namespace tut
         };
         ensure("read in the studio's words", linted(ALLSLToSLua::notesIn(said.text, close.words)) == 1);
         ensure("not in English's", linted(ALLSLToSLua::notesIn(said.text, nullptr)) == 0);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<33>()
+    {
+        set_test_name("a parameter the script only reads as a truth is a boolean, each call giving one; one read as a number, or given more than TRUE where it is asked about TRUE, stays a number; an event's stay the grid's numbers");
+        const ALLSLToSLua::Result r = convert("say(integer loud, string text) { if (loud) llShout(0, text); else llSay(0, text); }\n"
+                                              "glow(integer on) { if (!on) return; llOwnerSay(\"glow\"); }\n"
+                                              "integer next(integer n) { return n + 1; }\n"
+                                              "integer exactly(integer f) { return f == TRUE; }\n"
+                                              "default {\n"
+                                              "    touch_start(integer n) {\n"
+                                              "        say(TRUE, \"hi\");\n"
+                                              "        say(n > 1, \"many\");\n"
+                                              "        say(n, \"some\");\n"
+                                              "        glow(FALSE);\n"
+                                              "        llOwnerSay((string)next(n));\n"
+                                              "        exactly(1); exactly(5);\n"
+                                              "    }\n"
+                                              "    on_rez(integer p) { if (p) llOwnerSay(\"rezzed\"); }\n"
+                                              "}\n");
+        ensure("read only as a truth: a boolean: " + r.text, has(r, "local function say(loud, text)") && has(r, "if loud then"));
+        ensure("each call giving one, a number as its truth: " + r.text,
+               has(r, "say(true, \"hi\")") && has(r, "say(n > 1, \"many\")") && has(r, "say(n ~= 0, \"some\")"));
+        ensure("not, as a truth: " + r.text, has(r, "if not on then") && has(r, "glow(false)"));
+        ensure("read as a number: kept one: " + r.text, has(r, "return n + 1") && has(r, "next_(n)"));
+        ensure("given 5 where asked about TRUE: kept a number: " + r.text, has(r, "f == 1") && has(r, "exactly(5)"));
+        ensure("an event's: the grid's number: " + r.text, has(r, "if p ~= 0 then"));
+        checksClean(r);
+
+        ALLSLToSLua::Options typed;
+        typed.types = true;
+        const ALLSLToSLua::Result t = ALLSLToSLua::convert("say(integer loud, string text) { if (loud) llSay(0, text); }\n"
+                                                           "default { state_entry() { say(TRUE, \"hi\"); } }\n",
+                                                           typed);
+        ensure("typed: " + t.text, has(t, "local function say(loud: boolean, text: string)"));
+        checksClean(t);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<34>()
+    {
+        set_test_name("a counting loop over a list's items, its counter read as nothing else, walks the items; from another start, or read otherwise, it counts");
+        const ALLSLToSLua::Result r = convert("list gNames = [\"a\", \"b\"];\n"
+                                              "default { state_entry() {\n"
+                                              "    list keys = [llGetOwner()];\n"
+                                              "    integer i;\n"
+                                              "    for (i = 0; i < llGetListLength(gNames); ++i) llOwnerSay(llList2String(gNames, i));\n"
+                                              "    integer j;\n"
+                                              "    for (j = 0; j < llGetListLength(gNames); ++j) {\n"
+                                              "        integer k;\n"
+                                              "        for (k = 0; k < llGetListLength(keys); ++k) llOwnerSay(llList2String(gNames, j) + llList2String(keys, k));\n"
+                                              "    }\n"
+                                              "    integer m;\n"
+                                              "    for (m = 1; m < llGetListLength(gNames); ++m) llOwnerSay(llList2String(gNames, m));\n"
+                                              "    integer n;\n"
+                                              "    for (n = 0; n < llGetListLength(gNames); ++n) llOwnerSay(llList2String(gNames, n) + (string)n);\n"
+                                              "} }\n");
+        ensure("walked: " + r.text, has(r, "for _, item in gNames do\n    print(item)\n"));
+        ensure("one inside another, each its own name, a key's made text: " + r.text,
+               has(r, "for _, item2 in keys do\n        print(item .. tostring(item2))"));
+        ensure("from the second: counted: " + r.text, has(r, "for m = 2, #gNames do\n    print(gNames[m])"));
+        ensure("its counter read as a number too: counted: " + r.text, has(r, "for n = 0, #gNames - 1 do"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result named = convert("list gNames = [\"a\"];\n"
+                                                  "integer _ = 2;\n"
+                                                  "default { state_entry() {\n"
+                                                  "    integer i;\n"
+                                                  "    for (i = 0; i < llGetListLength(gNames); ++i) llOwnerSay(llList2String(gNames, i) + (string)_);\n"
+                                                  "} }\n");
+        ensure("an index that would hide the script's _ named afresh: " + named.text, has(named, "for _2, item in gNames do"));
+        checksClean(named);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<35>()
+    {
+        set_test_name("strings built in loops: one built by two loops declared once, the second adding to it; one appended to another in the loop it builds read as it stands, not built");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    string s;\n"
+                                              "    integer i;\n"
+                                              "    for (i = 0; i < 2; ++i) s += \"a\";\n"
+                                              "    integer j;\n"
+                                              "    for (j = 0; j < 2; ++j) s += \"b\";\n"
+                                              "    llOwnerSay(s);\n"
+                                              "    string line;\n"
+                                              "    string all;\n"
+                                              "    integer k;\n"
+                                              "    for (k = 0; k < 3; ++k) { line += \"x\"; all += line; }\n"
+                                              "    llOwnerSay(all);\n"
+                                              "} }\n");
+        ensure("declared at the first loop's join: " + r.text, has(r, "local s = table.concat(sParts)"));
+        ensure("the second adds to it: " + r.text, has(r, "s ..= table.concat(sParts2)") && !has(r, "local s = table.concat(sParts2)"));
+        ensure("one read in its loop kept as it is: " + r.text, has(r, "local line = \"\"") && !has(r, "table.concat(lineParts)"));
+        ensure("the other built from it: " + r.text, has(r, "table.insert(allParts, line)") && has(r, "local all = table.concat(allParts)"));
+        checksClean(r);
     }
 }

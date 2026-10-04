@@ -287,12 +287,35 @@ namespace
 
         Tokens run(std::string_view text)
         {
+            // A line ends at CRLF and at a lone CR as at LF (5.1.1.2 phase
+            // 1), as the studio's own text does: lexed from a copy with them
+            // made LF, where text from a disk, an external editor or an
+            // inventory include has them -- else a backslash before CRLF
+            // joins nothing and its CR is a blank.
+            if (!mVerbatim && text.find('\r') != std::string_view::npos)
+            {
+                mUnixText.clear();
+                mUnixText.reserve(text.size());
+                for (size_t i = 0; i < text.size(); ++i)
+                {
+                    if (text[i] != '\r')
+                    {
+                        mUnixText += text[i];
+                    }
+                    else if (i + 1 >= text.size() || text[i + 1] != '\n')
+                    {
+                        mUnixText += '\n';
+                    }
+                }
+                text = mUnixText;
+            }
             mText   = text;
             mPos    = 0;
             mLine   = 0;
             mColumn = 0;
             mJoined = 0;
             mOut.clear();
+            mSpacedJoins.clear();
             while (mPos < mText.size())
             {
                 if (mLua)
@@ -341,19 +364,63 @@ namespace
 
         // A backslash and a newline join two lines; both vanish, and the
         // newline that ends the joined line stands for them all, so that
-        // the lines after keep their numbers.
+        // the lines after keep their numbers. On a directive's line, blanks
+        // between the two are let by, as GCC and Clang let them by, with a
+        // warning: they are not seen, and what a #define then left behind
+        // went on as code. Not elsewhere, where a note ending in a
+        // backslash and a space would take the line of code after it.
         bool continuation()
         {
-            if (!mVerbatim && at(mPos) == '\\' && at(mPos + 1) == '\n')
+            if (mVerbatim || at(mPos) != '\\')
             {
-                mPos += 2;
-                ++mLine;
-                mColumn = 0;
-                ++mJoined;
-                return true;
+                return false;
             }
-            return false;
+            size_t newline = mPos + 1;
+            while (isBlank(at(newline)))
+            {
+                ++newline;
+            }
+            if (at(newline) != '\n')
+            {
+                return false;
+            }
+            if (newline > mPos + 1)
+            {
+                if (!onDirectiveLine())
+                {
+                    return false;
+                }
+                mSpacedJoins.push_back({ mLine, mColumn });
+            }
+            mPos = newline + 1;
+            ++mLine;
+            mColumn = 0;
+            ++mJoined;
+            return true;
         }
+
+        // Whether the line being lexed -- since the last newline not
+        // joined away -- begins, past blanks and comments, with what starts
+        // a directive.
+        bool onDirectiveLine() const
+        {
+            const Token* first = nullptr;
+            for (auto it = mOut.rbegin(); it != mOut.rend() && it->kind != Kind::Newline; ++it)
+            {
+                if (it->kind != Kind::Space && it->kind != Kind::Comment)
+                {
+                    first = &*it;
+                }
+            }
+            return first && first->kind == Kind::Punct && first->text == hashOf(mLua);
+        }
+
+    public:
+        // Where a backslash was joined to its newline over blanks, by its
+        // line and column, for a warning.
+        const std::vector<std::pair<S32, S32>>& spacedJoins() const { return mSpacedJoins; }
+
+    private:
 
         // Every join where a token goes on: C joins the lines before it
         // reads a token (5.1.1.2 phase 2), so one runs on over a join --
@@ -818,6 +885,9 @@ namespace
         S32              mJoined = 0;
         Token            mToken;
         Tokens           mOut;
+        // The text with its line ends made LF, where it had others.
+        std::string      mUnixText;
+        std::vector<std::pair<S32, S32>> mSpacedJoins;
     };
 
     // The text of a run of tokens, as written.
@@ -1266,7 +1336,17 @@ namespace
         else
         {
             f->index = mResult.map.addFile(name, path);
-            f->lexed = std::make_shared<const Tokens>(Lexer(mOptions.lua, f->index).run(text));
+            Lexer lexer(mOptions.lua, f->index);
+            f->lexed = std::make_shared<const Tokens>(lexer.run(text));
+            for (const auto& [line, column] : lexer.spacedJoins())
+            {
+                Token at;
+                at.file   = f->index;
+                at.line   = line;
+                at.column = column;
+                at.text   = "\\";
+                problem(ALScriptProblem::Severity::Warning, "PreprocBackslashSpace", "backslash and newline separated by space", {}, at);
+            }
             if (!path.empty())
             {
                 mLexed[path] = Lexed{ f->index, f->lexed };
@@ -5109,6 +5189,101 @@ void ALPreprocessor::optimize(Result& result, const Options& options)
     result.map       = after_map;
     result.text      = std::move(optimized.text);
     result.optimized = true;
+}
+
+// static
+bool ALPreprocessor::usesDirectives(const std::function<std::string_view(S32)>& line, S32 count, bool lua)
+{
+    bool in_comment = false;
+    for (S32 i = 0; i < count; ++i)
+    {
+        const std::string_view text = line(i);
+        if (!in_comment && directiveName(text, lua) != std::string_view::npos)
+        {
+            return true;
+        }
+        if (lua)
+        {
+            continue;
+        }
+        // Where an LSL block comment opens or closes on the line, past its
+        // strings and a line comment.
+        bool in_string = false;
+        for (size_t c = 0; c < text.size(); ++c)
+        {
+            const bool pair = c + 1 < text.size();
+            if (in_comment)
+            {
+                if (text[c] == '*' && pair && text[c + 1] == '/')
+                {
+                    in_comment = false;
+                    ++c;
+                }
+            }
+            else if (in_string)
+            {
+                if (text[c] == '\\')
+                {
+                    ++c;
+                }
+                else if (text[c] == '"')
+                {
+                    in_string = false;
+                }
+            }
+            else if (text[c] == '"')
+            {
+                in_string = true;
+            }
+            else if (text[c] == '/' && pair && text[c + 1] == '/')
+            {
+                break;
+            }
+            else if (text[c] == '/' && pair && text[c + 1] == '*')
+            {
+                in_comment = true;
+                ++c;
+            }
+        }
+    }
+    return false;
+}
+
+// static
+bool ALPreprocessor::usesDirectives(std::string_view text, bool lua)
+{
+    std::vector<std::string_view> lines;
+    for (size_t at = 0; at <= text.size();)
+    {
+        const size_t end = text.find('\n', at);
+        lines.push_back(text.substr(at, (end == std::string_view::npos ? text.size() : end) - at));
+        if (end == std::string_view::npos)
+        {
+            break;
+        }
+        at = end + 1;
+    }
+    return usesDirectives([&lines](S32 i) { return lines[static_cast<size_t>(i)]; }, static_cast<S32>(lines.size()), lua);
+}
+
+// static
+ALPreprocessor::Wanted ALPreprocessor::wanted(bool enveloped, const std::function<bool()>& directives, bool setting)
+{
+    if (enveloped)
+    {
+        return Wanted::Enveloped;
+    }
+    if (directives && directives())
+    {
+        return Wanted::Directives;
+    }
+    return setting ? Wanted::Setting : Wanted::No;
+}
+
+// static
+ALPreprocessor::Wanted ALPreprocessor::wanted(std::string_view text, bool lua, bool enveloped, bool setting)
+{
+    return wanted(enveloped, [text, lua]() { return usesDirectives(text, lua); }, setting);
 }
 
 // static

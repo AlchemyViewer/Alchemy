@@ -386,6 +386,10 @@ namespace
         // Whether every read of a counter in a loop's body is an index that
         // ll is given (llIndex), which the loop may count from 1 for.
         bool onlyIndexes(LSLSymbol* var, LSLASTNode* body);
+        // Whether every read of a counter in a loop's body is of one list's
+        // item at it, as it is (listItemFits): the loop may walk the list's
+        // items instead (mEach).
+        bool onlyItemsOf(LSLSymbol* var, LSLSymbol* list, LSLASTNode* body);
         // The call's arguments for ll: its index arguments moved on by one.
         std::string llArgs(LSLFunctionExpression* e, U16 indexes);
         // `: type` for an LSL type, where types are written.
@@ -510,6 +514,8 @@ namespace
         static std::vector<LSLExpression*> appended(LSLASTNode* node, LSLSymbol*& var);
         // A name no other in the script has, nor SLua holds.
         std::string freshName(const std::string& base);
+        // Every name the script has, and those made fresh, in mTaken.
+        void takeNames();
 
         // --- steps as statements -----------------------------------------------------
 
@@ -634,6 +640,11 @@ namespace
         boost::unordered_flat_set<LSLSymbol*>                 mFromOne;
         // Counters within a list's length, i < llGetListLength(l): the list.
         boost::unordered_flat_map<LSLSymbol*, LSLSymbol*>     mWithin;
+        // Counters whose loop walks their list's items instead: the item's
+        // name. A name for each depth of such loops, made once.
+        boost::unordered_flat_map<LSLSymbol*, std::string>    mEach;
+        std::vector<std::string>                              mItemNames;
+        std::string                                           mUnread;
         boost::unordered_flat_map<LSLSymbol*, U8>             mListTypes;
         boost::unordered_flat_set<LSLSymbol*>                 mLoopOnly;
         boost::unordered_flat_set<LSLSymbol*>                 mBooleans;
@@ -651,6 +662,11 @@ namespace
         // The strings each loop builds, and those being built, by the
         // table of their pieces.
         boost::unordered_flat_map<LSLASTNode*, std::vector<LSLSymbol*>> mBuilds;
+        // A string a loop builds, declared empty in the loop's own block
+        // with nothing between that touches it: declared where its pieces
+        // are joined instead, its declaration not written.
+        boost::unordered_flat_set<LSLASTNode*>                          mJoinedDeclarations;
+        boost::unordered_flat_set<std::pair<LSLASTNode*, LSLSymbol*>>   mDeclaredAtJoin;
         boost::unordered_flat_map<LSLSymbol*, std::string>              mBuilding;
         // Appends in loops that are noted rather than built.
         boost::unordered_flat_set<LSLASTNode*> mUnbuilt;
@@ -953,13 +969,15 @@ namespace
         int         at    = 0;
         for (LSLASTNode* arg = isNull(list) ? nullptr : list->getChild(0); arg; arg = arg->getNext(), ++at)
         {
-            auto*    given = static_cast<LSLExpression*>(arg);
-            LSLIType to    = param ? varType(static_cast<LSLIdentifier*>(param)->getSymbol(), param->getIType()) : given->getIType();
+            auto*      given = static_cast<LSLExpression*>(arg);
+            LSLSymbol* taken = param ? static_cast<LSLIdentifier*>(param)->getSymbol() : nullptr;
+            LSLIType   to    = param ? varType(taken, param->getIType()) : given->getIType();
             if ((text & (1 << at)) && (slType(given) == LST_STRING || slType(given) == LST_KEY))
             {
                 to = slType(given);
             }
-            out += (out.empty() ? "" : ", ") + coerced(given, to).text;
+            // A parameter the script only reads as a truth is given one.
+            out += (out.empty() ? "" : ", ") + (boolean(taken) ? truthOf(given) : coerced(given, to).text);
             param = param ? param->getNext() : nullptr;
         }
         return out;
@@ -2155,6 +2173,11 @@ namespace
                 {
                     return;
                 }
+                // A string declared where the loop building it joins it.
+                if (mJoinedDeclarations.contains(d))
+                {
+                    return;
+                }
                 const Steps steps = isNull(init) ? Steps() : hoistSteps(init, true);
                 writeSteps(steps.before);
                 if (boolean(id->getSymbol()))
@@ -2568,20 +2591,46 @@ namespace
                     : shift < 0 ? value(c.limit).text
                                 : bracketed(value(c.limit), ADD) + (shift > 0 ? " + 2" : " + 1");
         }
-        line("for " + nameOf(c.id) + " = " + start + ", " + to + step + " do");
+        // Up by one, below a list's length: within the list.
+        LSLExpression* limit_call = unwrapped(c.limit);
+        LSLExpression* listed     = nullptr;
+        if (up && c.step == 1 && c.check == OP_LESS && limit_call->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
+            std::string_view(static_cast<LSLFunctionExpression*>(limit_call)->getIdentifier()->getName()) == "llGetListLength")
+        {
+            listed = argumentAt(static_cast<LSLFunctionExpression*>(limit_call), 0);
+        }
+        LSLSymbol* within = listed ? wholeVariable(listed) : nullptr;
+        // From its first item, the counter read as nothing but the list's
+        // items: Luau's walk over them, each by name.
+        const bool each = from_one && within && from == 0 && onlyItemsOf(c.var, within, f->getBody());
+        if (each)
+        {
+            const size_t depth = mEach.size();
+            if (depth == mItemNames.size())
+            {
+                mItemNames.push_back(freshName("item"));
+            }
+            // The index unread, as Luau writes one, unless the script has
+            // a name that would be hidden by it.
+            if (mUnread.empty())
+            {
+                takeNames();
+                mUnread = mTaken.contains("_") ? freshName("_") : std::string("_");
+            }
+            line("for " + mUnread + ", " + mItemNames[depth] + " in " + lvalue(static_cast<LSLLValueExpression*>(unwrapped(listed))).text + " do");
+            mEach[c.var] = mItemNames[depth];
+        }
+        else
+        {
+            line("for " + nameOf(c.id) + " = " + start + ", " + to + step + " do");
+        }
         if (up || down)
         {
             mNonNegative.insert(c.var);
         }
-        // Up by one, below a list's length: within the list.
-        LSLExpression* limit_call = unwrapped(c.limit);
-        if (up && c.step == 1 && c.check == OP_LESS && limit_call->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
-            std::string_view(static_cast<LSLFunctionExpression*>(limit_call)->getIdentifier()->getName()) == "llGetListLength")
+        if (within)
         {
-            if (LSLSymbol* list = wholeVariable(argumentAt(static_cast<LSLFunctionExpression*>(limit_call), 0)))
-            {
-                mWithin[c.var] = list;
-            }
+            mWithin[c.var] = within;
         }
         if (from_one)
         {
@@ -2596,6 +2645,7 @@ namespace
         mNonNegative.erase(c.var);
         mFromOne.erase(c.var);
         mWithin.erase(c.var);
+        mEach.erase(c.var);
         line("end");
     }
 
@@ -2649,6 +2699,39 @@ namespace
             const bool item = builtin && arg->getParentSlot() == 1 && listItemFits(static_cast<LSLFunctionExpression*>(call));
             only = item || (trait && (trait->slua & ALLSLTraits::SluaIndexArgs) && !(trait->slua & not_ll) &&
                             (trait->sluaIndexArgs & (1 << arg->getParentSlot())) && name.rfind("llDetected", 0) != 0);
+        });
+        return any && only;
+    }
+
+    bool Writer::onlyItemsOf(LSLSymbol* var, LSLSymbol* list, LSLASTNode* body)
+    {
+        bool any  = false;
+        bool only = true;
+        walk(body, [&](LSLASTNode* node) {
+            if (!only || node->getNodeSubType() != NODE_LVALUE_EXPRESSION ||
+                static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol() != var)
+            {
+                return;
+            }
+            any = true;
+            // As it is, the index of a library call reading an item of the
+            // list.
+            LSLASTNode* arg = node;
+            while (arg->getParent() && arg->getParent()->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+            {
+                arg = arg->getParent();
+            }
+            LSLASTNode* args = arg->getParent();
+            LSLASTNode* call = args ? args->getParent() : nullptr;
+            if (!call || args->getNodeType() != NODE_AST_NODE_LIST || call->getNodeSubType() != NODE_FUNCTION_EXPRESSION ||
+                arg->getParentSlot() != 1)
+            {
+                only = false;
+                return;
+            }
+            auto*      read    = static_cast<LSLFunctionExpression*>(call);
+            LSLSymbol* fn      = read->getIdentifier()->getSymbol();
+            only               = fn && fn->getSubType() == SYM_BUILTIN && wholeVariable(argumentAt(read, 0)) == list && listItemFits(read);
         });
         return any && only;
     }
@@ -2860,6 +2943,30 @@ namespace
                 {
                     mBooleans.insert(f->getSymbol());
                 }
+                // Its integer parameters, each set by what its calls give
+                // it. An event's are the grid's, typed as numbers there,
+                // and stay numbers.
+                for (LSLASTNode* param = f->getArguments() ? f->getArguments()->getChild(0) : nullptr; !isNull(param); param = param->getNext())
+                {
+                    candidate(static_cast<LSLIdentifier*>(param), nullptr);
+                }
+            }
+            else if (node->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+            {
+                // A call of the script's own function: each argument what
+                // its parameter is set to.
+                auto*         call   = static_cast<LSLFunctionExpression*>(node);
+                LSLSymbol*    symbol = call->getIdentifier()->getSymbol();
+                LSLParamList* params = symbol && symbol->getSubType() != SYM_BUILTIN ? symbol->getFunctionDecl() : nullptr;
+                LSLASTNode*   param  = params ? params->getChild(0) : nullptr;
+                for (LSLASTNode* arg = isNull(call->getArguments()) ? nullptr : call->getArguments()->getChild(0); arg && !isNull(param);
+                     arg = arg->getNext(), param = param->getNext())
+                {
+                    if (LSLSymbol* set = static_cast<LSLIdentifier*>(param)->getSymbol(); set && param->getIType() == LST_INTEGER)
+                    {
+                        sets.emplace_back(set, static_cast<LSLExpression*>(arg));
+                    }
+                }
             }
             else if (node->getNodeSubType() == NODE_DECLARATION)
             {
@@ -2874,7 +2981,7 @@ namespace
                     sets.emplace_back(f, e);
                 }
             }
-            else if ((node->getNodeSubType() == NODE_LVALUE_EXPRESSION || node->getNodeSubType() == NODE_FUNCTION_EXPRESSION) && readOf(node))
+            if ((node->getNodeSubType() == NODE_LVALUE_EXPRESSION || node->getNodeSubType() == NODE_FUNCTION_EXPRESSION) && readOf(node))
             {
                 reads.push_back(node);
             }
@@ -3608,12 +3715,17 @@ namespace
                 appends.emplace_back(var, inner);
                 auto* b = static_cast<LSLBinaryExpression*>(inner);
                 accounted.insert(unwrapped(b->getLHS()));
-                LSLExpression* sum = unwrapped(b->getRHS());
-                while (b->getOperation() == OP_ASSIGN && sum->getNodeSubType() == NODE_BINARY_EXPRESSION)
+                // s = s + a: the s it adds to, which is the append's own.
+                // Nothing of s += a is: a string appended is read.
+                if (b->getOperation() == OP_ASSIGN)
                 {
-                    sum = unwrapped(static_cast<LSLBinaryExpression*>(sum)->getLHS());
+                    LSLExpression* sum = unwrapped(b->getRHS());
+                    while (sum->getNodeSubType() == NODE_BINARY_EXPRESSION)
+                    {
+                        sum = unwrapped(static_cast<LSLBinaryExpression*>(sum)->getLHS());
+                    }
+                    accounted.insert(sum);
                 }
-                accounted.insert(sum);
             });
             if (appends.empty())
             {
@@ -3661,6 +3773,48 @@ namespace
                 }
             }
         });
+        // Declared empty just before the loop that builds it, in the same
+        // block, nothing between reading or setting it: declared at the join.
+        const auto touches = [](LSLASTNode* statement, LSLSymbol* var) {
+            bool seen = false;
+            walk(statement, [&](LSLASTNode* inner) {
+                seen = seen || (inner->getNodeSubType() == NODE_LVALUE_EXPRESSION &&
+                                static_cast<LSLLValueExpression*>(inner)->getIdentifier()->getSymbol() == var);
+            });
+            return seen;
+        };
+        for (const auto& [built_by, vars] : mBuilds)
+        {
+            LSLASTNode* block = built_by->getParent();
+            if (!block || block->getNodeSubType() != NODE_COMPOUND_STATEMENT)
+            {
+                continue;
+            }
+            for (LSLSymbol* var : vars)
+            {
+                LSLDeclaration* declared = nullptr;
+                bool            touched  = false;
+                for (LSLASTNode* statement = block->getChild(0); statement && statement != built_by; statement = statement->getNext())
+                {
+                    if (statement->getNodeSubType() == NODE_DECLARATION && static_cast<LSLDeclaration*>(statement)->getIdentifier()->getSymbol() == var)
+                    {
+                        declared = static_cast<LSLDeclaration*>(statement);
+                        touched  = false;
+                    }
+                    else if (declared && touches(statement, var))
+                    {
+                        touched = true;
+                    }
+                }
+                if (declared && !touched && (isNull(declared->getInitializer()) || emptyValue(declared->getInitializer())))
+                {
+                    mJoinedDeclarations.insert(declared);
+                    // By this loop alone: a later one building it adds to
+                    // what this one declared.
+                    mDeclaredAtJoin.insert({ built_by, var });
+                }
+            }
+        }
         // An append an outer loop builds after all is not noted.
         boost::unordered::erase_if(mUnbuilt, [&](LSLASTNode* append) {
             LSLSymbol* var = nullptr;
@@ -3679,23 +3833,30 @@ namespace
     {
         const std::vector<LSLSymbol*> vars = std::move(mBuilds[loop]);
         mBuilds.erase(loop);
-        std::vector<std::pair<std::string, std::string>> joins;
+        struct Join
+        {
+            std::string name;
+            std::string parts;
+            bool        declared = false;
+        };
+        std::vector<Join> joins;
         for (LSLSymbol* var : vars)
         {
             const std::string name  = mNames.contains(var) ? mNames[var] : nameOf(var->getName());
             const std::string parts = freshName(name + "Parts");
             line("local " + parts + (mOptions.types ? ": { string }" : "") + " = {}");
             mBuilding[var] = parts;
-            joins.emplace_back(name, parts);
+            joins.push_back({ name, parts, mDeclaredAtJoin.contains({ loop, var }) });
         }
         statement(loop, last);
         for (LSLSymbol* var : vars)
         {
             mBuilding.erase(var);
         }
-        for (const auto& [name, parts] : joins)
+        for (const Join& join : joins)
         {
-            line(name + " ..= table.concat(" + parts + ")");
+            line(join.declared ? "local " + join.name + (mOptions.types ? ": string" : "") + " = table.concat(" + join.parts + ")"
+                               : join.name + " ..= table.concat(" + join.parts + ")");
         }
     }
 
@@ -3741,7 +3902,7 @@ namespace
         return true;
     }
 
-    std::string Writer::freshName(const std::string& base)
+    void Writer::takeNames()
     {
         if (mTaken.empty())
         {
@@ -3753,6 +3914,11 @@ namespace
                 }
             });
         }
+    }
+
+    std::string Writer::freshName(const std::string& base)
+    {
+        takeNames();
         std::string name = base;
         for (int n = 2; mTaken.contains(name) || reservedName(name); ++n)
         {
@@ -4068,7 +4234,9 @@ namespace
         LSLSymbol*        counter = wholeVariable(index);
         const auto        within  = counter ? mWithin.find(counter) : mWithin.end();
         const bool        found   = within != mWithin.end() && within->second == var;
-        const std::string item    = name + "[" + at + "]";
+        // And where its loop walks the list's items, the item by name.
+        const auto        walked  = found ? mEach.find(counter) : mEach.end();
+        const std::string item    = walked != mEach.end() ? walked->second : name + "[" + at + "]";
         const Expr        read    = found ? Expr{ item } : Expr{ item + " or " + kind->second.empty, OR };
         return as_is ? read : Expr{ "tostring(" + read.text + ")" };
     }
@@ -4271,8 +4439,9 @@ namespace
             std::string params;
             for (LSLASTNode* p = f->getArguments() ? f->getArguments()->getChild(0) : nullptr; p; p = p->getNext())
             {
+                LSLSymbol* param = static_cast<LSLIdentifier*>(p)->getSymbol();
                 params += (params.empty() ? "" : ", ") + nameOf(static_cast<LSLIdentifier*>(p)) +
-                          typed(varType(static_cast<LSLIdentifier*>(p)->getSymbol(), p->getIType()));
+                          (boolean(param) ? std::string(mOptions.types ? ": boolean" : "") : typed(varType(param, p->getIType())));
             }
             mFunction = f->getSymbol();
             line(std::string(forward ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +

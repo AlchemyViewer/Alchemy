@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alscriptstudiodoc.h"
+#include "alpreprocessor.h"
 #include "alscriptweight.h"
 #include "aljumpbar.h"
 #include "almenuslot.h"
@@ -67,6 +68,8 @@ public:
         virtual std::string                           vimBanner() const                                        = 0;
         virtual void                                  problemCounts(const Doc& doc, S32& errors, S32& warnings) const = 0;
         virtual std::optional<ALScriptWeight::Target> weightTarget(const Doc& doc) const                        = 0;
+        // Why a save preprocesses the tab, or that it does not.
+        virtual ALPreprocessor::Wanted                preprocessedWhy(const Doc& doc) const                     = 0;
 
     protected:
         ~Window() = default;
@@ -174,9 +177,10 @@ private:
         // What a save sends.
         bool                                  notecard   = false;
         size_t                                assetBytes = 0;
-        // The views'.
+        // The views', and whether a save preprocesses, and why.
         bool                                  expandable = false;
         bool                                  expanded   = false;
+        ALPreprocessor::Wanted                wanted     = ALPreprocessor::Wanted::No;
         // The colours the weight and the size are said in past a limit.
         LLColor4                              errorColor;
         LLColor4                              warningColor;

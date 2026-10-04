@@ -488,7 +488,8 @@ void ALVimKeymap::flushHeld(ALTextView& view)
     {
         const std::string text = std::move(mHeldTyped);
         mHeldTyped.clear();
-        view.insertText(text);
+        // At every caret, as the keys it held would have gone in.
+        view.typeText(text);
     }
 }
 
@@ -991,6 +992,9 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
                     {
                         view.perform(ALEditorCommand::Redo);
                     }
+                    // Normal mode works at one caret, whatever the step
+                    // brought back.
+                    view.singleSelection();
                     moveTo(view, view.caret());
                     clearPending();
                     return true;
@@ -2396,6 +2400,9 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             {
                 view.perform(ALEditorCommand::Undo);
             }
+            // Normal mode works at one caret, whatever the step brought
+            // back.
+            view.singleSelection();
             moveTo(view, view.caret());
             clearPending();
             return true;
@@ -3782,6 +3789,9 @@ void ALVimKeymap::enterInsert(ALTextView& view, S32 count, bool grouped)
 
 void ALVimKeymap::leaveInsert(ALTextView& view)
 {
+    // Vim has one caret: the others typing went in at go, before a count
+    // or a block puts in again at the main one.
+    view.singleSelection();
     const ALTextDocument& d = view.document();
     // What was typed, again as many times as the count said: made once and
     // put in as one edit, not an edit a time.
@@ -4099,13 +4109,22 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
     }
     if (mMode == Mode::Replace)
     {
-        // Over the character under the caret, if there is one.
-        const ALTextPos from = view.caret();
-        if (!atLineEnd(d, from))
+        // Over the character under each caret, where there is one.
+        const auto over = [&d](const ALTextPos& from) { return atLineEnd(d, from) ? ALTextRange(from, from) : ALTextRange(from, d.nextCluster(from)); };
+        if (view.hasOtherSelections())
         {
-            view.setSelection(ALTextRange(from, d.nextCluster(from)));
+            std::vector<ALTextRange> others;
+            for (const ALTextRange& one : view.otherSelections())
+            {
+                others.push_back(over(one.end));
+            }
+            view.setSelections(over(view.caret()), std::move(others));
         }
-        view.insertText(utf8Of(input.ch));
+        else
+        {
+            view.setSelection(over(view.caret()));
+        }
+        view.typeText(utf8Of(input.ch));
         mTyped += utf8Of(input.ch);
         return true;
     }

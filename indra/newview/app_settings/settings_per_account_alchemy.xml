@@ -121,6 +121,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptStudioSnippetsNotecard</key>
+        <map>
+            <key>Comment</key>
+            <string>The snippet notecard in inventory that Script Studio follows, by its item; empty for none. Its snippets are offered beside the viewer's and your own as it stands; its text is kept on disk with the asset it was read from, and fetched again only when the notecard has a new one.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string></string>
+        </map>
         <key>ALScriptStudioVimrcNotecard</key>
         <map>
             <key>Comment</key>

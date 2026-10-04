@@ -2818,4 +2818,42 @@ namespace tut
         ensure_equals("gone to", e.caret().line, 44);
         ensure("and below them there: " + std::to_string(below) + " of " + std::to_string(row_h), below >= 2 * row_h);
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<95>()
+    {
+        set_test_name("vim has one caret: what insert mode typed at several stays, Escape leaves the main caret alone, stepped back onto it, and a count types again there only");
+        ALCodeEditor& e = make("one\ntwo\nthree");
+        e.setSelections(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)) });
+        keys("iab");
+        ensure_equals("typed at each", e.text(), std::string("abone\nabtwo\nabthree"));
+        ensure("still several while inserting", e.hasOtherSelections());
+        keys("<Esc>");
+        ensure("one caret in normal mode", !e.hasOtherSelections());
+        ensure("the main one, on the last character it typed", e.caret() == ALTextPos(2, 1));
+        e.setSelections(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)) });
+        keys("3iX<Esc>");
+        ensure_equals("once at each, the count's again at the main one only", e.text(), std::string("Xabone\nXabtwo\nXXXabthree"));
+        ensure("one caret", !e.hasOtherSelections());
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<96>()
+    {
+        set_test_name("with several carets: a key held for a mapping goes in at each when let go, Replace overtypes at each, and an undo leaves normal mode one caret");
+        ALCodeEditor& e     = make("one\ntwo");
+        const auto    caret = [](S32 line, S32 column) { return ALTextRange(ALTextPos(line, column), ALTextPos(line, column)); };
+        ex("inoremap jk <Esc>");
+        e.setSelections(caret(1, 0), { caret(0, 0) });
+        keys("ijx");
+        ensure_equals("the held j at each, then the x", e.text(), std::string("jxone\njxtwo"));
+        keys("<Esc>");
+        e.setSelections(caret(1, 0), { caret(0, 0) });
+        keys("RQ");
+        ensure_equals("overtyped at each", e.text(), std::string("Qxone\nQxtwo"));
+        keys("<Esc>");
+        keys("u");
+        ensure_equals("undone", e.text(), std::string("jxone\njxtwo"));
+        ensure("one caret in normal mode after it", !e.hasOtherSelections());
+    }
 }

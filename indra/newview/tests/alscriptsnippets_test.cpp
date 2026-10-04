@@ -222,4 +222,39 @@ namespace tut
         merged = ALScriptSnippets::merge(own, { snippet("say", "llSay(0, \"c\");") });
         ensure_equals("numbered past the taken", own.back().name, std::string("say (3)"));
     }
+
+    template<> template<>
+    void alscriptsnippets_object::test<7>()
+    {
+        set_test_name("a followed notecard's snippets: each in its language, one saying none in both, taken in place of those before; text that is not snippets taken as nothing; never written as one's own");
+        const std::string text = "<llsd><array>"
+                                 "<map><key>name</key><string>say</string><key>body</key><string>llSay(0, \"\");</string><key>language</key><string>lsl</string></map>"
+                                 "<map><key>name</key><string>loop</string><key>body</key><string>for</string><key>language</key><string>slua</string></map>"
+                                 "<map><key>name</key><string>banner</string><key>body</key><string>x</string></map>"
+                                 "</array></llsd>";
+        ensure("followed", ALScriptSnippets::follow(text));
+        const std::vector<ALScriptSnippets::Snippet>& lsl  = ALScriptSnippets::followed(false);
+        const std::vector<ALScriptSnippets::Snippet>& slua = ALScriptSnippets::followed(true);
+        ensure("LSL's and the one saying none", lsl.size() == 2 && lsl[0].name == "say" && lsl[1].name == "banner");
+        ensure("SLua's and the one saying none", slua.size() == 2 && slua[0].name == "loop" && slua[1].name == "banner");
+        ensure("each the notecard's", lsl[0].followed && lsl[1].followed && slua[0].followed && !lsl[0].builtin);
+
+        ensure("not snippets: not taken", !ALScriptSnippets::follow("Dear diary"));
+        ensure("those before stay", ALScriptSnippets::followed(false).size() == 2);
+
+        // Never written where the scripter's own are, nor carried by their
+        // notecard; copied in, one's own.
+        const std::string file = folder + "/lsl.xml";
+        ensure("written", ALScriptSnippets::writeTo(file, { snippet("mine", "y"), lsl[0] }));
+        std::vector<ALScriptSnippets::Snippet> back;
+        ensure("read", ALScriptSnippets::readFrom(file, false, back));
+        ensure("one's own alone", back.size() == 1 && back[0].name == "mine");
+        ensure("not on one's notecard", ALScriptSnippets::notecardText(lsl, {}).find("banner") == std::string::npos);
+        std::vector<ALScriptSnippets::Snippet> own;
+        ALScriptSnippets::merge(own, { lsl[1] });
+        ensure("copied in: one's own", own.size() == 1 && !own[0].followed);
+
+        ensure("none followed", ALScriptSnippets::follow(std::string()));
+        ensure("none left", ALScriptSnippets::followed(false).empty() && ALScriptSnippets::followed(true).empty());
+    }
 }

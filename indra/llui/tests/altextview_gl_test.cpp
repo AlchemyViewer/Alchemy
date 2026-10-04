@@ -501,4 +501,110 @@ namespace tut
         ensure("drawn under the text", drawn == 255);
         ensure("only the fade just under the baseline: " + std::to_string(under), under < 128);
     }
+
+    // The carets besides the main one are drawn as it is, blinking with it:
+    // a frame with the main caret on one line and another on a second is
+    // the frame with the two the other way round. A selection besides the
+    // main one is washed as it is, on its own line only. And every caret
+    // in sight is the one draw.
+    template<> template<>
+    void altextview_gl_object::test<8>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::string text;
+        for (S32 i = 0; i < 12; ++i)
+        {
+            text += "integer value = f(x, [y, z]);\n";
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "view";
+        p.rect         = LLRect(0, H, W, 0);
+        p.default_text = text;
+        // The skin's colours are not loaded here: the caret's is given.
+        p.cursor_color = LLUIColor(LLColor4::white);
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        view->setSelectionColor(LLUIColor(LLColor4(0.2f, 0.4f, 0.9f, 0.6f)));
+        // Shown, and still from frame to frame.
+        view->setCaretBlink(false);
+        view->setFocus(true);
+
+        const auto frame = [&]() {
+            gl().clearFramebuffer();
+            glEnable(GL_BLEND);
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
+            view->draw();
+            gGL.flush();
+            glDisable(GL_BLEND);
+            glFinish();
+            return ll_test::readFramebufferRGBA(W, H);
+        };
+        // Every pixel that differs between two frames lies within a line's
+        // band, and some do.
+        const auto only_on = [&](const std::string& what, const std::vector<U8>& a, const std::vector<U8>& b, S32 line) {
+            const S32 top    = view->textRect().mTop - (view->layout().lineTop(line) - view->scrollY()) + 3;
+            const S32 bottom = top - 3 - view->layout().lineHeight(line) - 3;
+            bool      some   = false;
+            for (S32 y = 0; y < H; ++y)
+            {
+                for (S32 x = 0; x < W; ++x)
+                {
+                    const size_t i = (static_cast<size_t>(y) * W + x) * 4;
+                    if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2])
+                    {
+                        some = true;
+                        ensure(what + ": changed at " + std::to_string(x) + "," + std::to_string(y) + ", off line " + std::to_string(line),
+                               y <= top && y >= bottom);
+                    }
+                }
+            }
+            ensure(what + ": something changed", some);
+        };
+        const auto at = [](S32 line, S32 column) { return ALTextRange(ALTextPos(line, column), ALTextPos(line, column)); };
+
+        view->setSelection(at(4, 0));
+        const std::vector<U8> one = frame();
+        view->addSelection(at(2, 5));
+        const std::vector<U8> two = frame();
+        only_on("another caret", one, two, 2);
+        view->setSelections(at(2, 5), { at(4, 0) });
+        ensure("the two the other way round, the same frame", frame() == two);
+
+        const ALTextRange      span(ALTextPos(7, 2), ALTextPos(7, 10));
+        view->setSelections(at(4, 0), { span });
+        const std::vector<U8> other_span = frame();
+        only_on("another selection, its caret at its end", one, other_span, 7);
+        view->setSelections(span, { at(4, 0) });
+        ensure("the same as the main selection", frame() == other_span);
+
+        // A caret on every line: the carets are one draw, not one each.
+        std::vector<ALTextRange> many;
+        for (S32 line = 1; line < 12; ++line)
+        {
+            many.push_back(at(line, line));
+        }
+        view->setSelections(at(0, 0), many);
+        std::list<LLVertexBufferData> capture;
+        gGL.beginList(&capture);
+        view->draw();
+        gGL.flush();
+        gGL.endList();
+        glFinish();
+        const size_t with_many = capture.size();
+        capture.clear();
+        view->singleSelection();
+        gGL.beginList(&capture);
+        view->draw();
+        gGL.flush();
+        gGL.endList();
+        glFinish();
+        ensure("twelve carets cost what one does: " + std::to_string(with_many) + " against " + std::to_string(capture.size()),
+               with_many == capture.size());
+        gFocusMgr.setKeyboardFocus(nullptr);
+        view->die();
+    }
 }

@@ -42,6 +42,10 @@
     <floater.string name="SnippetsNotecardName">Script snippets</floater.string>
     <floater.string name="SnippetsNotecardNotMade">the notecard could not be made</floater.string>
     <floater.string name="SnippetsOnlyNotecards">Only a notecard in your inventory can bring snippets in</floater.string>
+    <floater.string name="SnippetsFollowOnlyNotecards">Only a notecard in your inventory can be followed for snippets</floater.string>
+    <floater.string name="SnippetFollowed">From [NAME], the notecard you follow. Copy it to make a version of your own, or change it in the notecard.</floater.string>
+    <floater.string name="SnippetNotecardUnknown">(a notecard not in inventory yet)</floater.string>
+    <floater.string name="SnippetNotecardTip">Drop a snippets notecard here to follow it: its snippets are offered beside yours, as the notecard stands whoever changes it. Cached until it changes</floater.string>
     <floater.string name="LintLSL20001">A declaration that hides one in an outer scope</floater.string>
     <floater.string name="LintLSL20002">An assignment used as a condition</floater.string>
     <floater.string name="LintLSL20003">Changing to the current state</floater.string>
@@ -103,7 +107,9 @@
     <floater.string name="LintLuauSlZeroIndex">A list, a string or ll counted from 0, as LSL counted (the studio's own)</floater.string>
     <floater.string name="LintLuauSlCompatCall">llcompat's function where ll's means the same (the studio's own)</floater.string>
     <floater.string name="LintLuauSlBooleanNumber">A boolean compared with a number, as LSL's TRUE and FALSE were (the studio's own)</floater.string>
-    <floater.string name="LintLuauSlGlobalAssign">A global made where a local would do, or a function made global inside a block (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlGlobalAssign">A global given a value at the top where a local would do, or a function made global inside a block (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlForIndexAssign">A for loop's own variable set inside it, which Luau's for does not go on from as LSL's did (the studio's own)</floater.string>
+    <floater.string name="LintLuauSlGlobalFunction">A function at the top made global where a local function would do (the studio's own)</floater.string>
     <floater.string name="LintLuauSlParenCondition">A condition in brackets, as LSL's had to be (the studio's own)</floater.string>
     <floater.string name="LintLuauSlAlmostSwapped">a = b and then b = a, which is no swap (the studio's own)</floater.string>
     <floater.string name="LintLuauSlMustUse">A call that only answers, its answer thrown away (the studio's own)</floater.string>
@@ -970,7 +976,7 @@ end</floater.string>
              layout="topleft"
              left="412"
              name="preproc_enabled"
-             tool_tip="Preprocess all scripts on save, keeping the source in Firestorm's envelope. Off: only enveloped ones"
+             tool_tip="Preprocess every script on save, keeping the source in Firestorm's envelope. Off: only scripts that have directives, or were saved with the preprocessor before"
              top_pad="6"
              width="370" />
             <check_box
@@ -1256,7 +1262,7 @@ end</floater.string>
              left="12"
              multi_select="false"
              name="snippet_list"
-             tool_tip="Your snippets, then the viewer's built-in ones (copy one to change it). Drop a snippets notecard here to add its snippets to yours."
+             tool_tip="Your snippets, then the followed notecard's, then the viewer's built-in ones (copy one to change it). Drop a snippets notecard here to add its snippets to yours."
              top_pad="8"
              width="280">
                 <scroll_list.columns dynamic_width="true" label="Snippet" name="name" />
@@ -1303,6 +1309,38 @@ end</floater.string>
              top_pad="4"
              width="140" />
 
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="306"
+             name="snippet_notecard_label"
+             top="13"
+             width="100">
+                Follow notecard:
+            </text>
+            <line_editor
+             enabled="false"
+             follows="left|top|right"
+             height="22"
+             label="Drop a notecard here"
+             layout="topleft"
+             left_pad="4"
+             max_length_bytes="255"
+             name="snippet_notecard"
+             tool_tip="Drop a snippets notecard here to follow it"
+             top_delta="-3"
+             width="314" />
+            <button
+             follows="top|right"
+             height="22"
+             label="Clear"
+             layout="topleft"
+             left_pad="4"
+             name="snippet_notecard_clear"
+             tool_tip="Stop following the notecard: its snippets are no longer offered"
+             top_delta="0"
+             width="64" />
             <text
              follows="left|top"
              height="16"

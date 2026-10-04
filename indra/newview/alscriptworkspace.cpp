@@ -36,6 +36,7 @@
 #include "alscripttempfiles.h"
 #include "lldbstrings.h"
 #include "llagent.h"
+#include "llavatarnamecache.h"
 #include "llcorehttputil.h"
 #include "llappviewer.h"
 #include "llassetstorage.h"
@@ -45,6 +46,8 @@
 #include "lleventtimer.h"
 #include "llfilesystem.h"
 #include "llfloaterperms.h"
+#include "llfloaterreg.h"
+#include "llfloatertopobjects.h"
 #include "llinventory.h"
 #include "llinventorydefines.h"
 #include "llinventorymodel.h"
@@ -73,6 +76,8 @@
 // [/RLVa:KB]
 
 #include <boost/unordered/unordered_flat_set.hpp>
+
+#include <deque>
 
 #include <algorithm>
 #include <memory>
@@ -266,6 +271,25 @@ namespace
     }
 
     // What the region reserves, asked of the viewer's world.
+    // Top Scripts asked for by the studio, oldest first, by owner, each
+    // given up once its answer has had time to come. The region's answer,
+    // LandStatReply, says neither who asked nor what for: which of these an
+    // answer of top scripts by owner is for, if any, is
+    // ALScriptRegionUsage::answering's to say, and any other answer is the
+    // Top Objects floater's, as before.
+    struct TimeAsked
+    {
+        F64                                                     until = 0.0;
+        std::string                                             owner;
+        std::function<void(const ALScriptRegionUsage::times_t&)> told;
+    };
+    std::deque<TimeAsked>& timesAsked()
+    {
+        static std::deque<TimeAsked> asked;
+        return asked;
+    }
+    constexpr F64 TIME_ANSWER_WITHIN = 30.0;
+
     ALScriptRegionUsage::World regionUsageWorld()
     {
         typedef ALScriptRegionUsage::World World;
@@ -324,6 +348,41 @@ namespace
                     });
                 });
             });
+        };
+        world.mayAskTime = []() { return gAgent.canManageEstate(); };
+        world.ownerOf    = [](const LLUUID& root) -> std::string {
+            // By the name Top Scripts gives an owner, the legacy one: the
+            // agent's own objects, or another's whose name is in hand. A
+            // group's, or one not known yet, is not asked about.
+            const LLViewerObject* object = gObjectList.findObject(root);
+            // A group's: the agent may act as its owner, and its owner id is
+            // the group's, which no avatar name answers for.
+            if (!object || object->permGroupOwner())
+            {
+                return std::string();
+            }
+            const LLUUID owner = object->permYouOwner() ? gAgentID : object->mOwnerID;
+            LLAvatarName name;
+            return owner.notNull() && LLAvatarNameCache::get(owner, &name) ? name.getLegacyName() : std::string();
+        };
+        world.askTime = [](const std::string& owner, std::function<void(const ALScriptRegionUsage::times_t&)> told) {
+            LLViewerRegion* region = gAgent.getRegion();
+            if (!region || !gMessageSystem)
+            {
+                return;
+            }
+            timesAsked().push_back({ LLTimer::getTotalSeconds() + TIME_ANSWER_WITHIN, owner, std::move(told) });
+            LLMessageSystem* msg = gMessageSystem;
+            msg->newMessageFast(_PREHASH_LandStatRequest);
+            msg->nextBlockFast(_PREHASH_AgentData);
+            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+            msg->nextBlockFast(_PREHASH_RequestData);
+            msg->addU32Fast(_PREHASH_ReportType, STAT_REPORT_TOP_SCRIPTS);
+            msg->addU32Fast(_PREHASH_RequestFlags, STAT_FILTER_BY_OWNER);
+            msg->addStringFast(_PREHASH_Filter, owner);
+            msg->addS32Fast(_PREHASH_ParcelLocalID, 0);
+            msg->sendReliable(region->getHost());
         };
         return world;
     }
@@ -986,7 +1045,7 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
 void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id, const std::string& text, bool lua,
                                 const std::string& target, prepared_callback_t callback, bool anyway)
 {
-    if (!ALScriptEnvelope::looksWrapped(text) && !ALScriptPreprocessor::enabled())
+    if (ALPreprocessor::wanted(text, lua, ALScriptEnvelope::looksWrapped(text), ALScriptPreprocessor::enabled()) == ALPreprocessor::Wanted::No)
     {
         ALScriptPrepared as_is;
         as_is.text = text;
@@ -1758,6 +1817,69 @@ bool ALScriptWorkspace::askRunning(const ALScriptRef& ref)
 }
 
 // static
+void ALScriptWorkspace::processLandStatReply(LLMessageSystem* msg, void** data)
+{
+    // Those given up on gone; then an answer of top scripts by owner is the
+    // studio's where answering says whose, and anything else Top Objects'.
+    std::deque<TimeAsked>& asked = timesAsked();
+    const F64              now   = LLTimer::getTotalSeconds();
+    while (!asked.empty() && asked.front().until < now)
+    {
+        asked.pop_front();
+    }
+    U32 report = 0;
+    U32 flags  = 0;
+    msg->getU32Fast(_PREHASH_RequestData, _PREHASH_ReportType, report);
+    msg->getU32Fast(_PREHASH_RequestData, _PREHASH_RequestFlags, flags);
+    if (asked.empty() || report != STAT_REPORT_TOP_SCRIPTS || (flags & STAT_FILTER_BY_OWNER) == 0)
+    {
+        LLFloaterTopObjects::handle_land_reply(msg, data);
+        return;
+    }
+    ALScriptRegionUsage::times_t times;
+    std::vector<std::string>     named;
+    const S32                    count = msg->getNumberOfBlocksFast(_PREHASH_ReportData);
+    for (S32 block = 0; block < count; ++block)
+    {
+        LLUUID      task;
+        F32         score = 0.f;
+        std::string owner;
+        msg->getUUIDFast(_PREHASH_ReportData, _PREHASH_TaskID, task, block);
+        msg->getF32Fast(_PREHASH_ReportData, _PREHASH_Score, score, block);
+        msg->getStringFast(_PREHASH_ReportData, _PREHASH_OwnerName, owner, block);
+        named.push_back(std::move(owner));
+        if (task.notNull())
+        {
+            times[task] = score;
+        }
+    }
+    std::vector<std::string> waiting;
+    for (const TimeAsked& one : asked)
+    {
+        waiting.push_back(one.owner);
+    }
+    // Top Objects takes an answer only while it is open, and what it waits
+    // on says which may be its.
+    const LLFloaterTopObjects* top = LLFloaterReg::findTypedInstance<LLFloaterTopObjects>("top_objects");
+    std::optional<std::string> theirs;
+    if (std::string owner; top && top->isInVisibleChain() && top->waitsForOwner(owner))
+    {
+        theirs = owner;
+    }
+    const std::optional<size_t> whose = ALScriptRegionUsage::answering(waiting, named, theirs);
+    if (!whose)
+    {
+        LLFloaterTopObjects::handle_land_reply(msg, data);
+        return;
+    }
+    const auto told = std::move(asked[*whose].told);
+    asked.erase(asked.begin() + static_cast<std::ptrdiff_t>(*whose));
+    if (told)
+    {
+        told(times);
+    }
+}
+
 void ALScriptWorkspace::processScriptRunningReply(LLMessageSystem* msg, void** data)
 {
     ALScriptRunningState state;

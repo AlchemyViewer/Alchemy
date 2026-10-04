@@ -1361,9 +1361,47 @@ bool LLWindowSDL::pasteTextFromClipboard(std::string &dst)
     return false;
 }
 
+#if LL_LINUX
+namespace
+{
+    // What was last copied, held here rather than by SDL. SDL frees the text
+    // it was given when it decides another client has the clipboard, while
+    // the Wayland source or X11 owner it handed that text to can go on
+    // serving it (SDL issues 16037 and 16245), and another application
+    // pasted whatever had since been allocated there. The registry's sdl3
+    // patches the wrong decisions known on 3.4.18
+    // (clipboard-keep-own-selection.patch); this stands for any left. SDL's
+    // cleanup does nothing, so whatever still serves the text reads this.
+    std::string sClipboardText;
+
+    // Every name the X11 and Wayland backends give text by: theirs when
+    // SDL_SetClipboardText chooses, so that SDL_GetClipboardText finds them.
+    const char* const CLIPBOARD_TEXT_TYPES[] = {
+        "text/plain;charset=utf-8", "UTF8_STRING", "text/plain", "TEXT", "STRING"
+    };
+
+    const void* SDLCALL clipboardText(void*, const char*, size_t* size)
+    {
+        *size = sClipboardText.size();
+        return sClipboardText.data();
+    }
+
+    void SDLCALL keepClipboardText(void*) {}
+}
+#endif
+
 bool LLWindowSDL::copyTextToClipboard(const std::string& text)
 {
+#if LL_LINUX
+    if (text.empty())
+    {
+        return SDL_ClearClipboardData();
+    }
+    sClipboardText = text;
+    return SDL_SetClipboardData(clipboardText, keepClipboardText, nullptr, CLIPBOARD_TEXT_TYPES, std::size(CLIPBOARD_TEXT_TYPES));
+#else
     return SDL_SetClipboardText(text.c_str());
+#endif
 }
 
 bool LLWindowSDL::isPrimaryTextAvailable()

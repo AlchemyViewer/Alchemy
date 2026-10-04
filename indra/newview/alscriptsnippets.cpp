@@ -41,6 +41,7 @@ namespace ALScriptSnippets
     {
         std::vector<Snippet> sAll[2];
         bool                 sLoaded[2] = { false, false };
+        std::vector<Snippet> sFollowed[2];
 
         std::string fileName(bool lua)
         {
@@ -91,7 +92,7 @@ namespace ALScriptSnippets
             {
                 // One without a name or a body is one being written, and is
                 // kept in the tab rather than in the file.
-                if (one.builtin || one.name.empty() || one.body.empty())
+                if (one.builtin || one.followed || one.name.empty() || one.body.empty())
                 {
                     continue;
                 }
@@ -220,8 +221,9 @@ namespace ALScriptSnippets
                 if (there == own.end())
                 {
                     own.push_back(one);
-                    own.back().name    = name;
-                    own.back().builtin = false;
+                    own.back().name     = name;
+                    own.back().builtin  = false;
+                    own.back().followed = false;
                     ++(n == 1 ? merged.added : merged.renamed);
                     break;
                 }
@@ -243,9 +245,38 @@ namespace ALScriptSnippets
             sLoaded[lua ? 1 : 0] = true;
             out.clear();
             readFrom(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, fileName(lua)), true, out);
+            const std::vector<Snippet>& notecard = sFollowed[lua ? 1 : 0];
+            out.insert(out.end(), notecard.begin(), notecard.end());
             readFrom(path(lua), false, out);
         }
         return out;
+    }
+
+    bool follow(const std::string& notecard_text)
+    {
+        std::vector<Snippet> lsl, slua, unused;
+        if (!notecard_text.empty() &&
+            (!readNotecard(notecard_text, false, lsl, unused) || !readNotecard(notecard_text, true, unused, slua)))
+        {
+            return false;
+        }
+        for (std::vector<Snippet>* one : { &lsl, &slua })
+        {
+            for (Snippet& snippet : *one)
+            {
+                snippet.followed = true;
+            }
+        }
+        sFollowed[0] = std::move(lsl);
+        sFollowed[1] = std::move(slua);
+        forget(false);
+        forget(true);
+        return true;
+    }
+
+    const std::vector<Snippet>& followed(bool lua)
+    {
+        return sFollowed[lua ? 1 : 0];
     }
 
     std::vector<Snippet> own(bool lua)

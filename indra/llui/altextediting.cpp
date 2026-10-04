@@ -27,6 +27,8 @@
 
 #include "altextediting.h"
 
+#include <algorithm>
+
 namespace
 {
     bool isBlank(char c)
@@ -43,6 +45,104 @@ namespace
             ++n;
         }
         return n;
+    }
+
+    // Lines first through last again, under them.
+    ALTextEditing::Replacement duplicated(const ALTextDocument& doc, S32 first, S32 last)
+    {
+        const std::string block = doc.text(ALTextRange(doc.lineStart(first), doc.lineEnd(last)));
+        return { ALTextRange(doc.lineEnd(last), doc.lineEnd(last)), "\n" + block };
+    }
+
+    // What deleting lines first through last takes -- the last line of the
+    // text with the break before it -- and the line a caret lands on once
+    // they are gone, and how long that is.
+    ALTextRange deleted(const ALTextDocument& doc, S32 first, S32 last, S32& line, S32& length)
+    {
+        const S32   count = doc.lineCount();
+        ALTextRange range(doc.lineStart(first), last + 1 < count ? doc.lineStart(last + 1) : doc.lineEnd(last));
+        line   = first;
+        length = last + 1 < count ? doc.lineLength(last + 1) : 0;
+        if (last + 1 >= count && first > 0)
+        {
+            range.begin = doc.lineEnd(first - 1);
+            line        = first - 1;
+            length      = doc.lineLength(first - 1);
+        }
+        return range;
+    }
+
+    // Whether every line first through last that says anything is
+    // commented with the token; nothing where none says anything.
+    std::optional<bool> commented(const ALTextDocument& doc, S32 first, S32 last, const std::string& token)
+    {
+        bool all_commented = true;
+        bool any_text      = false;
+        for (S32 l = first; l <= last; ++l)
+        {
+            const std::string& line = doc.line(l);
+            const S32          n    = indentationOf(line);
+            if (n == static_cast<S32>(line.size()))
+            {
+                continue;
+            }
+            any_text = true;
+            if (line.compare(n, token.size(), token) != 0)
+            {
+                all_commented = false;
+            }
+        }
+        if (!any_text)
+        {
+            return std::nullopt;
+        }
+        return all_commented;
+    }
+
+    // Each line first through last that says anything commented out, the
+    // token and the space after it taken from where its text begins; or in,
+    // the token and a space put there.
+    std::vector<ALTextEditing::Replacement> commentLines(const ALTextDocument& doc, S32 first, S32 last, const std::string& token, bool out)
+    {
+        std::vector<ALTextEditing::Replacement> replacements;
+        for (S32 l = first; l <= last; ++l)
+        {
+            const std::string& line = doc.line(l);
+            const S32          n    = indentationOf(line);
+            if (n == static_cast<S32>(line.size()))
+            {
+                continue;
+            }
+            if (out)
+            {
+                S32 taken = static_cast<S32>(token.size());
+                if (n + taken < static_cast<S32>(line.size()) && line[n + taken] == ' ')
+                {
+                    ++taken;
+                }
+                replacements.push_back({ ALTextRange(ALTextPos(l, n), ALTextPos(l, n + taken)), std::string() });
+            }
+            else
+            {
+                replacements.push_back({ ALTextRange(ALTextPos(l, n), ALTextPos(l, n)), token + " " });
+            }
+        }
+        return replacements;
+    }
+
+    // A selection's lines whole, from the first's start to the next line's
+    // start, or to the end of the text's last line as the replacements
+    // leave it.
+    ALTextRange wholeLines(const ALTextDocument& doc, const ALTextRange& selection, const std::vector<ALTextEditing::Replacement>& replacements)
+    {
+        const auto [first, last] = ALTextEditing::selectedLines(selection);
+        return ALTextRange(ALTextPos(first, 0), last + 1 < doc.lineCount() ? ALTextPos(last + 1, 0)
+                                                                            : ALTextEditing::placedThrough(replacements, doc.lineEnd(last)));
+    }
+
+    ALTextRange lineShifted(const ALTextRange& selection, S32 lines)
+    {
+        return ALTextRange(ALTextPos(selection.begin.line + lines, selection.begin.column), ALTextPos(selection.end.line + lines, selection.end.column));
     }
 }
 
@@ -62,10 +162,9 @@ std::pair<S32, S32> selectedLines(const ALTextRange& selection)
 Change duplicateLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret)
 {
     const auto [first, last] = selectedLines(ALTextRange(anchor, caret));
-    const std::string block  = doc.text(ALTextRange(doc.lineStart(first), doc.lineEnd(last)));
     const S32         count  = last - first + 1;
     Change            change;
-    change.replacements.push_back({ ALTextRange(doc.lineEnd(last), doc.lineEnd(last)), "\n" + block });
+    change.replacements.push_back(duplicated(doc, first, last));
     // The caret and the selection go with the copy.
     change.selects = true;
     change.anchor  = ALTextPos(anchor.line + count, anchor.column);
@@ -145,19 +244,11 @@ Change copyLinesTo(const ALTextDocument& doc, S32 first, S32 last, S32 below)
 Change deleteLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret)
 {
     const auto [first, last] = selectedLines(ALTextRange(anchor, caret));
-    const S32   count        = doc.lineCount();
-    ALTextRange range(doc.lineStart(first), last + 1 < count ? doc.lineStart(last + 1) : doc.lineEnd(last));
     // The line the caret lands on, and how long it is, once they are gone.
-    S32 line   = first;
-    S32 length = last + 1 < count ? doc.lineLength(last + 1) : 0;
-    if (last + 1 >= count && first > 0)
-    {
-        // The last line goes with the newline before it.
-        range.begin = doc.lineEnd(first - 1);
-        line        = first - 1;
-        length      = doc.lineLength(first - 1);
-    }
-    Change change;
+    S32               line   = first;
+    S32               length = 0;
+    const ALTextRange range  = deleted(doc, first, last, line, length);
+    Change            change;
     change.replacements.push_back({ range, std::string() });
     change.caret  = ALTextPos(line, llmin(caret.column, length));
     change.anchor = change.caret;
@@ -167,79 +258,28 @@ Change deleteLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALT
 std::optional<Change> toggleComment(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, const std::string& token)
 {
     const auto [first, last] = selectedLines(ALTextRange(anchor, caret));
-
     // Out where every line that says anything is commented; in otherwise.
-    bool all_commented = true;
-    bool any_text      = false;
-    for (S32 l = first; l <= last; ++l)
-    {
-        const std::string& line = doc.line(l);
-        const S32          n    = indentationOf(line);
-        if (n == static_cast<S32>(line.size()))
-        {
-            continue;
-        }
-        any_text = true;
-        if (line.compare(n, token.size(), token) != 0)
-        {
-            all_commented = false;
-        }
-    }
-    if (!any_text)
+    const std::optional<bool> out = commented(doc, first, last, token);
+    if (!out)
     {
         return std::nullopt;
     }
     Change change;
-    S32    caret_shift = 0;
-    // What the last line gained or lost, for where a selection of the
-    // lines whole ends.
-    S32    last_delta  = 0;
-    for (S32 l = first; l <= last; ++l)
-    {
-        const std::string& line = doc.line(l);
-        const S32          n    = indentationOf(line);
-        if (n == static_cast<S32>(line.size()))
-        {
-            continue;
-        }
-        S32 delta = 0;
-        if (all_commented)
-        {
-            S32 taken = static_cast<S32>(token.size());
-            if (n + taken < static_cast<S32>(line.size()) && line[n + taken] == ' ')
-            {
-                ++taken;
-            }
-            change.replacements.push_back({ ALTextRange(ALTextPos(l, n), ALTextPos(l, n + taken)), std::string() });
-            delta = -taken;
-            if (l == caret.line)
-            {
-                caret_shift = caret.column >= n + taken ? -taken : (caret.column > n ? n - caret.column : 0);
-            }
-        }
-        else
-        {
-            change.replacements.push_back({ ALTextRange(ALTextPos(l, n), ALTextPos(l, n)), token + " " });
-            delta = static_cast<S32>(token.size()) + 1;
-            if (l == caret.line && caret.column >= n)
-            {
-                caret_shift = static_cast<S32>(token.size()) + 1;
-            }
-        }
-        if (l == last)
-        {
-            last_delta = delta;
-        }
-    }
+    change.replacements = commentLines(doc, first, last, token, *out);
     if (anchor != caret)
     {
-        change.selects = true;
-        change.anchor  = ALTextPos(first, 0);
-        change.caret   = last + 1 < doc.lineCount() ? ALTextPos(last + 1, 0) : ALTextPos(last, doc.lineLength(last) + last_delta);
+        // The lines whole.
+        const ALTextRange lines = wholeLines(doc, ALTextRange(anchor, caret), change.replacements);
+        change.selects          = true;
+        change.anchor           = lines.begin;
+        change.caret            = lines.end;
     }
     else
     {
-        change.caret  = ALTextPos(caret.line, caret.column + caret_shift);
+        // The caret where it was in its text: pushed along by the token put
+        // in where it stands, and back to where the token was taken from
+        // where it stood in it.
+        change.caret  = placedThrough(change.replacements, caret);
         change.anchor = change.caret;
     }
     return change;
@@ -270,5 +310,288 @@ std::optional<Change> joinLines(const ALTextDocument& doc, S32 first, S32 last, 
     }
     change.caret = doc.lineEnd(first);
     return change;
+}
+
+ALTextPos endOf(const ALTextPos& at, const std::string& text)
+{
+    const size_t last_break = text.rfind('\n');
+    if (last_break == std::string::npos)
+    {
+        return ALTextPos(at.line, at.column + static_cast<S32>(text.size()));
+    }
+    return ALTextPos(at.line + static_cast<S32>(std::count(text.begin(), text.end(), '\n')), static_cast<S32>(text.size() - last_break - 1));
+}
+
+ALTextPos placedThrough(const std::vector<Replacement>& replacements, const ALTextPos& pos, bool pushed)
+{
+    // From the last, so that each is measured on the text as it was before
+    // any: those before it have not moved yet.
+    ALTextPos at = pos;
+    for (auto it = replacements.rbegin(); it != replacements.rend(); ++it)
+    {
+        ALTextDocument::Edit edit;
+        edit.range    = it->range.normalised();
+        edit.inserted = it->text;
+        at            = edit.placed(at, pushed);
+    }
+    return at;
+}
+
+Combined combine(std::vector<Group> groups, size_t count)
+{
+    Combined out;
+    out.selections.resize(count);
+    const auto by_begin = [](const Replacement& a, const Replacement& b) { return a.range.normalised().begin < b.range.normalised().begin; };
+    for (Group& group : groups)
+    {
+        std::stable_sort(group.replacements.begin(), group.replacements.end(), by_begin);
+    }
+    // In the order of the text: where a group's first replacement begins,
+    // or for one that replaces nothing, where its first selection does --
+    // before a group that replaces from the same place, its places being
+    // the text's as it stands.
+    const auto key = [](const Group& group) {
+        if (!group.replacements.empty())
+        {
+            return group.replacements.front().range.normalised().begin;
+        }
+        ALTextPos first(S32_MAX, S32_MAX);
+        for (const auto& [index, selection] : group.placed)
+        {
+            first = std::min(first, selection.normalised().begin);
+        }
+        return first;
+    };
+    std::vector<size_t> order(groups.size());
+    for (size_t i = 0; i < order.size(); ++i)
+    {
+        order[i] = i;
+    }
+    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+        const ALTextPos ka = key(groups[a]);
+        const ALTextPos kb = key(groups[b]);
+        if (ka != kb)
+        {
+            return ka < kb;
+        }
+        return groups[a].replacements.empty() && !groups[b].replacements.empty();
+    });
+
+    // Where each replacement kept so far ended, in the text before and in
+    // the text after: a place at or past one moves by the last of them as
+    // the place where it ended does (ALTextDocument::Edit's batch).
+    std::vector<std::pair<ALTextPos, ALTextPos>> ends;
+    const auto moved = [&ends](const ALTextPos& pos) {
+        const auto after = std::upper_bound(ends.begin(), ends.end(), pos, [](const ALTextPos& p, const std::pair<ALTextPos, ALTextPos>& end) { return p < end.first; });
+        if (after == ends.begin())
+        {
+            return pos;
+        }
+        const auto& [before_end, after_end] = *(after - 1);
+        if (pos.line == before_end.line)
+        {
+            return ALTextPos(after_end.line, after_end.column + (pos.column - before_end.column));
+        }
+        return ALTextPos(pos.line + (after_end.line - before_end.line), pos.column);
+    };
+    for (const size_t g : order)
+    {
+        Group& group = groups[g];
+        if (!group.replacements.empty() && !ends.empty() && group.replacements.front().range.normalised().begin < ends.back().first)
+        {
+            // Over a replacement before it: left out.
+            continue;
+        }
+        // Its selections, by the groups before it, which is all that has
+        // moved what its own replacements left.
+        for (const auto& [index, selection] : group.placed)
+        {
+            if (index < count)
+            {
+                out.selections[index] = ALTextRange(moved(selection.begin), moved(selection.end));
+            }
+        }
+        for (Replacement& replacement : group.replacements)
+        {
+            const ALTextRange range = replacement.range.normalised();
+            ends.emplace_back(range.end, endOf(moved(range.begin), replacement.text));
+            out.replacements.push_back({ range, std::move(replacement.text) });
+        }
+    }
+    return out;
+}
+
+std::vector<LineRun> lineRuns(const std::vector<ALTextRange>& selections, bool touching)
+{
+    std::vector<LineRun> runs;
+    for (size_t i = 0; i < selections.size(); ++i)
+    {
+        const auto [first, last] = selectedLines(selections[i]);
+        if (!runs.empty() && first <= runs.back().last + (touching ? 1 : 0))
+        {
+            runs.back().last = std::max(runs.back().last, last);
+            runs.back().selections.push_back(i);
+            continue;
+        }
+        LineRun run;
+        run.first = first;
+        run.last  = last;
+        run.selections.push_back(i);
+        runs.push_back(std::move(run));
+    }
+    return runs;
+}
+
+std::vector<Group> duplicateLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections)
+{
+    std::vector<Group> groups;
+    for (const LineRun& run : lineRuns(selections, false))
+    {
+        Group group;
+        group.replacements.push_back(duplicated(doc, run.first, run.last));
+        // Each selection with the copy.
+        for (const size_t i : run.selections)
+        {
+            group.placed.emplace_back(i, lineShifted(selections[i], run.last - run.first + 1));
+        }
+        groups.push_back(std::move(group));
+    }
+    return groups;
+}
+
+std::vector<Group> moveLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections, S32 direction)
+{
+    std::vector<Group>         groups;
+    const std::vector<LineRun> runs = lineRuns(selections, true);
+    for (const LineRun& run : runs)
+    {
+        if ((direction < 0 && run.first == 0) || (direction > 0 && run.last + 1 >= doc.lineCount()))
+        {
+            return {};
+        }
+    }
+    for (const LineRun& run : runs)
+    {
+        std::optional<Change> change = moveLinesTo(doc, run.first, run.last, direction < 0 ? run.first - 2 : run.last + 1);
+        if (!change)
+        {
+            continue;
+        }
+        Group group;
+        group.replacements = std::move(change->replacements);
+        for (const size_t i : run.selections)
+        {
+            group.placed.emplace_back(i, lineShifted(selections[i], direction));
+        }
+        groups.push_back(std::move(group));
+    }
+    return groups;
+}
+
+std::vector<Group> deleteLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections)
+{
+    std::vector<Group> groups;
+    for (const LineRun& run : lineRuns(selections, true))
+    {
+        S32   line   = run.first;
+        S32   length = 0;
+        Group group;
+        group.replacements.push_back({ deleted(doc, run.first, run.last, line, length), std::string() });
+        // Each caret on the line that took their place, in its column where
+        // that line has it.
+        for (const size_t i : run.selections)
+        {
+            const ALTextPos caret(line, llmin(selections[i].end.column, length));
+            group.placed.emplace_back(i, ALTextRange(caret, caret));
+        }
+        groups.push_back(std::move(group));
+    }
+    return groups;
+}
+
+std::vector<Group> toggleComment(const ALTextDocument& doc, const std::vector<ALTextRange>& selections, const std::string& token)
+{
+    const std::vector<LineRun> runs = lineRuns(selections, false);
+    // Out where every line that says anything is commented, in all of them.
+    bool out      = true;
+    bool any_text = false;
+    for (const LineRun& run : runs)
+    {
+        if (const std::optional<bool> all = commented(doc, run.first, run.last, token))
+        {
+            any_text = true;
+            out      = out && *all;
+        }
+    }
+    if (!any_text)
+    {
+        return {};
+    }
+    std::vector<Group> groups;
+    for (const LineRun& run : runs)
+    {
+        Group group;
+        group.replacements = commentLines(doc, run.first, run.last, token, out);
+        if (group.replacements.empty())
+        {
+            continue;
+        }
+        // A caret where it was in its text; a selection the lines whole.
+        for (const size_t i : run.selections)
+        {
+            const ALTextRange& selection = selections[i];
+            if (selection.empty())
+            {
+                const ALTextPos caret = placedThrough(group.replacements, selection.end);
+                group.placed.emplace_back(i, ALTextRange(caret, caret));
+            }
+            else
+            {
+                group.placed.emplace_back(i, wholeLines(doc, selection, group.replacements));
+            }
+        }
+        groups.push_back(std::move(group));
+    }
+    return groups;
+}
+
+std::vector<Group> joinLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections)
+{
+    // Each selection's lines, or a caret's line and the next, gathered
+    // where they share a line.
+    std::vector<LineRun> runs;
+    for (size_t i = 0; i < selections.size(); ++i)
+    {
+        const auto [first, selected] = selectedLines(selections[i]);
+        const S32 last               = llmax(selected, first + 1);
+        if (!runs.empty() && first <= runs.back().last)
+        {
+            runs.back().last = std::max(runs.back().last, last);
+            runs.back().selections.push_back(i);
+            continue;
+        }
+        LineRun run;
+        run.first = first;
+        run.last  = last;
+        run.selections.push_back(i);
+        runs.push_back(std::move(run));
+    }
+    std::vector<Group> groups;
+    for (const LineRun& run : runs)
+    {
+        std::optional<Change> change = joinLines(doc, run.first, run.last, false);
+        if (!change)
+        {
+            continue;
+        }
+        Group group;
+        group.replacements = std::move(change->replacements);
+        for (const size_t i : run.selections)
+        {
+            group.placed.emplace_back(i, ALTextRange(change->caret, change->caret));
+        }
+        groups.push_back(std::move(group));
+    }
+    return groups;
 }
 }

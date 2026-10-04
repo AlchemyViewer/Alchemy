@@ -190,7 +190,7 @@ namespace tut
             making.target      = ALScriptWeight::Target::Mono;
             making.includeName = [](const std::string& path) { return path.substr(path.rfind('/') + 1); };
             ALScriptProblemsPane::Made made = ALScriptProblemsPane::make(d, services, making);
-            d.shown                         = made.rows;
+            d.setShown(made.rows);
             if (pane)
             {
                 pane->changed(d);

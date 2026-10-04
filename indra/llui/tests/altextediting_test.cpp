@@ -28,7 +28,9 @@
 
 #include "../test/lltut.h"
 
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace tut
 {
@@ -47,6 +49,31 @@ namespace tut
             return doc.text();
         }
     };
+
+    // Several selections' groups made as one: the text after, and each
+    // selection where it is, "-" for one left to slide.
+    static std::string combined(const std::string& text, std::vector<Group> groups, size_t count, std::string& placed)
+    {
+        Combined                                         all = combine(std::move(groups), count);
+        ALTextDocument                                   doc(text);
+        std::vector<std::pair<ALTextRange, std::string>> edits;
+        for (const Replacement& one : all.replacements)
+        {
+            edits.emplace_back(one.range, one.text);
+        }
+        doc.replaceMany(std::move(edits));
+        placed.clear();
+        for (const std::optional<ALTextRange>& one : all.selections)
+        {
+            placed += one ? llformat("%d:%d-%d:%d ", one->begin.line, one->begin.column, one->end.line, one->end.column) : std::string("- ");
+        }
+        return doc.text();
+    }
+
+    static ALTextRange at(S32 line, S32 column)
+    {
+        return ALTextRange(ALTextPos(line, column), ALTextPos(line, column));
+    }
 
     typedef test_group<altextediting_data> altextediting_group;
     typedef altextediting_group::object    altextediting_object;
@@ -165,5 +192,109 @@ namespace tut
         const Change first = copyLinesTo(doc, 1, 1, -1);
         ensure_equals("copied to the top", applied(text, first), std::string("b\na\nb\nc\nd\ne"));
         ensure("the caret on it", first.caret == ALTextPos(0, 0));
+    }
+
+    template<> template<>
+    void altextediting_object::test<6>()
+    {
+        set_test_name("groups made as one: each selection moved by the groups before it; one over a group before it left out; one that replaces nothing placed by those before");
+        // Typed at two carets on a line, and a line broken at a third.
+        std::vector<Group> groups(3);
+        groups[0].replacements.push_back({ at(0, 1), "XY" });
+        groups[0].placed.emplace_back(0, at(0, 3));
+        groups[1].replacements.push_back({ at(0, 5), "XY" });
+        groups[1].placed.emplace_back(1, at(0, 7));
+        groups[2].replacements.push_back({ at(1, 2), "\n" });
+        groups[2].placed.emplace_back(2, at(2, 0));
+        std::string placed;
+        ensure_equals("all made", combined("abc def\nghi", groups, 3, placed), std::string("aXYbc dXYef\ngh\ni"));
+        ensure_equals("each moved by those before it", placed, std::string("0:3-0:3 0:9-0:9 2:0-2:0 "));
+
+        // A selection deleted over where the second typed: the one that
+        // comes first in the text stands, the second is left out.
+        Group taken;
+        taken.replacements.push_back({ ALTextRange(ALTextPos(0, 4), ALTextPos(0, 6)), "" });
+        taken.placed.emplace_back(3, at(0, 4));
+        // And a caret that moves over a closer, replacing nothing.
+        Group over;
+        over.placed.emplace_back(4, at(1, 1));
+        groups.push_back(taken);
+        groups.push_back(over);
+        ensure_equals("the second left out", combined("abc def\nghi", groups, 5, placed), std::string("aXYbc f\ngh\ni"));
+        ensure_equals("its caret not placed, the others moved", placed, std::string("0:3-0:3 - 2:0-2:0 0:6-0:6 1:1-1:1 "));
+    }
+
+    template<> template<>
+    void altextediting_object::test<7>()
+    {
+        set_test_name("selections gathered into runs over the same lines, or over lines next to each other too");
+        const std::vector<ALTextRange> selections = { at(0, 0), ALTextRange(ALTextPos(1, 0), ALTextPos(2, 3)), at(2, 5), at(4, 0), at(5, 1),
+                                                      ALTextRange(ALTextPos(6, 0), ALTextPos(8, 0)), at(8, 0) };
+        const auto said = [](const std::vector<LineRun>& runs) {
+            std::string out;
+            for (const LineRun& run : runs)
+            {
+                out += llformat("%d-%d:", run.first, run.last);
+                for (const size_t i : run.selections)
+                {
+                    out += llformat("%d", static_cast<S32>(i));
+                }
+                out += " ";
+            }
+            return out;
+        };
+        ensure_equals("over the same lines", said(lineRuns(selections, false)), std::string("0-0:0 1-2:12 4-4:3 5-5:4 6-7:5 8-8:6 "));
+        ensure_equals("and next to each other", said(lineRuns(selections, true)), std::string("0-2:012 4-8:3456 "));
+    }
+
+    template<> template<>
+    void altextediting_object::test<8>()
+    {
+        set_test_name("lines duplicated and moved at several selections: once for those on the same lines, each selection with its lines");
+        std::string placed;
+        ensure_equals("two carets on a line copy it once", combined("a\nb\nc\nd", duplicateLines(ALTextDocument("a\nb\nc\nd"), { at(0, 0), at(0, 1), at(2, 0) }), 3, placed),
+                      std::string("a\na\nb\nc\nc\nd"));
+        ensure_equals("each on its copy", placed, std::string("1:0-1:0 1:1-1:1 4:0-4:0 "));
+
+        const std::string text = "0\n1\n2\n3\n4\n5";
+        const ALTextDocument doc(text);
+        ensure_equals("lines next to each other move as one", combined(text, moveLines(doc, { at(1, 0), at(2, 0), at(4, 0) }, -1), 3, placed),
+                      std::string("1\n2\n0\n4\n3\n5"));
+        ensure_equals("each with its line", placed, std::string("0:0-0:0 1:0-1:0 3:0-3:0 "));
+        ensure("nothing where one is at the top already", moveLines(doc, { at(0, 0), at(3, 0) }, -1).empty());
+        ensure("nor at the bottom", moveLines(doc, { at(3, 0), at(5, 1) }, 1).empty());
+    }
+
+    template<> template<>
+    void altextediting_object::test<9>()
+    {
+        set_test_name("lines deleted and joined at several selections: lines next to each other as one, each caret where its run leaves it");
+        std::string       placed;
+        const std::string text = "0\n1\n2\n3\n4";
+        ensure_equals("the two in the middle and the last", combined(text, deleteLines(ALTextDocument(text), { at(1, 0), at(2, 0), at(4, 0) }), 3, placed),
+                      std::string("0\n3"));
+        ensure_equals("the carets on the line that took their place", placed, std::string("1:0-1:0 1:0-1:0 1:0-1:0 "));
+
+        const std::string lines = "a\n b\nc\n  d\ne";
+        ensure_equals("each caret's line and the next joined", combined(lines, joinLines(ALTextDocument(lines), { at(0, 0), at(2, 0) }), 2, placed),
+                      std::string("a b\nc d\ne"));
+        ensure_equals("each where its join is", placed, std::string("0:1-0:1 1:1-1:1 "));
+        ensure_equals("carets on lines a join shares joined as one run", combined(lines, joinLines(ALTextDocument(lines), { at(0, 0), at(1, 1) }), 2, placed),
+                      std::string("a b c\n  d\ne"));
+    }
+
+    template<> template<>
+    void altextediting_object::test<10>()
+    {
+        set_test_name("comments in or out the same way at every selection: in where any line is not, each caret kept in its text and each selection its lines whole");
+        std::string       placed;
+        const std::string text = "a\n  // b\nc";
+        const std::string in   = combined(text, toggleComment(ALTextDocument(text), { at(0, 1), at(1, 5), ALTextRange(ALTextPos(2, 0), ALTextPos(2, 1)) }, "//"), 3, placed);
+        ensure_equals("in at all of them, the commented line too", in, std::string("// a\n  // // b\n// c"));
+        ensure_equals("carets along, the selection its line whole", placed, std::string("0:4-0:4 1:8-1:8 2:0-2:4 "));
+        const std::string out = combined(in, toggleComment(ALTextDocument(in), { at(0, 4), at(2, 2) }, "//"), 2, placed);
+        ensure_equals("out where every one is", out, std::string("a\n  // // b\nc"));
+        ensure_equals("a caret inside the token where it began", placed, std::string("0:1-0:1 2:0-2:0 "));
+        ensure("nothing where no line says anything", toggleComment(ALTextDocument("\n  \n"), { at(0, 0), at(1, 1) }, "//").empty());
     }
 }

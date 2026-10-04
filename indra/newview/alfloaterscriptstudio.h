@@ -170,6 +170,14 @@ public:
     // left where it is.
     void openScript(const ALScriptRef& ref, const std::string& name, std::optional<std::string> carried = std::nullopt, S32 line = -1,
                     bool focus = true) override;
+    void holdTabs() override { ++mTabsHeld; }
+    void letGoOfTabs() override
+    {
+        if (mTabsHeld > 0 && --mTabsHeld == 0)
+        {
+            releaseTabs();
+        }
+    }
     // The active script moved to a window of its own, its unsaved text
     // going with it; or to another studio window already open. False where
     // it could not go.
@@ -890,6 +898,7 @@ private:
     void        trailerChosen(const std::string& value) override;
     std::string vimBanner() const override { return mVim.banner(); }
     std::optional<ALScriptWeight::Target> weightTarget(const Doc& doc) const override { return mWeighing.target(doc); }
+    ALPreprocessor::Wanted                preprocessedWhy(const Doc& doc) const override { return mChecking.preprocessedWhy(doc); }
     // How many errors and warnings a script shows.
     void   problemCounts(const Doc& doc, S32& errors, S32& warnings) const override;
     // What the Output tab asks of the window (ALScriptOutputPane::Window).
@@ -991,6 +1000,16 @@ private:
     std::optional<ToolbarFacts> mToolbarFacts;
     std::vector<TabFacts>              mTabFacts;
     size_t                             mTabFactsActive = NONE;
+    // What a tab's tip says of where its script is, read from the skin
+    // once rather than for every tab at every refill.
+    struct TabTips
+    {
+        std::string notecard;
+        std::string inventory;
+        std::string object;
+        std::string readOnly;
+    };
+    TabTips                            mTabTips;
     // What changed of a tab that the window shows of it, made good once
     // before the next frame is drawn, however often it was asked for in
     // between (docChanged); and made good now, all of it or one tab's.
