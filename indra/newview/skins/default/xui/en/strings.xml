@@ -635,6 +635,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="OptimizerIfAlwaysFalse">the condition of this if is always false; kept only what runs</string>
 	<string name="OptimizerIfAlwaysTrue">the condition of this if is always true; kept only what runs</string>
 	<string name="OptimizerInlinedConstant">inlined [1] to [2]</string>
+	<string name="OptimizerKeptCall">kept [1] in the local [2], which its [3] places read</string>
 	<string name="OptimizerNoDefinitions">the LSL definitions are not loaded, so nothing was optimized</string>
 	<string name="OptimizerUncompiled">not optimized: the script does not compile as it stands, and compiling it says why</string>
 	<string name="OptimizerWroteUncompilable">not optimized: what the optimizer made of this script did not compile ([1]), so it goes as it was; please report it</string>

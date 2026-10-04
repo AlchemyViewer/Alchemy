@@ -1933,4 +1933,53 @@ namespace tut
         const ALScriptWeight asLso = ALScriptWeigh::mono(ALLSLOptimizer::run(source, plain).text);
         ensure("smaller on Mono than named for LSO", named.compiled && asLso.compiled && named.total < asLso.total);
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<51>()
+    {
+        set_test_name("a pure call made again, given what nothing between changes, is kept in a local where the target has that no larger (L12); "
+                      "not across a write or a label, nor begun where its statement may not come to it");
+        ALLSLOptimizer::Options lso = options();
+        lso.target                  = ALLSLOptimizer::Target::LSO;
+        const std::string head      = "default\n{\n    touch_start(integer n)\n    {\n        string s = llDetectedName(0);\n";
+        const std::string tail      = "    }\n}\n";
+        const auto        body      = [&](const ALLSLOptimizer::Result& r) {
+            const size_t at = r.text.find("        string s = llDetectedName(0);\n");
+            return at == std::string::npos ? r.text : r.text.substr(at + 38);
+        };
+
+        const std::string three  = head + "        llOwnerSay(llToUpper(s));\n        llSay(0, llToUpper(s));\n        llWhisper(0, llToUpper(s));\n" + tail;
+        ALLSLOptimizer::Result r = ALLSLOptimizer::run(three, lso);
+        ensure("optimized: " + notes(r), r.optimized);
+        ensure_equals("kept", body(r), "        string toUpper = llToUpper(s);\n        llOwnerSay(toUpper);\n        llSay(0, toUpper);\n        llWhisper(0, toUpper);\n" + tail);
+        ensure("noted: " + notes(r), has(r, "kept llToUpper(s) in the local toUpper, which its 3 places read"));
+        // On Mono a call given one variable is smaller than a local.
+        r = ALLSLOptimizer::run(three, options());
+        ensure("not on Mono: " + r.text, r.text.find("toUpper") == std::string::npos);
+
+        // A place in a loop after one its statement always comes to.
+        r = ALLSLOptimizer::run(head + "        llSay(0, llToUpper(s));\n        integer i;\n        for (i = 0; i < n; ++i)\n            llSay(i, llToUpper(s));\n" + tail, lso);
+        ensure("into the loop: " + r.text, r.text.find("string toUpper = llToUpper(s);\n        llSay(0, toUpper);") != std::string::npos &&
+                                               r.text.find("llSay(i, toUpper);") != std::string::npos);
+
+        // The outermost call, and the call it is given with it.
+        r = ALLSLOptimizer::run(head + "        llSay(0, llGetSubString(llToUpper(s), 0, 2));\n        llSay(1, llGetSubString(llToUpper(s), 0, 2));\n" + tail, lso);
+        ensure_equals("outermost", body(r),
+                      "        string getSubString = llGetSubString(llToUpper(s), 0, 2);\n        llSay(0, getSubString);\n        llSay(1, getSubString);\n" + tail);
+
+        // A name the script has is not taken again.
+        r = ALLSLOptimizer::run(head + "        string toUpper = llDetectedName(1);\n        llSay(0, toUpper);\n        llSay(0, llToUpper(s));\n        llSay(1, llToUpper(s));\n" + tail, lso);
+        ensure("numbered: " + r.text, r.text.find("string toUpper2 = llToUpper(s);") != std::string::npos);
+
+        // What it is given written between: two places, each alone.
+        const std::string written = head + "        llSay(0, llToUpper(s));\n        s = llDetectedName(1);\n        llSay(0, llToUpper(s));\n        llSay(0, s);\n" + tail;
+        r                         = ALLSLOptimizer::run(written, lso);
+        ensure("not across a write: " + r.text, r.text.find("toUpper") == std::string::npos);
+        // A label between, which a jump could bring the code in by.
+        r = ALLSLOptimizer::run(head + "        llSay(0, llToUpper(s));\n        @again;\n        llSay(0, llToUpper(s));\n        if (llFrand(1) < 0.5)\n            jump again;\n" + tail, lso);
+        ensure("not across a label: " + r.text, r.text.find("toUpper") == std::string::npos);
+        // The first place in a branch: kept, it would run where it did not.
+        r = ALLSLOptimizer::run(head + "        if (n)\n            llSay(0, llToUpper(s));\n        llSay(0, llToUpper(s));\n" + tail, lso);
+        ensure("not begun in a branch: " + r.text, r.text.find("toUpper") == std::string::npos);
+    }
 } // namespace tut
