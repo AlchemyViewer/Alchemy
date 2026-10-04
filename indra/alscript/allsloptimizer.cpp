@@ -52,6 +52,7 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
@@ -1029,6 +1030,285 @@ namespace
         return std::string();
     }
 
+    // Rotations worked out more than one way, where the VM's own way is not
+    // known: LLQuaternion's of today and of 2007, in singles a step at a
+    // time and in doubles. What every way comes to as singles, where they
+    // all come to the same; nothing where they part.
+    template <class T> struct Quat
+    {
+        T x, y, z, s;
+    };
+
+    std::optional<std::array<float, 4>> agreed(std::initializer_list<std::optional<Quat<double>>> ways)
+    {
+        std::optional<std::array<float, 4>> out;
+        for (const std::optional<Quat<double>>& way : ways)
+        {
+            if (!way)
+            {
+                return std::nullopt;
+            }
+            const std::array<float, 4> q = { static_cast<float>(way->x), static_cast<float>(way->y), static_cast<float>(way->z), static_cast<float>(way->s) };
+            for (float part : q)
+            {
+                if (!std::isfinite(part))
+                {
+                    return std::nullopt;
+                }
+            }
+            if (out && *out != q)
+            {
+                return std::nullopt;
+            }
+            out = q;
+        }
+        return out;
+    }
+
+    template <class T> std::optional<Quat<double>> widened(const std::optional<Quat<T>>& q)
+    {
+        if (!q)
+        {
+            return std::nullopt;
+        }
+        return Quat<double>{ double(q->x), double(q->y), double(q->z), double(q->s) };
+    }
+
+    // A quaternion made of unit length: today's, always; 2007's only where
+    // it is more than a part in a million away.
+    template <class T> Quat<T> unitQuat(Quat<T> q, bool nearlyLeft)
+    {
+        const T mag = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.s * q.s);
+        if (mag > T(0.0000001) && (!nearlyLeft || std::fabs(mag - T(1)) > T(0.000001)))
+        {
+            const T over = T(1) / mag;
+            q            = { q.x * over, q.y * over, q.z * over, q.s * over };
+        }
+        return q;
+    }
+
+    // llRotBetween as LLQuaternion::shortestArc has it today: for vectors
+    // neither parallel nor opposed.
+    template <class T> std::optional<Quat<T>> arcToday(const Vector3& u, const Vector3& v)
+    {
+        const T ax = u.x, ay = u.y, az = u.z, bx = v.x, by = v.y, bz = v.z;
+        const T ab = ax * bx + ay * by + az * bz;
+        const T cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+        const T cc = cx * cx + cy * cy + cz * cz;
+        if (!(ab * ab + cc > T(0)) || !(cc > T(0)))
+        {
+            return std::nullopt;
+        }
+        const T sum  = std::sqrt(ab * ab + cc) + ab;
+        const T over = T(1) / std::sqrt(cc + sum * sum);
+        return Quat<T>{ cx * over, cy * over, cz * over, sum * over };
+    }
+
+    // And as it had it in 2007: each vector made unit, then the angle from
+    // its cosine about the cross product made unit.
+    template <class T> std::optional<Quat<T>> arc2007(const Vector3& u, const Vector3& v)
+    {
+        const auto unit = [](T& x, T& y, T& z) {
+            const T mag = std::sqrt(x * x + y * y + z * z);
+            if (mag > T(0.0000001))
+            {
+                const T over = T(1) / mag;
+                x *= over;
+                y *= over;
+                z *= over;
+            }
+            return mag;
+        };
+        T ax = u.x, ay = u.y, az = u.z, bx = v.x, by = v.y, bz = v.z;
+        if (unit(ax, ay, az) < T(0.00001) || unit(bx, by, bz) < T(0.00001))
+        {
+            return std::nullopt;
+        }
+        T       cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+        const T cosine = ax * bx + ay * by + az * bz;
+        if (cosine > T(1.0 - 0.00001) || cosine < T(-1.0 + 0.00001))
+        {
+            return std::nullopt;
+        }
+        const T theta = static_cast<T>(std::acos(double(cosine)));
+        unit(cx, cy, cz);
+        const T half = theta * T(0.5);
+        const T c = std::cos(half), sn = std::sin(half);
+        return unitQuat(Quat<T>{ cx * sn, cy * sn, cz * sn, c }, true);
+    }
+
+    // llAngleBetween: twice the arccosine of the rotations' dot product over
+    // their lengths; and, a way apart, twice the angle of the rotation from
+    // one to the other, by its arctangent.
+    template <class T> std::optional<double> angleByCosine(const Quaternion& p, const Quaternion& q)
+    {
+        const T ax = p.x, ay = p.y, az = p.z, as = p.s, bx = q.x, by = q.y, bz = q.z, bs = q.s;
+        const T aa = ax * ax + ay * ay + az * az + as * as, bb = bx * bx + by * by + bz * bz + bs * bs;
+        const T aabb = std::sqrt(aa * bb);
+        if (!(aabb > T(0)))
+        {
+            return std::nullopt;
+        }
+        T ab = std::fabs((ax * bx + ay * by + az * bz + as * bs) / aabb);
+        if (ab > T(1))
+        {
+            ab = T(1);
+        }
+        return double(T(2) * std::acos(ab));
+    }
+
+    std::optional<double> angleByTangent(const Quaternion& p, const Quaternion& q)
+    {
+        const double ax = p.x, ay = p.y, az = p.z, as = p.s, bx = q.x, by = q.y, bz = q.z, bs = q.s;
+        const double w  = as * bs + ax * bx + ay * by + az * bz;
+        const double vx = as * bx - bs * ax - (ay * bz - az * by);
+        const double vy = as * by - bs * ay - (az * bx - ax * bz);
+        const double vz = as * bz - bs * az - (ax * by - ay * bx);
+        const double v  = std::sqrt(vx * vx + vy * vy + vz * vz);
+        if (!(v > 0.0 || w != 0.0))
+        {
+            return std::nullopt;
+        }
+        return 2.0 * std::atan2(v, std::fabs(w));
+    }
+
+    // llAxes2Rot as LLMatrix3::quaternion has it where the trace is above
+    // nought, then made unit as today or as in 2007; and, a way apart, each
+    // part from its own square root, signed by the matrix.
+    template <class T> std::optional<Quat<T>> axesByTrace(const Vector3& f, const Vector3& l, const Vector3& u, bool nearlyLeft)
+    {
+        const T m[3][3] = { { f.x, f.y, f.z }, { l.x, l.y, l.z }, { u.x, u.y, u.z } };
+        const T tr      = m[0][0] + m[1][1] + m[2][2];
+        if (!(tr > T(0)))
+        {
+            return std::nullopt;
+        }
+        T       root = std::sqrt(tr + T(1));
+        const T w    = root * T(0.5);
+        root         = T(0.5) / root;
+        return unitQuat(Quat<T>{ (m[1][2] - m[2][1]) * root, (m[2][0] - m[0][2]) * root, (m[0][1] - m[1][0]) * root, w }, nearlyLeft);
+    }
+
+    std::optional<Quat<double>> axesByParts(const Vector3& f, const Vector3& l, const Vector3& u)
+    {
+        const double m[3][3] = { { f.x, f.y, f.z }, { l.x, l.y, l.z }, { u.x, u.y, u.z } };
+        const auto   part    = [](double square) { return 0.5 * std::sqrt(std::max(0.0, square)); };
+        const double w       = part(1.0 + m[0][0] + m[1][1] + m[2][2]);
+        if (!(w > 0.0))
+        {
+            return std::nullopt;
+        }
+        return Quat<double>{ std::copysign(part(1.0 + m[0][0] - m[1][1] - m[2][2]), m[1][2] - m[2][1]),
+                             std::copysign(part(1.0 - m[0][0] + m[1][1] - m[2][2]), m[2][0] - m[0][2]),
+                             std::copysign(part(1.0 - m[0][0] - m[1][1] + m[2][2]), m[0][1] - m[1][0]), w };
+    }
+
+    // A list's strings, where every element is one: what llParseString2List
+    // is given to split at.
+    std::optional<std::vector<std::string>> strings(LSLListConstant* list)
+    {
+        std::vector<std::string> out;
+        for (LSLConstant* item : elements(list))
+        {
+            if (item->getNodeSubType() != NODE_STRING_CONSTANT)
+            {
+                return std::nullopt;
+            }
+            out.emplace_back(static_cast<LSLStringConstant*>(item)->getValue());
+        }
+        return out;
+    }
+
+    // llParseString2List's and llParseStringKeepNulls' splitting: at each
+    // place the separator or spacer found there, the separator dropped and
+    // the spacer kept; what is between, empty or not as `nulls` says. Only
+    // where which one is found cannot be in question -- at most eight of
+    // each, which is as many as the VM reads, none empty and none the start
+    // of another -- and where everything is ASCII.
+    std::optional<std::vector<std::string>> parsed(const std::string& src, const std::vector<std::string>& separators,
+                                                   const std::vector<std::string>& spacers, bool nulls)
+    {
+        if (src.empty() || separators.size() > 8 || spacers.size() > 8 || !ascii(src.c_str()))
+        {
+            return std::nullopt;
+        }
+        std::vector<std::pair<std::string, bool>> marks; // the mark, and whether it is kept
+        for (const std::string& sep : separators)
+        {
+            marks.emplace_back(sep, false);
+        }
+        for (const std::string& spacer : spacers)
+        {
+            marks.emplace_back(spacer, true);
+        }
+        for (const auto& [mark, kept] : marks)
+        {
+            if (mark.empty() || !ascii(mark.c_str()))
+            {
+                return std::nullopt;
+            }
+            for (const auto& [other, also] : marks)
+            {
+                if (&other != &mark && other.size() >= mark.size() && other.compare(0, mark.size(), mark) == 0)
+                {
+                    return std::nullopt;
+                }
+            }
+        }
+        std::vector<std::string> out;
+        const auto               piece = [&](const std::string& text) {
+            if (nulls || !text.empty())
+            {
+                out.push_back(text);
+            }
+        };
+        size_t from = 0;
+        for (size_t at = 0; at < src.size();)
+        {
+            const auto found = std::find_if(marks.begin(), marks.end(), [&](const auto& m) { return src.compare(at, m.first.size(), m.first) == 0; });
+            if (found == marks.end())
+            {
+                ++at;
+                continue;
+            }
+            piece(src.substr(from, at - from));
+            if (found->second)
+            {
+                out.push_back(found->first);
+            }
+            at += found->first.size();
+            from = at;
+        }
+        piece(src.substr(from));
+        return out;
+    }
+
+    // Strings llListSort orders the same by their code points as by any
+    // culture's rules: letters and digits only, and the letters of all of
+    // them of one case -- "B" comes before "a" by code point, after it by a
+    // culture's. What letters a string has is told into `lower` and
+    // `upper`; false for one that has anything else.
+    bool plainSortKey(const char* s, bool& lower, bool& upper)
+    {
+        for (; *s; ++s)
+        {
+            const unsigned char ch = static_cast<unsigned char>(*s);
+            if (ch >= 'a' && ch <= 'z')
+            {
+                lower = true;
+            }
+            else if (ch >= 'A' && ch <= 'Z')
+            {
+                upper = true;
+            }
+            else if (ch < '0' || ch > '9')
+            {
+                return false;
+            }
+        }
+        return !(lower && upper);
+    }
+
     // A vector's length. On LSO and Mono in singles a step at a time, as
     // LLVector3 works it out, and as a double rounded once to a single:
     // whether the two agree, and what they come to where they do. On Luau,
@@ -1223,6 +1503,42 @@ namespace
                   if (!argUnitRotation(a, 0, q)) return nullptr;
                   const LLVector3 v = LLVector3(1.f, 0.f, 0.f) * q;
                   return c.vector(v.mV[VX], v.mV[VY], v.mV[VZ]);
+              } },
+            // Three more by more than one way each (agreed): left where the
+            // ways part, which an answer near a parallel, a half turn or
+            // nothing does.
+            { "llRotBetween",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  Vector3 u, v;
+                  if (!argVector(a, 0, u) || !argVector(a, 1, v)) return nullptr;
+                  const auto q = agreed({ widened(arcToday<float>(u, v)), arcToday<double>(u, v), widened(arc2007<float>(u, v)), arc2007<double>(u, v) });
+                  return q ? c.rotation((*q)[0], (*q)[1], (*q)[2], (*q)[3]) : nullptr;
+              } },
+            { "llAngleBetween",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  // Luau's answer is a double, by a way not known.
+                  if (c.target == ALLSLOptimizer::Target::Luau || a.size() != 2 || a[0]->getNodeSubType() != NODE_QUATERNION_CONSTANT ||
+                      a[1]->getNodeSubType() != NODE_QUATERNION_CONSTANT)
+                  {
+                      return nullptr;
+                  }
+                  const Quaternion& p = *static_cast<LSLQuaternionConstant*>(a[0])->getValue();
+                  const Quaternion& q = *static_cast<LSLQuaternionConstant*>(a[1])->getValue();
+                  std::optional<float> out;
+                  for (const std::optional<double>& way : { angleByCosine<float>(p, q), angleByCosine<double>(p, q), angleByTangent(p, q) })
+                  {
+                      if (!way || !std::isfinite(static_cast<float>(*way)) || (out && *out != static_cast<float>(*way))) return nullptr;
+                      out = static_cast<float>(*way);
+                  }
+                  return c.number(*out);
+              } },
+            { "llAxes2Rot",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  Vector3 f, l, u;
+                  if (!argVector(a, 0, f) || !argVector(a, 1, l) || !argVector(a, 2, u)) return nullptr;
+                  const auto q = agreed({ widened(axesByTrace<float>(f, l, u, false)), widened(axesByTrace<float>(f, l, u, true)),
+                                          axesByTrace<double>(f, l, u, false), axesByParts(f, l, u) });
+                  return q ? c.rotation((*q)[0], (*q)[1], (*q)[2], (*q)[3]) : nullptr;
               } },
             { "llRot2Left",
               [](Ctx& c, const Args& a) -> LSLConstant* {
@@ -1429,6 +1745,120 @@ namespace
                   int              start, end;
                   if (!argList(a, 0, l) || !argInt(a, 1, start) || !argInt(a, 2, end)) return nullptr;
                   return listOf(c, subRange(elements(l), start, end));
+              } },
+            // A list split, as LSL splits it, where nothing could make the
+            // two VMs split it otherwise (parsed): no spacers for the one
+            // that keeps what is empty, whose empties beside a spacer are
+            // not known.
+            { "llParseString2List",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  std::string      src;
+                  LSLListConstant *seps, *spacers;
+                  if (!argString(a, 0, src) || !argList(a, 1, seps) || !argList(a, 2, spacers)) return nullptr;
+                  const auto sepText = strings(seps), spacerText = strings(spacers);
+                  if (!sepText || !spacerText) return nullptr;
+                  const auto pieces = parsed(src, *sepText, *spacerText, false);
+                  if (!pieces) return nullptr;
+                  std::vector<LSLConstant*> out;
+                  for (const std::string& piece : *pieces)
+                  {
+                      LSLConstant* item = c.string(piece);
+                      if (!item) return nullptr;
+                      out.push_back(item);
+                  }
+                  return listOf(c, out);
+              } },
+            { "llParseStringKeepNulls",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  std::string      src;
+                  LSLListConstant *seps, *spacers;
+                  if (!argString(a, 0, src) || !argList(a, 1, seps) || !argList(a, 2, spacers) || spacers->getLength() != 0) return nullptr;
+                  const auto sepText = strings(seps);
+                  if (!sepText) return nullptr;
+                  const auto pieces = parsed(src, *sepText, {}, true);
+                  if (!pieces) return nullptr;
+                  std::vector<LSLConstant*> out;
+                  for (const std::string& piece : *pieces)
+                  {
+                      LSLConstant* item = c.string(piece);
+                      if (!item) return nullptr;
+                      out.push_back(item);
+                  }
+                  return listOf(c, out);
+              } },
+            // Comma-separated values as strings: only where no value is
+            // empty, starts or ends with a space, or holds the angle
+            // brackets that keep a vector's commas in -- what the two VMs
+            // are not known to treat alike.
+            { "llCSV2List",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  std::string src;
+                  if (!argString(a, 0, src) || src.empty() || src.find_first_of("<>") != std::string::npos) return nullptr;
+                  const auto pieces = parsed(src, { "," }, {}, true);
+                  if (!pieces) return nullptr;
+                  std::vector<LSLConstant*> out;
+                  for (const std::string& piece : *pieces)
+                  {
+                      if (piece.empty() || std::isspace(static_cast<unsigned char>(piece.front())) ||
+                          std::isspace(static_cast<unsigned char>(piece.back())))
+                      {
+                          return nullptr;
+                      }
+                      LSLConstant* item = c.string(piece);
+                      if (!item) return nullptr;
+                      out.push_back(item);
+                  }
+                  return listOf(c, out);
+              } },
+            // A list sorted by every stride-th element, ascending or not:
+            // only where the order cannot be the sort's to choose -- the
+            // keys all of one type, integers, floats or strings a culture
+            // orders as their code points do (plainSortKey), and no two the
+            // same, so that a sort that is not stable sorts them alike --
+            // and the stride divides the list.
+            { "llListSort",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  LSLListConstant* l;
+                  int              stride, ascending;
+                  if (!argList(a, 0, l) || !argInt(a, 1, stride) || !argInt(a, 2, ascending) || (ascending != 0 && ascending != 1)) return nullptr;
+                  const std::vector<LSLConstant*> items = elements(l);
+                  if (stride < 1 || items.size() % static_cast<size_t>(stride) != 0 || items.empty()) return nullptr;
+                  const LSLNodeSubType kind = items.front()->getNodeSubType();
+                  if (kind != NODE_INTEGER_CONSTANT && kind != NODE_FLOAT_CONSTANT && kind != NODE_STRING_CONSTANT) return nullptr;
+                  std::vector<size_t> groups;
+                  bool                lower = false, upper = false;
+                  for (size_t g = 0; g < items.size(); g += static_cast<size_t>(stride))
+                  {
+                      LSLConstant* key = items[g];
+                      if (key->getNodeSubType() != kind) return nullptr;
+                      if (kind == NODE_FLOAT_CONSTANT && !std::isfinite(static_cast<LSLFloatConstant*>(key)->getValue())) return nullptr;
+                      if (kind == NODE_STRING_CONSTANT && !plainSortKey(static_cast<LSLStringConstant*>(key)->getValue(), lower, upper)) return nullptr;
+                      groups.push_back(g);
+                  }
+                  const auto less = [&](size_t x, size_t y) {
+                      LSLConstant* p = items[x];
+                      LSLConstant* q = items[y];
+                      switch (kind)
+                      {
+                          case NODE_INTEGER_CONSTANT:
+                              return static_cast<LSLIntegerConstant*>(p)->getValue() < static_cast<LSLIntegerConstant*>(q)->getValue();
+                          case NODE_FLOAT_CONSTANT:
+                              return static_cast<LSLFloatConstant*>(p)->getValue() < static_cast<LSLFloatConstant*>(q)->getValue();
+                          default:
+                              return strcmp(static_cast<LSLStringConstant*>(p)->getValue(), static_cast<LSLStringConstant*>(q)->getValue()) < 0;
+                      }
+                  };
+                  std::sort(groups.begin(), groups.end(), [&](size_t x, size_t y) { return ascending ? less(x, y) : less(y, x); });
+                  for (size_t i = 1; i < groups.size(); ++i)
+                  {
+                      if (!less(groups[i - 1], groups[i]) && !less(groups[i], groups[i - 1])) return nullptr;
+                  }
+                  std::vector<LSLConstant*> out;
+                  for (size_t g : groups)
+                  {
+                      out.insert(out.end(), items.begin() + static_cast<std::ptrdiff_t>(g), items.begin() + static_cast<std::ptrdiff_t>(g) + stride);
+                  }
+                  return listOf(c, out);
               } },
             { "llDeleteSubList",
               [](Ctx& c, const Args& a) -> LSLConstant* {

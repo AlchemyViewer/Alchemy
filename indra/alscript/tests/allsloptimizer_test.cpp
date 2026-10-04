@@ -2157,4 +2157,56 @@ namespace tut
             ensure("noted: " + notes(r), allsloptimizer_data::has(r, "wrote (n & 4) && (n & 8) as !~(n | -13)"));
         }
     }
+    template<> template<>
+    void allsloptimizer_object::test<57>()
+    {
+        set_test_name("more of the library folded where the two VMs cannot part (L17): parsing, CSV and sorting where no edge is in play; a "
+                      "rotation between vectors, the angle between rotations and a rotation from axes where every way of working it out agrees");
+        // Each may be set again before it is read, so that its fold shows
+        // in its declaration.
+        const std::string source = wrap("", "        list p = llParseString2List(\"a,b;;c\", [\",\"], [\";\"]);\n"
+                                            "        list k = llParseStringKeepNulls(\"a,,b,\", [\",\"], []);\n"
+                                            "        list x = llParseString2List(\"ab\", [\"a\", \"ab\"], []);\n"
+                                            "        list v = llCSV2List(\"a,b,c\");\n"
+                                            "        list w = llCSV2List(\"a, b\");\n"
+                                            "        list s = llListSort([3, \"c\", 1, \"a\", 2, \"b\"], 2, TRUE);\n"
+                                            "        list t = llListSort([\"pear\", \"apple\", \"fig\"], 1, FALSE);\n"
+                                            "        list u = llListSort([2, 1, 2], 1, TRUE);\n"
+                                            "        list m = llListSort([\"b\", \"A\"], 1, TRUE);\n"
+                                            "        rotation r = llRotBetween(<1, 0, 0>, <0, 1, 0>);\n"
+                                            "        rotation q = llRotBetween(<1, 0, 0>, <1, 0, 0>);\n"
+                                            "        rotation n = llRotBetween(<1, 0, 0>, <0, 0, 2>);\n"
+                                            "        float h = llAngleBetween(<0, 0, 0, 1>, <0, 0, 0, 1>);\n"
+                                            "        rotation z = llAxes2Rot(<1, 0, 0>, <0, 1, 0>, <0, 0, 1>);\n"
+                                            "        rotation e = llAxes2Rot(<0, 1, 0>, <-1, 0, 0>, <0, 0, 1>);\n"
+                                            "        if (llFrand(1) < 0.5)\n        {\n            p = k = x = v = w = s = t = u = m = [];\n"
+                                            "            r = q = n = z = e = ZERO_ROTATION;\n            h = 1;\n        }\n"
+                                            "        llOwnerSay(llList2CSV(p + k + x + v + w + s + t + u + m) + (string)[r, q, n, h, z, e]);\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::LSO })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            const auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
+            ensure("split, spacers kept: " + r.text, has("list p = [\"a\", \"b\", \";\", \";\", \"c\"];"));
+            ensure("split, empties kept: " + r.text, has("list k = [\"a\", \"\", \"b\", \"\"];"));
+            ensure("a separator the start of another: left: " + r.text, has("list x = llParseString2List("));
+            ensure("CSV: " + r.text, has("list v = [\"a\", \"b\", \"c\"];"));
+            ensure("a value starting with a space: left: " + r.text, has("list w = llCSV2List("));
+            ensure("sorted by stride: " + r.text, has("list s = [1, \"a\", 2, \"b\", 3, \"c\"];"));
+            ensure("sorted down: " + r.text, has("list t = [\"pear\", \"fig\", \"apple\"];"));
+            ensure("two keys the same: left: " + r.text, has("list u = llListSort("));
+            ensure("keys of two cases: left: " + r.text, has("list m = llListSort("));
+            const float half = static_cast<float>(std::sqrt(0.5));
+            ensure("a quarter turn between: " + r.text, numbers(r.text, "rotation r") == std::vector<F32>{ 0.f, 0.f, half, half });
+            ensure("parallel: left: " + r.text, has("rotation q = llRotBetween("));
+            ensure("a quarter turn the other way: " + r.text, numbers(r.text, "rotation n") == std::vector<F32>{ 0.f, -half, 0.f, half });
+            ensure("no angle between the same: " + r.text, numbers(r.text, "float h") == std::vector<F32>{ 0.f });
+            ensure("the axes themselves: " + r.text, numbers(r.text, "rotation z") == std::vector<F32>{ 0.f, 0.f, 0.f, 1.f });
+            // Made unit, as LLQuaternion does today, a quarter turn is a bit
+            // larger in its last place than left as it was, as in 2007.
+            ensure("ways that part by a bit: left: " + r.text, has("rotation e = llAxes2Rot("));
+        }
+    }
 } // namespace tut
