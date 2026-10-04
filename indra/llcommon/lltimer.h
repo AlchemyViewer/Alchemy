@@ -92,7 +92,8 @@ public:
     void stop() { mStarted = false; }
     void reset();                               // Resets the timer
     void setLastClockCount(U64 current_count);      // Sets the timer so that the next elapsed call will be relative to this time
-    void setTimerExpirySec(F32SecondsImplicit expiration);
+    void setTimerExpirySec(F32SecondsImplicit expiration);      // Expires this long from now
+    void resetWithExpiry(F32SecondsImplicit expiration) { reset(); setTimerExpirySec(expiration); }
     bool checkExpirationAndReset(F32 expiration);
     bool hasExpired() const;
     F32SecondsImplicit getElapsedTimeAndResetF32(); // Returns elapsed time in seconds with reset
