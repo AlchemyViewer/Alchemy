@@ -1276,6 +1276,7 @@ void LLCircuitData::pingTimerStop(const U8 ping_id)
         // Ack, we got our ping response on the same frame! Sigh, let's get a real time otherwise
         // all of our ping calculations will be skewed.
         mt_secs = LLMessageSystem::getMessageTimeSeconds(true);
+        time = mt_secs - mPingTime;
     }
     mLastPingReceivedTime = mt_secs;
 
