@@ -196,7 +196,9 @@ namespace tut
         ensure("a float as LSL writes it: " + r.text, has(r, "string.format(\"%.6f\", f)"));
         ensure("a string as an integer: " + r.text, has(r, "lslInteger(\"12abc\")") && has(r, "local function lslInteger"));
         ensure("lists compared by length: " + r.text, has(r, "#l == #{1}") && noted(r, "SluaListCompare"));
-        ensure("bits: " + r.text, has(r, "bit32.bor(bit32.band(a, b), 4)") && noted(r, "SluaBit32"));
+        // bit32 answers 0 to 4294967295: made LSL's signed integer, but where
+        // bit32 takes it again.
+        ensure("bits: " + r.text, has(r, "int32(bit32.bor(bit32.band(a, b), 4))") && has(r, "local function int32"));
         ensure("a vector's part set: " + r.text, has(r, "v = vector(4, v.y, v.z)") && has(r, "v = vector(v.x, v.y, v.z + 1)"));
         ensure("a vector as LSL writes it: " + r.text, has(r, "ll.DumpList2String({v}, \"\")"));
         checksClean(r);
@@ -762,7 +764,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<24>()
     {
-        set_test_name("a note only where it says something: bit32's range not for an & with a flag nor a truth, && not over a read, a deprecated call's reason rather than its indexes");
+        set_test_name("a note only where it says something: && not over a read, a deprecated call's reason rather than its indexes; bit32's range made LSL's, not for an & with a flag nor a truth");
         const ALLSLToSLua::Result r = convert("integer sayIt() { llOwnerSay(\"x\"); return 1; }\n"
                                               "default { changed(integer what) {\n"
                                               "    if (what & CHANGED_LINK && llGetLinkNumber() == 0) llDie();\n"
@@ -771,8 +773,8 @@ namespace tut
                                               "    llOwnerSay(llList2String(l, what) + (string)m);\n"
                                               "    if ((what & 3) && sayIt()) llDie();\n"
                                               "} }\n");
-        ensure("bit32's range where it shows: " + r.text,
-               count(r, "-- LSL: bit32 answers") == 1 && has(r, "-- LSL: bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.\n    local m"));
+        ensure("bit32's range made LSL's where it shows: " + r.text, has(r, "local m = int32(bit32.bor(what, ") && !has(r, "-- LSL: bit32"));
+        ensure("not for a flag's truth: " + r.text, has(r, "if bit32.band(what, CHANGED_LINK) ~= 0"));
         ensure("&& said once, over a call that does something: " + r.text,
                count(r, "leaves its right side unrun") == 1 && has(r, "LSL ran both sides, the right one first.\n    if bit32.band(what, 3) ~= 0 and sayIt()"));
         ensure("the deprecated call's reason only: " + r.text, has(r, "-- LSL: SLua deprecates ll.List2String") && !has(r, "takes indexes from 0"));
@@ -1109,6 +1111,48 @@ namespace tut
         ensure("the second adds to it: " + r.text, has(r, "s ..= table.concat(sParts2)") && !has(r, "local s = table.concat(sParts2)"));
         ensure("one read in its loop kept as it is: " + r.text, has(r, "local line = \"\"") && !has(r, "table.concat(lineParts)"));
         ensure("the other built from it: " + r.text, has(r, "table.insert(allParts, line)") && has(r, "local all = table.concat(allParts)"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<36>()
+    {
+        set_test_name("bit32's answers made LSL's signed integers where they can pass 2147483647 -- a message number with its top bit set, the mask "
+                      "that finds it, ~, a shift -- and not where bit32 takes them again, only truth is asked, or an & is with a constant not below nought");
+        // A protocol of link messages whose numbers have their top bit set,
+        // as a set of scripts may share: before, the mask's answer was never
+        // the message's number, and no message was heard.
+        const ALLSLToSLua::Result r = convert("integer MASK = 0xFFFF0000;\n"
+                                              "integer MSG = 0xB3470000;\n"
+                                              "integer FN_MASK = 0x0000FF00;\n"
+                                              "integer FN_RESET = 0x0500;\n"
+                                              "default {\n"
+                                              "    state_entry() {\n"
+                                              "        llMessageLinked(LINK_SET, MSG | FN_RESET, \"\", \"\");\n"
+                                              "    }\n"
+                                              "    link_message(integer sender, integer num, string text, key id) {\n"
+                                              "        if ((num & MASK) == MSG) {\n"
+                                              "            integer fn = num & FN_MASK;\n"
+                                              "            if (fn == FN_RESET) llOwnerSay(\"reset\");\n"
+                                              "        }\n"
+                                              "        integer inverse = ~num;\n"
+                                              "        integer high = num << 4;\n"
+                                              "        integer low = num >> 2;\n"
+                                              "        integer part = FN_MASK >> 8;\n"
+                                              "        if (~llGetPermissions() & PERMISSION_TRIGGER_ANIMATION) llOwnerSay(\"ask\");\n"
+                                              "        llOwnerSay((string)(inverse + high + low + part));\n"
+                                              "    }\n"
+                                              "}\n");
+        ensure("the mask's answer signed: " + r.text, has(r, "if int32(bit32.band(num, MASK)) == MSG then"));
+        ensure("the number sent signed: " + r.text, has(r, "ll.MessageLinked(LINK_SET, int32(bit32.bor(MSG, FN_RESET)), \"\", \"\")"));
+        ensure("an & with a constant not below nought as it is: " + r.text, has(r, "local fn = bit32.band(num, FN_MASK)\n"));
+        ensure("~ signed: " + r.text, has(r, "local inverse = int32(bit32.bnot(num))"));
+        ensure("<< signed: " + r.text, has(r, "local high = int32(bit32.lshift(num, 4))"));
+        ensure(">> of what may be below nought signed: " + r.text, has(r, "local low = int32(bit32.arshift(num, 2))"));
+        ensure(">> of a constant not below nought as it is: " + r.text, has(r, "local part = bit32.arshift(FN_MASK, 8)\n"));
+        ensure("a truth, and what bit32 takes again, as they are: " + r.text,
+               has(r, "if bit32.band(bit32.bnot(ll.GetPermissions()), PERMISSION_TRIGGER_ANIMATION) ~= 0 then"));
+        ensure("the helper, once: " + r.text, count(r, "local function int32(n: number): number") == 1 && !has(r, "-- LSL: bit32"));
         checksClean(r);
     }
 }

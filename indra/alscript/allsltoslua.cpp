@@ -179,7 +179,7 @@ namespace
             "torotation", "touuid", "ipairs", "pairs", "next", "select", "error", "assert", "pcall", "xpcall", "unpack",
             "rawget", "rawset", "rawequal", "rawlen", "setmetatable", "getmetatable", "require", "lljson", "llbase64",
             // What the text written here defines of its own.
-            "states", "currentState", "setState", "joinLists", "lslInteger", "lslFloat", "detected", "setTimer", "timerHandle",
+            "states", "currentState", "setState", "joinLists", "int32", "lslInteger", "lslFloat", "detected", "setTimer", "timerHandle",
             "timerHandler",
         };
         return RESERVED.contains(name);
@@ -353,6 +353,12 @@ namespace
         Expr lvalue(LSLLValueExpression* e);
         Expr call(LSLFunctionExpression* e);
         Expr binary(LSLBinaryExpression* e);
+        // A bit32 call as LSL's signed integer, but where `same` says its
+        // answer is that already, or nothing asks for more.
+        Expr signedUnless(bool same, const std::string& call);
+        // A number not below nought: as nonNegative says, or a global the
+        // script never sets, declared one.
+        bool notBelowZero(LSLExpression* e) const;
         Expr unary(LSLUnaryExpression* e);
         Expr typecast(LSLTypecastExpression* e);
         // An assignment or a step inside an expression, which SLua makes a
@@ -612,7 +618,11 @@ namespace
         boost::unordered_flat_map<LSLSymbol*, std::string> mNames;
         boost::unordered_flat_set<std::string>           mTaken;
         // What the text needs of its own, defined once over it.
+        // The globals the script never sets, declared a number not below
+        // nought.
+        boost::unordered_flat_set<LSLSymbol*> mSteadyNonNegative;
         bool mJoinLists  = false;
+        bool mInt32      = false;
         bool mLslInteger = false;
         bool mLslFloat   = false;
         bool mManyStates = false;
@@ -1043,6 +1053,37 @@ namespace
         }
     }
 
+    // Whether what an expression gives is bit32's to take again, which takes
+    // a number below nought as it takes the same past 2147483647: an operand
+    // of &, | or ^, what ~ turns over, or what a shift moves.
+    bool intoBit32(LSLASTNode* e)
+    {
+        LSLASTNode* node   = e;
+        LSLASTNode* parent = node->getParent();
+        while (parent && parent->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            node   = parent;
+            parent = parent->getParent();
+        }
+        if (!parent || parent->getNodeType() != NODE_EXPRESSION)
+        {
+            return false;
+        }
+        switch (static_cast<LSLExpression*>(parent)->getOperation())
+        {
+            case OP_BIT_AND:
+            case OP_BIT_OR:
+            case OP_BIT_XOR:
+            case OP_BIT_NOT:
+                return true;
+            case OP_SHIFT_LEFT:
+            case OP_SHIFT_RIGHT:
+                return node->getParentSlot() == 0;
+            default:
+                return false;
+        }
+    }
+
     // A whole number written out, and what it is: a constant, or one with a
     // minus before it.
     bool wholeNumber(LSLExpression* e, int& v)
@@ -1461,6 +1502,43 @@ namespace
         return { "llcompat." + bare + "(" + args(e->getArguments(), params) + ")" };
     }
 
+    Expr Writer::signedUnless(bool same, const std::string& call)
+    {
+        if (same)
+        {
+            return { call };
+        }
+        mInt32 = true;
+        return { "int32(" + call + ")" };
+    }
+
+    bool Writer::notBelowZero(LSLExpression* e) const
+    {
+        if (nonNegative(e))
+        {
+            return true;
+        }
+        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
+        }
+        if (e && e->getNodeSubType() == NODE_BINARY_EXPRESSION)
+        {
+            // An & with one, an | or ^ of two, a >> of one.
+            auto* b = static_cast<LSLBinaryExpression*>(e);
+            switch (b->getOperation())
+            {
+                case OP_BIT_AND: return notBelowZero(b->getLHS()) || notBelowZero(b->getRHS());
+                case OP_BIT_OR:
+                case OP_BIT_XOR: return notBelowZero(b->getLHS()) && notBelowZero(b->getRHS());
+                case OP_SHIFT_RIGHT: return notBelowZero(b->getLHS());
+                default: return false;
+            }
+        }
+        return e && e->getNodeSubType() == NODE_LVALUE_EXPRESSION && !static_cast<LSLLValueExpression*>(e)->getMember() &&
+               mSteadyNonNegative.contains(static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol());
+    }
+
     Expr Writer::binary(LSLBinaryExpression* e)
     {
         // == and ~= the other way round under a not (unary).
@@ -1520,15 +1598,14 @@ namespace
                  "LSL ran the right side of this before the left, and Luau runs the left first: one side changes what the other reads.");
         }
         const auto bit = [&](const char* fn) -> Expr {
-            // Not where the answer is the same number: an & with a number not
-            // below nought, or an | or ^ of two; nor where it is only asked
-            // whether it is nought.
-            const bool same = (op == OP_BIT_AND && (nonNegative(lhs) || nonNegative(rhs))) ||
-                              ((op == OP_BIT_OR || op == OP_BIT_XOR) && nonNegative(lhs) && nonNegative(rhs)) || truthOnly(e);
-            if (!same)
-            {
-                noteOnce(e, "SluaBit32", "bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.");
-            }
+            // bit32 answers 0 to 4294967295, where LSL's integers were signed:
+            // made LSL's (int32), but where the answer is the same number --
+            // an & with a number not below nought, an | or ^ of two, a >> of
+            // one -- or where it is only asked whether it is nought, or
+            // bit32 takes it again.
+            const bool same = (op == OP_BIT_AND && (notBelowZero(lhs) || notBelowZero(rhs))) ||
+                              ((op == OP_BIT_OR || op == OP_BIT_XOR) && notBelowZero(lhs) && notBelowZero(rhs)) ||
+                              (op == OP_SHIFT_RIGHT && notBelowZero(lhs)) || truthOnly(e) || intoBit32(e);
             // An &, | or ^ of the same again, one call of them all: bit32's
             // take as many as are given.
             if (op == OP_BIT_AND || op == OP_BIT_OR || op == OP_BIT_XOR)
@@ -1550,9 +1627,9 @@ namespace
                 };
                 gather(lhs);
                 gather(rhs);
-                return { std::string("bit32.") + fn + "(" + all + ")" };
+                return signedUnless(same, std::string("bit32.") + fn + "(" + all + ")");
             }
-            return { std::string("bit32.") + fn + "(" + value(lhs).text + ", " + value(rhs).text + ")" };
+            return signedUnless(same, std::string("bit32.") + fn + "(" + value(lhs).text + ", " + value(rhs).text + ")");
         };
         switch (op)
         {
@@ -1710,8 +1787,7 @@ namespace
                 return { "not " + bracketed(condition(child), UNARY), UNARY, true };
             }
             case OP_BIT_NOT:
-                noteOnce(e, "SluaBit32", "bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.");
-                return { "bit32.bnot(" + value(child).text + ")" };
+                return signedUnless(truthOnly(e) || intoBit32(e), "bit32.bnot(" + value(child).text + ")");
             case OP_PRE_INCR:
             case OP_PRE_DECR:
             case OP_POST_INCR:
@@ -4682,6 +4758,16 @@ end
 
 )LUA";
         }
+        if (mInt32)
+        {
+            out += R"LUA(-- What bit32 answers, 0 to 4294967295, as LSL's integers were: signed, from
+-- -2147483648.
+local function int32(n: number): number
+    return if n >= 0x80000000 then n - 0x100000000 else n
+end
+
+)LUA";
+        }
         if (mLslInteger)
         {
             out += R"LUA(-- LSL's (integer) of a string: the whole number it starts with, in
@@ -4747,6 +4833,18 @@ end
         if (mTimers)
         {
             timersPreamble();
+        }
+        // The globals never set, declared a number not below nought: what an &
+        // with one of them gives needs no sign.
+        const ALLSLEffects::Writes written = mEffects.of(mScript);
+        for (LSLASTNode* g = mScript->getGlobals()->getChild(0); g; g = g->getNext())
+        {
+            int v = 0;
+            if (g->getNodeType() == NODE_GLOBAL_VARIABLE && !written.writes(g->getSymbol()) &&
+                wholeNumber(static_cast<LSLGlobalVariable*>(g)->getInitializer(), v) && v >= 0)
+            {
+                mSteadyNonNegative.insert(g->getSymbol());
+            }
         }
         globals();
         functions();

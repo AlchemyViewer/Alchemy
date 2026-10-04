@@ -1003,7 +1003,6 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaBool">llcompat.[1] answers 1 or 0, as LSL did; ll.[1] answers true or false.</string>
 	<string name="SluaBoolList">llcompat.[1]'s list has 1 or 0 where LSL's did; ll.[1]'s has true or false there.</string>
 	<string name="SluaRightFirst">LSL ran the right side of this before the left, and Luau runs the left first: one side changes what the other reads.</string>
-	<string name="SluaBit32">bit32 answers 0 to 4294967295; LSL's integers were signed, from -2147483648.</string>
 	<string name="SluaIntegerDivision">// rounds down, and LSL's integer / rounded toward zero: they differ where the answer is negative.</string>
 	<string name="SluaModulo">Luau's % takes the divisor's sign, and LSL's took the dividend's: they differ where one is negative.</string>
 	<string name="SluaListCompare">LSL compares lists by their lengths alone, and != answers the difference of them.</string>
