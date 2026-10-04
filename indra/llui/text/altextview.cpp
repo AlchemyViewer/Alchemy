@@ -6199,7 +6199,7 @@ bool ALTextView::sameClickSpot(S32 x, S32 y) const
 
 void ALTextView::armTripleClick()
 {
-    mTripleClick.setTimerExpirySec(TRIPLE_CLICK_INTERVAL);
+    mTripleClick.resetWithExpiry(TRIPLE_CLICK_INTERVAL);
 }
 
 bool ALTextView::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)

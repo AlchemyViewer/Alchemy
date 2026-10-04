@@ -2814,4 +2814,25 @@ namespace tut
         ensure("on down, out of it", v.perform(ALEditorCommand::MoveDown) && v.caretGap() == -1);
         ensure("told once more, on its line", told == 2 && seen == -1);
     }
+
+    template<> template<>
+    void altextview_object::test<89>()
+    {
+        set_test_name("a third press where a double click took a word takes the line, however long the view has been open");
+        ALTextView& v = make("hello world\nsecond");
+        // Longer than the triple-click window passes between the view being
+        // made and the first click.
+        ms_sleep(400);
+        LLFrameTimer::updateFrameTime();
+        S32 x, y;
+        pointOf(0, 8, x, y);
+        v.handleMouseDown(x, y, MASK_NONE);
+        v.handleMouseUp(x, y, MASK_NONE);
+        ensure("double", v.handleDoubleClick(x, y, MASK_NONE));
+        ensure_equals("the word", v.selectedText(), std::string("world"));
+        v.handleMouseUp(x, y, MASK_NONE);
+        ensure("third", v.handleMouseDown(x, y, MASK_NONE));
+        ensure("the line", v.selection().normalised() == ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
+        v.handleMouseUp(x, y, MASK_NONE);
+    }
 }
