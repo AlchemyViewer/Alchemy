@@ -70,6 +70,11 @@ public:
     // sort order and influence volumes from these two values.
     void syncToViewerObject();
 
+    // Called by the spatial group, viewer object or region this probe was registered for when it
+    // lets go of the probe. Clears any pointer back to it, and takes the probe out of relevance for
+    // the time the manager keeps it before deleting it.
+    void orphan();
+
     // True if this probe's influence volume has moved or resized enough since its neighbour
     // list was built that the list may no longer describe it.
     bool neighborsAreStale() const;
@@ -124,6 +129,11 @@ public:
     // automatic probe whose influence volume a manual probe completely swallows, so it can no
     // longer affect any pixel (maintained by LLReflectionMapManager, consulted by isRelevant)
     bool mInsideManualProbe = false;
+
+    // whatever registered this probe has let go of it (see orphan). Without this a probe with
+    // neither a group nor a viewer object is indistinguishable from a live terrain probe, and
+    // would be treated as one until the manager deletes it.
+    bool mOrphaned = false;
 
     // fade in parameter for this probe
     F32 mFadeIn = 0.f;

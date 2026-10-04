@@ -213,6 +213,13 @@ void LLReflectionMap::syncToViewerObject()
     }
 }
 
+void LLReflectionMap::orphan()
+{
+    mGroup = nullptr;
+    mViewerObject = nullptr;
+    mOrphaned = true;
+}
+
 bool LLReflectionMap::eclipses(const LLReflectionMap* other, F32 margin) const
 {
     if (!other || other == this || !mViewerObject || mViewerObject->isDead())
@@ -382,6 +389,11 @@ bool LLReflectionMap::isActive() const
 bool LLReflectionMap::isRelevant() const
 {
     static LLCachedControl<S32> RenderReflectionProbeLevel(gSavedSettings, "RenderReflectionProbeLevel", 3);
+
+    if (mOrphaned)
+    { // whatever it was registered for is gone; the manager deletes it on its next update
+        return false;
+    }
 
     if (mViewerObject && RenderReflectionProbeLevel > 0)
     { // not an automatic probe

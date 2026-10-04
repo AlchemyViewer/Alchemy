@@ -356,7 +356,7 @@ LLViewerObject::~LLViewerObject()
     // unhook from reflection probe manager
     if (mReflectionProbe.notNull())
     {
-        mReflectionProbe->mViewerObject = nullptr;
+        mReflectionProbe->orphan();
         mReflectionProbe = nullptr;
     }
 
@@ -537,7 +537,7 @@ void LLViewerObject::markDead()
 
         if (mReflectionProbe.notNull())
         {
-            mReflectionProbe->mViewerObject = nullptr;
+            mReflectionProbe->orphan();
             mReflectionProbe = nullptr;
         }
 

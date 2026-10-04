@@ -4596,6 +4596,7 @@ void LLVOVolume::updateReflectionProbePtr()
     {
         if (mReflectionProbe.notNull())
         {
+            mReflectionProbe->orphan();
             mReflectionProbe = nullptr;
         }
 

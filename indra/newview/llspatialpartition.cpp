@@ -128,6 +128,13 @@ LLSpatialGroup::~LLSpatialGroup()
 
     sNodeCount--;
 
+    // unhook from the reflection probe, which the manager keeps until its next update
+    // notices nothing else holds it -- and autoAdjustOrigin dereferences mGroup until then
+    if (mReflectionProbe.notNull())
+    {
+        mReflectionProbe->orphan();
+    }
+
     clearDrawMap();
 }
 
