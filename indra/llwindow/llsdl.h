@@ -28,6 +28,8 @@
 
 #include "llpreprocessor.h"
 
+#include <string>
+
 #include "SDL3/SDL.h"
 
 extern bool gSDLMainHandled;

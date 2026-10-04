@@ -37,6 +37,7 @@
 #include <type_traits>
 #include <utility>
 #include <cstdio>
+#include <cstring>                  // std::strlen()
 #include <cwchar>                   // std::wcslen()
 //#include <locale>
 #include <iomanip>
