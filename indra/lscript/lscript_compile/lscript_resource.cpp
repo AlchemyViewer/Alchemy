@@ -30,7 +30,7 @@
 
 void init_temp_jumps()
 {
-	gTempJumpCount = 0;
+    gTempJumpCount = 0;
 }
 
 S32 gTempJumpCount = 0;

@@ -37,57 +37,57 @@ LLScriptResource::LLScriptResource()
 
 bool LLScriptResource::request(S32 amount /* = 1 */)
 {
-	if (mUsed + amount <= mTotal)
-	{
-		mUsed += amount;
-		return true;
-	}
+    if (mUsed + amount <= mTotal)
+    {
+        mUsed += amount;
+        return true;
+    }
 
-	return false;
+    return false;
 }
 
 bool LLScriptResource::release(S32 amount /* = 1 */)
 {
-	if (mUsed >= amount)
-	{
-		mUsed -= amount;
-		return true;
-	}
+    if (mUsed >= amount)
+    {
+        mUsed -= amount;
+        return true;
+    }
 
-	return false;
+    return false;
 }
 
 S32 LLScriptResource::getAvailable() const
 {
-	if (mUsed > mTotal)
-	{
-		// It is possible after a parcel ownership change for more than total to be used
-		// In this case the user of this class just wants to know
-		// whether or not they can use a resource
-		return 0;
-	}
-	return (mTotal - mUsed);
+    if (mUsed > mTotal)
+    {
+        // It is possible after a parcel ownership change for more than total to be used
+        // In this case the user of this class just wants to know
+        // whether or not they can use a resource
+        return 0;
+    }
+    return (mTotal - mUsed);
 }
 
 void LLScriptResource::setTotal(S32 amount)
 {
-	// This may cause this resource to be over spent
-	// such that more are in use than total allowed
-	// Until those resources are released getAvailable will return 0.
-	mTotal = amount;
+    // This may cause this resource to be over spent
+    // such that more are in use than total allowed
+    // Until those resources are released getAvailable will return 0.
+    mTotal = amount;
 }
 
 S32 LLScriptResource::getTotal() const
 {
-	return mTotal;
+    return mTotal;
 }
 
 S32 LLScriptResource::getUsed() const
 {
-	return mUsed;
+    return mUsed;
 }
 
 bool LLScriptResource::isOverLimit() const
 {
-	return (mUsed > mTotal);
+    return (mUsed > mTotal);
 }

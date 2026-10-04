@@ -33,17 +33,17 @@
 class LLScriptResourcePool
 {
 public:
-	LLScriptResourcePool();
-	// ~LLSimResourceMgr();
+    LLScriptResourcePool();
+    // ~LLSimResourceMgr();
 
-	LLScriptResource& getPublicURLResource();
-	const LLScriptResource& getPublicURLResource() const;
+    LLScriptResource& getPublicURLResource();
+    const LLScriptResource& getPublicURLResource() const;
 
-	// An empty resource pool.
-	static LLScriptResourcePool null;
+    // An empty resource pool.
+    static LLScriptResourcePool null;
 
 private:
-	LLScriptResource mLSLPublicURLs;
+    LLScriptResource mLSLPublicURLs;
 };
 
 

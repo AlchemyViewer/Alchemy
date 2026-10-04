@@ -138,24 +138,24 @@ void print_calllib_two_byte(LLFILE *fp, U8 *buffer, S32 &offset, S32 tabs);
 class LLScriptLSOParse
 {
 public:
-	LLScriptLSOParse(LLFILE *fp);
-	LLScriptLSOParse(U8 *buffer);
-	~LLScriptLSOParse();
+    LLScriptLSOParse(LLFILE *fp);
+    LLScriptLSOParse(U8 *buffer);
+    ~LLScriptLSOParse();
 
-	void initOpCodePrinting();
+    void initOpCodePrinting();
 
-	void printData(LLFILE *fp);
-	void printNameDesc(LLFILE *fp);
-	void printRegisters(LLFILE *fp);
-	void printGlobals(LLFILE *fp);
-	void printGlobalFunctions(LLFILE *fp);
-	void printStates(LLFILE *fp);
-	void printHeap(LLFILE *fp);
-	void printOpCodes(LLFILE *fp, S32 &offset, S32 tabs);
-	void printOpCodeRange(LLFILE *fp, S32 start, S32 end, S32 tabs);
+    void printData(LLFILE *fp);
+    void printNameDesc(LLFILE *fp);
+    void printRegisters(LLFILE *fp);
+    void printGlobals(LLFILE *fp);
+    void printGlobalFunctions(LLFILE *fp);
+    void printStates(LLFILE *fp);
+    void printHeap(LLFILE *fp);
+    void printOpCodes(LLFILE *fp, S32 &offset, S32 tabs);
+    void printOpCodeRange(LLFILE *fp, S32 start, S32 end, S32 tabs);
 
-	U8	*mRawData;
-	void (*mPrintOpCodes[0x100])(LLFILE *fp, U8 *buffer, S32 &offset, S32 tabs);
+    U8  *mRawData;
+    void (*mPrintOpCodes[0x100])(LLFILE *fp, U8 *buffer, S32 &offset, S32 tabs);
 };
 
 

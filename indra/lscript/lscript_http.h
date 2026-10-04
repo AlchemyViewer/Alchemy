@@ -39,7 +39,7 @@ enum LLScriptHTTPRequestParameterKey
 
 enum LLScriptHTTPResponseMetadataKey
 {
-	HTTP_BODY_TRUNCATED
+    HTTP_BODY_TRUNCATED
 };
 
 #endif

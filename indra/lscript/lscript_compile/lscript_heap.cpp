@@ -33,12 +33,12 @@
 LLScriptHeapEntry::LLScriptHeapEntry(U8 *entry)
 : mEntry(entry)
 {
-	S32 offset = 0;
-	mNext = bytestream2integer(entry, offset);
-	mRefCount = bytestream2integer(entry, offset);
-	mType = *(entry + offset);
-	mData = entry + offset;
-	mListOffset = offset;
+    S32 offset = 0;
+    mNext = bytestream2integer(entry, offset);
+    mRefCount = bytestream2integer(entry, offset);
+    mType = *(entry + offset);
+    mData = entry + offset;
+    mListOffset = offset;
 }
 
 LLScriptHeapEntry::LLScriptHeapEntry(U8 *heap, S32 offset)
@@ -52,14 +52,14 @@ LLScriptHeapEntry::~LLScriptHeapEntry()
 
 void LLScriptHeapEntry::addString(char *string)
 {
-	S32 size = strlen(string) + 1;	 	/*Flawfinder: ignore*/
-	S32 offset = 0;
-	memcpy(mData, string, size);	 	/*Flawfinder: ignore*/
-	mNext += size;
-	integer2bytestream(mEntry, offset, mNext);
-	mRefCount++;
-	integer2bytestream(mEntry, offset, mRefCount);
-	*(mEntry + offset) = LSCRIPTTypeByte[LST_STRING];
+    S32 size = strlen(string) + 1;      /*Flawfinder: ignore*/
+    S32 offset = 0;
+    memcpy(mData, string, size);        /*Flawfinder: ignore*/
+    mNext += size;
+    integer2bytestream(mEntry, offset, mNext);
+    mRefCount++;
+    integer2bytestream(mEntry, offset, mRefCount);
+    *(mEntry + offset) = LSCRIPTTypeByte[LST_STRING];
 }
 
 

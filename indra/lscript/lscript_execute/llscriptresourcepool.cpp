@@ -35,10 +35,10 @@ LLScriptResourcePool::LLScriptResourcePool()
 
 LLScriptResource& LLScriptResourcePool::getPublicURLResource()
 {
-	return mLSLPublicURLs;
+    return mLSLPublicURLs;
 }
 
 const LLScriptResource& LLScriptResourcePool::getPublicURLResource() const
 {
-	return mLSLPublicURLs;
+    return mLSLPublicURLs;
 }

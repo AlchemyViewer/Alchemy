@@ -37,25 +37,25 @@ class LLScriptResourcePool;
 class LLScriptResourceConsumer
 {
 public:
-	LLScriptResourceConsumer();
+    LLScriptResourceConsumer();
 
-	virtual ~LLScriptResourceConsumer() { }
+    virtual ~LLScriptResourceConsumer() { }
 
-	// Get the number of public urls used by this consumer.
-	virtual S32 getUsedPublicURLs() const = 0;
+    // Get the number of public urls used by this consumer.
+    virtual S32 getUsedPublicURLs() const = 0;
 
-	// Get the resource pool this consumer is currently using.
-	LLScriptResourcePool& getScriptResourcePool();
-	const LLScriptResourcePool& getScriptResourcePool() const;
+    // Get the resource pool this consumer is currently using.
+    LLScriptResourcePool& getScriptResourcePool();
+    const LLScriptResourcePool& getScriptResourcePool() const;
 
-	bool switchScriptResourcePools(LLScriptResourcePool& new_pool);
-	bool canUseScriptResourcePool(const LLScriptResourcePool& resource_pool);
-	bool isInPool(const LLScriptResourcePool& resource_pool);
+    bool switchScriptResourcePools(LLScriptResourcePool& new_pool);
+    bool canUseScriptResourcePool(const LLScriptResourcePool& resource_pool);
+    bool isInPool(const LLScriptResourcePool& resource_pool);
 
 protected:
-	virtual void setScriptResourcePool(LLScriptResourcePool& pool);
+    virtual void setScriptResourcePool(LLScriptResourcePool& pool);
 
-	LLScriptResourcePool* mScriptResourcePool;
+    LLScriptResourcePool* mScriptResourcePool;
 };
 
 #endif // LL_LLSCRIPTRESOURCECONSUMER_H

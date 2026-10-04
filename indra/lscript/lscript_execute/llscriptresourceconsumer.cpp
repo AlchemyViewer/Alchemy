@@ -29,78 +29,78 @@
 #include "llscriptresourcepool.h"
 
 LLScriptResourceConsumer::LLScriptResourceConsumer()
-	: mScriptResourcePool(&LLScriptResourcePool::null)
+    : mScriptResourcePool(&LLScriptResourcePool::null)
 { }
 
 // Get the resource pool this consumer is currently using.
 // virtual
 LLScriptResourcePool& LLScriptResourceConsumer::getScriptResourcePool()
 {
-	return *mScriptResourcePool;
+    return *mScriptResourcePool;
 }
 
 // Get the resource pool this consumer is currently using.
 // virtual
 const LLScriptResourcePool& LLScriptResourceConsumer::getScriptResourcePool() const
 {
-	return *mScriptResourcePool;
+    return *mScriptResourcePool;
 }
 
 // virtual
 void LLScriptResourceConsumer::setScriptResourcePool(LLScriptResourcePool& new_pool)
 {
-	mScriptResourcePool = &new_pool;
+    mScriptResourcePool = &new_pool;
 }
 
 bool LLScriptResourceConsumer::switchScriptResourcePools(LLScriptResourcePool& new_pool)
 {
-	if (&new_pool == &LLScriptResourcePool::null)
-	{
-		LL_WARNS() << "New pool is null" << LL_ENDL;
-	}
+    if (&new_pool == &LLScriptResourcePool::null)
+    {
+        LL_WARNS() << "New pool is null" << LL_ENDL;
+    }
 
-	if (isInPool(new_pool))
-	{
-		return true;
-	}
+    if (isInPool(new_pool))
+    {
+        return true;
+    }
 
-	if (!canUseScriptResourcePool(new_pool))
-	{
-		return false;
-	}
+    if (!canUseScriptResourcePool(new_pool))
+    {
+        return false;
+    }
 
-	S32 used_urls = getUsedPublicURLs();
+    S32 used_urls = getUsedPublicURLs();
 
-	getScriptResourcePool().getPublicURLResource().release( used_urls );
-	setScriptResourcePool(new_pool);
-	getScriptResourcePool().getPublicURLResource().request( used_urls );
+    getScriptResourcePool().getPublicURLResource().release( used_urls );
+    setScriptResourcePool(new_pool);
+    getScriptResourcePool().getPublicURLResource().request( used_urls );
 
-	return true;
+    return true;
 }
 
 bool LLScriptResourceConsumer::canUseScriptResourcePool(const LLScriptResourcePool& resource_pool)
 {
-	if (isInPool(resource_pool))
-	{
-		return true;
-	}
+    if (isInPool(resource_pool))
+    {
+        return true;
+    }
 
-	if (resource_pool.getPublicURLResource().getAvailable() < getUsedPublicURLs())
-	{
-		return false;
-	}
+    if (resource_pool.getPublicURLResource().getAvailable() < getUsedPublicURLs())
+    {
+        return false;
+    }
 
-	return true;
+    return true;
 }
 
 bool LLScriptResourceConsumer::isInPool(const LLScriptResourcePool& resource_pool)
 {
-	const LLScriptResourcePool& current_pool = getScriptResourcePool();
-	if ( &resource_pool == &current_pool )
-	{
-		// This consumer is already in this pool
-		return true;
-	}
-	return false;
+    const LLScriptResourcePool& current_pool = getScriptResourcePool();
+    if ( &resource_pool == &current_pool )
+    {
+        // This consumer is already in this pool
+        return true;
+    }
+    return false;
 }
 

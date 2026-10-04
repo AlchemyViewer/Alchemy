@@ -37,19 +37,19 @@
 class LLScriptHeapEntry
 {
 public:
-	LLScriptHeapEntry(U8 *entry);
-	LLScriptHeapEntry(U8 *heap, S32 offset);
-	~LLScriptHeapEntry();
+    LLScriptHeapEntry(U8 *entry);
+    LLScriptHeapEntry(U8 *heap, S32 offset);
+    ~LLScriptHeapEntry();
 
-	void addString(char *string);
+    void addString(char *string);
 
-	S32 mNext;
-	U8	mType;
-	S32 mRefCount;
-	S32 mListOffset;
-	U8  *mEntry;
-	U8  *mData;
-	U8  *mListEntry;
+    S32 mNext;
+    U8  mType;
+    S32 mRefCount;
+    S32 mListOffset;
+    U8  *mEntry;
+    U8  *mData;
+    U8  *mListEntry;
 };
 
 #endif
