@@ -438,7 +438,13 @@ namespace
         Expr binary(LSLBinaryExpression* e);
         // A bit32 call as LSL's signed integer, but where `same` says its
         // answer is that already, or nothing asks for more.
-        Expr signedUnless(bool same, const std::string& call);
+        Expr signedUnless(bool same, const std::string& call, LSLASTNode* at);
+        // What a scripter from LSL is told once of each, over the first
+        // place it is written: hexadecimal past 0x7FFFFFFF, which SLua
+        // reads as another number than LSL did; and bit32.s32, which makes
+        // bit32's answer LSL's.
+        bool mSaidHexSign = false;
+        bool mSaidSigned  = false;
         // A number not below nought: as nonNegative says, or a global the
         // script never sets, declared one.
         bool notBelowZero(LSLExpression* e) const;
@@ -1428,8 +1434,17 @@ namespace
                 {
                     holder = holder->getParent();
                 }
-                if (std::optional<std::string> hex = hexAsWritten(c, v);
-                    hex && (v >= 0 || mBitsOnly.contains(holder) || (c->getParent() && intoBit32(c->getParent()))))
+                const std::optional<std::string> hex = hexAsWritten(c, v);
+                // Past 0x7FFFFFFF: what SLua reads it as, said once.
+                if (hex && v < 0 && !mSaidHexSign)
+                {
+                    mSaidHexSign = true;
+                    note(c, "SluaHexSign",
+                         "SLua reads [1] as [2], where LSL wrapped it to [3]: bit32 takes either the same, so it stays as written where only "
+                         "bit32 reads it, and is [3] where it is read as a number.",
+                         { *hex, std::to_string(static_cast<U32>(v)), std::to_string(v) });
+                }
+                if (hex && (v >= 0 || mBitsOnly.contains(holder) || (c->getParent() && intoBit32(c->getParent()))))
                 {
                     return { *hex, PRIMARY };
                 }
@@ -2321,11 +2336,18 @@ namespace
         return { "llcompat." + bare + "(" + args(e->getArguments(), params) + ")" };
     }
 
-    Expr Writer::signedUnless(bool same, const std::string& call)
+    Expr Writer::signedUnless(bool same, const std::string& call, LSLASTNode* at)
     {
         if (same)
         {
             return { call };
+        }
+        if (!mSaidSigned)
+        {
+            mSaidSigned = true;
+            note(at, "SluaBit32Signed",
+                 "bit32 answers 0 to 4294967295, where LSL's integers were signed: bit32.s32 makes the answer LSL's where it could pass "
+                 "2147483647 and is read as a number.");
         }
         return { "bit32.s32(" + call + ")" };
     }
@@ -2445,9 +2467,9 @@ namespace
                 };
                 gather(lhs);
                 gather(rhs);
-                return signedUnless(same, std::string("bit32.") + fn + "(" + all + ")");
+                return signedUnless(same, std::string("bit32.") + fn + "(" + all + ")", e);
             }
-            return signedUnless(same, std::string("bit32.") + fn + "(" + value(lhs).text + ", " + value(rhs).text + ")");
+            return signedUnless(same, std::string("bit32.") + fn + "(" + value(lhs).text + ", " + value(rhs).text + ")", e);
         };
         switch (op)
         {
@@ -2620,7 +2642,7 @@ namespace
                 return { "not " + bracketed(condition(child), UNARY), UNARY, true };
             }
             case OP_BIT_NOT:
-                return signedUnless(truthOnly(e) || intoBit32(e), "bit32.bnot(" + value(child).text + ")");
+                return signedUnless(truthOnly(e) || intoBit32(e), "bit32.bnot(" + value(child).text + ")", e);
             case OP_PRE_INCR:
             case OP_PRE_DECR:
             case OP_POST_INCR:

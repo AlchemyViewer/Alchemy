@@ -778,7 +778,7 @@ namespace tut
                                               "    llOwnerSay(llList2String(l, what) + (string)m);\n"
                                               "    if ((what & 3) && sayIt()) llDie();\n"
                                               "} }\n");
-        ensure("bit32's range made LSL's where it shows: " + r.text, has(r, "local m = bit32.s32(bit32.bor(what, ") && !has(r, "-- LSL: bit32"));
+        ensure("bit32's range made LSL's where it shows: " + r.text, has(r, "local m = bit32.s32(bit32.bor(what, ") && count(r, "-- LSL: bit32") == 1);
         ensure("not for a flag's truth: " + r.text, has(r, "if bit32.btest(what, CHANGED_LINK)"));
         ensure("&& said once, over a call that does something: " + r.text,
                count(r, "leaves its right side unrun") == 1 && has(r, "LSL ran both sides, the right one first.\n    if bit32.btest(what, 3) and sayIt()"));
@@ -1157,7 +1157,7 @@ namespace tut
         ensure(">> of a constant not below nought as it is: " + r.text, has(r, "local part = bit32.arshift(FN_MASK, 8)\n"));
         ensure("a truth, and what bit32 takes again, as they are: " + r.text,
                has(r, "if bit32.btest(bit32.bnot(ll.GetPermissions()), PERMISSION_TRIGGER_ANIMATION) then"));
-        ensure("SLua's own bit32.s32, no helper: " + r.text, !has(r, "local function int32") && !has(r, "-- LSL: bit32"));
+        ensure("SLua's own bit32.s32, no helper, said once: " + r.text, !has(r, "local function int32") && count(r, "-- LSL: bit32 answers") == 1);
         checksClean(r);
     }
 
@@ -1326,6 +1326,16 @@ namespace tut
                                                                                has(r, "bit32.band(flags, S_MASK)"));
         ensure("one read as a number does not: " + r.text, has(r, "local HIGH = -268435456"));
         ensure("nor a local, never set, only bit32 reads: " + r.text, has(r, "local low = 0xFFFF0000\n"));
+        // Each said once, over the first place: what SLua reads such a
+        // number as, and what bit32.s32 is for.
+        const auto times = [&r](const char* key) {
+            return std::count_if(r.notes.begin(), r.notes.end(), [key](const ALScriptProblem& p) { return p.key == key; });
+        };
+        ensure("the hexadecimal's number said once, over the first: " + r.text,
+               times("SluaHexSign") == 1 && noted(r, "SluaHexSign", "0xF0000000") &&
+                   has(r, "-- LSL: SLua reads 0xF0000000 as 4026531840, where LSL wrapped it to -268435456: bit32 takes either the same, so it "
+                          "stays as written where only bit32 reads it, and is -268435456 where it is read as a number.\nlocal HIGH = -268435456"));
+        ensure("bit32.s32 said once: " + r.text, times("SluaBit32Signed") == 1 && count(r, "-- LSL: bit32 answers 0 to 4294967295") == 1);
         ensure("within them, wrapped: " + r.text, has(r, "local WRAPPED = -2147483648\n"));
         checksClean(r);
     }
