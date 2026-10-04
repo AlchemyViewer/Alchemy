@@ -105,7 +105,8 @@ jobs:
       # starts: the database holds the viewer, not its dependencies. The
       # build tree sits outside the checkout, which keeps the vcpkg headers
       # out of the source root and so out of the alerts. Precompiled headers
-      # are off because the extractor reads each source file whole.
+      # stay on, as in the build: the extractor reads the forced-include
+      # header as text, and the tree does not build without them.
       - name: Configure
         if: matrix.build-mode == 'manual'
         shell: bash
@@ -120,8 +121,7 @@ jobs:
             -DAL_BUILD_PACKAGE:BOOL=OFF \
             -DAL_USE_VELOPACK:BOOL=ON \
             -DAL_USE_LTO:BOOL=OFF \
-            -DAL_USE_TRACY:BOOL=OFF \
-            -DAL_USE_PRECOMPILED_HEADERS:BOOL=OFF
+            -DAL_USE_TRACY:BOOL=OFF
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
