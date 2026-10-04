@@ -2489,16 +2489,7 @@ bool idle_startup()
         gRenderStartTime.reset();
         gSimLastTime = 0.f;
         gSimFrames = (F32)gFrameCount;
-        // Resetting a paused timer stores an absolute time where its paused
-        // elapsed time belongs, so the reset happens running and the pause is
-        // put back after.
-        const bool foreground = gForegroundTime.getStarted();
-        gForegroundTime.unpause();
         gForegroundTime.reset();
-        if (!foreground)
-        {
-            gForegroundTime.pause();
-        }
         gForegroundFrameCount = 0;
 
         // HACK: Inform simulator of window size.

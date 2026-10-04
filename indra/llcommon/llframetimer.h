@@ -85,9 +85,9 @@ public:
     void setTimerExpirySec(F32 expiration);         // Expires this long from now, as LLTimer's does
     void setExpiryAt(F64 seconds_since_epoch);
     bool checkExpirationAndReset(F32 expiration);
-    F32 getElapsedTimeAndResetF32()                 { F32 t = F32(sFrameTime - mStartTime); reset(); return t; }
+    F32 getElapsedTimeAndResetF32()                 { F32 t = getElapsedTimeF32(); reset(); return t; }
 
-    void setAge(const F64 age)                      { mStartTime = sFrameTime - age; }
+    void setAge(const F64 age)                      { mStartTime = mStarted ? sFrameTime - age : age; }
 
     // ACCESSORS
     bool hasExpired() const                         { return (sFrameTime >= mExpiry); }
