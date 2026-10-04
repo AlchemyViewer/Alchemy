@@ -128,7 +128,8 @@ void ALScriptRegionUsage::ask(const std::vector<LLUUID>& roots, F64 now)
     {
         return;
     }
-    std::vector<std::string> owners;
+    // Each owner asked for now, with the objects of theirs in hand.
+    std::vector<std::pair<std::string, std::vector<LLUUID>>> owners;
     for (const LLUUID& root : roots)
     {
         if (!mWorld.kindOf || mWorld.kindOf(root) == World::Kind::None)
@@ -136,21 +137,30 @@ void ALScriptRegionUsage::ask(const std::vector<LLUUID>& roots, F64 now)
             continue;
         }
         const std::string owner = mWorld.ownerOf(root);
-        const auto        asked = mTimeAsked.find(owner);
-        if (owner.empty() || (asked != mTimeAsked.end() && now - asked->second < ASK_EVERY) ||
-            std::find(owners.begin(), owners.end(), owner) != owners.end())
+        if (owner.empty())
+        {
+            continue;
+        }
+        const auto listed = std::find_if(owners.begin(), owners.end(), [&owner](const auto& one) { return one.first == owner; });
+        if (listed != owners.end())
+        {
+            listed->second.push_back(root);
+            continue;
+        }
+        const auto asked = mTimeAsked.find(owner);
+        if (asked != mTimeAsked.end() && now - asked->second < ASK_EVERY)
         {
             continue;
         }
         mTimeAsked[owner] = now;
-        owners.push_back(owner);
+        owners.push_back({ owner, { root } });
     }
-    for (const std::string& owner : owners)
+    for (auto& [owner, theirs] : owners)
     {
-        mWorld.askTime(owner, [this, alive](const times_t& times) {
+        mWorld.askTime(owner, [this, alive, theirs = std::move(theirs)](const times_t& times) {
             if (alive.lock())
             {
-                heardTimes(times, LLDate::now());
+                heardTimes(times, LLDate::now(), theirs);
             }
         });
     }
@@ -189,24 +199,41 @@ void ALScriptRegionUsage::heard(const usages_t& usages)
     mHeard();
 }
 
-void ALScriptRegionUsage::heardTimes(const times_t& times, const LLDate& when)
+void ALScriptRegionUsage::heardTimes(const times_t& times, const LLDate& when, const std::vector<LLUUID>& asked)
 {
-    if (times.empty())
-    {
-        return;
-    }
+    bool changed = false;
     for (const auto& [id, time] : times)
     {
         Usage& kept   = mUsages[id];
         kept.time     = time;
         kept.timeWhen = when;
+        changed       = true;
     }
-    mHeard();
+    // An answer short of the most Top Scripts gives names every object of
+    // the owner's that runs scripts: one asked for and not named runs
+    // none now, and what was said of it stands no longer.
+    if (times.size() < TOP_SCRIPTS_MOST)
+    {
+        for (const LLUUID& root : asked)
+        {
+            const auto kept = mUsages.find(root);
+            if (!times.contains(root) && kept != mUsages.end() && kept->second.hasTime())
+            {
+                kept->second.time     = -1.f;
+                kept->second.timeWhen = LLDate(0.0);
+                changed               = true;
+            }
+        }
+    }
+    if (changed)
+    {
+        mHeard();
+    }
 }
 
 // static
 std::optional<size_t> ALScriptRegionUsage::answering(const std::vector<std::string>& waiting, const std::vector<std::string>& named,
-                                                     bool topObjectsOpen)
+                                                     const std::optional<std::string>& topObjectsOwner)
 {
     std::vector<std::string> keys;
     keys.reserve(named.size());
@@ -214,14 +241,16 @@ std::optional<size_t> ALScriptRegionUsage::answering(const std::vector<std::stri
     {
         keys.push_back(ownerKey(name));
     }
+    const std::string theirs = topObjectsOwner ? ownerKey(*topObjectsOwner) : std::string();
     for (size_t i = 0; i < waiting.size(); ++i)
     {
-        if (std::find(keys.begin(), keys.end(), ownerKey(waiting[i])) != keys.end())
+        const std::string key = ownerKey(waiting[i]);
+        if ((!topObjectsOwner || key != theirs) && std::find(keys.begin(), keys.end(), key) != keys.end())
         {
             return i;
         }
     }
-    if (!waiting.empty() && !topObjectsOpen)
+    if (!waiting.empty() && !topObjectsOwner)
     {
         return 0;
     }

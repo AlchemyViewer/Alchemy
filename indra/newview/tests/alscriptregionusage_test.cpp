@@ -241,23 +241,45 @@ namespace tut
         // Memory again: the time stays.
         landAsks[0].second(details);
         ensure("time kept through memory", usage.usageOf(id(1))->time == 0.125f);
+
+        // A later answer for the owner that leaves one of theirs out: it
+        // runs no scripts now. One as full as Top Scripts gives proves
+        // nothing of those it leaves out.
+        Usage::times_t later;
+        later[id(2)] = 0.5f;
+        timeAsks[0].second(later);
+        ensure("left out: no time now, its memory kept", !usage.usageOf(id(1))->hasTime() && usage.usageOf(id(1))->hasMemory());
+        ensure("named: its time", usage.usageOf(id(2))->time == 0.5f);
+        Usage::times_t full;
+        for (U32 n = 0; n < ALScriptRegionUsage::TOP_SCRIPTS_MOST; ++n)
+        {
+            full[id(100 + n)] = 0.01f;
+        }
+        timeAsks[0].second(full);
+        ensure("a full answer leaving it out: its time stands", usage.usageOf(id(2))->time == 0.5f);
     }
 
     template<> template<>
     void alscriptregionusage_object::test<5>()
     {
-        set_test_name("an answer of Top Scripts by owner is the oldest ask's whose owner its rows name; else the oldest's while Top Objects is closed, and Top Objects' while it is open");
+        set_test_name("an answer of Top Scripts by owner: with Top Objects not waiting on one, the oldest ask's whose owner its rows name, else the oldest's; with it waiting, its own but for one naming an owner only the studio asked about");
         typedef std::optional<size_t> Whose;
+        typedef std::optional<std::string> Theirs;
         ensure_equals("a name in either form, lowered", ALScriptRegionUsage::ownerKey("Ann Resident  "), std::string("ann"));
         ensure_equals("a last name kept", ALScriptRegionUsage::ownerKey("Bo Smith"), std::string("bo.smith"));
         ensure_equals("a username as it is", ALScriptRegionUsage::ownerKey("Bo.Smith"), std::string("bo.smith"));
         const std::vector<std::string> waiting = { "Ann Resident", "Bo Smith", "Ann Resident" };
-        ensure("the oldest it names", ALScriptRegionUsage::answering(waiting, { "ann ", "ann " }, true) == Whose(0));
-        ensure("not the oldest where it names a later one", ALScriptRegionUsage::answering(waiting, { "Bo Smith" }, true) == Whose(1));
-        ensure("one it does not name, with Top Objects open: Top Objects'", !ALScriptRegionUsage::answering(waiting, { "Cy Resident" }, true));
-        ensure("no rows, with Top Objects open: Top Objects'", !ALScriptRegionUsage::answering(waiting, {}, true));
-        ensure("no rows, with it closed: the oldest's", ALScriptRegionUsage::answering(waiting, {}, false) == Whose(0));
-        ensure("named otherwise, with it closed: the oldest's still", ALScriptRegionUsage::answering(waiting, { "Cy Resident" }, false) == Whose(0));
-        ensure("none waiting: none", !ALScriptRegionUsage::answering({}, { "Ann Resident" }, false));
+        const Theirs                   none;
+        ensure("the oldest it names", ALScriptRegionUsage::answering(waiting, { "ann ", "ann " }, none) == Whose(0));
+        ensure("not the oldest where it names a later one", ALScriptRegionUsage::answering(waiting, { "Bo Smith" }, none) == Whose(1));
+        ensure("no rows, Top Objects not waiting: the oldest's", ALScriptRegionUsage::answering(waiting, {}, none) == Whose(0));
+        ensure("named otherwise, Top Objects not waiting: the oldest's still", ALScriptRegionUsage::answering(waiting, { "Cy Resident" }, none) == Whose(0));
+        ensure("none waiting: none", !ALScriptRegionUsage::answering({}, { "Ann Resident" }, none));
+        const Theirs cy = std::string("cy");
+        ensure("Top Objects waiting: one naming the studio's owner alone is the studio's", ALScriptRegionUsage::answering(waiting, { "Bo Smith" }, cy) == Whose(1));
+        ensure("one naming its own owner: Top Objects'", !ALScriptRegionUsage::answering(waiting, { "Cy Resident" }, cy));
+        ensure("no rows: Top Objects'", !ALScriptRegionUsage::answering(waiting, {}, cy));
+        ensure("an owner both asked about: Top Objects', the studio's answer to come",
+               !ALScriptRegionUsage::answering(waiting, { "Bo Smith" }, Theirs(std::string("Bo Smith"))));
     }
 }

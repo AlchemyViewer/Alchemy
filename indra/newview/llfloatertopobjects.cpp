@@ -154,8 +154,19 @@ void LLFloaterTopObjects::handle_land_reply(LLMessageSystem* msg, void** data)
 
 }
 
+bool LLFloaterTopObjects::waitsForOwner(std::string& owner) const
+{
+    if (!mWaiting || mAskedMode != STAT_REPORT_TOP_SCRIPTS || !(mAskedFlags & STAT_FILTER_BY_OWNER))
+    {
+        return false;
+    }
+    owner = mAskedFilter;
+    return true;
+}
+
 void LLFloaterTopObjects::handleReply(LLMessageSystem *msg, void** data)
 {
+    mWaiting = false;
     U32 request_flags;
     U32 total_count;
     U64 total_memory = 0;
@@ -458,6 +469,11 @@ void LLFloaterTopObjects::onRefresh()
     flags  = mFlags;
     filter = mFilter;
     clearList();
+
+    mWaiting     = true;
+    mAskedMode   = mode;
+    mAskedFlags  = flags;
+    mAskedFilter = filter;
 
     LLMessageSystem *msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_LandStatRequest);

@@ -355,7 +355,9 @@ namespace
             // agent's own objects, or another's whose name is in hand. A
             // group's, or one not known yet, is not asked about.
             const LLViewerObject* object = gObjectList.findObject(root);
-            if (!object)
+            // A group's: the agent may act as its owner, and its owner id is
+            // the group's, which no avatar name answers for.
+            if (!object || object->permGroupOwner())
             {
                 return std::string();
             }
@@ -1856,8 +1858,15 @@ void ALScriptWorkspace::processLandStatReply(LLMessageSystem* msg, void** data)
     {
         waiting.push_back(one.owner);
     }
-    const LLFloaterTopObjects*  top   = LLFloaterReg::findTypedInstance<LLFloaterTopObjects>("top_objects");
-    const std::optional<size_t> whose = ALScriptRegionUsage::answering(waiting, named, top && top->isInVisibleChain());
+    // Top Objects takes an answer only while it is open, and what it waits
+    // on says which may be its.
+    const LLFloaterTopObjects* top = LLFloaterReg::findTypedInstance<LLFloaterTopObjects>("top_objects");
+    std::optional<std::string> theirs;
+    if (std::string owner; top && top->isInVisibleChain() && top->waitsForOwner(owner))
+    {
+        theirs = owner;
+    }
+    const std::optional<size_t> whose = ALScriptRegionUsage::answering(waiting, named, theirs);
     if (!whose)
     {
         LLFloaterTopObjects::handle_land_reply(msg, data);

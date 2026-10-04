@@ -117,17 +117,26 @@ public:
     static void readDetails(const LLSD& answer, const LLDate& when, usages_t& out);
 
     // What an answer said kept, and heard: the objects it named. Memory
-    // and time each keep what the other said.
+    // and time each keep what the other said. An answer of times is one
+    // owner's, `asked` the objects of theirs it was asked for: those it
+    // does not name, where it names fewer than TOP_SCRIPTS_MOST, have no
+    // time any more.
     void heard(const usages_t& usages);
-    void heardTimes(const times_t& times, const LLDate& when);
+    void heardTimes(const times_t& times, const LLDate& when, const std::vector<LLUUID>& asked = {});
+    // The most objects Top Scripts names in one answer.
+    static constexpr size_t TOP_SCRIPTS_MOST = 100;
 
     // Which of the asks for time waiting, oldest first, by owner, an answer
-    // of Top Scripts by owner is for, the owners its rows name given: the
-    // oldest one whose owner they name; else, where nothing else could
-    // have asked -- Top Objects closed -- the oldest; else none, and the
-    // answer is Top Objects'. The region's answer says neither who asked
-    // nor what for. Names compared by ownerKey.
-    static std::optional<size_t> answering(const std::vector<std::string>& waiting, const std::vector<std::string>& named, bool topObjectsOpen);
+    // of Top Scripts by owner is for, the owners its rows name given, and
+    // the owner Top Objects waits on such an answer for, where it is open
+    // and does. With Top Objects not waiting, every such answer is the
+    // studio's: the oldest ask's whose owner the rows name, else the
+    // oldest's. With it waiting, the answer is its own, none -- but one
+    // whose rows name an owner the studio waits for and Top Objects did
+    // not ask about. The region's answer says neither who asked nor what
+    // for. Names compared by ownerKey.
+    static std::optional<size_t> answering(const std::vector<std::string>& waiting, const std::vector<std::string>& named,
+                                           const std::optional<std::string>& topObjectsOwner);
     // An owner's name as a username, lowered, whichever form it came in:
     // "First Resident" and "first" alike.
     static std::string ownerKey(std::string name);
