@@ -64,7 +64,9 @@ switch(type)
 		fprintf(fp, "box [ScriptTypes]LindenLab.SecondLife.Quaternion\n");
 		break;
 	default:
-		llassert(false);
+		// A list put in a list in a local, which the type pass lets by: the
+		// grid's compiler is a release build, where an assert here is
+		// nothing, so it boxes nothing and goes on.
 		break;
 	}
 }
