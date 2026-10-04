@@ -651,6 +651,16 @@ if(AL_BUILD_TESTS)
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
+  # What a comparison draws over its sides -- the current change's outline,
+  # a folded row's words -- read back the same way.
+  al_add_test(
+    aldiffview_gl
+    GL
+    PROJECT llui
+    LIBRARIES ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
   # The code editor over 50,000-line scripts: what each change to the edit
   # pipeline, the highlighter, the layout, the folds or find is measured by.
   al_add_bench(

@@ -469,6 +469,36 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
     refreshBar();
 }
 
+void ALDiffView::drawCurrentChange()
+{
+    // Its rows, the same on both sides, which are lined up: from the top
+    // of its first to the bottom of its last, across the text.
+    const S32 change = changeAtCaret();
+    if (change < 0)
+    {
+        return;
+    }
+    const F32           alpha   = getDrawContext().mAlpha;
+    const S32           first   = mChanges[static_cast<size_t>(change)];
+    const S32           last    = mChangeEnds[static_cast<size_t>(change)] - 1;
+    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
+    for (ALCodeEditor* side : sides)
+    {
+        if (!side || last < first)
+        {
+            continue;
+        }
+        const LLRect    frame  = side->getRect();
+        const LLRect    text   = side->textRect();
+        const S32       top    = frame.mBottom + text.mTop;
+        ALTextLayout&   layout = side->layout();
+        const S32       from   = top - (layout.lineTop(first) - side->scrollY());
+        const S32       to     = top - (layout.lineTop(last) + layout.lineHeight(last) - side->scrollY());
+        LLLocalClipRect clip(LLRect(frame.mLeft + text.mLeft, top, frame.mLeft + text.mRight, frame.mBottom + text.mBottom));
+        gl_rect_2d(frame.mLeft + text.mLeft, from, frame.mLeft + text.mRight - 1, to, colorOf("CodeDiffCurrentColor", side->cursorColor()) % (0.8f * alpha), false);
+    }
+}
+
 // --- folds -----------------------------------------------------------------------------
 
 void ALDiffView::setFoldSame(bool fold)
@@ -929,6 +959,7 @@ void ALDiffView::draw()
     }
     LLUICtrl::draw();
     drawFoldRows();
+    drawCurrentChange();
     if (!mInline)
     {
         const S32 half = (getRect().getWidth() - GAP) / 2;

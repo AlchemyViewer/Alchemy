@@ -198,6 +198,8 @@ private:
     // folded; -1 for none.
     S32               foldAtPoint(S32 x, S32 y, ALCodeEditor** side = nullptr);
     void              drawFoldRows();
+    // A line round the change the caret is in, on each side shown.
+    void              drawCurrentChange();
 
     // The bar's count and steps, as the caret of the side in front has them.
     void                    refreshBar();
