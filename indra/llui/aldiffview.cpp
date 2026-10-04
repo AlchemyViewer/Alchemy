@@ -43,15 +43,18 @@ namespace
     LLColor4 colorOf(const char* name, const LLColor4& otherwise) { return LLUIColorTable::instance().getColor(name, otherwise).get(); }
 
     // One side's text as it is shown: its lines, each's number (0 for a
-    // line put in to line the sides up), its tint, and the words marked.
+    // line put in to line the sides up), its tint, the words marked, and
+    // which lines are only there to line the sides up, which a copy leaves
+    // out.
     struct Shown
     {
         std::string                            text;
         std::vector<S32>                       numbers;
         std::vector<LLColor4>                  tints;
         std::vector<ALCodeEditor::Decoration>  words;
+        std::vector<bool>                      spacers;
 
-        S32 add(const std::string& line, S32 number, const LLColor4& tint)
+        S32 add(const std::string& line, S32 number, const LLColor4& tint, bool spacer = false)
         {
             if (!numbers.empty())
             {
@@ -60,6 +63,7 @@ namespace
             text += line;
             numbers.push_back(number);
             tints.push_back(tint);
+            spacers.push_back(spacer);
             return static_cast<S32>(numbers.size()) - 1;
         }
 
@@ -81,6 +85,7 @@ namespace
             editor.setText(text);
             editor.setLineNumbers(std::move(numbers));
             editor.setLineTints(std::move(tints));
+            editor.setSpacerLines(std::move(spacers));
             editor.setDecorations(std::move(words));
         }
     };
@@ -244,8 +249,8 @@ void ALDiffView::rebuild()
         {
             const bool      has_out = n < gone.size();
             const bool      has_in  = n < made.size();
-            const S32       lrow = has_out ? ls.add(left[static_cast<size_t>(gone[n])], gone[n] + 1, out) : ls.add(std::string(), 0, padding);
-            const S32       rrow = has_in ? rs.add(right[static_cast<size_t>(made[n])], made[n] + 1, in) : rs.add(std::string(), 0, padding);
+            const S32       lrow = has_out ? ls.add(left[static_cast<size_t>(gone[n])], gone[n] + 1, out) : ls.add(std::string(), 0, padding, true);
+            const S32       rrow = has_in ? rs.add(right[static_cast<size_t>(made[n])], made[n] + 1, in) : rs.add(std::string(), 0, padding, true);
             if (has_out && has_in)
             {
                 ALTextDiff::spans_t lspans;

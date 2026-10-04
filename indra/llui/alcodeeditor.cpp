@@ -236,9 +236,10 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     hideCard();
-    // Numbers and tints were for the text they were given with.
+    // Numbers, tints and spacers were for the text they were given with.
     mLineNumbers.clear();
     setLineTints({});
+    setSpacerLines({});
     // Each run of lines an edit replaced -- one, or a batch's several.
     const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
     const S32                                         lines = document().lineCount();

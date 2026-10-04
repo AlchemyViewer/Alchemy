@@ -27,6 +27,7 @@
 #include "../aldiffview.h"
 
 #include "../alcodeeditor.h"
+#include "../llclipboard.h"
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
 
@@ -218,5 +219,30 @@ namespace tut
         d.right()->handleUnicodeChar('y', false);
         ensure("nothing told, nothing typed", at_line == -1 && source->text() == "-- written\n\n\nllx.Say(0, \"hi\")");
         source->die();
+    }
+
+    template<> template<>
+    void aldiffview_object::test<7>()
+    {
+        set_test_name("a copy takes each side's text as it is: not the empty lines that line the sides up");
+        ALDiffView& d = make("one\nfour", "one\ntwo\nthree\nfour\nfive");
+        ensure_equals("lined up", d.left()->text(), std::string("one\n\n\nfour\n"));
+        LLClipboard& clipboard = LLClipboard::instance();
+        std::string  copied;
+
+        d.left()->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 0)));
+        d.left()->copy();
+        clipboard.pasteFromClipboard(copied);
+        ensure_equals("all of the left, as its text has it", copied, std::string("one\nfour"));
+
+        d.left()->setSelection(ALTextRange(ALTextPos(0, 1), ALTextPos(2, 0)));
+        d.left()->copy();
+        clipboard.pasteFromClipboard(copied);
+        ensure_equals("into the gap: the line's break, which the text has", copied, std::string("ne\n"));
+
+        d.right()->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 4)));
+        d.right()->copy();
+        clipboard.pasteFromClipboard(copied);
+        ensure_equals("the right, which has no gap, whole", copied, std::string("one\ntwo\nthree\nfour\nfive"));
     }
 }
