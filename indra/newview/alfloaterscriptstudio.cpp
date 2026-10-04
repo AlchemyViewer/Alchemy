@@ -48,6 +48,7 @@
 #include "alscriptstudiofileio.h"
 #include "alscriptstudioglue.h"
 #include "alscriptstudioplaces.h"
+#include "alscriptstudiosnippetnotecard.h"
 #include "alscriptstudiovimrc.h"
 #include "alscriptworkspace.h"
 #include "alemptystate.h"
@@ -154,13 +155,9 @@ namespace
             return lua ? LLSyntaxDefCache::instance().getLuaKeywords() : LLSyntaxDefCache::instance().getLSLKeywords();
         }
         std::string definitionsVersion() override { return LLSyntaxDefCache::instance().getSyntaxID().asString(); }
-        std::string definitionsYaml() override
-        {
-            llifstream        in(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "syntax_default", "lsl_definitions.yaml"), std::ios::binary);
-            std::stringstream text;
-            text << in.rdbuf();
-            return text.str();
-        }
+        // The region's, where it delivered them, as the keywords are; else
+        // those shipped.
+        std::string definitionsYaml() override { return LLSyntaxDefCache::instance().loadCacheFile("lsl_definitions.yaml"); }
         std::vector<std::string> preprocessorWords() override
         {
             std::vector<std::string> words;
@@ -614,6 +611,7 @@ bool ALFloaterScriptStudio::postBuild()
     // wanted and goes when closed. Said here, since building from the
     // skin sets both from the file, which cannot say which this is.
     setIsSingleInstance(mMain);
+    mTabTips = { getString("TabNotecardTip"), getString("TabInventoryTip"), getString("TabObjectTip"), getString("TabReadOnlyTip") };
     if (!mMain)
     {
         // No saved rect: a popped-out window is placed beside the one it
@@ -1475,6 +1473,8 @@ void ALFloaterScriptStudio::draw()
     {
         ALScriptStudioVimrc::instance().check();
     }
+    // The followed snippet notecard's, fetched again where it is saved.
+    ALScriptStudioSnippetNotecard::instance().check();
     mSearchPane->pump();
     mNavigation.pumpSettle();
     refreshUndoLabels();
@@ -3295,14 +3295,14 @@ ALTabStrip::Tab ALFloaterScriptStudio::tabOf(const Doc& doc, const TabFacts& fac
     // does not fit, and the name it cut is the one thing you hover a
     // cut tab to read; saying only where the script lives answered a
     // question nobody had asked.
-    const std::string where = !doc.file.empty()      ? doc.file
-                              : doc.notecard          ? getString("TabNotecardTip")
-                              : doc.ref.inInventory() ? getString("TabInventoryTip")
-                                                      : getString("TabObjectTip");
+    const std::string& where = !doc.file.empty()      ? doc.file
+                               : doc.notecard          ? mTabTips.notecard
+                               : doc.ref.inInventory() ? mTabTips.inventory
+                                                       : mTabTips.object;
     tab.toolTip = doc.name + "\n" + where;
     if (facts.readOnly)
     {
-        tab.toolTip += "\n" + getString("TabReadOnlyTip");
+        tab.toolTip += "\n" + mTabTips.readOnly;
     }
     return tab;
 }
@@ -3900,7 +3900,7 @@ std::vector<ALTextPos> ALFloaterScriptStudio::problemPlaces(const Doc& doc, bool
     const std::string      definitions = getString("OriginDefinitions");
     const std::string      weight      = getString("OriginWeight");
     std::vector<ALTextPos> places;
-    for (const Doc::Shown& row : doc.shown)
+    for (const Doc::Shown& row : doc.shown())
     {
         if (row.file.empty() && row.origin != definitions && row.origin != weight && (!migration || row.migration))
         {
@@ -4898,11 +4898,11 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteScripts(std::v
         for (const std::unique_ptr<Doc>& each : window->mDocs)
         {
             const Doc&        doc   = *each;
-            const std::string where = !doc.file.empty()         ? doc.file
-                                      : doc.notecard            ? getString("TabNotecardTip")
-                                      : doc.ref.inInventory()   ? getString("TabInventoryTip")
-                                      : !doc.objectName.empty() ? doc.objectName
-                                                                : getString("TabObjectTip");
+            const std::string& where = !doc.file.empty()         ? doc.file
+                                       : doc.notecard            ? mTabTips.notecard
+                                       : doc.ref.inInventory()   ? mTabTips.inventory
+                                       : !doc.objectName.empty() ? doc.objectName
+                                                                 : mTabTips.object;
             GoTo target;
             target.kind   = GoTo::Kind::Tab;
             target.window = window->getHandle();
@@ -8130,6 +8130,14 @@ void ALFloaterScriptStudio::addEditCommands()
     addEditorCommand("shrink_selection", ALEditorCommand::ShrinkSelection, false);
     addEditorCommand("select_next_occurrence", ALEditorCommand::SelectNextOccurrence, true);
     addEditorCommand("change_all_occurrences", ALEditorCommand::ChangeAllOccurrences, true);
+    addEditorCommand("add_caret_above", ALEditorCommand::AddCaretAbove, false);
+    addEditorCommand("add_caret_below", ALEditorCommand::AddCaretBelow, false);
+    // Keys a step at a time rather than menu items: Shift-Alt-drag puts a
+    // column with the mouse.
+    addEditorCommand("column_select_left", ALEditorCommand::ColumnSelectLeft, false);
+    addEditorCommand("column_select_right", ALEditorCommand::ColumnSelectRight, false);
+    addEditorCommand("column_select_up", ALEditorCommand::ColumnSelectUp, false);
+    addEditorCommand("column_select_down", ALEditorCommand::ColumnSelectDown, false);
     mCommands.add(
         "convert_slua",
         [this]() {
@@ -8331,7 +8339,7 @@ void ALFloaterScriptStudio::addGoCommands()
             },
             [this]() {
                 Doc* doc = active();
-                return doc && doc->loaded && !doc->shown.empty();
+                return doc && doc->loaded && !doc->shown().empty();
             });
     }
     mCommands.add("next_tab", [this]() { cycleTab(1); });

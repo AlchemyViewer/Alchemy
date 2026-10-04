@@ -31,6 +31,7 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -75,6 +76,10 @@ class ALFindings
 public:
     typedef Finding        finding_t;
     typedef ALFindingLevel Level;
+    // A file's findings as they are held: shared, so that whoever made
+    // them and keeps them too -- a script's tab -- hands them over without
+    // a copy, neither changing them after.
+    typedef std::shared_ptr<const std::vector<Finding>> shared_t;
 
     // Everything one file said, in place of whatever it said before. A file
     // that said nothing is still a file that was checked, and is kept as one
@@ -84,6 +89,10 @@ public:
     // file's each time.
     void replace(const std::string& file, std::vector<Finding> found)
     {
+        replace(file, std::make_shared<const std::vector<Finding>>(std::move(found)));
+    }
+    void replace(const std::string& file, shared_t found)
+    {
         if (file.empty())
         {
             return;
@@ -92,9 +101,13 @@ public:
         {
             mFiles.push_back(file);
         }
+        if (!found)
+        {
+            found = std::make_shared<const std::vector<Finding>>();
+        }
 
         Counts counts;
-        for (const Finding& finding : found)
+        for (const Finding& finding : *found)
         {
             counts.take(finding, 1);
             mTotal.take(finding, 1);
@@ -163,9 +176,10 @@ public:
             {
                 continue;
             }
-            for (size_t at = 0; at < held->second.size(); ++at)
+            const std::vector<Finding>& found = *held->second;
+            for (size_t at = 0; at < found.size(); ++at)
             {
-                const Finding& finding = held->second[at];
+                const Finding& finding = found[at];
                 switch (Traits::level(finding))
                 {
                     case Level::Error:   if (!query.errors)   { continue; } break;
@@ -202,7 +216,7 @@ public:
     const Finding* at(std::string_view file, size_t index) const
     {
         const auto held = mByFile.find(file);
-        return held != mByFile.end() && index < held->second.size() ? &held->second[index] : nullptr;
+        return held != mByFile.end() && index < held->second->size() ? &(*held->second)[index] : nullptr;
     }
 
     // The files that have been checked, in the order they first were.
@@ -242,7 +256,7 @@ public:
         boost::unordered_flat_map<std::string, S32, ll::string_hash, std::equal_to<>> tally;
         for (const auto& [file, found] : mByFile)
         {
-            for (const Finding& finding : found)
+            for (const Finding& finding : *found)
             {
                 ++tally[Traits::rule(finding)];
             }
@@ -265,7 +279,7 @@ private:
         {
             return false;
         }
-        for (const Finding& finding : held->second)
+        for (const Finding& finding : *held->second)
         {
             mTotal.take(finding, -1);
         }
@@ -300,7 +314,7 @@ private:
         }
     };
 
-    boost::unordered_flat_map<std::string, std::vector<Finding>, ll::string_hash, std::equal_to<>> mByFile;
+    boost::unordered_flat_map<std::string, shared_t, ll::string_hash, std::equal_to<>>             mByFile;
     boost::unordered_flat_map<std::string, Counts, ll::string_hash, std::equal_to<>>               mCountByFile;
     std::vector<std::string>                                                                        mFiles;
     Counts                                                                                          mTotal;

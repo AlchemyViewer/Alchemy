@@ -352,7 +352,7 @@ bool ALScriptProblemsPane::postBuild()
 
 void ALScriptProblemsPane::changed(const Doc& doc)
 {
-    mStore.replace(doc.id, doc.shown);
+    mStore.replace(doc.id, doc.shownRows);
     // The list, where it lists this script's: the one it is about, or
     // every one open.
     Doc* shown = listed();
@@ -672,7 +672,7 @@ void ALScriptProblemsPane::fill(const Doc* doc)
     };
     for (const Doc* each : docs)
     {
-        count(each->shown);
+        count(each->shown());
     }
     for (const Checked* each : checked)
     {

@@ -48,9 +48,10 @@ class LLTextBox;
 // in turn, and Space or Return presses the one it is on; and while the
 // bar has the keyboard, Alt with C, W, R or L -- Command and Option with
 // them on a Mac -- turns case, whole words, patterns or the selection on
-// or off, as the modern editors have it; Shift and Return goes back, and
-// Control, Alt and Return -- Command, Option and Return -- replaces every
-// one.
+// or off, as the modern editors have it; Shift and Return goes back,
+// Alt and Return -- Option and Return -- selects every match, each a
+// selection of its own, and Control, Alt and Return -- Command, Option and
+// Return -- replaces every one.
 class ALFindBar : public LLPanel
 {
 public:
@@ -100,6 +101,7 @@ public:
     boost::signals2::connection onPrevious(const signal_t::slot_type& cb) { return mPrevious.connect(cb); }
     boost::signals2::connection onReplace(const signal_t::slot_type& cb) { return mReplace.connect(cb); }
     boost::signals2::connection onReplaceAll(const signal_t::slot_type& cb) { return mReplaceAll.connect(cb); }
+    boost::signals2::connection onSelectAll(const signal_t::slot_type& cb) { return mSelectAll.connect(cb); }
     boost::signals2::connection onClose(const signal_t::slot_type& cb) { return mClose.connect(cb); }
 
     void draw() override;
@@ -139,5 +141,5 @@ private:
     Flat*         mReplaceOne   = nullptr;
     Flat*         mReplaceEvery = nullptr;
 
-    signal_t mChanged, mNext, mPrevious, mReplace, mReplaceAll, mClose;
+    signal_t mChanged, mNext, mPrevious, mReplace, mReplaceAll, mSelectAll, mClose;
 };

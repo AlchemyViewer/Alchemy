@@ -473,7 +473,11 @@ public:
     const std::vector<Completion>& completions() const { return mCompletionModel.list(); }
     S32                            chosenCompletion() const;
     // What accepting does, for whoever has a completion in hand without
-    // the list: the completion in place of the range.
+    // the list: the completion in place of the range. Where there are
+    // several carets it goes in at each -- in place of what reads as the
+    // range does on either side of it, else at it -- each with its own
+    // indentation, and each caret on its first parameter or stop, with
+    // none to Tab through.
     void complete(const Completion& chosen, const ALTextRange& range);
 
     // --- snippets --------------------------------------------------------------------
@@ -540,17 +544,14 @@ public:
     // signature and the stops.
     void                            dropTyping();
 
-    // Every place of a text changed at once, until there are several
-    // carets: the selection a stop, and the places that read as it does
-    // its mirrors, brought up as each key is typed and lit while they
-    // are; Escape, Tab, or the caret off the stop's line lets them go.
+    // Every place of a text changed at once, each a selection of its own.
     // Select Next Occurrence takes the name at the caret, then adds the
-    // next place after the last one taken, going round; Change All takes
-    // every place at once. A name taken so matches whole names only.
+    // next place after the main selection, going round, which becomes the
+    // main one; Change All selects every place at once, the main one kept
+    // main and the others it had let go. A name taken so matches whole
+    // names only.
     bool                            selectNextOccurrence();
     bool                            changeAllOccurrences();
-    void                            undo() override;
-    void                            redo() override;
     // The names of a signature's parameters, and where their list opens
     // (ALSnippetSession).
     static std::vector<std::string> parameterNames(std::string_view detail, std::string_view name = std::string_view())
@@ -838,11 +839,32 @@ private:
     bool hoverCardAt(S32 x, S32 y);
     // A pair typed as it was typed: the opener closed, the closer typed
     // over, a selection wrapped. False where the character is for the
-    // text as ever.
+    // text as ever. At every selection where there are several, each as
+    // it would be on its own, a character as ever at those it pairs
+    // nothing at; false where it pairs nothing at any.
     bool typePair(char c);
+    bool typePairs(char c);
+    // A completion in place of a stretch, as a change: the snippet, the
+    // call or the name, and where the selection is after.
+    ALTextEditing::Change completionAt(const Completion& chosen, const ALTextRange& over);
+    // What a character typed at a selection does as a pair: what it
+    // replaces and where the selection goes, as a change; whether that
+    // goes over a closer typing put in, or puts one in at the caret after.
+    // Nothing where the character is for the text as ever.
+    struct Paired
+    {
+        ALTextEditing::Change change;
+        bool                  over   = false;
+        bool                  closes = false;
+    };
+    std::optional<Paired> pairAt(const ALTextRange& selection, char c);
     // The pair around the caret that one Backspace takes away, if the
-    // closer is one typing put in.
+    // closer is one typing put in: at the caret, or as one Backspace at
+    // every caret where there are several, the pairs at those it finds
+    // one at. False where it finds none.
     bool deletePair();
+    bool deletePairs();
+    std::optional<ALTextRange> pairAround(const ALTextPos& at);
     // The problems squiggled under a position, and the stretch they span.
     std::vector<CardProblem> problemsUnder(const ALTextPos& at, ALTextRange& about) const;
     void vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out);
@@ -1052,15 +1074,19 @@ private:
     bool                    mCompletionMoved = false;
     // The stops of a snippet or a call being filled in (ALSnippetSession).
     ALSnippetSession         mSnippet;
-    // Each placeholder's mirrors made what it holds: as one step of its
-    // own, or as part of the key being typed.
-    void                     syncMirrors(S32 index, bool grouped = true);
+    // Each placeholder's mirrors made what it holds, as one step of its
+    // own.
+    void                     syncMirrors(S32 index);
+    // The selections folding has hidden, the main one among them, each a
+    // caret at the end of the fold's line.
+    void                     caretsOutOfFolds();
     // The places after `from` that read as `wanted`, going round, whole
-    // names only where asked, none of the stop's or its mirrors'; at most
-    // `most` of them.
-    std::vector<ALTextRange> placesOf(const std::string& wanted, bool whole, const ALTextPos& from, size_t most) const;
+    // names only where asked, none over any of `taken` -- the selections
+    // there are; at most `most` of them.
+    std::vector<ALTextRange> placesOf(const std::string& wanted, bool whole, const ALTextPos& from, size_t most,
+                                      const std::vector<ALTextRange>& taken) const;
     // The name Select Next Occurrence took at the caret, whose places are
-    // whole names only.
+    // whole names only: the main selection while it is one of them.
     ALTextRange              mOccurrenceName;
     // The placeholders let go of where the caret has left the lines they
     // and where the call or the snippet ends are on.

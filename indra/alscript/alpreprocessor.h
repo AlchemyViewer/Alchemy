@@ -296,6 +296,26 @@ public:
     // own name makes `--#` more than a comment. npos where the line holds
     // no directive.
     static size_t             directiveName(std::string_view line, bool lua);
+    // Whether a script holds a directive: a line that is one, outside an
+    // LSL block comment. `line` answers a line's text by its index, `count`
+    // of them.
+    static bool usesDirectives(const std::function<std::string_view(S32)>& line, S32 count, bool lua);
+    static bool usesDirectives(std::string_view text, bool lua);
+
+    // Why a script is preprocessed as it goes up, or No, in this order: it
+    // went up in the preprocessor's envelope before, its source kept, and
+    // goes up as it went; it holds a directive, which the grid could
+    // compile no other way, whatever the setting; Preprocess on Save is on,
+    // for every script. `directives` is asked only where it decides.
+    enum class Wanted : U8
+    {
+        No,
+        Enveloped,
+        Directives,
+        Setting
+    };
+    static Wanted wanted(bool enveloped, const std::function<bool()>& directives, bool setting);
+    static Wanted wanted(std::string_view text, bool lua, bool enveloped, bool setting);
 
     // The transform a line of LSL is written for, by the shape of its
     // first statement: `switch (` and `case ...:` the switch's; `break;`,

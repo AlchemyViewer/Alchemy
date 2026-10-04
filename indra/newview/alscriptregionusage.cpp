@@ -26,6 +26,10 @@
 
 #include "alscriptregionusage.h"
 
+#include "llcachename.h"
+
+#include <algorithm>
+
 namespace
 {
     // The objects of a list of groups -- an answer's attachment points, or
@@ -118,6 +122,48 @@ void ALScriptRegionUsage::ask(const std::vector<LLUUID>& roots, F64 now)
             }
         });
     }
+    // Time, of an estate manager: each owner's objects at once, an owner at
+    // most once a minute, whatever was asked of memory.
+    if (!mWorld.mayAskTime || !mWorld.askTime || !mWorld.ownerOf || !mWorld.mayAskTime())
+    {
+        return;
+    }
+    // Each owner asked for now, with the objects of theirs in hand.
+    std::vector<std::pair<std::string, std::vector<LLUUID>>> owners;
+    for (const LLUUID& root : roots)
+    {
+        if (!mWorld.kindOf || mWorld.kindOf(root) == World::Kind::None)
+        {
+            continue;
+        }
+        const std::string owner = mWorld.ownerOf(root);
+        if (owner.empty())
+        {
+            continue;
+        }
+        const auto listed = std::find_if(owners.begin(), owners.end(), [&owner](const auto& one) { return one.first == owner; });
+        if (listed != owners.end())
+        {
+            listed->second.push_back(root);
+            continue;
+        }
+        const auto asked = mTimeAsked.find(owner);
+        if (asked != mTimeAsked.end() && now - asked->second < ASK_EVERY)
+        {
+            continue;
+        }
+        mTimeAsked[owner] = now;
+        owners.push_back({ owner, { root } });
+    }
+    for (auto& [owner, theirs] : owners)
+    {
+        mWorld.askTime(owner, [this, alive, theirs = std::move(theirs)](const times_t& times) {
+            if (alive.lock())
+            {
+                heardTimes(times, LLDate::now(), theirs);
+            }
+        });
+    }
 }
 
 // static
@@ -139,12 +185,84 @@ void ALScriptRegionUsage::heard(const usages_t& usages)
         return;
     }
     // Each object named is answered for as of the last asking, asked with
-    // the others or not: a parcel's answer is every object on it.
+    // the others or not: a parcel's answer is every object on it. Its time,
+    // where said, stays.
     for (const auto& [id, usage] : usages)
     {
-        mUsages[id]      = usage;
+        Usage& kept      = mUsages[id];
+        kept.memory      = usage.memory;
+        kept.urls        = usage.urls;
+        kept.when        = usage.when;
         const auto asked = mAsked.find(id);
         mAsked[id]       = asked != mAsked.end() ? std::max(asked->second, mNow) : mNow;
     }
     mHeard();
+}
+
+void ALScriptRegionUsage::heardTimes(const times_t& times, const LLDate& when, const std::vector<LLUUID>& asked)
+{
+    bool changed = false;
+    for (const auto& [id, time] : times)
+    {
+        Usage& kept   = mUsages[id];
+        kept.time     = time;
+        kept.timeWhen = when;
+        changed       = true;
+    }
+    // An answer short of the most Top Scripts gives names every object of
+    // the owner's that runs scripts: one asked for and not named runs
+    // none now, and what was said of it stands no longer.
+    if (times.size() < TOP_SCRIPTS_MOST)
+    {
+        for (const LLUUID& root : asked)
+        {
+            const auto kept = mUsages.find(root);
+            if (!times.contains(root) && kept != mUsages.end() && kept->second.hasTime())
+            {
+                kept->second.time     = -1.f;
+                kept->second.timeWhen = LLDate(0.0);
+                changed               = true;
+            }
+        }
+    }
+    if (changed)
+    {
+        mHeard();
+    }
+}
+
+// static
+std::optional<size_t> ALScriptRegionUsage::answering(const std::vector<std::string>& waiting, const std::vector<std::string>& named,
+                                                     const std::optional<std::string>& topObjectsOwner)
+{
+    std::vector<std::string> keys;
+    keys.reserve(named.size());
+    for (const std::string& name : named)
+    {
+        keys.push_back(ownerKey(name));
+    }
+    const std::string theirs = topObjectsOwner ? ownerKey(*topObjectsOwner) : std::string();
+    for (size_t i = 0; i < waiting.size(); ++i)
+    {
+        const std::string key = ownerKey(waiting[i]);
+        if ((!topObjectsOwner || key != theirs) && std::find(keys.begin(), keys.end(), key) != keys.end())
+        {
+            return i;
+        }
+    }
+    if (!waiting.empty() && !topObjectsOwner)
+    {
+        return 0;
+    }
+    return std::nullopt;
+}
+
+// static
+std::string ALScriptRegionUsage::ownerKey(std::string name)
+{
+    // The region sends names with spaces after, at times.
+    LLStringUtil::trim(name);
+    name = LLCacheName::buildUsername(name);
+    LLStringUtil::toLower(name);
+    return name;
 }

@@ -177,7 +177,88 @@ namespace tut
         const ALScriptWeight light = ALScriptWeigh::slua("local s = \"x\"\nprint(s)\n");
         ensure("both compiled", heavy.compiled && light.compiled);
         ensure("the string weighs", heavy.total >= light.total + 2000);
-        ensure("in the strings", named(heavy, "strings") && named(heavy, "strings")->bytes >= 2000);
+        // Heavy, it is a part of its own, and no longer the table of
+        // strings'.
+        const ALScriptWeight::Part* constant = nullptr;
+        for (const ALScriptWeight::Part& one : heavy.parts)
+        {
+            constant = one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings" ? &one : constant;
+        }
+        // At the line that loads it: a local never set again is folded into
+        // where it is used, print(s), as -O1 compiles it.
+        ensure("a part of its own:" + listed(heavy), constant && constant->bytes >= 2000 && constant->line == 1);
+        ensure("named by its start: " + (constant ? constant->name : std::string()), constant && constant->name.rfind("\"xxxx", 0) == 0);
+        ensure("not the strings' too", named(heavy, "strings") && named(heavy, "strings")->bytes < 100);
+        ensure("a light one stays the strings'", std::none_of(light.parts.begin(), light.parts.end(), [](const ALScriptWeight::Part& one) {
+                   return one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings";
+               }));
+        // And for the LSL targets: LSO's in its code, Mono's in its strings,
+        // LSL on Luau's in its table; each a part of its own, out of the
+        // handler that held it, the whole as it was.
+        const std::string lsl = "default { state_entry() { llOwnerSay(\"" + words + "\"); } }\n";
+        for (const ALScriptWeight& one : { ALScriptWeigh::lso(lsl), ALScriptWeigh::mono(lsl), ALScriptWeigh::lslLuau(lsl) })
+        {
+            const ALScriptWeight::Part* found = nullptr;
+            size_t                      sum   = 0;
+            for (const ALScriptWeight::Part& part : one.parts)
+            {
+                found = part.kind == ALScriptWeight::Part::Kind::Constant && part.name != "strings" ? &part : found;
+                sum += part.bytes;
+            }
+            const std::string target = ALScriptWeight::nameOf(one.target);
+            ensure(target + ": a part of its own:" + listed(one), one.compiled && found && found->bytes >= 2000 && found->line == 0);
+            ensure(target + ": counted once", sum <= one.total);
+        }
+        // A table's values written in it, which no instruction loads -- the
+        // template carries them: heavy ones are parts of their own too, at
+        // the table's line.
+        const ALScriptWeight table = ALScriptWeigh::slua("local MSG = {\n    welcome = \"" + std::string(300, 'w') + "\",\n    help = \"" +
+                                                         std::string(300, 'h') + "\",\n}\nprint(MSG.welcome, MSG.help)\n");
+        size_t values = 0;
+        for (const ALScriptWeight::Part& one : table.parts)
+        {
+            values += one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings" && one.bytes >= 300 && one.line >= 0 && one.line <= 3;
+        }
+        ensure_equals("each value a part of its own, at the table:" + listed(table), values, size_t(2));
+        // Named by whole characters: the cut, 32 bytes in, falls inside
+        // one, or just after one.
+        const auto whole = [](const std::string& name) {
+            for (size_t i = 0; i < name.size();)
+            {
+                const unsigned char lead = static_cast<unsigned char>(name[i]);
+                const size_t length = lead < 0x80 ? 1 : (lead & 0xE0) == 0xC0 ? 2 : (lead & 0xF0) == 0xE0 ? 3 : (lead & 0xF8) == 0xF0 ? 4 : 0;
+                if (length == 0 || i + length > name.size())
+                {
+                    return false;
+                }
+                for (size_t k = 1; k < length; ++k)
+                {
+                    if ((static_cast<unsigned char>(name[i + k]) & 0xC0) != 0x80)
+                    {
+                        return false;
+                    }
+                }
+                i += length;
+            }
+            return true;
+        };
+        std::string cyrillic, cjk = "a";
+        for (int i = 0; i < 200; ++i)
+        {
+            cyrillic += "\xD0\x96";
+            cjk += "\xE3\x81\x82";
+        }
+        for (const std::string& text : { cyrillic, cjk })
+        {
+            const ALScriptWeight wide = ALScriptWeigh::slua("local s = \"" + text + "\"\nprint(s)\n");
+            const ALScriptWeight::Part* found = nullptr;
+            for (const ALScriptWeight::Part& one : wide.parts)
+            {
+                found = one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings" ? &one : found;
+            }
+            ensure("a wide one named: " + listed(wide), found && whole(found->name) && found->name.find("\xE2\x80\xA6") != std::string::npos);
+        }
+
         const ALScriptWeight broken = ALScriptWeigh::slua("local function (\n");
         ensure("a script that does not compile", !broken.compiled && !broken.error.empty());
     }
@@ -303,7 +384,8 @@ namespace tut
     }
 
     // LSL on Luau: the fork's own compiler, the asset as the server makes
-    // it, the bytecode read back as SLua's is.
+    // it, the bytecode read back as SLua's is; and again with its lines,
+    // for what each comes to.
     template<> template<>
     void alscriptweight_object::test<6>()
     {
@@ -335,6 +417,11 @@ namespace tut
         const ALScriptWeight::Part* touch = named(weight, "touch_start");
         ensure("a handler in its state:" + listed(weight), touch && touch->within == "default" && touch->kind == ALScriptWeight::Part::Kind::Handler);
         ensure_equals("where it is", touch->line, 11);
+        // Its lines, read off the compiler's lined bytecode, which the
+        // server's is not: the total stays what the server charges.
+        ensure("each line weighed:" + lined(weight), at(weight, 9) > 0 && at(weight, 13) > 0 && at(weight, 3) > 0);
+        ensure("the handler's long line its own:" + lined(weight), at(weight, 13) > at(weight, 9));
+        ensure("nothing past the script's lines:" + lined(weight), within(weight, 16, 1000) == 0);
         const ALScriptWeight broken = ALScriptWeigh::lslLuau("default { state_entry() { integer x = ; } }\n");
         ensure("a script that does not compile", !broken.compiled && !broken.error.empty());
     }
@@ -492,5 +579,61 @@ namespace tut
         ensure_equals("the third load as the second", three.total - two.total, two.total - one.total);
         ensure("the second less than the string" + lined(two), two.total - one.total < 20);
         ensure("the string is the first line's" + lined(two), at(two, 4) > at(two, 5) + 80);
+    }
+
+    // SLua's handlers and callbacks are named as the script means them, a
+    // state's with its state, each part from its function to its end; and
+    // a line carries the strings and constants it is first to name.
+    template<> template<>
+    void alscriptweight_object::test<12>()
+    {
+        const std::string script = "local greeting = \"a sentence of some length, said to the owner as the script starts up\"\n"
+                                   "local function twice(n: number): number\n"
+                                   "    return n * 2\n"
+                                   "end\n"
+                                   "local states = {}\n"
+                                   "states.default = {\n"
+                                   "    state_entry = function()\n"
+                                   "        ll.OwnerSay(greeting)\n"
+                                   "    end,\n"
+                                   "}\n"
+                                   "states[\"other place\"] = { touch_start = function(events) print(twice(1)) end }\n"
+                                   "LLEvents:on(\"touch_start\", function(events)\n"
+                                   "    print(\"touched\")\n"
+                                   "end)\n"
+                                   "LLTimers:every(1, function()\n"
+                                   "    print(\"tick\")\n"
+                                   "end)\n";
+        const ALScriptWeight weight = ALScriptWeigh::slua(script);
+        ensure("compiled: " + weight.error, weight.compiled);
+        const auto find = [&](const std::string& name, const std::string& within) -> const ALScriptWeight::Part* {
+            for (const ALScriptWeight::Part& part : weight.parts)
+            {
+                if (part.name == name && part.within == within)
+                {
+                    return &part;
+                }
+            }
+            return nullptr;
+        };
+        const ALScriptWeight::Part* twice = find("twice", "");
+        ensure("a local function, from its function to its end:" + listed(weight), twice && twice->line == 1 && twice->endLine == 3 && twice->endColumn == 3);
+        ensure("not a handler", twice->kind == ALScriptWeight::Part::Kind::Function);
+        const ALScriptWeight::Part* entry = find("state_entry", "default");
+        ensure("a state's handler, with its state:" + listed(weight), entry && entry->kind == ALScriptWeight::Part::Kind::Handler);
+        ensure("from its function to its end", entry->line == 6 && entry->column == 18 && entry->endLine == 8);
+        ensure("a state named by a string:" + listed(weight), find("touch_start", "other place") != nullptr);
+        const ALScriptWeight::Part* touched = find("touch_start", "");
+        ensure("LLEvents' handler by its event:" + listed(weight), touched && touched->kind == ALScriptWeight::Part::Kind::Handler && touched->line == 11);
+        const ALScriptWeight::Part* tick = find("LLTimers:every", "");
+        ensure("what LLTimers calls, by how it is set going:" + listed(weight), tick && tick->kind == ALScriptWeight::Part::Kind::Function);
+
+        // The greeting, a constant the compiler puts where it is used, is
+        // that line's; the strings every line names are counted on some
+        // line, so that the lines come to most of the whole.
+        ensure("the long string on the line that says it:" + lined(weight), at(weight, 7) > 80);
+        ensure("a short one on its own line:" + lined(weight), at(weight, 12) > 4 + std::string("touched").size());
+        const size_t lines = within(weight, 0, 100);
+        ensure("most of the whole on some line: " + std::to_string(lines) + " of " + std::to_string(weight.total), lines * 3 > weight.total * 2);
     }
 }

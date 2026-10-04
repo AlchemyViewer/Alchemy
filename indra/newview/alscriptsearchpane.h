@@ -173,6 +173,9 @@ private:
     // this search's.
     void matched(U32 generation, const std::string& where, const ALScriptRef& ref, const std::string& name, const std::string& text, bool notecard,
                  ALScriptSearch::Matched found);
+    // What an include held of the words, back from away from the main
+    // thread.
+    void includeMatched(U32 generation, const std::string& where, const std::string& name, const std::string& path, ALScriptSearch::Matched found);
     void buildSentence();
     void onChanged();
     void searchOpen(const Doc& doc);

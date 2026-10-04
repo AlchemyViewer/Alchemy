@@ -126,9 +126,9 @@ void ALScriptObjectCheck::begin(const Window::Listed::One& one)
 
 void ALScriptObjectCheck::checkRead(const Window::Listed::One& one, const Window::Read& read)
 {
-    // Read as a tab reads it: as the preprocessor makes it where it runs,
-    // or where the script went up in its envelope; as written otherwise.
-    if (!read.enveloped && !mWindow.preprocessing())
+    // Read as a tab reads it: as the preprocessor makes it where a save
+    // would run it (ALPreprocessor::wanted); as written otherwise.
+    if (ALPreprocessor::wanted(read.text, read.lua, read.enveloped, mWindow.preprocessing()) == ALPreprocessor::Wanted::No)
     {
         ask(one, read, nullptr);
         return;

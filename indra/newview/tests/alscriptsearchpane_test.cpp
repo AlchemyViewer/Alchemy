@@ -435,8 +435,10 @@ namespace tut
         ensure_equals("alone: the script's own", out.search().found().size(), size_t(1));
         ensure("nothing asked of what it includes", studio.askedIncludes.empty());
         out.bar()->setValue("includes", "yes");
+        const S32 before = studio.apart;
         find("timer");
         ensure_equals("and the file it includes, once for the two", out.search().found().size(), size_t(2));
+        ensure("sought apart, once, and back", studio.apart == before + 1 && out.search().pending() == 0);
         const ALScriptSearch::Found& found = out.search().found()[1];
         ensure_equals("by its identity", found.file, std::string("disk:/scripts/lib.lsl"));
         ensure("said to be included", found.where.find(services.words("SearchIncluded")) != std::string::npos && found.where.find("lib.lsl") != std::string::npos);

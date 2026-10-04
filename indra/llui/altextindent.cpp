@@ -611,30 +611,63 @@ std::optional<Change> reindentPasted(const ALTextDocument& doc, const ALTextPos&
 
 // --- whole lines ------------------------------------------------------------------
 
+namespace
+{
+    // What each line first through last gained or lost at its start, by
+    // the replacements of a shift of them.
+    std::vector<S32> shiftOf(const Change& change, S32 first, S32 last, bool in)
+    {
+        std::vector<S32> delta(static_cast<size_t>(last - first + 1), 0);
+        for (const ALTextEditing::Replacement& replacement : change.replacements)
+        {
+            delta[static_cast<size_t>(replacement.range.begin.line - first)] = in ? static_cast<S32>(replacement.text.size()) : -replacement.range.end.column;
+        }
+        return delta;
+    }
+
+    // A place where it was, moved by what its line gained or lost, and
+    // never before the line's start.
+    ALTextPos movedWith(ALTextPos pos, const std::vector<S32>& delta, S32 first)
+    {
+        if (pos.line >= first && pos.line < first + static_cast<S32>(delta.size()))
+        {
+            pos.column = llmax(0, pos.column + delta[static_cast<size_t>(pos.line - first)]);
+        }
+        return pos;
+    }
+}
+
 Change indentLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, bool in, const Options& options)
 {
     const auto [first, last] = ALTextEditing::selectedLines(ALTextRange(anchor, caret));
-    Change change            = shiftLines(doc, first, last, 1, in, options);
-    // What each line gained or lost at its start.
-    std::vector<S32> delta(static_cast<size_t>(last - first + 1), 0);
-    for (const ALTextEditing::Replacement& replacement : change.replacements)
-    {
-        const S32 line          = replacement.range.begin.line;
-        delta[line - first]     = in ? static_cast<S32>(replacement.text.size()) : -replacement.range.end.column;
-    }
-    // The caret and the anchor stay where they were, moved by what their
-    // lines gained or lost, and never before a line's start.
-    const auto moved = [&](ALTextPos pos) {
-        if (pos.line >= first && pos.line <= last)
-        {
-            pos.column = llmax(0, pos.column + delta[pos.line - first]);
-        }
-        return pos;
-    };
-    change.selects = true;
-    change.anchor  = moved(anchor);
-    change.caret   = moved(caret);
+    Change                 change = shiftLines(doc, first, last, 1, in, options);
+    const std::vector<S32> delta  = shiftOf(change, first, last, in);
+    change.selects                = true;
+    change.anchor                 = movedWith(anchor, delta, first);
+    change.caret                  = movedWith(caret, delta, first);
     return change;
+}
+
+std::vector<ALTextEditing::Group> indentLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections, bool in, const Options& options)
+{
+    std::vector<ALTextEditing::Group> groups;
+    for (const ALTextEditing::LineRun& run : ALTextEditing::lineRuns(selections, false))
+    {
+        Change change = shiftLines(doc, run.first, run.last, 1, in, options);
+        if (change.replacements.empty())
+        {
+            continue;
+        }
+        const std::vector<S32> delta = shiftOf(change, run.first, run.last, in);
+        ALTextEditing::Group   group;
+        group.replacements = std::move(change.replacements);
+        for (const size_t i : run.selections)
+        {
+            group.placed.emplace_back(i, ALTextRange(movedWith(selections[i].begin, delta, run.first), movedWith(selections[i].end, delta, run.first)));
+        }
+        groups.push_back(std::move(group));
+    }
+    return groups;
 }
 
 Change shiftLines(const ALTextDocument& doc, S32 first, S32 last, S32 levels, bool in, const Options& options)

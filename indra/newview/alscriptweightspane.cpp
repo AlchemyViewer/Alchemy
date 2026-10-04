@@ -294,6 +294,13 @@ void ALScriptWeightsPane::fillParts()
     {
         head += " " + mStrings->getString("WeightsHeadError", args);
     }
+    // A compiler that records no lines -- LSL's for Luau -- leaves the
+    // heat beside the text with nothing to show: said, rather than left to
+    // look like a script whose lines weigh nothing.
+    if (weight->target == ALScriptWeight::Target::LSLLuau && weight->compiled && weight->total > 0 && weight->lines.empty())
+    {
+        head += " " + mStrings->getString("WeightsHeadNoLines", args);
+    }
     if (mShown.beforeOptimizer)
     {
         const bool own = !mShown.weights.empty() && weight->target == mShown.weights.front().target;
@@ -307,15 +314,33 @@ void ALScriptWeightsPane::fillParts()
             head += " " + mStrings->getString("WeightsHeadBefore");
         }
     }
-    if (mShown.region)
+    if (mShown.region && mShown.region->hasMemory())
     {
         args["[RESERVED]"] = llformat("%f", (F64)mShown.region->memory / 1024.0);
         args["[URLS]"]     = std::to_string(mShown.region->urls);
         args["[WHEN]"]     = ALRecoveryEntry::sayWhen(mShown.region->when);
         head += " " + mStrings->getString(mShown.region->urls > 0 ? "WeightsHeadRegionUrls" : "WeightsHeadRegion", args);
     }
+    // And the time its scripts take, where the region tells an estate
+    // manager.
+    if (mShown.region && mShown.region->hasTime())
+    {
+        args["[TIME]"] = llformat("%.3f", mShown.region->time);
+        args["[WHEN]"] = ALRecoveryEntry::sayWhen(mShown.region->timeWhen);
+        head += " " + mStrings->getString("WeightsHeadRegionTime", args);
+    }
     mHead->setText(head);
-    mHead->setToolTip(mStrings->getString(mShown.region ? "WeightsHeadRegionTip" : "WeightsHeadTip"));
+    // The tip says how each of what the head says is counted.
+    std::string tip = mStrings->getString("WeightsHeadTip");
+    if (mShown.region && mShown.region->hasMemory())
+    {
+        tip += " " + mStrings->getString("WeightsHeadRegionTip");
+    }
+    if (mShown.region && mShown.region->hasTime())
+    {
+        tip += " " + mStrings->getString("WeightsHeadRegionTimeTip");
+    }
+    mHead->setToolTip(tip);
 
     // Each part, with how it moved since the text was last saved, where it
     // was weighed for this target then.

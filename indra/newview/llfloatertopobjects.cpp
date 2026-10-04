@@ -129,7 +129,9 @@ void LLFloaterTopObjects::setMode(U32 mode)
 // static
 void LLFloaterTopObjects::handle_land_reply(LLMessageSystem* msg, void** data)
 {
-    LLFloaterTopObjects* instance = LLFloaterReg::getTypedInstance<LLFloaterTopObjects>("top_objects");
+    // Found, not built: an answer can come while neither window is open
+    // (one of Script Studio's asks, given up on before it came).
+    LLFloaterTopObjects* instance = LLFloaterReg::findTypedInstance<LLFloaterTopObjects>("top_objects");
     if(instance && instance->isInVisibleChain())
     {
         instance->handleReply(msg, data);
@@ -143,7 +145,7 @@ void LLFloaterTopObjects::handle_land_reply(LLMessageSystem* msg, void** data)
     }
     else
     {
-        LLFloaterRegionInfo* region_info_floater = LLFloaterReg::getTypedInstance<LLFloaterRegionInfo>("region_info");
+        LLFloaterRegionInfo* region_info_floater = LLFloaterReg::findTypedInstance<LLFloaterRegionInfo>("region_info");
         if(region_info_floater)
         {
             region_info_floater->enableTopButtons();
@@ -152,8 +154,19 @@ void LLFloaterTopObjects::handle_land_reply(LLMessageSystem* msg, void** data)
 
 }
 
+bool LLFloaterTopObjects::waitsForOwner(std::string& owner) const
+{
+    if (!mWaiting || mAskedMode != STAT_REPORT_TOP_SCRIPTS || !(mAskedFlags & STAT_FILTER_BY_OWNER))
+    {
+        return false;
+    }
+    owner = mAskedFilter;
+    return true;
+}
+
 void LLFloaterTopObjects::handleReply(LLMessageSystem *msg, void** data)
 {
+    mWaiting = false;
     U32 request_flags;
     U32 total_count;
     U64 total_memory = 0;
@@ -456,6 +469,11 @@ void LLFloaterTopObjects::onRefresh()
     flags  = mFlags;
     filter = mFilter;
     clearList();
+
+    mWaiting     = true;
+    mAskedMode   = mode;
+    mAskedFlags  = flags;
+    mAskedFilter = filter;
 
     LLMessageSystem *msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_LandStatRequest);

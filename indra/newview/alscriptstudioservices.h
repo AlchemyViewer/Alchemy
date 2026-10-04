@@ -107,6 +107,22 @@ public:
                             bool focus = true) = 0;
     // A place in a script, gone to once the script is open, or now.
     virtual void goToPlace(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, S32 length) = 0;
+    // Many tabs opened at once: while held, what each would make again --
+    // the strip, the toolbar, the lists -- waits, and is made once as the
+    // last lets go (Held below). Nothing where tabs make nothing.
+    virtual void holdTabs() {}
+    virtual void letGoOfTabs() {}
+    class TabsHeld
+    {
+    public:
+        explicit TabsHeld(ALScriptStudioServices& services) : mServices(services) { mServices.holdTabs(); }
+        ~TabsHeld() { mServices.letGoOfTabs(); }
+        TabsHeld(const TabsHeld&)            = delete;
+        TabsHeld& operator=(const TabsHeld&) = delete;
+
+    private:
+        ALScriptStudioServices& mServices;
+    };
     // A list's row chosen and its place shown: the keyboard left in the
     // list to walk on, or, `to_editor`, taken to the script to type there.
     virtual void revealed(LLUICtrl* list, bool to_editor) = 0;

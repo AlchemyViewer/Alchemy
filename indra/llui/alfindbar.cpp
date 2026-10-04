@@ -490,11 +490,16 @@ bool ALFindBar::handleKeyHere(KEY key, MASK mask)
         }
     }
     // Return goes on through the fields and buttons by themselves; with
-    // Shift, back; with REPLACE_ALL_MASK, every one replaced where the
-    // second row is out.
+    // Shift, back; with Alt, every match selected; with REPLACE_ALL_MASK,
+    // every one replaced where the second row is out.
     if (key == KEY_RETURN && mask == MASK_SHIFT)
     {
         mPrevious();
+        return true;
+    }
+    if (key == KEY_RETURN && mask == MASK_ALT)
+    {
+        mSelectAll();
         return true;
     }
     if (key == KEY_RETURN && mask == REPLACE_ALL_MASK)

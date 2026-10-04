@@ -90,12 +90,6 @@ public:
     const ALTextPos&                after() const { return mAfter; }
     S32                             landing() const { return mLanding; }
     const std::vector<Mirror>&      mirrors() const { return mMirrors; }
-    // Another place that repeats a stop, added as it is found.
-    void                            addMirror(Mirror mirror) { mMirrors.push_back(std::move(mirror)); }
-    // Whether the mirrors are brought up as each key is typed, rather than
-    // as the stop is left: every place of a name being changed at once.
-    void                            setLive(bool live) { mLive = live; }
-    bool                            live() const { return mLive && active(); }
 
     // An edit heard: the stop being typed over becomes what was typed, the
     // others move with the text, and one the edit cut into goes, with its
@@ -124,7 +118,6 @@ private:
     ALTextPos                mAfter;
     std::vector<Mirror>      mMirrors;
     S32                      mSyncing = -1;
-    bool                     mLive    = false;
     // How long the text `${0:text}` put where the caret lands is, to be
     // chosen as it lands; nothing for a bare $0.
     S32                      mLanding = 0;

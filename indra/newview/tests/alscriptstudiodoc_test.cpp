@@ -262,11 +262,11 @@ namespace tut
         rows[2].level = Doc::Level::Warning;
         rows[3].level = Doc::Level::Note;
         doc.setShown(rows);
-        ensure("four rows", doc.shown.size() == 4);
+        ensure("four rows", doc.shown().size() == 4);
         ensure_equals("one error", doc.shownErrors, 1);
         ensure_equals("two warnings", doc.shownWarnings, 2);
         doc.setShown({});
-        ensure("none", doc.shown.empty() && doc.shownErrors == 0 && doc.shownWarnings == 0);
+        ensure("none", doc.shown().empty() && doc.shownErrors == 0 && doc.shownWarnings == 0);
     }
 
     template<> template<>

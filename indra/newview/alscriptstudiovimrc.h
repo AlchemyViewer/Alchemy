@@ -33,21 +33,14 @@
 #include <memory>
 #include <string>
 
+class ALFollowedNotecard;
 class ALWatchedFile;
 
 // The vimrc Script Studio's vim reads: the file vimrc in the viewer's
 // settings folder, or a notecard dropped on the box for it in the
-// studio's preferences, which is the vimrc while it is set -- kept in the
-// account's settings, since the notecard is the account's.
-//
-// A notecard's text is kept on disk with the asset it was read from.
-// An asset never changes: an edit to the notecard makes a new one and
-// gives the item its id, so while the item's asset is the one kept the
-// copy is the notecard as it stands, and it is read from disk rather
-// than fetched again -- at once, before inventory has so much as loaded,
-// so that the mappings are there from the first key. An item that has
-// moved on to another asset is fetched, the copy standing in until the
-// new text comes.
+// studio's preferences, which is the vimrc while it is set -- followed by
+// ALFollowedNotecard, which keeps its text on disk with the asset it was
+// read from, so that the mappings are there from the first key.
 class ALScriptStudioVimrc final : public LLSingleton<ALScriptStudioVimrc>
 {
     LLSINGLETON(ALScriptStudioVimrc);
@@ -87,12 +80,7 @@ private:
     // What the vimrc is now, from wherever the setting says.
     void refresh();
     void readFile();
-    void fetch(const LLUUID& item);
-    // The notecard's copy on disk, read once and written as it changes.
-    static std::string cachePath();
-    void               loadCache();
-    void               saveCache();
-    void               take(const std::string& text, const std::string& error);
+    void take(const std::string& text, const std::string& error);
 
     std::string      mText;
     std::string      mError;
@@ -100,15 +88,7 @@ private:
     // changes (ALWatchedFile, off the main thread).
     std::unique_ptr<ALWatchedFile> mWatch;
     LLTimer          mSinceCheck;
-    // The notecard's copy kept on disk: whose, from which asset, its name
-    // and its text.
-    bool             mCacheLoaded = false;
-    LLUUID           mCacheItem;
-    LLUUID           mCacheAsset;
-    std::string      mCacheName;
-    std::string      mCacheText;
-    // The asset a fetch is on its way for, so that another is not asked.
-    LLUUID           mFetching;
-    boost::signals2::scoped_connection mSettingChanged;
+    std::unique_ptr<ALFollowedNotecard> mNotecard;
+    boost::signals2::scoped_connection  mNotecardChanged;
     changed_signal_t mChanged;
 };

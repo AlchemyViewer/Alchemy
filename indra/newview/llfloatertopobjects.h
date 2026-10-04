@@ -72,6 +72,11 @@ public:
     static void setMode(U32 mode);
     void disableRefreshBtn();
 
+    // Whether it waits on an answer of top scripts filtered by owner, and
+    // whose: the region's answer says neither who asked nor what for, and
+    // Script Studio asks the same (ALScriptWorkspace::processLandStatReply).
+    bool waitsForOwner(std::string& owner) const;
+
 private:
     LLFloaterTopObjects(const LLSD& key);
     ~LLFloaterTopObjects();
@@ -113,6 +118,12 @@ private:
     U32 mCurrentMode;
     U32 mFlags;
     std::string mFilter;
+
+    // What was last asked, until its answer comes.
+    bool        mWaiting     = false;
+    U32         mAskedMode   = 0;
+    U32         mAskedFlags  = 0;
+    std::string mAskedFilter;
 
     bool mInitialized;
 

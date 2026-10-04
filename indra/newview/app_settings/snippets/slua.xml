@@ -96,7 +96,7 @@ end</string>
       <key>detail</key>
       <string>A loop over a table</string>
       <key>body</key>
-      <string>for ${1:key}, ${2:value} in ${3:table} do
+      <string>for ${1:k}, ${2:v} in ${3:table} do
     $0
 end</string>
     </map>

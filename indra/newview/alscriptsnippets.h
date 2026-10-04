@@ -28,9 +28,10 @@
 #include <vector>
 
 // What completion and Insert > Snippet offer: the viewer's snippets, from
-// app_settings/snippets, and the scripter's own, from the same folder under
-// the settings folder, which the preferences' Snippets tab edits and a
-// scripter may also edit as XML. Each file is an LLSD array of maps with a
+// app_settings/snippets; those of a notecard the scripter follows, as it
+// stands; and the scripter's own, from the same folder under the settings
+// folder, which the preferences' Snippets tab edits and a scripter may also
+// edit as XML. Each file is an LLSD array of maps with a
 // name, the prefix completion offers it under, a line of detail, and the
 // body, where ${1:text}, ${2} and $1 are the places Tab goes through and $0
 // is where the caret ends.
@@ -44,11 +45,22 @@ namespace ALScriptSnippets
         std::string body;
         // The viewer's, which a scripter copies to change.
         bool        builtin = false;
+        // The followed notecard's, which a scripter copies to change, or
+        // changes in the notecard.
+        bool        followed = false;
     };
 
-    // Every snippet of a language, the viewer's then the scripter's; read
-    // once, and again after either file changes.
+    // Every snippet of a language, the viewer's, the followed notecard's,
+    // then the scripter's; read once, and again after either file or the
+    // notecard changes.
     const std::vector<Snippet>& all(bool lua);
+    // The notecard followed, by its text, its snippets taken in place of
+    // those it had -- each in the language it says, one saying none in
+    // both; none with empty text. False, with none taken, where the text
+    // is not snippets.
+    bool                        follow(const std::string& notecard_text);
+    // The followed notecard's alone.
+    const std::vector<Snippet>& followed(bool lua);
     // The scripter's own alone, as their file holds them.
     std::vector<Snippet>        own(bool lua);
     // The scripter's own written back, and offered from then on. False

@@ -198,7 +198,8 @@ endfunction()
 # and a run that installs nothing still costs seconds. It runs only when
 # something it reads has changed since the install that last ran: the
 # manifest, the registry configuration, the triplets and what they include,
-# the feature list, the triplet, and the vcpkg tool. The root writes the
+# the feature list, the triplet, the overlay ports asked for, and the vcpkg
+# tool. An overlay port's own files changing is not seen: delete the stamp. The root writes the
 # stamp once project() has returned, which is after the install succeeded.
 # AL_VCPKG_INSTALL off leaves the ports to you; deleting the stamp file
 # forces one install.
@@ -235,6 +236,7 @@ if(AL_VCPKG_INSTALL)
   string(APPEND al_vcpkg_install_key "triplet=${VCPKG_TARGET_TRIPLET};")
   string(APPEND al_vcpkg_install_key "features=${VCPKG_MANIFEST_FEATURES};")
   string(APPEND al_vcpkg_install_key "toolchain=${CMAKE_TOOLCHAIN_FILE};")
+  string(APPEND al_vcpkg_install_key "overlays=${VCPKG_OVERLAY_PORTS};")
 
   if(DEFINED VCPKG_INSTALLED_DIR)
     set(al_vcpkg_installed_dir "${VCPKG_INSTALLED_DIR}")

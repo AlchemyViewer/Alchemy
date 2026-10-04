@@ -441,6 +441,7 @@ void ALScriptExplorerPane::contentsHeard(const ALScriptContents& contents)
         mWindow->explorerPinsChanged();
     }
     mStale = true;
+    ALScriptStudioServices::TabsHeld held(*mServices);
     for (Model::Opening& one : heard.opening)
     {
         mServices->openScript(one.ref, one.name, std::move(one.text));
@@ -552,9 +553,25 @@ void ALScriptExplorerPane::fill()
                                                   : bracketed(mServices->words("KindAwayIn", where));
                 if (const ALScriptRegionUsage::Usage* reserved = row.present ? usage.usageOf(row.value["root"].asUUID()) : nullptr)
                 {
-                    LLStringUtil::format_map_t size;
-                    size["[RESERVED]"] = llformat("%f", (F64)reserved->memory / 1024.0);
-                    out.suffix += bracketed(mServices->words("ExplorerReserved", size));
+                    // What it reserves, and the time its scripts take where
+                    // the region tells an estate manager.
+                    std::string said;
+                    if (reserved->hasMemory())
+                    {
+                        LLStringUtil::format_map_t size;
+                        size["[RESERVED]"] = llformat("%f", (F64)reserved->memory / 1024.0);
+                        said               = mServices->words("ExplorerReserved", size);
+                    }
+                    if (reserved->hasTime())
+                    {
+                        LLStringUtil::format_map_t time;
+                        time["[TIME]"] = llformat("%.3f", reserved->time);
+                        said += (said.empty() ? "" : ", ") + mServices->words("ExplorerTime", time);
+                    }
+                    if (!said.empty())
+                    {
+                        out.suffix += bracketed(said);
+                    }
                 }
                 out.icon   = row.many ? "Inv_Object_Multi" : "Inv_Object";
                 break;
@@ -676,7 +693,8 @@ void ALScriptExplorerPane::onChosen()
 {
     // A script or notecard opened; an object, a prim or a linkset's row of
     // prims holding nothing opened where it is folded, folded where it is
-    // open.
+    // open. The tabs made once, as the last is opened.
+    ALScriptStudioServices::TabsHeld held(*mServices);
     for (const LLSD& value : mTree->chosen())
     {
         const std::optional<Choice> row = Choice::of(value);

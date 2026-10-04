@@ -382,6 +382,11 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="TrailerSourceTipNoKeys">Showing the source. Click for the Preprocessed view, the code the server compiles</floater.string>
     <floater.string name="TrailerExpandedTip">Showing the preprocessed code the server compiles; read-only. Click for the source ([KEYS])</floater.string>
     <floater.string name="TrailerExpandedTipNoKeys">Showing the preprocessed code the server compiles; read-only. Click for the source</floater.string>
+    <floater.string name="TrailerPreprocessedEnveloped">A save preprocesses it: it was saved with the preprocessor before, and keeps its source.</floater.string>
+    <floater.string name="TrailerPreprocessedDirectives">A save preprocesses it: it has directives, which the server could compile no other way.</floater.string>
+    <floater.string name="TrailerPreprocessedSetting">A save preprocesses it: Build &gt; Preprocess on Save is on.</floater.string>
+    <floater.string name="TrailerNotPreprocessed">Not preprocessed on save</floater.string>
+    <floater.string name="TrailerNotPreprocessedTip">A save sends this script as written: it has no directive, was not saved with the preprocessor before, and Build &gt; Preprocess on Save is off. The Preprocessed view shows what the preprocessor would make of it, not what goes up.</floater.string>
     <floater.string name="ReferenceDeclaration">declaration</floater.string>
     <floater.string name="ReferenceDeclarationTip">Where [NAME] is declared</floater.string>
     <floater.string name="OutlineNoMatch">No symbol names match what you typed.</floater.string>
@@ -469,6 +474,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="RenameAfter">Renamed to [NAME]</floater.string>
     <floater.string name="RenameChangesNotHere">[SCRIPT] is not open here, or has changed since the lookup; its occurrences are listed in References.</floater.string>
     <floater.string name="FixAllPreviewed">[FIXES] for [NAME], shown beside the text. Apply makes them, as one step to undo.</floater.string>
+    <floater.string name="FixAllNotPreviewed">Nothing previewed is waiting to be applied. Ask for the fixes again to see them.</floater.string>
+    <floater.string name="FixAllNotMade">The fixes were not made: the text would not take them.</floater.string>
     <floater.string name="FixAllChangedSince">The text changed after the preview, so its fixes were not made. Use Fix All again to see them for the text now.</floater.string>
     <floater.string name="ActionApplyFixes">Apply</floater.string>
     <floater.string name="ActionApplyFixesTip">Make the fixes previewed in [NAME], as one step to undo</floater.string>
@@ -622,6 +629,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="RequireNotPreprocessed">require("[NAME]") is saved as written, but the grid does not support require: turn on Build &gt; Preprocess on Save to include the module</floater.string>
     <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Build > Preprocess on Save and Build > Extensions)</floater.string>
     <floater.string name="PreprocHintConst">([WORD] declares a constant, and lets a global be computed from other globals: turn on Build &gt; Preprocess on Save)</floater.string>
+    <floater.string name="PreprocHintDirective">(lines starting with # are the preprocessor's: turn on Build &gt; Preprocess on Save)</floater.string>
     <floater.string name="PreprocHintInline">([WORD] marks a function to be inlined at each call: turn on Build &gt; Preprocess on Save)</floater.string>
     <floater.string name="ClearRecentFiles">Clear Menu</floater.string>
     <floater.string name="OriginCompiler">Compiler</floater.string>
@@ -669,13 +677,17 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="WeightsHeadEstimate">[NAME] on [TARGET]: about [SIZE,number,1] of [LIMIT] KB used, [SHARE].</floater.string>
     <floater.string name="WeightsHeadFailed">[NAME] does not compile for [TARGET]: [ERROR]</floater.string>
     <floater.string name="WeightsHeadError">Currently, [ERROR].</floater.string>
+    <floater.string name="WeightsHeadNoLines">Its lines are not weighed one by one: the compiler for [TARGET] records no lines.</floater.string>
     <floater.string name="WeightsHeadBefore">Measured before the preprocessor's optimizer, which runs on save.</floater.string>
     <floater.string name="WeightsHeadSent">Measured before the preprocessor's optimizer. As saved, it is [SENT,number,1] KB.</floater.string>
     <floater.string name="WeightsHeadTip">Code size only, not counting the lists and strings the script builds while it runs.</floater.string>
     <floater.string name="WeightsHeadRegion">In the region, its object reserves [RESERVED,number,0] KB for all its scripts, as of [WHEN].</floater.string>
     <floater.string name="WeightsHeadRegionUrls">In the region, its object reserves [RESERVED,number,0] KB and [URLS] URLs for all its scripts, as of [WHEN].</floater.string>
-    <floater.string name="WeightsHeadRegionTip">Code size only, not counting the lists and strings the script builds while it runs. The region counts the memory of every script in the object, each at its limit (64 KB for Mono unless llSetMemoryLimit lowers it), not what it uses.</floater.string>
+    <floater.string name="WeightsHeadRegionTip">The region counts the memory of every script in the object, each at its limit (64 KB for Mono unless llSetMemoryLimit lowers it), not what it uses.</floater.string>
     <floater.string name="ExplorerReserved">[RESERVED,number,0] KB reserved</floater.string>
+    <floater.string name="ExplorerTime">[TIME] ms a frame</floater.string>
+    <floater.string name="WeightsHeadRegionTime">Its scripts take [TIME] ms of the region's time a frame, as of [WHEN].</floater.string>
+    <floater.string name="WeightsHeadRegionTimeTip">The time is the region's own count for all the object's scripts, on average, as its Top Scripts list shows an estate manager.</floater.string>
     <floater.string name="WeightsTargetTip">[TARGET]: [BYTES] bytes of code, of [MAX] bytes of memory.</floater.string>
     <floater.string name="WeightsTargetEstimateTip">[TARGET]: about [BYTES] bytes of code, of [MAX] bytes of memory, estimated from the compiled code.</floater.string>
     <floater.string name="WeightsTargetFailedTip">Does not compile for [TARGET]: [ERROR]</floater.string>
@@ -973,6 +985,15 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
             <menu_item_call label="Change All Occurrences" layout="topleft" name="change_all_occurrences">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="change_all_occurrences" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="change_all_occurrences" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Add Caret Above" layout="topleft" name="add_caret_above">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="add_caret_above" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="add_caret_above" />
+            </menu_item_call>
+            <menu_item_call label="Add Caret Below" layout="topleft" name="add_caret_below">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="add_caret_below" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="add_caret_below" />
             </menu_item_call>
         </menu>
         <menu

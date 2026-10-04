@@ -462,4 +462,26 @@ namespace tut
         ensure("off a line's end to the next", d.nextCluster(ALTextPos(0, static_cast<S32>(lines[0].size()))) == ALTextPos(1, 0));
         ensure("back off its start to the one before", d.prevCluster(ALTextPos(1, 0)) == ALTextPos(0, static_cast<S32>(lines[0].size())));
     }
+
+    template<> template<>
+    void altextdocument_object::test<20>()
+    {
+        set_test_name("a place moved by an edit, pushed by text put in at it or not; and the stretch a place stood in, a batch's own, not the text between");
+        ALTextDocument             doc("abcdef");
+        const ALTextDocument::Edit typed = doc.insert(ALTextPos(0, 2), "XY");
+        ensure("pushed", typed.placed(ALTextPos(0, 2)) == ALTextPos(0, 4));
+        ensure("not pushed", typed.placed(ALTextPos(0, 2), false) == ALTextPos(0, 2));
+        ensure("after it moved either way", typed.placed(ALTextPos(0, 3), false) == ALTextPos(0, 5));
+        ensure("nothing stood in what was put in", !typed.replacedAround(ALTextPos(0, 2)));
+
+        // "abXYcdef": "XY" and "ef" replaced at once.
+        const ALTextDocument::Edit batch =
+            doc.replaceMany({ { ALTextRange(ALTextPos(0, 2), ALTextPos(0, 4)), "-" }, { ALTextRange(ALTextPos(0, 6), ALTextPos(0, 8)), "" } });
+        ensure_equals("made", doc.text(), std::string("ab-cd"));
+        ensure("in the first", batch.replacedAround(ALTextPos(0, 3)) == ALTextRange(ALTextPos(0, 2), ALTextPos(0, 4)));
+        ensure("at the second's start", batch.replacedAround(ALTextPos(0, 6)) == ALTextRange(ALTextPos(0, 6), ALTextPos(0, 8)));
+        ensure("not between them", !batch.replacedAround(ALTextPos(0, 4)) && !batch.replacedAround(ALTextPos(0, 5)));
+        ensure("nor at an end", !batch.replacedAround(ALTextPos(0, 8)));
+        ensure("between them, moved by the first", batch.placed(ALTextPos(0, 5)) == ALTextPos(0, 4));
+    }
 }
