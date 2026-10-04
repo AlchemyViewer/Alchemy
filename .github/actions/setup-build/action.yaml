@@ -1,0 +1,114 @@
+name: Set up the build
+description: >-
+  Installs the host packages, Python tools and vcpkg that configuring the
+  viewer needs, and adds the R2 vcpkg binary cache when asked to. Expects the
+  repository checked out with its submodules and VCPKG_ROOT set.
+
+inputs:
+  r2-cache-mode:
+    description: "read or readwrite to use the R2 vcpkg binary cache; empty to go without it"
+    required: false
+    default: ""
+  r2-endpoint-url:
+    description: "The R2 account's S3 endpoint"
+    required: false
+    default: ""
+  r2-bucket:
+    description: "The R2 bucket holding the cache"
+    required: false
+    default: ""
+  r2-access-key-id:
+    description: "R2 access key id"
+    required: false
+    default: ""
+  r2-secret-access-key:
+    description: "R2 secret access key"
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Linux dependency install and disk cleanup
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          autoconf autoconf-archive automake bison build-essential cmake curl flex gettext \
+          libasound2-dev libaudio-dev libdbus-1-dev libdecor-0-dev libdrm-dev \
+          libegl1-mesa-dev libfribidi-dev libgbm-dev libgl1-mesa-dev libgl1-mesa-dri libgles2-mesa-dev \
+          libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libibus-1.0-dev libjack-dev libltdl-dev \
+          libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
+          libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
+          libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
+          libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev mold \
+          nasm ninja-build pkgconf tar tex-common texinfo unzip zip
+
+        sudo locale-gen en_US.UTF-8
+        sudo locale-gen en_GB.UTF-8
+        sudo locale-gen fr_FR.UTF-8
+
+        df -h
+        sudo docker container prune -f
+        sudo docker image prune -a -f
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /usr/local/.ghcup
+        df -h
+
+    - name: macOS Homebrew dependency install
+      if: runner.os == 'macOS'
+      shell: bash
+      run: brew install autoconf autoconf-archive automake libtool nasm unzip zip
+
+    - name: Setup python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.14"
+
+    # Linux builds with the CMake floor, so the floor is a floor.
+    - name: Install python dependencies
+      shell: bash
+      run: |
+        if [[ "$RUNNER_OS" == "Linux" ]]
+        then pip3 install llsd cmake==4.0.0 ninja
+        else pip3 install llsd cmake ninja
+        fi
+
+    - name: Bootstrap vcpkg Windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: ./vcpkg/bootstrap-vcpkg.bat
+
+    - name: Bootstrap vcpkg non-Windows
+      if: runner.os != 'Windows'
+      shell: bash
+      run: ./vcpkg/bootstrap-vcpkg.sh
+
+    # Ports built with cargo (Velopack) fetch their crates here. Keyed on the
+    # manifest and the registry baseline, which decide the crate versions.
+    - name: Cache Rust dependencies
+      uses: actions/cache@v6
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-cargo-${{ hashFiles('indra/vcpkg.json', 'indra/vcpkg-configuration.json') }}
+        restore-keys: ${{ runner.os }}-cargo-
+
+    - name: Install AWS CLI on macOS
+      if: inputs.r2-cache-mode != '' && runner.os == 'macOS'
+      shell: bash
+      run: brew install awscli
+
+    - name: Configure R2 binary cache
+      if: inputs.r2-cache-mode != ''
+      shell: bash
+      env:
+        R2_CACHE_MODE: ${{ inputs.r2-cache-mode }}
+        R2_ENDPOINT_URL: ${{ inputs.r2-endpoint-url }}
+        R2_BUCKET: ${{ inputs.r2-bucket }}
+        R2_ACCESS_KEY_ID: ${{ inputs.r2-access-key-id }}
+        R2_SECRET_ACCESS_KEY: ${{ inputs.r2-secret-access-key }}
+      run: python scripts/vcpkg/configure_r2_cache.py
