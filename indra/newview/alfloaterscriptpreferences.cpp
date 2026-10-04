@@ -108,12 +108,17 @@ namespace
 
     // The notecard of the agent's own that a drop carries, a link as what
     // it links to -- the notecard's asset is what changes as it is edited;
-    // null where it carries anything else.
+    // null where it carries anything else. The kind first: a drag of a
+    // person or a group carries an id, not an item.
     const LLViewerInventoryItem* droppedNotecard(EDragAndDropType cargo_type, void* cargo_data)
     {
+        if (cargo_type != DAD_NOTECARD || !cargo_data)
+        {
+            return nullptr;
+        }
         const LLInventoryItem*       item = static_cast<LLInventoryItem*>(cargo_data);
-        const LLViewerInventoryItem* held = item ? gInventory.getItem(item->getLinkedUUID()) : nullptr;
-        return cargo_type == DAD_NOTECARD && held && held->getType() == LLAssetType::AT_NOTECARD ? held : nullptr;
+        const LLViewerInventoryItem* held = gInventory.getItem(item->getLinkedUUID());
+        return held && held->getType() == LLAssetType::AT_NOTECARD ? held : nullptr;
     }
 
     const S32 SWATCH_ROW    = 24;
