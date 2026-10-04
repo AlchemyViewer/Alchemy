@@ -5194,6 +5194,8 @@ void ALTextView::draw()
     // A tint behind each line that has one, under everything else.
     if (!mLineTints.empty())
     {
+        // The first and last rows in sight may be partly out of it.
+        LLLocalClipRect clip(text);
         const S32 row_h = layout().rowHeight();
         forEachVisibleRow(text, [&](S32 line, S32, S32 screen_top) {
             if (line < static_cast<S32>(mLineTints.size()) && mLineTints[static_cast<size_t>(line)].mV[VALPHA] > 0.f)

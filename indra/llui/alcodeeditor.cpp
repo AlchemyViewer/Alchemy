@@ -1426,6 +1426,9 @@ void ALCodeEditor::drawBeforeRows(const LLRect& text)
         S32 row;
         layout().xOf(caret().line, caret().column, &row);
         const S32 top = screenTopOf(text, caret().line, row);
+        // Drawn before the text's clip, and the caret's line may be
+        // scrolled partly or wholly out of sight.
+        LLLocalClipRect clip(text);
         gl_rect_2d(text.mLeft, top, text.mRight, top - layout().rowHeight(), currentLineColor() % alpha);
     }
     drawGutter(text, alpha);
