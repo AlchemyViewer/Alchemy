@@ -236,8 +236,15 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     hideCard();
-    // Numbers, tints and spacers were for the text they were given with.
+    // Numbers, signs, tints and spacers were for the text they were given
+    // with, as were the ruler's tints.
     mLineNumbers.clear();
+    mLineSigns.clear();
+    if (!mRulerTints.empty())
+    {
+        mRulerTints.clear();
+        ++mMarksRevision;
+    }
     setLineTints({});
     setSpacerLines({});
     // Each run of lines an edit replaced -- one, or a batch's several.
@@ -905,6 +912,14 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
                     gGL.color4fv(lit.mV);
                     gl_circle_2d(static_cast<F32>(box.mRight), static_cast<F32>(box.mBottom) + 1.f, 2.f, 8, true);
                 }
+            }
+            else if (line < static_cast<S32>(mLineSigns.size()) && mLineSigns[static_cast<size_t>(line)])
+            {
+                // A diff's sign, where the mark goes, in the numbers' ink.
+                const char  sign = mLineSigns[static_cast<size_t>(line)];
+                const char* said = sign == '-' ? "\xE2\x88\x92" : sign == '+' ? "+" : "~";
+                font->renderUTF8(said, 0, gutter.mLeft + MARK_INSET + MARK_SIZE / 2, screen_top - ascent, line == caret_line ? lit : ink, LLFontGL::HCENTER,
+                                 LLFontGL::BASELINE);
             }
         }
         // A marker at a block's first line: pointing right at a folded

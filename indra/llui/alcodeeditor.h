@@ -324,6 +324,12 @@ public:
     void                         setLineNumberBase(S32 base) { mLineNumberBase = llmax(-1, base); }
     S32                          lineNumberBase() const override { return mLineNumberBase; }
     const std::vector<S32>&      lineNumbers() const { return mLineNumbers; }
+    // For a side of a diff too, what each line is beside its number, so
+    // that a change reads without its colour: '+' put in, '-' taken out,
+    // '~' changed into another, nought nothing. Where a problem's mark
+    // leaves the line none; cleared as the numbers are.
+    void                         setLineSigns(std::string signs) { mLineSigns = std::move(signs); }
+    const std::string&           lineSigns() const { return mLineSigns; }
     // Whether a line was changed since the text was last saved: the
     // gutter bars it, and a save clears them all.
     bool lineChanged(S32 line) const;
@@ -899,6 +905,7 @@ private:
 
     bool mShowLineNumbers      = true;
     std::vector<S32>      mLineNumbers;
+    std::string           mLineSigns;
     S32                   mLineNumberBase = 0;
     bool mShowFoldMarkers      = true;
     bool mHighlightCurrentLine = true;

@@ -62,6 +62,8 @@ namespace
         std::vector<ALCodeEditor::Decoration>  words;
         std::vector<bool>                      spacers;
         std::vector<LLColor4>                  marks;
+        // Beside each line's number: '+', '-', '~' or nought.
+        std::string                            signs;
 
         S32 add(const std::string& line, S32 number, const LLColor4& tint, bool spacer = false, const LLColor4& mark = LLColor4::transparent)
         {
@@ -74,8 +76,11 @@ namespace
             tints.push_back(tint);
             spacers.push_back(spacer);
             marks.push_back(mark);
+            signs.push_back('\0');
             return static_cast<S32>(numbers.size()) - 1;
         }
+
+        void sign(S32 row, char said) { signs[static_cast<size_t>(row)] = said; }
 
         void mark(S32 row, const ALTextDiff::spans_t& spans, const LLColor4& color)
         {
@@ -98,6 +103,7 @@ namespace
             editor.setSpacerLines(std::move(spacers));
             editor.setDecorations(std::move(words));
             editor.setRulerTints(std::move(marks));
+            editor.setLineSigns(std::move(signs));
         }
     };
 }
@@ -417,6 +423,15 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
             const bool      has_in  = n < made.size();
             const S32       lrow = has_out ? ls.add(left[static_cast<size_t>(gone[n])], gone[n] + 1, out, false, out_mark) : ls.add(std::string(), 0, padding, true, in_mark);
             const S32       rrow = has_in ? rs.add(right[static_cast<size_t>(made[n])], made[n] + 1, in, false, in_mark) : rs.add(std::string(), 0, padding, true, out_mark);
+            // Changed where both have a line, else taken out or put in.
+            if (has_out)
+            {
+                ls.sign(lrow, has_in ? '~' : '-');
+            }
+            if (has_in)
+            {
+                rs.sign(rrow, has_out ? '~' : '+');
+            }
             if (has_out && has_in)
             {
                 ALTextDiff::spans_t lspans;
@@ -430,13 +445,13 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
         const S32 first_out = static_cast<S32>(is.numbers.size());
         for (const S32 line : gone)
         {
-            is.add(left[static_cast<size_t>(line)], 0, out, false, out_mark);
+            is.sign(is.add(left[static_cast<size_t>(line)], 0, out, false, out_mark), '-');
             mInlineLeftRows.push_back(line + 1);
         }
         const S32 first_in = static_cast<S32>(is.numbers.size());
         for (const S32 line : made)
         {
-            is.add(right[static_cast<size_t>(line)], line + 1, in, false, in_mark);
+            is.sign(is.add(right[static_cast<size_t>(line)], line + 1, in, false, in_mark), '+');
             mInlineLeftRows.push_back(0);
         }
         for (size_t n = 0; n < gone.size() && n < made.size(); ++n)

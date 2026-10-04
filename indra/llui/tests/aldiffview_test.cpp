@@ -519,4 +519,15 @@ namespace tut
         d.setInline(true);
         ensure("inline: the line taken out, and the two put in", red(d.inlined(), 1) && !red(d.inlined(), 2) && !red(d.inlined(), 4) && !marked(d.inlined(), 3));
     }
+
+    template<> template<>
+    void aldiffview_object::test<16>()
+    {
+        set_test_name("beside the numbers, what each line is, so a change reads without its colour: ~ changed, - taken out, + put in");
+        ALDiffView& d = make("a\nb\nc\ne\nf", "a\nx\nc\nd\ne");
+        ensure("the left: the line changed, the one taken out", d.left()->lineSigns() == std::string("\0~\0\0\0-", 6));
+        ensure("the right: the line changed, the one put in, nothing beside the gap", d.right()->lineSigns() == std::string("\0~\0+\0\0", 6));
+        d.setInline(true);
+        ensure("inline: taken out and put in", d.inlined()->lineSigns() == std::string("\0-+\0+\0-", 7));
+    }
 }
