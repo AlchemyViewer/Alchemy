@@ -271,7 +271,8 @@ namespace tut
                                               "    llOwnerSay((string)first(j));\n"
                                               "} }\n");
         ensure("renamed: " + r.text, has(r, "local table_ = 1") && has(r, "(end_)"));
-        ensure("declared first: " + r.text, has(r, "local first, second\n") && has(r, "function first(end_)"));
+        ensure("only the one called before it is written declared first: " + r.text,
+               has(r, "local second\n") && has(r, "local function first(end_)") && has(r, "\nfunction second(x)"));
         ensure("an assignment in place: " + r.text, has(r, "(function() i = 4 return i end)()") && noted(r, "SluaAssignInExpression"));
         ensure("a step after, what it was: " + r.text, has(r, "(function() local was = i; i += 1 return was end)()"));
         checksClean(r);
@@ -1311,5 +1312,37 @@ namespace tut
         ensure("hexadecimal kept: " + r.text, has(r, "local MASK = 0x0000FF00"));
         ensure("but past 0x7FFFFFFF, which SLua reads as another number: " + r.text, has(r, "local HIGH = -268435456"));
         checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<40>()
+    {
+        set_test_name("numeric for by a constant's name, and a counter its fors share; each function local but one called before it is written");
+        const ALLSLToSLua::Result r = convert("integer ACTIVE_PROPS_STRIDE = 3;\n"
+                                              "list activeProps = [\"a\", 1, 2, \"b\", 3, 4];\n"
+                                              "setProps(list unattachedProps) {\n"
+                                              "    integer i;\n"
+                                              "    for (i = llGetListLength(activeProps) - ACTIVE_PROPS_STRIDE; i >= 0; i -= ACTIVE_PROPS_STRIDE) {\n"
+                                              "        llOwnerSay((string)i);\n"
+                                              "    }\n"
+                                              "    for (i = 0; i < llGetListLength(unattachedProps); i++) {\n"
+                                              "        llOwnerSay((string)i + llList2String(unattachedProps, i));\n"
+                                              "    }\n"
+                                              "    report();\n"
+                                              "}\n"
+                                              "report() { llOwnerSay(\"done\"); }\n"
+                                              "integer twice(integer n) { return n * 2; }\n"
+                                              "default { state_entry() { setProps([\"x\"]); llOwnerSay((string)twice(2)); } }\n");
+        ensure("down by the constant's name: " + r.text, has(r, "for i = #activeProps - ACTIVE_PROPS_STRIDE, 0, -ACTIVE_PROPS_STRIDE do"));
+        ensure("the same counter's other for: " + r.text, has(r, "for i = 0, #unattachedProps - 1 do"));
+        ensure("the counter's declaration gone: " + r.text, !has(r, "local i = 0") && !has(r, "while i"));
+        ensure("only the one called first declared first: " + r.text, has(r, "local report\n") && has(r, "local function setProps(") &&
+                                                                             has(r, "\nfunction report()") && has(r, "local function twice("));
+        checksClean(r);
+
+        const ALLSLToSLua::Result set = convert("integer gStep = 2;\n"
+                                                "default { state_entry() { integer i; for (i = 0; i < 10; i += gStep) llOwnerSay((string)i); gStep = 3; } }\n");
+        ensure("a step by a global something sets keeps the while: " + set.text, has(set, "while i < 10 do"));
+        checksClean(set);
     }
 }

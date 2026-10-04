@@ -473,8 +473,13 @@ namespace
             LSLExpression* limit = nullptr;
             LSLOperator    check = OP_NONE;
             int            step  = 0;
+            // A step by a constant's name, which the step is written by.
+            LSLExpression* by    = nullptr;
         };
         std::optional<Counting> counting(LSLForStatement* f) const;
+        // A whole number written out, or the name of one that never
+        // changes: a global nothing sets, given one, or one of LSL's own.
+        bool steadyWhole(LSLExpression* e, int& v) const;
         // Whether an expression reads the same on every turn of a loop:
         // nothing it reads is set in the loop, and it calls only what the
         // definitions call pure.
@@ -684,8 +689,9 @@ namespace
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsBefore;
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsWithin;
         // The globals the script never sets, declared a number not below
-        // nought.
-        boost::unordered_flat_set<LSLSymbol*> mSteadyNonNegative;
+        // nought; and declared any whole number, by what it is.
+        boost::unordered_flat_set<LSLSymbol*>      mSteadyNonNegative;
+        boost::unordered_flat_map<LSLSymbol*, int> mSteadyWhole;
         bool mJoinLists  = false;
         bool mLslInteger = false;
         bool mLslFloat   = false;
@@ -3109,9 +3115,11 @@ namespace
         {
             c.step = -1;
         }
-        else if ((op == OP_ADD_ASSIGN || op == OP_SUB_ASSIGN) && wholeNumber(static_cast<LSLBinaryExpression*>(incr)->getRHS(), by) && by > 0)
+        else if ((op == OP_ADD_ASSIGN || op == OP_SUB_ASSIGN) && steadyWhole(static_cast<LSLBinaryExpression*>(incr)->getRHS(), by) && by > 0)
         {
             c.step = op == OP_ADD_ASSIGN ? by : -by;
+            LSLExpression* step = unwrapped(static_cast<LSLBinaryExpression*>(incr)->getRHS());
+            c.by                = step->getNodeSubType() == NODE_LVALUE_EXPRESSION ? step : nullptr;
         }
         const bool up = c.check == OP_LESS || c.check == OP_LEQ;
         if (c.step == 0 || (c.step > 0) != up)
@@ -3127,6 +3135,32 @@ namespace
             return std::nullopt;
         }
         return c;
+    }
+
+    bool Writer::steadyWhole(LSLExpression* e, int& v) const
+    {
+        if (wholeNumber(e, v))
+        {
+            return true;
+        }
+        e = unwrapped(e);
+        if (!e || e->getNodeSubType() != NODE_LVALUE_EXPRESSION || !isNull(static_cast<LSLLValueExpression*>(e)->getMember()))
+        {
+            return false;
+        }
+        LSLSymbol* symbol = static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol();
+        if (const auto found = mSteadyWhole.find(symbol); found != mSteadyWhole.end())
+        {
+            v = found->second;
+            return true;
+        }
+        LSLConstant* value = symbol && symbol->getSubType() == SYM_BUILTIN ? symbol->getConstantValue() : nullptr;
+        if (value && value->getNodeSubType() == NODE_INTEGER_CONSTANT)
+        {
+            v = static_cast<LSLIntegerConstant*>(value)->getValue();
+            return true;
+        }
+        return false;
     }
 
     bool Writer::steadyIn(LSLExpression* e, LSLASTNode* loop) const
@@ -3237,7 +3271,9 @@ namespace
             const Expr bound = value(c.limit);
             to = strict ? bracketed(bound, ADD) + (shift < 0 ? " - 1" : " + 1") : bound.text;
         }
-        const std::string step = c.step == 1 ? std::string() : ", " + std::to_string(c.step);
+        const std::string step = c.by        ? ", " + std::string(c.step < 0 ? "-" : "") + value(c.by).text
+                                 : c.step == 1 ? std::string()
+                                               : ", " + std::to_string(c.step);
         // A counter never below nought -- up from a whole number that is
         // not, or down to one -- is an index ll may be given moved on by
         // one; and where the body reads it as nothing else, it counts from 1.
@@ -5099,8 +5135,9 @@ namespace
 
     void Writer::functions()
     {
-        // Declared together first where one calls another written after
-        // it, which LSL allows and a Luau local does not.
+        // Declared first, together, those a function written before them
+        // calls, which LSL allows and a Luau local function does not; the
+        // rest local functions.
         std::vector<LSLGlobalFunction*> all;
         for (LSLASTNode* g = mScript->getGlobals()->getChild(0); g; g = g->getNext())
         {
@@ -5109,8 +5146,8 @@ namespace
                 all.push_back(static_cast<LSLGlobalFunction*>(g));
             }
         }
-        bool forward = false;
-        for (size_t i = 0; i < all.size() && !forward; ++i)
+        boost::unordered_flat_set<LSLSymbol*> forward;
+        for (size_t i = 0; i < all.size(); ++i)
         {
             walk(all[i]->getStatements(), [&](LSLASTNode* node) {
                 if (node->getNodeSubType() != NODE_FUNCTION_EXPRESSION)
@@ -5122,16 +5159,22 @@ namespace
                 LSLSymbol* callee = static_cast<LSLFunctionExpression*>(node)->getIdentifier()->getSymbol();
                 for (size_t j = i + 1; j < all.size(); ++j)
                 {
-                    forward = forward || all[j]->getSymbol() == callee;
+                    if (all[j]->getSymbol() == callee)
+                    {
+                        forward.insert(callee);
+                    }
                 }
             });
         }
-        if (forward)
+        if (!forward.empty())
         {
             std::string names;
             for (LSLGlobalFunction* f : all)
             {
-                names += (names.empty() ? "" : ", ") + nameOf(f->getIdentifier());
+                if (forward.contains(f->getSymbol()))
+                {
+                    names += (names.empty() ? "" : ", ") + nameOf(f->getIdentifier());
+                }
             }
             line("local " + names);
             line("");
@@ -5147,7 +5190,7 @@ namespace
             }
             mFunction = f->getSymbol();
             commentsBefore(f);
-            line(std::string(forward ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +
+            line(std::string(forward.contains(mFunction) ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +
                  (boolean(mFunction) ? std::string(mOptions.types ? ": boolean" : "") : typed(f->getIdentifier()->getIType())));
             ++mDepth;
             prepareBody(f->getStatements());
@@ -5465,9 +5508,13 @@ end
         {
             int v = 0;
             if (g->getNodeType() == NODE_GLOBAL_VARIABLE && !written.writes(g->getSymbol()) &&
-                wholeNumber(static_cast<LSLGlobalVariable*>(g)->getInitializer(), v) && v >= 0)
+                wholeNumber(static_cast<LSLGlobalVariable*>(g)->getInitializer(), v))
             {
-                mSteadyNonNegative.insert(g->getSymbol());
+                mSteadyWhole.emplace(g->getSymbol(), v);
+                if (v >= 0)
+                {
+                    mSteadyNonNegative.insert(g->getSymbol());
+                }
             }
         }
         globals();
