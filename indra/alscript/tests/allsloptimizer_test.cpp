@@ -2090,4 +2090,34 @@ namespace tut
             ensure("noted: " + notes(r), has(r, "settled llGetListLength(l) < 0 to 0") || has(r, "settled (l != []) < 0 to 0") || has(r, "settled l != [] < 0 to 0"));
         }
     }
+    template<> template<>
+    void allsloptimizer_object::test<55>()
+    {
+        set_test_name("the folding arithmetic is IEEE's whatever the build's float flags: llVecNorm folds where dividing by the length and "
+                      "multiplying by its reciprocal agree, as LLVector3 does, and not where they differ; a negative zero keeps its sign");
+        // Each may be set again before it is read, so that its fold shows
+        // in its declaration.
+        const std::string source = wrap("", "        vector a = llVecNorm(<0.75, 3, 1>);\n        vector b = llVecNorm(<0, 3, 4>);\n"
+                                            "        float m = llVecMag(<0, 3, 4>);\n        list l = [-0.0];\n"
+                                            "        if (llFrand(1) < 0.5)\n        {\n            a = b = ZERO_VECTOR;\n            m = 0;\n            l = [];\n        }\n"
+                                            "        llSay(0, (string)a + (string)b + (string)m + llList2CSV(l));\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::LSO })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            // 0.75 / 3.25 is 0.230769232 as a single, 0.75 * (1 / 3.25)
+            // 0.230769247: which the VM gives is not known, so it is left.
+            // Built with the viewer's float flags, the compiler made the
+            // division a product with the reciprocal, and this folded.
+            ensure("left where the two differ: " + r.text, r.text.find("vector a = llVecNorm(<0.75, ") != std::string::npos);
+            const std::vector<F32> b = numbers(r.text, "vector b");
+            ensure("folded where they agree: " + r.text, b.size() == 3 && b[0] == 0.0f && b[1] == 3.0f / 5.0f && b[2] == 4.0f / 5.0f);
+            ensure("a length both ways the same: " + r.text, numbers(r.text, "float m") == std::vector<F32>{ 5.0f });
+            const size_t at = r.text.find("list l = ");
+            ensure("a negative zero keeps its sign: " + r.text,
+                   at != std::string::npos && r.text.substr(at, r.text.find('\n', at) - at).find("-0.0") != std::string::npos);
+        }
+    }
 } // namespace tut

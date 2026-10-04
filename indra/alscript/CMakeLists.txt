@@ -101,6 +101,30 @@ target_sources(
 target_link_libraries(alscript PRIVATE al::flags ll::slua ll::tailslide llmath PUBLIC llcommon)
 target_precompile_headers(alscript REUSE_FROM llprecompiled)
 
+# The optimizer folds LSL's floats to what the VM gives and prints them so
+# that they read back as themselves: IEEE's arithmetic a step at a time, and
+# a zero's sign kept. The viewer's float flags (00-Common.cmake) let the
+# compiler reassociate, fuse a product into a sum, take a reciprocal for a
+# division and forget a zero's sign -- a vector normalised as a product with
+# 1 / mag where the code divides -- so these are built without them, and
+# without the precompiled header those flags were part of.
+if(WINDOWS)
+  set(alscript_ieee_options /fp:precise)
+else()
+  set(
+    alscript_ieee_options
+    -ffp-contract=off
+    -fno-associative-math
+    -fno-reciprocal-math
+    -fsigned-zeros
+  )
+endif()
+set_source_files_properties(
+  allslvalues.cpp
+  allsloptimizer.cpp
+  PROPERTIES COMPILE_OPTIONS "${alscript_ieee_options}" SKIP_PRECOMPILE_HEADERS TRUE
+)
+
 # tests
 if(AL_BUILD_TESTS)
   # The tests check real scripts against the grid's own definitions, which

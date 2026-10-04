@@ -1029,6 +1029,25 @@ namespace
         return std::string();
     }
 
+    // A vector's length. On LSO and Mono in singles a step at a time, as
+    // LLVector3 works it out, and as a double rounded once to a single:
+    // whether the two agree, and what they come to where they do. On Luau,
+    // whose numbers are doubles, the double's.
+    bool magnitude(const Ctx& c, float x, float y, float z, double& out)
+    {
+        const double once = std::sqrt(double(x) * x + double(y) * y + double(z) * z);
+        if (c.target == ALLSLOptimizer::Target::Luau)
+        {
+            out = once;
+            return std::isfinite(once);
+        }
+        const float xx = x * x, yy = y * y, zz = z * z;
+        const float sum     = (xx + yy) + zz;
+        const float stepped = std::sqrt(sum);
+        out                 = stepped;
+        return std::isfinite(stepped) && static_cast<double>(static_cast<float>(once)) == static_cast<double>(stepped);
+    }
+
     typedef std::function<LSLConstant*(Ctx&, const Args&)> Evaluator;
 
     const boost::unordered_flat_map<std::string, Evaluator, ll::string_hash, std::equal_to<>>& evaluators()
@@ -1118,25 +1137,37 @@ namespace
                   }
                   return c.integer(static_cast<int>(result));
               } },
+            // A vector's length as LLVector3 has it, in singles a step at a
+            // time, and as a double rounded once: which the VM does is not
+            // known, so folded only where the two agree (magnitude). And a
+            // vector normalised by dividing each part by the length, and by
+            // the product with 1 / length that LLVector3 makes of a division,
+            // likewise.
             { "llVecMag",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   Vector3 v;
-                  return argVector(a, 0, v) ? c.number(std::sqrt(double(v.x) * v.x + double(v.y) * v.y + double(v.z) * v.z)) : nullptr;
+                  double  mag = 0.0;
+                  return argVector(a, 0, v) && magnitude(c, v.x, v.y, v.z, mag) ? c.number(mag) : nullptr;
               } },
             { "llVecDist",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   Vector3 p, q;
+                  double  mag = 0.0;
                   if (!argVector(a, 0, p) || !argVector(a, 1, q)) return nullptr;
                   const float dx = p.x - q.x, dy = p.y - q.y, dz = p.z - q.z;
-                  return c.number(std::sqrt(double(dx) * dx + double(dy) * dy + double(dz) * dz));
+                  return magnitude(c, dx, dy, dz, mag) ? c.number(mag) : nullptr;
               } },
             { "llVecNorm",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   Vector3 v;
-                  if (!argVector(a, 0, v)) return nullptr;
-                  const float mag = static_cast<float>(std::sqrt(double(v.x) * v.x + double(v.y) * v.y + double(v.z) * v.z));
+                  double  length = 0.0;
+                  if (!argVector(a, 0, v) || !magnitude(c, v.x, v.y, v.z, length)) return nullptr;
+                  const float mag = static_cast<float>(length);
                   if (mag == 0.0f) return c.vector(0, 0, 0);
-                  return c.vector(v.x / mag, v.y / mag, v.z / mag);
+                  const float x = v.x / mag, y = v.y / mag, z = v.z / mag;
+                  const float over = 1.0f / mag;
+                  if (c.target != ALLSLOptimizer::Target::Luau && (x != v.x * over || y != v.y * over || z != v.z * over)) return nullptr;
+                  return c.vector(x, y, z);
               } },
             // The rotations, by the viewer's own quaternion, which is the
             // lineage of the simulator's: Euler angles through the
