@@ -28,6 +28,15 @@
 
 #include "../test/lltut.h"
 
+// llui reaches the viewer for this one, and on Linux the link pulls the
+// object that calls it. Nothing under test goes near it.
+class LLAvatarName;
+const std::string gAnalyzersTestAnonName("Anon");
+const std::string& rlvGetAnonym(const LLAvatarName& av_name)
+{
+    return gAnalyzersTestAnonName;
+}
+
 namespace tut
 {
     struct alscriptanalyzers_data
