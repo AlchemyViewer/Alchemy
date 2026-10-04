@@ -190,11 +190,12 @@ namespace tut
         ensure("and: " + r.text, has(r, "if a > 1 and #l > 1 then"));
         ensure("integer division: " + r.text, has(r, "local q = a // b") && noted(r, "SluaIntegerDivision"));
         ensure("remainder: " + r.text, has(r, "local m = a % b") && noted(r, "SluaModulo"));
-        ensure("a list no other holds grown in place: " + r.text, has(r, "table.insert(l, 3)") && has(r, "table.insert(l, 4)") &&
-                                                                    has(r, "table.insert(l, \"five\")") && !has(r, "joinLists"));
+        ensure("a list no other holds grown in place: " + r.text, has(r, "table.insert(l, 3)") && has(r, "table.append(l, 4, \"five\")") &&
+                                                                    !has(r, "joinLists"));
         ensure("TRUE and FALSE: " + r.text, has(r, "local t = 1") && has(r, "if false then"));
         ensure("a float as LSL writes it: " + r.text, has(r, "string.format(\"%.6f\", f)"));
-        ensure("a string as an integer: " + r.text, has(r, "lslInteger(\"12abc\")") && has(r, "local function lslInteger"));
+        ensure("a string as an integer, as a list's item converts it: " + r.text,
+               has(r, "lslInteger(\"12abc\")") && has(r, "return llcompat.List2Integer({ s }, 0)"));
         ensure("lists compared by length: " + r.text, has(r, "#l == #{1}") && noted(r, "SluaListCompare"));
         // bit32 answers 0 to 4294967295: made LSL's signed integer, but where
         // bit32 takes it again.
@@ -520,7 +521,7 @@ namespace tut
                                                          has(r, "    table.insert(gAll, item)"));
         ensure("prepended: " + r.text, has(r, "table.insert(gAll, 1, \"first\")"));
         ensure("a list by its name: " + r.text, has(r, "table.move(more, 1, #more, #gAll + 1, gAll)"));
-        ensure("several that do not run apart: " + r.text, has(r, "table.move({ll.GetTime(), ll.Frand(1.0)}, 1, 2, #gAll + 1, gAll)"));
+        ensure("several that do not run apart, each had before any is added: " + r.text, has(r, "table.append(gAll, ll.GetTime(), ll.Frand(1.0))"));
         ensure("passed to a function that only reads it: " + r.text, has(r, "table.insert(gSeen, n)"));
         ensure("passed to one that keeps it: " + r.text,
                has(r, "gPassed = joinLists(gPassed, {n})") &&
@@ -777,9 +778,9 @@ namespace tut
                                               "    if ((what & 3) && sayIt()) llDie();\n"
                                               "} }\n");
         ensure("bit32's range made LSL's where it shows: " + r.text, has(r, "local m = bit32.s32(bit32.bor(what, ") && !has(r, "-- LSL: bit32"));
-        ensure("not for a flag's truth: " + r.text, has(r, "if bit32.band(what, CHANGED_LINK) ~= 0"));
+        ensure("not for a flag's truth: " + r.text, has(r, "if bit32.btest(what, CHANGED_LINK)"));
         ensure("&& said once, over a call that does something: " + r.text,
-               count(r, "leaves its right side unrun") == 1 && has(r, "LSL ran both sides, the right one first.\n    if bit32.band(what, 3) ~= 0 and sayIt()"));
+               count(r, "leaves its right side unrun") == 1 && has(r, "LSL ran both sides, the right one first.\n    if bit32.btest(what, 3) and sayIt()"));
         ensure("the deprecated call's reason only: " + r.text, has(r, "-- LSL: SLua deprecates ll.List2String") && !has(r, "takes indexes from 0"));
         checksClean(r);
     }
@@ -842,7 +843,7 @@ namespace tut
                                                  "    gOn = !gOn; if (gOn) llOwnerSay(\"on\");\n"
                                                  "} }\n");
         ensure("not a number: the other way round: " + nots.text,
-               has(nots, "if n == 0 then") && has(nots, "if bit32.band(n, 4) == 0 then") && has(nots, "if not (n > 1) then") &&
+               has(nots, "if n == 0 then") && has(nots, "if not bit32.btest(n, 4) then") && has(nots, "if not (n > 1) then") &&
                    has(nots, "gOn = not gOn"));
         checksClean(nots);
         ensure("the check itself: " + r.text, has(r, "    gOn = n > 1\n") && has(r, "    gOn = not (n > 5)\n"));
@@ -1154,7 +1155,7 @@ namespace tut
         ensure(">> of what may be below nought signed: " + r.text, has(r, "local low = bit32.s32(bit32.arshift(num, 2))"));
         ensure(">> of a constant not below nought as it is: " + r.text, has(r, "local part = bit32.arshift(FN_MASK, 8)\n"));
         ensure("a truth, and what bit32 takes again, as they are: " + r.text,
-               has(r, "if bit32.band(bit32.bnot(ll.GetPermissions()), PERMISSION_TRIGGER_ANIMATION) ~= 0 then"));
+               has(r, "if bit32.btest(bit32.bnot(ll.GetPermissions()), PERMISSION_TRIGGER_ANIMATION) then"));
         ensure("SLua's own bit32.s32, no helper: " + r.text, !has(r, "local function int32") && !has(r, "-- LSL: bit32"));
         checksClean(r);
     }
@@ -1276,5 +1277,39 @@ namespace tut
         ensure("the handler: " + at(7), at(7).find("touch_start") != std::string::npos);
         ensure("a call under its comment, not the comment: " + at(10), at(10).find("add(1)") != std::string::npos);
         ensure("the next: " + at(11), at(11).find("ll.Say(0") != std::string::npos);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<39>()
+    {
+        set_test_name("in fewer calls: an & asked whether it is nought by bit32.btest, values added together by one table.append, a key's default "
+                      "the null key; and hexadecimal as written where SLua reads the same number");
+        const ALLSLToSLua::Result r = convert("integer MASK = 0x0000FF00;\n"
+                                              "integer HIGH = 0xF0000000;\n"
+                                              "key gSitter;\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    integer flags = llGetParcelFlags(llGetPos());\n"
+                                              "    if (flags & PARCEL_FLAG_ALLOW_CREATE_OBJECTS) llOwnerSay(\"build\");\n"
+                                              "    if (!(flags & MASK & 0x300)) llOwnerSay(\"none\");\n"
+                                              "    if ((flags & 4) == 0) llOwnerSay(\"no 4\");\n"
+                                              "    integer masked = flags & MASK;\n"
+                                              "    list params = [PRIM_NAME, \"a\"];\n"
+                                              "    params += [PRIM_LINK_TARGET, LINK_ROOT, PRIM_POSITION, llGetPos()];\n"
+                                              "    params += n;\n"
+                                              "    llSetLinkPrimitiveParamsFast(LINK_THIS, params);\n"
+                                              "    float f = (float)\"1.5\";\n"
+                                              "    llOwnerSay((string)(masked + HIGH) + (string)f + (string)gSitter);\n"
+                                              "} }\n");
+        ensure("an & as a condition: " + r.text, has(r, "if bit32.btest(flags, PARCEL_FLAG_ALLOW_CREATE_OBJECTS) then"));
+        ensure("not of one, an & of &s one call: " + r.text, has(r, "if not bit32.btest(flags, MASK, 0x300) then"));
+        ensure("against nought: " + r.text, has(r, "if not bit32.btest(flags, 4) then"));
+        ensure("an & as a number is still bit32.band: " + r.text, has(r, "local masked = bit32.band(flags, MASK)"));
+        ensure("values added together: " + r.text,
+               has(r, "table.append(params, PRIM_LINK_TARGET, LINK_ROOT, PRIM_POSITION, ll.GetPos())") && has(r, "table.insert(params, n)"));
+        ensure("the null key: " + r.text, has(r, "local gSitter = NULL_KEY") && !has(r, "uuid(\"\")"));
+        ensure("a float from a string: " + r.text, has(r, "lslFloat(\"1.5\")") && has(r, "return llcompat.List2Float({ s }, 0)"));
+        ensure("hexadecimal kept: " + r.text, has(r, "local MASK = 0x0000FF00"));
+        ensure("but past 0x7FFFFFFF, which SLua reads as another number: " + r.text, has(r, "local HIGH = -268435456"));
+        checksClean(r);
     }
 }

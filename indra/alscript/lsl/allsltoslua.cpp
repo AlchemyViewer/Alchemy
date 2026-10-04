@@ -41,7 +41,9 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <functional>
 #include <optional>
 #include <string_view>
@@ -250,7 +252,7 @@ namespace
             case LST_INTEGER:
             case LST_FLOATINGPOINT: return "0";
             case LST_STRING: return "\"\"";
-            case LST_KEY: return "uuid(\"\")";
+            case LST_KEY: return "NULL_KEY";
             case LST_VECTOR: return "ZERO_VECTOR";
             case LST_QUATERNION: return "ZERO_ROTATION";
             case LST_LIST: return "{}";
@@ -385,9 +387,18 @@ namespace
         Expr value(LSLExpression* e);
         // As a boolean, as LSL reads a value in a condition.
         Expr condition(LSLExpression* e);
+        // An & asked only whether it is nought, as bit32.btest asks it: an
+        // & of &s one call of them all. None for anything else.
+        std::optional<Expr> bitTest(LSLExpression* e);
         // As a value of another LSL type, where LSL converts on its own.
         Expr coerced(LSLExpression* e, LSLIType to);
         Expr constant(LSLConstant* c);
+        // How the LSL wrote a number in hexadecimal, on the line Tailslide
+        // puts its constant at or the one before: where it did, and wrote
+        // it no other way there. Tailslide's constants are where the
+        // parser's next token was, not where they were.
+        std::optional<std::string> hexAsWritten(LSLConstant* c, int v);
+        std::vector<size_t>        mLineStarts;
         Expr lvalue(LSLLValueExpression* e);
         Expr call(LSLFunctionExpression* e);
         Expr binary(LSLBinaryExpression* e);
@@ -1246,7 +1257,14 @@ namespace
         {
             case NODE_INTEGER_CONSTANT:
             {
+                // Hexadecimal as the LSL wrote it, where SLua reads the same
+                // number: not past 0x7FFFFFFF, which LSL's integers wrapped
+                // below nought.
                 const int v = static_cast<LSLIntegerConstant*>(c)->getValue();
+                if (std::optional<std::string> hex = v >= 0 ? hexAsWritten(c, v) : std::nullopt)
+                {
+                    return { *hex, PRIMARY };
+                }
                 return { std::to_string(v), v < 0 ? UNARY : PRIMARY };
             }
             case NODE_FLOAT_CONSTANT:
@@ -1280,6 +1298,87 @@ namespace
             default:
                 return { "nil" };
         }
+    }
+
+    std::optional<std::string> Writer::hexAsWritten(LSLConstant* c, int v)
+    {
+        const auto* loc = c->getLoc();
+        if (!loc || loc->first_line < 1)
+        {
+            return std::nullopt;
+        }
+        if (mLineStarts.empty())
+        {
+            mLineStarts.push_back(0);
+            for (size_t i = 0; i < mSource.size(); ++i)
+            {
+                if (mSource[i] == '\n')
+                {
+                    mLineStarts.push_back(i + 1);
+                }
+            }
+        }
+        // Each number on a line, past strings and comments: hexadecimal of
+        // the value, and whether the value is there another way.
+        bool       other  = false;
+        const auto onLine = [&](S32 line) -> std::optional<std::string> {
+            if (line < 1 || static_cast<size_t>(line) > mLineStarts.size())
+            {
+                return std::nullopt;
+            }
+            const size_t           from = mLineStarts[static_cast<size_t>(line) - 1];
+            const std::string_view text = mSource.substr(from, std::min(mSource.find('\n', from), mSource.size()) - from);
+            std::optional<std::string> hex;
+            for (size_t i = 0; i < text.size();)
+            {
+                const char ch = text[i];
+                if (ch == '"')
+                {
+                    for (++i; i < text.size() && text[i] != '"'; ++i)
+                    {
+                        i += text[i] == '\\' ? 1 : 0;
+                    }
+                    ++i;
+                    continue;
+                }
+                if (ch == '/' && i + 1 < text.size() && (text[i + 1] == '/' || text[i + 1] == '*'))
+                {
+                    break;
+                }
+                const bool starts = std::isdigit(static_cast<unsigned char>(ch)) &&
+                                    (i == 0 || !(std::isalnum(static_cast<unsigned char>(text[i - 1])) || text[i - 1] == '_' || text[i - 1] == '.'));
+                if (!starts)
+                {
+                    ++i;
+                    continue;
+                }
+                size_t end = i;
+                while (end < text.size() && (std::isalnum(static_cast<unsigned char>(text[end])) || text[end] == '.' || text[end] == '_'))
+                {
+                    ++end;
+                }
+                const std::string word(text.substr(i, end - i));
+                if (word.size() > 2 && word[0] == '0' && (word[1] == 'x' || word[1] == 'X') &&
+                    word.find_first_not_of("0123456789abcdefABCDEF", 2) == std::string::npos)
+                {
+                    if (std::strtoll(word.c_str(), nullptr, 16) == v)
+                    {
+                        hex = word;
+                    }
+                }
+                else if (word.find_first_not_of("0123456789") == std::string::npos && std::strtoll(word.c_str(), nullptr, 10) == v)
+                {
+                    other = true;
+                }
+                i = end;
+            }
+            return other ? std::nullopt : hex;
+        };
+        if (std::optional<std::string> hex = onLine(loc->first_line))
+        {
+            return hex;
+        }
+        return other ? std::nullopt : onLine(loc->first_line - 1);
     }
 
     Expr Writer::lvalue(LSLLValueExpression* e)
@@ -1349,6 +1448,10 @@ namespace
                 return *test;
             }
         }
+        if (std::optional<Expr> test = bitTest(inner))
+        {
+            return *test;
+        }
         Expr out = expr(e);
         if (out.boolean)
         {
@@ -1373,6 +1476,35 @@ namespace
             case LST_LIST: return { "#" + bracketed(out, UNARY) + " > 0", COMPARE, true };
             default: return { out.text, out.prec, true };
         }
+    }
+
+    std::optional<Expr> Writer::bitTest(LSLExpression* e)
+    {
+        const auto bare = [](LSLExpression* one) {
+            while (one && one->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+            {
+                one = static_cast<LSLParenthesisExpression*>(one)->getChildExpr();
+            }
+            return one;
+        };
+        LSLExpression* inner = bare(e);
+        if (!inner || inner->getNodeSubType() != NODE_BINARY_EXPRESSION || inner->getOperation() != OP_BIT_AND)
+        {
+            return std::nullopt;
+        }
+        std::string                                   all;
+        const std::function<void(LSLExpression* one)> gather = [&](LSLExpression* one) {
+            LSLExpression* b = bare(one);
+            if (b->getNodeSubType() == NODE_BINARY_EXPRESSION && b->getOperation() == OP_BIT_AND)
+            {
+                gather(static_cast<LSLBinaryExpression*>(b)->getLHS());
+                gather(static_cast<LSLBinaryExpression*>(b)->getRHS());
+                return;
+            }
+            all += (all.empty() ? "" : ", ") + value(one).text;
+        };
+        gather(inner);
+        return Expr{ "bit32.btest(" + all + ")", PRIMARY, true };
     }
 
     Expr Writer::coerced(LSLExpression* e, LSLIType to)
@@ -2124,6 +2256,17 @@ namespace
                     return *asked;
                 }
                 const bool eq = op == OP_EQ;
+                // An & against nought: whether it is.
+                {
+                    int                 zero = 1;
+                    std::optional<Expr> test = wholeNumber(rhs, zero) && zero == 0 ? bitTest(lhs)
+                                               : wholeNumber(lhs, zero) && zero == 0 ? bitTest(rhs)
+                                                                                     : std::nullopt;
+                    if (test)
+                    {
+                        return eq ? Expr{ "not " + test->text, UNARY, true } : *test;
+                    }
+                }
                 if (lt == LST_LIST && rt == LST_LIST)
                 {
                     // LSL compares two lists by their lengths alone; != says
@@ -2215,6 +2358,10 @@ namespace
                                      static_cast<LSLLValueExpression*>(inner)->getIdentifier()->getSymbol()->getSubType() == SYM_BUILTIN);
                 if (plain && inner->getIType() == LST_INTEGER)
                 {
+                    if (std::optional<Expr> test = bitTest(inner))
+                    {
+                        return { "not " + test->text, UNARY, true };
+                    }
                     const Expr v = expr(inner);
                     if (v.boolean)
                     {
@@ -4078,7 +4225,6 @@ namespace
             Kind                     kind;
             LSLExpression*           e;
             std::vector<LSLASTNode*> items;
-            bool                     apart = true;
         };
         std::vector<Part> shaped;
         for (LSLExpression* e : parts)
@@ -4101,7 +4247,6 @@ namespace
                 for (LSLASTNode* item = m->getChild(0); !isNull(item); item = item->getNext())
                 {
                     part.items.push_back(item);
-                    part.apart = part.apart && apart(item);
                 }
             }
             else if (m->getNodeSubType() == NODE_CONSTANT_EXPRESSION && m->getChild(0)->getNodeSubType() == NODE_LIST_CONSTANT)
@@ -4130,23 +4275,61 @@ namespace
             return item->getNodeType() == NODE_CONSTANT ? constant(static_cast<LSLConstant*>(item)).text
                                                         : value(static_cast<LSLExpression*>(item)).text;
         };
+        // The values added at the end one after another, one table.append
+        // of them all, which has each before it adds any, as a list written
+        // out had -- and of several parts, each runs apart -- but one alone,
+        // which table.insert, a builtin of Luau's, adds faster; and more than
+        // a call takes well, a table of them moved on.
+        std::vector<std::string> values;
+        const auto               append = [&]() {
+            std::string all;
+            for (const std::string& v : values)
+            {
+                all += (all.empty() ? "" : ", ") + v;
+            }
+            if (values.size() == 1)
+            {
+                line("table.insert(" + name + ", " + all + ")");
+            }
+            else if (values.size() > 32)
+            {
+                line("table.move({" + all + "}, 1, " + std::to_string(values.size()) + ", #" + name + " + 1, " + name + ")");
+            }
+            else if (!values.empty())
+            {
+                line("table.append(" + name + ", " + all + ")");
+            }
+            values.clear();
+        };
         for (const Part& part : shaped)
         {
+            if (part.kind != Kind::Value && part.kind != Kind::Items)
+            {
+                append();
+            }
             switch (part.kind)
             {
-                case Kind::Value: line("table.insert(" + name + at + value(part.e).text + ")"); break;
-                case Kind::Items:
-                    if (part.items.size() == 1 || part.apart)
+                case Kind::Value:
+                    if (before)
                     {
-                        for (LSLASTNode* item : part.items)
-                        {
-                            line("table.insert(" + name + at + text(item) + ")");
-                        }
+                        line("table.insert(" + name + at + value(part.e).text + ")");
                     }
                     else
                     {
-                        line("table.move(" + expr(part.e).text + ", 1, " + std::to_string(part.items.size()) + ", #" + name + " + 1, " +
-                             name + ")");
+                        values.push_back(value(part.e).text);
+                    }
+                    break;
+                case Kind::Items:
+                    for (LSLASTNode* item : part.items)
+                    {
+                        if (before)
+                        {
+                            line("table.insert(" + name + at + text(item) + ")");
+                        }
+                        else
+                        {
+                            values.push_back(text(item));
+                        }
                     }
                     break;
                 case Kind::Named:
@@ -4168,6 +4351,7 @@ namespace
                 }
             }
         }
+        append();
         return true;
     }
 
@@ -5211,17 +5395,14 @@ end
 
 )LUA";
         }
+        // LSL's casts of a string, as LSL converts a list's item, which is
+        // the same: llcompat's, as tonumber reads text its own way.
         if (mLslInteger)
         {
             out += R"LUA(-- LSL's (integer) of a string: the whole number it starts with, in
 -- decimal or 0x hexadecimal, after any spaces; 0 where it starts with none.
 local function lslInteger(s: string): number
-    local sign, hex = string.match(s, "^%s*([+-]?)0[xX](%x+)")
-    if hex then
-        local v = tonumber(hex, 16) or 0
-        return if sign == "-" then -v else v
-    end
-    return tonumber(string.match(s, "^%s*([+-]?%d+)") or "0") or 0
+    return llcompat.List2Integer({ s }, 0)
 end
 
 )LUA";
@@ -5231,8 +5412,7 @@ end
             out += R"LUA(-- LSL's (float) of a string: the number it starts with; 0 where it
 -- starts with none.
 local function lslFloat(s: string): number
-    local found = string.match(s, "^%s*([+-]?%d*%.?%d+[eE][+-]?%d+)") or string.match(s, "^%s*([+-]?%d*%.?%d*)")
-    return tonumber(found or "0") or 0
+    return llcompat.List2Float({ s }, 0)
 end
 
 )LUA";
