@@ -26,6 +26,7 @@
 #define AL_ALDIFFVIEW_H
 
 #include "alcodeeditor.h"
+#include "altextdiff.h"
 #include "alviewtype.h"
 #include "lluictrl.h"
 
@@ -46,7 +47,8 @@ class LLTextBox;
 // words that changed are marked. Each side has a title over it.
 //
 // F7 goes to the next change and Shift-F7 to the one before; Escape tells
-// whoever shows it, to put back what was there.
+// whoever shows it, to put back what was there. What is typed in it, which
+// it cannot take, goes to whoever shows it, where it says.
 class ALDiffView : public LLUICtrl
 {
 public:
@@ -66,8 +68,9 @@ public:
     ~ALDiffView() override;
 
     // The texts, the left the one taken from, the right the one made, and
-    // what each is.
-    void setTexts(std::string_view left, std::string_view right);
+    // what each is; lined up where lines are known to stand for each other
+    // (ALTextDiff's anchors), however they differ.
+    void setTexts(std::string_view left, std::string_view right, const ALTextDiff::anchors_t& anchors = {});
     void setTitles(const std::string& left, const std::string& right);
     void setSyntax(const std::string& syntax);
     // The grammar both sides are coloured by, as another view has it.
@@ -92,9 +95,20 @@ public:
 
     // Told when Escape is pressed in it.
     void setOnEscape(std::function<void()> escape) { mEscape = std::move(escape); }
+    // Told when what is typed in it would change the right's text -- a
+    // character, a line broken or joined, a paste -- with where, as a line
+    // and column of the right's text; answered with the view to type in
+    // instead, or nothing where the typing goes nowhere.
+    typedef std::function<LLView*(S32 line, S32 column)> edit_t;
+    void setOnEdit(edit_t edit) { mEdit = std::move(edit); }
+    // The line of the right's text the caret of the side in front is on,
+    // and its column there: the row's, or where the row has none -- a
+    // line taken out, a gap -- the nearest line after it, else before.
+    std::pair<S32, S32> rightAtCaret() const;
 
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
     bool handleKeyHere(KEY key, MASK mask) override;
+    bool handleUnicodeCharHere(llwchar uni_char) override;
     void draw() override;
 
 protected:
@@ -108,6 +122,11 @@ private:
 
     std::string           mLeftText;
     std::string           mRightText;
+    ALTextDiff::anchors_t mAnchors;
+    // Each row's line of the right, side by side and inline, counted from
+    // one; nought where the row has none.
+    std::vector<S32>      mRightRows;
+    std::vector<S32>      mInlineRows;
     std::string           mLeftTitle;
     std::string           mRightTitle;
     bool                  mInline = false;
@@ -123,6 +142,7 @@ private:
     S32                   mScrolledY = 0;
     F32                   mScrolledX = 0.f;
     std::function<void()> mEscape;
+    edit_t                mEdit;
 };
 
 #endif // AL_ALDIFFVIEW_H

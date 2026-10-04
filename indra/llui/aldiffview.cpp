@@ -141,10 +141,11 @@ ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::
     return made;
 }
 
-void ALDiffView::setTexts(std::string_view left, std::string_view right)
+void ALDiffView::setTexts(std::string_view left, std::string_view right, const ALTextDiff::anchors_t& anchors)
 {
     mLeftText  = std::string(left);
     mRightText = std::string(right);
+    mAnchors   = anchors;
     rebuild();
 }
 
@@ -199,7 +200,7 @@ void ALDiffView::rebuild()
 {
     const std::vector<std::string>      left  = ALTextDiff::split(mLeftText);
     const std::vector<std::string>      right = ALTextDiff::split(mRightText);
-    const std::vector<ALTextDiff::Run>  runs  = ALTextDiff::lines(left, right);
+    const std::vector<ALTextDiff::Run>  runs  = mAnchors.empty() ? ALTextDiff::lines(left, right) : ALTextDiff::lines(left, right, mAnchors);
     const LLColor4                      none(0.f, 0.f, 0.f, 0.f);
     const LLColor4                      out       = colorOf("CodeDiffRemovedColor", LLColor4(0.85f, 0.25f, 0.25f, 0.18f));
     const LLColor4                      in        = colorOf("CodeDiffAddedColor", LLColor4(0.25f, 0.75f, 0.35f, 0.18f));
@@ -274,6 +275,8 @@ void ALDiffView::rebuild()
             is.mark(first_in + static_cast<S32>(n), rspans, in_words);
         }
     }
+    mRightRows  = rs.numbers;
+    mInlineRows = is.numbers;
     ls.into(*mLeft);
     rs.into(*mRight);
     is.into(*mInlined);
@@ -360,8 +363,67 @@ bool ALDiffView::goToChange(bool forward)
     return true;
 }
 
+std::pair<S32, S32> ALDiffView::rightAtCaret() const
+{
+    const ALCodeEditor*     side = shown();
+    const std::vector<S32>& rows = side == mInlined ? mInlineRows : mRightRows;
+    const S32               row  = side->caret().line;
+    if (rows.empty())
+    {
+        return { 0, 0 };
+    }
+    const S32 at = llclamp(row, 0, static_cast<S32>(rows.size()) - 1);
+    if (rows[static_cast<size_t>(at)] > 0)
+    {
+        // The column where the caret stands in the right's own text: the
+        // right side's, or a line inline that the right has.
+        return { rows[static_cast<size_t>(at)] - 1, side == mLeft ? 0 : side->caret().column };
+    }
+    for (S32 n = at + 1; n < static_cast<S32>(rows.size()); ++n)
+    {
+        if (rows[static_cast<size_t>(n)] > 0)
+        {
+            return { rows[static_cast<size_t>(n)] - 1, 0 };
+        }
+    }
+    for (S32 n = at - 1; n >= 0; --n)
+    {
+        if (rows[static_cast<size_t>(n)] > 0)
+        {
+            return { rows[static_cast<size_t>(n)] - 1, 0 };
+        }
+    }
+    return { 0, 0 };
+}
+
+bool ALDiffView::handleUnicodeCharHere(llwchar uni_char)
+{
+    // A character the side in front would not take, being read only.
+    if (mEdit && uni_char >= 0x20 && uni_char != 0x7F)
+    {
+        const auto [line, column] = rightAtCaret();
+        if (LLView* to = mEdit(line, column))
+        {
+            return to->handleUnicodeChar(uni_char, true);
+        }
+    }
+    return LLUICtrl::handleUnicodeCharHere(uni_char);
+}
+
 bool ALDiffView::handleKeyHere(KEY key, MASK mask)
 {
+    // A key the side in front would not take, being read only, that
+    // changes the text: a line broken or joined, a tab, a paste or a cut.
+    const bool edits = ((key == KEY_RETURN || key == KEY_BACKSPACE || key == KEY_DELETE || key == KEY_TAB) && (mask == MASK_NONE || mask == MASK_SHIFT)) ||
+                       ((key == 'V' || key == 'X') && mask == MASK_CONTROL);
+    if (mEdit && edits)
+    {
+        const auto [line, column] = rightAtCaret();
+        if (LLView* to = mEdit(line, column))
+        {
+            return to->handleKey(key, mask, true);
+        }
+    }
     if (key == KEY_F7 && (mask == MASK_NONE || mask == MASK_SHIFT))
     {
         goToChange(mask == MASK_NONE);
