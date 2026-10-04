@@ -165,7 +165,7 @@ namespace
         c.bitTestsMerged               = true;
 
         c.local         = 4;
-        c.jump          = 93;
+        c.jump          = 92;
         c.function      = 37;
         c.functionChar  = 1;
         c.parameter     = 0;

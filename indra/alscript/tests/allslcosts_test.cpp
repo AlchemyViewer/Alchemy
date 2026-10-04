@@ -309,9 +309,7 @@ namespace tut
 
             const Delta jump = delta(t, { "", "jump L; @L;" }, { "", "" });
             said("a jump", t, jump, -c.jump);
-            // What Luau's compiler makes of a jump is a byte more in some
-            // runs than in others, the same build and the same text.
-            ensure("a jump" + where + ": " + std::to_string(-jump.first), t == Target::Luau ? std::abs(-jump.first - c.jump) <= 1 : -jump.first == c.jump);
+            ensure("a jump" + where + ": " + std::to_string(-jump.first), -jump.first == c.jump);
 
             const Delta f2  = delta(t, none, two);
             const Delta f18 = delta(t, none, eighteen);
