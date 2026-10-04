@@ -171,9 +171,9 @@ namespace tut
     void allsloptimizer_object::test<2>()
     {
         set_test_name("floats fold in single precision and print so that they read back exactly");
-        // Each variable is assigned again later, so that it stays a
-        // variable and the fold shows in its declaration.
-        const std::string source = wrap("", "        float a = 0.1 + 0.2;\n        float b = PI * 2;\n        float c = 1.0 / 3;\n        llSay(0, (string)a + (string)b + (string)c);\n        a = b = c = 0;\n");
+        // Each variable may be assigned again before it is read, so that
+        // it stays a variable and the fold shows in its declaration.
+        const std::string source = wrap("", "        float a = 0.1 + 0.2;\n        float b = PI * 2;\n        float c = 1.0 / 3;\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = 0;\n        }\n        llSay(0, (string)a + (string)b + (string)c);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
         ensure("optimized", r.optimized);
         // 0.1f + 0.2f is 0.3 exactly as a single, PI * 2 is 6.2831855f,
@@ -184,7 +184,7 @@ namespace tut
 
         // A float that is a whole number prints as an integer where LSL
         // would convert one, and stays a float where it would not.
-        r = ALLSLOptimizer::run(wrap("", "        float f = 2.0;\n        list l = [2.0];\n        string s = (string)2.0;\n        vector v = <1.0, 2.0, 3.5>;\n        llSay(0, (string)f + llList2CSV(l) + s + (string)v);\n        f = 0; l = []; s = \"\"; v = ZERO_VECTOR;\n"), options());
+        r = ALLSLOptimizer::run(wrap("", "        float f = 2.0;\n        list l = [2.0];\n        string s = (string)2.0;\n        vector v = <1.0, 2.0, 3.5>;\n        if (llFrand(1) < 0.5)\n        {\n            f = 0; l = []; s = \"\"; v = ZERO_VECTOR;\n        }\n        llSay(0, (string)f + llList2CSV(l) + s + (string)v);\n"), options());
         ensure("whole float as integer: " + r.text, r.text.find("float f = 2;") != std::string::npos);
         // As the cast of an integer on Mono, where that is smaller (ALLSLCosts::castForWholeFloat).
         ensure("list element stays a float: " + r.text, r.text.find("list l = (list)((float)2);") != std::string::npos);
@@ -211,7 +211,7 @@ namespace tut
     void allsloptimizer_object::test<4>()
     {
         set_test_name("pure library calls with constant arguments are evaluated, others left");
-        const std::string source = wrap("", "        integer a = llAbs(-3);\n        float b = llSqrt(16);\n        string c = llToUpper(\"abc\");\n        string d = llGetSubString(\"abcdef\", 4, 1);\n        string e = llDeleteSubString(\"abcdef\", 1, 3);\n        integer f = llStringLength(\"hello\");\n        string g = llEscapeURL(\"a b\");\n        string h = llBase64ToString(llStringToBase64(\"hi\"));\n        integer i = llList2Integer([1, 2, 3], -1);\n        string j = llList2String([1, 2.5, <1,2,3>], 1);\n        list k = llList2List([1, 2, 3, 4], 1, 2);\n        integer l = llFloor(2.7) + llCeil(2.2);\n        string m = llGetSubString(\"h\xc3\xa9llo\", 0, 1);\n        integer n = llGetUnixTime();\n        string o = llList2CSV([1, \"a\", 2.0]);\n        llSay(0, (string)a + (string)b + c + d + e + (string)f + g + h + (string)i + j + llList2CSV(k) + (string)l + m + (string)n + o);\n        a = f = i = l = n = 0; b = 0; c = d = e = g = h = j = m = o = \"\"; k = [];\n");
+        const std::string source = wrap("", "        integer a = llAbs(-3);\n        float b = llSqrt(16);\n        string c = llToUpper(\"abc\");\n        string d = llGetSubString(\"abcdef\", 4, 1);\n        string e = llDeleteSubString(\"abcdef\", 1, 3);\n        integer f = llStringLength(\"hello\");\n        string g = llEscapeURL(\"a b\");\n        string h = llBase64ToString(llStringToBase64(\"hi\"));\n        integer i = llList2Integer([1, 2, 3], -1);\n        string j = llList2String([1, 2.5, <1,2,3>], 1);\n        list k = llList2List([1, 2, 3, 4], 1, 2);\n        integer l = llFloor(2.7) + llCeil(2.2);\n        string m = llGetSubString(\"h\xc3\xa9llo\", 0, 1);\n        integer n = llGetUnixTime();\n        string o = llList2CSV([1, \"a\", 2.0]);\n        if (llFrand(1) < 0.5)\n        {\n            a = f = i = l = n = 0; b = 0; c = d = e = g = h = j = m = o = \"\"; k = [];\n        }\n        llSay(0, (string)a + (string)b + c + d + e + (string)f + g + h + (string)i + j + llList2CSV(k) + (string)l + m + (string)n + o);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
         ensure("optimized", r.optimized);
         ensure("abs: " + r.text, r.text.find("integer a = 3;") != std::string::npos);
@@ -383,7 +383,7 @@ namespace tut
     void allsloptimizer_object::test<11>()
     {
         set_test_name("the rotation functions fold over unit rotations by the viewer's own quaternion, and leave the rest");
-        const std::string source = wrap("", "        rotation a = llEuler2Rot(<0, 0, PI_BY_TWO>);\n        vector b = llRot2Euler(<0, 0, 0.7071068, 0.7071068>);\n        rotation c = llAxisAngle2Rot(<0, 0, 2>, PI);\n        vector d = llRot2Axis(<0, 0, 0.7071068, 0.7071068>);\n        float e = llRot2Angle(<0, 0, 0.7071068, 0.7071068>);\n        vector f = llRot2Fwd(<0, 0, 0.7071068, 0.7071068>);\n        vector h = llRot2Up(<0.7071068, 0, 0, 0.7071068>);\n        vector i = llRot2Axis(<0, 0, 0, 1>);\n        vector j = llRot2Fwd(<0, 0, 2, 2>);\n        llSay(0, (string)a + (string)b + (string)c + (string)d + (string)e + (string)f + (string)h + (string)i + (string)j);\n        a = c = ZERO_ROTATION; b = d = f = h = i = j = ZERO_VECTOR; e = 0;\n");
+        const std::string source = wrap("", "        rotation a = llEuler2Rot(<0, 0, PI_BY_TWO>);\n        vector b = llRot2Euler(<0, 0, 0.7071068, 0.7071068>);\n        rotation c = llAxisAngle2Rot(<0, 0, 2>, PI);\n        vector d = llRot2Axis(<0, 0, 0.7071068, 0.7071068>);\n        float e = llRot2Angle(<0, 0, 0.7071068, 0.7071068>);\n        vector f = llRot2Fwd(<0, 0, 0.7071068, 0.7071068>);\n        vector h = llRot2Up(<0.7071068, 0, 0, 0.7071068>);\n        vector i = llRot2Axis(<0, 0, 0, 1>);\n        vector j = llRot2Fwd(<0, 0, 2, 2>);\n        if (llFrand(1) < 0.5)\n        {\n            a = c = ZERO_ROTATION; b = d = f = h = i = j = ZERO_VECTOR; e = 0;\n        }\n        llSay(0, (string)a + (string)b + (string)c + (string)d + (string)e + (string)f + (string)h + (string)i + (string)j);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
         ensure("optimized", r.optimized);
         auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
@@ -402,7 +402,7 @@ namespace tut
     void allsloptimizer_object::test<12>()
     {
         set_test_name("llJsonGetValue folds a string or a plain number out of strict JSON, and leaves the rest to the simulator");
-        const std::string source = wrap("", "        string a = llJsonGetValue(\"{\\\"name\\\": \\\"Ann\\\", \\\"tags\\\": [\\\"x\\\", 7, {\\\"k\\\": \\\"v\\\"}]}\", [\"name\"]);\n        string b = llJsonGetValue(\"{\\\"tags\\\": [\\\"x\\\", -7]}\", [\"tags\", 1]);\n        string c = llJsonGetValue(\"{\\\"tags\\\": [\\\"x\\\", 7, {\\\"k\\\": \\\"v\\\"}]}\", [\"tags\", 2, \"k\"]);\n        string d = llJsonGetValue(\"[1.5]\", [0]);\n        string e = llJsonGetValue(\"[true]\", [0]);\n        string f = llJsonGetValue(\"[1]\", [3]);\n        string g = llJsonGetValue(\"{\\\"a\\\": 1, \\\"a\\\": 2}\", [\"a\"]);\n        string h = llJsonGetValue(\"[1,]\", [0]);\n        string i = llJsonGetValue(\"[\\\"a\\\\\\\"b\\\"]\", [0]);\n        llSay(0, a + b + c + d + e + f + g + h + i);\n        a = b = c = d = e = f = g = h = i = \"\";\n");
+        const std::string source = wrap("", "        string a = llJsonGetValue(\"{\\\"name\\\": \\\"Ann\\\", \\\"tags\\\": [\\\"x\\\", 7, {\\\"k\\\": \\\"v\\\"}]}\", [\"name\"]);\n        string b = llJsonGetValue(\"{\\\"tags\\\": [\\\"x\\\", -7]}\", [\"tags\", 1]);\n        string c = llJsonGetValue(\"{\\\"tags\\\": [\\\"x\\\", 7, {\\\"k\\\": \\\"v\\\"}]}\", [\"tags\", 2, \"k\"]);\n        string d = llJsonGetValue(\"[1.5]\", [0]);\n        string e = llJsonGetValue(\"[true]\", [0]);\n        string f = llJsonGetValue(\"[1]\", [3]);\n        string g = llJsonGetValue(\"{\\\"a\\\": 1, \\\"a\\\": 2}\", [\"a\"]);\n        string h = llJsonGetValue(\"[1,]\", [0]);\n        string i = llJsonGetValue(\"[\\\"a\\\\\\\"b\\\"]\", [0]);\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = d = e = f = g = h = i = \"\";\n        }\n        llSay(0, a + b + c + d + e + f + g + h + i);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
         ensure("optimized", r.optimized);
         auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
@@ -416,7 +416,7 @@ namespace tut
         ensure("a trailing comma is left", has("string h = llJsonGetValue"));
         ensure("an escape unescaped: " + r.text, has("string i = \"a\\\"b\";"));
         // The answers that are constants are the constants' names.
-        const std::string more = wrap("", "        string a = llJsonGetValue(\"[true, null]\", [0]);\n        string b = llJsonGetValue(\"[1]\", [3]);\n        string c = llJsonValueType(\"{\\\"a\\\": [1, {}]}\", [\"a\", 1]);\n        string d = llJsonValueType(\"{\\\"a\\\": 1}\", [\"b\"]);\n        string e = llJsonValueType(\"[1,]\", []);\n        string f = llList2Json(JSON_OBJECT, [\"name\", \"Ann Lee\", \"count\", 3]);\n        string g = llList2Json(JSON_ARRAY, [1, \"true\"]);\n        string h = llList2Json(JSON_ARRAY, [1.5]);\n        list i = llJson2List(\"[1, \\\"two\\\", -3]\");\n        list j = llJson2List(\"{\\\"k\\\": \\\"v\\\"}\");\n        list k = llJson2List(\"[true]\");\n        llSay(0, a + b + c + d + e + f + g + h + llList2CSV(i) + llList2CSV(j) + llList2CSV(k));\n        a = b = c = d = e = f = g = h = \"\"; i = j = k = [];\n");
+        const std::string more = wrap("", "        string a = llJsonGetValue(\"[true, null]\", [0]);\n        string b = llJsonGetValue(\"[1]\", [3]);\n        string c = llJsonValueType(\"{\\\"a\\\": [1, {}]}\", [\"a\", 1]);\n        string d = llJsonValueType(\"{\\\"a\\\": 1}\", [\"b\"]);\n        string e = llJsonValueType(\"[1,]\", []);\n        string f = llList2Json(JSON_OBJECT, [\"name\", \"Ann Lee\", \"count\", 3]);\n        string g = llList2Json(JSON_ARRAY, [1, \"true\"]);\n        string h = llList2Json(JSON_ARRAY, [1.5]);\n        list i = llJson2List(\"[1, \\\"two\\\", -3]\");\n        list j = llJson2List(\"{\\\"k\\\": \\\"v\\\"}\");\n        list k = llJson2List(\"[true]\");\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = d = e = f = g = h = \"\"; i = j = k = [];\n        }\n        llSay(0, a + b + c + d + e + f + g + h + llList2CSV(i) + llList2CSV(j) + llList2CSV(k));\n");
         ALLSLOptimizer::Result m = ALLSLOptimizer::run(more, options());
         ensure("optimized", m.optimized);
         auto hasm = [&m](const char* text) { return m.text.find(text) != std::string::npos; };
@@ -433,7 +433,7 @@ namespace tut
         ensure("a true in it is left: " + m.text, hasm("list k = llJson2List"));
         // A nested value comes out written the compact way; a set puts a
         // value in, at a key or an index, where the document is plain.
-        const std::string sets = wrap("", "        string a = llJsonGetValue(\"{\\\"a\\\": [1, {\\\"b\\\": true}, \\\"c\\\"]}\", [\"a\"]);\n        string b = llJsonSetValue(\"{\\\"a\\\": 1}\", [\"b\"], \"two\");\n        string c = llJsonSetValue(\"[1, 2]\", [1], \"9\");\n        string d = llJsonSetValue(\"[1, 2]\", [JSON_APPEND], JSON_TRUE);\n        string e = llJsonSetValue(\"[1, 2]\", [5], \"9\");\n        string f = llJsonSetValue(\"{}\", [\"a\", \"b\"], \"x\");\n        string g = llJsonSetValue(\"[1]\", [0], \"1.5\");\n        string h = llJsonGetValue(\"[1.5]\", []);\n        llSay(0, a + b + c + d + e + f + g + h);\n        a = b = c = d = e = f = g = h = \"\";\n");
+        const std::string sets = wrap("", "        string a = llJsonGetValue(\"{\\\"a\\\": [1, {\\\"b\\\": true}, \\\"c\\\"]}\", [\"a\"]);\n        string b = llJsonSetValue(\"{\\\"a\\\": 1}\", [\"b\"], \"two\");\n        string c = llJsonSetValue(\"[1, 2]\", [1], \"9\");\n        string d = llJsonSetValue(\"[1, 2]\", [JSON_APPEND], JSON_TRUE);\n        string e = llJsonSetValue(\"[1, 2]\", [5], \"9\");\n        string f = llJsonSetValue(\"{}\", [\"a\", \"b\"], \"x\");\n        string g = llJsonSetValue(\"[1]\", [0], \"1.5\");\n        string h = llJsonGetValue(\"[1.5]\", []);\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = d = e = f = g = h = \"\";\n        }\n        llSay(0, a + b + c + d + e + f + g + h);\n");
         ALLSLOptimizer::Result n = ALLSLOptimizer::run(sets, options());
         ensure("optimized", n.optimized);
         auto hasn = [&n](const char* text) { return n.text.find(text) != std::string::npos; };
@@ -445,7 +445,7 @@ namespace tut
         ensure("a path to create is left: " + n.text, hasn("string f = llJsonSetValue"));
         ensure("a value that is a fraction is left: " + n.text, hasn("string g = llJsonSetValue"));
         ensure("a document with a fraction is left: " + n.text, hasn("string h = llJsonGetValue"));
-        const std::string dels = wrap("", "        string a = llJsonSetValue(\"{\\\"a\\\": 1, \\\"b\\\": 2}\", [\"a\"], JSON_DELETE);\n        string b = llJsonSetValue(\"[1, 2, 3]\", [1], JSON_DELETE);\n        string c = llJsonSetValue(\"[1, 2, 3]\", [7], JSON_DELETE);\n        llSay(0, a + b + c);\n        a = b = c = \"\";\n");
+        const std::string dels = wrap("", "        string a = llJsonSetValue(\"{\\\"a\\\": 1, \\\"b\\\": 2}\", [\"a\"], JSON_DELETE);\n        string b = llJsonSetValue(\"[1, 2, 3]\", [1], JSON_DELETE);\n        string c = llJsonSetValue(\"[1, 2, 3]\", [7], JSON_DELETE);\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = \"\";\n        }\n        llSay(0, a + b + c);\n");
         ALLSLOptimizer::Result q = ALLSLOptimizer::run(dels, options());
         auto hasq = [&q](const char* text) { return q.text.find(text) != std::string::npos; };
         ensure("a key deleted: " + q.text, hasq("string a = \"{\\\"b\\\":2}\";"));
@@ -2003,5 +2003,53 @@ namespace tut
             ensure("cross: " + r.text, about(numbers(r.text, "vector c"), { -3.f, 6.f, -3.f }));
             ensure("crossed by itself: " + r.text, about(numbers(r.text, "vector z"), { 0.f, 0.f, 0.f }));
         }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<53>()
+    {
+        set_test_name("a local set to a constant is that constant where it is read before it is set again, on every way there (L15); "
+                      "not where the ways disagree, in a loop that sets it, past a label, nor after a write in the same statement");
+        const std::string head = "default\n{\n    touch_start(integer n)\n    {\n";
+        const std::string tail = "    }\n}\n";
+        ALLSLOptimizer::Result r =
+            ALLSLOptimizer::run(head + "        integer x = 5;\n        llSay(0, (string)x);\n        x = 7;\n        llSay(0, (string)x);\n        n = 3;\n        llSay(n, \"n\");\n" + tail, options());
+        ensure("optimized: " + notes(r), r.optimized);
+        ensure_equals("each read its value, and the variable gone", r.text,
+                      head + "        llSay(0, \"5\");\n        llSay(0, \"7\");\n        llSay(3, \"n\");\n" + tail);
+        ensure("noted: " + notes(r), has(r, "folded (string)x to \"7\"") && has(r, "inlined n to 3") && has(r, "removed x, which is set and never read"));
+
+        // The ways of an if: what both say goes on, what they do not stops.
+        r = ALLSLOptimizer::run(head + "        integer x = 1;\n        integer y = 1;\n        if (n)\n        {\n            x = 2;\n            llSay(0, \"a\");\n        }\n"
+                                       "        else\n        {\n            llSay(0, \"b\");\n        }\n        llSay(x, (string)y);\n        x = y = 0;\n" + tail,
+                                options());
+        ensure("agreed: " + r.text, r.text.find("llSay(x, \"1\");") != std::string::npos);
+        // A way that returns says nothing of what comes after.
+        r = ALLSLOptimizer::run(head + "        integer x = 1;\n        if (n)\n        {\n            x = 2;\n            return;\n        }\n        llSay(x, \"c\");\n        x = 0;\n" + tail,
+                                options());
+        ensure("a way that ends: " + r.text, r.text.find("llSay(1, \"c\");") != std::string::npos);
+
+        // A loop that sets it: not inside, nor after.
+        r = ALLSLOptimizer::run(head + "        integer i = 0;\n        while (i < n)\n        {\n            llSay(i, \"d\");\n            ++i;\n        }\n        llSay(i, \"e\");\n" + tail,
+                                options());
+        ensure("in a loop: " + r.text, r.text.find("llSay(i, \"d\");") != std::string::npos && r.text.find("llSay(i, \"e\");") != std::string::npos);
+        // Past a label, which a jump may come to with anything.
+        r = ALLSLOptimizer::run(head + "        integer x = 1;\n        @top;\n        llSay(x, \"f\");\n        x = 2;\n        if (llFrand(1) < 0.5)\n            jump top;\n" + tail,
+                                options());
+        ensure("past a label: " + r.text, r.text.find("llSay(x, \"f\");") != std::string::npos);
+        // A loop holding a label forgets everything as it begins.
+        r = ALLSLOptimizer::run(head + "        integer x = 1;\n        while (llFrand(1) < 0.5)\n        {\n            @in;\n            llSay(x, \"g\");\n        }\n"
+                                       "        x = 2;\n        if (llFrand(1) < 0.5)\n            jump in;\n" + tail,
+                                options());
+        ensure("a loop with a label: " + r.text, r.text.find("llSay(x, \"g\");") != std::string::npos);
+        // LSL runs a binary operator's right side first: the read on the
+        // left comes after the write.
+        r = ALLSLOptimizer::run(head + "        integer x = 1;\n        llSay(0, (string)(x + (x = 3)));\n        llSay(x, \"h\");\n" + tail, options());
+        ensure("after a write in the statement: " + r.text, r.text.find("(string)(x + (x = 3))") != std::string::npos);
+        // A read left where another read of the variable is not known: a
+        // literal in place of a read is no smaller, and the variable stays.
+        r = ALLSLOptimizer::run(head + "        string s = \"a long string of text\";\n        llSay(0, s);\n        if (n)\n            s = llDetectedName(0);\n        llSay(1, s);\n" + tail,
+                                options());
+        ensure("not one read alone: " + r.text, r.text.find("llSay(0, s);") != std::string::npos);
     }
 } // namespace tut

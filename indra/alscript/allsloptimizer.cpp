@@ -1910,6 +1910,418 @@ namespace
         }
     };
 
+    // Tailslide's values, and with them a local's or a parameter's through
+    // the code that runs on from where it was set to a constant: read
+    // before it is set again, on every way there, it is that constant --
+    // where Tailslide gives one only to a variable never set after it is
+    // declared. What is known goes with the code as it runs: a statement's
+    // reads see it as the statement begins and its writes change it as it
+    // ends, and a read that something in the same statement may write
+    // first -- LSL runs a binary operator's right side before its left --
+    // sees nothing. Both ways of an if are followed, and what they agree on
+    // goes on; a loop forgets what it writes before it begins, since it may
+    // come round again; and a label forgets everything, since a jump may
+    // come in from anywhere -- a loop holding one, everything before it
+    // begins. Lists are left alone, as Tailslide leaves them; and a local
+    // declared with no value is known only once it is set.
+    class FlowValues : public ConstantDeterminingVisitor
+    {
+    public:
+        // `vectors` where a vector's or a rotation's literal is no larger
+        // than what it is worked out from: not on Luau, which builds one
+        // where LSO and Mono load it.
+        FlowValues(AOperationBehavior* behavior, ScriptAllocator* allocator, const ALLSLEffects& effects, bool vectors)
+            : ConstantDeterminingVisitor(behavior, allocator), mEffects(effects), mVectors(vectors)
+        {
+        }
+
+        bool beforeDescend(LSLASTNode* node) override
+        {
+            if (!ConstantDeterminingVisitor::beforeDescend(node))
+            {
+                if (node->getNodeType() == NODE_STATEMENT || node->getNodeType() == NODE_EXPRESSION)
+                {
+                    forget(mEffects.of(node));
+                }
+                return false;
+            }
+            switch (node->getNodeType())
+            {
+                case NODE_GLOBAL_FUNCTION:
+                case NODE_EVENT_HANDLER:
+                    mState = State{};
+                    return true;
+                case NODE_STATEMENT:
+                    statement(node);
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
+        bool visit(LSLLValueExpression* lvalue) override
+        {
+            ConstantDeterminingVisitor::visit(lvalue);
+            LSLSymbol* sym = lvalue->getSymbol();
+            if (!sym || sym->getAssignments() == 0 || !tracked(sym) || !mState.reachable || written(lvalue))
+            {
+                return true;
+            }
+            const auto found = mState.known.find(sym);
+            if (found == mState.known.end() || (mHot && mHot->writes(sym) && !readFirst(lvalue, sym)))
+            {
+                return true;
+            }
+            LSLConstant* cv = found->second;
+            if (LSLIdentifier* member = lvalue->getMember())
+            {
+                cv = part(cv, member->getName());
+            }
+            lvalue->setConstantValue(cv);
+            return true;
+        }
+
+        bool visit(LSLDeclaration* decl) override
+        {
+            ConstantDeterminingVisitor::visit(decl);
+            LSLSymbol*  sym  = decl->getSymbol();
+            LSLASTNode* init = decl->getChild(1);
+            if (!sym || !tracked(sym))
+            {
+                return false;
+            }
+            // The value Tailslide gave the symbol from what it was declared
+            // with, made the symbol's type.
+            LSLConstant* cv = init && init->getNodeType() != NODE_NULL ? sym->getConstantValue() : nullptr;
+            if (cv && mState.reachable)
+            {
+                mState.known[sym] = cv;
+            }
+            else
+            {
+                mState.known.erase(sym);
+            }
+            return false;
+        }
+
+    private:
+        struct State
+        {
+            boost::unordered_flat_map<LSLSymbol*, LSLConstant*> known;
+            // False after a return, a jump or a change of state, until a label.
+            bool                                                reachable = true;
+        };
+
+        bool tracked(LSLSymbol* sym) const
+        {
+            if (sym->getSymbolType() != SYM_VARIABLE ||
+                (sym->getSubType() != SYM_LOCAL && sym->getSubType() != SYM_FUNCTION_PARAMETER && sym->getSubType() != SYM_EVENT_PARAMETER))
+            {
+                return false;
+            }
+            switch (sym->getIType())
+            {
+                case LST_INTEGER:
+                case LST_FLOATINGPOINT:
+                case LST_STRING:
+                case LST_KEY:
+                    return true;
+                case LST_VECTOR:
+                case LST_QUATERNION:
+                    return mVectors;
+                default:
+                    return false;
+            }
+        }
+
+        // What an assignment or an increment writes, not a read.
+        static bool written(LSLLValueExpression* lvalue)
+        {
+            LSLASTNode* parent = lvalue->getParent();
+            return parent && parent->getNodeType() == NODE_EXPRESSION && operation_mutates(static_cast<LSLExpression*>(parent)->getOperation()) &&
+                   parent->getChild(0) == lvalue;
+        }
+
+        // Whether nothing of the expression a read is in that runs before it
+        // writes what it reads.
+        bool readFirst(LSLLValueExpression* lvalue, LSLSymbol* sym) const
+        {
+            for (LSLASTNode* earlier : ALLSLEffects::before(mRoot, lvalue))
+            {
+                if (mEffects.of(earlier).writes(sym))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // A vector's or a rotation's part, as Tailslide reads one.
+        LSLConstant* part(LSLConstant* cv, const char* member) const
+        {
+            if (!member)
+            {
+                return nullptr;
+            }
+            if (cv->getIType() == LST_VECTOR)
+            {
+                const Vector3* v = static_cast<LSLVectorConstant*>(cv)->getValue();
+                switch (member[0])
+                {
+                    case 'x': return _mAllocator->newTracked<LSLFloatConstant>(v->x);
+                    case 'y': return _mAllocator->newTracked<LSLFloatConstant>(v->y);
+                    case 'z': return _mAllocator->newTracked<LSLFloatConstant>(v->z);
+                    default: return nullptr;
+                }
+            }
+            if (cv->getIType() == LST_QUATERNION)
+            {
+                const Quaternion* q = static_cast<LSLQuaternionConstant*>(cv)->getValue();
+                switch (member[0])
+                {
+                    case 'x': return _mAllocator->newTracked<LSLFloatConstant>(q->x);
+                    case 'y': return _mAllocator->newTracked<LSLFloatConstant>(q->y);
+                    case 'z': return _mAllocator->newTracked<LSLFloatConstant>(q->z);
+                    case 's': return _mAllocator->newTracked<LSLFloatConstant>(q->s);
+                    default: return nullptr;
+                }
+            }
+            return nullptr;
+        }
+
+        static bool same(LSLConstant* a, LSLConstant* b)
+        {
+            if (a == b)
+            {
+                return true;
+            }
+            if (a->getNodeSubType() != b->getNodeSubType())
+            {
+                return false;
+            }
+            // Bit for bit: -0.0 is not 0.0, and NaN is not itself.
+            const auto bits = [](double x, double y) { return x == y && std::signbit(x) == std::signbit(y); };
+            switch (a->getNodeSubType())
+            {
+                case NODE_INTEGER_CONSTANT:
+                    return static_cast<LSLIntegerConstant*>(a)->getValue() == static_cast<LSLIntegerConstant*>(b)->getValue();
+                case NODE_FLOAT_CONSTANT:
+                    return bits(static_cast<LSLFloatConstant*>(a)->getValue(), static_cast<LSLFloatConstant*>(b)->getValue());
+                case NODE_STRING_CONSTANT:
+                    return !strcmp(static_cast<LSLStringConstant*>(a)->getValue(), static_cast<LSLStringConstant*>(b)->getValue());
+                case NODE_KEY_CONSTANT:
+                    return !strcmp(static_cast<LSLKeyConstant*>(a)->getValue(), static_cast<LSLKeyConstant*>(b)->getValue());
+                case NODE_VECTOR_CONSTANT:
+                {
+                    const Vector3* u = static_cast<LSLVectorConstant*>(a)->getValue();
+                    const Vector3* v = static_cast<LSLVectorConstant*>(b)->getValue();
+                    return bits(u->x, v->x) && bits(u->y, v->y) && bits(u->z, v->z);
+                }
+                case NODE_QUATERNION_CONSTANT:
+                {
+                    const Quaternion* p = static_cast<LSLQuaternionConstant*>(a)->getValue();
+                    const Quaternion* q = static_cast<LSLQuaternionConstant*>(b)->getValue();
+                    return bits(p->x, q->x) && bits(p->y, q->y) && bits(p->z, q->z) && bits(p->s, q->s);
+                }
+                default:
+                    return false;
+            }
+        }
+
+        // What two ways that meet both know.
+        static State merged(const State& a, const State& b)
+        {
+            if (!a.reachable)
+            {
+                return b;
+            }
+            if (!b.reachable)
+            {
+                return a;
+            }
+            State out;
+            for (const auto& [sym, cv] : a.known)
+            {
+                const auto there = b.known.find(sym);
+                if (there != b.known.end() && same(cv, there->second))
+                {
+                    out.known.emplace(sym, cv);
+                }
+            }
+            return out;
+        }
+
+        void forget(const ALLSLEffects::Writes& writes)
+        {
+            for (LSLSymbol* sym : writes.variables)
+            {
+                mState.known.erase(sym);
+            }
+        }
+
+        static bool holdsLabel(LSLASTNode* root)
+        {
+            std::vector<LSLASTNode*> stack{ root };
+            while (!stack.empty())
+            {
+                LSLASTNode* n = stack.back();
+                stack.pop_back();
+                if (n->getNodeType() == NODE_STATEMENT && n->getNodeSubType() == NODE_LABEL)
+                {
+                    return true;
+                }
+                for (LSLASTNode* child = n->getChild(0); child; child = child->getNext())
+                {
+                    stack.push_back(child);
+                }
+            }
+            return false;
+        }
+
+        // A loop about to begin: what it writes forgotten, or everything
+        // where a jump could come into it.
+        void entering(LSLASTNode* loop, const ALLSLEffects::Writes& writes)
+        {
+            if (holdsLabel(loop))
+            {
+                mState.known.clear();
+                return;
+            }
+            forget(writes);
+        }
+
+        // An expression run as one: its reads see what is known as it
+        // begins, and what it writes is known as it ends -- a variable set
+        // by the whole of it to a constant, that constant.
+        void expression(LSLASTNode* expr)
+        {
+            if (!expr || expr->getNodeType() == NODE_NULL)
+            {
+                return;
+            }
+            const ALLSLEffects::Writes writes = mEffects.of(expr);
+            LSLASTNode* const          root   = mRoot;
+            const ALLSLEffects::Writes* hot   = mHot;
+            mRoot                             = expr;
+            mHot                              = &writes;
+            expr->visit(this);
+            mRoot = root;
+            mHot  = hot;
+            LSLSymbol*   set = nullptr;
+            LSLConstant* to  = nullptr;
+            if (expr->getNodeType() == NODE_EXPRESSION && static_cast<LSLExpression*>(expr)->getOperation() == OP_ASSIGN &&
+                expr->getChild(0)->getNodeSubType() == NODE_LVALUE_EXPRESSION && !static_cast<LSLLValueExpression*>(expr->getChild(0))->getMember())
+            {
+                set                = expr->getChild(0)->getSymbol();
+                LSLASTNode* value  = expr->getChild(1);
+                to                 = set && !mEffects.of(value).writes(set) ? value->getConstantValue() : nullptr;
+            }
+            forget(writes);
+            if (set && to && tracked(set) && mState.reachable)
+            {
+                if (to->getType() != set->getType())
+                {
+                    to = to->getType()->canCoerce(set->getType()) ? _mOperationBehavior->cast(set->getType(), to, to->getLoc()) : nullptr;
+                }
+                if (to)
+                {
+                    mState.known[set] = to;
+                }
+            }
+        }
+
+        void statement(LSLASTNode* stmt)
+        {
+            switch (stmt->getNodeSubType())
+            {
+                case NODE_COMPOUND_STATEMENT:
+                    visitChildren(stmt);
+                    return;
+                case NODE_EXPRESSION_STATEMENT:
+                    expression(stmt->getChild(0));
+                    return;
+                case NODE_RETURN_STATEMENT:
+                    expression(stmt->getChild(0));
+                    mState.reachable = false;
+                    return;
+                case NODE_DECLARATION:
+                    // Known as visit(LSLDeclaration*) says, once its value has run.
+                    stmt->getChild(0)->visit(this);
+                    expression(stmt->getChild(1));
+                    return;
+                case NODE_STATE_STATEMENT:
+                case NODE_JUMP_STATEMENT:
+                    visitChildren(stmt);
+                    mState.reachable = false;
+                    return;
+                case NODE_LABEL:
+                    visitChildren(stmt);
+                    mState = State{};
+                    return;
+                case NODE_IF_STATEMENT:
+                {
+                    expression(stmt->getChild(0));
+                    const State before = mState;
+                    stmt->getChild(1)->visit(this);
+                    const State yes = std::move(mState);
+                    mState          = before;
+                    stmt->getChild(2)->visit(this);
+                    mState = merged(yes, mState);
+                    return;
+                }
+                case NODE_WHILE_STATEMENT:
+                {
+                    entering(stmt, mEffects.of(stmt));
+                    expression(stmt->getChild(0));
+                    const State checked = mState;
+                    stmt->getChild(1)->visit(this);
+                    mState = merged(checked, mState);
+                    return;
+                }
+                case NODE_DO_STATEMENT:
+                {
+                    entering(stmt, mEffects.of(stmt));
+                    const State begun = mState;
+                    stmt->getChild(0)->visit(this);
+                    expression(stmt->getChild(1));
+                    mState = merged(begun, mState);
+                    return;
+                }
+                case NODE_FOR_STATEMENT:
+                {
+                    for (LSLASTNode* init = stmt->getChild(0)->getChild(0); init; init = init->getNext())
+                    {
+                        expression(init);
+                    }
+                    ALLSLEffects::Writes loops = mEffects.of(stmt->getChild(1));
+                    loops.add(mEffects.of(stmt->getChild(2)));
+                    loops.add(mEffects.of(stmt->getChild(3)));
+                    entering(stmt, loops);
+                    expression(stmt->getChild(1));
+                    const State checked = mState;
+                    stmt->getChild(3)->visit(this);
+                    for (LSLASTNode* step = stmt->getChild(2)->getChild(0); step; step = step->getNext())
+                    {
+                        expression(step);
+                    }
+                    mState = merged(checked, mState);
+                    return;
+                }
+                default:
+                    visitChildren(stmt);
+                    forget(mEffects.of(stmt));
+                    return;
+            }
+        }
+
+        const ALLSLEffects&         mEffects;
+        const bool                  mVectors;
+        State                       mState;
+        // The expression being run, and what it writes.
+        LSLASTNode*                 mRoot = nullptr;
+        const ALLSLEffects::Writes* mHot  = nullptr;
+    };
+
     struct Pass
     {
         Ctx&                          ctx;
@@ -2031,7 +2443,7 @@ namespace
                 return false;
             }
             LSLConstant* cv = lvalue->getConstantValue();
-            if (cv && inlineable(cv) && writeOut(sym, cv))
+            if (cv && inlineable(cv) && writeOut(sym, cv) && (sym->getAssignments() == 0 || sym->getSubType() == SYM_GLOBAL || allKnown(lvalue, sym)))
             {
                 fold(lvalue, cv, "OptimizerInlinedConstant", "inlined");
             }
@@ -2039,6 +2451,59 @@ namespace
         }
 
     private:
+        // Of a variable set more than once, whose reads have values where
+        // the code that runs to them set it to a constant (FlowValues):
+        // whether every read has one, so that with all of them written out
+        // the variable goes. Where one has none the variable stays, and a
+        // value written at a read alone is a literal in place of a read --
+        // larger, for most -- unless what it is read in folds with it,
+        // which is that expression's fold, not this.
+        bool allKnown(LSLLValueExpression* lvalue, LSLSymbol* sym)
+        {
+            if (!mCounted)
+            {
+                mCounted = true;
+                std::vector<LSLASTNode*> stack{ lvalue->getRoot() };
+                while (!stack.empty())
+                {
+                    LSLASTNode* n = stack.back();
+                    stack.pop_back();
+                    if (n->getNodeType() == NODE_EXPRESSION && n->getNodeSubType() == NODE_LVALUE_EXPRESSION && n->getSymbol() &&
+                        n->getSymbol()->getAssignments() > 0)
+                    {
+                        auto*       read   = static_cast<LSLLValueExpression*>(n);
+                        LSLASTNode* parent = n->getParent();
+                        const bool  set    = parent && parent->getNodeType() == NODE_EXPRESSION &&
+                                         static_cast<LSLExpression*>(parent)->getOperation() == OP_ASSIGN && parent->getChild(0) == n;
+                        if (!set)
+                        {
+                            // A compound assignment or an increment reads it
+                            // too, with nothing to write in its place.
+                            const bool  mutated = parent && parent->getNodeType() == NODE_EXPRESSION &&
+                                                 operation_mutates(static_cast<LSLExpression*>(parent)->getOperation()) && parent->getChild(0) == n;
+                            LSLConstant* known  = mutated ? nullptr : read->getConstantValue();
+                            auto&        count  = mReads[n->getSymbol()];
+                            ++count.first;
+                            if (known && inlineable(known) && (n->getSymbol()->getIType() != LST_KEY || keyMayInline(read)))
+                            {
+                                ++count.second;
+                            }
+                        }
+                    }
+                    for (LSLASTNode* child = n->getChild(0); child; child = child->getNext())
+                    {
+                        stack.push_back(child);
+                    }
+                }
+            }
+            const auto found = mReads.find(sym);
+            return found != mReads.end() && found->second.first == found->second.second;
+        }
+
+        // Each such variable's reads, and those of them with a value.
+        boost::unordered_flat_map<LSLSymbol*, std::pair<int, int>> mReads;
+        bool                                                      mCounted = false;
+
         // A global's value goes where it is read only where writing it at
         // every place it is read costs less than the global does: a vector
         // read ten times is ten vectors. What goes where is the target's
@@ -5157,11 +5622,17 @@ namespace
             LSLASTNode::replaceNode(node, ctx.allocator->newTracked<LSLNopStatement>());
         }
 
+        static bool parameter(LSLSymbol* sym)
+        {
+            return sym->getSubType() == SYM_FUNCTION_PARAMETER || sym->getSubType() == SYM_EVENT_PARAMETER;
+        }
+
         // A variable -- a local, a global -- set and never read goes, and
         // each place it is set keeps what setting it ran: `x = f();` is
         // `f();`, `x++;` nothing, and `integer h = llListen(...);` the
         // call. Only where every place that names it but its declaration
-        // sets it, and nothing reads what was set.
+        // sets it, and nothing reads what was set. A parameter so set
+        // loses its writes the same way, and stays.
         void writeOnly(LSLScript* script)
         {
             struct Uses
@@ -5192,7 +5663,7 @@ namespace
                 else if (node->getNodeType() == NODE_EXPRESSION && node->getNodeSubType() == NODE_LVALUE_EXPRESSION)
                 {
                     LSLSymbol* sym = node->getSymbol();
-                    if (!sym || (sym->getSubType() != SYM_LOCAL && sym->getSubType() != SYM_GLOBAL))
+                    if (!sym || (sym->getSubType() != SYM_LOCAL && sym->getSubType() != SYM_GLOBAL && !parameter(sym)))
                     {
                         return;
                     }
@@ -5214,13 +5685,16 @@ namespace
                 // A global never used at all goes with the unused (globals()),
                 // and a local set to nothing that changes anything goes with
                 // those (unusedLocal); one set to what does is this pass's.
+                // A parameter's writes go, and the parameter stays.
                 Uses&      use    = uses[sym];
                 const bool global = use.declaration && use.declaration->getNodeType() == NODE_GLOBAL_VARIABLE;
-                if (use.read || !use.declaration || (global && use.writes.empty()))
+                const bool given  = parameter(sym);
+                if (use.read || (!use.declaration && !given) || ((global || given) && use.writes.empty()))
                 {
                     continue;
                 }
-                report.note(use.declaration->getLoc(), "OptimizerRemovedWriteOnly", "removed [1], which is set and never read", { sym->getName() });
+                report.note(given ? use.writes.front()->getLoc() : use.declaration->getLoc(), "OptimizerRemovedWriteOnly",
+                            "removed [1], which is set and never read", { sym->getName() });
                 for (LSLASTNode* write : use.writes)
                 {
                     LSLASTNode* value  = write->getNodeSubType() == NODE_BINARY_EXPRESSION ? write->getChild(1) : nullptr;
@@ -5240,7 +5714,7 @@ namespace
                     script->getSymbolTable()->remove(sym);
                     script->getGlobals()->removeChild(use.declaration);
                 }
-                else
+                else if (!given)
                 {
                     auto*       decl = static_cast<LSLDeclaration*>(use.declaration);
                     LSLASTNode* init = decl->getInitializer();
@@ -6103,7 +6577,17 @@ namespace
         script->determineTypes();
         script->recalculateReferenceData();
         ALLSLArithmetic behavior(&parser.allocator, options.addstrings, options.target);
-        const auto propagate = [&]() {
+        // Tailslide's values until what the script writes is known, and
+        // with it, where folding is asked for, what the locals hold as the
+        // code runs (FlowValues).
+        const ALLSLEffects* flowing   = nullptr;
+        const auto          propagate = [&]() {
+            if (flowing)
+            {
+                FlowValues values(&behavior, &parser.allocator, *flowing, options.target != ALLSLOptimizer::Target::Luau);
+                script->visit(&values);
+                return;
+            }
             ConstantDeterminingVisitor values(&behavior, &parser.allocator);
             script->visit(&values);
         };
@@ -6118,6 +6602,11 @@ namespace
         }
 
         const ALLSLEffects effects(script);
+        if (options.constfold)
+        {
+            flowing = &effects;
+            propagate();
+        }
         Ctx                ctx;
         ctx.allocator = &parser.allocator;
         ctx.context   = &parser.context;
