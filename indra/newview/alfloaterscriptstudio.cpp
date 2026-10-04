@@ -931,6 +931,7 @@ void ALFloaterScriptStudio::listenToWorld()
             mOrphansDirty = true;
         }
     });
+    mConvertedContents = ALScriptWorkspace::instance().contentsIndex().onHeard([this](const ALScriptContents& contents) { convertedListed(contents); });
     // The vimrc read again into this window's vim whenever it changes: its
     // file saved, a notecard dropped on the preferences' box, or saved.
     mVimrcConnection = ALScriptStudioVimrc::instance().onChanged([this]() {
@@ -7628,41 +7629,120 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
         report(getString("ConvertFailed", args), true, &doc);
         return;
     }
-    // Named after it, in the inventory's scripts folder, as a new script
-    // is made; opened with the SLua put in unsaved, and set beside the LSL
-    // once it has loaded.
+    // Named after it, beside it: in the prim it is in, as the scripter
+    // would put it, or in the inventory's scripts folder, as a new script
+    // is made there; opened with the SLua put in unsaved, and set beside
+    // the LSL once it has loaded.
     const std::string         name     = getString("ConvertName", args);
     const std::string         lsl      = expanded ? *doc.expanded.text : source;
     const std::string         text     = converted.text;
-    const std::string         theirs   = getString(expanded ? "ConvertExpandedTitle" : "ConvertLSLTitle", args);
-    const std::string         own      = getString("ConvertSLuaTitle");
+    const Doc::PendingCompare compare{ lsl, getString(expanded ? "ConvertExpandedTitle" : "ConvertLSLTitle", args), getString("ConvertSLuaTitle") };
     const LLHandle<LLFloater> handle   = getHandle();
-    LLPointer<LLBoostFuncInventoryCallback> made = new LLBoostFuncInventoryCallback(create_script_cb);
-    made->addOnFireFunc([handle, text, lsl, theirs, own](const LLUUID& item_id) {
-        ALFloaterScriptStudio*       studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-        const LLViewerInventoryItem* item   = item_id.notNull() ? gInventory.getItem(item_id) : nullptr;
-        if (!studio || !item)
+    if (!doc.ref.inInventory() && doc.file.empty())
+    {
+        ConvertedWaiting waiting{ doc.ref.object, LLUUID::null, name, {}, text, compare };
+        for (const ALScriptContents::Item& item : ALScriptWorkspace::instance().contentsIndex().items(doc.ref.object))
         {
-            return;
-        }
-        const ALScriptRef ref(LLUUID::null, item_id);
-        studio->openScript(ref, item->getName(), text);
-        if (Doc* opened = studio->findDoc(ref))
-        {
-            opened->pendingCompare = Doc::PendingCompare{ lsl, theirs, own };
-            if (opened->loaded)
+            if (item.name == name)
             {
-                studio->comparePending(*opened);
+                waiting.before.push_back(item.id);
             }
         }
-    });
-    std::string desc;
-    LLViewerAssetType::generateDescriptionFor(LLAssetType::AT_LSL_TEXT, desc);
-    create_inventory_item(gAgent.getID(), gAgent.getSessionID(), gInventory.findCategoryUUIDForType(LLFolderType::FT_LSL_TEXT), LLTransactionID::tnull,
-                          name, desc, LLAssetType::AT_LSL_TEXT, LLInventoryType::IT_LSL, SST_LUA, LLFloaterPerms::getNextOwnerPerms("Scripts"), made);
+        std::string error;
+        const bool  asked = ALScriptWorkspace::instance().create(
+            doc.ref.object, false, true, name,
+            [handle, waiting](const ALScriptCreated& made) {
+                if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+                {
+                    studio->convertedMade(made, waiting);
+                }
+            },
+            error);
+        if (!asked)
+        {
+            report(error, true, &doc);
+            return;
+        }
+    }
+    else
+    {
+        LLPointer<LLBoostFuncInventoryCallback> made = new LLBoostFuncInventoryCallback(create_script_cb);
+        made->addOnFireFunc([handle, text, compare](const LLUUID& item_id) {
+            ALFloaterScriptStudio*       studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+            const LLViewerInventoryItem* item   = item_id.notNull() ? gInventory.getItem(item_id) : nullptr;
+            if (studio && item)
+            {
+                studio->openConverted(ALScriptRef(LLUUID::null, item_id), item->getName(), text, compare);
+            }
+        });
+        std::string desc;
+        LLViewerAssetType::generateDescriptionFor(LLAssetType::AT_LSL_TEXT, desc);
+        create_inventory_item(gAgent.getID(), gAgent.getSessionID(), gInventory.findCategoryUUIDForType(LLFolderType::FT_LSL_TEXT),
+                              LLTransactionID::tnull, name, desc, LLAssetType::AT_LSL_TEXT, LLInventoryType::IT_LSL, SST_LUA,
+                              LLFloaterPerms::getNextOwnerPerms("Scripts"), made);
+    }
     args["[NEW]"]   = name;
     args["[NOTES]"] = counted("ConvertNotes", static_cast<S32>(converted.notes.size()));
     report(getString(expanded ? "ConvertedExpanded" : "Converted", args), false, &doc);
+}
+
+void ALFloaterScriptStudio::convertedMade(const ALScriptCreated& made, ConvertedWaiting waiting)
+{
+    if (!made.error.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"]  = made.name;
+        args["[ERROR]"] = made.error;
+        report(getString("CreateFailed", args), true);
+        return;
+    }
+    waiting.item = made.item;
+    waiting.name = made.name;
+    mConvertedWaiting.push_back(std::move(waiting));
+    // Asked of the region now, rather than once the object hears that its
+    // contents changed.
+    ALScriptWorkspace::instance().contentsIndex().ask(made.prim, true, true);
+}
+
+void ALFloaterScriptStudio::convertedListed(const ALScriptContents& contents)
+{
+    // Taken off the list before any is opened, since opening one can list
+    // the prim again.
+    std::vector<std::pair<ALScriptContents::Item, ConvertedWaiting>> listed;
+    for (auto waiting = mConvertedWaiting.begin(); waiting != mConvertedWaiting.end();)
+    {
+        const auto item = waiting->prim != contents.prim
+                              ? contents.items.end()
+                              : std::find_if(contents.items.begin(), contents.items.end(), [&waiting](const ALScriptContents::Item& item) {
+                                    return waiting->item.notNull() ? item.id == waiting->item
+                                                                   : item.name == waiting->name &&
+                                                                         std::find(waiting->before.begin(), waiting->before.end(), item.id) == waiting->before.end();
+                                });
+        if (item == contents.items.end())
+        {
+            ++waiting;
+            continue;
+        }
+        listed.emplace_back(*item, std::move(*waiting));
+        waiting = mConvertedWaiting.erase(waiting);
+    }
+    for (const auto& [item, waiting] : listed)
+    {
+        openConverted(ALScriptRef(waiting.prim, item.id), item.name, waiting.text, waiting.compare);
+    }
+}
+
+void ALFloaterScriptStudio::openConverted(const ALScriptRef& ref, const std::string& name, const std::string& text, const Doc::PendingCompare& compare)
+{
+    openScript(ref, name, text);
+    if (Doc* opened = findDoc(ref))
+    {
+        opened->pendingCompare = compare;
+        if (opened->loaded)
+        {
+            comparePending(*opened);
+        }
+    }
 }
 
 // --- copying from a list -------------------------------------------------------------

@@ -439,9 +439,29 @@ private:
     // a notecard, its items with it -- and the tab closed once it is.
     void saveCopyToInventory(Doc& doc) override;
     // An LSL tab written again as SLua (ALLSLToSLua) in a new SLua script
-    // of the inventory's, its text put in unsaved and set beside the LSL;
-    // the LSL script left as it is.
+    // beside it -- in the prim the LSL is in, or the inventory's scripts
+    // folder for one in the inventory -- its text put in unsaved and set
+    // beside the LSL; the LSL script left as it is.
     void convertToSLua(Doc& doc);
+    // A script written as SLua into a prim, waited for until the prim lists
+    // it: by the id the region gave, or by its name where it gave none, as
+    // one of that name that was not there before.
+    struct ConvertedWaiting
+    {
+        LLUUID              prim;
+        LLUUID              item;
+        std::string         name;
+        std::vector<LLUUID> before;
+        std::string         text;
+        Doc::PendingCompare compare;
+    };
+    std::vector<ConvertedWaiting>      mConvertedWaiting;
+    boost::signals2::scoped_connection mConvertedContents;
+    void convertedMade(const ALScriptCreated& made, ConvertedWaiting waiting);
+    void convertedListed(const ALScriptContents& contents);
+    // The new SLua script opened with its text unsaved, and set beside the
+    // LSL once it has loaded.
+    void openConverted(const ALScriptRef& ref, const std::string& name, const std::string& text, const Doc::PendingCompare& compare);
 
     // --- problems and checks -----------------------------------------------------------
 
