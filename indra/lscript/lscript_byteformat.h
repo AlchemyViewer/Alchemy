@@ -31,6 +31,17 @@
 
 #include "stdtypes.h"
 
+// llcommon's BOOL, TRUE and FALSE as they were when this was written, and as
+// lsl-definitions' generated code still writes them; llcommon has since
+// dropped them for bool.
+typedef S32 BOOL;
+#ifndef TRUE
+#define TRUE (1)
+#endif
+#ifndef FALSE
+#define FALSE (0)
+#endif
+
 const S32 LSL2_VERSION_NUMBER = 0x0200;
 const S32 LSL2_VERSION1_END_NUMBER = 0x0101;
 const S32 LSL2_VERSION2_START_NUMBER = 0x0200;

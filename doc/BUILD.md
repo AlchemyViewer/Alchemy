@@ -404,7 +404,9 @@ Enable tests at configure time:
 cmake -S indra --preset <preset> -DAL_BUILD_TESTS=ON
 ```
 
-Four tests drive a Python peer (`llleap`, `llprocess`, `llsdserialize`, `llcorehttp`); they need a Python 3 interpreter with the `llsd` package (`pip install -r requirements.txt`, in a venv if you like) and are registered disabled when configure finds none. Nothing else in the build runs Python.
+Four tests drive a Python peer (`llleap`, `llprocess`, `llsdserialize`, `llcorehttp`); they need a Python 3 interpreter with the `llsd` package (`pip install -r requirements.txt`, in a venv if you like) and are registered disabled when configure finds none.
+
+LL's LSL compiler (`indra/lscript`), restored as a reference for the script tests, is built only with tests on. Its lexer, grammar, newer event nodes and library table are written at build time by lsl-definitions' own generator, which needs Python with `PyYAML` and `llsd` (both in `requirements.txt`), and then put through `bison` and `flex`. Where any of them is missing, configure leaves the library out and the configuration report says what it needs. Nothing else in the build runs Python.
 
 The `llrender` suites render on a hidden SDL window with the platform's own GL -- WGL on Windows, EGL on Linux, and where Linux has no display SDL's offscreen driver over Mesa (set `LIBGL_ALWAYS_SOFTWARE=1` for llvmpipe on a machine with no GPU). A host with no GL 4.1 to give, such as a CI runner without a graphics driver, configures with `-DAL_ENABLE_GL_TESTS=OFF`: those suites still build, and CTest reports them as not run rather than failed. They carry the label `gl`, so `ctest -LE gl` skips them for one run.
 

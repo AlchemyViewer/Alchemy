@@ -15,6 +15,7 @@ CMake with vcpkg for dependency management. The source root for CMake is `indra/
 - CMake 4.0+, Visual Studio 2022/2026 (Windows) or Xcode (macOS) or GCC/Clang+Ninja (Linux)
 - Rust and the .NET SDK (`dotnet tool restore`) only for Velopack installers
 - Python 3 with `llsd` (`pip install -r requirements.txt`) only for the four tests that spawn a Python peer; without it they are registered disabled
+- Python 3 with `PyYAML` and `llsd`, plus bison and flex, only for LL's LSL compiler (`indra/lscript`, a test-only reference); without them it is left out
 
 CMake files are formatted with gersemi (`.gersemirc` at the repo root): run `gersemi -i <files>` on any CMake file you edit.
 

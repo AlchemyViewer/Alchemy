@@ -351,6 +351,11 @@ function(al_configuration_report)
     _al_report_row("Python" "not found; the tests that spawn a Python peer are disabled")
   endif()
 
+  if(AL_BUILD_TESTS)
+    get_property(lscript_status GLOBAL PROPERTY AL_LSCRIPT_STATUS)
+    _al_report_row("LL's compiler" "${lscript_status}")
+  endif()
+
   if(LL_GENERATOR_IS_MULTI_CONFIG)
     _al_report_row("Staging" "${INDRA_BINARY_DIR}/newview/<config>")
   elseif(DARWIN)
