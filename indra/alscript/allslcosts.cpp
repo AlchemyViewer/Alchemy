@@ -44,6 +44,16 @@ namespace
         c.negateComplementForIncrement = true;
         c.complementNegateForDecrement = true;
         c.preForPost                   = true;
+        // A float's, a key's, a vector's and a rotation's default loads
+        // smaller than what writes it.
+        c.incrementForAssign           = false;
+        c.dropIntegerDefault           = false;
+        c.dropFloatDefault             = true;
+        c.dropKeyDefault               = true;
+        c.dropVectorDefault            = true;
+        c.dropRotationDefault          = true;
+        c.dropIntegerGlobalDefault     = false;
+        c.castForNegative              = false;
         c.emptyForNullKey              = true;
         c.comparisonForNot             = true;
         c.xorForNotEqual               = true;
@@ -97,6 +107,18 @@ namespace
         c.negateComplementForIncrement = true;
         c.complementNegateForDecrement = true;
         c.preForPost                   = true;
+        // Mono loads an integer the script writes by ldc.i4, five bytes:
+        // ++x adds the one it makes up itself in one; an integer's default
+        // is ldc.i4.0; and the cast of a negative number is one constant,
+        // where the number negated is two instructions.
+        c.incrementForAssign           = true;
+        c.dropIntegerDefault           = true;
+        c.dropFloatDefault             = false;
+        c.dropKeyDefault               = false;
+        c.dropVectorDefault            = false;
+        c.dropRotationDefault          = false;
+        c.dropIntegerGlobalDefault     = true;
+        c.castForNegative              = true;
         c.emptyForNullKey              = true;
         c.comparisonForNot             = true;
         c.xorForNotEqual               = true;
@@ -152,6 +174,15 @@ namespace
         c.negateComplementForIncrement = false;
         c.complementNegateForDecrement = false;
         c.preForPost                   = false;
+        // A key's default loads smaller than the empty string it is.
+        c.incrementForAssign           = false;
+        c.dropIntegerDefault           = false;
+        c.dropFloatDefault             = false;
+        c.dropKeyDefault               = true;
+        c.dropVectorDefault            = false;
+        c.dropRotationDefault          = false;
+        c.dropIntegerGlobalDefault     = false;
+        c.castForNegative              = false;
         c.emptyForNullKey              = true;
         c.comparisonForNot             = true;
         c.xorForNotEqual               = false;

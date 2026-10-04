@@ -14,9 +14,9 @@ default
     touch_start(integer f)
     {
         integer d;
-        for (d = 0; d < f; d = -~d)
+        for (d = 0; d < f; ++d)
         {
-            b = -~b;
+            ++b;
             c((string)b);
         }
         @g;

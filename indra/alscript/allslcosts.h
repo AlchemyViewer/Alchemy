@@ -76,6 +76,24 @@ struct ALLSLCosts
     bool complementNegateForDecrement = false;
     // `x++` as `++x`, and `x--` as `--x`, where the value goes unused.
     bool preForPost = false;
+    // `x = x + 1`, `x = 1 + x` and `x += 1` as `++x`, and `x = x - 1` and
+    // `x -= 1` as `--x`, of an integer variable: a float's are larger.
+    bool incrementForAssign = false;
+    // A local's initializer that is its type's default left out --
+    // `integer x = 0;` as `integer x;` -- each type on its own, since each
+    // target loads each type's default its own way: a string's and a list's
+    // are never smaller. And an integer global's.
+    bool dropIntegerDefault       = false;
+    bool dropFloatDefault         = false;
+    bool dropKeyDefault           = false;
+    bool dropVectorDefault        = false;
+    bool dropRotationDefault      = false;
+    bool dropIntegerGlobalDefault = false;
+    // A negative number in an expression as the cast of one -- `-5` as
+    // `((integer)-5)`, `-5.5` as `((float)-5.5)` -- which is one constant,
+    // where `-5` is 5 negated. Never in a global's initializer, which takes
+    // no cast and reads `-5` as one constant already.
+    bool castForNegative = false;
     // A key a library function is given that is NULL_KEY, or no key at
     // all, as "": the function takes either as it takes the other.
     bool emptyForNullKey = false;

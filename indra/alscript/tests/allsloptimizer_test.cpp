@@ -90,6 +90,13 @@ namespace tut
             const size_t     at = text.find(declaration + " = ");
             if (at == std::string::npos)
             {
+                // Declared with no value, where its default is the smaller
+                // (ALLSLCosts::drop*Default): the default.
+                if (text.find(declaration + ";") != std::string::npos)
+                {
+                    const std::string type = declaration.substr(0, declaration.find(' '));
+                    return type == "vector" ? std::vector<F32>{ 0.f, 0.f, 0.f } : type == "rotation" ? std::vector<F32>{ 0.f, 0.f, 0.f, 1.f } : std::vector<F32>{ 0.f };
+                }
                 return out;
             }
             const char* p = text.c_str() + at + declaration.size() + 3;
@@ -99,6 +106,20 @@ namespace tut
             }
             while (true)
             {
+                // A negative part may be written as its cast, on Mono.
+                while (*p == ' ')
+                {
+                    ++p;
+                }
+                bool cast = false;
+                for (const char* spelt : { "((float)", "((integer)" })
+                {
+                    if (std::strncmp(p, spelt, std::strlen(spelt)) == 0)
+                    {
+                        p += std::strlen(spelt);
+                        cast = true;
+                    }
+                }
                 char*     end = nullptr;
                 const F32 v   = std::strtof(p, &end);
                 if (end == p)
@@ -107,6 +128,10 @@ namespace tut
                 }
                 out.push_back(v);
                 p = end;
+                if (cast && *p == ')')
+                {
+                    ++p;
+                }
                 if (*p != ',')
                 {
                     break;
@@ -201,7 +226,8 @@ namespace tut
         ensure("optimized", r.optimized);
         ensure("wrapped: " + r.text, r.text.find("llSay(0, \"-2147483648\");") != std::string::npos);
         ensure("zero stays", r.text.find("(string)(1 / 0)") != std::string::npos);
-        ensure("the overflow stays", r.text.find("(string)(-2147483648 / -1)") != std::string::npos);
+        // On Mono, each negative number as its cast (ALLSLCosts::castForNegative).
+        ensure("the overflow stays: " + r.text, r.text.find("(string)(((integer)-2147483648) / ((integer)-1))") != std::string::npos);
         ensure("integer division", r.text.find("llSay(0, \"6\");") != std::string::npos);
         ensure("a wide shift stays", r.text.find("(string)(1 << 40)") != std::string::npos);
         ensure("modulo keeps the sign", r.text.find("llSay(0, \"-1\");") != std::string::npos);
@@ -247,7 +273,8 @@ namespace tut
         // And on Mono, two less as ~-~-g (ALLSLCosts::complementNegateForDecrement).
         ensure("plus minus: " + r.text, r.text.find("integer d = ~-~-g;") != std::string::npos);
         ensure("cast", r.text.find("integer e = g;") != std::string::npos);
-        ensure("times zero", r.text.find("integer f = 0;") != std::string::npos);
+        // Left at its default on Mono (ALLSLCosts::dropIntegerDefault).
+        ensure("times zero: " + r.text, r.text.find("integer f;") != std::string::npos);
         ensure("equals zero", r.text.find("integer i = (!g);") != std::string::npos);
         ensure("not equal zero as condition", r.text.find("if (g)\n            h = 1;") != std::string::npos);
         ensure("double not", r.text.find("if (g)\n            h = 2;") != std::string::npos);
@@ -397,7 +424,7 @@ namespace tut
         ensure("the axis back: " + r.text, about(numbers(r.text, "vector d"), { 0.f, 0.f, 1.f }));
         ensure("the angle back: " + r.text, about(numbers(r.text, "float e"), { 1.5707964f }));
         ensure("fwd of a quarter turn is left: " + r.text, !has("llRot2Fwd(<0, 0, 0.7071068, 0.7071068>)") && has("vector f = <"));
-        ensure("up of a roll: " + r.text, !has("llRot2Up(") && has("vector h = <0, -"));
+        ensure("up of a roll: " + r.text, !has("llRot2Up(") && has("vector h = <0, ((float)-"));
         ensure("no rotation has no axis: left", has("llRot2Axis(<0, 0, 0, 1>)"));
         ensure("not a unit rotation: left", has("llRot2Fwd(<0, 0, 2, 2>)"));
     }
@@ -431,7 +458,7 @@ namespace tut
         ensure("an object from plain strings and integers: " + m.text, hasm("string f = \"{\\\"name\\\":\\\"Ann Lee\\\",\\\"count\\\":3}\";"));
         ensure("a string that reads as a JSON word is left: " + m.text, hasm("string g = llList2Json"));
         ensure("a float is left: " + m.text, hasm("string h = llList2Json"));
-        ensure("an array to a list: " + m.text, hasm("list i = [1, \"two\", -3];"));
+        ensure("an array to a list: " + m.text, hasm("list i = [1, \"two\", ((integer)-3)];"));
         ensure("an object to a list: " + m.text, hasm("list j = [\"k\", \"v\"];"));
         ensure("a true in it is left: " + m.text, hasm("list k = llJson2List"));
         // A nested value comes out written the compact way; a set puts a
@@ -2149,9 +2176,10 @@ namespace tut
             const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
             ensure("optimized: " + notes(r), r.optimized);
             const auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
-            ensure("all set: " + r.text, has("if (!~(n | -13))"));
+            // -13 as its cast on Mono (ALLSLCosts::castForNegative).
+            ensure("all set: " + r.text, has("if (!~(n | -13))") || has("if (!~(n | ((integer)-13)))"));
             // v and w are read once, and their values go where they are read.
-            ensure("three, a value: " + r.text, has("llSay(!~(n | -14), "));
+            ensure("three, a value: " + r.text, has("llSay(!~(n | -14), ") || has("llSay(!~(n | ((integer)-14)), "));
             ensure("all clear: " + r.text, has("if (!(n & 12))"));
             ensure("any, where only truth counts: " + r.text, has("if (n & 20)"));
             ensure("an | of them: " + r.text, has("(string)(n & 15)"));
@@ -2212,5 +2240,91 @@ namespace tut
             // larger in its last place than left as it was, as in 2007.
             ensure("ways that part by a bit: left: " + r.text, has("rotation e = llAxes2Rot("));
         }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<58>()
+    {
+        set_test_name("Mono's ++x for x = x + 1, a default left out, and a negative number as its cast; each where its target has it smaller, and what "
+                      "must stay stays");
+        const std::string source = "integer gz = 0;\n"
+                                   "integer gn = -5;\n"
+                                   "default\n"
+                                   "{\n"
+                                   "    state_entry()\n"
+                                   "    {\n"
+                                   "        integer i = (integer)llFrand(9);\n"
+                                   "        integer j = (integer)llFrand(9);\n"
+                                   "        float f = llFrand(9);\n"
+                                   "        vector v = llGetPos();\n"
+                                   "        i = i + 1;\n"
+                                   "        j -= 1;\n"
+                                   "        j = i = 1 + i;\n"
+                                   "        f = f + 1;\n"
+                                   "        v.x = v.x + 1;\n"
+                                   "        integer z = 0;\n"
+                                   "        float y = 0.0;\n"
+                                   "        float n = -0.0;\n"
+                                   "        key k = \"\";\n"
+                                   "        key nk = NULL_KEY;\n"
+                                   "        string s = \"\";\n"
+                                   "        vector w = ZERO_VECTOR;\n"
+                                   "        rotation r = ZERO_ROTATION;\n"
+                                   "        if (llFrand(1) < 0.5)\n"
+                                   "        {\n"
+                                   "            z = 3; y = 1.5; n = 2.5; k = llGetOwner(); nk = llGetOwner(); s = \"a\"; w = llGetPos(); r = llGetRot();\n"
+                                   "        }\n"
+                                   "        llSay(-5, \"x\");\n"
+                                   "        llSetText(\"\", <-1.5, 0, 0>, 1);\n"
+                                   "        llOwnerSay((string)[i, j, f, v, z, y, n, k, nk, s, w, r, gz, gn]);\n"
+                                   "    }\n"
+                                   "    touch_start(integer t)\n"
+                                   "    {\n"
+                                   "        gz = t;\n"
+                                   "        gn = t;\n"
+                                   "    }\n"
+                                   "}\n";
+        const auto run = [&](ALLSLOptimizer::Target target) {
+            ALLSLOptimizer::Options o = allsloptimizer_data::options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + allsloptimizer_data::notes(r), r.optimized);
+            ALLSLService           service;
+            const ALScriptProblems said = service.check(r.text, target != ALLSLOptimizer::Target::LSO);
+            for (const ALScriptProblem& p : said)
+            {
+                ensure("no error in what was written: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+            }
+            return r.text;
+        };
+        const auto has = [](const std::string& text, const std::string& what) { return text.find(what) != std::string::npos; };
+
+        const std::string mono = run(ALLSLOptimizer::Target::Mono);
+        ensure("Mono: x = x + 1 as ++x: " + mono, has(mono, "++i;"));
+        ensure("Mono: x -= 1 as --x", has(mono, "--j;"));
+        ensure("Mono: as a value, 1 + x", has(mono, "j = ++i;"));
+        ensure("Mono: a float's stays", !has(mono, "++f") && !has(mono, "f;"));
+        ensure("Mono: a vector's part stays", !has(mono, "++v.x"));
+        ensure("Mono: an integer's default left out", has(mono, "integer z;"));
+        ensure("Mono: an integer global's too", has(mono, "integer gz;"));
+        ensure("Mono: a float's is not, there", !has(mono, "float y;"));
+        ensure("Mono: a negative number as its cast", has(mono, "llSay(((integer)-5), "));
+        ensure("Mono: a vector's negative part", has(mono, "<((float)-1.5), 0, 0>"));
+        ensure("Mono: never in a global's value", has(mono, "integer gn = -5;"));
+
+        const std::string lso = run(ALLSLOptimizer::Target::LSO);
+        ensure("LSO: x = x + 1 stays as LSO has it smaller: " + lso, !has(lso, "++i;") && !has(lso, "--j;"));
+        ensure("LSO: a float's default left out", has(lso, "float y;"));
+        ensure("LSO: -0.0 is not the default", !has(lso, "float n;"));
+        ensure("LSO: a key's default, \"\"", has(lso, "key k;"));
+        ensure("LSO: NULL_KEY is not a key's default", !has(lso, "key nk;"));
+        ensure("LSO: a string's never", !has(lso, "string s;"));
+        ensure("LSO: a vector's and a rotation's", has(lso, "vector w;") && has(lso, "rotation r;"));
+        ensure("LSO: an integer's is not, there", !has(lso, "integer z;"));
+        ensure("LSO: no casts of negative numbers", !has(lso, "((integer)-") && !has(lso, "((float)-"));
+
+        const std::string luau = run(ALLSLOptimizer::Target::Luau);
+        ensure("Luau: a key's default left out: " + luau, has(luau, "key k;"));
+        ensure("Luau: nothing else", !has(luau, "integer z;") && !has(luau, "++i;") && !has(luau, "((integer)-"));
     }
 } // namespace tut

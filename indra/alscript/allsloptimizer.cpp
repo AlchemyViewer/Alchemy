@@ -4067,6 +4067,11 @@ namespace
             {
                 return false;
             }
+            // x = x + 1 as ++x, before its x + 1 is seen and made -~x.
+            if (mStage == Stage::Values && increment(expr))
+            {
+                return false;
+            }
             // A list's elements bare, seen as the author wrote them, before
             // what is left of a literal is made a sum below.
             if (mStage == Stage::Lists)
@@ -4085,6 +4090,26 @@ namespace
                 return false;
             }
             integers(expr);
+            return false;
+        }
+
+        bool visit(LSLDeclaration* decl) override
+        {
+            visitChildren(decl);
+            if (mStage == Stage::Values)
+            {
+                dropDefault(decl, decl->getSymbol(), false);
+            }
+            return false;
+        }
+
+        bool visit(LSLGlobalVariable* global) override
+        {
+            visitChildren(global);
+            if (mStage == Stage::Values)
+            {
+                dropDefault(global, global->getSymbol(), true);
+            }
             return false;
         }
 
@@ -4821,6 +4846,122 @@ namespace
                 LSLASTNode::replaceNode(arg, made);
                 wrote(arg, made, before);
             }
+        }
+
+        // x = x + 1, x = 1 + x and x += 1 as ++x, and x = x - 1 and x -= 1
+        // as --x, of an integer variable (ALLSLCosts::incrementForAssign).
+        // ++x gives what the assignment gave, x after it, so a value read
+        // of it reads the same. True where it was written.
+        bool increment(LSLBinaryExpression* expr)
+        {
+            if (!mCosts.incrementForAssign || expr->getIType() != LST_INTEGER)
+            {
+                return false;
+            }
+            const LSLOperator op     = expr->getOperation();
+            LSLExpression*    target = expr->getLHS();
+            LSLExpression*    value  = expr->getRHS();
+            if (!target || !value || target->getNodeSubType() != NODE_LVALUE_EXPRESSION || static_cast<LSLLValueExpression*>(target)->getMember() ||
+                target->getIType() != LST_INTEGER || !target->getSymbol())
+            {
+                return false;
+            }
+            LSLSymbol* sym   = target->getSymbol();
+            const auto reads = [sym](LSLExpression* x) {
+                x = bare(x);
+                return x && x->getNodeSubType() == NODE_LVALUE_EXPRESSION && !static_cast<LSLLValueExpression*>(x)->getMember() && x->getSymbol() == sym;
+            };
+            int step = 0;
+            if ((op == OP_ADD_ASSIGN || op == OP_SUB_ASSIGN) && isInteger(value, 1))
+            {
+                step = op == OP_ADD_ASSIGN ? 1 : -1;
+            }
+            else if (op == OP_ASSIGN && bare(value)->getNodeSubType() == NODE_BINARY_EXPRESSION)
+            {
+                auto* sum = static_cast<LSLBinaryExpression*>(bare(value));
+                if (sum->getOperation() == OP_PLUS && ((reads(sum->getLHS()) && isInteger(sum->getRHS(), 1)) || (isInteger(sum->getLHS(), 1) && reads(sum->getRHS()))))
+                {
+                    step = 1;
+                }
+                else if (sum->getOperation() == OP_MINUS && reads(sum->getLHS()) && isInteger(sum->getRHS(), 1))
+                {
+                    step = -1;
+                }
+            }
+            if (step == 0)
+            {
+                return false;
+            }
+            const std::string before = report.wanted() ? render(expr) : std::string();
+            auto*             x      = static_cast<LSLExpression*>(expr->takeChild(0));
+            LSLExpression*    made   = nullptr;
+            {
+                const Uncounted uncounted(*ctx.context);
+                made = uncounted.made(ctx.allocator->newTracked<LSLUnaryExpression>(x, step > 0 ? OP_PRE_INCR : OP_PRE_DECR));
+            }
+            made->setType(TYPE(LST_INTEGER));
+            made->setLoc(expr->getLoc());
+            LSLASTNode::replaceNode(expr, made);
+            wrote(expr, made, before);
+            return true;
+        }
+
+        // A declaration's initializer that is its type's default, left out,
+        // where that loads smaller: `integer x = 0;` as `integer x;`. Its
+        // value exactly -- a float's +0, not -0; a key's "", not NULL_KEY; a
+        // rotation's <0, 0, 0, 1> -- since what is left out is what LSL
+        // gives it.
+        void dropDefault(LSLASTNode* decl, LSLSymbol* sym, bool global)
+        {
+            LSLASTNode* init = decl->getChild(1);
+            if (!sym || !init || init->getNodeType() != NODE_EXPRESSION)
+            {
+                return;
+            }
+            const LSLIType type = sym->getIType();
+            const bool     drop = global ? type == LST_INTEGER && mCosts.dropIntegerGlobalDefault
+                                         : (type == LST_INTEGER && mCosts.dropIntegerDefault) || (type == LST_FLOATINGPOINT && mCosts.dropFloatDefault) ||
+                                               (type == LST_KEY && mCosts.dropKeyDefault) || (type == LST_VECTOR && mCosts.dropVectorDefault) ||
+                                               (type == LST_QUATERNION && mCosts.dropRotationDefault);
+            LSLConstant* cv = drop ? init->getConstantValue() : nullptr;
+            if (!cv)
+            {
+                return;
+            }
+            const auto zero = [](double v) { return v == 0.0 && !std::signbit(v); };
+            bool       isDefault = false;
+            switch (cv->getIType())
+            {
+                case LST_INTEGER: isDefault = type == LST_INTEGER && static_cast<LSLIntegerConstant*>(cv)->getValue() == 0; break;
+                case LST_FLOATINGPOINT: isDefault = type == LST_FLOATINGPOINT && zero(static_cast<LSLFloatConstant*>(cv)->getValue()); break;
+                case LST_STRING: isDefault = type == LST_KEY && !*static_cast<LSLStringConstant*>(cv)->getValue(); break;
+                case LST_KEY: isDefault = type == LST_KEY && !*static_cast<LSLKeyConstant*>(cv)->getValue(); break;
+                case LST_VECTOR:
+                {
+                    const Vector3* v = static_cast<LSLVectorConstant*>(cv)->getValue();
+                    isDefault        = type == LST_VECTOR && v && zero(v->x) && zero(v->y) && zero(v->z);
+                    break;
+                }
+                case LST_QUATERNION:
+                {
+                    const Quaternion* q = static_cast<LSLQuaternionConstant*>(cv)->getValue();
+                    isDefault           = type == LST_QUATERNION && q && zero(q->x) && zero(q->y) && zero(q->z) && q->s == 1.0f;
+                    break;
+                }
+                default: break;
+            }
+            // An integer 0 a float is set to is its default too.
+            if (cv->getIType() == LST_INTEGER && type == LST_FLOATINGPOINT)
+            {
+                isDefault = static_cast<LSLIntegerConstant*>(cv)->getValue() == 0;
+            }
+            if (!isDefault)
+            {
+                return;
+            }
+            decl->setChild(1, nullptr);
+            report.note(decl->getLoc(), "OptimizerDroppedDefault", "left out [1]'s initializer, which is its default", { sym->getName() });
+            ++changes;
         }
 
         // x++ and x-- whose value nothing reads, as ++x and --x.
@@ -6858,7 +6999,17 @@ namespace
         Printer(const PrettyPrintOpts& opts, const ALLSLOptimizer::Options& options) : PrettyPrintVisitor(opts), mOptions(options) {}
 
         bool visit(LSLIdentifier* id) override { return marked(id, [&] { return PrettyPrintVisitor::visit(id); }); }
-        bool visit(LSLIntegerConstant* c) override { return marked(c, [&] { return PrettyPrintVisitor::visit(c); }); }
+        bool visit(LSLIntegerConstant* c) override
+        {
+            return marked(c, [&] {
+                if (negativeCast(c, c->getValue()))
+                {
+                    mStream << "((integer)" << c->getValue() << ")";
+                    return false;
+                }
+                return PrettyPrintVisitor::visit(c);
+            });
+        }
         bool visit(LSLStringConstant* c) override { return marked(c, [&] { return PrettyPrintVisitor::visit(c); }); }
         bool visit(LSLKeyConstant* c) override { return marked(c, [&] { return PrettyPrintVisitor::visit(c); }); }
         bool visit(LSLFloatConstant* c) override
@@ -6876,7 +7027,7 @@ namespace
                     mStream << "((float)" << static_cast<long long>(v) << ")";
                     return false;
                 }
-                mStream << number(v, integer);
+                mStream << signedNumber(c, v, integer);
                 return false;
             });
         }
@@ -6884,7 +7035,7 @@ namespace
         {
             return marked(c, [&] {
                 const Vector3* v = c->getValue();
-                mStream << '<' << number(v->x, true) << ", " << number(v->y, true) << ", " << number(v->z, true) << '>';
+                mStream << '<' << signedNumber(c, v->x, true) << ", " << signedNumber(c, v->y, true) << ", " << signedNumber(c, v->z, true) << '>';
                 return false;
             });
         }
@@ -6892,7 +7043,8 @@ namespace
         {
             return marked(c, [&] {
                 const Quaternion* q = c->getValue();
-                mStream << '<' << number(q->x, true) << ", " << number(q->y, true) << ", " << number(q->z, true) << ", " << number(q->s, true) << '>';
+                mStream << '<' << signedNumber(c, q->x, true) << ", " << signedNumber(c, q->y, true) << ", " << signedNumber(c, q->z, true) << ", "
+                        << signedNumber(c, q->s, true) << '>';
                 return false;
             });
         }
@@ -6998,6 +7150,28 @@ namespace
                 return std::to_string(static_cast<long long>(v));
             }
             return floatText(v, mOptions.target == ALLSLOptimizer::Target::Luau);
+        }
+
+        // A negative number as the cast of one, where that is smaller
+        // (ALLSLCosts::castForNegative): one constant, where -5 is 5 negated.
+        // Not in a global's value, which takes no cast and reads -5 as one
+        // constant already.
+        bool negativeCast(LSLASTNode* c, double v) const
+        {
+            return mOptions.constfold && v < 0.0 && std::isfinite(v) && ALLSLCosts::of(mOptions.target).castForNegative && !inGlobal(c);
+        }
+
+        // A float as number() writes it, the cast of it where it is negative:
+        // an integer's where it is written as one.
+        std::string signedNumber(LSLASTNode* c, double v, bool asInteger)
+        {
+            const std::string text = number(v, asInteger);
+            if (!negativeCast(c, v))
+            {
+                return text;
+            }
+            const bool whole = text.find_first_not_of("-0123456789") == std::string::npos;
+            return std::string(whole ? "((integer)" : "((float)") + text + ")";
         }
 
         // Whether an integer literal may stand where this float does: where

@@ -627,6 +627,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="OptimizerDoRunsOnce">a do loop whose condition is always false runs once; kept its body</string>
 	<string name="OptimizerDroppedCast">dropped the cast in [1]</string>
 	<string name="OptimizerEvaluated">evaluated [1] to [2]</string>
+	<string name="OptimizerDroppedDefault">left out [1]'s initializer, which is its default</string>
 	<string name="OptimizerFolded">folded [1] to [2]</string>
 	<string name="OptimizerSizes">optimized from [1] to [2] bytes of source; script memory is the simulator's to say</string>
 	<string name="OptimizerSizesWeighed">optimized from [1] to [2] bytes of source, and from [3] to [4] bytes of code on [5]</string>
