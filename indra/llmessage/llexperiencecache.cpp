@@ -267,8 +267,6 @@ void LLExperienceCache::requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdap
 
     if (!status)
     {
-        F64 now = LLFrameTimer::getTotalSeconds();
-
         LLSD headers = httpResults[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_HEADERS];
         // build dummy entries for the failed requests
         for (RequestQueue_t::const_iterator it = requests.begin(); it != requests.end(); ++it)
@@ -279,7 +277,8 @@ void LLExperienceCache::requestExperiencesCoro(LLCoreHttpUtil::HttpCoroutineAdap
             {
                 exp[PROPERTIES] = PROPERTY_INVALID;
             }
-            exp[EXPIRES] = now + LLExperienceCacheImpl::getErrorRetryDeltaTime(status, headers);
+            // A delta, as the server sends it: processExperience adds the time.
+            exp[EXPIRES] = LLExperienceCacheImpl::getErrorRetryDeltaTime(status, headers);
             exp[EXPERIENCE_ID] = *it;
             exp["key_type"] = EXPERIENCE_ID;
             exp["uuid"] = *it;
