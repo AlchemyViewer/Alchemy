@@ -407,7 +407,7 @@ jobs:
             -DAL_USE_SENTRY:BOOL="$AL_USE_SENTRY" \
             -DAL_SENTRY_DSN:STRING="$AL_SENTRY_DSN" \
             -DAL_CHANNEL:STRING="${AL_CHANNEL}" \
-            -DAL_GRID:STRING="\"$VIEWER_GRID\"" \
+            -DAL_GRID:STRING="$VIEWER_GRID" \
             $template_verifier_master_url \
             "${SIGNING[@]}"
 
