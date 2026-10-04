@@ -2660,4 +2660,37 @@ namespace tut
         o.addstrings              = true;
         ensure("joined on Mono where the option asks", in(ALLSLOptimizer::run(source, o).text, "\"Hello, world\""));
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<67>()
+    {
+        set_test_name("a string cast to an integer folds as the grid's 32-bit hosts cast one, past 0xFFFFFFFF -1; a JSON number past 32 bits "
+                      "is left to the simulator");
+        const std::string source = "default\n{\n    touch_start(integer n)\n    {\n"
+                                   "        llOwnerSay((string)((integer)\"4294967296\"));\n"
+                                   "        llOwnerSay((string)((integer)\"-4294967296\"));\n"
+                                   "        llOwnerSay((string)((integer)\"0x1FFFFFFFF\"));\n"
+                                   "        llOwnerSay((string)((integer)\"99999999999999999999\"));\n"
+                                   "        llOwnerSay((string)((integer)\"3000000000\"));\n"
+                                   "        llOwnerSay((string)((integer)\" 12abc\"));\n"
+                                   "        llOwnerSay((string)((integer)\"0x10\"));\n"
+                                   "        llOwnerSay((string)((integer)\"-0x10\"));\n"
+                                   "        llOwnerSay(llList2CSV(llJson2List(\"[9999999999]\")) + llList2CSV(llJson2List(\"[2147483647, -2147483648]\")));\n"
+                                   "    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            const std::string text = optimized(source, target);
+            size_t minus_ones = 0;
+            for (size_t at = text.find("llOwnerSay(\"-1\");"); at != std::string::npos; at = text.find("llOwnerSay(\"-1\");", at + 1))
+            {
+                ++minus_ones;
+            }
+            ensure("past 0xFFFFFFFF, -1, its minus or not: " + text, minus_ones == 4);
+            ensure("within it, wrapped below nought: " + text, in(text, "llOwnerSay(\"-1294967296\");"));
+            ensure("spaces and what follows the number, hexadecimal only from a leading 0x: " + text,
+                   in(text, "llOwnerSay(\"12\");") && in(text, "llOwnerSay(\"16\");") && in(text, "llOwnerSay(\"0\");"));
+            ensure("a JSON number past 32 bits left: " + text, in(text, "llJson2List(\"[9999999999]\")"));
+            ensure("one within them folded: " + text, in(text, "2147483647") && !in(text, "llJson2List(\"[2147483647"));
+        }
+    }
 } // namespace tut

@@ -26,11 +26,69 @@
 
 #include "allslvalues.h"
 
+#include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 
 using namespace Tailslide;
+
+namespace
+{
+    // A string cast to an integer as the grid's VMs cast one -- LSO's and LSL
+    // on SLua's alike: base 16 only after a leading 0x, then strtoul -- on
+    // their 32-bit Linux hosts, whose strtoul stops at 0xFFFFFFFF, so that a
+    // number past it is -1, its minus or not. A 64-bit host's strtoul, which
+    // Tailslide's own fold calls, wraps it instead: "4294967296" was 0.
+    S32 stringInteger(const char* text)
+    {
+        const int   base = text[0] == '0' && (text[1] == 'x' || text[1] == 'X') ? 16 : 10;
+        const char* at   = text;
+        while (*at == ' ' || (*at >= '\t' && *at <= '\r'))
+        {
+            ++at;
+        }
+        const bool negative = *at == '-';
+        if (*at == '+' || *at == '-')
+        {
+            ++at;
+        }
+        if (base == 16 && at[0] == '0' && (at[1] == 'x' || at[1] == 'X') && std::isxdigit(static_cast<unsigned char>(at[2])))
+        {
+            at += 2;
+        }
+        uint64_t value = 0;
+        bool     past  = false;
+        for (;; ++at)
+        {
+            int digit = 0;
+            if (*at >= '0' && *at <= '9')
+            {
+                digit = *at - '0';
+            }
+            else if (base == 16 && std::isxdigit(static_cast<unsigned char>(*at)))
+            {
+                digit = std::tolower(static_cast<unsigned char>(*at)) - 'a' + 10;
+            }
+            else
+            {
+                break;
+            }
+            value = value * static_cast<uint64_t>(base) + static_cast<uint64_t>(digit);
+            if (value > 0xFFFFFFFFull)
+            {
+                past  = true;
+                value = 0xFFFFFFFFull;
+            }
+        }
+        if (past)
+        {
+            return -1;
+        }
+        return static_cast<S32>(negative ? 0u - static_cast<uint32_t>(value) : static_cast<uint32_t>(value));
+    }
+}
 
 ALLSLArithmetic::ALLSLArithmetic(ScriptAllocator* allocator, bool addstrings, ALLSLOptimizer::Target target)
     : TailslideOperationBehavior(allocator, true), mAddStrings(addstrings), mTarget(target)
@@ -160,6 +218,10 @@ LSLConstant* ALLSLArithmetic::cast(LSLType* to, LSLConstant* cv, Tailslide::YYLT
     if (mTarget == ALLSLOptimizer::Target::Luau && ((from == LST_FLOATINGPOINT && into == LST_STRING) || (from == LST_STRING && into == LST_FLOATINGPOINT)))
     {
         return nullptr;
+    }
+    if (from == LST_STRING && into == LST_INTEGER)
+    {
+        return integer(stringInteger(static_cast<LSLStringConstant*>(cv)->getValue()));
     }
     return rounded(TailslideOperationBehavior::cast(to, cv, lloc));
 }

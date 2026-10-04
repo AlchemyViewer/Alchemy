@@ -1812,8 +1812,12 @@ namespace
                   auto                          push = [&](const JsonValue& v) {
                       if (v.kind == JsonValue::Kind::Number)
                       {
-                          if (v.text.size() > 10) return false;
-                          out.push_back(c.integer(static_cast<int>(std::strtol(v.text.c_str(), nullptr, 10))));
+                          // Within 32 bits: past them, what the simulator
+                          // makes of one is its 32-bit host's business, and
+                          // a long is 64 bits here, and 32 on Windows.
+                          const long long n = v.text.size() <= 11 ? std::strtoll(v.text.c_str(), nullptr, 10) : INT64_MAX;
+                          if (n < INT32_MIN || n > INT32_MAX) return false;
+                          out.push_back(c.integer(static_cast<int>(n)));
                           return true;
                       }
                       if (v.kind == JsonValue::Kind::String && plainJsonString(v.text))
