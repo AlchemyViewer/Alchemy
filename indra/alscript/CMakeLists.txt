@@ -45,7 +45,6 @@ target_sources(
     lsl/optimizer/allslflowvalues.cpp
     lsl/optimizer/allslfolder.cpp
     lsl/optimizer/allslglobals.cpp
-    lsl/optimizer/allslglobals.cpp
     lsl/optimizer/allslinliner.cpp
     lsl/optimizer/allsllibraryfold.cpp
     lsl/optimizer/allslnames.cpp
@@ -54,7 +53,6 @@ target_sources(
     lsl/optimizer/allslprinter.cpp
     lsl/optimizer/allslrepeatedcalls.cpp
     lsl/optimizer/allslshapes.cpp
-    lsl/optimizer/allslsignatures.cpp
     lsl/optimizer/allslsignatures.cpp
     lsl/optimizer/allslsimplifier.cpp
     luau/alluauconfig.cpp
