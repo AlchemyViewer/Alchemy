@@ -31,6 +31,15 @@ void line_comment();
 void block_comment();
 void parse_string();
 
+// An integer literal as the grid's compiler reads one, on its 32-bit host:
+// strtoul of 32 bits, which stops at 0xFFFFFFFF past it -- -1 once it is
+// signed -- where a 64-bit host's strtoul would wrap it instead.
+static S32 lsl_integer(const char* text, int base)
+{
+	const unsigned long long value = strtoull(text, NULL, base);
+	return (S32)(U32)(value > 0xFFFFFFFFull ? 0xFFFFFFFFull : value);
+}
+
 #define YYLMAX 16384
 #define YY_NEVER_INTERACTIVE 1 /* stops flex from calling isatty() */
 #ifdef LL_WINDOWS
@@ -105,8 +114,8 @@ int yyerror(const char *fmt, ...);
 "."						{ count(); return(PERIOD); }
 
 
-0[xX]{H}+			{ count(); yylval.ival = strtoul(yytext, NULL, 0);  return(INTEGER_CONSTANT); }
-{N}+				{ count(); yylval.ival = strtoul(yytext, NULL, 10); return(INTEGER_CONSTANT); }
+0[xX]{H}+			{ count(); yylval.ival = lsl_integer(yytext, 0);  return(INTEGER_CONSTANT); }
+{N}+				{ count(); yylval.ival = lsl_integer(yytext, 10); return(INTEGER_CONSTANT); }
 "TRUE"				{ count(); yylval.ival = 1; return(INTEGER_TRUE); }
 "FALSE"				{ count(); yylval.ival = 0; return(INTEGER_FALSE); }
 /* GENERATED LEXER CONSTANTS */

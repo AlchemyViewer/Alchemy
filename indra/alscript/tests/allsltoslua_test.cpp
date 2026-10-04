@@ -1287,6 +1287,9 @@ namespace tut
                       "the null key; and hexadecimal as written where SLua reads the same number");
         const ALLSLToSLua::Result r = convert("integer MASK = 0x0000FF00;\n"
                                               "integer HIGH = 0xF0000000;\n"
+                                              "integer BIG = 4294967296;\n"
+                                              "integer BIG_HEX = 0x100000000;\n"
+                                              "integer WRAPPED = 2147483648;\n"
                                               "key gSitter;\n"
                                               "default { touch_start(integer n) {\n"
                                               "    integer flags = llGetParcelFlags(llGetPos());\n"
@@ -1300,7 +1303,7 @@ namespace tut
                                               "    params += n;\n"
                                               "    llSetLinkPrimitiveParamsFast(LINK_THIS, params);\n"
                                               "    float f = (float)\"1.5\";\n"
-                                              "    llOwnerSay((string)(masked + HIGH + top) + (string)f + (string)gSitter);\n"
+                                              "    llOwnerSay((string)(masked + HIGH + top + BIG + BIG_HEX + WRAPPED) + (string)f + (string)gSitter);\n"
                                               "} }\n");
         ensure("an & as a condition: " + r.text, has(r, "if bit32.btest(flags, PARCEL_FLAG_ALLOW_CREATE_OBJECTS) then"));
         ensure("not of one, an & of &s one call: " + r.text, has(r, "if not bit32.btest(flags, MASK, 0x300) then"));
@@ -1313,6 +1316,9 @@ namespace tut
         ensure("a float from a string: " + r.text, has(r, "lslFloat(\"1.5\")") && has(r, "return llcompat.List2Float({ s }, 0)"));
         ensure("hexadecimal kept: " + r.text, has(r, "local MASK = 0x0000FF00"));
         ensure("past 0x7FFFFFFF, which SLua reads as another number, as LSL had it: " + r.text, has(r, "local HIGH = -268435456"));
+        // As the grid's 32-bit hosts read them: strtoul stops at 0xFFFFFFFF.
+        ensure("past 32 bits, -1: " + r.text, has(r, "local BIG = -1\n") && has(r, "local BIG_HEX = -1\n"));
+        ensure("within them, wrapped: " + r.text, has(r, "local WRAPPED = -2147483648\n"));
         checksClean(r);
     }
 

@@ -371,4 +371,22 @@ namespace tut
         ensure("most of them: " + std::to_string(both), both >= 75);
         ensure(wrong, wrong.empty());
     }
+
+    template<> template<>
+    void allslreferencecheck_object::test<4>()
+    {
+        set_test_name("integer literals past 32 bits as the grid's 32-bit hosts read them, -1, decimal or hexadecimal: the same image from either");
+        ensure("builtins: " + error, loaded);
+        const std::string text = "integer a = 4294967296;\n"
+                                 "integer b = 0x100000000;\n"
+                                 "integer c = 99999999999999999999999;\n"
+                                 "integer d = 2147483648;\n"
+                                 "default { state_entry() { llOwnerSay((string)(a + b + c + d + 4294967297 - 0x1FFFFFFFF)); } }\n";
+        std::vector<U8> ours;
+        std::string     why;
+        ensure("Tailslide compiles it: " + why, ALScriptWeigh::tailslideLSO(text, ours, why));
+        const ALLSLReference::Result ll = ALLSLReference::compile(text, Target::LSO);
+        ensure("LL's compiles it", ll.ok);
+        ensure("the same image", ours == ll.image);
+    }
 }
