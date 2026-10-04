@@ -112,6 +112,12 @@ public:
         // Why nothing was converted: the LSL does not parse, or the
         // definitions are not loaded.
         ALScriptProblems problems;
+        // Lines of the LSL beside the lines of the SLua written of them, each
+        // counted from nought: where each global, function, state, handler
+        // and statement begins, and the first line of code made of it. In
+        // the order written, which is not always the LSL's: what a diff of
+        // the two lines up (ALTextDiff's anchors).
+        std::vector<std::pair<S32, S32>> anchors;
     };
 
     static Result convert(std::string_view lsl, const Options& options);

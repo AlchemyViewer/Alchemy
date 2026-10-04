@@ -316,6 +316,7 @@ namespace
 
         std::string write();
         ALScriptProblems& notes() { return mNotes; }
+        const std::vector<std::pair<S32, S32>>& anchors() const { return mAnchors; }
 
     private:
         // --- where the two languages differ -----------------------------------------
@@ -649,6 +650,15 @@ namespace
         // What each part of the script may change, for LSL's order.
         ALLSLEffects                                     mEffects;
         std::string                                      mText;
+        // The LSL's lines beside the SLua's first lines made of them, the
+        // SLua's counted in mText until the head goes over it; the LSL line
+        // of the node whose first line is written next, once its comments
+        // are; and how many lines mText was counted to hold, and to where.
+        std::vector<std::pair<S32, S32>>                 mAnchors;
+        std::optional<S32>                               mAnchorPending;
+        size_t                                           mCounted      = 0;
+        S32                                              mCountedLines = 0;
+        S32                                              linesWritten();
         int                                              mDepth = 0;
         std::vector<std::string>                         mPending;
         boost::unordered_flat_set<std::string>           mOnce;
@@ -839,7 +849,26 @@ namespace
             }
             mPending.clear();
         }
+        if (mAnchorPending && !mInline && !text.empty())
+        {
+            mAnchors.emplace_back(*mAnchorPending, linesWritten());
+            mAnchorPending.reset();
+        }
         mText += text.empty() ? std::string("\n") : indent() + text + "\n";
+    }
+
+    S32 Writer::linesWritten()
+    {
+        // Appended to but for an assignment in an expression, written apart
+        // and put back as it was.
+        if (mCounted > mText.size())
+        {
+            mCounted      = 0;
+            mCountedLines = 0;
+        }
+        mCountedLines += static_cast<S32>(std::count(mText.begin() + static_cast<std::ptrdiff_t>(mCounted), mText.end(), '\n'));
+        mCounted = mText.size();
+        return mCountedLines;
     }
 
     // --- the script's own comments -----------------------------------------------------
@@ -1180,14 +1209,19 @@ namespace
 
     void Writer::commentsBefore(LSLASTNode* node)
     {
-        const auto found = mCommentsBefore.find(node);
-        if (found == mCommentsBefore.end())
+        // Every node written is through here first: the first line of code
+        // written after its comments is the one made of it.
+        mAnchorPending.reset();
+        if (const auto found = mCommentsBefore.find(node); found != mCommentsBefore.end())
         {
-            return;
+            for (size_t k : found->second)
+            {
+                writeComment(mComments[k]);
+            }
         }
-        for (size_t k : found->second)
+        if (!isNull(node) && node->getLoc())
         {
-            writeComment(mComments[k]);
+            mAnchorPending = zeroBased(node->getLoc()->first_line);
         }
     }
 
@@ -5290,6 +5324,13 @@ end
             out += "\n";
         }
         helpers(out);
+        // The head over what was written: the SLua's lines counted from the
+        // top.
+        const S32 above = static_cast<S32>(std::count(out.begin(), out.end(), '\n'));
+        for (std::pair<S32, S32>& anchor : mAnchors)
+        {
+            anchor.second += above;
+        }
         return out + mText;
     }
 }
@@ -5477,6 +5518,7 @@ ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& op
         Writer writer(script, lsl, options);
         result.text      = writer.write();
         result.notes     = std::move(writer.notes());
+        result.anchors   = writer.anchors();
         result.converted = true;
     });
     return result;

@@ -1226,4 +1226,52 @@ namespace tut
         ensure("none where asked: " + bare.text, bare.converted && bare.text.find("Door script") == std::string::npos &&
                                                     bare.text.find("degrees") == std::string::npos && bare.text.find("--[[") == std::string::npos);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<38>()
+    {
+        set_test_name("anchors: each global, function, handler and statement's LSL line beside the line of SLua made of it, under the head, its notes and comments");
+        const std::string lsl = "integer count = 0;\n"               // 0
+                                "add(integer n)\n"                   // 1
+                                "{\n"                                // 2
+                                "    count += n;\n"                  // 3
+                                "}\n"                                // 4
+                                "default\n"                          // 5
+                                "{\n"                                // 6
+                                "    touch_start(integer d)\n"       // 7
+                                "    {\n"                            // 8
+                                "        // one more\n"              // 9
+                                "        add(1);\n"                  // 10
+                                "        llSay(0, (string)count);\n" // 11
+                                "    }\n"                            // 12
+                                "}\n";                               // 13
+        const ALLSLToSLua::Result r = convert(lsl);
+        std::vector<std::string>  lines;
+        for (size_t from = 0; from <= r.text.size();)
+        {
+            const size_t cut = std::min(r.text.find('\n', from), r.text.size());
+            lines.push_back(r.text.substr(from, cut - from));
+            from = cut + 1;
+        }
+        for (const auto& [l, s] : r.anchors)
+        {
+            ensure("within both: " + std::to_string(l) + " " + std::to_string(s), l >= 0 && l < 14 && s >= 0 && s < static_cast<S32>(lines.size()));
+        }
+        const auto at = [&](S32 lsl_line) -> std::string {
+            for (const auto& [l, s] : r.anchors)
+            {
+                if (l == lsl_line)
+                {
+                    return lines[static_cast<size_t>(s)];
+                }
+            }
+            return "(none)";
+        };
+        ensure("the global: " + at(0) + "\n" + r.text, at(0).find("local count") != std::string::npos);
+        ensure("the function: " + at(1), at(1).find("function add(") != std::string::npos);
+        ensure("its statement: " + at(3), at(3).find("count") != std::string::npos && at(3).find("n") != std::string::npos);
+        ensure("the handler: " + at(7), at(7).find("touch_start") != std::string::npos);
+        ensure("a call under its comment, not the comment: " + at(10), at(10).find("add(1)") != std::string::npos);
+        ensure("the next: " + at(11), at(11).find("ll.Say(0") != std::string::npos);
+    }
 }
