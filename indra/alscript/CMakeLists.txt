@@ -16,16 +16,26 @@ target_sources(
     almodulelook.cpp
     allslconsts.cpp
     allslcosts.cpp
+    allsldeadcode.cpp
     allsleffects.cpp
+    allslflowvalues.cpp
+    allslfolder.cpp
     allsllintpass.cpp
     allslinliner.cpp
+    allsllibraryfold.cpp
     almessagemap.cpp
+    allslnames.cpp
     allsloptimizer.cpp
+    allsloptimizerpass.cpp
+    allslprinter.cpp
+    allslrepeatedcalls.cpp
     alluauconfig.cpp
     alluauexports.cpp
     alluauservice.cpp
     allslexports.cpp
     allslservice.cpp
+    allslshapes.cpp
+    allslsimplifier.cpp
     allsltoslua.cpp
     allsltraits.cpp
     allslvalues.cpp
@@ -59,11 +69,19 @@ target_sources(
         almodulelook.h
         allslconsts.h
         allslcosts.h
+        allsldeadcode.h
         allsleffects.h
+        allslflowvalues.h
+        allslfolder.h
         allsllintpass.h
         allslinliner.h
+        allsllibraryfold.h
         almessagemap.h
+        allslnames.h
         allsloptimizer.h
+        allsloptimizerpass.h
+        allslprinter.h
+        allslrepeatedcalls.h
         allsltraits.inc
         allsluuids.inc
         allsleventtext.inc
@@ -72,6 +90,8 @@ target_sources(
         alluauservice.h
         allslexports.h
         allslservice.h
+        allslshapes.h
+        allslsimplifier.h
         allsltoslua.h
         allsltraits.h
         allslvalues.h
@@ -120,8 +140,18 @@ else()
   )
 endif()
 set_source_files_properties(
-  allslvalues.cpp
+  allsldeadcode.cpp
+  allslflowvalues.cpp
+  allslfolder.cpp
+  allsllibraryfold.cpp
+  allslnames.cpp
   allsloptimizer.cpp
+  allsloptimizerpass.cpp
+  allslprinter.cpp
+  allslrepeatedcalls.cpp
+  allslshapes.cpp
+  allslsimplifier.cpp
+  allslvalues.cpp
   PROPERTIES COMPILE_OPTIONS "${alscript_ieee_options}" SKIP_PRECOMPILE_HEADERS TRUE
 )
 
