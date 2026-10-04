@@ -345,11 +345,18 @@ namespace
                     }
                     case LBC_CONSTANT_TABLE_WITH_CONSTANTS:
                     {
+                        // Each key, and the constant its value is where it
+                        // has one (-1 where not): no instruction names that
+                        // value, the template carrying it.
                         const uint64_t keys = in.varint();
                         for (uint64_t j = 0; j < keys && in.ok(); ++j)
                         {
                             constant.constants.push_back(in.varint());
-                            in.skip(4);
+                            const int32_t value = in.int32();
+                            if (value >= 0)
+                            {
+                                constant.constants.push_back(static_cast<uint64_t>(value));
+                            }
                         }
                         break;
                     }
@@ -470,19 +477,19 @@ namespace
     std::string constantName(std::string_view text)
     {
         constexpr size_t SHOWN = 32;
-        std::string      out   = "\"";
-        size_t           taken = 0;
-        for (size_t i = 0; i < text.size() && taken < SHOWN; ++i, ++taken)
+        // Cut never inside a character: where one is cut, before it.
+        size_t cut = std::min(text.size(), SHOWN);
+        while (cut > 0 && cut < text.size() && (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80)
+        {
+            --cut;
+        }
+        std::string out = "\"";
+        for (size_t i = 0; i < cut; ++i)
         {
             const char c = text[i];
             out += c == '\n' ? std::string("\\n") : c == '\t' ? std::string("\\t") : std::string(1, c);
         }
-        // Not cut inside a character.
-        while (taken < text.size() && !out.empty() && (static_cast<unsigned char>(out.back()) & 0xC0) == 0x80)
-        {
-            out.pop_back();
-        }
-        return out + (taken < text.size() ? "\xE2\x80\xA6\"" : "\"");
+        return out + (cut < text.size() ? "\xE2\x80\xA6\"" : "\"");
     }
 
     ALScriptWeight::Part heavyConstant(std::string_view text, size_t bytes, S32 line)
@@ -728,8 +735,9 @@ namespace
                     });
                     pc += static_cast<size_t>(std::max(1, Luau::getOpLength(static_cast<LuauOpcode>(LUAU_INSN_OP(insn)))));
                 }
-                // What an import's path and a template's keys name, with
-                // the constant that names them: no instruction does.
+                // What an import's path and a template's keys and values
+                // name, with the constant that names them: no instruction
+                // does.
                 for (size_t k = 0; k < p.constants.size(); ++k)
                 {
                     for (const uint64_t other : p.constants[k].constants)

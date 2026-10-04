@@ -209,6 +209,56 @@ namespace tut
             ensure(target + ": a part of its own:" + listed(one), one.compiled && found && found->bytes >= 2000 && found->line == 0);
             ensure(target + ": counted once", sum <= one.total);
         }
+        // A table's values written in it, which no instruction loads -- the
+        // template carries them: heavy ones are parts of their own too, at
+        // the table's line.
+        const ALScriptWeight table = ALScriptWeigh::slua("local MSG = {\n    welcome = \"" + std::string(300, 'w') + "\",\n    help = \"" +
+                                                         std::string(300, 'h') + "\",\n}\nprint(MSG.welcome, MSG.help)\n");
+        size_t values = 0;
+        for (const ALScriptWeight::Part& one : table.parts)
+        {
+            values += one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings" && one.bytes >= 300 && one.line >= 0 && one.line <= 3;
+        }
+        ensure_equals("each value a part of its own, at the table:" + listed(table), values, size_t(2));
+        // Named by whole characters: the cut, 32 bytes in, falls inside
+        // one, or just after one.
+        const auto whole = [](const std::string& name) {
+            for (size_t i = 0; i < name.size();)
+            {
+                const unsigned char lead = static_cast<unsigned char>(name[i]);
+                const size_t length = lead < 0x80 ? 1 : (lead & 0xE0) == 0xC0 ? 2 : (lead & 0xF0) == 0xE0 ? 3 : (lead & 0xF8) == 0xF0 ? 4 : 0;
+                if (length == 0 || i + length > name.size())
+                {
+                    return false;
+                }
+                for (size_t k = 1; k < length; ++k)
+                {
+                    if ((static_cast<unsigned char>(name[i + k]) & 0xC0) != 0x80)
+                    {
+                        return false;
+                    }
+                }
+                i += length;
+            }
+            return true;
+        };
+        std::string cyrillic, cjk = "a";
+        for (int i = 0; i < 200; ++i)
+        {
+            cyrillic += "\xD0\x96";
+            cjk += "\xE3\x81\x82";
+        }
+        for (const std::string& text : { cyrillic, cjk })
+        {
+            const ALScriptWeight wide = ALScriptWeigh::slua("local s = \"" + text + "\"\nprint(s)\n");
+            const ALScriptWeight::Part* found = nullptr;
+            for (const ALScriptWeight::Part& one : wide.parts)
+            {
+                found = one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings" ? &one : found;
+            }
+            ensure("a wide one named: " + listed(wide), found && whole(found->name) && found->name.find("\xE2\x80\xA6") != std::string::npos);
+        }
+
         const ALScriptWeight broken = ALScriptWeigh::slua("local function (\n");
         ensure("a script that does not compile", !broken.compiled && !broken.error.empty());
     }
