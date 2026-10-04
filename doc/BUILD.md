@@ -476,7 +476,9 @@ The hosted build (`.github/workflows/build.yaml`) packages Windows and macOS in 
 | `AZURE_KEY_VAULT_URI`, `AZURE_KEY_VAULT_CERTIFICATE` | The Azure Key Vault and the name of the Windows code-signing certificate in it |
 | `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` | The Entra application AzureSignTool signs as |
 | `MACOS_CERTIFICATE`, `MACOS_CERTIFICATE_PASSWORD` | The Developer ID Application certificate and key, as a base64 `.p12`, and its password |
-| `MACOS_NOTARY_KEY`, `MACOS_NOTARY_KEY_ID`, `MACOS_NOTARY_ISSUER_ID` | An App Store Connect API key (the `.p8`'s text), its key ID and issuer ID, to notarize with |
+| `MACOS_NOTARY_KEY`, `MACOS_NOTARY_KEY_ID`, `MACOS_NOTARY_ISSUER_ID` | An App Store Connect API key (the `.p8`'s text) and its key ID, to notarize with, and the issuer ID of a team key; an individual key has none |
+
+`scripts/signing/macos_signing_secrets.py` makes the macOS secrets from the exported `.p12` and the API key's `.p8`, checking each as the build will use it, and stores them with `gh secret set` (`--repo`) or writes them to files (`--output`); its header says where each comes from.
 
 vpk signs every Windows binary, its `Setup.exe` and `Update.exe` through AzureSignTool. On macOS the job signs the bundle inside out with `ViewerCodeSign.cmake`, vpk adds its updater, seals, notarizes and staples the bundle, and the job builds the disk image from that bundle with [dmgbuild](https://dmgbuild.readthedocs.io) (`indra/newview/installers/darwin/dmg_settings.py`), then signs, notarizes and staples the image.
 

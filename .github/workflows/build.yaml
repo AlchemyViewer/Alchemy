@@ -828,14 +828,19 @@ jobs:
           fi
           echo "identity=$identity" >> "$GITHUB_OUTPUT"
 
-          if [[ -z "$MACOS_NOTARY_KEY" || -z "$MACOS_NOTARY_KEY_ID" || -z "$MACOS_NOTARY_ISSUER_ID" ]]; then
+          if [[ -z "$MACOS_NOTARY_KEY" || -z "$MACOS_NOTARY_KEY_ID" ]]; then
             echo "::notice::No App Store Connect API key: the macOS package is signed but not notarized"
             exit 0
+          fi
+          # A team key has an issuer; an individual key must be given none.
+          issuer=()
+          if [[ -n "$MACOS_NOTARY_ISSUER_ID" ]]; then
+            issuer=(--issuer "$MACOS_NOTARY_ISSUER_ID")
           fi
           # notarytool keeps the API key in the job's keychain, as a profile.
           printf '%s\n' "$MACOS_NOTARY_KEY" > "$notary_key"
           xcrun notarytool store-credentials alchemy-notary --key "$notary_key" \
-            --key-id "$MACOS_NOTARY_KEY_ID" --issuer "$MACOS_NOTARY_ISSUER_ID" --keychain "$keychain"
+            --key-id "$MACOS_NOTARY_KEY_ID" "${issuer[@]}" --keychain "$keychain"
           echo "notary_profile=alchemy-notary" >> "$GITHUB_OUTPUT"
 
       # Always, ad-hoc without an identity: unpacking the archive decomposes
