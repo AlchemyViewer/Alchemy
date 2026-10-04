@@ -60,6 +60,9 @@ if(DARWIN)
   set(AL_INSTALL_LIBDIR "${AL_INSTALL_BUNDLE}/Contents/Frameworks")
   set(AL_INSTALL_PLUGINDIR "${AL_INSTALL_DATADIR}")
   set(al_ca_bundle_dir "${AL_INSTALL_DATADIR}")
+  # What ViewerCodeSign.cmake signs with, here and in the package steps.
+  set(AL_SIGN_PLUGIN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/slplugin.entitlements")
+  set(AL_SIGN_HELPER_ENTITLEMENTS "${INDRA_SOURCE_DIR}/dullahan/src/dullahan.entitlements")
 elseif(LINUX)
   set(AL_INSTALL_DATADIR ".")
   set(AL_INSTALL_BINDIR "bin")
@@ -424,13 +427,16 @@ if(TARGET media_plugin_libvlc)
     set(vlc_frameworks_dir "${AL_INSTALL_PLUGINDIR}/media_plugin_libvlc.app/Contents/Frameworks")
     file(GLOB vlc_libraries "${al_vcpkg_dir}/lib/libvlc*.dylib*")
     install(FILES ${vlc_libraries} DESTINATION "${vlc_frameworks_dir}" COMPONENT plugins)
+    # Not plugins.dat: VLC trusts its cache only while every plugin keeps the
+    # size and time it was cached with, and signing changes both. A data file
+    # under Frameworks would also need a signature of its own, which lives in
+    # extended attributes that archives and update packages drop.
     install(
       DIRECTORY "${VLC_PLUGINS_DIR}/"
       DESTINATION "${vlc_frameworks_dir}/plugins"
       COMPONENT plugins
       FILES_MATCHING
       PATTERN "*.dylib"
-      PATTERN "plugins.dat"
     )
   endif()
 endif()
@@ -632,19 +638,17 @@ if(DARWIN)
     )
   endforeach()
 
-  # Ad-hoc, or with AL_SIGNING_IDENTITY, inside out; the hosted build signs
-  # in its own step.
-  if(NOT DEFINED ENV{GITHUB_ACTIONS})
-    install(
-      CODE
-        "set(AL_SIGN_BUNDLE \"\${CMAKE_INSTALL_PREFIX}/${AL_INSTALL_BUNDLE}\")
+  # Ad-hoc, or with AL_SIGNING_IDENTITY, inside out. The hosted build signs
+  # ad-hoc here and again with its Developer ID in the packaging job.
+  install(
+    CODE
+      "set(AL_SIGN_BUNDLE \"\${CMAKE_INSTALL_PREFIX}/${AL_INSTALL_BUNDLE}\")
 set(AL_SIGN_IDENTITY \"${AL_SIGNING_IDENTITY}\")
-set(AL_SIGN_PLUGIN_ENTITLEMENTS \"${al_newview_dir}/slplugin.entitlements\")
-set(AL_SIGN_HELPER_ENTITLEMENTS \"${INDRA_SOURCE_DIR}/dullahan/src/dullahan.entitlements\")"
-      COMPONENT viewer
-    )
-    install(SCRIPT "${CMAKE_CURRENT_LIST_DIR}/ViewerCodeSign.cmake" COMPONENT viewer)
-  endif()
+set(AL_SIGN_PLUGIN_ENTITLEMENTS \"${AL_SIGN_PLUGIN_ENTITLEMENTS}\")
+set(AL_SIGN_HELPER_ENTITLEMENTS \"${AL_SIGN_HELPER_ENTITLEMENTS}\")"
+    COMPONENT viewer
+  )
+  install(SCRIPT "${CMAKE_CURRENT_LIST_DIR}/ViewerCodeSign.cmake" COMPONENT viewer)
 endif()
 
 if(LINUX)

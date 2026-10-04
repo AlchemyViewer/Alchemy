@@ -8,6 +8,13 @@
         "vpk"
       ],
       "rollForward": false
+    },
+    "azuresigntool": {
+      "version": "7.0.1",
+      "commands": [
+        "azuresigntool"
+      ],
+      "rollForward": false
     }
   }
 }

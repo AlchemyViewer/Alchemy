@@ -257,7 +257,6 @@ jobs:
     continue-on-error: ${{ startsWith(matrix.build_variant, 'Tests') }}
     outputs:
       viewer_version: ${{ steps.build.outputs.viewer_version }}
-      imagename: ${{ steps.build.outputs.imagename }}
     env:
       # Sets Xcode version used for build
       DEVELOPER_DIR: "/Applications/Xcode.app/Contents/Developer"
@@ -338,7 +337,6 @@ jobs:
             cmake_preset_postfix="-os"
           fi
 
-          SIGNING=()
           case "$RUNNER_OS" in
             Windows)
               cmake_preset_name="vs2026${cmake_preset_postfix}-$BUILD_ARCH"
@@ -385,8 +383,7 @@ jobs:
             -DAL_SENTRY_DSN:STRING="$AL_SENTRY_DSN" \
             -DAL_CHANNEL:STRING="${AL_CHANNEL}" \
             -DAL_GRID:STRING="$VIEWER_GRID" \
-            $template_verifier_master_url \
-            "${SIGNING[@]}"
+            $template_verifier_master_url
 
       - name: Build
         id: build
@@ -441,9 +438,10 @@ jobs:
               echo "viewer_version=$viewer_version" >> "$GITHUB_OUTPUT"
           fi
 
-          # The package: the install tree on Windows, which the signing job
-          # packages with Velopack from it and its package.env metadata; the
-          # CPack archive elsewhere.
+          # The package. On Windows and macOS, what the packaging jobs sign and
+          # package with Velopack, guided by package.env: the install tree on
+          # Windows; on macOS the archive of the stripped bundle, which is
+          # signed ad-hoc and signed again there. On Linux, the release itself.
           if $AL_BUILD_VIEWER
           then
             case "$RUNNER_OS" in
@@ -452,10 +450,10 @@ jobs:
                 echo "viewer_app=$RUNNER_TEMP/app" >> "$GITHUB_OUTPUT"
                 ;;
               *)
-                cpack --config "$BUILD_DIRECTORY/CPackConfig.cmake" -C "$cmake_config" -B "$RUNNER_TEMP/package"
-                viewer_app="$(ls "$RUNNER_TEMP"/package/*.tar.xz "$RUNNER_TEMP"/package/*.dmg 2>/dev/null | head -n 1 || true)"
+                cpack --config "$BUILD_DIRECTORY/CPackConfig.cmake" -C "$cmake_config" -G TXZ -B "$RUNNER_TEMP/package"
+                viewer_app="$(ls "$RUNNER_TEMP"/package/*.tar.xz 2>/dev/null | head -n 1 || true)"
                 if [[ -z "$viewer_app" ]]; then
-                  echo "::error::No .tar.xz or .dmg package under $RUNNER_TEMP/package"
+                  echo "::error::No .tar.xz package under $RUNNER_TEMP/package"
                   exit 1
                 fi
                 echo "viewer_app=$viewer_app" >> "$GITHUB_OUTPUT"
@@ -463,9 +461,9 @@ jobs:
             esac
           fi
 
-      - name: Upload Windows package metadata
+      - name: Upload package metadata
         uses: actions/upload-artifact@v7
-        if: runner.os == 'Windows' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
+        if: runner.os != 'Linux' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
         with:
           name: "${{ steps.build.outputs.artifact }}-metadata"
           path: ${{ steps.configure.outputs.build_directory }}/newview/package.env
@@ -477,8 +475,7 @@ jobs:
         with:
           name: "${{ steps.build.outputs.artifact }}-app"
           if-no-files-found: error
-          # The Windows install tree is uncompressed; the .tar.xz and .dmg
-          # already are.
+          # The Windows install tree is uncompressed; the .tar.xz already is.
           compression-level: ${{ runner.os == 'Windows' && 9 || 0 }}
           path: |
             ${{ steps.build.outputs.viewer_app }}
@@ -574,6 +571,8 @@ jobs:
       #       ${{ steps.configure.outputs.build_directory }}/llappearanceutility/Release/appearance-utility-bin
       #       ${{ steps.configure.outputs.build_directory }}/llappearanceutility/Release/appearance-utility-headless-bin
 
+  # Pull requests are packaged unsigned: the code they build has not been
+  # reviewed, and the certificates are not lent to it.
   sign-and-package-windows:
     needs: [setup, build]
     timeout-minutes: 30
@@ -581,9 +580,11 @@ jobs:
       matrix:
         arch: [x64, arm64]
     runs-on: windows-2025-vs2026
+    env:
+      SIGN_PACKAGES: ${{ github.event_name != 'pull_request' }}
     steps:
       # The app and its metadata come from the build's artifacts; the tree
-      # contributes only the Velopack tool manifest.
+      # contributes only the .NET tool manifest.
       - name: Checkout code
         uses: actions/checkout@v7
         with:
@@ -597,7 +598,7 @@ jobs:
         with:
           dotnet-version: '10.x'
 
-      - name: Install Velopack CLI
+      - name: Install Velopack CLI and AzureSignTool
         run: dotnet tool restore
 
       - name: Fetch Windows app
@@ -612,17 +613,24 @@ jobs:
           name: Windows${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-metadata
           path: .metadata
 
-      - name: Load Velopack metadata
+      - name: Load package metadata
         shell: bash
         run: |
+          # Every key, upper-cased, into the environment of the steps below.
           while IFS='=' read -r key value; do
-            if [[ "$key" == velopack_* ]]; then
+            if [[ -n "$key" ]]; then
               printf '%s=%s\n' "${key^^}" "$value" >> "$GITHUB_ENV"
             fi
           done < .metadata/package.env
 
-      - name: Build and sign Velopack package
+      - name: Package with Velopack
         shell: bash
+        env:
+          AZURE_KEY_VAULT_URI: ${{ secrets.AZURE_KEY_VAULT_URI }}
+          AZURE_KEY_VAULT_CERTIFICATE: ${{ secrets.AZURE_KEY_VAULT_CERTIFICATE }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           set -x
 
@@ -650,41 +658,32 @@ jobs:
             vpk_args+=(--splashImage ".app/$VELOPACK_SPLASH")
           fi
 
+          # Every binary vpk packs, and the Setup.exe and Update.exe it adds,
+          # signed by AzureSignTool with the certificate in Azure Key Vault.
+          # vpk runs the template through cmd.exe, which expands the
+          # %VARIABLES%, so the credentials stay off the command line it logs.
+          if [[ "$SIGN_PACKAGES" == "true" && -n "$AZURE_KEY_VAULT_URI" && -n "$AZURE_KEY_VAULT_CERTIFICATE" \
+                && -n "$AZURE_CLIENT_ID" && -n "$AZURE_CLIENT_SECRET" && -n "$AZURE_TENANT_ID" ]]; then
+            vpk_args+=(--signTemplate "dotnet azuresigntool sign -kvu %AZURE_KEY_VAULT_URI% -kvc %AZURE_KEY_VAULT_CERTIFICATE% -kvi %AZURE_CLIENT_ID% -kvs %AZURE_CLIENT_SECRET% -kvt %AZURE_TENANT_ID% -tr http://timestamp.digicert.com -td sha256 {{file...}}")
+          else
+            echo "::notice::No Azure Key Vault signing certificate: the Windows package is not signed"
+          fi
+
           "${vpk_args[@]}"
 
       - name: Rename Velopack outputs
         shell: bash
         run: |
-          # Move Setup.exe into .app for the installer upload step
-          setup="Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}-Setup.exe"
-          if [[ -f "$setup" ]]; then
-            mv "$setup" ".app/${VELOPACK_INSTALLER_BASE}_Setup.exe"
-            echo "Moved $setup to .app/${VELOPACK_INSTALLER_BASE}_Setup.exe"
-          fi
-
-          # Rename Portable.zip to include version
-          portable="Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}-Portable.zip"
-          if [[ -f "$portable" ]]; then
-            mv "$portable" "Releases/${VELOPACK_INSTALLER_BASE}_Portable.zip"
-            echo "Moved $portable to Releases/${VELOPACK_INSTALLER_BASE}_Portable.zip"
-          fi
-
-      - name: Find Velopack installer
-        id: find-installer
-        shell: bash
-        run: |
-          installer="$(ls -t .app/*_Setup.exe 2>/dev/null | head -n 1 || true)"
-          if [[ -z "$installer" ]]; then
-            echo "::error::No Velopack installer found under .app"
-            exit 1
-          fi
-          echo "installer=$installer" >> "$GITHUB_OUTPUT"
+          # The installer and the portable archive take the package's name.
+          mkdir .installer
+          mv "Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}-Setup.exe" ".installer/${IMAGENAME}_Setup.exe"
+          mv "Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}-Portable.zip" "Releases/${IMAGENAME}_Portable.zip"
 
       - name: Post the installer
         uses: actions/upload-artifact@v7
         with:
           name: "Windows${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-installer"
-          path: ${{ steps.find-installer.outputs.installer }}
+          path: .installer/
           if-no-files-found: error
 
       - name: Upload Velopack releases
@@ -694,51 +693,270 @@ jobs:
           path: Releases/
           if-no-files-found: error
 
-  # sign-and-package-mac:
-  #   env:
-  #     NOTARIZE_CREDS_MACOS: ${{ secrets.NOTARIZE_CREDS_MACOS }}
-  #     SIGNING_CERT_MACOS: ${{ secrets.SIGNING_CERT_MACOS }}
-  #     SIGNING_CERT_MACOS_IDENTITY: ${{ secrets.SIGNING_CERT_MACOS_IDENTITY }}
-  #     SIGNING_CERT_MACOS_PASSWORD: ${{ secrets.SIGNING_CERT_MACOS_PASSWORD }}
-  #   needs: [setup, build]
-  #   runs-on: macos-latest
-  #   if: needs.setup.outputs.build_type == 'proprietary'
-  #   steps:
-  #     - name: Unpack Mac notarization credentials
-  #       if: env.NOTARIZE_CREDS_MACOS
-  #       id: note-creds
-  #       shell: bash
-  #       run: |
-  #         # In NOTARIZE_CREDS_MACOS we expect to find:
-  #         # USERNAME="..."
-  #         # PASSWORD="..."
-  #         # TEAM_ID="..."
-  #         eval "${{ env.NOTARIZE_CREDS_MACOS }}"
-  #         echo "::add-mask::$USERNAME"
-  #         echo "::add-mask::$PASSWORD"
-  #         echo "::add-mask::$TEAM_ID"
-  #         echo "note_user=$USERNAME" >> "$GITHUB_OUTPUT"
-  #         echo "note_pass=$PASSWORD" >> "$GITHUB_OUTPUT"
-  #         echo "note_team=$TEAM_ID" >> "$GITHUB_OUTPUT"
-  #         # If we didn't manage to retrieve all of these credentials, better
-  #         # find out sooner than later.
-  #         [[ -n "$USERNAME" && -n "$PASSWORD" && -n "$TEAM_ID" ]]
+  # Pull requests are packaged signed ad-hoc and not notarized, for the reason
+  # above.
+  sign-and-package-mac:
+    needs: [setup, build]
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        arch: [arm64]
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: "/Applications/Xcode.app/Contents/Developer"
+      SIGN_PACKAGES: ${{ github.event_name != 'pull_request' }}
+    steps:
+      # The app and its metadata come from the build's artifacts; the tree
+      # contributes the .NET tool manifest, the signing script, the
+      # entitlements and the disk image's layout.
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            /dotnet-tools.json
+            /indra/cmake/ViewerCodeSign.cmake
+            /indra/newview/slplugin.entitlements
+            /indra/newview/installers/darwin/
+            /indra/dullahan
+          sparse-checkout-cone-mode: false
 
-  #     - name: Sign and package Mac viewer
-  #       if: env.SIGNING_CERT_MACOS && env.SIGNING_CERT_MACOS_IDENTITY && env.SIGNING_CERT_MACOS_PASSWORD && steps.note-creds.outputs.note_user && steps.note-creds.outputs.note_pass && steps.note-creds.outputs.note_team
-  #       uses: secondlife/viewer-build-util/sign-pkg-mac@v2
-  #       with:
-  #         channel: ${{ needs.setup.outputs.viewer_channel }}
-  #         imagename: ${{ needs.build.outputs.imagename }}
-  #         cert_base64: ${{ env.SIGNING_CERT_MACOS }}
-  #         cert_name: ${{ env.SIGNING_CERT_MACOS_IDENTITY }}
-  #         cert_pass: ${{ env.SIGNING_CERT_MACOS_PASSWORD }}
-  #         note_user: ${{ steps.note-creds.outputs.note_user }}
-  #         note_pass: ${{ steps.note-creds.outputs.note_pass }}
-  #         note_team: ${{ steps.note-creds.outputs.note_team }}
+      # The CEF helpers' entitlements are dullahan's.
+      - name: Checkout dullahan
+        run: git submodule update --init --depth 1 -- indra/dullahan
+
+      - name: Setup .NET for Velopack
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.x'
+
+      - name: Install Velopack CLI
+        run: dotnet tool restore
+
+      - name: Setup python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      # The badge_icons extra badges the volume icon through Quartz.
+      - name: Install CMake and dmgbuild
+        run: pip install cmake "dmgbuild[badge_icons]==1.6.7"
+
+      - name: Fetch macOS app
+        uses: actions/download-artifact@v8
+        with:
+          name: macOS${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-app
+          path: .package
+
+      - name: Fetch macOS package metadata
+        uses: actions/download-artifact@v8
+        with:
+          name: macOS${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-metadata
+          path: .metadata
+
+      - name: Load package metadata
+        shell: bash
+        run: |
+          # Every key, upper-cased, into the environment of the steps below.
+          while IFS='=' read -r key value; do
+            if [[ -n "$key" ]]; then
+              printf '%s=%s\n' "$(tr '[:lower:]' '[:upper:]' <<< "$key")" "$value" >> "$GITHUB_ENV"
+            fi
+          done < .metadata/package.env
+
+      - name: Unpack the app
+        id: unpack
+        shell: bash
+        run: |
+          mkdir .unpacked
+          tar -xJf .package/*.tar.xz -C .unpacked
+          app="$(find .unpacked -maxdepth 2 -name '*.app' -print -quit)"
+          if [[ -z "$app" ]]; then
+            echo "::error::No .app in the macOS package"
+            exit 1
+          fi
+          # Extended attributes codesign refuses to seal over.
+          xattr -cr "$app"
+          echo "app=$PWD/$app" >> "$GITHUB_OUTPUT"
+
+      - name: Set up the signing keychain
+        id: keychain
+        if: env.SIGN_PACKAGES == 'true'
+        shell: bash
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          if [[ -z "$MACOS_CERTIFICATE" || -z "$MACOS_CERTIFICATE_PASSWORD" ]]; then
+            echo "::notice::No Developer ID certificate: the macOS package is signed ad-hoc and not notarized"
+            exit 0
+          fi
+
+          certificate="$RUNNER_TEMP/certificate.p12"
+          notary_key="$RUNNER_TEMP/notary.p8"
+          trap 'rm -f "$certificate" "$notary_key"' EXIT
+
+          # A keychain of the job's own, unlocked for its length, and on the
+          # search list so codesign finds the certificate's chain.
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(openssl rand -base64 24)"
+          echo "::add-mask::$password"
+          security create-keychain -p "$password" "$keychain"
+          echo "keychain=$keychain" >> "$GITHUB_OUTPUT"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          searchlist=()
+          while IFS= read -r path; do
+            searchlist+=("$path")
+          done < <(security list-keychains -d user | sed -e 's/^[[:space:]]*"//' -e 's/"$//')
+          security list-keychains -d user -s "$keychain" "${searchlist[@]}"
+
+          base64 --decode > "$certificate" <<< "$MACOS_CERTIFICATE"
+          security import "$certificate" -k "$keychain" -f pkcs12 -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" > /dev/null
+
+          # The identity by its hash, which no other certificate can share.
+          identity="$(security find-identity -v -p codesigning "$keychain" \
+                        | awk '/"Developer ID Application: / { print $2; exit }')"
+          if [[ -z "$identity" ]]; then
+            echo "::error::MACOS_CERTIFICATE holds no Developer ID Application identity"
+            exit 1
+          fi
+          echo "identity=$identity" >> "$GITHUB_OUTPUT"
+
+          if [[ -z "$MACOS_NOTARY_KEY" || -z "$MACOS_NOTARY_KEY_ID" || -z "$MACOS_NOTARY_ISSUER_ID" ]]; then
+            echo "::notice::No App Store Connect API key: the macOS package is signed but not notarized"
+            exit 0
+          fi
+          # notarytool keeps the API key in the job's keychain, as a profile.
+          printf '%s\n' "$MACOS_NOTARY_KEY" > "$notary_key"
+          xcrun notarytool store-credentials alchemy-notary --key "$notary_key" \
+            --key-id "$MACOS_NOTARY_KEY_ID" --issuer "$MACOS_NOTARY_ISSUER_ID" --keychain "$keychain"
+          echo "notary_profile=alchemy-notary" >> "$GITHUB_OUTPUT"
+
+      # Always, ad-hoc without an identity: unpacking the archive decomposes
+      # some file names, which breaks the seal the build made.
+      - name: Sign the app inside out
+        shell: bash
+        env:
+          APP: ${{ steps.unpack.outputs.app }}
+          IDENTITY: ${{ steps.keychain.outputs.identity }}
+          KEYCHAIN: ${{ steps.keychain.outputs.keychain }}
+        run: |
+          cmake \
+            -D "AL_SIGN_BUNDLE=$APP" \
+            -D "AL_SIGN_IDENTITY=$IDENTITY" \
+            -D "AL_SIGN_KEYCHAIN=$KEYCHAIN" \
+            -D "AL_SIGN_PLUGIN_ENTITLEMENTS=$PWD/indra/newview/slplugin.entitlements" \
+            -D "AL_SIGN_HELPER_ENTITLEMENTS=$PWD/indra/dullahan/src/dullahan.entitlements" \
+            -P indra/cmake/ViewerCodeSign.cmake
+
+      # vpk signs the updater it adds and seals the bundle again with the
+      # viewer's entitlements; given a profile, it notarizes and staples it.
+      - name: Package with Velopack
+        shell: bash
+        env:
+          APP: ${{ steps.unpack.outputs.app }}
+          IDENTITY: ${{ steps.keychain.outputs.identity }}
+          KEYCHAIN: ${{ steps.keychain.outputs.keychain }}
+          NOTARY_PROFILE: ${{ steps.keychain.outputs.notary_profile }}
+        run: |
+          vpk_args=(
+            dotnet vpk pack
+            --packId "$VELOPACK_PACK_ID"
+            --packVersion "$VELOPACK_PACK_VERSION"
+            --packAuthors "$VELOPACK_PACK_AUTHORS"
+            --packTitle "$VELOPACK_PACK_TITLE"
+            --packDir "$APP"
+            --mainExe "$VELOPACK_MAIN_EXE"
+            --channel "$VELOPACK_CHANNEL"
+            --runtime "$VELOPACK_RUNTIME"
+            --noInst
+            --signAppIdentity "${IDENTITY:--}"
+            --signDisableDeep
+            --signEntitlements "$PWD/indra/newview/slplugin.entitlements"
+          )
+          if [[ -n "$KEYCHAIN" ]]; then
+            vpk_args+=(--keychain "$KEYCHAIN")
+          fi
+          if [[ -n "$NOTARY_PROFILE" ]]; then
+            vpk_args+=(--notaryProfile "$NOTARY_PROFILE")
+          fi
+          "${vpk_args[@]}"
+
+      # From the bundle vpk sealed, updater and all, so a viewer installed
+      # from the image updates itself.
+      - name: Build the disk image
+        id: dmg
+        shell: bash
+        run: |
+          mkdir .dmg-app .installer
+          ditto -x -k "Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}-Portable.zip" .dmg-app
+          app="$(find .dmg-app -maxdepth 1 -name '*.app' -print -quit)"
+          installer="$PWD/.installer/$IMAGENAME.dmg"
+          dmgbuild -s indra/newview/installers/darwin/dmg_settings.py -D "app=$app" "$VELOPACK_PACK_TITLE" "$installer"
+          echo "installer=$installer" >> "$GITHUB_OUTPUT"
+
+      - name: Sign and notarize the disk image
+        if: steps.keychain.outputs.identity != ''
+        shell: bash
+        env:
+          INSTALLER: ${{ steps.dmg.outputs.installer }}
+          IDENTITY: ${{ steps.keychain.outputs.identity }}
+          KEYCHAIN: ${{ steps.keychain.outputs.keychain }}
+          NOTARY_PROFILE: ${{ steps.keychain.outputs.notary_profile }}
+        run: |
+          codesign --force --sign "$IDENTITY" --keychain "$KEYCHAIN" --timestamp "$INSTALLER"
+          if [[ -z "$NOTARY_PROFILE" ]]; then
+            exit 0
+          fi
+
+          # notarytool can exit 0 on a rejection, so the verdict is read from
+          # its report, and the log fetched when it is not Accepted.
+          notary=(--keychain-profile "$NOTARY_PROFILE" --keychain "$KEYCHAIN")
+          result="$(xcrun notarytool submit "$INSTALLER" "${notary[@]}" --wait --output-format json)" || true
+          echo "$result"
+          id="$(plutil -extract id raw -o - - <<< "$result" 2>/dev/null || true)"
+          status="$(plutil -extract status raw -o - - <<< "$result" 2>/dev/null || true)"
+          if [[ "$status" != "Accepted" ]]; then
+            if [[ -n "$id" ]]; then
+              xcrun notarytool log "$id" "${notary[@]}"
+            fi
+            echo "::error::Notarizing the disk image ended ${status:-without a verdict}"
+            exit 1
+          fi
+          xcrun stapler staple "$INSTALLER"
+          spctl --assess --type open --context context:primary-signature --verbose "$INSTALLER"
+
+      - name: Post the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: "macOS${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-installer"
+          path: ${{ steps.dmg.outputs.installer }}
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Upload Velopack releases
+        uses: actions/upload-artifact@v7
+        with:
+          name: "macOS${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-releases"
+          path: Releases/
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Remove the signing keychain
+        if: always() && steps.keychain.outputs.keychain != ''
+        shell: bash
+        env:
+          KEYCHAIN: ${{ steps.keychain.outputs.keychain }}
+        run: security delete-keychain "$KEYCHAIN"
 
   release:
-    needs: [setup, build, sign-and-package-windows]
+    needs: [setup, build, sign-and-package-windows, sign-and-package-mac]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     if: needs.setup.outputs.release_run
@@ -778,9 +996,9 @@ jobs:
           append_body: true
           fail_on_unmatched_files: true
           files: |
-            Windows*-installer/*.exe
+            *-installer/*
+            *-releases/*
             *.tar.xz
-            Windows*-releases/*
 
       - name: post release URL
         env:

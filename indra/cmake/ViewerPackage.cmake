@@ -15,37 +15,29 @@ include_guard()
 set(al_velopack_authors "Alchemy Viewer Project")
 set(al_velopack_splash_color "#00a5dc")
 set(al_velopack_version "${VIEWER_SHORT_VERSION}-${VIEWER_VERSION_REVISION}")
+# An installed viewer updates from releases.<channel>.json, so each platform
+# and architecture has a channel of its own, named for its runtime. The
+# channel also names the files vpk writes.
+set(al_velopack_os "")
 if(DARWIN)
   set(al_velopack_title "${AL_APP_NAME}")
   set(al_velopack_main_exe "${product}")
-else()
+  set(al_velopack_os osx)
+elseif(WINDOWS)
   set(al_velopack_title "${AL_APP_NAME_ONEWORD}")
   set(al_velopack_main_exe "${OUTPUT_BINARY_NAME}.exe")
-  # An installed viewer updates from releases.<channel>.json, so each
-  # architecture has a channel of its own, named for its runtime. The
-  # channel also names the installer, the portable archive and the packages
-  # vpk writes.
-  if(BUILD_TARGET_IS_ARM64)
-    set(al_velopack_runtime win-arm64)
-  else()
-    set(al_velopack_runtime win-x64)
-  endif()
-  set(al_velopack_channel ${al_velopack_runtime})
+  set(al_velopack_os win)
 endif()
 
-# What the hosted build's packaging and signing steps need to know, one
-# key=value per line for GITHUB_OUTPUT.
-if(DARWIN)
-  set(
-    al_package_env
-    "velopack_mac_pack_id=${AL_APP_NAME_ONEWORD}
-velopack_mac_pack_version=${al_velopack_version}
-velopack_mac_pack_title=${al_velopack_title}
-velopack_mac_main_exe=${al_velopack_main_exe}
-velopack_mac_bundle_id=${MACOSX_BUNDLE_GUI_IDENTIFIER}
-"
-  )
-elseif(WINDOWS)
+# What the hosted build's packaging jobs need to know, one key=value per
+# line. The jobs export every key to the environment in upper case.
+if(al_velopack_os)
+  if(BUILD_TARGET_IS_ARM64)
+    set(al_velopack_runtime ${al_velopack_os}-arm64)
+  else()
+    set(al_velopack_runtime ${al_velopack_os}-x64)
+  endif()
+  set(al_velopack_channel ${al_velopack_runtime})
   set(
     al_package_env
     "velopack_pack_id=${AL_APP_NAME_ONEWORD}
@@ -53,14 +45,19 @@ velopack_pack_version=${al_velopack_version}
 velopack_pack_title=${al_velopack_title}
 velopack_pack_authors=${al_velopack_authors}
 velopack_main_exe=${al_velopack_main_exe}
-velopack_icon=install_icon.ico
-velopack_splash=install_splash.gif
-velopack_splash_color=${al_velopack_splash_color}
-velopack_installer_base=${AL_PACKAGE_NAME}
 velopack_channel=${al_velopack_channel}
 velopack_runtime=${al_velopack_runtime}
 "
   )
+  if(WINDOWS)
+    string(
+      APPEND al_package_env
+      "velopack_icon=install_icon.ico
+velopack_splash=install_splash.gif
+velopack_splash_color=${al_velopack_splash_color}
+"
+    )
+  endif()
 else()
   set(al_package_env "")
 endif()
@@ -108,21 +105,28 @@ set(CPACK_AL_REPOSITORY "${al_repository_dir}")
 if(WINDOWS)
   set(CPACK_GENERATOR ZIP)
 elseif(DARWIN)
+  # A plain disk image with the Applications link beside the bundle. The
+  # hosted build makes its own, laid out, from the notarized bundle. APFS,
+  # not HFS+: HFS+ decomposes file names, and the bundle's seal holds the
+  # names of the font stand-ins with Japanese names as they were composed.
   set(CPACK_GENERATOR DragNDrop)
   set(CPACK_DMG_VOLUME_NAME "${AL_APP_NAME}")
-  set(
-    CPACK_DMG_BACKGROUND_IMAGE
-    "${CMAKE_CURRENT_SOURCE_DIR}/installers/darwin/release-dmg/background.jpg"
-  )
-  set(CPACK_DMG_DS_STORE "${CMAKE_CURRENT_SOURCE_DIR}/installers/darwin/release-dmg/_DS_Store")
+  set(CPACK_DMG_FILESYSTEM APFS)
+  set(CPACK_DMG_FORMAT ULMO)
 else()
   set(CPACK_GENERATOR TXZ)
 endif()
 
 # Release archives on Linux and macOS are stripped of debug information
-# after the install into the package staging area.
+# after the install into the package staging area; on macOS the bundle is
+# then sealed again as the install signed it.
 if(NOT WINDOWS)
   set(CPACK_PRE_BUILD_SCRIPTS "${CMAKE_CURRENT_LIST_DIR}/ViewerStrip.cmake")
+endif()
+if(DARWIN)
+  set(CPACK_AL_SIGN_IDENTITY "${AL_SIGNING_IDENTITY}")
+  set(CPACK_AL_SIGN_PLUGIN_ENTITLEMENTS "${AL_SIGN_PLUGIN_ENTITLEMENTS}")
+  set(CPACK_AL_SIGN_HELPER_ENTITLEMENTS "${AL_SIGN_HELPER_ENTITLEMENTS}")
 endif()
 
 include(CPack)
@@ -131,19 +135,34 @@ if(AL_USE_VELOPACK)
   set(velopack_dir "${CMAKE_CURRENT_BINARY_DIR}/velopack/$<CONFIG>")
   set(velopack_releases "${velopack_dir}/Releases")
   if(DARWIN)
+    # The install signed every nested piece; vpk signs the updater it adds,
+    # seals the bundle again with the viewer's entitlements, and notarizes it
+    # when given a notarytool profile. Ad-hoc without an identity.
+    if(AL_SIGNING_IDENTITY)
+      set(velopack_identity "${AL_SIGNING_IDENTITY}")
+    else()
+      set(velopack_identity "-")
+    endif()
     set(
       velopack_args
       --packDir
       "${velopack_dir}/app/${AL_INSTALL_BUNDLE}"
       --mainExe
       "${al_velopack_main_exe}"
-      --bundleId
-      "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
-      --icon
-      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.icns"
+      --channel
+      "${al_velopack_channel}"
+      --runtime
+      "${al_velopack_runtime}"
       --noInst
+      --signAppIdentity
+      "${velopack_identity}"
+      --signDisableDeep
+      --signEntitlements
+      "${AL_SIGN_PLUGIN_ENTITLEMENTS}"
     )
-    set(velopack_rename "")
+    if(AL_SIGNING_IDENTITY AND AL_NOTARY_PROFILE)
+      list(APPEND velopack_args --notaryProfile "${AL_NOTARY_PROFILE}")
+    endif()
   else()
     set(
       velopack_args
@@ -164,6 +183,12 @@ if(AL_USE_VELOPACK)
       --runtime
       "${al_velopack_runtime}"
     )
+  endif()
+  # The Windows installer and portable archive take the package's name; vpk's
+  # names for the macOS outputs carry the channel, which keeps them apart
+  # from the Windows arm64 ones on a release page.
+  set(velopack_rename "")
+  if(WINDOWS)
     set(
       velopack_rename
       COMMAND

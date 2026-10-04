@@ -51,7 +51,6 @@ set(
   AL_ENABLE_TRACY_LOCAL_ONLY
   AL_ENABLE_TRACY_GPU
   AL_BUILD_TRACY_GUI
-  AL_ENABLE_SIGNING
   AL_USE_VELOPACK
   AL_ENABLE_RELEASE_DEBUG_LOGGING
   AL_BUILD_PACKAGE
@@ -326,10 +325,16 @@ function(al_configuration_report)
     endif()
     _al_report_row("Package" "${package_kind}")
   endif()
-  if(AL_ENABLE_SIGNING)
-    _al_report_row("Signing" "identity '${AL_SIGNING_IDENTITY}'")
-  else()
-    _al_report_row("Signing" "off")
+  if(DARWIN)
+    if(AL_SIGNING_IDENTITY)
+      set(signing "identity '${AL_SIGNING_IDENTITY}'")
+    else()
+      set(signing "ad-hoc")
+    endif()
+    if(AL_USE_VELOPACK AND AL_NOTARY_PROFILE)
+      string(APPEND signing ", Velopack notarized with profile '${AL_NOTARY_PROFILE}'")
+    endif()
+    _al_report_row("Signing" "${signing}")
   endif()
 
   if(AL_BUILD_TESTS)
