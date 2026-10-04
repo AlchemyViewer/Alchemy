@@ -1505,4 +1505,23 @@ namespace tut
                has(r, "print(string.format(\"%.6f\", f) .. \";\" .. tostring(k) .. \";\" .. (n * 2) .. -n)"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<45>()
+    {
+        set_test_name("a vector made text as LSL wrote it, five places a part, which tostring would not: noted, once");
+        const ALLSLToSLua::Result r = convert("integer SEAT_NUM = 0;\n"
+                                              "vector offset = ZERO_VECTOR;\n"
+                                              "set(integer which, string value) { llLinksetDataWrite((string)which, value); }\n"
+                                              "default { state_entry() {\n"
+                                              "    set(7, (string)SEAT_NUM + \";\" + (string)offset);\n"
+                                              "    llOwnerSay((string)ZERO_ROTATION);\n"
+                                              "} }\n");
+        ensure("converted", r.converted);
+        ensure("LSL's text kept: " + r.text, has(r, "set(7, SEAT_NUM .. \";\" .. ll.DumpList2String({offset}, \"\"))"));
+        ensure("a rotation's too: " + r.text, has(r, "ll.DumpList2String({ZERO_ROTATION}, \"\")"));
+        ensure("said why, once: " + r.text, noted(r, "SluaVectorText") && r.text.find("-- LSL: ll.DumpList2String writes") != std::string::npos &&
+                                                 r.text.find("-- LSL: ll.DumpList2String writes") == r.text.rfind("-- LSL: ll.DumpList2String writes"));
+        checksClean(r);
+    }
 }

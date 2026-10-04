@@ -1025,6 +1025,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaSharedReturned">returned by a function</string>
 	<string name="SluaSharedKept">passed to a function of the script's that keeps it</string>
 	<string name="SluaKeyText">LSL's keys held any text; SLua's uuid() stops the script on text that is no UUID, as it would here, where only a uuid will do.</string>
+	<string name="SluaVectorText">ll.DumpList2String writes a vector's or a rotation's parts as LSL did, with five places; SLua's tostring writes as few as each needs, &lt;1, 2, 3&gt;, which tovector reads back the same.</string>
 	<string name="SluaUuidText">uuid() stops the script on text that is no UUID, where LSL's keys held any text; touuid() answers nil instead.</string>
 	<string name="SluaDetectedTable">detected[n] is what LSL read with llDetected*(n - 1): SLua counts it from 1, and one past its end is an error, where LSL answered nothing.</string>
 	<string name="SluaMathDomain">math.sqrt, math.log and math.log10 answer nan or -inf out of their range, where LSL answered 0 or stopped with a math error.</string>

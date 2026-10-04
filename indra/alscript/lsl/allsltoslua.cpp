@@ -2718,7 +2718,12 @@ namespace
                     case LST_LIST: return { "ll.DumpList2String(" + v.text + ", \"\")" };
                     case LST_VECTOR:
                     case LST_QUATERNION:
-                        // LSL writes each part with five places.
+                        // LSL writes each part with five places, as ll's
+                        // DumpList2String still does; SLua's tostring as
+                        // few as each needs.
+                        noteOnce(e, "SluaVectorText",
+                                 "ll.DumpList2String writes a vector's or a rotation's parts as LSL did, with five places; SLua's tostring "
+                                 "writes as few as each needs, <1, 2, 3>, which tovector reads back the same.");
                         return { "ll.DumpList2String({" + v.text + "}, \"\")" };
                     default: return { "tostring(" + v.text + ")" };
                 }
