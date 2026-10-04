@@ -140,7 +140,7 @@ public:
     {
         typedef boost::date_time::local_adjustor<ptime, -8, no_dst> pst;
         typedef boost::date_time::local_adjustor<ptime, -7, no_dst> pdt;
-        time_t t_time = time(NULL);
+        time_t t_time = time_corrected();
         ptime p_time = LLStringOps::getPacificDaylightTime()
             ? pdt::utc_to_local(from_time_t(t_time))
             : pst::utc_to_local(from_time_t(t_time));

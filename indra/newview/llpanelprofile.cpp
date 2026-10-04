@@ -1676,7 +1676,7 @@ void LLPanelProfileSecondLife::onAvatarNameCacheSetName(const LLUUID& agent_id, 
 
     LL_INFOS("LegacyProfile") << "name-change now " << LLDate::now() << " next_update "
         << LLDate(av_name.mNextUpdate) << LL_ENDL;
-    F64 now_secs = LLDate::now().secondsSinceEpoch();
+    F64 now_secs = (F64)time_corrected();
 
     if (now_secs < av_name.mNextUpdate)
     {

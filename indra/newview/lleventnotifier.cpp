@@ -134,7 +134,7 @@ void LLEventNotifier::update()
         // Check our notifications again and send out updates
         // if they happen.
 
-        F64 alert_time = LLDate::now().secondsSinceEpoch() + 5 * 60;
+        F64 alert_time = (F64)time_corrected() + 5 * 60;
         en_map::iterator iter;
         for (iter = mEventNotifications.begin();
              iter != mEventNotifications.end();)

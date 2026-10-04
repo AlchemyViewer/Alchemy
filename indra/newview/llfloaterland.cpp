@@ -2500,7 +2500,7 @@ void LLPanelLandAccess::refresh()
                 if (entry.mTime != 0)
                 {
                     LLStringUtil::format_map_t args;
-                    S32 now = (S32)time(NULL);
+                    S32 now = (S32)time_corrected();
                     S32 seconds = entry.mTime - now;
                     if (seconds < 0) seconds = 0;
                     prefix.assign(" (");
@@ -2549,7 +2549,7 @@ void LLPanelLandAccess::refresh()
                 if (entry.mTime != 0)
                 {
                     LLStringUtil::format_map_t args;
-                    S32 now = (S32)time(NULL);
+                    S32 now = (S32)time_corrected();
                     seconds = entry.mTime - now;
                     if (seconds < 0) seconds = 0;
 
