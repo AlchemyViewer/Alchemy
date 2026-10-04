@@ -174,3 +174,15 @@ set_source_files_properties(${lscript_sources} PROPERTIES COMPILE_OPTIONS "${lsc
 # tests
 # LL's compiler over a handful of scripts, each to LSO and to CIL.
 al_add_test(allslreference PROJECT lscript LIBRARIES lscript llcommon)
+# Tailslide's LSO images and CIL, and the Mono weigher, held against LL's
+# compiler's over Tailslide's test scripts.
+al_add_test(
+  allslreferencecheck
+  PROJECT lscript
+  LIBRARIES lscript alscript llcommon
+  DEFINES
+    "AL_LSL_DEFINITIONS_DIR=\"${LSL_DEFINITIONS_DIR}\""
+    "AL_ALSCRIPT_TEST_DIR=\"${INDRA_SOURCE_DIR}/alscript/tests\""
+)
+
+
