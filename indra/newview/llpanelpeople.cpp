@@ -222,8 +222,8 @@ protected:
     virtual bool doCompare(const LLAvatarListItem* item1, const LLAvatarListItem* item2) const
     {
 
-        F32 arr_time1 = LLRecentPeople::instance().getArrivalTimeByID(item1->getAvatarId());
-        F32 arr_time2 = LLRecentPeople::instance().getArrivalTimeByID(item2->getAvatarId());
+        F64 arr_time1 = LLRecentPeople::instance().getArrivalTimeByID(item1->getAvatarId());
+        F64 arr_time2 = LLRecentPeople::instance().getArrivalTimeByID(item2->getAvatarId());
 
         if (arr_time1 == arr_time2)
         {
