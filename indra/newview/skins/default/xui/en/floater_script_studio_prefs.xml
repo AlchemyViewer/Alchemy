@@ -1669,6 +1669,17 @@ end</floater.string>
              tool_tip="Each place SLua means something else than LSL did, or has a way of its own, said over its line. Off: said only in Output."
              top_pad="4"
              width="700" />
+            <check_box
+             control_name="ALScriptConvertKeepComments"
+             follows="left|top"
+             height="20"
+             label="The script's own comments, each over what it stood over"
+             layout="topleft"
+             left="12"
+             name="convert_keep_comments"
+             tool_tip="// as --, and /* */ as --[[ ]], each over the global, function, handler or statement it stood over, or at the end of what held it. Off: the SLua has none of them."
+             top_pad="4"
+             width="700" />
         </panel>
         <panel
          class="al_panel_script_keymap"

@@ -7603,6 +7603,7 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     options.handlers      = gSavedSettings.getBOOL("ALScriptConvertHandlerFields") ? ALLSLToSLua::Options::Handlers::Field : ALLSLToSLua::Options::Handlers::On;
     options.types         = gSavedSettings.getBOOL("ALScriptConvertTypes");
     options.comments      = gSavedSettings.getBOOL("ALScriptConvertComments");
+    options.keepComments  = gSavedSettings.getBOOL("ALScriptConvertKeepComments");
     // Its notes, and its comments, in the skin's words.
     options.words = alScriptKeyedWords;
     const std::string   source    = doc.editor->wholeText();
