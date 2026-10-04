@@ -125,9 +125,34 @@ namespace
                     break;
                 case OP_BOOLEAN_AND:
                 case OP_BOOLEAN_OR:
+                {
+                    // a || 1 is 1, and a && 0 is 0, where a does nothing; a
+                    // || 0 and a && 1 are a, where it is 1 or 0 already.
+                    const bool any = op == OP_BOOLEAN_OR;
+                    for (int slot = 0; slot < 2; ++slot)
+                    {
+                        LSLASTNode*        side  = expr->getChild(slot);
+                        auto*              other = static_cast<LSLExpression*>(expr->getChild(1 - slot));
+                        LSLConstant*       cv    = side->getConstantValue();
+                        if (!cv || cv->getNodeSubType() != NODE_INTEGER_CONSTANT || other->getIType() != LST_INTEGER)
+                        {
+                            continue;
+                        }
+                        const bool         set   = static_cast<LSLIntegerConstant*>(cv)->getValue() != 0;
+                        const std::optional<Range> r = rangeOf(other);
+                        if (set == any && changesNothing(other))
+                        {
+                            return become(expr, ctx.integer(any ? 1 : 0));
+                        }
+                        if (set != any && r && r->least >= 0.0 && r->most <= 1.0)
+                        {
+                            return keep(expr, 1 - slot);
+                        }
+                    }
                     condition(expr, 0);
                     condition(expr, 1);
                     break;
+                }
                 default:
                     break;
             }
@@ -482,6 +507,20 @@ namespace
             }
             auto*          expr  = static_cast<LSLExpression*>(child);
             LSLExpression* inner = bare(expr);
+            // a | c, c not nought, is true, where a does nothing.
+            if (inner->getNodeSubType() == NODE_BINARY_EXPRESSION && inner->getOperation() == OP_BIT_OR && inner->getIType() == LST_INTEGER)
+            {
+                for (int slot = 0; slot < 2; ++slot)
+                {
+                    LSLConstant* cv = inner->getChild(slot)->getConstantValue();
+                    if (cv && cv->getNodeSubType() == NODE_INTEGER_CONSTANT && static_cast<LSLIntegerConstant*>(cv)->getValue() != 0 &&
+                        changesNothing(inner->getChild(1 - slot)))
+                    {
+                        fold(expr, ctx.integer(1), "OptimizerSimplified", "simplified");
+                        return;
+                    }
+                }
+            }
             if (inner->getNodeSubType() == NODE_BINARY_EXPRESSION && inner->getOperation() == OP_NEQ)
             {
                 auto* bin = static_cast<LSLBinaryExpression*>(inner);

@@ -59,6 +59,7 @@
 #include "allsleffects.h"
 #include "allslflowvalues.h"
 #include "allslfolder.h"
+#include "allslglobals.h"
 #include "allslinliner.h"
 #include "allslnames.h"
 #include "allsloptimizerpass.h"
@@ -66,6 +67,7 @@
 #include "allslrepeatedcalls.h"
 #include "allslservice.h"
 #include "allslshapes.h"
+#include "allslsignatures.h"
 #include "allslsimplifier.h"
 
 #include <tailslide/passes/values.hh>
@@ -470,10 +472,15 @@ namespace
                     }
                 }
                 // Branches and loops in fewer jumps, once what can never run
-                // is gone.
+                // is gone; the functions given and giving what their calls
+                // need, and globals that are only scratch made locals.
                 if (options.constfold)
                 {
-                    const int restructured = restructure(ctx, report, options, script);
+                    int restructured = restructure(ctx, report, options, script);
+                    walks(1);
+                    restructured += trimSignatures(ctx, report, options, script);
+                    walks(1);
+                    restructured += localizeGlobals(ctx, report, options, script);
                     walks(1);
                     if (restructured)
                     {

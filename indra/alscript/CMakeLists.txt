@@ -43,6 +43,8 @@ target_sources(
     lsl/optimizer/allsldeadcode.cpp
     lsl/optimizer/allslflowvalues.cpp
     lsl/optimizer/allslfolder.cpp
+    lsl/optimizer/allslglobals.cpp
+    lsl/optimizer/allslglobals.cpp
     lsl/optimizer/allslinliner.cpp
     lsl/optimizer/allsllibraryfold.cpp
     lsl/optimizer/allslnames.cpp
@@ -51,6 +53,8 @@ target_sources(
     lsl/optimizer/allslprinter.cpp
     lsl/optimizer/allslrepeatedcalls.cpp
     lsl/optimizer/allslshapes.cpp
+    lsl/optimizer/allslsignatures.cpp
+    lsl/optimizer/allslsignatures.cpp
     lsl/optimizer/allslsimplifier.cpp
     luau/alluauconfig.cpp
     luau/alluauexports.cpp
@@ -104,6 +108,7 @@ target_sources(
         lsl/optimizer/allsldeadcode.h
         lsl/optimizer/allslflowvalues.h
         lsl/optimizer/allslfolder.h
+        lsl/optimizer/allslglobals.h
         lsl/optimizer/allslinliner.h
         lsl/optimizer/allsllibraryfold.h
         lsl/optimizer/allslnames.h
@@ -112,6 +117,7 @@ target_sources(
         lsl/optimizer/allslprinter.h
         lsl/optimizer/allslrepeatedcalls.h
         lsl/optimizer/allslshapes.h
+        lsl/optimizer/allslsignatures.h
         lsl/optimizer/allslsimplifier.h
         luau/alluauconfig.h
         luau/alluauexports.h

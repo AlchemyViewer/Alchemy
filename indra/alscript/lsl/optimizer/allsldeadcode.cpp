@@ -169,6 +169,7 @@ namespace
             flattenBlocks(block);
             sinkDeclarations(block);
             substituteLocals(block);
+            deadStores(block);
             return false;
         }
 
@@ -435,6 +436,131 @@ namespace
                 }
                 // The only label of the name in the function or event.
                 return labelsNamed(next, target) == 1;
+            }
+        }
+
+        // A value set and set again, in later statements of the same block,
+        // before anything reads it: `x = 3; ... x = 4;`, `integer x = 3;
+        // ... for (x = 0; ...)`. The first goes -- what it ran still run --
+        // where nothing between names x, jumps or is jumped to. Of a local
+        // or a parameter, which nothing outside the code here reads.
+        void deadStores(LSLCompoundStatement* block)
+        {
+            std::vector<LSLASTNode*> statements;
+            for (LSLASTNode* stmt : *block)
+            {
+                statements.push_back(stmt);
+            }
+            const auto names = [](LSLASTNode* root, LSLSymbol* sym) {
+                bool found = false;
+                each(root, [&](LSLASTNode* n) { found = found || (n->getNodeType() == NODE_IDENTIFIER && static_cast<LSLIdentifier*>(n)->getSymbol() == sym); });
+                return found;
+            };
+            const auto jumpy = [](LSLASTNode* root) {
+                bool found = false;
+                each(root, [&](LSLASTNode* n) {
+                    found = found || (n->getNodeType() == NODE_STATEMENT && (n->getNodeSubType() == NODE_LABEL || n->getNodeSubType() == NODE_JUMP_STATEMENT));
+                });
+                return found;
+            };
+            // `x = e`, whole, e naming nothing of x: what it sets.
+            const auto setsWhole = [&](LSLASTNode* expr) -> LSLSymbol* {
+                if (!expr || expr->getNodeType() != NODE_EXPRESSION || expr->getNodeSubType() != NODE_BINARY_EXPRESSION ||
+                    static_cast<LSLExpression*>(expr)->getOperation() != OP_ASSIGN)
+                {
+                    return nullptr;
+                }
+                LSLASTNode* target = expr->getChild(0);
+                LSLSymbol*  sym    = target->getNodeSubType() == NODE_LVALUE_EXPRESSION && !static_cast<LSLLValueExpression*>(target)->getMember()
+                                         ? target->getSymbol()
+                                         : nullptr;
+                return sym && !names(expr->getChild(1), sym) ? sym : nullptr;
+            };
+            // Whether a statement sets x again before it reads it.
+            const auto overwrites = [&](LSLASTNode* stmt, LSLSymbol* sym) {
+                if (stmt->getNodeSubType() == NODE_EXPRESSION_STATEMENT)
+                {
+                    return setsWhole(stmt->getChild(0)) == sym;
+                }
+                if (stmt->getNodeSubType() == NODE_FOR_STATEMENT)
+                {
+                    // Its first part, the first that names x setting it.
+                    for (LSLASTNode* init = stmt->getChild(0)->getChild(0); init; init = init->getNext())
+                    {
+                        if (names(init, sym))
+                        {
+                            return setsWhole(init) == sym;
+                        }
+                    }
+                }
+                return false;
+            };
+            bool changed = false;
+            for (size_t i = 0; i < statements.size(); ++i)
+            {
+                LSLASTNode* stmt  = statements[i];
+                LSLASTNode* value = nullptr;
+                LSLSymbol*  sym   = nullptr;
+                if (stmt->getNodeSubType() == NODE_DECLARATION)
+                {
+                    value = stmt->getChild(1);
+                    sym   = value && value->getNodeType() == NODE_EXPRESSION ? stmt->getSymbol() : nullptr;
+                }
+                else if (stmt->getNodeSubType() == NODE_EXPRESSION_STATEMENT)
+                {
+                    sym   = setsWhole(stmt->getChild(0));
+                    value = sym ? stmt->getChild(0)->getChild(1) : nullptr;
+                }
+                if (!sym || (sym->getSubType() != SYM_LOCAL && !parameter(sym)) || sym->getIType() == LST_LIST)
+                {
+                    continue;
+                }
+                bool dead = false;
+                for (size_t j = i + 1; j < statements.size(); ++j)
+                {
+                    if (overwrites(statements[j], sym))
+                    {
+                        dead = true;
+                        break;
+                    }
+                    if (names(statements[j], sym) || jumpy(statements[j]))
+                    {
+                        break;
+                    }
+                }
+                if (!dead)
+                {
+                    continue;
+                }
+                report.note(stmt->getLoc(), "OptimizerDeadStore", "removed the value [1] is set to here, which it is set again before anything reads",
+                            { sym->getName() });
+                const Uncounted uncounted(*ctx.context);
+                if (stmt->getNodeSubType() == NODE_DECLARATION)
+                {
+                    auto* was = static_cast<LSLExpression*>(stmt->takeChild(1));
+                    if (!changesNothing(was))
+                    {
+                        auto* run = ctx.allocator->newTracked<LSLExpressionStatement>(was);
+                        run->setLoc(stmt->getLoc());
+                        statements.insert(statements.begin() + static_cast<std::ptrdiff_t>(i) + 1, run);
+                    }
+                }
+                else if (changesNothing(value))
+                {
+                    statements.erase(statements.begin() + static_cast<std::ptrdiff_t>(i));
+                    --i;
+                }
+                else
+                {
+                    LSLASTNode* expr = stmt->getChild(0);
+                    stmt->setChild(0, expr->takeChild(1));
+                }
+                changed = true;
+                ++changes;
+            }
+            if (changed)
+            {
+                setStatements(block, statements, *ctx.context);
             }
         }
 

@@ -188,6 +188,20 @@ namespace tut
         }
 
         static bool in(const std::string& text, const std::string& what) { return text.find(what) != std::string::npos; }
+
+        // A script whose default state also says each of `globals` when
+        // touched: read before anything there sets them, they hold what was
+        // set before, and stay globals (localizeGlobals).
+        static std::string kept(const std::string& source, std::initializer_list<const char*> globals)
+        {
+            std::string said;
+            for (const char* g : globals)
+            {
+                said += std::string("        llOwnerSay((string)") + g + ");\n";
+            }
+            const size_t end = source.rfind("}\n");
+            return source.substr(0, end) + "    touch_start(integer kept)\n    {\n" + said + "    }\n}\n";
+        }
     };
 
     // Past TUT's fifty tests a group runs only what it is told it has.
@@ -1542,7 +1556,7 @@ namespace tut
     void allsloptimizer_object::test<40>()
     {
         set_test_name("-1 tests, one and two either way, increments and list elements are written as each target has them smaller, and compile");
-        const std::string source = wrap("list l;\ninteger g;\n",
+        const std::string source = kept(wrap("list l;\ninteger g;\n",
                                         "        integer a = (integer)llFrand(9);\n        integer b = (integer)llFrand(9);\n        string s = llGetObjectName();\n"
                                         "        integer found = llListFindList(l, [a]);\n"
                                         "        if (a != -1) g = 1;\n"
@@ -1563,7 +1577,7 @@ namespace tut
                                         "        l = l + (list)s;\n"
                                         "        l += [b];\n"
                                         "        l = l + [llFrand(1), llFrand(2)];\n"
-                                        "        llOwnerSay((string)g + (string)l + (string)a + (string)b);\n");
+                                        "        llOwnerSay((string)g + (string)l + (string)a + (string)b);\n"), { "g" });
         const auto run = [&](ALLSLOptimizer::Target target) {
             ALLSLOptimizer::Options o = allsloptimizer_data::options();
             o.target                  = target;
@@ -1954,7 +1968,7 @@ namespace tut
                                    "default\n{\n    touch_start(integer n)\n    {\n"
                                    "        integer busy = n;\n        busy = busy * busy + busy;\n        busy = busy - busy / 3;\n"
                                    "        counted = busy;\n        llOwnerSay(\"Q\" + (string)counted);\n        state waiting;\n    }\n}\n"
-                                   "state waiting\n{\n    touch_start(integer n)\n    {\n        state default;\n    }\n}\n";
+                                   "state waiting\n{\n    touch_start(integer n)\n    {\n        llOwnerSay((string)counted);\n        state default;\n    }\n}\n";
         const auto run = [&source](ALLSLOptimizer::Target target) {
             ALLSLOptimizer::Options o = allsloptimizer_data::options();
             o.target                  = target;
@@ -2354,7 +2368,7 @@ namespace tut
     {
         set_test_name("operators as each target has them smaller: && of truths as &, a - b as a + -b, -1 - x as ~x, a shift left as a product, a "
                       "doubling as a sum, a float halved as a product, x * -1 as -x; Luau's bitwise tests as arithmetic");
-        const std::string source = wrap("integer g;\nfloat h;\n",
+        const std::string source = kept(wrap("integer g;\nfloat h;\n",
                                         "        integer a = (integer)llFrand(9);\n        integer b = (integer)llFrand(9);\n"
                                         "        integer c = llStringLength(llGetObjectName());\n        float f = llFrand(9);\n        float e = llFrand(9);\n"
                                         "        g = a - b;\n"
@@ -2371,7 +2385,7 @@ namespace tut
                                         "        g = c >> 2;\n"
                                         "        g = c & 7;\n"
                                         "        g = a >> 2;\n"
-                                        "        llOwnerSay((string)[a, b, c, f, e, g, h]);\n");
+                                        "        llOwnerSay((string)[a, b, c, f, e, g, h]);\n"), { "g", "h" });
         const std::string mono = optimized(source, ALLSLOptimizer::Target::Mono);
         ensure("Mono: a - b as a + -b: " + mono, in(mono, "g = a + -b;"));
         ensure("Mono: -= as += -", in(mono, "g += -b;"));
@@ -2427,7 +2441,8 @@ namespace tut
                                    "        if (a > 1)\n            if (b < 4)\n                llOwnerSay(\"inner\");\n"
                                    "        if (a)\n            if (b)\n                llOwnerSay(\"both\");\n"
                                    "        if (a)\n            if (100 / b)\n                llOwnerSay(\"faults\");\n"
-                                   "        llOwnerSay((string)[big(a), none(b), pick(a), g, t, u]);\n    }\n}\n";
+                                   "        llOwnerSay((string)[big(a), none(b), pick(a), g, t, u]);\n    }\n"
+                                   "    touch_start(integer n)\n    {\n        llOwnerSay((string)g + t);\n    }\n}\n";
         for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
         {
             const std::string text = optimized(source, target);
@@ -2509,6 +2524,74 @@ namespace tut
             ensure("a listen's speaker: " + text, in(text, "if (id)\n            llOwnerSay(m);"));
             ensure("not a key cast from a string", in(text, "if (given != "));
             ensure("not a link message's key, which is any string", in(text, "if (id != ") && in(text, "llOwnerSay(str);"));
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<63>()
+    {
+        set_test_name("functions given and giving what their calls need: a parameter never read taken away with what each call gives it, one every "
+                      "call gives the same constant made a local, a value no call reads no longer returned; not where a call's argument does "
+                      "something, the calls differ, the parameter is set, or a call reads the value");
+        const std::string source = "integer got;\n"
+                                   "say(integer channel, string message, integer unused)\n{\n    llSay(channel, message);\n}\n"
+                                   "tell(integer quiet, string message)\n{\n    llOwnerSay(message);\n}\n"
+                                   "integer noisy(integer n)\n{\n    llOwnerSay((string)n);\n    return n * 2;\n}\n"
+                                   "integer read(integer n)\n{\n    return n + 1;\n}\n"
+                                   "set(integer n)\n{\n    n = n + 1;\n    llOwnerSay((string)n);\n}\n"
+                                   "default\n{\n    state_entry()\n    {\n"
+                                   "        say(0, \"a\", 1);\n        say(0, \"b\", 2);\n"
+                                   "        tell(llListen(5, \"\", \"\", \"\"), \"c\");\n        tell(3, \"d\");\n"
+                                   "        noisy(llGetUnixTime());\n        noisy(4);\n"
+                                   "        got = read(llGetUnixTime());\n"
+                                   "        set(7);\n        set(7);\n"
+                                   "    }\n"
+                                   "    touch_start(integer t)\n    {\n        llOwnerSay((string)got);\n    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            const std::string text = optimized(source, target);
+            ensure("a parameter never read gone, and its arguments: " + text, in(text, "say(string message)") && in(text, "say(\"a\");"));
+            ensure("one every call gives the same constant made its value", in(text, "llSay(0, message);"));
+            ensure("not where a call's argument does something", in(text, "tell(integer quiet, string message)") && in(text, "llListen(5"));
+            ensure("a value no call reads no longer returned", in(text, "\nnoisy(integer n)") && !in(text, "integer noisy"));
+            ensure("what it returned still worked out where it does something, or gone", !in(text, "return n * 2") || in(text, "n * 2;"));
+            ensure("not where a call reads it", in(text, "integer read(integer n)"));
+            ensure("not a parameter that is set", in(text, "set(integer n)") && in(text, "set(7);"));
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<64>()
+    {
+        set_test_name("a value set again before it is read is not set; a global every handler sets before it reads made a local of each; not one "
+                      "read before it is set, nor one a function also sets; a || 1 and a && 0 settled");
+        const std::string source = "integer scratch;\n"
+                                   "integer kept = 3;\n"
+                                   "integer shared;\n"
+                                   "poke(integer n)\n{\n    shared = n;\n}\n"
+                                   "default\n{\n"
+                                   "    state_entry()\n    {\n"
+                                   "        integer i = llGetUnixTime();\n        i = (integer)llFrand(9);\n        llOwnerSay((string)i);\n"
+                                   "        integer j = 4;\n        for (j = 0; j < (integer)llFrand(9); ++j)\n            llOwnerSay((string)j);\n"
+                                   "        scratch = llGetUnixTime();\n        llOwnerSay((string)scratch);\n"
+                                   "        shared = 1;\n        poke(2);\n        llOwnerSay((string)shared);\n"
+                                   "        if ((integer)llFrand(2) || 1)\n            llOwnerSay(\"always\");\n"
+                                   "        if ((integer)llFrand(2) && 0)\n            llOwnerSay(\"never\");\n"
+                                   "    }\n"
+                                   "    touch_start(integer t)\n    {\n        scratch = t;\n        llOwnerSay((string)scratch + (string)kept);\n"
+                                   "        kept = t;\n    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            const std::string text = optimized(source, target);
+            // A read of the clock changes nothing, and goes with it.
+            ensure("a value set again before it is read not set: " + text, in(text, "integer i = (integer)llFrand(9);"));
+            ensure("a for's first part sets again", !in(text, "integer j = 4;"));
+            ensure("a global every handler sets before it reads made a local of each", in(text, "integer scratch = llGetUnixTime();") &&
+                                                                                          in(text, "llOwnerSay((string)t + "));
+            ensure("not one read before it is set", in(text, "integer kept"));
+            ensure("not one a function sets too", in(text, "integer shared"));
+            ensure("a || 1 settled true", in(text, "llOwnerSay(\"always\")") && !in(text, "|| 1"));
+            ensure("a && 0 settled false", !in(text, "never"));
         }
     }
 } // namespace tut

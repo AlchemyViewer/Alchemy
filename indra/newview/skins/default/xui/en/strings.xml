@@ -651,6 +651,11 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="OptimizerRemovedEmptyIf">removed if ([1]), which has nothing to do either way</string>
 	<string name="OptimizerMergedIfs">wrote if ([1]) as one if</string>
 	<string name="OptimizerKeyAsTruth">wrote [1] as the key itself, which is a key found or NULL_KEY</string>
+	<string name="OptimizerRemovedParameter">removed the parameter [1] of [2], which it never reads, and what its calls gave it</string>
+	<string name="OptimizerConstantParameter">made the parameter [1] of [2] a local, every call giving it the same value</string>
+	<string name="OptimizerUnreadResult">made [1] return nothing, as no call reads what it returns</string>
+	<string name="OptimizerLocalizedGlobal">made the global [1] a local where it is used, each setting it before it reads it</string>
+	<string name="OptimizerDeadStore">removed the value [1] is set to here, which it is set again before anything reads</string>
 	<string name="OptimizerNoDefinitions">the LSL definitions are not loaded, so nothing was optimized</string>
 	<string name="OptimizerUncompiled">not optimized: the script does not compile as it stands, and compiling it says why</string>
 	<string name="OptimizerWroteUncompilable">not optimized: what the optimizer made of this script did not compile ([1]), so it goes as it was; please report it</string>

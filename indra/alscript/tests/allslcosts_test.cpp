@@ -357,6 +357,17 @@ namespace tut
               { "", "k = llGetOwner(); if (k) i = 3; else i = 2;" }, "<<<", nullptr },
             { "if (k == NULL_KEY) A as if (k) ; else A", { "", "k = llGetOwner(); if (k == NULL_KEY) i = 2;" }, { "", "k = llGetOwner(); if (k) ; else i = 2;" },
               "<<<", nullptr },
+            // Functions and variables.
+            { "a parameter never read taken away", { "f1(integer a, integer b) { llOwnerSay((string)a); }", "f1(i, j); f1(j, i);" },
+              { "f1(integer a) { llOwnerSay((string)a); }", "f1(i); f1(j);" }, "<<<", nullptr },
+            { "a parameter every call gives 2 made a local", { "f1(integer a, integer b) { llOwnerSay((string)(a + b)); }", "f1(i, 2); f1(j, 2);" },
+              { "f1(integer a) { llOwnerSay((string)(a + 2)); }", "f1(i); f1(j);" }, "<<<", nullptr },
+            { "a string no call reads not returned", { "string f1(integer a) { llOwnerSay((string)a); return \"x\"; }", "f1(i); f1(j);" },
+              { "f1(integer a) { llOwnerSay((string)a); }", "f1(i); f1(j);" }, "<<<", nullptr },
+            { "a global set before it is read made a local", { "integer z0;", "z0 = llGetUnixTime(); i = z0;" }, { "", "integer z0 = llGetUnixTime(); i = z0;" },
+              "<<<", nullptr },
+            { "a value set again before it is read not set", { "", "integer z = i; z = j; i = z;" }, { "", "integer z = j; i = z;" }, "<<<", nullptr },
+            { "a || 1 settled", { "", "if ((integer)s || 1) i = 2;" }, { "", "i = 2;" }, "<<<", nullptr },
         };
         for (const Fact& fact : facts)
         {
