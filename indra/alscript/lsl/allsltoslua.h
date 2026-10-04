@@ -83,8 +83,10 @@ public:
         // Each place noted as a "-- LSL:" comment over its line, as well as
         // in the notes.
         bool comments = true;
-        // The script's own comments, each over what it stood over, or at the
-        // end of what held it: // as --, and /* */ as --[[ ]].
+        // The script's own comments, each over what it stood over, after it
+        // where it was after it on its line, or at the end of what held it:
+        // // as --, and /* */ as --[[ ]]; a rule of stars or slashes as one of
+        // dashes, and the //* ... //*/ toggle as ---[[ ... --]].
         bool keepComments = true;
         // What a note says, by its key -- the studio's own words for it,
         // in its skin's language -- where given; else the English, its

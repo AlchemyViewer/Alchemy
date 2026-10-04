@@ -227,7 +227,7 @@ namespace tut
                                               "} }\n");
         ensure("a numeric for: " + r.text, has(r, "for i = 0, 9 do"));
         ensure("its counter declared by it alone: " + r.text, !has(r, "local i = 0"));
-        ensure("continue, the step Luau's own: " + r.text, has(r, "then\n        continue"));
+        ensure("continue, the step Luau's own: " + r.text, has(r, "then continue end"));
         ensure("break: " + r.text, has(r, "break"));
         ensure("repeat: " + r.text, has(r, "repeat") && has(r, "until not (n > 5)"));
         ensure("a step: " + r.text, has(r, "n -= 1"));
@@ -657,7 +657,7 @@ namespace tut
         ensure("a key against a key: " + r.text, has(r, "if k ~= NULL_KEY then"));
         ensure("a string where LSL's string was: " + r.text, has(r, "tostring(NULL_KEY) ~= \"\"") && has(r, "ll.GetSubString(tostring(NULL_KEY), 1, 8)"));
         ensure("in a list, as LSL had it: " + r.text, has(r, "{tostring(NULL_KEY), tostring(TEXTURE_BLANK)}"));
-        ensure("a string's truth: " + r.text, has(r, "if tostring(NULL_KEY) ~= \"\" then\n        print("));
+        ensure("a string's truth: " + r.text, has(r, "if tostring(NULL_KEY) ~= \"\" then print("));
         ensure("given to a string and a key: " + r.text, has(r, "local gName = tostring(NULL_KEY)") && has(r, "local gKey = NULL_KEY"));
         ensure("returned as a string function's: " + r.text, has(r, "return tostring(NULL_KEY)"));
         checksClean(r);
@@ -1210,18 +1210,18 @@ namespace tut
         const auto                at = [&r](const std::string& text) { return r.text.find(text); };
         ensure("the script's own at the top: " + r.text, has(r, "-- Door script by Someone.\n-- Do as you like with it.\n\n"));
         ensure("over everything, once: " + r.text, at("-- Door script by Someone.") < at("local SWING") && count(r, "Door script") == 1);
-        ensure("a global's, with what trailed it: " + r.text, has(r, "-- How far it swings, in degrees\n-- a right angle\nlocal SWING = 90.0\n"));
+        ensure("a global's, what trailed it still after it: " + r.text, has(r, "-- How far it swings, in degrees\nlocal SWING = 90.0 -- a right angle\n"));
         ensure("those inside a list, over it: " + r.text, has(r, "-- when it is open\n-- when it is shut\nlocal NAMES = {\"open\", \"closed\"}\n"));
         ensure("a block comment as Luau's: " + r.text, has(r, "--[[ old code:\ninteger unused() { return 1; }\n]]\n"));
         ensure("over the function it stood over: " + r.text, at("--[[ old code:") > at("local NAMES") && at("--[[ old code:") < at("-- Turns the door."));
         ensure("a brace's, over what it opens: " + r.text, has(r, "-- Turns the door.\n-- by degrees\nlocal function swing(by)\n"));
         ensure("over a statement: " + r.text, has(r, "    -- the rotation it turns by\n    local r = "));
-        ensure("a trailing one, over its statement: " + r.text, has(r, "    -- turn\n    ll.SetLinkPrimitiveParamsFast("));
+        ensure("a trailing one, after its statement: " + r.text, has(r, "    ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_ROT_LOCAL, r * ll.GetLocalRot()}) -- turn\n"));
         ensure("between branches, over the elseif: " + r.text, has(r, "    -- when it shuts\n    elseif by < 0 then\n"));
         ensure("an empty branch's, in it: " + r.text, has(r, "    if false then\n        --[[ left off ]]\n    elseif by == 0 then\n"));
         ensure("at a block's end: " + r.text, has(r, "    -- done\nend\n"));
         ensure("a state's, over its handler: " + r.text, has(r, "-- on a touch\nLLEvents:on(\"touch_start\""));
-        ensure("not a block of Luau's: " + r.text, has(r, "    -- [[ not a block of Luau's ]]\n    swing(SWING)\n"));
+        ensure("not a block of Luau's: " + r.text, has(r, "    swing(SWING) -- [[ not a block of Luau's ]]\n"));
         ensure("a level nothing in it closes: " + r.text, has(r, "    --[=[ it ends ]] here ]=]\nend)"));
         checksClean(r);
 
@@ -1344,5 +1344,72 @@ namespace tut
                                                 "default { state_entry() { integer i; for (i = 0; i < 10; i += gStep) llOwnerSay((string)i); gStep = 3; } }\n");
         ensure("a step by a global something sets keeps the while: " + set.text, has(set, "while i < 10 do"));
         checksClean(set);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<41>()
+    {
+        set_test_name("the script's comments as it laid them out: one after a statement still after it, rules of stars and slashes as dashes, "
+                      "the //* toggle as ---[[, and an if on one line on one line");
+        ALLSLToSLua::Options options;
+        options.types               = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert("/***************************************/\n"
+                                                           "/************** CONSTANTS **************/\n"
+                                                           "/***************************************/\n"
+                                                           "integer S_MASK = 0xF0000000; // -268435456\n"
+                                                           "///////////////////////// DEBUGGING ///////////////////////////\n"
+                                                           "integer gDebug = TRUE;\n"
+                                                           "//*\n"
+                                                           "string get(integer keey) {\n"
+                                                           "    return llLinksetDataRead(\"ARS#\" + (string)keey);\n"
+                                                           "}\n"
+                                                           "//*/\n"
+                                                           "/*\n"
+                                                           "string old() { return \"\"; }\n"
+                                                           "//*/\n"
+                                                           "integer allowed(integer parcelFlags) {\n"
+                                                           "    if (parcelFlags & PARCEL_FLAG_ALLOW_CREATE_OBJECTS) return TRUE; // may build\n"
+                                                           "    if (parcelFlags & 4)\n"
+                                                           "        return 2;\n"
+                                                           "    integer n = 3; // three\n"
+                                                           "    n += 1;    /* and one */\n"
+                                                           "    return FALSE;\n"
+                                                           "}\n"
+                                                           "default { state_entry() { llOwnerSay(get(allowed(S_MASK)) + (string)gDebug); } }\n",
+                                                           options);
+        ensure("converted", r.converted);
+        ensure("a rule of stars: " + r.text, has(r, "\n-----------------------------------------\n--------------- CONSTANTS ---------------\n"));
+        ensure("after its statement: " + r.text, has(r, "local S_MASK: number = -268435456 -- -268435456\n"));
+        ensure("a rule of slashes: " + r.text, has(r, "\n---------------------------------------------------------------\n") ||
+                                                    has(r, "------------------------- DEBUGGING ---------------------------\n"));
+        ensure("the toggle: " + r.text, has(r, "---[[\nlocal function get(") && has(r, "end\n\n--]]\n"));
+        ensure("the toggle the other way: " + r.text, has(r, "--[[\nstring old() { return \"\"; }\n--]]"));
+        ensure("an if on one line on one: " + r.text,
+               has(r, "    if bit32.btest(parcelFlags, PARCEL_FLAG_ALLOW_CREATE_OBJECTS) then return 1 end -- may build\n"));
+        ensure("one on two lines on three: " + r.text, has(r, "    if bit32.btest(parcelFlags, 4) then\n        return 2\n    end\n"));
+        ensure("after a declaration and a block comment after a step: " + r.text,
+               has(r, "local n: number = 3 -- three\n") && has(r, "n += 1 --[[ and one ]]\n"));
+        // The lines beside the LSL's past an if put on one line.
+        std::vector<std::string> lines;
+        for (size_t from = 0; from <= r.text.size();)
+        {
+            const size_t cut = std::min(r.text.find('\n', from), r.text.size());
+            lines.push_back(r.text.substr(from, cut - from));
+            from = cut + 1;
+        }
+        const auto at = [&](S32 lsl_line) -> std::string {
+            for (const auto& [l, s] : r.anchors)
+            {
+                if (l == lsl_line && s >= 0 && s < static_cast<S32>(lines.size()))
+                {
+                    return lines[static_cast<size_t>(s)];
+                }
+            }
+            return "(none)";
+        };
+        ensure("the if on one line beside its line: " + at(15), at(15).find("then return 1 end") != std::string::npos);
+        ensure("the next beside its own: " + at(16), at(16).find("if bit32.btest(parcelFlags, 4) then") != std::string::npos);
+        ensure("and those after: " + at(18) + " / " + at(19), at(18).find("local n: number = 3") != std::string::npos && at(19).find("n += 1") != std::string::npos);
+        checksClean(r);
     }
 }

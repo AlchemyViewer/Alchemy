@@ -654,7 +654,7 @@
         <key>ALScriptConvertKeepComments</key>
         <map>
             <key>Comment</key>
-            <string>Convert to SLua carries the script's own comments over, each over what it stood over: // as --, and /* */ as --[[ ]].</string>
+            <string>Convert to SLua carries the script's own comments over, each over what it stood over, or after it where it was after it on its line: // as --, and /* */ as --[[ ]].</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

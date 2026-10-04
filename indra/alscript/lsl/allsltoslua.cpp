@@ -378,6 +378,11 @@ namespace
         void commentsBefore(LSLASTNode* node);
         void commentsAtEnd(LSLASTNode* holder);
         void writeComment(Comment& c);
+        // Those after a node on the line it ends, where it is all on one
+        // line or no if or loop: at the end of the first line of code
+        // written of it from `from` in the text, as the LSL had them; or
+        // where nothing was, on a line of their own.
+        void commentsAfter(LSLASTNode* node, size_t from);
         std::string indent() const { return std::string(static_cast<size_t>(mDepth) * 4, ' '); }
 
         // --- expressions ------------------------------------------------------------
@@ -453,7 +458,12 @@ namespace
         // --- statements -------------------------------------------------------------
 
         void statement(LSLASTNode* s, bool last);
+        void statementBody(LSLASTNode* s, bool last);
         void block(LSLASTNode* s);
+        // An if written from `at` in the text, `lines` lines down, its
+        // anchors from `anchors`, put on one line where it is one statement
+        // and nothing said over it: if c then s end.
+        void onOneLine(size_t at, S32 lines, size_t anchors);
         // An expression standing as a statement: an assignment, a step, a
         // call.
         void effect(LSLExpression* e);
@@ -687,6 +697,7 @@ namespace
         std::vector<Comment>                                         mComments;
         std::vector<size_t>                                          mLeadComments;
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsBefore;
+        boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsAfter;
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsWithin;
         // The globals the script never sets, declared a number not below
         // nought; and declared any whole number, by what it is.
@@ -890,6 +901,23 @@ namespace
 
     // --- the script's own comments -----------------------------------------------------
 
+    namespace
+    {
+        // The runs of a mark a comment's text begins and ends with, as
+        // dashes: a rule, or the rule a heading stands in.
+        void dashed(std::string& text, char mark)
+        {
+            for (size_t i = 0; i < text.size() && text[i] == mark; ++i)
+            {
+                text[i] = '-';
+            }
+            for (size_t i = text.size(); i > 0 && text[i - 1] == mark; --i)
+            {
+                text[i - 1] = '-';
+            }
+        }
+    }
+
     void Writer::findComments()
     {
         if (!mOptions.keepComments)
@@ -952,12 +980,33 @@ namespace
                     body = " " + body;
                 }
                 k.text = "--" + body;
+                if (body == "*" || body == "*/")
+                {
+                    // //* over code and //*/ under it, which a / taken out of
+                    // the first makes a block comment: ---[[ and --]], which a
+                    // - taken out of the first makes one.
+                    k.text = body == "*" ? "---[[" : "--]]";
+                }
+                else if (!body.empty() && body[0] == '/')
+                {
+                    // A rule of slashes, a heading in it or not: of dashes.
+                    dashed(body, '/');
+                    k.text = "--" + body;
+                }
             }
             else
             {
                 const size_t close = src.find("*/", i + 2);
                 end                = close == std::string_view::npos ? src.size() : close + 2;
                 std::string body   = std::string(src.substr(i + 2, (close == std::string_view::npos ? src.size() : close) - i - 2));
+                // The toggle's other way, /* over code and //*/ under it: --]]
+                // under it, which ---[[ over it would leave a line comment.
+                const bool toggled = body.size() >= 2 && body.compare(body.size() - 2, 2, "//") == 0 &&
+                                     body.find('\n') != std::string::npos;
+                if (toggled)
+                {
+                    body.resize(body.size() - 2);
+                }
                 // Brackets of a level nothing in it closes.
                 std::string level;
                 while (body.find("]" + level + "]") != std::string::npos)
@@ -968,7 +1017,14 @@ namespace
                 {
                     body += " ";
                 }
-                k.text = "--[" + level + "[" + body + "]" + level + "]";
+                k.text = "--[" + level + "[" + body + (toggled ? "--" : "") + "]" + level + "]";
+                if (body.size() > 1 && body.front() == '*' && body.back() == '*' && body.find('\n') == std::string::npos)
+                {
+                    // A rule of stars on its line, a heading in it or not: of
+                    // dashes, as long.
+                    dashed(body, '*');
+                    k.text = "--" + body + "--";
+                }
             }
             // A comment that reads as one of the notes this writes is not one.
             if (k.text.rfind(NOTE_MARK, 0) == 0)
@@ -1097,10 +1153,23 @@ namespace
             }
             break;
         }
-        // On the line a bare statement ends, after it: about that statement.
+        // On the line a bare statement ends, after it: about that statement,
+        // and after it too, where it is one line of the comment's and the
+        // statement one line, or no if or loop, whose first line is not
+        // where the comment was.
         if (prev && endsBare(prev) && at.line == prev->getLoc()->last_line)
         {
-            mCommentsBefore[prev].push_back(k);
+            const LSLNodeSubType type    = prev->getNodeSubType();
+            const bool           control = type == NODE_IF_STATEMENT || type == NODE_WHILE_STATEMENT || type == NODE_FOR_STATEMENT ||
+                                 type == NODE_DO_STATEMENT;
+            if (mComments[k].endLine == at.line && (!control || prev->getLoc()->first_line == prev->getLoc()->last_line))
+            {
+                mCommentsAfter[prev].push_back(k);
+            }
+            else
+            {
+                mCommentsBefore[prev].push_back(k);
+            }
             return;
         }
         // Over what follows it in here; or, where nothing does, at the end.
@@ -1240,6 +1309,51 @@ namespace
         {
             mAnchorPending = zeroBased(node->getLoc()->first_line);
         }
+    }
+
+    void Writer::commentsAfter(LSLASTNode* node, size_t from)
+    {
+        const auto found = mCommentsAfter.find(node);
+        if (found == mCommentsAfter.end())
+        {
+            return;
+        }
+        std::string after;
+        for (size_t k : found->second)
+        {
+            Comment& c = mComments[k];
+            if (!c.written)
+            {
+                c.written = true;
+                after += " " + c.text;
+            }
+        }
+        if (after.empty())
+        {
+            return;
+        }
+        // Past what was said over it, and the comments over what it holds.
+        for (size_t at = from; at < mText.size();)
+        {
+            const size_t end = mText.find('\n', at);
+            if (end == std::string::npos)
+            {
+                break;
+            }
+            const size_t first = mText.find_first_not_of(' ', at);
+            if (first < end && mText.compare(first, 2, "--") != 0)
+            {
+                mText.insert(end, after);
+                // Counted past it: as many lines, further on.
+                if (end < mCounted)
+                {
+                    mCounted += after.size();
+                }
+                return;
+            }
+            at = end + 1;
+        }
+        mText += indent() + after.substr(1) + "\n";
     }
 
     void Writer::commentsAtEnd(LSLASTNode* holder)
@@ -2806,6 +2920,63 @@ namespace
             return;
         }
         commentsBefore(s);
+        const size_t from = mText.size();
+        statementBody(s, last);
+        commentsAfter(s, from);
+    }
+
+    void Writer::onOneLine(size_t at, S32 lines, size_t anchors)
+    {
+        // Its lines, the last three if c then, s, end; any before them what
+        // was said over it.
+        std::vector<size_t> starts;
+        for (size_t i = at; i < mText.size(); i = mText.find('\n', i) + 1)
+        {
+            starts.push_back(i);
+            if (mText.find('\n', i) == std::string::npos)
+            {
+                return;
+            }
+        }
+        if (starts.size() < 3)
+        {
+            return;
+        }
+        const auto row = [&](size_t n) {
+            const size_t begin = starts[n];
+            const size_t first = std::min(mText.find_first_not_of(' ', begin), mText.find('\n', begin));
+            return std::string_view(mText).substr(first, mText.find('\n', begin) - first);
+        };
+        const size_t head = starts.size() - 3;
+        for (size_t n = 0; n < head; ++n)
+        {
+            if (row(n).substr(0, 2) != "--")
+            {
+                return;
+            }
+        }
+        const std::string_view body = row(head + 1);
+        if (row(head).substr(0, 3) != "if " || body.empty() || body.substr(0, 2) == "--" || row(head + 2) != "end")
+        {
+            return;
+        }
+        const std::string joined = mText.substr(starts[head], mText.find('\n', starts[head]) - starts[head]) + " " + std::string(body) + " end\n";
+        mText.replace(starts[head], std::string::npos, joined);
+        // What is anchored past its first line, on it.
+        const S32 first = lines + static_cast<S32>(head);
+        for (size_t n = mAnchors.size(); n > anchors; --n)
+        {
+            if (mAnchors[n - 1].second > first)
+            {
+                mAnchors.erase(mAnchors.begin() + static_cast<std::ptrdiff_t>(n - 1));
+            }
+        }
+        mCounted      = starts[head];
+        mCountedLines = first;
+    }
+
+    void Writer::statementBody(LSLASTNode* s, bool last)
+    {
         if (mBuilds.contains(s))
         {
             buildingLoop(s, last);
@@ -2886,6 +3057,11 @@ namespace
                     line(nameOf(chosen) + " = " + (when_true ? check.text : "not " + bracketed(check, UNARY)));
                     return;
                 }
+                // On one line where the LSL wrote it on one, with no else.
+                const bool   one_line = s->getLoc()->first_line == s->getLoc()->last_line && isNull(i->getFalseBranch());
+                const S32    lines_at = one_line ? linesWritten() : 0;
+                const size_t text_at  = mText.size();
+                const size_t anchors  = mAnchors.size();
                 line("if " + condition(i->getCheckExpr()).text + " then");
                 for (;;)
                 {
@@ -2911,6 +3087,10 @@ namespace
                     break;
                 }
                 line("end");
+                if (one_line)
+                {
+                    onOneLine(text_at, lines_at, anchors);
+                }
                 return;
             }
             case NODE_WHILE_STATEMENT:
@@ -5116,6 +5296,7 @@ namespace
             LSLIdentifier* id     = global->getIdentifier();
             LSLExpression* init   = global->getInitializer();
             commentsBefore(global);
+            const size_t from = mText.size();
             if (boolean(id->getSymbol()))
             {
                 line("local " + nameOf(id) + (mOptions.types ? ": boolean" : "") + " = " + (isNull(init) ? std::string("false") : truthOf(init)));
@@ -5125,6 +5306,7 @@ namespace
                 const LSLIType type = varType(id->getSymbol(), id->getIType());
                 line("local " + nameOf(id) + typed(type) + " = " + (isNull(init) ? defaultOf(type) : coerced(init, type).text));
             }
+            commentsAfter(global, from);
             any = true;
         }
         if (any)

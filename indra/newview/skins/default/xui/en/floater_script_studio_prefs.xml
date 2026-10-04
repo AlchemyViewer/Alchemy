@@ -1677,7 +1677,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="convert_keep_comments"
-             tool_tip="// as --, and /* */ as --[[ ]], each over the global, function, handler or statement it stood over, or at the end of what held it. Off: the SLua has none of them."
+             tool_tip="// as --, and /* */ as --[[ ]], each over the global, function, handler or statement it stood over, after it where it was after it on its line, or at the end of what held it; rules of stars or slashes as dashes, and //* ... //*/ as ---[[ ... --]]. Off: the SLua has none of them."
              top_pad="4"
              width="700" />
         </panel>
