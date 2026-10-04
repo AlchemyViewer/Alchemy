@@ -40,6 +40,7 @@ ALFollowedNotecard::ALFollowedNotecard(std::string setting, std::string cache_fi
     if (LLControlVariable* control = gSavedPerAccountSettings.getControl(mSetting))
     {
         mSettingChanged = control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) {
+            mFailed.setNull();
             mMoving = true;
             refresh();
             mMoving = false;
@@ -84,7 +85,8 @@ void ALFollowedNotecard::check()
         return;
     }
     const LLViewerInventoryItem* held = gInventory.getItem(followed);
-    if (held && (mCacheItem != followed || held->getAssetUUID() != mCacheAsset) && held->getAssetUUID() != mFetching)
+    if (held && (mCacheItem != followed || held->getAssetUUID() != mCacheAsset) && held->getAssetUUID() != mFetching &&
+        held->getAssetUUID() != mFailed)
     {
         refresh();
     }
@@ -119,9 +121,10 @@ void ALFollowedNotecard::fetch(const LLUUID& followed)
     {
         return;
     }
-    mFetching = held->getAssetUUID();
+    mFetching                 = held->getAssetUUID();
+    const LLUUID        asset = mFetching;
     std::weak_ptr<bool> alive = mAlive;
-    ALScriptWorkspace::getInstance()->load(ALScriptRef(LLUUID::null, followed), [this, alive, followed](const ALScriptLoaded& loaded) {
+    ALScriptWorkspace::getInstance()->load(ALScriptRef(LLUUID::null, followed), [this, alive, followed, asset](const ALScriptLoaded& loaded) {
         if (alive.expired())
         {
             return;
@@ -134,7 +137,9 @@ void ALFollowedNotecard::fetch(const LLUUID& followed)
         }
         if (!loaded.error.empty() || !loaded.notecard)
         {
-            // What was there stays; why it is not the notecard is said.
+            // What was there stays; why it is not the notecard is said, and
+            // the asset is not asked for again.
+            mFailed = asset;
             take(mText, loaded.error.empty() ? LLTrans::getString(mNotNotecard) : loaded.error);
             return;
         }

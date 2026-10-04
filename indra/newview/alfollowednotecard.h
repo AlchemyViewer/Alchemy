@@ -89,8 +89,11 @@ private:
     LLUUID      mCacheAsset;
     std::string mCacheName;
     std::string mCacheText;
-    // The asset a fetch is on its way for, so that another is not asked.
+    // The asset a fetch is on its way for, so that another is not asked;
+    // and the one that could not be read, asked again only once the item
+    // has another or another item is followed.
     LLUUID mFetching;
+    LLUUID mFailed;
     // While another notecard is taken up: said once, as moved.
     bool                               mMoving = false;
     boost::signals2::scoped_connection mSettingChanged;
