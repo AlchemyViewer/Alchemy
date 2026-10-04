@@ -593,13 +593,17 @@ struct ALScriptStudioDoc
     };
     std::optional<PendingCompare>              pendingCompare;
     // The titles of a comparison shown whose right is this tab's text, its
-    // own said unsaved for as long as the tab is.
+    // own said unsaved for as long as the tab is. While there are, the
+    // comparison follows the tab: changed since it was made, it is made
+    // again once the changes have stopped for a moment, or as it is shown.
     struct CompareTitles
     {
         std::string theirs;
         std::string own;
     };
     std::optional<CompareTitles>               compareTitles;
+    bool                                       compareStale     = false;
+    F64                                        compareChangedAt = 0.0;
     // A save of its item compared with it (ALScriptStudioHistory), until
     // the comparison ends: offered back by the notice.
     std::optional<ALSavedText>                 historyShown;

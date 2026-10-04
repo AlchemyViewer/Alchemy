@@ -196,6 +196,9 @@ public:
 
     // A word of the language, as the region defines it (ALScriptStudioWords).
     typedef ALScriptStudioWords::Vocab Vocab;
+    // How long a tab's changes stop before a comparison following it is
+    // made again, in seconds.
+    static constexpr F64 COMPARE_SETTLE = 0.3;
     // The least and the most a zoom takes the text to, in points
     // (ALScriptStudio::editorFont).
     static constexpr F32 MIN_TEXT_POINTS = 6.f;
@@ -846,6 +849,14 @@ private:
     // A comparison whose right is the tab's text titled again, unsaved or
     // not as the tab now is.
     void retitleCompare(const Doc& doc) const;
+    // Another text beside the tab's own, which the comparison follows as
+    // the tab changes: under the other's title and the tab's, "now" where
+    // none is given; lined up at the anchors where there are any.
+    void compareWithTab(Doc& doc, const std::string& theirs, const std::string& their_title, const std::string& own_title = std::string(),
+                        const std::vector<std::pair<S32, S32>>& anchors = {}) override;
+    // A comparison that follows its tab made again from the tab's text,
+    // where the tab has changed since.
+    void refreshCompare(Doc& doc);
     // Every comparison inline or side by side, as the last was asked for.
     void setCompareInline(bool inline_view);
     void endCompare(Doc& doc) override;

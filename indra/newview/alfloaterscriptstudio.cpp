@@ -1489,6 +1489,13 @@ void ALFloaterScriptStudio::draw()
     settleChanges();
     mProblemsPane->pump();
     mOutlinePane->pump();
+    // The comparison in front made again from its tab once the tab's
+    // changes have stopped for a moment.
+    if (Doc* front = active(); front && front->compareStale && front->shownView() == Doc::View::Compare &&
+                               LLTimer::getTotalSeconds() - front->compareChangedAt > COMPARE_SETTLE)
+    {
+        refreshCompare(*front);
+    }
     ALStudioFloater::draw();
 }
 
@@ -1778,6 +1785,7 @@ void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const
                                         const std::string& right_title, const std::vector<std::pair<S32, S32>>& anchors)
 {
     doc.compareTitles.reset();
+    doc.compareStale = false;
     if (!doc.compareView)
     {
         // In the editors' place, in their colours and face; unwrapped, since
@@ -2098,6 +2106,12 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
         scheduleAnalysis(*raw);
         mSearchPane->typedIn(*raw);
         mRecovery.schedule(*raw);
+        // A comparison that follows the tab, made again once typing stops.
+        if (raw->compareTitles)
+        {
+            raw->compareStale     = true;
+            raw->compareChangedAt = LLTimer::getTotalSeconds();
+        }
     });
     // Typing stopped short, a notecard being full: said why. The editor
     // goes with the tab, and the connection with it.
@@ -2633,6 +2647,11 @@ void ALFloaterScriptStudio::showView(Doc& doc, Doc::View view, bool focus)
         }
         return;
     }
+    // A comparison that follows the tab, as the tab now is.
+    if (doc.shownView() == Doc::View::Compare)
+    {
+        refreshCompare(doc);
+    }
     showEditors();
     if (focus || had_keys)
     {
@@ -2674,7 +2693,7 @@ void ALFloaterScriptStudio::compareWithSaved()
         setStatus(getString("CompareNothingSaved"), true);
         return;
     }
-    compare(*doc, *saved, doc->editor->wholeText(), getString("CompareSaved"), getString("CompareNow"));
+    compareWithTab(*doc, *saved, getString("CompareSaved"));
 }
 
 void ALFloaterScriptStudio::endCompare(Doc& doc)
@@ -6252,11 +6271,28 @@ void ALFloaterScriptStudio::comparePending(Doc& doc)
     }
     const Doc::PendingCompare pending = std::move(*doc.pendingCompare);
     doc.pendingCompare.reset();
+    compareWithTab(doc, pending.text, pending.theirTitle, pending.ownTitle, pending.anchors);
+}
+
+void ALFloaterScriptStudio::compareWithTab(Doc& doc, const std::string& theirs, const std::string& their_title, const std::string& own_title,
+                                           const std::vector<std::pair<S32, S32>>& anchors)
+{
     // This tab's text as it stands, which it says where it is not saved,
-    // for as long as it is not.
-    showCompare(doc, pending.text, doc.editor->wholeText(), pending.theirTitle, pending.ownTitle, pending.anchors);
-    doc.compareTitles = Doc::CompareTitles{ pending.theirTitle, pending.ownTitle };
+    // for as long as it is not, and which the comparison follows.
+    const std::string own = own_title.empty() ? getString("CompareNow") : own_title;
+    showCompare(doc, theirs, doc.editor->wholeText(), their_title, own, anchors);
+    doc.compareTitles = Doc::CompareTitles{ their_title, own };
     retitleCompare(doc);
+}
+
+void ALFloaterScriptStudio::refreshCompare(Doc& doc)
+{
+    if (!doc.compareStale || !doc.compareView || !doc.compareTitles)
+    {
+        return;
+    }
+    doc.compareStale = false;
+    doc.compareView->setRightText(doc.editor->wholeText());
 }
 
 void ALFloaterScriptStudio::retitleCompare(const Doc& doc) const
@@ -7392,12 +7428,12 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
                 return;
             }
             const std::string theirs = answer.notecard ? answer.text : sourceOf(answer);
-            studio->compare(*found, theirs, found->editor->wholeText(), studio->getString("CompareWorld"), studio->getString("CompareNow"));
+            studio->compareWithTab(*found, theirs, studio->getString("CompareWorld"));
         });
     }
     else if (action == "compare_saved" && doc.savedThere)
     {
-        compare(doc, *doc.savedThere, doc.editor->wholeText(), getString("CompareSavedThere"), getString("CompareNow"));
+        compareWithTab(doc, *doc.savedThere, getString("CompareSavedThere"));
     }
 }
 
@@ -8730,6 +8766,24 @@ void ALFloaterScriptStudio::addViewCommands()
         [this]() {
             const Doc* doc = active();
             return doc && doc->loaded && (doc->editor->isDirty() || doc->shownView() == Doc::View::Compare);
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->shownView() == Doc::View::Compare;
+        });
+    // The tab's comparison and its source in turn: back to a comparison
+    // that typing in it left for the source, as the tab now is.
+    mCommands.add(
+        "compare_shown",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                showView(*doc, doc->shownView() == Doc::View::Compare ? Doc::View::Source : Doc::View::Compare, true);
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->compareView && (doc->compareTitles || doc->shownView() == Doc::View::Compare);
         },
         [this]() {
             const Doc* doc = active();

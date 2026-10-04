@@ -125,7 +125,7 @@ bool ALScriptStudioHistory::compare(Doc& doc, ALSavedText saved)
     doc.historyShown         = std::move(saved);
     if (doc.loaded)
     {
-        mWindow.compare(doc, text, doc.editor->wholeText(), theirs, mServices.words("CompareNow"));
+        mWindow.compareWithTab(doc, text, theirs, mServices.words("CompareNow"), {});
     }
     else
     {
