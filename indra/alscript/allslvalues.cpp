@@ -106,6 +106,48 @@ LSLConstant* ALLSLArithmetic::operation(LSLOperator op, LSLConstant* cv, LSLCons
                 break;
         }
     }
+    // Two vectors' dot and cross products, which Tailslide's arithmetic has
+    // wrong: its dot takes each part by the other's opposite part, x by z,
+    // and its cross is a product less a product that a compiler may fuse,
+    // where the VM rounds each. Worked out as a single does it, a step at a
+    // time, and as a double rounded once, and folded only where the two
+    // agree.
+    if (other && cv->getIType() == LST_VECTOR && other->getIType() == LST_VECTOR && (op == OP_MUL || op == OP_MOD))
+    {
+        const Vector3* u = static_cast<LSLVectorConstant*>(cv)->getValue();
+        const Vector3* v = static_cast<LSLVectorConstant*>(other)->getValue();
+        if (!u || !v)
+        {
+            return nullptr;
+        }
+        // One operation of singles in double, which is exact enough, rounded
+        // once: what a single's own operation gives.
+        const auto mul = [](double a, double b) { return static_cast<double>(static_cast<float>(a * b)); };
+        const auto add = [](double a, double b) { return static_cast<double>(static_cast<float>(a + b)); };
+        const auto sub = [](double a, double b) { return static_cast<double>(static_cast<float>(a - b)); };
+        const auto agreed = [](double stepped, double once, double& out) {
+            out = stepped;
+            return std::isfinite(stepped) && static_cast<double>(static_cast<float>(once)) == stepped;
+        };
+        const double ux = u->x, uy = u->y, uz = u->z;
+        const double vx = v->x, vy = v->y, vz = v->z;
+        if (op == OP_MUL)
+        {
+            double dot = 0.0;
+            if (!agreed(add(add(mul(ux, vx), mul(uy, vy)), mul(uz, vz)), ux * vx + uy * vy + uz * vz, dot))
+            {
+                return nullptr;
+            }
+            return _mAllocator->newTracked<LSLFloatConstant>(dot);
+        }
+        double x = 0.0, y = 0.0, z = 0.0;
+        if (!agreed(sub(mul(uy, vz), mul(uz, vy)), uy * vz - uz * vy, x) || !agreed(sub(mul(uz, vx), mul(ux, vz)), uz * vx - ux * vz, y) ||
+            !agreed(sub(mul(ux, vy), mul(uy, vx)), ux * vy - uy * vx, z))
+        {
+            return nullptr;
+        }
+        return _mAllocator->newTracked<LSLVectorConstant>(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z));
+    }
     return rounded(TailslideOperationBehavior::operation(op, cv, other, lloc));
 }
 

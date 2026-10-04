@@ -1982,4 +1982,26 @@ namespace tut
         r = ALLSLOptimizer::run(head + "        if (n)\n            llSay(0, llToUpper(s));\n        llSay(0, llToUpper(s));\n" + tail, lso);
         ensure("not begun in a branch: " + r.text, r.text.find("toUpper") == std::string::npos);
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<52>()
+    {
+        set_test_name("two vectors' dot and cross products fold to what the VM gives: each part by the same part, and a vector by itself crossed to nothing");
+        // Each may be set again before it is read, so that its fold shows
+        // in its declaration.
+        const std::string source = wrap("", "        float d = <1, 3, -5> * <4, -2, -1>;\n        vector c = <1.0, 2.0, 3.0> % <4.0, 5.0, 6.0>;\n"
+                                            "        vector z = <44608876.0, 125129528.0, 357885664.0> % <44608876.0, 125129528.0, 357885664.0>;\n"
+                                            "        if (llFrand(1) < 0.5)\n        {\n            d = 0;\n            c = z = ZERO_VECTOR;\n        }\n"
+                                            "        llSay(0, (string)d + (string)c + (string)z);\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::LSO })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            ensure("dot: " + r.text, about(numbers(r.text, "float d"), { 3.f }));
+            ensure("cross: " + r.text, about(numbers(r.text, "vector c"), { -3.f, 6.f, -3.f }));
+            ensure("crossed by itself: " + r.text, about(numbers(r.text, "vector z"), { 0.f, 0.f, 0.f }));
+        }
+    }
 } // namespace tut
