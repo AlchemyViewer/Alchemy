@@ -264,7 +264,7 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
     // typical session never hits the wrap boundary (where the non-periodic
     // noise would show a one-frame jump), and short enough that 32-bit float
     // precision stays good for the scaled time term in the shader.
-    sStarTime = (F32)fmod(LLFrameTimer::getElapsedSeconds() * 0.5, 86400.0);
+    sStarTime = (F32)fmod(LLFrameTimer::getUptimeSeconds() * 0.5, 86400.0);
 
     gDeferredStarProgram.uniform1f(LLShaderMgr::WATER_TIME, sStarTime);
 

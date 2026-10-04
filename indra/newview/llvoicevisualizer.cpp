@@ -96,7 +96,7 @@ F32  LLVoiceVisualizer::sAahPowerTransfersf = 0.0f;
 LLVoiceVisualizer::LLVoiceVisualizer( const U8 type )
     : LLHUDEffect(type)
 {
-    mCurrentTime                    = mTimer.getTotalSeconds();
+    mCurrentTime                    = LLFrameTimer::getTotalSeconds();
     mPreviousTime                   = mCurrentTime;
     mStartTime                      = mCurrentTime;
     mVoiceSourceWorldPosition       = LLVector3( 0.0f, 0.0f, 0.0f );
@@ -107,8 +107,6 @@ LLVoiceVisualizer::LLVoiceVisualizer( const U8 type )
     mMaxGesticulationAmplitude      = DEFAULT_MAXIMUM_GESTICULATION_AMPLITUDE;
     mSoundSymbol.mActive            = true;
     mSoundSymbol.mPosition          = LLVector3( 0.0f, 0.0f, 0.0f );
-
-    mTimer.reset();
 
     const char* sound_level_img[] =
     {
@@ -173,7 +171,7 @@ void LLVoiceVisualizer::setVoiceEnabled( bool v )
 //---------------------------------------------------
 void LLVoiceVisualizer::setStartSpeaking()
 {
-    mStartTime              = mTimer.getTotalSeconds();
+    mStartTime              = LLFrameTimer::getTotalSeconds();
     mCurrentlySpeaking      = true;
     mSoundSymbol.mActive    = true;
 
@@ -298,7 +296,7 @@ void LLVoiceVisualizer::lipSyncOohAah( F32& ooh, F32& aah )
         }
         F32 transfer_aah = sAahPowerTransfer[transfer_index];
 
-        F64 current_time   = mTimer.getTotalSeconds();
+        F64 current_time   = LLFrameTimer::getTotalSeconds();
         F64 elapsed_time   = current_time - mStartTime;
         U32 elapsed_frames = (U32) (elapsed_time * sOohAahRate);
         U32 elapsed_oohs   = elapsed_frames % sOohs;
@@ -346,7 +344,7 @@ void LLVoiceVisualizer::render()
     if ( mSoundSymbol.mActive )
     {
         mPreviousTime = mCurrentTime;
-        mCurrentTime = mTimer.getTotalSeconds();
+        mCurrentTime = LLFrameTimer::getTotalSeconds();
 
         //---------------------------------------------------------------
         // set the sound symbol position over the source (avatar's head)

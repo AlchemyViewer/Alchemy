@@ -42,10 +42,10 @@ public:
     LLFrameTimer() : mStartTime( sFrameTime ), mExpiry(0), mStarted(true) {}
 
     // Return the number of seconds since the start of this
-    // application instance.
-    static F64SecondsImplicit getElapsedSeconds()
+    // application instance, as of the current frame. Static: it is not this
+    // timer's elapsed time, which is getElapsedTimeF32().
+    static F64SecondsImplicit getUptimeSeconds()
     {
-        // Loses msec precision after ~4.5 hours...
         return sFrameTime;
     }
 

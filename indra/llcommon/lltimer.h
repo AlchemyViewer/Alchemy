@@ -66,8 +66,9 @@ public:
     static void cleanupClass();
 
     // Return a high precision number of seconds since the start of
-    // this application instance.
-    static F64SecondsImplicit getElapsedSeconds()
+    // this application instance. Static: it is not this timer's elapsed
+    // time, which is getElapsedTimeF64().
+    static F64SecondsImplicit getUptimeSeconds()
     {
         if (sTimer)
     {

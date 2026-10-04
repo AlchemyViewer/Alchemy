@@ -153,7 +153,7 @@ bool LLCommandHandlerRegistry::dispatch(const std::string& cmd,
             {
                 break;
             }
-            cur_time = LLTimer::getElapsedSeconds();
+            cur_time = LLTimer::getUptimeSeconds();
             if (cur_time < last_throttle_time + THROTTLE_PERIOD)
             {
                 // block request from external browser if it happened

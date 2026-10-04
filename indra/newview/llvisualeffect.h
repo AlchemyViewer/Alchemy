@@ -141,7 +141,7 @@ public:
         this->m_CurValue = boost::none;
         m_EndValue = endValue;
 
-        m_StartTime = LLTimer::getElapsedSeconds();
+        m_StartTime = LLTimer::getUptimeSeconds();
         m_Duration = duration;
     }
 

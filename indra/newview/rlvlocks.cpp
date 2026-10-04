@@ -717,7 +717,7 @@ void RlvAttachmentLockWatchdog::onSavedAssetIntoInventory(const LLUUID& idItem)
         if ( (!itAttach->second.fAssetSaved) && (idItem == itAttach->second.idItem) )
         {
             LLAttachmentsMgr::instance().addAttachmentRequest(itAttach->second.idItem, itAttach->first, true, true);
-            itAttach->second.tsAttach = LLFrameTimer::getElapsedSeconds();
+            itAttach->second.tsAttach = LLFrameTimer::getUptimeSeconds();
         }
     }
 }
@@ -726,7 +726,7 @@ void RlvAttachmentLockWatchdog::onSavedAssetIntoInventory(const LLUUID& idItem)
 bool RlvAttachmentLockWatchdog::onTimer()
 {
     // RELEASE-RLVa: [SL-2.0.0] This will need rewriting for "ENABLE_MULTIATTACHMENTS"
-    F64 tsCurrent = LLFrameTimer::getElapsedSeconds();
+    F64 tsCurrent = LLFrameTimer::getUptimeSeconds();
 
     // Garbage collect (failed) wear requests older than 60 seconds
     rlv_wear_map_t::iterator itWear = m_PendingWear.begin();

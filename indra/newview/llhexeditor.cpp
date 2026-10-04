@@ -908,7 +908,7 @@ void LLHexEditor::draw()
 
 
     // Cursor
-    if(has_focus && !mHasSelection && (U32(LLTimer::getElapsedSeconds() * 2.0f) & 0x1))
+    if(has_focus && !mHasSelection && (U32(LLTimer::getUptimeSeconds() * 2.0f) & 0x1))
     {
         U32 cursor_line = mCursorPos / mColumns;
         if((cursor_line >= first_line) && (cursor_line <= last_line))

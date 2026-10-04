@@ -643,7 +643,7 @@ LLPurgeDiskCacheThread* LLAppViewer::sPurgeDiskCacheThread = NULL;
 
 std::string getRuntime()
 {
-    return llformat("%.4f", (F32)LLTimer::getElapsedSeconds().value());
+    return llformat("%.4f", (F32)LLTimer::getUptimeSeconds().value());
 }
 
 LLAppViewer::LLAppViewer()
@@ -6534,7 +6534,7 @@ void LLAppViewer::forceErrorInfiniteLoop()
     {
         if (timer_expiry.hasExpired())
         {
-            LL_INFOS() << "Infinite loop time : " << timer_total.getElapsedSeconds() << LL_ENDL;
+            LL_INFOS() << "Infinite loop time : " << timer_total.getElapsedTimeF64() << LL_ENDL;
             timer_expiry.setTimerExpirySec(report_frequency);
         }
     }

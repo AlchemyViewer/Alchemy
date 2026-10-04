@@ -610,7 +610,7 @@ void LLWorldMap::updateRegions(S32 x0, S32 y0, S32 x1, S32 y1)
 
     // Expire blocks requested more than BLOCK_UPDATE_TIMER ago so that they are
     // re-requested below and their sim info refreshed.
-    const F64 time_now = LLTimer::getElapsedSeconds();
+    const F64 time_now = LLTimer::getUptimeSeconds();
     for (auto it = mMapBlockLastUpdateOffsets.begin(); it != mMapBlockLastUpdateOffsets.end();)
     {
         if ((time_now - it->second) > BLOCK_UPDATE_TIMER)

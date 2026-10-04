@@ -205,7 +205,7 @@ public:
     bool isModerator() const { return mIsModerator; }
     void moderateVoice(bool mute_voice) { mIsModeratorMuted = mute_voice; }
     void setIsModerator(bool is_moderator) { mIsModerator = is_moderator; mNeedsRefresh = true; }
-    void setTimeNow() { mLastActiveTime = LLFrameTimer::getElapsedSeconds(); mNeedsRefresh = true; }
+    void setTimeNow() { mLastActiveTime = LLFrameTimer::getUptimeSeconds(); mNeedsRefresh = true; }
     void setDistance(F64 dist) { mDistToAgent = dist; mNeedsRefresh = true; }
 
     void buildContextMenu(LLMenuGL& menu, U32 flags);

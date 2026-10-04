@@ -660,7 +660,7 @@ void send_viewer_stats(bool include_preferences)
 
     time_t ltime;
     time(&ltime);
-    F32 run_time = F32(LLFrameTimer::getElapsedSeconds());
+    F32 run_time = F32(LLFrameTimer::getUptimeSeconds());
 
     agent["start_time"] = S32(ltime - S32(run_time));
 

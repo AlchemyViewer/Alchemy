@@ -751,7 +751,7 @@ bool LLAvatarPropertiesProcessor::isPendingRequest(const LLUUID& avatar_id, EAva
     if (it == mRequestTimestamps.end()) return false;
 
     // We found a request, check if it has timed out
-    F64 now = LLFrameTimer::getElapsedSeconds();
+    F64 now = LLFrameTimer::getUptimeSeconds();
     const F64 REQUEST_EXPIRE_SECS = 5.0;
     F64 expires = it->second + REQUEST_EXPIRE_SECS;
 
@@ -766,7 +766,7 @@ void LLAvatarPropertiesProcessor::addPendingRequest(const LLUUID& avatar_id, EAv
 {
     timestamp_map_t::key_type key = std::make_pair(avatar_id, type);
     // Add or update existing (expired) request
-    mRequestTimestamps[ key ] = LLFrameTimer::getElapsedSeconds();
+    mRequestTimestamps[ key ] = LLFrameTimer::getUptimeSeconds();
 }
 
 void LLAvatarPropertiesProcessor::removePendingRequest(const LLUUID& avatar_id, EAvatarProcessorType type)

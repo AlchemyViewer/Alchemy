@@ -177,7 +177,7 @@ protected:
     struct RlvReattachInfo
     {
         RlvReattachInfo(const LLUUID& itemid) : idItem(itemid), fAssetSaved(false), tsAttach(0)
-            { tsDetach = LLFrameTimer::getElapsedSeconds(); }
+            { tsDetach = LLFrameTimer::getUptimeSeconds(); }
 
         LLUUID idItem;
         bool   fAssetSaved;
@@ -192,7 +192,7 @@ protected:
     struct RlvWearInfo
     {
         RlvWearInfo(const LLUUID& itemid, ERlvWearMask wearaction) : idItem(itemid), eWearAction(wearaction)
-            { tsWear = LLFrameTimer::getElapsedSeconds(); }
+            { tsWear = LLFrameTimer::getUptimeSeconds(); }
 
         bool isAddLockedAttachPt(S32 idxAttachPt) const;
         void dumpInstance() const;

@@ -2519,7 +2519,7 @@ void process_chat_from_simulator(LLMessageSystem *msg, void **user_data)
     msg->getU8Fast(_PREHASH_ChatData, _PREHASH_Audible, audible_temp);
     chat.mAudible = (EChatAudible)audible_temp;
 
-    chat.mTime = LLFrameTimer::getElapsedSeconds();
+    chat.mTime = LLFrameTimer::getUptimeSeconds();
 
     // IDEVO Correct for new-style "Resident" names
     if (chat.mSourceType == CHAT_SOURCE_AGENT)

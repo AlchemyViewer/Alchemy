@@ -2452,7 +2452,7 @@ ALTextDocument::Edit ALTextView::edit(const ALTextRange& range_in, std::string_v
         return done;
     }
     const ALTextPos after = mDocument.clamp(done.endAfter());
-    mUndo.record(done, before, after, LLTimer::getElapsedSeconds(), std::move(others));
+    mUndo.record(done, before, after, LLTimer::getUptimeSeconds(), std::move(others));
     placeCaret(after, false);
     return done;
 }
@@ -2479,7 +2479,7 @@ ALTextDocument::Edit ALTextView::editMany(std::vector<std::pair<ALTextRange, std
         return done;
     }
     const ALTextPos after = mDocument.clamp(caret);
-    mUndo.record(done, before, after, LLTimer::getElapsedSeconds(), std::move(others));
+    mUndo.record(done, before, after, LLTimer::getUptimeSeconds(), std::move(others));
     placeCaret(after, false);
     return done;
 }

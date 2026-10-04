@@ -3063,7 +3063,7 @@ void LLPanelLandCovenant::refresh()
     }
 
     if (mLastRegionID != region->getRegionID()
-        || mNextUpdateTime < LLTimer::getElapsedSeconds())
+        || mNextUpdateTime < LLTimer::getUptimeSeconds())
     {
         // Request Covenant Info
         // Note: LLPanelLandCovenant doesn't change Covenant's content and any
@@ -3076,7 +3076,7 @@ void LLPanelLandCovenant::refresh()
         msg->sendReliable(region->getHost());
 
         mLastRegionID = region->getRegionID();
-        mNextUpdateTime = LLTimer::getElapsedSeconds() + COVENANT_REFRESH_TIME_SEC;
+        mNextUpdateTime = LLTimer::getUptimeSeconds() + COVENANT_REFRESH_TIME_SEC;
     }
 }
 
