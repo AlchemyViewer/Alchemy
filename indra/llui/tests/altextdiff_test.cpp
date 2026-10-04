@@ -41,12 +41,14 @@ namespace tut
         // The runs walked over both texts: each the next lines of its own,
         // what is the same the same, and between them all of both. Answers
         // how many lines were taken out and put in.
-        static S32 walk(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<Run>& runs)
+        // An anchored diff's runs may part two changes with a Same run of
+        // no lines, where `partings`.
+        static S32 walk(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<Run>& runs, bool partings = false)
         {
             S32 l = 0, r = 0, changed = 0;
             for (const Run& run : runs)
             {
-                ensure("counts something", run.count > 0);
+                ensure("counts something", run.count > 0 || (partings && run.kind == Kind::Same));
                 ensure_equals("the left's next", run.left, l);
                 ensure_equals("the right's next", run.right, r);
                 if (run.kind == Kind::Same)
@@ -168,5 +170,40 @@ namespace tut
         ensure("nothing", left.empty() && right.empty());
         ALTextDiff::words("x = \xC3\xA9t\xC3\xA9;", "x = \xC3\xA9t\xC3\xA9s;", left, right);
         ensure("a word past ASCII is one word", left.size() == 1 && left[0] == std::make_pair(4, 9) && right[0] == std::make_pair(4, 10));
+    }
+
+    template<> template<>
+    void altextdiff_object::test<6>()
+    {
+        set_test_name("anchored: each pair beside each other however it differs, the stretches between compared on their own; pairs out of order dropped");
+        // LSL and the SLua it became: nothing the same but a blank line.
+        const std::vector<std::string> lsl  = { "default", "{", "    state_entry()", "    {", "        llSay(0, \"hi\");", "    }", "", "}" };
+        const std::vector<std::string> slua = { "-- header", "", "ll.Say(0, \"hi\")", "" };
+        // state_entry's call to its call; the blank before the end.
+        const ALTextDiff::anchors_t anchors = { { 4, 2 }, { 6, 3 } };
+        const std::vector<Run>      runs    = ALTextDiff::lines(lsl, slua, anchors);
+        walk(lsl, slua, runs, true);
+        // The call stands first in its change, beside its own.
+        bool paired = false;
+        for (size_t i = 0; i + 1 < runs.size(); ++i)
+        {
+            if (runs[i] == Run{ Kind::Removed, 4, 2, 1 } && runs[i + 1] == Run{ Kind::Added, 5, 2, 1 })
+            {
+                paired = i > 0 && runs[i - 1].kind == Kind::Same;
+            }
+        }
+        ensure("the call beside its call, after a parting", paired);
+        ensure("the blank the same", std::find(runs.begin(), runs.end(), Run{ Kind::Same, 6, 3, 1 }) != runs.end());
+
+        // Out of order, or outside a text: dropped, the rest kept.
+        const std::vector<Run> crossed = ALTextDiff::lines(lsl, slua, { { 4, 2 }, { 1, 3 }, { 40, 1 }, { 6, 3 } });
+        ensure("only the pairs that rise on both sides", crossed == runs);
+
+        // No anchors: as lines() says.
+        const std::vector<std::string> was = { "a", "b", "c" };
+        const std::vector<std::string> now = { "a", "x", "c" };
+        ensure("none, as before", ALTextDiff::lines(was, now, {}) == ALTextDiff::lines(was, now));
+        // The same lines anchored: as without, joined into one run.
+        ensure("same pairs join", ALTextDiff::lines(was, was, { { 0, 0 }, { 2, 2 } }) == std::vector<Run>{ Run{ Kind::Same, 0, 0, 3 } });
     }
 }
