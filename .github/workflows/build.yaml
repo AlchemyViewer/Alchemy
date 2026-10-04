@@ -22,18 +22,40 @@ on:
         type: string
         default: "hippo"
   pull_request:
+    # Everything but documentation and the GitHub files no build reads;
+    # later patterns win.
+    paths:
+      - "**"
+      - "!**/*.md"
+      - "!doc/**"
+      - "!LICENSE"
+      - "!.github/**"
+      - ".github/workflows/build.yaml"
+      - ".github/actions/**"
   push:
     branches: ["main", "release/*", "beta/*", "project/*"]
     tags: ["Alchemy*"]
 
+# Every job reads the repository and nothing more, unless it says otherwise.
 permissions:
   contents: read
+
+# A new push to a pull request supersedes the run in flight. Everything else
+# (branches, tags, dispatches) runs to completion.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   # The whole point of the setup job is that we want to set variables once
   # that will be consumed by multiple subsequent jobs.
   setup:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # which-branch looks up a tag's branch and that branch's pull request.
+      pull-requests: read
     outputs:
       viewer_branch: ${{ steps.which-branch.outputs.branch }}
       relnotes: ${{ steps.which-branch.outputs.relnotes }}
@@ -43,20 +65,17 @@ jobs:
       sentry_dsn: ${{ steps.setvar.outputs.sentry_dsn }}
       viewer_channel: ${{ steps.setvar.outputs.viewer_channel }}
       is_private_build: ${{ steps.setvar.outputs.is_private_build }}
+      r2_cache_mode: ${{ steps.setvar.outputs.r2_cache_mode }}
     env:
       # Build with a tag like "Alchemy#abcdef0" to generate a release page
       # (used for builds we are planning to deploy).
       # When you want to use a string variable as a workflow YAML boolean, it's
       # important to ensure it's the empty string when false. If you omit || '',
       # its value when false is "false", which is interpreted as true.
-      RELEASE_RUN: ${{ (github.event.inputs.release_run || github.ref_type == 'tag' && startsWith(github.ref_name, 'Alchemy')) && 'Y' || '' }}
+      RELEASE_RUN: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'Alchemy') && 'Y' || '' }}
       FROM_FORK: ${{ github.event.pull_request.head.repo.fork }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-
+      # which-branch installs PyGithub for tag builds.
       - name: Setup python
         uses: actions/setup-python@v7
         with:
@@ -77,6 +96,14 @@ jobs:
           # The Sentry project crash reports go to; unset, the viewer is
           # built without a crash reporter.
           SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          # Inputs and ref names reach the script through the environment,
+          # never pasted into it, so no input can become a command.
+          INPUT_CHANNEL: ${{ inputs.channel }}
+          INPUT_PROJECT: ${{ inputs.project }}
+          IS_EDU_TAG: ${{ github.ref_type == 'tag' && contains(github.ref_name, 'edu') }}
+          R2_ENABLED: ${{ vars.VCPKG_R2_ENABLED }}
+          REF_PROTECTED: ${{ github.ref_protected }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
           echo "release_run=$RELEASE_RUN" >> "$GITHUB_OUTPUT"
 
@@ -108,25 +135,42 @@ jobs:
             echo "sentry_dsn=" >> "$GITHUB_OUTPUT"
           fi
 
+          # The vcpkg binary cache in R2. Only trusted builds of protected
+          # refs write it; same-repository pull requests read it with the
+          # read-only keys, so code still under review cannot put packages in
+          # front of a release build. Forks get no secrets and Dependabot gets
+          # its own, so neither uses it.
+          r2_cache_mode=
+          if [[ "$R2_ENABLED" == "true" && "$GITHUB_ACTOR" != "dependabot[bot]" ]]; then
+            if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+              if [[ "$PR_HEAD_REPO" == "$GITHUB_REPOSITORY" ]]; then
+                r2_cache_mode="read"
+              fi
+            elif [[ "$REF_PROTECTED" == "true" ]]; then
+              r2_cache_mode="readwrite"
+            fi
+          fi
+          echo "r2_cache_mode=$r2_cache_mode" >> "$GITHUB_OUTPUT"
+
           # determine the viewer channel from the branch or tag name
           # trigger an EDU build by including "edu" in the tag
-          edu=${{ github.ref_type == 'tag' && contains(github.ref_name, 'edu') }}
-          echo "ref_type=${{ github.ref_type }}, ref_name=${{ github.ref_name }}, edu='$edu'"
+          edu=$IS_EDU_TAG
+          echo "ref_type=$GITHUB_REF_TYPE, ref_name=$GITHUB_REF_NAME, edu='$edu'"
           branch=$BUILD_VCS_BRANCH
-          if [[ "${{inputs.channel}}" != "" && "${{inputs.channel}}" != "Auto" ]];
+          if [[ "$INPUT_CHANNEL" != "" && "$INPUT_CHANNEL" != "Auto" ]];
           then
-              if [[ "${{inputs.channel}}" == "Project" ]];
+              if [[ "$INPUT_CHANNEL" == "Project" ]];
               then
-                  export viewer_channel="${{ env.VIEWER_CHANNEL_BASE }} Project ${{inputs.project}}"
+                  export viewer_channel="$VIEWER_CHANNEL_BASE Project $INPUT_PROJECT"
               else
-                  export viewer_channel="${{ env.VIEWER_CHANNEL_BASE }} ${{inputs.channel}}"
+                  export viewer_channel="$VIEWER_CHANNEL_BASE $INPUT_CHANNEL"
               fi
           elif [[ "$edu" == "true" ]];
           then
-              export viewer_channel="${{ env.VIEWER_CHANNEL_BASE }} Release edu"
+              export viewer_channel="$VIEWER_CHANNEL_BASE Release edu"
           elif  [[ "$branch" == "develop" ]];
           then
-              export viewer_channel="${{ env.VIEWER_CHANNEL_BASE }} Develop"
+              export viewer_channel="$VIEWER_CHANNEL_BASE Develop"
           else
               IFS='/' read -ra ba <<< "$branch"
               prefix=${ba[0]}
@@ -135,21 +179,21 @@ jobs:
                   prj_str="${prj[*]}"
                   # uppercase first letter of each word
                   capitalized=$(echo "$prj_str" | awk '{for (i=1; i<=NF; i++) $i = toupper(substr($i,1,1)) substr($i,2); print}')
-                  export viewer_channel="${{ env.VIEWER_CHANNEL_BASE }} Project $capitalized"
+                  export viewer_channel="$VIEWER_CHANNEL_BASE Project $capitalized"
               elif  [[ "$prefix" == "release" || "$prefix" == "main" ]];
               then
-                  export viewer_channel="${{ env.VIEWER_CHANNEL_BASE }} Release"
+                  export viewer_channel="$VIEWER_CHANNEL_BASE Release"
               else
-                  export viewer_channel="${{ env.VIEWER_CHANNEL_BASE }} Test"
+                  export viewer_channel="$VIEWER_CHANNEL_BASE Test"
               fi
           fi
           echo "viewer_channel=$viewer_channel" >> "$GITHUB_OUTPUT"
 
   build:
     needs: setup
-    permissions:
-      packages: write
     strategy:
+      # One platform failing says nothing about the others: let them finish.
+      fail-fast: false
       matrix:
         runner: ["windows-2025-vs2026", "xcode-27", "ubuntu-26.04"]
         configuration: [release]
@@ -163,15 +207,7 @@ jobs:
           - runner: windows-2025-vs2026
             arch: arm64
           - runner: xcode-27
-            configuration: relwithdebinfo
-          - runner: xcode-27
-            configuration: optdebug
-          - runner: xcode-27
             arch: x64
-          - build_variant: Viewer
-            configuration: relwithdebinfo
-          - build_variant: Viewer
-            configuration: optdebug
         include:
           # Linux on arm64: NEON is a first-class target, and this is the
           # one row where GCC compiles the SIMD layer for it.
@@ -194,8 +230,7 @@ jobs:
             build_variant: Tests
 
     runs-on: ${{ matrix.runner }}
-    # Windows arm64 is allowed to fail, without cancelling the other rows,
-    # until the vlc-bin port has an arm64 Windows build.
+    # A failing test row is reported without failing the run.
     continue-on-error: ${{ startsWith(matrix.build_variant, 'Tests') }}
     outputs:
       viewer_version: ${{ steps.build.outputs.viewer_version }}
@@ -234,116 +269,35 @@ jobs:
       master_message_template_checkout: ${{ github.workspace }}/.master-message-template
       # vcpkg Setup
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-      VCPKG_USERNAME: ${{ github.repository_owner }}
-      # VCPKG_FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
       VCPKG_BINARY_SOURCES: "clear;default,readwrite"
     steps:
-      - name: Linux Dependency Install and Disk Cleanup
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt update
-          sudo apt install -y \
-            autoconf autoconf-archive automake bison build-essential cmake curl flex gettext \
-            libasound2-dev libaudio-dev libdbus-1-dev libdbus-1-dev libdecor-0-dev libdrm-dev \
-            libegl1-mesa-dev libfribidi-dev libgbm-dev libgl1-mesa-dev libgl1-mesa-dri libgles2-mesa-dev \
-            libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libibus-1.0-dev libjack-dev libltdl-dev \
-            libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
-            libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
-            libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
-            libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev mold \
-            nasm ninja-build pkgconf tar tex-common texinfo unzip zip
-
-          sudo locale-gen en_US.UTF-8
-          sudo locale-gen en_GB.UTF-8
-          sudo locale-gen fr_FR.UTF-8
-
-          df -h
-          sudo docker container prune -f
-          sudo docker image prune -a -f
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/.ghcup
-          df -h
-
-      - name: macOS Homebrew Dependency Install
-        if: runner.os == 'macOS'
-        run: |
-          brew install autoconf autoconf-archive automake libtool nasm unzip zip
-
       - name: Checkout code
         uses: actions/checkout@v7
         with:
+          # Full history: the vcpkg submodule needs it to resolve the
+          # versions the manifest pins.
           fetch-depth: 0
+          persist-credentials: false
           submodules: recursive
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Checkout master-message-template
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           repository: secondlife/master-message-template
           path: .master-message-template
 
-      - name: Setup python
-        uses: actions/setup-python@v7
+      - name: Set up the build
+        uses: ./.github/actions/setup-build
         with:
-          python-version: "3.14"
-
-      # Linux builds with the CMake floor, so the floor is a floor.
-      - name: Install python dependencies
-        shell: bash
-        run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]
-          then pip3 install llsd cmake==4.0.0 ninja
-          else pip3 install llsd cmake ninja
-          fi
-
-      - name: Bootstrap vcpkg Windows
-        if: runner.os == 'Windows'
-        run: |
-          ./vcpkg/bootstrap-vcpkg.bat
-
-      - name: Bootstrap vcpkg non-Windows
-        if: runner.os == 'macOS' || runner.os == 'Linux'
-        run: |
-          ./vcpkg/bootstrap-vcpkg.sh
-
-      - name: Install AWS CLI on macOS
-        if: >-
-          vars.VCPKG_R2_ENABLED == 'true' && runner.os == 'macOS' &&
-          ((github.ref_protected && github.event_name != 'pull_request') ||
-           (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
-        run: brew install awscli
-
-      - name: Configure R2 binary cache for trusted builds
-        if: vars.VCPKG_R2_ENABLED == 'true' && github.ref_protected && github.event_name != 'pull_request'
-        env:
-          R2_CACHE_MODE: readwrite
-          R2_ENDPOINT_URL: ${{ vars.VCPKG_R2_ENDPOINT_URL }}
-          R2_BUCKET: ${{ vars.VCPKG_R2_BUCKET }}
-          R2_ACCESS_KEY_ID: ${{ secrets.VCPKG_R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.VCPKG_R2_SECRET_ACCESS_KEY }}
-        run: python scripts/vcpkg/configure_r2_cache.py
-
-      - name: Configure R2 binary cache for same-repository PRs
-        if: >-
-          vars.VCPKG_R2_ENABLED == 'true' && github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          # Temporary cache population test; restore read mode and reader secrets afterward.
-          R2_CACHE_MODE: readwrite
-          R2_ENDPOINT_URL: ${{ vars.VCPKG_R2_ENDPOINT_URL }}
-          R2_BUCKET: ${{ vars.VCPKG_R2_BUCKET }}
-          R2_ACCESS_KEY_ID: ${{ secrets.VCPKG_R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.VCPKG_R2_SECRET_ACCESS_KEY }}
-        run: python scripts/vcpkg/configure_r2_cache.py
-
-      - name: Cache Rust Dependencies
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          r2-cache-mode: ${{ needs.setup.outputs.r2_cache_mode }}
+          r2-endpoint-url: ${{ vars.VCPKG_R2_ENDPOINT_URL }}
+          r2-bucket: ${{ vars.VCPKG_R2_BUCKET }}
+          # The writer keys only where the cache is written; a reader's mode
+          # alone would not stop code that finds writer keys from using them.
+          r2-access-key-id: ${{ needs.setup.outputs.r2_cache_mode == 'readwrite' && secrets.VCPKG_R2_ACCESS_KEY_ID || secrets.VCPKG_R2_READ_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ needs.setup.outputs.r2_cache_mode == 'readwrite' && secrets.VCPKG_R2_SECRET_ACCESS_KEY || secrets.VCPKG_R2_READ_SECRET_ACCESS_KEY }}
 
       - name: Configure
         id: configure
@@ -407,7 +361,7 @@ jobs:
             -DAL_USE_SENTRY:BOOL="$AL_USE_SENTRY" \
             -DAL_SENTRY_DSN:STRING="$AL_SENTRY_DSN" \
             -DAL_CHANNEL:STRING="${AL_CHANNEL}" \
-            -DAL_GRID:STRING="\"$VIEWER_GRID\"" \
+            -DAL_GRID:STRING="$VIEWER_GRID" \
             $template_verifier_master_url \
             "${SIGNING[@]}"
 
@@ -430,15 +384,15 @@ jobs:
           if $BUILD_TESTS
           then
             # Now build the tests. We want to build them in a separate step before running them.
-            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config" --parallel $(nproc)
+            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config" --parallel "$(nproc)"
 
             # Now that we've built the tests, we can run them to validate the build.
             # If the tests fail, their output will be visible in the logs due to
             # CTEST_OUTPUT_ON_FAILURE above, and the build step will be marked as failed.
-            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config" --target BUILD_AND_RUN_TESTS --parallel $(nproc)
+            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config" --target BUILD_AND_RUN_TESTS --parallel "$(nproc)"
           elif $AL_BUILD_VIEWER
           then
-            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config" --parallel $(nproc)
+            cmake --build "$BUILD_DIRECTORY" --config "$cmake_config" --parallel "$(nproc)"
           else
             echo "::notice::Skipping build due to both viewer and tests being disabled"
           fi
@@ -465,17 +419,10 @@ jobs:
           fi
 
           # The package: the install tree on Windows, which the signing job
-          # packages with Velopack; the CPack archive elsewhere. The names
-          # the packaging steps need come from the configure.
+          # packages with Velopack from it and its package.env metadata; the
+          # CPack archive elsewhere.
           if $AL_BUILD_VIEWER
           then
-            # The job's outputs come from whichever row sets them last.
-            # Keep the shared Velopack outputs on x64; Windows packaging
-            # reads per-architecture metadata artifacts below.
-            if [[ "$RUNNER_OS" != "Windows" || "$BUILD_ARCH" == "x64" ]]
-            then
-              cat "$BUILD_DIRECTORY/newview/package.env" >> "$GITHUB_OUTPUT"
-            fi
             case "$RUNNER_OS" in
               Windows)
                 cmake --install "$BUILD_DIRECTORY" --config "$cmake_config" --prefix "$RUNNER_TEMP/app"
@@ -507,7 +454,9 @@ jobs:
         with:
           name: "${{ steps.build.outputs.artifact }}-app"
           if-no-files-found: error
-          compression-level: 9
+          # The Windows install tree is uncompressed; the .tar.xz and .dmg
+          # already are.
+          compression-level: ${{ runner.os == 'Windows' && 9 || 0 }}
           path: |
             ${{ steps.build.outputs.viewer_app }}
 
@@ -604,17 +553,21 @@ jobs:
 
   sign-and-package-windows:
     needs: [setup, build]
+    timeout-minutes: 30
     strategy:
       matrix:
         arch: [x64, arm64]
     runs-on: windows-2025-vs2026
     steps:
+      # The app and its metadata come from the build's artifacts; the tree
+      # contributes only the Velopack tool manifest.
       - name: Checkout code
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-          submodules: recursive
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: /dotnet-tools.json
+          sparse-checkout-cone-mode: false
 
       - name: Setup .NET for Velopack
         uses: actions/setup-dotnet@v6
@@ -764,8 +717,10 @@ jobs:
   release:
     needs: [setup, build, sign-and-package-windows]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: needs.setup.outputs.release_run
     permissions:
+      # Creates the release, generates its notes and uploads its assets.
       contents: write
     steps:
       - uses: actions/download-artifact@v8
@@ -791,7 +746,9 @@ jobs:
         with:
           # name the release page for the branch. We want channel and version.
           name: "${{ needs.setup.outputs.viewer_channel }} ${{ needs.build.outputs.viewer_version }}"
-          body: |
+          # The tag's pull request notes after "relnotes:", if any, ahead of
+          # the generated notes.
+          body: ${{ needs.setup.outputs.relnotes }}
           prerelease: true
           generate_release_notes: true
           target_commitish: ${{ github.sha }}
@@ -803,5 +760,7 @@ jobs:
             Windows*-releases/*
 
       - name: post release URL
+        env:
+          RELEASE_URL: ${{ steps.release.outputs.url }}
         run: |
-          echo "::notice::Release ${{ steps.release.outputs.url }}"
+          echo "::notice::Release $RELEASE_URL"

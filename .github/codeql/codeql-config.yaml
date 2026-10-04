@@ -1,0 +1,18 @@
+name: Alchemy CodeQL config
+
+# security-extended adds the lower-precision security queries to the default
+# set, the taint tracking among them: data from the network followed into
+# parsers, allocations and file paths. A rule that proves too noisy for this
+# codebase goes in query-filters, e.g.
+#
+# query-filters:
+#   - exclude:
+#       id: cpp/some-rule
+queries:
+  - uses: security-extended
+
+# Only the languages read without a build (Python, Actions) honour paths:
+# C/C++ analyses exactly what the build compiles.
+paths-ignore:
+  - indra/externals
+  - vcpkg
