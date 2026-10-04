@@ -36,6 +36,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <optional>
@@ -851,6 +853,108 @@ namespace
             });
         });
     }
+
+    // SlIntegerPast32Bits: a whole number written past 0xFFFFFFFF, which the
+    // grid's compilers read as -1 -- their 32-bit hosts' strtoul stops
+    // there -- and as 1 with a minus before it. Read from the text, past
+    // strings, comments and floats, since Tailslide's tree keeps only what
+    // it read. A warning: no script means what it says.
+    void integersPast32Bits(const Text& text, ALScriptProblems& out)
+    {
+        const std::string_view source = text.source();
+        for (size_t at = 0; at < source.size();)
+        {
+            const char c = source[at];
+            if (c == '"')
+            {
+                for (++at; at < source.size() && source[at] != '"'; ++at)
+                {
+                    at += source[at] == '\\';
+                }
+                ++at;
+                continue;
+            }
+            if (c == '/' && at + 1 < source.size() && source[at + 1] == '/')
+            {
+                at = std::min(source.find('\n', at), source.size());
+                continue;
+            }
+            if (c == '/' && at + 1 < source.size() && source[at + 1] == '*')
+            {
+                const size_t end = source.find("*/", at + 2);
+                at               = end == std::string_view::npos ? source.size() : end + 2;
+                continue;
+            }
+            const bool starts = std::isdigit(static_cast<unsigned char>(c)) &&
+                                (at == 0 || !(ALScriptLexicon::isNameByte(source[at - 1]) || source[at - 1] == '.'));
+            if (!starts)
+            {
+                ++at;
+                continue;
+            }
+            const bool hex = c == '0' && at + 2 < source.size() && (source[at + 1] == 'x' || source[at + 1] == 'X') &&
+                             std::isxdigit(static_cast<unsigned char>(source[at + 2]));
+            size_t     end = hex ? at + 2 : at;
+            while (end < source.size() && (hex ? std::isxdigit(static_cast<unsigned char>(source[end])) : std::isdigit(static_cast<unsigned char>(source[end]))))
+            {
+                ++end;
+            }
+            // A float, or a name that starts with digits: not a whole number.
+            if (end < source.size() && (source[end] == '.' || ALScriptLexicon::isNameByte(source[end])))
+            {
+                while (end < source.size() && (source[end] == '.' || ALScriptLexicon::isNameByte(source[end])))
+                {
+                    ++end;
+                }
+                at = end;
+                continue;
+            }
+            const std::string written(source.substr(at, end - at));
+            errno                          = 0;
+            const unsigned long long value = std::strtoull(written.c_str(), nullptr, hex ? 16 : 10);
+            if (errno == ERANGE || value > 0xFFFFFFFFull)
+            {
+                // A minus before it that is not taking it from something:
+                // -1 made 1.
+                size_t minus = at;
+                while (minus > 0 && (source[minus - 1] == ' ' || source[minus - 1] == '\t'))
+                {
+                    --minus;
+                }
+                size_t before = minus > 0 && source[minus - 1] == '-' ? minus - 1 : std::string_view::npos;
+                if (before != std::string_view::npos)
+                {
+                    size_t prior = before;
+                    while (prior > 0 && std::isspace(static_cast<unsigned char>(source[prior - 1])))
+                    {
+                        --prior;
+                    }
+                    const char last = prior > 0 ? source[prior - 1] : '\0';
+                    if (ALScriptLexicon::isNameByte(last) || last == ')' || last == ']' || last == '.')
+                    {
+                        before = std::string_view::npos;
+                    }
+                }
+                const size_t from              = before != std::string_view::npos ? before : at;
+                const auto [line, column]      = text.place(from);
+                const auto [end_line, end_col] = text.place(end);
+                ALScriptProblem p;
+                p.severity  = ALScriptLintPass::rule("SlIntegerPast32Bits")->severity;
+                p.source    = ALScriptProblem::Source::Lint;
+                p.line      = line;
+                p.column    = column;
+                p.endLine   = end_line;
+                p.endColumn = end_col;
+                p.code      = "SlIntegerPast32Bits";
+                p.key       = "LSLSlIntegerPast32Bits";
+                p.args      = { std::string(source.substr(from, end - from)), before != std::string_view::npos ? "1" : "-1" };
+                p.message   = ALScriptProblem::fill("LSL reads [1] as [2]: past 0xFFFFFFFF, the most its 32 bits hold, a number stops there, which is -1",
+                                                    p.args);
+                out.push_back(std::move(p));
+            }
+            at = end;
+        }
+    }
 }
 
 // static
@@ -868,4 +972,5 @@ void ALLSLLintPass::check(std::string_view source, LSLScript* script, ALScriptPr
     costlyEvents(script, out);
     stringBuilds(script, out);
     repeatedCalls(text, script, effects, out);
+    integersPast32Bits(text, out);
 }

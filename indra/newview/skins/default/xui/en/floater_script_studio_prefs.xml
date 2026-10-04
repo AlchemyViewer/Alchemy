@@ -69,6 +69,7 @@
     <floater.string name="LintLSLSlCostlyListen">A listen on channel 0 for anyone, which hears every line of chat (the studio's own)</floater.string>
     <floater.string name="LintLSLSlFastTimer">A timer under a tenth of a second (the studio's own)</floater.string>
     <floater.string name="LintLSLSlFastSensor">A sensor repeat under a second (the studio's own)</floater.string>
+    <floater.string name="LintLSLSlIntegerPast32Bits">A whole number past 0xFFFFFFFF, which LSL reads as -1 (the studio's own)</floater.string>
     <floater.string name="LintLSLSlStringBuild">A string joined to in a loop, which makes it anew each time round (the studio's own)</floater.string>
     <floater.string name="LintLSLSlRepeatedCall">The same answer asked for again in one handler, llGetOwner() and its kin (the studio's own)</floater.string>
     <floater.string name="LintLuauUnknownGlobal">An unknown global (the type checker also reports it)</floater.string>

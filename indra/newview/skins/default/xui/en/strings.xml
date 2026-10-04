@@ -808,6 +808,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LSLSyntaxUnexpected">Did not expect [1] here.</string>
 	<string name="LSLSyntaxUnexpectedWanted">Did not expect [1] here; expected [2].</string>
 	<string name="LSLParameterUntyped">The parameter '[1]' needs its type before it: integer, float, string, key, vector, rotation or list.</string>
+	<string name="LSLSlIntegerPast32Bits">LSL reads [1] as [2]: past 0xFFFFFFFF, the most its 32 bits hold, a number stops there, which is -1</string>
 	<string name="LSLSlLoopInvariantCall">[1] is worked out again on every turn of the loop, though nothing in the loop changes what it is given: a local set before the loop works it out once</string>
 	<string name="LSLSlSleepingCall">[1] makes the script sleep [2] s each call; [3] does the same without the sleep</string>
 	<string name="LSLSlSleepingCallOften">[1] makes the script sleep [2] s each time it runs here, in a loop or the timer event; [3] does the same without the sleep</string>

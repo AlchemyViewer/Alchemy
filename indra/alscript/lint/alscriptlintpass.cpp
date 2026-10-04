@@ -112,6 +112,9 @@ namespace
         // for i = 1, n do ... i = j ... end: LSL's for went on from what i was
         // set to, Luau's makes i afresh each time round.
         { "SlForIndexAssign", Rule::SLua, Severity::Warning, true, false, nullptr, true },
+        // integer x = 4294967296: past 0xFFFFFFFF, which the grid's compilers
+        // read as -1.
+        { "SlIntegerPast32Bits", Rule::LSL, Severity::Warning, true, false, nullptr },
     };
 
     const ALScriptLintPass::PrimParams PRIM_PARAMS[] = {
