@@ -1422,61 +1422,99 @@ namespace
     };
 }
 
-namespace ALScriptWeigh
+namespace
 {
-    ALScriptWeight mono(std::string_view source)
+    // An assembly's text a line to an instruction, as Tailslide writes it
+    // and monoOf() reads it: LL's compiler writes `cil managed` on a line of
+    // its own, and runs the instruction after a print onto the call's line.
+    // Each instruction keeps the form it was written in, and Tailslide's
+    // own text comes through as it was.
+    std::string instructionLines(std::string_view text)
     {
-        LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+        std::vector<std::string> lines;
+        const auto add = [&lines](std::string line) {
+            const size_t lead = line.find_first_not_of(" \t\r");
+            line              = lead == std::string::npos ? std::string() : line.substr(lead, line.find_last_not_of(" \t\r") - lead + 1);
+            if (line == "cil managed" && !lines.empty())
+            {
+                lines.back() += " cil managed";
+                return;
+            }
+            lines.push_back(std::move(line));
+        };
+        for (size_t from = 0; from <= text.size();)
+        {
+            const size_t cut  = std::min(text.find('\n', from), text.size());
+            std::string  line(text.substr(from, cut - from));
+            from = cut + 1;
+            // What follows a call's signature on its line, an instruction of
+            // its own.
+            const size_t lead = line.find_first_not_of(" \t");
+            const bool   call = lead != std::string::npos && (line.compare(lead, 5, "call ") == 0 || line.compare(lead, 9, "callvirt ") == 0 ||
+                                                            line.compare(lead, 7, "newobj ") == 0);
+            const size_t colons = call ? line.find("::") : std::string::npos;
+            if (colons == std::string::npos)
+            {
+                add(std::move(line));
+                continue;
+            }
+            const size_t name  = line.find("::") + 2;
+            size_t       close = line.find('(', name);
+            for (S32 depth = 0; close != std::string::npos && close < line.size(); ++close)
+            {
+                depth += line[close] == '(' ? 1 : line[close] == ')' ? -1 : 0;
+                if (depth == 0)
+                {
+                    break;
+                }
+            }
+            if (close != std::string::npos && close + 1 < line.size() && line.find_first_not_of(" \t\r", close + 1) != std::string::npos)
+            {
+                std::string rest = line.substr(close + 1);
+                line.erase(close + 1);
+                add(std::move(line));
+                add(std::move(rest));
+                continue;
+            }
+            add(std::move(line));
+        }
+        std::string out;
+        for (const std::string& line : lines)
+        {
+            out += line + "\n";
+        }
+        return out;
+    }
+
+    // An assembly's text sized as mono() sizes Tailslide's: a method at a
+    // time, over the base. `places` names each method as the script does,
+    // where its tree is to hand; `at_lines` gives the text's places the
+    // source lines they were written for. Without them, each method is a
+    // function of the assembly's name, and no line is anybody's.
+    ALScriptWeight monoOf(std::string_view text, const Places* places, const std::vector<std::pair<size_t, S32>>* at_lines)
+    {
         ALScriptWeight weight;
         weight.target   = ALScriptWeight::Target::Mono;
         weight.limit    = ALScriptWeight::limitOf(weight.target);
         weight.estimate = true;
-        if (!ALLSLService::builtinsLoaded())
-        {
-            weight.error = "the LSL builtins are not loaded";
-            return weight;
-        }
-        AL_SCRIPT_ENGINE_HELD;
-        Tailslide::ScopedScriptParser parser(nullptr);
-        const std::string            text(source);
-        Tailslide::LSLScript*        script = parser.parseLSLBytes(text.data(), static_cast<int>(text.size()));
-        if (!script)
-        {
-            weight.error = "it does not parse";
-            return weight;
-        }
-        script->collectSymbols();
-        script->determineTypes();
-        script->recalculateReferenceData();
-        script->propagateValues();
-        script->finalPass();
-        script->validateGlobals(true);
-        script->checkSymbols();
-        if (parser.logger.getErrors())
-        {
-            weight.error = "it has errors";
-            return weight;
-        }
-        Places places;
-        script->visit(&places);
-        LinedMono compiler(&parser.allocator);
-        script->visit(&compiler);
-
         // A method at a time: its header, its code, its locals, and what
         // declaring it takes; with the fields, the strings and what it calls
         // over the whole. Each instruction, with its string, is the line it
         // was written for as well.
-        std::istringstream    cil(compiler.mCIL.str());
+        // Another compiler's text a line to an instruction; Tailslide's own
+        // as it is, where the marks count its bytes.
+        std::istringstream    cil{ places || at_lines ? std::string(text) : instructionLines(text) };
         std::set<std::string> referenced;
         std::set<std::string> strings;
-        size_t                shared = MONO_BASE_BYTES;
+        size_t                shared = ALScriptWeigh::MONO_BASE_BYTES;
         ALScriptWeight::Part* method = nullptr;
         // Heavy strings, parts of their own once every method is in.
         std::vector<ALScriptWeight::Part> heavy;
         ALScriptWeight::Part  globals;
         globals.kind = ALScriptWeight::Part::Kind::Frame;
         globals.name = "globals";
-        const std::vector<std::pair<size_t, S32>>& marks = compiler.marks.marks();
+        const std::vector<std::pair<size_t, S32>> none;
+        const std::vector<std::pair<size_t, S32>>& marks = at_lines ? *at_lines : none;
         size_t                                     mark  = 0;
         size_t                                     next  = 0;
         std::map<S32, size_t>                      by_line;
@@ -1518,14 +1556,19 @@ namespace ALScriptWeigh
                     globals.bytes += head;
                     continue;
                 }
-                const auto known = places.methods.find(name);
+                const auto known = places ? places->methods.find(name) : decltype(places->methods.find(name)){};
+                const bool found = places && known != places->methods.end();
                 ALScriptWeight::Part part;
-                part.kind  = known != places.methods.end() && !known->second.second.second.empty() ? ALScriptWeight::Part::Kind::Handler
-                                                                                                  : ALScriptWeight::Part::Kind::Function;
-                part.name  = known != places.methods.end() ? known->second.second.first : name;
-                part.within = known != places.methods.end() ? known->second.second.second : std::string();
+                part.kind  = found && !known->second.second.second.empty() ? ALScriptWeight::Part::Kind::Handler
+                                                                           : ALScriptWeight::Part::Kind::Function;
+                // Without the tree, a function by its name in the script:
+                // the assembly's, quoted and after a g.
+                part.name  = found                                                      ? known->second.second.first
+                             : name.size() > 3 && name.front() == '\'' && name[1] == 'g' ? name.substr(2, name.size() - 3)
+                                                                                          : name;
+                part.within = found ? known->second.second.second : std::string();
                 part.bytes = head;
-                if (known != places.methods.end())
+                if (found)
                 {
                     if (const Tailslide::YYLTYPE* at = known->second.first->getLoc(); at && at->first_line > 0)
                     {
@@ -1579,14 +1622,36 @@ namespace ALScriptWeigh
             {
                 by_line[source] += bytes;
             }
-            if ((op == "call" || op == "callvirt" || op == "newobj" || op == "ldfld" || op == "stfld" || op == "ldflda") &&
-                referenced.insert(rest).second)
+            if (op == "call" || op == "callvirt" || op == "newobj" || op == "ldfld" || op == "stfld" || op == "ldflda")
             {
-                // What it names outside itself, once however often: a row
-                // with a name and a signature.
-                const size_t colons = rest.find("::");
-                const size_t paren  = rest.find('(', colons == std::string::npos ? 0 : colons);
-                shared += 6 + (colons == std::string::npos ? 8 : (paren == std::string::npos ? rest.size() : paren) - colons) + 8;
+                // What it names outside itself, once however often, as the
+                // metadata holds it: a row with a name and a signature, the
+                // name without the quotes the assembler reads it by, and the
+                // member the same whether its owner is written `class` or
+                // `valuetype` or bare.
+                std::string member = rest;
+                for (const char* spelt : { "class [", "valuetype [" })
+                {
+                    for (size_t at; (at = member.find(spelt)) != std::string::npos;)
+                    {
+                        member.erase(at, strlen(spelt) - 1);
+                    }
+                }
+                const size_t colons = member.find("::");
+                if (colons != std::string::npos && colons + 2 < member.size() && member[colons + 2] == '\'')
+                {
+                    const size_t close = member.find('\'', colons + 3);
+                    if (close != std::string::npos)
+                    {
+                        member.erase(close, 1);
+                        member.erase(colons + 2, 1);
+                    }
+                }
+                if (referenced.insert(member).second)
+                {
+                    const size_t paren = member.find('(', colons == std::string::npos ? 0 : colons);
+                    shared += 6 + (colons == std::string::npos ? 8 : (paren == std::string::npos ? member.size() : paren) - colons) + 8;
+                }
             }
         }
         weight.parts.insert(weight.parts.begin(), globals);
@@ -1602,6 +1667,124 @@ namespace ALScriptWeigh
         }
         weight.compiled = true;
         return weight;
+    }
+}
+
+namespace ALScriptWeigh
+{
+    ALScriptWeight mono(std::string_view source)
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+        ALScriptWeight weight;
+        weight.target   = ALScriptWeight::Target::Mono;
+        weight.limit    = ALScriptWeight::limitOf(weight.target);
+        weight.estimate = true;
+        if (!ALLSLService::builtinsLoaded())
+        {
+            weight.error = "the LSL builtins are not loaded";
+            return weight;
+        }
+        AL_SCRIPT_ENGINE_HELD;
+        Tailslide::ScopedScriptParser parser(nullptr);
+        const std::string            text(source);
+        Tailslide::LSLScript*        script = parser.parseLSLBytes(text.data(), static_cast<int>(text.size()));
+        if (!script)
+        {
+            weight.error = "it does not parse";
+            return weight;
+        }
+        script->collectSymbols();
+        script->determineTypes();
+        script->recalculateReferenceData();
+        script->propagateValues();
+        script->finalPass();
+        script->validateGlobals(true);
+        script->checkSymbols();
+        if (parser.logger.getErrors())
+        {
+            weight.error = "it has errors";
+            return weight;
+        }
+        Places places;
+        script->visit(&places);
+        LinedMono compiler(&parser.allocator);
+        script->visit(&compiler);
+        return monoOf(compiler.mCIL.str(), &places, &compiler.marks.marks());
+    }
+
+    ALScriptWeight monoOfCIL(std::string_view cil)
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+        return monoOf(cil, nullptr, nullptr);
+    }
+
+    namespace
+    {
+        // Parsed and through the passes Tailslide's own tool runs before it
+        // compiles, but its optimizer, as lso() and mono() run them; null
+        // with why where it does not get that far.
+        Tailslide::LSLScript* readied(Tailslide::ScopedScriptParser& parser, const std::string& text, bool mono, std::string& error)
+        {
+            if (!ALLSLService::builtinsLoaded())
+            {
+                error = "the LSL builtins are not loaded";
+                return nullptr;
+            }
+            Tailslide::LSLScript* script = parser.parseLSLBytes(text.data(), static_cast<int>(text.size()));
+            if (!script)
+            {
+                error = "it does not parse";
+                return nullptr;
+            }
+            script->collectSymbols();
+            script->determineTypes();
+            script->recalculateReferenceData();
+            script->propagateValues();
+            script->finalPass();
+            script->validateGlobals(mono);
+            script->checkSymbols();
+            if (parser.logger.getErrors())
+            {
+                error = "it has errors";
+                return nullptr;
+            }
+            return script;
+        }
+    }
+
+    bool tailslideLSO(std::string_view source, std::vector<U8>& image, std::string& error)
+    {
+        AL_SCRIPT_ENGINE_HELD;
+        Tailslide::ScopedScriptParser parser(nullptr);
+        Tailslide::LSLScript*         script = readied(parser, std::string(source), false, error);
+        if (!script)
+        {
+            return false;
+        }
+        Tailslide::LSOScriptCompiler compiler(&parser.allocator);
+        script->visit(&compiler);
+        if (parser.logger.getErrors())
+        {
+            error = "it does not fit in 16 KB";
+            return false;
+        }
+        image.assign(compiler.mScriptBS.data(), compiler.mScriptBS.data() + compiler.mScriptBS.size());
+        return true;
+    }
+
+    bool tailslideCIL(std::string_view source, std::string& cil, std::string& error)
+    {
+        AL_SCRIPT_ENGINE_HELD;
+        Tailslide::ScopedScriptParser parser(nullptr);
+        Tailslide::LSLScript*         script = readied(parser, std::string(source), true, error);
+        if (!script)
+        {
+            return false;
+        }
+        Tailslide::MonoScriptCompiler compiler(&parser.allocator);
+        script->visit(&compiler);
+        cil = compiler.mCIL.str();
+        return true;
     }
 }
 

@@ -164,4 +164,14 @@ namespace ALScriptWeigh
     // counts against 64 KB is the runtime's business rather than the IL's.
     // As lso() for the builtins and the lock.
     ALScriptWeight mono(std::string_view source);
+    // Any assembly's text sized as mono() sizes Tailslide's -- LL's
+    // compiler's, to hold the two against each other -- each method a part
+    // by the assembly's name, and no line anybody's.
+    ALScriptWeight monoOfCIL(std::string_view cil);
+
+    // What Tailslide makes of a script, as lso() and mono() have it before
+    // they weigh it: the 16 KB LSO image, and the CIL text. False, with why,
+    // where it makes nothing. As lso() for the builtins and the lock.
+    bool tailslideLSO(std::string_view source, std::vector<U8>& image, std::string& error);
+    bool tailslideCIL(std::string_view source, std::string& cil, std::string& error);
 }

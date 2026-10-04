@@ -116,19 +116,19 @@ namespace
         c.parameter     = 14;
         c.call          = 6;
         c.argument      = 2;
-        c.reference     = 19;
+        c.reference     = 17;
         c.referenceChar = 1;
 
         // A global is a field, set in the constructor; a string is held
         // once, however many places load it.
-        c.integer       = { 45, -1, -1 };
-        c.floating      = { 49, 3, 3 };
-        c.wholeFloating = { 42, -4, -4 };
-        c.vector        = { 72, 26, 26 };
-        c.wholeVector   = { 51, 5, 5 };
-        c.rotation      = { 115, 35, 35 };
-        c.wholeRotation = { 87, 7, 7 };
-        c.string         = { 47, -1, -1 };
+        c.integer       = { 43, -1, -1 };
+        c.floating      = { 47, 3, 3 };
+        c.wholeFloating = { 40, -4, -4 };
+        c.vector        = { 70, 26, 26 };
+        c.wholeVector   = { 49, 5, 5 };
+        c.rotation      = { 111, 35, 35 };
+        c.wholeRotation = { 83, 7, 7 };
+        c.string         = { 45, -1, -1 };
         c.stringChar     = { 2, 0, 0 };
         c.stringHeld     = 2;
         c.stringHeldChar = 2;
