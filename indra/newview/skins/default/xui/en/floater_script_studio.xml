@@ -624,6 +624,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="RequireNotPreprocessed">require("[NAME]") is saved as written, but the grid does not support require: turn on Build &gt; Preprocess on Save to include the module</floater.string>
     <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Build > Preprocess on Save and Build > Extensions)</floater.string>
     <floater.string name="PreprocHintConst">([WORD] declares a constant, and lets a global be computed from other globals: turn on Build &gt; Preprocess on Save)</floater.string>
+    <floater.string name="PreprocHintDirective">(lines starting with # are the preprocessor's: turn on Build &gt; Preprocess on Save)</floater.string>
     <floater.string name="PreprocHintInline">([WORD] marks a function to be inlined at each call: turn on Build &gt; Preprocess on Save)</floater.string>
     <floater.string name="ClearRecentFiles">Clear Menu</floater.string>
     <floater.string name="OriginCompiler">Compiler</floater.string>

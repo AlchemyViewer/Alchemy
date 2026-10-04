@@ -775,6 +775,17 @@ namespace tut
         studio.asks.back().answered(answer(constant, { problem(0, "syntax error") }));
         ensure("const explained: " + constant.check->analysis[0].message,
                constant.check->analysis[0].message.find("syntax error PreprocHintConst [WORD]=const") == 0);
+
+        // A directive read as code: the preprocessor's to explain, and
+        // nothing put in where the parser stopped.
+        Doc& directive = tab("d", "  #define MAX 15\ndefault { state_entry() { } }\n");
+        checking.ask(directive, Kind::Check, ALTextPos(), ALTextPos());
+        ALScriptProblem missing = problem(0, "Missing '('.");
+        missing.fixes.push_back(fix("Insert '('", 0, 9, 9, "("));
+        studio.asks.back().answered(answer(directive, { missing, problem(1, "syntax error") }));
+        ensure("the directive explained: " + directive.check->analysis[0].message,
+               directive.check->analysis[0].message == "Missing '('. PreprocHintDirective" && directive.check->analysis[0].fixes.empty());
+        ensure_equals("a line of code: as the parser said", directive.check->analysis[1].message, std::string("syntax error"));
         preprocessing = true;
     }
 

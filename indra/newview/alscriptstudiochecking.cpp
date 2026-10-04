@@ -1285,16 +1285,32 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
 void ALScriptStudioChecking::explainTransformWords(Doc& doc)
 {
     // A parse error on one of the preprocessor's words, with its transform
-    // off, is the transform's to explain (ALPreprocessor::transformAt).
+    // off, is the transform's to explain (ALPreprocessor::transformAt); one
+    // on a directive, with the script not preprocessed, the preprocessor's.
     using Transform                     = ALPreprocessor::Transform;
     const bool            preprocessing = ALScriptStudioViewer::get().preprocessing();
     const ALTextDocument& text          = doc.editor->document();
     const auto            line          = [&text](S32 index) { return std::string_view(text.line(index)); };
+    const bool expanded = preprocessed(doc);
     for (ALScriptProblem& problem : doc.check->analysis)
     {
         if (problem.severity != ALScriptProblem::Severity::Error || !problem.file.empty())
         {
             continue;
+        }
+        // A directive read as code, the script not preprocessed: the
+        // parser's complaint is the preprocessor's to explain, and what it
+        // would put in is nothing the line wants.
+        if (!expanded && problem.line >= 0 && problem.line < text.lineCount())
+        {
+            const std::string_view at   = line(problem.line);
+            const size_t           code = at.find_first_not_of(" \t");
+            if (code != std::string_view::npos && at[code] == '#')
+            {
+                problem.message += " " + mServices.words("PreprocHintDirective");
+                problem.fixes.clear();
+                continue;
+            }
         }
         std::string     word;
         const Transform transform = ALPreprocessor::transformAt(line, text.lineCount(), problem.line, word);
