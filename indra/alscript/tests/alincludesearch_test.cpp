@@ -23,9 +23,9 @@
 
 #include "linden_common.h"
 
-#include "../alincludesearch.h"
+#include "../preprocessor/alincludesearch.h"
 
-#include "../alincludeidentity.h"
+#include "../preprocessor/alincludeidentity.h"
 #include "fsyspath.h"
 #include "llfile.h"
 

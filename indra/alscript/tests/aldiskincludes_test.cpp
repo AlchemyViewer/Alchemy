@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../aldiskincludes.h"
+#include "../preprocessor/aldiskincludes.h"
 
 #include "fsyspath.h"
 

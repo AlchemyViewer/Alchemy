@@ -23,7 +23,7 @@
 
 #include "linden_common.h"
 
-#include "../alscriptsnapshot.h"
+#include "../preprocessor/alscriptsnapshot.h"
 
 #include "../test/lltut.h"
 

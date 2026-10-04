@@ -6,55 +6,64 @@
 
 add_library(alscript STATIC)
 
+# Each folder is a part of the library, and each is on the include path,
+# so that a header is named alone wherever it is used:
+#   core/          what both languages share: problems, spans and symbols, the
+#                  lexicon, the messages, a script's weight, the formatter;
+#   lint/          the studio's own lints over both languages, and the fixes;
+#   lsl/           the LSL analyzer over Tailslide, and what reads LSL;
+#   lsl/optimizer/ the LSL optimizer, a pass a file;
+#   luau/          the SLua analyzer over Second Life's fork of Luau;
+#   preprocessor/  the preprocessor, its includes and what it keeps.
 target_sources(
   alscript
   PRIVATE
-    aldiskcache.cpp
-    aldiskincludes.cpp
-    alincludeidentity.cpp
-    alincludesearch.cpp
-    almodulelook.cpp
-    allslconsts.cpp
-    allslcosts.cpp
-    allsldeadcode.cpp
-    allsleffects.cpp
-    allslflowvalues.cpp
-    allslfolder.cpp
-    allsllintpass.cpp
-    allslinliner.cpp
-    allsllibraryfold.cpp
-    almessagemap.cpp
-    allslnames.cpp
-    allsloptimizer.cpp
-    allsloptimizerpass.cpp
-    allslprinter.cpp
-    allslrepeatedcalls.cpp
-    alluauconfig.cpp
-    alluauexports.cpp
-    alluauservice.cpp
-    allslexports.cpp
-    allslservice.cpp
-    allslshapes.cpp
-    allslsimplifier.cpp
-    allsltoslua.cpp
-    allsltraits.cpp
-    allslvalues.cpp
-    alpreprocessor.cpp
-    alscriptenvelope.cpp
-    alscriptfixes.cpp
-    alscriptformatter.cpp
-    alscriptlexicon.cpp
-    alscriptlintpass.cpp
-    alscriptmessages.cpp
-    alscriptnameindex.cpp
-    alscriptsnapshot.cpp
-    alnotecardformat.cpp
-    alscriptweight.cpp
-    alscriptstack.cpp
-    alscripttempfiles.cpp
-    alscripttextcache.cpp
-    alselenefilters.cpp
-    alsourcemap.cpp
+    core/almessagemap.cpp
+    core/alnotecardformat.cpp
+    core/alscriptformatter.cpp
+    core/alscriptlexicon.cpp
+    core/alscriptmessages.cpp
+    core/alscriptnameindex.cpp
+    core/alscriptstack.cpp
+    core/alscripttempfiles.cpp
+    core/alscriptweight.cpp
+    lint/allsllintpass.cpp
+    lint/alscriptfixes.cpp
+    lint/alscriptlintpass.cpp
+    lint/alselenefilters.cpp
+    lsl/allslconsts.cpp
+    lsl/allsleffects.cpp
+    lsl/allslexports.cpp
+    lsl/allslservice.cpp
+    lsl/allsltoslua.cpp
+    lsl/allsltraits.cpp
+    lsl/allslvalues.cpp
+    lsl/optimizer/allslcosts.cpp
+    lsl/optimizer/allsldeadcode.cpp
+    lsl/optimizer/allslflowvalues.cpp
+    lsl/optimizer/allslfolder.cpp
+    lsl/optimizer/allslinliner.cpp
+    lsl/optimizer/allsllibraryfold.cpp
+    lsl/optimizer/allslnames.cpp
+    lsl/optimizer/allsloptimizer.cpp
+    lsl/optimizer/allsloptimizerpass.cpp
+    lsl/optimizer/allslprinter.cpp
+    lsl/optimizer/allslrepeatedcalls.cpp
+    lsl/optimizer/allslshapes.cpp
+    lsl/optimizer/allslsimplifier.cpp
+    luau/alluauconfig.cpp
+    luau/alluauexports.cpp
+    luau/alluauservice.cpp
+    preprocessor/aldiskcache.cpp
+    preprocessor/aldiskincludes.cpp
+    preprocessor/alincludeidentity.cpp
+    preprocessor/alincludesearch.cpp
+    preprocessor/almodulelook.cpp
+    preprocessor/alpreprocessor.cpp
+    preprocessor/alscriptenvelope.cpp
+    preprocessor/alscriptsnapshot.cpp
+    preprocessor/alscripttextcache.cpp
+    preprocessor/alsourcemap.cpp
 )
 
 target_sources(
@@ -62,60 +71,65 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
-        aldiskcache.h
-        aldiskincludes.h
-        alincludeidentity.h
-        alincludesearch.h
-        almodulelook.h
-        allslconsts.h
-        allslcosts.h
-        allsldeadcode.h
-        allsleffects.h
-        allslflowvalues.h
-        allslfolder.h
-        allsllintpass.h
-        allslinliner.h
-        allsllibraryfold.h
-        almessagemap.h
-        allslnames.h
-        allsloptimizer.h
-        allsloptimizerpass.h
-        allslprinter.h
-        allslrepeatedcalls.h
-        allsltraits.inc
-        allsluuids.inc
-        allsleventtext.inc
-        alluauconfig.h
-        alluauexports.h
-        alluauservice.h
-        allslexports.h
-        allslservice.h
-        allslshapes.h
-        allslsimplifier.h
-        allsltoslua.h
-        allsltraits.h
-        allslvalues.h
-        alpreprocessor.h
-        alscriptengine.h
-        alscriptenvelope.h
-        alscriptfixes.h
-        alscriptformatter.h
-        alscriptjoblane.h
-        alscriptlexicon.h
-        alscriptlintpass.h
-        alscriptmessages.h
-        alscriptnameindex.h
-        alscriptsnapshot.h
-        alscriptspan.h
-        alnotecardformat.h
-        alscriptproblem.h
-        alscriptstack.h
-        alscriptsymbol.h
-        alscripttempfiles.h
-        alscripttextcache.h
-        alscriptweight.h
-        alselenefilters.h
-        alsourcemap.h
+        core/almessagemap.h
+        core/alnotecardformat.h
+        core/alscriptengine.h
+        core/alscriptformatter.h
+        core/alscriptlexicon.h
+        core/alscriptmessages.h
+        core/alscriptnameindex.h
+        core/alscriptproblem.h
+        core/alscriptspan.h
+        core/alscriptstack.h
+        core/alscriptsymbol.h
+        core/alscripttempfiles.h
+        core/alscriptweight.h
+        lint/allsllintpass.h
+        lint/alscriptfixes.h
+        lint/alscriptlintpass.h
+        lint/alselenefilters.h
+        lsl/allslconsts.h
+        lsl/allsleffects.h
+        lsl/allsleventtext.inc
+        lsl/allslexports.h
+        lsl/allslservice.h
+        lsl/allsltoslua.h
+        lsl/allsltraits.h
+        lsl/allsltraits.inc
+        lsl/allsluuids.inc
+        lsl/allslvalues.h
+        lsl/optimizer/allslcosts.h
+        lsl/optimizer/allsldeadcode.h
+        lsl/optimizer/allslflowvalues.h
+        lsl/optimizer/allslfolder.h
+        lsl/optimizer/allslinliner.h
+        lsl/optimizer/allsllibraryfold.h
+        lsl/optimizer/allslnames.h
+        lsl/optimizer/allsloptimizer.h
+        lsl/optimizer/allsloptimizerpass.h
+        lsl/optimizer/allslprinter.h
+        lsl/optimizer/allslrepeatedcalls.h
+        lsl/optimizer/allslshapes.h
+        lsl/optimizer/allslsimplifier.h
+        luau/alluauconfig.h
+        luau/alluauexports.h
+        luau/alluauservice.h
+        preprocessor/aldiskcache.h
+        preprocessor/aldiskincludes.h
+        preprocessor/alincludeidentity.h
+        preprocessor/alincludesearch.h
+        preprocessor/almodulelook.h
+        preprocessor/alpreprocessor.h
+        preprocessor/alscriptenvelope.h
+        preprocessor/alscriptjoblane.h
+        preprocessor/alscriptsnapshot.h
+        preprocessor/alscripttextcache.h
+        preprocessor/alsourcemap.h
+)
+
+target_include_directories(
+  alscript
+  PUBLIC core lint lsl lsl/optimizer luau preprocessor
 )
 
 target_link_libraries(alscript PRIVATE al::flags ll::slua ll::tailslide llmath PUBLIC llcommon)
@@ -140,18 +154,18 @@ else()
   )
 endif()
 set_source_files_properties(
-  allsldeadcode.cpp
-  allslflowvalues.cpp
-  allslfolder.cpp
-  allsllibraryfold.cpp
-  allslnames.cpp
-  allsloptimizer.cpp
-  allsloptimizerpass.cpp
-  allslprinter.cpp
-  allslrepeatedcalls.cpp
-  allslshapes.cpp
-  allslsimplifier.cpp
-  allslvalues.cpp
+  lsl/allslvalues.cpp
+  lsl/optimizer/allsldeadcode.cpp
+  lsl/optimizer/allslflowvalues.cpp
+  lsl/optimizer/allslfolder.cpp
+  lsl/optimizer/allsllibraryfold.cpp
+  lsl/optimizer/allslnames.cpp
+  lsl/optimizer/allsloptimizer.cpp
+  lsl/optimizer/allsloptimizerpass.cpp
+  lsl/optimizer/allslprinter.cpp
+  lsl/optimizer/allslrepeatedcalls.cpp
+  lsl/optimizer/allslshapes.cpp
+  lsl/optimizer/allslsimplifier.cpp
   PROPERTIES COMPILE_OPTIONS "${alscript_ieee_options}" SKIP_PRECOMPILE_HEADERS TRUE
 )
 

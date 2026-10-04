@@ -23,7 +23,7 @@
 
 #include "linden_common.h"
 
-#include "../alsourcemap.h"
+#include "../preprocessor/alsourcemap.h"
 
 #include "../test/lltut.h"
 

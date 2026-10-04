@@ -24,9 +24,9 @@
 
 #include "linden_common.h"
 
-#include "../alscriptstack.h"
+#include "../core/alscriptstack.h"
 
-#include "../alpreprocessor.h"
+#include "../preprocessor/alpreprocessor.h"
 
 #include "../test/lltut.h"
 

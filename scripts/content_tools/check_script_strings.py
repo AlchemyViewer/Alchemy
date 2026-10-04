@@ -57,16 +57,21 @@ import xml.etree.ElementTree as ET
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 STRINGS = os.path.join(ROOT, "indra", "newview", "skins", "default", "xui", "en", "strings.xml")
-MAP = os.path.join(ROOT, "indra", "alscript", "almessagemap.cpp")
-FIXES = os.path.join(ROOT, "indra", "alscript", "alscriptfixes.cpp")
+MAP = os.path.join(ROOT, "indra", "alscript", "core", "almessagemap.cpp")
+FIXES = os.path.join(ROOT, "indra", "alscript", "lint", "alscriptfixes.cpp")
 EDITOR_KEYS = os.path.join(ROOT, "indra", "llui", "alkeymap.cpp")
 KEYS_PANEL = os.path.join(ROOT, "indra", "newview", "skins", "default", "xui", "en", "panel_script_studio_keys.xml")
 STUDIO_SKIN = os.path.join(ROOT, "indra", "newview", "skins", "default", "xui", "en", "floater_script_studio.xml")
 CODE = [
     os.path.join(ROOT, "indra", "llui"),
-    os.path.join(ROOT, "indra", "alscript"),
     os.path.join(ROOT, "indra", "newview"),
 ]
+# alscript is a folder a part (core, lint, lsl, lsl/optimizer, ...); its
+# tests are not the studio's words.
+ALSCRIPT = os.path.join(ROOT, "indra", "alscript")
+for here, folders, _ in os.walk(ALSCRIPT):
+    folders[:] = sorted(f for f in folders if f != "tests")
+    CODE.append(here)
 # The keys that are the studio's: what strings.xml groups under these
 # prefixes is compared; the rest of the file is the viewer's.
 PREFIXES = ("Vim", "Preproc", "Optimizer", "Inliner", "LuauLint", "Luau", "LSL", "Workspace", "Analysis", "XUIEdit", "FindBar", "TabStrip", "ScriptFix", "ScriptAction", "Slua")

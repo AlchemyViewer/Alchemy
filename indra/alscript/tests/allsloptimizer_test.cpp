@@ -25,11 +25,11 @@
 
 #include "linden_common.h"
 
-#include "../alscriptengine.h"
-#include "../allslinliner.h"
-#include "../allsloptimizer.h"
-#include "../allslservice.h"
-#include "../allsltraits.h"
+#include "../core/alscriptengine.h"
+#include "../lsl/optimizer/allslinliner.h"
+#include "../lsl/optimizer/allsloptimizer.h"
+#include "../lsl/allslservice.h"
+#include "../lsl/allsltraits.h"
 
 #include "../test/lltut.h"
 

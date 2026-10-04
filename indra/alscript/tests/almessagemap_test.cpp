@@ -24,8 +24,8 @@
 
 #include "linden_common.h"
 
-#include "../almessagemap.h"
-#include "../alscriptproblem.h"
+#include "../core/almessagemap.h"
+#include "../core/alscriptproblem.h"
 
 #include "../test/lltut.h"
 

@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alscripttempfiles.h"
+#include "../core/alscripttempfiles.h"
 
 #include "fsyspath.h"
 #include "llfile.h"

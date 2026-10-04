@@ -33,10 +33,10 @@
 
 #include "linden_common.h"
 
-#include "../allslcosts.h"
+#include "../lsl/optimizer/allslcosts.h"
 
-#include "../allslservice.h"
-#include "../alscriptweight.h"
+#include "../lsl/allslservice.h"
+#include "../core/alscriptweight.h"
 
 #include "../test/lltut.h"
 

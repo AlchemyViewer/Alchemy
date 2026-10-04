@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alscriptenvelope.h"
+#include "../preprocessor/alscriptenvelope.h"
 
 #include "../test/lltut.h"
 

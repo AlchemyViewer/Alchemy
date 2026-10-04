@@ -25,8 +25,8 @@
 
 #include "linden_common.h"
 
-#include "../allsleffects.h"
-#include "../allslservice.h"
+#include "../lsl/allsleffects.h"
+#include "../lsl/allslservice.h"
 
 #include "../test/lltut.h"
 

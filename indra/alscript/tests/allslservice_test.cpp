@@ -24,8 +24,8 @@
 
 #include "linden_common.h"
 
-#include "../allslservice.h"
-#include "../alscriptfixes.h"
+#include "../lsl/allslservice.h"
+#include "../lint/alscriptfixes.h"
 
 #include "../test/lltut.h"
 

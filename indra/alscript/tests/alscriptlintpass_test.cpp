@@ -24,11 +24,11 @@
 
 #include "linden_common.h"
 
-#include "../allslservice.h"
-#include "../allsltoslua.h"
-#include "../alluauservice.h"
-#include "../alscriptfixes.h"
-#include "../alscriptlintpass.h"
+#include "../lsl/allslservice.h"
+#include "../lsl/allsltoslua.h"
+#include "../luau/alluauservice.h"
+#include "../lint/alscriptfixes.h"
+#include "../lint/alscriptlintpass.h"
 
 #include "../test/lltut.h"
 

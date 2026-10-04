@@ -23,7 +23,7 @@
 
 #include "linden_common.h"
 
-#include "../alincludeidentity.h"
+#include "../preprocessor/alincludeidentity.h"
 
 #include "../test/lltut.h"
 

@@ -24,8 +24,8 @@
 
 #include "linden_common.h"
 
-#include "../alluauconfig.h"
-#include "../alscriptlintpass.h"
+#include "../luau/alluauconfig.h"
+#include "../lint/alscriptlintpass.h"
 
 #include "../test/lltut.h"
 
