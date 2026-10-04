@@ -1465,4 +1465,24 @@ namespace tut
         ensure("locals lined up: " + r.text, has(r, "\nlocal x: number  = 1\nlocal yy: number = 2.5\n"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<43>()
+    {
+        set_test_name("text made a vector or a rotation bracketed only where an operator around it needs it");
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert("vector offset;\n"
+                                                           "default { state_entry() {\n"
+                                                           "    list command = [\"a\", \"<1,2,3>\"];\n"
+                                                           "    offset = (vector)llList2String(command, 1);\n"
+                                                           "    rotation r = (rotation)llList2String(command, 1);\n"
+                                                           "    llOwnerSay((string)((vector)llList2String(command, 1) * 2.0));\n"
+                                                           "    llSetPos((vector)llList2String(command, 1));\n"
+                                                           "} }\n");
+        ensure("converted", r.converted);
+        ensure("assigned as it is: " + r.text, has(r, "offset = tovector(command[2] or \"\") or ZERO_VECTOR\n"));
+        ensure("a local's value too: " + r.text, has(r, "local r = toquaternion(command[2] or \"\") or ZERO_ROTATION\n"));
+        ensure("an argument too: " + r.text, has(r, "ll.SetPos(tovector(command[2] or \"\") or ZERO_VECTOR)"));
+        ensure("an operand bracketed: " + r.text, has(r, "(tovector(command[2] or \"\") or ZERO_VECTOR) * 2"));
+        checksClean(r);
+    }
 }

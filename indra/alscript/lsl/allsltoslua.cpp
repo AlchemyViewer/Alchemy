@@ -2698,8 +2698,10 @@ namespace
             case LST_KEY:
                 note(e, "SluaUuid", "SLua's uuid holds a key; LSL's key could hold any text.");
                 return { "uuid(" + v.text + ")" };
-            case LST_VECTOR: return { "(tovector(" + v.text + ") or ZERO_VECTOR)" };
-            case LST_QUATERNION: return { "(toquaternion(" + v.text + ") or ZERO_ROTATION)" };
+            // Text that is no vector or rotation is LSL's zero one; bracketed
+            // only where an operator around it binds more tightly than or.
+            case LST_VECTOR: return { "tovector(" + v.text + ") or ZERO_VECTOR", OR };
+            case LST_QUATERNION: return { "toquaternion(" + v.text + ") or ZERO_ROTATION", OR };
             case LST_LIST: return { "{" + v.text + "}" };
             default: return v;
         }
