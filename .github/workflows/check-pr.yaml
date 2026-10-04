@@ -4,12 +4,13 @@ on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
 
-permissions:
-  contents: read
+# The check reads the event payload; it makes no API calls.
+permissions: {}
 
 jobs:
   check-description:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Check PR description
         uses: actions/github-script@v9

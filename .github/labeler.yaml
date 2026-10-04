@@ -1,3 +1,7 @@
+alscript:
+- changed-files:
+  - any-glob-to-any-file: indra/alscript/**
+
 llappearance:
 - changed-files:
   - any-glob-to-any-file: indra/llappearance/**
@@ -17,10 +21,6 @@ llcommon:
 llcorehttp:
 - changed-files:
   - any-glob-to-any-file: indra/llcorehttp/**
-
-llcrashlogger:
-- changed-files:
-  - any-glob-to-any-file: indra/llcrashlogger/**
 
 llfilesystem:
 - changed-files:
@@ -46,13 +46,13 @@ llmath:
 - changed-files:
   - any-glob-to-any-file: indra/llmath/**
 
-llmeshoptimizer:
-- changed-files:
-  - any-glob-to-any-file: indra/llmeshoptimizer/**
-
 llmessage:
 - changed-files:
   - any-glob-to-any-file: indra/llmessage/**
+
+llphysicsextensionsos:
+- changed-files:
+  - any-glob-to-any-file: indra/llphysicsextensionsos/**
 
 llplugin:
 - changed-files:
@@ -70,6 +70,10 @@ llui:
 - changed-files:
   - any-glob-to-any-file: indra/llui/**
 
+llwebrtc:
+- changed-files:
+  - any-glob-to-any-file: indra/llwebrtc/**
+
 llwindow:
 - changed-files:
   - any-glob-to-any-file: indra/llwindow/**
@@ -77,6 +81,10 @@ llwindow:
 llxml:
 - changed-files:
   - any-glob-to-any-file: indra/llxml/**
+
+media_plugins:
+- changed-files:
+  - any-glob-to-any-file: indra/media_plugins/**
 
 viewer:
 - changed-files:
@@ -115,3 +123,7 @@ objc:
   - any-glob-to-any-file:
     - '**/*.m'
     - '**/*.mm'
+
+github_actions:
+- changed-files:
+  - any-glob-to-any-file: .github/**

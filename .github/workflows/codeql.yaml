@@ -1,0 +1,142 @@
+name: CodeQL
+
+on:
+  push:
+    branches: ["develop", "main"]
+  pull_request:
+    branches: ["develop", "main"]
+    # Nothing CodeQL reads: skins, settings, shaders, docs.
+    paths-ignore:
+      - "**/*.md"
+      - "doc/**"
+      - "indra/newview/app_settings/**"
+      - "indra/newview/character/**"
+      - "indra/newview/skins/**"
+  schedule:
+    # Weekly, so new queries reach code nobody has touched since.
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A pull request analyses only its latest push. A branch keeps one analysis
+# running and the newest waiting, so a busy develop still finishes some.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.build-mode == 'manual' && 360 || 30 }}
+    permissions:
+      # Reads the run the results belong to.
+      actions: read
+      contents: read
+      # Uploads the results to code scanning.
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: actions
+            language: actions
+            build-mode: none
+            runner: ubuntu-latest
+            category: /language:actions
+          - name: python
+            language: python
+            build-mode: none
+            runner: ubuntu-latest
+            category: /language:python
+          # C/C++ is traced through a real build, so the analysis sees the
+          # code as compiled, every vcpkg header resolved and every platform
+          # #if decided. One row per platform layer. Linux keeps the category
+          # default setup used, so its alerts and their dismissals carry over.
+          # macOS adds little: CodeQL does not read Objective-C++.
+          - name: c-cpp, Linux
+            language: c-cpp
+            build-mode: manual
+            runner: ubuntu-26.04
+            preset: ninja-os-mold
+            triplet: x64-linux-alchemy-avx2-release
+            category: /language:c-cpp
+          - name: c-cpp, Windows
+            language: c-cpp
+            build-mode: manual
+            runner: windows-2025-vs2026
+            preset: vs2026-os-x64
+            triplet: x64-windows-alchemy-avx2-release
+            category: /language:c-cpp/os:windows
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: "clear;default,readwrite"
+      # MSBuild keeps its worker nodes alive between builds. One started by
+      # the configure, before tracing began, would compile untraced.
+      MSBUILDDISABLENODEREUSE: 1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          # The build needs the submodules, and vcpkg its full history to
+          # resolve the versions the manifest pins.
+          fetch-depth: ${{ matrix.build-mode == 'manual' && '0' || '1' }}
+          persist-credentials: false
+          submodules: ${{ matrix.build-mode == 'manual' && 'recursive' || 'false' }}
+
+      - name: Set up the build
+        if: matrix.build-mode == 'manual'
+        uses: ./.github/actions/setup-build
+        with:
+          # Read only, with the read-only keys: an analysis has nothing to add
+          # to the cache.
+          r2-cache-mode: >-
+            ${{ vars.VCPKG_R2_ENABLED == 'true' && github.actor != 'dependabot[bot]' &&
+            (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+            'read' || '' }}
+          r2-endpoint-url: ${{ vars.VCPKG_R2_ENDPOINT_URL }}
+          r2-bucket: ${{ vars.VCPKG_R2_BUCKET }}
+          r2-access-key-id: ${{ secrets.VCPKG_R2_READ_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.VCPKG_R2_READ_SECRET_ACCESS_KEY }}
+
+      # The configure installs the vcpkg ports, so it runs before tracing
+      # starts: the database holds the viewer, not its dependencies. The
+      # build tree sits outside the checkout, which keeps the vcpkg headers
+      # out of the source root and so out of the alerts. Precompiled headers
+      # are off because the extractor reads each source file whole.
+      - name: Configure
+        if: matrix.build-mode == 'manual'
+        shell: bash
+        env:
+          PRESET: ${{ matrix.preset }}
+          TRIPLET: ${{ matrix.triplet }}
+        run: |
+          set -x
+          cmake -S indra --preset "$PRESET" -B "$RUNNER_TEMP/codeql-build" \
+            -DVCPKG_TARGET_TRIPLET="$TRIPLET" \
+            -DAL_BUILD_TESTS:BOOL=OFF \
+            -DAL_BUILD_PACKAGE:BOOL=OFF \
+            -DAL_USE_VELOPACK:BOOL=ON \
+            -DAL_USE_LTO:BOOL=OFF \
+            -DAL_USE_TRACY:BOOL=OFF \
+            -DAL_USE_PRECOMPILED_HEADERS:BOOL=OFF
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          config-file: ./.github/codeql/codeql-config.yaml
+
+      # The runner's own shell on each platform: pwsh on Windows, where the
+      # tracer follows MSBuild's processes.
+      - name: Build
+        if: matrix.build-mode == 'manual'
+        run: cmake --build "${{ runner.temp }}/codeql-build" --config Release --parallel
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: ${{ matrix.category }}
