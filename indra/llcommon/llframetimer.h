@@ -82,7 +82,7 @@ public:
     void resetWithExpiry(F32 expiration);
     void pause();
     void unpause();
-    void setTimerExpirySec(F32 expiration);
+    void setTimerExpirySec(F32 expiration);         // Expires this long from now, as LLTimer's does
     void setExpiryAt(F64 seconds_since_epoch);
     bool checkExpirationAndReset(F32 expiration);
     F32 getElapsedTimeAndResetF32()                 { F32 t = F32(sFrameTime - mStartTime); reset(); return t; }

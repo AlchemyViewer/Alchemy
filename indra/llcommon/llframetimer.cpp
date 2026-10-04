@@ -96,7 +96,7 @@ void LLFrameTimer::unpause()
 
 void LLFrameTimer::setTimerExpirySec(F32 expiration)
 {
-    mExpiry = expiration + mStartTime;
+    mExpiry = expiration + sFrameTime;
 }
 
 void LLFrameTimer::setExpiryAt(F64 seconds_since_epoch)
