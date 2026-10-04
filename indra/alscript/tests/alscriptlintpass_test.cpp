@@ -902,5 +902,12 @@ namespace tut
                    std::string::npos);
         ensure("not where _G is",
                found(std::string("print(_G)\n") + shared, "SlGlobalAssign", ALScriptProblem::Severity::Note).find("LuauLintSlGlobalInFunction") == std::string::npos);
+        ensure("set at the top in a block of it: not in a function",
+               found("if true then\n    x = 1\nend\nfunction f() x = 2 end\nf()\nprint(x)\n", "SlGlobalAssign", ALScriptProblem::Severity::Note)
+                   .find("LuauLintSlGlobalInFunction") == std::string::npos);
+        ensure("made by function f() at the top, its own lint off: made there",
+               found("--!nolint SlGlobalFunction\nfunction onTouch() end\nfunction reset() onTouch = nil end\nreset()\nonTouch()\n", "SlGlobalAssign",
+                     ALScriptProblem::Severity::Note)
+                   .find("LuauLintSlGlobalInFunction") == std::string::npos);
     }
 }

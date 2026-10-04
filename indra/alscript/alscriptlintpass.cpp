@@ -487,7 +487,8 @@ namespace
     };
 
     // Every global the script sets, by name: where it is first set, and
-    // whether it is ever set by a statement of the script's top itself.
+    // whether it is ever set outside every function -- at the top, or in a
+    // block of the top's.
     class GlobalSets final : public Luau::AstVisitor
     {
     public:
@@ -496,31 +497,42 @@ namespace
             Luau::Location first;
             bool           atTop = false;
         };
-        explicit GlobalSets(const Luau::AstStatBlock* root)
-        {
-            for (Luau::AstStat* stat : root->body)
-            {
-                mTop.insert(stat);
-            }
-        }
         boost::unordered_flat_map<std::string, Set> sets;
 
         bool visit(Luau::AstStatAssign* node) override
         {
             for (Luau::AstExpr* var : node->vars)
             {
-                took(var, node);
+                took(var);
             }
             return true;
         }
         bool visit(Luau::AstStatCompoundAssign* node) override
         {
-            took(node->var, node);
+            took(node->var);
             return true;
+        }
+        // function f() at the top makes f there; one inside a function is
+        // FunctionInScope's to say.
+        bool visit(Luau::AstStatFunction* node) override
+        {
+            if (mDepth == 0)
+            {
+                took(node->name);
+            }
+            return true;
+        }
+        // Inside a function, however deep in the top's blocks it stands.
+        bool visit(Luau::AstExprFunction* node) override
+        {
+            ++mDepth;
+            node->body->visit(this);
+            --mDepth;
+            return false;
         }
 
     private:
-        void took(Luau::AstExpr* var, Luau::AstStat* stat)
+        void took(Luau::AstExpr* var)
         {
             const auto* global = var->as<Luau::AstExprGlobal>();
             if (!global)
@@ -532,9 +544,9 @@ namespace
             {
                 it->second.first = global->location;
             }
-            it->second.atTop = it->second.atTop || mTop.contains(stat);
+            it->second.atTop = it->second.atTop || mDepth == 0;
         }
-        boost::unordered_flat_set<const Luau::AstStat*> mTop;
+        S32 mDepth = 0;
     };
 
     // What a loop's body does to strings, not looking into the functions
@@ -2183,7 +2195,7 @@ namespace
             {
                 return;
             }
-            GlobalSets sets(mRoot);
+            GlobalSets sets;
             const_cast<Luau::AstStatBlock*>(mRoot)->visit(&sets);
             std::vector<std::pair<std::string, GlobalSets::Set>> ordered(sets.sets.begin(), sets.sets.end());
             std::sort(ordered.begin(), ordered.end(), [](const auto& a, const auto& b) { return a.second.first.begin < b.second.first.begin; });
