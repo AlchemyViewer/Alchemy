@@ -173,6 +173,8 @@ ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::
     ALCodeEditor* made       = LLUICtrlFactory::create<ALCodeEditor>(p);
     addChild(made);
     made->onCaretMoved([this]() { refreshBar(); });
+    // Vim's ]c and [c, where the host puts vim over the sides.
+    made->setChangeStepper([this](bool forward) { return goToChange(forward); });
     return made;
 }
 

@@ -74,6 +74,11 @@ public:
     virtual std::optional<ALTextRange> functionFrom(const ALTextPos& at, bool forward, bool ends) const = 0;
     virtual std::optional<ALTextRange> functionAround(const ALTextRange& range) const                  = 0;
 
+    // The next change of a comparison the text is a side of, or the one
+    // before it, the caret put at its first line: ]c and [c. False where
+    // there is none that way, or the text is a side of none.
+    virtual bool stepChange(bool forward) = 0;
+
 protected:
     ~ALVimHost() = default;
 };

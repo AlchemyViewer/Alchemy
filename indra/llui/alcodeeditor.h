@@ -581,6 +581,11 @@ public:
     std::optional<ALTextRange> functionFrom(const ALTextPos& at, bool forward, bool ends) const override;
     // The innermost function holding a stretch and more besides.
     std::optional<ALTextRange> functionAround(const ALTextRange& range) const override;
+    // A comparison's changes, where the text is a side of one: what vim's
+    // ]c and [c step through, answered by the comparison.
+    typedef std::function<bool(bool forward)> change_stepper_t;
+    void setChangeStepper(change_stepper_t stepper) { mChangeStepper = std::move(stepper); }
+    bool stepChange(bool forward) override { return mChangeStepper && mChangeStepper(forward); }
     typedef std::function<void(const LLSD& value)> fix_handler_t;
     void setFixHandler(fix_handler_t handler) { mFixHandler = std::move(handler); }
     // What the problems on a line offer: any fix at all -- a suppression
@@ -1057,6 +1062,7 @@ private:
     boost::unordered_flat_map<std::string, LLUIImagePtr, ll::string_hash, std::equal_to<>> mIcons;
     fix_provider_t          mFixProvider;
     function_provider_t     mFunctionProvider;
+    change_stepper_t        mChangeStepper;
     fix_handler_t           mFixHandler;
     // What the list holds (ALFixListModel); who is told each showing of
     // it, and who is asked for the refactors.

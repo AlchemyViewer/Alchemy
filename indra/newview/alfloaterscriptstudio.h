@@ -343,6 +343,11 @@ private:
     // A notecard's editor takes the notecards' own wrap and line numbers,
     // counted from 0 where that is asked for.
     void                      applyEditorOptions(ALCodeEditor& editor, bool notecard = false);
+    // The keys every editor shares, vim's among them where it is on.
+    void                      applyEditorKeys(ALCodeEditor& editor);
+    // A comparison's sides in the editors' face and keys, but for what
+    // would part the sides: wrapping, folding.
+    void                      applyCompareOptions(ALDiffView& view);
     // The expanded text put in the document's other editor, which is shown
     // once there is one where the tab asked for it.
     void                      showExpanded(Doc& doc, const std::string& text) override;

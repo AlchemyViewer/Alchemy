@@ -902,12 +902,18 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
         switch (input.key)
         {
             case KEY_ESCAPE:
+            {
+                // Normal mode with nothing begun: the view's, which lets a
+                // selection go, or passes it on where it says -- out of a
+                // comparison, back to its source.
+                const bool begun = mMode != Mode::Normal || mPending || mCount || mOperator || mRegister || mSurroundWaiting;
                 if (mMode != Mode::Normal)
                 {
                     leaveVisual(view);
                 }
                 clearPending();
-                return true;
+                return begun;
+            }
             case KEY_LEFT:      return command(view, 'h');
             case KEY_RIGHT:     return command(view, 'l');
             case KEY_UP:        return command(view, 'k');
@@ -1714,7 +1720,7 @@ bool ALVimKeymap::afterBracket(ALTextView& view, llwchar pending, llwchar ch)
     const ALTextDocument& d       = view.document();
     const S32             count   = countOr(mCount);
     // ]d [d the problems, ]s [s the misspellings, [z ]z the fold
-    // the caret is in.
+    // the caret is in, ]c [c the changes of a comparison.
     const bool    forward  = pending == ']';
     const S32     given    = mCount;
     const llwchar operated = mOperator;
@@ -1726,6 +1732,14 @@ bool ALVimKeymap::afterBracket(ALTextView& view, llwchar pending, llwchar ch)
     else if (ch == 's')
     {
         misspelling(view, forward, countOr(given));
+    }
+    else if (ch == 'c')
+    {
+        // The count on, as far as there are changes.
+        ALVimHost* host = view.vimHost();
+        for (S32 n = 0; n < countOr(given) && host && host->stepChange(forward); ++n)
+        {
+        }
     }
     else if (ch == 'z')
     {

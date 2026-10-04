@@ -29,6 +29,7 @@
 #include "../alcodeeditor.h"
 #include "../aldiffbar.h"
 #include "../alflatbutton.h"
+#include "../alvimkeymap.h"
 #include "../llclipboard.h"
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
@@ -37,6 +38,7 @@
 
 #include "../test/lltut.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -364,4 +366,34 @@ namespace tut
         ensure_equals("still the right's line", d.rightAtCaret().first, 2);
     }
 
+    template<> template<>
+    void aldiffview_object::test<12>()
+    {
+        set_test_name("vim over a side: ]c and [c step through the changes, a count as far as there are; Escape with nothing begun leaves the comparison");
+        ALDiffView& d = make("one\ntwo\nthree\nfour\nfive\nsix\nseven", "one\n2\nthree\nfour\n5\nsix\nseven\neight");
+        d.right()->setModalKeymap(std::make_unique<ALVimKeymap>());
+        d.right()->setFocus(true);
+        const auto typed = [&d](const char* keys) {
+            for (const char* c = keys; *c; ++c)
+            {
+                d.right()->handleUnicodeChar(static_cast<llwchar>(*c), false);
+            }
+        };
+        typed("]c");
+        ensure_equals("the first change", d.right()->caret().line, 1);
+        typed("]c");
+        ensure_equals("the next", d.right()->caret().line, 4);
+        typed("[c");
+        ensure_equals("back", d.right()->caret().line, 1);
+        typed("5]c");
+        ensure_equals("a count, as far as there are", d.right()->caret().line, 7);
+        ensure("nothing typed anywhere", d.right()->text().find(']') == std::string::npos);
+        ensure("j moves, as in a text that cannot be changed", (typed("gg"), typed("j"), d.right()->caret().line == 1));
+
+        S32 told = 0;
+        d.setOnEscape([&told]() { ++told; });
+        typed("3");
+        ensure("Escape with a count begun lets the count go", d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false) && told == 0);
+        ensure("then the comparison's", d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false) && told == 1);
+    }
 }

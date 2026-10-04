@@ -1791,7 +1791,7 @@ void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const
         p.side                    = side;
         doc.compareView           = LLUICtrlFactory::create<ALDiffView>(p);
         doc.compareView->setVisible(false);
-        doc.compareView->setFont(ALScriptStudio::editorFont());
+        applyCompareOptions(*doc.compareView);
         doc.compareView->setOnInline([this](bool inline_view) { setCompareInline(inline_view); });
         const std::string id = doc.id;
         doc.compareView->setOnEscape([this, id]() {
@@ -1891,10 +1891,8 @@ void ALScriptStudio::applyTypingOptions(ALCodeEditor& editor)
     editor.setHoverDelay(llclamp(gSavedSettings.getF32("ALScriptStudioHoverDelay"), 0.f, 5.f));
 }
 
-void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor, bool notecard)
+void ALFloaterScriptStudio::applyEditorKeys(ALCodeEditor& editor)
 {
-    editor.setFont(ALScriptStudio::editorFont());
-    editor.setOnZoomWheel([this](S32 steps) { zoomText(steps); });
     editor.keymap() = ALScriptKeymap::current();
     // Vim put over the editor, or taken away; one already there keeps
     // its marks and registers. The vimrc is read before the first.
@@ -1912,6 +1910,23 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor, bool noteca
     {
         editor.setModalKeymap(nullptr);
     }
+}
+
+void ALFloaterScriptStudio::applyCompareOptions(ALDiffView& view)
+{
+    view.setFont(ALScriptStudio::editorFont());
+    for (ALCodeEditor* side : { view.left(), view.right(), view.inlined() })
+    {
+        side->setOnZoomWheel([this](S32 steps) { zoomText(steps); });
+        applyEditorKeys(*side);
+    }
+}
+
+void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor, bool notecard)
+{
+    editor.setFont(ALScriptStudio::editorFont());
+    editor.setOnZoomWheel([this](S32 steps) { zoomText(steps); });
+    applyEditorKeys(editor);
     editor.setWordWrap(notecard ? mNotecardWrap : mWordWrap);
     editor.setShowLineNumbers(notecard ? mNotecardLineNumbers : mLineNumbers);
     if (notecard)
@@ -1947,6 +1962,10 @@ void ALFloaterScriptStudio::applyEditorOptions()
         if (each->expandedEditor)
         {
             applyEditorOptions(*each->expandedEditor);
+        }
+        if (each->compareView)
+        {
+            applyCompareOptions(*each->compareView);
         }
     }
     showEditorKeys();
