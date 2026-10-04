@@ -337,8 +337,8 @@ public:
 
 		while (scope)
 		{
-			entry_map_t::iterator found_it = mEntryMap.find(name);
-			if (found_it != mEntryMap.end())
+			entry_map_t::iterator found_it = scope->mEntryMap.find(name);
+			if (found_it != scope->mEntryMap.end())
 			{
 				// cool, we found it at this scope
 				return found_it->second;
