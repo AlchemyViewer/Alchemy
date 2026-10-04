@@ -1412,4 +1412,31 @@ namespace tut
         ensure("and those after: " + at(18) + " / " + at(19), at(18).find("local n: number = 3") != std::string::npos && at(19).find("n += 1") != std::string::npos);
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<42>()
+    {
+        set_test_name("declarations the LSL lined up lined up again, their = and the comments after them; those it did not, as written");
+        ALLSLToSLua::Options options;
+        options.types               = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert("integer S_MASK        = 0xF0000000; // the sign\n"
+                                                           "integer ACTIVE_STRIDE = 3;          // per prop\n"
+                                                           "string  PREFIX        = \"ARS#\";     // linkset data\n"
+                                                           "\n"
+                                                           "integer a = 1;\n"
+                                                           "string bee = \"b\";\n"
+                                                           "default { state_entry() {\n"
+                                                           "    integer x    = 1;\n"
+                                                           "    float   yy   = 2.5;\n"
+                                                           "    llOwnerSay(PREFIX + (string)(S_MASK + ACTIVE_STRIDE + a + x + yy) + bee);\n"
+                                                           "} }\n",
+                                                           options);
+        ensure("converted", r.converted);
+        ensure("globals lined up: " + r.text, has(r, "local S_MASK: number        = -268435456 -- the sign\n"
+                                                     "local ACTIVE_STRIDE: number = 3          -- per prop\n"
+                                                     "local PREFIX: string        = \"ARS#\"     -- linkset data\n"));
+        ensure("not lined up, not lined up: " + r.text, has(r, "local a: number = 1\nlocal bee: string = \"b\"\n"));
+        ensure("locals lined up: " + r.text, has(r, "\nlocal x: number  = 1\nlocal yy: number = 2.5\n"));
+        checksClean(r);
+    }
 }

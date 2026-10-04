@@ -383,6 +383,23 @@ namespace
         // written of it from `from` in the text, as the LSL had them; or
         // where nothing was, on a line of their own.
         void commentsAfter(LSLASTNode* node, size_t from);
+        // How long what commentsAfter put after each node's line was.
+        boost::unordered_flat_map<LSLASTNode*, size_t> mTrailed;
+
+        // Declarations on lines one after another that the LSL lined up --
+        // each one line, given a value, and their = at one column, or the
+        // comments after them -- lined up again, as what each is written as
+        // is as long as it is: each as it is written from `from`, the run
+        // ended by anything else.
+        void lined(LSLASTNode* node, size_t from);
+        void lineUp();
+        struct Lined
+        {
+            LSLASTNode*    node;
+            LSLIdentifier* id;
+            size_t         at;
+        };
+        std::vector<Lined> mRun;
         std::string indent() const { return std::string(static_cast<size_t>(mDepth) * 4, ' '); }
 
         // --- expressions ------------------------------------------------------------
@@ -403,6 +420,8 @@ namespace
         // it no other way there. Tailslide's constants are where the
         // parser's next token was, not where they were.
         std::optional<std::string> hexAsWritten(LSLConstant* c, int v);
+        // Where each of the LSL's lines starts, from the first.
+        const std::vector<size_t>& lineStarts();
         std::vector<size_t>        mLineStarts;
         Expr lvalue(LSLLValueExpression* e);
         Expr call(LSLFunctionExpression* e);
@@ -1349,6 +1368,7 @@ namespace
                 {
                     mCounted += after.size();
                 }
+                mTrailed[node] = after.size();
                 return;
             }
             at = end + 1;
@@ -1420,13 +1440,8 @@ namespace
         }
     }
 
-    std::optional<std::string> Writer::hexAsWritten(LSLConstant* c, int v)
+    const std::vector<size_t>& Writer::lineStarts()
     {
-        const auto* loc = c->getLoc();
-        if (!loc || loc->first_line < 1)
-        {
-            return std::nullopt;
-        }
         if (mLineStarts.empty())
         {
             mLineStarts.push_back(0);
@@ -1438,6 +1453,17 @@ namespace
                 }
             }
         }
+        return mLineStarts;
+    }
+
+    std::optional<std::string> Writer::hexAsWritten(LSLConstant* c, int v)
+    {
+        const auto* loc = c->getLoc();
+        if (!loc || loc->first_line < 1)
+        {
+            return std::nullopt;
+        }
+        lineStarts();
         // Each number on a line, past strings and comments: hexadecimal of
         // the value, and whether the value is there another way.
         bool       other  = false;
@@ -2907,10 +2933,12 @@ namespace
             {
                 statement(child, !child->getNext());
             }
+            lineUp();
             commentsAtEnd(s);
             return;
         }
         statement(s, true);
+        lineUp();
     }
 
     void Writer::statement(LSLASTNode* s, bool last)
@@ -2919,10 +2947,170 @@ namespace
         {
             return;
         }
+        // Lined up before anything else is written, which notes where in
+        // the text it was.
+        if (s->getNodeSubType() != NODE_DECLARATION)
+        {
+            lineUp();
+        }
         commentsBefore(s);
         const size_t from = mText.size();
         statementBody(s, last);
         commentsAfter(s, from);
+        lined(s, from);
+    }
+
+    void Writer::lined(LSLASTNode* node, size_t from)
+    {
+        // Its one line of code, past what was said over it.
+        LSLIdentifier* id    = nullptr;
+        LSLASTNode*    init  = nullptr;
+        if (node->getNodeType() == NODE_GLOBAL_VARIABLE)
+        {
+            id   = static_cast<LSLGlobalVariable*>(node)->getIdentifier();
+            init = static_cast<LSLGlobalVariable*>(node)->getInitializer();
+        }
+        else if (node->getNodeSubType() == NODE_DECLARATION)
+        {
+            id   = static_cast<LSLDeclaration*>(node)->getIdentifier();
+            init = static_cast<LSLDeclaration*>(node)->getInitializer();
+        }
+        size_t at    = std::string::npos;
+        int    lines = 0;
+        for (size_t i = from; id && i < mText.size();)
+        {
+            const size_t end   = mText.find('\n', i);
+            const size_t first = mText.find_first_not_of(' ', i);
+            if (end == std::string::npos)
+            {
+                break;
+            }
+            if (first < end && mText.compare(first, 2, "--") != 0)
+            {
+                at = lines++ == 0 ? i : at;
+            }
+            i = end + 1;
+        }
+        const bool fits = id && !isNull(init) && lines == 1 && node->getLoc()->first_line == node->getLoc()->last_line;
+        if (!fits || (!mRun.empty() && (mRun.back().node->getParent() != node->getParent() ||
+                                        mRun.back().node->getLoc()->last_line + 1 != node->getLoc()->first_line)))
+        {
+            // What it pads is all before this one's line, which moves on.
+            const size_t before = mText.size();
+            lineUp();
+            at += mText.size() - before;
+        }
+        if (fits)
+        {
+            mRun.push_back({ node, id, at });
+        }
+    }
+
+    void Writer::lineUp()
+    {
+        std::vector<Lined> run;
+        run.swap(mRun);
+        if (run.size() < 2)
+        {
+            return;
+        }
+        lineStarts();
+        // Where the LSL put each one's =, and the comment after it.
+        const auto lslLine = [&](S32 line) {
+            const size_t from = mLineStarts[static_cast<size_t>(line) - 1];
+            return mSource.substr(from, std::min(mSource.find('\n', from), mSource.size()) - from);
+        };
+        bool                 padded = false;
+        std::optional<size_t> equals;
+        std::optional<S32>    comment;
+        bool                  sameEquals  = true;
+        bool                  sameComment = true;
+        int                   comments    = 0;
+        for (const Lined& one : run)
+        {
+            const auto*            loc  = one.id->getLoc();
+            const std::string_view text = loc->first_line >= 1 && static_cast<size_t>(loc->first_line) <= mLineStarts.size()
+                                              ? lslLine(loc->first_line)
+                                              : std::string_view();
+            size_t                 i    = static_cast<size_t>(std::max(1, loc->first_column) - 1);
+            while (i < text.size() && (std::isalnum(static_cast<unsigned char>(text[i])) || text[i] == '_'))
+            {
+                ++i;
+            }
+            const size_t name_end = i;
+            while (i < text.size() && (text[i] == ' ' || text[i] == '\t'))
+            {
+                ++i;
+            }
+            if (i >= text.size() || text[i] != '=')
+            {
+                sameEquals = false;
+            }
+            else
+            {
+                padded     = padded || i - name_end > 1;
+                sameEquals = sameEquals && (!equals || *equals == i);
+                equals     = i;
+            }
+            if (const auto after = mCommentsAfter.find(one.node); after != mCommentsAfter.end() && mTrailed.contains(one.node))
+            {
+                const S32 column = mComments[after->second.front()].at.column;
+                sameComment      = sameComment && (!comment || *comment == column);
+                comment          = column;
+                ++comments;
+            }
+        }
+        const auto lineEnd = [&](size_t at) { return mText.find('\n', at); };
+        // Spaces put in, and where each line after them starts moved on.
+        const auto pad = [&](size_t at, size_t count) {
+            mText.insert(at, count, ' ');
+            if (at < mCounted)
+            {
+                mCounted += count;
+            }
+            for (Lined& one : run)
+            {
+                one.at += one.at > at ? count : 0;
+            }
+        };
+        // Each =, at the column of the one furthest on.
+        if (sameEquals && padded)
+        {
+            size_t most = 0;
+            for (const Lined& one : run)
+            {
+                most = std::max(most, mText.find(" = ", one.at) - one.at);
+            }
+            for (size_t n = run.size(); n > 0; --n)
+            {
+                const size_t at = mText.find(" = ", run[n - 1].at);
+                if (at < lineEnd(run[n - 1].at))
+                {
+                    pad(at, most - (at - run[n - 1].at));
+                }
+            }
+        }
+        // And each comment after them, past the longest line of code that
+        // has one.
+        if (sameComment && comments > 1)
+        {
+            size_t most = 0;
+            for (const Lined& one : run)
+            {
+                if (const auto trailed = mTrailed.find(one.node); trailed != mTrailed.end())
+                {
+                    most = std::max(most, lineEnd(one.at) - trailed->second - one.at);
+                }
+            }
+            for (size_t n = run.size(); n > 0; --n)
+            {
+                if (const auto trailed = mTrailed.find(run[n - 1].node); trailed != mTrailed.end())
+                {
+                    const size_t code = lineEnd(run[n - 1].at) - trailed->second;
+                    pad(code, most - (code - run[n - 1].at));
+                }
+            }
+        }
     }
 
     void Writer::onOneLine(size_t at, S32 lines, size_t anchors)
@@ -5307,8 +5495,10 @@ namespace
                 line("local " + nameOf(id) + typed(type) + " = " + (isNull(init) ? defaultOf(type) : coerced(init, type).text));
             }
             commentsAfter(global, from);
+            lined(global, from);
             any = true;
         }
+        lineUp();
         if (any)
         {
             line("");
