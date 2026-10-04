@@ -27,11 +27,15 @@
 #include "aldiffview.h"
 
 #include "alcodeeditor.h"
+#include "aldiffbar.h"
 #include "altextdiff.h"
 #include "lltextbox.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 #include "llrender2dutils.h"
+
+#include <algorithm>
+#include <tuple>
 
 static LLDefaultChildRegistry::Register<ALDiffView> r("diff_view");
 
@@ -102,6 +106,31 @@ ALDiffView::ALDiffView(const Params& p)
 :   LLUICtrl(p),
     mInline(p.inline_view)
 {
+    ALDiffBar::Params bp(LLUICtrlFactory::getDefaultParams<ALDiffBar>());
+    bp.name          = "bar";
+    bp.rect          = LLRect(0, ALDiffBar::wantedHeight(), 10, 0);
+    bp.follows.flags = FOLLOWS_NONE;
+    mBar             = LLUICtrlFactory::create<ALDiffBar>(bp);
+    addChild(mBar);
+    mBar->onPrevious([this]() { stepFromBar(false); });
+    mBar->onNext([this]() { stepFromBar(true); });
+    mBar->onInline([this]() {
+        setInline(!mInline);
+        if (mOnInline)
+        {
+            mOnInline(mInline);
+        }
+    });
+    mBar->onSwap([this]() { setSwapped(!mSwapped); });
+    mBar->onDone([this]() {
+        if (mEscape)
+        {
+            mEscape();
+        }
+    });
+    mBar->setInline(mInline);
+    mBar->setDoneShown(false);
+
     LLTextBox::Params head(LLUICtrlFactory::getDefaultParams<LLTextBox>());
     head.rect(LLRect(0, 16, 10, 0));
     head.follows.flags(FOLLOWS_NONE);
@@ -143,6 +172,7 @@ ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::
     p.pass_escape            = true;
     ALCodeEditor* made       = LLUICtrlFactory::create<ALCodeEditor>(p);
     addChild(made);
+    made->onCaretMoved([this]() { refreshBar(); });
     return made;
 }
 
@@ -191,21 +221,90 @@ void ALDiffView::setInline(bool inline_view)
     {
         return;
     }
-    const bool had_keys = hasFocus();
-    mInline             = inline_view;
+    const bool  had_keys = hasFocus();
+    const Place place    = placeOfCaret();
+    mInline              = inline_view;
+    mBar->setInline(mInline);
     arrange();
     rebuild();
+    restorePlace(place);
     if (had_keys)
     {
         shown()->setFocus(true);
     }
 }
 
+void ALDiffView::setSwapped(bool swapped)
+{
+    if (mSwapped == swapped)
+    {
+        return;
+    }
+    // The keyboard left on the side it was on, which now shows the other
+    // text: the place kept is the right's line, wherever that now is.
+    const Place place = placeOfCaret();
+    mSwapped          = swapped;
+    mBar->setSwapped(mSwapped);
+    arrange();
+    rebuild();
+    restorePlace(place);
+}
+
+void ALDiffView::setOnEscape(std::function<void()> escape)
+{
+    mEscape = std::move(escape);
+    mBar->setDoneShown(mEscape != nullptr);
+}
+
+ALDiffView::Place ALDiffView::placeOfCaret()
+{
+    Place               place;
+    ALCodeEditor*       side = shown();
+    std::tie(place.line, place.column) = rightAtCaret();
+    place.belowTop = side->layout().lineTop(side->caret().line) - side->scrollY();
+    return place;
+}
+
+void ALDiffView::restorePlace(const Place& place)
+{
+    // The row that now shows the right's line, on the side in front.
+    ALCodeEditor*           side = shown();
+    const std::vector<S32>& rows = rightRowsOf(side);
+    const auto              row  = std::find(rows.begin(), rows.end(), place.line + 1);
+    if (row == rows.end())
+    {
+        return;
+    }
+    const S32 at     = static_cast<S32>(row - rows.begin());
+    const S32 scroll = llmax(0, side->layout().lineTop(at) - place.belowTop);
+    // Each side at the row and scrolled alike: lined up, side by side.
+    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
+    for (ALCodeEditor* each : sides)
+    {
+        if (each)
+        {
+            each->goTo(ALTextPos(at, each == notRightSide() ? 0 : place.column));
+            each->setScrollY(scroll);
+        }
+    }
+    mScrolledY = side->scrollY();
+}
+
 void ALDiffView::rebuild()
 {
-    const std::vector<std::string>      left  = ALTextDiff::split(mLeftText);
-    const std::vector<std::string>      right = ALTextDiff::split(mRightText);
-    const std::vector<ALTextDiff::Run>  runs  = mAnchors.empty() ? ALTextDiff::lines(left, right) : ALTextDiff::lines(left, right, mAnchors);
+    // What is shown on the left and on the right: the texts as given, or
+    // swapped, and the pairs that line them up with them.
+    const std::vector<std::string> left  = ALTextDiff::split(mSwapped ? mRightText : mLeftText);
+    const std::vector<std::string> right = ALTextDiff::split(mSwapped ? mLeftText : mRightText);
+    ALTextDiff::anchors_t          anchors(mAnchors);
+    if (mSwapped)
+    {
+        for (auto& [from, to] : anchors)
+        {
+            std::swap(from, to);
+        }
+    }
+    const std::vector<ALTextDiff::Run> runs = anchors.empty() ? ALTextDiff::lines(left, right) : ALTextDiff::lines(left, right, anchors);
     const LLColor4                      none(0.f, 0.f, 0.f, 0.f);
     const LLColor4                      out       = colorOf("CodeDiffRemovedColor", LLColor4(0.85f, 0.25f, 0.25f, 0.18f));
     const LLColor4                      in        = colorOf("CodeDiffAddedColor", LLColor4(0.25f, 0.75f, 0.35f, 0.18f));
@@ -213,6 +312,8 @@ void ALDiffView::rebuild()
     const LLColor4                      out_words = colorOf("CodeDiffRemovedWordColor", LLColor4(0.9f, 0.25f, 0.25f, 0.4f));
     const LLColor4                      in_words  = colorOf("CodeDiffAddedWordColor", LLColor4(0.25f, 0.85f, 0.35f, 0.4f));
     mChanges.clear();
+    mChangeEnds.clear();
+    mInlineLeftRows.clear();
     Shown ls;
     Shown rs;
     Shown is;
@@ -227,6 +328,7 @@ void ALDiffView::rebuild()
                 ls.add(left[static_cast<size_t>(run.left + n)], run.left + n + 1, none);
                 rs.add(line, run.right + n + 1, none);
                 is.add(line, run.right + n + 1, none);
+                mInlineLeftRows.push_back(run.left + n + 1);
             }
             ++i;
             continue;
@@ -265,11 +367,13 @@ void ALDiffView::rebuild()
         for (const S32 line : gone)
         {
             is.add(left[static_cast<size_t>(line)], 0, out);
+            mInlineLeftRows.push_back(line + 1);
         }
         const S32 first_in = static_cast<S32>(is.numbers.size());
         for (const S32 line : made)
         {
             is.add(right[static_cast<size_t>(line)], line + 1, in);
+            mInlineLeftRows.push_back(0);
         }
         for (size_t n = 0; n < gone.size() && n < made.size(); ++n)
         {
@@ -279,7 +383,9 @@ void ALDiffView::rebuild()
             is.mark(first_out + static_cast<S32>(n), lspans, out_words);
             is.mark(first_in + static_cast<S32>(n), rspans, in_words);
         }
+        mChangeEnds.push_back(mInline ? static_cast<S32>(is.numbers.size()) : static_cast<S32>(ls.numbers.size()));
     }
+    mLeftRows   = ls.numbers;
     mRightRows  = rs.numbers;
     mInlineRows = is.numbers;
     ls.into(*mLeft);
@@ -287,15 +393,18 @@ void ALDiffView::rebuild()
     is.into(*mInlined);
     mScrolledY = 0;
     mScrolledX = 0.f;
+    refreshBar();
 }
 
 void ALDiffView::arrange()
 {
     const S32    width  = getRect().getWidth();
-    const S32    height = getRect().getHeight();
+    const S32    bar_h  = ALDiffBar::wantedHeight();
+    const S32    height = llmax(0, getRect().getHeight() - bar_h);
     const S32    head_h = LLFontGL::getFontSansSerifSmall()->getLineHeight() + 6;
     const S32    body   = llmax(0, height - head_h);
     const S32    half   = (width - GAP) / 2;
+    mBar->setShape(LLRect(0, height + bar_h, width, height));
     mLeft->setVisible(!mInline);
     mRight->setVisible(!mInline);
     mInlined->setVisible(mInline);
@@ -304,15 +413,17 @@ void ALDiffView::arrange()
     {
         mInlined->setShape(LLRect(0, body, width, 0));
         mLeftHead->setShape(LLRect(4, height - 3, width - 4, body));
-        mLeftHead->setText(mLeftTitle.empty() && mRightTitle.empty() ? std::string() : mLeftTitle + "  \xE2\x86\x92  " + mRightTitle);
+        const std::string& from = mSwapped ? mRightTitle : mLeftTitle;
+        const std::string& to   = mSwapped ? mLeftTitle : mRightTitle;
+        mLeftHead->setText(from.empty() && to.empty() ? std::string() : from + "  \xE2\x86\x92  " + to);
         return;
     }
     mLeft->setShape(LLRect(0, body, half, 0));
     mRight->setShape(LLRect(half + GAP, body, width, 0));
     mLeftHead->setShape(LLRect(4, height - 3, half - 4, body));
     mRightHead->setShape(LLRect(half + GAP + 4, height - 3, width - 4, body));
-    mLeftHead->setText(mLeftTitle);
-    mRightHead->setText(mRightTitle);
+    mLeftHead->setText(mSwapped ? mRightTitle : mLeftTitle);
+    mRightHead->setText(mSwapped ? mLeftTitle : mRightTitle);
 }
 
 void ALDiffView::reshape(S32 width, S32 height, bool called_from_parent)
@@ -331,6 +442,25 @@ ALCodeEditor* ALDiffView::shown() const
         return mInlined;
     }
     return mLeft->hasFocus() ? mLeft : mRight;
+}
+
+S32 ALDiffView::changeAtCaret() const
+{
+    const S32  at   = shown()->caret().line;
+    const auto next = std::upper_bound(mChanges.begin(), mChanges.end(), at);
+    if (next == mChanges.begin())
+    {
+        return -1;
+    }
+    const size_t change = static_cast<size_t>(next - mChanges.begin()) - 1;
+    return at < mChangeEnds[change] ? static_cast<S32>(change) : -1;
+}
+
+void ALDiffView::stepFromBar(bool forward)
+{
+    ALCodeEditor* side = shown();
+    goToChange(forward);
+    side->setFocus(true);
 }
 
 bool ALDiffView::goToChange(bool forward)
@@ -368,10 +498,27 @@ bool ALDiffView::goToChange(bool forward)
     return true;
 }
 
+const std::vector<S32>& ALDiffView::rightRowsOf(const ALCodeEditor* side) const
+{
+    // The right's text is shown on the right, or on the left once swapped;
+    // and inline, numbered as the side shown on the right, or else by the
+    // lines taken out.
+    if (side == mInlined)
+    {
+        return mSwapped ? mInlineLeftRows : mInlineRows;
+    }
+    return mSwapped ? mLeftRows : mRightRows;
+}
+
+const ALCodeEditor* ALDiffView::notRightSide() const
+{
+    return mInline ? nullptr : mSwapped ? mRight : mLeft;
+}
+
 std::pair<S32, S32> ALDiffView::rightAtCaret() const
 {
     const ALCodeEditor*     side = shown();
-    const std::vector<S32>& rows = side == mInlined ? mInlineRows : mRightRows;
+    const std::vector<S32>& rows = rightRowsOf(side);
     const S32               row  = side->caret().line;
     if (rows.empty())
     {
@@ -382,7 +529,7 @@ std::pair<S32, S32> ALDiffView::rightAtCaret() const
     {
         // The column where the caret stands in the right's own text: the
         // right side's, or a line inline that the right has.
-        return { rows[static_cast<size_t>(at)] - 1, side == mLeft ? 0 : side->caret().column };
+        return { rows[static_cast<size_t>(at)] - 1, side == notRightSide() ? 0 : side->caret().column };
     }
     for (S32 n = at + 1; n < static_cast<S32>(rows.size()); ++n)
     {
@@ -434,6 +581,13 @@ bool ALDiffView::handleKeyHere(KEY key, MASK mask)
         goToChange(mask == MASK_NONE);
         return true;
     }
+    // As the modern editors' comparisons have it; a side, which cannot be
+    // changed, lets the lines it would move go.
+    if ((key == KEY_DOWN || key == KEY_UP) && mask == MASK_ALT)
+    {
+        goToChange(key == KEY_DOWN);
+        return true;
+    }
     if (key == KEY_ESCAPE && mask == MASK_NONE)
     {
         // Kept either way: passed on, a panel would take the keyboard out
@@ -447,8 +601,24 @@ bool ALDiffView::handleKeyHere(KEY key, MASK mask)
     return LLUICtrl::handleKeyHere(key, mask);
 }
 
+void ALDiffView::refreshBar()
+{
+    // The change the caret is in, and the steps there are from it.
+    mBar->setCount(changeAtCaret(), changeCount());
+    const S32 at = shown()->caret().line;
+    mBar->setSteps(!mChanges.empty() && mChanges.front() < at, !mChanges.empty() && mChanges.back() > at);
+}
+
 void ALDiffView::draw()
 {
+    // The bar as the side in front has it, which the keyboard may have
+    // moved to; in the sides' colours as they are now.
+    refreshBar();
+    if (mBarColors != LLUIColorTable::instance().generation())
+    {
+        mBarColors = LLUIColorTable::instance().generation();
+        mBar->setColors(mRight->backgroundColor(), mRight->textColor());
+    }
     // The sides scrolled together: whichever moved since the last frame,
     // the other follows.
     if (!mInline)

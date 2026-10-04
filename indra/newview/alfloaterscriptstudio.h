@@ -841,6 +841,8 @@ private:
     // A comparison whose right is the tab's text titled again, unsaved or
     // not as the tab now is.
     void retitleCompare(const Doc& doc) const;
+    // Every comparison inline or side by side, as the last was asked for.
+    void setCompareInline(bool inline_view);
     void endCompare(Doc& doc) override;
     // A tab made to hold a kept text with nothing loaded under it: unsaved,
     // with whatever its script or file was.

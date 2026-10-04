@@ -1792,6 +1792,7 @@ void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const
         doc.compareView           = LLUICtrlFactory::create<ALDiffView>(p);
         doc.compareView->setVisible(false);
         doc.compareView->setFont(ALScriptStudio::editorFont());
+        doc.compareView->setOnInline([this](bool inline_view) { setCompareInline(inline_view); });
         const std::string id = doc.id;
         doc.compareView->setOnEscape([this, id]() {
             if (Doc* found = findDoc(id))
@@ -6255,6 +6256,18 @@ void ALFloaterScriptStudio::retitleCompare(const Doc& doc) const
     doc.compareView->setTitles(doc.compareTitles->theirs, own);
 }
 
+void ALFloaterScriptStudio::setCompareInline(bool inline_view)
+{
+    mCompareInline = inline_view;
+    for (const std::unique_ptr<Doc>& each : mDocs)
+    {
+        if (each->compareView)
+        {
+            each->compareView->setInline(mCompareInline);
+        }
+    }
+}
+
 // --- windows ---------------------------------------------------------------------------
 
 bool ALFloaterScriptStudio::canClose()
@@ -8706,16 +8719,7 @@ void ALFloaterScriptStudio::addViewCommands()
     // A comparison inline or side by side, as the last one was asked for.
     mCommands.add(
         "compare_inline",
-        [this]() {
-            mCompareInline = !mCompareInline;
-            for (const std::unique_ptr<Doc>& each : mDocs)
-            {
-                if (each->compareView)
-                {
-                    each->compareView->setInline(mCompareInline);
-                }
-            }
-        },
+        [this]() { setCompareInline(!mCompareInline); },
         [this]() {
             const Doc* doc = active();
             return doc && doc->shownView() == Doc::View::Compare;

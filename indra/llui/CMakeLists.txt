@@ -119,6 +119,7 @@ target_sources(
     alcolortablepanel.cpp
     alcolorsheet.cpp
     aldeferredrebuild.cpp
+    aldiffbar.cpp
     aldiffview.cpp
     aldockpanel.cpp
     alemptystate.cpp
@@ -333,6 +334,7 @@ target_sources(
         alcolortablepanel.h
         alcolorsheet.h
         aldeferredrebuild.h
+        aldiffbar.h
         aldiffview.h
         aldockpanel.h
         alemptystate.h
