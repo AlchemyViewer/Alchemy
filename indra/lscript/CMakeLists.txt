@@ -81,6 +81,7 @@ add_library(lscript STATIC)
 
 set(
   lscript_sources
+  allslreference.cpp
   lscript_compile/lscript_bytecode.cpp
   lscript_compile/lscript_error.cpp
   lscript_compile/lscript_heap.cpp
@@ -107,6 +108,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        allslreference.h
         lscript_alloc.h
         lscript_byteconvert.h
         lscript_byteformat.h
@@ -151,3 +153,7 @@ else()
   )
 endif()
 set_source_files_properties(${lscript_sources} PROPERTIES COMPILE_OPTIONS "${lscript_ieee_options}")
+
+# tests
+# LL's compiler over a handful of scripts, each to LSO and to CIL.
+al_add_test(allslreference PROJECT lscript LIBRARIES lscript llcommon)
