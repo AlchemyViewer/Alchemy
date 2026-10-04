@@ -4539,6 +4539,13 @@ namespace
             {
                 return;
             }
+            // Two numbers are the folder's, whose one number is smaller than
+            // any shape of them: 1 + 2 is 3, never -~-~1 -- though a run that
+            // stops before it folds leaves them as they are.
+            if (left->getNodeSubType() == NODE_CONSTANT_EXPRESSION && right->getNodeSubType() == NODE_CONSTANT_EXPRESSION)
+            {
+                return;
+            }
             switch (expr->getOperation())
             {
                 case OP_EQ:
