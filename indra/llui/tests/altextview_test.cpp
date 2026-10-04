@@ -2349,7 +2349,7 @@ namespace tut
             v.setSelection(spanRange(0, 0, 6));
             key(KEY_DOWN, column);
             ensure_equals("as many columns as they are drawn across", rangesSaid({ v.selection() }),
-                          rangesSaid({ spanRange(1, 0, llround(columns)) }));
+                          rangesSaid({ spanRange(1, 0, ll_round(columns)) }));
         }
 
         v.setReadOnly(true);
