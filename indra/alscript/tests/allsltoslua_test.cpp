@@ -159,7 +159,7 @@ namespace tut
         ensure("the handler: " + r.text, has(r, "LLEvents:on(\"touch_start\", function(detected)") && has(r, "local total_number = #detected"));
         ensure("the step: " + r.text, has(r, "gCount += total_number"));
         ensure("what was detected from the table: " + r.text, has(r, "detected[1]:getName()") && noted(r, "SluaDetectedTable"));
-        ensure("an integer joined to text as it is, which .. writes as LSL did: " + r.text, has(r, "greet(detected[1]:getName()) .. \" \" .. gCount)"));
+        ensure("an integer joined to text, interpolated: " + r.text, has(r, "ll.Say(0, `{greet(detected[1]:getName())} {gCount}`)"));
         ensure("state_entry last: " + r.text, r.text.find("-- state_entry") > r.text.find("LLEvents:on") && has(r, "ll.Say(0, greet(\"world\"))"));
         ensure("the note over its line: " + r.text, has(r, "-- LSL: detected[n] is what LSL read"));
         checksClean(r);
@@ -598,7 +598,7 @@ namespace tut
         ensure("a vector's cross product: " + r.text, has(r, "v = vector.cross(v, vector(0, 1, 0))"));
         ensure("x = x op y: " + r.text, has(r, "b += c") && has(r, "b -= c - 1"));
         ensure("not where the left of the operator is more than x: " + r.text, has(r, "b = b - c - 1") && has(r, "c = c * 2 + b"));
-        ensure("a string's pieces, joined: " + r.text, has(r, "s ..= \"y\" .. b"));
+        ensure("a string's pieces, joined: " + r.text, has(r, "s ..= `y{b}`"));
         ensure("a float's and a vector's as LSL writes them, in one interpolated string: " + r.text,
                has(r, "print(`{a}{string.format(\"%.6f\", f)}{ll.DumpList2String({v}, \"\")}{s}{b + c}`)"));
         checksClean(r);
@@ -610,7 +610,7 @@ namespace tut
         set_test_name("a minus before a negative number is bracketed, not a comment");
         const ALLSLToSLua::Result r = convert("default { state_entry() { integer a = -5; llOwnerSay((string)(-(-2147483648)) + (string)(-a) + (string)(- -a)); } }\n");
         ensure("bracketed: " + r.text, has(r, "-(-2147483648)") && !has(r, "--2147483648"));
-        ensure("a name as it was: " + r.text, has(r, " .. -a .. "));
+        ensure("a name as it was: " + r.text, has(r, "}{-a}{"));
         ensure("twice: " + r.text, has(r, "-(-a)"));
         checksClean(r);
     }
@@ -798,7 +798,7 @@ namespace tut
                                               "    llSetTextureAnim(ANIM_ON | ROTATE | LOOP, ALL_SIDES, 0, 0, 0, TWO_PI, 1.0);\n"
                                               "    llOwnerSay((string)((f | 2) & n));\n"
                                               "} }\n");
-        ensure("a chain: " + r.text, has(r, "print(\"a\" .. b .. \"c\" .. n)"));
+        ensure("a chain, one string: " + r.text, has(r, "print(`a{b}c{n}`)"));
         ensure("one call: " + r.text, has(r, "ll.SetTextureAnim(bit32.bor(ANIM_ON, ROTATE, LOOP), ALL_SIDES"));
         ensure("not across operators: " + r.text, has(r, "bit32.band(bit32.bor(f, 2), n)"));
         checksClean(r);
@@ -822,7 +822,7 @@ namespace tut
         ensure("before: " + r.text, has(r, "\nn += 1\nlocal m = n\n"));
         ensure("read again, kept: " + r.text, has(r, "local k = (function() local was = n; n += 1 return was end)() + n"));
         ensure("a global with nothing of the script's called: " + r.text, has(r, "print(tostring(gLine))\ngLine += 1\n"));
-        ensure("a global beside a call of the script's, kept: " + r.text, has(r, "print(bump() .. (function() local was = gLine;"));
+        ensure("a global beside a call of the script's, kept: " + r.text, has(r, "print(`{bump()}{(function() local was = gLine;"));
         ensure("a return's step before it: " + r.text, has(r, "    gLine += 1\n    return gLine\n"));
         checksClean(r);
     }
@@ -867,7 +867,7 @@ namespace tut
                                               "} }\n");
         ensure("counting from 1: " + r.text, has(r, "for i = 1, n do\n    print(ll.GetInventoryName(INVENTORY_SOUND, i))"));
         ensure("read as a number too, moved on by one: " + r.text,
-               has(r, "for j = 0, n - 1 do\n    print(j .. ll.GetInventoryName(INVENTORY_SOUND, j + 1))"));
+               has(r, "for j = 0, n - 1 do\n    print(`{j}{ll.GetInventoryName(INVENTORY_SOUND, j + 1)}`)"));
         ensure("down to nought: " + r.text, has(r, "for k = n - 1, 0, -1 do\n    print(ll.GetInventoryName(INVENTORY_SOUND, k + 1))"));
         ensure("to and with, a number added: " + r.text, has(r, "for c = 1, 3 do\n    print(ll.GetSubString(s, c, c + 1))"));
         ensure("no llcompat: " + r.text, !has(r, "llcompat."));
@@ -1491,7 +1491,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<44>()
     {
-        set_test_name("an integer made text where .. joins it written bare, which .. makes the same text of; alone, or a lone piece of a table's, as before; with a float's or a key's, interpolated");
+        set_test_name("an integer made text where text is joined, interpolated; alone, or a lone piece of a table's, by tostring");
         const ALLSLToSLua::Result r = convert("set(integer keey, string value) { llLinksetDataWrite(\"ARS#\" + (string)keey, value); }\n"
                                               "default { state_entry() {\n"
                                               "    integer n = 4; float f = 1.5; key k = llGetOwner();\n"
@@ -1499,7 +1499,7 @@ namespace tut
                                               "    llOwnerSay((string)f + \";\" + (string)k + \";\" + (string)(n * 2) + (string)(-n));\n"
                                               "} }\n");
         ensure("converted", r.converted);
-        ensure("as Tapple would have it: " + r.text, has(r, "ll.LinksetDataWrite(\"ARS#\" .. keey, value)"));
+        ensure("joined, interpolated: " + r.text, has(r, "ll.LinksetDataWrite(`ARS#{keey}`, value)"));
         ensure("alone, still text: " + r.text, has(r, "set(n, tostring(n))"));
         ensure("a float's six places, a key's text, a product bracketed, a negation bare: " + r.text,
                has(r, "print(`{string.format(\"%.6f\", f)};{k};{n * 2}{-n}`)"));
@@ -1528,7 +1528,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<46>()
     {
-        set_test_name("text joined with a piece that asks for a conversion as one interpolated string, its own text escaped; strings and numbers alone with ..");
+        set_test_name("text joined with a piece that is no string as one interpolated string, its own text escaped; strings alone with ..");
         const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
                                               "    key k = llGetOwner(); integer n = 3; string s = \"x\"; float f = 0.5;\n"
                                               "    llOwnerSay(\"100% `{a}` \\\\ \\\"q\\\"\\n\" + (string)k);\n"
@@ -1542,7 +1542,8 @@ namespace tut
         ensure("converted", r.converted);
         ensure("its text escaped -- a backtick, a brace, a backslash, a line -- and % as it is: " + r.text,
                has(r, "print(`100% \\`\\{a}\\` \\\\ \"q\"\\n{k}`)"));
-        ensure("strings and numbers alone, with ..: " + r.text, has(r, "print(\"n=\" .. n .. \";\" .. s)"));
+        ensure("a number joined too: " + r.text, has(r, "print(`n={n};{s}`)"));
+        ensure("strings alone, with ..: " + r.text, has(r, "print(all .. s)"));
         ensure("one inside another's braces: " + r.text, has(r, "print(`a{ll.ToUpper(`b{k}`)}{string.format(\"%.6f\", f)}`)"));
         ensure("joined onto a string: " + r.text, has(r, "s ..= `/{k}`"));
         checksClean(r);

@@ -455,9 +455,10 @@ namespace
         bool joinsText(LSLExpression* e);
         void textPieces(LSLExpression* e, std::vector<LSLExpression*>& out);
         // Pieces of text joined as one interpolated string, where one of them
-        // is no string or number that `..` takes as it is -- a key, a float,
-        // a vector, a list made text: string.format once, rather than a
-        // conversion a piece and `..`. None where every piece is.
+        // is no string -- a number, a key, a float, a vector, a list made
+        // text: string.format once, rather than a conversion a piece and
+        // `..`. None where every piece is a string, which `..` joins faster,
+        // or where there is one piece, and nothing to join.
         std::optional<Expr> interpolated(const std::vector<LSLExpression*>& pieces);
         Expr constant(LSLConstant* c);
         // How the LSL wrote a number in hexadecimal, on the line Tailslide
@@ -1884,13 +1885,12 @@ namespace
             return e && e->getNodeSubType() == NODE_TYPECAST_EXPRESSION && e->getIType() == LST_STRING ? static_cast<LSLTypecastExpression*>(e)->getChildExpr()
                                                                                                          : nullptr;
         };
-        // A string, or an integer cast, `..` takes as it is; anything else
-        // asks for a conversion.
+        // Anything but a string is made text: by `..` itself for a number,
+        // which string.format does in fewer steps, else by a call.
         const auto converted = [&](LSLExpression* e) {
-            const LSLIType type = cast(e) ? slType(cast(e)) : slType(bare(e));
-            return type != LST_STRING && type != LST_INTEGER;
+            return (cast(e) ? slType(cast(e)) : slType(bare(e))) != LST_STRING;
         };
-        if (std::none_of(pieces.begin(), pieces.end(), converted))
+        if (pieces.size() < 2 || std::none_of(pieces.begin(), pieces.end(), converted))
         {
             return std::nullopt;
         }
