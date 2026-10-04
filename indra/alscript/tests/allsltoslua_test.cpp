@@ -1155,4 +1155,75 @@ namespace tut
         ensure("the helper, once: " + r.text, count(r, "local function int32(n: number): number") == 1 && !has(r, "-- LSL: bit32"));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<37>()
+    {
+        set_test_name("the script's comments carried over, each over what it stood over: the script's own at the top, a global's, those inside a list, "
+                      "a trailing one, a brace's, between branches, at a block's end; // as --, /* */ as --[[ ]] at a level nothing in it closes");
+        const std::string lsl = "// Door script by Someone.\n"
+                                "// Do as you like with it.\n"
+                                "\n"
+                                "// How far it swings, in degrees\n"
+                                "float SWING = 90.0; // a right angle\n"
+                                "list NAMES = [\n"
+                                "    \"open\",   // when it is open\n"
+                                "    \"closed\"  // when it is shut\n"
+                                "];\n"
+                                "/* old code:\n"
+                                "integer unused() { return 1; }\n"
+                                "*/\n"
+                                "\n"
+                                "// Turns the door.\n"
+                                "swing(float by) { // by degrees\n"
+                                "    // the rotation it turns by\n"
+                                "    rotation r = llEuler2Rot(<0, 0, by * DEG_TO_RAD>);\n"
+                                "    llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_ROT_LOCAL, r * llGetLocalRot()]); // turn\n"
+                                "    if (by > 0) {\n"
+                                "        llOwnerSay(\"opening\");\n"
+                                "    }\n"
+                                "    // when it shuts\n"
+                                "    else if (by < 0) {\n"
+                                "        llOwnerSay(\"closing\");\n"
+                                "    }\n"
+                                "    if (FALSE) {\n"
+                                "        /* left off */\n"
+                                "    } else if (by == 0) {\n"
+                                "        llOwnerSay(\"still\");\n"
+                                "    }\n"
+                                "    // done\n"
+                                "}\n"
+                                "\n"
+                                "default {\n"
+                                "    // on a touch\n"
+                                "    touch_start(integer n) {\n"
+                                "        swing(SWING); //[[ not a block of Luau's ]]\n"
+                                "        /* it ends ]] here */\n"
+                                "    }\n"
+                                "}\n";
+        const ALLSLToSLua::Result r = convert(lsl);
+        const auto                at = [&r](const std::string& text) { return r.text.find(text); };
+        ensure("the script's own at the top: " + r.text, has(r, "-- Door script by Someone.\n-- Do as you like with it.\n\n"));
+        ensure("over everything, once: " + r.text, at("-- Door script by Someone.") < at("local SWING") && count(r, "Door script") == 1);
+        ensure("a global's, with what trailed it: " + r.text, has(r, "-- How far it swings, in degrees\n-- a right angle\nlocal SWING = 90.0\n"));
+        ensure("those inside a list, over it: " + r.text, has(r, "-- when it is open\n-- when it is shut\nlocal NAMES = {\"open\", \"closed\"}\n"));
+        ensure("a block comment as Luau's: " + r.text, has(r, "--[[ old code:\ninteger unused() { return 1; }\n]]\n"));
+        ensure("over the function it stood over: " + r.text, at("--[[ old code:") > at("local NAMES") && at("--[[ old code:") < at("-- Turns the door."));
+        ensure("a brace's, over what it opens: " + r.text, has(r, "-- Turns the door.\n-- by degrees\nlocal function swing(by)\n"));
+        ensure("over a statement: " + r.text, has(r, "    -- the rotation it turns by\n    local r = "));
+        ensure("a trailing one, over its statement: " + r.text, has(r, "    -- turn\n    ll.SetLinkPrimitiveParamsFast("));
+        ensure("between branches, over the elseif: " + r.text, has(r, "    -- when it shuts\n    elseif by < 0 then\n"));
+        ensure("an empty branch's, in it: " + r.text, has(r, "    if false then\n        --[[ left off ]]\n    elseif by == 0 then\n"));
+        ensure("at a block's end: " + r.text, has(r, "    -- done\nend\n"));
+        ensure("a state's, over its handler: " + r.text, has(r, "-- on a touch\nLLEvents:on(\"touch_start\""));
+        ensure("not a block of Luau's: " + r.text, has(r, "    -- [[ not a block of Luau's ]]\n    swing(SWING)\n"));
+        ensure("a level nothing in it closes: " + r.text, has(r, "    --[=[ it ends ]] here ]=]\nend)"));
+        checksClean(r);
+
+        ALLSLToSLua::Options none;
+        none.keepComments              = false;
+        const ALLSLToSLua::Result bare = ALLSLToSLua::convert(lsl, none);
+        ensure("none where asked: " + bare.text, bare.converted && bare.text.find("Door script") == std::string::npos &&
+                                                    bare.text.find("degrees") == std::string::npos && bare.text.find("--[[") == std::string::npos);
+    }
 }

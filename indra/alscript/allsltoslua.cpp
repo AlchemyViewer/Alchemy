@@ -309,7 +309,10 @@ namespace
     class Writer
     {
     public:
-        Writer(LSLScript* script, const ALLSLToSLua::Options& options) : mScript(script), mOptions(options), mEffects(script) {}
+        Writer(LSLScript* script, std::string_view source, const ALLSLToSLua::Options& options)
+            : mScript(script), mSource(source), mOptions(options), mEffects(script)
+        {
+        }
 
         std::string write();
         ALScriptProblems& notes() { return mNotes; }
@@ -338,6 +341,40 @@ namespace
         // --- the text ---------------------------------------------------------------
 
         void line(const std::string& text);
+
+        // --- the script's own comments -----------------------------------------------
+
+        // Where a comment begins, or a node begins or ends, by line and
+        // column from one; a node's end is one past it.
+        struct Pos
+        {
+            S32 line   = 0;
+            S32 column = 0;
+            bool operator<(const Pos& o) const { return line != o.line ? line < o.line : column < o.column; }
+        };
+        struct Comment
+        {
+            Pos         at;
+            S32         endLine = 0;
+            // As SLua writes it: a block comment's lines past its first as
+            // they were.
+            std::string text;
+            // A blank line over it in the LSL, which it keeps.
+            bool        apart   = false;
+            bool        written = false;
+        };
+        // Each comment in the LSL, given to the node it is written over --
+        // a global, a function, a state, a handler, a statement -- or to
+        // the end of what holds it, where nothing after it in there does.
+        void findComments();
+        void place(size_t k, const std::vector<LSLASTNode*>& children, LSLASTNode* holder);
+        bool placeInside(size_t k, LSLASTNode* node);
+        void placeIn(size_t k, LSLASTNode* compound);
+        // Those given to a node, written over it; those at a holder's end,
+        // with any of what it held that nothing wrote, at its end.
+        void commentsBefore(LSLASTNode* node);
+        void commentsAtEnd(LSLASTNode* holder);
+        void writeComment(Comment& c);
         std::string indent() const { return std::string(static_cast<size_t>(mDepth) * 4, ' '); }
 
         // --- expressions ------------------------------------------------------------
@@ -607,6 +644,7 @@ namespace
         void helpers(std::string& out);
 
         LSLScript*                                       mScript;
+        std::string_view                                 mSource;
         const ALLSLToSLua::Options&                      mOptions;
         // What each part of the script may change, for LSL's order.
         ALLSLEffects                                     mEffects;
@@ -618,6 +656,12 @@ namespace
         boost::unordered_flat_map<LSLSymbol*, std::string> mNames;
         boost::unordered_flat_set<std::string>           mTaken;
         // What the text needs of its own, defined once over it.
+        // The script's comments; those over its first global, written at the
+        // top; and by what each is given to.
+        std::vector<Comment>                                         mComments;
+        std::vector<size_t>                                          mLeadComments;
+        boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsBefore;
+        boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsWithin;
         // The globals the script never sets, declared a number not below
         // nought.
         boost::unordered_flat_set<LSLSymbol*> mSteadyNonNegative;
@@ -797,6 +841,368 @@ namespace
             mPending.clear();
         }
         mText += text.empty() ? std::string("\n") : indent() + text + "\n";
+    }
+
+    // --- the script's own comments -----------------------------------------------------
+
+    void Writer::findComments()
+    {
+        if (!mOptions.keepComments)
+        {
+            return;
+        }
+        // Each comment, past strings, where it begins.
+        const std::string_view src    = mSource;
+        Pos                    at     = { 1, 1 };
+        const auto             step   = [&](char c) {
+            if (c == '\n')
+            {
+                ++at.line;
+                at.column = 1;
+            }
+            else
+            {
+                ++at.column;
+            }
+        };
+        for (size_t i = 0; i < src.size();)
+        {
+            const char c = src[i];
+            if (c == '"')
+            {
+                step(src[i++]);
+                while (i < src.size() && src[i] != '"')
+                {
+                    if (src[i] == '\\' && i + 1 < src.size())
+                    {
+                        step(src[i++]);
+                    }
+                    step(src[i++]);
+                }
+                if (i < src.size())
+                {
+                    step(src[i++]);
+                }
+                continue;
+            }
+            if (c != '/' || i + 1 >= src.size() || (src[i + 1] != '/' && src[i + 1] != '*'))
+            {
+                step(src[i++]);
+                continue;
+            }
+            Comment k;
+            k.at = at;
+            size_t end;
+            if (src[i + 1] == '/')
+            {
+                end              = std::min(src.find('\n', i), src.size());
+                std::string body = std::string(src.substr(i + 2, end - i - 2));
+                while (!body.empty() && (body.back() == '\r' || body.back() == ' ' || body.back() == '\t'))
+                {
+                    body.pop_back();
+                }
+                // Not a block comment of Luau's, which --[[ would begin.
+                if (!body.empty() && body[0] == '[')
+                {
+                    body = " " + body;
+                }
+                k.text = "--" + body;
+            }
+            else
+            {
+                const size_t close = src.find("*/", i + 2);
+                end                = close == std::string_view::npos ? src.size() : close + 2;
+                std::string body   = std::string(src.substr(i + 2, (close == std::string_view::npos ? src.size() : close) - i - 2));
+                // Brackets of a level nothing in it closes.
+                std::string level;
+                while (body.find("]" + level + "]") != std::string::npos)
+                {
+                    level += "=";
+                }
+                if (!body.empty() && body.back() == ']')
+                {
+                    body += " ";
+                }
+                k.text = "--[" + level + "[" + body + "]" + level + "]";
+            }
+            // A comment that reads as one of the notes this writes is not one.
+            if (k.text.rfind(NOTE_MARK, 0) == 0)
+            {
+                k.text.insert(2, " ");
+            }
+            while (i < end)
+            {
+                step(src[i++]);
+            }
+            k.endLine = at.line;
+            mComments.push_back(std::move(k));
+        }
+        // Whether a line of the LSL, from one, is blank.
+        std::vector<size_t> starts{ 0 };
+        for (size_t i = 0; i < src.size(); ++i)
+        {
+            if (src[i] == '\n')
+            {
+                starts.push_back(i + 1);
+            }
+        }
+        const auto blank = [&](S32 line) {
+            if (line < 1 || static_cast<size_t>(line) > starts.size())
+            {
+                return false;
+            }
+            const size_t from = starts[static_cast<size_t>(line) - 1];
+            const size_t to   = std::min(src.find('\n', from), src.size());
+            return src.substr(from, to - from).find_first_not_of(" \t\r") == std::string_view::npos;
+        };
+        for (Comment& c : mComments)
+        {
+            c.apart = blank(c.at.line - 1);
+        }
+        if (mComments.empty())
+        {
+            return;
+        }
+        std::vector<LSLASTNode*> top;
+        for (LSLASTNode* g = mScript->getGlobals()->getChild(0); g; g = g->getNext())
+        {
+            top.push_back(g);
+        }
+        for (LSLASTNode* st = mScript->getStates()->getChild(0); st; st = st->getNext())
+        {
+            top.push_back(st);
+        }
+        // Over the first global, those with no blank line between them and it
+        // are about it; those before, the script's own, go at the top.
+        size_t before = 0;
+        while (!top.empty() && before < mComments.size() &&
+               mComments[before].at < Pos{ top.front()->getLoc()->first_line, top.front()->getLoc()->first_column })
+        {
+            ++before;
+        }
+        size_t about = before;
+        S32    next  = top.empty() ? 0 : top.front()->getLoc()->first_line;
+        while (about > 0 && mComments[about - 1].endLine + 1 >= next && !blank(next - 1))
+        {
+            --about;
+            next = mComments[about].at.line;
+        }
+        for (size_t k = 0; k < mComments.size(); ++k)
+        {
+            if (k < about)
+            {
+                // Written at the top as the text is put together.
+                mLeadComments.push_back(k);
+                mComments[k].written = true;
+                continue;
+            }
+            place(k, top, nullptr);
+        }
+    }
+
+    namespace
+    {
+        // Whether what a node ends with is a statement of its own, not a
+        // block's brace: a comment after it on its line is about it.
+        bool endsBare(LSLASTNode* node)
+        {
+            switch (node->getNodeType())
+            {
+                case NODE_GLOBAL_VARIABLE: return true;
+                case NODE_STATEMENT: break;
+                default: return false;
+            }
+            switch (node->getNodeSubType())
+            {
+                case NODE_COMPOUND_STATEMENT: return false;
+                case NODE_IF_STATEMENT:
+                {
+                    LSLASTNode* last = node->getChild(2);
+                    return endsBare(isNull(last) ? node->getChild(1) : last);
+                }
+                case NODE_WHILE_STATEMENT: return endsBare(node->getChild(1));
+                case NODE_FOR_STATEMENT: return endsBare(node->getChild(3));
+                default: return true;
+            }
+        }
+    }
+
+    void Writer::place(size_t k, const std::vector<LSLASTNode*>& children, LSLASTNode* holder)
+    {
+        const Pos   at   = mComments[k].at;
+        LSLASTNode* prev = nullptr;
+        mCommentsWithin[holder].push_back(k);
+        for (LSLASTNode* child : children)
+        {
+            const Pos begins = { child->getLoc()->first_line, child->getLoc()->first_column };
+            const Pos ends   = { child->getLoc()->last_line, child->getLoc()->last_column };
+            if (!(at < ends))
+            {
+                prev = child;
+                continue;
+            }
+            if (!(at < begins))
+            {
+                // Inside it: in what it holds, or over it.
+                if (!placeInside(k, child))
+                {
+                    mCommentsBefore[child].push_back(k);
+                }
+                return;
+            }
+            break;
+        }
+        // On the line a bare statement ends, after it: about that statement.
+        if (prev && endsBare(prev) && at.line == prev->getLoc()->last_line)
+        {
+            mCommentsBefore[prev].push_back(k);
+            return;
+        }
+        // Over what follows it in here; or, where nothing does, at the end.
+        for (LSLASTNode* child : children)
+        {
+            if (at < Pos{ child->getLoc()->first_line, child->getLoc()->first_column })
+            {
+                mCommentsBefore[child].push_back(k);
+                return;
+            }
+        }
+    }
+
+    void Writer::placeIn(size_t k, LSLASTNode* compound)
+    {
+        std::vector<LSLASTNode*> children;
+        for (LSLASTNode* child = compound->getChild(0); child; child = child->getNext())
+        {
+            children.push_back(child);
+        }
+        place(k, children, compound);
+    }
+
+    bool Writer::placeInside(size_t k, LSLASTNode* node)
+    {
+        const Pos  at     = mComments[k].at;
+        const auto inside = [&at](LSLASTNode* n) {
+            return !isNull(n) && !(at < Pos{ n->getLoc()->first_line, n->getLoc()->first_column }) &&
+                   at < Pos{ n->getLoc()->last_line, n->getLoc()->last_column };
+        };
+        // A statement standing where one goes -- a body, a branch -- in what
+        // it holds, or over it.
+        const auto within = [&](LSLASTNode* body) {
+            if (!inside(body))
+            {
+                return false;
+            }
+            if (body->getNodeSubType() == NODE_COMPOUND_STATEMENT)
+            {
+                // On the line its brace opens, before anything in it: about
+                // what the block is the body of.
+                LSLASTNode* first = body->getChild(0);
+                if (at.line == body->getLoc()->first_line &&
+                    (!first || at < Pos{ first->getLoc()->first_line, first->getLoc()->first_column }))
+                {
+                    return false;
+                }
+                placeIn(k, body);
+            }
+            else if (!placeInside(k, body))
+            {
+                mCommentsBefore[body].push_back(k);
+            }
+            return true;
+        };
+        switch (node->getNodeType())
+        {
+            case NODE_GLOBAL_FUNCTION:
+                return within(static_cast<LSLGlobalFunction*>(node)->getStatements());
+            case NODE_EVENT_HANDLER:
+                return within(static_cast<LSLEventHandler*>(node)->getStatements());
+            case NODE_STATE:
+            {
+                std::vector<LSLASTNode*> handlers;
+                for (LSLASTNode* h = static_cast<LSLState*>(node)->getEventHandlers()->getChild(0); h; h = h->getNext())
+                {
+                    handlers.push_back(h);
+                }
+                place(k, handlers, node);
+                return true;
+            }
+            case NODE_STATEMENT:
+                switch (node->getNodeSubType())
+                {
+                    case NODE_COMPOUND_STATEMENT: placeIn(k, node); return true;
+                    case NODE_IF_STATEMENT:
+                    {
+                        if (within(node->getChild(1)) || within(node->getChild(2)))
+                        {
+                            return true;
+                        }
+                        // Between the branches: over what the else runs -- an
+                        // elseif's line, or the else's first statement.
+                        LSLASTNode* no = node->getChild(2);
+                        if (isNull(no) || !(at < Pos{ no->getLoc()->first_line, no->getLoc()->first_column }) ||
+                            at < Pos{ node->getChild(1)->getLoc()->last_line, node->getChild(1)->getLoc()->last_column })
+                        {
+                            return false;
+                        }
+                        if (no->getNodeSubType() == NODE_COMPOUND_STATEMENT)
+                        {
+                            placeIn(k, no);
+                        }
+                        else
+                        {
+                            mCommentsBefore[no].push_back(k);
+                        }
+                        return true;
+                    }
+                    case NODE_WHILE_STATEMENT: return within(node->getChild(1));
+                    case NODE_DO_STATEMENT: return within(node->getChild(0));
+                    case NODE_FOR_STATEMENT: return within(node->getChild(3));
+                    default: return false;
+                }
+            default:
+                return false;
+        }
+    }
+
+    void Writer::writeComment(Comment& c)
+    {
+        if (c.written)
+        {
+            return;
+        }
+        c.written = true;
+        if (c.apart && !mText.empty() && mText.compare(mText.size() - std::min<size_t>(mText.size(), 2), 2, "\n\n") != 0)
+        {
+            mText += "\n";
+        }
+        mText += indent() + c.text + "\n";
+    }
+
+    void Writer::commentsBefore(LSLASTNode* node)
+    {
+        const auto found = mCommentsBefore.find(node);
+        if (found == mCommentsBefore.end())
+        {
+            return;
+        }
+        for (size_t k : found->second)
+        {
+            writeComment(mComments[k]);
+        }
+    }
+
+    void Writer::commentsAtEnd(LSLASTNode* holder)
+    {
+        const auto found = mCommentsWithin.find(holder);
+        if (found == mCommentsWithin.end())
+        {
+            return;
+        }
+        for (size_t k : found->second)
+        {
+            writeComment(mComments[k]);
+        }
     }
 
     // --- expressions ------------------------------------------------------------------
@@ -2202,6 +2608,7 @@ namespace
             {
                 statement(child, !child->getNext());
             }
+            commentsAtEnd(s);
             return;
         }
         statement(s, true);
@@ -2213,6 +2620,7 @@ namespace
         {
             return;
         }
+        commentsBefore(s);
         if (mBuilds.contains(s))
         {
             buildingLoop(s, last);
@@ -2307,6 +2715,7 @@ namespace
                     if (otherwise->getNodeSubType() == NODE_IF_STATEMENT)
                     {
                         i = static_cast<LSLIfStatement*>(otherwise);
+                        commentsBefore(i);
                         line("elseif " + condition(i->getCheckExpr()).text + " then");
                         continue;
                     }
@@ -4454,6 +4863,7 @@ namespace
             auto*          global = static_cast<LSLGlobalVariable*>(g);
             LSLIdentifier* id     = global->getIdentifier();
             LSLExpression* init   = global->getInitializer();
+            commentsBefore(global);
             if (boolean(id->getSymbol()))
             {
                 line("local " + nameOf(id) + (mOptions.types ? ": boolean" : "") + " = " + (isNull(init) ? std::string("false") : truthOf(init)));
@@ -4520,6 +4930,7 @@ namespace
                           (boolean(param) ? std::string(mOptions.types ? ": boolean" : "") : typed(varType(param, p->getIType())));
             }
             mFunction = f->getSymbol();
+            commentsBefore(f);
             line(std::string(forward ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +
                  (boolean(mFunction) ? std::string(mOptions.types ? ": boolean" : "") : typed(f->getIdentifier()->getIType())));
             ++mDepth;
@@ -4565,6 +4976,7 @@ namespace
     void Writer::singleState(LSLState* state)
     {
         LSLEventHandler* entry = nullptr;
+        commentsBefore(state);
         for (LSLASTNode* h = state->getEventHandlers()->getChild(0); h; h = h->getNext())
         {
             auto*             handler = static_cast<LSLEventHandler*>(h);
@@ -4574,6 +4986,7 @@ namespace
                 entry = handler;
                 continue;
             }
+            commentsBefore(handler);
             if (event == "state_exit")
             {
                 // Not an event SLua has, and one that never came: said, over
@@ -4610,11 +5023,13 @@ namespace
         {
             // What LSL ran as the script started, run as SLua runs a script:
             // once, from the top.
+            commentsBefore(entry);
             line("-- state_entry");
             mTopLevel = true;
             handlerBody(entry);
             mTopLevel = false;
         }
+        commentsAtEnd(state);
     }
 
     void Writer::statesPreamble()
@@ -4701,6 +5116,7 @@ namespace
         {
             auto*             state = static_cast<LSLState*>(s);
             const std::string name  = state->getIdentifier()->getName();
+            commentsBefore(state);
             line("states" + stateKey(name) + " = {");
             ++mDepth;
             for (LSLASTNode* h = state->getEventHandlers()->getChild(0); h; h = h->getNext())
@@ -4709,6 +5125,7 @@ namespace
                 const std::string event   = handler->getIdentifier()->getName();
                 std::string       lead;
                 const std::string params = handlerParams(handler, lead);
+                commentsBefore(handler);
                 if (event == "timer" && !mTimers)
                 {
                     noteOnce(handler, "SluaTimerStates",
@@ -4725,6 +5142,7 @@ namespace
                 --mDepth;
                 line("end,");
             }
+            commentsAtEnd(state);
             --mDepth;
             line("}");
             line("");
@@ -4834,6 +5252,7 @@ end
         {
             timersPreamble();
         }
+        findComments();
         // The globals never set, declared a number not below nought: what an &
         // with one of them gives needs no sign.
         const ALLSLEffects::Writes written = mEffects.of(mScript);
@@ -4849,6 +5268,12 @@ end
         globals();
         functions();
         states();
+        // Those after everything, and any of what nothing wrote, last.
+        commentsAtEnd(nullptr);
+        for (Comment& c : mComments)
+        {
+            writeComment(c);
+        }
         // Each of its lines a comment, whatever language the studio says
         // it in.
         const std::string head = mOptions.comments
@@ -4866,6 +5291,16 @@ end
             from = cut + 1;
         }
         out += "\n";
+        // The script's own first comments, over everything: what it is, and
+        // whose.
+        if (!mLeadComments.empty())
+        {
+            for (size_t k : mLeadComments)
+            {
+                out += mComments[k].text + "\n";
+            }
+            out += "\n";
+        }
         helpers(out);
         return out + mText;
     }
@@ -5051,7 +5486,7 @@ ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& op
             }
             return;
         }
-        Writer writer(script, options);
+        Writer writer(script, lsl, options);
         result.text      = writer.write();
         result.notes     = std::move(writer.notes());
         result.converted = true;
