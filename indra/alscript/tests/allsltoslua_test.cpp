@@ -1087,4 +1087,28 @@ namespace tut
         ensure("an index that would hide the script's _ named afresh: " + named.text, has(named, "for _2, item in gNames do"));
         checksClean(named);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<35>()
+    {
+        set_test_name("strings built in loops: one built by two loops declared once, the second adding to it; one appended to another in the loop it builds read as it stands, not built");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    string s;\n"
+                                              "    integer i;\n"
+                                              "    for (i = 0; i < 2; ++i) s += \"a\";\n"
+                                              "    integer j;\n"
+                                              "    for (j = 0; j < 2; ++j) s += \"b\";\n"
+                                              "    llOwnerSay(s);\n"
+                                              "    string line;\n"
+                                              "    string all;\n"
+                                              "    integer k;\n"
+                                              "    for (k = 0; k < 3; ++k) { line += \"x\"; all += line; }\n"
+                                              "    llOwnerSay(all);\n"
+                                              "} }\n");
+        ensure("declared at the first loop's join: " + r.text, has(r, "local s = table.concat(sParts)"));
+        ensure("the second adds to it: " + r.text, has(r, "s ..= table.concat(sParts2)") && !has(r, "local s = table.concat(sParts2)"));
+        ensure("one read in its loop kept as it is: " + r.text, has(r, "local line = \"\"") && !has(r, "table.concat(lineParts)"));
+        ensure("the other built from it: " + r.text, has(r, "table.insert(allParts, line)") && has(r, "local all = table.concat(allParts)"));
+        checksClean(r);
+    }
 }

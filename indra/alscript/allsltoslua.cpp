@@ -666,7 +666,7 @@ namespace
         // with nothing between that touches it: declared where its pieces
         // are joined instead, its declaration not written.
         boost::unordered_flat_set<LSLASTNode*>                          mJoinedDeclarations;
-        boost::unordered_flat_set<LSLSymbol*>                           mDeclaredAtJoin;
+        boost::unordered_flat_set<std::pair<LSLASTNode*, LSLSymbol*>>   mDeclaredAtJoin;
         boost::unordered_flat_map<LSLSymbol*, std::string>              mBuilding;
         // Appends in loops that are noted rather than built.
         boost::unordered_flat_set<LSLASTNode*> mUnbuilt;
@@ -3715,12 +3715,17 @@ namespace
                 appends.emplace_back(var, inner);
                 auto* b = static_cast<LSLBinaryExpression*>(inner);
                 accounted.insert(unwrapped(b->getLHS()));
-                LSLExpression* sum = unwrapped(b->getRHS());
-                while (b->getOperation() == OP_ASSIGN && sum->getNodeSubType() == NODE_BINARY_EXPRESSION)
+                // s = s + a: the s it adds to, which is the append's own.
+                // Nothing of s += a is: a string appended is read.
+                if (b->getOperation() == OP_ASSIGN)
                 {
-                    sum = unwrapped(static_cast<LSLBinaryExpression*>(sum)->getLHS());
+                    LSLExpression* sum = unwrapped(b->getRHS());
+                    while (sum->getNodeSubType() == NODE_BINARY_EXPRESSION)
+                    {
+                        sum = unwrapped(static_cast<LSLBinaryExpression*>(sum)->getLHS());
+                    }
+                    accounted.insert(sum);
                 }
-                accounted.insert(sum);
             });
             if (appends.empty())
             {
@@ -3804,7 +3809,9 @@ namespace
                 if (declared && !touched && (isNull(declared->getInitializer()) || emptyValue(declared->getInitializer())))
                 {
                     mJoinedDeclarations.insert(declared);
-                    mDeclaredAtJoin.insert(var);
+                    // By this loop alone: a later one building it adds to
+                    // what this one declared.
+                    mDeclaredAtJoin.insert({ built_by, var });
                 }
             }
         }
@@ -3839,7 +3846,7 @@ namespace
             const std::string parts = freshName(name + "Parts");
             line("local " + parts + (mOptions.types ? ": { string }" : "") + " = {}");
             mBuilding[var] = parts;
-            joins.push_back({ name, parts, mDeclaredAtJoin.contains(var) });
+            joins.push_back({ name, parts, mDeclaredAtJoin.contains({ loop, var }) });
         }
         statement(loop, last);
         for (LSLSymbol* var : vars)
