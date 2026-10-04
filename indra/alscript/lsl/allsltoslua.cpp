@@ -5080,7 +5080,10 @@ namespace
         // runs, and the timer where LLTimers calls it.
         const std::string own = mTimers ? "event ~= \"state_entry\" and event ~= \"state_exit\" and event ~= \"timer\""
                                         : "event ~= \"state_entry\" and event ~= \"state_exit\"";
-        const std::string off = field ? "(LLEvents :: any)[event] = nil" : "LLEvents:off(event :: any, handler)";
+        // Taken off by LLEvents:off either way: SLua puts on a handler
+        // assigned to a field as LLEvents:on does, and stops the script at
+        // a field assigned nil.
+        const std::string off = "LLEvents:off(event :: any, handler)";
         const std::string on  = field ? "(LLEvents :: any)[event] = handler" : "LLEvents:on(event :: any, handler)";
         mText += "    if name == currentState then\n"
                  "        return\n"

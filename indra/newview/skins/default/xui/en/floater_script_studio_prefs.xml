@@ -1644,7 +1644,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="convert_fields"
-             tool_tip="LLEvents.touch_start = function(detected) ... end, one for each event. Off: LLEvents:on, which lets other code listen to the event too."
+             tool_tip="LLEvents.touch_start = function(detected) ... end. SLua puts an assigned handler on as LLEvents:on does, beside any others, but only LLEvents:handlers finds it again for LLEvents:off. Off: LLEvents:on."
              top_pad="4"
              width="700" />
             <check_box

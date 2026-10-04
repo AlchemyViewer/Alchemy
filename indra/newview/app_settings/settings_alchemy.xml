@@ -621,7 +621,7 @@
         <key>ALScriptConvertHandlerFields</key>
         <map>
             <key>Comment</key>
-            <string>Convert to SLua assigns handlers to LLEvents' fields (LLEvents.touch_start = function ...), one for each event, rather than putting them on with LLEvents:on.</string>
+            <string>Convert to SLua assigns handlers to LLEvents' fields (LLEvents.touch_start = function ...) rather than putting them on with LLEvents:on. SLua puts an assigned handler on as LLEvents:on does, beside any others.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

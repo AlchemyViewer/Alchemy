@@ -356,7 +356,10 @@ namespace tut
         const ALLSLToSLua::Result many = ALLSLToSLua::convert("default { touch_start(integer n) { state other; } }\n"
                                                               "state other { touch_start(integer n) { state default; } }\n",
                                                               options);
-        ensure("setState sets the fields: " + many.text, has(many, "(LLEvents :: any)[event] = handler") && has(many, "(LLEvents :: any)[event] = nil"));
+        // SLua stops the script at a field assigned nil: taken off by
+        // LLEvents:off, as LLEvents:on's are.
+        ensure("setState sets the fields: " + many.text, has(many, "(LLEvents :: any)[event] = handler") &&
+                                                         has(many, "LLEvents:off(event :: any, handler)") && !has(many, "[event] = nil"));
         checksClean(many);
     }
 
