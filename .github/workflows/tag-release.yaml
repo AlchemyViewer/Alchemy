@@ -26,19 +26,22 @@ on:
         description: "Override the tag name (optional). If the tag already exists, a numeric suffix is appended."
         required: false
 
+# The tag is created with a personal access token, not the GITHUB_TOKEN.
+permissions: {}
+
 jobs:
   tag-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Setup Env Vars
-        run: |
-          CHANNEL="${{ inputs.channel }}"
-          echo VIEWER_CHANNEL="Alchemy_${CHANNEL:-Develop}" >> ${GITHUB_ENV}
-          NIGHTLY_DATE=$(date --rfc-3339=date)
-          echo NIGHTLY_DATE=${NIGHTLY_DATE} >> ${GITHUB_ENV}
-          echo TAG_ID="$(echo ${{ github.sha }} | cut -c1-8)-${{ inputs.project || '${NIGHTLY_DATE}' }}" >> ${GITHUB_ENV}
       - name: Create Tag
         uses: actions/github-script@v9
+        env:
+          # Inputs reach the script through the environment, never pasted
+          # into it, so no input can become code.
+          CHANNEL: ${{ inputs.channel }}
+          PROJECT: ${{ inputs.project }}
+          TAG_OVERRIDE: ${{ inputs.tag_override }}
         with:
           # use a real access token instead of GITHUB_TOKEN default.
           # required so that the results of this tag creation can trigger the build workflow
@@ -47,8 +50,11 @@ jobs:
           # this token will need to be renewed anually in January
           github-token: ${{ secrets.LL_TAG_RELEASE_TOKEN }}
           script: |
-            const override = `${{ inputs.tag_override }}`.trim();
-            const baseTag = override || `${{ env.VIEWER_CHANNEL }}#${{ env.TAG_ID }}`;
+            // A scheduled run has no inputs: a Develop build tagged with the date.
+            const channel = process.env.CHANNEL || 'Develop';
+            const suffix = process.env.PROJECT || new Date().toISOString().slice(0, 10);
+            const override = (process.env.TAG_OVERRIDE || '').trim();
+            const baseTag = override || `Alchemy_${channel}#${context.sha.slice(0, 8)}-${suffix}`;
 
             // Try the base tag first, then append -2, -3, etc. if it already exists
             let tag = baseTag;
