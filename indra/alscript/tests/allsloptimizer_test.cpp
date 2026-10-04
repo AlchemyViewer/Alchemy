@@ -2052,4 +2052,42 @@ namespace tut
                                 options());
         ensure("not one read alone: " + r.text, r.text.find("llSay(0, s);") != std::string::npos);
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<54>()
+    {
+        set_test_name("a comparison settled by what each side can be (L16): a count never below nought, a find never below -1, llFrand of a positive "
+                      "magnitude, a truth 1 or 0, a type within its constants; not where the ranges meet, nor where a side changes something");
+        const std::string source = "integer said() { llOwnerSay(\"said\"); return 1; }\n"
+                                   "default\n{\n    touch_start(integer n)\n    {\n"
+                                   "        list l = llParseString2List(llDetectedName(0), [\" \"], []);\n"
+                                   "        if (llGetListLength(l) < 0) llSay(0, \"a\");\n"
+                                   "        integer count = llGetListLength(l);\n"
+                                   "        if (count >= 0) llSay(0, \"b\");\n"
+                                   "        if (llFrand(10.0) < 0) llSay(0, \"c\");\n"
+                                   "        if (llListFindList(l, [\"x\"]) > -2) llSay(0, \"d\");\n"
+                                   "        if (llGetListEntryType(l, 0) == 9) llSay(0, \"e\");\n"
+                                   "        if (llSameGroup(llDetectedKey(0)) == 2) llSay(0, \"f\");\n"
+                                   "        if (llFrand(10.0) < 5) llSay(0, \"g\");\n"
+                                   "        if (llGetListLength(l) > 0) llSay(0, \"h\");\n"
+                                   "        if (llStringLength(llList2String(l, said())) < 0) llSay(0, \"i\");\n"
+                                   "    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::LSO })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            const auto said = [&r](const char* what) { return r.text.find(std::string("llSay(0, \"") + what + "\")") != std::string::npos; };
+            ensure("a count below nought never: " + r.text, !said("a"));
+            ensure("a count's local nought or more always: " + r.text, said("b") && r.text.find("count") == std::string::npos);
+            ensure("llFrand of ten never below nought: " + r.text, !said("c"));
+            ensure("a find above -2 always: " + r.text, said("d") && r.text.find("llListFindList") == std::string::npos);
+            ensure("a type past TYPE_ROTATION never: " + r.text, !said("e"));
+            ensure("a truth never 2: " + r.text, !said("f"));
+            ensure("where the ranges meet, kept: " + r.text, said("g") && said("h"));
+            ensure("where a side changes something, kept: " + r.text, said("i"));
+            ensure("noted: " + notes(r), has(r, "settled llGetListLength(l) < 0 to 0") || has(r, "settled (l != []) < 0 to 0") || has(r, "settled l != [] < 0 to 0"));
+        }
+    }
 } // namespace tut

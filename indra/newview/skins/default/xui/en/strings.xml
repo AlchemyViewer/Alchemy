@@ -653,6 +653,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="OptimizerRemovedUnreachable">removed [1], which can never run</string>
 	<string name="OptimizerRemovedWhile">removed a while loop whose condition is always false</string>
 	<string name="OptimizerRenamed">renamed the [1] [2] to [3]</string>
+	<string name="OptimizerSettled">settled [1] to [2]</string>
 	<string name="OptimizerSimplified">simplified [1] to [2]</string>
 	<string name="OptimizerSubstitutedLocal">put the value of [1] where it is read, and removed it</string>
 	<string name="OptimizerSwappedBranches">swapped the branches of if ([1]) and dropped the !</string>

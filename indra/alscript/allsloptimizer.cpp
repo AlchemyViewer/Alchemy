@@ -2842,6 +2842,10 @@ namespace
             {
                 return false;
             }
+            if (settled(expr))
+            {
+                return false;
+            }
             const LSLOperator op   = expr->getOperation();
             const LSLIType    type = expr->getIType();
             const bool        keepLeft  = left->getIType() == type;
@@ -3087,6 +3091,165 @@ namespace
         }
 
     private:
+        // What a number can be, the least and the most, where something
+        // says: a constant; a library function's answer (ALLSLTraits::bounds),
+        // llFrand's of a magnitude whose sign is known; a truth; an & with a
+        // number not below nought; a list's length as l != []; a local set
+        // to one of these where it is declared and never after.
+        struct Range
+        {
+            double least = 0.0;
+            double most  = 0.0;
+        };
+        std::optional<Range> range(LSLExpression* e, int depth = 0) const
+        {
+            e = bare(e);
+            if (!e || depth > 8)
+            {
+                return std::nullopt;
+            }
+            if (LSLConstant* cv = e->getConstantValue())
+            {
+                double v = 0.0;
+                if (cv->getNodeSubType() == NODE_INTEGER_CONSTANT)
+                {
+                    v = static_cast<LSLIntegerConstant*>(cv)->getValue();
+                }
+                else if (cv->getNodeSubType() == NODE_FLOAT_CONSTANT && std::isfinite(static_cast<LSLFloatConstant*>(cv)->getValue()))
+                {
+                    v = static_cast<LSLFloatConstant*>(cv)->getValue();
+                }
+                else
+                {
+                    return std::nullopt;
+                }
+                return Range{ v, v };
+            }
+            const auto number = [](LSLExpression* x) { return x && (x->getIType() == LST_INTEGER || x->getIType() == LST_FLOATINGPOINT); };
+            switch (e->getNodeSubType())
+            {
+                case NODE_LVALUE_EXPRESSION:
+                {
+                    auto*       read = static_cast<LSLLValueExpression*>(e);
+                    LSLSymbol*  sym  = read->getSymbol();
+                    LSLASTNode* decl = sym && !read->getMember() && read->getIsFoldable() && sym->getSubType() == SYM_LOCAL && sym->getAssignments() == 0
+                                           ? sym->getVarDecl()
+                                           : nullptr;
+                    LSLASTNode* init = decl ? decl->getChild(1) : nullptr;
+                    return init && init->getNodeType() == NODE_EXPRESSION ? range(static_cast<LSLExpression*>(init), depth + 1) : std::nullopt;
+                }
+                case NODE_FUNCTION_EXPRESSION:
+                {
+                    LSLSymbol* sym = e->getSymbol();
+                    if (!sym || sym->getSubType() != SYM_BUILTIN)
+                    {
+                        return std::nullopt;
+                    }
+                    if (!strcmp(sym->getName(), "llFrand"))
+                    {
+                        // From nought towards what it is given, whose sign it
+                        // has; the bound itself let in, which rounding can give.
+                        LSLASTNode*                arg = static_cast<LSLFunctionExpression*>(e)->getArguments()->getChild(0);
+                        const std::optional<Range> mag = arg && arg->getNodeType() == NODE_EXPRESSION ? range(static_cast<LSLExpression*>(arg), depth + 1)
+                                                                                                      : std::nullopt;
+                        if (!mag)
+                        {
+                            return std::nullopt;
+                        }
+                        return Range{ std::min(0.0, mag->least), std::max(0.0, mag->most) };
+                    }
+                    S32 least = 0, most = 0;
+                    if (e->getIType() == LST_INTEGER && ALLSLTraits::bounds(sym->getName(), least, most))
+                    {
+                        return Range{ static_cast<double>(least), static_cast<double>(most) };
+                    }
+                    return std::nullopt;
+                }
+                case NODE_UNARY_EXPRESSION:
+                    return e->getOperation() == OP_BOOLEAN_NOT ? std::optional<Range>(Range{ 0.0, 1.0 }) : std::nullopt;
+                case NODE_BINARY_EXPRESSION:
+                {
+                    auto* b = static_cast<LSLBinaryExpression*>(e);
+                    switch (b->getOperation())
+                    {
+                        case OP_LESS:
+                        case OP_GREATER:
+                        case OP_LEQ:
+                        case OP_GEQ:
+                        case OP_EQ:
+                        case OP_BOOLEAN_AND:
+                        case OP_BOOLEAN_OR:
+                            return Range{ 0.0, 1.0 };
+                        case OP_NEQ:
+                            // A list's != is how much longer it is; LSO's of
+                            // a string not only 1 or 0.
+                            if (b->getLHS()->getIType() == LST_LIST && isEmptyList(b->getRHS()))
+                            {
+                                return Range{ 0.0, static_cast<double>(INT32_MAX) };
+                            }
+                            return number(b->getLHS()) && number(b->getRHS()) ? std::optional<Range>(Range{ 0.0, 1.0 }) : std::nullopt;
+                        case OP_BIT_AND:
+                            for (LSLExpression* side : { b->getLHS(), b->getRHS() })
+                            {
+                                const std::optional<Range> r = side && side->getIType() == LST_INTEGER ? range(side, depth + 1) : std::nullopt;
+                                if (r && r->least >= 0.0)
+                                {
+                                    return Range{ 0.0, r->most };
+                                }
+                            }
+                            return std::nullopt;
+                        default:
+                            return std::nullopt;
+                    }
+                }
+                default:
+                    return std::nullopt;
+            }
+        }
+
+        // A comparison of numbers settled by what each side can be: never
+        // below nought is never below -1, and a random float of a positive
+        // magnitude never below nought. Only where neither side changes
+        // anything, since neither is run any more.
+        bool settled(LSLBinaryExpression* expr)
+        {
+            const LSLOperator op = expr->getOperation();
+            if (op != OP_LESS && op != OP_GREATER && op != OP_LEQ && op != OP_GEQ && op != OP_EQ && op != OP_NEQ)
+            {
+                return false;
+            }
+            LSLExpression* left   = expr->getLHS();
+            LSLExpression* right  = expr->getRHS();
+            const auto     number = [](LSLExpression* x) { return x->getIType() == LST_INTEGER || x->getIType() == LST_FLOATINGPOINT; };
+            if (!number(left) || !number(right) || expr->getConstantValue() || !changesNothing(left) || !changesNothing(right))
+            {
+                return false;
+            }
+            const std::optional<Range> a = range(left);
+            const std::optional<Range> b = range(right);
+            if (!a || !b)
+            {
+                return false;
+            }
+            std::optional<bool> is;
+            const bool          apart = a->most < b->least || b->most < a->least;
+            switch (op)
+            {
+                case OP_LESS: is = a->most < b->least ? std::optional<bool>(true) : a->least >= b->most ? std::optional<bool>(false) : std::nullopt; break;
+                case OP_LEQ: is = a->most <= b->least ? std::optional<bool>(true) : a->least > b->most ? std::optional<bool>(false) : std::nullopt; break;
+                case OP_GREATER: is = a->least > b->most ? std::optional<bool>(true) : a->most <= b->least ? std::optional<bool>(false) : std::nullopt; break;
+                case OP_GEQ: is = a->least >= b->most ? std::optional<bool>(true) : a->most < b->least ? std::optional<bool>(false) : std::nullopt; break;
+                case OP_EQ: is = apart ? std::optional<bool>(false) : std::nullopt; break;
+                default: is = apart ? std::optional<bool>(true) : std::nullopt; break;
+            }
+            if (!is)
+            {
+                return false;
+            }
+            fold(expr, ctx.integer(*is ? 1 : 0), "OptimizerSettled", "settled");
+            return true;
+        }
+
         static bool empty(LSLStatement* s)
         {
             if (!s)
@@ -3609,8 +3772,8 @@ namespace
             wrote(expr, made, before);
         }
 
-        // Whether a value is never below -1: a find's, or a local's that
-        // is set to one where it is declared and never after.
+        // Whether a value is never below -1: a find's, a count's, or a
+        // local's that is set to one where it is declared and never after.
         static bool atLeastMinusOne(LSLExpression* x)
         {
             x = bare(x);
@@ -3625,8 +3788,9 @@ namespace
             {
                 return false;
             }
-            LSLSymbol* sym = static_cast<LSLFunctionExpression*>(x)->getSymbol();
-            return sym && sym->getSubType() == SYM_BUILTIN && ALLSLTraits::atLeastMinusOne(sym->getName());
+            LSLSymbol* sym   = static_cast<LSLFunctionExpression*>(x)->getSymbol();
+            S32        least = 0, most = 0;
+            return sym && sym->getSubType() == SYM_BUILTIN && ALLSLTraits::bounds(sym->getName(), least, most) && least >= -1;
         }
 
         static bool integerOperands(LSLBinaryExpression* expr)

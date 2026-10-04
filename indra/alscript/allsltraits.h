@@ -106,4 +106,10 @@ public:
     // something, and INVENTORY_NONE. What the definitions do not say, so
     // kept by hand.
     static bool atLeastMinusOne(const char* name);
+    // The least and the most an integer function answers, where either is
+    // narrower than any integer: a count's nought or more, a find's -1 or
+    // more, 1 or 0 where the definitions say it answers a truth, a type's
+    // TYPE_INVALID to TYPE_ROTATION. Kept by hand beside the definitions'
+    // truths; false for a function it says nothing of.
+    static bool bounds(const char* name, S32& least, S32& most);
 };

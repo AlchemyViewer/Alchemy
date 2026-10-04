@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <iterator>
 #include <string_view>
 
@@ -192,6 +193,53 @@ bool ALLSLTraits::sideEffectFree(Tailslide::LSLASTNode* node)
 bool ALLSLTraits::changesNothing(Tailslide::LSLASTNode* node)
 {
     return quiet(node, true);
+}
+
+// static
+bool ALLSLTraits::bounds(const char* name, S32& least, S32& most)
+{
+    if (!name)
+    {
+        return false;
+    }
+    if (atLeastMinusOne(name))
+    {
+        least = -1;
+        most  = INT32_MAX;
+        return true;
+    }
+    struct Row
+    {
+        std::string_view name;
+        S32              least;
+        S32              most;
+    };
+    // Not llGetUnixTime, whose answer wraps below nought in 2038.
+    static constexpr Row ROWS[] = {
+        { "llGetAttached", 0, INT32_MAX },        { "llGetFreeMemory", 0, INT32_MAX },     { "llGetFreeURLs", 0, INT32_MAX },
+        { "llGetInventoryNumber", 0, INT32_MAX }, { "llGetLinkNumber", 0, INT32_MAX },      { "llGetLinkNumberOfSides", 0, INT32_MAX },
+        { "llGetListEntryType", 0, 6 },           { "llGetListLength", 0, INT32_MAX },      { "llGetMemoryLimit", 0, INT32_MAX },
+        { "llGetNumberOfPrims", 0, INT32_MAX },   { "llGetNumberOfSides", 0, INT32_MAX },   { "llGetObjectPrimCount", 0, INT32_MAX },
+        { "llGetRegionAgentCount", 0, INT32_MAX }, { "llGetSPMaxMemory", 0, INT32_MAX },    { "llGetUsedMemory", 0, INT32_MAX },
+        { "llStringLength", 0, INT32_MAX },
+    };
+    for (const Row& row : ROWS)
+    {
+        if (row.name == name)
+        {
+            least = row.least;
+            most  = row.most;
+            return true;
+        }
+    }
+    const Trait* t = of(name);
+    if (t && (t->slua & SluaBool))
+    {
+        least = 0;
+        most  = 1;
+        return true;
+    }
+    return false;
 }
 
 // static
