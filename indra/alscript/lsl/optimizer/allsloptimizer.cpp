@@ -54,6 +54,7 @@
 #include "alscriptengine.h"
 
 #include "allslbranches.h"
+#include "allslconstantglobals.h"
 #include "allslcosts.h"
 #include "allsldeadcode.h"
 #include "allsleffects.h"
@@ -500,7 +501,7 @@ namespace
         // places it leaves open.
         if (options.constfold && !result.stoppedEarly)
         {
-            const int kept = keepRepeatedCalls(ctx, report, options, script);
+            const int kept = keepRepeatedCalls(ctx, report, options, script, Keeping::Calls);
             walks(1);
             if (kept)
             {
@@ -514,6 +515,16 @@ namespace
         {
             shape(ctx, report, options, script, ShapeStage::Values);
             walks(1);
+            // A constant written at many places kept once: in a global where
+            // the target holds one smaller so, else in a local where the
+            // compiler says that is no larger. After the shapes, which take
+            // some constants away -- x + 1 as -~x -- and never folded again.
+            if (!result.stoppedEarly)
+            {
+                poolConstants(ctx, report, options, script);
+                keepRepeatedCalls(ctx, report, options, script, Keeping::Constants);
+                walks(2);
+            }
             // A list's shapes on Mono, which references a list's helpers
             // once for the whole script -- one to add a string, another to
             // add an integer, one for a literal. At each place they are

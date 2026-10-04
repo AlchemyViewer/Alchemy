@@ -26,6 +26,7 @@
 
 #include "allsloptimizer.h"
 
+#include "allslcosts.h"
 #include "allsltraits.h"
 #include "allslvalues.h"
 #include "llstl.h"
@@ -245,6 +246,12 @@ namespace ALLSLPasses
     // A block's statements made `statements`, in that order: those it had
     // and those moved in from elsewhere, none counted again.
     void setStatements(LSLASTNode* block, const std::vector<LSLASTNode*>& statements, ScriptContext& context);
+
+    // What a constant costs held in a global against written where it is
+    // read, on a target (ALLSLCosts::Held): a float's, a vector's and a
+    // rotation's as whole or not, a string's and a key's by their length;
+    // nothing for a list.
+    std::optional<ALLSLCosts::Held> heldFor(ALLSLOptimizer::Target target, LSLConstant* cv);
 
     // What a text weighs on the target's compiler, and the weigher's name
     // for the target.

@@ -368,6 +368,11 @@ namespace tut
               "<<<", nullptr },
             { "a value set again before it is read not set", { "", "integer z = i; z = j; i = z;" }, { "", "integer z = j; i = z;" }, "<<<", nullptr },
             { "a || 1 settled", { "", "if ((integer)s || 1) i = 2;" }, { "", "i = 2;" }, "<<<", nullptr },
+            // What is kept in a local, as the weigher has it (Mono's frame not in it).
+            { "a global read three times read once", { "", "i = gi + j; j = gi + i; i = gi + j;" }, { "", "integer z = gi; i = z + j; j = z + i; i = z + j;" },
+              "><<", nullptr },
+            { "a vector written twice kept in a local", { "", "v = v + <1.5, 2.5, 3.5>; v = v - <1.5, 2.5, 3.5>;" },
+              { "", "vector z = <1.5, 2.5, 3.5>; v = v + z; v = v - z;" }, "><<", nullptr },
         };
         for (const Fact& fact : facts)
         {

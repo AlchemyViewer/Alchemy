@@ -165,6 +165,14 @@ struct ALLSLCosts
     // A local declared and set, then read, against the value used where it
     // is read.
     S32 local         = 0;
+    // What a local costs past its code where the target keeps each in a
+    // frame it saves and restores: the grid microthreads Mono, each function
+    // a frame class with a field for every local, filled by its constructor,
+    // read back by a restore and pushed by a save -- some 31 bytes a local,
+    // from the grid's IL (the SL wiki's sample), where the weigher sizes
+    // Tailslide's IL, which has none of it. An estimate, so not measured
+    // here; what a new local must save past what the weigher says.
+    S32 localFrame    = 0;
     // A jump and the label it goes to.
     S32 jump          = 0;
     // A function taking and returning nothing, with an empty body, and what

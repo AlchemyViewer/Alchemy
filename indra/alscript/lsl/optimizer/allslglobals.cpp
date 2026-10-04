@@ -99,6 +99,19 @@ namespace
             return n && n->getNodeType() == NODE_STATEMENT && n->getNodeSubType() == type;
         }
 
+        // What a global of a type costs the script, its default's value.
+        static S32 globalCost(const ALLSLCosts& costs, LSLIType type)
+        {
+            switch (type)
+            {
+                case LST_INTEGER: return costs.integer.global;
+                case LST_FLOATINGPOINT: return costs.wholeFloating.global;
+                case LST_VECTOR: return costs.wholeVector.global;
+                case LST_QUATERNION: return costs.wholeRotation.global;
+                default: return costs.string.global;
+            }
+        }
+
         static bool mentions(LSLASTNode* root, LSLSymbol* sym)
         {
             bool found = false;
@@ -259,6 +272,13 @@ namespace
                 }
             }
             if (owners.empty())
+            {
+                return;
+            }
+            // A local in each, on a target that keeps a frame for every one,
+            // against the global it replaces.
+            const ALLSLCosts& costs = ALLSLCosts::of(ctx.target);
+            if (costs.localFrame > 0 && static_cast<S32>(owners.size()) * costs.localFrame >= globalCost(costs, sym->getIType()))
             {
                 return;
             }

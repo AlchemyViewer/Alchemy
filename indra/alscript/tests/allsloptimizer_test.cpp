@@ -2563,9 +2563,11 @@ namespace tut
     template<> template<>
     void allsloptimizer_object::test<64>()
     {
-        set_test_name("a value set again before it is read is not set; a global every handler sets before it reads made a local of each; not one "
-                      "read before it is set, nor one a function also sets; a || 1 and a && 0 settled");
+        set_test_name("a value set again before it is read is not set; a global every handler sets before it reads made a local of each -- on "
+                      "Mono, whose locals each cost a frame, only where that is less than the global; not one read before it is set, nor one a "
+                      "function also sets; a || 1 and a && 0 settled");
         const std::string source = "integer scratch;\n"
+                                   "integer twice;\n"
                                    "integer kept = 3;\n"
                                    "integer shared;\n"
                                    "poke(integer n)\n{\n    shared = n;\n}\n"
@@ -2574,11 +2576,12 @@ namespace tut
                                    "        integer i = llGetUnixTime();\n        i = (integer)llFrand(9);\n        llOwnerSay((string)i);\n"
                                    "        integer j = 4;\n        for (j = 0; j < (integer)llFrand(9); ++j)\n            llOwnerSay((string)j);\n"
                                    "        scratch = llGetUnixTime();\n        llOwnerSay((string)scratch);\n"
+                                   "        twice = llGetUnixTime();\n        llOwnerSay((string)twice);\n"
                                    "        shared = 1;\n        poke(2);\n        llOwnerSay((string)shared);\n"
                                    "        if ((integer)llFrand(2) || 1)\n            llOwnerSay(\"always\");\n"
                                    "        if ((integer)llFrand(2) && 0)\n            llOwnerSay(\"never\");\n"
                                    "    }\n"
-                                   "    touch_start(integer t)\n    {\n        scratch = t;\n        llOwnerSay((string)scratch + (string)kept);\n"
+                                   "    touch_start(integer t)\n    {\n        twice = t;\n        llOwnerSay((string)twice + (string)kept);\n"
                                    "        kept = t;\n    }\n}\n";
         for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
         {
@@ -2586,12 +2589,50 @@ namespace tut
             // A read of the clock changes nothing, and goes with it.
             ensure("a value set again before it is read not set: " + text, in(text, "integer i = (integer)llFrand(9);"));
             ensure("a for's first part sets again", !in(text, "integer j = 4;"));
-            ensure("a global every handler sets before it reads made a local of each", in(text, "integer scratch = llGetUnixTime();") &&
-                                                                                          in(text, "llOwnerSay((string)t + "));
+            ensure("a global one handler sets before it reads made a local", in(text, "integer scratch = llGetUnixTime();") && !in(text, "integer scratch;\n"));
+            ensure("one two handlers set before they read, a local of each but on Mono",
+                   target == ALLSLOptimizer::Target::Mono ? in(text, "integer twice;\n") : in(text, "integer twice = llGetUnixTime();") && in(text, "llOwnerSay((string)t + "));
             ensure("not one read before it is set", in(text, "integer kept"));
             ensure("not one a function sets too", in(text, "integer shared"));
             ensure("a || 1 settled true", in(text, "llOwnerSay(\"always\")") && !in(text, "|| 1"));
             ensure("a && 0 settled false", !in(text, "never"));
         }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<65>()
+    {
+        set_test_name("a global the script sets read again and again read once into a local, where nothing between sets it; a constant written at "
+                      "many places kept once, in a global where the target holds one smaller so, else in a local; each on its target, Mono's "
+                      "locals paying for their frames");
+        const std::string source = "integer channel;\n"
+                                   "integer never = 7;\n"
+                                   "default\n{\n"
+                                   "    state_entry()\n    {\n        channel = (integer)llFrand(1000);\n    }\n"
+                                   "    touch_start(integer n)\n    {\n"
+                                   "        llSay(channel, \"one\");\n        llSay(channel, \"two\");\n        llSay(channel, \"three\");\n"
+                                   "        channel = n;\n        llSay(channel, (string)never);\n        llSay(never, (string)never);\n"
+                                   "        llOwnerSay(\"a sentence long enough to be worth holding\");\n"
+                                   "        llOwnerSay(\"a sentence long enough to be worth holding\");\n"
+                                   "        llOwnerSay(\"a sentence long enough to be worth holding\");\n"
+                                   "        llSetPos(llGetPos() + <1.5, 2.5, 3.5>);\n        llSetPos(llGetPos() + <1.5, 2.5, 3.5>);\n"
+                                   "        llSetPos(llGetPos() + <1.5, 2.5, 3.5>);\n        llSetPos(llGetPos() + <1.5, 2.5, 3.5>);\n"
+                                   "    }\n}\n";
+        const std::string lso = optimized(source, ALLSLOptimizer::Target::LSO);
+        ensure("LSO: a long string at three places kept in a global: " + lso, in(lso, "string s = \"a sentence long enough to be worth holding\";") &&
+                                                                              in(lso, "llOwnerSay(s);"));
+        ensure("LSO: a vector at four places, in a global", in(lso, "vector v = <1.5, 2.5, 3.5>;"));
+        ensure("LSO: a global's reads stay, as large as a local's there", in(lso, "llSay(channel, \"one\");"));
+
+        const std::string luau = optimized(source, ALLSLOptimizer::Target::Luau);
+        ensure("Luau: a global read three times read once: " + luau, in(luau, "integer localChannel = channel;") && in(luau, "llSay(localChannel, \"one\");"));
+        ensure("Luau: not across where it is set", in(luau, "channel = n;"));
+        ensure("Luau: never one the script never sets, which is the folder's", !in(luau, "localNever"));
+        ensure("Luau: constants held once in a function already", !in(luau, "string s = "));
+
+        const std::string mono = optimized(source, ALLSLOptimizer::Target::Mono);
+        ensure("Mono: a vector at four places kept in a local, its frame paid for: " + mono, in(mono, "vector v = <1.5, 2.5, 3.5>;"));
+        ensure("Mono: three reads of a global not worth a local's frame", !in(mono, "localChannel"));
+        ensure("Mono: a string held once already", !in(mono, "string s = "));
     }
 } // namespace tut

@@ -26,6 +26,7 @@
 
 #include "allslrepeatedcalls.h"
 
+#include "allslcosts.h"
 #include "allsleffects.h"
 #include "alscriptlexicon.h"
 
@@ -34,7 +35,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
+#include <optional>
 
 namespace ALLSLPasses
 {
@@ -49,10 +52,14 @@ namespace
     // is one its statement always comes to, so that the call runs no more
     // often than it did. It goes ahead of that statement, which changes
     // nothing it is given.
+    // A global's read so too, where the run sets nothing of it; and, once
+    // nothing more will fold, a constant written again and again: each read
+    // or written at any time alike, its first place anywhere in the run.
     class RepeatedCalls : public ASTVisitor, public Pass
     {
     public:
-        RepeatedCalls(Ctx& c, Report& r, const ALLSLOptimizer::Options& o, LSLScript* script) : Pass(c, r, o)
+        RepeatedCalls(Ctx& c, Report& r, const ALLSLOptimizer::Options& o, LSLScript* script, Keeping keeping)
+            : Pass(c, r, o), mCosts(ALLSLCosts::of(o.target)), mKeeping(keeping)
         {
             // Every name the script writes, which a local's may be none of:
             // LSL has no shadowing.
@@ -80,10 +87,88 @@ namespace
         // variables it reads, in the order it reads them.
         struct Group
         {
-            std::vector<LSLSymbol*>                                    reads;
-            std::vector<std::pair<size_t, LSLFunctionExpression*>>     places;
-            size_t                                                     length = 0;
+            std::vector<LSLSymbol*>                            reads;
+            std::vector<std::pair<size_t, LSLExpression*>>     places;
+            size_t                                             length = 0;
         };
+
+        const ALLSLCosts& mCosts;
+        const Keeping     mKeeping;
+
+        // A read of a global the script sets, whole, that is no write of it.
+        static LSLSymbol* globalRead(LSLASTNode* n)
+        {
+            if (n->getNodeType() != NODE_EXPRESSION || n->getNodeSubType() != NODE_LVALUE_EXPRESSION || static_cast<LSLLValueExpression*>(n)->getMember())
+            {
+                return nullptr;
+            }
+            LSLSymbol*  sym    = n->getSymbol();
+            LSLASTNode* parent = n->getParent();
+            const bool  write  = parent && parent->getNodeType() == NODE_EXPRESSION && operation_mutates(static_cast<LSLExpression*>(parent)->getOperation()) &&
+                                parent->getChild(0) == n;
+            // One never set is the folder's, which writes its value out or not.
+            return sym && sym->getSymbolType() == SYM_VARIABLE && sym->getSubType() == SYM_GLOBAL && sym->getAssignments() > 0 && !write &&
+                           typeName(sym->getIType())
+                       ? sym
+                       : nullptr;
+        }
+
+        // A constant of a type a local may hold, but a list.
+        static bool keptConstant(LSLASTNode* n)
+        {
+            if (n->getNodeType() != NODE_EXPRESSION || n->getNodeSubType() != NODE_CONSTANT_EXPRESSION || !n->getConstantValue())
+            {
+                return false;
+            }
+            const LSLIType type = n->getIType();
+            return type != LST_LIST && typeName(type) && !n->getConstantValue()->containsNaN();
+        }
+
+        // A number as the printer writes it for the target: whole as an
+        // integer where that is smaller, negative as its cast where that is.
+        std::string printedNumber(double v, bool asInteger, bool alone) const
+        {
+            const bool  wide = ctx.target == ALLSLOptimizer::Target::Luau;
+            std::string text = asInteger && integral(v) && mCosts.integerForFloat ? std::to_string(static_cast<long long>(v)) : floatText(v, wide);
+            if (alone && !asInteger && mCosts.castForWholeFloat && integral(v) && std::fabs(v) < 2147483648.0 && !(v == 0.0 && std::signbit(v)))
+            {
+                return "((float)" + std::to_string(static_cast<long long>(v)) + ")";
+            }
+            if (v < 0.0 && mCosts.castForNegative)
+            {
+                const bool whole = text.find_first_not_of("-0123456789") == std::string::npos;
+                return std::string(whole ? "((integer)" : "((float)") + text + ")";
+            }
+            return text;
+        }
+
+        // A constant as the printer writes it, for a weighing.
+        std::optional<std::string> printed(LSLConstant* cv) const
+        {
+            switch (cv->getNodeSubType())
+            {
+                case NODE_INTEGER_CONSTANT:
+                {
+                    const S32 v = static_cast<LSLIntegerConstant*>(cv)->getValue();
+                    return v < 0 && mCosts.castForNegative ? "((integer)" + std::to_string(v) + ")" : std::to_string(v);
+                }
+                case NODE_FLOAT_CONSTANT:
+                    return printedNumber(static_cast<LSLFloatConstant*>(cv)->getValue(), false, true);
+                case NODE_VECTOR_CONSTANT:
+                {
+                    const Vector3* v = static_cast<LSLVectorConstant*>(cv)->getValue();
+                    return "<" + printedNumber(v->x, true, false) + ", " + printedNumber(v->y, true, false) + ", " + printedNumber(v->z, true, false) + ">";
+                }
+                case NODE_QUATERNION_CONSTANT:
+                {
+                    const Quaternion* q = static_cast<LSLQuaternionConstant*>(cv)->getValue();
+                    return "<" + printedNumber(q->x, true, false) + ", " + printedNumber(q->y, true, false) + ", " + printedNumber(q->z, true, false) + ", " +
+                           printedNumber(q->s, true, false) + ">";
+                }
+                default:
+                    return ALLSLValues::literal(cv, ctx.target == ALLSLOptimizer::Target::Luau);
+            }
+        }
 
         template <class F> static void each(LSLASTNode* root, const F& f)
         {
@@ -184,13 +269,38 @@ namespace
             return found;
         }
 
-        // A name of the script's own for the local: the function's without
-        // its ll, a length's `length`, numbered where it is taken.
-        std::string fresh(const char* function)
+        // What the local is named for: a call's function without its ll, a
+        // length's `length`; a global's `local` and its name; a constant's
+        // type, by its first letter.
+        static std::string nameFor(LSLExpression* kept)
         {
-            const std::string_view called = function;
-            std::string base = called == "llGetListLength" || called == "llStringLength" ? std::string("length") : std::string(called.substr(2));
-            base[0]          = static_cast<char>(std::tolower(static_cast<unsigned char>(base[0])));
+            if (kept->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+            {
+                const std::string_view called = kept->getSymbol()->getName();
+                std::string base = called == "llGetListLength" || called == "llStringLength" ? std::string("length") : std::string(called.substr(2));
+                base[0]          = static_cast<char>(std::tolower(static_cast<unsigned char>(base[0])));
+                return base;
+            }
+            if (kept->getNodeSubType() == NODE_LVALUE_EXPRESSION)
+            {
+                std::string name = kept->getSymbol()->getName();
+                name[0]          = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
+                return "local" + name;
+            }
+            switch (kept->getIType())
+            {
+                case LST_INTEGER: return "n";
+                case LST_FLOATINGPOINT: return "f";
+                case LST_STRING: return "s";
+                case LST_KEY: return "k";
+                case LST_VECTOR: return "v";
+                default: return "r";
+            }
+        }
+
+        // A name of the script's own for the local, numbered where it is taken.
+        std::string fresh(const std::string& base)
+        {
             const auto usable = [&](const std::string& name) {
                 return !mTaken.contains(name) && ALScriptLexicon::lslWord(name) == ALScriptLexicon::LSL_NAME &&
                        !(ctx.context->builtins && ctx.context->builtins->lookup(name.c_str(), SYM_ANY));
@@ -204,29 +314,51 @@ namespace
             return name;
         }
 
-        // Whether the local is no larger than the call at `places` places,
-        // each compiled in a function of its own given what the call reads.
-        bool smaller(LSLFunctionExpression* call, const std::vector<LSLSymbol*>& reads, size_t places)
+        // Whether the local is no larger than what it keeps at `places`
+        // places, each compiled in a function of its own: a call given what
+        // it reads, a global's read with the global declared, a constant as
+        // the printer writes it.
+        bool smaller(LSLExpression* first, const std::vector<LSLSymbol*>& reads, size_t places)
         {
-            const char* type = typeName(call->getIType());
+            const char* type = typeName(first->getIType());
+            std::string globals;
             std::string given;
-            std::vector<LSLSymbol*> seen;
-            for (LSLSymbol* sym : reads)
+            std::string text;
+            if (first->getNodeSubType() == NODE_CONSTANT_EXPRESSION)
             {
-                if (sym->getSubType() == SYM_BUILTIN || std::find(seen.begin(), seen.end(), sym) != seen.end())
-                {
-                    continue;
-                }
-                const char* its = typeName(sym->getIType());
-                if (!its)
+                const std::optional<std::string> literal = printed(first->getConstantValue());
+                if (!literal)
                 {
                     return false;
                 }
-                seen.push_back(sym);
-                given += std::string(given.empty() ? "" : ", ") + its + " " + sym->getName();
+                text = *literal;
             }
-            const std::string text    = render(call);
-            const std::string head    = "keptCall(" + given + ")\n{\n";
+            else if (first->getNodeSubType() == NODE_LVALUE_EXPRESSION)
+            {
+                LSLSymbol* sym = first->getSymbol();
+                globals        = std::string(typeName(sym->getIType())) + " " + sym->getName() + ";\n";
+                text           = sym->getName();
+            }
+            else
+            {
+                std::vector<LSLSymbol*> seen;
+                for (LSLSymbol* sym : reads)
+                {
+                    if (sym->getSubType() == SYM_BUILTIN || std::find(seen.begin(), seen.end(), sym) != seen.end())
+                    {
+                        continue;
+                    }
+                    const char* its = typeName(sym->getIType());
+                    if (!its)
+                    {
+                        return false;
+                    }
+                    seen.push_back(sym);
+                    given += std::string(given.empty() ? "" : ", ") + its + " " + sym->getName();
+                }
+                text = render(first);
+            }
+            const std::string head    = globals + "keptCall(" + given + ")\n{\n";
             const std::string tail    = "}\ndefault\n{\n    state_entry()\n    {\n    }\n}\n";
             std::string       asCalls = head;
             std::string       asLocal = head + "    " + type + " kept = " + text + ";\n";
@@ -244,7 +376,8 @@ namespace
             }
             const ALScriptWeight byCalls = weigh(ctx.target, asCalls);
             const ALScriptWeight byLocal = weigh(ctx.target, asLocal);
-            const bool           no      = byCalls.compiled && byLocal.compiled && byLocal.total <= byCalls.total;
+            // The local's frame too, on a target that keeps one for it.
+            const bool           no      = byCalls.compiled && byLocal.compiled && byLocal.total + mCosts.localFrame <= byCalls.total;
             ctx.answers.emplace(key, no);
             return no;
         }
@@ -262,21 +395,25 @@ namespace
             for (size_t i = 0; i < statements.size(); ++i)
             {
                 each(statements[i], [&](LSLASTNode* n) {
-                    if (n->getNodeType() != NODE_EXPRESSION || n->getNodeSubType() != NODE_FUNCTION_EXPRESSION ||
-                        !keepable(static_cast<LSLFunctionExpression*>(n)))
+                    const bool call     = mKeeping == Keeping::Calls && n->getNodeType() == NODE_EXPRESSION &&
+                                      n->getNodeSubType() == NODE_FUNCTION_EXPRESSION && keepable(static_cast<LSLFunctionExpression*>(n));
+                    const bool global   = mKeeping == Keeping::Calls && globalRead(n);
+                    const bool constant = mKeeping == Keeping::Constants && keptConstant(n);
+                    if (!call && !global && !constant)
                     {
                         return;
                     }
-                    auto*                   call = static_cast<LSLFunctionExpression*>(n);
+                    auto*                   kept = static_cast<LSLExpression*>(n);
                     std::vector<LSLSymbol*> reads;
-                    each(call, [&reads](LSLASTNode* m) {
+                    each(kept, [&reads](LSLASTNode* m) {
                         if (m->getNodeType() == NODE_EXPRESSION && m->getNodeSubType() == NODE_LVALUE_EXPRESSION)
                         {
                             reads.push_back(m->getSymbol());
                         }
                     });
-                    const std::string text = render(call);
-                    std::string       key  = text;
+                    // A string's and a key's literals are written alike.
+                    const std::string text = render(kept);
+                    std::string       key  = std::string(typeName(kept->getIType())) + "\n" + text;
                     for (LSLSymbol* sym : reads)
                     {
                         key += "\n" + std::to_string(reinterpret_cast<uintptr_t>(sym));
@@ -286,7 +423,7 @@ namespace
                     {
                         groups.push_back(Group{ std::move(reads), {}, text.size() });
                     }
-                    groups[at->second].places.emplace_back(i, call);
+                    groups[at->second].places.emplace_back(i, kept);
                 });
             }
             // The outermost first: a call kept takes with it the calls it is
@@ -315,9 +452,9 @@ namespace
             {
                 // Runs of statements that change nothing the call reads, each
                 // begun where a place is always come to.
-                size_t                              open  = std::string::npos;
-                LSLFunctionExpression*              first = nullptr;
-                std::vector<LSLFunctionExpression*> held;
+                size_t                      open  = std::string::npos;
+                LSLExpression*              first = nullptr;
+                std::vector<LSLExpression*> held;
                 const auto close = [&]() {
                     const bool kept = held.size() > 1 && smaller(first, g->reads, held.size());
                     if (kept)
@@ -332,7 +469,7 @@ namespace
                 for (size_t i = 0; i < statements.size(); ++i)
                 {
                     const bool barred = labelled[i] || std::any_of(g->reads.begin(), g->reads.end(), [&](LSLSymbol* s) { return writes[i].writes(s); });
-                    std::vector<LSLFunctionExpression*> here;
+                    std::vector<LSLExpression*> here;
                     while (next < g->places.size() && g->places[next].first == i)
                     {
                         here.push_back(g->places[next++].second);
@@ -351,7 +488,11 @@ namespace
                     }
                     if (open == std::string::npos)
                     {
-                        const auto starts = std::find_if(here.begin(), here.end(), [&](LSLFunctionExpression* c) { return always(c, statements[i]); });
+                        // A call only where its statement always comes to it; what
+                        // reads the same at any time anywhere.
+                        const auto starts = std::find_if(here.begin(), here.end(), [&](LSLExpression* c) {
+                            return c->getNodeSubType() != NODE_FUNCTION_EXPRESSION || always(c, statements[i]);
+                        });
                         if (starts == here.end())
                         {
                             continue;
@@ -371,10 +512,10 @@ namespace
 
         // `first`'s call made the value of a local declared before `before`,
         // and each place held made a read of it.
-        void keep(LSLCompoundStatement* block, LSLASTNode* before, LSLFunctionExpression* first, const std::vector<LSLFunctionExpression*>& held)
+        void keep(LSLCompoundStatement* block, LSLASTNode* before, LSLExpression* first, const std::vector<LSLExpression*>& held)
         {
             LSLType*          type  = first->getType();
-            const std::string local = fresh(first->getSymbol()->getName());
+            const std::string local = fresh(nameFor(first));
             const std::string said  = report.wanted() ? render(first) : std::string();
             const char*       name  = ctx.allocator->copyStr(local.c_str());
             auto*             id    = ctx.allocator->newTracked<LSLIdentifier>(type, name);
@@ -383,7 +524,7 @@ namespace
             decl->setLoc(first->getLoc());
             auto* sym = ctx.allocator->newTracked<LSLSymbol>(name, type, SYM_VARIABLE, SYM_LOCAL, first->getLoc(), nullptr, decl);
             id->setSymbol(sym);
-            for (LSLFunctionExpression* place : held)
+            for (LSLExpression* place : held)
             {
                 auto* read = ctx.allocator->newTracked<LSLIdentifier>(type, name);
                 read->setSymbol(sym);
@@ -434,9 +575,9 @@ namespace
     };
 }
 
-    int keepRepeatedCalls(Ctx& ctx, Report& report, const ALLSLOptimizer::Options& options, LSLScript* script)
+    int keepRepeatedCalls(Ctx& ctx, Report& report, const ALLSLOptimizer::Options& options, LSLScript* script, Keeping keeping)
     {
-        RepeatedCalls repeated(ctx, report, options, script);
+        RepeatedCalls repeated(ctx, report, options, script, keeping);
         script->visit(&repeated);
         return repeated.changes;
     }

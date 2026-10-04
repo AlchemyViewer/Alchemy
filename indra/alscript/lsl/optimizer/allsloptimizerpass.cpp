@@ -28,6 +28,7 @@
 
 #include <tailslide/passes/pretty_print.hh>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -321,6 +322,37 @@ std::optional<Range> rangeOf(LSLExpression* e, int depth)
         for (LSLASTNode* stmt : statements)
         {
             block->pushChild(stmt);
+        }
+    }
+
+    std::optional<ALLSLCosts::Held> heldFor(ALLSLOptimizer::Target target, LSLConstant* cv)
+    {
+        const ALLSLCosts& costs = ALLSLCosts::of(target);
+        const auto        whole = [](std::initializer_list<double> parts) {
+            return std::all_of(parts.begin(), parts.end(), [](double v) { return integral(v); });
+        };
+        switch (cv->getIType())
+        {
+            case LST_INTEGER:
+                return costs.integer;
+            case LST_FLOATINGPOINT:
+                return whole({ static_cast<LSLFloatConstant*>(cv)->getValue() }) ? costs.wholeFloating : costs.floating;
+            case LST_VECTOR:
+            {
+                const Vector3* v = static_cast<LSLVectorConstant*>(cv)->getValue();
+                return whole({ v->x, v->y, v->z }) ? costs.wholeVector : costs.vector;
+            }
+            case LST_QUATERNION:
+            {
+                const Quaternion* q = static_cast<LSLQuaternionConstant*>(cv)->getValue();
+                return whole({ q->x, q->y, q->z, q->s }) ? costs.wholeRotation : costs.rotation;
+            }
+            case LST_STRING:
+                return costs.stringOf(static_cast<S32>(strlen(static_cast<LSLStringConstant*>(cv)->getValue())));
+            case LST_KEY:
+                return costs.stringOf(static_cast<S32>(strlen(static_cast<LSLKeyConstant*>(cv)->getValue())));
+            default:
+                return std::nullopt;
         }
     }
 }

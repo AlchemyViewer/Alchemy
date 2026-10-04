@@ -152,38 +152,12 @@ namespace
             {
                 return true;
             }
-            const ALLSLCosts& costs = ALLSLCosts::of(ctx.target);
-            const auto        whole = [](std::initializer_list<double> parts) {
-                return std::all_of(parts.begin(), parts.end(), [](double v) { return integral(v); });
-            };
-            ALLSLCosts::Held held;
-            switch (cv->getIType())
+            const std::optional<ALLSLCosts::Held> held = cv->getIType() == LST_KEY ? std::nullopt : heldFor(ctx.target, cv);
+            if (!held)
             {
-                case LST_INTEGER:
-                    held = costs.integer;
-                    break;
-                case LST_FLOATINGPOINT:
-                    held = whole({ static_cast<LSLFloatConstant*>(cv)->getValue() }) ? costs.wholeFloating : costs.floating;
-                    break;
-                case LST_VECTOR:
-                {
-                    const Vector3* v = static_cast<LSLVectorConstant*>(cv)->getValue();
-                    held             = whole({ v->x, v->y, v->z }) ? costs.wholeVector : costs.vector;
-                    break;
-                }
-                case LST_QUATERNION:
-                {
-                    const Quaternion* q = static_cast<LSLQuaternionConstant*>(cv)->getValue();
-                    held                = whole({ q->x, q->y, q->z, q->s }) ? costs.wholeRotation : costs.rotation;
-                    break;
-                }
-                case LST_STRING:
-                    held = costs.stringOf(static_cast<S32>(strlen(static_cast<LSLStringConstant*>(cv)->getValue())));
-                    break;
-                default:
-                    return true;
+                return true;
             }
-            return held.writeOut(sym->getReferences() - 1 - sym->getAssignments());
+            return held->writeOut(sym->getReferences() - 1 - sym->getAssignments());
         }
 
         // Tailslide's rules: a key's key-ness must not be lost to a list,

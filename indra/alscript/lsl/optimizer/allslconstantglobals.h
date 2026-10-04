@@ -1,6 +1,6 @@
 /**
- * @file allslrepeatedcalls.h
- * @brief The LSL optimizer's repeated calls kept in a local.
+ * @file allslconstantglobals.h
+ * @brief The LSL optimizer's constants written at many places kept once in a global.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -28,17 +28,10 @@
 
 namespace ALLSLPasses
 {
-    // What a run keeps in a local: pure library calls and globals' reads,
-    // or -- once nothing more will fold, which would write them back --
-    // constants.
-    enum class Keeping : U8
-    {
-        Calls,
-        Constants
-    };
-
-    // A pure library call, a global's read or a constant made more than once
-    // in a straight run of a block's statements kept in a local, where the
-    // target's compiler says that is no larger. How many it kept.
-    int keepRepeatedCalls(Ctx& ctx, Report& report, const ALLSLOptimizer::Options& options, LSLScript* script, Keeping keeping);
+    // A constant the script writes at enough places kept once in a global
+    // of its own, each place reading it, where the target holds it smaller
+    // so (ALLSLCosts::Held, which the folder writes globals out by): LSO's
+    // long strings, keys and vectors, Mono's and LSO's rotations. Once
+    // nothing more will fold, which would write them back. How many it kept.
+    int poolConstants(Ctx& ctx, Report& report, const ALLSLOptimizer::Options& options, LSLScript* script);
 }

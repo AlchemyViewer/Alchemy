@@ -81,6 +81,7 @@ namespace
         c.doForKnownFirst              = true;
 
         c.local         = 11;
+        c.localFrame    = 0;
         c.jump          = 5;
         c.function      = 16;
         c.functionChar  = 0;
@@ -165,6 +166,7 @@ namespace
         c.doForKnownFirst              = true;
 
         c.local         = 6;
+        c.localFrame    = 31;
         c.jump          = 5;
         c.function      = 35;
         c.functionChar  = 1;
@@ -244,6 +246,7 @@ namespace
         c.doForKnownFirst              = false;
 
         c.local         = 4;
+        c.localFrame    = 0;
         c.jump          = 92;
         c.function      = 37;
         c.functionChar  = 1;
