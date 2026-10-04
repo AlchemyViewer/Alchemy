@@ -211,7 +211,10 @@ endif()
 # The crash reporter. Its out-of-process handler sits beside the executable,
 # and on Windows the WER module beside the handler, which is where the client
 # looks for it; sentry.dll itself comes with the runtime DLLs above. On macOS
-# the SDK is a framework the viewer loads from Contents/Frameworks.
+# the SDK is a framework the viewer loads from Contents/Frameworks. On Linux
+# nothing collects the library on the viewer's behalf, so it ships here: the
+# triplet builds sentry-native shared on every platform for the sake of that
+# Windows module, and the loader asks for libsentry.so by name.
 if(AL_USE_SENTRY)
   if(WINDOWS)
     install(
@@ -236,6 +239,10 @@ if(AL_USE_SENTRY)
       PROGRAMS "${al_vcpkg_dir}/tools/sentry-native/crashpad_handler"
       DESTINATION "${AL_INSTALL_BINDIR}"
       COMPONENT viewer
+    )
+    install(
+      IMPORTED_RUNTIME_ARTIFACTS sentry::sentry
+      LIBRARY DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer
     )
   endif()
 endif()
