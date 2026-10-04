@@ -83,7 +83,8 @@ namespace
     ALLSLCosts mono()
     {
         ALLSLCosts c;
-        // A small integer loads in a byte or two, and a float in nine.
+        // An integer the script writes loads in five bytes, as LL's compiler
+        // writes every one and the grid keeps it, and a float in nine.
         c.integerForFloat  = true;
         c.lengthAsNotEqual = false;
         c.listAsSum        = true;
@@ -92,8 +93,8 @@ namespace
         c.listHelperMost   = 26;
 
         c.complementForNotMinusOne     = true;
-        c.notComplementForMinusOne     = false;
-        c.negateComplementForIncrement = false;
+        c.notComplementForMinusOne     = true;
+        c.negateComplementForIncrement = true;
         c.complementNegateForDecrement = true;
         c.preForPost                   = true;
         c.emptyForNullKey              = true;
@@ -123,11 +124,11 @@ namespace
         // once, however many places load it.
         c.integer       = { 43, -1, -1 };
         c.floating      = { 47, 3, 3 };
-        c.wholeFloating = { 40, -4, -4 };
+        c.wholeFloating = { 44, 0, 0 };
         c.vector        = { 70, 26, 26 };
-        c.wholeVector   = { 49, 5, 5 };
+        c.wholeVector   = { 61, 17, 17 };
         c.rotation      = { 111, 35, 35 };
-        c.wholeRotation = { 83, 7, 7 };
+        c.wholeRotation = { 99, 23, 23 };
         c.string         = { 45, -1, -1 };
         c.stringChar     = { 2, 0, 0 };
         c.stringHeld     = 2;

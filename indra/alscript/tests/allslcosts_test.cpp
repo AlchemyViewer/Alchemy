@@ -200,15 +200,15 @@ namespace tut
               &ALLSLCosts::complementForNotMinusOne, true },
             { "a find > -1 as ~find", { "", "if (llSubStringIndex(s, \"a\") > -1) i = 2;" }, { "", "if (~llSubStringIndex(s, \"a\")) i = 2;" }, "<<>",
               &ALLSLCosts::complementForNotMinusOne, true },
-            { "x == -1 as !~x", { "", "i = j == -1;" }, { "", "i = !~j;" }, "<=>", &ALLSLCosts::notComplementForMinusOne },
-            { "x == -1 as !~x, as a condition", { "", "if (j == -1) i = 2;" }, { "", "if (!~j) i = 2;" }, "<=>", &ALLSLCosts::notComplementForMinusOne },
+            { "x == -1 as !~x", { "", "i = j == -1;" }, { "", "i = !~j;" }, "<<>", &ALLSLCosts::notComplementForMinusOne },
+            { "x == -1 as !~x, as a condition", { "", "if (j == -1) i = 2;" }, { "", "if (!~j) i = 2;" }, "<<>", &ALLSLCosts::notComplementForMinusOne },
             // Luau's answer turns on the operand -- a call here, a local above
             // -- and the flag keeps to the local's.
-            { "a find < 0 as !~find", { "", "if (llSubStringIndex(s, \"a\") < 0) i = 2;" }, { "", "if (!~llSubStringIndex(s, \"a\")) i = 2;" }, "<><",
+            { "a find < 0 as !~find", { "", "if (llSubStringIndex(s, \"a\") < 0) i = 2;" }, { "", "if (!~llSubStringIndex(s, \"a\")) i = 2;" }, "<<<",
               nullptr },
             // One and two either way.
-            { "x + 1 as -~x", { "", "i = j + 1;" }, { "", "i = -~j;" }, "<=>", &ALLSLCosts::negateComplementForIncrement },
-            { "x + 2 as -~-~x", { "", "i = j + 2;" }, { "", "i = -~-~j;" }, "<>>", &ALLSLCosts::negateComplementForIncrement },
+            { "x + 1 as -~x", { "", "i = j + 1;" }, { "", "i = -~j;" }, "<<>", &ALLSLCosts::negateComplementForIncrement },
+            { "x + 2 as -~-~x", { "", "i = j + 2;" }, { "", "i = -~-~j;" }, "<<>", &ALLSLCosts::negateComplementForIncrement },
             { "x - 1 as ~-x", { "", "i = j - 1;" }, { "", "i = ~-j;" }, "<<>", &ALLSLCosts::complementNegateForDecrement },
             { "x - 2 as ~-~-x", { "", "i = j - 2;" }, { "", "i = ~-~-j;" }, "<<>", &ALLSLCosts::complementNegateForDecrement },
             // An increment whose value goes unused.
@@ -236,7 +236,7 @@ namespace tut
             { "a >= 5 as a > 4", { "", "if (j >= 5) i = 2;" }, { "", "if (j > 4) i = 2;" }, "=<=", &ALLSLCosts::strictForInclusive },
             { "a <= 5 as a < 6", { "", "if (j <= 5) i = 2;" }, { "", "if (j < 6) i = 2;" }, "=<=", &ALLSLCosts::strictForInclusive },
             { "a || b as a | b", { "", "while (i || j) i--;" }, { "", "while (i | j) i--;" }, "=<>", &ALLSLCosts::bitOrForOr },
-            { "a <= b as a < b + 1, of a variable", { "", "i = j <= i;" }, { "", "i = j < i + 1;" }, "><=", nullptr },
+            { "a <= b as a < b + 1, of a variable", { "", "i = j <= i;" }, { "", "i = j < i + 1;" }, ">>=", nullptr },
             // The library as casts.
             { "llDumpList2String(l, \"\") as (string)l", { "", "s = llDumpList2String(l, \"\");" }, { "", "s = (string)l;" }, "<<<",
               &ALLSLCosts::castForDump },
@@ -244,7 +244,7 @@ namespace tut
               { "", "s = (string)llGetObjectDetails(k, [OBJECT_NAME]);" }, "<<<", &ALLSLCosts::castForDetail },
             // Not taken: a key's is NULL_KEY from an empty list, an integer's no 0 of a key.
             { "llList2Key(llGetObjectDetails(k, [X]), 0) as (key)(string)", { "", "k = llList2Key(llGetObjectDetails(k, [OBJECT_OWNER]), 0);" },
-              { "", "k = (key)((string)llGetObjectDetails(k, [OBJECT_OWNER]));" }, "<>>", nullptr },
+              { "", "k = (key)((string)llGetObjectDetails(k, [OBJECT_OWNER]));" }, "<<>", nullptr },
             { "a whole float in a list as ((float)2)", { "", "l = [2.0];" }, { "", "l = [(float)2];" }, "><=", &ALLSLCosts::castForWholeFloat },
             { "a whole float cast as ((float)2)", { "", "s = (string)2.0;" }, { "", "s = (string)((float)2);" }, "><=", &ALLSLCosts::castForWholeFloat },
             // To come.
@@ -258,10 +258,10 @@ namespace tut
             { "(a & 4) || (a & 8) as a & 12, only truth asked", { "", "if ((j & 4) || (j & 8)) i = 2;" }, { "", "if (j & 12) i = 2;" }, "<<<",
               &ALLSLCosts::bitTestsMerged },
             { "(a & 4) | (a & 8) as a & 12", { "", "i = (j & 4) | (j & 8);" }, { "", "i = j & 12;" }, "<<<", &ALLSLCosts::bitTestsMerged },
-            { "i = i + 1 as ++i", { "", "i = i + 1;" }, { "", "++i;" }, "===", nullptr },
-            { "-5 as ((integer)-5)", { "", "i = -5;" }, { "", "i = ((integer)-5);" }, "===", nullptr },
+            { "i = i + 1 as ++i", { "", "i = i + 1;" }, { "", "++i;" }, "=<=", nullptr },
+            { "-5 as ((integer)-5)", { "", "i = -5;" }, { "", "i = ((integer)-5);" }, "=<=", nullptr },
             { "-5.5 as ((float)-5.5)", { "", "f = -5.5;" }, { "", "f = ((float)-5.5);" }, "=<>", nullptr },
-            { "integer x = 0 as integer x", { "", "integer z = 0; i = z;" }, { "", "integer z; i = z;" }, "===", nullptr },
+            { "integer x = 0 as integer x", { "", "integer z = 0; i = z;" }, { "", "integer z; i = z;" }, "=<=", nullptr },
             { "a && b as !(!a | !b)", { "", "if (i && j) i = 2;" }, { "", "if (!(!i | !j)) i = 2;" }, ">=>", nullptr },
             { "NULL_KEY as \"\"", { "", "k = llGetOwnerKey(NULL_KEY);" }, { "", "k = llGetOwnerKey(\"\");" }, "<<<", &ALLSLCosts::emptyForNullKey },
             { "llStringLength(s) as s != \"\"", { "", "if (llStringLength(s)) i = 2;" }, { "", "if (s != \"\") i = 2;" }, "<>>", &ALLSLCosts::emptyForLength },

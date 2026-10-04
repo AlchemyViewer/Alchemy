@@ -241,7 +241,9 @@ namespace tut
         ensure("optimized", r.optimized);
         ensure("plus zero: " + r.text, r.text.find("integer a = g;") != std::string::npos);
         ensure("times one", r.text.find("integer b = g;") != std::string::npos);
-        ensure("minus minus", r.text.find("integer c = g + 1;") != std::string::npos);
+        // One more as -~g on Mono, whose ldc.i4 1 is five bytes
+        // (ALLSLCosts::negateComplementForIncrement).
+        ensure("minus minus: " + r.text, r.text.find("integer c = -~g;") != std::string::npos);
         // And on Mono, two less as ~-~-g (ALLSLCosts::complementNegateForDecrement).
         ensure("plus minus: " + r.text, r.text.find("integer d = ~-~-g;") != std::string::npos);
         ensure("cast", r.text.find("integer e = g;") != std::string::npos);
@@ -285,10 +287,11 @@ namespace tut
         ensure("list add: " + r.text, r.text.find("l = (list)1 + \"a\";") != std::string::npos);
         ensure("an empty list stays", r.text.find("l = [];") != std::string::npos);
 
-        // On Mono the comparison is not; nor is the sum here, one sum not
-        // paying for the helper it would be the script's only use of.
+        // On Mono the comparison is not, though one more is -~x there too;
+        // nor is the sum here, one sum not paying for the helper it would
+        // be the script's only use of.
         r = ALLSLOptimizer::run(source, options());
-        ensure("no comparison on Mono: " + r.text, r.text.find("llGetListLength(l) + 1") != std::string::npos && r.text.find("l != []") == std::string::npos);
+        ensure("no comparison on Mono: " + r.text, r.text.find("integer n = -~llGetListLength(l);") != std::string::npos && r.text.find("l != []") == std::string::npos);
         ensure("one sum not worth its helper on Mono: " + r.text, r.text.find("l = [1, \"a\"];") != std::string::npos);
 
         // On Luau neither.
@@ -1321,7 +1324,7 @@ namespace tut
         ensure("optimized: " + notes(r), r.optimized);
         auto has = [&r](const std::string& text) { return r.text.find(text) != std::string::npos; };
         ensure("b goes where it is read: " + r.text, !has("integer b") && has("llOwnerSay((string)(g * 2));"));
-        ensure("c's g is written between: it stays: " + r.text, has("integer c = g + 1;"));
+        ensure("c's g is written between: it stays: " + r.text, has("integer c = -~g;"));
         ensure("d is read twice: " + r.text, has("integer d = g * 3;"));
         ensure("e is read round a loop: " + r.text, has("integer e = g * 4;"));
         ensure("f is read in a branch, a statement of its own: " + r.text, has("integer f = g * 5;"));
@@ -1552,8 +1555,9 @@ namespace tut
 
         const std::string mono = run(ALLSLOptimizer::Target::Mono);
         ensure("Mono: x != -1 as ~x: " + mono, has(mono, "if (~a)"));
-        ensure("Mono: x == -1 stays", has(mono, "g = a == -1;"));
-        ensure("Mono: x + 1 stays", has(mono, "g = a + 1;"));
+        // Mono's ldc.i4 is five bytes, -1 and 1 too.
+        ensure("Mono: x == -1 as !~x: " + mono, has(mono, "g = !~a;"));
+        ensure("Mono: x + 1 as -~x", has(mono, "g = -~a;"));
         ensure("Mono: x - 1 as ~-x", has(mono, "g = ~-b;"));
         ensure("Mono: ++a", has(mono, "++a;"));
         ensure("Mono: what it wrote weighs what it says", mono.find("l = l") != std::string::npos);

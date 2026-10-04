@@ -13,7 +13,7 @@ default
         llSetText(describe(), <1, 1, 1>, 1);
         while (i < 3)
         {
-            i = i + 1;
+            i = -~i;
         }
     }
 

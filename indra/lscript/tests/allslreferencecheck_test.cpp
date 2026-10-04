@@ -213,56 +213,6 @@ namespace
         return out;
     }
 
-    // Each constant as LL's compiler writes it: an integer by ldc.i4 alone,
-    // and a minus before a number folded into it -- LL's grammar reads `-1`
-    // as one constant in places where Tailslide pushes 1 and negates it.
-    // Folded on both sides, where LL's own negates a number.
-    std::vector<std::string> asLLWrites(const std::vector<std::string>& lines)
-    {
-        std::vector<std::string> out;
-        for (std::string line : lines)
-        {
-            if (line == "ldc.i4.m1")
-            {
-                line = "ldc.i4 -1";
-            }
-            else if (line.size() == 8 && startsWith(line, "ldc.i4.") && isdigit(line[7]))
-            {
-                line = std::string("ldc.i4 ") + line[7];
-            }
-            else if (startsWith(line, "ldc.i4.s "))
-            {
-                line = "ldc.i4 " + line.substr(9);
-            }
-            if (line == "neg" && !out.empty() && (startsWith(out.back(), "ldc.i4 ") || startsWith(out.back(), "ldc.r8 ")))
-            {
-                std::string& constant = out.back();
-                const size_t number   = constant.find(' ') + 1;
-                constant              = constant[number] == '-' ? constant.erase(number, 1) : constant.insert(number, "-");
-                continue;
-            }
-            out.push_back(std::move(line));
-        }
-        return out;
-    }
-
-    // The bytes the constants of a text encode to: an ldc.i4 of four, a
-    // short form of one or none, a double's eight, and a negation's byte.
-    S32 constantBytes(const std::vector<std::string>& lines)
-    {
-        S32 bytes = 0;
-        for (const std::string& line : lines)
-        {
-            bytes += startsWith(line, "ldc.i4.s ")                                         ? 2
-                     : startsWith(line, "ldc.i4 ")                                         ? 5
-                     : line == "ldc.i4.m1" || (line.size() == 8 && startsWith(line, "ldc.i4.")) ? 1
-                     : startsWith(line, "ldc.r8 ")                                         ? 9
-                     : line == "neg"                                                       ? 1
-                                                                                           : 0;
-        }
-        return bytes;
-    }
-
     std::string listed(const std::set<std::string>& names)
     {
         std::string out;
@@ -290,11 +240,12 @@ namespace tut
     template<> template<>
     void allslreferencecheck_object::test<1>()
     {
-        set_test_name("LSO: Tailslide's image is LL's byte for byte, but for a list global copied from one never set; and what each refuses");
+        set_test_name("LSO: Tailslide's image is LL's byte for byte; and what each refuses");
         ensure("builtins: " + error, loaded);
-        // Tailslide's bit stream, moved to its end, grows a byte past it: a
-        // last global left all zeros keeps the byte, and all after it moves.
-        const std::set<std::string> PARTED = { "global_list_refs.lsl" };
+        // None, since the port's bitstream-move-to-end.patch: a bit stream
+        // moved to its end grew a byte past it, which a last global left all
+        // zeros kept, and all after it moved.
+        const std::set<std::string> PARTED;
         // LL's lets a list into a local's list, and takes print() as giving
         // a string; it reads `foo` after `@foo` as the label, which Tailslide
         // takes as the global with a warning.
@@ -340,18 +291,17 @@ namespace tut
     template<> template<>
     void allslreferencecheck_object::test<2>()
     {
-        set_test_name("CIL: Tailslide's is LL's, method for method, once its constants are written as LL writes them");
+        set_test_name("CIL: Tailslide's is LL's, method for method, but for spelling an assembler reads alike");
         ensure("builtins: " + error, loaded);
         // What only LSO's image building refuses: a list in a global's list.
+        // Its constants are LL's since the port's mono-constants-as-ll.patch:
+        // an integer literal by ldc.i4 alone, and a minus before a number in
+        // a global's initializer one constant.
         const std::set<std::string> ONLY_LL        = { "bugs/0019.lsl", "nested_lists.lsl", "print_type_bug.lsl" };
         const std::set<std::string> ONLY_TAILSLIDE = { "label_shadowing.lsl" };
-        // Where a minus stands before a number and LL's makes one constant
-        // of it, and Tailslide pushes the number and negates it.
-        const std::set<std::string> NEGATED = { "apotheus_vendor/main.lsl", "constprop.lsl", "infinity_repr.lsl", "irc-4.lsl",
-                                                "libhttpdb.lsl",            "tltp/browser.lsl", "unixtime.lsl",  "xytext1.2.lsl" };
-        std::set<std::string> only_ll, only_tailslide, negated, parted;
-        size_t                both = 0;
-        std::string           where;
+        std::set<std::string>       only_ll, only_tailslide, parted;
+        size_t                      both = 0;
+        std::string                 where;
         for (const auto& [name, text] : corpus())
         {
             std::string                  ours;
@@ -368,30 +318,21 @@ namespace tut
                 continue;
             }
             ++both;
-            const std::vector<std::string> theirs  = asLLWrites(spelt(instructionsOf(ll.cil), false));
+            const std::vector<std::string> theirs  = spelt(instructionsOf(ll.cil), false);
             const std::vector<std::string> written = spelt(instructionsOf(ours), true);
-            const std::vector<std::string> as_ll   = asLLWrites(written);
-            if (as_ll != theirs)
+            if (written != theirs)
             {
                 parted.insert(name);
                 size_t at = 0;
-                while (at < as_ll.size() && at < theirs.size() && as_ll[at] == theirs[at])
+                while (at < written.size() && at < theirs.size() && written[at] == theirs[at])
                 {
                     ++at;
                 }
-                where += name + ": [" + (at < as_ll.size() ? as_ll[at] : "") + "] against LL's [" + (at < theirs.size() ? theirs[at] : "") + "]\n";
-            }
-            // Negated where LL's has its constant: LL folds a minus before a
-            // number in some places and not others.
-            const std::vector<std::string> llwrote = spelt(instructionsOf(ll.cil), false);
-            if (std::count(written.begin(), written.end(), "neg") != std::count(llwrote.begin(), llwrote.end(), "neg"))
-            {
-                negated.insert(name);
+                where += name + ": [" + (at < written.size() ? written[at] : "") + "] against LL's [" + (at < theirs.size() ? theirs[at] : "") + "]\n";
             }
         }
         ensure("most of them: " + std::to_string(both), both >= 75);
-        ensure("the same as LL's once its constants are LL's:\n" + where, parted.empty());
-        ensure("a minus before a number: " + listed(negated), negated == NEGATED);
+        ensure("the same as LL's:\n" + where, parted.empty());
         ensure("LL's compiles alone: " + listed(only_ll), only_ll == ONLY_LL);
         ensure("Tailslide compiles alone: " + listed(only_tailslide), only_tailslide == ONLY_TAILSLIDE);
     }
@@ -399,11 +340,10 @@ namespace tut
     template<> template<>
     void allslreferencecheck_object::test<3>()
     {
-        set_test_name("Mono: the weigher reads either compiler's CIL alike, and LL's weighs more by its constants' forms alone");
+        set_test_name("Mono: the weigher reads either compiler's CIL alike, and both weigh the same");
         ensure("builtins: " + error, loaded);
         std::string wrong;
         size_t      both = 0;
-        S32         more = 0;
         for (const auto& [name, text] : corpus())
         {
             std::string                  ours;
@@ -414,26 +354,21 @@ namespace tut
                 continue;
             }
             ++both;
-            const ALScriptWeight weighed  = ALScriptWeigh::mono(text);
-            const ALScriptWeight tailside = ALScriptWeigh::monoOfCIL(ours);
-            const ALScriptWeight theirs   = ALScriptWeigh::monoOfCIL(ll.cil);
-            if (tailside.total != weighed.total)
+            const ALScriptWeight weighed   = ALScriptWeigh::mono(text);
+            const ALScriptWeight tailslide = ALScriptWeigh::monoOfCIL(ours);
+            const ALScriptWeight theirs    = ALScriptWeigh::monoOfCIL(ll.cil);
+            if (tailslide.total != weighed.total)
             {
-                wrong += name + ": Tailslide's CIL weighs " + std::to_string(tailside.total) + " as text and " + std::to_string(weighed.total) + " weighed\n";
+                wrong += name + ": Tailslide's CIL weighs " + std::to_string(tailslide.total) + " as text and " + std::to_string(weighed.total) + " weighed\n";
             }
-            const S32 forms = constantBytes(instructionsOf(ll.cil)) - constantBytes(instructionsOf(ours));
-            const S32 apart = static_cast<S32>(theirs.total) - static_cast<S32>(tailside.total);
-            if (apart != forms)
+            // LL's numbers are what the grid keeps -- its microthreaded IL
+            // loads `ldc.i4 1` in five bytes -- and Tailslide's are LL's.
+            if (theirs.total != tailslide.total)
             {
-                wrong += name + ": LL's weighs " + std::to_string(apart) + " more, its constants " + std::to_string(forms) + "\n";
+                wrong += name + ": LL's weighs " + std::to_string(theirs.total) + ", Tailslide's " + std::to_string(tailslide.total) + "\n";
             }
-            more += apart;
         }
         ensure("most of them: " + std::to_string(both), both >= 75);
         ensure(wrong, wrong.empty());
-        // LL writes a number by ldc.i4 alone, which the grid keeps as
-        // written (its microthreaded IL loads `ldc.i4 1` in five bytes):
-        // what the viewer's weights leave out until Tailslide writes them so.
-        ensure("LL's heavier: " + std::to_string(more), more > 0);
     }
 }

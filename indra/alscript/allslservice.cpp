@@ -49,6 +49,7 @@
 #include <mutex>
 #include <optional>
 #include <set>
+#include <sstream>
 
 namespace
 {
@@ -1354,13 +1355,7 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
         {
             return true;
         }
-        const std::string more = path + ".added";
-        {
-            llofstream out(more, std::ios::out | std::ios::binary | std::ios::trunc);
-            out << added;
-        }
-        Tailslide::tailslide_init_builtins(more.c_str());
-        LLFile::remove(more);
+        Tailslide::tailslide_init_builtins_from_data(added.c_str());
         // An event new here numbered as the runtime numbers it, or after
         // every event there already was: those numbered before keep theirs.
         int last = 0;
@@ -1388,19 +1383,26 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
         mImpl->builtins = true;
         return true;
     }
-    // A file that is not there has nothing loaded, which is said here: the
-    // file is opened first. A line Tailslide cannot read -- a type it does
-    // not know, a constant it cannot parse, blanks -- it says so on stderr
-    // and skips, since the tailslide port's builtins-skip-unreadable.patch;
-    // before that it ended the process, over a file the grid sends.
-    LLFILE* file = LLFile::fopen(path, LLFILE_MODE("rb"));
-    if (!file)
+    // Read here and handed over as text: a path Tailslide opened itself
+    // went through the narrow fopen(), which Windows reads in the ANSI code
+    // page. A file that is not there has nothing loaded, which is said here.
+    // A line Tailslide cannot read -- a type it does not know, a constant it
+    // cannot parse -- it says so on stderr and skips, since the tailslide
+    // port's builtins-skip-unreadable.patch; before that it ended the
+    // process, over a file the grid sends.
+    std::string text;
     {
-        error = "cannot open " + path;
-        return false;
+        llifstream in(path, std::ios::in | std::ios::binary);
+        if (!in.is_open())
+        {
+            error = "cannot open " + path;
+            return false;
+        }
+        std::stringstream all;
+        all << in.rdbuf();
+        text = all.str();
     }
-    fclose(file);
-    Tailslide::tailslide_init_builtins(path.c_str());
+    Tailslide::tailslide_init_builtins_from_data(text.c_str());
     // Every event numbered as the runtime numbers it (Luau::lslEventIndex):
     // the grid's definitions list them in an order of their own, and what an
     // event's number goes into -- LSO's handled-events bits, the dispatch of
