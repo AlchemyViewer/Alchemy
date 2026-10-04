@@ -35,6 +35,7 @@ namespace ALLSLPasses
     // statements made an if; a value set before an if rather than in its
     // else; and a loop whose first check is known to pass run as a do, or
     // counted down where its counter is read nowhere else. How many
-    // changes it made.
-    int restructure(Ctx& ctx, Report& report, const ALLSLOptimizer::Options& options, LSLScript* script);
+    // changes it made. `last`, once the rounds are done: a loop that never
+    // ends run by a jump back, which the dead code must not see.
+    int restructure(Ctx& ctx, Report& report, const ALLSLOptimizer::Options& options, LSLScript* script, bool last = false);
 }

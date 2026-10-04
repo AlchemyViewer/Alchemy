@@ -2635,4 +2635,29 @@ namespace tut
         ensure("Mono: three reads of a global not worth a local's frame", !in(mono, "localChannel"));
         ensure("Mono: a string held once already", !in(mono, "string s = "));
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<66>()
+    {
+        set_test_name("two string literals joined on LSO, which writes each where it is used, and where the option says elsewhere; a loop that "
+                      "never ends run by a jump back on LSO and Mono");
+        const std::string source = "default\n{\n    touch_start(integer n)\n    {\n"
+                                   "        llOwnerSay(\"Hello, \" + \"world\");\n"
+                                   "        while (TRUE)\n        {\n            llOwnerSay((string)llFrand(1));\n"
+                                   "            if (llFrand(1) > 0.5)\n                jump out;\n        }\n"
+                                   "        @out;\n        llOwnerSay(\"done\");\n    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            const std::string text = optimized(source, target);
+            const bool        lso  = target == ALLSLOptimizer::Target::LSO;
+            const bool        luau = target == ALLSLOptimizer::Target::Luau;
+            ensure("two literals joined on LSO alone, by default: " + text, lso ? in(text, "\"Hello, world\"") : in(text, "\"Hello, \" + \"world\""));
+            ensure("a loop that never ends by a jump back, not on Luau", luau ? in(text, "while (TRUE)") : in(text, "@loop;") && in(text, "jump loop;"));
+            // Its jump out and back made one jump back where the check fails.
+            ensure("what follows it still reached: " + text, in(text, "llOwnerSay(\"done\");") && (luau || in(text, "jump loop;\n        llOwnerSay(\"done\");")));
+        }
+        ALLSLOptimizer::Options o = options();
+        o.addstrings              = true;
+        ensure("joined on Mono where the option asks", in(ALLSLOptimizer::run(source, o).text, "\"Hello, world\""));
+    }
 } // namespace tut

@@ -648,6 +648,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="OptimizerSetBeforeIf">set the value of [1]'s else before it</string>
 	<string name="OptimizerLoopAsDo">ran the loop on ([1]) as a do, its first check known to pass</string>
 	<string name="OptimizerLoopNeverRuns">removed the loop on ([1]), its first check known to fail</string>
+	<string name="OptimizerForeverAsJump">ran the loop on ([1]), which never ends, by a jump back</string>
 	<string name="OptimizerCountedDown">counted the loop while ([1]) down to nought</string>
 	<string name="OptimizerRemovedEmptyIf">removed if ([1]), which has nothing to do either way</string>
 	<string name="OptimizerMergedIfs">wrote if ([1]) as one if</string>

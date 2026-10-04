@@ -374,7 +374,10 @@ namespace
         script->collectSymbols();
         script->determineTypes();
         script->recalculateReferenceData();
-        ALLSLArithmetic behavior(&parser.allocator, options.addstrings, options.target);
+        // LSO writes every string where it is used, so that two joined are
+        // always the smaller there; elsewhere the joined may be one more
+        // string held beside the two, which the option says.
+        ALLSLArithmetic behavior(&parser.allocator, options.addstrings || options.target == ALLSLOptimizer::Target::LSO, options.target);
         // Tailslide's values until what the script writes is known, and
         // with it, where folding is asked for, what the locals hold as the
         // code runs (FlowValues).
@@ -514,7 +517,8 @@ namespace
         if (options.constfold)
         {
             shape(ctx, report, options, script, ShapeStage::Values);
-            walks(1);
+            restructure(ctx, report, options, script, true);
+            walks(2);
             // A constant written at many places kept once: in a global where
             // the target holds one smaller so, else in a local where the
             // compiler says that is no larger. After the shapes, which take

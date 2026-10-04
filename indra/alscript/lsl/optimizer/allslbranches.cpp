@@ -28,6 +28,7 @@
 
 #include "allslcosts.h"
 #include "allsleffects.h"
+#include "alscriptlexicon.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
@@ -49,7 +50,7 @@ namespace
     class Branches : public ASTVisitor, public Pass
     {
     public:
-        Branches(Ctx& c, Report& r, const ALLSLOptimizer::Options& o) : Pass(c, r, o), mCosts(ALLSLCosts::of(o.target)) {}
+        Branches(Ctx& c, Report& r, const ALLSLOptimizer::Options& o, bool last) : Pass(c, r, o), mCosts(ALLSLCosts::of(o.target)), mLast(last) {}
 
         bool visit(LSLCompoundStatement* block) override
         {
@@ -64,6 +65,9 @@ namespace
         typedef std::vector<LSLASTNode*> Statements;
 
         const ALLSLCosts& mCosts;
+        // The last run, once the rounds are done: only what hides a loop
+        // from the dead code, which must have seen it whole first.
+        const bool        mLast;
 
         static bool present(LSLASTNode* n) { return n && n->getNodeType() != NODE_NULL; }
 
@@ -284,6 +288,37 @@ namespace
             return negated;
         }
 
+        // The opposite of a check: a comparison of integers the other way,
+        // == and != of anything but lists each other; else !(c).
+        LSLExpression* notOf(LSLExpression* c)
+        {
+            LSLExpression* inner = bare(c);
+            if (inner && inner->getNodeSubType() == NODE_BINARY_EXPRESSION)
+            {
+                auto*      cmp   = static_cast<LSLBinaryExpression*>(inner);
+                const bool ints  = cmp->getLHS() && cmp->getRHS() && cmp->getLHS()->getIType() == LST_INTEGER && cmp->getRHS()->getIType() == LST_INTEGER;
+                const bool lists = cmp->getLHS() && cmp->getRHS() && (cmp->getLHS()->getIType() == LST_LIST || cmp->getRHS()->getIType() == LST_LIST);
+                LSLOperator to   = OP_NONE;
+                switch (cmp->getOperation())
+                {
+                    case OP_LESS: to = ints ? OP_GEQ : OP_NONE; break;
+                    case OP_GEQ: to = ints ? OP_LESS : OP_NONE; break;
+                    case OP_GREATER: to = ints ? OP_LEQ : OP_NONE; break;
+                    case OP_LEQ: to = ints ? OP_GREATER : OP_NONE; break;
+                    case OP_EQ: to = lists ? OP_NONE : OP_NEQ; break;
+                    case OP_NEQ: to = lists ? OP_NONE : OP_EQ; break;
+                    default: break;
+                }
+                // != of floats as == is the one of them NaN tells apart.
+                if (to != OP_NONE && (ints || (cmp->getLHS()->getIType() != LST_FLOATINGPOINT && cmp->getRHS()->getIType() != LST_FLOATINGPOINT)))
+                {
+                    cmp->setOperation(to);
+                    return c;
+                }
+            }
+            return negation(c);
+        }
+
         // Whether a value is only ever 1 or 0.
         static bool truthValue(LSLExpression* x)
         {
@@ -330,6 +365,17 @@ namespace
             for (size_t i = 0; i < stmts.size(); ++i)
             {
                 LSLASTNode* stmt = stmts[i];
+                if (mLast)
+                {
+                    // The loop made a jump back, and a jump out of it after
+                    // that made one jump back where the check fails.
+                    if ((isStatement(stmt, NODE_DO_STATEMENT) && foreverAsJump(block, stmts, i, static_cast<LSLDoStatement*>(stmt))) ||
+                        (isStatement(stmt, NODE_IF_STATEMENT) && jumpOver(block, stmts, i, static_cast<LSLIfStatement*>(stmt))))
+                    {
+                        return true;
+                    }
+                    continue;
+                }
                 if (isStatement(stmt, NODE_IF_STATEMENT))
                 {
                     auto* branch = static_cast<LSLIfStatement*>(stmt);
@@ -647,8 +693,18 @@ namespace
                 detach(s);
             }
             detach(label);
-            stmt->setChild(1, branchOf(way, stmt));
-            stmt->setChild(2, branchOf(over, stmt));
+            LSLExpression* c = stmt->getCheckExpr();
+            if (way.empty() && c && c->getIType() == LST_INTEGER)
+            {
+                // Nothing else that way: if (!c) S.
+                stmt->setChild(0, notOf(static_cast<LSLExpression*>(stmt->takeChild(0))));
+                stmt->setChild(1, branchOf(over, stmt));
+            }
+            else
+            {
+                stmt->setChild(1, branchOf(way, stmt));
+                stmt->setChild(2, branchOf(over, stmt));
+            }
             stmts.erase(stmts.begin() + static_cast<std::ptrdiff_t>(i) + 1, stmts.begin() + static_cast<std::ptrdiff_t>(at) + 1);
             setStatements(block, stmts, *ctx.context);
             noteAt(stmt, "OptimizerJumpAsIf", "wrote the jump to [1] over what follows as an else", before);
@@ -1166,6 +1222,77 @@ namespace
             return true;
         }
 
+        // A do whose check is a constant other than nought, a loop that
+        // never ends: `@l; S jump l;`, l a label the function has no name
+        // like. Where the target has the jump the smaller; in the last run
+        // alone, since what follows such a loop holds a label the dead code
+        // would then take for one a jump comes back to.
+        bool foreverAsJump(LSLCompoundStatement* block, Statements& stmts, size_t i, LSLDoStatement* loop)
+        {
+            const std::optional<S32> check = integerValue(loop->getCheckExpr());
+            if (!mCosts.jumpForForever || !check || !*check)
+            {
+                return false;
+            }
+            // A name nothing in the function has.
+            boost::unordered_flat_map<std::string, bool> names;
+            eachNode(callable(loop), [&](LSLASTNode* n) {
+                if (n->getNodeType() == NODE_IDENTIFIER && static_cast<LSLIdentifier*>(n)->getName())
+                {
+                    names.emplace(static_cast<LSLIdentifier*>(n)->getName(), true);
+                }
+            });
+            std::string name = "loop";
+            for (int k = 2; names.contains(name) || ALScriptLexicon::lslWord(name) != ALScriptLexicon::LSL_NAME ||
+                            (ctx.context->builtins && ctx.context->builtins->lookup(name.c_str(), SYM_ANY));
+                 ++k)
+            {
+                name = "loop" + std::to_string(k);
+            }
+            const std::string before = report.wanted() ? render(loop->getCheckExpr()) : std::string();
+            const char*       id     = ctx.allocator->copyStr(name.c_str());
+            auto*             at     = ctx.allocator->newTracked<LSLIdentifier>(TYPE(LST_NULL), id);
+            at->setLoc(loop->getLoc());
+            auto* label = ctx.allocator->newTracked<LSLLabel>(at);
+            label->setLoc(loop->getLoc());
+            auto* sym = ctx.allocator->newTracked<LSLSymbol>(id, TYPE(LST_NULL), SYM_LABEL, SYM_LOCAL, loop->getLoc(), nullptr, nullptr, label);
+            at->setSymbol(sym);
+            auto* to = ctx.allocator->newTracked<LSLIdentifier>(TYPE(LST_NULL), id);
+            to->setSymbol(sym);
+            to->setLoc(loop->getLoc());
+            auto* jump = ctx.allocator->newTracked<LSLJumpStatement>(to);
+            jump->setLoc(loop->getLoc());
+            const Uncounted uncounted(*ctx.context);
+            LSLASTNode*     body = loop->takeChild(0);
+            stmts.erase(stmts.begin() + static_cast<std::ptrdiff_t>(i));
+            Statements made{ label };
+            // The body's statements in the block where they declare and
+            // label nothing, so that a jump out of the loop stands beside
+            // the jump back.
+            bool       flat = isStatement(body, NODE_COMPOUND_STATEMENT);
+            for (LSLASTNode* stmt = flat ? body->getChild(0) : nullptr; stmt; stmt = stmt->getNext())
+            {
+                flat = flat && !isStatement(stmt, NODE_DECLARATION) && !isStatement(stmt, NODE_LABEL);
+            }
+            if (flat)
+            {
+                for (LSLASTNode* stmt : takeStatements(body))
+                {
+                    made.push_back(stmt);
+                }
+            }
+            else
+            {
+                made.push_back(body);
+            }
+            made.push_back(jump);
+            stmts.insert(stmts.begin() + static_cast<std::ptrdiff_t>(i), made.begin(), made.end());
+            setStatements(block, stmts, *ctx.context);
+            label->defineSymbol(sym);
+            noteAt(loop, "OptimizerForeverAsJump", "ran the loop on ([1]), which never ends, by a jump back", before);
+            return true;
+        }
+
         // A while whose first check is known, from the constants the
         // statements just before it set: gone where it fails, run as a do
         // where it passes.
@@ -1233,9 +1360,9 @@ namespace
     };
 }
 
-    int restructure(Ctx& ctx, Report& report, const ALLSLOptimizer::Options& options, LSLScript* script)
+    int restructure(Ctx& ctx, Report& report, const ALLSLOptimizer::Options& options, LSLScript* script, bool last)
     {
-        Branches branches(ctx, report, options);
+        Branches branches(ctx, report, options, last);
         script->visit(&branches);
         return branches.changes;
     }

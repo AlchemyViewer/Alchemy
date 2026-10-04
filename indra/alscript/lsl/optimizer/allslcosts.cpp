@@ -79,6 +79,7 @@ namespace
         c.bitAndForNestedTruths        = true;
         c.arithmeticForSelect          = true;
         c.doForKnownFirst              = true;
+        c.jumpForForever               = true;
 
         c.local         = 11;
         c.localFrame    = 0;
@@ -164,6 +165,7 @@ namespace
         c.bitAndForNestedTruths        = true;
         c.arithmeticForSelect          = true;
         c.doForKnownFirst              = true;
+        c.jumpForForever               = true;
 
         c.local         = 6;
         c.localFrame    = 31;
@@ -244,6 +246,7 @@ namespace
         c.bitAndForNestedTruths        = false;
         c.arithmeticForSelect          = false;
         c.doForKnownFirst              = false;
+        c.jumpForForever               = false;
 
         c.local         = 4;
         c.localFrame    = 0;

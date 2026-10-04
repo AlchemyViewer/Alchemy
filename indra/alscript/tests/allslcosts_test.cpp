@@ -373,6 +373,11 @@ namespace tut
               "><<", nullptr },
             { "a vector written twice kept in a local", { "", "v = v + <1.5, 2.5, 3.5>; v = v - <1.5, 2.5, 3.5>;" },
               { "", "vector z = <1.5, 2.5, 3.5>; v = v + z; v = v - z;" }, "><<", nullptr },
+            { "a loop that never ends by a jump back", { "", "do { i = i + j; if (i) jump L; } while (TRUE); @L;" },
+              { "", "@M; { i = i + j; if (i) jump L; } jump M; @L;" }, "<<>", &ALLSLCosts::jumpForForever, true },
+            // Smaller everywhere where the two are held nowhere else; LSO,
+            // which holds none, joins them whatever the option.
+            { "two string literals joined", { "", "s = \"abc\" + \"def\";" }, { "", "s = \"abcdef\";" }, "<<<", nullptr },
         };
         for (const Fact& fact : facts)
         {

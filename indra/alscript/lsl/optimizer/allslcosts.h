@@ -159,6 +159,9 @@ struct ALLSLCosts
     // A for or a while whose first check is known to pass run as a do:
     // `for (i = 0; i < 10; ++i) S` as `i = 0; do S while (++i < 10);`.
     bool doForKnownFirst = false;
+    // A loop that never ends, `do S while (TRUE);`, as `@l; S jump l;`: a
+    // jump back in place of the check's constant and its jump.
+    bool jumpForForever = false;
 
     // ---- functions, for whether putting one in place saves
 
