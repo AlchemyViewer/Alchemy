@@ -313,6 +313,9 @@ namespace ALLSLPasses
             }
             return std::isfinite(v) ? allocator->newTracked<LSLFloatConstant>(v) : nullptr;
         }
+        // An ll function's float answer, which is a single on every target:
+        // LSO's and Mono's F32, and SLua's luaSL_pushfloat.
+        LSLConstant* single(float f) { return std::isfinite(f) ? allocator->newTracked<LSLFloatConstant>(static_cast<double>(f)) : nullptr; }
         LSLConstant* string(const std::string& s)
         {
             if (!ascii(s.c_str()) || (!foldtabs && s.find('\t') != std::string::npos))

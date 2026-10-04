@@ -2693,4 +2693,36 @@ namespace tut
             ensure("one within them folded: " + text, in(text, "2147483647") && !in(text, "llJson2List(\"[2147483647"));
         }
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<68>()
+    {
+        set_test_name("a float function of the library folds where in double rounded once and in single precision it agrees, to a single on "
+                      "every target, as each VM answers; a pow or an atan2 of -0 is 0; on Luau, sin of no single and a length no single "
+                      "is are left");
+        const std::string source = "default\n{\n    touch_start(integer n)\n    {\n"
+                                   "        llOwnerSay((string)llPow(2.0, 10.0));\n"
+                                   "        llOwnerSay((string)llSqrt(2.0));\n"
+                                   "        llOwnerSay((string)llAtan2(-0.0, 1.0));\n"
+                                   "        llOwnerSay((string)llPow(-0.0, 3.0));\n"
+                                   "        llOwnerSay((string)llSin(1.0));\n"
+                                   "        llOwnerSay((string)llSin(0.1 + 0.2));\n"
+                                   "        llOwnerSay((string)llVecMag(<1, 1, 0>));\n"
+                                   "        llOwnerSay((string)llVecMag(<0, 3, 4>));\n"
+                                   "    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono })
+        {
+            const std::string text = optimized(source, target);
+            ensure("each folded as the VM's single: " + text,
+                   in(text, "llOwnerSay(\"1024.000000\");") && in(text, "llOwnerSay(\"1.414214\");") && in(text, "llOwnerSay(\"0.841471\");") &&
+                       in(text, "llOwnerSay(\"0.295520\");") && in(text, "llOwnerSay(\"5.000000\");") && !in(text, "llSin") && !in(text, "llVecMag"));
+            ensure("-0 made 0, not -0: " + text, !in(text, "-0.000000"));
+        }
+        const std::string luau = optimized(source, ALLSLOptimizer::Target::Luau);
+        ensure("a single, not the double: " + luau, in(luau, "(string)0.8414709568023682") && in(luau, "(string)1.4142135381698608"));
+        ensure("exact, folded: " + luau, in(luau, "(string)1024.0") && in(luau, "(string)5.0"));
+        ensure("-0 made 0: " + luau, !in(luau, "-0.0"));
+        ensure("sin of what is no single, which SLua takes as it is, left: " + luau, in(luau, "llSin(0.30000000447034836)"));
+        ensure("a length no single is, which the simulator gives by a way not known, left: " + luau, in(luau, "llVecMag("));
+    }
 } // namespace tut

@@ -1000,23 +1000,60 @@ namespace
         return !(lower && upper);
     }
 
-    // A vector's length. On LSO and Mono in singles a step at a time, as
-    // LLVector3 works it out, and as a double rounded once to a single:
-    // whether the two agree, and what they come to where they do. On Luau,
-    // whose numbers are doubles, the double's.
+    // A vector's length, in singles a step at a time, as LLVector3 works it
+    // out, and as a double rounded once to a single: whether the two agree,
+    // and what they come to where they do. On Luau, whose answer the
+    // simulator gives by a way not known, a single or a double, only where
+    // the single is the double too.
     bool magnitude(const Ctx& c, float x, float y, float z, double& out)
     {
-        const double once = std::sqrt(double(x) * x + double(y) * y + double(z) * z);
-        if (c.target == ALLSLOptimizer::Target::Luau)
+        const double once    = std::sqrt(double(x) * x + double(y) * y + double(z) * z);
+        const float  xx      = x * x, yy = y * y, zz = z * z;
+        const float  sum     = (xx + yy) + zz;
+        const float  stepped = std::sqrt(sum);
+        out                  = stepped;
+        const bool agree     = std::isfinite(stepped) && static_cast<double>(static_cast<float>(once)) == static_cast<double>(stepped);
+        return agree && (c.target != ALLSLOptimizer::Target::Luau || static_cast<double>(stepped) == once);
+    }
+
+    // An ll function of floats, whose answer is a single on every target,
+    // folded only where two ways of working it out agree: in double and
+    // rounded once, as the VMs do it, and in single precision. This host's
+    // library is not the grid's -- glibc on 32-bit Linux, and .NET's under
+    // Mono -- and where the answer lies so near a single's rounding that two
+    // libraries could round it apart, the two ways here part too, and the VM
+    // is left to say. Its sign kept: -0 is not 0 to a single's text.
+    template <class Double, class Single>
+    LSLConstant* agreedSingle(Ctx& c, Double inDouble, Single inSingle)
+    {
+        const float once = static_cast<float>(inDouble());
+        const float each = inSingle();
+        if (!std::isfinite(once) || once != each || std::signbit(once) != std::signbit(each))
         {
-            out = once;
-            return std::isfinite(once);
+            return nullptr;
         }
-        const float xx = x * x, yy = y * y, zz = z * z;
-        const float sum     = (xx + yy) + zz;
-        const float stepped = std::sqrt(sum);
-        out                 = stepped;
-        return std::isfinite(stepped) && static_cast<double>(static_cast<float>(once)) == static_cast<double>(stepped);
+        return c.single(once);
+    }
+
+    // Whether an argument is exactly a single: what sin, cos and tan take on
+    // Luau, whose SLua takes its double as it is where the others round it.
+    bool exactSingle(const Args& a, size_t i)
+    {
+        if (i >= a.size())
+        {
+            return false;
+        }
+        if (a[i]->getNodeSubType() == NODE_FLOAT_CONSTANT)
+        {
+            const double v = static_cast<LSLFloatConstant*>(a[i])->getValue();
+            return static_cast<double>(static_cast<float>(v)) == v;
+        }
+        if (a[i]->getNodeSubType() == NODE_INTEGER_CONSTANT)
+        {
+            const int v = static_cast<LSLIntegerConstant*>(a[i])->getValue();
+            return static_cast<int>(static_cast<float>(v)) == v;
+        }
+        return false;
     }
 
     typedef std::function<LSLConstant*(Ctx&, const Args&)> Evaluator;
@@ -1033,7 +1070,7 @@ namespace
             { "llFabs",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double v;
-                  return argFloat(a, 0, v) ? c.number(std::fabs(v)) : nullptr;
+                  return argFloat(a, 0, v) ? c.single(static_cast<float>(std::fabs(v))) : nullptr;
               } },
             { "llFloor",
               [](Ctx& c, const Args& a) -> LSLConstant* {
@@ -1049,45 +1086,59 @@ namespace
                   const double r = std::ceil(v);
                   return (r >= -2147483648.0 && r < 2147483648.0) ? c.integer(static_cast<int>(r)) : nullptr;
               } },
+            // The functions of floats, each where its two ways agree
+            // (agreedSingle), and with what SLua's own make of their edges,
+            // which say they are Mono's: a pow or an atan2 of -0 is 0.
             { "llSqrt",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double v;
-                  return argFloat(a, 0, v) && v >= 0.0 ? c.number(std::sqrt(v)) : nullptr;
+                  if (!argFloat(a, 0, v) || v < 0.0) return nullptr;
+                  return agreedSingle(c, [v] { return std::sqrt(v); }, [v] { return std::sqrt(static_cast<float>(v)); });
               } },
             { "llPow",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double b, e;
-                  return argFloat(a, 0, b) && argFloat(a, 1, e) ? c.number(std::pow(b, e)) : nullptr;
+                  if (!argFloat(a, 0, b) || !argFloat(a, 1, e) || !std::isfinite(b) || !std::isfinite(e)) return nullptr;
+                  const auto zero = [](auto r) { return r == 0 ? decltype(r)(0) : r; };
+                  return agreedSingle(c, [&] { return zero(std::pow(b, e)); }, [&] { return zero(std::pow(static_cast<float>(b), static_cast<float>(e))); });
               } },
             { "llSin",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double v;
-                  return argFloat(a, 0, v) ? c.number(std::sin(v)) : nullptr;
+                  if (!argFloat(a, 0, v) || (c.target == ALLSLOptimizer::Target::Luau && !exactSingle(a, 0))) return nullptr;
+                  return agreedSingle(c, [v] { return std::sin(v); }, [v] { return std::sin(static_cast<float>(v)); });
               } },
             { "llCos",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double v;
-                  return argFloat(a, 0, v) ? c.number(std::cos(v)) : nullptr;
+                  if (!argFloat(a, 0, v) || (c.target == ALLSLOptimizer::Target::Luau && !exactSingle(a, 0))) return nullptr;
+                  return agreedSingle(c, [v] { return std::cos(v); }, [v] { return std::cos(static_cast<float>(v)); });
               } },
             { "llTan",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double v;
-                  return argFloat(a, 0, v) ? c.number(std::tan(v)) : nullptr;
+                  if (!argFloat(a, 0, v) || (c.target == ALLSLOptimizer::Target::Luau && !exactSingle(a, 0))) return nullptr;
+                  return agreedSingle(c, [v] { return std::tan(v); }, [v] { return std::tan(static_cast<float>(v)); });
               } },
             { "llAtan2",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double y, x;
-                  return argFloat(a, 0, y) && argFloat(a, 1, x) ? c.number(std::atan2(y, x)) : nullptr;
+                  if (!argFloat(a, 0, y) || !argFloat(a, 1, x) || !std::isfinite(y) || !std::isfinite(x)) return nullptr;
+                  const auto zero = [](auto r) { return r == 0 ? decltype(r)(0) : r; };
+                  return agreedSingle(c, [&] { return zero(std::atan2(y, x)); },
+                                      [&] { return zero(std::atan2(static_cast<float>(y), static_cast<float>(x))); });
               } },
             { "llLog",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double v;
-                  return argFloat(a, 0, v) && v > 0.0 ? c.number(std::log(v)) : nullptr;
+                  if (!argFloat(a, 0, v) || v <= 0.0) return nullptr;
+                  return agreedSingle(c, [v] { return std::log(v); }, [v] { return std::log(static_cast<float>(v)); });
               } },
             { "llLog10",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double v;
-                  return argFloat(a, 0, v) && v > 0.0 ? c.number(std::log10(v)) : nullptr;
+                  if (!argFloat(a, 0, v) || v <= 0.0) return nullptr;
+                  return agreedSingle(c, [v] { return std::log10(v); }, [v] { return std::log10(static_cast<float>(v)); });
               } },
             { "llModPow",
               [](Ctx& c, const Args& a) -> LSLConstant* {
@@ -1137,7 +1188,7 @@ namespace
                   if (mag == 0.0f) return c.vector(0, 0, 0);
                   const float x = v.x / mag, y = v.y / mag, z = v.z / mag;
                   const float over = 1.0f / mag;
-                  if (c.target != ALLSLOptimizer::Target::Luau && (x != v.x * over || y != v.y * over || z != v.z * over)) return nullptr;
+                  if (x != v.x * over || y != v.y * over || z != v.z * over) return nullptr;
                   return c.vector(x, y, z);
               } },
             // The rotations, by the viewer's own quaternion, which is the
@@ -1852,12 +1903,14 @@ namespace
             { "llAcos",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double v;
-                  return argFloat(a, 0, v) && std::fabs(v) <= 1.0 ? c.number(std::acos(v)) : nullptr;
+                  if (!argFloat(a, 0, v) || std::fabs(v) > 1.0) return nullptr;
+                  return agreedSingle(c, [v] { return std::acos(v); }, [v] { return std::acos(static_cast<float>(v)); });
               } },
             { "llAsin",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double v;
-                  return argFloat(a, 0, v) && std::fabs(v) <= 1.0 ? c.number(std::asin(v)) : nullptr;
+                  if (!argFloat(a, 0, v) || std::fabs(v) > 1.0) return nullptr;
+                  return agreedSingle(c, [v] { return std::asin(v); }, [v] { return std::asin(static_cast<float>(v)); });
               } },
             { "llRound",
               [](Ctx& c, const Args& a) -> LSLConstant* {
