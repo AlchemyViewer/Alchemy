@@ -48,6 +48,7 @@ public:
 	const char *mReturnType;
 	const char *mArgs;
 	BOOL mGodOnly;
+	F32  mMonoSleepTime;
 };
 
 class LLScriptLibrary
@@ -60,6 +61,9 @@ public:
 
 	void addFunction(F32 eu, F32 st, void (*exec_func)(LLScriptLibData *, LLScriptLibData *, const LLUUID &), const char *name, const char *ret_type, const char *args, BOOL god_only = FALSE);
 	void assignExec(const char *name, void (*exec_func)(LLScriptLibData *, LLScriptLibData *, const LLUUID &));
+	// lsl-definitions' form: the function at its own number, which the
+	// bytecode calls it by, rather than at the end of the list.
+	void dangerousAddFunction(S32 number, const char *name, const char *ret_type, const char *args, F32 eu, F32 st, F32 mono_st, bool god_only);
 
 	std::vector<LLScriptLibraryFunction>	mFunctions;
 };

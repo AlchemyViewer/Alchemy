@@ -52,40 +52,11 @@
 %token					JUMP
 %token					RETURN
 
-%token					STATE_ENTRY
-%token					STATE_EXIT
-%token					TOUCH_START
-%token					TOUCH
-%token					TOUCH_END
-%token					COLLISION_START
-%token					COLLISION
-%token					COLLISION_END
-%token					LAND_COLLISION_START
-%token					LAND_COLLISION
-%token					LAND_COLLISION_END
-%token					TIMER
+/* GENERATED PARSER EVENT TOKENS */
 %token					CHAT
-%token					SENSOR
-%token					NO_SENSOR
-%token					CONTROL
-%token					AT_TARGET
-%token					NOT_AT_TARGET
-%token					AT_ROT_TARGET
-%token					NOT_AT_ROT_TARGET
-%token					MONEY
-%token					EMAIL
-%token					RUN_TIME_PERMISSIONS
 %token					INVENTORY
-%token					ATTACH
-%token					DATASERVER
-%token					MOVING_START
-%token					MOVING_END
 %token					REZ
-%token					OBJECT_REZ
-%token					LINK_MESSAGE
-%token					REMOTE_DATA
-%token					HTTP_RESPONSE
-%token					HTTP_REQUEST
+%token					LINKSET_DATA
 
 %token <sval>			IDENTIFIER
 %token <sval>			STATE_DEFAULT
@@ -162,40 +133,11 @@
 %type <state>			state
 %type <handler>			state_body
 %type <handler>			event
-%type <event>			state_entry
-%type <event>			state_exit
-%type <event>			touch_start
-%type <event>			touch
-%type <event>			touch_end
-%type <event>			collision_start
-%type <event>			collision
-%type <event>			collision_end
-%type <event>			land_collision_start
-%type <event>			land_collision
-%type <event>			land_collision_end
-%type <event>			at_target
-%type <event>			not_at_target
-%type <event>			at_rot_target
-%type <event>			not_at_rot_target
-%type <event>			money
-%type <event>			email
-%type <event>			run_time_permissions
-%type <event>			inventory
-%type <event>			attach
-%type <event>			dataserver
-%type <event>			moving_start
-%type <event>			moving_end
-%type <event>			rez
-%type <event>			object_rez
-%type <event>			remote_data
-%type <event>			http_response
-%type <event>			http_request
-%type <event>			link_message
-%type <event>			timer
+/* GENERATED PARSER EVENT TYPES */
 %type <event>			chat
-%type <event>			sensor
-%type <event>			no_sensor
-%type <event>			control
+%type <event>			inventory
+%type <event>			rez
+%type <event>			linkset_data
 %type <statement>		compound_statement
 %type <statement>		statement
 %type <statement>		statements
@@ -678,284 +620,29 @@ state_body
 	;
 	
 event
-	: state_entry compound_statement												
+	: chat compound_statement
 	{  
 		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
 		gAllocationManager->addAllocation($$);
 	}
-	| state_exit compound_statement													
+	| inventory compound_statement
 	{  
 		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
 		gAllocationManager->addAllocation($$);
 	}
-	| touch_start compound_statement												
-	{
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| touch compound_statement														
+	| rez compound_statement
 	{  
 		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
 		gAllocationManager->addAllocation($$);
 	}
-	| touch_end compound_statement													
+	| linkset_data compound_statement
 	{  
 		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
 		gAllocationManager->addAllocation($$);
 	}
-	| collision_start compound_statement											
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| collision compound_statement													
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| collision_end compound_statement												
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| land_collision_start compound_statement											
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| land_collision compound_statement													
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| land_collision_end compound_statement												
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| timer compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| chat compound_statement														
-	{
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| sensor compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| no_sensor compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| at_target compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| not_at_target compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| at_rot_target compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| not_at_rot_target compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| money compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| email compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| run_time_permissions compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| inventory compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| attach compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| dataserver compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| control compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| moving_start compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| moving_end compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| rez compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| object_rez compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| link_message compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| remote_data compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| http_response compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
-	| http_request compound_statement														
-	{  
-		$$ = new LLScriptEventHandler(gLine, gColumn, $1, $2);
-		gAllocationManager->addAllocation($$);
-	}
+/* GENERATED PARSER EVENT SWITCH */
 	;
 	
-state_entry
-	: STATE_ENTRY '(' ')'															
-	{  
-		$$ = new LLScriptStateEntryEvent(gLine, gColumn);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-state_exit
-	: STATE_EXIT '(' ')'															
-	{  
-		$$ = new LLScriptStateExitEvent(gLine, gColumn);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-touch_start
-	: TOUCH_START '(' INTEGER IDENTIFIER ')'					
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		$$ = new LLScriptTouchStartEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-touch
-	: TOUCH '(' INTEGER IDENTIFIER ')'					
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		$$ = new LLScriptTouchEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-touch_end
-	: TOUCH_END '(' INTEGER IDENTIFIER ')'					
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		$$ = new LLScriptTouchEndEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-collision_start
-	: COLLISION_START '(' INTEGER IDENTIFIER ')'					
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		$$ = new LLScriptCollisionStartEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-collision
-	: COLLISION '(' INTEGER IDENTIFIER ')'					
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		$$ = new LLScriptCollisionEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-collision_end
-	: COLLISION_END '(' INTEGER IDENTIFIER ')'					
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		$$ = new LLScriptCollisionEndEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-land_collision_start
-	: LAND_COLLISION_START '(' VECTOR IDENTIFIER ')'	
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		$$ = new LLScriptLandCollisionStartEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-land_collision
-	: LAND_COLLISION '(' VECTOR IDENTIFIER ')'	
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		$$ = new LLScriptLandCollisionEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-land_collision_end
-	: LAND_COLLISION_END '(' VECTOR IDENTIFIER ')'	
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		$$ = new LLScriptLandCollisionEndEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
 at_target
 	: AT_TARGET '(' INTEGER IDENTIFIER ',' VECTOR IDENTIFIER ',' VECTOR IDENTIFIER ')'	
 	{  
@@ -1000,36 +687,6 @@ not_at_rot_target
 	}
 	;
 
-money
-	: MONEY '(' LLKEY IDENTIFIER ',' INTEGER IDENTIFIER ')'															
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		LLScriptIdentifier	*id2 = new LLScriptIdentifier(gLine, gColumn, $7);	
-		gAllocationManager->addAllocation(id2);
-		$$ = new LLScriptMoneyEvent(gLine, gColumn, id1, id2);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-email
-	: EMAIL '(' STRING IDENTIFIER ',' STRING IDENTIFIER ',' STRING IDENTIFIER ',' STRING IDENTIFIER ',' INTEGER IDENTIFIER ')'															
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		LLScriptIdentifier	*id2 = new LLScriptIdentifier(gLine, gColumn, $7);	
-		gAllocationManager->addAllocation(id2);
-		LLScriptIdentifier	*id3 = new LLScriptIdentifier(gLine, gColumn, $10);	
-		gAllocationManager->addAllocation(id3);
-		LLScriptIdentifier	*id4 = new LLScriptIdentifier(gLine, gColumn, $13);	
-		gAllocationManager->addAllocation(id4);
-		LLScriptIdentifier	*id5 = new LLScriptIdentifier(gLine, gColumn, $16);	
-		gAllocationManager->addAllocation(id5);
-		$$ = new LLScriptEmailEvent(gLine, gColumn, id1, id2, id3, id4, id5);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
 run_time_permissions
 	: RUN_TIME_PERMISSIONS '(' INTEGER IDENTIFIER ')'															
 	{  
@@ -1050,52 +707,6 @@ inventory
 	}
 	;
 
-attach
-	: ATTACH '(' LLKEY IDENTIFIER ')'																	
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		$$ = new LLScriptAttachEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-dataserver
-	: DATASERVER '(' LLKEY IDENTIFIER ',' STRING IDENTIFIER')'																	
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		LLScriptIdentifier	*id2 = new LLScriptIdentifier(gLine, gColumn, $7);	
-		gAllocationManager->addAllocation(id2);
-		$$ = new LLScriptDataserverEvent(gLine, gColumn, id1, id2);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-moving_start
-	: MOVING_START '(' ')'																	
-	{  
-		$$ = new LLScriptMovingStartEvent(gLine, gColumn);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-moving_end
-	: MOVING_END '(' ')'																	
-	{  
-		$$ = new LLScriptMovingEndEvent(gLine, gColumn);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-timer
-	: TIMER '(' ')'																	
-	{  
-		$$ = new LLScriptTimerEvent(gLine, gColumn);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
 chat
 	: CHAT '(' INTEGER IDENTIFIER ',' STRING IDENTIFIER ',' LLKEY IDENTIFIER ',' STRING IDENTIFIER ')'							
 	{  
@@ -1112,70 +723,12 @@ chat
 	}
 	;
 
-sensor
-	: SENSOR '(' INTEGER IDENTIFIER ')'	
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		$$ = new LLScriptSensorEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-no_sensor
-	: NO_SENSOR '(' ')'															
-	{  
-		$$ = new LLScriptNoSensorEvent(gLine, gColumn);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-control
-	: CONTROL '(' LLKEY IDENTIFIER ',' INTEGER IDENTIFIER ',' INTEGER IDENTIFIER ')'	
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		LLScriptIdentifier	*id2 = new LLScriptIdentifier(gLine, gColumn, $7);	
-		gAllocationManager->addAllocation(id2);
-		LLScriptIdentifier	*id3 = new LLScriptIdentifier(gLine, gColumn, $10);	
-		gAllocationManager->addAllocation(id3);
-		$$ = new LLScriptControlEvent(gLine, gColumn, id1, id2, id3);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
 rez
 	: REZ '(' INTEGER IDENTIFIER ')'															
 	{  
 		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
 		gAllocationManager->addAllocation(id1);
 		$$ = new LLScriptRezEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-object_rez
-	: OBJECT_REZ '(' LLKEY IDENTIFIER ')'															
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		$$ = new LLScriptObjectRezEvent(gLine, gColumn, id1);
-		gAllocationManager->addAllocation($$);
-	}
-	;
-
-link_message
-	: LINK_MESSAGE '(' INTEGER IDENTIFIER ','  INTEGER IDENTIFIER ',' STRING IDENTIFIER ',' LLKEY IDENTIFIER ')'															
-	{  
-		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
-		gAllocationManager->addAllocation(id1);
-		LLScriptIdentifier	*id2 = new LLScriptIdentifier(gLine, gColumn, $7);	
-		gAllocationManager->addAllocation(id2);
-		LLScriptIdentifier	*id3 = new LLScriptIdentifier(gLine, gColumn, $10);	
-		gAllocationManager->addAllocation(id3);
-		LLScriptIdentifier	*id4 = new LLScriptIdentifier(gLine, gColumn, $13);	
-		gAllocationManager->addAllocation(id4);
-		$$ = new LLScriptLinkMessageEvent(gLine, gColumn, id1, id2, id3, id4);
 		gAllocationManager->addAllocation($$);
 	}
 	;
@@ -1200,24 +753,30 @@ remote_data
 	}
 	;
 
-http_response
-	: HTTP_RESPONSE '(' LLKEY IDENTIFIER ','  INTEGER IDENTIFIER ','  LIST IDENTIFIER ',' STRING IDENTIFIER ')'															
+experience_permissions
+	: EXPERIENCE_PERMISSIONS '(' LLKEY IDENTIFIER ')'
 	{  
 		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
 		gAllocationManager->addAllocation(id1);
-		LLScriptIdentifier	*id2 = new LLScriptIdentifier(gLine, gColumn, $7);	
-		gAllocationManager->addAllocation(id2);
-		LLScriptIdentifier	*id3 = new LLScriptIdentifier(gLine, gColumn, $10);	
-		gAllocationManager->addAllocation(id3);
-		LLScriptIdentifier	*id4 = new LLScriptIdentifier(gLine, gColumn, $13);	
-		gAllocationManager->addAllocation(id4);
-		$$ = new LLScriptHTTPResponseEvent(gLine, gColumn, id1, id2, id3, id4);
+		$$ = new LLScriptExperiencePermissionsEvent(gLine, gColumn, id1);
 		gAllocationManager->addAllocation($$);
 	}
 	;
 
-http_request
-	: HTTP_REQUEST '(' LLKEY IDENTIFIER ','  STRING IDENTIFIER ',' STRING IDENTIFIER ')'															
+experience_permissions_denied
+	: EXPERIENCE_PERMISSIONS_DENIED '(' LLKEY IDENTIFIER ',' INTEGER IDENTIFIER ')'
+	{  
+		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
+		gAllocationManager->addAllocation(id1);
+		LLScriptIdentifier	*id2 = new LLScriptIdentifier(gLine, gColumn, $7);	
+		gAllocationManager->addAllocation(id2);
+		$$ = new LLScriptExperiencePermissionsDeniedEvent(gLine, gColumn, id1, id2);
+		gAllocationManager->addAllocation($$);
+	}
+	;
+
+linkset_data
+	: LINKSET_DATA '(' INTEGER IDENTIFIER ',' STRING IDENTIFIER ',' STRING IDENTIFIER ')'
 	{  
 		LLScriptIdentifier	*id1 = new LLScriptIdentifier(gLine, gColumn, $4);	
 		gAllocationManager->addAllocation(id1);
@@ -1225,11 +784,13 @@ http_request
 		gAllocationManager->addAllocation(id2);
 		LLScriptIdentifier	*id3 = new LLScriptIdentifier(gLine, gColumn, $10);	
 		gAllocationManager->addAllocation(id3);
-		$$ = new LLScriptHTTPRequestEvent(gLine, gColumn, id1, id2, id3);
+		$$ = new LLScriptLinksetDataEvent(gLine, gColumn, id1, id2, id3);
 		gAllocationManager->addAllocation($$);
 	}
 	;
-	
+
+/* GENERATED PARSER EVENT DEFINITIONS */
+
 compound_statement
 	: '{' '}'																		
 	{  
