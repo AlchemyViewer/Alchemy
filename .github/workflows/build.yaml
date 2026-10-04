@@ -75,17 +75,40 @@ jobs:
       RELEASE_RUN: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'Alchemy') && 'Y' || '' }}
       FROM_FORK: ${{ github.event.pull_request.head.repo.fork }}
     steps:
-      # which-branch installs PyGithub for tag builds.
-      - name: Setup python
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.14"
-
+      # The branch the build is of. A pull request or push names its own; a
+      # tag build is of the branch whose tip the tagged commit is, and takes
+      # its release notes from that branch's open pull request: whatever the
+      # description says after a line reading only "relnotes:".
       - name: Determine source branch
         id: which-branch
-        uses: AlchemyViewer/viewer-build-util/which-branch@v3
-        with:
-          token: ${{ github.token }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then
+            echo "branch=${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          branch="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/branches-where-head" \
+                      --jq '[.[].name] | sort | first // empty')"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          if [[ -z "$branch" ]]; then
+            echo "::warning::No branch has $GITHUB_SHA at its tip"
+            exit 0
+          fi
+
+          # head= wants owner:branch; a bare branch name is ignored, and every
+          # open pull request comes back.
+          body="$(gh api -X GET "repos/$GITHUB_REPOSITORY/pulls" \
+                    -f state=open -f "head=$GITHUB_REPOSITORY_OWNER:$branch" \
+                    --jq 'first.body // empty' | tr -d '\r')"
+          relnotes="$(sed -n '/^[[:space:]]*relnotes:[[:space:]]*$/,$p' <<< "$body" | tail -n +2)"
+          if [[ -n "$relnotes" ]]; then
+            # A delimiter the notes cannot contain.
+            delimiter="relnotes_$(openssl rand -hex 16)"
+            printf 'relnotes<<%s\n%s\n%s\n' "$delimiter" "$relnotes" "$delimiter" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set Variables
         id: setvar
