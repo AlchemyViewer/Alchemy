@@ -833,6 +833,14 @@ private:
     void                         takeOffer(Doc& doc, const std::string& action) override { outputAction(doc, action); }
     void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
                  const std::string& right_title) override;
+    // A comparison shown in the tab's editor's place, lined up at the
+    // anchors where there are any; what is typed in it goes to the source,
+    // at the line the caret is on.
+    void showCompare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title, const std::string& right_title,
+                     const std::vector<std::pair<S32, S32>>& anchors);
+    // A comparison whose right is the tab's text titled again, unsaved or
+    // not as the tab now is.
+    void retitleCompare(const Doc& doc) const;
     void endCompare(Doc& doc) override;
     // A tab made to hold a kept text with nothing loaded under it: unsaved,
     // with whatever its script or file was.

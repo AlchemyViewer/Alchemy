@@ -1770,6 +1770,13 @@ ALCodeEditor::Params ALFloaterScriptStudio::editorParams(const std::string& id, 
 void ALFloaterScriptStudio::compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
                                     const std::string& right_title)
 {
+    showCompare(doc, left, right, left_title, right_title, {});
+}
+
+void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
+                                        const std::string& right_title, const std::vector<std::pair<S32, S32>>& anchors)
+{
+    doc.compareTitles.reset();
     if (!doc.compareView)
     {
         // In the editors' place, in their colours and face; unwrapped, since
@@ -1791,11 +1798,23 @@ void ALFloaterScriptStudio::compare(Doc& doc, const std::string& left, const std
                 showView(*found, Doc::View::Source, true);
             }
         });
+        // Its right is the tab's text, which can be changed only in the
+        // source: typing goes on there, where the caret was.
+        doc.compareView->setOnEdit([this, id](S32 line, S32 column) -> LLView* {
+            Doc* found = findDoc(id);
+            if (!found || !found->loaded || !found->modifiable || found->editor->isReadOnly())
+            {
+                return nullptr;
+            }
+            showView(*found, Doc::View::Source, true);
+            found->editor->goTo(ALTextPos(line, column));
+            return found->editor;
+        });
         mEditorHost->addChild(doc.compareView);
     }
     doc.compareView->setGrammar(doc.editor->highlighter().grammar());
     doc.compareView->setInline(mCompareInline);
-    doc.compareView->setTexts(left, right);
+    doc.compareView->setTexts(left, right, anchors);
     doc.compareView->setTitles(left_title, right_title);
     showView(doc, Doc::View::Compare, true);
 }
@@ -3234,6 +3253,10 @@ void ALFloaterScriptStudio::fillTabs()
     }
     mTabFacts       = facts;
     mTabFactsActive = mActive;
+    for (const std::unique_ptr<Doc>& doc : mDocs)
+    {
+        retitleCompare(*doc);
+    }
 
     std::vector<ALTabStrip::Tab> tabs;
     tabs.reserve(mDocs.size());
@@ -3271,6 +3294,7 @@ void ALFloaterScriptStudio::fillTabs(const Doc& doc)
     const bool renamed = facts.name != mTabFacts[index].name;
     mTabFacts[index]   = std::move(facts);
     mTabs->setTab(tabOf(doc, mTabFacts[index]));
+    retitleCompare(doc);
     if (renamed && index == mActive)
     {
         setTitle(words("WindowTitleNamed", { { "[NAME]", doc.name } }));
@@ -6207,15 +6231,27 @@ void ALFloaterScriptStudio::comparePending(Doc& doc)
     }
     const Doc::PendingCompare pending = std::move(*doc.pendingCompare);
     doc.pendingCompare.reset();
-    // This tab's text as it stands, which it says where it is not saved.
-    std::string own = pending.ownTitle;
+    // This tab's text as it stands, which it says where it is not saved,
+    // for as long as it is not.
+    showCompare(doc, pending.text, doc.editor->wholeText(), pending.theirTitle, pending.ownTitle, pending.anchors);
+    doc.compareTitles = Doc::CompareTitles{ pending.theirTitle, pending.ownTitle };
+    retitleCompare(doc);
+}
+
+void ALFloaterScriptStudio::retitleCompare(const Doc& doc) const
+{
+    if (!doc.compareView || !doc.compareTitles)
+    {
+        return;
+    }
+    std::string own = doc.compareTitles->own;
     if (doc.unsaved())
     {
         LLStringUtil::format_map_t args;
         args["[TITLE]"] = own;
         own             = getString("CompareUnsaved", args);
     }
-    compare(doc, pending.text, doc.editor->wholeText(), pending.theirTitle, own);
+    doc.compareView->setTitles(doc.compareTitles->theirs, own);
 }
 
 // --- windows ---------------------------------------------------------------------------
@@ -7636,7 +7672,8 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     const std::string         name     = getString("ConvertName", args);
     const std::string         lsl      = expanded ? *doc.expanded.text : source;
     const std::string         text     = converted.text;
-    const Doc::PendingCompare compare{ lsl, getString(expanded ? "ConvertExpandedTitle" : "ConvertLSLTitle", args), getString("ConvertSLuaTitle") };
+    const Doc::PendingCompare compare{ lsl, getString(expanded ? "ConvertExpandedTitle" : "ConvertLSLTitle", args), getString("ConvertSLuaTitle"),
+                                       converted.anchors };
     const LLHandle<LLFloater> handle   = getHandle();
     if (!doc.ref.inInventory() && doc.file.empty())
     {
