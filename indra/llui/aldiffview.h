@@ -78,6 +78,13 @@ public:
     // what each is; lined up where lines are known to stand for each other
     // (ALTextDiff's anchors), however they differ.
     void setTexts(std::string_view left, std::string_view right, const ALTextDiff::anchors_t& anchors = {});
+    // The right made anew -- the text it is of, changed -- and compared
+    // again: the caret kept on its line of the right wherever that went,
+    // the runs folded as open as they were, and the anchors carried to
+    // where their lines of the right now are, changed or not.
+    void setRightText(std::string_view right);
+    const std::string& leftText() const { return mLeftText; }
+    const std::string& rightText() const { return mRightText; }
     void setTitles(const std::string& left, const std::string& right);
     void setSyntax(const std::string& syntax);
     // The grammar both sides are coloured by, as another view has it.

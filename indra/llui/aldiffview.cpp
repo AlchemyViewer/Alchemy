@@ -212,6 +212,87 @@ void ALDiffView::setTexts(std::string_view left, std::string_view right, const A
     rebuild();
 }
 
+void ALDiffView::setRightText(std::string_view right)
+{
+    if (right == mRightText)
+    {
+        return;
+    }
+    // Each line of the right as it was, where it now is: a line still
+    // there, its own; one taken out or changed, where the right had got to
+    // there -- a line changed, the line it became. And which are still
+    // there as they were, where the caret's column still holds.
+    const std::vector<std::string> was = ALTextDiff::split(mRightText);
+    const std::vector<std::string> now = ALTextDiff::split(right);
+    std::vector<S32>               moved(was.size() + 1, static_cast<S32>(now.size()));
+    std::vector<bool>              kept(was.size(), false);
+    for (const ALTextDiff::Run& run : ALTextDiff::lines(was, now))
+    {
+        for (S32 n = 0; n < run.count && run.kind != ALTextDiff::Kind::Added; ++n)
+        {
+            const size_t line = static_cast<size_t>(run.left + n);
+            moved[line]       = run.kind == ALTextDiff::Kind::Same ? run.right + n : run.right;
+            kept[line]        = run.kind == ALTextDiff::Kind::Same;
+        }
+    }
+    const S32  last_line  = llmax(0, static_cast<S32>(now.size()) - 1);
+    const auto movedLine = [&](S32 line) { return llclamp(moved[static_cast<size_t>(llclamp(line, 0, static_cast<S32>(was.size())))], 0, last_line); };
+    // An anchor goes with its line, changed or not: an edit of the SLua a
+    // statement became still stands for the statement. Two come to one
+    // line where one was taken out; lines() keeps those it can.
+    ALTextDiff::anchors_t anchors;
+    for (const auto& [left, at] : mAnchors)
+    {
+        if (at >= 0 && at < static_cast<S32>(was.size()))
+        {
+            anchors.emplace_back(left, movedLine(at));
+        }
+    }
+    // The runs open, by the first line of the right each hides.
+    std::vector<S32>        opened;
+    const std::vector<S32>& rows = rightRowsOf(mRight);
+    for (const Fold& fold : mFolds)
+    {
+        if (fold.open && fold.row + 1 < static_cast<S32>(rows.size()) && rows[static_cast<size_t>(fold.row + 1)] > 0)
+        {
+            opened.push_back(movedLine(rows[static_cast<size_t>(fold.row + 1)] - 1));
+        }
+    }
+    Place place = placeOfCaret();
+    if (place.line >= 0 && place.line < static_cast<S32>(was.size()) && !kept[static_cast<size_t>(place.line)])
+    {
+        place.column = 0;
+    }
+    // On a folded row, the row for its run again, by the run's first line.
+    place.line          = movedLine(place.line);
+    const S32 fold_line = place.fold >= 0 ? place.line : -1;
+    place.fold          = -1;
+    mRightText          = std::string(right);
+    mAnchors   = std::move(anchors);
+    rebuild();
+    const std::vector<S32>& now_rows = rightRowsOf(mRight);
+    bool                    changed  = false;
+    for (size_t n = 0; n < mFolds.size(); ++n)
+    {
+        Fold&     fold  = mFolds[n];
+        const S32 first = fold.row + 1 < static_cast<S32>(now_rows.size()) ? now_rows[static_cast<size_t>(fold.row + 1)] - 1 : -1;
+        if (!fold.open && std::find(opened.begin(), opened.end(), first) != opened.end())
+        {
+            fold.open = true;
+            changed   = true;
+        }
+        if (first == fold_line && !fold.open)
+        {
+            place.fold = static_cast<S32>(n);
+        }
+    }
+    if (changed)
+    {
+        applyFolds();
+    }
+    restorePlace(place);
+}
+
 void ALDiffView::setTitles(const std::string& left, const std::string& right)
 {
     mLeftTitle  = left;

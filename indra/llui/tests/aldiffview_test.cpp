@@ -530,4 +530,46 @@ namespace tut
         d.setInline(true);
         ensure("inline: taken out and put in", d.inlined()->lineSigns() == std::string("\0-+\0+\0-", 7));
     }
+
+    template<> template<>
+    void aldiffview_object::test<17>()
+    {
+        set_test_name("the right made anew: compared again, the caret on its line where it went, the runs as open as they were, the anchors carried with their lines, changed or not");
+        const std::string left  = lines(30);
+        const std::string right = lines(30, { { 2, "two" }, { 27, "twenty-seven" } });
+        ALDiffView&       d     = make(left.c_str(), right.c_str());
+        d.right()->setFocus(true);
+        d.right()->goTo(ALTextPos(10, 0));
+        ensure("the run opened", d.foldedCount() == 0);
+        // Row 26 is the right's line 25: context below the run.
+        d.right()->goTo(ALTextPos(26, 2));
+        ensure("on the right's line 25", d.rightAtCaret() == std::make_pair(25, 2));
+        d.setRightText("inserted\n" + right);
+        ensure_equals("compared again: a change more", d.changeCount(), 3);
+        ensure("the caret on the same line, one further down", d.rightAtCaret() == std::make_pair(26, 2));
+        ensure("the run as open as it was", d.foldCount() == 1 && d.foldedCount() == 0);
+        d.setRightText(right);
+        d.setFoldSame(true);
+        d.right()->goTo(ALTextPos(6, 0));
+        d.setRightText("inserted\n" + right);
+        ensure("on a folded row: on its row again, folded", d.foldedCount() == 1 && d.right()->spacerLine(d.right()->caret().line));
+
+        d.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 2 } });
+        d.setRightText("-- written\n-- and more\n\nll.Say(0, \"hi\")");
+        const std::vector<S32>& left_numbers  = d.left()->lineNumbers();
+        const std::vector<S32>& right_numbers = d.right()->lineNumbers();
+        bool                    beside        = false;
+        for (size_t row = 0; row < left_numbers.size() && row < right_numbers.size(); ++row)
+        {
+            beside = beside || (left_numbers[row] == 5 && right_numbers[row] == 4);
+        }
+        ensure("the LSL's call beside the SLua's, a line further down", beside);
+        d.setRightText("-- written\n-- and more\n\nll.Say(0, \"bye\")");
+        bool still = false;
+        for (size_t row = 0; row < d.left()->lineNumbers().size() && row < d.right()->lineNumbers().size(); ++row)
+        {
+            still = still || (d.left()->lineNumbers()[row] == 5 && d.right()->lineNumbers()[row] == 4);
+        }
+        ensure("its line changed: beside it still", still);
+    }
 }
