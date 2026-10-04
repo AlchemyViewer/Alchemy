@@ -500,4 +500,23 @@ namespace tut
         d.setSwapped(true);
         ensure("swapped, folded still", d.foldedCount() == 1 && hidden(d.left(), 1) && hidden(d.right(), 1));
     }
+
+    template<> template<>
+    void aldiffview_object::test<15>()
+    {
+        set_test_name("the ruler down each side marks its own changes and, beside a gap, the other side's: either alone shows them all; inline, each line's");
+        ALDiffView& d      = make("a\nb\nc\ne", "a\nx\nc\nd\ne");
+        const auto  marked = [](const ALCodeEditor* side, S32 row) {
+            return row < static_cast<S32>(side->rulerTints().size()) && side->rulerTints()[static_cast<size_t>(row)].mV[VALPHA] > 0.f;
+        };
+        const auto  red = [](const ALCodeEditor* side, S32 row) {
+            const LLColor4& c = side->rulerTints()[static_cast<size_t>(row)];
+            return c.mV[VRED] > c.mV[VGREEN];
+        };
+        ensure("nothing the same marked", !marked(d.left(), 0) && !marked(d.right(), 0) && !marked(d.right(), 2) && !marked(d.left(), 4));
+        ensure("a line changed: taken out on the left, put in on the right", red(d.left(), 1) && !red(d.right(), 1));
+        ensure("a line put in: on the right, and on the left beside its gap", marked(d.left(), 3) && !red(d.left(), 3) && !red(d.right(), 3));
+        d.setInline(true);
+        ensure("inline: the line taken out, and the two put in", red(d.inlined(), 1) && !red(d.inlined(), 2) && !red(d.inlined(), 4) && !marked(d.inlined(), 3));
+    }
 }

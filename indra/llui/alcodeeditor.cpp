@@ -3220,6 +3220,11 @@ bool ALCodeEditor::mapMark(S32 line, LLColor4& color) const
     const Mark mark = markAt(line);
     if (mark == Mark::None)
     {
+        if (line >= 0 && line < static_cast<S32>(mRulerTints.size()) && mRulerTints[static_cast<size_t>(line)].mV[VALPHA] > 0.f)
+        {
+            color = mRulerTints[static_cast<size_t>(line)];
+            return true;
+        }
         return false;
     }
     color = markColor(mark);

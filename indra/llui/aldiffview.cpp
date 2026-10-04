@@ -50,9 +50,10 @@ namespace
     LLColor4 colorOf(const char* name, const LLColor4& otherwise) { return LLUIColorTable::instance().getColor(name, otherwise).get(); }
 
     // One side's text as it is shown: its lines, each's number (0 for a
-    // line put in to line the sides up), its tint, the words marked, and
-    // which lines are only there to line the sides up, which a copy leaves
-    // out.
+    // line put in to line the sides up), its tint, the words marked, which
+    // lines are only there to line the sides up, which a copy leaves out,
+    // and the mark each has on the ruler down the side, for what changed
+    // there on either side.
     struct Shown
     {
         std::string                            text;
@@ -60,8 +61,9 @@ namespace
         std::vector<LLColor4>                  tints;
         std::vector<ALCodeEditor::Decoration>  words;
         std::vector<bool>                      spacers;
+        std::vector<LLColor4>                  marks;
 
-        S32 add(const std::string& line, S32 number, const LLColor4& tint, bool spacer = false)
+        S32 add(const std::string& line, S32 number, const LLColor4& tint, bool spacer = false, const LLColor4& mark = LLColor4::transparent)
         {
             if (!numbers.empty())
             {
@@ -71,6 +73,7 @@ namespace
             numbers.push_back(number);
             tints.push_back(tint);
             spacers.push_back(spacer);
+            marks.push_back(mark);
             return static_cast<S32>(numbers.size()) - 1;
         }
 
@@ -94,6 +97,7 @@ namespace
             editor.setLineTints(std::move(tints));
             editor.setSpacerLines(std::move(spacers));
             editor.setDecorations(std::move(words));
+            editor.setRulerTints(std::move(marks));
         }
     };
 }
@@ -332,6 +336,9 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
     const LLColor4                      folded    = colorOf("CodeDiffFoldColor", LLColor4(0.5f, 0.5f, 0.5f, 0.14f));
     const LLColor4                      out_words = colorOf("CodeDiffRemovedWordColor", LLColor4(0.9f, 0.25f, 0.25f, 0.4f));
     const LLColor4                      in_words  = colorOf("CodeDiffAddedWordColor", LLColor4(0.25f, 0.85f, 0.35f, 0.4f));
+    // The ruler's: each side's own change, and beside a gap, the other's.
+    const LLColor4                      out_mark  = colorOf("CodeDiffRemovedMarkColor", LLColor4(0.9f, 0.3f, 0.3f, 0.85f));
+    const LLColor4                      in_mark   = colorOf("CodeDiffAddedMarkColor", LLColor4(0.3f, 0.8f, 0.4f, 0.85f));
     mChanges.clear();
     mChangeEnds.clear();
     mInlineLeftRows.clear();
@@ -408,8 +415,8 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
         {
             const bool      has_out = n < gone.size();
             const bool      has_in  = n < made.size();
-            const S32       lrow = has_out ? ls.add(left[static_cast<size_t>(gone[n])], gone[n] + 1, out) : ls.add(std::string(), 0, padding, true);
-            const S32       rrow = has_in ? rs.add(right[static_cast<size_t>(made[n])], made[n] + 1, in) : rs.add(std::string(), 0, padding, true);
+            const S32       lrow = has_out ? ls.add(left[static_cast<size_t>(gone[n])], gone[n] + 1, out, false, out_mark) : ls.add(std::string(), 0, padding, true, in_mark);
+            const S32       rrow = has_in ? rs.add(right[static_cast<size_t>(made[n])], made[n] + 1, in, false, in_mark) : rs.add(std::string(), 0, padding, true, out_mark);
             if (has_out && has_in)
             {
                 ALTextDiff::spans_t lspans;
@@ -423,13 +430,13 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
         const S32 first_out = static_cast<S32>(is.numbers.size());
         for (const S32 line : gone)
         {
-            is.add(left[static_cast<size_t>(line)], 0, out);
+            is.add(left[static_cast<size_t>(line)], 0, out, false, out_mark);
             mInlineLeftRows.push_back(line + 1);
         }
         const S32 first_in = static_cast<S32>(is.numbers.size());
         for (const S32 line : made)
         {
-            is.add(right[static_cast<size_t>(line)], line + 1, in);
+            is.add(right[static_cast<size_t>(line)], line + 1, in, false, in_mark);
             mInlineLeftRows.push_back(0);
         }
         for (size_t n = 0; n < gone.size() && n < made.size(); ++n)

@@ -591,6 +591,15 @@ public:
     // to show.
     typedef std::function<bool(S32 line)> line_revealer_t;
     void setLineRevealer(line_revealer_t revealer) { mLineRevealer = std::move(revealer); }
+    // A colour for each line on the ruler down the side, where the marks
+    // on it leave the line none: what a comparison changed there. Cleared
+    // by an empty list; a line past its end has none.
+    void setRulerTints(std::vector<LLColor4> tints)
+    {
+        mRulerTints = std::move(tints);
+        ++mMarksRevision;
+    }
+    const std::vector<LLColor4>& rulerTints() const { return mRulerTints; }
     typedef std::function<void(const LLSD& value)> fix_handler_t;
     void setFixHandler(fix_handler_t handler) { mFixHandler = std::move(handler); }
     // What the problems on a line offer: any fix at all -- a suppression
@@ -1001,6 +1010,7 @@ private:
     ALLineTable<Mark>                  mMarks;
     // Moves on as marks are set or cleared, for the ruler's list of them.
     U32                                mMarksRevision = 0;
+    std::vector<LLColor4>              mRulerTints;
     // One per line: changed since the last save.
     ALLineTable<U8>                    mChanged;
     // The mouse over the gutter, and the line it is on there: the fold
