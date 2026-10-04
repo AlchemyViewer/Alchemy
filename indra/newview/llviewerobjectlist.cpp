@@ -1073,6 +1073,7 @@ void LLViewerObjectList::update(LLAgent &agent)
     {
         LLViewerStats::getInstance()->updateFrameStats(time_diff);
     }
+    mWasPaused = false;
 
     /*
     // Debugging code for viewing orphans, and orphaned parents
