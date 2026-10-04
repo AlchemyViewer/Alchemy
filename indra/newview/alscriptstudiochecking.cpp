@@ -112,7 +112,25 @@ ALScriptStudioChecking::ALScriptStudioChecking(ALScriptStudioServices& services,
 
 bool ALScriptStudioChecking::preprocessed(const Doc& doc) const
 {
-    return doc.loaded && !doc.notecard && (doc.envelope.has_value() || ALScriptStudioViewer::get().preprocessing());
+    return preprocessedWhy(doc) != ALPreprocessor::Wanted::No;
+}
+
+ALPreprocessor::Wanted ALScriptStudioChecking::preprocessedWhy(const Doc& doc) const
+{
+    if (!doc.loaded || doc.notecard)
+    {
+        return ALPreprocessor::Wanted::No;
+    }
+    const auto directives = [&doc]() {
+        const ALTextDocument& text = doc.editor->document();
+        if (doc.directivesOf != text.version())
+        {
+            doc.directives   = ALPreprocessor::usesDirectives([&text](S32 i) { return std::string_view(text.line(i)); }, text.lineCount(), doc.language.lua);
+            doc.directivesOf = text.version();
+        }
+        return doc.directives;
+    };
+    return ALPreprocessor::wanted(doc.envelope.has_value(), directives, ALScriptStudioViewer::get().preprocessing());
 }
 
 ALScriptPreprocessor::Request ALScriptStudioChecking::preprocessRequest(const Doc& doc, bool with_source) const
@@ -1288,10 +1306,10 @@ void ALScriptStudioChecking::explainTransformWords(Doc& doc)
     // off, is the transform's to explain (ALPreprocessor::transformAt); one
     // on a directive, with the script not preprocessed, the preprocessor's.
     using Transform                     = ALPreprocessor::Transform;
-    const bool            preprocessing = ALScriptStudioViewer::get().preprocessing();
+    const bool            preprocessing = preprocessed(doc);
     const ALTextDocument& text          = doc.editor->document();
     const auto            line          = [&text](S32 index) { return std::string_view(text.line(index)); };
-    const bool expanded = preprocessed(doc);
+    const bool expanded = preprocessing;
     for (ALScriptProblem& problem : doc.check->analysis)
     {
         if (problem.severity != ALScriptProblem::Severity::Error || !problem.file.empty())

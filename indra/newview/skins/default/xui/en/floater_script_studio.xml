@@ -382,6 +382,11 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="TrailerSourceTipNoKeys">Showing the source. Click for the Preprocessed view, the code the server compiles</floater.string>
     <floater.string name="TrailerExpandedTip">Showing the preprocessed code the server compiles; read-only. Click for the source ([KEYS])</floater.string>
     <floater.string name="TrailerExpandedTipNoKeys">Showing the preprocessed code the server compiles; read-only. Click for the source</floater.string>
+    <floater.string name="TrailerPreprocessedEnveloped">A save preprocesses it: it was saved with the preprocessor before, and keeps its source.</floater.string>
+    <floater.string name="TrailerPreprocessedDirectives">A save preprocesses it: it has directives, which the server could compile no other way.</floater.string>
+    <floater.string name="TrailerPreprocessedSetting">A save preprocesses it: Build &gt; Preprocess on Save is on.</floater.string>
+    <floater.string name="TrailerNotPreprocessed">Not preprocessed on save</floater.string>
+    <floater.string name="TrailerNotPreprocessedTip">A save sends this script as written: it has no directive, was not saved with the preprocessor before, and Build &gt; Preprocess on Save is off. The Preprocessed view shows what the preprocessor would make of it, not what goes up.</floater.string>
     <floater.string name="ReferenceDeclaration">declaration</floater.string>
     <floater.string name="ReferenceDeclarationTip">Where [NAME] is declared</floater.string>
     <floater.string name="OutlineNoMatch">No symbol names match what you typed.</floater.string>

@@ -898,6 +898,7 @@ private:
     void        trailerChosen(const std::string& value) override;
     std::string vimBanner() const override { return mVim.banner(); }
     std::optional<ALScriptWeight::Target> weightTarget(const Doc& doc) const override { return mWeighing.target(doc); }
+    ALPreprocessor::Wanted                preprocessedWhy(const Doc& doc) const override { return mChecking.preprocessedWhy(doc); }
     // How many errors and warnings a script shows.
     void   problemCounts(const Doc& doc, S32& errors, S32& warnings) const override;
     // What the Output tab asks of the window (ALScriptOutputPane::Window).

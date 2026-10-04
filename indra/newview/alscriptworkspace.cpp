@@ -1045,7 +1045,7 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
 void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id, const std::string& text, bool lua,
                                 const std::string& target, prepared_callback_t callback, bool anyway)
 {
-    if (!ALScriptEnvelope::looksWrapped(text) && !ALScriptPreprocessor::enabled())
+    if (ALPreprocessor::wanted(text, lua, ALScriptEnvelope::looksWrapped(text), ALScriptPreprocessor::enabled()) == ALPreprocessor::Wanted::No)
     {
         ALScriptPrepared as_is;
         as_is.text = text;

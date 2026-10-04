@@ -976,7 +976,7 @@ end</floater.string>
              layout="topleft"
              left="412"
              name="preproc_enabled"
-             tool_tip="Preprocess all scripts on save, keeping the source in Firestorm's envelope. Off: only enveloped ones"
+             tool_tip="Preprocess every script on save, keeping the source in Firestorm's envelope. Off: only scripts that have directives, or were saved with the preprocessor before"
              top_pad="6"
              width="370" />
             <check_box

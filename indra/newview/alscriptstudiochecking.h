@@ -183,6 +183,9 @@ public:
     // where only where the script is matters; and what an include is
     // called.
     bool                          preprocessed(const Doc& doc) const;
+    // And why (ALPreprocessor::wanted): No for a notecard, or one not yet
+    // loaded.
+    ALPreprocessor::Wanted        preprocessedWhy(const Doc& doc) const;
     ALScriptPreprocessor::Request preprocessRequest(const Doc& doc, bool with_source = true) const;
     std::string                   includeName(const Doc& doc, const std::string& path) const;
     // An LSL file on disk with no default state: an include's functions

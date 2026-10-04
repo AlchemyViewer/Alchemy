@@ -5192,6 +5192,101 @@ void ALPreprocessor::optimize(Result& result, const Options& options)
 }
 
 // static
+bool ALPreprocessor::usesDirectives(const std::function<std::string_view(S32)>& line, S32 count, bool lua)
+{
+    bool in_comment = false;
+    for (S32 i = 0; i < count; ++i)
+    {
+        const std::string_view text = line(i);
+        if (!in_comment && directiveName(text, lua) != std::string_view::npos)
+        {
+            return true;
+        }
+        if (lua)
+        {
+            continue;
+        }
+        // Where an LSL block comment opens or closes on the line, past its
+        // strings and a line comment.
+        bool in_string = false;
+        for (size_t c = 0; c < text.size(); ++c)
+        {
+            const bool pair = c + 1 < text.size();
+            if (in_comment)
+            {
+                if (text[c] == '*' && pair && text[c + 1] == '/')
+                {
+                    in_comment = false;
+                    ++c;
+                }
+            }
+            else if (in_string)
+            {
+                if (text[c] == '\\')
+                {
+                    ++c;
+                }
+                else if (text[c] == '"')
+                {
+                    in_string = false;
+                }
+            }
+            else if (text[c] == '"')
+            {
+                in_string = true;
+            }
+            else if (text[c] == '/' && pair && text[c + 1] == '/')
+            {
+                break;
+            }
+            else if (text[c] == '/' && pair && text[c + 1] == '*')
+            {
+                in_comment = true;
+                ++c;
+            }
+        }
+    }
+    return false;
+}
+
+// static
+bool ALPreprocessor::usesDirectives(std::string_view text, bool lua)
+{
+    std::vector<std::string_view> lines;
+    for (size_t at = 0; at <= text.size();)
+    {
+        const size_t end = text.find('\n', at);
+        lines.push_back(text.substr(at, (end == std::string_view::npos ? text.size() : end) - at));
+        if (end == std::string_view::npos)
+        {
+            break;
+        }
+        at = end + 1;
+    }
+    return usesDirectives([&lines](S32 i) { return lines[static_cast<size_t>(i)]; }, static_cast<S32>(lines.size()), lua);
+}
+
+// static
+ALPreprocessor::Wanted ALPreprocessor::wanted(bool enveloped, const std::function<bool()>& directives, bool setting)
+{
+    if (enveloped)
+    {
+        return Wanted::Enveloped;
+    }
+    if (directives && directives())
+    {
+        return Wanted::Directives;
+    }
+    return setting ? Wanted::Setting : Wanted::No;
+}
+
+// static
+ALPreprocessor::Wanted ALPreprocessor::wanted(std::string_view text, bool lua, bool enveloped, bool setting)
+{
+    return wanted(enveloped, [text, lua]() { return usesDirectives(text, lua); }, setting);
+}
+
+// static
 size_t ALPreprocessor::directiveName(std::string_view line, bool lua)
 {
     size_t at = line.find_first_not_of(" \t");

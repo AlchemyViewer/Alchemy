@@ -1695,4 +1695,36 @@ namespace tut
         }
         ensure("some golden files", checked > 0);
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<44>()
+    {
+        set_test_name("a script holds a directive where a line is one, outside an LSL block comment; why one is preprocessed: enveloped, then its directives, then the setting");
+        typedef ALPreprocessor P;
+        ensure("#define", P::usesDirectives("#define X 1\ndefault { state_entry() { } }\n", false));
+        ensure("one further down, indented", P::usesDirectives("integer x;\n  #include \"lib.lsl\"\n", false));
+        ensure("none: # only in a string", !P::usesDirectives("default { state_entry() { llSay(0, \"#define\"); } }\n", false));
+        ensure("none: a line comment", !P::usesDirectives("// #define X 1\ndefault { }\n", false));
+        ensure("none: in a block comment", !P::usesDirectives("/* notes\n#define X 1\n*/\ndefault { }\n", false));
+        ensure("after a block comment closes", P::usesDirectives("/* notes */\n#define X 1\n", false));
+        ensure("not opened by one in a string", P::usesDirectives("string s = \"/*\";\n#define X 1\n", false));
+        ensure("SLua's --#", P::usesDirectives("--#define X 1\nprint(X)\n", true));
+        ensure("none: Luau's length operator first on a line", !P::usesDirectives("local n =\n    #items\n", true));
+        ensure("none: an SLua comment", !P::usesDirectives("-- # a heading\nprint(1)\n", true));
+        ensure("none: LSL's # in SLua's place", !P::usesDirectives("#define X 1\n", true));
+
+        bool asked = false;
+        const auto directives = [&asked](bool answer) {
+            return [&asked, answer]() {
+                asked = true;
+                return answer;
+            };
+        };
+        ensure("enveloped first, its text not read", P::wanted(true, directives(true), true) == P::Wanted::Enveloped && !asked);
+        ensure("then its directives, the setting on or off",
+               P::wanted(false, directives(true), true) == P::Wanted::Directives && P::wanted(false, directives(true), false) == P::Wanted::Directives);
+        ensure("then the setting", P::wanted(false, directives(false), true) == P::Wanted::Setting);
+        ensure("else not", P::wanted(false, directives(false), false) == P::Wanted::No);
+        ensure("by text", P::wanted("#define X 1\n", false, false, false) == P::Wanted::Directives);
+    }
 }

@@ -147,6 +147,7 @@ ALScriptCrumbsBar::Steady ALScriptCrumbsBar::steadyOf(Doc& doc) const
     steady.target     = mWindow->weightTarget(doc);
     steady.expandable = doc.expandedEditor != nullptr;
     steady.expanded   = doc.shownView() == Doc::View::Expanded;
+    steady.wanted     = mWindow->preprocessedWhy(doc);
     steady.optimized  = steady.expanded && doc.uploaded.valid && doc.uploaded.version == doc.editor->document().version();
     steady.codeBefore = doc.uploaded.codeBefore;
     steady.codeAfter  = doc.uploaded.codeAfter;
@@ -181,6 +182,15 @@ void ALScriptCrumbsBar::lead(Doc& doc, std::vector<Part>& parts) const
     {
         parts.push_back({ banner, std::string(), std::string() });
         parts.back().drop = DROP_LEAD;
+    }
+    // A preprocessed view of a script a save sends as written -- one asked
+    // for, the preprocessor off for it: said, lest the view be taken for
+    // what goes up.
+    if (doc.expandedEditor && !doc.notecard && mWindow->preprocessedWhy(doc) == ALPreprocessor::Wanted::No)
+    {
+        parts.push_back({ mServices->words("TrailerNotPreprocessed"), "expanded", mServices->words("TrailerNotPreprocessedTip") });
+        parts.back().color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
+        parts.back().drop  = DROP_LEAD;
     }
 }
 
@@ -474,8 +484,16 @@ void ALScriptCrumbsBar::views(Doc& doc, std::vector<Part>& parts) const
     if (doc.expandedEditor)
     {
         const bool expanded = doc.shownView() == Doc::View::Expanded;
-        parts.push_back(
-            { mServices->words(expanded ? "TrailerExpanded" : "TrailerSource"), "expanded", expanded ? mTips.expanded : mTips.source });
+        // And why a save preprocesses it, where one does.
+        std::string                  tip = expanded ? mTips.expanded : mTips.source;
+        const ALPreprocessor::Wanted why = mWindow->preprocessedWhy(doc);
+        if (why != ALPreprocessor::Wanted::No)
+        {
+            tip += " " + mServices->words(why == ALPreprocessor::Wanted::Enveloped    ? "TrailerPreprocessedEnveloped"
+                                          : why == ALPreprocessor::Wanted::Directives ? "TrailerPreprocessedDirectives"
+                                                                                      : "TrailerPreprocessedSetting");
+        }
+        parts.push_back({ mServices->words(expanded ? "TrailerExpanded" : "TrailerSource"), "expanded", tip });
         parts.back().drop = DROP_VIEW;
     }
 }

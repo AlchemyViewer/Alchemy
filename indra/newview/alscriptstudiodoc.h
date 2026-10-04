@@ -298,6 +298,11 @@ struct ALScriptStudioDoc
     // and whose expanded code the other editor shows; a save runs
     // the preprocessor over the source and wraps both again.
     std::optional<ALScriptEnvelope>            envelope;
+    // Whether the text holds a directive of the preprocessor's, as of a
+    // version of it (ALPreprocessor::usesDirectives): read as it is asked,
+    // which is often, and the text but now and then changed.
+    mutable U32                                directivesOf = ~0u;
+    mutable bool                               directives   = false;
     // The version a wrapped script was loaded at, where the first run over
     // its source is to be held up to its compiled half; none once it has
     // been. And the compiled half, where the source could not have made
