@@ -1,25 +1,25 @@
-/** 
+/**
  * @file lscript_execute.h
  * @brief Classes to execute bytecode
  *
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -276,7 +276,7 @@ public:
 		}
 	}
 
-	~LLScriptEventData()	
+	~LLScriptEventData()
 	{
 		delete_and_clear(mEventDataList);
 	}
@@ -399,7 +399,7 @@ public:
 	virtual void error() {;} // Processing that must be performed when error flag is set and so run is not called.
 
 	virtual U32 getUsedMemory() = 0;
-	
+
 	// Run current event handler for a maximum of time_slice seconds.
 	// Updates current handler and current events registers.
 	virtual void resumeEventHandler(BOOL b_print, const LLUUID &id, F32 time_slice) = 0;
@@ -408,7 +408,7 @@ public:
 	// Updates current handler and current events registers.
 	virtual void callEventHandler(LSCRIPTStateEventType event, const LLUUID &id, F32 time_slice) = 0;;
 
-	// Run handler for next queued event for maximum of time_slice seconds. 
+	// Run handler for next queued event for maximum of time_slice seconds.
 	// Updates current handler and current events registers.
 	// Removes processed event from queue.
 	virtual void callNextQueuedEventHandler(U64 event_register, const LLUUID &id, F32 time_slice) = 0;
@@ -420,25 +420,25 @@ public:
 
 	// Switch to next state.
 	// Returns new set of handled events.
-	virtual U64 nextState() = 0; 
+	virtual U64 nextState() = 0;
 
 	// Returns time taken.
 	virtual F32 runQuanta(BOOL b_print, const LLUUID &id,
-						  const char **errorstr, 
+						  const char **errorstr,
 						  F32 quanta,
 						  U32& events_processed, LLTimer& timer);
 
 	// NOTE: babbage: this must be used on occasions where another script may already be executing. Only 2 levels of nesting are allowed.
 	// Provided to support bizarre detach behaviour only. Do not use.
 	virtual F32 runNested(BOOL b_print, const LLUUID &id,
-						  const char **errorstr, 
+						  const char **errorstr,
 						  F32 quanta,
 						  U32& events_processed, LLTimer& timer);
 
 	// Run smallest possible amount of code: an instruction for LSL2, a segment
 	// between save tests for Mono
 	void runInstructions(BOOL b_print, const LLUUID &id,
-						 const char **errorstr, 
+						 const char **errorstr,
 						 U32& events_processed,
 						 F32 quanta);
 
@@ -452,7 +452,7 @@ public:
 
 	// Called when the script is scheduled to be stopped from newsim/LLScriptData
 	virtual void stopRunning() = 0;
-	
+
 	// A timer is regularly checked to see if script takes too long, but we
 	// don't do it every opcode due to performance hits.
 	static void		setTimerCheckSkip( S32 value )			{ sTimerCheckSkip = value;		}
@@ -491,7 +491,7 @@ public:
 	virtual U64 getEventHandlers() {return get_event_register(mBuffer, LREG_ER, getMajorVersion());}
 	virtual void setEventHandlers(U64 value) {set_event_register(mBuffer, LREG_ER, value, getMajorVersion());}
 	virtual U64 getCurrentHandler();
-	virtual void setCurrentHandler(U64 value) {return set_event_register(mBuffer, LREG_IE, value, getMajorVersion());}	
+	virtual void setCurrentHandler(U64 value) {return set_event_register(mBuffer, LREG_IE, value, getMajorVersion());}
 	virtual BOOL isFinished() const {return get_register(mBuffer, LREG_IP) == 0;}
 	virtual BOOL isStateChangePending() const {return get_register(mBuffer, LREG_CS) != get_register(mBuffer, LREG_NS);}
 	virtual S32 writeState(U8 **dest, U32 header_size, U32 footer_size); // Not including Events.
@@ -513,7 +513,7 @@ public:
 	// Updates current handler and current events registers.
 	virtual void callEventHandler(LSCRIPTStateEventType event, const LLUUID &id, F32 time_slice);
 
-	// Run handler for next queued event for maximum of time_slice seconds. 
+	// Run handler for next queued event for maximum of time_slice seconds.
 	// Updates current handler and current events registers.
 	// Removes processed event from queue.
 	virtual void callNextQueuedEventHandler(U64 event_register, const LLUUID &id, F32 time_slice);
@@ -525,7 +525,7 @@ public:
 
 	// Switch to next state.
 	// Returns new set of handled events.
-	virtual U64 nextState(); 
+	virtual U64 nextState();
 
 	void init();
 

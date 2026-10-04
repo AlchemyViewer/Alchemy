@@ -1,25 +1,25 @@
-/** 
+/**
  * @file lscript_bytecode.cpp
  * @brief classes to build actual bytecode
  *
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -239,7 +239,7 @@ LLScriptScriptCodeChunk::~LLScriptScriptCodeChunk()
 
 void LLScriptScriptCodeChunk::build(LLFILE *efp, LLFILE *bcfp)
 {
-	S32 code_data_size = mRegisters->mCurrentOffset + 
+	S32 code_data_size = mRegisters->mCurrentOffset +
 					 mGlobalVariables->mCurrentOffset +
 					 mGlobalFunctions->mCurrentOffset +
 					 mStates->mCurrentOffset +
@@ -251,8 +251,8 @@ void LLScriptScriptCodeChunk::build(LLFILE *efp, LLFILE *bcfp)
 	{
 		mCompleteCode = new U8[mTotalSize];
 		memset(mCompleteCode, 0, mTotalSize);
-		
-		memcpy(mCompleteCode, mRegisters->mCodeChunk, mRegisters->mCurrentOffset);	
+
+		memcpy(mCompleteCode, mRegisters->mCodeChunk, mRegisters->mCurrentOffset);
 		offset += mRegisters->mCurrentOffset;
 
 		set_register(mCompleteCode, LREG_IP, 0);
@@ -262,12 +262,12 @@ void LLScriptScriptCodeChunk::build(LLFILE *efp, LLFILE *bcfp)
 		set_register(mCompleteCode, LREG_SP, mTotalSize - 1);
 
 		set_register(mCompleteCode, LREG_GVR, offset);
-		
+
 		memcpy(mCompleteCode + offset, mGlobalVariables->mCodeChunk, mGlobalVariables->mCurrentOffset);	 	/*Flawfinder: ignore*/
 		offset += mGlobalVariables->mCurrentOffset;
 
 		set_register(mCompleteCode, LREG_GFR, offset);
-		
+
 		memcpy(mCompleteCode + offset, mGlobalFunctions->mCodeChunk, mGlobalFunctions->mCurrentOffset);	/*Flawfinder: ignore*/
 		offset += mGlobalFunctions->mCurrentOffset;
 
@@ -286,15 +286,15 @@ void LLScriptScriptCodeChunk::build(LLFILE *efp, LLFILE *bcfp)
 			default_state_offset = 4;
 		}
 		set_event_register(mCompleteCode, LREG_ER, bytestream2u64(mStates->mCodeChunk, default_state_offset), LSL2_CURRENT_MAJOR_VERSION);
-		
+
 		memcpy(mCompleteCode + offset, mStates->mCodeChunk, mStates->mCurrentOffset);	 	/*Flawfinder: ignore*/
 		offset += mStates->mCurrentOffset;
 
 		set_register(mCompleteCode, LREG_HR, offset);
-		
+
 		memcpy(mCompleteCode + offset, mHeap->mCodeChunk, mHeap->mCurrentOffset);	 	/*Flawfinder: ignore*/
 		offset += mHeap->mCurrentOffset;
-		
+
 		set_register(mCompleteCode, LREG_HP, offset);
 		set_register(mCompleteCode, LREG_FR, 0);
 		set_register(mCompleteCode, LREG_SLR, 0);

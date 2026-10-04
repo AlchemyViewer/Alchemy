@@ -1,25 +1,25 @@
-/** 
+/**
  * @file lscript_tree.h
  * @brief provides the classes required to build lscript's abstract syntax tree and symbol table
  *
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -110,7 +110,7 @@ public:
 	{
 	}
 
-	~LLScriptConstantString() 
+	~LLScriptConstantString()
 	{
 		delete [] mValue;
 		mValue = NULL;
@@ -131,7 +131,7 @@ public:
 	{
 	}
 
-	~LLScriptIdentifier() 
+	~LLScriptIdentifier()
 	{
 		delete [] mName;
 		mName = NULL;
@@ -166,7 +166,7 @@ public:
 
 	void addAssignable(LLScriptSimpleAssignable *assign);
 
-	virtual ~LLScriptSimpleAssignable() 
+	virtual ~LLScriptSimpleAssignable()
 	{
 		// don't delete next pointer because we're going to store allocation lists and delete from those
 	}
@@ -186,7 +186,7 @@ public:
 	{
 	}
 
-	~LLScriptSAIdentifier() 
+	~LLScriptSAIdentifier()
 	{
 	}
 
@@ -204,7 +204,7 @@ public:
 	{
 	}
 
-	~LLScriptSAConstant() 
+	~LLScriptSAConstant()
 	{
 	}
 
@@ -217,15 +217,15 @@ public:
 class LLScriptSAVector : public LLScriptSimpleAssignable
 {
 public:
-	LLScriptSAVector(S32 line, S32 col, LLScriptSimpleAssignable *e1, 
-										LLScriptSimpleAssignable *e2, 
+	LLScriptSAVector(S32 line, S32 col, LLScriptSimpleAssignable *e1,
+										LLScriptSimpleAssignable *e2,
 										LLScriptSimpleAssignable *e3)
-		: LLScriptSimpleAssignable(line, col, LSSAT_VECTOR_CONSTANT), 
+		: LLScriptSimpleAssignable(line, col, LSSAT_VECTOR_CONSTANT),
 			mEntry1(e1), mEntry2(e2), mEntry3(e3)
 	{
 	}
 
-	~LLScriptSAVector() 
+	~LLScriptSAVector()
 	{
 	}
 
@@ -240,16 +240,16 @@ public:
 class LLScriptSAQuaternion : public LLScriptSimpleAssignable
 {
 public:
-	LLScriptSAQuaternion(S32 line, S32 col, LLScriptSimpleAssignable *e1, 
-											LLScriptSimpleAssignable *e2, 
-											LLScriptSimpleAssignable *e3, 
+	LLScriptSAQuaternion(S32 line, S32 col, LLScriptSimpleAssignable *e1,
+											LLScriptSimpleAssignable *e2,
+											LLScriptSimpleAssignable *e3,
 											LLScriptSimpleAssignable *e4)
-		: LLScriptSimpleAssignable(line, col, LSSAT_QUATERNION_CONSTANT), 
+		: LLScriptSimpleAssignable(line, col, LSSAT_QUATERNION_CONSTANT),
 			mEntry1(e1), mEntry2(e2), mEntry3(e3), mEntry4(e4)
 	{
 	}
 
-	~LLScriptSAQuaternion() 
+	~LLScriptSAQuaternion()
 	{
 	}
 
@@ -270,7 +270,7 @@ public:
 	{
 	}
 
-	~LLScriptSAList() 
+	~LLScriptSAList()
 	{
 	}
 
@@ -293,10 +293,10 @@ public:
 
 	void addGlobal(LLScriptGlobalVariable *global);
 
-	~LLScriptGlobalVariable() 
+	~LLScriptGlobalVariable()
 	{
 	}
-	
+
 	void gonext(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCompilePass pass, LSCRIPTPruneType ptype, BOOL &prunearg, LLScriptScope *scope, LSCRIPTType &type, LSCRIPTType basetype, U64 &count, LLScriptByteCodeChunk *chunk, LLScriptByteCodeChunk *heap, S32 stacksize, LLScriptScopeEntry *entry, S32 entrycount, LLScriptLibData **ldata);
 
 	void recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCompilePass pass, LSCRIPTPruneType ptype, BOOL &prunearg, LLScriptScope *scope, LSCRIPTType &type, LSCRIPTType basetype, U64 &count, LLScriptByteCodeChunk *chunk, LLScriptByteCodeChunk *heap, S32 stacksize, LLScriptScopeEntry *entry, S32 entrycount, LLScriptLibData **ldata);
@@ -357,7 +357,7 @@ public:
 	{
 	}
 
-	~LLScriptTouchStartEvent() 
+	~LLScriptTouchStartEvent()
 	{
 	}
 
@@ -375,7 +375,7 @@ public:
 	{
 	}
 
-	~LLScriptTouchEvent() 
+	~LLScriptTouchEvent()
 	{
 	}
 
@@ -393,7 +393,7 @@ public:
 	{
 	}
 
-	~LLScriptTouchEndEvent() 
+	~LLScriptTouchEndEvent()
 	{
 	}
 
@@ -411,7 +411,7 @@ public:
 	{
 	}
 
-	~LLScriptCollisionStartEvent() 
+	~LLScriptCollisionStartEvent()
 	{
 	}
 
@@ -429,7 +429,7 @@ public:
 	{
 	}
 
-	~LLScriptCollisionEvent() 
+	~LLScriptCollisionEvent()
 	{
 	}
 
@@ -447,7 +447,7 @@ public:
 	{
 	}
 
-	~LLScriptCollisionEndEvent() 
+	~LLScriptCollisionEndEvent()
 	{
 	}
 
@@ -465,7 +465,7 @@ public:
 	{
 	}
 
-	~LLScriptLandCollisionStartEvent() 
+	~LLScriptLandCollisionStartEvent()
 	{
 	}
 
@@ -483,7 +483,7 @@ public:
 	{
 	}
 
-	~LLScriptLandCollisionEvent() 
+	~LLScriptLandCollisionEvent()
 	{
 	}
 
@@ -501,7 +501,7 @@ public:
 	{
 	}
 
-	~LLScriptLandCollisionEndEvent() 
+	~LLScriptLandCollisionEndEvent()
 	{
 	}
 
@@ -606,7 +606,7 @@ class LLScriptRTPEvent : public LLScriptEvent
 {
 public:
 	LLScriptRTPEvent(S32 line, S32 col, LLScriptIdentifier *rtperm)
-		: LLScriptEvent(line, col, LSTT_RTPERMISSIONS), mRTPermissions(rtperm) 
+		: LLScriptEvent(line, col, LSTT_RTPERMISSIONS), mRTPermissions(rtperm)
 	{
 	}
 
@@ -626,7 +626,7 @@ public:
 	{
 	}
 
-	~LLScriptChatEvent() 
+	~LLScriptChatEvent()
 	{
 	}
 
@@ -647,7 +647,7 @@ public:
 	{
 	}
 
-	~LLScriptObjectRezEvent() 
+	~LLScriptObjectRezEvent()
 	{
 	}
 
@@ -665,7 +665,7 @@ public:
 	{
 	}
 
-	~LLScriptSensorEvent() 
+	~LLScriptSensorEvent()
 	{
 	}
 
@@ -683,7 +683,7 @@ public:
 	{
 	}
 
-	~LLScriptControlEvent() 
+	~LLScriptControlEvent()
 	{
 	}
 
@@ -703,7 +703,7 @@ public:
 	{
 	}
 
-	~LLScriptLinkMessageEvent() 
+	~LLScriptLinkMessageEvent()
 	{
 	}
 
@@ -724,7 +724,7 @@ public:
 	{
 	}
 
-	~LLScriptRemoteEvent() 
+	~LLScriptRemoteEvent()
 	{
 	}
 
@@ -758,7 +758,7 @@ public:
 		LLScriptByteCodeChunk *chunk, LLScriptByteCodeChunk *heap,
 		S32 stacksize, LLScriptScopeEntry *entry,
 		S32 entrycount, LLScriptLibData **ldata);
-		
+
 	S32 getSize();
 
 	LLScriptIdentifier	*mRequestId;
@@ -785,7 +785,7 @@ public:
 		LLScriptByteCodeChunk *chunk, LLScriptByteCodeChunk *heap,
 		S32 stacksize, LLScriptScopeEntry *entry,
 		S32 entrycount, LLScriptLibData **ldata);
-		
+
 	S32 getSize();
 
 	LLScriptIdentifier	*mRequestId;
@@ -894,7 +894,7 @@ public:
 	{
 	}
 
-	~LLScriptMoneyEvent() 
+	~LLScriptMoneyEvent()
 	{
 	}
 
@@ -913,7 +913,7 @@ public:
 	{
 	}
 
-	~LLScriptEmailEvent() 
+	~LLScriptEmailEvent()
 	{
 	}
 
@@ -1062,7 +1062,7 @@ public:
 
 	void addExpression(LLScriptExpression *expression);
 
-	virtual ~LLScriptExpression() 
+	virtual ~LLScriptExpression()
 	{
 		// don't delete next pointer because we're going to store allocation lists and delete from those
 	}
@@ -1086,7 +1086,7 @@ public:
 	{
 	}
 
-	~LLScriptForExpressionList() 
+	~LLScriptForExpressionList()
 	{
 	}
 
@@ -1105,7 +1105,7 @@ public:
 	{
 	}
 
-	~LLScriptFuncExpressionList() 
+	~LLScriptFuncExpressionList()
 	{
 	}
 
@@ -1124,7 +1124,7 @@ public:
 	{
 	}
 
-	~LLScriptListExpressionList() 
+	~LLScriptListExpressionList()
 	{
 	}
 
@@ -1143,7 +1143,7 @@ public:
 	{
 	}
 
-	~LLScriptLValue() 
+	~LLScriptLValue()
 	{
 	}
 
@@ -1163,7 +1163,7 @@ public:
 	{
 	}
 
-	~LLScriptAssignment() 
+	~LLScriptAssignment()
 	{
 	}
 
@@ -1182,7 +1182,7 @@ public:
 	{
 	}
 
-	~LLScriptAddAssignment() 
+	~LLScriptAddAssignment()
 	{
 	}
 
@@ -1201,7 +1201,7 @@ public:
 	{
 	}
 
-	~LLScriptSubAssignment() 
+	~LLScriptSubAssignment()
 	{
 	}
 
@@ -1220,7 +1220,7 @@ public:
 	{
 	}
 
-	~LLScriptMulAssignment() 
+	~LLScriptMulAssignment()
 	{
 	}
 
@@ -1239,7 +1239,7 @@ public:
 	{
 	}
 
-	~LLScriptDivAssignment() 
+	~LLScriptDivAssignment()
 	{
 	}
 
@@ -1258,7 +1258,7 @@ public:
 	{
 	}
 
-	~LLScriptModAssignment() 
+	~LLScriptModAssignment()
 	{
 	}
 
@@ -1277,7 +1277,7 @@ public:
 	{
 	}
 
-	~LLScriptEquality() 
+	~LLScriptEquality()
 	{
 	}
 
@@ -1296,7 +1296,7 @@ public:
 	{
 	}
 
-	~LLScriptNotEquals() 
+	~LLScriptNotEquals()
 	{
 	}
 
@@ -1315,7 +1315,7 @@ public:
 	{
 	}
 
-	~LLScriptLessEquals() 
+	~LLScriptLessEquals()
 	{
 	}
 
@@ -1334,7 +1334,7 @@ public:
 	{
 	}
 
-	~LLScriptGreaterEquals() 
+	~LLScriptGreaterEquals()
 	{
 	}
 
@@ -1353,7 +1353,7 @@ public:
 	{
 	}
 
-	~LLScriptLessThan() 
+	~LLScriptLessThan()
 	{
 	}
 
@@ -1372,7 +1372,7 @@ public:
 	{
 	}
 
-	~LLScriptGreaterThan() 
+	~LLScriptGreaterThan()
 	{
 	}
 
@@ -1391,7 +1391,7 @@ public:
 	{
 	}
 
-	~LLScriptPlus() 
+	~LLScriptPlus()
 	{
 	}
 
@@ -1410,7 +1410,7 @@ public:
 	{
 	}
 
-	~LLScriptMinus() 
+	~LLScriptMinus()
 	{
 	}
 
@@ -1429,7 +1429,7 @@ public:
 	{
 	}
 
-	~LLScriptTimes() 
+	~LLScriptTimes()
 	{
 	}
 
@@ -1448,7 +1448,7 @@ public:
 	{
 	}
 
-	~LLScriptDivide() 
+	~LLScriptDivide()
 	{
 	}
 
@@ -1467,7 +1467,7 @@ public:
 	{
 	}
 
-	~LLScriptMod() 
+	~LLScriptMod()
 	{
 	}
 
@@ -1486,7 +1486,7 @@ public:
 	{
 	}
 
-	~LLScriptBitAnd() 
+	~LLScriptBitAnd()
 	{
 	}
 
@@ -1505,7 +1505,7 @@ public:
 	{
 	}
 
-	~LLScriptBitOr() 
+	~LLScriptBitOr()
 	{
 	}
 
@@ -1524,7 +1524,7 @@ public:
 	{
 	}
 
-	~LLScriptBitXor() 
+	~LLScriptBitXor()
 	{
 	}
 
@@ -1543,7 +1543,7 @@ public:
 	{
 	}
 
-	~LLScriptBooleanAnd() 
+	~LLScriptBooleanAnd()
 	{
 	}
 
@@ -1562,7 +1562,7 @@ public:
 	{
 	}
 
-	~LLScriptBooleanOr() 
+	~LLScriptBooleanOr()
 	{
 	}
 
@@ -1581,7 +1581,7 @@ public:
 	{
 	}
 
-	~LLScriptShiftLeft() 
+	~LLScriptShiftLeft()
 	{
 	}
 
@@ -1600,7 +1600,7 @@ public:
 	{
 	}
 
-	~LLScriptShiftRight() 
+	~LLScriptShiftRight()
 	{
 	}
 
@@ -1619,7 +1619,7 @@ public:
 	{
 	}
 
-	~LLScriptParenthesis() 
+	~LLScriptParenthesis()
 	{
 	}
 
@@ -1637,7 +1637,7 @@ public:
 	{
 	}
 
-	~LLScriptUnaryMinus() 
+	~LLScriptUnaryMinus()
 	{
 	}
 
@@ -1655,7 +1655,7 @@ public:
 	{
 	}
 
-	~LLScriptBooleanNot() 
+	~LLScriptBooleanNot()
 	{
 	}
 
@@ -1673,7 +1673,7 @@ public:
 	{
 	}
 
-	~LLScriptBitNot() 
+	~LLScriptBitNot()
 	{
 	}
 
@@ -1691,7 +1691,7 @@ public:
 	{
 	}
 
-	~LLScriptPreIncrement() 
+	~LLScriptPreIncrement()
 	{
 	}
 
@@ -1709,7 +1709,7 @@ public:
 	{
 	}
 
-	~LLScriptPreDecrement() 
+	~LLScriptPreDecrement()
 	{
 	}
 
@@ -1727,7 +1727,7 @@ public:
 	{
 	}
 
-	~LLScriptTypeCast() 
+	~LLScriptTypeCast()
 	{
 	}
 
@@ -1741,17 +1741,17 @@ public:
 class LLScriptVectorInitializer : public LLScriptExpression
 {
 public:
-	LLScriptVectorInitializer(S32 line, S32 col, LLScriptExpression *expression1, 
-												 LLScriptExpression *expression2, 
+	LLScriptVectorInitializer(S32 line, S32 col, LLScriptExpression *expression1,
+												 LLScriptExpression *expression2,
 												 LLScriptExpression *expression3)
-		: LLScriptExpression(line, col, LET_VECTOR_INITIALIZER), 
+		: LLScriptExpression(line, col, LET_VECTOR_INITIALIZER),
 			mExpression1(expression1),
 			mExpression2(expression2),
 			mExpression3(expression3)
 	{
 	}
 
-	~LLScriptVectorInitializer() 
+	~LLScriptVectorInitializer()
 	{
 	}
 
@@ -1766,11 +1766,11 @@ public:
 class LLScriptQuaternionInitializer : public LLScriptExpression
 {
 public:
-	LLScriptQuaternionInitializer(S32 line, S32 col, LLScriptExpression *expression1, 
-													 LLScriptExpression *expression2, 
+	LLScriptQuaternionInitializer(S32 line, S32 col, LLScriptExpression *expression1,
+													 LLScriptExpression *expression2,
 													 LLScriptExpression *expression3,
 													 LLScriptExpression *expression4)
-		: LLScriptExpression(line, col, LET_VECTOR_INITIALIZER), 
+		: LLScriptExpression(line, col, LET_VECTOR_INITIALIZER),
 			mExpression1(expression1),
 			mExpression2(expression2),
 			mExpression3(expression3),
@@ -1778,7 +1778,7 @@ public:
 	{
 	}
 
-	~LLScriptQuaternionInitializer() 
+	~LLScriptQuaternionInitializer()
 	{
 	}
 
@@ -1799,7 +1799,7 @@ public:
 	{
 	}
 
-	~LLScriptListInitializer() 
+	~LLScriptListInitializer()
 	{
 	}
 
@@ -1817,7 +1817,7 @@ public:
 	{
 	}
 
-	~LLScriptPostIncrement() 
+	~LLScriptPostIncrement()
 	{
 	}
 
@@ -1835,7 +1835,7 @@ public:
 	{
 	}
 
-	~LLScriptPostDecrement() 
+	~LLScriptPostDecrement()
 	{
 	}
 
@@ -1853,7 +1853,7 @@ public:
 	{
 	}
 
-	~LLScriptFunctionCall() 
+	~LLScriptFunctionCall()
 	{
 	}
 
@@ -1872,7 +1872,7 @@ public:
 	{
 	}
 
-	~LLScriptPrint() 
+	~LLScriptPrint()
 	{
 	}
 
@@ -1890,7 +1890,7 @@ public:
 	{
 	}
 
-	~LLScriptConstantExpression() 
+	~LLScriptConstantExpression()
 	{
 	}
 
@@ -1929,7 +1929,7 @@ public:
 	{
 	}
 
-	virtual ~LLScriptStatement() 
+	virtual ~LLScriptStatement()
 	{
 		delete mStatementScope;
 	}
@@ -1955,7 +1955,7 @@ public:
 	{
 	}
 
-	~LLScriptStatementSequence() 
+	~LLScriptStatementSequence()
 	{
 	}
 
@@ -1988,7 +1988,7 @@ public:
 	{
 	}
 
-	~LLScriptStateChange() 
+	~LLScriptStateChange()
 	{
 	}
 
@@ -2007,7 +2007,7 @@ public:
 	{
 	}
 
-	~LLScriptJump() 
+	~LLScriptJump()
 	{
 	}
 
@@ -2043,7 +2043,7 @@ public:
 	{
 	}
 
-	~LLScriptReturn() 
+	~LLScriptReturn()
 	{
 	}
 
@@ -2062,7 +2062,7 @@ public:
 	{
 	}
 
-	~LLScriptExpressionStatement() 
+	~LLScriptExpressionStatement()
 	{
 	}
 
@@ -2080,7 +2080,7 @@ public:
 	{
 	}
 
-	~LLScriptIf() 
+	~LLScriptIf()
 	{
 	}
 
@@ -2100,7 +2100,7 @@ public:
 	{
 	}
 
-	~LLScriptIfElse() 
+	~LLScriptIfElse()
 	{
 	}
 
@@ -2121,7 +2121,7 @@ public:
 	{
 	}
 
-	~LLScriptFor() 
+	~LLScriptFor()
 	{
 	}
 
@@ -2143,7 +2143,7 @@ public:
 	{
 	}
 
-	~LLScriptDoWhile() 
+	~LLScriptDoWhile()
 	{
 	}
 
@@ -2163,7 +2163,7 @@ public:
 	{
 	}
 
-	~LLScriptWhile() 
+	~LLScriptWhile()
 	{
 	}
 
@@ -2184,7 +2184,7 @@ public:
 	{
 	}
 
-	~LLScriptDeclaration() 
+	~LLScriptDeclaration()
 	{
 	}
 
@@ -2204,7 +2204,7 @@ public:
 	{
 	}
 
-	~LLScriptCompoundStatement() 
+	~LLScriptCompoundStatement()
 	{
 	}
 
@@ -2256,7 +2256,7 @@ public:
 	{
 	}
 
-	~LLScriptFunctionDec() 
+	~LLScriptFunctionDec()
 	{
 	}
 
@@ -2275,9 +2275,9 @@ public:
 class LLScriptGlobalFunctions : public LLScriptFilePosition
 {
 public:
-	LLScriptGlobalFunctions(S32 line, S32 col, LLScriptType *type, 
-											   LLScriptIdentifier *identifier, 
-											   LLScriptFunctionDec *parameters, 
+	LLScriptGlobalFunctions(S32 line, S32 col, LLScriptType *type,
+											   LLScriptIdentifier *identifier,
+											   LLScriptFunctionDec *parameters,
 											   LLScriptStatement *statements)
 		: LLScriptFilePosition(line, col), mType(type), mIdentifier(identifier), mParameters(parameters), mStatements(statements), mNextp(NULL), mFunctionScope(NULL), mbNeedTrailingReturn(FALSE)
 	{
@@ -2324,7 +2324,7 @@ public:
 
 	void addState(LLScriptState *state);
 
-	~LLScriptState() 
+	~LLScriptState()
 	{
 	}
 
@@ -2361,7 +2361,7 @@ public:
 	void recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCompilePass pass, LSCRIPTPruneType ptype, BOOL &prunearg, LLScriptScope *scope, LSCRIPTType &type, LSCRIPTType basetype, U64 &count, LLScriptByteCodeChunk *chunk, LLScriptByteCodeChunk *heap, S32 stacksize, LLScriptScopeEntry *entry, S32 entrycount, LLScriptLibData **ldata)
 	{
 	}
-	
+
 	S32 getSize()
 	{
 		return 0;
@@ -2385,7 +2385,7 @@ public:
 class LLScriptScript : public LLScriptFilePosition
 {
 public:
-	LLScriptScript(LLScritpGlobalStorage *globals, 
+	LLScriptScript(LLScritpGlobalStorage *globals,
 				   LLScriptState *states);
 
 	~LLScriptScript()
@@ -2416,7 +2416,7 @@ class LLScriptAllocationManager
 {
 public:
 	LLScriptAllocationManager() {}
-	~LLScriptAllocationManager() 
+	~LLScriptAllocationManager()
 	{
 		deleteAllocations();
 	}

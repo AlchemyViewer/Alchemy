@@ -1,25 +1,25 @@
-/** 
+/**
  * @file lscript_byteconvert.h
  * @brief Shared code for compiler and assembler for LSL
  *
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -59,7 +59,7 @@ inline U64 bytestream2u64(const U8 *stream, S32 &offset)
 {
 	stream += offset;
 	offset += 8;
-	return ((U64)(*stream)<<56)| ((U64)(*(stream + 1))<<48) | ((U64)(*(stream + 2))<<40) | ((U64)(*(stream + 3))<<32) | 
+	return ((U64)(*stream)<<56)| ((U64)(*(stream + 1))<<48) | ((U64)(*(stream + 2))<<40) | ((U64)(*(stream + 3))<<32) |
 		   ((U64)(*(stream + 4))<<24) | ((U64)(*(stream + 5))<<16) | ((U64)(*(stream + 6))<<8) | (U64)(*(stream + 7));
 }
 
@@ -849,12 +849,12 @@ inline U64 get_handled_events(U8 *stream, S32 state)
 	S32 state_handled_offset = 0;
 	if (value == LSL2_VERSION1_END_NUMBER)
 	{
-		state_handled_offset = sr + LSCRIPTDataSize[LST_INTEGER]*2*state + 2*LSCRIPTDataSize[LST_INTEGER];	
+		state_handled_offset = sr + LSCRIPTDataSize[LST_INTEGER]*2*state + 2*LSCRIPTDataSize[LST_INTEGER];
 		retvalue = bytestream2integer(stream, state_handled_offset);
 	}
 	else if (value == LSL2_VERSION_NUMBER)
 	{
-		state_handled_offset = sr + LSCRIPTDataSize[LST_INTEGER]*3*state + 2*LSCRIPTDataSize[LST_INTEGER];	
+		state_handled_offset = sr + LSCRIPTDataSize[LST_INTEGER]*3*state + 2*LSCRIPTDataSize[LST_INTEGER];
 		retvalue = bytestream2u64(stream, state_handled_offset);
 	}
 

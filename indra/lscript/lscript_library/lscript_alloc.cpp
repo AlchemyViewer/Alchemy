@@ -1,25 +1,25 @@
-/** 
+/**
  * @file lscript_alloc.cpp
  * @brief general heap management for scripting system
  *
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -49,7 +49,7 @@
 //  key pointer			4 bytes of address of key data on the heap (only used in list data)
 
 // heap format
-// 
+//
 // 4 byte offset to next block (in bytes)
 // 1 byte of type of variable or empty
 // 2 bytes of reference count
@@ -97,7 +97,7 @@ S32 lsa_heap_top(U8 *heap_start, S32 maxtop)
 //			insert data into block
 //			return address
 //	else
-//		if next block is >= SP 
+//		if next block is >= SP
 //			set Stack-Heap collision
 //			return NULL
 //		if next block is empty
@@ -731,7 +731,7 @@ S32 lsa_cmp_strings(U8 *buffer, S32 offset1, S32 offset2)
 
 	string1 = lsa_get_data(buffer, offset1, TRUE);
 	string2 = lsa_get_data(buffer, offset2, TRUE);
-	
+
 	if (  (!string1)
 		||(!string2))
 	{

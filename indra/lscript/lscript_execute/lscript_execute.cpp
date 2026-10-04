@@ -5,21 +5,21 @@
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -67,7 +67,7 @@ const char* URL_REQUEST_GRANTED = "URL_REQUEST_GRANTED";
 const char* URL_REQUEST_DENIED = "URL_REQUEST_DENIED";
 
 // HTTP Requests to LSL scripts will time out after 25 seconds.
-const U64 LSL_HTTP_REQUEST_TIMEOUT_USEC = 25 * USEC_PER_SEC; 
+const U64 LSL_HTTP_REQUEST_TIMEOUT_USEC = 25 * USEC_PER_SEC;
 
 LLScriptExecuteLSL2::LLScriptExecuteLSL2(LLFILE *fp)
 {
@@ -533,61 +533,61 @@ U64 LLScriptExecuteLSL2::nextState()
 	return get_handled_events(mBuffer, next_state);
 }
 
-//virtual 
+//virtual
 void LLScriptExecuteLSL2::addEvent(LLScriptDataCollection* event)
 {
 	mEventData.addEventData(event);
 }
 
-//virtual 
+//virtual
 void LLScriptExecuteLSL2::removeEventType(LSCRIPTStateEventType event_type)
 {
 	mEventData.removeEventType(event_type);
 }
 
-//virtual 
+//virtual
 F32 LLScriptExecuteLSL2::getSleep() const
 {
 	return get_register_fp(mBuffer, LREG_SLR);
 }
 
-//virtual 
+//virtual
 void LLScriptExecuteLSL2::setSleep(F32 value)
 {
 	set_register_fp(mBuffer, LREG_SLR, value);
 }
 
-//virtual 
+//virtual
 U64 LLScriptExecuteLSL2::getCurrentHandler()
 {
 	return get_event_register(mBuffer, LREG_IE, getMajorVersion());
 }
 
-//virtual 
+//virtual
 F32 LLScriptExecuteLSL2::getEnergy() const
 {
 	return get_register_fp(mBuffer, LREG_ESR);
 }
 
-//virtual 
+//virtual
 void LLScriptExecuteLSL2::setEnergy(F32 value)
 {
 	set_register_fp(mBuffer, LREG_ESR, value);
 }
 
-//virtual 
+//virtual
 U32 LLScriptExecuteLSL2::getFreeMemory()
 {
 	return get_register(mBuffer, LREG_SP) - get_register(mBuffer, LREG_HP);
 }
 
-//virtual 
+//virtual
 S32 LLScriptExecuteLSL2::getParameter()
 {
 	return get_register(mBuffer, LREG_PR);
 }
 
-//virtual 
+//virtual
 void LLScriptExecuteLSL2::setParameter(S32 value)
 {
 	set_register(mBuffer, LREG_PR, value);
@@ -611,8 +611,8 @@ S32 LLScriptExecuteLSL2::writeState(U8 **dest, U32 header_size, U32 footer_size)
 
 	S32 heap_size = get_register(mBuffer, LREG_HP) - get_register(mBuffer, LREG_HR);
 	S32 stack_size = get_register(mBuffer, LREG_TM) - get_register(mBuffer, LREG_SP);
-	S32 total_size = registers_size + LSCRIPTDataSize[LST_INTEGER] + 
-						heap_size + LSCRIPTDataSize[LST_INTEGER] + 
+	S32 total_size = registers_size + LSCRIPTDataSize[LST_INTEGER] +
+						heap_size + LSCRIPTDataSize[LST_INTEGER] +
 						stack_size + LSCRIPTDataSize[LST_INTEGER];
 
 	// actually allocate data
@@ -685,7 +685,7 @@ S32 LLScriptExecuteLSL2::readState(U8 *src)
 		reset_hp_to_safe_spot(mBuffer);
 		return -1;
 	}
-	
+
 	// read heap size
 	size = bytestream2integer(src, src_offset);
 
@@ -776,7 +776,7 @@ bool LLScriptExecute::isYieldDue() const
 	{
 		return true;
 	}
-			
+
 	if(getSleep() > 0.f)
 	{
 		return true;
@@ -799,10 +799,10 @@ bool LLScriptExecute::isYieldDue() const
 	return false;
 }
 
-// Run smallest number of instructions possible: 
+// Run smallest number of instructions possible:
 // a single instruction for LSL2, a segment between save tests for Mono
-void LLScriptExecute::runInstructions(BOOL b_print, const LLUUID &id, 
-									 const char **errorstr, 
+void LLScriptExecute::runInstructions(BOOL b_print, const LLUUID &id,
+									 const char **errorstr,
 									 U32& events_processed,
 									 F32 quanta)
 {
@@ -936,7 +936,7 @@ F32 LLScriptExecute::runQuanta(BOOL b_print, const LLUUID &id, const char **erro
 	{
 		runInstructions(b_print, id, errorstr,
 						events_processed, quanta);
-		
+
 		if(isYieldDue())
 		{
 			break;
@@ -3312,7 +3312,7 @@ BOOL run_state(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
 	{
 		major_version = 2;
 	}
-					
+
 	S32 current_state = get_register(buffer, LREG_CS);
 	if (state != current_state)
 	{
@@ -3367,13 +3367,13 @@ BOOL run_return(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
 	if (b_print)
 		printf("[0x%X]\tRETURN\n", offset);
 	offset++;
-	
+
 	// SEC-53: babbage: broken instructions may allow inbalanced pushes and
 	// pops which can cause caller BP and return IP to be corrupted, so restore
 	// SP from BP before popping caller BP and IP.
 	S32 bp = get_register(buffer, LREG_BP);
 	set_sp(buffer, bp);
-	
+
 	bp = lscript_pop_int(buffer);
 	set_bp(buffer, bp);
 	offset = lscript_pop_int(buffer);
@@ -4079,7 +4079,7 @@ void lscript_pop_variable(LLScriptLibData *data, U8 *buffer, char type)
 	case 'k':
 		data->mType = LST_KEY;
 		data->mKey = NULL;
-		
+
 		base_address = lscript_pop_int(buffer);
 	// this bit of nastiness is to get around that code paths to local variables can result in lack of initialization
 	// and function clean up of ref counts isn't based on scope (a mistake, I know)

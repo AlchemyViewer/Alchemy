@@ -1,25 +1,25 @@
-/** 
+/**
  * @file lscript_heapruntime.cpp
  * @brief classes to manage script heap at runtime
  *
  * $LicenseInfo:firstyear=2002&license=viewerlgpl$
  * Second Life Viewer Source Code
  * Copyright (C) 2010, Linden Research, Inc.
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
  * version 2.1 of the License only.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
@@ -48,11 +48,11 @@
 					5: Quaternion
 					6: List
 	0x1 - 0x4	Integer, Floating Point, String Address, List Address
-	or	
+	or
 	0x1 - 0xd	Vector
-	or	
+	or
 	0x1 - 0x11	Quaternion
-	. . .	
+	. . .
 
 	Heap Block Format
 	Byte		Description
@@ -77,12 +77,12 @@
 	7)	If zero, this spot is empty.  If empty spot is zero, set empty spot to this address and go to step 9.  Otherwise, coalesce with last empty spot and then go to step 9.
 	8)	Skip forward by offset and go to step 3.
 	9)	If the spot is empty, check to see if the size needed == offset - 9.
-	10)	 If it does, let's drop our data into this spot.  Set reference count to 1.  Set entry type appropriately and copy the data in.  
+	10)	 If it does, let's drop our data into this spot.  Set reference count to 1.  Set entry type appropriately and copy the data in.
 	11)	 If size needed < offset - 9 then we can stick in data and add in an empty block.
 	12)	 Otherwise, we need to keep looking.  Go to step 3.
 
 	Increasing reference counts
-		
+
 	Decreasing reference counts
 	1)	Set entry type to 0.
 	2)	If offset is non-zero and the next entry is empty, coalesce.  Go to step 2.
@@ -243,7 +243,7 @@ void LLScriptHeapRunTime::removeData(S32 address)
 		// is this block, empty?
 		tclean += LSCRIPTDataSize[LST_INTEGER];
 		type = *(mBuffer + tclean);
-		
+
 		if (!clean_offset)
 		{
 			if (!type)
@@ -291,7 +291,7 @@ void LLScriptHeapRunTime::removeData(S32 address)
 			clean += clean_offset;
 		}
 	}
-}	
+}
 
 void LLScriptHeapRunTime::coalesce(S32 address1, S32 address2)
 {
@@ -323,7 +323,7 @@ void LLScriptHeapRunTime::split(S32 address1, S32 size)
 	integer2bytestream(mBuffer, address1, size + HEAP_BLOCK_HEADER_SIZE);
 }
 
-/* 
+/*
 
 	For reference count changes, strings are easy.  For lists, we'll need to go through the lists reducing
 	the reference counts for any included strings and lists
@@ -435,7 +435,7 @@ void LLScriptHeapRunTime::releaseGlobal(S32 address)
 
 
 // we know the following function has "unreachable code"
-// don't remind us every friggin' time we compile. . . 
+// don't remind us every friggin' time we compile. . .
 
 #if defined(_MSC_VER)
 # pragma warning(disable: 4702) // unreachable code
