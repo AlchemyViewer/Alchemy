@@ -415,6 +415,9 @@ namespace
         std::optional<Expr> bitTest(LSLExpression* e);
         // As a value of another LSL type, where LSL converts on its own.
         Expr coerced(LSLExpression* e, LSLIType to);
+        // An operand of `..`: as coerced to a string, but an integer's cast
+        // to one, which `..` makes the same text of itself, left a number.
+        Expr joinedPiece(LSLExpression* e);
         Expr constant(LSLConstant* c);
         // How the LSL wrote a number in hexadecimal, on the line Tailslide
         // puts its constant at or the one before: where it did, and wrote
@@ -1770,6 +1773,30 @@ namespace
         return Expr{ "bit32.btest(" + all + ")", PRIMARY, true };
     }
 
+    Expr Writer::joinedPiece(LSLExpression* e)
+    {
+        // `..` makes a number text as tostring does, and an integer's text
+        // in LSL is its digits, which is what both write. Not a float's,
+        // which LSL writes with six places, nor a key's, which `..` refuses.
+        LSLExpression* bare = e;
+        while (bare && bare->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            bare = static_cast<LSLParenthesisExpression*>(bare)->getChildExpr();
+        }
+        if (bare && bare->getNodeSubType() == NODE_TYPECAST_EXPRESSION && bare->getIType() == LST_STRING)
+        {
+            LSLExpression* child = static_cast<LSLTypecastExpression*>(bare)->getChildExpr();
+            // Arithmetic bracketed as the cast had it: `.. (b + c)`, which
+            // `.. b + c` means as well but reads less plainly.
+            if (slType(child) == LST_INTEGER)
+            {
+                const Expr number = value(child);
+                return number.prec >= UNARY ? number : Expr{ "(" + number.text + ")" };
+            }
+        }
+        return coerced(e, LST_STRING);
+    }
+
     Expr Writer::coerced(LSLExpression* e, LSLIType to)
     {
         Expr           out  = value(e);
@@ -2490,8 +2517,8 @@ namespace
                 }
                 if (lt == LST_STRING || lt == LST_KEY || rt == LST_STRING || rt == LST_KEY)
                 {
-                    const Expr a = coerced(lhs, LST_STRING);
-                    const Expr b = coerced(rhs, LST_STRING);
+                    const Expr a = joinedPiece(lhs);
+                    const Expr b = joinedPiece(rhs);
                     // Joining text is the same whichever way round it goes:
                     // a chain unbracketed.
                     return { bracketed(a, CONCAT) + " .. " + bracketed(b, CONCAT), CONCAT };
@@ -2818,7 +2845,7 @@ namespace
                 case OP_POST_INCR:
                     if (t == LST_STRING)
                     {
-                        return old + " .. " + bracketed(coerced(rhs, LST_STRING), CONCAT);
+                        return old + " .. " + bracketed(joinedPiece(rhs), CONCAT);
                     }
                     if (t == LST_LIST)
                     {
@@ -2878,10 +2905,12 @@ namespace
         {
             LSLBinaryExpression* whole = static_cast<LSLBinaryExpression*>(target->getParent());
             LSLSymbol*           var   = nullptr;
-            std::string          piece;
-            for (LSLExpression* part : appended(whole, var))
+            // A lone piece made a string, so that the table holds strings.
+            std::string                       piece;
+            const std::vector<LSLExpression*> parts = appended(whole, var);
+            for (LSLExpression* part : parts)
             {
-                piece += (piece.empty() ? "" : " .. ") + bracketed(coerced(part, LST_STRING), CONCAT);
+                piece += (piece.empty() ? "" : " .. ") + bracketed(parts.size() > 1 ? joinedPiece(part) : coerced(part, LST_STRING), CONCAT);
             }
             if (!piece.empty())
             {
@@ -2897,7 +2926,7 @@ namespace
                 std::string joined;
                 for (LSLExpression* part : parts)
                 {
-                    joined += (joined.empty() ? "" : " .. ") + bracketed(coerced(part, LST_STRING), CONCAT);
+                    joined += (joined.empty() ? "" : " .. ") + bracketed(joinedPiece(part), CONCAT);
                 }
                 line(name + " ..= " + joined);
                 return;
