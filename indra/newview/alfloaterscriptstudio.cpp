@@ -7894,21 +7894,37 @@ void ALFloaterScriptStudio::addCommands()
 
 void ALFloaterScriptStudio::addEditorCommand(const std::string& name, ALEditorCommand command, bool changes)
 {
+    editorCommand(name, command, changes, true);
+}
+
+void ALFloaterScriptStudio::addUnlistedEditorCommand(const std::string& name, ALEditorCommand command, bool changes)
+{
+    editorCommand(name, command, changes, false);
+}
+
+void ALFloaterScriptStudio::editorCommand(const std::string& name, ALEditorCommand command, bool changes, bool listed)
+{
     // The view in front's, as every command of the text's own is: the
     // expansion being read says it cannot, where the source out of
     // sight would have done it unseen.
-    mCommands.add(
-        name,
-        [this, command]() {
-            if (Doc* doc = active())
-            {
-                doc->shownText()->perform(command);
-            }
-        },
-        [this, command, changes]() {
-            Doc* doc = active();
-            return doc && (!changes || doc->modifiable) && doc->shownText()->canPerform(command);
-        });
+    const ALScriptStudioCommands::run_t run = [this, command]() {
+        if (Doc* doc = active())
+        {
+            doc->shownText()->perform(command);
+        }
+    };
+    const ALScriptStudioCommands::test_t enabled = [this, command, changes]() {
+        Doc* doc = active();
+        return doc && (!changes || doc->modifiable) && doc->shownText()->canPerform(command);
+    };
+    if (listed)
+    {
+        mCommands.add(name, run, enabled);
+    }
+    else
+    {
+        mCommands.addUnlisted(name, run, enabled);
+    }
 }
 
 void ALFloaterScriptStudio::addFileCommands()
@@ -8134,10 +8150,10 @@ void ALFloaterScriptStudio::addEditCommands()
     addEditorCommand("add_caret_below", ALEditorCommand::AddCaretBelow, false);
     // Keys a step at a time rather than menu items: Shift-Alt-drag puts a
     // column with the mouse.
-    addEditorCommand("column_select_left", ALEditorCommand::ColumnSelectLeft, false);
-    addEditorCommand("column_select_right", ALEditorCommand::ColumnSelectRight, false);
-    addEditorCommand("column_select_up", ALEditorCommand::ColumnSelectUp, false);
-    addEditorCommand("column_select_down", ALEditorCommand::ColumnSelectDown, false);
+    addUnlistedEditorCommand("column_select_left", ALEditorCommand::ColumnSelectLeft, false);
+    addUnlistedEditorCommand("column_select_right", ALEditorCommand::ColumnSelectRight, false);
+    addUnlistedEditorCommand("column_select_up", ALEditorCommand::ColumnSelectUp, false);
+    addUnlistedEditorCommand("column_select_down", ALEditorCommand::ColumnSelectDown, false);
     mCommands.add(
         "convert_slua",
         [this]() {

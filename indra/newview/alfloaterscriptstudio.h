@@ -636,6 +636,10 @@ private:
     void addBuildCommands();
     void addHelpCommands();
     void addEditorCommand(const std::string& name, ALEditorCommand command, bool changes);
+    // One of the text's own that no item of the menus gives: reached by its
+    // keys alone.
+    void addUnlistedEditorCommand(const std::string& name, ALEditorCommand command, bool changes);
+    void editorCommand(const std::string& name, ALEditorCommand command, bool changes, bool listed);
     void onCompileTarget();
     // A notecard's grammar picked from the strip.
     void onNotecardGrammar();

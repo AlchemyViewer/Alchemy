@@ -187,14 +187,15 @@ def read_key_commands():
 
 def read_studio_commands():
     """The names the studio's command table is given, as the code gives
-    them: the first argument of an `add`, `addUnlisted` or
-    `addEditorCommand` call on the table; and, inside a function named
+    them: the first argument of an `add`, `addUnlisted`,
+    `addEditorCommand` or `addUnlistedEditorCommand` call on the table;
+    and, inside a function named
     add...Commands, the name that begins each `std::pair{ "name", ... }`
     or `std::tuple{ "name", ... }`
     and each name of a `for (const char* x : { "a", "b" })` list, which
     the loops there register. Returns (listed, unlisted, twice)."""
     listed, unlisted, twice = [], [], []
-    call = re.compile(r'(?:\bcommands\(\)|\bmCommands|\bcommands)\s*(?:\.|->)\s*add(Unlisted)?\(\s*"([a-z_]+)"|\baddEditorCommand\(\s*"([a-z_]+)"')
+    call = re.compile(r'(?:\bcommands\(\)|\bmCommands|\bcommands)\s*(?:\.|->)\s*add(Unlisted)?\(\s*"([a-z_]+)"|\badd(Unlisted)?EditorCommand\(\s*"([a-z_]+)"')
     body_start = re.compile(r'\b\w+::add\w*Commands\(\)\s*\{')
     for path in sorted(glob.glob(os.path.join(ROOT, "indra", "newview", "*.cpp"))):
         text = open(path, encoding="utf-8", errors="replace").read()
@@ -202,7 +203,7 @@ def read_studio_commands():
             if m.group(2):
                 (unlisted if m.group(1) else listed).append(m.group(2))
             else:
-                listed.append(m.group(3))
+                (unlisted if m.group(3) else listed).append(m.group(4))
         for m in body_start.finditer(text):
             depth, i = 1, m.end()
             while depth and i < len(text):
