@@ -198,7 +198,7 @@ namespace tut
         ensure("lists compared by length: " + r.text, has(r, "#l == #{1}") && noted(r, "SluaListCompare"));
         // bit32 answers 0 to 4294967295: made LSL's signed integer, but where
         // bit32 takes it again.
-        ensure("bits: " + r.text, has(r, "int32(bit32.bor(bit32.band(a, b), 4))") && has(r, "local function int32"));
+        ensure("bits: " + r.text, has(r, "bit32.s32(bit32.bor(bit32.band(a, b), 4))") && !has(r, "local function int32"));
         ensure("a vector's part set: " + r.text, has(r, "v = vector(4, v.y, v.z)") && has(r, "v = vector(v.x, v.y, v.z + 1)"));
         ensure("a vector as LSL writes it: " + r.text, has(r, "ll.DumpList2String({v}, \"\")"));
         checksClean(r);
@@ -773,7 +773,7 @@ namespace tut
                                               "    llOwnerSay(llList2String(l, what) + (string)m);\n"
                                               "    if ((what & 3) && sayIt()) llDie();\n"
                                               "} }\n");
-        ensure("bit32's range made LSL's where it shows: " + r.text, has(r, "local m = int32(bit32.bor(what, ") && !has(r, "-- LSL: bit32"));
+        ensure("bit32's range made LSL's where it shows: " + r.text, has(r, "local m = bit32.s32(bit32.bor(what, ") && !has(r, "-- LSL: bit32"));
         ensure("not for a flag's truth: " + r.text, has(r, "if bit32.band(what, CHANGED_LINK) ~= 0"));
         ensure("&& said once, over a call that does something: " + r.text,
                count(r, "leaves its right side unrun") == 1 && has(r, "LSL ran both sides, the right one first.\n    if bit32.band(what, 3) ~= 0 and sayIt()"));
@@ -1143,16 +1143,16 @@ namespace tut
                                               "        llOwnerSay((string)(inverse + high + low + part));\n"
                                               "    }\n"
                                               "}\n");
-        ensure("the mask's answer signed: " + r.text, has(r, "if int32(bit32.band(num, MASK)) == MSG then"));
-        ensure("the number sent signed: " + r.text, has(r, "ll.MessageLinked(LINK_SET, int32(bit32.bor(MSG, FN_RESET)), \"\", \"\")"));
+        ensure("the mask's answer signed: " + r.text, has(r, "if bit32.s32(bit32.band(num, MASK)) == MSG then"));
+        ensure("the number sent signed: " + r.text, has(r, "ll.MessageLinked(LINK_SET, bit32.s32(bit32.bor(MSG, FN_RESET)), \"\", \"\")"));
         ensure("an & with a constant not below nought as it is: " + r.text, has(r, "local fn = bit32.band(num, FN_MASK)\n"));
-        ensure("~ signed: " + r.text, has(r, "local inverse = int32(bit32.bnot(num))"));
-        ensure("<< signed: " + r.text, has(r, "local high = int32(bit32.lshift(num, 4))"));
-        ensure(">> of what may be below nought signed: " + r.text, has(r, "local low = int32(bit32.arshift(num, 2))"));
+        ensure("~ signed: " + r.text, has(r, "local inverse = bit32.s32(bit32.bnot(num))"));
+        ensure("<< signed: " + r.text, has(r, "local high = bit32.s32(bit32.lshift(num, 4))"));
+        ensure(">> of what may be below nought signed: " + r.text, has(r, "local low = bit32.s32(bit32.arshift(num, 2))"));
         ensure(">> of a constant not below nought as it is: " + r.text, has(r, "local part = bit32.arshift(FN_MASK, 8)\n"));
         ensure("a truth, and what bit32 takes again, as they are: " + r.text,
                has(r, "if bit32.band(bit32.bnot(ll.GetPermissions()), PERMISSION_TRIGGER_ANIMATION) ~= 0 then"));
-        ensure("the helper, once: " + r.text, count(r, "local function int32(n: number): number") == 1 && !has(r, "-- LSL: bit32"));
+        ensure("SLua's own bit32.s32, no helper: " + r.text, !has(r, "local function int32") && !has(r, "-- LSL: bit32"));
         checksClean(r);
     }
 

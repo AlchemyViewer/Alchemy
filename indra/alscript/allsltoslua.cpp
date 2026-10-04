@@ -179,7 +179,7 @@ namespace
             "torotation", "touuid", "ipairs", "pairs", "next", "select", "error", "assert", "pcall", "xpcall", "unpack",
             "rawget", "rawset", "rawequal", "rawlen", "setmetatable", "getmetatable", "require", "lljson", "llbase64",
             // What the text written here defines of its own.
-            "states", "currentState", "setState", "joinLists", "int32", "lslInteger", "lslFloat", "detected", "setTimer", "timerHandle",
+            "states", "currentState", "setState", "joinLists", "lslInteger", "lslFloat", "detected", "setTimer", "timerHandle",
             "timerHandler",
         };
         return RESERVED.contains(name);
@@ -666,7 +666,6 @@ namespace
         // nought.
         boost::unordered_flat_set<LSLSymbol*> mSteadyNonNegative;
         bool mJoinLists  = false;
-        bool mInt32      = false;
         bool mLslInteger = false;
         bool mLslFloat   = false;
         bool mManyStates = false;
@@ -1914,8 +1913,7 @@ namespace
         {
             return { call };
         }
-        mInt32 = true;
-        return { "int32(" + call + ")" };
+        return { "bit32.s32(" + call + ")" };
     }
 
     bool Writer::notBelowZero(LSLExpression* e) const
@@ -2005,10 +2003,10 @@ namespace
         }
         const auto bit = [&](const char* fn) -> Expr {
             // bit32 answers 0 to 4294967295, where LSL's integers were signed:
-            // made LSL's (int32), but where the answer is the same number --
-            // an & with a number not below nought, an | or ^ of two, a >> of
-            // one -- or where it is only asked whether it is nought, or
-            // bit32 takes it again.
+            // made LSL's by bit32.s32, but where the answer is the same
+            // number -- an & with a number not below nought, an | or ^ of
+            // two, a >> of one -- or where it is only asked whether it is
+            // nought, or bit32 takes it again.
             const bool same = (op == OP_BIT_AND && (notBelowZero(lhs) || notBelowZero(rhs))) ||
                               ((op == OP_BIT_OR || op == OP_BIT_XOR) && notBelowZero(lhs) && notBelowZero(rhs)) ||
                               (op == OP_SHIFT_RIGHT && notBelowZero(lhs)) || truthOnly(e) || intoBit32(e);
@@ -5172,16 +5170,6 @@ local function joinLists(a: { any }, b: { any }): { any }
     local out = table.clone(a)
     table.move(b, 1, #b, #out + 1, out)
     return out
-end
-
-)LUA";
-        }
-        if (mInt32)
-        {
-            out += R"LUA(-- What bit32 answers, 0 to 4294967295, as LSL's integers were: signed, from
--- -2147483648.
-local function int32(n: number): number
-    return if n >= 0x80000000 then n - 0x100000000 else n
 end
 
 )LUA";
