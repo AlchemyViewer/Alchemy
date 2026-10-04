@@ -31,6 +31,7 @@
 
 #include <string>
 
+class ALFlatButton;
 class LLLineEditor;
 class LLTextBox;
 
@@ -113,10 +114,7 @@ protected:
     ALFindBar(const Params& p);
 
 private:
-    // A glyph that is a button: flat, lit when it is a toggle that is on.
-    class Flat;
-
-    Flat*         flat(const std::string& name, const std::string& glyph, bool toggle, const std::string& tip);
+    ALFlatButton* flat(const std::string& name, const std::string& glyph, bool toggle, const std::string& tip);
     LLLineEditor* field(const std::string& name, const std::string& label, S32 pad_right);
     void          layout();
 
@@ -126,20 +124,20 @@ private:
     LLUIColor     mBgColor;
     LLUIColor     mInkColor;
 
-    Flat*         mExpand       = nullptr;
+    ALFlatButton* mExpand       = nullptr;
     LLLineEditor* mFind         = nullptr;
-    Flat*         mCase         = nullptr;
-    Flat*         mWord         = nullptr;
-    Flat*         mRegex        = nullptr;
+    ALFlatButton* mCase         = nullptr;
+    ALFlatButton* mWord         = nullptr;
+    ALFlatButton* mRegex        = nullptr;
     LLTextBox*    mCount        = nullptr;
-    Flat*         mPrev         = nullptr;
-    Flat*         mNextButton   = nullptr;
-    Flat*         mSelection    = nullptr;
-    Flat*         mCloseButton  = nullptr;
+    ALFlatButton* mPrev         = nullptr;
+    ALFlatButton* mNextButton   = nullptr;
+    ALFlatButton* mSelection    = nullptr;
+    ALFlatButton* mCloseButton  = nullptr;
     LLLineEditor* mReplaceField = nullptr;
-    Flat*         mPreserveCase = nullptr;
-    Flat*         mReplaceOne   = nullptr;
-    Flat*         mReplaceEvery = nullptr;
+    ALFlatButton* mPreserveCase = nullptr;
+    ALFlatButton* mReplaceOne   = nullptr;
+    ALFlatButton* mReplaceEvery = nullptr;
 
     signal_t mChanged, mNext, mPrevious, mReplace, mReplaceAll, mSelectAll, mClose;
 };

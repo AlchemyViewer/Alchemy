@@ -146,6 +146,7 @@ target_sources(
     alsmartselect.cpp
     alsnippetsession.cpp
     alfindbar.cpp
+    alflatbutton.cpp
     alkeycapture.cpp
     alkeychord.cpp
     alkeymap.cpp
@@ -367,6 +368,7 @@ target_sources(
         alanchoredranges.h
         alfenwicktree.h
         alfindbar.h
+        alflatbutton.h
         alkeycapture.h
         alkeychord.h
         alkeymap.h

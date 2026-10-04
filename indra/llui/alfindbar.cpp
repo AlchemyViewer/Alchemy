@@ -26,10 +26,10 @@
 
 #include "alfindbar.h"
 
+#include "alflatbutton.h"
 #include "alsaid.h"
 #include "alsurface.h"
 
-#include "llfocusmgr.h"
 #include "llfontgl.h"
 #include "llkeyboard.h"
 #include "lllineeditor.h"
@@ -37,7 +37,6 @@
 #include "lltextbox.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
-#include "llwindow.h"
 
 static LLDefaultChildRegistry::Register<ALFindBar> r("find_bar");
 
@@ -65,145 +64,6 @@ namespace
     // typed with Return, AltGr or not.
     constexpr MASK REPLACE_ALL_MASK = MASK_CONTROL | MASK_ALT;
 }
-
-// --- a flat glyph button ---------------------------------------------------------------
-
-class ALFindBar::Flat : public LLUICtrl
-{
-public:
-    struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
-    {
-    };
-
-    Flat(const Params& p, std::string glyph, bool toggle, const LLUIColor& ink, const LLUIColor& lit)
-    :   LLUICtrl(p),
-        mGlyph(std::move(glyph)),
-        mToggle(toggle),
-        mInk(ink),
-        mLit(lit)
-    {
-        // Made here rather than by the factory, which is what would have
-        // read the parameter: a stop for Tab, as a button is.
-        setTabStop(true);
-    }
-
-    void setGlyph(const std::string& glyph) { mGlyph = glyph; }
-    // The key that presses it, with TOGGLE_MASK unless said, said after
-    // its tip.
-    void setKey(KEY key, MASK mask = TOGGLE_MASK)
-    {
-        mKey     = key;
-        mKeyMask = mask;
-    }
-
-    // Put together as it is shown rather than when it is made: a key's
-    // name is the viewer's to give, in the viewer's language.
-    std::string getToolTip() const override
-    {
-        const std::string tip = LLUICtrl::getToolTip();
-        return mKey == KEY_NONE || tip.empty() ? tip
-                                               : alSaid("TipWithKeys", "[TIP] ([KEYS])",
-                                                        { { "[TIP]", tip }, { "[KEYS]", LLKeyboard::stringFromAccelerator(mKeyMask, mKey) } });
-    }
-    void setInk(const LLColor4& ink) { mInk = ink; }
-    void setLit(const LLColor4& lit) { mLit = lit; }
-    bool getToggleState() const { return mOn; }
-    void setToggleState(bool on) { mOn = on; }
-
-    void draw() override
-    {
-        const F32    alpha = getDrawContext().mAlpha;
-        const LLRect local = getLocalRect();
-        if (mOn)
-        {
-            gl_rect_2d(local, mLit.get() % alpha);
-        }
-        else if (mHover && getEnabled())
-        {
-            gl_rect_2d(local, mInk.get() % (0.12f * alpha));
-        }
-        LLColor4 ink = mInk.get() % alpha;
-        if (!getEnabled())
-        {
-            ink.mV[VALPHA] *= 0.35f;
-        }
-        const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
-        font->renderUTF8(mGlyph, 0, local.getCenterX(), local.getCenterY() - font->getLineHeight() / 2 + 1, ink, LLFontGL::HCENTER, LLFontGL::BOTTOM);
-        if (hasFocus())
-        {
-            // Where the keyboard is, once Tab has brought it here.
-            gl_rect_2d(local, gFocusMgr.getFocusColor() % alpha, false);
-        }
-        mHover = false;
-    }
-
-    bool handleHover(S32 x, S32 y, MASK mask) override
-    {
-        mHover = true;
-        // A button: the arrow, not the text's cursor under the bar.
-        if (LLWindow* window = getWindow())
-        {
-            window->setCursor(UI_CURSOR_ARROW);
-        }
-        return true;
-    }
-
-    bool handleMouseDown(S32 x, S32 y, MASK mask) override
-    {
-        press();
-        return true;
-    }
-
-    bool handleMouseUp(S32 x, S32 y, MASK mask) override { return true; }
-
-    // Pressed from the keyboard as a button is: Space, which comes as the
-    // character, once however long it is held; and Return.
-    bool handleUnicodeCharHere(llwchar uni_char) override
-    {
-        if (uni_char == ' ')
-        {
-            if (!gKeyboard || !gKeyboard->getKeyRepeated(' '))
-            {
-                press();
-            }
-            return true;
-        }
-        return LLUICtrl::handleUnicodeCharHere(uni_char);
-    }
-
-    bool handleKeyHere(KEY key, MASK mask) override
-    {
-        if (key == KEY_RETURN && mask == MASK_NONE)
-        {
-            press();
-            return true;
-        }
-        return LLUICtrl::handleKeyHere(key, mask);
-    }
-
-    void press()
-    {
-        if (!getEnabled())
-        {
-            return;
-        }
-        if (mToggle)
-        {
-            mOn = !mOn;
-        }
-        onCommit();
-    }
-
-private:
-    std::string mGlyph;
-    KEY         mKey     = KEY_NONE;
-    MASK        mKeyMask = TOGGLE_MASK;
-    bool        mToggle  = false;
-    bool        mOn     = false;
-    bool        mHover  = false;
-    LLUIColor   mInk;
-    LLUIColor   mLit;
-};
 
 // --- the bar --------------------------------------------------------------------------
 
@@ -239,13 +99,13 @@ ALFindBar::ALFindBar(const Params& p)
     mCase  = flat("match_case", "Aa", true, alSaid("FindBarCase", "Match case"));
     mWord  = flat("whole_word", "ab", true, alSaid("FindBarWord", "Match whole words"));
     mRegex = flat("regex", ".*", true, alSaid("FindBarPattern", "Match a regular expression"));
-    for (Flat* toggle : { mCase, mWord, mRegex })
+    for (ALFlatButton* toggle : { mCase, mWord, mRegex })
     {
         toggle->setCommitCallback([this](LLUICtrl*, const LLSD&) { mChanged(); });
     }
-    mCase->setKey('C');
-    mWord->setKey('W');
-    mRegex->setKey('R');
+    mCase->setKey('C', TOGGLE_MASK);
+    mWord->setKey('W', TOGGLE_MASK);
+    mRegex->setKey('R', TOGGLE_MASK);
 
     LLTextBox::Params tp(LLUICtrlFactory::getDefaultParams<LLTextBox>());
     tp.name       = "count";
@@ -264,7 +124,7 @@ ALFindBar::ALFindBar(const Params& p)
     mPrev->setCommitCallback([this](LLUICtrl*, const LLSD&) { mPrevious(); });
     mNextButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mNext(); });
     mSelection->setCommitCallback([this](LLUICtrl*, const LLSD&) { mChanged(); });
-    mSelection->setKey('L');
+    mSelection->setKey('L', TOGGLE_MASK);
     mCloseButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mClose(); });
 
     mReplaceField = field("replace", alSaid("FindBarReplace", "Replace"), SMALL_W + 6);
@@ -282,16 +142,16 @@ ALFindBar::ALFindBar(const Params& p)
     layout();
 }
 
-ALFindBar::Flat* ALFindBar::flat(const std::string& name, const std::string& glyph, bool toggle, const std::string& tip)
+ALFlatButton* ALFindBar::flat(const std::string& name, const std::string& glyph, bool toggle, const std::string& tip)
 {
-    Flat::Params fp;
+    ALFlatButton::Params fp;
     fp.name     = name;
     fp.rect     = LLRect(0, ROW, SMALL_W, 0);
     fp.tool_tip = tip;
     // The band behind a glyph that is switched on. The view's own
     // colours, which setColors puts back whenever the theme moves; what
     // is here is only what it wears until the first of those.
-    Flat* made  = new Flat(fp, glyph, toggle, mInkColor, ALSurface::chosen(LLColor4::black, mInkColor.get()));
+    ALFlatButton* made = new ALFlatButton(fp, glyph, toggle, mInkColor, ALSurface::chosen(LLColor4::black, mInkColor.get()));
     addChild(made);
     return made;
 }
@@ -410,7 +270,7 @@ void ALFindBar::setCount(S32 current, S32 total, const std::string& error, bool 
     }
     mCount->setText(said);
     mCount->setToolTip(tip);
-    for (Flat* button : { mPrev, mNextButton, mReplaceOne, mReplaceEvery })
+    for (ALFlatButton* button : { mPrev, mNextButton, mReplaceOne, mReplaceEvery })
     {
         button->setEnabled(total > 0);
     }
@@ -421,7 +281,7 @@ void ALFindBar::setColors(const LLColor4& background, const LLColor4& ink)
     mBgColor  = ALSurface::ground(background, ink);
     mInkColor = ink;
     const LLColor4 chosen = ALSurface::chosen(background, ink);
-    for (Flat* glyph : { mExpand, mCase, mWord, mRegex, mPrev, mNextButton, mSelection, mCloseButton, mPreserveCase, mReplaceOne, mReplaceEvery })
+    for (ALFlatButton* glyph : { mExpand, mCase, mWord, mRegex, mPrev, mNextButton, mSelection, mCloseButton, mPreserveCase, mReplaceOne, mReplaceEvery })
     {
         glyph->setInk(ink);
         glyph->setLit(chosen);
@@ -482,7 +342,7 @@ bool ALFindBar::handleKeyHere(KEY key, MASK mask)
     }
     if (mask == TOGGLE_MASK)
     {
-        Flat* toggle = key == 'C' ? mCase : key == 'W' ? mWord : key == 'R' ? mRegex : key == 'L' ? mSelection : nullptr;
+        ALFlatButton* toggle = key == 'C' ? mCase : key == 'W' ? mWord : key == 'R' ? mRegex : key == 'L' ? mSelection : nullptr;
         if (toggle)
         {
             toggle->press();
@@ -535,7 +395,7 @@ void ALFindBar::layout()
 
     const S32 x     = PAD + EXPAND_W + GAP;
     S32       right = width - PAD;
-    for (Flat* button : { mCloseButton, mSelection, mNextButton, mPrev })
+    for (ALFlatButton* button : { mCloseButton, mSelection, mNextButton, mPrev })
     {
         button->setShape(LLRect(right - SMALL_W, top, right, top - ROW));
         right -= SMALL_W + 1;
@@ -546,7 +406,7 @@ void ALFindBar::layout()
     mFind->setShape(LLRect(x, top, field_right, top - ROW));
     // The three ways of matching, inside the field's right end.
     S32 inner = field_right - 2;
-    for (Flat* toggle : { mRegex, mWord, mCase })
+    for (ALFlatButton* toggle : { mRegex, mWord, mCase })
     {
         toggle->setShape(LLRect(inner - SMALL_W, top - 2, inner, top - ROW + 2));
         inner -= SMALL_W;
@@ -560,7 +420,7 @@ void ALFindBar::layout()
         mReplaceField->setShape(LLRect(x, second, field_right, second - ROW));
         mPreserveCase->setShape(LLRect(field_right - 2 - SMALL_W, second - 2, field_right - 2, second - ROW + 2));
         S32 after = field_right + GAP;
-        for (Flat* button : { mReplaceOne, mReplaceEvery })
+        for (ALFlatButton* button : { mReplaceOne, mReplaceEvery })
         {
             button->setShape(LLRect(after, second, after + SMALL_W, second - ROW));
             after += SMALL_W + 1;
