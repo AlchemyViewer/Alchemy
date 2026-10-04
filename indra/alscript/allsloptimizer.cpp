@@ -3650,6 +3650,10 @@ namespace
                 return false;
             }
             visitChildren(expr);
+            if (bitTests(expr))
+            {
+                return false;
+            }
             integers(expr);
             return false;
         }
@@ -3908,6 +3912,194 @@ namespace
         // What an integer comparison or sum comes to in fewer bytes, as a
         // value: x == -1 as !~x, x < 0 as !~x of a find, x + 1 as -~x,
         // x - 1 as ~-x, and two either way.
+        // Bit tests of one value merged into one (L18), each form smaller on
+        // every target (ALLSLCosts::bitTestsMerged): a chain of `x & c` one
+        // bit each, all asked, as `!~(x | ~mask)`; of `!(x & c)` as
+        // `!(x & mask)`; and an | of `x & c` as `x & mask` -- and, where only
+        // whether it is true counts, an || of them (anyBit). Each form is
+        // one this makes, so that a chain merges a link at a time. x is read
+        // once where it was read at each test: only what is the same at any
+        // time, an integer.
+        enum class Test : U8
+        {
+            Set,     // x & c, or a !~(x | ~mask) this made: the bits all set
+            Clear,   // !(x & c): the bits all clear
+            Masked,  // x & c, for an |: the bits as they are
+        };
+        std::optional<std::pair<LSLExpression*, U32>> bitTest(LSLExpression* e, Test kind) const
+        {
+            e = bare(e);
+            if (!e)
+            {
+                return std::nullopt;
+            }
+            if (kind == Test::Clear || kind == Test::Set)
+            {
+                // A ! over the rest: !(x & c), or !~(x | k).
+                if (e->getNodeSubType() != NODE_UNARY_EXPRESSION || e->getOperation() != OP_BOOLEAN_NOT)
+                {
+                    if (kind == Test::Clear)
+                    {
+                        return std::nullopt;
+                    }
+                }
+                else
+                {
+                    LSLExpression* inner = bare(static_cast<LSLUnaryExpression*>(e)->getChildExpr());
+                    if (kind == Test::Clear)
+                    {
+                        return bitTest(inner, Test::Masked);
+                    }
+                    if (!inner || inner->getNodeSubType() != NODE_UNARY_EXPRESSION || inner->getOperation() != OP_BIT_NOT)
+                    {
+                        return std::nullopt;
+                    }
+                    const auto set = operand(bare(static_cast<LSLUnaryExpression*>(inner)->getChildExpr()), OP_BIT_OR);
+                    return set ? std::optional<std::pair<LSLExpression*, U32>>({ set->first, ~set->second }) : std::nullopt;
+                }
+            }
+            const auto masked = operand(e, OP_BIT_AND);
+            // One bit each, for a test that asks it is set.
+            if (masked && kind == Test::Set && (masked->second == 0 || (masked->second & (masked->second - 1)) != 0))
+            {
+                return std::nullopt;
+            }
+            return masked;
+        }
+
+        // `x op c` or `c op x`: x, an integer that is the same at any time,
+        // and the constant.
+        static std::optional<std::pair<LSLExpression*, U32>> operand(LSLExpression* e, LSLOperator op)
+        {
+            if (!e || e->getNodeSubType() != NODE_BINARY_EXPRESSION || e->getOperation() != op || e->getIType() != LST_INTEGER)
+            {
+                return std::nullopt;
+            }
+            for (int slot = 0; slot < 2; ++slot)
+            {
+                LSLConstant*   cv = e->getChild(slot)->getConstantValue();
+                LSLExpression* x  = static_cast<LSLExpression*>(e->getChild(1 - slot));
+                if (cv && cv->getNodeSubType() == NODE_INTEGER_CONSTANT && !x->getConstantValue() && x->getIType() == LST_INTEGER && sideEffectFree(x))
+                {
+                    return std::make_pair(x, static_cast<U32>(static_cast<LSLIntegerConstant*>(cv)->getValue()));
+                }
+            }
+            return std::nullopt;
+        }
+
+        // The tests a chain of `op` is made of, all of one x; their x and
+        // their bits together.
+        std::optional<std::pair<LSLExpression*, U32>> chain(LSLBinaryExpression* expr, LSLOperator op, Test kind) const
+        {
+            std::vector<LSLExpression*>                 leaves;
+            const std::function<void(LSLExpression*)> gather = [&](LSLExpression* e) {
+                LSLExpression* inner = bare(e);
+                if (inner && inner->getNodeSubType() == NODE_BINARY_EXPRESSION && inner->getOperation() == op)
+                {
+                    gather(static_cast<LSLBinaryExpression*>(inner)->getLHS());
+                    gather(static_cast<LSLBinaryExpression*>(inner)->getRHS());
+                    return;
+                }
+                leaves.push_back(e);
+            };
+            gather(expr->getLHS());
+            gather(expr->getRHS());
+            LSLExpression* x    = nullptr;
+            std::string    said;
+            U32            bits = 0;
+            for (LSLExpression* leaf : leaves)
+            {
+                const auto test = bitTest(leaf, kind);
+                if (!test)
+                {
+                    return std::nullopt;
+                }
+                const std::string text = render(test->first);
+                if (x && text != said)
+                {
+                    return std::nullopt;
+                }
+                x    = test->first;
+                said = text;
+                bits |= test->second;
+            }
+            return x ? std::optional<std::pair<LSLExpression*, U32>>({ x, bits }) : std::nullopt;
+        }
+
+        // `x op mask`, x taken from where it stands.
+        LSLExpression* withMask(const Uncounted& uncounted, LSLExpression* x, LSLOperator op, U32 mask, LSLASTNode* at)
+        {
+            LSLASTNode* parent = x->getParent();
+            parent->takeChild(x->getParentSlot());
+            auto* made = uncounted.made(ctx.allocator->newTracked<LSLBinaryExpression>(x, op, constant(ctx.integer(static_cast<int32_t>(mask)), at)));
+            made->setType(TYPE(LST_INTEGER));
+            made->setLoc(at->getLoc());
+            return made;
+        }
+
+        bool bitTests(LSLBinaryExpression* expr)
+        {
+            if (!mCosts.bitTestsMerged || inGlobal(expr))
+            {
+                return false;
+            }
+            const LSLOperator op = expr->getOperation();
+            std::optional<std::pair<LSLExpression*, U32>> set, clear, masked;
+            if (op == OP_BOOLEAN_AND)
+            {
+                set   = chain(expr, op, Test::Set);
+                clear = set ? std::nullopt : chain(expr, op, Test::Clear);
+            }
+            else if (op == OP_BIT_OR)
+            {
+                masked = chain(expr, op, Test::Masked);
+            }
+            if (!set && !clear && !masked)
+            {
+                return false;
+            }
+            const std::string before = report.wanted() ? render(expr) : std::string();
+            LSLExpression*    made   = nullptr;
+            {
+                const Uncounted uncounted(*ctx.context);
+                if (set)
+                {
+                    made = unary(uncounted, OP_BOOLEAN_NOT, unary(uncounted, OP_BIT_NOT, withMask(uncounted, set->first, OP_BIT_OR, ~set->second, expr)));
+                }
+                else if (clear)
+                {
+                    made = unary(uncounted, OP_BOOLEAN_NOT, withMask(uncounted, clear->first, OP_BIT_AND, clear->second, expr));
+                }
+                else
+                {
+                    made = withMask(uncounted, masked->first, OP_BIT_AND, masked->second, expr);
+                }
+            }
+            made->setLoc(expr->getLoc());
+            putInPlace(expr, made, ctx.allocator);
+            wrote(expr, made, before);
+            return true;
+        }
+
+        // An || of `x & c` where only whether it is true counts: `x & mask`.
+        bool anyBit(LSLBinaryExpression* expr)
+        {
+            const auto any = mCosts.bitTestsMerged ? chain(expr, OP_BOOLEAN_OR, Test::Masked) : std::nullopt;
+            if (!any)
+            {
+                return false;
+            }
+            const std::string before = report.wanted() ? render(expr) : std::string();
+            LSLExpression*    made   = nullptr;
+            {
+                const Uncounted uncounted(*ctx.context);
+                made = withMask(uncounted, any->first, OP_BIT_AND, any->second, expr);
+            }
+            putInPlace(expr, made, ctx.allocator);
+            wrote(expr, made, before);
+            return true;
+        }
+
         void integers(LSLBinaryExpression* expr)
         {
             strict(expr);
@@ -4013,6 +4205,10 @@ namespace
             auto*          expr  = static_cast<LSLBinaryExpression*>(inner);
             LSLExpression* left  = expr->getLHS();
             LSLExpression* right = expr->getRHS();
+            if (expr->getOperation() == OP_BOOLEAN_OR && anyBit(expr))
+            {
+                return;
+            }
             if (expr->getOperation() == OP_BOOLEAN_AND || expr->getOperation() == OP_BOOLEAN_OR)
             {
                 truth(expr, 0);

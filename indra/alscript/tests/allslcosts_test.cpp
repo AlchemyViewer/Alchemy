@@ -248,6 +248,16 @@ namespace tut
             { "a whole float in a list as ((float)2)", { "", "l = [2.0];" }, { "", "l = [(float)2];" }, "><=", &ALLSLCosts::castForWholeFloat },
             { "a whole float cast as ((float)2)", { "", "s = (string)2.0;" }, { "", "s = (string)((float)2);" }, "><=", &ALLSLCosts::castForWholeFloat },
             // To come.
+            // Bit tests of one value as one.
+            { "(a & 4) && (a & 8) as !~(a | -13)", { "", "if ((j & 4) && (j & 8)) i = 2;" }, { "", "if (!~(j | -13)) i = 2;" }, "<<<",
+              &ALLSLCosts::bitTestsMerged },
+            { "the same, a value", { "", "i = (j & 4) && (j & 8);" }, { "", "i = !~(j | -13);" }, "<<<", &ALLSLCosts::bitTestsMerged },
+            { "three bits", { "", "if ((j & 4) && (j & 8) && (j & 1)) i = 2;" }, { "", "if (!~(j | -14)) i = 2;" }, "<<<", &ALLSLCosts::bitTestsMerged },
+            { "!(a & 4) && !(a & 8) as !(a & 12)", { "", "if (!(j & 4) && !(j & 8)) i = 2;" }, { "", "if (!(j & 12)) i = 2;" }, "<<<",
+              &ALLSLCosts::bitTestsMerged },
+            { "(a & 4) || (a & 8) as a & 12, only truth asked", { "", "if ((j & 4) || (j & 8)) i = 2;" }, { "", "if (j & 12) i = 2;" }, "<<<",
+              &ALLSLCosts::bitTestsMerged },
+            { "(a & 4) | (a & 8) as a & 12", { "", "i = (j & 4) | (j & 8);" }, { "", "i = j & 12;" }, "<<<", &ALLSLCosts::bitTestsMerged },
             { "i = i + 1 as ++i", { "", "i = i + 1;" }, { "", "++i;" }, "===", nullptr },
             { "-5 as ((integer)-5)", { "", "i = -5;" }, { "", "i = ((integer)-5);" }, "===", nullptr },
             { "-5.5 as ((float)-5.5)", { "", "f = -5.5;" }, { "", "f = ((float)-5.5);" }, "=<>", nullptr },

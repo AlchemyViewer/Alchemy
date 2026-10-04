@@ -53,6 +53,7 @@ namespace
         c.castForDump                  = true;
         c.castForDetail                = true;
         c.castForWholeFloat            = false;
+        c.bitTestsMerged               = true;
 
         c.local         = 11;
         c.jump          = 5;
@@ -106,6 +107,7 @@ namespace
         // script may not have.
         c.castForDetail                = false;
         c.castForWholeFloat            = true;
+        c.bitTestsMerged               = true;
 
         c.local         = 6;
         c.jump          = 5;
@@ -160,6 +162,7 @@ namespace
         c.castForDump                  = false;
         c.castForDetail                = false;
         c.castForWholeFloat            = false;
+        c.bitTestsMerged               = true;
 
         c.local         = 4;
         c.jump          = 93;

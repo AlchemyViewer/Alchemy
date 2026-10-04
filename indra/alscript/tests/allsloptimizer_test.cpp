@@ -2120,4 +2120,41 @@ namespace tut
                    at != std::string::npos && r.text.substr(at, r.text.find('\n', at) - at).find("-0.0") != std::string::npos);
         }
     }
+    template<> template<>
+    void allsloptimizer_object::test<56>()
+    {
+        set_test_name("bit tests of one value merged (L18): one-bit tests all asked as !~(x | ~mask), all clear as !(x & mask), an | of them as "
+                      "x & mask, an || of them so where only truth counts; not of two values, of a test of more than one bit, nor where x changes");
+        const std::string source = "integer said() { llOwnerSay(\"said\"); return 4; }\n"
+                                   "default\n{\n    touch_start(integer n)\n    {\n"
+                                   "        integer m = llGetLinkNumber();\n"
+                                   "        if ((n & 4) && (n & 8)) llSay(0, \"a\");\n"
+                                   "        integer v = (n & 4) && (n & 8) && (n & 1);\n"
+                                   "        if (!(n & 4) && !(n & 8)) llSay(0, \"b\");\n"
+                                   "        if ((n & 4) || (n & 16)) llSay(0, \"c\");\n"
+                                   "        integer w = (n & 3) | (n & 12);\n"
+                                   "        if ((n & 4) && (m & 8)) llSay(0, \"d\");\n"
+                                   "        if ((n & 6) && (n & 8)) llSay(0, \"e\");\n"
+                                   "        if ((said() & 4) && (said() & 8)) llSay(0, \"f\");\n"
+                                   "        llSay(v, (string)w);\n"
+                                   "    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Luau })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            const auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
+            ensure("all set: " + r.text, has("if (!~(n | -13))"));
+            // v and w are read once, and their values go where they are read.
+            ensure("three, a value: " + r.text, has("llSay(!~(n | -14), "));
+            ensure("all clear: " + r.text, has("if (!(n & 12))"));
+            ensure("any, where only truth counts: " + r.text, has("if (n & 20)"));
+            ensure("an | of them: " + r.text, has("(string)(n & 15)"));
+            ensure("two values left: " + r.text, has("(n & 4)") && has("(m & 8)"));
+            ensure("more than one bit left: " + r.text, has("(n & 6)") && has("(n & 8)"));
+            ensure("what changes left: " + r.text, has("(said() & 4)") && has("(said() & 8)"));
+            ensure("noted: " + notes(r), allsloptimizer_data::has(r, "wrote (n & 4) && (n & 8) as !~(n | -13)"));
+        }
+    }
 } // namespace tut

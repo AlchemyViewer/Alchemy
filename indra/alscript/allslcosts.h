@@ -100,6 +100,10 @@ struct ALLSLCosts
     // A float whose value is whole, where LSL converts nothing for it -- a
     // list's element, what is cast -- as `((float)2)` rather than `2.0`.
     bool castForWholeFloat = false;
+    // Bit tests of one value as one: `(x & 4) && (x & 8)` as
+    // `!~(x | -13)`, `!(x & 4) && !(x & 8)` as `!(x & 12)`, `(x & 4) | (x & 8)`
+    // as `x & 12`, and an || of them as that where only truth counts.
+    bool bitTestsMerged = false;
 
     // ---- functions, for whether putting one in place saves
 
