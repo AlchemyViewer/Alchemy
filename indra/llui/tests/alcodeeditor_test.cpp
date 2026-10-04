@@ -2184,6 +2184,21 @@ namespace tut
         e.setCaret(ALTextPos(3, 0));
         e.paste();
         ensure_equals("a selection copied goes in where the caret is", e.text(), std::string("two\nthree\ne\ntwotwo"));
+
+        // Several, one selecting something: what is copied is what a cut
+        // takes, the selections' text, not a caret's line too.
+        e.setText("alpha\nbeta");
+        e.setSelections(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)), { ALTextRange(ALTextPos(1, 1), ALTextPos(1, 1)) });
+        e.copy();
+        LLClipboard::instance().pasteFromClipboard(held);
+        ensure_equals("the selection's alone", held, std::string("al"));
+        e.cut();
+        ensure_equals("and the cut takes that alone", e.text(), std::string("pha\nbeta"));
+
+        // A jump to a line leaves one caret there.
+        e.setSelections(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 1)), { ALTextRange(ALTextPos(1, 1), ALTextPos(1, 1)) });
+        e.goToLine(1);
+        ensure("one caret, at the line", !e.hasOtherSelections() && e.caret() == ALTextPos(1, 0));
     }
 
     template<> template<>
@@ -2651,6 +2666,16 @@ namespace tut
         e.setSelections(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 1)), { ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)) });
         type("(");
         ensure_equals("closed where it is code, typed as ever in the comment", e.text(), std::string("x()\n// y("));
+
+        // A closer typed over at one caret and typed plain at another: the
+        // plain one comes out as it would alone.
+        e.setText("{\n        \nx");
+        e.setCaret(ALTextPos(2, 1));
+        type("{");
+        e.setSelections(ALTextRange(ALTextPos(2, 2), ALTextPos(2, 2)), { ALTextRange(ALTextPos(1, 8), ALTextPos(1, 8)) });
+        type("}");
+        ensure_equals("typed over at one", e.document().line(2), std::string("x{}"));
+        ensure_equals("brought out at the other", e.document().line(1), std::string("}"));
     }
 
     template<> template<>
@@ -2711,5 +2736,14 @@ namespace tut
         e.foldAll();
         ensure("folding all moves them out as well", e.otherSelections().size() == 1 && !e.layout().hidden(e.otherSelections()[0].end.line));
         ensure("into sight above", e.otherSelections()[0] == caretAt(0, 7));
+
+        // The main one folded away too: every block folds, none opened
+        // again for a caret in it.
+        e.setText("f()\n{\n    llSay(0, \"a\");\n}\ng()\n{\n    llSay(0, \"b\");\n}\n");
+        e.setSelections(caretAt(2, 4), { caretAt(6, 4) });
+        e.foldAll();
+        ensure("both folded", e.isFolded(0) && e.isFolded(4));
+        ensure("the main one at its fold's line", e.selection() == caretAt(0, 3));
+        ensure("the other at its own", e.otherSelections().size() == 1 && e.otherSelections()[0] == caretAt(4, 3));
     }
 }

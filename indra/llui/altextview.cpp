@@ -1060,7 +1060,7 @@ bool ALTextView::addCarets(S32 direction)
     const std::vector<ALTextRange> all  = selectionsInOrder(&main);
     // Each caret's x where a motion or this left them, else where it is:
     // a column grown past a short line keeps to its column.
-    std::vector<F32> xs = mEachDesired.selections == all ? mEachDesired.xs : std::vector<F32>(all.size(), -1.f);
+    std::vector<F32> xs = desiredXs(all);
     std::vector<ALTextRange> placed = all;
     for (size_t i = 0; i < all.size(); ++i)
     {
@@ -1104,6 +1104,7 @@ bool ALTextView::addCarets(S32 direction)
     }
     mEachDesired.selections = std::move(now);
     mEachDesired.xs         = std::move(now_xs);
+    mEachDesired.under      = laidOut();
     mDesiredX               = xs[furthest];
     scrollToCaret();
     return true;
@@ -1165,9 +1166,22 @@ bool ALTextView::stepRow(S32& line, S32& row, S32 direction)
     return true;
 }
 
+ALTextView::LaidOut ALTextView::laidOut()
+{
+    return { mLayout.wrapWidth(), mLayout.columnWidth() };
+}
+
+std::vector<F32> ALTextView::desiredXs(const std::vector<ALTextRange>& all)
+{
+    return mEachDesired.selections == all && mEachDesired.under == laidOut() ? mEachDesired.xs : std::vector<F32>(all.size(), -1.f);
+}
+
 std::pair<ALTextView::ColumnCorner, ALTextView::ColumnCorner> ALTextView::columnCorners()
 {
-    if (!mColumn.selections.empty() && selectionsInOrder() == mColumn.selections)
+    // Its own corners while it stands as it was put, in the layout it was
+    // put in: zoomed or wrapped again since, its x's and rows are another
+    // layout's.
+    if (!mColumn.selections.empty() && selectionsInOrder() == mColumn.selections && mColumn.under == laidOut())
     {
         return { mColumn.from, mColumn.to };
     }
@@ -1196,10 +1210,12 @@ void ALTextView::selectColumn(const ColumnCorner& from, const ColumnCorner& to)
     mColumn.from       = from;
     mColumn.to         = to;
     mColumn.selections = selectionsInOrder();
+    mColumn.under      = laidOut();
     // Each caret keeps the column's x between rows, as carets added above
     // and below do, so that moving them keeps the column past short rows.
     mEachDesired.selections = mColumn.selections;
     mEachDesired.xs.assign(mColumn.selections.size(), to.x);
+    mEachDesired.under = mColumn.under;
     mDesiredX = to.x;
     scrollToCaret();
 }
@@ -2785,6 +2801,22 @@ std::optional<ALTextRange> ALTextView::erasedBy(ALEditorCommand command, const A
     return std::nullopt;
 }
 
+void ALTextView::typeText(std::string_view text)
+{
+    if (mReadOnly || text.empty())
+    {
+        return;
+    }
+    if (hasOtherSelections())
+    {
+        typeAtEach(text, 0);
+    }
+    else
+    {
+        insertText(text);
+    }
+}
+
 void ALTextView::typeAtEach(std::string_view text, llwchar typed)
 {
     const std::string put(text);
@@ -2795,16 +2827,19 @@ void ALTextView::typeAtEach(std::string_view text, llwchar typed)
         one.caret = ALTextEditing::endOf(over.begin, put);
         return std::optional<ALTextEditing::Change>(std::move(one));
     });
-    if (!typed)
+    if (typed)
     {
-        return;
+        outdentEach(typed);
     }
-    // What the character finishes brought out at each caret; a word so
-    // brought out is not kept to be put back, as one caret's is.
+}
+
+void ALTextView::outdentEach(llwchar typed, const std::function<bool(size_t)>& at)
+{
+    // A word so brought out is not kept to be put back, as one caret's is.
     mAutoOutdent = ALTextIndent::AutoOutdent();
     const ALSyntaxGrammar* grammar = mHighlighter.grammar().get();
-    editEach([&](size_t, const ALTextRange& selection) -> std::optional<ALTextEditing::Change> {
-        if (!selection.empty())
+    editEach([&](size_t i, const ALTextRange& selection) -> std::optional<ALTextEditing::Change> {
+        if (!selection.empty() || (at && !at(i)))
         {
             return std::nullopt;
         }
@@ -2842,16 +2877,31 @@ std::optional<bool> ALTextView::performAtEach(ALEditorCommand command)
             return true;
         case C::Indent:
             // A selection, however small, indents its lines; a caret puts a
-            // tab in.
+            // tab in -- but for one on a line a selection indents, which
+            // goes in with the line rather than putting a tab before what
+            // the selection holds.
             editGroups([this](const std::vector<ALTextRange>& all) {
+                std::vector<std::pair<S32, S32>> indented;
+                for (const ALTextRange& one : all)
+                {
+                    if (!one.empty())
+                    {
+                        indented.push_back(ALTextEditing::selectedLines(one));
+                    }
+                }
+                const auto onIndented = [&indented](S32 line) {
+                    return std::ranges::any_of(indented, [line](const std::pair<S32, S32>& lines) { return line >= lines.first && line <= lines.second; });
+                };
                 std::vector<ALTextRange> selected;
                 std::vector<size_t>      at;
+                std::vector<bool>        taken(all.size(), false);
                 for (size_t i = 0; i < all.size(); ++i)
                 {
-                    if (!all[i].empty())
+                    if (!all[i].empty() || onIndented(all[i].end.line))
                     {
                         selected.push_back(all[i]);
                         at.push_back(i);
+                        taken[i] = true;
                     }
                 }
                 std::vector<ALTextEditing::Group> groups = ALTextIndent::indentLines(mDocument, selected, true, editingOptions());
@@ -2864,7 +2914,7 @@ std::optional<bool> ALTextView::performAtEach(ALEditorCommand command)
                 }
                 for (size_t i = 0; i < all.size(); ++i)
                 {
-                    if (all[i].empty())
+                    if (!taken[i])
                     {
                         const std::string    tab = tabText(all[i].end);
                         const ALTextPos      end = ALTextEditing::endOf(all[i].end, tab);
@@ -3001,7 +3051,7 @@ bool ALTextView::moveEach(ALEditorCommand command)
     // The x each caret keeps between rows, where the last motion left them
     // and they have not moved since; else each from where it is.
     const bool       vertical = isVertical(command);
-    std::vector<F32> xs       = vertical && mEachDesired.selections == all ? mEachDesired.xs : std::vector<F32>(all.size(), -1.f);
+    std::vector<F32> xs       = vertical ? desiredXs(all) : std::vector<F32>(all.size(), -1.f);
     std::vector<ALTextRange> placed(all.size());
     for (size_t i = 0; i < all.size(); ++i)
     {
@@ -3018,6 +3068,7 @@ bool ALTextView::moveEach(ALEditorCommand command)
         {
             mEachDesired.selections = std::move(now);
             mEachDesired.xs         = std::move(xs);
+            mEachDesired.under      = laidOut();
         }
     }
     scrollToCaret();
@@ -3616,12 +3667,14 @@ void ALTextView::copy()
     if (hasOtherSelections())
     {
         // Each selection's text, one to a line in the order they begin: or
-        // a caret's whole line where lines are clipped, else nothing of it.
+        // a caret's whole line where lines are clipped and none selects
+        // anything -- what a cut takes -- else nothing of it.
         std::string text;
-        bool        any = false;
+        bool        any      = false;
+        const bool  selected = anySelected();
         for (const ALTextRange& one : selectionsInOrder())
         {
-            if (one.empty() && !mClipsLines)
+            if (one.empty() && (!mClipsLines || selected))
             {
                 continue;
             }

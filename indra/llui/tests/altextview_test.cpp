@@ -2391,6 +2391,21 @@ namespace tut
     }
 
     template<> template<>
+    void altextview_object::test<77>()
+    {
+        set_test_name("Tab with several: a caret on a line a selection indents goes in with the line; one elsewhere puts its tab in");
+        ALTextView& v = make("abcdefgh\nxy");
+        v.setSelections(spanRange(0, 3, 6), { caretRange(0, 1), caretRange(1, 1) });
+        v.perform(ALEditorCommand::Indent);
+        ensure_equals("the selection's line indented once", v.document().line(0), std::string("    abcdefgh"));
+        ensure_equals("the selection over what it held", v.selectedText(), std::string("def"));
+        const std::vector<ALTextRange>& others = v.otherSelections();
+        ensure("the caret on its line moved with it", std::ranges::find(others, caretRange(0, 5)) != others.end());
+        const std::string& second = v.document().line(1);
+        ensure("a tab put in at the caret elsewhere: " + second, second.size() > 2 && second.front() == 'x' && second.back() == 'y');
+    }
+
+    template<> template<>
     void altextview_object::test<76>()
     {
         set_test_name("the find bar's next and previous let the other carets go, as F3 does");

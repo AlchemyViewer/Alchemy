@@ -390,6 +390,10 @@ public:
 
     // In place of the selection, or at the caret.
     void insertText(std::string_view text);
+    // As typed: at every selection where there are several, else as
+    // insertText -- what a keymap that holds keys back puts in when it
+    // lets them go.
+    void typeText(std::string_view text);
     void deleteRange(const ALTextRange& range);
     // Several ranges of the text as it stands, each replaced by its
     // string, as one step to undo: what a rename is. The ranges must not
@@ -969,6 +973,9 @@ protected:
     // it was a character that finishes what closes a block, that line
     // brought out at each (outdentAsTyped) -- one key typed.
     void                     typeAtEach(std::string_view text, llwchar typed);
+    // What a character just typed finishes brought out at each caret, or
+    // at those `at` says by their place in order (outdentAsTyped).
+    void                     outdentEach(llwchar typed, const std::function<bool(size_t)>& at = nullptr);
 
     // --- LLPreeditor ---------------------------------------------------------
 
@@ -1006,12 +1013,25 @@ private:
     bool                 deleteSelectedEach();
     // The x each caret keeps between rows, as a vertical motion of several
     // left them, for as long as they are where it left them.
+    // An x is the layout's, in pixels: kept under the layout it was taken
+    // in, wrapped as wide and its characters as wide, and no other.
+    struct LaidOut
+    {
+        S32  wrap   = -1;
+        F32  column = -1.f;
+        bool operator==(const LaidOut&) const = default;
+    };
+    LaidOut              laidOut();
     struct EachDesired
     {
         std::vector<ALTextRange> selections;
         std::vector<F32>         xs;
+        LaidOut                  under;
     };
     EachDesired          mEachDesired;
+    // The xs kept for `all`, where they are still those selections' and
+    // the layout's; none (-1) otherwise.
+    std::vector<F32>     desiredXs(const std::vector<ALTextRange>& all);
     // One row on from a row of a line, down or up below zero, past the
     // lines folded away; false at the first or the last.
     bool                 stepRow(S32& line, S32& row, S32 direction);
@@ -1037,6 +1057,7 @@ private:
         ColumnCorner             from;
         ColumnCorner             to;
         std::vector<ALTextRange> selections;
+        LaidOut                  under;
     };
     Column               mColumn;
     // A drag begun with Shift-Alt, which puts a column rather than a

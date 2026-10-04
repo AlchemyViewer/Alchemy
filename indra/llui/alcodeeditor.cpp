@@ -760,6 +760,8 @@ S32 ALCodeEditor::heatWidth() const
 
 void ALCodeEditor::goToLine(S32 line)
 {
+    // One caret there, as goTo leaves.
+    singleSelection();
     setCaret(document().lineStart(line));
 }
 
@@ -1976,26 +1978,27 @@ bool ALCodeEditor::foldAt(S32 line)
         setCaret(document().lineEnd(chosen->start));
     }
     applyFolds();
-    othersOutOfFolds();
+    caretsOutOfFolds();
     return true;
 }
 
-void ALCodeEditor::othersOutOfFolds()
+void ALCodeEditor::caretsOutOfFolds()
 {
-    if (!hasOtherSelections() || !layout().anyHidden())
+    if (!layout().anyHidden())
     {
         return;
     }
     // Each one in what is folded away a caret at the end of the line above
-    // it that shows -- the fold's own line -- as the main one is put; those
-    // that meet there become one.
+    // it that shows -- the fold's own line; those that meet there become
+    // one. All at once: the main one put alone would open again the folds
+    // the others are in.
     size_t                   main  = 0;
     std::vector<ALTextRange> all   = selectionsInOrder(&main);
     bool                     moved = false;
     for (size_t i = 0; i < all.size(); ++i)
     {
         const ALTextRange range = all[i].normalised();
-        if (i == main || (!layout().hidden(range.begin.line) && !layout().hidden(range.end.line)))
+        if (!layout().hidden(range.begin.line) && !layout().hidden(range.end.line))
         {
             continue;
         }
@@ -2009,6 +2012,7 @@ void ALCodeEditor::othersOutOfFolds()
     if (moved)
     {
         placeSelections(all, main);
+        scrollToCaret();
     }
 }
 
@@ -2026,11 +2030,7 @@ void ALCodeEditor::foldAll()
 {
     folds().foldAll(document(), getTabWidth());
     applyFolds();
-    if (layout().hidden(caret().line))
-    {
-        setCaret(document().lineEnd(layout().visibleFrom(caret().line, -1)));
-    }
-    othersOutOfFolds();
+    caretsOutOfFolds();
 }
 
 void ALCodeEditor::unfoldAll()
@@ -4577,7 +4577,11 @@ bool ALCodeEditor::typePairs(char c)
                 mAutoClosed.insert(now[i].end);
             }
         }
+        // A plain one typed where none paired, brought out as it would be
+        // were it typed alone.
+        outdentEach(static_cast<llwchar>(static_cast<unsigned char>(c)), [&paired](size_t i) { return !paired[i]; });
     }
+    undoJournal().settle(selection());
     return true;
 }
 

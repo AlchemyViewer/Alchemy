@@ -2836,4 +2836,24 @@ namespace tut
         ensure_equals("once at each, the count's again at the main one only", e.text(), std::string("Xabone\nXabtwo\nXXXabthree"));
         ensure("one caret", !e.hasOtherSelections());
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<96>()
+    {
+        set_test_name("with several carets: a key held for a mapping goes in at each when let go, Replace overtypes at each, and an undo leaves normal mode one caret");
+        ALCodeEditor& e     = make("one\ntwo");
+        const auto    caret = [](S32 line, S32 column) { return ALTextRange(ALTextPos(line, column), ALTextPos(line, column)); };
+        ex("inoremap jk <Esc>");
+        e.setSelections(caret(1, 0), { caret(0, 0) });
+        keys("ijx");
+        ensure_equals("the held j at each, then the x", e.text(), std::string("jxone\njxtwo"));
+        keys("<Esc>");
+        e.setSelections(caret(1, 0), { caret(0, 0) });
+        keys("RQ");
+        ensure_equals("overtyped at each", e.text(), std::string("Qxone\nQxtwo"));
+        keys("<Esc>");
+        keys("u");
+        ensure_equals("undone", e.text(), std::string("jxone\njxtwo"));
+        ensure("one caret in normal mode after it", !e.hasOtherSelections());
+    }
 }
