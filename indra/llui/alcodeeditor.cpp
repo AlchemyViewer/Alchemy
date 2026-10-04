@@ -2045,6 +2045,10 @@ void ALCodeEditor::unfoldAll()
 
 void ALCodeEditor::revealLine(S32 line)
 {
+    if (mLineRevealer && mLineRevealer(line))
+    {
+        return;
+    }
     if (folds().reveal(document(), getTabWidth(), line))
     {
         applyFolds();

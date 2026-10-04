@@ -29,10 +29,13 @@
 #include "alcodeeditor.h"
 #include "aldiffbar.h"
 #include "altextdiff.h"
+#include "alsaid.h"
+#include "lllocalcliprect.h"
 #include "lltextbox.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 #include "llrender2dutils.h"
+#include "llwindow.h"
 
 #include <algorithm>
 #include <tuple>
@@ -121,6 +124,7 @@ ALDiffView::ALDiffView(const Params& p)
             mOnInline(mInline);
         }
     });
+    mBar->onFold([this]() { setFoldSame(!mFoldSame); });
     mBar->onSwap([this]() { setSwapped(!mSwapped); });
     mBar->onDone([this]() {
         if (mEscape)
@@ -129,6 +133,7 @@ ALDiffView::ALDiffView(const Params& p)
         }
     });
     mBar->setInline(mInline);
+    mBar->setFolded(mFoldSame);
     mBar->setDoneShown(false);
 
     LLTextBox::Params head(LLUICtrlFactory::getDefaultParams<LLTextBox>());
@@ -175,6 +180,17 @@ ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::
     made->onCaretMoved([this]() { refreshBar(); });
     // Vim's ]c and [c, where the host puts vim over the sides.
     made->setChangeStepper([this](bool forward) { return goToChange(forward); });
+    // The caret landing on a line folded away opens its fold, both sides
+    // at once, rather than the one line on the one side.
+    made->setLineRevealer([this, made](S32 line) {
+        const S32 fold = foldOfRow(made, line, true);
+        if (fold < 0 || mFolds[static_cast<size_t>(fold)].open)
+        {
+            return false;
+        }
+        openFold(fold);
+        return true;
+    });
     return made;
 }
 
@@ -228,7 +244,7 @@ void ALDiffView::setInline(bool inline_view)
     mInline              = inline_view;
     mBar->setInline(mInline);
     arrange();
-    rebuild();
+    rebuild(foldsOpen());
     restorePlace(place);
     if (had_keys)
     {
@@ -248,7 +264,7 @@ void ALDiffView::setSwapped(bool swapped)
     mSwapped          = swapped;
     mBar->setSwapped(mSwapped);
     arrange();
-    rebuild();
+    rebuild(foldsOpen());
     restorePlace(place);
 }
 
@@ -264,20 +280,22 @@ ALDiffView::Place ALDiffView::placeOfCaret()
     ALCodeEditor*       side = shown();
     std::tie(place.line, place.column) = rightAtCaret();
     place.belowTop = side->layout().lineTop(side->caret().line) - side->scrollY();
+    place.fold     = foldOfRow(side, side->caret().line, false);
     return place;
 }
 
 void ALDiffView::restorePlace(const Place& place)
 {
-    // The row that now shows the right's line, on the side in front.
+    // The row that now shows the right's line, on the side in front; or
+    // the folded row the caret was on, which shows none.
     ALCodeEditor*           side = shown();
     const std::vector<S32>& rows = rightRowsOf(side);
     const auto              row  = std::find(rows.begin(), rows.end(), place.line + 1);
-    if (row == rows.end())
+    if (row == rows.end() && (place.fold < 0 || place.fold >= foldCount()))
     {
         return;
     }
-    const S32 at     = static_cast<S32>(row - rows.begin());
+    const S32 at     = place.fold >= 0 && place.fold < foldCount() ? rowOfFold(side, place.fold) : static_cast<S32>(row - rows.begin());
     const S32 scroll = llmax(0, side->layout().lineTop(at) - place.belowTop);
     // Each side at the row and scrolled alike: lined up, side by side.
     ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
@@ -292,7 +310,7 @@ void ALDiffView::restorePlace(const Place& place)
     mScrolledY = side->scrollY();
 }
 
-void ALDiffView::rebuild()
+void ALDiffView::rebuild(const std::vector<bool>& open)
 {
     // What is shown on the left and on the right: the texts as given, or
     // swapped, and the pairs that line them up with them.
@@ -311,11 +329,24 @@ void ALDiffView::rebuild()
     const LLColor4                      out       = colorOf("CodeDiffRemovedColor", LLColor4(0.85f, 0.25f, 0.25f, 0.18f));
     const LLColor4                      in        = colorOf("CodeDiffAddedColor", LLColor4(0.25f, 0.75f, 0.35f, 0.18f));
     const LLColor4                      padding   = colorOf("CodeDiffPaddingColor", LLColor4(0.5f, 0.5f, 0.5f, 0.07f));
+    const LLColor4                      folded    = colorOf("CodeDiffFoldColor", LLColor4(0.5f, 0.5f, 0.5f, 0.14f));
     const LLColor4                      out_words = colorOf("CodeDiffRemovedWordColor", LLColor4(0.9f, 0.25f, 0.25f, 0.4f));
     const LLColor4                      in_words  = colorOf("CodeDiffAddedWordColor", LLColor4(0.25f, 0.85f, 0.35f, 0.4f));
     mChanges.clear();
     mChangeEnds.clear();
     mInlineLeftRows.clear();
+    std::vector<Fold> folds;
+    // The last run that is a change: the runs the same after it are at
+    // the text's end. Where none is, nothing is folded.
+    size_t last_change = runs.size();
+    for (size_t i = runs.size(); i-- > 0;)
+    {
+        if (runs[i].kind != ALTextDiff::Kind::Same)
+        {
+            last_change = i;
+            break;
+        }
+    }
     Shown ls;
     Shown rs;
     Shown is;
@@ -324,13 +355,37 @@ void ALDiffView::rebuild()
         const ALTextDiff::Run& run = runs[i];
         if (run.kind == ALTextDiff::Kind::Same)
         {
-            for (S32 n = 0; n < run.count; ++n)
-            {
+            const auto same = [&](S32 n) {
                 const std::string& line = right[static_cast<size_t>(run.right + n)];
                 ls.add(left[static_cast<size_t>(run.left + n)], run.left + n + 1, none);
                 rs.add(line, run.right + n + 1, none);
                 is.add(line, run.right + n + 1, none);
                 mInlineLeftRows.push_back(run.left + n + 1);
+            };
+            // Context kept beside a change, none at either end; what is
+            // left folded away behind a row of its own, where it is enough.
+            const S32 before = ls.numbers.empty() ? 0 : FOLD_CONTEXT;
+            const S32 after  = i > last_change ? 0 : FOLD_CONTEXT;
+            const S32 hidden = last_change == runs.size() ? 0 : run.count - before - after;
+            S32       n      = 0;
+            if (hidden >= FOLD_LEAST)
+            {
+                for (; n < before; ++n)
+                {
+                    same(n);
+                }
+                Fold fold;
+                fold.row       = ls.add(std::string(), 0, folded, true);
+                fold.inlineRow = is.add(std::string(), 0, folded, true);
+                rs.add(std::string(), 0, folded, true);
+                mInlineLeftRows.push_back(0);
+                fold.count = hidden;
+                fold.open  = !mFoldSame;
+                folds.push_back(fold);
+            }
+            for (; n < run.count; ++n)
+            {
+                same(n);
             }
             ++i;
             continue;
@@ -395,7 +450,213 @@ void ALDiffView::rebuild()
     is.into(*mInlined);
     mScrolledY = 0;
     mScrolledX = 0.f;
+    if (open.size() == folds.size())
+    {
+        for (size_t n = 0; n < folds.size(); ++n)
+        {
+            folds[n].open = open[n];
+        }
+    }
+    mFolds = std::move(folds);
+    applyFolds();
     refreshBar();
+}
+
+// --- folds -----------------------------------------------------------------------------
+
+void ALDiffView::setFoldSame(bool fold)
+{
+    mFoldSame = fold;
+    mBar->setFolded(fold);
+    if (mFolds.empty())
+    {
+        return;
+    }
+    // The caret's row kept as far down the view as it was; where its line
+    // is folded away, the row that stands for it.
+    ALCodeEditor* side      = shown();
+    const S32     below_top = side->layout().lineTop(side->caret().line) - side->scrollY();
+    for (Fold& each : mFolds)
+    {
+        each.open = !fold;
+    }
+    applyFolds();
+    const S32 scroll = llmax(0, side->layout().lineTop(side->caret().line) - below_top);
+    for (ALCodeEditor* each : { mLeft, mRight, mInlined })
+    {
+        each->setScrollY(scroll);
+    }
+    mScrolledY = mRight->scrollY();
+}
+
+S32 ALDiffView::foldedCount() const
+{
+    return static_cast<S32>(std::count_if(mFolds.begin(), mFolds.end(), [](const Fold& fold) { return !fold.open; }));
+}
+
+std::vector<bool> ALDiffView::foldsOpen() const
+{
+    std::vector<bool> open;
+    open.reserve(mFolds.size());
+    for (const Fold& fold : mFolds)
+    {
+        open.push_back(fold.open);
+    }
+    return open;
+}
+
+void ALDiffView::applyFolds()
+{
+    for (ALCodeEditor* side : { mLeft, mRight, mInlined })
+    {
+        ALTextLayout& layout = side->layout();
+        for (size_t n = 0; n < mFolds.size(); ++n)
+        {
+            const Fold& fold = mFolds[n];
+            const S32   row  = rowOfFold(side, static_cast<S32>(n));
+            layout.setHidden(row, row, fold.open);
+            layout.setHidden(row + 1, row + fold.count, !fold.open);
+        }
+        // A caret left on a line now hidden: on the row standing for its
+        // run where that is folded, else on the run's first line.
+        const S32 at   = side->caret().line;
+        const S32 fold = foldOfRow(side, at, true);
+        if (fold >= 0 && layout.hidden(at))
+        {
+            const S32 row = rowOfFold(side, fold);
+            side->goTo(ALTextPos(mFolds[static_cast<size_t>(fold)].open ? row + 1 : row, 0));
+        }
+    }
+}
+
+S32 ALDiffView::rowOfFold(const ALCodeEditor* side, S32 fold) const
+{
+    const Fold& each = mFolds[static_cast<size_t>(fold)];
+    return side == mInlined ? each.inlineRow : each.row;
+}
+
+S32 ALDiffView::foldOfRow(const ALCodeEditor* side, S32 row, bool lines) const
+{
+    // The last fold whose row is at or before it, in order of their rows.
+    const bool inlined = side == mInlined;
+    const auto after   = std::upper_bound(mFolds.begin(), mFolds.end(), row, [inlined](S32 at, const Fold& fold) {
+        return at < (inlined ? fold.inlineRow : fold.row);
+    });
+    if (after == mFolds.begin())
+    {
+        return -1;
+    }
+    const S32 fold  = static_cast<S32>(after - mFolds.begin()) - 1;
+    const S32 start = rowOfFold(side, fold);
+    return row == start || (lines && row <= start + mFolds[static_cast<size_t>(fold)].count) ? fold : -1;
+}
+
+void ALDiffView::openFold(S32 fold)
+{
+    mFolds[static_cast<size_t>(fold)].open = true;
+    applyFolds();
+}
+
+S32 ALDiffView::foldAtPoint(S32 x, S32 y, ALCodeEditor** under)
+{
+    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
+    for (ALCodeEditor* side : sides)
+    {
+        const LLRect frame = side ? side->getRect() : LLRect();
+        if (!side || !frame.pointInRect(x, y))
+        {
+            continue;
+        }
+        const S32    local_x = x - frame.mLeft;
+        const S32    local_y = y - frame.mBottom;
+        const LLRect text    = side->textRect();
+        if (local_y > text.mTop || local_y < text.mBottom)
+        {
+            return -1;
+        }
+        const S32 fold = foldOfRow(side, side->posAtLocal(llmax(local_x, text.mLeft), local_y, false).line, false);
+        if (fold < 0 || mFolds[static_cast<size_t>(fold)].open)
+        {
+            return -1;
+        }
+        if (under)
+        {
+            *under = side;
+        }
+        return fold;
+    }
+    return -1;
+}
+
+bool ALDiffView::handleMouseDown(S32 x, S32 y, MASK mask)
+{
+    // A folded row opened, the caret put on the first line it hid, on the
+    // side pressed, which takes the keyboard.
+    ALCodeEditor* side = nullptr;
+    const S32     fold = foldAtPoint(x, y, &side);
+    if (fold < 0)
+    {
+        return LLUICtrl::handleMouseDown(x, y, mask);
+    }
+    const S32 row = rowOfFold(side, fold);
+    openFold(fold);
+    side->goTo(ALTextPos(row + 1, 0));
+    side->setFocus(true);
+    return true;
+}
+
+bool ALDiffView::handleHover(S32 x, S32 y, MASK mask)
+{
+    if (foldAtPoint(x, y) >= 0)
+    {
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_HAND);
+        }
+        return true;
+    }
+    return LLUICtrl::handleHover(x, y, mask);
+}
+
+void ALDiffView::drawFoldRows()
+{
+    // Over each folded row, how many lines it stands for: the row is an
+    // empty line, which the side draws tinted, and this is said over it.
+    const F32           alpha       = getDrawContext().mAlpha;
+    const LLFontGL*     font        = LLFontGL::getFontSansSerifSmall();
+    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
+    for (ALCodeEditor* side : sides)
+    {
+        if (!side)
+        {
+            continue;
+        }
+        const LLRect   frame = side->getRect();
+        const LLRect   text  = side->textRect();
+        const S32      top   = frame.mBottom + text.mTop;
+        const S32      left  = frame.mLeft + text.mLeft;
+        LLLocalClipRect clip(LLRect(left, top, frame.mLeft + text.mRight, frame.mBottom + text.mBottom));
+        const LLColor4 ink   = side->textColor() % (0.6f * alpha);
+        ALTextLayout&  layout = side->layout();
+        for (size_t n = 0; n < mFolds.size(); ++n)
+        {
+            const Fold& fold = mFolds[n];
+            if (fold.open)
+            {
+                continue;
+            }
+            const S32 row    = rowOfFold(side, static_cast<S32>(n));
+            const S32 row_t  = top - (layout.lineTop(row) - side->scrollY());
+            const S32 height = layout.lineHeight(row);
+            if (row_t - height > top || row_t < frame.mBottom + text.mBottom)
+            {
+                continue;
+            }
+            const std::string said = alSaidCount("DiffFoldedLines", fold.count, "\xE2\x8B\xAF 1 line the same \xE2\x8B\xAF",
+                                                 "\xE2\x8B\xAF [COUNT] lines the same \xE2\x8B\xAF");
+            font->renderUTF8(said, 0, left + 8, row_t - height / 2, ink, LLFontGL::LEFT, LLFontGL::VCENTER);
+        }
+    }
 }
 
 void ALDiffView::arrange()
@@ -566,6 +827,17 @@ bool ALDiffView::handleUnicodeCharHere(llwchar uni_char)
 
 bool ALDiffView::handleKeyHere(KEY key, MASK mask)
 {
+    // Return on a folded row opens it, rather than going to the source.
+    if (key == KEY_RETURN && mask == MASK_NONE)
+    {
+        ALCodeEditor* side = shown();
+        const S32     fold = foldOfRow(side, side->caret().line, false);
+        if (fold >= 0 && !mFolds[static_cast<size_t>(fold)].open)
+        {
+            openFold(fold);
+            return true;
+        }
+    }
     // A key the side in front would not take, being read only, that
     // changes the text: a line broken or joined, a tab, a paste or a cut.
     const bool edits = ((key == KEY_RETURN || key == KEY_BACKSPACE || key == KEY_DELETE || key == KEY_TAB) && (mask == MASK_NONE || mask == MASK_SHIFT)) ||
@@ -649,6 +921,7 @@ void ALDiffView::draw()
         mScrolledX = mRight->scrollX();
     }
     LLUICtrl::draw();
+    drawFoldRows();
     if (!mInline)
     {
         const S32 half = (getRect().getWidth() - GAP) / 2;

@@ -586,6 +586,11 @@ public:
     typedef std::function<bool(bool forward)> change_stepper_t;
     void setChangeStepper(change_stepper_t stepper) { mChangeStepper = std::move(stepper); }
     bool stepChange(bool forward) override { return mChangeStepper && mChangeStepper(forward); }
+    // Lines a host hides itself -- a comparison's runs the same -- shown by
+    // the host where the caret lands on one: true where it was the host's
+    // to show.
+    typedef std::function<bool(S32 line)> line_revealer_t;
+    void setLineRevealer(line_revealer_t revealer) { mLineRevealer = std::move(revealer); }
     typedef std::function<void(const LLSD& value)> fix_handler_t;
     void setFixHandler(fix_handler_t handler) { mFixHandler = std::move(handler); }
     // What the problems on a line offer: any fix at all -- a suppression
@@ -1063,6 +1068,7 @@ private:
     fix_provider_t          mFixProvider;
     function_provider_t     mFunctionProvider;
     change_stepper_t        mChangeStepper;
+    line_revealer_t         mLineRevealer;
     fix_handler_t           mFixHandler;
     // What the list holds (ALFixListModel); who is told each showing of
     // it, and who is asked for the refactors.

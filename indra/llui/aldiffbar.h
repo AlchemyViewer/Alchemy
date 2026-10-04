@@ -38,8 +38,8 @@ class LLTextBox;
 
 // The thin bar over a comparison's titles (ALDiffView): which change the
 // caret is in, of how many, and the arrows to the one before and the next;
-// the comparison inline or side by side, its sides swapped; and done, back
-// to what it was made from. In the comparison's colours, as the find bar
+// what is the same folded away, the comparison inline or side by side, its
+// sides swapped; and done, back to what it was made from. In the comparison's colours, as the find bar
 // is in its view's.
 //
 // It holds what it shows and nothing else: the view tells it the count
@@ -60,6 +60,7 @@ public:
     std::string countSaid() const;
     // Whether there is a change before the caret, and one after it.
     void        setSteps(bool previous, bool next);
+    void        setFolded(bool folded);
     void        setInline(bool inline_view);
     void        setSwapped(bool swapped);
     // Whether there is anywhere to go back to.
@@ -75,6 +76,7 @@ public:
     typedef boost::signals2::signal<void()> signal_t;
     boost::signals2::connection onPrevious(const signal_t::slot_type& cb) { return mPrevious.connect(cb); }
     boost::signals2::connection onNext(const signal_t::slot_type& cb) { return mNext.connect(cb); }
+    boost::signals2::connection onFold(const signal_t::slot_type& cb) { return mFold.connect(cb); }
     boost::signals2::connection onInline(const signal_t::slot_type& cb) { return mInline.connect(cb); }
     boost::signals2::connection onSwap(const signal_t::slot_type& cb) { return mSwap.connect(cb); }
     boost::signals2::connection onDone(const signal_t::slot_type& cb) { return mDone.connect(cb); }
@@ -98,11 +100,12 @@ private:
     LLTextBox*    mCount          = nullptr;
     ALFlatButton* mPreviousButton = nullptr;
     ALFlatButton* mNextButton     = nullptr;
+    ALFlatButton* mFoldButton     = nullptr;
     ALFlatButton* mInlineButton   = nullptr;
     ALFlatButton* mSwapButton     = nullptr;
     ALFlatButton* mDoneButton     = nullptr;
 
-    signal_t mPrevious, mNext, mInline, mSwap, mDone;
+    signal_t mPrevious, mNext, mFold, mInline, mSwap, mDone;
 };
 
 #endif // AL_ALDIFFBAR_H

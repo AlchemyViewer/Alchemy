@@ -38,6 +38,7 @@
 
 #include "../test/lltut.h"
 
+#include <initializer_list>
 #include <memory>
 #include <string>
 #include <vector>
@@ -83,6 +84,27 @@ namespace tut
 
         static void press(ALDiffView& d, const char* name) { ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>(name))->press(); }
         static bool enabled(ALDiffView& d, const char* name) { return d.bar()->getChild<LLView>(name)->getEnabled(); }
+
+        // The lines "line 0" on, so many, with some of them said otherwise.
+        static std::string lines(S32 count, std::initializer_list<std::pair<S32, const char*>> changed = {})
+        {
+            std::string text;
+            for (S32 n = 0; n < count; ++n)
+            {
+                std::string line = "line " + std::to_string(n);
+                for (const auto& [at, said] : changed)
+                {
+                    if (at == n)
+                    {
+                        line = said;
+                    }
+                }
+                text += (n ? "\n" : "") + line;
+            }
+            return text;
+        }
+
+        static bool hidden(ALCodeEditor* side, S32 row) { return side->layout().hidden(row); }
 
         static bool tinted(const ALCodeEditor& side, S32 line)
         {
@@ -395,5 +417,87 @@ namespace tut
         typed("3");
         ensure("Escape with a count begun lets the count go", d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false) && told == 0);
         ensure("then the comparison's", d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false) && told == 1);
+    }
+
+    template<> template<>
+    void aldiffview_object::test<13>()
+    {
+        set_test_name("a long run the same folds beyond three lines of context, both sides, to one row; numbers stay true, a copy takes it all; Return, the bar, and the caret landing in it open it");
+        const std::string left  = lines(30);
+        const std::string right = lines(30, { { 2, "two" }, { 27, "twenty-seven" } });
+        ALDiffView&       d     = make(left.c_str(), right.c_str());
+        ensure("one fold, folded", d.foldCount() == 1 && d.foldedCount() == 1);
+        // Rows: 0-1 the same, 2 a change, 3-5 context, 6 the fold's row,
+        // 7-24 what it hides, 25-27 context, 28 a change, 29-30 the same.
+        for (ALCodeEditor* side : { d.left(), d.right() })
+        {
+            ensure("context shown, the row shown", !hidden(side, 5) && !hidden(side, 6) && !hidden(side, 25));
+            ensure("the run hidden", hidden(side, 7) && hidden(side, 16) && hidden(side, 24));
+            ensure("its row a line of neither text", side->lineNumbers()[6] == 0 && side->spacerLine(6));
+            ensure_equals("numbers true past it", side->lineNumbers()[7], 7);
+        }
+        LLClipboard& clipboard = LLClipboard::instance();
+        std::string  copied;
+        d.left()->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(30, 7)));
+        d.left()->copy();
+        clipboard.pasteFromClipboard(copied);
+        ensure_equals("a copy over it takes what it hides, and not its row", copied, left);
+
+        d.right()->setFocus(true);
+        d.handleKey(KEY_F7, MASK_NONE, false);
+        d.handleKey(KEY_F7, MASK_NONE, false);
+        ensure_equals("the changes stepped through over it", d.right()->caret().line, 28);
+
+        d.right()->goTo(ALTextPos(6, 0));
+        ensure("Return on its row", d.right()->handleKey(KEY_RETURN, MASK_NONE, false));
+        ensure("opened, both sides", d.foldedCount() == 0 && !hidden(d.left(), 7) && !hidden(d.right(), 24));
+        ensure("its row gone, the caret on the first line it hid", hidden(d.right(), 6) && d.right()->caret().line == 7);
+
+        press(d, "fold");
+        ensure("the bar: folding off, nothing folded", !d.foldsSame() && d.foldedCount() == 0);
+        press(d, "fold");
+        ensure("and on: folded again", d.foldsSame() && d.foldedCount() == 1 && hidden(d.left(), 7));
+        ensure("the caret, on a line folded away, on the row for it", d.right()->caret().line == 6);
+
+        d.left()->goTo(ALTextPos(12, 0));
+        ensure("the caret landing in it opens it, both sides", d.foldedCount() == 0 && !hidden(d.right(), 12) && d.left()->caret().line == 12);
+    }
+
+    template<> template<>
+    void aldiffview_object::test<14>()
+    {
+        set_test_name("folds at the ends without context outside, none too short or where nothing changed; a click on a row opens it; inline and swapped, as open as they were");
+        const std::string left  = lines(20);
+        const std::string right = lines(20, { { 19, "nineteen" } });
+        ALDiffView&       d     = make(left.c_str(), right.c_str());
+        ensure_equals("one, at the start", d.foldCount(), 1);
+        ensure("its row first, no context before it", !hidden(d.right(), 0) && hidden(d.right(), 1) && hidden(d.right(), 16) && !hidden(d.right(), 17));
+        ensure_equals("the first line it hides numbered as itself", d.right()->lineNumbers()[1], 1);
+
+        d.setTexts(lines(15).c_str(), lines(15, { { 0, "zero" }, { 14, "fourteen" } }).c_str());
+        ensure_equals("thirteen between changes: seven beyond context, not enough", d.foldCount(), 0);
+        d.setTexts(lines(16).c_str(), lines(16, { { 0, "zero" }, { 15, "fifteen" } }).c_str());
+        ensure_equals("fourteen: eight, enough", d.foldCount(), 1);
+        d.setTexts(left.c_str(), left.c_str());
+        ensure_equals("nothing changed: nothing folded", d.foldCount(), 0);
+
+        d.setTexts(left.c_str(), right.c_str());
+        ALCodeEditor* side = d.right();
+        const LLRect  frame = side->getRect();
+        const LLRect  text  = side->textRect();
+        const S32     y     = frame.mBottom + text.mTop - (side->layout().lineTop(0) - side->scrollY()) - side->layout().lineHeight(0) / 2;
+        ensure("a click on its row", d.handleMouseDown(frame.mLeft + text.mLeft + 10, y, MASK_NONE));
+        ensure("opened, the caret on its first line, the side with the keyboard", d.foldedCount() == 0 && side->caret().line == 1 && side->hasFocus());
+        ensure("a click on a line of text is the side's", (d.handleMouseDown(frame.mLeft + text.mLeft + 10, y, MASK_NONE), d.foldedCount() == 0));
+
+        d.setInline(true);
+        ensure("inline: as open as it was", d.foldCount() == 1 && d.foldedCount() == 0 && !hidden(d.inlined(), 1));
+        d.setFoldSame(true);
+        ensure("folded, inline", hidden(d.inlined(), 1) && !hidden(d.inlined(), 0));
+        d.inlined()->goTo(ALTextPos(0, 0));
+        d.setInline(false);
+        ensure("side by side, folded, the caret on its row", d.foldedCount() == 1 && d.right()->caret().line == 0);
+        d.setSwapped(true);
+        ensure("swapped, folded still", d.foldedCount() == 1 && hidden(d.left(), 1) && hidden(d.right(), 1));
     }
 }

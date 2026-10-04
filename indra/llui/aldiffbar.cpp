@@ -70,8 +70,9 @@ ALDiffBar::ALDiffBar(const Params& p)
 
     mPreviousButton = flat("previous", "\xE2\x86\x91", false, alSaid("DiffBarPrevious", "Previous change"));
     mNextButton     = flat("next", "\xE2\x86\x93", false, alSaid("DiffBarNext", "Next change"));
-    // The two ways of showing lit by the view, as it is once it has done
-    // what was asked: a press only asks, and turns nothing itself.
+    // The ways of showing lit by the view, as it is once it has done what
+    // was asked: a press only asks, and turns nothing itself.
+    mFoldButton     = flat("fold", "\xE2\x8B\xAF", false, alSaid("DiffBarFold", "Fold away what is the same"));
     mInlineButton   = flat("inline", "\xE2\x96\xA4", false, alSaid("DiffBarInline", "Show the changes inline, in one text"));
     mSwapButton     = flat("swap", "\xE2\x87\x84", false, alSaid("DiffBarSwap", "Swap the sides"));
     mDoneButton     = flat("done", "\xC3\x97", false, alSaid("DiffBarDone", "Back to the text"));
@@ -80,6 +81,7 @@ ALDiffBar::ALDiffBar(const Params& p)
     mDoneButton->setKey(KEY_ESCAPE, MASK_NONE);
     mPreviousButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mPrevious(); });
     mNextButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mNext(); });
+    mFoldButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mFold(); });
     mInlineButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mInline(); });
     mSwapButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSwap(); });
     mDoneButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mDone(); });
@@ -135,6 +137,11 @@ void ALDiffBar::setSteps(bool previous, bool next)
     mNextButton->setEnabled(next);
 }
 
+void ALDiffBar::setFolded(bool folded)
+{
+    mFoldButton->setToggleState(folded);
+}
+
 void ALDiffBar::setInline(bool inline_view)
 {
     mInlineButton->setToggleState(inline_view);
@@ -156,7 +163,7 @@ void ALDiffBar::setColors(const LLColor4& background, const LLColor4& ink)
     mBgColor              = ALSurface::ground(background, ink);
     mInkColor             = ink;
     const LLColor4 chosen = ALSurface::chosen(background, ink);
-    for (ALFlatButton* glyph : { mPreviousButton, mNextButton, mInlineButton, mSwapButton, mDoneButton })
+    for (ALFlatButton* glyph : { mPreviousButton, mNextButton, mFoldButton, mInlineButton, mSwapButton, mDoneButton })
     {
         glyph->setInk(ink);
         glyph->setLit(chosen);
@@ -181,7 +188,7 @@ void ALDiffBar::draw()
 
 void ALDiffBar::layout()
 {
-    // The buttons at the right, in threes and twos -- the steps, the ways
+    // The buttons at the right, in twos and threes -- the steps, the ways
     // of showing, done -- and the count over what is left at the left.
     const S32 width = getRect().getWidth();
     const S32 top   = getRect().getHeight() - PAD;
@@ -197,6 +204,7 @@ void ALDiffBar::layout()
     }
     place(mSwapButton);
     place(mInlineButton);
+    place(mFoldButton);
     right -= GAP;
     place(mNextButton);
     place(mPreviousButton);

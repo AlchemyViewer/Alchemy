@@ -45,10 +45,12 @@ class LLTextBox;
 // and scrolled together; or inline, in one, what was taken out above what
 // was put in, numbered as the right. Lines taken out are tinted one colour
 // and lines put in another, and within a line changed into another, the
-// words that changed are marked. Each side has a title over it, and over
-// the titles a bar (ALDiffBar): which change the caret is in, of how many,
-// the steps through them, inline or side by side, the sides swapped, and
-// done.
+// words that changed are marked. Runs of lines the same are folded away
+// beyond a few lines of context, each to a row saying how many, which a
+// click or Return opens. Each side has a title over it, and over the
+// titles a bar (ALDiffBar): which change the caret is in, of how many,
+// the steps through them, folding, inline or side by side, the sides
+// swapped, and done.
 //
 // F7 or Alt-Down goes to the next change and Shift-F7 or Alt-Up to the one
 // before; Escape tells whoever shows it, to put back what was there. What
@@ -89,6 +91,20 @@ public:
     void setSwapped(bool swapped);
     bool isSwapped() const { return mSwapped; }
 
+    // Lines the same folded away: a run of them beyond FOLD_CONTEXT lines
+    // either side of a change -- none at the text's start or end -- where
+    // that leaves FOLD_LEAST or more, both sides at once, to one row that
+    // says how many. Each opened by a click on its row, Return on it, or
+    // the caret landing in it; all of them opened, or folded again, by
+    // turning this off or on. On unless asked; never where nothing changed.
+    static constexpr S32 FOLD_CONTEXT = 3;
+    static constexpr S32 FOLD_LEAST   = 8;
+    void setFoldSame(bool fold);
+    bool foldsSame() const { return mFoldSame; }
+    // How many runs there are to fold, and how many are folded.
+    S32  foldCount() const { return static_cast<S32>(mFolds.size()); }
+    S32  foldedCount() const;
+
     // How many changes there are: each run of lines taken out, put in, or
     // both, between lines the same.
     S32 changeCount() const { return static_cast<S32>(mChanges.size()); }
@@ -125,6 +141,8 @@ public:
     std::pair<S32, S32> rightAtCaret() const;
 
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleKeyHere(KEY key, MASK mask) override;
     bool handleUnicodeCharHere(llwchar uni_char) override;
     void draw() override;
@@ -135,7 +153,9 @@ protected:
 
 private:
     ALCodeEditor* makeSide(const ALCodeEditor::Params& side, const std::string& name);
-    void          rebuild();
+    // Made again from the texts; the folds as open as given, where there
+    // are as many as there were.
+    void          rebuild(const std::vector<bool>& open = {});
     void          arrange();
     // The rows of the side in front that stand for the right's lines, each
     // counted from one (nought where a row has none of it); and the side
@@ -150,9 +170,35 @@ private:
         S32 line     = 0;
         S32 column   = 0;
         S32 belowTop = 0;
+        // The fold whose row the caret is on, which stands for no line.
+        S32 fold     = -1;
     };
     Place                   placeOfCaret();
     void                    restorePlace(const Place& place);
+    // A run of lines the same, folded away or not: the row before it that
+    // stands for it while it is, side by side and inline, and how many
+    // lines after that row it hides.
+    struct Fold
+    {
+        S32  row       = 0;
+        S32  inlineRow = 0;
+        S32  count     = 0;
+        bool open      = false;
+    };
+    // Each side's lines hidden and shown as the folds are, and a caret on
+    // a line hidden put on the line that stands for it.
+    void              applyFolds();
+    // The fold whose row a row of a side is, or with `lines` whose lines
+    // it is one of too; -1 for none.
+    S32               foldOfRow(const ALCodeEditor* side, S32 row, bool lines) const;
+    S32               rowOfFold(const ALCodeEditor* side, S32 fold) const;
+    void              openFold(S32 fold);
+    std::vector<bool> foldsOpen() const;
+    // The side under a point of the view and the fold whose row is there,
+    // folded; -1 for none.
+    S32               foldAtPoint(S32 x, S32 y, ALCodeEditor** side = nullptr);
+    void              drawFoldRows();
+
     // The bar's count and steps, as the caret of the side in front has them.
     void                    refreshBar();
     // A step from the bar: the keyboard given to the side in front.
@@ -181,6 +227,8 @@ private:
     // of what is shown: the same on both sides, which are lined up.
     std::vector<S32>      mChanges;
     std::vector<S32>      mChangeEnds;
+    std::vector<Fold>     mFolds;
+    bool                  mFoldSame = true;
     // Where the two sides were last scrolled to, to follow the one moved.
     S32                   mScrolledY = 0;
     F32                   mScrolledX = 0.f;

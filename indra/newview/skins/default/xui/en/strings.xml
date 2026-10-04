@@ -403,6 +403,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	     is in, the steps through them, and the ways of showing them. -->
 	<string name="DiffBarPrevious">Previous change</string>
 	<string name="DiffBarNext">Next change</string>
+	<string name="DiffBarFold">Fold away what is the same</string>
 	<string name="DiffBarInline">Show the changes inline, in one text</string>
 	<string name="DiffBarSwap">Swap the sides</string>
 	<string name="DiffBarDone">Back to the text</string>
@@ -410,6 +411,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="DiffBarChangesA">[COUNT] change</string>
 	<string name="DiffBarChangesB">[COUNT] changes</string>
 	<string name="DiffBarNone">No changes</string>
+	<!-- A comparison's row standing for lines the same folded away. -->
+	<string name="DiffFoldedLinesA">⋯ 1 line the same ⋯</string>
+	<string name="DiffFoldedLinesB">⋯ [COUNT] lines the same ⋯</string>
 
 	<!-- The row of tabs over an editor (altabstrip.cpp): the button that
 	     lists them all once they run past it. -->
