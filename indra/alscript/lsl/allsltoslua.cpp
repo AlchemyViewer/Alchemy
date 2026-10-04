@@ -1391,6 +1391,8 @@ namespace
 
     // --- expressions ------------------------------------------------------------------
 
+    bool intoBit32(LSLASTNode* e);
+
     Expr Writer::constant(LSLConstant* c)
     {
         switch (c->getNodeSubType())
@@ -1398,10 +1400,14 @@ namespace
             case NODE_INTEGER_CONSTANT:
             {
                 // Hexadecimal as the LSL wrote it, where SLua reads the same
-                // number: not past 0x7FFFFFFF, which LSL's integers wrapped
-                // below nought.
+                // number, or where bit32 takes it, which takes one past
+                // 0x7FFFFFFF as the number below nought LSL wrapped it to:
+                // one constant either way. Elsewhere such a one as LSL had
+                // it, which bit32.s32 of the hexadecimal would make a call
+                // that SLua's compiler does not fold.
                 const int v = static_cast<LSLIntegerConstant*>(c)->getValue();
-                if (std::optional<std::string> hex = v >= 0 ? hexAsWritten(c, v) : std::nullopt)
+                if (std::optional<std::string> hex = hexAsWritten(c, v);
+                    hex && (v >= 0 || (c->getParent() && intoBit32(c->getParent()))))
                 {
                     return { *hex, PRIMARY };
                 }
@@ -1507,12 +1513,16 @@ namespace
                 if (word.size() > 2 && word[0] == '0' && (word[1] == 'x' || word[1] == 'X') &&
                     word.find_first_not_of("0123456789abcdefABCDEF", 2) == std::string::npos)
                 {
-                    if (std::strtoll(word.c_str(), nullptr, 16) == v)
+                    // Of 32 bits at most: LSL's integer of it, as its own
+                    // reading wraps one.
+                    const size_t digits = word.size() - std::min(word.find_first_not_of('0', 2), word.size());
+                    if (digits <= 8 && static_cast<U32>(std::strtoull(word.c_str(), nullptr, 16)) == static_cast<U32>(v))
                     {
                         hex = word;
                     }
                 }
-                else if (word.find_first_not_of("0123456789") == std::string::npos && std::strtoll(word.c_str(), nullptr, 10) == v)
+                else if (word.find_first_not_of("0123456789") == std::string::npos &&
+                         std::llabs(std::strtoll(word.c_str(), nullptr, 10)) == std::llabs(static_cast<long long>(v)))
                 {
                     other = true;
                 }

@@ -1294,23 +1294,25 @@ namespace tut
                                               "    if (!(flags & MASK & 0x300)) llOwnerSay(\"none\");\n"
                                               "    if ((flags & 4) == 0) llOwnerSay(\"no 4\");\n"
                                               "    integer masked = flags & MASK;\n"
+                                              "    integer top = flags & 0x80000000;\n"
                                               "    list params = [PRIM_NAME, \"a\"];\n"
                                               "    params += [PRIM_LINK_TARGET, LINK_ROOT, PRIM_POSITION, llGetPos()];\n"
                                               "    params += n;\n"
                                               "    llSetLinkPrimitiveParamsFast(LINK_THIS, params);\n"
                                               "    float f = (float)\"1.5\";\n"
-                                              "    llOwnerSay((string)(masked + HIGH) + (string)f + (string)gSitter);\n"
+                                              "    llOwnerSay((string)(masked + HIGH + top) + (string)f + (string)gSitter);\n"
                                               "} }\n");
         ensure("an & as a condition: " + r.text, has(r, "if bit32.btest(flags, PARCEL_FLAG_ALLOW_CREATE_OBJECTS) then"));
         ensure("not of one, an & of &s one call: " + r.text, has(r, "if not bit32.btest(flags, MASK, 0x300) then"));
         ensure("against nought: " + r.text, has(r, "if not bit32.btest(flags, 4) then"));
         ensure("an & as a number is still bit32.band: " + r.text, has(r, "local masked = bit32.band(flags, MASK)"));
+        ensure("one bit32 takes, as written, which it reads the same: " + r.text, has(r, "local top = bit32.s32(bit32.band(flags, 0x80000000))"));
         ensure("values added together: " + r.text,
                has(r, "table.append(params, PRIM_LINK_TARGET, LINK_ROOT, PRIM_POSITION, ll.GetPos())") && has(r, "table.insert(params, n)"));
         ensure("the null key: " + r.text, has(r, "local gSitter = NULL_KEY") && !has(r, "uuid(\"\")"));
         ensure("a float from a string: " + r.text, has(r, "lslFloat(\"1.5\")") && has(r, "return llcompat.List2Float({ s }, 0)"));
         ensure("hexadecimal kept: " + r.text, has(r, "local MASK = 0x0000FF00"));
-        ensure("but past 0x7FFFFFFF, which SLua reads as another number: " + r.text, has(r, "local HIGH = -268435456"));
+        ensure("past 0x7FFFFFFF, which SLua reads as another number, as LSL had it: " + r.text, has(r, "local HIGH = -268435456"));
         checksClean(r);
     }
 
