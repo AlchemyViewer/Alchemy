@@ -53,9 +53,10 @@ class ALVimExCommands;
 // C D Y p P J gJ r ~ o O i a I A u Ctrl-R and . to do the last change
 // again; in insert mode Ctrl-W Ctrl-U Ctrl-H Ctrl-T Ctrl-D Ctrl-N Ctrl-P
 // Ctrl-A Ctrl-R Ctrl-E Ctrl-Y, and Ctrl-J Ctrl-M Ctrl-I for Return and
-// Tab; registers, the unnamed one the editor's own unless clipboard is
-// unnamed, with 0 for the last yank and a-z by name (A-Z to add), and "+
-// and "* the system clipboard; marks a-z, ` and '; a
+// Tab; registers, shared by the keymaps that share their state, the
+// unnamed one vim's own unless clipboard is unnamed, with 0 for the last
+// yank and a-z by name (A-Z to add), and "+ and "* the system
+// clipboard; marks a-z, ` and '; a
 // search line for / and ?; and a : line for a line number, s/// with
 // vim's flags and & g& :& :&& to do the last one again, set, g and v
 // over the lines a pattern picks out, normal, and whatever the hooks
@@ -156,8 +157,10 @@ public:
     char recordingInto() const { return mRecording; }
 
     // What one vim shares among its buffers, which here are the keymaps
-    // of one studio's editors: the lines entered on the : line and on
-    // the search line, oldest first, for Up and Down on the line, q: q/
+    // of the studio's editors: the registers, so that what is yanked in
+    // one is put in another, the system clipboard or not; the lines
+    // entered on the : line and on the search line, oldest first, for Up
+    // and Down on the line, q: q/
     // @: and :history; and the settings a :set changes, ignorecase and
     // smartcase, and clipboard: whether what is yanked, deleted and put
     // with no register named goes by the system clipboard, as vim's
@@ -167,6 +170,10 @@ public:
     // whatever this says. The keymap's own unless told to share another's.
     struct Shared
     {
+        // a-z, 0 for the last yank, 1-9 for the last deletes of a line or
+        // more, newest first, - for the last smaller one, and the unnamed
+        // one (ALVimRegisters).
+        ALVimRegisters           registers;
         std::vector<std::string> command;
         std::vector<std::string> search;
         bool                     ignoreCase       = false;
@@ -188,6 +195,9 @@ public:
         // tabstop, shiftwidth -- as it said them, for the host to set on
         // each editor it puts vim over (setViewOption).
         std::vector<std::string> viewOptions;
+        // Whether a host has read a vimrc into it yet: once is enough for
+        // every keymap sharing it, and again resets what a :set changed.
+        bool                     sourced = false;
     };
     const Shared&           shared() const { return *mShared; }
     std::shared_ptr<Shared> sharedState() const { return mShared; }
@@ -466,10 +476,6 @@ private:
     ALVimSearch mSearch{ *this };
     friend class ALVimSearch;
 
-    // The registers by name: a-z, 0 for the last yank, 1-9 for the last
-    // deletes of a line or more, newest first, and - for the last
-    // smaller one; and the unnamed one (ALVimRegisters).
-    ALVimRegisters            mRegisters;
     // The marks, which move with the text as it is edited: the document
     // they are in is listened to from the first key on it.
     std::map<char, ALTextPos> mMarks;

@@ -131,7 +131,7 @@ public:
     // the options the window keeps -- line numbers, wrapping -- are set
     // through its commands, and every editor's own set again.
     void source(bool show = false);
-    bool sourced() const { return mSourced; }
+    bool sourced() const { return mShared->sourced; }
     // The vimrc's options that are each editor's own -- expandtab,
     // tabstop -- set on one, after the studio's own settings.
     void applyViewOptions(ALTextView& view);
@@ -213,10 +213,10 @@ private:
     ALScriptNavigation&                  mNavigation;
     ALScriptStudioCommands&              mCommands;
     Window&                              mWindow;
-    std::shared_ptr<ALVimKeymap::Shared> mShared = std::make_shared<ALVimKeymap::Shared>();
+    // One for every studio window, as vim has one for all its buffers:
+    // the registers, the histories and the settings, for the session.
+    std::shared_ptr<ALVimKeymap::Shared> mShared;
     std::string                          mBanner;
-    // Whether the vimrc has been read into this window's vim yet.
-    bool                                 mSourced = false;
     // The tab in front as pump last saw it, and the one before it, by id.
     std::string                          mCurrent;
     std::string                          mAlternate;

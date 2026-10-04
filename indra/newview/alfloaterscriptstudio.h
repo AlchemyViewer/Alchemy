@@ -1322,7 +1322,8 @@ private:
     boost::signals2::scoped_connection mCompiledConnection;
     boost::signals2::scoped_connection mSavedConnection;
     boost::signals2::scoped_connection mDefinitionsConnection;
-    // The vimrc changed: read again into this window's vim.
+    // The vimrc changed: read again into the studio's vim, which every
+    // window shares, and this window's editors set again from it.
     boost::signals2::scoped_connection mVimrcConnection;
     // The settings the window follows as they change: the lints and the
     // Luau mode, the preprocessor's, vim's clipboard.

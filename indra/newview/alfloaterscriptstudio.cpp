@@ -932,8 +932,9 @@ void ALFloaterScriptStudio::listenToWorld()
         }
     });
     mConvertedContents = ALScriptWorkspace::instance().contentsIndex().onHeard([this](const ALScriptContents& contents) { convertedListed(contents); });
-    // The vimrc read again into this window's vim whenever it changes: its
-    // file saved, a notecard dropped on the preferences' box, or saved.
+    // The vimrc read again into the studio's vim whenever it changes: its
+    // file saved, a notecard dropped on the preferences' box, or saved;
+    // each window's editors set again from it.
     mVimrcConnection = ALScriptStudioVimrc::instance().onChanged([this]() {
         if (mVim.sourced())
         {
