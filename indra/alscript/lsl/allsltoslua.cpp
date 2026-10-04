@@ -231,6 +231,38 @@ namespace
         return out + "\"";
     }
 
+    // Text between Luau's backticks: a string's escapes, and the backtick
+    // and the opening brace, which would end it or begin an expression; a
+    // closing brace is text there. Luau's compiler escapes a % itself.
+    std::string luaTemplateText(std::string_view text)
+    {
+        std::string out;
+        for (const char c : text)
+        {
+            const unsigned char u = static_cast<unsigned char>(c);
+            switch (c)
+            {
+                case '\\': out += "\\\\"; break;
+                case '`': out += "\\`"; break;
+                case '{': out += "\\{"; break;
+                case '\n': out += "\\n"; break;
+                case '\r': out += "\\r"; break;
+                case '\t': out += "\\t"; break;
+                default:
+                    if (u < 0x20 || u == 0x7f)
+                    {
+                        out += llformat("\\%03d", u);
+                    }
+                    else
+                    {
+                        out += c;
+                    }
+                    break;
+            }
+        }
+        return out;
+    }
+
     std::string number(double v)
     {
         if (std::isnan(v))
@@ -418,6 +450,15 @@ namespace
         // An operand of `..`: as coerced to a string, but an integer's cast
         // to one, which `..` makes the same text of itself, left a number.
         Expr joinedPiece(LSLExpression* e);
+        // Whether an expression is LSL's + of text; and the pieces a chain
+        // of them joins, left to right, through brackets.
+        bool joinsText(LSLExpression* e);
+        void textPieces(LSLExpression* e, std::vector<LSLExpression*>& out);
+        // Pieces of text joined as one interpolated string, where one of them
+        // is no string or number that `..` takes as it is -- a key, a float,
+        // a vector, a list made text: string.format once, rather than a
+        // conversion a piece and `..`. None where every piece is.
+        std::optional<Expr> interpolated(const std::vector<LSLExpression*>& pieces);
         Expr constant(LSLConstant* c);
         // How the LSL wrote a number in hexadecimal, on the line Tailslide
         // puts its constant at or the one before: where it did, and wrote
@@ -1797,6 +1838,84 @@ namespace
         return coerced(e, LST_STRING);
     }
 
+    bool Writer::joinsText(LSLExpression* e)
+    {
+        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
+        }
+        if (!e || e->getNodeSubType() != NODE_BINARY_EXPRESSION || static_cast<LSLBinaryExpression*>(e)->getOperation() != OP_PLUS)
+        {
+            return false;
+        }
+        const LSLIType lt = slType(static_cast<LSLBinaryExpression*>(e)->getLHS());
+        const LSLIType rt = slType(static_cast<LSLBinaryExpression*>(e)->getRHS());
+        return lt != LST_LIST && rt != LST_LIST && (lt == LST_STRING || lt == LST_KEY || rt == LST_STRING || rt == LST_KEY);
+    }
+
+    void Writer::textPieces(LSLExpression* e, std::vector<LSLExpression*>& out)
+    {
+        if (!joinsText(e))
+        {
+            out.push_back(e);
+            return;
+        }
+        while (e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
+        }
+        textPieces(static_cast<LSLBinaryExpression*>(e)->getLHS(), out);
+        textPieces(static_cast<LSLBinaryExpression*>(e)->getRHS(), out);
+    }
+
+    std::optional<Expr> Writer::interpolated(const std::vector<LSLExpression*>& pieces)
+    {
+        // What each piece is once its brackets are let go of; and, for one
+        // made text by a cast, what was cast.
+        const auto bare = [](LSLExpression* e) {
+            while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+            {
+                e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
+            }
+            return e;
+        };
+        const auto cast = [&](LSLExpression* e) -> LSLExpression* {
+            e = bare(e);
+            return e && e->getNodeSubType() == NODE_TYPECAST_EXPRESSION && e->getIType() == LST_STRING ? static_cast<LSLTypecastExpression*>(e)->getChildExpr()
+                                                                                                         : nullptr;
+        };
+        // A string, or an integer cast, `..` takes as it is; anything else
+        // asks for a conversion.
+        const auto converted = [&](LSLExpression* e) {
+            const LSLIType type = cast(e) ? slType(cast(e)) : slType(bare(e));
+            return type != LST_STRING && type != LST_INTEGER;
+        };
+        if (std::none_of(pieces.begin(), pieces.end(), converted))
+        {
+            return std::nullopt;
+        }
+        std::string body;
+        for (LSLExpression* piece : pieces)
+        {
+            LSLExpression* e = bare(piece);
+            if (e->getNodeSubType() == NODE_CONSTANT_EXPRESSION && e->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
+            {
+                body += luaTemplateText(static_cast<LSLStringConstant*>(e->getChild(0))->getValue());
+                continue;
+            }
+            // A string, a number or a key as it is, which {} makes text as
+            // tostring does; a float, a vector or a list as LSL wrote it.
+            LSLExpression* from = cast(piece);
+            const Expr     made = from && slType(from) != LST_FLOATINGPOINT && slType(from) != LST_VECTOR && slType(from) != LST_QUATERNION &&
+                                      slType(from) != LST_LIST
+                                      ? value(from)
+                                      : value(e);
+            // {{ is no expression in Luau: a table's braces bracketed.
+            body += "{" + (!made.text.empty() && made.text.front() == '{' ? "(" + made.text + ")" : made.text) + "}";
+        }
+        return Expr{ "`" + body + "`" };
+    }
+
     Expr Writer::coerced(LSLExpression* e, LSLIType to)
     {
         Expr           out  = value(e);
@@ -2517,6 +2636,14 @@ namespace
                 }
                 if (lt == LST_STRING || lt == LST_KEY || rt == LST_STRING || rt == LST_KEY)
                 {
+                    // The whole chain as one string, where a piece of it asks
+                    // for a conversion.
+                    std::vector<LSLExpression*> pieces;
+                    textPieces(e, pieces);
+                    if (std::optional<Expr> joined = interpolated(pieces))
+                    {
+                        return *joined;
+                    }
                     const Expr a = joinedPiece(lhs);
                     const Expr b = joinedPiece(rhs);
                     // Joining text is the same whichever way round it goes:
@@ -2913,9 +3040,21 @@ namespace
             // A lone piece made a string, so that the table holds strings.
             std::string                       piece;
             const std::vector<LSLExpression*> parts = appended(whole, var);
+            std::vector<LSLExpression*>       flat;
             for (LSLExpression* part : parts)
             {
-                piece += (piece.empty() ? "" : " .. ") + bracketed(parts.size() > 1 ? joinedPiece(part) : coerced(part, LST_STRING), CONCAT);
+                textPieces(part, flat);
+            }
+            if (std::optional<Expr> joined = interpolated(flat))
+            {
+                piece = joined->text;
+            }
+            else
+            {
+                for (LSLExpression* part : parts)
+                {
+                    piece += (piece.empty() ? "" : " .. ") + bracketed(parts.size() > 1 ? joinedPiece(part) : coerced(part, LST_STRING), CONCAT);
+                }
             }
             if (!piece.empty())
             {
@@ -2928,10 +3067,22 @@ namespace
         {
             if (type == LST_STRING)
             {
-                std::string joined;
+                std::vector<LSLExpression*> flat;
                 for (LSLExpression* part : parts)
                 {
-                    joined += (joined.empty() ? "" : " .. ") + bracketed(joinedPiece(part), CONCAT);
+                    textPieces(part, flat);
+                }
+                std::string joined;
+                if (std::optional<Expr> whole = interpolated(flat))
+                {
+                    joined = whole->text;
+                }
+                else
+                {
+                    for (LSLExpression* part : parts)
+                    {
+                        joined += (joined.empty() ? "" : " .. ") + bracketed(joinedPiece(part), CONCAT);
+                    }
                 }
                 line(name + " ..= " + joined);
                 return;

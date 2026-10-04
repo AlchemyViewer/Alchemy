@@ -599,8 +599,8 @@ namespace tut
         ensure("x = x op y: " + r.text, has(r, "b += c") && has(r, "b -= c - 1"));
         ensure("not where the left of the operator is more than x: " + r.text, has(r, "b = b - c - 1") && has(r, "c = c * 2 + b"));
         ensure("a string's pieces, joined: " + r.text, has(r, "s ..= \"y\" .. b"));
-        ensure("an integer's sum joined bracketed, a float's and a vector's as LSL writes them: " + r.text,
-               has(r, "print(a .. string.format(\"%.6f\", f) .. ll.DumpList2String({v}, \"\") .. s .. (b + c))"));
+        ensure("a float's and a vector's as LSL writes them, in one interpolated string: " + r.text,
+               has(r, "print(`{a}{string.format(\"%.6f\", f)}{ll.DumpList2String({v}, \"\")}{s}{b + c}`)"));
         checksClean(r);
     }
 
@@ -763,7 +763,7 @@ namespace tut
                has(r, "ll.MessageLinked(LINK_SET, 1, \"hi\", DOMAIN)") && has(r, "ll.MessageLinked(LINK_SET, 2, \"x\", gOwner)") &&
                    has(r, "send(\"other text\")") && has(r, "ll.MessageLinked(LINK_SET, 0, \"\", to)"));
         ensure("compared as text: " + r.text, has(r, "if id == DOMAIN then") && has(r, "if id == tostring(gOwner) then"));
-        ensure("a key given the id, text: " + r.text, has(r, "local k = id") && has(r, " .. k)"));
+        ensure("a key given the id, text: " + r.text, has(r, "local k = id") && has(r, "{k}`)"));
         ensure("uuid() where only a uuid will do, said: " + r.text, has(r, "ll.GetOwnerKey(uuid(\"abc\"))") && noted(r, "SluaKeyText"));
         checksClean(r);
     }
@@ -1491,7 +1491,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<44>()
     {
-        set_test_name("an integer made text where .. joins it written bare, which .. makes the same text of; alone, a float's, a key's, or a lone piece of a table's, as before");
+        set_test_name("an integer made text where .. joins it written bare, which .. makes the same text of; alone, or a lone piece of a table's, as before; with a float's or a key's, interpolated");
         const ALLSLToSLua::Result r = convert("set(integer keey, string value) { llLinksetDataWrite(\"ARS#\" + (string)keey, value); }\n"
                                               "default { state_entry() {\n"
                                               "    integer n = 4; float f = 1.5; key k = llGetOwner();\n"
@@ -1502,7 +1502,7 @@ namespace tut
         ensure("as Tapple would have it: " + r.text, has(r, "ll.LinksetDataWrite(\"ARS#\" .. keey, value)"));
         ensure("alone, still text: " + r.text, has(r, "set(n, tostring(n))"));
         ensure("a float's six places, a key's text, a product bracketed, a negation bare: " + r.text,
-               has(r, "print(string.format(\"%.6f\", f) .. \";\" .. tostring(k) .. \";\" .. (n * 2) .. -n)"));
+               has(r, "print(`{string.format(\"%.6f\", f)};{k};{n * 2}{-n}`)"));
         checksClean(r);
     }
 
@@ -1518,10 +1518,33 @@ namespace tut
                                               "    llOwnerSay((string)ZERO_ROTATION);\n"
                                               "} }\n");
         ensure("converted", r.converted);
-        ensure("LSL's text kept: " + r.text, has(r, "set(7, SEAT_NUM .. \";\" .. ll.DumpList2String({offset}, \"\"))"));
+        ensure("LSL's text kept: " + r.text, has(r, "set(7, `{SEAT_NUM};{ll.DumpList2String({offset}, \"\")}`)"));
         ensure("a rotation's too: " + r.text, has(r, "ll.DumpList2String({ZERO_ROTATION}, \"\")"));
         ensure("said why, once: " + r.text, noted(r, "SluaVectorText") && r.text.find("-- LSL: ll.DumpList2String writes") != std::string::npos &&
                                                  r.text.find("-- LSL: ll.DumpList2String writes") == r.text.rfind("-- LSL: ll.DumpList2String writes"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<46>()
+    {
+        set_test_name("text joined with a piece that asks for a conversion as one interpolated string, its own text escaped; strings and numbers alone with ..");
+        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
+                                              "    key k = llGetOwner(); integer n = 3; string s = \"x\"; float f = 0.5;\n"
+                                              "    llOwnerSay(\"100% `{a}` \\\\ \\\"q\\\"\\n\" + (string)k);\n"
+                                              "    llOwnerSay(\"n=\" + (string)n + \";\" + s);\n"
+                                              "    llOwnerSay(\"a\" + llToUpper(\"b\" + (string)k) + (string)f);\n"
+                                              "    s = s + \"/\" + (string)k;\n"
+                                              "    string all = \"\";\n"
+                                              "    integer i; for (i = 0; i < n; ++i) all += (string)k + \",\";\n"
+                                              "    llOwnerSay(all + s);\n"
+                                              "} }\n");
+        ensure("converted", r.converted);
+        ensure("its text escaped -- a backtick, a brace, a backslash, a line -- and % as it is: " + r.text,
+               has(r, "print(`100% \\`\\{a}\\` \\\\ \"q\"\\n{k}`)"));
+        ensure("strings and numbers alone, with ..: " + r.text, has(r, "print(\"n=\" .. n .. \";\" .. s)"));
+        ensure("one inside another's braces: " + r.text, has(r, "print(`a{ll.ToUpper(`b{k}`)}{string.format(\"%.6f\", f)}`)"));
+        ensure("joined onto a string: " + r.text, has(r, "s ..= `/{k}`"));
         checksClean(r);
     }
 }
