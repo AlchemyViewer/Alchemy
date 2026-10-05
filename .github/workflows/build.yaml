@@ -546,6 +546,9 @@ jobs:
     runs-on: windows-2025-vs2026
     env:
       SIGN_PACKAGES: ${{ github.event_name != 'pull_request' }}
+      # The .NET tools restore into a folder of their own, so the cache holds
+      # them and not whatever packages the image carries.
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
     steps:
       # The app and its metadata come from the build's artifacts; the tree
       # contributes only the .NET tool manifest.
@@ -557,10 +560,14 @@ jobs:
           sparse-checkout: /dotnet-tools.json
           sparse-checkout-cone-mode: false
 
+      # vpk is a 147 MB package: it comes from the cache, keyed on the tool
+      # manifest, rather than from nuget.org.
       - name: Setup .NET for Velopack
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.x'
+          cache: true
+          cache-dependency-path: dotnet-tools.json
 
       - name: Install Velopack CLI and AzureSignTool
         run: dotnet tool restore
@@ -672,6 +679,8 @@ jobs:
     env:
       DEVELOPER_DIR: "/Applications/Xcode.app/Contents/Developer"
       SIGN_PACKAGES: ${{ github.event_name != 'pull_request' }}
+      # As in the Windows packaging job.
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
     steps:
       # The app and its metadata come from the build's artifacts; the tree
       # contributes the .NET tool manifest, the signing script, the
@@ -697,6 +706,8 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.x'
+          cache: true
+          cache-dependency-path: dotnet-tools.json
 
       - name: Install Velopack CLI
         run: dotnet tool restore

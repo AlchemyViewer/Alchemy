@@ -129,16 +129,10 @@ runs:
       shell: bash
       run: ./vcpkg/bootstrap-vcpkg.sh
 
-    # Ports built with cargo (Velopack) fetch their crates here. Keyed on the
-    # manifest and the registry baseline, which decide the crate versions.
-    - name: Cache Rust dependencies
-      uses: actions/cache@v6
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-        key: ${{ runner.os }}-cargo-${{ hashFiles('indra/vcpkg.json', 'indra/vcpkg-configuration.json') }}
-        restore-keys: ${{ runner.os }}-cargo-
+    # No cargo cache. The one port built with cargo, Velopack, is built only
+    # when the binary cache misses it; every other row restored the crates
+    # for nothing, at up to a minute a row on Windows, where fetching them
+    # takes the rare row that needs them ten seconds.
 
     - name: Install AWS CLI on macOS
       if: inputs.r2-cache-mode != '' && runner.os == 'macOS'
