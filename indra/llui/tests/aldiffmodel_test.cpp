@@ -456,4 +456,22 @@ namespace tut
         m.setSame(ALDiffSame::make({ { "llSay", "ll.Say" } }));
         ensure("the whole comparison's: nothing marked anywhere", m.line(Column::Left, 0).words.empty() && m.line(Column::Left, 1).words.empty());
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<16>()
+    {
+        set_test_name("a block moved: its lines signed > on each side and inline, unpaired, each its move's; a line's other end, each way");
+        const std::string block = "llOwnerSay(\"a block of lines\");\nllOwnerSay(\"moved as one\");";
+        m.setTexts(block + "\nstay one\nstay two", "stay one\nstay two\n" + block);
+        ensure_equals("one move", m.moveCount(), 1);
+        ensure("taken out at the top, signed >", signsOf(Column::Left) == std::string(">>\0\0", 4) && m.line(Column::Left, 0).move == 0);
+        ensure("put in at the bottom, signed >", signsOf(Column::Right) == std::string("\0\0>>", 4) && m.line(Column::Right, 3).move == 0);
+        ensure("the other end, from the left", m.moveOtherEnd(Column::Left, 1) == std::make_pair(Column::Right, 3));
+        ensure("and from the right", m.moveOtherEnd(Column::Right, 2) == std::make_pair(Column::Left, 0));
+        ensure("none from a line not moved", m.moveOtherEnd(Column::Left, 2).second == -1);
+        ensure("inline too", signsOf(Column::Inline) == std::string(">>\0\0>>", 6) && m.moveOtherEnd(Column::Inline, 1) == std::make_pair(Column::Inline, 5) &&
+                                 m.moveOtherEnd(Column::Inline, 4) == std::make_pair(Column::Inline, 0));
+        ensure("no words marked", m.line(Column::Left, 0).words.empty());
+        ensure_equals("still changes, stepped through", m.changeCount(), 2);
+    }
 }

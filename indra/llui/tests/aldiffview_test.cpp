@@ -773,4 +773,32 @@ namespace tut
         d.right()->setFocus(true);
         ensure_equals("and back", d.bar()->countSaid(), std::string("2 changes"));
     }
+
+    template<> template<>
+    void aldiffview_object::test<24>()
+    {
+        set_test_name("a block moved: tinted as neither taken out nor put in, signed, marked on the ruler; a click on its sign goes to its other end");
+        const std::string block = "llOwnerSay(\"a block of lines\");\nllOwnerSay(\"moved as one\");";
+        const std::string left  = block + "\nstay one\nstay two\nstay three";
+        const std::string right = "stay one\nstay two\nstay three\n" + block;
+        ALDiffView&       d     = make(left.c_str(), right.c_str());
+        const LLColor4&   moved = d.left()->lineAnnotation(0).tint;
+        const LLColor4&   gone  = d.left()->lineAnnotation(0).rulerTint;
+        ensure("tinted, as neither red nor green", moved.mV[VALPHA] > 0.f && moved.mV[VBLUE] > moved.mV[VRED] && moved.mV[VBLUE] > moved.mV[VGREEN]);
+        ensure("marked on the ruler likewise", gone.mV[VBLUE] > gone.mV[VRED]);
+        ensure_equals("signed", signsOf(d.left()), std::string(">>\0\0\0", 5));
+
+        // A click in the left's gutter beside its second line moved.
+        ALCodeEditor* side  = d.left();
+        const LLRect  frame = side->getRect();
+        const LLRect  text  = side->textRect();
+        const S32     row_h = side->layout().lineHeight(1);
+        const S32     y     = frame.mBottom + text.mTop - (side->layout().lineTop(1) - side->scrollY()) - row_h / 2;
+        ensure("taken", d.handleMouseDown(frame.mLeft + text.mLeft / 2, y, MASK_NONE));
+        ensure("the right's caret on the other end, which has the keyboard", d.right()->caret().line == 4 && d.right()->hasFocus());
+        // In the text rather than the gutter: not taken as a step.
+        d.left()->setFocus(true);
+        d.handleMouseDown(frame.mLeft + text.mLeft + 20, y, MASK_NONE);
+        ensure("a click in the text is the text's", d.right()->caret().line == 4 && !d.right()->hasFocus());
+    }
 }

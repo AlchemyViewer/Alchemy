@@ -518,7 +518,8 @@ public:
     {
         static constexpr S32 OWN_NUMBER = -1;
         S32                  number     = OWN_NUMBER;
-        // '+' put in, '-' taken out, '~' changed into another; 0 none.
+        // '+' put in, '-' taken out, '~' changed into another, '>' moved
+        // (drawn as a guillemet); 0 none.
         char                 sign       = 0;
         LLColor4             tint       = LLColor4::transparent;
         LLColor4             rulerTint  = LLColor4::transparent;

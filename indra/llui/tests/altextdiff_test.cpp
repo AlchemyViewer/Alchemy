@@ -26,6 +26,7 @@
 
 #include "altextdiff.h"
 
+#include "aldiffmoves.h"
 #include "aldiffsame.h"
 #include "allinepairs.h"
 
@@ -669,5 +670,52 @@ namespace tut
                                                      ALLinePairs::alike("llSay(0, s)", "ll.Say(0, s)") < 1.f);
         ensure("a table of nothing joined with one: that one", ALDiffSame::joined(nullptr, same.same) == same.same &&
                                                                   ALDiffSame::joined(same.same, ALDiffSame::make({}))->pairs().size() == 3);
+    }
+
+    template<> template<>
+    void altextdiff_object::test<18>()
+    {
+        set_test_name("blocks moved: a function moved down found, two crossing found, one changed within it or too small not");
+        typedef ALDiffMoves::moves_t M;
+        const auto fn = [](const std::string& name) {
+            return std::vector<std::string>{ "integer " + name + "(integer a)", "{", "    llOwnerSay(\"" + name + " called\");", "    return a * 2;", "}", "" };
+        };
+        const auto join = [](std::initializer_list<std::vector<std::string>> parts) {
+            std::vector<std::string> out;
+            for (const auto& part : parts)
+            {
+                out.insert(out.end(), part.begin(), part.end());
+            }
+            return out;
+        };
+        const std::vector<std::string> abc = join({ fn("alpha"), fn("beta"), fn("gamma") });
+        const std::vector<std::string> bca = join({ fn("beta"), fn("gamma"), fn("alpha") });
+        const std::vector<Run>         runs = ALTextDiff::lines(abc, bca);
+        const M                        down = ALDiffMoves::find(abc, bca, runs);
+        ensure("one block: alpha, from the top to the bottom", down.size() == 1 && down[0].left == 0 && down[0].right == 12 && down[0].count >= 5);
+
+        const std::vector<std::string> axb = join({ fn("alpha"), fn("omega"), fn("delta") });
+        const std::vector<std::string> bxa = join({ fn("delta"), fn("omega"), fn("alpha") });
+        const M                        crossing = ALDiffMoves::find(axb, bxa, ALTextDiff::lines(axb, bxa));
+        // Alike in shape, their braces and blank lines stay where they are
+        // beside the other's, which cuts each block in pieces: each
+        // function's own lines moved, whatever else.
+        const auto moved_line = [&crossing](S32 line) {
+            return std::any_of(crossing.begin(), crossing.end(), [line](const ALDiffMoves::Move& m) { return line >= m.left && line < m.left + m.count; });
+        };
+        ensure("two crossing: alpha's lines and delta's moved", moved_line(0) && moved_line(2) && moved_line(12) && moved_line(14) && !moved_line(6));
+
+        // Short lines, each part of the block too small once one is changed.
+        // Eight letters and digits a line: the three are enough, one not.
+        // Moved past more lines than it has, which stay.
+        const std::vector<std::string> small = { "keep one", "aaa = bbb + cc;", "ddd = eee + ff;", "ggg = hhh + ii;", "two", "three", "four", "five", "end" };
+        const std::vector<std::string> moved = { "keep one", "two", "three", "four", "five", "aaa = bbb + cc;", "ddd = eee + ff;", "ggg = hhh + ii;", "end" };
+        ensure_equals("the whole block, moved", ALDiffMoves::find(small, moved, ALTextDiff::lines(small, moved)).size(), static_cast<size_t>(1));
+        std::vector<std::string> changed = moved;
+        changed[6]                       = "ddd = eee - ff;";
+        ensure("moved and changed within: none", ALDiffMoves::find(small, changed, ALTextDiff::lines(small, changed)).empty());
+        const std::vector<std::string> braces = { "a();", "}", "b();", "c();" };
+        const std::vector<std::string> later  = { "a();", "b();", "c();", "}" };
+        ensure("a brace moved: too small to count", ALDiffMoves::find(braces, later, ALTextDiff::lines(braces, later)).empty());
     }
 }

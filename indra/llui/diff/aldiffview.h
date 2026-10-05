@@ -50,10 +50,11 @@ class LLTextBox;
 // changed into another, the words that changed are marked. Runs of lines
 // the same are folded away beyond a few lines of context, each to a row
 // of nothing saying how many, which a click, Return on it, or unfolding
-// beside it opens. Each side has a title over it, and over the titles a
-// bar (ALDiffBar): which change the caret is in, of how many, the steps
-// through them, folding, inline or side by side, the sides swapped, and
-// done.
+// beside it opens. A block of lines moved is tinted as neither, its lines
+// signed », and a click on a sign goes to the block's other end. Each side
+// has a title over it, and over the titles a bar (ALDiffBar): which change
+// the caret is in, of how many, the steps through them, folding, inline
+// or side by side, the sides swapped, and done.
 //
 // What is shown, row by row, and every lookup between rows, lines, changes
 // and folds is the model's; this fills an editor for each of its columns,
@@ -256,6 +257,11 @@ private:
     // folded; -1 for none.
     S32           foldAtPoint(S32 x, S32 y, ALCodeEditor** side = nullptr);
     void          drawFoldRows();
+    // The side under a point of the view and the line in its gutter there,
+    // where it is a line of a block moved; and the step from such a line to
+    // the other end of its block, which takes the keyboard.
+    bool          moveAtPoint(S32 x, S32 y, ALCodeEditor** side, S32* line);
+    void          goToMoved(ALCodeEditor* side, S32 line);
     // A line round the change the caret is in, on each side shown.
     void          drawCurrentChange();
 

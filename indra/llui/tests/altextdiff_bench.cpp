@@ -32,10 +32,11 @@
 //
 // After the times, what each comparison says of some edits a person
 // makes -- a line changed, a block moved, a function reformatted, lines
-// changed all over -- as counts: changes, lines marked, and words marked
-// in lines paired. Those are not better or worse by being lower; they are
-// read against the same rows from before a change to how texts are
-// compared, to see that it did what it meant to and nothing else.
+// changed all over -- as counts: changes, lines marked, words marked in
+// lines paired, and lines taken out that were moved. Those are not better
+// or worse by being lower; they are read against the same rows from
+// before a change to how texts are compared, to see that it did what it
+// meant to and nothing else.
 //
 // An unoptimised build exits 125, which CTest reads as skipped.
 
@@ -198,12 +199,13 @@ namespace
         model.setLexer(options.lexer);
         model.setAlgorithm(options.algorithm);
         model.setTexts(left, right);
-        S32 removed = 0, added = 0, paired = 0, marks = 0;
+        S32 removed = 0, added = 0, paired = 0, marks = 0, moved = 0;
         for (S32 line = 0; line < model.lineCount(ALDiffModel::Column::Left); ++line)
         {
             const ALDiffModel::Line& one = model.line(ALDiffModel::Column::Left, line);
             removed += one.kind == ALDiffModel::Kind::Removed;
             paired += one.sign == '~';
+            moved += one.move >= 0;
             marks += static_cast<S32>(one.words.size());
         }
         for (S32 line = 0; line < model.lineCount(ALDiffModel::Column::Right); ++line)
@@ -212,7 +214,7 @@ namespace
             added += one.kind == ALDiffModel::Kind::Added;
             marks += static_cast<S32>(one.words.size());
         }
-        std::printf("  %-44s %8d %8d %8d %8d %8d\n", name, model.changeCount(), removed, added, paired, marks);
+        std::printf("  %-44s %8d %8d %8d %8d %8d %8d\n", name, model.changeCount(), removed, added, paired, marks, moved);
     }
 }
 #endif // LL_RELEASE
@@ -301,7 +303,7 @@ int main(int, char**)
     row("a keystroke, a thousand edits, LSL's grammar", typed(small_t, small1kt, true), typed(big_t, big1kt, true));
 
     std::printf("\nWhat it says (5,000 lines)\n");
-    std::printf("  %-44s %8s %8s %8s %8s %8s\n", "", "changes", "out", "in", "paired", "words");
+    std::printf("  %-44s %8s %8s %8s %8s %8s %8s\n", "", "changes", "out", "in", "paired", "words", "moved");
     ALTextDiff::Options by_grammar;
     by_grammar.lexer = lexer();
     says("ten edits", small_t, small10t);

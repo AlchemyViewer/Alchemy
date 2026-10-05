@@ -394,6 +394,9 @@ void ALDiffView::fill()
     // The ruler's: each side's own change, and beside a gap, the other's.
     const LLColor4 out_mark  = colorOf("CodeDiffRemovedMarkColor", LLColor4(0.9f, 0.3f, 0.3f, 0.85f));
     const LLColor4 in_mark   = colorOf("CodeDiffAddedMarkColor", LLColor4(0.3f, 0.8f, 0.4f, 0.85f));
+    // A block moved, at either end: neither red nor green.
+    const LLColor4 moved      = colorOf("CodeDiffMovedColor", LLColor4(0.45f, 0.45f, 0.95f, 0.18f));
+    const LLColor4 moved_mark = colorOf("CodeDiffMovedMarkColor", LLColor4(0.5f, 0.5f, 1.f, 0.85f));
     for (ALCodeEditor* side : { mLeft, mRight, mInlined })
     {
         // What the editor is told of each line of the column, and of the
@@ -417,8 +420,8 @@ void ALDiffView::fill()
                 each.number = line.number;
             }
             each.sign      = line.sign;
-            each.tint      = gone ? out : made ? in : LLColor4::transparent;
-            each.rulerTint = gone ? out_mark : made ? in_mark : LLColor4::transparent;
+            each.tint      = line.move >= 0 ? moved : gone ? out : made ? in : LLColor4::transparent;
+            each.rulerTint = line.move >= 0 ? moved_mark : gone ? out_mark : made ? in_mark : LLColor4::transparent;
             each.gap       = line.padding;
             if (line.padding > 0)
             {
@@ -679,6 +682,48 @@ S32 ALDiffView::foldAtPoint(S32 x, S32 y, ALCodeEditor** under)
     return -1;
 }
 
+bool ALDiffView::moveAtPoint(S32 x, S32 y, ALCodeEditor** under, S32* at_line)
+{
+    // In a side's gutter, beside a line of a block moved.
+    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
+    for (ALCodeEditor* side : sides)
+    {
+        const LLRect frame = side ? side->getRect() : LLRect();
+        if (!side || !frame.pointInRect(x, y))
+        {
+            continue;
+        }
+        const S32    local_x = x - frame.mLeft;
+        const S32    local_y = y - frame.mBottom;
+        const LLRect text    = side->textRect();
+        if (local_x >= text.mLeft || local_y > text.mTop || local_y < text.mBottom || side->gapAtLocal(local_y) >= 0)
+        {
+            return false;
+        }
+        const S32 line = side->posAtLocal(text.mLeft, local_y, false).line;
+        if (mModel.line(columnOf(side), line).move < 0)
+        {
+            return false;
+        }
+        *under   = side;
+        *at_line = line;
+        return true;
+    }
+    return false;
+}
+
+void ALDiffView::goToMoved(ALCodeEditor* side, S32 line)
+{
+    const auto [column, other] = mModel.moveOtherEnd(columnOf(side), line);
+    if (other < 0)
+    {
+        return;
+    }
+    ALCodeEditor* to = column == Column::Left ? mLeft : column == Column::Right ? mRight : mInlined;
+    to->goTo(ALTextPos(other, 0));
+    to->setFocus(true);
+}
+
 bool ALDiffView::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     // A folded row opened, the caret put on the first line it hid, on the
@@ -686,6 +731,14 @@ bool ALDiffView::handleMouseDown(S32 x, S32 y, MASK mask)
     if (const S32 change = arrowAtPoint(x, y); change >= 0)
     {
         takeBack(change);
+        return true;
+    }
+    // A moved line's sign: to the other end of its block.
+    ALCodeEditor* moved_side = nullptr;
+    S32           moved_line = -1;
+    if (moveAtPoint(x, y, &moved_side, &moved_line))
+    {
+        goToMoved(moved_side, moved_line);
         return true;
     }
     ALCodeEditor* side = nullptr;
@@ -704,7 +757,9 @@ bool ALDiffView::handleMouseDown(S32 x, S32 y, MASK mask)
 bool ALDiffView::handleHover(S32 x, S32 y, MASK mask)
 {
     mArrowHover = arrowAtPoint(x, y);
-    if (mArrowHover >= 0 || foldAtPoint(x, y) >= 0)
+    ALCodeEditor* moved_side = nullptr;
+    S32           moved_line = -1;
+    if (mArrowHover >= 0 || foldAtPoint(x, y) >= 0 || moveAtPoint(x, y, &moved_side, &moved_line))
     {
         if (LLWindow* window = getWindow())
         {

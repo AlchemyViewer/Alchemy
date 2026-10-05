@@ -274,6 +274,20 @@ void ALDiffModel::build(const std::vector<bool>& open)
         }
         return mOptions;
     };
+    // The blocks moved, and which each line of either side is in.
+    const ALDiffMoves::moves_t moves = ALDiffMoves::find(left, right, runs, options);
+    std::vector<S32>           left_move(left.size(), -1);
+    std::vector<S32>           right_move(right.size(), -1);
+    mMoves.assign(moves.size(), Move());
+    for (size_t n = 0; n < moves.size(); ++n)
+    {
+        mMoves[n].lines = moves[n];
+        for (S32 k = 0; k < moves[n].count; ++k)
+        {
+            left_move[static_cast<size_t>(moves[n].left + k)]   = static_cast<S32>(n);
+            right_move[static_cast<size_t>(moves[n].right + k)] = static_cast<S32>(n);
+        }
+    }
     for (ColumnData& c : mColumns)
     {
         c = ColumnData();
@@ -374,7 +388,38 @@ void ALDiffModel::build(const std::vector<bool>& open)
         // once for both ways of showing; the rest taken out or put in alone,
         // beside a row of nothing, what was taken out before what was put
         // in between two pairs.
-        const ALLinePairs::pairs_t pairs = ALLinePairs::pair(left, right, gone, made, options, left_regions, right_regions);
+        // Lines of a block moved stand alone: paired, of the rest.
+        std::vector<S32> gone_free;
+        std::vector<S32> made_free;
+        std::vector<S32> gone_at;
+        std::vector<S32> made_at;
+        for (size_t n = 0; n < gone.size(); ++n)
+        {
+            if (left_move[static_cast<size_t>(gone[n])] < 0)
+            {
+                gone_free.push_back(gone[n]);
+                gone_at.push_back(static_cast<S32>(n));
+            }
+        }
+        for (size_t n = 0; n < made.size(); ++n)
+        {
+            if (right_move[static_cast<size_t>(made[n])] < 0)
+            {
+                made_free.push_back(made[n]);
+                made_at.push_back(static_cast<S32>(n));
+            }
+        }
+        ALLinePairs::pairs_t pairs = ALLinePairs::pair(left, right, gone_free, made_free, options, left_regions, right_regions);
+        for (auto& [g, d] : pairs)
+        {
+            g = gone_at[static_cast<size_t>(g)];
+            d = made_at[static_cast<size_t>(d)];
+        }
+        // A line taken out or put in alone, signed as its own or as moved.
+        const auto alone = [&](Column column, const std::string& text, S32 line, Kind kind, S32 move) {
+            add(column, text, line + 1, kind, move >= 0 ? '>' : kind == Kind::Removed ? '-' : '+');
+            of(column).lines.back().move = move;
+        };
         std::vector<std::pair<ALTextDiff::spans_t, ALTextDiff::spans_t>> paired;
         size_t                                                           g = 0;
         size_t                                                           d = 0;
@@ -384,13 +429,13 @@ void ALDiffModel::build(const std::vector<bool>& open)
             const size_t to_made = p < pairs.size() ? static_cast<size_t>(pairs[p].second) : made.size();
             for (; g < to_gone; ++g)
             {
-                add(Column::Left, left[static_cast<size_t>(gone[g])], gone[g] + 1, Kind::Removed, '-');
+                alone(Column::Left, left[static_cast<size_t>(gone[g])], gone[g], Kind::Removed, left_move[static_cast<size_t>(gone[g])]);
                 pad(Column::Right);
             }
             for (; d < to_made; ++d)
             {
                 pad(Column::Left);
-                add(Column::Right, right[static_cast<size_t>(made[d])], made[d] + 1, Kind::Added, '+');
+                alone(Column::Right, right[static_cast<size_t>(made[d])], made[d], Kind::Added, right_move[static_cast<size_t>(made[d])]);
             }
             if (p == pairs.size())
             {
@@ -410,14 +455,26 @@ void ALDiffModel::build(const std::vector<bool>& open)
         const S32 first_out = lineCount(Column::Inline);
         for (const S32 line : gone)
         {
-            add(Column::Inline, left[static_cast<size_t>(line)], 0, Kind::Removed, '-');
+            const S32 move = left_move[static_cast<size_t>(line)];
+            if (move >= 0 && mMoves[static_cast<size_t>(move)].lines.left == line)
+            {
+                mMoves[static_cast<size_t>(move)].inlineLeft = lineCount(Column::Inline);
+            }
+            add(Column::Inline, left[static_cast<size_t>(line)], 0, Kind::Removed, move >= 0 ? '>' : '-');
+            of(Column::Inline).lines.back().move = move;
             inline_left.push_back(line);
             inline_right.push_back(-1);
         }
         const S32 first_in = lineCount(Column::Inline);
         for (const S32 line : made)
         {
-            add(Column::Inline, right[static_cast<size_t>(line)], line + 1, Kind::Added, '+');
+            const S32 move = right_move[static_cast<size_t>(line)];
+            if (move >= 0 && mMoves[static_cast<size_t>(move)].lines.right == line)
+            {
+                mMoves[static_cast<size_t>(move)].inlineRight = lineCount(Column::Inline);
+            }
+            add(Column::Inline, right[static_cast<size_t>(line)], line + 1, Kind::Added, move >= 0 ? '>' : '+');
+            of(Column::Inline).lines.back().move = move;
             inline_left.push_back(-1);
             inline_right.push_back(line);
         }
@@ -687,6 +744,26 @@ bool ALDiffModel::takeBack(S32 change, ALTextRange& range, std::string& text, st
     const auto offset = [&](const ALTextPos& pos) { return starts[static_cast<size_t>(pos.line)] + static_cast<size_t>(pos.column); };
     made              = mRightText.substr(0, offset(range.begin)) + text + mRightText.substr(offset(range.end));
     return true;
+}
+
+// --- moves ---------------------------------------------------------------------------
+
+std::pair<ALDiffModel::Column, S32> ALDiffModel::moveOtherEnd(Column column, S32 line) const
+{
+    const Line& one = this->line(column, line);
+    if (one.move < 0)
+    {
+        return { column, -1 };
+    }
+    // A line taken out stands for the line put in as far into the block.
+    const Move& move = mMoves[static_cast<size_t>(one.move)];
+    if (column == Column::Inline)
+    {
+        return one.kind == Kind::Removed ? std::make_pair(column, move.inlineRight + line - move.inlineLeft)
+                                         : std::make_pair(column, move.inlineLeft + line - move.inlineRight);
+    }
+    return column == Column::Left ? std::make_pair(Column::Right, move.lines.right + line - move.lines.left)
+                                  : std::make_pair(Column::Left, move.lines.left + line - move.lines.right);
 }
 
 // --- ranges --------------------------------------------------------------------------

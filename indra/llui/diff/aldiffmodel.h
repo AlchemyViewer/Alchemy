@@ -25,6 +25,7 @@
 #ifndef AL_ALDIFFMODEL_H
 #define AL_ALDIFFMODEL_H
 
+#include "aldiffmoves.h"
 #include "altextdiff.h"
 #include "altextdocument.h"
 
@@ -83,10 +84,11 @@ public:
 
     // A line of a column: taken out (Removed), put in (Added) or the same;
     // its sign, '~' for a line changed into another, '-' taken out and '+'
-    // put in, nought for the same; the number its gutter shows -- of its
-    // own text side by side; inline, the right's, nought for a line taken
-    // out; the words of it that changed; and the rows of nothing above it,
-    // beside lines the other column has.
+    // put in, '>' taken out or put in as part of a block moved, nought for
+    // the same; the number its gutter shows -- of its own text side by
+    // side; inline, the right's, nought for a line taken out; the words of
+    // it that changed; the rows of nothing above it, beside lines the
+    // other column has; and the block moved it is in, -1 for none.
     struct Line
     {
         Kind                kind    = Kind::Same;
@@ -94,6 +96,7 @@ public:
         S32                 number  = 0;
         S32                 padding = 0;
         ALTextDiff::spans_t words;
+        S32                 move    = -1;
     };
 
     // A change's lines in the texts as given, swapped or not: where they
@@ -222,6 +225,17 @@ public:
     // there -- and the right's text as it will be. False for no change.
     bool               takeBack(S32 change, ALTextRange& range, std::string& text, std::string& made) const;
 
+    // --- moves -------------------------------------------------------------------
+
+    // Blocks of lines taken out in one place and put in at another, the
+    // same (ALDiffMoves): each line of one signed '>', not paired with
+    // another, and its move's.
+    S32                    moveCount() const { return static_cast<S32>(mMoves.size()); }
+    // The line at the other end of the move a line of a column is in --
+    // side by side in the other column, inline in its own -- and that
+    // column; -1 for the line where it is in none.
+    std::pair<Column, S32> moveOtherEnd(Column column, S32 line) const;
+
     // --- ranges ------------------------------------------------------------------
 
     // A range's rows side by side in a column -- of the stretch of the text
@@ -281,6 +295,14 @@ private:
         S32         end[2]   = { 0, 0 };
         ChangeLines lines;
     };
+    // A move's lines as shown, and where its first line taken out and its
+    // first put in are inline.
+    struct Move
+    {
+        ALDiffMoves::Move lines;
+        S32               inlineLeft  = -1;
+        S32               inlineRight = -1;
+    };
     struct Fold
     {
         S32  first[2] = { 0, 0 };
@@ -313,6 +335,7 @@ private:
     // Each row's line of the right's text, side by side and inline.
     std::vector<S32>      mRightLines[2];
     std::vector<Change>   mChanges;
+    std::vector<Move>     mMoves;
     std::vector<Fold>     mFolds;
 };
 

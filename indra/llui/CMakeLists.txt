@@ -138,6 +138,7 @@ target_sources(
     diff/aldiffbar.cpp
     diff/aldifflexer.cpp
     diff/aldiffmodel.cpp
+    diff/aldiffmoves.cpp
     diff/aldiffsame.cpp
     diff/aldifftokens.cpp
     diff/aldiffview.cpp
@@ -361,6 +362,7 @@ target_sources(
         diff/aldiffids.h
         diff/aldifflexer.h
         diff/aldiffmodel.h
+        diff/aldiffmoves.h
         diff/aldiffsame.h
         diff/aldifftokens.h
         diff/aldiffview.h
@@ -540,6 +542,7 @@ if(AL_BUILD_TESTS)
   # What comparing two texts is made of, compiled in, below the view.
   set(
     diff_sources
+    diff/aldiffmoves.cpp
     diff/aldiffsame.cpp
     diff/aldifftokens.cpp
     diff/allinediff.cpp

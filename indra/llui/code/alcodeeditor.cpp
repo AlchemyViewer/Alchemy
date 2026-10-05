@@ -913,7 +913,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
             else if (said.sign)
             {
                 // The host's sign, where the mark goes, in the numbers' ink.
-                const char* glyph = said.sign == '-' ? "\xE2\x88\x92" : said.sign == '+' ? "+" : "~";
+                const char* glyph = said.sign == '-' ? "\xE2\x88\x92" : said.sign == '+' ? "+" : said.sign == '>' ? "\xC2\xBB" : "~";
                 font->renderUTF8(glyph, 0, gutter.mLeft + MARK_INSET + MARK_SIZE / 2, screen_top - ascent, line == caret_line ? lit : ink, LLFontGL::HCENTER,
                                  LLFontGL::BASELINE);
             }
