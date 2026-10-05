@@ -406,6 +406,14 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="DiffBarFold">Fold away what is the same</string>
 	<string name="DiffBarIgnore">What to ignore: whitespace, blank lines, comments, case</string>
 	<string name="DiffBarCopy">Copy this change, or the whole comparison as a unified diff</string>
+	<!-- A peek at a change from the code editor (alchangepeek.cpp): its bar. -->
+	<string name="PeekChanged">Changed since saved · [CURRENT] of [TOTAL]</string>
+	<string name="PeekAdded">Added since saved · [CURRENT] of [TOTAL]</string>
+	<string name="PeekRemoved">Taken out since saved · [CURRENT] of [TOTAL]</string>
+	<string name="PeekTakeBack">Take this change back</string>
+	<string name="PeekPrevious">Previous change</string>
+	<string name="PeekNext">Next change</string>
+	<string name="PeekClose">Close</string>
 	<string name="DiffBarInline">Show the changes inline, in one text</string>
 	<string name="DiffBarSwap">Swap the sides</string>
 	<string name="DiffBarDone">Back to the text</string>

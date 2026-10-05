@@ -46,6 +46,7 @@
 #include <string_view>
 #include <vector>
 
+class ALChangePeek;
 class ALChoicePopup;
 
 // The text view configured for code: a gutter with line numbers, a mark
@@ -323,6 +324,12 @@ public:
     // Whether a line was changed since the text was last saved: the
     // gutter bars it, and a save clears them all.
     bool lineChanged(S32 line) const;
+    // A peek at the change since the text was saved that a line is in
+    // (ALChangePeek): its lines as they were, in a gap under them, with
+    // the change taken back and the steps to the others. What a press on
+    // a line's bar does. False where the line is in none.
+    bool          peekChange(S32 line);
+    ALChangePeek* changePeek() const { return mPeek; }
     void resetDirty() override;
     void markSavedAt(const ALTextUndo::SavePoint& point) override;
     // Nothing saved is known to measure against: every line barred.
@@ -1018,6 +1025,9 @@ private:
     // markers of open blocks show while it is, and the block under it
     // shows its extent.
     bool                               mGutterHover     = false;
+    // The peek at a change, made the first time one is asked for; a child
+    // let go of before the rest of the editor is.
+    ALChangePeek*                      mPeek            = nullptr;
     S32                                mGutterHoverLine = -1;
     ALAnchoredRanges<Decoration>       mDecorations;
     std::array<ALAnchoredRanges<ALTextRange>, static_cast<size_t>(Highlight::COUNT)> mHighlights;

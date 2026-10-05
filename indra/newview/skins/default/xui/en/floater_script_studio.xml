@@ -510,6 +510,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ExplorerNothingToCompare">Nothing listed in the Explorer is like [NAME] to compare it with. Pin or select the other object first.</floater.string>
     <floater.string name="CompareSaved">As last saved</floater.string>
     <floater.string name="CompareWithTitle">Compare [NAME] with</floater.string>
+    <floater.string name="PeekNoChange">The caret's line has not changed since the script was saved.</floater.string>
     <floater.string name="ComparePreprocessed">Preprocessed, as a save sends it</floater.string>
     <floater.string name="SelectionLine">[NAME], line [FIRST]</floater.string>
     <floater.string name="SelectionLines">[NAME], lines [FIRST]–[LAST]</floater.string>
@@ -1295,6 +1296,11 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_saved" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_saved" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_saved" />
+            </menu_item_check>
+            <menu_item_check label="Peek at Change" layout="topleft" name="peek_change">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="peek_change" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="peek_change" />
+                <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="peek_change" />
             </menu_item_check>
             <menu_item_call label="Compare With..." layout="topleft" name="compare_with">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_with" />

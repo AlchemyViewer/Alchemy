@@ -77,6 +77,7 @@
 #include "llcallbacklist.h"
 #include "llcheckboxctrl.h"
 #include "alsaid.h"
+#include "alchangepeek.h"
 #include "llclipboard.h"
 #include "llcombobox.h"
 #include "lldir.h"
@@ -8941,6 +8942,33 @@ void ALFloaterScriptStudio::addViewCommands()
         [this]() {
             const Doc* doc = active();
             return doc && ALScriptStudioCompareWith::canCompare(*doc);
+        });
+    // A peek at the change the caret is in, under its lines, without
+    // leaving the source; asked again, away.
+    mCommands.add(
+        "peek_change",
+        [this]() {
+            Doc* doc = active();
+            if (!doc || doc->shownView() != Doc::View::Source)
+            {
+                return;
+            }
+            if (ALChangePeek* peek = doc->editor->changePeek(); peek && peek->isOpen())
+            {
+                peek->close();
+            }
+            else if (!doc->editor->peekChange(doc->editor->caret().line))
+            {
+                setStatus(getString("PeekNoChange"));
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->loaded && doc->shownView() == Doc::View::Source && doc->editor->isDirty();
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->editor->changePeek() && doc->editor->changePeek()->isOpen();
         });
     // The source beside what a save sends of it, lined up by the map.
     mCommands.add(

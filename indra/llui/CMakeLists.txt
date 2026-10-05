@@ -169,6 +169,7 @@ target_sources(
     studio/alstudiofloater.cpp
     base/alsurface.cpp
     code/alcodecards.cpp
+    code/alchangepeek.cpp
     code/alcodeeditor.cpp
     code/albracketindex.cpp
     code/alcompletionmodel.cpp
@@ -405,6 +406,7 @@ target_sources(
         base/alundostack.h
         base/alstringmatch.h
         code/alcodecards.h
+        code/alchangepeek.h
         code/alcodeeditor.h
         code/albracketindex.h
         code/alcompletionmodel.h
@@ -728,6 +730,7 @@ if(AL_BUILD_TESTS)
     altextview
     alcodecards
     alcodeeditor
+    alchangepeek
     aldiffview
     albracketindex
     alcompletionmodel

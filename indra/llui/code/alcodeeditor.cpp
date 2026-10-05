@@ -26,6 +26,8 @@
 
 #include "alcodeeditor.h"
 
+#include "alchangepeek.h"
+
 #include "alplace.h"
 #include "alsaid.h"
 #include "alsmartselect.h"
@@ -66,6 +68,9 @@ namespace
     const S32 UNDERLINE_DOT      = 2;
     const S32 UNDERLINE_DOT_GAP  = 2;
     const S32 MARK_INSET  = 3;
+    // How far in from the gutter's edge a press is on a changed line's
+    // bar, which is drawn two wide: wider than it, to be hit.
+    const S32 CHANGE_BAR_HIT = 5;
     const S32 FOLD_COLUMN = 12;
     const S32 FOLD_MARKER = 7;
     const S32 FOLD_BOX_GAP = 6;
@@ -205,6 +210,13 @@ ALCodeEditor::ALCodeEditor(const Params& p)
 
 ALCodeEditor::~ALCodeEditor()
 {
+    // Before the signals it listens to go with this part of the editor.
+    if (mPeek)
+    {
+        removeChild(mPeek);
+        delete mPeek;
+        mPeek = nullptr;
+    }
     // The layout outlives this part of the editor, and asks the provider
     // about this part's inlays; the view, its features.
     layout().setInlayProvider(nullptr);
@@ -638,6 +650,16 @@ LLColor4 ALCodeEditor::foldColor() const
 LLColor4 ALCodeEditor::changedColor() const
 {
     return mChangedColorSet ? mChangedColor.get() : ALSurface::shade(backgroundColor(), LLColor4(0.35f, 0.6f, 0.95f, 1.f), 0.9f);
+}
+
+bool ALCodeEditor::peekChange(S32 line)
+{
+    if (!mPeek)
+    {
+        mPeek = new ALChangePeek(*this);
+        addChild(mPeek);
+    }
+    return mPeek->showAt(line);
 }
 
 bool ALCodeEditor::lineChanged(S32 line) const
@@ -4751,6 +4773,15 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     mAutoClosed.clear();
     const LLRect text         = textRect();
     const S32    gutter_right = leftEdge() + gutterWidth();
+    // A changed line's bar, at the gutter's edge: a peek at its change.
+    if (x >= leftEdge() && x < leftEdge() + CHANGE_BAR_HIT && text.mBottom <= y && y <= text.mTop)
+    {
+        const S32 line = posAtLocal(text.mLeft, y, false).line;
+        if (lineChanged(line) && peekChange(line))
+        {
+            return true;
+        }
+    }
     // The mark column of a line whose problems offer fixes: its fixes,
     // listed as Control-. would list them.
     if (mShowLineNumbers && x >= leftEdge() && x < leftEdge() + MARK_INSET + MARK_SIZE + GUTTER_PAD / 2)
@@ -5091,6 +5122,11 @@ void ALCodeEditor::pump()
 void ALCodeEditor::draw()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    // In its gap as the text is scrolled, before the children are drawn.
+    if (mPeek && mPeek->isOpen())
+    {
+        mPeek->place();
+    }
     ALTextView::draw();
     if (mCards.signature())
     {
