@@ -48,6 +48,7 @@
 #include "llenvironment.h"
 #include "llsettingssky.h"
 #include "llsettingswater.h"
+#include "skfarplane.h" // <SK:Nexii> render/farplane
 
 bool LLDrawPoolWater::sSkipScreenCopy = false;
 bool LLDrawPoolWater::sNeedsReflectionUpdate = true;
@@ -96,7 +97,10 @@ void LLDrawPoolWater::prerender()
 
 S32 LLDrawPoolWater::getNumPostDeferredPasses()
 {
-    if (LLViewerCamera::getInstance()->getOrigin().mV[2] < 1024.f)
+    // <SK:Nexii> render/farplane: water stays while within terrain reach under an infinite projection
+    const LLViewerCamera* camera = LLViewerCamera::getInstance();
+    if (skWaterVisibleFrom(camera->getOrigin().mV[2], LLEnvironment::instance().getWaterHeight(), camera->getProjectionFar()))
+    // </SK:Nexii>
     {
         return 1;
     }
@@ -279,6 +283,21 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     shader->uniform3fv(LLViewerShaderMgr::LIGHTNORM, 1, rotated_light_direction.mV);
 
     shader->uniform3fv(LLShaderMgr::WL_CAMPOSLOCAL, 1, LLViewerCamera::getInstance()->getOrigin().mV);
+
+    // <SK:Nexii> render/farplane: wave clamp, and the edge water's outer rectangle relative to the camera for its fade (skWaterFar).
+    {
+        SKWaterFar water_far = skWaterFar(LLViewerCamera::getInstance()->getNear(), LLViewerCamera::getInstance()->getProjectionFar());
+        // The whole rim, not the patches in view: a culled side would pull the rectangle in over interior water.
+        LLVector3 rim_min, rim_max;
+        if (!LLWorld::getInstance()->getEdgeWaterBounds(rim_min, rim_max))
+        {
+            water_far.mEdgeFade = 0.f;
+        }
+        const LLVector3& eye = LLViewerCamera::getInstance()->getOrigin();
+        shader->uniform4f(LLShaderMgr::SK_WATER_FAR, water_far.mWaveClamp, water_far.mEdgeFade, 0.f, 0.f);
+        shader->uniform4f(LLShaderMgr::SK_WATER_RIM, rim_min.mV[VX] - eye.mV[VX], rim_min.mV[VY] - eye.mV[VY], rim_max.mV[VX] - eye.mV[VX], rim_max.mV[VY] - eye.mV[VY]);
+    }
+    // </SK:Nexii>
 
     if (LLViewerCamera::getInstance()->cameraUnderWater())
     {

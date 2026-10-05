@@ -75,8 +75,14 @@ SKSkyDepth skSkyDepth(F32 near_plane, F32 projection_far)
 
 F32 skFarthestWater()
 {
-    const F32 edge = SK_REACH_TERRAIN + MAX_FAR_CLIP;
-    return sqrtf(2.f * edge * edge + SK_REACH_TERRAIN * SK_REACH_TERRAIN);
+    const F32 edge = skEdgeWaterStretch(true) + MAX_FAR_CLIP;
+    return sqrtf(2.f * edge * edge + SK_EDGE_WATER_STRETCH * SK_EDGE_WATER_STRETCH);
+}
+
+F32 skFarthestWaterHorizontal()
+{
+    const F32 edge = skEdgeWaterStretch(true) + MAX_FAR_CLIP;
+    return sqrtf(2.f * edge * edge);
 }
 
 SKWaterFar skWaterFar(F32 near_plane, F32 projection_far)
@@ -84,9 +90,8 @@ SKWaterFar skWaterFar(F32 near_plane, F32 projection_far)
     SKWaterFar water;
     if (skIsInfinite(projection_far))
     {
-        water.mWaveClamp = SK_REACH_TERRAIN;
+        water.mWaveClamp = skFarthestWaterHorizontal();
         water.mEdgeFade = skEdgeWaterStretch(true);
-        water.mSkyThreshold = skSkyDepth(near_plane, projection_far).mThreshold;
     }
     return water;
 }
@@ -98,13 +103,12 @@ F32 skTerrainReach(F32 projection_far)
 
 bool skWaterVisibleFrom(F32 camera_z, F32 water_height, F32 projection_far)
 {
-    const F32 reach = skTerrainReach(projection_far);
-    return reach > 0.f ? camera_z - water_height < reach : camera_z < 1024.f;
+    return skIsInfinite(projection_far) ? camera_z - water_height < SK_EDGE_WATER_STRETCH : camera_z < 1024.f;
 }
 
 F32 skEdgeWaterStretch(bool infinite)
 {
-    return infinite ? SK_REACH_TERRAIN : 2048.f;
+    return infinite ? SK_EDGE_WATER_STRETCH : 2048.f;
 }
 
 F32 skForcedProjectionFar(F32 projection_far, S32 force, F32 draw_distance, bool reverse_z, bool cube_snapshot)

@@ -2125,6 +2125,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("sk_sky_ramp");
     mReservedUniforms.push_back("sk_sky_pin");
     mReservedUniforms.push_back("sk_water_far");
+    mReservedUniforms.push_back("sk_water_rim");
     mReservedUniforms.push_back("sk_sky_body_depth");
     // </SK:Nexii>
 

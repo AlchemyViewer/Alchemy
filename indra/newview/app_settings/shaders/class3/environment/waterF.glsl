@@ -81,6 +81,18 @@ uniform vec3 normScale;
 uniform float fresnelScale;
 uniform float fresnelOffset;
 
+// <SK:Nexii> render/farplane: y is the edge water stretch, 0 unless the projection is infinite (skWaterFar); sk_water_rim is
+// the edge water's outer rectangle relative to the camera, min xy then max xy.
+uniform vec4 sk_water_far;
+uniform vec4 sk_water_rim;
+// The wave coordinates, rebuilt per fragment under the infinite projection: interpolated from edge water vertices
+// hundreds of km out, waterV's world-space coordinates lost the precision the normal maps need, so far water went flat.
+uniform vec3 eyeVec;
+uniform vec2 waveDir1;
+uniform vec2 waveDir2;
+uniform float time;
+// </SK:Nexii>
+
 //bigWave is (refCoord.w, view.w);
 in vec4 refCoord;
 in vec4 littleWave;
@@ -125,14 +137,28 @@ void generateWaveNormals(out vec3 wave1, out vec3 wave2, out vec3 wave3)
     // We layer these back and forth.
 
     vec2 bigwave = vec2(refCoord.w, view.w);
+    vec4 little = littleWave;
+
+    // <SK:Nexii> render/farplane: waterV's wave coordinates from the camera-relative view vector, which interpolates
+    // precisely, and the eye position (see eyeVec above).
+    if (sk_water_far.y > 0.0)
+    {
+        float d = max(length(view.xy), 0.001);
+        vec2 v = eyeVec.xy + view.xy / d * min(d, sk_water_far.x);
+        v.x += (cos(v.x*0.08)+sin(v.y*0.02))*6.0;
+        bigwave = v * vec2(0.04,0.04) + waveDir1 * time * 0.055;
+        little.xy = v * vec2(0.45, 0.9) + waveDir2 * time * 0.13;
+        little.zw = v * vec2(0.1, 0.2) + waveDir1 * time * 0.1;
+    }
+    // </SK:Nexii>
 
     vec3 wave1_a = texture(bumpMap, bigwave).xyz * 2.0 - 1.0;
-    vec3 wave2_a = texture(bumpMap, littleWave.xy).xyz * 2.0 - 1.0;
-    vec3 wave3_a = texture(bumpMap, littleWave.zw).xyz * 2.0 - 1.0;
+    vec3 wave2_a = texture(bumpMap, little.xy).xyz * 2.0 - 1.0;
+    vec3 wave3_a = texture(bumpMap, little.zw).xyz * 2.0 - 1.0;
 
     vec3 wave1_b = texture(bumpMap2, bigwave).xyz * 2.0 - 1.0;
-    vec3 wave2_b = texture(bumpMap2, littleWave.xy).xyz * 2.0 - 1.0;
-    vec3 wave3_b = texture(bumpMap2, littleWave.zw).xyz * 2.0 - 1.0;
+    vec3 wave2_b = texture(bumpMap2, little.xy).xyz * 2.0 - 1.0;
+    vec3 wave3_b = texture(bumpMap2, little.zw).xyz * 2.0 - 1.0;
 
     wave1 = BlendNormal(wave1_a, wave1_b);
     wave2 = BlendNormal(wave2_a, wave2_b);
@@ -300,6 +326,11 @@ void main()
 
     pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, normalize(wavef+up*max(dist, 32.0)/32.0*(1.0-vdu)), v, normalize(light_dir), nl, diffPunc, specPunc);
 
+    // <SK:Nexii> render/farplane: the sun's specular divides by NdotV, which reaches zero on the far water at the horizon, so it fades out there.
+    if (sk_water_far.y > 0.0)
+    {
+        specPunc *= smoothstep(0.0, 0.02, dot(up, v));
+    }
     vec3 punctual = clamp(nl * (diffPunc + specPunc), vec3(0), vec3(10)) * sunlit_linear * shadow * atten;
     radiance *= df2.y;
     vec3 color = vec3(0);
@@ -318,6 +349,24 @@ void main()
     fade *= 60;
     fade = min(1, fade);
     color = mix(fb.rgb, color, fade);
+
+    // <SK:Nexii> render/farplane: over the last 15% of the edge water the sky behind it shows through; the pass is unblended,
+    // so the water fades to the probes' sky along the view ray, which is what the missing water would have revealed.
+    if (sk_water_far.y > 0.0)
+    {
+        vec2 to_rim2 = min(view.xy - sk_water_rim.xy, sk_water_rim.zw - view.xy);
+        float gone = 1.0 - smoothstep(0.0, 0.15 * sk_water_far.y, min(to_rim2.x, to_rim2.y));
+        if (gone > 0.0)
+        {
+            // The flat surface's reflection: at the rim's grazing angles that is the sky at the horizon. A normal across
+            // the view ray would reflect it onto itself, into the probe's downward faces, and show the terrain from above.
+            vec3 sky_amb = vec3(0);
+            vec3 sky = vec3(0);
+            sampleReflectionProbesWater(sky_amb, sky, distort, pos.xyz, up, 1.0, amblit);
+            color = mix(color, sky, gone);
+        }
+    }
+    // </SK:Nexii>
 
     float spec = min(max(max(punctual.r, punctual.g), punctual.b), 0);
 

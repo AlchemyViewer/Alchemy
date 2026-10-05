@@ -35,6 +35,11 @@ vec4 getWaterFogView(vec3 pos);
 
 uniform int above_water;
 
+// <SK:Nexii> render/farplane: deferredUtil's sky classification; sky behind water is held a legacy distance past the surface.
+uniform vec2 sk_sky_pin;
+uniform vec4 waterPlane;
+// </SK:Nexii>
+
 uniform sampler2D exclusionTex;
 
 void main()
@@ -75,6 +80,17 @@ void main()
     }
 
     vec4  pos          = getPositionWithDepth(tc, depth);
+
+    // <SK:Nexii> render/farplane: an infinite projection puts the sky behind void water tens of km down, so its fog would depend on
+    // that distance; it is held at the pin's legacy distance past where the ray enters the water, a depth upstream's saturates at.
+    if (depth <= sk_sky_pin.x)
+    {
+        vec3 dir = normalize(pos.xyz);
+        float es = -dot(dir, waterPlane.xyz);
+        float entry = (waterPlane.w > 0.0 && es > 0.0) ? waterPlane.w / es : 0.0;
+        pos.xyz = dir * (entry + sk_sky_pin.y);
+    }
+    // </SK:Nexii>
 
     vec4 fogged = getWaterFogView(pos.xyz);
     fogged.a = max(pow(fogged.a, 1.7), 0);

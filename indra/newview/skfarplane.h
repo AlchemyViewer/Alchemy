@@ -51,12 +51,16 @@ bool skIsInfinite(F32 projection_far);
 // only by the projection: SK_REACH_TERRAIN under an infinite projection, 0 (unbounded) otherwise.
 F32 skTerrainReach(F32 projection_far);
 
-// How far edge (void) water stretches past the loaded regions: out to SK_REACH_TERRAIN while the projection
+// The horizon from 4 km up, the top of a region, is 243.9 km away with standard refraction (225.8 km geometric), so edge
+// water stretched 256 km past the regions reaches it from any height a region allows; vertices stay within ~3 cm.
+constexpr F32 SK_EDGE_WATER_STRETCH = 256000.f;
+
+// How far edge (void) water stretches past the loaded regions: out to SK_EDGE_WATER_STRETCH while the projection
 // is infinite, the old 2048 m otherwise.
 F32 skEdgeWaterStretch(bool infinite);
 
-// Whether water is drawn from a camera this high: upstream stops at 1024 m, where its projection had
-// already clipped the water away; under an infinite projection water shows while it is within terrain reach.
+// Whether water is drawn from a camera this high: upstream stops at 1024 m, where its projection had already
+// clipped the water away; under an infinite projection water shows from as high as the edge water stretches.
 bool skWaterVisibleFrom(F32 camera_z, F32 water_height, F32 projection_far);
 
 // Window depth updateFrustumPlanes takes the far corners at: SK_RECONSTRUCT_FAR's depth under an infinite
@@ -74,17 +78,19 @@ struct SKSkyDepth
 };
 SKSkyDepth skSkyDepth(F32 near_plane, F32 projection_far);
 
-// Distance to the farthest water the haze can see: a corner of the edge water, stretched SK_REACH_TERRAIN past
-// regions loaded out to MAX_FAR_CLIP, seen from SK_REACH_TERRAIN above it. The sky threshold stays past it.
+// Distance to the farthest water the haze can see: a corner of the edge water, stretched skEdgeWaterStretch past
+// regions loaded out to MAX_FAR_CLIP, seen from as high above it. The sky threshold stays past it.
 F32 skFarthestWater();
 
+// Horizontal distance to that corner, which the waves follow out to so none of the water shares one wave.
+F32 skFarthestWaterHorizontal();
+
 // The water shaders' far-plane terms (sk_water_far). Finite projections keep the defaults, which leave the
-// shaders as upstream: waves clamped at 2560 m, no edge fade, nothing classified as sky.
+// shaders as upstream: waves clamped at 2560 m and no edge fade.
 struct SKWaterFar
 {
     F32 mWaveClamp = 2560.f;    // horizontal distance past which wave coordinates stop following the surface
-    F32 mEdgeFade = 0.f;        // edge water stretch; water fades to haze over its last 15% of horizontal distance
-    F32 mSkyThreshold = -1.f;   // SKSkyDepth::mThreshold: refraction depths at or below it see sky, not water fog
+    F32 mEdgeFade = 0.f;        // edge water stretch; water fades out over its last 15%
 };
 SKWaterFar skWaterFar(F32 near_plane, F32 projection_far);
 
