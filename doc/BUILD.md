@@ -329,7 +329,7 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 |:-----------------|:--------|:----------------------------------------------------------------------------|
 | `AL_ENABLE_PROPRIETARY` | OFF | Allow the non-free libraries below                                     |
 | `AL_USE_KDU`     | OFF     | Kakadu JPEG2000 codec (needs `AL_ENABLE_PROPRIETARY`)                       |
-| `AL_USE_DISCORD` | ON      | Discord rich presence through the Social SDK (needs `AL_ENABLE_PROPRIETARY` and access to the private registry; off on Linux arm64, which the SDK does not support) |
+| `AL_USE_DISCORD` | ON      | Discord rich presence through the Social SDK (needs `AL_ENABLE_PROPRIETARY` and access to the private registry; held off on Linux arm64, which the SDK is not built for) |
 
 Some proprietary ports come from AlchemyViewer's private vcpkg registry,
 `https://github.com/AlchemyViewer/private-registry`, which
