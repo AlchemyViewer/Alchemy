@@ -846,6 +846,24 @@ bool ALDiffModel::takeBack(S32 change, ALTextRange& range, std::string& text, st
     return ALDiffEdit::replaceLines(mRightText, mRightLines, c.rightFirst, c.rightCount, left, range, text, made);
 }
 
+std::string ALDiffModel::changeText(S32 change, bool given_left) const
+{
+    if (change < 0 || change >= changeCount())
+    {
+        return std::string();
+    }
+    const ChangeLines&              c     = mChanges[static_cast<size_t>(change)].lines;
+    const std::vector<std::string>& lines = given_left ? mLeftLines : mRightLines;
+    const S32                       first = given_left ? c.leftFirst : c.rightFirst;
+    const S32                       count = given_left ? c.leftCount : c.rightCount;
+    std::string                     text;
+    for (S32 n = 0; n < count; ++n)
+    {
+        text += lines[static_cast<size_t>(first + n)] + "\n";
+    }
+    return text;
+}
+
 // --- a merge ---------------------------------------------------------------------------
 
 void ALDiffModel::setMergeBase(std::optional<std::string_view> base)

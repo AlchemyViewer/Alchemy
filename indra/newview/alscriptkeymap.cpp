@@ -605,6 +605,8 @@ namespace ALScriptKeymap
             { "compare_inline", KEY_NONE, MASK_NONE },
             { "compare_shown", KEY_NONE, MASK_NONE },
             { "compare_take_back", KEY_NONE, MASK_NONE },
+            { "compare_copy_change", KEY_NONE, MASK_NONE },
+            { "compare_copy_diff", KEY_NONE, MASK_NONE },
             { "compare_histogram", KEY_NONE, MASK_NONE },
             { "compare_patience", KEY_NONE, MASK_NONE },
             { "compare_minimal", KEY_NONE, MASK_NONE },

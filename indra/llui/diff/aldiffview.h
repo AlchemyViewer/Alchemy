@@ -218,6 +218,17 @@ public:
     // conflict, or an edit it needs was not made.
     bool settle(S32 change, ALTextMerge::Take take);
 
+    // A change's lines on the side in front -- inline, those taken out --
+    // copied to the clipboard, each ended by a line break: what a side
+    // that cannot be taken back from is taken from by hand. False where
+    // the change has none there.
+    bool        copyChange(S32 change);
+    // The comparison as a unified diff (ALUnifiedDiff), from the left as
+    // shown to the right, under their titles; and copied. False where the
+    // two are the same.
+    std::string unifiedDiff() const;
+    bool        copyUnifiedDiff();
+
     // The side the keyboard is in, else the right, or the one inline:
     // what a find or a copy works on.
     ALCodeEditor* shown() const;
@@ -309,6 +320,9 @@ private:
     // the other end of its block, which takes the keyboard.
     bool          moveAtPoint(S32 x, S32 y, ALCodeEditor** side, S32* line);
     void          goToMoved(ALCodeEditor* side, S32 line);
+    // Whether the side in front shows the text given as the left: inline,
+    // what it takes out.
+    bool          frontShowsLeft() const;
     // A line round the change the caret is in, on each side shown.
     void          drawCurrentChange();
     // An edge down each change in a conflict, on each side shown.

@@ -221,6 +221,10 @@ public:
     // as one edit of the right's text -- what stretch of it and what goes
     // there -- and the right's text as it will be. False for no change.
     bool               takeBack(S32 change, ALTextRange& range, std::string& text, std::string& made) const;
+    // A change's lines in the text given as the left, or as the right,
+    // each ended by a line break: what a copy of it takes. None where it
+    // has none there.
+    std::string        changeText(S32 change, bool given_left) const;
 
     // --- a merge -----------------------------------------------------------------
 

@@ -32,7 +32,9 @@
 #include "aldiffbar.h"
 #include "aldiffmodel.h"
 #include "altextdiff.h"
+#include "alunifieddiff.h"
 #include "alsaid.h"
+#include "llclipboard.h"
 #include "lllocalcliprect.h"
 #include "lltextbox.h"
 #include "lluicolortable.h"
@@ -91,6 +93,8 @@ ALDiffView::ALDiffView(const Params& p)
         takeBack(changeAtCaret());
         side->setFocus(true);
     });
+    mBar->setCopies({ [this]() { return !mModel.changeText(changeAtCaret(), frontShowsLeft()).empty(); }, [this]() { copyChange(changeAtCaret()); },
+                      [this]() { return changeCount() > 0; }, [this]() { copyUnifiedDiff(); } });
     mBar->onVersion([this](S32 version) {
         if (mVersionChosen)
         {
@@ -1124,6 +1128,33 @@ bool ALDiffView::takeBack(S32 change)
     }
     setRightText(made);
     return true;
+}
+
+bool ALDiffView::copyChange(S32 change)
+{
+    const std::string text = mModel.changeText(change, frontShowsLeft());
+    return !text.empty() && LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
+}
+
+bool ALDiffView::frontShowsLeft() const
+{
+    // The right's where it shows it, else the left's, which is what inline
+    // takes out unless swapped.
+    const Column column = columnOf(shown());
+    return column == Column::Inline ? !mModel.swapped() : column != mModel.rightColumn();
+}
+
+std::string ALDiffView::unifiedDiff() const
+{
+    const bool swapped = mModel.swapped();
+    return ALUnifiedDiff::write(swapped ? mModel.rightText() : mModel.leftText(), swapped ? mModel.leftText() : mModel.rightText(),
+                                swapped ? mRightTitle : mLeftTitle, swapped ? mLeftTitle : mRightTitle, mModel.options());
+}
+
+bool ALDiffView::copyUnifiedDiff()
+{
+    const std::string diff = unifiedDiff();
+    return !diff.empty() && LLClipboard::instance().copyToClipboard(diff, 0, static_cast<S32>(diff.size()));
 }
 
 bool ALDiffView::settle(S32 change, ALTextMerge::Take take)

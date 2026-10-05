@@ -8998,6 +8998,32 @@ void ALFloaterScriptStudio::addViewCommands()
             const Doc* doc = active();
             return doc && doc->shownView() == Doc::View::Compare && doc->compareView->canTakeBack() && doc->compareView->changeAtCaret() >= 0;
         });
+    // The comparison's change at the caret copied from the side in front,
+    // or the whole of it as a unified diff.
+    mCommands.add(
+        "compare_copy_change",
+        [this]() {
+            if (Doc* doc = active(); doc && doc->shownView() == Doc::View::Compare)
+            {
+                doc->compareView->copyChange(doc->compareView->changeAtCaret());
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->shownView() == Doc::View::Compare && doc->compareView->changeAtCaret() >= 0;
+        });
+    mCommands.add(
+        "compare_copy_diff",
+        [this]() {
+            if (Doc* doc = active(); doc && doc->shownView() == Doc::View::Compare)
+            {
+                doc->compareView->copyUnifiedDiff();
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->shownView() == Doc::View::Compare && doc->compareView->changeCount() > 0;
+        });
     // A comparison inline or side by side, as the last one was asked for.
     mCommands.add(
         "compare_inline",

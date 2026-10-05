@@ -77,6 +77,7 @@ ALDiffBar::ALDiffBar(const Params& p)
     // was asked: a press only asks, and turns nothing itself.
     mFoldButton     = flat("fold", "\xE2\x8B\xAF", false, alSaid("DiffBarFold", "Fold away what is the same"));
     mIgnoreButton   = flat("ignore", "\xE2\x90\xA3", false, alSaid("DiffBarIgnore", "What to ignore: whitespace, blank lines, comments, case"));
+    mCopyButton     = flat("copy", "\xE2\x9D\x90", false, alSaid("DiffBarCopy", "Copy this change, or the whole comparison as a unified diff"));
     mInlineButton   = flat("inline", "\xE2\x96\xA4", false, alSaid("DiffBarInline", "Show the changes inline, in one text"));
     mSwapButton     = flat("swap", "\xE2\x87\x84", false, alSaid("DiffBarSwap", "Swap the sides"));
     mDoneButton     = flat("done", "\xC3\x97", false, alSaid("DiffBarDone", "Back to the text"));
@@ -88,6 +89,7 @@ ALDiffBar::ALDiffBar(const Params& p)
     mNextButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mNext(); });
     mFoldButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mFold(); });
     mIgnoreButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { showIgnoreMenu(); });
+    mCopyButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { showCopyMenu(); });
     mInlineButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mInline(); });
     mSwapButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSwap(); });
     mDoneButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mDone(); });
@@ -243,6 +245,31 @@ void ALDiffBar::showIgnoreMenu()
     }
 }
 
+void ALDiffBar::showCopyMenu()
+{
+    if (!mCopies.canCopyChange || !mCopies.copyChange || !mCopies.canCopyDiff || !mCopies.copyDiff)
+    {
+        return;
+    }
+    const LLHandle<LLPanel>                           self = getHandle();
+    LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
+    LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
+    commit.add("DiffCopy.Do", [self](LLUICtrl*, const LLSD& what) {
+        if (ALDiffBar* bar = ALViewType::as<ALDiffBar>(self.get()))
+        {
+            what.asString() == "change" ? bar->mCopies.copyChange() : bar->mCopies.copyDiff();
+        }
+    });
+    enable.add("DiffCopy.Enabled", [self](LLUICtrl*, const LLSD& what) {
+        const ALDiffBar* bar = ALViewType::as<ALDiffBar>(self.get());
+        return bar && (what.asString() == "change" ? bar->mCopies.canCopyChange() : bar->mCopies.canCopyDiff());
+    });
+    if (mCopyMenu.make("menu_diff_copy.xml"))
+    {
+        mCopyMenu.show(mCopyButton, 0, 0);
+    }
+}
+
 void ALDiffBar::setInline(bool inline_view)
 {
     mInlineButton->setToggleState(inline_view);
@@ -342,8 +369,8 @@ void ALDiffBar::setColors(const LLColor4& background, const LLColor4& ink)
     mBgColor              = ALSurface::ground(background, ink);
     mInkColor             = ink;
     const LLColor4 chosen = ALSurface::chosen(background, ink);
-    for (ALFlatButton* glyph : { mPreviousButton, mNextButton, mFoldButton, mIgnoreButton, mInlineButton, mSwapButton, mDoneButton, mTakeBackButton,
-                                 mTheirsButton, mMineButton, mBothButton, mOlderButton, mNewerButton })
+    for (ALFlatButton* glyph : { mPreviousButton, mNextButton, mFoldButton, mIgnoreButton, mCopyButton, mInlineButton, mSwapButton, mDoneButton,
+                                 mTakeBackButton, mTheirsButton, mMineButton, mBothButton, mOlderButton, mNewerButton })
     {
         glyph->setInk(ink);
         glyph->setLit(chosen);
@@ -388,6 +415,7 @@ void ALDiffBar::layout()
     place(mInlineButton);
     place(mIgnoreButton);
     place(mFoldButton);
+    place(mCopyButton);
     right -= GAP;
     if (mTheirsButton->getVisible())
     {

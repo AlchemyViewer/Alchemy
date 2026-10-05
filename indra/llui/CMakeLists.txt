@@ -150,6 +150,7 @@ target_sources(
     diff/allinepairs.cpp
     diff/alstructuraldiff.cpp
     diff/altextmerge.cpp
+    diff/alunifieddiff.cpp
     diff/alworddiff.cpp
     studio/aldockpanel.cpp
     studio/alemptystate.cpp
@@ -380,6 +381,7 @@ target_sources(
         diff/allinepairs.h
         diff/alstructuraldiff.h
         diff/altextmerge.h
+        diff/alunifieddiff.h
         diff/alworddiff.h
         studio/aldockpanel.h
         studio/alemptystate.h
@@ -567,6 +569,15 @@ if(AL_BUILD_TESTS)
     diff/alworddiff.cpp
   )
   al_add_test(altextdiff UNIT PROJECT llui DIR diff SOURCES ${diff_sources} LIBRARIES ${test_libs})
+  # Two texts' differences written as a unified diff.
+  al_add_test(
+    alunifieddiff
+    UNIT
+    PROJECT llui
+    DIR diff
+    SOURCES diff/altextdiff.cpp ${diff_sources}
+    LIBRARIES ${test_libs}
+  )
   # A merge settled in a comparison, and lines of a text put in place of
   # others as one edit of it.
   al_add_test(

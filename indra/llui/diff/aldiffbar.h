@@ -42,7 +42,8 @@ class LLTextBox;
 
 // The thin bar over a comparison's titles (ALDiffView): which change the
 // caret is in, of how many, and the arrows to the one before and the next;
-// the change taken back, where whoever shows it can; what is the same
+// the change taken back, where whoever shows it can; a change, or the
+// whole comparison as a unified diff, copied; what is the same
 // folded away, what is let go of in telling lines the same -- a menu, lit
 // while anything is -- the comparison inline or side by side, its sides
 // swapped; and done, back to what it was made from. Merging, how many
@@ -84,6 +85,17 @@ public:
         std::function<void(const std::string&)> toggle;
     };
     void        setIgnores(Ignores ignores) { mIgnores = std::move(ignores); }
+    // What the menu under the copy button asks of the view: whether the
+    // caret's change can be copied, and doing it; the same of the whole
+    // comparison as a unified diff.
+    struct Copies
+    {
+        std::function<bool()> canCopyChange;
+        std::function<void()> copyChange;
+        std::function<bool()> canCopyDiff;
+        std::function<void()> copyDiff;
+    };
+    void        setCopies(Copies copies) { mCopies = std::move(copies); }
     void        setInline(bool inline_view);
     void        setSwapped(bool swapped);
     // Whether there is anywhere to go back to.
@@ -140,8 +152,9 @@ private:
     void          chooseVersion(S32 version);
     void          layout();
     // The menu of what to let go of (menu_diff_ignore.xml), under its
-    // button.
+    // button; and of what to copy (menu_diff_copy.xml), under its.
     void          showIgnoreMenu();
+    void          showCopyMenu();
 
     LLUIColor     mBgColor;
     LLUIColor     mInkColor;
@@ -152,12 +165,15 @@ private:
     S32           mConflicts = -1;
     Ignores       mIgnores;
     ALMenuSlot    mIgnoreMenu;
+    Copies        mCopies;
+    ALMenuSlot    mCopyMenu;
 
     LLTextBox*    mCount          = nullptr;
     ALFlatButton* mPreviousButton = nullptr;
     ALFlatButton* mNextButton     = nullptr;
     ALFlatButton* mFoldButton     = nullptr;
     ALFlatButton* mIgnoreButton   = nullptr;
+    ALFlatButton* mCopyButton     = nullptr;
     ALFlatButton* mInlineButton   = nullptr;
     ALFlatButton* mSwapButton     = nullptr;
     ALFlatButton* mDoneButton     = nullptr;

@@ -1020,4 +1020,46 @@ namespace tut
         press(d, "newer");
         ensure("nothing told", chosen.size() == 4);
     }
+
+    template<> template<>
+    void aldiffview_object::test<30>()
+    {
+        set_test_name("a change's lines copied from the side in front, inline those taken out; the whole as a unified diff from the left as shown");
+        ALDiffView& d = make("a\nb\nc", "a\nB\nc");
+        d.setTitles("old", "new");
+        ensure("a copy button on the bar", d.bar()->getChild<LLView>("copy")->getVisible());
+        const auto clipboard = []() {
+            std::string text;
+            LLClipboard::instance().pasteFromClipboard(text);
+            return text;
+        };
+        d.right()->setFocus(true);
+        d.right()->goTo(ALTextPos(1, 0));
+        ensure("from the right", d.copyChange(d.changeAtCaret()) && clipboard() == "B\n");
+        d.left()->setFocus(true);
+        d.left()->goTo(ALTextPos(1, 0));
+        ensure("from the left", d.copyChange(d.changeAtCaret()) && clipboard() == "b\n");
+        d.setInline(true);
+        d.inlined()->setFocus(true);
+        ensure("inline, what is taken out", d.copyChange(0) && clipboard() == "b\n");
+        d.setSwapped(true);
+        ensure("swapped, what is taken out is the right's", d.copyChange(0) && clipboard() == "B\n");
+
+        ensure_equals("as a unified diff, swapped: from the right", d.unifiedDiff(),
+                      std::string("--- new\n+++ old\n@@ -1,3 +1,3 @@\n a\n-B\n+b\n c\n\\ No newline at end of file\n"));
+        d.setSwapped(false);
+        d.setInline(false);
+        ensure("copied", d.copyUnifiedDiff());
+        ensure_equals("from the left", clipboard(), std::string("--- old\n+++ new\n@@ -1,3 +1,3 @@\n a\n-b\n+B\n c\n\\ No newline at end of file\n"));
+
+        // Lines put in alone: nothing of them on the left to copy.
+        d.setTexts("a\nc", "a\nb\nc");
+        d.left()->setFocus(true);
+        d.left()->goTo(ALTextPos(1, 0));
+        ensure_equals("the caret under the gap is in it", d.changeAtCaret(), 0);
+        LLClipboard::instance().copyToClipboard(std::string_view("kept"), 0, 4);
+        ensure("nothing copied", !d.copyChange(0) && clipboard() == "kept");
+        d.setTexts("same", "same");
+        ensure("the same: no diff", d.unifiedDiff().empty() && !d.copyUnifiedDiff() && clipboard() == "kept");
+    }
 }
