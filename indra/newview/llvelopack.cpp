@@ -1510,7 +1510,8 @@ std::string velopack_get_current_version()
     size_t len = vpkc_get_current_version(sUpdateManager, version, sizeof(version));
     if (len > 0)
     {
-        return std::string(version, len);
+        // The length returned is the whole version's, which may not have fit.
+        return std::string(version, std::min(len, sizeof(version) - 1));
     }
     return "";
 }

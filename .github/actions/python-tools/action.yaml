@@ -1,0 +1,53 @@
+name: Python tools
+description: >-
+  Puts a venv of pinned Python tools on the path, restored whole from the
+  Actions cache when the runner, the interpreter and the requirements match,
+  so a job with a hit runs no pip. Expects setup-python to have run and
+  scripts/ci/python_tools.py checked out.
+
+inputs:
+  requirements:
+    description: >-
+      pip requirements, one to a line. Pin each: the venv is reused until this
+      text or the interpreter changes, so an unpinned one, or anything one
+      depends on, stays at the version it first got
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Key the Python tools
+      id: key
+      shell: bash
+      env:
+        REQUIREMENTS: ${{ inputs.requirements }}
+      run: python scripts/ci/python_tools.py key
+
+    - name: Restore the Python tools
+      id: restore
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.key.outputs.venv }}
+        key: ${{ steps.key.outputs.key }}
+
+    - name: Install the Python tools
+      if: steps.restore.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        REQUIREMENTS: ${{ inputs.requirements }}
+      run: python scripts/ci/python_tools.py build
+
+    # As soon as it is built rather than when the job ends, which a failed
+    # job does not reach.
+    - name: Save the Python tools
+      if: steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ steps.key.outputs.venv }}
+        key: ${{ steps.key.outputs.key }}
+
+    - name: Put the Python tools on the path
+      shell: bash
+      env:
+        REQUIREMENTS: ${{ inputs.requirements }}
+      run: python scripts/ci/python_tools.py activate

@@ -1,0 +1,11 @@
+# The Rust the viewer builds, through Corrosion; see cmake/Velopack.cmake.
+# One workspace, so one Cargo.lock pins every crate, and CI keys its crate
+# cache on it.
+#
+# Cargo's default release profile. Velopack's own optimises for size with
+# LTO into one code unit, which made velopack_libc a quarter the size and
+# its build four times as long; every build tree builds it now, and the
+# linker drops what the viewer does not call.
+[workspace]
+resolver = "2"
+members = ["velopack_libc"]

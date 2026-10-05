@@ -515,8 +515,7 @@ jobs:
             exit 1
           fi
 
-          pip3 install sentry-cli==3.7.0
-
+          # sentry-cli is one of the setup's Python tools.
           cmake --build "$BUILD_DIRECTORY" --config Release --target symbols
           sentry-cli debug-files upload --include-sources --wait "$BUILD_DIRECTORY/symbols/Release"
 
@@ -546,6 +545,9 @@ jobs:
     runs-on: windows-2025-vs2026
     env:
       SIGN_PACKAGES: ${{ github.event_name != 'pull_request' }}
+      # The .NET tools restore into a folder of their own, so the cache holds
+      # them and not whatever packages the image carries.
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
     steps:
       # The app and its metadata come from the build's artifacts; the tree
       # contributes only the .NET tool manifest.
@@ -557,10 +559,14 @@ jobs:
           sparse-checkout: /dotnet-tools.json
           sparse-checkout-cone-mode: false
 
+      # vpk is a 147 MB package: it comes from the cache, keyed on the tool
+      # manifest, rather than from nuget.org.
       - name: Setup .NET for Velopack
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.x'
+          cache: true
+          cache-dependency-path: dotnet-tools.json
 
       - name: Install Velopack CLI and AzureSignTool
         run: dotnet tool restore
@@ -672,10 +678,12 @@ jobs:
     env:
       DEVELOPER_DIR: "/Applications/Xcode.app/Contents/Developer"
       SIGN_PACKAGES: ${{ github.event_name != 'pull_request' }}
+      # As in the Windows packaging job.
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
     steps:
       # The app and its metadata come from the build's artifacts; the tree
-      # contributes the .NET tool manifest, the signing script, the
-      # entitlements and the disk image's layout.
+      # contributes the .NET tool manifest, the Python tools' action, the
+      # signing script, the entitlements and the disk image's layout.
       - name: Checkout code
         uses: actions/checkout@v7
         with:
@@ -683,6 +691,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           sparse-checkout: |
             /dotnet-tools.json
+            /.github/actions/python-tools/
+            /scripts/ci/python_tools.py
             /indra/cmake/ViewerCodeSign.cmake
             /indra/newview/slplugin.entitlements
             /indra/newview/installers/darwin/
@@ -697,6 +707,8 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.x'
+          cache: true
+          cache-dependency-path: dotnet-tools.json
 
       - name: Install Velopack CLI
         run: dotnet tool restore
@@ -706,9 +718,14 @@ jobs:
         with:
           python-version: "3.14"
 
-      # The badge_icons extra badges the volume icon through Quartz.
+      # CMake runs the signing script; the badge_icons extra badges the
+      # volume icon through Quartz.
       - name: Install CMake and dmgbuild
-        run: pip install cmake "dmgbuild[badge_icons]==1.6.7"
+        uses: ./.github/actions/python-tools
+        with:
+          requirements: |
+            cmake==4.4.4
+            dmgbuild[badge_icons]==1.6.7
 
       - name: Fetch macOS app
         uses: actions/download-artifact@v8

@@ -30,6 +30,7 @@ indra/.distcc
 indra/out/*
 
 indra/packages/*
+indra/rust/target/
 build-*/
 indra/CMakeFiles
 indra/build-vc[0-9]*
