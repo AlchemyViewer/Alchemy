@@ -1530,24 +1530,27 @@ bool ALFloaterScriptStudio::undo()
     // The view in front's own steps: the expansion, being read, has none,
     // and the source's are not to be taken back out of sight.
     Doc*          doc  = active();
-    ALCodeEditor* text = doc ? doc->shownText() : nullptr;
+    ALCodeEditor* text = doc ? doc->undoText() : nullptr;
     if (!text || !text->canUndo())
     {
         return false;
     }
     text->undo();
+    // A comparison that follows the tab, as the step left it, at once.
+    refreshCompare(*doc);
     return true;
 }
 
 bool ALFloaterScriptStudio::redo()
 {
     Doc*          doc  = active();
-    ALCodeEditor* text = doc ? doc->shownText() : nullptr;
+    ALCodeEditor* text = doc ? doc->undoText() : nullptr;
     if (!text || !text->canRedo())
     {
         return false;
     }
     text->redo();
+    refreshCompare(*doc);
     return true;
 }
 
@@ -1786,6 +1789,11 @@ void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const
 {
     doc.compareTitles.reset();
     doc.compareStale = false;
+    if (doc.compareView)
+    {
+        // Given again where the comparison follows the tab.
+        doc.compareView->setOnTakeBack(nullptr);
+    }
     if (!doc.compareView)
     {
         // In the editors' place, in their colours and face; unwrapped, since
@@ -2100,8 +2108,8 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
         }
         else if (raw == active())
         {
-            mUndoButton->setEnabled(raw->shownText()->canUndo());
-            mRedoButton->setEnabled(raw->shownText()->canRedo());
+            mUndoButton->setEnabled(raw->undoText()->canUndo());
+            mRedoButton->setEnabled(raw->undoText()->canRedo());
         }
         scheduleAnalysis(*raw);
         mSearchPane->typedIn(*raw);
@@ -3573,8 +3581,8 @@ ALFloaterScriptStudio::ToolbarFacts ALFloaterScriptStudio::toolbarFactsOf() cons
     facts.file             = !doc->file.empty();
     facts.inventory        = doc->ref.inInventory();
     facts.sending          = doc->save.sending();
-    facts.canUndo          = doc->shownText()->canUndo();
-    facts.canRedo          = doc->shownText()->canRedo();
+    facts.canUndo          = doc->undoText()->canUndo();
+    facts.canRedo          = doc->undoText()->canRedo();
     facts.expandable       = doc->expandedEditor != nullptr;
     facts.view             = static_cast<U8>(doc->shownView());
     facts.running          = doc->running;
@@ -3622,8 +3630,8 @@ void ALFloaterScriptStudio::refreshToolbar()
     }
     mSaveButton->setEnabled(have && doc->modifiable && !doc->save.sending());
     mSaveAllButton->setEnabled(mToolbarFacts->anyDirty);
-    mUndoButton->setEnabled(doc && doc->shownText()->canUndo());
-    mRedoButton->setEnabled(doc && doc->shownText()->canRedo());
+    mUndoButton->setEnabled(doc && doc->undoText()->canUndo());
+    mRedoButton->setEnabled(doc && doc->undoText()->canRedo());
     mFindButton->setEnabled(doc != nullptr);
     mFormatButton->setEnabled(have && doc->modifiable && !doc->notecard && doc->shownView() == Doc::View::Source);
     mExpandedButton->setEnabled(doc && doc->expandedEditor != nullptr);
@@ -4203,7 +4211,7 @@ void ALFloaterScriptStudio::refreshUndoLabels()
     Doc*                     doc   = active();
     const LLEditMenuHandler* field = focusedEditHandler();
     const bool               ours  = !field || (doc && (field == doc->editor || field == doc->expandedEditor));
-    ALCodeEditor*            text  = doc ? doc->shownText() : nullptr;
+    ALCodeEditor*            text  = doc ? doc->undoText() : nullptr;
     // Nothing the names come from has moved: nothing to say again.
     const UndoSaidOf of{ doc, field, text, text ? text->undoJournal().revision() : 0, !ours && field->canUndo(), !ours && field->canRedo() };
     if (of == mUndoSaidOf)
@@ -6283,6 +6291,27 @@ void ALFloaterScriptStudio::compareWithTab(Doc& doc, const std::string& theirs, 
     showCompare(doc, theirs, doc.editor->wholeText(), their_title, own, anchors);
     doc.compareTitles = Doc::CompareTitles{ their_title, own };
     retitleCompare(doc);
+    // A change taken back is an edit of the tab, one step to undo, where
+    // the tab may be changed; of the text as compared, which is the tab's
+    // unless it has moved since and the comparison not yet followed.
+    if (doc.modifiable && !doc.editor->isReadOnly())
+    {
+        const std::string id = doc.id;
+        doc.compareView->setOnTakeBack([this, id](const ALTextRange& range, const std::string& text) {
+            Doc* found = findDoc(id);
+            if (!found || !found->compareTitles || !found->loaded || !found->modifiable || found->editor->isReadOnly())
+            {
+                return false;
+            }
+            if (found->editor->wholeText() != found->compareView->rightText())
+            {
+                found->compareStale = true;
+                refreshCompare(*found);
+                return false;
+            }
+            return found->editor->replaceAll({ { range, text } });
+        });
+    }
 }
 
 void ALFloaterScriptStudio::refreshCompare(Doc& doc)
@@ -8278,7 +8307,7 @@ void ALFloaterScriptStudio::addEditCommands()
             [this, forward]() {
                 Doc*               doc   = active();
                 LLEditMenuHandler* field = focusedEditHandler();
-                return (field && (forward ? field->canRedo() : field->canUndo())) || (doc && (forward ? doc->shownText()->canRedo() : doc->shownText()->canUndo()));
+                return (field && (forward ? field->canRedo() : field->canUndo())) || (doc && (forward ? doc->undoText()->canRedo() : doc->undoText()->canUndo()));
             });
     }
     // Whatever has the keyboard: a list of problems is worth copying
@@ -8788,6 +8817,21 @@ void ALFloaterScriptStudio::addViewCommands()
         [this]() {
             const Doc* doc = active();
             return doc && doc->shownView() == Doc::View::Compare;
+        });
+    // The change the caret is in taken back, as the arrow beside it does.
+    mCommands.add(
+        "compare_take_back",
+        [this]() {
+            Doc* doc = active();
+            if (doc && doc->shownView() == Doc::View::Compare)
+            {
+                refreshCompare(*doc);
+                doc->compareView->takeBack(doc->compareView->changeAtCaret());
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->shownView() == Doc::View::Compare && doc->compareView->canTakeBack() && doc->compareView->changeAtCaret() >= 0;
         });
     // A comparison inline or side by side, as the last one was asked for.
     mCommands.add(

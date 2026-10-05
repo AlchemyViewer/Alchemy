@@ -601,6 +601,7 @@ namespace ALScriptKeymap
             { "compare_saved", KEY_NONE, MASK_NONE },
             { "compare_inline", KEY_NONE, MASK_NONE },
             { "compare_shown", KEY_NONE, MASK_NONE },
+            { "compare_take_back", KEY_NONE, MASK_NONE },
             // The text's size: Control-= and Control-minus, Shift or not,
             // the keypad's too, as everywhere -- Command on a Mac -- and
             // Control-0 back to the size chosen. The '=' key is '=' from

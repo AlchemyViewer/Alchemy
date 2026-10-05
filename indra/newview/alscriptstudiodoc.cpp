@@ -121,6 +121,11 @@ ALCodeEditor* ALScriptStudioDoc::shownText() const
     }
 }
 
+ALCodeEditor* ALScriptStudioDoc::undoText() const
+{
+    return shownView() == View::Compare && compareTitles ? editor : shownText();
+}
+
 bool ALScriptStudioDoc::hasKeyboard() const
 {
     for (const LLView* view : { static_cast<const LLView*>(editor), static_cast<const LLView*>(expandedEditor), static_cast<const LLView*>(compareView) })

@@ -148,6 +148,10 @@ struct ALScriptStudioDoc
     // whose answer a save may yet wait on.
     bool          saveUnderway() const { return save.underway() || preprocessing; }
     ALCodeEditor* shownText() const;
+    // Whose steps undo and redo take back and make again: the view in
+    // front's, but the tab's own while a comparison that follows the tab
+    // is -- a change taken back from it among them.
+    ALCodeEditor* undoText() const;
     // Whether the keyboard is in one of its views, shown or not.
     bool          hasKeyboard() const;
     // Whether a check asked about is still unanswered at `now`, a while
