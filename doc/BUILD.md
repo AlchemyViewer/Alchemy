@@ -19,7 +19,8 @@ Every platform needs a C++ toolchain plus:
 
 - **CMake** 4.0+
 - **Git**
-- **Rust** and **.NET SDK** — only for Velopack installers (`-DAL_USE_VELOPACK=ON`)
+- **Rust** — only for the Velopack update client (`-DAL_USE_VELOPACK=ON`, Windows and macOS), whose C API the build compiles from `indra/rust`
+- **.NET SDK** — only for Velopack installers
 - **Python** 3 — only for the tests that spawn a Python peer (see [Running tests](#running-tests))
 
 Install commands are platform-specific; see below.
@@ -33,7 +34,7 @@ Install the following:
 - [Visual Studio 2026](https://visualstudio.microsoft.com/vs/community/) — select the **Desktop development with C++** workload
 - [CMake](https://cmake.org/download/) 4.0+
 - [Git for Windows](https://git-scm.com/install/windows)
-- [Rust](https://rust-lang.org/tools/install/) — run `rustup-init.exe` and accept defaults (packaging only)
+- [Rust](https://rust-lang.org/tools/install/) — run `rustup-init.exe` and accept defaults (Velopack only)
 - [.NET SDK](https://dotnet.microsoft.com/en-us/download) (packaging only)
 
 Sanity-check in a fresh terminal:
@@ -54,10 +55,11 @@ brew install git cmake zip unzip curl pkgconf automake autoconf autoconf-archive
     gettext libtool rustup dotnet
 ```
 
-Initialize the Rust toolchain (packaging only):
+Put Homebrew's rustup on the path and install a stable toolchain (Velopack only). The formula is keg-only and no longer provides `rustup-init`; add the `export` to your shell profile too:
 
 ```
-rustup-init -y
+export PATH="$(brew --prefix rustup)/bin:$PATH"
+rustup default stable
 ```
 
 ### Linux
@@ -70,7 +72,7 @@ Install system packages for your distro:
 ```
 sudo pacman -Syu automake autoconf autoconf-archive base-devel cmake fontconfig git glib2-devel \
     gstreamer gst-plugins-base-libs ninja libglvnd libtool libvlc libx11 pkgconf python \
-    wayland dotnet-sdk rustup zip nasm
+    wayland dotnet-sdk zip nasm
 ```
 
 </details>
@@ -88,7 +90,7 @@ sudo apt install \
     libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
     libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
     libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev ninja-build \
-    pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 rustup nasm
+    pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 nasm
 ```
 
 </details>
@@ -106,7 +108,7 @@ sudo apt install \
     libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
     libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
     libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev ninja-build \
-    pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 rustup nasm
+    pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 nasm
 ```
 
 </details>
@@ -120,7 +122,7 @@ sudo apt install \
 sudo dnf group install "Development Tools"
 sudo dnf install cmake fontconfig-devel git glib2-devel gstreamer1-devel \
     gstreamer1-plugins-base-devel libX11-devel libglvnd-devel \
-    ninja-build python3 vlc-devel wayland-devel dotnet-sdk-10.0 rustup
+    ninja-build python3 vlc-devel wayland-devel dotnet-sdk-10.0
 ```
 
 You may need to enable EPEL first: `sudo dnf install epel-release`
@@ -131,7 +133,7 @@ You may need to enable EPEL first: `sudo dnf install epel-release`
 sudo dnf install @development-tools @c-development cmake fontconfig-devel git glib-devel \
     gstreamer1-devel gstreamer1-plugins-base-devel libX11-devel \
     libglvnd-devel ninja-build python3 vlc-devel \
-    wayland-devel dotnet-sdk-10.0 rustup perl-IPC-Cmd perl-FindBin perl-Time-Piece \
+    wayland-devel dotnet-sdk-10.0 perl-IPC-Cmd perl-FindBin perl-Time-Piece \
     autoconf-archive perl-open libXcursor-devel wayland-protocols-devel dbus-devel \
     ibus-devel mesa-libGLU-devel libxkbcommon-devel mesa-libEGL-devel mesa-libGL-devel \
     libXtst-devel libXrandr-devel pipewire-devel pulseaudio-libs-devel alsa-lib-devel \
@@ -153,12 +155,6 @@ sudo zypper install cmake fontconfig-devel git glib2-devel gstreamer-devel \
 ```
 
 </details>
-
-Initialize a stable Rust toolchain (packaging only):
-
-```
-rustup default stable
-```
 
 ## Clone and bootstrap
 
@@ -521,15 +517,15 @@ Velopack needs the `vpk` .NET tool. Install it once per clone:
 dotnet tool restore
 ```
 
-### Rust / `cargo` missing during packaging
+### `rustc` not found when configuring
 
-Velopack invokes `cargo`. Install a stable Rust toolchain:
+With `AL_USE_VELOPACK=ON` the build compiles Velopack's C API, `indra/rust/velopack_libc`, with cargo through [Corrosion](https://github.com/corrosion-rs/corrosion), which looks for `rustc` on the path and in `~/.cargo/bin`. Install a stable toolchain:
 
 ```
 rustup default stable
 ```
 
-Only needed with `AL_USE_VELOPACK=ON`.
+On macOS, Homebrew's rustup keeps `rustc` and `cargo` in `$(brew --prefix rustup)/bin`, which must be on the path. A target the toolchain lacks, such as `x86_64-apple-darwin` for an x86_64 build on Apple silicon, is added with rustup while configuring; `-DRust_RUSTUP_INSTALL_MISSING_TARGET=OFF` stops that.
 
 ### Warnings fail the build
 

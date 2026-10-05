@@ -36,6 +36,7 @@
 - **media_plugins** - Out-of-process media plugin implementations (CEF, VLC, GStreamer)
 - **alscript** - Script Studio's language services, free of UI (depends on llcommon, llmath, Tailslide and SLua's Luau). One folder a part, each on the include path: `core/` (problems, symbols, the lexicon, messages, weights, the formatter), `lint/` (the studio's lints and fixes), `lsl/` (the LSL analyzer over Tailslide, the SLua converter), `lsl/optimizer/` (the LSL optimizer, a pass a file, sharing `allsloptimizerpass.h`), `luau/` (the SLua analyzer) and `preprocessor/` (the preprocessor and its includes)
 - **lscript** - LL's LSL compiler and LSO VM, restored as a test-only reference for the optimizer and the weigher; built with tests, never linked into the viewer
+- **rust** - The Rust the viewer builds: one Cargo workspace and lock file, imported by Corrosion, a vcpkg port. It holds velopack_libc, Velopack's C API over the `velopack` crate from crates.io, its sources and headers vendored unchanged from the release (`cmake/Velopack.cmake`): a DLL on Windows, a static library on macOS, the release build for every configuration
 - **newview** - The main viewer application. Contains all viewer-specific logic: the rendering pipeline, scene graph, UI floaters/panels, settings, object/avatar systems, and the application entry point. Links against all libraries above plus third-party: Tracy, OpenXR, Discord SDK, NVAPI, TinyEXR, Velopack
 
 ### Application Lifecycle

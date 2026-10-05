@@ -295,7 +295,7 @@
     "velopack": {
       "description": "Build with support for the Velopack install and update framework",
       "dependencies": [
-        "velopack"
+        "corrosion"
       ]
     },
     "webrtc": {

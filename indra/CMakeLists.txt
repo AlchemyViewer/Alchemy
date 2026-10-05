@@ -422,6 +422,7 @@ set(
   SDL3
   Sentry
   Tracy
+  Velopack
   WebRTC
 )
 

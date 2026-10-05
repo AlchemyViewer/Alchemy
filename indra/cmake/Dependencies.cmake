@@ -110,7 +110,6 @@ al_import(ll::fontconfig   PACKAGE Fontconfig                 TARGETS Fontconfig
 al_import(ll::faudio       PACKAGE FAudio              CONFIG TARGETS FAudio::FAudio DEFINES LL_FAUDIO=1     WHEN AL_USE_FAUDIO)
 al_import(ll::openal       PACKAGE OpenAL              CONFIG TARGETS OpenAL::OpenAL DEFINES LL_OPENAL=1     WHEN AL_USE_OPENAL)
 al_import(ll::openxr       PACKAGE OpenXR              CONFIG TARGETS OpenXR::headers OpenXR::openxr_loader WHEN AL_USE_OPENXR)
-al_import(ll::velopack     PACKAGE unofficial-velopack CONFIG TARGETS unofficial::velopack::velopack DEFINES LL_VELOPACK=1 WHEN AL_USE_VELOPACK)
 al_import(ll::nsspellchecker LINK "-framework AppKit" "-framework Foundation"                       WHEN AL_USE_NSSPELLCHECKER)
 al_import(ll::winspellcheck  LINK ole32                                                            WHEN AL_USE_WINSPELLCHECK)
 # gersemi: on
