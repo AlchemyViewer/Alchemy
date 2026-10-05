@@ -2163,21 +2163,6 @@ if(AL_BUILD_VIEWER)
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
     )
 
-    # Support generating dsym for non-xcode generators
-    if(NOT XCODE)
-      if(AL_USE_SENTRY)
-        set(VIEWER_DEBUG_BUNDLE "${SYMBOLS_STAGING_DIR}/dSYMs/${product}.dSYM")
-        find_program(DSYMUTIL_PROGRAM dsymutil REQUIRED)
-        add_custom_command(
-          TARGET ${AL_VIEWER_BINARY_NAME}
-          POST_BUILD
-          COMMAND
-            ${DSYMUTIL_PROGRAM} -o ${VIEWER_DEBUG_BUNDLE} $<TARGET_FILE:${AL_VIEWER_BINARY_NAME}>
-          COMMENT "Generating Alchemy.dSYM"
-        )
-      endif()
-    endif()
-
     target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE llphysicsextensionsos)
 
     # The bundle's localised strings carry the version.
@@ -2344,92 +2329,56 @@ ${settings_install}</map>
   include(ViewerPackage)
 
   # After every link, stage the tree the viewer runs from: the install rules
-  # applied to the build directory the viewer already sits in.
+  # applied to the build directory the viewer already sits in. The install's
+  # manifest, which the next install anywhere overwrites, is kept per
+  # configuration as the list of what ships.
+  set(staged_manifest "${CMAKE_CURRENT_BINARY_DIR}/install_manifest_staged_$<CONFIG>.txt")
   add_custom_command(
     TARGET ${AL_VIEWER_BINARY_NAME}
     POST_BUILD
     COMMAND
       ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --config $<CONFIG> --prefix
       ${VIEWER_STAGING_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/install_manifest.txt ${staged_manifest}
     COMMENT "Staging the viewer into ${VIEWER_STAGING_DIR}"
     VERBATIM
   )
 
-  if(AL_BUILD_PACKAGE AND AL_ENABLE_CRASH_REPORTING)
-    if(AL_USE_SENTRY)
-      # The debug information Sentry symbolicates crash reports with, staged
-      # per platform as <channel>.sym.tar.xz or the dSYM archive. It is part
-      # of the default build: CPack's package target is created at generate
-      # time, so nothing can be made to depend on it.
-      if(WINDOWS)
-        # Redirect symbols to staging directory for upload.
-        set_target_properties(
-          ${AL_VIEWER_BINARY_NAME}
-          PROPERTIES PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}"
-        )
-
-        set(VIEWER_APP_SYMBOLS_ARCHIVE "${SYMBOLS_STAGING_DIR}.sym.tar.xz")
-
-        # Just pack up a tarball containing only the .pdb files for the
-        # executables.
-        add_custom_command(
-          OUTPUT "${VIEWER_APP_SYMBOLS_ARCHIVE}"
-          COMMAND tar cJf "${AL_CHANNEL}.sym.tar.xz" "${AL_CHANNEL}"
-          DEPENDS "${AL_VIEWER_BINARY_NAME}"
-          WORKING_DIRECTORY "${SYMBOLS_STAGING_DIR}/.."
-          COMMENT "Packing viewer PDBs into ${VIEWER_APP_SYMBOLS_ARCHIVE}"
-          VERBATIM
-        )
-        add_custom_target(generate_symbols ALL DEPENDS "${VIEWER_APP_SYMBOLS_ARCHIVE}")
-        add_dependencies(generate_symbols ${AL_VIEWER_BINARY_NAME})
-      endif()
-      if(DARWIN)
-        set(VIEWER_APP_XCARCHIVE "${SYMBOLS_STAGING_DIR}.xcarchive.zip")
-
-        # we only need an xcarchive with dSYMs (including the application)
-        set_target_properties(
-          ${AL_VIEWER_BINARY_NAME}
-          PROPERTIES
-            XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
-            XCODE_ATTRIBUTE_DWARF_DSYM_FOLDER_PATH "${SYMBOLS_STAGING_DIR}/dSYMs"
-        )
-
-        add_custom_command(
-          OUTPUT "${VIEWER_APP_XCARCHIVE}"
-          COMMAND zip -r "${VIEWER_APP_XCARCHIVE}" "${AL_CHANNEL}"
-          WORKING_DIRECTORY "${SYMBOLS_STAGING_DIR}/.."
-          DEPENDS "${AL_VIEWER_BINARY_NAME}"
-          COMMENT "Generating ${VIEWER_APP_XCARCHIVE} for upload"
-          VERBATIM
-        )
-        add_custom_target(generate_symbols ALL DEPENDS "${VIEWER_APP_XCARCHIVE}")
-      endif()
-      if(LINUX)
-        # The debug information, split from the build-tree binary before the
-        # package strips its own copy; the two share a GNU build ID, which is
-        # how they are paired again.
-        find_program(OBJCOPY_PROGRAM objcopy REQUIRED)
-        set(VIEWER_APP_SYMBOLS_ARCHIVE "${SYMBOLS_STAGING_DIR}.sym.tar.xz")
-        set(
-          VIEWER_DEBUG_FILE
-          "${SYMBOLS_STAGING_DIR}/$<TARGET_FILE_NAME:${AL_VIEWER_BINARY_NAME}>.debug"
-        )
-        add_custom_command(
-          OUTPUT "${VIEWER_APP_SYMBOLS_ARCHIVE}"
-          COMMAND ${CMAKE_COMMAND} -E make_directory "${SYMBOLS_STAGING_DIR}"
-          COMMAND
-            ${OBJCOPY_PROGRAM} --only-keep-debug --compress-debug-sections=zlib
-            $<TARGET_FILE:${AL_VIEWER_BINARY_NAME}> "${VIEWER_DEBUG_FILE}"
-          COMMAND tar cJf "${AL_CHANNEL}.sym.tar.xz" "${AL_CHANNEL}"
-          DEPENDS "${AL_VIEWER_BINARY_NAME}"
-          WORKING_DIRECTORY "${SYMBOLS_STAGING_DIR}/.."
-          COMMENT "Packing the viewer's debug information into ${VIEWER_APP_SYMBOLS_ARCHIVE}"
-          VERBATIM
-        )
-        add_custom_target(generate_symbols ALL DEPENDS "${VIEWER_APP_SYMBOLS_ARCHIVE}")
-      endif()
-    endif()
+  # The symbol store (ViewerSymbols.cmake): every binary in the staged tree
+  # with its debug information beside it, which Sentry symbolicates crash
+  # reports with and a debugger reads a shipped build with. Made on request
+  # rather than by every build.
+  if(WINDOWS)
+    cmake_path(GET CMAKE_LINKER PARENT_PATH linker_dir)
+    find_program(DUMPBIN_PROGRAM dumpbin HINTS "${linker_dir}")
+    set(
+      symbols_options
+      -DAL_SYMBOLS_FORMAT=pe
+      "-DAL_SYMBOLS_DUMPBIN=${DUMPBIN_PROGRAM}"
+      "-DAL_SYMBOLS_VCPKG=${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}"
+    )
+  elseif(DARWIN)
+    find_program(DSYMUTIL_PROGRAM dsymutil)
+    set(symbols_options -DAL_SYMBOLS_FORMAT=macho "-DAL_SYMBOLS_DSYMUTIL=${DSYMUTIL_PROGRAM}")
+  else()
+    set(
+      symbols_options
+      -DAL_SYMBOLS_FORMAT=elf
+      "-DAL_SYMBOLS_OBJCOPY=${CMAKE_OBJCOPY}"
+      "-DAL_SYMBOLS_READELF=${CMAKE_READELF}"
+    )
   endif()
+  add_custom_target(
+    symbols
+    COMMAND
+      ${CMAKE_COMMAND} ${symbols_options} "-DAL_SYMBOLS_MANIFEST=${staged_manifest}"
+      "-DAL_SYMBOLS_VIEWER=$<TARGET_FILE:${AL_VIEWER_BINARY_NAME}>"
+      "-DAL_SYMBOLS_PREFIX=${VIEWER_STAGING_DIR}" "-DAL_SYMBOLS_DIR=${SYMBOLS_DIR}" -P
+      "${INDRA_SOURCE_DIR}/cmake/ViewerSymbols.cmake"
+    COMMENT "Making the symbol store in ${SYMBOLS_DIR}"
+    VERBATIM
+  )
+  add_dependencies(symbols ${AL_VIEWER_BINARY_NAME})
 
 elseif(AL_BUILD_TESTS)
 

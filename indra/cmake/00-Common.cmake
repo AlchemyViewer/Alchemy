@@ -438,7 +438,7 @@ if(DARWIN)
 
   set(CMAKE_XCODE_ATTRIBUTE_COMPILATION_CACHE_ENABLE_CACHING YES)
   set(CMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS YES)
-  set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf") # dSYMs only where a target asks
+  set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf") # the symbols target makes the dSYMs
   set(CMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH NO)
   # Xcode does not read -march; this is the Darwin row of AlchemyTarget.cmake
   # in the spelling it does read.

@@ -488,38 +488,10 @@ jobs:
           path: |
             ${{ steps.build.outputs.viewer_app }}
 
-      # The other upload of nontrivial size is the symbol file. Use a distinct
-      # artifact for that too.
-      - name: Upload Windows symbol file
-        uses: actions/upload-artifact@v7
-        if: runner.os == 'Windows' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.sentry_dsn != ''
-        with:
-          name: "${{ steps.build.outputs.artifact }}-symbols"
-          if-no-files-found: error
-          path: |
-            ${{ steps.configure.outputs.build_directory }}/symbols/Release/${{ needs.setup.outputs.viewer_channel }}.sym.tar.xz
-
-      - name: Upload macOS symbol file
-        uses: actions/upload-artifact@v7
-        if: runner.os == 'macOS' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.sentry_dsn != ''
-        with:
-          name: "${{ steps.build.outputs.artifact }}-symbols"
-          if-no-files-found: error
-          path: |
-            ${{ steps.configure.outputs.build_directory }}/symbols/Release/${{ needs.setup.outputs.viewer_channel }}.xcarchive.zip
-
-      - name: Upload Linux symbol file
-        uses: actions/upload-artifact@v7
-        if: runner.os == 'Linux' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.sentry_dsn != ''
-        with:
-          name: "${{ steps.build.outputs.artifact }}-symbols"
-          if-no-files-found: error
-          path: |
-            ${{ steps.configure.outputs.build_directory }}/symbols/Release/${{ needs.setup.outputs.viewer_channel }}.sym.tar.xz
-
-      # Sentry symbolicates a crash report with the debug files of the
-      # binaries that shipped, in pairs: PE and PDB, Mach-O and dSYM, ELF and
-      # its split .debug. The build tree still holds both halves side by side.
+      # Sentry symbolicates a crash report with the symbol store: every binary
+      # that shipped with its debug information beside it, PE and PDB, Mach-O
+      # and dSYM, ELF and its split .debug filed by build ID. The store is
+      # made from the staged tree, after the package is.
       - name: Upload debug files to Sentry
         if: matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.sentry_dsn != ''
         shell: bash
@@ -538,37 +510,8 @@ jobs:
 
           pip3 install sentry-cli==3.7.0
 
-          case "$RUNNER_OS" in
-            Windows)
-              candidates=(
-                "$BUILD_DIRECTORY/newview/Release"
-                "$BUILD_DIRECTORY/symbols/Release"
-                "$BUILD_DIRECTORY/dullahan/Release"
-              )
-              ;;
-            macOS)
-              candidates=(
-                "$BUILD_DIRECTORY"/newview/Release/*.app/Contents/MacOS
-                "$BUILD_DIRECTORY"/newview/Release/*.app/Contents/Frameworks
-                "$BUILD_DIRECTORY"/newview/Release/*.app/Contents/Resources/llplugin
-                "$BUILD_DIRECTORY/symbols/Release"
-              )
-              ;;
-            Linux)
-              candidates=(
-                "$BUILD_DIRECTORY/newview/Release/bin"
-                "$BUILD_DIRECTORY/newview/Release/llplugin"
-                "$BUILD_DIRECTORY/symbols/Release"
-              )
-              ;;
-          esac
-
-          paths=()
-          for candidate in "${candidates[@]}"; do
-            [[ -e "$candidate" ]] && paths+=("$candidate")
-          done
-
-          sentry-cli debug-files upload --include-sources --wait "${paths[@]}"
+          cmake --build "$BUILD_DIRECTORY" --config Release --target symbols
+          sentry-cli debug-files upload --include-sources --wait "$BUILD_DIRECTORY/symbols/Release"
 
       # The headroom the row finished with, failed or not.
       - name: Report disk space

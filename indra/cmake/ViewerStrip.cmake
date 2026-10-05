@@ -4,7 +4,8 @@
 # archive is written: strips debug information from the Release binaries.
 # `strip -S` keeps the symbol table, so a crash log still names functions.
 # On Linux that is every ELF file under bin/ and lib/; on macOS the viewer
-# executable, whose dSYM is generated separately. The install signed the
+# executable. The symbols target keeps what is stripped, from the build
+# tree's copies (ViewerSymbols.cmake). The install signed the
 # bundle and stripping breaks the seal, so the bundle is sealed again.
 
 if(NOT CPACK_BUILD_CONFIG STREQUAL "Release")
