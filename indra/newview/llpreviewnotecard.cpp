@@ -633,14 +633,35 @@ void LLPreviewNotecard::toggleCompare()
         mCompare->setOnEscape([this]() { toggleCompare(); });
         // A notecard is prose: a change of case alone may be let go of.
         mCompare->setOffersIgnoreCase(true);
-        // Its lines chosen as the studio's comparisons choose them.
-        mCompare->setAlgorithm(ALScriptStudio::compareAlgorithm());
+        // Its right is the text, which is changed only there: what is
+        // typed goes on in it, where the caret was, the comparison left.
+        mCompare->setOnEdit([this](S32 line, S32 column) -> LLView* {
+            if (!mModifiable || mText->isReadOnly())
+            {
+                return nullptr;
+            }
+            toggleCompare();
+            mText->goTo(mText->document().clamp(ALTextPos(line, column)));
+            return mText;
+        });
         host->addChild(mCompare);
     }
     const bool comparing = !mCompare->getVisible() && (mSavedThere || mHistoryShown);
     if (comparing)
     {
         mCompare->setRect(mText->getRect());
+        // Its lines chosen as the studio's comparisons choose them, as the
+        // setting is now.
+        mCompare->setAlgorithm(ALScriptStudio::compareAlgorithm());
+        // A change taken back is an edit of the text, one step to undo,
+        // where the text may be changed and is still what was compared.
+        mCompare->setOnTakeBack(nullptr);
+        if (mModifiable)
+        {
+            mCompare->setOnTakeBack([this](const ALTextRange& range, const std::string& text) {
+                return mModifiable && !mText->isReadOnly() && mText->wholeText() == mCompare->rightText() && mText->replaceAll({ { range, text } });
+            });
+        }
         if (mHistoryShown)
         {
             LLStringUtil::format_map_t args;
@@ -740,6 +761,41 @@ void LLPreviewNotecard::compareSave(ALSavedText saved)
     }
     mHistoryShown = std::move(saved);
     toggleCompare();
+    showHistoryNotice();
+    // The notecard's other saves to step through, each put on the left in
+    // its place, as the studio's comparison of a save has them.
+    if (mCompare && mCompare->getVisible())
+    {
+        ALScriptStudioHistory::offerVersions(
+            *mCompare, ALRecoveryStore::keyOf(mObjectUUID, mItemUUID, std::string()), mHistoryShown->path,
+            [this](ALSavedText stepped) {
+                if (!mHistoryShown || !mCompare || !mCompare->getVisible())
+                {
+                    return;
+                }
+                LLStringUtil::format_map_t when;
+                when["[WHEN]"] = ALRecoveryEntry::sayWhen(stepped.when);
+                mCompare->setLeftText(stepped.text);
+                mCompare->setTitles(getString("HistorySavedAt", when), getString("CompareMine"));
+                mHistoryShown = std::move(stepped);
+                showHistoryNotice();
+            },
+            [this](const ALSavedText& unread) {
+                LLStringUtil::format_map_t when;
+                when["[WHEN]"] = ALRecoveryEntry::sayWhen(unread.when);
+                setStatus(getString("HistoryUnreadable", when), true);
+            });
+    }
+}
+
+void LLPreviewNotecard::showHistoryNotice()
+{
+    if (!mHistoryShown)
+    {
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[WHEN]"] = ALRecoveryEntry::sayWhen(mHistoryShown->when);
     std::vector<NoticeButton> buttons;
     if (mModifiable)
     {

@@ -147,30 +147,76 @@ bool ALScriptStudioHistory::compare(Doc& doc, ALSavedText saved)
     return true;
 }
 
-void ALScriptStudioHistory::versions(Doc& doc)
+// static
+void ALScriptStudioHistory::offerVersions(ALDiffView& view, const std::string& key, const std::string& shown,
+                                          std::function<void(ALSavedText saved)> stepped, std::function<void(const ALSavedText& saved)> unreadable)
 {
     const std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
-    const std::string                    key     = keyOf(doc);
-    if (!history || key.empty() || !doc.compareView || !doc.historyShown)
+    if (!history || key.empty())
     {
         return;
     }
     // Listed newest first; the slider has them oldest first.
-    std::vector<ALSavedText> saves = history->list(key);
-    std::reverse(saves.begin(), saves.end());
-    const auto shown = std::find_if(saves.begin(), saves.end(), [&doc](const ALSavedText& save) { return save.path == doc.historyShown->path; });
-    if (shown == saves.end())
+    struct Saves
+    {
+        std::vector<ALSavedText> saves;
+        S32                      current = 0;
+    };
+    auto listed = std::make_shared<Saves>();
+    listed->saves = history->list(key);
+    std::reverse(listed->saves.begin(), listed->saves.end());
+    const auto at = std::find_if(listed->saves.begin(), listed->saves.end(), [&shown](const ALSavedText& save) { return save.path == shown; });
+    if (at == listed->saves.end())
+    {
+        return;
+    }
+    listed->current = static_cast<S32>(at - listed->saves.begin());
+    // The view holds this, and is there whenever it is called.
+    ALDiffView* const shows = &view;
+    view.setVersions(static_cast<S32>(listed->saves.size()), listed->current, [listed, shows, stepped, unreadable](S32 version) {
+        if (version < 0 || version >= static_cast<S32>(listed->saves.size()))
+        {
+            return;
+        }
+        ALSavedText                          save    = listed->saves[static_cast<size_t>(version)];
+        const std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
+        if (!save.whole && (!history || !history->load(save)))
+        {
+            unreadable(save);
+            shows->showVersion(listed->current);
+            return;
+        }
+        listed->current = version;
+        stepped(std::move(save));
+    });
+}
+
+void ALScriptStudioHistory::versions(Doc& doc)
+{
+    if (!doc.compareView || !doc.historyShown)
     {
         return;
     }
     const std::weak_ptr<bool> alive = mAlive;
     const std::string         id    = doc.id;
-    doc.compareView->setVersions(static_cast<S32>(saves.size()), static_cast<S32>(shown - saves.begin()), [this, alive, id, saves](S32 version) {
-        if (alive.lock() && version >= 0 && version < static_cast<S32>(saves.size()))
-        {
-            step(id, saves[static_cast<size_t>(version)]);
-        }
-    });
+    offerVersions(
+        *doc.compareView, keyOf(doc), doc.historyShown->path,
+        [this, alive, id](ALSavedText saved) {
+            if (alive.lock())
+            {
+                step(id, std::move(saved));
+            }
+        },
+        [this, alive, id](const ALSavedText& saved) {
+            const Doc* doc = alive.lock() ? mServices.findDoc(id) : nullptr;
+            if (doc)
+            {
+                LLStringUtil::format_map_t args;
+                args["[NAME]"] = doc->name;
+                args["[WHEN]"] = ALRecoveryEntry::sayWhen(saved.when);
+                mServices.setStatus(mServices.words("HistoryUnreadable", args), true);
+            }
+        });
 }
 
 void ALScriptStudioHistory::step(const std::string& id, ALSavedText saved)
@@ -182,15 +228,8 @@ void ALScriptStudioHistory::step(const std::string& id, ALSavedText saved)
         return;
     }
     LLStringUtil::format_map_t args;
-    args["[NAME]"]                               = doc->name;
-    args["[WHEN]"]                               = ALRecoveryEntry::sayWhen(saved.when);
-    const std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
-    if (!saved.whole && (!history || !history->load(saved)))
-    {
-        mServices.setStatus(mServices.words("HistoryUnreadable", args), true);
-        versions(*doc);
-        return;
-    }
+    args["[NAME]"]             = doc->name;
+    args["[WHEN]"]             = ALRecoveryEntry::sayWhen(saved.when);
     const std::string text     = saved.text;
     doc->historyShown          = std::move(saved);
     doc->compareTitles->theirs = mServices.words("HistorySavedAt", args);

@@ -113,6 +113,7 @@ public:
     // fewer than two.
     void        setVersions(S32 count, S32 current);
     S32         versionShown() const { return mVersion; }
+    S32         versionCount() const { return mVersionCount; }
 
     // The colours of the comparison it is over: its glyphs and its count
     // in the sides' ink, its ground a shade off their paper.

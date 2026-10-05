@@ -133,6 +133,8 @@ private:
     // and offered back as one step to undo; and let go of, with its notice.
     void showHistory();
     void compareSave(ALSavedText saved);
+    // What the notice says of the save compared, and offers.
+    void showHistoryNotice();
     void restoreSave();
     void endHistory();
 

@@ -356,4 +356,33 @@ namespace tut
         studio.choose(studio.candidates[0].value);
         ensure("one save: no slider", alone.compareView && !alone.compareView->bar()->getChild<LLView>("versions")->getVisible());
     }
+
+    template<> template<>
+    void alscriptstudiohistory_object::test<8>()
+    {
+        set_test_name("a save stepped to that can no longer be read: said, the slider put back, the left as it was");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        studio.host = window.floater;
+        Doc& doc    = tab("door", "now");
+        saved(doc, "older", 200.0);
+        saved(doc, "newer", 100.0);
+        unit.show(doc);
+        studio.choose(studio.candidates[0].value);
+        ALDiffView& view = *doc.compareView;
+        ensure_equals("at the newest", view.bar()->versionShown(), 1);
+        // The older one gone from disk since it was listed.
+        const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
+        std::error_code                gone;
+        std::filesystem::remove(fsyspath(listed[1].path), gone);
+        ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("older"))->press();
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = "door";
+        args["[WHEN]"] = ALRecoveryEntry::sayWhen(listed[1].when);
+        ensure_equals("said", services().statuses.back(), said("HistoryUnreadable", args));
+        ensure("the slider put back", view.bar()->versionShown() == 1);
+        ensure("the left as it was", view.leftText() == "newer" && doc.historyShown->text == "newer");
+    }
 }

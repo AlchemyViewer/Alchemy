@@ -106,6 +106,9 @@ public:
     // none for fewer than two.
     typedef std::function<void(S32 version)> version_t;
     void setVersions(S32 count, S32 current, version_t chosen);
+    // The version shown said again on the bar, as given before: where one
+    // chosen could not be shown after all.
+    void showVersion(S32 current);
     const std::string& leftText() const { return mModel.leftText(); }
     const std::string& rightText() const { return mModel.rightText(); }
     // What is compared, laid out: what a host or a test reads of it.

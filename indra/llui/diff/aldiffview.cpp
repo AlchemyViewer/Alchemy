@@ -208,6 +208,11 @@ void ALDiffView::setVersions(S32 count, S32 current, version_t chosen)
     mBar->setVersions(count, current);
 }
 
+void ALDiffView::showVersion(S32 current)
+{
+    mBar->setVersions(mBar->versionCount(), current);
+}
+
 void ALDiffView::setMergeBase(std::optional<std::string_view> base)
 {
     mModel.setMergeBase(base);

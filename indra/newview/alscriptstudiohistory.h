@@ -86,6 +86,14 @@ public:
     typedef std::function<std::string(const char* name, std::optional<S32> count)> words_t;
     static std::vector<ALQuickOpen::Candidate> candidatesOf(const std::vector<ALSavedText>& saves, const LLUUID& current, const words_t& words,
                                                             const std::function<std::string(const std::vector<std::string>&)>& listed);
+    // A comparison of a save given the saves kept under its key to step
+    // through, oldest first, the one at `shown` among them -- for the
+    // notecard window's comparison as well as the studio's: each stepped
+    // to read whole and handed on; one that cannot be read said so, and
+    // the slider put back. Nothing for fewer than two, or a save not
+    // among them.
+    static void offerVersions(ALDiffView& view, const std::string& key, const std::string& shown, std::function<void(ALSavedText saved)> stepped,
+                              std::function<void(const ALSavedText& saved)> unreadable);
     // The saves of a tab's item offered to compare with it; said where
     // there are none.
     void show(Doc& doc);
@@ -95,9 +103,8 @@ public:
     bool compare(Doc& doc, ALSavedText saved);
 
 private:
-    // The comparison of a save given the item's saves to step through,
-    // oldest first, the one shown among them; and one stepped to, put on
-    // the left in its place.
+    // The comparison of a save given the item's saves to step through
+    // (offerVersions); and one stepped to, put on the left in its place.
     void versions(Doc& doc);
     void step(const std::string& id, ALSavedText saved);
 
