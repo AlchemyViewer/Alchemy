@@ -122,11 +122,13 @@ public:
     // --- what is compared --------------------------------------------------
 
     // The texts, the left the one taken from and the right the one made;
-    // lined up where lines are known to stand for each other (ALTextDiff's
-    // anchors), however they differ. The runs folded as foldsSame() says.
-    void setTexts(std::string_view left, std::string_view right, const ALTextDiff::anchors_t& anchors = {});
+    // lined up where stretches of them are known to stand for each other
+    // (ALTextDiff's ranges), however they differ: each range starting
+    // beside its other, and what follows it level again. The runs folded
+    // as foldsSame() says.
+    void setTexts(std::string_view left, std::string_view right, const ALTextDiff::ranges_t& ranges = {});
     // The right made anew -- the text it is of, changed -- and compared
-    // again: the anchors carried to where their lines of the right went,
+    // again: the ranges carried to where their lines of the right went,
     // changed or not, and the runs as open as they were, by the first line
     // of the right each hides. Where each of its lines went.
     LineMap setRightText(std::string_view right);
@@ -138,7 +140,7 @@ public:
 
     const std::string&           leftText() const { return mLeftText; }
     const std::string&           rightText() const { return mRightText; }
-    const ALTextDiff::anchors_t& anchors() const { return mAnchors; }
+    const ALTextDiff::ranges_t&  ranges() const { return mRanges; }
     const ALTextDiff::Likeness&  likeness() const { return mLike; }
     bool                         swapped() const { return mSwapped; }
 
@@ -205,6 +207,20 @@ public:
     // there -- and the right's text as it will be. False for no change.
     bool               takeBack(S32 change, ALTextRange& range, std::string& text, std::string& made) const;
 
+    // --- ranges ------------------------------------------------------------------
+
+    // A range's rows side by side in a column -- of the stretch of the text
+    // the column shows -- from its first line's row to the row past its
+    // last line's; nothing inline.
+    std::pair<S32, S32> rangeRows(S32 range, Column column) const;
+    // Whether a view brackets it: its first lines lined up beside each
+    // other -- not one the diff could not keep in order, the SLua of a
+    // state_entry written last -- and no other so lined up lying within
+    // it on both sides: a statement rather than the block or the function
+    // it is in, but a block whose statements were not lined up, an if on
+    // one line of LSL written as three of SLua.
+    bool                rangeBracketed(S32 range) const { return mBracketed[static_cast<size_t>(range)]; }
+
     // --- folds -------------------------------------------------------------------
 
     // Runs folded as they are found, or not; and every run folded so, or
@@ -268,10 +284,13 @@ private:
     // Made again from the texts; the runs as open as given, where there
     // are as many as there were.
     void              build(const std::vector<bool>& open = {});
+    // Which ranges are bracketed, worked out as each layout is made.
+    void              findBracketed();
 
     std::string           mLeftText;
     std::string           mRightText;
-    ALTextDiff::anchors_t mAnchors;
+    ALTextDiff::ranges_t  mRanges;
+    std::vector<bool>     mBracketed;
     ALTextDiff::Likeness  mLike;
     bool                  mSwapped  = false;
     bool                  mFoldSame = true;

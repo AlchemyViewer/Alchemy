@@ -104,6 +104,19 @@ public:
         }
     };
 
+    // A stretch of the LSL beside the SLua written of it, each counted
+    // from nought: the first and last line of a global, function, state,
+    // handler or statement as the LSL has it, and the first and last line
+    // of code made of it -- its notes and comments, which go over the
+    // next, left out at its end.
+    struct Span
+    {
+        S32 lslFirst  = 0;
+        S32 lslLast   = 0;
+        S32 sluaFirst = 0;
+        S32 sluaLast  = 0;
+    };
+
     struct Result
     {
         bool             converted = false;
@@ -115,12 +128,11 @@ public:
         // Why nothing was converted: the LSL does not parse, or the
         // definitions are not loaded.
         ALScriptProblems problems;
-        // Lines of the LSL beside the lines of the SLua written of them, each
-        // counted from nought: where each global, function, state, handler
-        // and statement begins, and the first line of code made of it. In
-        // the order written, which is not always the LSL's: what a diff of
-        // the two lines up (ALTextDiff's anchors).
-        std::vector<std::pair<S32, S32>> anchors;
+        // Each stretch of the LSL beside the SLua written of it, a block
+        // and the statements in it each one of its own, in the order
+        // written, which is not always the LSL's: what a diff of the two
+        // lines up (ALTextDiff's ranges).
+        std::vector<Span> spans;
     };
 
     static Result convert(std::string_view lsl, const Options& options);

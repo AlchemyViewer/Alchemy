@@ -416,4 +416,27 @@ namespace tut
         ALTextDiff::words("Say(X)", "say(x)", left, right, ALTextDiff::Likeness{ false, true });
         ensure("case let go of: nothing", left.empty() && right.empty());
     }
+
+    template<> template<>
+    void altextdiff_object::test<13>()
+    {
+        set_test_name("anchors of ranges: each's first lines and the lines after it; nested ones settled to a line each way, an end that cuts a range let go of");
+        typedef ALTextDiff::anchors_t A;
+        ensure("one range: its start and the line after it", ALTextDiff::anchorsOf({ { 4, 5, 2, 2 } }) == A{ { 4, 2 }, { 6, 3 } });
+        // An if on one LSL line written as three of SLua, the call in it on
+        // the middle one: the if's head beside it, the call's end, which
+        // would put the line after it beside the if's end, let go of.
+        ensure("an if on one line", ALTextDiff::anchorsOf({ { 4, 4, 2, 4 }, { 4, 4, 3, 3 } }) == A{ { 4, 2 }, { 5, 5 } });
+        // A state that wrote nothing of its own, its handler's first line
+        // its first: the handler beside it; the handler's end, which would
+        // put the state's closing line beside a line past the state's SLua,
+        // let go of for the state's own.
+        ensure("a handler in a state", ALTextDiff::anchorsOf({ { 0, 7, 0, 6 }, { 2, 6, 0, 6 } }) == A{ { 2, 0 }, { 8, 7 } });
+        // A for written as a declaration, a while, its body, a step and an
+        // end: the for's first line beside the declaration, the line after
+        // it beside the line after the end.
+        ensure("a for", ALTextDiff::anchorsOf({ { 4, 4, 2, 6 }, { 4, 4, 4, 4 } }) == A{ { 4, 2 }, { 5, 7 } });
+        ensure("ranges in a row: one line each way between them", ALTextDiff::anchorsOf({ { 0, 0, 0, 1 }, { 1, 2, 2, 2 } }) == A{ { 0, 0 }, { 1, 2 }, { 3, 3 } });
+        ensure("none: none", ALTextDiff::anchorsOf({}).empty());
+    }
 }

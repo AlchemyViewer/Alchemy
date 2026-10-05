@@ -351,7 +351,7 @@ namespace
 
         std::string write();
         ALScriptProblems& notes() { return mNotes; }
-        const std::vector<std::pair<S32, S32>>& anchors() const { return mAnchors; }
+        const std::vector<ALLSLToSLua::Span>& spans() const { return mSpans; }
 
     private:
         // --- where the two languages differ -----------------------------------------
@@ -541,9 +541,9 @@ namespace
         void statementBody(LSLASTNode* s, bool last);
         void block(LSLASTNode* s);
         // An if written from `at` in the text, `lines` lines down, its
-        // anchors from `anchors`, put on one line where it is one statement
+        // stretches from `spans`, put on one line where it is one statement
         // and nothing said over it: if c then s end.
-        void onOneLine(size_t at, S32 lines, size_t anchors);
+        void onOneLine(size_t at, S32 lines, size_t spans);
         // An expression standing as a statement: an assignment, a step, a
         // call.
         void effect(LSLExpression* e);
@@ -756,12 +756,14 @@ namespace
         // What each part of the script may change, for LSL's order.
         ALLSLEffects                                     mEffects;
         std::string                                      mText;
-        // The LSL's lines beside the SLua's first lines made of them, the
-        // SLua's counted in mText until the head goes over it; the LSL line
-        // of the node whose first line is written next, once its comments
-        // are; and how many lines mText was counted to hold, and to where.
-        std::vector<std::pair<S32, S32>>                 mAnchors;
-        std::optional<S32>                               mAnchorPending;
+        // The LSL's stretches beside the SLua's made of them, the SLua's
+        // counted in mText until the head goes over it, and its last lines
+        // worked out once all is written (endSpans); the LSL lines of the
+        // node whose first line is written next, once its comments are; and
+        // how many lines mText was counted to hold, and to where.
+        std::vector<ALLSLToSLua::Span>                   mSpans;
+        std::optional<std::pair<S32, S32>>               mAnchorPending;
+        void                                             endSpans();
         size_t                                           mCounted      = 0;
         S32                                              mCountedLines = 0;
         S32                                              linesWritten();
@@ -959,7 +961,8 @@ namespace
         }
         if (mAnchorPending && !mInline && !text.empty())
         {
-            mAnchors.emplace_back(*mAnchorPending, linesWritten());
+            const S32 at = linesWritten();
+            mSpans.push_back(ALLSLToSLua::Span{ mAnchorPending->first, mAnchorPending->second, at, at });
             mAnchorPending.reset();
         }
         mText += text.empty() ? std::string("\n") : indent() + text + "\n";
@@ -1387,7 +1390,8 @@ namespace
         }
         if (!isNull(node) && node->getLoc())
         {
-            mAnchorPending = zeroBased(node->getLoc()->first_line);
+            const S32 first = zeroBased(node->getLoc()->first_line);
+            mAnchorPending  = std::make_pair(first, std::max(first, zeroBased(node->getLoc()->last_line)));
         }
     }
 
@@ -3424,7 +3428,7 @@ namespace
         }
     }
 
-    void Writer::onOneLine(size_t at, S32 lines, size_t anchors)
+    void Writer::onOneLine(size_t at, S32 lines, size_t spans)
     {
         // Its lines, the last three if c then, s, end; any before them what
         // was said over it.
@@ -3463,11 +3467,11 @@ namespace
         mText.replace(starts[head], std::string::npos, joined);
         // What is anchored past its first line, on it.
         const S32 first = lines + static_cast<S32>(head);
-        for (size_t n = mAnchors.size(); n > anchors; --n)
+        for (size_t n = mSpans.size(); n > spans; --n)
         {
-            if (mAnchors[n - 1].second > first)
+            if (mSpans[n - 1].sluaFirst > first)
             {
-                mAnchors.erase(mAnchors.begin() + static_cast<std::ptrdiff_t>(n - 1));
+                mSpans.erase(mSpans.begin() + static_cast<std::ptrdiff_t>(n - 1));
             }
         }
         mCounted      = starts[head];
@@ -3560,7 +3564,7 @@ namespace
                 const bool   one_line = s->getLoc()->first_line == s->getLoc()->last_line && isNull(i->getFalseBranch());
                 const S32    lines_at = one_line ? linesWritten() : 0;
                 const size_t text_at  = mText.size();
-                const size_t anchors  = mAnchors.size();
+                const size_t spans    = mSpans.size();
                 line("if " + condition(i->getCheckExpr()).text + " then");
                 for (;;)
                 {
@@ -3588,7 +3592,7 @@ namespace
                 line("end");
                 if (one_line)
                 {
-                    onOneLine(text_at, lines_at, anchors);
+                    onOneLine(text_at, lines_at, spans);
                 }
                 return;
             }
@@ -6240,12 +6244,57 @@ end
         helpers(out);
         // The head over what was written: the SLua's lines counted from the
         // top.
+        endSpans();
         const S32 above = static_cast<S32>(std::count(out.begin(), out.end(), '\n'));
-        for (std::pair<S32, S32>& anchor : mAnchors)
+        for (ALLSLToSLua::Span& span : mSpans)
         {
-            anchor.second += above;
+            span.sluaFirst += above;
+            span.sluaLast += above;
         }
         return out + mText;
+    }
+
+    void Writer::endSpans()
+    {
+        // Each stretch's SLua runs to where the next written that is not
+        // inside it (by its LSL) begins, or to the end; less the blank
+        // lines and comments before that, which are the next's -- its notes,
+        // the comments over it -- or nobody's, and the lines written less
+        // deep than its first, which close the blocks it is in.
+        std::vector<std::string_view> lines;
+        for (size_t from = 0; from < mText.size();)
+        {
+            const size_t cut = std::min(mText.find('\n', from), mText.size());
+            lines.push_back(std::string_view(mText).substr(from, cut - from));
+            from = cut + 1;
+        }
+        const auto depth = [&](S32 line) { return lines[static_cast<size_t>(line)].find_first_not_of(" \t"); };
+        const auto spoken = [&](S32 line) {
+            const std::string_view text  = lines[static_cast<size_t>(line)];
+            const size_t           first = text.find_first_not_of(" \t");
+            return first != std::string_view::npos && text.substr(first, 2) != "--";
+        };
+        for (size_t i = 0; i < mSpans.size(); ++i)
+        {
+            ALLSLToSLua::Span& span = mSpans[i];
+            S32                end  = static_cast<S32>(lines.size()) - 1;
+            for (size_t j = i + 1; j < mSpans.size(); ++j)
+            {
+                const ALLSLToSLua::Span& next = mSpans[j];
+                if (next.lslFirst < span.lslFirst || next.lslLast > span.lslLast)
+                {
+                    end = next.sluaFirst - 1;
+                    break;
+                }
+            }
+            end = std::min(end, static_cast<S32>(lines.size()) - 1);
+            const size_t own = span.sluaFirst < static_cast<S32>(lines.size()) ? depth(span.sluaFirst) : 0;
+            while (end > span.sluaFirst && (!spoken(end) || depth(end) < own))
+            {
+                --end;
+            }
+            span.sluaLast = std::max(span.sluaFirst, end);
+        }
     }
 }
 
@@ -6432,7 +6481,7 @@ ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& op
         Writer writer(script, lsl, options);
         result.text      = writer.write();
         result.notes     = std::move(writer.notes());
-        result.anchors   = writer.anchors();
+        result.spans     = writer.spans();
         result.converted = true;
     });
     return result;

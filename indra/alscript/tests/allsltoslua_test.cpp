@@ -1237,7 +1237,7 @@ namespace tut
     template<> template<>
     void allsltoslua_object::test<38>()
     {
-        set_test_name("anchors: each global, function, handler and statement's LSL line beside the line of SLua made of it, under the head, its notes and comments");
+        set_test_name("spans: each global, function, handler and statement's LSL line beside the line of SLua made of it, under the head, its notes and comments");
         const std::string lsl = "integer count = 0;\n"               // 0
                                 "add(integer n)\n"                   // 1
                                 "{\n"                                // 2
@@ -1260,16 +1260,18 @@ namespace tut
             lines.push_back(r.text.substr(from, cut - from));
             from = cut + 1;
         }
-        for (const auto& [l, s] : r.anchors)
+        for (const ALLSLToSLua::Span& span : r.spans)
         {
-            ensure("within both: " + std::to_string(l) + " " + std::to_string(s), l >= 0 && l < 14 && s >= 0 && s < static_cast<S32>(lines.size()));
+            ensure("within both: " + std::to_string(span.lslFirst) + " " + std::to_string(span.sluaFirst),
+                   span.lslFirst >= 0 && span.lslLast < 14 && span.lslFirst <= span.lslLast && span.sluaFirst >= 0 && span.sluaFirst <= span.sluaLast &&
+                       span.sluaLast < static_cast<S32>(lines.size()));
         }
         const auto at = [&](S32 lsl_line) -> std::string {
-            for (const auto& [l, s] : r.anchors)
+            for (const ALLSLToSLua::Span& span : r.spans)
             {
-                if (l == lsl_line)
+                if (span.lslFirst == lsl_line)
                 {
-                    return lines[static_cast<size_t>(s)];
+                    return lines[static_cast<size_t>(span.sluaFirst)];
                 }
             }
             return "(none)";
@@ -1426,11 +1428,11 @@ namespace tut
             from = cut + 1;
         }
         const auto at = [&](S32 lsl_line) -> std::string {
-            for (const auto& [l, s] : r.anchors)
+            for (const ALLSLToSLua::Span& span : r.spans)
             {
-                if (l == lsl_line && s >= 0 && s < static_cast<S32>(lines.size()))
+                if (span.lslFirst == lsl_line && span.sluaFirst >= 0 && span.sluaFirst < static_cast<S32>(lines.size()))
                 {
-                    return lines[static_cast<size_t>(s)];
+                    return lines[static_cast<size_t>(span.sluaFirst)];
                 }
             }
             return "(none)";
@@ -1547,5 +1549,67 @@ namespace tut
         ensure("one inside another's braces: " + r.text, has(r, "print(`a{ll.ToUpper(`b{k}`)}{string.format(\"%.6f\", f)}`)"));
         ensure("joined onto a string: " + r.text, has(r, "s ..= `/{k}`"));
         checksClean(r);
+    }
+    template<> template<>
+    void allsltoslua_object::test<47>()
+    {
+        set_test_name("spans end where the SLua made of them does: a block at its end, a statement at its own line, a comment over the next left to the next");
+        const std::string lsl = "default\n"                        // 0
+                                "{\n"                              // 1
+                                "    touch_start(integer d)\n"     // 2
+                                "    {\n"                          // 3
+                                "        if (d > 1)\n"             // 4
+                                "        {\n"                      // 5
+                                "            llSay(0, \"many\");\n" // 6
+                                "        }\n"                      // 7
+                                "        // after\n"               // 8
+                                "        llSay(0, \"one\");\n"     // 9
+                                "    }\n"                          // 10
+                                "}\n";                             // 11
+        const ALLSLToSLua::Result r = convert(lsl);
+        std::vector<std::string>  lines;
+        for (size_t from = 0; from <= r.text.size();)
+        {
+            const size_t cut = std::min(r.text.find('\n', from), r.text.size());
+            lines.push_back(r.text.substr(from, cut - from));
+            from = cut + 1;
+        }
+        // The innermost span starting on an LSL line, and its SLua's first
+        // and last lines.
+        const auto span = [&](S32 lsl_first) -> const ALLSLToSLua::Span* {
+            const ALLSLToSLua::Span* found = nullptr;
+            for (const ALLSLToSLua::Span& each : r.spans)
+            {
+                if (each.lslFirst == lsl_first && (!found || each.lslLast <= found->lslLast))
+                {
+                    found = &each;
+                }
+            }
+            return found;
+        };
+        const auto trimmed = [&](S32 line) {
+            const std::string& text  = lines[static_cast<size_t>(line)];
+            const size_t       first = text.find_first_not_of(' ');
+            return first == std::string::npos ? std::string() : text.substr(first);
+        };
+        const ALLSLToSLua::Span* block = span(4);
+        ensure("the if", block && block->lslLast == 7);
+        ensure("from its head: " + trimmed(block->sluaFirst), trimmed(block->sluaFirst).find("if d > 1 then") == 0);
+        ensure("to its end: " + trimmed(block->sluaLast) + "\n" + r.text, trimmed(block->sluaLast) == "end");
+        const ALLSLToSLua::Span* inside = span(6);
+        std::string all;
+        for (const ALLSLToSLua::Span& each : r.spans)
+        {
+            all += std::to_string(each.lslFirst) + "-" + std::to_string(each.lslLast) + " : " + std::to_string(each.sluaFirst) + "-" + std::to_string(each.sluaLast) + "\n";
+        }
+        ensure("the statement in it, a line of its own\n" + all + r.text, inside && inside->lslLast == 6 && inside->sluaFirst == inside->sluaLast &&
+                                                             trimmed(inside->sluaFirst).find("ll.Say(0, \"many\")") == 0);
+        const ALLSLToSLua::Span* next = span(9);
+        ensure("the next, under the comment: " + (next ? trimmed(next->sluaFirst) : std::string()),
+               next && next->sluaFirst == next->sluaLast && trimmed(next->sluaFirst).find("ll.Say(0, \"one\")") == 0 &&
+                   trimmed(next->sluaFirst - 1) == "-- after");
+        const ALLSLToSLua::Span* handler = span(2);
+        ensure("the handler, over all of it", handler && handler->lslLast == 10 && handler->sluaFirst < block->sluaFirst && handler->sluaLast >= next->sluaLast);
+        ensure("to its own end: " + trimmed(handler->sluaLast), trimmed(handler->sluaLast).find("end") == 0);
     }
 }

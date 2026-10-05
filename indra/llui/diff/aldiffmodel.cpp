@@ -51,11 +51,11 @@ ALDiffModel::ALDiffModel()
     build();
 }
 
-void ALDiffModel::setTexts(std::string_view left, std::string_view right, const ALTextDiff::anchors_t& anchors)
+void ALDiffModel::setTexts(std::string_view left, std::string_view right, const ALTextDiff::ranges_t& ranges)
 {
     mLeftText  = std::string(left);
     mRightText = std::string(right);
-    mAnchors   = anchors;
+    mRanges    = ranges;
     build();
 }
 
@@ -78,15 +78,17 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
             map.same[line]    = run.kind == Kind::Same;
         }
     }
-    // An anchor goes with its line, changed or not: an edit of the SLua a
+    // A range goes with its lines, changed or not: an edit of the SLua a
     // statement became still stands for the statement. Two come to one
     // line where one was taken out; lines() keeps those it can.
-    ALTextDiff::anchors_t anchors;
-    for (const auto& [left, at] : mAnchors)
+    ALTextDiff::ranges_t ranges;
+    for (ALTextDiff::Range range : mRanges)
     {
-        if (at >= 0 && at < static_cast<S32>(was.size()))
+        if (range.rightFirst >= 0 && range.rightFirst < static_cast<S32>(was.size()))
         {
-            anchors.emplace_back(left, map.line(at));
+            range.rightFirst = map.line(range.rightFirst);
+            range.rightLast  = llmax(range.rightFirst, map.line(range.rightLast));
+            ranges.push_back(range);
         }
     }
     // The runs open, by the first line of the right each hides.
@@ -101,7 +103,7 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
         }
     }
     mRightText = std::string(right);
-    mAnchors   = std::move(anchors);
+    mRanges    = std::move(ranges);
     build();
     const std::vector<S32>& now_rows = mRightLines[index(Layout::Sides)];
     for (Fold& fold : mFolds)
@@ -171,7 +173,7 @@ void ALDiffModel::build(const std::vector<bool>& open)
     // swapped, and the pairs that line them up with them.
     const std::vector<std::string> left  = ALTextDiff::split(mSwapped ? mRightText : mLeftText);
     const std::vector<std::string> right = ALTextDiff::split(mSwapped ? mLeftText : mRightText);
-    ALTextDiff::anchors_t          anchors(mAnchors);
+    ALTextDiff::anchors_t          anchors = ALTextDiff::anchorsOf(mRanges);
     if (mSwapped)
     {
         for (auto& [from, to] : anchors)
@@ -349,6 +351,7 @@ void ALDiffModel::build(const std::vector<bool>& open)
         }
     }
     mFolds = std::move(folds);
+    findBracketed();
 }
 
 // --- a column's lines ----------------------------------------------------------
@@ -588,6 +591,65 @@ bool ALDiffModel::takeBack(S32 change, ALTextRange& range, std::string& text, st
     const auto offset = [&](const ALTextPos& pos) { return starts[static_cast<size_t>(pos.line)] + static_cast<size_t>(pos.column); };
     made              = mRightText.substr(0, offset(range.begin)) + text + mRightText.substr(offset(range.end));
     return true;
+}
+
+// --- ranges --------------------------------------------------------------------------
+
+void ALDiffModel::findBracketed()
+{
+    // Those whose first lines are on one row, side by side; then, in order
+    // of their first lines on the left, each against the lined up ones
+    // that start within it there, which are the only ones that can lie
+    // within it on both sides.
+    const size_t count = mRanges.size();
+    mBracketed.assign(count, false);
+    std::vector<size_t> order;
+    for (size_t n = 0; n < count; ++n)
+    {
+        const auto [lf, le] = rangeRows(static_cast<S32>(n), mSwapped ? Column::Right : Column::Left);
+        const auto [rf, re] = rangeRows(static_cast<S32>(n), mSwapped ? Column::Left : Column::Right);
+        if (le > lf && re > rf && lf == rf)
+        {
+            mBracketed[n] = true;
+            order.push_back(n);
+        }
+    }
+    std::sort(order.begin(), order.end(), [this](size_t a, size_t b) { return mRanges[a].leftFirst < mRanges[b].leftFirst; });
+    for (size_t i = 0; i < order.size(); ++i)
+    {
+        const ALTextDiff::Range& outer = mRanges[order[i]];
+        // Back over those starting on the same line, then on while they
+        // start inside it.
+        size_t from = i;
+        while (from > 0 && mRanges[order[from - 1]].leftFirst == outer.leftFirst)
+        {
+            --from;
+        }
+        for (size_t j = from; j < order.size() && mRanges[order[j]].leftFirst <= outer.leftLast; ++j)
+        {
+            const ALTextDiff::Range& inner = mRanges[order[j]];
+            if (j != i && !(inner == outer) && inner.leftLast <= outer.leftLast && inner.rightFirst >= outer.rightFirst && inner.rightLast <= outer.rightLast)
+            {
+                mBracketed[order[i]] = false;
+                break;
+            }
+        }
+    }
+}
+
+std::pair<S32, S32> ALDiffModel::rangeRows(S32 range, Column column) const
+{
+    if (column == Column::Inline || range < 0 || range >= static_cast<S32>(mRanges.size()) || lineCount(column) == 0)
+    {
+        return { 0, 0 };
+    }
+    // The left shows the text given as the left, but swapped.
+    const ALTextDiff::Range& r     = mRanges[static_cast<size_t>(range)];
+    const bool               given = (column == Column::Left) != mSwapped;
+    const S32                last  = lineCount(column) - 1;
+    const S32                first = llclamp(given ? r.leftFirst : r.rightFirst, 0, last);
+    const S32                end   = llclamp(given ? r.leftLast : r.rightLast, first, last);
+    return { rowOfLine(column, first), rowOfLine(column, end) + 1 };
 }
 
 // --- folds ---------------------------------------------------------------------------

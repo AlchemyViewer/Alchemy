@@ -175,7 +175,7 @@ namespace tut
     void aldiffmodel_object::test<4>()
     {
         set_test_name("anchored: lines known to stand for each other side by side however they differ; the right's line at a row and back");
-        m.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 2 } });
+        m.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 4, 2, 2 } });
         ensure("the LSL's call beside the SLua's", beside(4, 2));
         const S32 row = m.rowOfLine(Column::Right, 2);
         ensure("the right's line at that row, both ways", m.rightLineOfRow(Layout::Sides, row) == 2 && m.rowOfRightLine(Layout::Sides, 2) == row);
@@ -298,9 +298,9 @@ namespace tut
         ensure("a line changed: to the line it became, not kept", gone.line(26) == 26 && !gone.kept(26) && gone.kept(25));
         ensure("past the end: the last", gone.line(400) == 30);
 
-        m.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 2 } });
+        m.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 4, 2, 2 } });
         m.setRightText("-- written\n-- and more\n\nll.Say(0, \"hi\")");
-        ensure("the LSL's call beside the SLua's, a line further down", beside(4, 3) && m.anchors().size() == 1 && m.anchors()[0].second == 3);
+        ensure("the LSL's call beside the SLua's, a line further down", beside(4, 3) && m.ranges().size() == 1 && m.ranges()[0].rightFirst == 3 && m.ranges()[0].rightLast == 3);
         m.setRightText("-- written\n-- and more\n\nll.Say(0, \"bye\")");
         ensure("its line changed: beside it still", beside(4, 3));
     }
@@ -330,5 +330,47 @@ namespace tut
         m.setTexts("one\ntwo\nthree", "one\nx\ny\nthree");
         m.setSwapped(true);
         ensure("swapped: still the right's text, with the left's lines", m.takeBack(0, range, text, made) && made == "one\ntwo\nthree");
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<11>()
+    {
+        set_test_name("ranges: each starts beside its other and what follows it starts level again; its rows each side; those bracketed; swapped; carried with the right");
+        const char* lsl  = "default\n"                               // 0
+                           "{\n"                                     // 1
+                           "    touch_start(integer d)\n"            // 2
+                           "    {\n"                                 // 3
+                           "        if (d > 1) llSay(0, \"many\");\n" // 4
+                           "        llSay(0, \"one\");\n"            // 5
+                           "    }\n"                                 // 6
+                           "}";                                       // 7
+        const char* slua = "LLEvents:on(\"touch_start\", function(detected)\n" // 0
+                           "    local d = #detected\n"                         // 1
+                           "    if d > 1 then\n"                               // 2
+                           "        ll.Say(0, \"many\")\n"                    // 3
+                           "    end\n"                                         // 4
+                           "    ll.Say(0, \"one\")\n"                         // 5
+                           "end)";                                            // 6
+        const ALTextDiff::ranges_t ranges = { { 0, 7, 0, 6 }, { 2, 6, 0, 6 }, { 4, 4, 2, 4 }, { 4, 4, 3, 3 }, { 5, 5, 5, 5 } };
+        m.setTexts(lsl, slua, ranges);
+        ensure("the if beside its head", beside(4, 2));
+        ensure("what follows it level again", beside(5, 5));
+        ensure("two rows of nothing over it on the left, beside the if's own", m.line(Column::Left, 5).padding == 2);
+        // The state's first line beside nothing, the handler having the
+        // SLua's first; the call in the if on the if's own line, which is
+        // beside the if's head: neither lined up, so the if is bracketed,
+        // and the call after it, and not the handler around them.
+        ensure("bracketed: the if and the call after it",
+               !m.rangeBracketed(0) && !m.rangeBracketed(1) && m.rangeBracketed(2) && !m.rangeBracketed(3) && m.rangeBracketed(4));
+        const auto [lf, le] = m.rangeRows(2, Column::Left);
+        const auto [rf, re] = m.rangeRows(2, Column::Right);
+        ensure("the if's rows: one on the left, three on the right, from the same", lf == rf && le == lf + 1 && re == rf + 3);
+        ensure("none inline", m.rangeRows(2, Column::Inline) == std::make_pair(0, 0));
+        m.setSwapped(true);
+        const auto [sf, se] = m.rangeRows(2, Column::Left);
+        ensure("swapped: the SLua's rows on the left", se == sf + 3 && m.rangeRows(2, Column::Right).second == m.rangeRows(2, Column::Right).first + 1);
+        m.setSwapped(false);
+        m.setRightText(std::string("-- a line more\n") + slua);
+        ensure("carried with the right's lines", m.ranges()[2].rightFirst == 3 && m.ranges()[2].rightLast == 5 && beside(4, 3) && beside(5, 6));
     }
 }

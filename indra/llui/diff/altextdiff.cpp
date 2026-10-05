@@ -598,6 +598,54 @@ std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& l
     return lines(left, right, anchors, Likeness());
 }
 
+// static
+ALTextDiff::anchors_t ALTextDiff::anchorsOf(const ranges_t& ranges)
+{
+    // By their first lines on the left, the widest first: those open as
+    // each is come to, kept on a stack, are the ones its first line is in.
+    std::vector<size_t> order(ranges.size());
+    for (size_t n = 0; n < ranges.size(); ++n)
+    {
+        order[n] = n;
+    }
+    std::sort(order.begin(), order.end(), [&ranges](size_t a, size_t b) {
+        return ranges[a].leftFirst != ranges[b].leftFirst ? ranges[a].leftFirst < ranges[b].leftFirst : ranges[a].leftLast > ranges[b].leftLast;
+    });
+    anchors_t           out;
+    std::vector<size_t> open;
+    out.reserve(ranges.size() * 2);
+    for (const size_t n : order)
+    {
+        const Range& range = ranges[n];
+        while (!open.empty() && ranges[open.back()].leftLast < range.leftFirst)
+        {
+            open.pop_back();
+        }
+        out.emplace_back(range.leftFirst, range.rightFirst);
+        // Its end, but where a range around it holds one of the two lines
+        // after it and not the other.
+        const S32  left  = range.leftLast + 1;
+        const S32  right = range.rightLast + 1;
+        const bool cuts  = std::any_of(open.begin(), open.end(), [&](size_t o) {
+            const Range& around = ranges[o];
+            const bool   inside = around.leftLast >= range.leftLast && around.rightFirst <= range.rightFirst && around.rightLast >= range.rightLast;
+            return inside && (left <= around.leftLast) != (right <= around.rightLast);
+        });
+        if (!cuts)
+        {
+            out.emplace_back(left, right);
+        }
+        open.push_back(n);
+    }
+    // One anchor a line each way: on a line of the left, the earliest of
+    // the right; then on a line of the right, the latest of the left.
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.first == b.first; }), out.end());
+    std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.second != b.second ? a.second < b.second : a.first > b.first; });
+    out.erase(std::unique(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.second == b.second; }), out.end());
+    return out;
+}
+
 std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const anchors_t& anchors,
                                                const Likeness& like)
 {

@@ -232,4 +232,28 @@ namespace tut
         ensure_equals("opened", d.foldedCount(), 0);
         ensure("its row gone", layout.gapRows(under) == 0 && !layout.hidden(12));
     }
+
+    template<> template<>
+    void aldiffview_gl_object::test<3>()
+    {
+        set_test_name("ranges bracketed across a wider gap: a band from a line on the left to the three on the right it became; none for a pair level line for line");
+        ALDiffView& d = make();
+        const S32   narrow = d.right()->getRect().mLeft - d.left()->getRect().mRight;
+        // An LSL line that became three of SLua, then one that became one.
+        d.setTexts("default\n{\n    if (a) b();\n    c();\n}", "if a then\n    b()\nend\nc()", { { 2, 2, 0, 2 }, { 3, 3, 3, 3 } });
+        const S32 gap = d.right()->getRect().mLeft - d.left()->getRect().mRight;
+        ensure("the gap wider", gap > narrow);
+        const std::vector<U8> drawn_now = drawn(d);
+        // The gap's columns, inside its edges, down the rows of each range.
+        const S32  from   = d.left()->getRect().mRight + 1;
+        const S32  to     = d.right()->getRect().mLeft - 1;
+        // The band's ground is faint over the black it is drawn on.
+        const auto lit    = [](U8 r, U8 g, U8 b) { return r > 8 || g > 8 || b > 8; };
+        const Band block  = band(d.right(), 0, 2);
+        const Band single = band(d.right(), 3, 3);
+        ensure("a band beside the if's three lines", count(drawn_now, from, to, block.bottom + 2, block.top - 2, lit) > (to - from) * 4);
+        ensure("nothing beside the call level with its own", count(drawn_now, from, to, single.bottom + 2, single.top - 2, lit) == 0);
+        d.setTexts("a();\nb();", "a()\nb()", { { 0, 0, 0, 0 }, { 1, 1, 1, 1 } });
+        ensure("ranges all level line for line: no bands, the gap as narrow as ever", d.right()->getRect().mLeft - d.left()->getRect().mRight == narrow);
+    }
 }

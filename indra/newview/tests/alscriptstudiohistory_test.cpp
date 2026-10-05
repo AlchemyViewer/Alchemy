@@ -50,7 +50,7 @@ namespace
             did.push_back("compare " + doc.id + ": " + left + " | " + right + " (" + left_title + " | " + right_title + ")");
         }
         void compareWithTab(Doc& doc, const std::string& theirs, const std::string& their_title, const std::string& own_title,
-                            const std::vector<std::pair<S32, S32>>&) override
+                            const ALTextDiff::ranges_t&) override
         {
             // The tab's own text on the right, as the studio puts it.
             compare(doc, theirs, doc.editor->wholeText(), their_title, own_title);

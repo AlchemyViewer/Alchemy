@@ -84,9 +84,11 @@ public:
     ~ALDiffView() override;
 
     // The texts, the left the one taken from, the right the one made, and
-    // what each is; lined up where lines are known to stand for each other
-    // (ALTextDiff's anchors), however they differ.
-    void setTexts(std::string_view left, std::string_view right, const ALTextDiff::anchors_t& anchors = {});
+    // what each is; lined up where stretches of them are known to stand for
+    // each other (ALTextDiff's ranges), however they differ, and side by
+    // side each range lined up bracketed to its other across the gap -- an
+    // LSL statement to the SLua lines written of it.
+    void setTexts(std::string_view left, std::string_view right, const ALTextDiff::ranges_t& ranges = {});
     // The right made anew -- the text it is of, changed -- and compared
     // again: the caret kept on its line of the right wherever that went,
     // the runs folded as open as they were, and the anchors carried to
@@ -225,8 +227,13 @@ private:
     // row, the bottom of the text.
     S32           topOfRow(ALCodeEditor* side, S32 row) const;
     // The gap between the sides: wider where it holds the arrows that take
-    // a change back.
+    // a change back, or bands between ranges.
     S32           gap() const;
+    // Each range the model brackets, in sight, joined to its other across
+    // the gap: a band from the rows it has on the left to those on the
+    // right; but where those are one row each and level, which says
+    // nothing the rows beside each other do not.
+    void          drawRanges();
     // The change whose arrow is under a point of the view; -1 for none.
     S32           arrowAtPoint(S32 x, S32 y);
     void          drawArrows();
@@ -274,8 +281,10 @@ private:
     U32                       mColorsGeneration = U32_MAX;
     LLColor4                  mCurrentColor;
     LLColor4                  mDividerColor;
-    // What each folded row says, worked out as the comparison is filled.
+    // What each folded row says, and the ranges drawn as bands, worked out
+    // as the comparison is filled.
     std::vector<std::string>  mFoldSaid;
+    std::vector<S32>          mBands;
     // The sides' signals, let go of before the sides are: a side losing
     // the keyboard as it goes would tell a comparison already gone.
     std::vector<boost::signals2::scoped_connection> mConnections;

@@ -842,18 +842,20 @@ private:
     void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
                  const std::string& right_title) override;
     // A comparison shown in the tab's editor's place, lined up at the
-    // anchors where there are any; what is typed in it goes to the source,
+    // ranges where there are any; what is typed in it goes to the source,
     // at the line the caret is on.
     void showCompare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title, const std::string& right_title,
-                     const std::vector<std::pair<S32, S32>>& anchors);
+                     const ALTextDiff::ranges_t& ranges);
     // A comparison whose right is the tab's text titled again, unsaved or
     // not as the tab now is.
     void retitleCompare(const Doc& doc) const;
     // Another text beside the tab's own, which the comparison follows as
     // the tab changes: under the other's title and the tab's, "now" where
-    // none is given; lined up at the anchors where there are any.
+    // none is given; lined up at the ranges where there are any -- the LSL
+    // a conversion was made from against the SLua it wrote, whose changes
+    // are no one's to take back.
     void compareWithTab(Doc& doc, const std::string& theirs, const std::string& their_title, const std::string& own_title = std::string(),
-                        const std::vector<std::pair<S32, S32>>& anchors = {}) override;
+                        const ALTextDiff::ranges_t& ranges = {}) override;
     // A comparison that follows its tab made again from the tab's text,
     // where the tab has changed since.
     void refreshCompare(Doc& doc);

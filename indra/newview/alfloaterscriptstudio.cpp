@@ -1785,7 +1785,7 @@ void ALFloaterScriptStudio::compare(Doc& doc, const std::string& left, const std
 }
 
 void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
-                                        const std::string& right_title, const std::vector<std::pair<S32, S32>>& anchors)
+                                        const std::string& right_title, const ALTextDiff::ranges_t& ranges)
 {
     doc.compareTitles.reset();
     doc.compareStale = false;
@@ -1832,7 +1832,7 @@ void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const
     }
     doc.compareView->setGrammar(doc.editor->highlighter().grammar());
     doc.compareView->setInline(mCompareInline);
-    doc.compareView->setTexts(left, right, anchors);
+    doc.compareView->setTexts(left, right, ranges);
     doc.compareView->setTitles(left_title, right_title);
     showView(doc, Doc::View::Compare, true);
 }
@@ -6279,22 +6279,24 @@ void ALFloaterScriptStudio::comparePending(Doc& doc)
     }
     const Doc::PendingCompare pending = std::move(*doc.pendingCompare);
     doc.pendingCompare.reset();
-    compareWithTab(doc, pending.text, pending.theirTitle, pending.ownTitle, pending.anchors);
+    compareWithTab(doc, pending.text, pending.theirTitle, pending.ownTitle, pending.ranges);
 }
 
 void ALFloaterScriptStudio::compareWithTab(Doc& doc, const std::string& theirs, const std::string& their_title, const std::string& own_title,
-                                           const std::vector<std::pair<S32, S32>>& anchors)
+                                           const ALTextDiff::ranges_t& ranges)
 {
     // This tab's text as it stands, which it says where it is not saved,
     // for as long as it is not, and which the comparison follows.
     const std::string own = own_title.empty() ? getString("CompareNow") : own_title;
-    showCompare(doc, theirs, doc.editor->wholeText(), their_title, own, anchors);
+    showCompare(doc, theirs, doc.editor->wholeText(), their_title, own, ranges);
     doc.compareTitles = Doc::CompareTitles{ their_title, own };
     retitleCompare(doc);
     // A change taken back is an edit of the tab, one step to undo, where
     // the tab may be changed; of the text as compared, which is the tab's
-    // unless it has moved since and the comparison not yet followed.
-    if (doc.modifiable && !doc.editor->isReadOnly())
+    // unless it has moved since and the comparison not yet followed. Not
+    // where the two are known to stand for each other line by line: the
+    // LSL a conversion was made from is no text to put back into the SLua.
+    if (doc.modifiable && !doc.editor->isReadOnly() && ranges.empty())
     {
         const std::string id = doc.id;
         doc.compareView->setOnTakeBack([this, id](const ALTextRange& range, const std::string& text) {
@@ -7770,8 +7772,13 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     const std::string         name     = getString("ConvertName", args);
     const std::string         lsl      = expanded ? *doc.expanded.text : source;
     const std::string         text     = converted.text;
+    ALTextDiff::ranges_t      ranges;
+    for (const ALLSLToSLua::Span& span : converted.spans)
+    {
+        ranges.push_back({ span.lslFirst, span.lslLast, span.sluaFirst, span.sluaLast });
+    }
     const Doc::PendingCompare compare{ lsl, getString(expanded ? "ConvertExpandedTitle" : "ConvertLSLTitle", args), getString("ConvertSLuaTitle"),
-                                       converted.anchors };
+                                       std::move(ranges) };
     const LLHandle<LLFloater> handle   = getHandle();
     if (!doc.ref.inInventory() && doc.file.empty())
     {

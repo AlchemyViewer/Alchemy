@@ -57,7 +57,7 @@ public:
                              const std::string& right_title) = 0;
         // Another text beside the tab's own, which the comparison follows.
         virtual void compareWithTab(Doc& doc, const std::string& theirs, const std::string& their_title, const std::string& own_title,
-                                    const std::vector<std::pair<S32, S32>>& anchors) = 0;
+                                    const ALTextDiff::ranges_t& ranges) = 0;
         // A list to pick from, over the editors: what is chosen, and what
         // Shift-Return is pressed on.
         virtual void pick(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,

@@ -239,7 +239,7 @@ namespace tut
     {
         set_test_name("anchored: lines known to stand for each other side by side however they differ; and typing goes to whoever shows it, at the right's line");
         ALDiffView& d = make("", "");
-        d.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 2 } });
+        d.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 4, 2, 2 } });
         ensure("the LSL's call beside the SLua's", beside(d, 4, 2));
 
         ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());

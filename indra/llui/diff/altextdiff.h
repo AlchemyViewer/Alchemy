@@ -97,6 +97,30 @@ public:
     static std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const anchors_t& anchors);
     static std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const anchors_t& anchors,
                                   const Likeness& like);
+    // Stretches known to stand for each other -- an LSL statement and the
+    // SLua lines written of it -- each the first and the last line of the
+    // left and of the right, counted from nought.
+    struct Range
+    {
+        S32 leftFirst  = 0;
+        S32 leftLast   = 0;
+        S32 rightFirst = 0;
+        S32 rightLast  = 0;
+
+        bool operator==(const Range& other) const = default;
+    };
+    typedef std::vector<Range> ranges_t;
+    // The anchors that line ranges up: each's first lines, and the lines
+    // after each's last, so that a range starts beside its other and what
+    // follows it starts level again. Ranges inside others -- a block and
+    // the statements in it -- may ask one line to be beside two: an end
+    // that would put a line inside a range beside one outside it is let
+    // go of; of two on one line of the left, the one with the earlier line
+    // of the right is kept, a block's head before the statement written
+    // on its line; of two on one line of the right, the one with the later
+    // line of the left, the node that wrote it before the one around it
+    // that wrote nothing of its own.
+    static anchors_t anchorsOf(const ranges_t& ranges);
 
     // A text's lines, for lines().
     static std::vector<std::string> split(std::string_view text);
