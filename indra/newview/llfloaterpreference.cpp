@@ -398,11 +398,6 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
     mCommitCallbackRegistrar.add("Pref.DeleteTranscripts",      boost::bind(&LLFloaterPreference::onDeleteTranscripts, this));
     mCommitCallbackRegistrar.add("UpdateFilter", boost::bind(&LLFloaterPreference::onUpdateFilterTerm, this, false)); // <FS:ND/> Hook up for filtering
     mCommitCallbackRegistrar.add("Pref.CopySearchAsSLURL",      boost::bind(&LLFloaterPreference::onCopySearch, this));
-#ifdef LL_DISCORD
-    gSavedSettings.getControl("EnableDiscord")->getCommitSignal()->connect(boost::bind(&LLAppViewer::updateDiscordActivity));
-    gSavedSettings.getControl("ShowDiscordActivityDetails")->getCommitSignal()->connect(boost::bind(&LLAppViewer::updateDiscordActivity));
-    gSavedSettings.getControl("ShowDiscordActivityState")->getCommitSignal()->connect(boost::bind(&LLAppViewer::updateDiscordActivity));
-#endif
     mCommitCallbackRegistrar.add("Pref.AddSkin", boost::bind(&LLFloaterPreference::onAddSkin, this));
     mCommitCallbackRegistrar.add("Pref.RemoveSkin", boost::bind(&LLFloaterPreference::onRemoveSkin, this));
     mCommitCallbackRegistrar.add("Pref.ApplySkin", boost::bind(&LLFloaterPreference::onApplySkin, this));
@@ -2192,6 +2187,14 @@ void LLFloaterPreference::setPersonalInfo(const std::string& visibility)
     getChildView("conversation_log_combo")->setEnabled(true);
     getChild<LLUICtrl>("voice_call_friends_only_check")->setEnabled(true);
     getChild<LLUICtrl>("voice_call_friends_only_check")->setValue(gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly"));
+
+#ifdef LL_DISCORD
+    // The account's settings, so only once there is an account.
+    getChildView("enable_discord")->setEnabled(true);
+    getChildView("show_name")->setEnabled(true);
+    getChildView("show_location")->setEnabled(true);
+    getChildView("discord_max_maturity")->setEnabled(true);
+#endif
 }
 
 

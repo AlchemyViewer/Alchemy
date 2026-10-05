@@ -927,10 +927,6 @@ void LLPanelPeople::updateNearbyList()
     }
 // [/RLVa:KB]
     mNearbyList->setDirty();
-#ifdef LL_DISCORD
-    if (gSavedSettings.getBOOL("EnableDiscord"))
-        LLAppViewer::updateDiscordPartyMaxSize((S32)mNearbyList->getIDs().size());
-#endif
 
     DISTANCE_COMPARATOR.updateAvatarsPositions(positions, mNearbyList->getIDs());
     LLActiveSpeakerMgr::instance().update(true);

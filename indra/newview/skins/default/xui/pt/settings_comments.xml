@@ -543,8 +543,6 @@
   <string>Ativar a criação de novos anúncios classificados a partir de link web.</string>
   <key>EnableCollisionSounds</key>
   <string>Reproduzir sons em colisões.</string>
-  <key>EnableDiscord</key>
-  <string>Quando ativado, conecta ao Discord para habilitar o Rich Presence.</string>
   <key>EnableDiskCacheDebugInfo</key>
   <string>Quando ativado, exibir informações adicionais de depuração do cache.</string>
   <key>EnableGestureSounds</key>
@@ -2367,10 +2365,6 @@
   <string>Exibir console de depuração.</string>
   <key>ShowDeviceSettings</key>
   <string>Mostrar configurações de dispositivo.</string>
-  <key>ShowDiscordActivityDetails</key>
-  <string>Quando ativado, mostrar o nome do avatar no Discord Rich Presence.</string>
-  <key>ShowDiscordActivityState</key>
-  <string>Quando ativado, mostrar a localização no Discord Rich Presence.</string>
   <key>ShowFavoritesOnLogin</key>
   <string>Define se os favoritos do último usuário logado serão salvos ao sair e exibidos na tela de login.</string>
   <key>ShowGestureButton</key>

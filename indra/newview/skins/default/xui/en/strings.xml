@@ -5345,4 +5345,8 @@ and report the problem.
     <string name="TooltipDistance">
         Distance: [OBJECT_DISTANCE]
     </string>
+
+    <!-- Discord rich presence -->
+    <string name="DiscordViaViewer">via [APP_NAME]</string>
+    <string name="DiscordHiddenRegion">Hidden Region</string>
 </strings>

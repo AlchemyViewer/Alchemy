@@ -1837,6 +1837,12 @@ if(AL_BUILD_VIEWER)
     roles_constants.h
   )
 
+  # Discord rich presence, over the SDK from the private registry.
+  if(AL_USE_DISCORD)
+    list(APPEND viewer_SOURCES aldiscordmanager.cpp)
+    list(APPEND viewer_HEADERS aldiscordmanager.h)
+  endif()
+
   # The version as one line, for the hosted build's metadata.
   file(
     WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
