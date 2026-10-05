@@ -121,17 +121,26 @@ option(AL_ENABLE_PROPRIETARY "Build with support for non-free libraries" OFF)
 cmake_dependent_option(
   AL_USE_KDU
   "Enable support for the Kakadu JPEG2000 decoding library"
-  ON
+  OFF
   "AL_ENABLE_PROPRIETARY"
   OFF
 )
 
 # The Discord Social SDK comes from AlchemyViewer's private vcpkg registry;
-# see cmake/Discord.cmake.
+# see cmake/Discord.cmake. It has no Linux arm64 build. This runs before
+# project(), so the host stands for the target, as it does for the triplet:
+# nothing cross-compiles the viewer.
+set(al_discord_default ON)
+if(
+  CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux"
+  AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$"
+)
+  set(al_discord_default OFF)
+endif()
 cmake_dependent_option(
   AL_USE_DISCORD
-  "Enable Discord presence and friends through the Discord Social SDK"
-  OFF
+  "Enable Discord rich presence through the Discord Social SDK"
+  ${al_discord_default}
   "AL_ENABLE_PROPRIETARY"
   OFF
 )
