@@ -26,6 +26,7 @@
 #define AL_ALDIFFMODEL_H
 
 #include "aldiffmoves.h"
+#include "aldiffsplice.h"
 #include "altextdiff.h"
 #include "altextdocument.h"
 
@@ -109,19 +110,8 @@ public:
         S32 rightCount = 0;
     };
 
-    // Where each line of the right as it was went when it was made anew:
-    // a line still there, to itself; one taken out or changed, to where the
-    // right had got to there -- a line changed, to the line it became.
-    struct LineMap
-    {
-        S32  line(S32 was) const;
-        // Whether it is still there as it was, where a column on it holds.
-        bool kept(S32 was) const;
-
-        std::vector<S32>  to;
-        std::vector<bool> same;
-        S32               last = 0;
-    };
+    // Where each line of the right as it was went when it was made anew.
+    typedef ALDiffSplice::LineMap LineMap;
 
     ALDiffModel();
 

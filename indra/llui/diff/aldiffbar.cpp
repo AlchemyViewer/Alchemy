@@ -84,7 +84,7 @@ ALDiffBar::ALDiffBar(const Params& p)
     mPreviousButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mPrevious(); });
     mNextButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mNext(); });
     mFoldButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mFold(); });
-    mIgnoreButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mIgnore(); });
+    mIgnoreButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { showIgnoreMenu(); });
     mInlineButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mInline(); });
     mSwapButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSwap(); });
     mDoneButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mDone(); });
@@ -168,9 +168,34 @@ void ALDiffBar::setIgnoring(bool ignoring)
     mIgnoreButton->setToggleState(ignoring);
 }
 
-LLView* ALDiffBar::ignoreButton() const
+void ALDiffBar::showIgnoreMenu()
 {
-    return mIgnoreButton;
+    if (!mIgnores.checked || !mIgnores.offered || !mIgnores.toggle)
+    {
+        return;
+    }
+    // The menu calls back while it is open; the bar may be gone by then.
+    const LLHandle<LLPanel>                           self = getHandle();
+    LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
+    LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
+    commit.add("DiffIgnore.Toggle", [self](LLUICtrl*, const LLSD& what) {
+        if (ALDiffBar* bar = ALViewType::as<ALDiffBar>(self.get()))
+        {
+            bar->mIgnores.toggle(what.asString());
+        }
+    });
+    enable.add("DiffIgnore.Checked", [self](LLUICtrl*, const LLSD& what) {
+        const ALDiffBar* bar = ALViewType::as<ALDiffBar>(self.get());
+        return bar && bar->mIgnores.checked(what.asString());
+    });
+    enable.add("DiffIgnore.Offered", [self](LLUICtrl*, const LLSD& what) {
+        const ALDiffBar* bar = ALViewType::as<ALDiffBar>(self.get());
+        return bar && bar->mIgnores.offered(what.asString());
+    });
+    if (mIgnoreMenu.make("menu_diff_ignore.xml"))
+    {
+        mIgnoreMenu.show(mIgnoreButton, 0, 0);
+    }
 }
 
 void ALDiffBar::setInline(bool inline_view)

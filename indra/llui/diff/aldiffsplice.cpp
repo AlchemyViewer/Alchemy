@@ -66,7 +66,6 @@ namespace
     };
 }
 
-// static
 S32 ALDiffSplice::lastCompared()
 {
     return sLastCompared;
@@ -236,4 +235,53 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const std::vector<std::string>
     }
     runs.swap(made);
     return true;
+}
+
+S32 ALDiffSplice::LineMap::line(S32 was) const
+{
+    if (to.empty())
+    {
+        return 0;
+    }
+    return llclamp(to[static_cast<size_t>(llclamp(was, 0, static_cast<S32>(to.size()) - 1))], 0, last);
+}
+
+bool ALDiffSplice::LineMap::kept(S32 was) const
+{
+    return was >= 0 && was < static_cast<S32>(same.size()) && same[static_cast<size_t>(was)];
+}
+
+ALDiffSplice::LineMap ALDiffSplice::lineMap(const std::vector<std::string>& was, const std::vector<std::string>& now)
+{
+    LineMap map;
+    map.to.assign(was.size() + 1, static_cast<S32>(now.size()));
+    map.same.assign(was.size(), false);
+    map.last  = std::max(0, static_cast<S32>(now.size()) - 1);
+    S32 head = 0;
+    S32 tail = 0;
+    edges(was, now, head, tail);
+    for (S32 line = 0; line < head; ++line)
+    {
+        map.to[static_cast<size_t>(line)]   = line;
+        map.same[static_cast<size_t>(line)] = true;
+    }
+    const S32 was_size = static_cast<S32>(was.size());
+    const S32 now_size = static_cast<S32>(now.size());
+    for (S32 n = 0; n < tail; ++n)
+    {
+        map.to[static_cast<size_t>(was_size - tail + n)]   = now_size - tail + n;
+        map.same[static_cast<size_t>(was_size - tail + n)] = true;
+    }
+    const std::vector<std::string> some_was(was.begin() + head, was.end() - tail);
+    const std::vector<std::string> some_now(now.begin() + head, now.end() - tail);
+    for (const Run& run : ALTextDiff::lines(some_was, some_now))
+    {
+        for (S32 n = 0; n < run.count && run.kind != Kind::Added; ++n)
+        {
+            const size_t line = static_cast<size_t>(head + run.left + n);
+            map.to[line]      = head + (run.kind == Kind::Same ? run.right + n : run.right);
+            map.same[line]    = run.kind == Kind::Same;
+        }
+    }
+    return map;
 }

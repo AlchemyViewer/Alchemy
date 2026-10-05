@@ -25,12 +25,14 @@
 #ifndef AL_ALDIFFBAR_H
 #define AL_ALDIFFBAR_H
 
+#include "almenuslot.h"
 #include "alviewtype.h"
 #include "lluicolor.h"
 #include "llpanel.h"
 
 #include <boost/signals2.hpp>
 
+#include <functional>
 #include <string>
 
 class ALFlatButton;
@@ -39,9 +41,9 @@ class LLTextBox;
 // The thin bar over a comparison's titles (ALDiffView): which change the
 // caret is in, of how many, and the arrows to the one before and the next;
 // the change taken back, where whoever shows it can; what is the same
-// folded away, what is let go of in telling lines the same -- a menu the
-// view shows, lit while anything is -- the comparison inline or side by
-// side, its sides swapped; and done, back to what it was made from. In the comparison's colours, as
+// folded away, what is let go of in telling lines the same -- a menu, lit
+// while anything is -- the comparison inline or side by side, its sides
+// swapped; and done, back to what it was made from. In the comparison's colours, as
 // the find bar is in its view's.
 //
 // It holds what it shows and nothing else: the view tells it the count
@@ -66,8 +68,17 @@ public:
     // Whether there is a change before the caret, and one after it.
     void        setSteps(bool previous, bool next);
     void        setFolded(bool folded);
-    // Whether anything is let go of in telling lines the same.
+    // Whether anything is let go of in telling lines the same; and what
+    // the menu under the blanks button asks of the view: whether each, by
+    // its name, is let go of and is offered, and turning one.
     void        setIgnoring(bool ignoring);
+    struct Ignores
+    {
+        std::function<bool(const std::string&)> checked;
+        std::function<bool(const std::string&)> offered;
+        std::function<void(const std::string&)> toggle;
+    };
+    void        setIgnores(Ignores ignores) { mIgnores = std::move(ignores); }
     void        setInline(bool inline_view);
     void        setSwapped(bool swapped);
     // Whether there is anywhere to go back to.
@@ -87,10 +98,6 @@ public:
     boost::signals2::connection onPrevious(const signal_t::slot_type& cb) { return mPrevious.connect(cb); }
     boost::signals2::connection onNext(const signal_t::slot_type& cb) { return mNext.connect(cb); }
     boost::signals2::connection onFold(const signal_t::slot_type& cb) { return mFold.connect(cb); }
-    // Asked for the menu of what to let go of, which the view shows under
-    // ignoreButton().
-    boost::signals2::connection onIgnore(const signal_t::slot_type& cb) { return mIgnore.connect(cb); }
-    LLView*                     ignoreButton() const;
     boost::signals2::connection onInline(const signal_t::slot_type& cb) { return mInline.connect(cb); }
     boost::signals2::connection onSwap(const signal_t::slot_type& cb) { return mSwap.connect(cb); }
     boost::signals2::connection onDone(const signal_t::slot_type& cb) { return mDone.connect(cb); }
@@ -106,12 +113,17 @@ protected:
 private:
     ALFlatButton* flat(const std::string& name, const std::string& glyph, bool toggle, const std::string& tip);
     void          layout();
+    // The menu of what to let go of (menu_diff_ignore.xml), under its
+    // button.
+    void          showIgnoreMenu();
 
     LLUIColor     mBgColor;
     LLUIColor     mInkColor;
     S32           mCurrent = -2;
     S32           mTotal   = -1;
     bool          mFellBack = false;
+    Ignores       mIgnores;
+    ALMenuSlot    mIgnoreMenu;
 
     LLTextBox*    mCount          = nullptr;
     ALFlatButton* mPreviousButton = nullptr;
@@ -123,7 +135,7 @@ private:
     ALFlatButton* mDoneButton     = nullptr;
     ALFlatButton* mTakeBackButton = nullptr;
 
-    signal_t mPrevious, mNext, mFold, mIgnore, mInline, mSwap, mDone, mTakeBack;
+    signal_t mPrevious, mNext, mFold, mInline, mSwap, mDone, mTakeBack;
 };
 
 #endif // AL_ALDIFFBAR_H

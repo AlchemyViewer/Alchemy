@@ -27,7 +27,6 @@
 
 #include "alcodeeditor.h"
 #include "aldiffmodel.h"
-#include "almenuslot.h"
 #include "altextdiff.h"
 #include "alviewtype.h"
 #include "lluictrl.h"
@@ -239,8 +238,6 @@ private:
     };
     Place         placeOfCaret();
     void          restorePlace(const Place& place);
-    // The menu of what to let go of, under the bar's button.
-    void          showIgnoreMenu();
     // Words cut by a grammar's tokens, where it is one of code; compared
     // again, the caret kept.
     void          compareBy(const std::shared_ptr<const ALSyntaxGrammar>& grammar);
@@ -310,10 +307,8 @@ private:
     LLColor4                  mDividerColor;
     // The grammar words are cut by: none for prose.
     std::shared_ptr<const ALSyntaxGrammar> mLexedBy;
-    // Whether letting case go is offered; and the menu of what is let go
-    // of, while it is open.
+    // Whether letting case go is offered.
     bool                      mOffersCase = false;
-    ALMenuSlot                mIgnoreMenu;
     // What each folded row says, and the ranges drawn as bands, worked out
     // as the comparison is filled.
     std::vector<std::string>  mFoldSaid;

@@ -139,6 +139,7 @@ target_sources(
     diff/aldifflexer.cpp
     diff/aldiffmodel.cpp
     diff/aldiffmoves.cpp
+    diff/aldiffrangesame.cpp
     diff/aldiffsame.cpp
     diff/aldiffsplice.cpp
     diff/aldifftokens.cpp
@@ -366,6 +367,7 @@ target_sources(
         diff/aldifflexer.h
         diff/aldiffmodel.h
         diff/aldiffmoves.h
+        diff/aldiffrangesame.h
         diff/aldiffsame.h
         diff/aldiffsplice.h
         diff/aldifftokens.h
@@ -549,6 +551,7 @@ if(AL_BUILD_TESTS)
   set(
     diff_sources
     diff/aldiffmoves.cpp
+    diff/aldiffrangesame.cpp
     diff/aldiffsame.cpp
     diff/aldiffsplice.cpp
     diff/aldifftokens.cpp

@@ -27,7 +27,6 @@
 #include "aldiffview.h"
 
 #include "aldifflexer.h"
-#include "llmenugl.h"
 
 #include "alcodeeditor.h"
 #include "aldiffbar.h"
@@ -84,7 +83,8 @@ ALDiffView::ALDiffView(const Params& p)
         }
     });
     mBar->onFold([this]() { setFoldSame(!mModel.foldsSame()); });
-    mBar->onIgnore([this]() { showIgnoreMenu(); });
+    mBar->setIgnores({ [this](const std::string& what) { return ignores(what); }, [this](const std::string& what) { return offersIgnore(what); },
+                       [this](const std::string& what) { setIgnore(what, !ignores(what)); } });
     mBar->onSwap([this]() { setSwapped(!mModel.swapped()); });
     mBar->onTakeBack([this]() {
         ALCodeEditor* side = shown();
@@ -349,32 +349,6 @@ void ALDiffView::setIgnore(const std::string& what, bool ignore)
     {
         *flag = ignore;
         setLikeness(like);
-    }
-}
-
-void ALDiffView::showIgnoreMenu()
-{
-    // The menu calls back while it is open; the view may be gone by then.
-    const LLHandle<LLView>                            self = getHandle();
-    LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
-    LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
-    commit.add("DiffIgnore.Toggle", [self](LLUICtrl*, const LLSD& what) {
-        if (ALDiffView* view = ALViewType::as<ALDiffView>(self.get()))
-        {
-            view->setIgnore(what.asString(), !view->ignores(what.asString()));
-        }
-    });
-    enable.add("DiffIgnore.Checked", [self](LLUICtrl*, const LLSD& what) {
-        const ALDiffView* view = ALViewType::as<ALDiffView>(self.get());
-        return view && view->ignores(what.asString());
-    });
-    enable.add("DiffIgnore.Offered", [self](LLUICtrl*, const LLSD& what) {
-        const ALDiffView* view = ALViewType::as<ALDiffView>(self.get());
-        return view && view->offersIgnore(what.asString());
-    });
-    if (mIgnoreMenu.make("menu_diff_ignore.xml"))
-    {
-        mIgnoreMenu.show(mBar->ignoreButton(), 0, 0);
     }
 }
 

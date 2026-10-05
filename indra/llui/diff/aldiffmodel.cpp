@@ -26,28 +26,11 @@
 
 #include "aldiffmodel.h"
 
-#include "aldiffsame.h"
-#include "aldiffsplice.h"
+#include "aldiffrangesame.h"
 #include "allinepairs.h"
 #include "alstructuraldiff.h"
 
 #include <algorithm>
-
-// --- LineMap -------------------------------------------------------------------
-
-S32 ALDiffModel::LineMap::line(S32 was) const
-{
-    if (to.empty())
-    {
-        return 0;
-    }
-    return llclamp(to[static_cast<size_t>(llclamp(was, 0, static_cast<S32>(to.size()) - 1))], 0, last);
-}
-
-bool ALDiffModel::LineMap::kept(S32 was) const
-{
-    return was >= 0 && was < static_cast<S32>(same.size()) && same[static_cast<size_t>(was)];
-}
 
 // --- what is compared ---------------------------------------------------------
 
@@ -70,47 +53,10 @@ void ALDiffModel::setTexts(std::string_view left, std::string_view right, const 
 
 ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
 {
-    // Each line of the right as it was, where it now is; and which are
-    // still there as they were: the lines before the first changed and
-    // after the last as they were, those between compared.
+    // Each line of the right as it was, where it now is.
     std::vector<std::string>        now = ALTextDiff::split(right);
     const std::vector<std::string>& was = mRightLines;
-    LineMap                         map;
-    map.to.assign(was.size() + 1, static_cast<S32>(now.size()));
-    map.same.assign(was.size(), false);
-    map.last          = llmax(0, static_cast<S32>(now.size()) - 1);
-    const size_t most = std::min(was.size(), now.size());
-    size_t       head = 0;
-    while (head < most && was[head] == now[head])
-    {
-        ++head;
-    }
-    size_t tail = 0;
-    while (tail < most - head && was[was.size() - 1 - tail] == now[now.size() - 1 - tail])
-    {
-        ++tail;
-    }
-    for (size_t line = 0; line < head; ++line)
-    {
-        map.to[line]   = static_cast<S32>(line);
-        map.same[line] = true;
-    }
-    for (size_t n = 0; n < tail; ++n)
-    {
-        map.to[was.size() - tail + n]   = static_cast<S32>(now.size() - tail + n);
-        map.same[was.size() - tail + n] = true;
-    }
-    const std::vector<std::string> some_was(was.begin() + static_cast<std::ptrdiff_t>(head), was.end() - static_cast<std::ptrdiff_t>(tail));
-    const std::vector<std::string> some_now(now.begin() + static_cast<std::ptrdiff_t>(head), now.end() - static_cast<std::ptrdiff_t>(tail));
-    for (const ALTextDiff::Run& run : ALTextDiff::lines(some_was, some_now))
-    {
-        for (S32 n = 0; n < run.count && run.kind != Kind::Added; ++n)
-        {
-            const size_t line = head + static_cast<size_t>(run.left + n);
-            map.to[line]      = static_cast<S32>(head) + (run.kind == Kind::Same ? run.right + n : run.right);
-            map.same[line]    = run.kind == Kind::Same;
-        }
-    }
+    const LineMap                   map = ALDiffSplice::lineMap(was, now);
     // A range goes with its lines, changed or not: an edit of the SLua a
     // statement became still stands for the statement. Two come to one
     // line where one was taken out; lines() keeps those it can.
@@ -320,55 +266,13 @@ void ALDiffModel::layout(const std::vector<bool>& open)
     const auto regionsOf = [](const std::vector<ALTextDiff::regions_t>* regions, S32 line) {
         return regions ? &(*regions)[static_cast<size_t>(line)] : nullptr;
     };
-    // The words that mean the same in a pair: the innermost range's that
-    // holds both its lines and has a table of its own, with the whole
-    // comparison's; else the whole's. By each line of the text given as
-    // the left, the ranges with tables over it, the narrowest first.
-    std::vector<std::vector<S32>> tabled;
-    std::vector<ALTextDiff::same_t> joined(mRanges.size());
-    for (size_t n = 0; n < mRanges.size(); ++n)
-    {
-        const ALTextDiff::Range& range = mRanges[n];
-        if (!range.same)
-        {
-            continue;
-        }
-        tabled.resize(std::max(tabled.size(), static_cast<size_t>(std::max(range.leftLast + 1, 0))));
-        for (S32 line = std::max(range.leftFirst, 0); line <= range.leftLast; ++line)
-        {
-            tabled[static_cast<size_t>(line)].push_back(static_cast<S32>(n));
-        }
-    }
-    for (std::vector<S32>& over : tabled)
-    {
-        std::sort(over.begin(), over.end(), [this](S32 a, S32 b) {
-            const ALTextDiff::Range& x = mRanges[static_cast<size_t>(a)];
-            const ALTextDiff::Range& y = mRanges[static_cast<size_t>(b)];
-            return x.leftLast - x.leftFirst + x.rightLast - x.rightFirst < y.leftLast - y.leftFirst + y.rightLast - y.rightFirst;
-        });
-    }
-    ALTextDiff::Options with = mOptions;
+    // The words that mean the same in a pair, by the ranges its lines are
+    // in (of the texts as given).
+    ALDiffRangeSame     same(mRanges, mOptions.same);
+    ALTextDiff::Options with      = mOptions;
     const auto          optionsOf = [&](S32 shown_left, S32 shown_right) -> const ALTextDiff::Options& {
-        const S32 given_left  = mSwapped ? shown_right : shown_left;
-        const S32 given_right = mSwapped ? shown_left : shown_right;
-        if (given_left >= 0 && given_left < static_cast<S32>(tabled.size()))
-        {
-            for (const S32 n : tabled[static_cast<size_t>(given_left)])
-            {
-                const ALTextDiff::Range& range = mRanges[static_cast<size_t>(n)];
-                if (given_right >= range.rightFirst && given_right <= range.rightLast)
-                {
-                    ALTextDiff::same_t& table = joined[static_cast<size_t>(n)];
-                    if (!table)
-                    {
-                        table = ALDiffSame::joined(mOptions.same, range.same);
-                    }
-                    with.same = table;
-                    return with;
-                }
-            }
-        }
-        return mOptions;
+        with.same = mSwapped ? same.at(shown_right, shown_left) : same.at(shown_left, shown_right);
+        return with;
     };
     // The blocks moved, and which each line of either side is in.
     const ALDiffMoves::moves_t moves = ALDiffMoves::find(left, right, runs, options);

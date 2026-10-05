@@ -58,6 +58,23 @@ namespace ALDiffSplice
     // How many lines the last splice compared again, on both sides: what a
     // test holds its cost to.
     S32 lastCompared();
+
+    // Where each line of a text as it was went when it was made anew: a
+    // line still there, to itself; one taken out or changed, to where the
+    // text had got to there -- a line changed, to the line it became.
+    struct LineMap
+    {
+        S32  line(S32 was) const;
+        // Whether it is still there as it was, where a column on it holds.
+        bool kept(S32 was) const;
+
+        std::vector<S32>  to;
+        std::vector<bool> same;
+        S32               last = 0;
+    };
+    // The lines before the first changed and after the last as they were,
+    // those between compared.
+    LineMap lineMap(const std::vector<std::string>& was, const std::vector<std::string>& now);
 }
 
 #endif // AL_ALDIFFSPLICE_H
