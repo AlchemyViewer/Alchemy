@@ -607,4 +607,68 @@ namespace tut
         gFocusMgr.setKeyboardFocus(nullptr);
         view->die();
     }
+    // A gap: its tint across the text and nothing else in it, the line
+    // under it drawn as far down as the gap is tall, and the rows below
+    // the text drawn too.
+    template<> template<>
+    void altextview_gl_object::test<9>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "view";
+        p.rect         = LLRect(0, H, W, 0);
+        p.default_text = "MMMMMMMM\nMMMMMMMM\nMMMMMMMM";
+        // The skin's colours are not loaded here: the text's is given, on
+        // black.
+        p.text_color   = LLUIColor(LLColor4::white);
+        p.bg_visible   = false;
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        const auto frame = [&]() {
+            gl().clearFramebuffer();
+            glEnable(GL_BLEND);
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
+            view->draw();
+            gGL.flush();
+            glDisable(GL_BLEND);
+            glFinish();
+            return ll_test::readFramebufferRGBA(W, H);
+        };
+        // How many pixels in a band of the view's rows, from a row's top
+        // down so many rows, are lit in a channel over a floor.
+        const S32  row_h  = view->layout().rowHeight();
+        const LLRect text = view->textRect();
+        const auto lit    = [&](const std::vector<U8>& rgba, S32 from_row, S32 rows, S32 channel, U8 floor) {
+            S32 count = 0;
+            for (S32 y = text.mTop - (from_row + rows) * row_h; y < text.mTop - from_row * row_h; ++y)
+            {
+                for (S32 x = text.mLeft; x < text.mRight; ++x)
+                {
+                    count += rgba[(static_cast<size_t>(y) * W + x) * 4 + channel] > floor ? 1 : 0;
+                }
+            }
+            return count;
+        };
+        const std::vector<U8> before = frame();
+        ensure("the second line's ink in its row", lit(before, 1, 1, 0, 128) > 20);
+
+        std::vector<ALTextView::LineAnnotation> lines(4);
+        lines[1].gap     = 2;
+        lines[1].gapTint = LLColor4(0.f, 0.f, 1.f, 1.f);
+        lines[3].gap     = 1;
+        lines[3].gapTint = LLColor4(0.f, 1.f, 0.f, 1.f);
+        view->setLineAnnotations(lines);
+        const std::vector<U8> after = frame();
+        const S32             width = text.getWidth();
+        ensure("the gap tinted across the text", lit(after, 1, 2, 2, 200) >= width * (2 * row_h - 2));
+        ensure("and nothing written in it", lit(after, 1, 2, 0, 128) == 0);
+        ensure("the line under it as far down", lit(after, 3, 1, 0, 128) > 20 && lit(after, 3, 1, 0, 128) == lit(before, 1, 1, 0, 128));
+        ensure("the first line where it was", lit(after, 0, 1, 0, 128) == lit(before, 0, 1, 0, 128));
+        ensure("the rows below the text tinted", lit(after, 5, 1, 1, 200) >= width * (row_h - 2) && lit(after, 6, 1, 1, 200) == 0);
+        view->die();
+    }
 }

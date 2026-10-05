@@ -441,6 +441,7 @@ void ALTextView::setText(std::string_view text)
     setSubstitutions({});
     setAtoms({});
     setStyles({});
+    setLineAnnotations({});
     // Through the virtual, so that what a subclass keeps about changes
     // since the last save -- the gutter's bars -- starts clean too.
     resetDirty();
@@ -696,7 +697,7 @@ void ALTextView::syncScrollbar()
     if (!mScrollAsked && mLayout.heightsRevision() != mAnchorHeights && mDocument.lineCount() > 0)
     {
         const S32 line = llclamp(mAnchorLine, 0, mDocument.lineCount() - 1);
-        mScrollY       = mLayout.lineTop(line) + llmin(mAnchorOffset, llmax(0, mLayout.lineHeight(line) - 1));
+        mScrollY       = mLayout.lineTop(line) + llclamp(mAnchorOffset, -mLayout.gapHeight(line), llmax(0, mLayout.lineHeight(line) - 1));
     }
     // The ruler takes room the wrap width depends on, so the need for it
     // is decided again once the first decision has been applied.
@@ -810,8 +811,11 @@ void ALTextView::scrollToShow(const ALTextPos& pos)
     }
     // Up, below what is drawn over the top where it is -- the find bar,
     // the lines pinned there -- which is asked again at each place tried,
-    // since what is pinned is what the top of the view is inside.
+    // since what is pinned is what the top of the view is inside. A line's
+    // first row scrolled up to brings the gap above it with it, where
+    // there is room for both: what stands for what is not there.
     const S32 local_x = text.mLeft + static_cast<S32>(x - mScrollX);
+    const S32 gap     = row == 0 ? mLayout.gapHeight(pos.line) : 0;
     for (S32 tries = 0; tries < 4 && mScrollY > 0; ++tries)
     {
         const S32 covered = llmin(llmax(0, coveredAbove(local_x)), llmax(0, page - height));
@@ -819,11 +823,11 @@ void ALTextView::scrollToShow(const ALTextPos& pos)
         {
             break;
         }
-        mScrollY = llmax(0, top - covered);
+        mScrollY = llmax(0, top - covered - llmin(gap, llmax(0, page - height - covered)));
     }
     if (top < mScrollY)
     {
-        mScrollY = top;
+        mScrollY = top - llmin(gap, llmax(0, page - height));
     }
     mScrollY     = llmax(0, mScrollY);
     mScrollAsked = true;
@@ -2090,11 +2094,40 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
     mSpelling.edited(edit, mDocument.lineCount());
     mSpellTimer.reset();
     // What a host said of each line slides with the lines; a line the
-    // edit made says nothing.
+    // edit made says nothing, but for the rows above it: a gap above a
+    // line typed in, or replaced, stays above the first line made there.
     if (annotated())
     {
+        std::vector<std::pair<S32, LineAnnotation>> gaps;
+        if (mAnyGap)
+        {
+            S32 moved = 0;
+            for (const ALTextDocument::Edit::LineSpan& span : edit.lineSpans())
+            {
+                if (span.made > 0 && span.first >= 0 && span.first < static_cast<S32>(mAnnotations.size()) &&
+                    mAnnotations[static_cast<size_t>(span.first)].gap > 0)
+                {
+                    gaps.emplace_back(span.first + moved, mAnnotations[static_cast<size_t>(span.first)]);
+                }
+                moved += span.made - (span.last - span.first + 1);
+            }
+        }
         mAnnotations.applySpans(edit.lineSpans(), mDocument.lineCount(), LineAnnotation(), LineAnnotation());
+        for (const auto& [line, was] : gaps)
+        {
+            if (line >= 0 && line < static_cast<S32>(mAnnotations.size()))
+            {
+                LineAnnotation& now = mAnnotations[static_cast<size_t>(line)];
+                now.gap             = was.gap;
+                now.gapTint         = was.gapTint;
+                now.gapRulerTint    = was.gapRulerTint;
+            }
+        }
         ++mAnnotationsRevision;
+        if (mAnyGap)
+        {
+            mLayout.gapsChanged();
+        }
     }
     // What the find bar found slides with the text, and so do the carets
     // besides the main one, which whoever made the edit puts.
@@ -3595,6 +3628,33 @@ void ALTextView::forEachVisibleRow(const LLRect& text, const std::function<void(
     }
 }
 
+void ALTextView::forEachVisibleGap(const LLRect& text, const std::function<void(S32, S32, S32)>& visit)
+{
+    if (!mAnyGap || mLayout.rowHeight() <= 0)
+    {
+        return;
+    }
+    const S32 count    = mDocument.lineCount();
+    const S32 bottom_y = mScrollY + text.getHeight();
+    const auto shown   = [&](S32 line) {
+        const S32 top    = mLayout.gapTop(line);
+        const S32 height = mLayout.gapHeight(line);
+        if (height > 0 && top < bottom_y && top + height > mScrollY)
+        {
+            visit(line, text.mTop - (top - mScrollY), height);
+        }
+        return top < bottom_y;
+    };
+    for (S32 line = mLayout.lineAtY(mScrollY); line < count; ++line)
+    {
+        if (!mLayout.hidden(line) && !shown(line))
+        {
+            return;
+        }
+    }
+    shown(count);
+}
+
 // --- LLEditMenuHandler ---------------------------------------------------------
 
 void ALTextView::undo()
@@ -3689,11 +3749,7 @@ void ALTextView::copy()
             {
                 text += '\n';
             }
-            if (one.empty() && spacerLine(one.end.line))
-            {
-                continue;
-            }
-            text += one.empty() ? mDocument.line(one.end.line) : copiedText(one);
+            text += one.empty() ? mDocument.line(one.end.line) : mDocument.text(one);
             any = true;
         }
         if (any)
@@ -3705,7 +3761,7 @@ void ALTextView::copy()
     }
     if (!hasSelection())
     {
-        if (!mClipsLines || spacerLine(mCaret.line))
+        if (!mClipsLines)
         {
             return;
         }
@@ -3721,49 +3777,85 @@ void ALTextView::copy()
 
 void ALTextView::setLineAnnotations(std::vector<LineAnnotation> lines)
 {
-    mAnySpacer = std::any_of(lines.begin(), lines.end(), [](const LineAnnotation& line) { return line.spacer; });
+    // One more than the text has lines: the gap below it.
+    const size_t count = static_cast<size_t>(mDocument.lineCount());
+    mEndAnnotation     = lines.size() > count ? lines[count] : LineAnnotation();
+    lines.resize(std::min(lines.size(), count));
+    const bool had_gap = mAnyGap;
+    mAnyGap = mEndAnnotation.gap > 0 || std::any_of(lines.begin(), lines.end(), [](const LineAnnotation& line) { return line.gap > 0; });
     mAnnotations.assign(std::make_move_iterator(lines.begin()), std::make_move_iterator(lines.end()));
     ++mAnnotationsRevision;
+    if (mAnyGap || had_gap)
+    {
+        provideGaps();
+    }
+}
+
+void ALTextView::setLineAnnotation(S32 line, const LineAnnotation& said)
+{
+    const S32 count = mDocument.lineCount();
+    if (line < 0 || line > count)
+    {
+        return;
+    }
+    const S32 had = lineAnnotation(line).gap;
+    if (line == count)
+    {
+        mEndAnnotation = said;
+    }
+    else
+    {
+        if (static_cast<S32>(mAnnotations.size()) <= line)
+        {
+            mAnnotations.resize(static_cast<size_t>(line) + 1);
+        }
+        mAnnotations[static_cast<size_t>(line)] = said;
+    }
+    ++mAnnotationsRevision;
+    if (said.gap != had)
+    {
+        if (!mAnyGap && said.gap > 0)
+        {
+            mAnyGap = true;
+            provideGaps();
+        }
+        else
+        {
+            mLayout.gapChanged(line);
+        }
+    }
 }
 
 const ALTextView::LineAnnotation& ALTextView::lineAnnotation(S32 line) const
 {
     static const LineAnnotation nothing;
-    return line >= 0 && line < static_cast<S32>(mAnnotations.size()) ? mAnnotations[line] : nothing;
+    if (line == mDocument.lineCount())
+    {
+        return mEndAnnotation;
+    }
+    return line >= 0 && line < static_cast<S32>(mAnnotations.size()) ? mAnnotations[static_cast<size_t>(line)] : nothing;
 }
 
-std::string ALTextView::copiedText(const ALTextRange& range) const
+void ALTextView::provideGaps()
 {
-    if (!mAnySpacer)
+    // Asked of the layout only where some line has one.
+    if (mAnyGap)
     {
-        return mDocument.text(range);
+        mLayout.setGapProvider([this](S32 line) { return lineAnnotation(line).gap; });
     }
-    // Each line's part that is in the range, and its break where the range
-    // goes on past it and the text has a line after it: a spacer gives
-    // neither, and the text's last line has no break of its own to give,
-    // whatever spacers are shown after it.
-    const ALTextRange ordered = range.normalised();
-    S32               last    = mDocument.lineCount() - 1;
-    while (last > 0 && spacerLine(last))
+    else
     {
-        --last;
+        mLayout.setGapProvider(nullptr);
     }
-    std::string text;
-    for (S32 line = ordered.begin.line; line <= ordered.end.line; ++line)
+}
+
+S32 ALTextView::gapAtLocal(S32 y)
+{
+    if (!mAnyGap)
     {
-        if (spacerLine(line))
-        {
-            continue;
-        }
-        const S32 from = line == ordered.begin.line ? ordered.begin.column : 0;
-        const S32 to   = line == ordered.end.line ? ordered.end.column : static_cast<S32>(mDocument.line(line).size());
-        text += mDocument.text(ALTextRange(ALTextPos(line, from), ALTextPos(line, to)));
-        if (line < ordered.end.line && line < last)
-        {
-            text += '\n';
-        }
+        return -1;
     }
-    return text;
+    return mLayout.gapAtY((textRect().mTop - y) + mScrollY);
 }
 
 bool ALTextView::canPaste() const
@@ -5249,7 +5341,8 @@ void ALTextView::draw()
         gl_rect_2d(getLocalRect(), backgroundColor() % alpha);
     }
     const LLRect text = textRect();
-    // A tint behind each line that has one, under everything else.
+    // A tint behind each line that has one, and each gap, under
+    // everything else.
     if (annotated())
     {
         // The first and last rows in sight may be partly out of it.
@@ -5260,6 +5353,13 @@ void ALTextView::draw()
             if (tint.mV[VALPHA] > 0.f)
             {
                 gl_rect_2d(text.mLeft, screen_top, text.mRight, screen_top - row_h, tint % alpha);
+            }
+        });
+        forEachVisibleGap(text, [&](S32 line, S32 screen_top, S32 height) {
+            const LLColor4& tint = lineAnnotation(line).gapTint;
+            if (tint.mV[VALPHA] > 0.f)
+            {
+                gl_rect_2d(text.mLeft, screen_top, text.mRight, screen_top - height, tint % alpha);
             }
         });
     }

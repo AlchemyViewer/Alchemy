@@ -2045,10 +2045,33 @@ bool ALCodeEditor::unfoldAt(S32 line)
 {
     if (!folds().unfold(document(), getTabWidth(), line))
     {
-        return false;
+        const S32 beside = hostHiddenBeside(line);
+        if (beside < 0)
+        {
+            return false;
+        }
+        mLineRevealer(beside);
+        return !layout().hidden(beside);
     }
     applyFolds();
     return true;
+}
+
+S32 ALCodeEditor::hostHiddenBeside(S32 line) const
+{
+    if (!mLineRevealer)
+    {
+        return -1;
+    }
+    const ALTextLayout& lines = layout();
+    for (const S32 at : { line - 1, line + 1 })
+    {
+        if (lines.hiddenBy(at, ALTextLayout::HiddenBy::Host))
+        {
+            return at;
+        }
+    }
+    return -1;
 }
 
 void ALCodeEditor::foldAll()
@@ -2358,7 +2381,9 @@ bool ALCodeEditor::canFold(ALEditorCommand command) const
     ALCodeEditor* self = const_cast<ALCodeEditor*>(this);
     if (!mFoldable)
     {
-        return false;
+        // What the host hid beside the caret is the host's to show, whether
+        // the text folds or not.
+        return command == ALEditorCommand::Unfold && hostHiddenBeside(caret().line) >= 0;
     }
     switch (command)
     {
@@ -2372,7 +2397,7 @@ bool ALCodeEditor::canFold(ALEditorCommand command) const
             return region && !isFolded(region->start);
         }
         case ALEditorCommand::Unfold:
-            return !mFolds.folded().empty();
+            return !mFolds.folded().empty() || hostHiddenBeside(caret().line) >= 0;
         case ALEditorCommand::FoldAll:
             return mFolds.folded().size() < self->foldRegions().size();
         case ALEditorCommand::UnfoldAll:

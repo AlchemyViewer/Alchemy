@@ -115,12 +115,16 @@ private:
     // Where the mouse rests on the map, or -1: what the preview is of.
     S32  mHoverY     = -1;
 
-    // The lines the map shows, as of the layout's hidden revision and the
-    // line count.
-    std::vector<S32> mMapLines;
-    bool             mMapLinesValid    = false;
-    U32              mMapLinesRevision = 0;
-    S32              mMapLinesCount    = 0;
+    // The lines the map shows, a row each, and a row for each row of a
+    // gap, which is the line it is above's (one past the last for the gap
+    // below the text) and said to be a gap; as of the layout's hidden
+    // revision, the line count and what the host says of the lines.
+    std::vector<S32>  mMapLines;
+    std::vector<bool> mMapGaps;
+    bool              mMapLinesValid       = false;
+    U32               mMapLinesRevision    = 0;
+    S32               mMapLinesCount       = 0;
+    U32               mMapLinesAnnotations = 0;
     // The map's runs of text for the lines in sight, by column, as last
     // read: kept while the text, its grammar and each line's tokens, the
     // tab width, the map's width and the lines in sight hold, so that an
@@ -144,9 +148,11 @@ private:
     // A line's mark: a problem's (ALTextFeatures::mapMark), else what the
     // host says of the line (ALTextView::LineAnnotation::rulerTint).
     bool markOf(S32 line, LLColor4& color) const;
-    // The ruler's lines with a mark, as of the text's version, the marks'
-    // revision and what the host says of each line.
+    // The ruler's lines with a mark, and those with a gap with one, as of
+    // the text's version, the marks' revision and what the host says of
+    // each line.
     std::vector<S32> mMarkLines;
+    std::vector<S32> mGapMarkLines;
     bool             mMarksValid          = false;
     U32              mMarksVersion        = 0;
     U32              mMarksRevision       = 0;

@@ -332,6 +332,12 @@ void ALTextLayout::setIndentProvider(indent_provider_t provider)
     invalidateAll();
 }
 
+void ALTextLayout::setGapProvider(gap_provider_t provider)
+{
+    mGaps = std::move(provider);
+    gapsChanged();
+}
+
 void ALTextLayout::invalidateLine(S32 index)
 {
     if (index < 0 || index >= lineCount())
@@ -812,7 +818,7 @@ S32 ALTextLayout::countedHeight(S32 index) const
         return 0;
     }
     const S32 height = mLines[index].height;
-    return height > 0 ? height : rowHeight();
+    return (height > 0 ? height : rowHeight()) + gapHeight(index);
 }
 
 void ALTextLayout::ensureHeights()
@@ -828,19 +834,95 @@ void ALTextLayout::ensureHeights()
         mHeightScratch[i] = countedHeight(static_cast<S32>(i));
     }
     mHeights.assign(mHeightScratch);
+    mEndGap       = mGaps ? llmax(0, mGaps(lineCount())) : 0;
     mHeightsStale = false;
 }
 
 S32 ALTextLayout::lineTop(S32 index)
 {
     ensureHeights();
-    return mHeights.before(static_cast<size_t>(llclamp(index, 0, static_cast<S32>(mLines.size()))));
+    const S32 count = static_cast<S32>(mLines.size());
+    const S32 at    = llclamp(index, 0, count);
+    if (at == count)
+    {
+        return mHeights.total() + mEndGap * rowHeight();
+    }
+    return mHeights.before(static_cast<size_t>(at)) + (mHidden[at] ? 0 : gapHeight(at));
 }
 
 S32 ALTextLayout::totalHeight()
 {
     ensureHeights();
-    return mHeights.total();
+    return mHeights.total() + mEndGap * rowHeight();
+}
+
+// --- gaps ------------------------------------------------------------------------
+
+void ALTextLayout::gapsChanged()
+{
+    heightsMoved();
+}
+
+void ALTextLayout::gapChanged(S32 index)
+{
+    if (index == lineCount())
+    {
+        // Below the text: nothing is summed past it.
+        const S32 rows = mGaps ? llmax(0, mGaps(index)) : 0;
+        if (!mHeightsStale && rows != mEndGap)
+        {
+            mEndGap = rows;
+            ++mHeightsRevision;
+        }
+        return;
+    }
+    if (index < 0 || index > lineCount() || mHeightsStale || static_cast<size_t>(index) >= mHeights.size())
+    {
+        return;
+    }
+    if (mHeights.at(static_cast<size_t>(index)) != countedHeight(index))
+    {
+        mHeights.set(static_cast<size_t>(index), countedHeight(index));
+        ++mHeightsRevision;
+    }
+}
+
+S32 ALTextLayout::gapRows(S32 index) const
+{
+    if (!mGaps || index < 0 || index > lineCount() || hidden(index))
+    {
+        return 0;
+    }
+    return llmax(0, mGaps(index));
+}
+
+S32 ALTextLayout::gapTop(S32 index)
+{
+    ensureHeights();
+    const S32 count = static_cast<S32>(mLines.size());
+    return mHeights.before(static_cast<size_t>(llclamp(index, 0, count)));
+}
+
+S32 ALTextLayout::gapAtY(S32 y)
+{
+    ensureHeights();
+    if (!mGaps || y < 0)
+    {
+        return -1;
+    }
+    // Past every line's rows, the gap below the text; else the line whose
+    // height the y falls in, where it falls above its text.
+    const S32 lines = mHeights.total();
+    if (y >= lines)
+    {
+        return mEndGap > 0 && y < lines + mEndGap * rowHeight() ? lineCount() : -1;
+    }
+    const S32 line = static_cast<S32>(mHeights.reach(y));
+    if (line < 0 || line >= lineCount() || mHidden[line])
+    {
+        return -1;
+    }
+    return y < mHeights.before(static_cast<size_t>(line)) + gapHeight(line) ? line : -1;
 }
 
 S32 ALTextLayout::lineAtY(S32 y)

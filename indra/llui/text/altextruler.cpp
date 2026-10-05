@@ -123,7 +123,8 @@ void ALTextRuler::drawRuler(F32 alpha)
     gl_rect_2d(ruler, ink % (0.04f * alpha));
     const S32 total   = llmax(1, layout.totalHeight());
     const S32 track_h = llmax(1, ruler.getHeight());
-    const auto yOf    = [&](S32 line) { return ruler.mTop - static_cast<S32>(static_cast<F32>(layout.lineTop(line)) / static_cast<F32>(total) * static_cast<F32>(track_h)); };
+    const auto yAt    = [&](S32 doc_y) { return ruler.mTop - static_cast<S32>(static_cast<F32>(doc_y) / static_cast<F32>(total) * static_cast<F32>(track_h)); };
+    const auto yOf    = [&](S32 line) { return yAt(layout.lineTop(line)); };
     const S32 middle  = ruler.mLeft + WIDTH / 2;
     // The lines with a mark, found again only where the text or the
     // marks have changed; their colours asked every frame, which a
@@ -133,14 +134,24 @@ void ALTextRuler::drawRuler(F32 alpha)
         !mMarksValid)
     {
         mMarkLines.clear();
-        LLColor4  unused;
+        mGapMarkLines.clear();
+        LLColor4   unused;
         // A text with neither -- a log -- not read through at all.
-        const S32 count = features || mView.annotated() ? document.lineCount() : 0;
+        const bool annotated = mView.annotated();
+        const S32  count     = features || annotated ? document.lineCount() : 0;
         for (S32 line = 0; line < count; ++line)
         {
             if (markOf(line, unused))
             {
                 mMarkLines.push_back(line);
+            }
+        }
+        for (S32 line = 0; annotated && line <= document.lineCount(); ++line)
+        {
+            const ALTextView::LineAnnotation& said = mView.lineAnnotation(line);
+            if (said.gap > 0 && said.gapRulerTint.mV[VALPHA] > 0.f)
+            {
+                mGapMarkLines.push_back(line);
             }
         }
         mMarksVersion        = document.version();
@@ -155,6 +166,15 @@ void ALTextRuler::drawRuler(F32 alpha)
         {
             const S32 y = yOf(line);
             gl_rect_2d(middle, y, ruler.mRight - 2, y - 2, mark % alpha);
+        }
+    }
+    // A gap's mark as tall as the gap is, where that is more than a mark.
+    for (const S32 line : mGapMarkLines)
+    {
+        if (layout.gapHeight(line) > 0)
+        {
+            const S32 y = yAt(layout.gapTop(line));
+            gl_rect_2d(middle, y, ruler.mRight - 2, llmin(y - 2, yOf(line)), mView.lineAnnotation(line).gapRulerTint % alpha);
         }
     }
     // The matches by the pixel rows they fall on, found again only as
@@ -215,19 +235,32 @@ S32 ALTextRuler::mapScroll(const LLRect& map)
     // only where which are hidden may have changed.
     ALTextLayout& layout = mView.layout();
     const S32     count  = mView.document().lineCount();
-    if (!mMapLinesValid || mMapLinesRevision != layout.hiddenRevision() || mMapLinesCount != count)
+    if (!mMapLinesValid || mMapLinesRevision != layout.hiddenRevision() || mMapLinesCount != count ||
+        mMapLinesAnnotations != mView.annotationsRevision())
     {
         mMapLines.clear();
+        mMapGaps.clear();
+        const auto gap = [&](S32 line) {
+            for (S32 row = layout.gapRows(line); row > 0; --row)
+            {
+                mMapLines.push_back(line);
+                mMapGaps.push_back(true);
+            }
+        };
         for (S32 line = 0; line < count; ++line)
         {
             if (!layout.hidden(line))
             {
+                gap(line);
                 mMapLines.push_back(line);
+                mMapGaps.push_back(false);
             }
         }
-        mMapLinesRevision = layout.hiddenRevision();
-        mMapLinesCount    = count;
-        mMapLinesValid    = true;
+        gap(count);
+        mMapLinesRevision    = layout.hiddenRevision();
+        mMapLinesCount       = count;
+        mMapLinesAnnotations = mView.annotationsRevision();
+        mMapLinesValid       = true;
     }
     const S32 doc_h = static_cast<S32>(mMapLines.size()) * MAP_LINE_H;
     const S32 map_h = map.getHeight() - 2 * MAP_PAD;
@@ -250,7 +283,8 @@ S32 ALTextRuler::mapLineAt(S32 y)
     }
     const S32 scroll  = mapScroll(map);
     const S32 ordinal = llclamp((map.mTop - MAP_PAD - y + scroll) / MAP_LINE_H, 0, static_cast<S32>(mMapLines.size()) - 1);
-    return mMapLines.empty() ? -1 : mMapLines[ordinal];
+    // A gap's row is the line's below it, or the last line's below them all.
+    return mMapLines.empty() ? -1 : llmin(mMapLines[ordinal], mView.document().lineCount() - 1);
 }
 
 void ALTextRuler::drawPreview(F32 alpha)
@@ -449,9 +483,11 @@ void ALTextRuler::drawMap(F32 alpha)
     MapRuns&  runs    = mMapRuns;
     bool      fresh   = runs.version == mView.document().version() && runs.grammar == highlighter.grammar().get() && runs.tabWidth == tab_width &&
                  runs.columns == columns && runs.first == first && runs.last == last && runs.hidden == layout.hiddenRevision();
+    // A gap's row has no text, and no runs.
+    const auto revisionOf = [&](S32 o) { return mMapGaps[static_cast<size_t>(o)] ? 0 : highlighter.revision(mMapLines[o]); };
     for (S32 o = first; fresh && o <= last; ++o)
     {
-        fresh = runs.revisions[static_cast<size_t>(o - first)] == highlighter.revision(mMapLines[o]);
+        fresh = runs.revisions[static_cast<size_t>(o - first)] == revisionOf(o);
     }
     if (!fresh)
     {
@@ -467,10 +503,12 @@ void ALTextRuler::drawMap(F32 alpha)
         runs.runs.clear();
         for (S32 o = first; o <= last; ++o)
         {
-            const S32 line = mMapLines[o];
             runs.starts.push_back(runs.runs.size());
-            runs.revisions.push_back(highlighter.revision(line));
-            readMapRuns(line, columns, runs.runs);
+            runs.revisions.push_back(revisionOf(o));
+            if (!mMapGaps[static_cast<size_t>(o)])
+            {
+                readMapRuns(mMapLines[o], columns, runs.runs);
+            }
         }
         runs.starts.push_back(runs.runs.size());
     }
@@ -486,6 +524,16 @@ void ALTextRuler::drawMap(F32 alpha)
         const S32 line   = mMapLines[o];
         const S32 top    = map.mTop - MAP_PAD - (o * MAP_LINE_H - scroll);
         const S32 bottom = top - MAP_LINE_H;
+        if (mMapGaps[static_cast<size_t>(o)])
+        {
+            // A gap's row: nothing in it but its mark.
+            const LLColor4& tint = mView.lineAnnotation(line).gapRulerTint;
+            if (tint.mV[VALPHA] > 0.f)
+            {
+                gl_rect_2d_in_batch(mark_left, top, mark_left + MAP_MARK_W, bottom, tint % alpha);
+            }
+            continue;
+        }
         // Each run of glyphs, a rectangle in its kind's ink.
         const size_t from = runs.starts[static_cast<size_t>(o - first)];
         const size_t to   = runs.starts[static_cast<size_t>(o - first) + 1];
@@ -521,9 +569,11 @@ void ALTextRuler::drawMap(F32 alpha)
     const S32  page        = llmax(1, mView.textRect().getHeight());
     const S32  top_line    = layout.lineAtY(mView.scrollY());
     const S32  bottom_line = layout.lineAtY(mView.scrollY() + page - 1);
-    const auto ordinal     = [&](S32 line) { return static_cast<S32>(std::lower_bound(mMapLines.begin(), mMapLines.end(), line) - mMapLines.begin()); };
-    const S32  y0          = map.mTop - MAP_PAD - (ordinal(top_line) * MAP_LINE_H - scroll);
-    const S32  y1          = map.mTop - MAP_PAD - ((ordinal(bottom_line) + 1) * MAP_LINE_H - scroll);
+    // From the top line's first row, its gap's, to the bottom line's own.
+    const auto first_row   = [&](S32 line) { return static_cast<S32>(std::lower_bound(mMapLines.begin(), mMapLines.end(), line) - mMapLines.begin()); };
+    const auto own_row     = [&](S32 line) { return static_cast<S32>(std::upper_bound(mMapLines.begin(), mMapLines.end(), line) - mMapLines.begin()) - 1; };
+    const S32  y0          = map.mTop - MAP_PAD - (first_row(top_line) * MAP_LINE_H - scroll);
+    const S32  y1          = map.mTop - MAP_PAD - ((own_row(bottom_line) + 1) * MAP_LINE_H - scroll);
     gl_rect_2d(map.mLeft, y0, map.mRight, y1, ink % (alpha * 0.12f));
     gl_rect_2d(map.mLeft, y0, map.mRight, y1, ink % (alpha * 0.3f), false);
 }

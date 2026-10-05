@@ -104,19 +104,32 @@ namespace tut
             return text;
         }
 
-        static bool hidden(ALCodeEditor* side, S32 row) { return side->layout().hidden(row); }
+        static bool hidden(ALCodeEditor* side, S32 line) { return side->layout().hidden(line); }
 
-        // What a side is told of its lines, a row each: its numbers, its
-        // signs ('\0' for none).
+        // What a side shows of its lines, a line each: the numbers in its
+        // gutter, its signs ('\0' for none); and the rows of nothing above
+        // each, and below the last.
         static std::vector<S32> numbersOf(const ALCodeEditor* side)
         {
             std::vector<S32> out;
-            for (S32 row = 0; row < side->document().lineCount(); ++row)
+            for (S32 line = 0; line < side->document().lineCount(); ++line)
             {
-                out.push_back(side->lineAnnotation(row).number);
+                const S32 said = side->lineAnnotation(line).number;
+                out.push_back(said == ALTextView::LineAnnotation::OWN_NUMBER ? line + 1 : said);
             }
             return out;
         }
+        static std::vector<S32> gapsOf(ALCodeEditor* side)
+        {
+            std::vector<S32> out;
+            for (S32 line = 0; line <= side->document().lineCount(); ++line)
+            {
+                out.push_back(side->layout().gapRows(line));
+            }
+            return out;
+        }
+        // Whether two lines, one each side, are beside each other.
+        static bool beside(ALDiffView& d, S32 left, S32 right) { return d.left()->layout().lineTop(left) == d.right()->layout().lineTop(right); }
         static std::string signsOf(const ALCodeEditor* side)
         {
             std::string out;
@@ -139,15 +152,18 @@ namespace tut
     template<> template<>
     void aldiffview_object::test<1>()
     {
-        set_test_name("side by side: the lines lined up, a line one side has beside an empty one without a number, and each change tinted");
+        set_test_name("side by side: each text as it is, lined up, a line one side has beside a gap on the other, and each change tinted");
         ALDiffView& d = make("a\nb\nc", "a\nx\nc\nd");
-        ensure_equals("the left, with a line to stand beside d", d.left()->text(), std::string("a\nb\nc\n"));
+        ensure_equals("the left as it is", d.left()->text(), std::string("a\nb\nc"));
         ensure_equals("the right as it is", d.right()->text(), std::string("a\nx\nc\nd"));
-        ensure("numbered as each text's own, the empty line none", numbersOf(d.left()) == std::vector<S32>{ 1, 2, 3, 0 });
+        ensure("numbered as each text's own", numbersOf(d.left()) == std::vector<S32>{ 1, 2, 3 });
         ensure("the right's", numbersOf(d.right()) == std::vector<S32>{ 1, 2, 3, 4 });
+        ensure("a row of nothing below the left, to stand beside d", gapsOf(d.left()) == std::vector<S32>{ 0, 0, 0, 1 });
+        ensure("none on the right", gapsOf(d.right()) == std::vector<S32>{ 0, 0, 0, 0, 0 });
+        ensure("lined up", beside(d, 2, 2) && d.left()->layout().totalHeight() == d.right()->layout().totalHeight());
         ensure("what is the same untinted", !tinted(*d.left(), 0) && !tinted(*d.right(), 2));
         ensure("what was taken out, and what was put in, tinted", tinted(*d.left(), 1) && tinted(*d.right(), 1) && tinted(*d.right(), 3));
-        ensure("the empty line too, quieter", tinted(*d.left(), 3));
+        ensure("the gap too, quieter", d.left()->lineAnnotation(3).gapTint.mV[VALPHA] > 0.f);
         ensure_equals("two changes", d.changeCount(), 2);
         ensure("the word changed marked on each side", d.left()->decorations().size() == 1 && d.right()->decorations().size() == 1);
         ensure("neither side can be changed", d.left()->isReadOnly() && d.right()->isReadOnly());
@@ -164,7 +180,7 @@ namespace tut
         ensure("the one shown", d.shown() == d.inlined() && d.inlined()->getVisible() && !d.left()->getVisible());
         d.setInline(false);
         ensure("side by side again", d.left()->getVisible() && d.right()->getVisible() && !d.inlined()->getVisible());
-        ensure_equals("lined up as before", d.left()->text(), std::string("a\nb\nc\n"));
+        ensure_equals("as before", d.left()->text(), std::string("a\nb\nc"));
     }
 
     template<> template<>
@@ -219,18 +235,7 @@ namespace tut
         set_test_name("anchored: lines known to stand for each other side by side however they differ; and typing goes to whoever shows it, at the right's line");
         ALDiffView& d = make("", "");
         d.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 2 } });
-        const std::vector<S32>& left_numbers  = numbersOf(d.left());
-        const std::vector<S32>& right_numbers = numbersOf(d.right());
-        S32                     say           = -1;
-        for (S32 row = 0; row < static_cast<S32>(left_numbers.size()); ++row)
-        {
-            if (left_numbers[static_cast<size_t>(row)] == 5)
-            {
-                say = row;
-            }
-        }
-        ensure("the LSL's call shown", say >= 0 && say < static_cast<S32>(right_numbers.size()));
-        ensure_equals("beside the SLua's", right_numbers[static_cast<size_t>(say)], 3);
+        ensure("the LSL's call beside the SLua's", beside(d, 4, 2));
 
         ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
         p.name                 = "source";
@@ -246,7 +251,7 @@ namespace tut
             return source;
         });
         d.right()->setFocus(true);
-        d.right()->goTo(ALTextPos(say, 2));
+        d.right()->goTo(ALTextPos(2, 2));
         ensure("a character typed on the right", d.right()->handleUnicodeChar('x', false));
         ensure("told where: the right's line and column", at_line == 2 && at_column == 2);
         ensure_equals("typed there instead", source->text(), std::string("-- written\n\nllx.Say(0, \"hi\")"));
@@ -255,7 +260,7 @@ namespace tut
         // From the left, the line beside it, from its start; from a line
         // the right has none of, the next it has.
         d.left()->setFocus(true);
-        d.left()->goTo(ALTextPos(say, 5));
+        d.left()->goTo(ALTextPos(4, 5));
         ensure("a line broken on the left", d.left()->handleKey(KEY_RETURN, MASK_NONE, false));
         ensure("the right's line beside it, its start", at_line == 2 && at_column == 0);
         ensure_equals("broken there", source->text(), std::string("-- written\n\n\nllx.Say(0, \"hi\")"));
@@ -274,21 +279,22 @@ namespace tut
     template<> template<>
     void aldiffview_object::test<7>()
     {
-        set_test_name("a copy takes each side's text as it is: not the empty lines that line the sides up");
+        set_test_name("a copy takes each side's text as it is: the gaps that line the sides up are no part of it");
         ALDiffView& d = make("one\nfour", "one\ntwo\nthree\nfour\nfive");
-        ensure_equals("lined up", d.left()->text(), std::string("one\n\n\nfour\n"));
+        ensure_equals("the left as it is", d.left()->text(), std::string("one\nfour"));
+        ensure("lined up by gaps", gapsOf(d.left()) == std::vector<S32>{ 0, 2, 1 } && beside(d, 1, 3));
         LLClipboard& clipboard = LLClipboard::instance();
         std::string  copied;
 
-        d.left()->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 0)));
+        d.left()->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 4)));
         d.left()->copy();
         clipboard.pasteFromClipboard(copied);
         ensure_equals("all of the left, as its text has it", copied, std::string("one\nfour"));
 
-        d.left()->setSelection(ALTextRange(ALTextPos(0, 1), ALTextPos(2, 0)));
+        d.left()->setSelection(ALTextRange(ALTextPos(0, 1), ALTextPos(1, 0)));
         d.left()->copy();
         clipboard.pasteFromClipboard(copied);
-        ensure_equals("into the gap: the line's break, which the text has", copied, std::string("ne\n"));
+        ensure_equals("over the gap: the line's break, which the text has", copied, std::string("ne\n"));
 
         d.right()->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 4)));
         d.right()->copy();
@@ -358,7 +364,8 @@ namespace tut
         press(d, "swap");
         ensure("swapped, and lit", d.isSwapped() && ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("swap"))->getToggleState());
         ensure_equals("the right's text on the left", d.left()->text(), std::string("a\nx\nc\nd"));
-        ensure_equals("the left's on the right, lined up", d.right()->text(), std::string("a\nb\nc\n"));
+        ensure_equals("the left's on the right", d.right()->text(), std::string("a\nb\nc"));
+        ensure("lined up, the gap below it", gapsOf(d.right()) == std::vector<S32>{ 0, 0, 0, 1 });
         ensure("its lines now the ones put in", tinted(*d.right(), 1) && !tinted(*d.right(), 0));
         ensure_equals("the titles with them", d.getChild<LLUICtrl>("left_title")->getValue().asString(), std::string("Now"));
         ensure_equals("both", d.getChild<LLUICtrl>("right_title")->getValue().asString(), std::string("Saved"));
@@ -375,9 +382,9 @@ namespace tut
         d.left()->handleUnicodeChar('y', false);
         ensure("from the side showing the right's text: its line and column", at_line == 1 && at_column == 1);
         d.right()->setFocus(true);
-        d.right()->goTo(ALTextPos(3, 0));
+        d.right()->goTo(ALTextPos(2, 1));
         d.right()->handleUnicodeChar('y', false);
-        ensure("from the other, the right's line beside it, its start", at_line == 3 && at_column == 0);
+        ensure("from the other, the right's line beside it, its start", at_line == 2 && at_column == 0);
 
         d.setInline(true);
         ensure_equals("inline, the right's lines taken out", d.inlined()->text(), std::string("a\nx\nb\nc\nd"));
@@ -387,7 +394,7 @@ namespace tut
         ensure("one of the left's: the right's next, from its start", d.rightAtCaret() == std::make_pair(2, 0));
         d.setInline(false);
         d.setSwapped(false);
-        ensure_equals("back as it was", d.left()->text(), std::string("a\nb\nc\n"));
+        ensure_equals("back as it was", d.left()->text(), std::string("a\nb\nc"));
         ensure_equals("titles too", d.getChild<LLUICtrl>("left_title")->getValue().asString(), std::string("Saved"));
     }
 
@@ -443,42 +450,47 @@ namespace tut
     template<> template<>
     void aldiffview_object::test<13>()
     {
-        set_test_name("a long run the same folds beyond three lines of context, both sides, to one row; numbers stay true, a copy takes it all; Return, the bar, and the caret landing in it open it");
+        set_test_name("a long run the same folds beyond three lines of context, both sides, to a row of nothing after it; each text as it is, a copy takes it all; unfolding beside it, the bar, and the caret landing in it open it");
         const std::string left  = lines(30);
         const std::string right = lines(30, { { 2, "two" }, { 27, "twenty-seven" } });
         ALDiffView&       d     = make(left.c_str(), right.c_str());
         ensure("one fold, folded", d.foldCount() == 1 && d.foldedCount() == 1);
-        // Rows: 0-1 the same, 2 a change, 3-5 context, 6 the fold's row,
-        // 7-24 what it hides, 25-27 context, 28 a change, 29-30 the same.
+        // Each side's lines: 0-1 the same, 2 a change, 3-5 context, 6-23
+        // what it hides, its row the gap above 24, 24-26 context, 27 a
+        // change, 28-29 the same.
         for (ALCodeEditor* side : { d.left(), d.right() })
         {
-            ensure("context shown, the row shown", !hidden(side, 5) && !hidden(side, 6) && !hidden(side, 25));
-            ensure("the run hidden", hidden(side, 7) && hidden(side, 16) && hidden(side, 24));
-            ensure("its row a line of neither text", numbersOf(side)[6] == 0 && side->spacerLine(6));
-            ensure_equals("numbers true past it", numbersOf(side)[7], 7);
+            ensure("context shown", !hidden(side, 5) && !hidden(side, 24));
+            ensure("the run hidden", hidden(side, 6) && hidden(side, 15) && hidden(side, 23));
+            ensure("its row a gap above the line after it", side->layout().gapRows(24) == 1 && side->layout().gapRows(6) == 0);
+            ensure("the text as it is", side->text() == (side == d.left() ? left : right));
         }
+        ensure("lined up past it", beside(d, 25, 25));
         LLClipboard& clipboard = LLClipboard::instance();
         std::string  copied;
-        d.left()->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(30, 7)));
+        d.left()->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(29, 7)));
         d.left()->copy();
         clipboard.pasteFromClipboard(copied);
-        ensure_equals("a copy over it takes what it hides, and not its row", copied, left);
+        ensure_equals("a copy over it takes what it hides", copied, left);
 
         d.right()->setFocus(true);
         d.handleKey(KEY_F7, MASK_NONE, false);
         d.handleKey(KEY_F7, MASK_NONE, false);
-        ensure_equals("the changes stepped through over it", d.right()->caret().line, 28);
+        ensure_equals("the changes stepped through over it", d.right()->caret().line, 27);
 
-        d.right()->goTo(ALTextPos(6, 0));
-        ensure("Return on its row", d.right()->handleKey(KEY_RETURN, MASK_NONE, false));
-        ensure("opened, both sides", d.foldedCount() == 0 && !hidden(d.left(), 7) && !hidden(d.right(), 24));
-        ensure("its row gone, the caret on the first line it hid", hidden(d.right(), 6) && d.right()->caret().line == 7);
+        d.right()->goTo(ALTextPos(24, 0));
+        ensure("unfolding offered under its row", d.right()->canPerform(ALEditorCommand::Unfold));
+        ensure("unfolded", d.right()->perform(ALEditorCommand::Unfold));
+        ensure("opened, both sides", d.foldedCount() == 0 && !hidden(d.left(), 6) && !hidden(d.right(), 23));
+        ensure("its row gone, the caret where it was", d.right()->layout().gapRows(24) == 0 && d.right()->caret().line == 24);
+        ensure("nothing more to unfold", !d.right()->canPerform(ALEditorCommand::Unfold));
 
         press(d, "fold");
         ensure("the bar: folding off, nothing folded", !d.foldsSame() && d.foldedCount() == 0);
+        d.right()->goTo(ALTextPos(12, 0));
         press(d, "fold");
-        ensure("and on: folded again", d.foldsSame() && d.foldedCount() == 1 && hidden(d.left(), 7));
-        ensure("the caret, on a line folded away, on the row for it", d.right()->caret().line == 6);
+        ensure("and on: folded again", d.foldsSame() && d.foldedCount() == 1 && hidden(d.left(), 6));
+        ensure("the caret, on a line folded away, under the run's row", d.right()->caret().line == 24);
 
         d.left()->goTo(ALTextPos(12, 0));
         ensure("the caret landing in it opens it, both sides", d.foldedCount() == 0 && !hidden(d.right(), 12) && d.left()->caret().line == 12);
@@ -492,8 +504,8 @@ namespace tut
         const std::string right = lines(20, { { 19, "nineteen" } });
         ALDiffView&       d     = make(left.c_str(), right.c_str());
         ensure_equals("one, at the start", d.foldCount(), 1);
-        ensure("its row first, no context before it", !hidden(d.right(), 0) && hidden(d.right(), 1) && hidden(d.right(), 16) && !hidden(d.right(), 17));
-        ensure_equals("the first line it hides numbered as itself", numbersOf(d.right())[1], 1);
+        ensure("no context before it, its row the gap above the context after", hidden(d.right(), 0) && hidden(d.right(), 15) && !hidden(d.right(), 16));
+        ensure("the gap", gapsOf(d.right())[16] == 1 && d.right()->layout().lineTop(16) == d.right()->layout().rowHeight());
 
         d.setTexts(lines(15).c_str(), lines(15, { { 0, "zero" }, { 14, "fourteen" } }).c_str());
         ensure_equals("thirteen between changes: seven beyond context, not enough", d.foldCount(), 0);
@@ -503,21 +515,22 @@ namespace tut
         ensure_equals("nothing changed: nothing folded", d.foldCount(), 0);
 
         d.setTexts(left.c_str(), right.c_str());
-        ALCodeEditor* side = d.right();
+        ALCodeEditor* side  = d.right();
         const LLRect  frame = side->getRect();
         const LLRect  text  = side->textRect();
-        const S32     y     = frame.mBottom + text.mTop - (side->layout().lineTop(0) - side->scrollY()) - side->layout().lineHeight(0) / 2;
+        const S32     y     = frame.mBottom + text.mTop - (side->layout().gapTop(16) - side->scrollY()) - side->layout().rowHeight() / 2;
+        ensure("the point in its gap", side->gapAtLocal(y - frame.mBottom) == 16);
         ensure("a click on its row", d.handleMouseDown(frame.mLeft + text.mLeft + 10, y, MASK_NONE));
-        ensure("opened, the caret on its first line, the side with the keyboard", d.foldedCount() == 0 && side->caret().line == 1 && side->hasFocus());
+        ensure("opened, the caret on its first line, the side with the keyboard", d.foldedCount() == 0 && side->caret().line == 0 && side->hasFocus());
         ensure("a click on a line of text is the side's", (d.handleMouseDown(frame.mLeft + text.mLeft + 10, y, MASK_NONE), d.foldedCount() == 0));
 
         d.setInline(true);
         ensure("inline: as open as it was", d.foldCount() == 1 && d.foldedCount() == 0 && !hidden(d.inlined(), 1));
         d.setFoldSame(true);
-        ensure("folded, inline", hidden(d.inlined(), 1) && !hidden(d.inlined(), 0));
-        d.inlined()->goTo(ALTextPos(0, 0));
+        ensure("folded, inline", hidden(d.inlined(), 1) && !hidden(d.inlined(), 16) && gapsOf(d.inlined())[16] == 1);
+        d.inlined()->goTo(ALTextPos(16, 0));
         d.setInline(false);
-        ensure("side by side, folded, the caret on its row", d.foldedCount() == 1 && d.right()->caret().line == 0);
+        ensure("side by side, folded, the caret under its row", d.foldedCount() == 1 && d.right()->caret().line == 16);
         d.setSwapped(true);
         ensure("swapped, folded still", d.foldedCount() == 1 && hidden(d.left(), 1) && hidden(d.right(), 1));
     }
@@ -534,9 +547,13 @@ namespace tut
             const LLColor4& c = side->lineAnnotation(row).rulerTint;
             return c.mV[VRED] > c.mV[VGREEN];
         };
-        ensure("nothing the same marked", !marked(d.left(), 0) && !marked(d.right(), 0) && !marked(d.right(), 2) && !marked(d.left(), 4));
+        const auto  gap_marked = [](const ALCodeEditor* side, S32 line) {
+            const LLColor4& c = side->lineAnnotation(line).gapRulerTint;
+            return c.mV[VALPHA] > 0.f && c.mV[VGREEN] > c.mV[VRED];
+        };
+        ensure("nothing the same marked", !marked(d.left(), 0) && !marked(d.right(), 0) && !marked(d.right(), 2) && !marked(d.left(), 3));
         ensure("a line changed: taken out on the left, put in on the right", red(d.left(), 1) && !red(d.right(), 1));
-        ensure("a line put in: on the right, and on the left beside its gap", marked(d.left(), 3) && !red(d.left(), 3) && !red(d.right(), 3));
+        ensure("a line put in: on the right, and on the left by its gap", marked(d.right(), 3) && !red(d.right(), 3) && gap_marked(d.left(), 3));
         d.setInline(true);
         ensure("inline: the line taken out, and the two put in", red(d.inlined(), 1) && !red(d.inlined(), 2) && !red(d.inlined(), 4) && !marked(d.inlined(), 3));
     }
@@ -546,8 +563,8 @@ namespace tut
     {
         set_test_name("beside the numbers, what each line is, so a change reads without its colour: ~ changed, - taken out, + put in");
         ALDiffView& d = make("a\nb\nc\ne\nf", "a\nx\nc\nd\ne");
-        ensure("the left: the line changed, the one taken out", signsOf(d.left()) == std::string("\0~\0\0\0-", 6));
-        ensure("the right: the line changed, the one put in, nothing beside the gap", signsOf(d.right()) == std::string("\0~\0+\0\0", 6));
+        ensure("the left: the line changed, the one taken out", signsOf(d.left()) == std::string("\0~\0\0-", 5));
+        ensure("the right: the line changed, the one put in", signsOf(d.right()) == std::string("\0~\0+\0", 5));
         d.setInline(true);
         ensure("inline: taken out and put in", signsOf(d.inlined()) == std::string("\0-+\0+\0-", 7));
     }
@@ -562,8 +579,8 @@ namespace tut
         d.right()->setFocus(true);
         d.right()->goTo(ALTextPos(10, 0));
         ensure("the run opened", d.foldedCount() == 0);
-        // Row 26 is the right's line 25: context below the run.
-        d.right()->goTo(ALTextPos(26, 2));
+        // The right's line 25: context below the run.
+        d.right()->goTo(ALTextPos(25, 2));
         ensure("on the right's line 25", d.rightAtCaret() == std::make_pair(25, 2));
         d.setRightText("inserted\n" + right);
         ensure_equals("compared again: a change more", d.changeCount(), 3);
@@ -571,27 +588,15 @@ namespace tut
         ensure("the run as open as it was", d.foldCount() == 1 && d.foldedCount() == 0);
         d.setRightText(right);
         d.setFoldSame(true);
-        d.right()->goTo(ALTextPos(6, 0));
+        d.right()->goTo(ALTextPos(24, 0));
         d.setRightText("inserted\n" + right);
-        ensure("on a folded row: on its row again, folded", d.foldedCount() == 1 && d.right()->spacerLine(d.right()->caret().line));
+        ensure("under a folded row: under it again, folded", d.foldedCount() == 1 && d.right()->caret().line == 25 && d.right()->layout().gapRows(25) == 1);
 
         d.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 2 } });
         d.setRightText("-- written\n-- and more\n\nll.Say(0, \"hi\")");
-        const std::vector<S32>& left_numbers  = numbersOf(d.left());
-        const std::vector<S32>& right_numbers = numbersOf(d.right());
-        bool                    beside        = false;
-        for (size_t row = 0; row < left_numbers.size() && row < right_numbers.size(); ++row)
-        {
-            beside = beside || (left_numbers[row] == 5 && right_numbers[row] == 4);
-        }
-        ensure("the LSL's call beside the SLua's, a line further down", beside);
+        ensure("the LSL's call beside the SLua's, a line further down", beside(d, 4, 3));
         d.setRightText("-- written\n-- and more\n\nll.Say(0, \"bye\")");
-        bool still = false;
-        for (size_t row = 0; row < numbersOf(d.left()).size() && row < numbersOf(d.right()).size(); ++row)
-        {
-            still = still || (numbersOf(d.left())[row] == 5 && numbersOf(d.right())[row] == 4);
-        }
-        ensure("its line changed: beside it still", still);
+        ensure("its line changed: beside it still", beside(d, 4, 3));
     }
 
     template<> template<>

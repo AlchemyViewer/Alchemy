@@ -404,7 +404,10 @@ public:
     // has changed.
     const std::vector<FoldRegion>& foldRegions() override;
     // The block that starts at the line, else the innermost one around
-    // it. False where there is none, or it is already that way.
+    // it. False where there is none, or it is already that way. Unfolding
+    // where no block is folded shows what the host hid next to the line
+    // instead -- a comparison's run folded away above it or below it --
+    // as the host sees fit.
     bool foldAt(S32 line) override;
     bool unfoldAt(S32 line) override;
     void foldAll() override;
@@ -588,7 +591,8 @@ public:
     bool stepChange(bool forward) override { return mChangeStepper && mChangeStepper(forward); }
     // The lines a host hides (ALTextLayout::HiddenBy::Host) -- a
     // comparison's runs the same -- shown by the host as it sees fit where
-    // the caret lands on one; what it leaves hidden there is shown anyway.
+    // the caret lands on one, or unfolds next to one; what it leaves
+    // hidden where the caret lands is shown anyway.
     typedef std::function<void(S32 line)> line_revealer_t;
     void setLineRevealer(line_revealer_t revealer) { mLineRevealer = std::move(revealer); }
     typedef std::function<void(const LLSD& value)> fix_handler_t;
@@ -748,6 +752,9 @@ protected:
     bool canPerformFeature(ALEditorCommand command) const override;
     bool offersSymbols() const override { return static_cast<bool>(mSymbolRequest); }
     void revealLine(S32 line) override;
+    // A line next to this one that the host hides, above first; -1 for
+    // none, or no host to show it.
+    S32  hostHiddenBeside(S32 line) const;
     bool mapMark(S32 line, LLColor4& color) const override;
     U32  marksRevision() const override { return mMarksRevision; }
     bool closerOpenedAt(const ALTextPos& closer, ALTextPos& opener) override;

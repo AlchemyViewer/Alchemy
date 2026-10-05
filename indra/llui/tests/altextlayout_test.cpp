@@ -780,4 +780,48 @@ namespace tut
         layout.setHidden(By::Any, 0, 10, false);
         ensure("all shown", !layout.anyHidden());
     }
+    template<> template<>
+    void altextlayout_object::test<20>()
+    {
+        set_test_name("gaps: rows of nothing above a line in its height, its top its text's; hidden with it; one changed moves the tops below; below the text");
+        ready("0\n1\n2\n3\n4\n5");
+        const S32        row_h = layout.rowHeight();
+        std::vector<S32> gaps(7, 0);
+        gaps[3]       = 2;
+        gaps[6]       = 1;
+        S32 asked     = 0;
+        layout.setGapProvider([&](S32 line) {
+            ++asked;
+            return gaps[static_cast<size_t>(line)];
+        });
+        ensure_equals("in the height, and below the text", layout.totalHeight(), 9 * row_h);
+        ensure("the line's top its text's", layout.lineTop(3) == 5 * row_h && layout.gapTop(3) == 3 * row_h && layout.lineTop(4) == 6 * row_h);
+        ensure("past the last: the bottom of everything", layout.lineTop(6) == 9 * row_h && layout.gapTop(6) == 8 * row_h);
+        ensure("a y in the gap over the line below it", layout.lineAtY(3 * row_h) == 3 && layout.lineAtY(5 * row_h - 1) == 3 && layout.gapAtY(4 * row_h) == 3);
+        ensure("its text not in it", layout.gapAtY(5 * row_h) == -1 && layout.gapAtY(2 * row_h) == -1);
+        ensure("past the text, in the rows below it", layout.gapAtY(8 * row_h) == 6 && layout.gapAtY(9 * row_h) == -1 && layout.lineAtY(8 * row_h) == 5);
+
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 2, 3, true);
+        ensure("hidden, its gap with it", layout.gapRows(3) == 0 && layout.totalHeight() == 5 * row_h && layout.lineTop(4) == 2 * row_h);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 2, 3, false);
+        ensure("shown, its gap again", layout.gapRows(3) == 2 && layout.totalHeight() == 9 * row_h);
+
+        // One line's gap changed: its own height set, nothing summed again.
+        const U32 was = layout.heightsRevision();
+        gaps[1]       = 1;
+        asked         = 0;
+        layout.gapChanged(1);
+        ensure("the tops below moved", layout.lineTop(2) == 3 * row_h && layout.totalHeight() == 10 * row_h && layout.heightsRevision() != was);
+        ensure("asked of that line alone", asked <= 3);
+        gaps[6] = 0;
+        layout.gapChanged(6);
+        ensure_equals("the rows below the text let go", layout.totalHeight(), 9 * row_h);
+
+        // Made again where many changed.
+        gaps.assign(7, 0);
+        layout.gapsChanged();
+        ensure_equals("none", layout.totalHeight(), 6 * row_h);
+        layout.setGapProvider(nullptr);
+        ensure("none asked of nobody", layout.gapRows(3) == 0 && layout.gapAtY(0) == -1);
+    }
 }

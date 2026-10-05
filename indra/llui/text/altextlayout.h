@@ -144,6 +144,10 @@ public:
     };
     typedef std::function<Indent(S32 line)> indent_provider_t;
 
+    // How many rows of nothing stand above a line: asked of a line, and of
+    // the line one past the last, for the rows below the text.
+    typedef std::function<S32(S32 line)> gap_provider_t;
+
     // A row of a line: the bytes it holds, the glyphs it holds, where in
     // the unwrapped line it starts, since the glyphs keep their unwrapped
     // pen; where it sits under the line's top and how tall it is, since
@@ -221,6 +225,10 @@ public:
     // Asked, as each line is laid out, how far in its rows start;
     // likewise.
     void setIndentProvider(indent_provider_t provider);
+    // Asked, as the lines' heights are summed, how many rows of nothing
+    // stand above each; whoever provides them says when they change
+    // (gapsChanged, or gapChanged for one line). See gaps below.
+    void setGapProvider(gap_provider_t provider);
     void invalidateLine(S32 index);
     // A space's advance in the UI's pixels, as every other x the layout
     // hands out is: what a column is, for whoever draws by columns.
@@ -264,10 +272,34 @@ public:
     // of the lines in sight.
     U32 hiddenRevision() const { return mHiddenRevision; }
 
+    // --- gaps ------------------------------------------------------------------
+
+    // A gap is rows of nothing above a line, as tall as rows of the
+    // document's font: a comparison's side lined up with lines the other
+    // side has and it has not, or a row standing for lines hidden. Counted
+    // into the line's height, so that what is below it moves down; never a
+    // line of the document, never where the caret goes. A line's top is
+    // its text's, under its gap; a point in a gap is over the line below
+    // it. The line one past the last has the gap below the text. A hidden
+    // line has none: its gap is hidden with it.
+    void gapsChanged();
+    void gapChanged(S32 index);
+    // Its rows and its height, as they count; one past the last line, the
+    // gap below the text.
+    S32  gapRows(S32 index) const;
+    S32  gapHeight(S32 index) const { return gapRows(index) * rowHeight(); }
+    // The top of a line's gap, which is its top where it has none; one
+    // past the last line, the top of the gap below the text.
+    S32  gapTop(S32 index);
+    // The line whose gap a y is in, one past the last for the gap below
+    // the text; -1 where it is in none.
+    S32  gapAtY(S32 y);
+
     // --- a line ------------------------------------------------------------
 
     const Line& line(S32 index);
     S32         rowCount(S32 index) { return static_cast<S32>(line(index).rows.size()); }
+    // Its text's height, without its gap.
     S32         lineHeight(S32 index) { return hidden(index) ? 0 : line(index).height; }
     // A row's top under its line's top, and its height; the row a y
     // under the line's top falls in, clamped to the first and the last.
@@ -277,7 +309,8 @@ public:
 
     // --- the column ----------------------------------------------------------
 
-    // The top of a line from the top of the document, and the whole. Lines
+    // The top of a line's text from the top of the document, under any gap
+    // above it; one past the last line, the bottom of everything. Lines
     // not yet laid out count as one row, and one laid out once as the
     // height it was until it is laid out again.
     S32 lineTop(S32 index);
@@ -287,8 +320,8 @@ public:
     // everything laid out again -- for a view that keeps to its place in
     // the text as heights above it change.
     U32 heightsRevision() const { return mHeightsRevision; }
-    // The line whose rows cover a y, clamped to the first and the last;
-    // never a hidden one where any line is not.
+    // The line whose rows or gap cover a y, clamped to the first and the
+    // last; never a hidden one where any line is not.
     S32 lineAtY(S32 y);
 
     // --- the caret -------------------------------------------------------------
@@ -330,8 +363,8 @@ private:
     // glyphs are current at another wrap width.
     void layoutLine(S32 index, Line& out);
     void wrapLine(S32 index, Line& out);
-    // What a line counts for in the column: nothing hidden; its height
-    // once laid out, even since thrown away; a row before.
+    // What a line counts for in the column: nothing hidden; its gap and
+    // its height once laid out, even since thrown away; a row before.
     S32  countedHeight(S32 index) const;
     // Every line's height summed afresh, where lines were made or taken
     // away, hidden or everything thrown away since.
@@ -357,6 +390,8 @@ private:
     std::vector<S32>                   mHeightScratch;
     bool                               mHeightsStale    = true;
     U32                                mHeightsRevision = 0;
+    // The rows below the text, as last asked.
+    S32                                mEndGap = 0;
     F32                                mSpaceAdvance = -1.f;
     // Negative until asked for.
     F32                                mContentWidth = -1.f;
@@ -380,4 +415,5 @@ private:
     run_provider_t                     mRuns;
     std::vector<Run>                   mRunScratch;
     indent_provider_t                  mIndents;
+    gap_provider_t                     mGaps;
 };

@@ -40,17 +40,24 @@ class ALDiffBar;
 class LLTextBox;
 
 // Two texts compared (ALTextDiff). Side by side, each in a code editor of
-// its own that cannot be changed, their lines lined up -- a line one side
-// has and the other not stands beside an empty one, which has no number --
-// and scrolled together; or inline, in one, what was taken out above what
-// was put in, numbered as the right. Lines taken out are tinted one colour
-// and lines put in another, and within a line changed into another, the
-// words that changed are marked. Runs of lines the same are folded away
-// beyond a few lines of context, each to a row saying how many, which a
-// click or Return opens. Each side has a title over it, and over the
+// its own that cannot be changed and holds its text as it is, their lines
+// lined up -- a line one side has and the other not stands beside rows of
+// nothing, a gap in the layout (ALTextLayout) -- and scrolled together; or
+// inline, in one, what was taken out above what was put in, numbered as
+// the right. Lines taken out are tinted one colour and lines put in
+// another, and within a line changed into another, the words that changed
+// are marked. Runs of lines the same are folded away beyond a few lines of
+// context, each to a row of nothing saying how many, which a click, or
+// unfolding beside it, opens. Each side has a title over it, and over the
 // titles a bar (ALDiffBar): which change the caret is in, of how many,
 // the steps through them, folding, inline or side by side, the sides
 // swapped, and done.
+//
+// Its rows are the lines of both sides lined up, a row of nothing where a
+// side has no line -- a gap's row, above the next line it has -- and a
+// row for each run folded, after the run, drawn while it is folded. A
+// change, a fold and the place kept across a rebuild are rows; a side's
+// caret and its layout are of its own lines.
 //
 // F7 or Alt-Down goes to the next change and Shift-F7 or Alt-Up to the one
 // before; Escape tells whoever shows it, to put back what was there. What
@@ -100,10 +107,11 @@ public:
 
     // Lines the same folded away: a run of them beyond FOLD_CONTEXT lines
     // either side of a change -- none at the text's start or end -- where
-    // that leaves FOLD_LEAST or more, both sides at once, to one row that
-    // says how many. Each opened by a click on its row, Return on it, or
-    // the caret landing in it; all of them opened, or folded again, by
-    // turning this off or on. On unless asked; never where nothing changed.
+    // that leaves FOLD_LEAST or more, both sides at once, to one row of
+    // nothing after it that says how many. Each opened by a click on its
+    // row, unfolding on a line beside it (ALEditorCommand::Unfold), or the
+    // caret landing in it; all of them opened, or folded again, by turning
+    // this off or on. On unless asked; never where nothing changed.
     static constexpr S32 FOLD_CONTEXT = 3;
     static constexpr S32 FOLD_LEAST   = 8;
     void setFoldSame(bool fold);
@@ -125,10 +133,13 @@ public:
     // both, between lines the same.
     S32 changeCount() const { return static_cast<S32>(mChanges.size()); }
     // The change the caret of the side in front is in, counted from
-    // nought; -1 where it is in none.
+    // nought; -1 where it is in none. Where the side has none of a
+    // change's lines, the caret on the line under its gap is in it.
     S32 changeAtCaret() const;
-    // The next change after the line the caret is on, or the one before;
-    // the caret put at its first line. False where there is none that way.
+    // The change after the one the caret is in, or the one before; from
+    // between changes, the next after its line or the last before. The
+    // caret put at its first line, or under its gap. False where there is
+    // none that way.
     bool goToChange(bool forward);
 
     // A change taken back: the right's lines of it made the left's again,
@@ -192,28 +203,25 @@ private:
     const ALCodeEditor*     notRightSide() const;
     // Where the caret is, to keep across a rebuild that changes the rows:
     // its line of the right's text and its column there, and how far down
-    // the view its row is.
+    // the view its line is.
     struct Place
     {
         S32 line     = 0;
         S32 column   = 0;
         S32 belowTop = 0;
-        // The fold whose row the caret is on, which stands for no line.
-        S32 fold     = -1;
     };
     Place                   placeOfCaret();
     // Made again as lines are now told the same, the caret kept.
     void                    rebuildLikeness();
     void                    restorePlace(const Place& place);
-    // A run of lines the same, folded away or not: the row before it that
-    // stands for it while it is, side by side and inline, and how many
-    // lines after that row it hides.
+    // A run of lines the same, folded away or not: its first row, side by
+    // side and inline, and how many; its own row is the one after it.
     struct Fold
     {
-        S32  row       = 0;
-        S32  inlineRow = 0;
-        S32  count     = 0;
-        bool open      = false;
+        S32  first       = 0;
+        S32  inlineFirst = 0;
+        S32  count       = 0;
+        bool open        = false;
     };
     // Each change's lines in the texts as given, swapped or not: where
     // they start on the left and on the right, and how many each has.
@@ -226,18 +234,51 @@ private:
     };
     // The change a row of what is shown is in; -1 for none.
     S32               changeOfRow(S32 row) const;
+    // The change a line of a side is in, or is under the gap of, as the
+    // caret's is (changeAtCaret); -1 for none.
+    S32               changeOfLine(const ALCodeEditor* side, S32 line) const;
+    // The change a step from the caret goes to (goToChange); -1 for none.
+    S32               changeStep(bool forward) const;
+    // Each row's line of the text an editor shows -- the left's or the
+    // right's, or the one inline -- or -1 for a row of nothing there,
+    // which is in the gap above the next line that has one; and each
+    // line's row.
+    struct Lines
+    {
+        std::vector<S32> lineOf;
+        std::vector<S32> rowOf;
+    };
+    const Lines&      linesOf(const ALCodeEditor* side) const;
+    S32               rowOfLine(const ALCodeEditor* side, S32 line) const;
+    // A row's line, or the line after it where it has none; one past the
+    // last past them all, which is the gap below the text.
+    S32               lineBelowRow(const ALCodeEditor* side, S32 row) const;
+    // Where the caret goes for a row: its line, or the line under its
+    // gap, or at the text's end the last.
+    S32               caretLineOfRow(const ALCodeEditor* side, S32 row) const;
+    // A row's top down a side's text: its line's, or as far down the gap
+    // it is in as there are rows of it drawn before it. Past the last
+    // row, the bottom of the text.
+    S32               topOfRow(ALCodeEditor* side, S32 row) const;
+    // Whether a row of nothing is drawn: a fold's own row only while its
+    // run is folded.
+    bool              rowDrawn(const ALCodeEditor* side, S32 row) const;
+    // Whether a side has any line among a change's rows.
+    bool              hasLinesIn(const ALCodeEditor* side, S32 change) const;
     // The gap between the sides: wider where it holds the arrows that take
     // a change back.
     S32               gap() const;
     // The change whose arrow is under a point of the view; -1 for none.
     S32               arrowAtPoint(S32 x, S32 y);
     void              drawArrows();
-    // Each side's lines hidden and shown as the folds are, and a caret on
-    // a line hidden put on the line that stands for it.
+    // Each side's lines hidden and shown as the folds are, each folded
+    // run's row a gap above the line after it, and a caret on a line
+    // hidden put beside the run.
     void              applyFolds();
-    // The fold whose row a row of a side is, or with `lines` whose lines
-    // it is one of too; -1 for none.
+    // The fold whose own row a row of a side is, or with `lines` whose
+    // lines it is one of too; -1 for none.
     S32               foldOfRow(const ALCodeEditor* side, S32 row, bool lines) const;
+    S32               firstOfFold(const ALCodeEditor* side, S32 fold) const;
     S32               rowOfFold(const ALCodeEditor* side, S32 fold) const;
     void              openFold(S32 fold);
     std::vector<bool> foldsOpen() const;
@@ -262,6 +303,10 @@ private:
     std::vector<S32>      mRightRows;
     std::vector<S32>      mInlineLeftRows;
     std::vector<S32>      mInlineRows;
+    // Each editor's lines by row, and rows by line.
+    Lines                 mLeftLines;
+    Lines                 mRightLines;
+    Lines                 mInlineLines;
     std::string           mLeftTitle;
     std::string           mRightTitle;
     bool                  mInline  = false;
@@ -272,7 +317,7 @@ private:
     ALDiffBar*            mBar       = nullptr;
     LLTextBox*            mLeftHead  = nullptr;
     LLTextBox*            mRightHead = nullptr;
-    // Where each change starts and where it ends, past its last, as lines
+    // Where each change starts and where it ends, past its last, as rows
     // of what is shown: the same on both sides, which are lined up.
     std::vector<S32>      mChanges;
     std::vector<S32>      mChangeEnds;

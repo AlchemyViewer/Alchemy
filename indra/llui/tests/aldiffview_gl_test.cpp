@@ -215,18 +215,21 @@ namespace tut
     template<> template<>
     void aldiffview_gl_object::test<2>()
     {
-        set_test_name("a folded row, a line with nothing on it, has how many it stands for said over it; opened, it is gone");
+        set_test_name("a folded run's row, a gap above the line after it, has how many it stands for said over it; opened, it is gone");
         ALDiffView& d = make();
         ensure_equals("one run folded", d.foldedCount(), 1);
-        // Rows: 0-1, the change at 2, 3-4, the line put in at 5, context
-        // 6-8, and the folded row at 9.
-        const S32 row = 9;
-        ensure("the row a spacer", d.right()->spacerLine(row));
-        const Band            b      = band(d.right(), row, row);
+        // The right's lines: 0-1, the change at 2, 3-4, the line put in at
+        // 5, context 6-8, the run 9-27, and its row the gap above 28.
+        const S32      under  = 28;
+        ALTextLayout&  layout = d.right()->layout();
+        ensure("the row a gap", layout.gapRows(under) == 1 && layout.hidden(9) && layout.hidden(27));
+        Band b      = band(d.right(), under, under);
+        b.bottom    = b.top;
+        b.top       = b.top + layout.gapHeight(under);
         const std::vector<U8> folded = drawn(d);
         ensure("words over it", count(folded, b.left, b.right, b.bottom + 1, b.top - 1, inked) > 20);
-        d.right()->goTo(ALTextPos(row + 1, 0));
+        d.right()->goTo(ALTextPos(12, 0));
         ensure_equals("opened", d.foldedCount(), 0);
-        ensure("its row hidden", d.right()->layout().hidden(row));
+        ensure("its row gone", layout.gapRows(under) == 0 && !layout.hidden(12));
     }
 }

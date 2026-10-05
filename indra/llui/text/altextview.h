@@ -343,10 +343,7 @@ public:
     ALTextRange selection() const { return ALTextRange(mAnchor, mCaret); }
     bool        hasSelection() const { return mAnchor != mCaret; }
     void        setSelection(const ALTextRange& range);
-    // The selection's text, as a copy takes it: but for spacer lines.
-    std::string selectedText() const { return copiedText(selection()); }
-    // A range's text but for the spacer lines in it, each with its break.
-    std::string copiedText(const ALTextRange& range) const;
+    std::string selectedText() const { return mDocument.text(selection()); }
     // The identifier the caret is at the end of: letters, digits and
     // underscores back from the caret. Empty at anything else.
     std::string wordBeforeCaret() const;
@@ -512,9 +509,10 @@ public:
     // own (0 for none); a sign beside the number, so that what the line is
     // reads without colour; a tint behind it, the width of the text; a mark
     // on the ruler down the side, where a problem's leaves it none; and
-    // whether it is no part of the text at all -- an empty row a
-    // comparison lines its sides up with -- which a copy leaves out. What
-    // a comparison's sides are made of, a fix's preview, a choice's pane.
+    // rows of nothing above it (ALTextLayout's gap) -- a comparison's side
+    // lined up with lines the other has, a row standing for lines hidden
+    // -- tinted, and marked on the ruler, as said. What a comparison's
+    // sides are made of, a fix's preview, a choice's pane.
     struct LineAnnotation
     {
         static constexpr S32 OWN_NUMBER = -1;
@@ -523,19 +521,29 @@ public:
         char                 sign       = 0;
         LLColor4             tint       = LLColor4::transparent;
         LLColor4             rulerTint  = LLColor4::transparent;
-        bool                 spacer     = false;
+        S32                  gap          = 0;
+        LLColor4             gapTint      = LLColor4::transparent;
+        LLColor4             gapRulerTint = LLColor4::transparent;
     };
-    // A line each, from the first; kept a line each as the text is edited,
-    // sliding with the lines, a line an edit makes or replaces saying
-    // nothing. Set after the text, which a new text clears.
+    // A line each, from the first, and where there is one more, what is
+    // said of the line one past the last: the gap below the text. Kept a
+    // line each as the text is edited, sliding with the lines, a line an
+    // edit makes or replaces saying nothing -- but for the rows above it,
+    // which stay above the first line an edit makes in their place. Set
+    // after the text, which a new text clears.
     void setLineAnnotations(std::vector<LineAnnotation> lines);
-    // What is said of a line: nothing, where nothing was.
+    // What is said of one line, or of the line one past the last.
+    void setLineAnnotation(S32 line, const LineAnnotation& said);
+    // What is said of a line, or of the one past the last: nothing, where
+    // nothing was.
     const LineAnnotation& lineAnnotation(S32 line) const;
     // Moves on whenever what is said of any line may have changed.
     U32                   annotationsRevision() const { return mAnnotationsRevision; }
     // Whether anything is said of the lines at all.
-    bool                  annotated() const { return !mAnnotations.empty(); }
-    bool                  spacerLine(S32 line) const { return lineAnnotation(line).spacer; }
+    bool                  annotated() const { return !mAnnotations.empty() || mAnyGap; }
+    // The line whose gap a y of the view is in, one past the last for the
+    // gap below the text; -1 where it is in none.
+    S32                   gapAtLocal(S32 y);
 
     // --- atoms ---------------------------------------------------------------
 
@@ -946,6 +954,9 @@ protected:
     // beside them.
     S32  screenTopOf(const LLRect& text, S32 line, S32 row);
     void forEachVisibleRow(const LLRect& text, const std::function<void(S32 line, S32 row, S32 screen_top)>& visit);
+    // Every gap on screen: the line it is above (one past the last for
+    // the gap below the text), its top on the screen and its height.
+    void forEachVisibleGap(const LLRect& text, const std::function<void(S32 line, S32 screen_top, S32 height)>& visit);
     // Every change goes through here: the document, the journal, the
     // caret, and whoever is listening.
     ALTextDocument::Edit edit(const ALTextRange& range, std::string_view text);
@@ -1177,6 +1188,9 @@ private:
     // of its stretches in fonts of their own.
     void provideSubstitutions(S32 line, std::vector<ALTextLayout::Substitution>& out) const;
     void provideRuns(S32 line, std::vector<ALTextLayout::Run>& out) const;
+    // The layout asks for the lines' gaps where some line has one, and
+    // not otherwise.
+    void provideGaps();
     // The first style that reaches a line, by the styles' order.
     std::vector<Style>::const_iterator firstStyleOn(S32 line) const;
     // A position inside what is shown as one thing, moved out to the side
@@ -1398,10 +1412,12 @@ private:
     ALAnchoredRanges<Atom, AtomRange>  mAtoms;
     ALAnchoredRanges<Style>            mStyles;
     ALLineTable<LineAnnotation>        mAnnotations;
+    // What is said of the line one past the last: the gap below the text.
+    LineAnnotation                     mEndAnnotation;
     U32                                mAnnotationsRevision = 0;
-    // Whether any line was said to be a spacer, so that a copy of a text
-    // with none of them is the text as it is.
-    bool                               mAnySpacer = false;
+    // Whether any line was said to have a gap: the layout asks for them
+    // only where one was.
+    bool                               mAnyGap = false;
     LLUIColor                          mLinkColor;
     link_signal_t                      mLinkClicked;
     drop_handler_t                     mDropHandler;

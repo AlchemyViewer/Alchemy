@@ -2431,25 +2431,119 @@ namespace tut
         lines[1].tint   = LLColor4(1.f, 0.f, 0.f, 0.5f);
         lines[2].sign   = '+';
         lines[3].number = 0;
-        lines[3].spacer = true;
+        lines[3].rulerTint = LLColor4(0.f, 1.f, 0.f, 1.f);
         lines[4].number = 9;
         U32 was = v.annotationsRevision();
         v.setLineAnnotations(lines);
         ensure("said", v.annotated() && v.annotationsRevision() != was);
-        ensure("each its own", v.lineAnnotation(1).tint.mV[VALPHA] > 0.f && v.lineAnnotation(2).sign == '+' && v.spacerLine(3) && v.lineAnnotation(4).number == 9);
+        ensure("each its own", v.lineAnnotation(1).tint.mV[VALPHA] > 0.f && v.lineAnnotation(2).sign == '+' && v.lineAnnotation(3).number == 0 &&
+                                   v.lineAnnotation(4).number == 9);
         ensure("nothing of a line unsaid, or past the text", v.lineAnnotation(0).number == Said::OWN_NUMBER && v.lineAnnotation(7).sign == 0);
-        ensure_equals("a copy leaves a spacer out", v.copiedText(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 4))), std::string("two\nfour"));
 
         was = v.annotationsRevision();
         v.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "new\n");
-        ensure("a line made above: they slide down", v.lineAnnotation(2).tint.mV[VALPHA] > 0.f && v.lineAnnotation(3).sign == '+' && v.spacerLine(4) &&
-                                                       v.lineAnnotation(5).number == 9);
+        ensure("a line made above: they slide down", v.lineAnnotation(2).tint.mV[VALPHA] > 0.f && v.lineAnnotation(3).sign == '+' &&
+                                                       v.lineAnnotation(4).rulerTint.mV[VALPHA] > 0.f && v.lineAnnotation(5).number == 9);
         ensure("the line made says nothing", v.lineAnnotation(0).number == Said::OWN_NUMBER && v.lineAnnotation(1).tint.mV[VALPHA] == 0.f);
         ensure("which moved them", v.annotationsRevision() != was);
         v.document().replace(ALTextRange(ALTextPos(3, 0), ALTextPos(3, 3)), "TWO");
-        ensure("a line typed over says nothing", v.lineAnnotation(3).sign == 0 && v.spacerLine(4));
+        ensure("a line typed over says nothing", v.lineAnnotation(3).sign == 0 && v.lineAnnotation(4).number == 0);
 
         v.setText("other");
-        ensure("a new text: nothing said", v.lineAnnotation(0).number == Said::OWN_NUMBER && !v.spacerLine(0) && v.lineAnnotation(0).tint.mV[VALPHA] == 0.f);
+        ensure("a new text: nothing said", !v.annotated() && v.lineAnnotation(0).number == Said::OWN_NUMBER && v.lineAnnotation(0).tint.mV[VALPHA] == 0.f);
+    }
+
+    template<> template<>
+    void altextview_object::test<79>()
+    {
+        set_test_name("a gap: rows of nothing above a line, and below the text, in its height and no part of the text; a point in one over the line below; the caret passes over it");
+        ALTextView& v = make("zero\none\ntwo\nthree");
+        typedef ALTextView::LineAnnotation Said;
+        ALTextLayout& layout = v.layout();
+        const S32     row_h  = layout.rowHeight();
+        const S32     plain  = layout.totalHeight();
+        std::vector<Said> lines(5);
+        lines[2].gap     = 2;
+        lines[2].gapTint = LLColor4(0.f, 0.f, 1.f, 0.5f);
+        lines[4].gap     = 1;
+        v.setLineAnnotations(lines);
+        ensure("as tall as its rows, above the line and below the text", layout.totalHeight() == plain + 3 * row_h);
+        ensure("the line's top its text's, under its gap", layout.lineTop(2) == 4 * row_h && layout.gapTop(2) == 2 * row_h);
+        ensure("its rows", layout.gapRows(2) == 2 && layout.gapRows(4) == 1 && layout.gapRows(1) == 0 && layout.gapHeight(2) == 2 * row_h);
+        ensure("the gap below the text", layout.gapTop(4) == 6 * row_h && layout.lineTop(4) == layout.totalHeight());
+        ensure("found by a y", layout.gapAtY(2 * row_h) == 2 && layout.gapAtY(4 * row_h - 1) == 2 && layout.gapAtY(4 * row_h) == -1 &&
+                                  layout.gapAtY(row_h) == -1 && layout.gapAtY(6 * row_h + 1) == 4);
+        ensure("a y in it over the line below", layout.lineAtY(3 * row_h) == 2 && layout.lineAtY(2 * row_h - 1) == 1);
+        ensure_equals("the text as it was", v.text(), std::string("zero\none\ntwo\nthree"));
+
+        const LLRect text = v.textRect();
+        const S32    y    = text.mTop - 3 * row_h;
+        ensure("a point of the view in it", v.gapAtLocal(y) == 2 && v.gapAtLocal(text.mTop - 1) == -1);
+        ensure("a press there on the line below", v.posAtLocal(text.mLeft + 2, y, false) == ALTextPos(2, 0));
+
+        v.setCaret(ALTextPos(1, 2));
+        v.perform(ALEditorCommand::MoveDown);
+        ensure("down over the gap to the line below", v.caret() == ALTextPos(2, 2));
+        v.perform(ALEditorCommand::MoveUp);
+        ensure("and back", v.caret() == ALTextPos(1, 2));
+        v.selectAll();
+        ensure_equals("a copy the text alone", v.selectedText(), std::string("zero\none\ntwo\nthree"));
+
+        // An edit: the gap stays above a line typed in, and above the first
+        // line made where lines were broken there.
+        v.document().replace(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), "x");
+        ensure("typed in: kept", layout.gapRows(2) == 2 && v.lineAnnotation(2).gapTint.mV[VALPHA] > 0.f);
+        v.document().replace(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), "made\n");
+        ensure("broken there: above the first line made", layout.gapRows(2) == 2 && layout.gapRows(3) == 0 && layout.lineTop(3) == 5 * row_h);
+        v.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "new\n");
+        ensure("a line made above: down with its line", layout.gapRows(3) == 2 && layout.gapRows(2) == 0);
+        ensure("the gap below the text kept", layout.gapRows(v.document().lineCount()) == 1);
+
+        // One line said again.
+        Said said = v.lineAnnotation(3);
+        said.gap  = 0;
+        v.setLineAnnotation(3, said);
+        ensure("one line's gap let go", layout.gapRows(3) == 0 && layout.totalHeight() == (v.document().lineCount() + 1) * row_h);
+        v.setText("other");
+        ensure("a new text: no gaps", layout.gapRows(0) == 0 && layout.gapRows(1) == 0 && layout.totalHeight() == row_h);
+    }
+
+    template<> template<>
+    void altextview_object::test<80>()
+    {
+        set_test_name("scrolled up to a line, its gap comes into sight with it where there is room; and a view kept on its line as gaps above it change");
+        std::string many;
+        for (S32 n = 0; n < 60; ++n)
+        {
+            many += (n ? "\n" : "") + std::string("line ") + std::to_string(n);
+        }
+        ALTextView& v = make(many.c_str());
+        typedef ALTextView::LineAnnotation Said;
+        ALTextLayout&     layout = v.layout();
+        const S32         row_h  = layout.rowHeight();
+        std::vector<Said> lines(60);
+        lines[30].gap = 3;
+        v.setLineAnnotations(lines);
+        v.setScrollY(layout.lineTop(40));
+        v.setCaret(ALTextPos(31, 0));
+        v.scrollToCaret();
+        ensure_equals("a line without a gap: to its top", v.scrollY(), layout.lineTop(31));
+        v.setCaret(ALTextPos(30, 0));
+        v.scrollToCaret();
+        ensure_equals("a line with one: to the gap's top", v.scrollY(), layout.gapTop(30));
+        v.setScrollY(layout.lineTop(29));
+        v.setCaret(ALTextPos(30, 0));
+        v.scrollToCaret();
+        ensure_equals("in sight already: left where it is", v.scrollY(), layout.lineTop(29));
+
+        v.setScrollY(layout.lineTop(45));
+        const S32 top = v.firstVisibleLine();
+        Said      said;
+        said.gap = 5;
+        v.setLineAnnotation(10, said);
+        // What a frame does first: the view put back on its line.
+        v.setScrollX(v.scrollX());
+        ensure("rows above it: the view still on its line", v.firstVisibleLine() == top && v.scrollY() == layout.lineTop(45));
+        ensure_equals("which is further down, past both gaps", layout.lineTop(45), (45 + 3 + 5) * row_h);
     }
 }
