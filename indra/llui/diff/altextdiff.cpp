@@ -530,7 +530,6 @@ namespace
     }
 }
 
-// static
 std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like)
 {
     std::string out;
@@ -553,52 +552,154 @@ std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like)
     return out;
 }
 
-std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right)
+namespace
 {
-    return lines(left, right, Likeness());
-}
-
-std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Likeness& like)
-{
-    // Each line as compared, kept while its id is.
-    std::vector<std::string> keys;
-    if (like.any())
+    // As lines(), without anchors.
+    std::vector<Run> plainLines(const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Likeness& like)
     {
-        keys.reserve(left.size() + right.size());
-        for (const std::string& line : left)
+        // Each line as compared, kept while its id is.
+        std::vector<std::string> keys;
+        if (like.any())
         {
-            keys.push_back(likenessOf(line, like));
+            keys.reserve(left.size() + right.size());
+            for (const std::string& line : left)
+            {
+                keys.push_back(ALTextDiff::likenessOf(line, like));
+            }
+            for (const std::string& line : right)
+            {
+                keys.push_back(ALTextDiff::likenessOf(line, like));
+            }
         }
-        for (const std::string& line : right)
+        Interned         ids;
+        std::vector<S32> a;
+        std::vector<S32> b;
+        a.reserve(left.size());
+        b.reserve(right.size());
+        for (size_t i = 0; i < left.size(); ++i)
         {
-            keys.push_back(likenessOf(line, like));
+            a.push_back(ids.idOf(like.any() ? keys[i] : left[i]));
         }
+        for (size_t i = 0; i < right.size(); ++i)
+        {
+            b.push_back(ids.idOf(like.any() ? keys[left.size() + i] : right[i]));
+        }
+        std::vector<Run> out = runs(a, b, true);
+        slide(out, a, b, left, right);
+        return out;
     }
-    Interned         ids;
-    std::vector<S32> a;
-    std::vector<S32> b;
-    a.reserve(left.size());
-    b.reserve(right.size());
-    for (size_t i = 0; i < left.size(); ++i)
+
+    // As lines(), lined up at anchors.
+    std::vector<Run> anchoredLines(const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::anchors_t& anchors,
+                                   const ALTextDiff::Likeness& like)
     {
-        a.push_back(ids.idOf(like.any() ? keys[i] : left[i]));
+        // The pairs kept: within both texts, by the right then the left the
+        // other way, so that of two on one line of the right the longest
+        // rising run takes one at most; then that run, rising on the left.
+        ALTextDiff::anchors_t given;
+        for (const std::pair<S32, S32>& pair : anchors)
+        {
+            if (pair.first >= 0 && pair.second >= 0 && pair.first < static_cast<S32>(left.size()) && pair.second < static_cast<S32>(right.size()))
+            {
+                given.push_back(pair);
+            }
+        }
+        std::sort(given.begin(), given.end(), [](const std::pair<S32, S32>& a, const std::pair<S32, S32>& b) {
+            return a.second != b.second ? a.second < b.second : a.first > b.first;
+        });
+        std::vector<size_t> tails;  // the pair ending the best run of each length
+        std::vector<size_t> before(given.size(), std::numeric_limits<size_t>::max());
+        for (size_t i = 0; i < given.size(); ++i)
+        {
+            const auto at = std::lower_bound(tails.begin(), tails.end(), given[i].first,
+                                             [&given](size_t tail, S32 first) { return given[tail].first < first; });
+            if (at != tails.begin())
+            {
+                before[i] = *(at - 1);
+            }
+            if (at == tails.end())
+            {
+                tails.push_back(i);
+            }
+            else
+            {
+                *at = i;
+            }
+        }
+        ALTextDiff::anchors_t kept;
+        for (size_t i = tails.empty() ? std::numeric_limits<size_t>::max() : tails.back(); i != std::numeric_limits<size_t>::max(); i = before[i])
+        {
+            kept.push_back(given[i]);
+        }
+        std::reverse(kept.begin(), kept.end());
+
+        std::vector<Run> out;
+        const auto push = [&out](const Run& run) {
+            if (run.count <= 0 && run.kind != Kind::Same)
+            {
+                return;
+            }
+            if (run.count > 0 && !out.empty() && out.back().kind == run.kind && out.back().count > 0)
+            {
+                Run&       last = out.back();
+                const bool next = run.kind == Kind::Same      ? last.left + last.count == run.left && last.right + last.count == run.right
+                                  : run.kind == Kind::Removed ? last.left + last.count == run.left && last.right == run.right
+                                                              : last.right + last.count == run.right && last.left == run.left;
+                if (next)
+                {
+                    last.count += run.count;
+                    return;
+                }
+            }
+            out.push_back(run);
+        };
+        S32 l = 0;
+        S32 r = 0;
+        for (size_t i = 0; i <= kept.size(); ++i)
+        {
+            const S32 to_left  = i < kept.size() ? kept[i].first : static_cast<S32>(left.size());
+            const S32 to_right = i < kept.size() ? kept[i].second : static_cast<S32>(right.size());
+            // The stretch before the pair, on its own.
+            const std::vector<std::string> some_left(left.begin() + l, left.begin() + to_left);
+            const std::vector<std::string> some_right(right.begin() + r, right.begin() + to_right);
+            for (Run run : plainLines(some_left, some_right, like))
+            {
+                run.left += l;
+                run.right += r;
+                push(run);
+            }
+            if (i == kept.size())
+            {
+                break;
+            }
+            if (like.any() ? ALTextDiff::likenessOf(left[static_cast<size_t>(to_left)], like) == ALTextDiff::likenessOf(right[static_cast<size_t>(to_right)], like)
+                           : left[static_cast<size_t>(to_left)] == right[static_cast<size_t>(to_right)])
+            {
+                push(Run{ Kind::Same, to_left, to_right, 1 });
+            }
+            else
+            {
+                // Parted from a change just before, so that the pair stands
+                // first in its own.
+                if (!out.empty() && out.back().kind != Kind::Same)
+                {
+                    out.push_back(Run{ Kind::Same, to_left, to_right, 0 });
+                }
+                push(Run{ Kind::Removed, to_left, to_right, 1 });
+                push(Run{ Kind::Added, to_left + 1, to_right, 1 });
+            }
+            l = to_left + 1;
+            r = to_right + 1;
+        }
+        return out;
     }
-    for (size_t i = 0; i < right.size(); ++i)
-    {
-        b.push_back(ids.idOf(like.any() ? keys[left.size() + i] : right[i]));
-    }
-    std::vector<Run> out = runs(a, b, true);
-    slide(out, a, b, left, right);
-    return out;
 }
 
-// static
-std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const anchors_t& anchors)
+std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options)
 {
-    return lines(left, right, anchors, Likeness());
+    return options.anchors.empty() ? plainLines(left, right, options.like) : anchoredLines(left, right, options.anchors, options.like);
 }
 
-// static
 ALTextDiff::anchors_t ALTextDiff::anchorsOf(const ranges_t& ranges)
 {
     // By their first lines on the left, the widest first: those open as
@@ -646,111 +747,6 @@ ALTextDiff::anchors_t ALTextDiff::anchorsOf(const ranges_t& ranges)
     return out;
 }
 
-std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const anchors_t& anchors,
-                                               const Likeness& like)
-{
-    // The pairs kept: within both texts, by the right then the left the
-    // other way, so that of two on one line of the right the longest
-    // rising run takes one at most; then that run, rising on the left.
-    anchors_t given;
-    for (const std::pair<S32, S32>& pair : anchors)
-    {
-        if (pair.first >= 0 && pair.second >= 0 && pair.first < static_cast<S32>(left.size()) && pair.second < static_cast<S32>(right.size()))
-        {
-            given.push_back(pair);
-        }
-    }
-    std::sort(given.begin(), given.end(), [](const std::pair<S32, S32>& a, const std::pair<S32, S32>& b) {
-        return a.second != b.second ? a.second < b.second : a.first > b.first;
-    });
-    std::vector<size_t> tails;  // the pair ending the best run of each length
-    std::vector<size_t> before(given.size(), std::numeric_limits<size_t>::max());
-    for (size_t i = 0; i < given.size(); ++i)
-    {
-        const auto at = std::lower_bound(tails.begin(), tails.end(), given[i].first,
-                                         [&given](size_t tail, S32 first) { return given[tail].first < first; });
-        if (at != tails.begin())
-        {
-            before[i] = *(at - 1);
-        }
-        if (at == tails.end())
-        {
-            tails.push_back(i);
-        }
-        else
-        {
-            *at = i;
-        }
-    }
-    anchors_t kept;
-    for (size_t i = tails.empty() ? std::numeric_limits<size_t>::max() : tails.back(); i != std::numeric_limits<size_t>::max(); i = before[i])
-    {
-        kept.push_back(given[i]);
-    }
-    std::reverse(kept.begin(), kept.end());
-
-    std::vector<Run> out;
-    const auto push = [&out](const Run& run) {
-        if (run.count <= 0 && run.kind != Kind::Same)
-        {
-            return;
-        }
-        if (run.count > 0 && !out.empty() && out.back().kind == run.kind && out.back().count > 0)
-        {
-            Run&       last = out.back();
-            const bool next = run.kind == Kind::Same      ? last.left + last.count == run.left && last.right + last.count == run.right
-                              : run.kind == Kind::Removed ? last.left + last.count == run.left && last.right == run.right
-                                                          : last.right + last.count == run.right && last.left == run.left;
-            if (next)
-            {
-                last.count += run.count;
-                return;
-            }
-        }
-        out.push_back(run);
-    };
-    S32 l = 0;
-    S32 r = 0;
-    for (size_t i = 0; i <= kept.size(); ++i)
-    {
-        const S32 to_left  = i < kept.size() ? kept[i].first : static_cast<S32>(left.size());
-        const S32 to_right = i < kept.size() ? kept[i].second : static_cast<S32>(right.size());
-        // The stretch before the pair, on its own.
-        const std::vector<std::string> some_left(left.begin() + l, left.begin() + to_left);
-        const std::vector<std::string> some_right(right.begin() + r, right.begin() + to_right);
-        for (Run run : lines(some_left, some_right, like))
-        {
-            run.left += l;
-            run.right += r;
-            push(run);
-        }
-        if (i == kept.size())
-        {
-            break;
-        }
-        if (like.any() ? likenessOf(left[static_cast<size_t>(to_left)], like) == likenessOf(right[static_cast<size_t>(to_right)], like)
-                       : left[static_cast<size_t>(to_left)] == right[static_cast<size_t>(to_right)])
-        {
-            push(Run{ Kind::Same, to_left, to_right, 1 });
-        }
-        else
-        {
-            // Parted from a change just before, so that the pair stands
-            // first in its own.
-            if (!out.empty() && out.back().kind != Kind::Same)
-            {
-                out.push_back(Run{ Kind::Same, to_left, to_right, 0 });
-            }
-            push(Run{ Kind::Removed, to_left, to_right, 1 });
-            push(Run{ Kind::Added, to_left + 1, to_right, 1 });
-        }
-        l = to_left + 1;
-        r = to_right + 1;
-    }
-    return out;
-}
-
-// static
 std::vector<std::string> ALTextDiff::split(std::string_view text)
 {
     std::vector<std::string> out;
@@ -772,14 +768,9 @@ std::vector<std::string> ALTextDiff::split(std::string_view text)
     }
 }
 
-// static
-void ALTextDiff::words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out)
+void ALTextDiff::words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out, const Options& options)
 {
-    words(left, right, left_out, right_out, Likeness());
-}
-
-void ALTextDiff::words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out, const Likeness& like)
-{
+    const Likeness& like = options.like;
     left_out.clear();
     right_out.clear();
     // Each side's words as compared: blanks, where they are let go of, none.

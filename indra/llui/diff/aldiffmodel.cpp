@@ -129,7 +129,7 @@ void ALDiffModel::setSwapped(bool swapped)
 
 void ALDiffModel::setLikeness(const ALTextDiff::Likeness& like)
 {
-    mLike = like;
+    mOptions.like = like;
     build();
 }
 
@@ -181,7 +181,9 @@ void ALDiffModel::build(const std::vector<bool>& open)
             std::swap(from, to);
         }
     }
-    const std::vector<ALTextDiff::Run> runs = anchors.empty() ? ALTextDiff::lines(left, right, mLike) : ALTextDiff::lines(left, right, anchors, mLike);
+    ALTextDiff::Options options = mOptions;
+    options.anchors             = std::move(anchors);
+    const std::vector<ALTextDiff::Run> runs = ALTextDiff::lines(left, right, options);
     for (ColumnData& c : mColumns)
     {
         c = ColumnData();
@@ -305,7 +307,7 @@ void ALDiffModel::build(const std::vector<bool>& open)
             if (has_out && has_in)
             {
                 auto& [lspans, rspans] = paired.emplace_back();
-                ALTextDiff::words(left[static_cast<size_t>(gone[n])], right[static_cast<size_t>(made[n])], lspans, rspans, mLike);
+                ALTextDiff::words(left[static_cast<size_t>(gone[n])], right[static_cast<size_t>(made[n])], lspans, rspans, mOptions);
                 of(Column::Left).lines.back().words  = lspans;
                 of(Column::Right).lines.back().words = rspans;
             }

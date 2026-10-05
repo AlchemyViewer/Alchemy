@@ -79,6 +79,16 @@ namespace tut
             return changed;
         }
 
+        // Options lined up at anchors, or telling lines the same as `like` has it.
+        static ALTextDiff::Options at(const ALTextDiff::anchors_t& anchors, const ALTextDiff::Likeness& like = ALTextDiff::Likeness())
+        {
+            ALTextDiff::Options options;
+            options.anchors = anchors;
+            options.like    = like;
+            return options;
+        }
+        static ALTextDiff::Options as(const ALTextDiff::Likeness& like) { return at({}, like); }
+
         static std::vector<std::string> numbered(S32 count, const char* prefix = "line ")
         {
             std::vector<std::string> out;
@@ -184,7 +194,7 @@ namespace tut
         const std::vector<std::string> slua = { "-- header", "", "ll.Say(0, \"hi\")", "" };
         // state_entry's call to its call; the blank before the end.
         const ALTextDiff::anchors_t anchors = { { 4, 2 }, { 6, 3 } };
-        const std::vector<Run>      runs    = ALTextDiff::lines(lsl, slua, anchors);
+        const std::vector<Run>      runs    = ALTextDiff::lines(lsl, slua, at(anchors));
         walk(lsl, slua, runs, true);
         // The call stands first in its change, beside its own.
         bool paired = false;
@@ -199,15 +209,15 @@ namespace tut
         ensure("the blank the same", std::find(runs.begin(), runs.end(), Run{ Kind::Same, 6, 3, 1 }) != runs.end());
 
         // Out of order, or outside a text: dropped, the rest kept.
-        const std::vector<Run> crossed = ALTextDiff::lines(lsl, slua, { { 4, 2 }, { 1, 3 }, { 40, 1 }, { 6, 3 } });
+        const std::vector<Run> crossed = ALTextDiff::lines(lsl, slua, at({ { 4, 2 }, { 1, 3 }, { 40, 1 }, { 6, 3 } }));
         ensure("only the pairs that rise on both sides", crossed == runs);
 
         // No anchors: as lines() says.
         const std::vector<std::string> was = { "a", "b", "c" };
         const std::vector<std::string> now = { "a", "x", "c" };
-        ensure("none, as before", ALTextDiff::lines(was, now, ALTextDiff::anchors_t{}) == ALTextDiff::lines(was, now));
+        ensure("none, as before", ALTextDiff::lines(was, now, at({})) == ALTextDiff::lines(was, now));
         // The same lines anchored: as without, joined into one run.
-        ensure("same pairs join", ALTextDiff::lines(was, was, { { 0, 0 }, { 2, 2 } }) == std::vector<Run>{ Run{ Kind::Same, 0, 0, 3 } });
+        ensure("same pairs join", ALTextDiff::lines(was, was, at({ { 0, 0 }, { 2, 2 } })) == std::vector<Run>{ Run{ Kind::Same, 0, 0, 3 } });
     }
 
     template<> template<>
@@ -328,7 +338,7 @@ namespace tut
             {
                 anchors.emplace_back(static_cast<S32>(random() % left.size()), static_cast<S32>(random() % right.size()));
             }
-            walk(left, right, ALTextDiff::lines(left, right, anchors), true);
+            walk(left, right, ALTextDiff::lines(left, right, at(anchors)), true);
         }
     }
 
@@ -388,18 +398,18 @@ namespace tut
         const std::vector<std::string> was = { "integer x;", "if (a) {", "a b", "end" };
         const std::vector<std::string> now = { "    integer x;  ", "if (a)\t  {", "ab", "end" };
         ensure_equals("as they are: three changed", walk(was, now, ALTextDiff::lines(was, now)), 6);
-        std::vector<Run> runs = ALTextDiff::lines(was, now, blanks);
+        std::vector<Run> runs = ALTextDiff::lines(was, now, as(blanks));
         ensure_equals("re-indented and re-spaced the same; a blank gone altogether not", walk(was, now, runs, false, blanks), 2);
         ensure("the one changed the third: out and in", runs.size() == 4 && runs[1].kind == Kind::Removed && runs[1].left == 2 && runs[2].kind == Kind::Added);
 
         ALTextDiff::Likeness cased;
         cased.ignoreCase = true;
-        ensure_equals("case let go of", walk({ "Hello World" }, { "hello world" }, ALTextDiff::lines({ "Hello World" }, { "hello world" }, cased), false, cased), 0);
-        ensure_equals("but not blanks", walk({ "Hello World" }, { "hello  world" }, ALTextDiff::lines({ "Hello World" }, { "hello  world" }, cased), false, cased), 2);
+        ensure_equals("case let go of", walk({ "Hello World" }, { "hello world" }, ALTextDiff::lines({ "Hello World" }, { "hello world" }, as(cased)), false, cased), 0);
+        ensure_equals("but not blanks", walk({ "Hello World" }, { "hello  world" }, ALTextDiff::lines({ "Hello World" }, { "hello  world" }, as(cased)), false, cased), 2);
 
         const std::vector<std::string> lsl  = { "default", "{", "        llSay(0, x);", "}" };
         const std::vector<std::string> slua = { "-- a", "llSay(0,  x);" };
-        runs = ALTextDiff::lines(lsl, slua, { { 2, 1 } }, blanks);
+        runs = ALTextDiff::lines(lsl, slua, at({ { 2, 1 } }, blanks));
         walk(lsl, slua, runs, true, blanks);
         bool same = false;
         for (const Run& run : runs)
@@ -411,9 +421,9 @@ namespace tut
         ALTextDiff::spans_t left, right;
         ALTextDiff::words("x  =  1;", "x = 2;", left, right);
         ensure("as they are: the blanks marked too", left.size() == 2 && left[0] == std::make_pair(1, 3));
-        ALTextDiff::words("x  =  1;", "x = 2;", left, right, blanks);
+        ALTextDiff::words("x  =  1;", "x = 2;", left, right, as(blanks));
         ensure("blanks let go of: the number alone", left.size() == 1 && left[0] == std::make_pair(6, 7) && right.size() == 1 && right[0] == std::make_pair(4, 5));
-        ALTextDiff::words("Say(X)", "say(x)", left, right, ALTextDiff::Likeness{ false, true });
+        ALTextDiff::words("Say(X)", "say(x)", left, right, as(ALTextDiff::Likeness{ false, true }));
         ensure("case let go of: nothing", left.empty() && right.empty());
     }
 

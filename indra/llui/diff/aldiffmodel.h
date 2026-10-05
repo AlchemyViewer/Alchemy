@@ -141,7 +141,10 @@ public:
     const std::string&           leftText() const { return mLeftText; }
     const std::string&           rightText() const { return mRightText; }
     const ALTextDiff::ranges_t&  ranges() const { return mRanges; }
-    const ALTextDiff::Likeness&  likeness() const { return mLike; }
+    const ALTextDiff::Likeness&  likeness() const { return mOptions.like; }
+    // How the texts are compared, but for the anchors, which are the
+    // ranges'.
+    const ALTextDiff::Options&   options() const { return mOptions; }
     bool                         swapped() const { return mSwapped; }
 
     // --- a column's lines --------------------------------------------------
@@ -291,7 +294,7 @@ private:
     std::string           mRightText;
     ALTextDiff::ranges_t  mRanges;
     std::vector<bool>     mBracketed;
-    ALTextDiff::Likeness  mLike;
+    ALTextDiff::Options   mOptions;
     bool                  mSwapped  = false;
     bool                  mFoldSame = true;
     ColumnData            mColumns[3];
