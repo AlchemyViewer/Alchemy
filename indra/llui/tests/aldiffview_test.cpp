@@ -868,4 +868,54 @@ namespace tut
         d.setTexts(lsl, slua);
         ensure("let go of with new texts", d.left()->noteAt(4).empty());
     }
+
+    template<> template<>
+    void aldiffview_object::test<27>()
+    {
+        set_test_name("vim over a side, typed as the window types: / searches it, Return entering it, and nothing goes to the source; nor ? or :; from either side or inline");
+        ALDiffView& d = make("one\ntwo\nthree\nfour\nfive", "one\n2\nthree\nfour\nfive\nsix");
+        S32 edits = 0;
+        d.setOnEdit([&edits](S32, S32) -> LLView* {
+            ++edits;
+            return nullptr;
+        });
+        // Each side vim's, as the studio gives them.
+        for (ALCodeEditor* side : { d.left(), d.right(), d.inlined() })
+        {
+            side->setModalKeymap(std::make_unique<ALVimKeymap>());
+        }
+        d.right()->setFocus(true);
+        // As the window types: the key, and its character whether or not
+        // the key was taken -- Return as its key alone -- each from the view
+        // with the keyboard, up to the comparison where it is not taken.
+        const auto typed = [&d](const char* keys) {
+            for (const char* c = keys; *c; ++c)
+            {
+                LLView* in = dynamic_cast<LLView*>(gFocusMgr.getKeyboardFocus());
+                ensure("the keyboard in the comparison", in && (in == &d || d.hasChild(in->getName(), true)));
+                if (*c == '\n')
+                {
+                    in->handleKey(KEY_RETURN, MASK_NONE, false);
+                    continue;
+                }
+                in->handleKey(static_cast<KEY>(toupper(static_cast<unsigned char>(*c))), MASK_NONE, false);
+                in->handleUnicodeChar(static_cast<llwchar>(static_cast<unsigned char>(*c)), false);
+            }
+        };
+        typed("/fiv\n");
+        ensure_equals("found", d.right()->caret().line, 4);
+        ensure_equals("nothing handed to the source", edits, 0);
+        ensure("still the comparison's side, with the keyboard", d.right()->hasFocus() && d.right()->getVisible());
+        typed("?thr\n");
+        ensure_equals("back", d.right()->caret().line, 2);
+        typed(":3\n");
+        ensure("a : line too", d.right()->caret().line == 2 && edits == 0);
+        d.left()->setFocus(true);
+        typed("/fou\n");
+        ensure("from the left", d.left()->caret().line == 3 && edits == 0);
+        d.setInline(true);
+        d.inlined()->setFocus(true);
+        typed("/six\n");
+        ensure("inline", d.inlined()->caret().line == d.inlined()->document().lineCount() - 1 && edits == 0);
+    }
 }
