@@ -134,9 +134,10 @@ public:
     // as foldsSame() says.
     void setTexts(std::string_view left, std::string_view right, const ALTextDiff::ranges_t& ranges = {});
     // The right made anew -- the text it is of, changed -- and compared
-    // again: the ranges carried to where their lines of the right went,
-    // changed or not, and the runs as open as they were, by the first line
-    // of the right each hides. Where each of its lines went.
+    // again, only where it changed (ALDiffSplice) where that is enough: the
+    // ranges carried to where their lines of the right went, changed or
+    // not, and the runs as open as they were, by the first line of the
+    // right each hides. Where each of its lines went.
     LineMap setRightText(std::string_view right);
     // Swapped or not: the runs as open as they were.
     void    setSwapped(bool swapped);
@@ -318,9 +319,14 @@ private:
     S32               add(Column column, const std::string& text, S32 number, Kind kind, char sign = 0);
     S32               pad(Column column);
     S32               none(Column column);
-    // Made again from the texts; the runs as open as given, where there
-    // are as many as there were.
+    // Compared again and made again from the texts; the runs as open as
+    // given, where there are as many as there were. And made again from
+    // the runs as they are.
     void              build(const std::vector<bool>& open = {});
+    void              layout(const std::vector<bool>& open = {});
+    // The options the texts as shown are compared by: the ranges' anchors,
+    // swapped where the texts are.
+    ALTextDiff::Options shownOptions() const;
     // Which ranges are bracketed, worked out as each layout is made.
     void              findBracketed();
 
@@ -333,7 +339,12 @@ private:
     bool                  mFoldSame = true;
     ColumnData            mColumns[3];
     // Each row's line of the right's text, side by side and inline.
-    std::vector<S32>      mRightLines[2];
+    std::vector<S32>      mRightRows[2];
+    // Each text's lines, and the runs the texts as shown were last found
+    // to have: what a right made anew is compared again from.
+    std::vector<std::string>     mLeftLines;
+    std::vector<std::string>     mRightLines;
+    std::vector<ALTextDiff::Run> mRuns;
     std::vector<Change>   mChanges;
     std::vector<Move>     mMoves;
     std::vector<Fold>     mFolds;

@@ -27,6 +27,7 @@
 #include "aldiffmodel.h"
 
 #include "aldiffsame.h"
+#include "aldiffsplice.h"
 #include "allinepairs.h"
 
 #include <algorithm>
@@ -50,34 +51,62 @@ bool ALDiffModel::LineMap::kept(S32 was) const
 // --- what is compared ---------------------------------------------------------
 
 ALDiffModel::ALDiffModel()
+:   mLeftLines(ALTextDiff::split("")),
+    mRightLines(ALTextDiff::split(""))
 {
     build();
 }
 
 void ALDiffModel::setTexts(std::string_view left, std::string_view right, const ALTextDiff::ranges_t& ranges)
 {
-    mLeftText  = std::string(left);
-    mRightText = std::string(right);
-    mRanges    = ranges;
+    mLeftText   = std::string(left);
+    mRightText  = std::string(right);
+    mLeftLines  = ALTextDiff::split(mLeftText);
+    mRightLines = ALTextDiff::split(mRightText);
+    mRanges     = ranges;
     build();
 }
 
 ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
 {
     // Each line of the right as it was, where it now is; and which are
-    // still there as they were.
-    const std::vector<std::string> was = ALTextDiff::split(mRightText);
-    const std::vector<std::string> now = ALTextDiff::split(right);
-    LineMap                        map;
+    // still there as they were: the lines before the first changed and
+    // after the last as they were, those between compared.
+    std::vector<std::string>        now = ALTextDiff::split(right);
+    const std::vector<std::string>& was = mRightLines;
+    LineMap                         map;
     map.to.assign(was.size() + 1, static_cast<S32>(now.size()));
     map.same.assign(was.size(), false);
-    map.last = llmax(0, static_cast<S32>(now.size()) - 1);
-    for (const ALTextDiff::Run& run : ALTextDiff::lines(was, now))
+    map.last          = llmax(0, static_cast<S32>(now.size()) - 1);
+    const size_t most = std::min(was.size(), now.size());
+    size_t       head = 0;
+    while (head < most && was[head] == now[head])
+    {
+        ++head;
+    }
+    size_t tail = 0;
+    while (tail < most - head && was[was.size() - 1 - tail] == now[now.size() - 1 - tail])
+    {
+        ++tail;
+    }
+    for (size_t line = 0; line < head; ++line)
+    {
+        map.to[line]   = static_cast<S32>(line);
+        map.same[line] = true;
+    }
+    for (size_t n = 0; n < tail; ++n)
+    {
+        map.to[was.size() - tail + n]   = static_cast<S32>(now.size() - tail + n);
+        map.same[was.size() - tail + n] = true;
+    }
+    const std::vector<std::string> some_was(was.begin() + static_cast<std::ptrdiff_t>(head), was.end() - static_cast<std::ptrdiff_t>(tail));
+    const std::vector<std::string> some_now(now.begin() + static_cast<std::ptrdiff_t>(head), now.end() - static_cast<std::ptrdiff_t>(tail));
+    for (const ALTextDiff::Run& run : ALTextDiff::lines(some_was, some_now))
     {
         for (S32 n = 0; n < run.count && run.kind != Kind::Added; ++n)
         {
-            const size_t line = static_cast<size_t>(run.left + n);
-            map.to[line]      = run.kind == Kind::Same ? run.right + n : run.right;
+            const size_t line = head + static_cast<size_t>(run.left + n);
+            map.to[line]      = static_cast<S32>(head) + (run.kind == Kind::Same ? run.right + n : run.right);
             map.same[line]    = run.kind == Kind::Same;
         }
     }
@@ -96,7 +125,7 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
     }
     // The runs open, by the first line of the right each hides.
     std::vector<S32>        opened;
-    const std::vector<S32>& rows = mRightLines[index(Layout::Sides)];
+    const std::vector<S32>& rows = mRightRows[index(Layout::Sides)];
     for (const Fold& fold : mFolds)
     {
         const S32 first = fold.first[index(Layout::Sides)];
@@ -105,10 +134,23 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
             opened.push_back(map.line(rows[static_cast<size_t>(first)]));
         }
     }
-    mRightText = std::string(right);
-    mRanges    = std::move(ranges);
-    build();
-    const std::vector<S32>& now_rows = mRightLines[index(Layout::Sides)];
+    // Compared again where it changed (ALDiffSplice), else all of it.
+    std::vector<std::string> before = std::move(mRightLines);
+    mRightText                      = std::string(right);
+    mRightLines                     = std::move(now);
+    mRanges                         = std::move(ranges);
+    const ALTextDiff::Options options = shownOptions();
+    const bool spliced = mSwapped ? ALDiffSplice::splice(mRuns, before, mRightLines, mLeftLines, mLeftLines, options)
+                                  : ALDiffSplice::splice(mRuns, mLeftLines, mLeftLines, before, mRightLines, options);
+    if (spliced)
+    {
+        layout();
+    }
+    else
+    {
+        build();
+    }
+    const std::vector<S32>& now_rows = mRightRows[index(Layout::Sides)];
     for (Fold& fold : mFolds)
     {
         const S32 first = fold.first[index(Layout::Sides)];
@@ -191,23 +233,36 @@ S32 ALDiffModel::none(Column column)
     return static_cast<S32>(c.lineOf.size()) - 1;
 }
 
-void ALDiffModel::build(const std::vector<bool>& open)
+ALTextDiff::Options ALDiffModel::shownOptions() const
 {
-    // What is shown on the left and on the right: the texts as given, or
-    // swapped, and the pairs that line them up with them.
-    const std::vector<std::string> left  = ALTextDiff::split(mSwapped ? mRightText : mLeftText);
-    const std::vector<std::string> right = ALTextDiff::split(mSwapped ? mLeftText : mRightText);
-    ALTextDiff::anchors_t          anchors = ALTextDiff::anchorsOf(mRanges);
+    // The pairs that line the texts up, as they are shown: the ranges'
+    // anchors, swapped where the texts are.
+    ALTextDiff::Options options = mOptions;
+    options.anchors             = ALTextDiff::anchorsOf(mRanges);
     if (mSwapped)
     {
-        for (auto& [from, to] : anchors)
+        for (auto& [from, to] : options.anchors)
         {
             std::swap(from, to);
         }
     }
-    ALTextDiff::Options options = mOptions;
-    options.anchors             = std::move(anchors);
-    const std::vector<ALTextDiff::Run> runs = ALTextDiff::lines(left, right, options);
+    return options;
+}
+
+void ALDiffModel::build(const std::vector<bool>& open)
+{
+    mRuns = ALTextDiff::lines(mSwapped ? mRightLines : mLeftLines, mSwapped ? mLeftLines : mRightLines, shownOptions());
+    layout(open);
+}
+
+void ALDiffModel::layout(const std::vector<bool>& open)
+{
+    // What is shown on the left and on the right: the texts as given, or
+    // swapped, and their runs.
+    const std::vector<std::string>&     left    = mSwapped ? mRightLines : mLeftLines;
+    const std::vector<std::string>&     right   = mSwapped ? mLeftLines : mRightLines;
+    const std::vector<ALTextDiff::Run>& runs    = mRuns;
+    const ALTextDiff::Options           options = shownOptions();
     // Each text's lines' regions, where a grammar cuts their words.
     const std::vector<ALTextDiff::regions_t>* left_regions  = nullptr;
     const std::vector<ALTextDiff::regions_t>* right_regions = nullptr;
@@ -568,8 +623,8 @@ void ALDiffModel::build(const std::vector<bool>& open)
     }
     // The right's lines by row: side by side, the column showing it;
     // inline, the right's as shown, or swapped the left's.
-    mRightLines[index(Layout::Sides)] = of(rightColumn()).lineOf;
-    mRightLines[index(Layout::Inline)] = mSwapped ? inline_left : inline_right;
+    mRightRows[index(Layout::Sides)] = of(rightColumn()).lineOf;
+    mRightRows[index(Layout::Inline)] = mSwapped ? inline_left : inline_right;
     if (open.size() == folds.size())
     {
         for (size_t n = 0; n < folds.size(); ++n)
@@ -640,20 +695,20 @@ bool ALDiffModel::rowDrawn(Layout layout, S32 row) const
 
 S32 ALDiffModel::rightLineOfRow(Layout layout, S32 row) const
 {
-    const std::vector<S32>& rows = mRightLines[index(layout)];
+    const std::vector<S32>& rows = mRightRows[index(layout)];
     return row >= 0 && row < static_cast<S32>(rows.size()) ? rows[static_cast<size_t>(row)] : -1;
 }
 
 S32 ALDiffModel::rowOfRightLine(Layout layout, S32 line) const
 {
-    const std::vector<S32>& rows = mRightLines[index(layout)];
+    const std::vector<S32>& rows = mRightRows[index(layout)];
     const auto              at   = std::find(rows.begin(), rows.end(), line);
     return line >= 0 && at != rows.end() ? static_cast<S32>(at - rows.begin()) : -1;
 }
 
 std::pair<S32, S32> ALDiffModel::rightAt(Column column, S32 line, S32 at_column) const
 {
-    const std::vector<S32>& rows = mRightLines[index(layoutOf(column))];
+    const std::vector<S32>& rows = mRightRows[index(layoutOf(column))];
     if (rows.empty())
     {
         return { 0, 0 };
@@ -782,9 +837,9 @@ bool ALDiffModel::takeBack(S32 change, ALTextRange& range, std::string& text, st
     // line's break with the lines taken out or put in, at the text's end
     // the one before them.
     const ChangeLines&             c     = mChanges[static_cast<size_t>(change)].lines;
-    const std::vector<std::string> left  = ALTextDiff::split(mLeftText);
-    const std::vector<std::string> right = ALTextDiff::split(mRightText);
-    std::string                    lines;
+    const std::vector<std::string>& left  = mLeftLines;
+    const std::vector<std::string>& right = mRightLines;
+    std::string                     lines;
     for (S32 n = 0; n < c.leftCount; ++n)
     {
         lines += (n ? "\n" : "") + left[static_cast<size_t>(c.leftFirst + n)];

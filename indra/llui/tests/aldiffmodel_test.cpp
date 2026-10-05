@@ -491,4 +491,62 @@ namespace tut
         m.setTexts("a\nb\nc", "a\n\nnew\nb\nc");
         ensure_equals("a blank line with another: a change", m.changeCount(), 1);
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<18>()
+    {
+        set_test_name("the right made anew, compared again where it changed: laid out as the texts compared afresh are, edit after edit");
+        const std::string left = lines(300, { { 40, "changed forty" }, { 200, "changed two hundred" } });
+        std::vector<std::string> right = ALTextDiff::split(lines(300, { { 120, "line one hundred and twenty" } }));
+        m.setTexts(left, lines(300, { { 120, "line one hundred and twenty" } }));
+        const auto text = [](const std::vector<std::string>& at) {
+            std::string out;
+            for (size_t i = 0; i < at.size(); ++i)
+            {
+                out += (i ? "\n" : "") + at[i];
+            }
+            return out;
+        };
+        // Lines typed into, put in, taken out, near changes and far from them.
+        const std::vector<std::pair<S32, S32>> edits = { { 10, 0 }, { 41, 0 }, { 150, 1 }, { 199, 2 }, { 120, 1 }, { 0, 2 }, { 298, 0 }, { 60, 1 } };
+        for (const auto& [at, how] : edits)
+        {
+            if (how == 0)
+            {
+                right[static_cast<size_t>(at)] += " typed";
+            }
+            else if (how == 1)
+            {
+                right.insert(right.begin() + at, "put in");
+            }
+            else
+            {
+                right.erase(right.begin() + at);
+            }
+            m.setRightText(text(right));
+            ALDiffModel fresh;
+            fresh.setTexts(left, text(right));
+            const std::string where = "after an edit at " + std::to_string(at);
+            ensure_equals(where + ": changes", m.changeCount(), fresh.changeCount());
+            ensure_equals(where + ": rows", m.rowCount(Layout::Sides), fresh.rowCount(Layout::Sides));
+            for (Column c : { Column::Left, Column::Right, Column::Inline })
+            {
+                std::string mine, theirs;
+                for (S32 l = 0; l < m.lineCount(c); ++l)
+                {
+                    mine.push_back(m.line(c, l).sign);
+                }
+                for (S32 l = 0; l < fresh.lineCount(c); ++l)
+                {
+                    theirs.push_back(fresh.line(c, l).sign);
+                }
+                ensure(where + ": signs", mine == theirs);
+            }
+        }
+        // A line put back at the end, beside the change that took it out:
+        // compared with that change, not beside it.
+        m.setTexts("a\nb\nc\nd\ne", "a\nB\nc\nd");
+        m.setRightText("a\nB\nc\nd\ne");
+        ensure("the line put back the same as the left's", m.changeCount() == 1 && beside(4, 4));
+    }
 }

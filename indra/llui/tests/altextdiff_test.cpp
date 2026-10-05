@@ -28,6 +28,7 @@
 
 #include "aldiffmoves.h"
 #include "aldiffsame.h"
+#include "aldiffsplice.h"
 #include "allinepairs.h"
 
 #include "../test/lltut.h"
@@ -783,5 +784,75 @@ namespace tut
         all.ignoreTrailing       = true;
         const ALTextDiff::regions_t spaced = { { 0, 9, R::Code }, { 9, 17, R::Comment } };
         ensure("together", ALTextDiff::likenessOf("x = 1;   // one  ", all, &spaced) == "x = 1;" && ALTextDiff::ignorable("  ", all));
+    }
+
+    template<> template<>
+    void altextdiff_object::test<20>()
+    {
+        set_test_name("compared again where it changed: the runs walk both texts after any one edit to either side; a line typed in a long text compares a few lines; the whole again where it must be");
+        std::mt19937                       random(777);
+        const std::vector<std::string>     pieces = { "{", "}", "", "a", "b", "c", "    x;", "    y;", "if (q)", "return;" };
+        std::uniform_int_distribution<int> piece(0, static_cast<int>(pieces.size()) - 1);
+        std::uniform_int_distribution<int> length(1, 60);
+        S32                                spliced = 0;
+        for (S32 round = 0; round < 400; ++round)
+        {
+            std::vector<std::string> left;
+            for (S32 i = length(random); i > 0; --i)
+            {
+                left.push_back(pieces[static_cast<size_t>(piece(random))] + (random() % 3 == 0 ? std::to_string(i) : std::string()));
+            }
+            std::vector<std::string> right = left;
+            for (S32 n = static_cast<S32>(random() % 6); n > 0 && !right.empty(); --n)
+            {
+                right[random() % right.size()] += "!";
+            }
+            std::vector<Run> runs = ALTextDiff::lines(left, right);
+            // One edit, to one side or the other: lines changed, put in or
+            // taken out, somewhere.
+            std::vector<std::string>  left_now  = left;
+            std::vector<std::string>  right_now = right;
+            std::vector<std::string>& edited    = round % 3 == 0 ? left_now : right_now;
+            const size_t              at        = edited.empty() ? 0 : random() % (edited.size() + 1);
+            const size_t              out       = std::min(edited.size() - at, static_cast<size_t>(random() % 3));
+            edited.erase(edited.begin() + static_cast<std::ptrdiff_t>(at), edited.begin() + static_cast<std::ptrdiff_t>(at + out));
+            for (S32 n = static_cast<S32>(random() % 3); n > 0; --n)
+            {
+                edited.insert(edited.begin() + static_cast<std::ptrdiff_t>(at), pieces[static_cast<size_t>(piece(random))]);
+            }
+            if (ALDiffSplice::splice(runs, left, left_now, right, right_now, ALTextDiff::Options()))
+            {
+                ++spliced;
+                walk(left_now, right_now, runs);
+            }
+        }
+        ensure("most spliced", spliced > 300);
+
+        // A line typed into a long text: a few lines compared again.
+        std::vector<std::string> left  = numbered(20000);
+        std::vector<std::string> right = left;
+        right[100]                     = "changed";
+        std::vector<Run> runs          = ALTextDiff::lines(left, right);
+        std::vector<std::string> typed = right;
+        typed[10000] += "x";
+        ensure("spliced", ALDiffSplice::splice(runs, left, left, right, typed, ALTextDiff::Options()));
+        ensure("a few lines compared", ALDiffSplice::lastCompared() <= 4);
+        ensure_equals("both changes found", walk(left, typed, runs), 4);
+        ensure("as the whole would find them", runs == ALTextDiff::lines(left, typed));
+
+        // Where it must be compared whole: an anchor across the stretch's
+        // edge; comments let go of; most of the text changed.
+        ALTextDiff::Options anchored;
+        anchored.anchors = { { 10000, 5 } };
+        std::vector<Run> kept = runs;
+        std::vector<std::string> again = typed;
+        again[10000] += "y";
+        ensure("an anchor across the edge", !ALDiffSplice::splice(kept, left, left, typed, again, anchored) && kept == runs);
+        ALTextDiff::Options comments;
+        comments.like.ignoreComments = true;
+        ensure("comments let go of", !ALDiffSplice::splice(kept, left, left, typed, again, comments));
+        std::vector<std::string> most = numbered(20000, "other ");
+        ensure("most of it changed", !ALDiffSplice::splice(kept, left, left, typed, most, ALTextDiff::Options()));
+        ensure("nothing changed: as it was", ALDiffSplice::splice(kept, left, left, typed, typed, ALTextDiff::Options()) && kept == runs);
     }
 }

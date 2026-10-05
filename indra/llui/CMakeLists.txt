@@ -140,6 +140,7 @@ target_sources(
     diff/aldiffmodel.cpp
     diff/aldiffmoves.cpp
     diff/aldiffsame.cpp
+    diff/aldiffsplice.cpp
     diff/aldifftokens.cpp
     diff/aldiffview.cpp
     diff/allinediff.cpp
@@ -364,6 +365,7 @@ target_sources(
         diff/aldiffmodel.h
         diff/aldiffmoves.h
         diff/aldiffsame.h
+        diff/aldiffsplice.h
         diff/aldifftokens.h
         diff/aldiffview.h
         diff/allinediff.h
@@ -544,6 +546,7 @@ if(AL_BUILD_TESTS)
     diff_sources
     diff/aldiffmoves.cpp
     diff/aldiffsame.cpp
+    diff/aldiffsplice.cpp
     diff/aldifftokens.cpp
     diff/allinediff.cpp
     diff/allinepairs.cpp
