@@ -38,6 +38,14 @@ if(AL_USE_VELOPACK)
   )
   # Built for the viewer that links it, not by every build with Velopack on.
   set_target_properties(cargo-build_velopack_libc PROPERTIES EXCLUDE_FROM_ALL TRUE)
+  if(WINDOWS AND CMAKE_LINKER)
+    # rustc runs link.exe by name, and a build from Git Bash finds Git's
+    # coreutils link first on the path. cargo takes the one CMake found, for
+    # the crate and for the build scripts it builds for the same target.
+    string(TOUPPER "${Rust_CARGO_TARGET}" velopack_rust_target)
+    string(REPLACE "-" "_" velopack_rust_target "${velopack_rust_target}")
+    corrosion_set_env_vars(velopack_libc "CARGO_TARGET_${velopack_rust_target}_LINKER=${CMAKE_LINKER}")
+  endif()
   if(DARWIN)
     # What Corrosion links a static library with on macOS, System, c and m,
     # is libSystem, which every link takes already: given again, ld warns of
