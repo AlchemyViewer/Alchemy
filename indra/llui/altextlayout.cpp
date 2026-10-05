@@ -248,16 +248,21 @@ F32 ALTextLayout::contentWidth()
 
 // --- hidden lines --------------------------------------------------------------
 
-void ALTextLayout::setHidden(S32 first, S32 last, bool hidden)
+void ALTextLayout::setHidden(HiddenBy by, S32 first, S32 last, bool hidden)
 {
-    first = llmax(first, 0);
-    last  = llmin(last, static_cast<S32>(mHidden.size()) - 1);
+    const U8 bits = static_cast<U8>(by);
+    first         = llmax(first, 0);
+    last          = llmin(last, static_cast<S32>(mHidden.size()) - 1);
     for (S32 l = first; l <= last; ++l)
     {
-        if (static_cast<bool>(mHidden[l]) != hidden)
+        // The owner's bit set or let go; the line hidden or shown only
+        // where that leaves it hidden by somebody, or by nobody.
+        const U8 was = mHidden[l];
+        const U8 now = hidden ? static_cast<U8>(was | bits) : static_cast<U8>(was & ~bits);
+        mHidden[l]   = now;
+        if ((was != 0) != (now != 0))
         {
-            mHidden[l] = hidden ? 1 : 0;
-            mHiddenCount += hidden ? 1 : -1;
+            mHiddenCount += now != 0 ? 1 : -1;
             ++mHiddenRevision;
             if (!mHeightsStale && static_cast<size_t>(l) < mHeights.size())
             {

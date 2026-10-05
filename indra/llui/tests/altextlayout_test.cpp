@@ -267,7 +267,7 @@ namespace tut
         ready("a\nbbbb\nc\nd");
         const S32 row = layout.rowHeight();
         ensure("the widest line is the second", close_to(layout.contentWidth(), layout.line(1).width));
-        layout.setHidden(1, 2, true);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 1, 2, true);
         ensure("hidden", layout.hidden(1) && layout.hidden(2) && !layout.hidden(3));
         ensure("any", layout.anyHidden());
         ensure_equals("no height", layout.lineHeight(1), 0);
@@ -284,7 +284,7 @@ namespace tut
         doc.insert(ALTextPos(0, 0), "\n");
         ensure("slid down by the line the edit made", !layout.hidden(1) && layout.hidden(2) && layout.hidden(3) && !layout.hidden(4));
         ensure_equals("three rows now", layout.totalHeight(), 3 * row);
-        layout.setHidden(0, 4, false);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 0, 4, false);
         ensure("none hidden", !layout.anyHidden());
         ensure_equals("five rows", layout.totalHeight(), 5 * row);
     }
@@ -482,9 +482,9 @@ namespace tut
         ensure_equals("nothing laid out again", again, laid);
 
         const U32 before = layout.hiddenRevision();
-        layout.setHidden(1, 1, false);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 1, 1, false);
         ensure_equals("shown already: nothing moved", layout.hiddenRevision(), before);
-        layout.setHidden(1, 1, true);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 1, 1, true);
         ensure("hidden: moved", layout.hiddenRevision() != before);
         const U32 hidden = layout.hiddenRevision();
         doc.insert(ALTextPos(0, 0), "x\n");
@@ -499,7 +499,7 @@ namespace tut
         U32 was = layout.hiddenRevision();
         doc.replace(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 4)), "\nnew");
         ensure("none hidden, a line made: no change", layout.hiddenRevision() == was);
-        layout.setHidden(3, 4, true);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 3, 4, true);
         ensure("hidden", layout.hiddenRevision() != was && layout.hidden(3) && layout.hidden(4));
         was = layout.hiddenRevision();
         doc.replace(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)), "N");
@@ -686,9 +686,9 @@ namespace tut
         check("lines made");
         doc.remove(ALTextRange(ALTextPos(1, 0), ALTextPos(4, 0)));
         check("lines taken away");
-        layout.setHidden(6, 9, true);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 6, 9, true);
         check("hidden");
-        layout.setHidden(7, 7, false);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 7, 7, false);
         check("one shown");
         layout.setWrapWidth(120);
         check("narrower");
@@ -750,5 +750,34 @@ namespace tut
         ensure_equals("nothing kept: nothing held", layout.trim(0, -1), 11);
         ensure_equals("none held", layout.linesHeld(), 0);
         ensure_equals("nothing more to let go of", layout.trim(0, -1), 0);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<19>()
+    {
+        set_test_name("hidden by whom: a line hidden while the folds or the host hide it, each showing only its own; edits slide both");
+        ready("0\n1\n2\n3\n4\n5\n6\n7\n8\n9");
+        typedef ALTextLayout::HiddenBy By;
+        const S32 row_h = layout.totalHeight() / 10;
+        layout.setHidden(By::Host, 2, 5, true);
+        layout.setHidden(By::Folds, 4, 7, true);
+        ensure("either hides it", layout.hidden(2) && layout.hidden(5) && layout.hidden(7) && !layout.hidden(8));
+        ensure("whose", layout.hiddenBy(4, By::Host) && layout.hiddenBy(4, By::Folds) && !layout.hiddenBy(2, By::Folds) && !layout.hiddenBy(7, By::Host));
+        ensure_equals("six lines take no height", layout.totalHeight(), 4 * row_h);
+        U32 was = layout.hiddenRevision();
+        layout.setHidden(By::Folds, 4, 7, false);
+        ensure("the folds shown: the host's still hidden", layout.hidden(4) && layout.hidden(5) && !layout.hidden(6) && !layout.hidden(7));
+        ensure("which moved what is hidden", layout.hiddenRevision() != was);
+        ensure_equals("four lines take none", layout.totalHeight(), 6 * row_h);
+        layout.setHidden(By::Folds, 3, 3, true);
+        was = layout.hiddenRevision();
+        layout.setHidden(By::Folds, 3, 3, true);
+        ensure("hiding a line hidden again moves nothing", layout.hiddenRevision() == was);
+        layout.setHidden(By::Host, 2, 5, false);
+        ensure("the host's shown: the fold's still hidden", !layout.hidden(2) && layout.hidden(3) && !layout.hidden(4));
+        doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "new\n");
+        ensure("slid by a line made above", !layout.hidden(3) && layout.hiddenBy(4, By::Folds));
+        layout.setHidden(By::Any, 0, 10, false);
+        ensure("all shown", !layout.anyHidden());
     }
 }

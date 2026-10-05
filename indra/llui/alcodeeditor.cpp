@@ -1914,12 +1914,12 @@ void ALCodeEditor::applyFolds()
     {
         if (first <= last_line)
         {
-            layout().setHidden(first, llmin(last, last_line), false);
+            layout().setHidden(ALTextLayout::HiddenBy::Folds, first, llmin(last, last_line), false);
         }
     }
     for (const auto& [first, last] : hidden)
     {
-        layout().setHidden(first, last, true);
+        layout().setHidden(ALTextLayout::HiddenBy::Folds, first, last, true);
     }
     mHiddenByFolds.swap(hidden);
 }
@@ -2080,17 +2080,22 @@ void ALCodeEditor::unfoldAll()
 
 void ALCodeEditor::revealLine(S32 line)
 {
-    if (mLineRevealer && mLineRevealer(line))
+    // Each owner shows what it hid its own way: the host as it sees fit --
+    // a comparison opens the run the line is in, on both sides -- and the
+    // folds the block it is in.
+    ALTextLayout& lines = layout();
+    if (lines.hiddenBy(line, ALTextLayout::HiddenBy::Host) && mLineRevealer)
     {
-        return;
+        mLineRevealer(line);
     }
-    if (folds().reveal(document(), getTabWidth(), line))
+    if (lines.hiddenBy(line, ALTextLayout::HiddenBy::Folds) && folds().reveal(document(), getTabWidth(), line))
     {
         applyFolds();
     }
-    else
+    // Whatever still hides it lets it go: the caret is on it.
+    if (lines.hidden(line))
     {
-        layout().setHidden(line, line, false);
+        lines.setHidden(ALTextLayout::HiddenBy::Any, line, line, false);
     }
 }
 

@@ -931,7 +931,7 @@ void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret)
         }
         else
         {
-            mLayout.setHidden(line, line, false);
+            mLayout.setHidden(ALTextLayout::HiddenBy::Any, line, line, false);
         }
     };
     reveal(mCaret.line);

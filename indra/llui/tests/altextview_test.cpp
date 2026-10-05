@@ -1871,7 +1871,7 @@ namespace tut
             ensure("nor is done", !v.perform(command));
         }
         ensure("no completion, nor what a call takes", !v.perform(ALEditorCommand::Complete) && !v.perform(ALEditorCommand::SignatureHelp));
-        v.layout().setHidden(1, 1, true);
+        v.layout().setHidden(ALTextLayout::HiddenBy::Folds, 1, 1, true);
         v.setCaret(ALTextPos(1, 1));
         ensure("the caret's line shown again", !v.layout().hidden(1) && v.caret() == ALTextPos(1, 1));
     }

@@ -237,10 +237,24 @@ public:
     // --- hidden lines ----------------------------------------------------------
 
     // A hidden line is folded away: it keeps its layout and takes no
-    // height, so the line after it sits where it would have. Who hides
-    // what is the view's business; this only lays out around it.
-    void setHidden(S32 first, S32 last, bool hidden);
+    // height, so the line after it sits where it would have. Hidden by
+    // whom: the code editor's folds, or the host that shows the text -- a
+    // comparison's runs the same. A line is hidden while either hides it,
+    // and each shows only its own, so neither undoes the other. What each
+    // hides is the view's business; this only lays out around it.
+    enum class HiddenBy : U8
+    {
+        Folds = 1,
+        Host  = 2,
+        // To show a line, whoever hid it.
+        Any   = 3
+    };
+    void setHidden(HiddenBy by, S32 first, S32 last, bool hidden);
     bool hidden(S32 index) const { return index >= 0 && index < static_cast<S32>(mHidden.size()) && mHidden[index]; }
+    bool hiddenBy(S32 index, HiddenBy by) const
+    {
+        return index >= 0 && index < static_cast<S32>(mHidden.size()) && (mHidden[index] & static_cast<U8>(by)) != 0;
+    }
     bool anyHidden() const { return mHiddenCount > 0; }
     // The nearest line not hidden, starting at this one and looking in
     // this direction (1 or -1); -1 where there is none.

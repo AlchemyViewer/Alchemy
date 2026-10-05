@@ -205,13 +205,10 @@ ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::
     // The caret landing on a line folded away opens its fold, both sides
     // at once, rather than the one line on the one side.
     made->setLineRevealer([this, made](S32 line) {
-        const S32 fold = foldOfRow(made, line, true);
-        if (fold < 0 || mFolds[static_cast<size_t>(fold)].open)
+        if (const S32 fold = foldOfRow(made, line, true); fold >= 0 && !mFolds[static_cast<size_t>(fold)].open)
         {
-            return false;
+            openFold(fold);
         }
-        openFold(fold);
-        return true;
     });
     return made;
 }
@@ -763,8 +760,8 @@ void ALDiffView::applyFolds()
         {
             const Fold& fold = mFolds[n];
             const S32   row  = rowOfFold(side, static_cast<S32>(n));
-            layout.setHidden(row, row, fold.open);
-            layout.setHidden(row + 1, row + fold.count, !fold.open);
+            layout.setHidden(ALTextLayout::HiddenBy::Host, row, row, fold.open);
+            layout.setHidden(ALTextLayout::HiddenBy::Host, row + 1, row + fold.count, !fold.open);
         }
         // A caret left on a line now hidden: on the row standing for its
         // run where that is folded, else on the run's first line.

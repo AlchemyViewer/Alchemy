@@ -2746,4 +2746,28 @@ namespace tut
         ensure("the main one at its fold's line", e.selection() == caretAt(0, 3));
         ensure("the other at its own", e.otherSelections().size() == 1 && e.otherSelections()[0] == caretAt(4, 3));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<76>()
+    {
+        set_test_name("a host's hidden lines and the folds' apart: unfolding leaves the host's; the caret landing in them asks the host, else shows the line");
+        ALCodeEditor& e = make("default\n{\n    state_entry()\n    {\n        a();\n        b();\n    }\n}");
+        typedef ALTextLayout::HiddenBy By;
+        e.layout().setHidden(By::Host, 4, 5, true);
+        e.foldAll();
+        ensure("folded too", e.layout().hiddenBy(3, By::Folds) || e.layout().hiddenBy(4, By::Folds));
+        e.unfoldAll();
+        ensure("unfolded: the host's still hidden", e.layout().hidden(4) && e.layout().hidden(5) && !e.layout().hiddenBy(4, By::Folds));
+        S32 asked = -1;
+        e.setLineRevealer([&](S32 line) {
+            asked = line;
+            e.layout().setHidden(By::Host, 4, 5, false);
+        });
+        e.goTo(ALTextPos(5, 0));
+        ensure("the host asked, and showed its run", asked == 5 && !e.layout().hidden(4) && !e.layout().hidden(5));
+        e.layout().setHidden(By::Host, 4, 5, true);
+        e.setLineRevealer(nullptr);
+        e.goTo(ALTextPos(4, 0));
+        ensure("nobody to ask: the line shown, the rest left", !e.layout().hidden(4) && e.layout().hidden(5));
+    }
 }

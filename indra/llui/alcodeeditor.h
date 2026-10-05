@@ -596,10 +596,10 @@ public:
     typedef std::function<bool(bool forward)> change_stepper_t;
     void setChangeStepper(change_stepper_t stepper) { mChangeStepper = std::move(stepper); }
     bool stepChange(bool forward) override { return mChangeStepper && mChangeStepper(forward); }
-    // Lines a host hides itself -- a comparison's runs the same -- shown by
-    // the host where the caret lands on one: true where it was the host's
-    // to show.
-    typedef std::function<bool(S32 line)> line_revealer_t;
+    // The lines a host hides (ALTextLayout::HiddenBy::Host) -- a
+    // comparison's runs the same -- shown by the host as it sees fit where
+    // the caret lands on one; what it leaves hidden there is shown anyway.
+    typedef std::function<void(S32 line)> line_revealer_t;
     void setLineRevealer(line_revealer_t revealer) { mLineRevealer = std::move(revealer); }
     // A colour for each line on the ruler down the side, where the marks
     // on it leave the line none: what a comparison changed there. Cleared
