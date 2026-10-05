@@ -41,9 +41,16 @@ class PythonToolsTests(unittest.TestCase):
             self.assertNotEqual(key, base)
 
     def test_paths_sit_in_the_runner_temp(self):
-        root, requirements = tools.paths({"RUNNER_TEMP": "/home/runner/work/_temp/"})
-        self.assertEqual(root, Path("/home/runner/work/_temp/python-tools"))
-        self.assertEqual(requirements, Path("/home/runner/work/_temp/python-tools-requirements.txt"))
+        root, requirements = tools.paths({"RUNNER_TEMP": "/home/runner/work/_temp/", "REQUIREMENTS": REQUIREMENTS})
+        self.assertEqual(root.parent, Path("/home/runner/work/_temp"))
+        self.assertTrue(root.name.startswith("python-tools-"))
+        self.assertEqual(requirements, root.with_name(root.name + ".txt"))
+
+    def test_each_list_has_its_own_venv(self):
+        env = {"RUNNER_TEMP": "/home/runner/work/_temp"}
+        first = tools.paths({**env, "REQUIREMENTS": REQUIREMENTS})
+        self.assertEqual(first, tools.paths({**env, "REQUIREMENTS": "\r\n" + REQUIREMENTS}))
+        self.assertNotEqual(first[0], tools.paths({**env, "REQUIREMENTS": "dmgbuild==1.6.7\n"})[0])
 
 
 if __name__ == "__main__":

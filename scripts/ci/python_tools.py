@@ -7,7 +7,9 @@ job with a hit runs no pip at all. The python-tools action calls this three
 times:
 
   key       the cache key and the venv's path, as step outputs; the
-            requirements, from REQUIREMENTS, go to a file beside the venv
+            requirements, from REQUIREMENTS, go to a file beside the venv.
+            Each list has a venv of its own, so a job that asks for two
+            never saves one's tools under the other's key
   build     on a miss, the venv. Without pip, which a restored venv never
             runs: the setup's own pip installs into it. Without the CMake
             documentation either, which no build reads. Each file left out
@@ -57,7 +59,9 @@ def cache_key(runner_os, runner_arch, version, base_prefix, requirements):
 
 def paths(env):
     temp = Path(os.path.normpath(env["RUNNER_TEMP"]))
-    return temp / "python-tools", temp / "python-tools-requirements.txt"
+    digest = hashlib.sha256(normalized(env["REQUIREMENTS"]).encode("utf-8")).hexdigest()[:12]
+    name = f"python-tools-{digest}"
+    return temp / name, temp / f"{name}.txt"
 
 
 def documentation(python):
