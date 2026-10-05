@@ -205,11 +205,16 @@ namespace tut
     template<> template<>
     void aldiffview_object::test<4>()
     {
-        set_test_name("the same texts: no change, nothing tinted; and titles over each side");
+        set_test_name("the same texts: no change, nothing tinted; and titles over each side, with no room taken where there are none");
         ALDiffView& d = make("same\ntext", "same\ntext");
         ensure_equals("no changes", d.changeCount(), 0);
         ensure("nothing tinted", !tinted(*d.left(), 0) && !tinted(*d.right(), 1));
+        const S32 under_bar = d.getRect().getHeight() - ALDiffBar::wantedHeight();
+        ensure("no titles: no row for them, the sides up to the bar",
+               d.right()->getRect().mTop == under_bar && !d.getChild<LLView>("left_title")->getVisible() && !d.getChild<LLView>("right_title")->getVisible());
         d.setTitles("Compiled", "Made from the source");
+        ensure("titles: a row for them over the sides",
+               d.right()->getRect().mTop < under_bar && d.getChild<LLView>("left_title")->getVisible() && d.getChild<LLView>("right_title")->getVisible());
         ensure_equals("the left's", d.getChild<LLUICtrl>("left_title")->getValue().asString(), std::string("Compiled"));
         ensure_equals("the right's", d.getChild<LLUICtrl>("right_title")->getValue().asString(), std::string("Made from the source"));
     }

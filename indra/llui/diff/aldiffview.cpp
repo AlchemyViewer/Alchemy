@@ -973,17 +973,21 @@ void ALDiffView::drawFoldRows()
 
 void ALDiffView::arrange()
 {
+    // The titles' row only where there is a title: else the sides start
+    // under the bar.
+    const bool   titled = !mLeftTitle.empty() || !mRightTitle.empty();
     const S32    width  = getRect().getWidth();
     const S32    bar_h  = ALDiffBar::wantedHeight();
     const S32    height = llmax(0, getRect().getHeight() - bar_h);
-    const S32    head_h = LLFontGL::getFontSansSerifSmall()->getLineHeight() + 6;
+    const S32    head_h = titled ? LLFontGL::getFontSansSerifSmall()->getLineHeight() + 6 : 0;
     const S32    body   = llmax(0, height - head_h);
     const S32    half   = (width - gap()) / 2;
     mBar->setShape(LLRect(0, height + bar_h, width, height));
     mLeft->setVisible(!mInline);
     mRight->setVisible(!mInline);
     mInlined->setVisible(mInline);
-    mRightHead->setVisible(!mInline);
+    mLeftHead->setVisible(titled);
+    mRightHead->setVisible(titled && !mInline);
     if (mInline)
     {
         mInlined->setShape(LLRect(0, body, width, 0));
