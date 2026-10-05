@@ -413,6 +413,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="DiffBarChangesA">[COUNT] change</string>
 	<string name="DiffBarChangesB">[COUNT] changes</string>
 	<string name="DiffBarNone">No changes</string>
+	<!-- After the count, where a comparison by structure compared a change by lines. -->
+	<string name="DiffBarByLines">· by lines where too large to compare by structure</string>
 	<!-- A comparison's row standing for lines the same folded away. -->
 	<string name="DiffFoldedLinesA">⋯ 1 line the same ⋯</string>
 	<string name="DiffFoldedLinesB">⋯ [COUNT] lines the same ⋯</string>

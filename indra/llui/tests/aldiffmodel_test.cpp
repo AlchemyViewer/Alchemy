@@ -549,4 +549,27 @@ namespace tut
         m.setRightText("a\nB\nc\nd\ne");
         ensure("the line put back the same as the left's", m.changeCount() == 1 && beside(4, 4));
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<19>()
+    {
+        set_test_name("by structure: a reformatting alone no change; a change within one marked by its tokens; lined up by ranges too");
+        const char* call  = "default\n{\n    llSay(0, \"a\" + b);\n}";
+        const char* flown = "default\n{\n    llSay(\n        0,\n        \"a\" + b\n    );\n}";
+        m.setTexts(call, flown);
+        ensure("by lines: a change", m.changeCount() == 1);
+        m.setAlgorithm(ALTextDiff::Algorithm::Structural);
+        ensure("by structure: none, the lines shown untinted", m.changeCount() == 0 && kindsOf(Column::Right) == std::string(7, '=') && !m.fellBack());
+        m.setTexts(call, "default\n{\n    llSay(\n        1,\n        \"a\" + b\n    );\n}");
+        ensure_equals("a real change in it: one", m.changeCount(), 1);
+        ensure("marked by its token alone", m.line(Column::Right, 3).words == ALTextDiff::spans_t{ { 8, 9 } } && m.line(Column::Right, 2).words.empty());
+        m.setTexts(call, flown, { { 2, 2, 2, 5 } });
+        ensure("lined up by ranges, then by tokens: none", !m.fellBack() && m.changeCount() == 0);
+        // Made anew live: the lines' runs spliced, the changes read again.
+        m.setTexts(call, flown);
+        m.setRightText("default\n{\n    llSay(\n        2,\n        \"a\" + b\n    );\n}");
+        ensure("typed into: the change, marked by its token", m.changeCount() == 1 && m.line(Column::Right, 3).words == ALTextDiff::spans_t{ { 8, 9 } });
+        m.setRightText(flown);
+        ensure("typed back: none again", m.changeCount() == 0);
+    }
 }

@@ -59,6 +59,9 @@ public:
     // The change the caret is in, counted from nought, or -1 where it is
     // in none; of how many.
     void        setCount(S32 current, S32 total);
+    // Whether the comparison, asked to compare by structure, compared a
+    // change too large for it by lines instead: said after the count.
+    void        setFellBack(bool fell_back);
     std::string countSaid() const;
     // Whether there is a change before the caret, and one after it.
     void        setSteps(bool previous, bool next);
@@ -108,6 +111,7 @@ private:
     LLUIColor     mInkColor;
     S32           mCurrent = -2;
     S32           mTotal   = -1;
+    bool          mFellBack = false;
 
     LLTextBox*    mCount          = nullptr;
     ALFlatButton* mPreviousButton = nullptr;

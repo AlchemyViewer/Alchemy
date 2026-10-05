@@ -114,16 +114,18 @@ namespace ALTextDiff
     // How the lines that stay are chosen: each stretch the two share whose
     // lines are rarest kept, and the rest found the same way (Histogram,
     // the default); the lines that come once in each kept, and the rest
-    // found the same way (Patience); or the fewest lines taken out and put
-    // in, whatever they are (Minimal).
+    // found the same way (Patience); the fewest lines taken out and put
+    // in, whatever they are (Minimal); or by the tokens of code, whatever
+    // lines they are on (Structural, ALStructuralDiff).
     enum class Algorithm : U8
     {
         Histogram,
         Patience,
-        Minimal
+        Minimal,
+        Structural
     };
     // Each by a name a setting can hold: "histogram", "patience",
-    // "minimal"; a name of none, nothing.
+    // "minimal", "structural"; a name of none, nothing.
     const char*              algorithmName(Algorithm algorithm);
     std::optional<Algorithm> algorithmFromName(std::string_view name);
 

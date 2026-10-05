@@ -1302,6 +1302,11 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                     <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_minimal" />
                     <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_minimal" />
                 </menu_item_check>
+                <menu_item_check label="By Structure" layout="topleft" name="compare_structural">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_structural" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_structural" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_structural" />
+                </menu_item_check>
                 <menu_item_separator layout="topleft" />
                 <menu_item_check label="Ignore Whitespace" layout="topleft" name="compare_ignore_whitespace">
                     <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_ignore_whitespace" />

@@ -605,6 +605,7 @@ namespace ALScriptKeymap
             { "compare_histogram", KEY_NONE, MASK_NONE },
             { "compare_patience", KEY_NONE, MASK_NONE },
             { "compare_minimal", KEY_NONE, MASK_NONE },
+            { "compare_structural", KEY_NONE, MASK_NONE },
             { "compare_ignore_whitespace", KEY_NONE, MASK_NONE },
             { "compare_ignore_trailing", KEY_NONE, MASK_NONE },
             { "compare_ignore_blank_lines", KEY_NONE, MASK_NONE },

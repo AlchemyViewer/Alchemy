@@ -147,8 +147,14 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const std::vector<std::string>
     }
     // Anchors inside it, counted from its start; one holding a line inside
     // it and one outside, the whole again.
+    // By structure, the runs are of lines: what reads them as tokens
+    // after is the caller's.
     ALTextDiff::Options some = options;
     some.anchors.clear();
+    if (some.algorithm == ALTextDiff::Algorithm::Structural)
+    {
+        some.algorithm = ALTextDiff::Algorithm::Histogram;
+    }
     for (const auto& [l, r] : options.anchors)
     {
         const bool in_left  = l >= start.left && l < l_end;

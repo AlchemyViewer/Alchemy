@@ -257,6 +257,10 @@ int main(int, char**)
         minimal.algorithm = ALTextDiff::Algorithm::Minimal;
         row("minimal, ten edits", lines(small, small10, minimal), lines(big, big10, minimal));
         row("minimal, a thousand edits", lines(small, small1k, minimal), lines(big, big1k, minimal));
+        ALTextDiff::Options structural;
+        structural.algorithm = ALTextDiff::Algorithm::Structural;
+        row("structural, ten edits", lines(small, small10, structural), lines(big, big10, structural));
+        row("structural, a thousand edits", lines(small, small1k, structural), lines(big, big1k, structural));
     }
 
     std::printf("\nLaid out (ALDiffModel: lines, pairs, words, rows)\n");
@@ -282,12 +286,14 @@ int main(int, char**)
     // A live comparison, the right typed in: a character put in a line
     // near the middle and compared again, then taken out and compared
     // again; per keystroke.
-    const auto typed = [&](const std::string& left, const std::string& right, bool grammar = false) {
+    const auto typed = [&](const std::string& left, const std::string& right, bool grammar = false,
+                           ALTextDiff::Algorithm algorithm = ALTextDiff::Algorithm::Histogram) {
         ALDiffModel model;
         if (grammar)
         {
             model.setLexer(lexer());
         }
+        model.setAlgorithm(algorithm);
         model.setTexts(left, right);
         const size_t at   = right.find('\n', right.size() / 2);
         std::string  with = right;
@@ -301,6 +307,8 @@ int main(int, char**)
     row("a keystroke, ten edits", typed(small_t, small10t), typed(big_t, big10t));
     row("a keystroke, a thousand edits", typed(small_t, small1kt), typed(big_t, big1kt));
     row("a keystroke, a thousand edits, LSL's grammar", typed(small_t, small1kt, true), typed(big_t, big1kt, true));
+    row("a keystroke, a thousand edits, by structure", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Structural),
+        typed(big_t, big1kt, true, ALTextDiff::Algorithm::Structural));
 
     std::printf("\nWhat it says (5,000 lines)\n");
     std::printf("  %-44s %8s %8s %8s %8s %8s %8s\n", "", "changes", "out", "in", "paired", "words", "moved");
@@ -322,7 +330,8 @@ int main(int, char**)
         says("one taken out among six changed", small_t, joined(right));
     }
     says("a thousand edits, LSL's grammar", small_t, small1kt, by_grammar);
-    for (const auto& [algorithm, name] : { std::make_pair(ALTextDiff::Algorithm::Patience, "patience"), std::make_pair(ALTextDiff::Algorithm::Minimal, "minimal") })
+    for (const auto& [algorithm, name] : { std::make_pair(ALTextDiff::Algorithm::Patience, "patience"), std::make_pair(ALTextDiff::Algorithm::Minimal, "minimal"),
+                                           std::make_pair(ALTextDiff::Algorithm::Structural, "structural") })
     {
         ALTextDiff::Options by;
         by.algorithm = algorithm;

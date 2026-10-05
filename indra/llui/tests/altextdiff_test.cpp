@@ -30,6 +30,7 @@
 #include "aldiffsame.h"
 #include "aldiffsplice.h"
 #include "allinepairs.h"
+#include "alstructuraldiff.h"
 
 #include "../test/lltut.h"
 
@@ -859,5 +860,70 @@ namespace tut
         std::vector<std::string> most = numbered(20000, "other ");
         ensure("most of it changed", !ALDiffSplice::splice(kept, left, left, typed, most, ALTextDiff::Options()));
         ensure("nothing changed: as it was", ALDiffSplice::splice(kept, left, left, typed, typed, ALTextDiff::Options()) && kept == runs);
+    }
+
+    template<> template<>
+    void altextdiff_object::test<21>()
+    {
+        set_test_name("by structure: a call's arguments put one to a line, a brace moved, a condition wrapped -- changes with nothing marked; a real change inside a reformatting marked alone; a change too large, by lines");
+        typedef ALStructuralDiff::Result Result;
+        const auto unmarked = [](const Result& r) {
+            for (const auto& marks : { r.leftMarks, r.rightMarks })
+            {
+                for (const ALTextDiff::spans_t& line : marks)
+                {
+                    if (!line.empty())
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        };
+        const std::vector<std::string> call  = { "default", "{", "    llSay(0, \"a\" + b);", "}" };
+        const std::vector<std::string> flown = { "default", "{", "    llSay(", "        0,", "        \"a\" + b", "    );", "}" };
+        const Result reflowed = ALStructuralDiff::compare(call, flown, ALTextDiff::Options());
+        walk(call, flown, reflowed.runs);
+        ensure("arguments put one to a line: a change, nothing marked", reflowed.runs.size() > 1 && unmarked(reflowed) && !reflowed.tooLarge);
+        ensure("its lines read as tokens, those the same not", reflowed.leftByTokens[2] && reflowed.rightByTokens[4] && !reflowed.leftByTokens[0]);
+        ensure("the lines around it the same", reflowed.runs.front() == Run{ Kind::Same, 0, 0, 2 } && reflowed.runs.back().kind == Kind::Same);
+
+        const std::vector<std::string> brace = { "if (x) {", "    go();", "}" };
+        const std::vector<std::string> own   = { "if (x)", "{", "    go();", "}" };
+        const Result moved_brace = ALStructuralDiff::compare(brace, own, ALTextDiff::Options());
+        walk(brace, own, moved_brace.runs);
+        ensure("a brace moved to its own line: nothing marked", unmarked(moved_brace));
+
+        const std::vector<std::string> cond    = { "if (a && b)", "    go();" };
+        const std::vector<std::string> wrapped = { "if (a &&", "    b)", "    go();" };
+        ensure("a condition wrapped: nothing marked", unmarked(ALStructuralDiff::compare(cond, wrapped, ALTextDiff::Options())));
+
+        const std::vector<std::string> changed = { "default", "{", "    llSay(", "        1,", "        \"a\" + b", "    );", "}" };
+        const Result real = ALStructuralDiff::compare(call, changed, ALTextDiff::Options());
+        walk(call, changed, real.runs);
+        ensure("the change inside the reformatting marked, and nothing else", real.leftMarks[2] == ALTextDiff::spans_t{ { 10, 11 } } &&
+                                                                             real.rightMarks[3] == ALTextDiff::spans_t{ { 8, 9 } } &&
+                                                                             real.rightMarks[2].empty() && real.rightMarks[4].empty());
+
+        // Brackets kept only with their others.
+        const std::vector<std::string> one = { "f(a)(b)" };
+        const std::vector<std::string> two = { "f(a(b))" };
+        const Result nested = ALStructuralDiff::compare(one, two, ALTextDiff::Options());
+        ensure("a bracket whose other went elsewhere marked", !nested.leftMarks[0].empty() && !nested.rightMarks[0].empty());
+        // f's ( kept by the tokens alone, though its ) is not: let go of.
+        const Result closed = ALStructuralDiff::compare({ "f(a); g(b);" }, { "f(a; g(b));" }, ALTextDiff::Options());
+        ensure("an opening bracket whose closing one was not kept, marked", !closed.leftMarks[0].empty() && closed.leftMarks[0].front().first == 1);
+
+        // Through lines(), and its fall back.
+        ALTextDiff::Options by_structure;
+        by_structure.algorithm = ALTextDiff::Algorithm::Structural;
+        ensure("lines() by structure", ALTextDiff::lines(call, flown, by_structure) == reflowed.runs);
+        by_structure.anchors = { { 2, 2 } };
+        ensure("anchored, as lines anchored are, then by tokens", unmarked(ALStructuralDiff::compare(call, flown, by_structure)));
+        // A change of more tokens than are read: by lines, said so.
+        const std::vector<std::string> mine   = numbered(ALStructuralDiff::MOST_TOKENS / 2 + 1, "mine ");
+        const std::vector<std::string> theirs = numbered(ALStructuralDiff::MOST_TOKENS / 2 + 1, "theirs ");
+        const Result                   big    = ALStructuralDiff::compare(mine, theirs, ALTextDiff::Options());
+        ensure("too large: by lines, said so", big.tooLarge && !big.leftByTokens[0] && big.leftMarks[0].empty());
     }
 }

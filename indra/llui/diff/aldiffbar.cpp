@@ -107,6 +107,17 @@ ALFlatButton* ALDiffBar::flat(const std::string& name, const std::string& glyph,
     return made;
 }
 
+void ALDiffBar::setFellBack(bool fell_back)
+{
+    if (mFellBack != fell_back)
+    {
+        mFellBack = fell_back;
+        const S32 total = mTotal;
+        mTotal          = -2;
+        setCount(mCurrent, total);
+    }
+}
+
 void ALDiffBar::setCount(S32 current, S32 total)
 {
     if (current == mCurrent && total == mTotal)
@@ -127,6 +138,11 @@ void ALDiffBar::setCount(S32 current, S32 total)
     else
     {
         said = alSaidCount("DiffBarChanges", total, "[COUNT] change", "[COUNT] changes");
+    }
+    if (mFellBack)
+    {
+        // The skin's string loses the blank before it.
+        said += " " + alSaid("DiffBarByLines", "\xC2\xB7 by lines where too large to compare by structure");
     }
     mCount->setText(said);
 }

@@ -1125,6 +1125,7 @@ bool ALDiffView::handleKeyHere(KEY key, MASK mask)
 void ALDiffView::refreshBar()
 {
     // The change the caret is in, and the steps there are from it.
+    mBar->setFellBack(mModel.fellBack());
     mBar->setCount(changeAtCaret(), changeCount());
     mBar->setTakeBackShown(mTakeBack != nullptr);
     mBar->setTakeBackEnabled(mTakeBack && changeAtCaret() >= 0);

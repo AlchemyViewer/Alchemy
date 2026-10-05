@@ -42,6 +42,8 @@
 // The whole is compared again, rather, where the stretch is more than
 // MOST_SHARE of the texts, an anchor holds a line in it and one outside
 // it, or comments are let go of (which a lexer reads whole texts for).
+// Compared by structure, the runs are the lines' (Histogram), which
+// ALStructuralDiff::read then reads as tokens.
 namespace ALDiffSplice
 {
     // As a share of both texts' lines.

@@ -29,6 +29,7 @@
 #include "aldiffsame.h"
 #include "aldiffsplice.h"
 #include "allinepairs.h"
+#include "alstructuraldiff.h"
 
 #include <algorithm>
 
@@ -142,7 +143,13 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
     const ALTextDiff::Options options = shownOptions();
     const bool spliced = mSwapped ? ALDiffSplice::splice(mRuns, before, mRightLines, mLeftLines, mLeftLines, options)
                                   : ALDiffSplice::splice(mRuns, mLeftLines, mLeftLines, before, mRightLines, options);
-    if (spliced)
+    if (spliced && options.algorithm == ALTextDiff::Algorithm::Structural)
+    {
+        // Its changes read as tokens again, the lines' runs as spliced.
+        readTokens();
+        layout();
+    }
+    else if (spliced)
     {
         layout();
     }
@@ -251,8 +258,42 @@ ALTextDiff::Options ALDiffModel::shownOptions() const
 
 void ALDiffModel::build(const std::vector<bool>& open)
 {
-    mRuns = ALTextDiff::lines(mSwapped ? mRightLines : mLeftLines, mSwapped ? mLeftLines : mRightLines, shownOptions());
+    const std::vector<std::string>& left    = mSwapped ? mRightLines : mLeftLines;
+    const std::vector<std::string>& right   = mSwapped ? mLeftLines : mRightLines;
+    const ALTextDiff::Options       options = shownOptions();
+    for (size_t side = 0; side < 2; ++side)
+    {
+        mMarks[side].clear();
+        mByTokens[side].clear();
+    }
+    mFellBack = false;
+    if (options.algorithm != ALTextDiff::Algorithm::Structural)
+    {
+        mRuns = ALTextDiff::lines(left, right, options);
+        layout(open);
+        return;
+    }
+    // By structure: the lines' runs, then their changes read as tokens.
+    ALTextDiff::Options by_lines = options;
+    by_lines.algorithm           = ALTextDiff::Algorithm::Histogram;
+    mRuns                        = ALTextDiff::lines(left, right, by_lines);
+    readTokens();
     layout(open);
+}
+
+void ALDiffModel::readTokens()
+{
+    const std::vector<std::string>&           left          = mSwapped ? mRightLines : mLeftLines;
+    const std::vector<std::string>&           right         = mSwapped ? mLeftLines : mRightLines;
+    const std::vector<ALTextDiff::regions_t>* left_regions  = mOptions.lexer ? &mOptions.lexer(left) : nullptr;
+    const std::vector<ALTextDiff::regions_t>* right_regions = mOptions.lexer ? &mOptions.lexer(right) : nullptr;
+    ALStructuralDiff::Result by_tokens = ALStructuralDiff::read(left, right, std::move(mRuns), mOptions, left_regions, right_regions);
+    mRuns        = std::move(by_tokens.runs);
+    mFellBack    = by_tokens.tooLarge;
+    mMarks[0]    = std::move(by_tokens.leftMarks);
+    mMarks[1]    = std::move(by_tokens.rightMarks);
+    mByTokens[0] = std::move(by_tokens.leftByTokens);
+    mByTokens[1] = std::move(by_tokens.rightByTokens);
 }
 
 void ALDiffModel::layout(const std::vector<bool>& open)
@@ -357,7 +398,20 @@ void ALDiffModel::layout(const std::vector<bool>& open)
     // their runs.
     const ALTextDiff::Likeness& like = mOptions.like;
     std::vector<bool>           ignored(runs.size(), false);
-    if (like.ignoreBlankLines || like.ignoreComments)
+    // By tokens, a change whose lines have none not kept is formatting
+    // alone: no change either. A line's change read as tokens, and its
+    // tokens not kept.
+    const bool by_tokens = !mByTokens[0].empty() || !mByTokens[1].empty();
+    const auto tokened   = [this](bool out, S32 line) {
+        const std::vector<bool>& flags = mByTokens[out ? 0 : 1];
+        return line >= 0 && line < static_cast<S32>(flags.size()) && flags[static_cast<size_t>(line)];
+    };
+    const auto marksOf = [this](bool out, S32 line) -> const ALTextDiff::spans_t& {
+        static const ALTextDiff::spans_t none;
+        const std::vector<ALTextDiff::spans_t>& marks = mMarks[out ? 0 : 1];
+        return line >= 0 && line < static_cast<S32>(marks.size()) ? marks[static_cast<size_t>(line)] : none;
+    };
+    if (like.ignoreBlankLines || like.ignoreComments || by_tokens)
     {
         for (size_t i = 0; i < runs.size();)
         {
@@ -374,7 +428,8 @@ void ALDiffModel::layout(const std::vector<bool>& open)
                 for (S32 n = 0; n < runs[j].count && none; ++n)
                 {
                     const S32 line = (out ? runs[j].left : runs[j].right) + n;
-                    none = ALTextDiff::ignorable(out ? left[static_cast<size_t>(line)] : right[static_cast<size_t>(line)], like,
+                    none = (tokened(out, line) && marksOf(out, line).empty()) ||
+                           ALTextDiff::ignorable(out ? left[static_cast<size_t>(line)] : right[static_cast<size_t>(line)], like,
                                                  regionsOf(out ? left_regions : right_regions, line));
                 }
             }
@@ -548,6 +603,11 @@ void ALDiffModel::layout(const std::vector<bool>& open)
         const auto alone = [&](Column column, const std::string& text, S32 line, Kind kind, S32 move) {
             add(column, text, line + 1, kind, move >= 0 ? '>' : kind == Kind::Removed ? '-' : '+');
             of(column).lines.back().move = move;
+            // By tokens, a line alone marked where its tokens were not kept.
+            if (move < 0 && tokened(kind == Kind::Removed, line))
+            {
+                of(column).lines.back().words = marksOf(kind == Kind::Removed, line);
+            }
         };
         std::vector<std::pair<ALTextDiff::spans_t, ALTextDiff::spans_t>> paired;
         size_t                                                           g = 0;
@@ -573,8 +633,16 @@ void ALDiffModel::layout(const std::vector<bool>& open)
             add(Column::Left, left[static_cast<size_t>(gone[g])], gone[g] + 1, Kind::Removed, '~');
             add(Column::Right, right[static_cast<size_t>(made[d])], made[d] + 1, Kind::Added, '~');
             auto& [lspans, rspans] = paired.emplace_back();
-            ALTextDiff::words(left[static_cast<size_t>(gone[g])], right[static_cast<size_t>(made[d])], lspans, rspans, optionsOf(gone[g], made[d]),
-                              regionsOf(left_regions, gone[g]), regionsOf(right_regions, made[d]));
+            if (tokened(true, gone[g]) && tokened(false, made[d]))
+            {
+                lspans = marksOf(true, gone[g]);
+                rspans = marksOf(false, made[d]);
+            }
+            else
+            {
+                ALTextDiff::words(left[static_cast<size_t>(gone[g])], right[static_cast<size_t>(made[d])], lspans, rspans, optionsOf(gone[g], made[d]),
+                                  regionsOf(left_regions, gone[g]), regionsOf(right_regions, made[d]));
+            }
             of(Column::Left).lines.back().words  = lspans;
             of(Column::Right).lines.back().words = rspans;
             ++g;
@@ -591,6 +659,10 @@ void ALDiffModel::layout(const std::vector<bool>& open)
             }
             add(Column::Inline, left[static_cast<size_t>(line)], 0, Kind::Removed, move >= 0 ? '>' : '-');
             of(Column::Inline).lines.back().move = move;
+            if (move < 0 && tokened(true, line))
+            {
+                of(Column::Inline).lines.back().words = marksOf(true, line);
+            }
             inline_left.push_back(line);
             inline_right.push_back(-1);
         }
@@ -604,6 +676,10 @@ void ALDiffModel::layout(const std::vector<bool>& open)
             }
             add(Column::Inline, right[static_cast<size_t>(line)], line + 1, Kind::Added, move >= 0 ? '>' : '+');
             of(Column::Inline).lines.back().move = move;
+            if (move < 0 && tokened(false, line))
+            {
+                of(Column::Inline).lines.back().words = marksOf(false, line);
+            }
             inline_left.push_back(-1);
             inline_right.push_back(line);
         }

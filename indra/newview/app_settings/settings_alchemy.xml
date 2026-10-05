@@ -676,7 +676,7 @@
         <key>ALScriptStudioDiffAlgorithm</key>
         <map>
             <key>Comment</key>
-            <string>How Script Studio's comparisons, and a notecard's, choose the lines that stay: histogram, patience or minimal.</string>
+            <string>How Script Studio's comparisons, and a notecard's, choose the lines that stay: histogram, patience, minimal or structural.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

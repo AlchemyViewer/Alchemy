@@ -147,8 +147,12 @@ public:
     // Words that mean the same in the two texts (ALDiffSame), the whole
     // comparison's; a range may have its own besides.
     void    setSame(ALTextDiff::same_t same);
-    // How the lines that stay are chosen (ALTextDiff::Algorithm).
+    // How the lines that stay are chosen (ALTextDiff::Algorithm). By
+    // structure, a changed line's words are its tokens not kept, and a
+    // change of nothing but formatting is none; a change too large for it
+    // is compared as lines are, which fellBack() says.
     void    setAlgorithm(ALTextDiff::Algorithm algorithm);
+    bool    fellBack() const { return mFellBack; }
     // How lines are cut into words -- a grammar's tokens, or none for their
     // bytes alone -- and so which lines of a change pair and what is
     // marked in them.
@@ -324,6 +328,8 @@ private:
     // the runs as they are.
     void              build(const std::vector<bool>& open = {});
     void              layout(const std::vector<bool>& open = {});
+    // By structure, the runs' changes read as tokens (ALStructuralDiff).
+    void              readTokens();
     // The options the texts as shown are compared by: the ranges' anchors,
     // swapped where the texts are.
     ALTextDiff::Options shownOptions() const;
@@ -345,6 +351,12 @@ private:
     std::vector<std::string>     mLeftLines;
     std::vector<std::string>     mRightLines;
     std::vector<ALTextDiff::Run> mRuns;
+    // Compared by structure: each line's tokens of the left and the right
+    // as shown not kept, and whether its change was read so; and whether a
+    // change was too large to be.
+    std::vector<ALTextDiff::spans_t> mMarks[2];
+    std::vector<bool>                mByTokens[2];
+    bool                             mFellBack = false;
     std::vector<Change>   mChanges;
     std::vector<Move>     mMoves;
     std::vector<Fold>     mFolds;

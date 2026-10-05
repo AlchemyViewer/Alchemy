@@ -8870,7 +8870,8 @@ void ALFloaterScriptStudio::addViewCommands()
         [this]() { return mCompareInline; });
     // How comparisons choose the lines that stay: every comparison, and
     // the ones to come.
-    for (const ALTextDiff::Algorithm algorithm : { ALTextDiff::Algorithm::Histogram, ALTextDiff::Algorithm::Patience, ALTextDiff::Algorithm::Minimal })
+    for (const ALTextDiff::Algorithm algorithm :
+         { ALTextDiff::Algorithm::Histogram, ALTextDiff::Algorithm::Patience, ALTextDiff::Algorithm::Minimal, ALTextDiff::Algorithm::Structural })
     {
         mCommands.add(
             std::string("compare_") + ALTextDiff::algorithmName(algorithm), [this, algorithm]() { setCompareAlgorithm(algorithm); }, []() { return true; },

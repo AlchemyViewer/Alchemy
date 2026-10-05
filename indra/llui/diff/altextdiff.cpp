@@ -29,6 +29,7 @@
 #include "aldiffids.h"
 #include "aldifftokens.h"
 #include "allinediff.h"
+#include "alstructuraldiff.h"
 #include "alworddiff.h"
 
 #include <algorithm>
@@ -49,6 +50,8 @@ const char* ALTextDiff::algorithmName(Algorithm algorithm)
             return "patience";
         case Algorithm::Minimal:
             return "minimal";
+        case Algorithm::Structural:
+            return "structural";
         default:
             return "histogram";
     }
@@ -56,7 +59,7 @@ const char* ALTextDiff::algorithmName(Algorithm algorithm)
 
 std::optional<ALTextDiff::Algorithm> ALTextDiff::algorithmFromName(std::string_view name)
 {
-    for (const Algorithm algorithm : { Algorithm::Histogram, Algorithm::Patience, Algorithm::Minimal })
+    for (const Algorithm algorithm : { Algorithm::Histogram, Algorithm::Patience, Algorithm::Minimal, Algorithm::Structural })
     {
         if (name == algorithmName(algorithm))
         {
@@ -218,6 +221,12 @@ namespace
 
 std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options)
 {
+    if (options.algorithm == Algorithm::Structural)
+    {
+        const std::vector<regions_t>* left_regions  = options.lexer ? &options.lexer(left) : nullptr;
+        const std::vector<regions_t>* right_regions = options.lexer ? &options.lexer(right) : nullptr;
+        return ALStructuralDiff::compare(left, right, options, left_regions, right_regions).runs;
+    }
     const Likeness& like = options.like;
     // Each line's regions, where comments are let go of and a grammar says
     // where they are.
