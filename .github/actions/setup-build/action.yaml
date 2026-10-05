@@ -5,6 +5,10 @@ description: >-
   repository checked out with its submodules and VCPKG_ROOT set.
 
 inputs:
+  msvc-environment:
+    description: "true to give the job MSVC's environment on Windows, for a Ninja build"
+    required: false
+    default: "false"
   r2-cache-mode:
     description: "read or readwrite to use the R2 vcpkg binary cache; empty to go without it"
     required: false
@@ -107,6 +111,13 @@ runs:
         then pip3 install llsd cmake==4.0.0 ninja==1.13.2
         else pip3 install llsd cmake==4.4.3 ninja==1.13.2
         fi
+
+    # What a Developer Command Prompt has, for the runner's architecture,
+    # but Visual Studio's CMake, Ninja and vcpkg.
+    - name: MSVC environment
+      if: runner.os == 'Windows' && inputs.msvc-environment == 'true'
+      shell: pwsh
+      run: python scripts/ci/msvc_environment.py
 
     - name: Bootstrap vcpkg Windows
       if: runner.os == 'Windows'

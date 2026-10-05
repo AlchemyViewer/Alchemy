@@ -315,6 +315,7 @@ jobs:
       - name: Set up the build
         uses: ./.github/actions/setup-build
         with:
+          msvc-environment: true
           r2-cache-mode: ${{ needs.setup.outputs.r2_cache_mode }}
           r2-endpoint-url: ${{ vars.VCPKG_R2_ENDPOINT_URL }}
           r2-bucket: ${{ vars.VCPKG_R2_BUCKET }}
@@ -339,10 +340,15 @@ jobs:
             cmake_preset_postfix="-os"
           fi
 
+          compiler_args=()
           case "$RUNNER_OS" in
             Windows)
-              cmake_preset_name="vs2026${cmake_preset_postfix}-$BUILD_ARCH"
+              # Ninja with the MSVC environment the setup gave the job, for
+              # the runner's architecture; named, so no other compiler on the
+              # image's path is taken for it.
+              cmake_preset_name="ninja${cmake_preset_postfix}"
               build_directory="build-Windows-$cmake_preset_name"
+              compiler_args=(-DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl)
               if [[ "$BUILD_ARCH" == "arm64" ]]
               then
                 vcpkg_triplet="arm64-windows-alchemy-release"
@@ -373,6 +379,7 @@ jobs:
           # installed: a cache miss builds every port, and their leftovers
           # would take the disk the viewer's own build needs.
           cmake -S indra --preset $cmake_preset_name \
+            "${compiler_args[@]}" \
             -DVCPKG_INSTALL_OPTIONS=--clean-after-build \
             -DVCPKG_TARGET_TRIPLET="$vcpkg_triplet" \
             -DAL_BUILD_VIEWER:BOOL="$AL_BUILD_VIEWER" \
