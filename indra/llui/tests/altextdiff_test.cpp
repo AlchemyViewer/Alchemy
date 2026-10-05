@@ -26,6 +26,8 @@
 
 #include "altextdiff.h"
 
+#include "allinepairs.h"
+
 #include "../test/lltut.h"
 
 #include <random>
@@ -448,5 +450,47 @@ namespace tut
         ensure("a for", ALTextDiff::anchorsOf({ { 4, 4, 2, 6 }, { 4, 4, 4, 4 } }) == A{ { 4, 2 }, { 5, 7 } });
         ensure("ranges in a row: one line each way between them", ALTextDiff::anchorsOf({ { 0, 0, 0, 1 }, { 1, 2, 2, 2 } }) == A{ { 0, 0 }, { 1, 2 }, { 3, 3 } });
         ensure("none: none", ALTextDiff::anchorsOf({}).empty());
+    }
+
+    template<> template<>
+    void altextdiff_object::test<14>()
+    {
+        set_test_name("a change's lines paired by likeness: alike enough or alone, in order, the most alike in all; two swapped, one of them; long changes by place");
+        ensure("the same words: alike", ALLinePairs::alike("x = 1;", "x = 1;") == 1.f);
+        ensure("half their words: just alike enough", ALLinePairs::alike("a b c d", "a b x y") == 0.5f);
+        ensure("blanks not weighed", ALLinePairs::alike("a  b", "a b") == 1.f);
+        ensure("nothing in common", ALLinePairs::alike("}", "end") == 0.f);
+        ensure("two lines of no words alike", ALLinePairs::alike("", "  ") == 1.f);
+
+        typedef ALLinePairs::pairs_t P;
+        const std::vector<std::string> left  = { "integer a = 1;", "integer b = 2;", "llSay(0, \"gone\");", "integer c = 3;" };
+        const std::vector<std::string> right = { "integer a = 10;", "integer b = 20;", "integer c = 30;" };
+        ensure("the line taken out in the middle alone, the rest beside what they became",
+               ALLinePairs::pair(left, right, { 0, 1, 2, 3 }, { 0, 1, 2 }) == P{ { 0, 0 }, { 1, 1 }, { 3, 2 } });
+        ensure("only some of a text's lines, by where they are", ALLinePairs::pair(left, right, { 2, 3 }, { 2 }) == P{ { 1, 0 } });
+        const std::vector<std::string> words   = { "alpha beta gamma delta", "one two three four" };
+        const std::vector<std::string> swapped = { "one two three five", "alpha beta gamma epsilon" };
+        const P one = ALLinePairs::pair(words, swapped, { 0, 1 }, { 0, 1 });
+        ensure("two swapped: one of them paired, in order", one.size() == 1 && (one[0] == std::make_pair(0, 1) || one[0] == std::make_pair(1, 0)));
+        ensure("nothing alike: nothing paired", ALLinePairs::pair({ "}", "}" }, { "end", "end" }, { 0, 1 }, { 0, 1 }).empty());
+        ensure("nothing either side: nothing", ALLinePairs::pair(left, right, {}, { 0 }).empty());
+        ALTextDiff::Options anchored;
+        anchored.anchors = { { 0, 1 } };
+        ensure("an anchored pair paired however unlike", ALLinePairs::pair({ "}" }, { "x", "end" }, { 0 }, { 0, 1 }, anchored) == P{ { 0, 1 } });
+
+        // Past what may be weighed: each by its own place.
+        std::vector<std::string> many_left;
+        std::vector<std::string> many_right;
+        std::vector<S32>         gone;
+        std::vector<S32>         made;
+        for (S32 i = 0; i < 400; ++i)
+        {
+            many_left.push_back("value " + std::to_string(i) + " = old;");
+            many_right.push_back(i == 0 ? std::string("nothing like it") : "value " + std::to_string(i) + " = new;");
+            gone.push_back(i);
+            made.push_back(i);
+        }
+        const P placed = ALLinePairs::pair(many_left, many_right, gone, made);
+        ensure("by place, the unlike first alone", placed.size() == 399 && placed.front() == std::make_pair(1, 1) && placed.back() == std::make_pair(399, 399));
     }
 }

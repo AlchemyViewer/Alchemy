@@ -137,7 +137,10 @@ target_sources(
     base/aldeferredrebuild.cpp
     diff/aldiffbar.cpp
     diff/aldiffmodel.cpp
+    diff/aldifftokens.cpp
     diff/aldiffview.cpp
+    diff/allinediff.cpp
+    diff/allinepairs.cpp
     studio/aldockpanel.cpp
     studio/alemptystate.cpp
     fields/alflagsfield.cpp
@@ -352,8 +355,12 @@ target_sources(
         fields/alcolorsheet.h
         base/aldeferredrebuild.h
         diff/aldiffbar.h
+        diff/aldiffids.h
         diff/aldiffmodel.h
+        diff/aldifftokens.h
         diff/aldiffview.h
+        diff/allinediff.h
+        diff/allinepairs.h
         studio/aldockpanel.h
         studio/alemptystate.h
         fields/alflagsfield.h
@@ -524,13 +531,15 @@ if(AL_BUILD_TESTS)
   al_add_test(llchatautocompletemodel UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(llurlmatch UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(alkeymap UNIT PROJECT llui DIR code LIBRARIES ${test_libs})
-  al_add_test(altextdiff UNIT PROJECT llui DIR diff LIBRARIES ${test_libs})
+  # What comparing two texts is made of, compiled in, below the view.
+  set(diff_sources diff/aldifftokens.cpp diff/allinediff.cpp diff/allinepairs.cpp)
+  al_add_test(altextdiff UNIT PROJECT llui DIR diff SOURCES ${diff_sources} LIBRARIES ${test_libs})
   al_add_test(
     aldiffmodel
     UNIT
     PROJECT llui
     DIR diff
-    SOURCES diff/altextdiff.cpp
+    SOURCES diff/altextdiff.cpp ${diff_sources}
     LIBRARIES ${test_libs}
   )
   al_add_test(alanchoredranges PROJECT llui SOURCES text/altextdocument.cpp LIBRARIES ${test_libs})

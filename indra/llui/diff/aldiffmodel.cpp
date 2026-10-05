@@ -26,6 +26,8 @@
 
 #include "aldiffmodel.h"
 
+#include "allinepairs.h"
+
 #include <algorithm>
 
 // --- LineMap -------------------------------------------------------------------
@@ -279,38 +281,41 @@ void ALDiffModel::build(const std::vector<bool>& open)
             std::swap(change.lines.leftFirst, change.lines.rightFirst);
             std::swap(change.lines.leftCount, change.lines.rightCount);
         }
-        // Side by side: changed where both have a line, else taken out or
-        // put in beside a row of nothing; the words that differ found once
-        // for both ways of showing.
-        const size_t                                                     rows = std::max(gone.size(), made.size());
+        // Side by side: the lines that stand for each other (ALTextDiff's
+        // pairs) changed, beside each other, their words that differ found
+        // once for both ways of showing; the rest taken out or put in alone,
+        // beside a row of nothing, what was taken out before what was put
+        // in between two pairs.
+        const ALLinePairs::pairs_t pairs = ALLinePairs::pair(left, right, gone, made, options);
         std::vector<std::pair<ALTextDiff::spans_t, ALTextDiff::spans_t>> paired;
-        for (size_t n = 0; n < rows; ++n)
+        size_t                                                           g = 0;
+        size_t                                                           d = 0;
+        for (size_t p = 0; p <= pairs.size(); ++p)
         {
-            const bool has_out = n < gone.size();
-            const bool has_in  = n < made.size();
-            if (has_out)
+            const size_t to_gone = p < pairs.size() ? static_cast<size_t>(pairs[p].first) : gone.size();
+            const size_t to_made = p < pairs.size() ? static_cast<size_t>(pairs[p].second) : made.size();
+            for (; g < to_gone; ++g)
             {
-                add(Column::Left, left[static_cast<size_t>(gone[n])], gone[n] + 1, Kind::Removed, has_in ? '~' : '-');
-            }
-            else
-            {
-                pad(Column::Left);
-            }
-            if (has_in)
-            {
-                add(Column::Right, right[static_cast<size_t>(made[n])], made[n] + 1, Kind::Added, has_out ? '~' : '+');
-            }
-            else
-            {
+                add(Column::Left, left[static_cast<size_t>(gone[g])], gone[g] + 1, Kind::Removed, '-');
                 pad(Column::Right);
             }
-            if (has_out && has_in)
+            for (; d < to_made; ++d)
             {
-                auto& [lspans, rspans] = paired.emplace_back();
-                ALTextDiff::words(left[static_cast<size_t>(gone[n])], right[static_cast<size_t>(made[n])], lspans, rspans, mOptions);
-                of(Column::Left).lines.back().words  = lspans;
-                of(Column::Right).lines.back().words = rspans;
+                pad(Column::Left);
+                add(Column::Right, right[static_cast<size_t>(made[d])], made[d] + 1, Kind::Added, '+');
             }
+            if (p == pairs.size())
+            {
+                break;
+            }
+            add(Column::Left, left[static_cast<size_t>(gone[g])], gone[g] + 1, Kind::Removed, '~');
+            add(Column::Right, right[static_cast<size_t>(made[d])], made[d] + 1, Kind::Added, '~');
+            auto& [lspans, rspans] = paired.emplace_back();
+            ALTextDiff::words(left[static_cast<size_t>(gone[g])], right[static_cast<size_t>(made[d])], lspans, rspans, mOptions);
+            of(Column::Left).lines.back().words  = lspans;
+            of(Column::Right).lines.back().words = rspans;
+            ++g;
+            ++d;
         }
         // Inline: what was taken out, unnumbered, above what was put in.
         const S32 first_out = lineCount(Column::Inline);
@@ -327,10 +332,10 @@ void ALDiffModel::build(const std::vector<bool>& open)
             inline_left.push_back(-1);
             inline_right.push_back(line);
         }
-        for (size_t n = 0; n < paired.size(); ++n)
+        for (size_t n = 0; n < pairs.size(); ++n)
         {
-            of(Column::Inline).lines[static_cast<size_t>(first_out) + n].words = std::move(paired[n].first);
-            of(Column::Inline).lines[static_cast<size_t>(first_in) + n].words  = std::move(paired[n].second);
+            of(Column::Inline).lines[static_cast<size_t>(first_out + pairs[n].first)].words = std::move(paired[n].first);
+            of(Column::Inline).lines[static_cast<size_t>(first_in + pairs[n].second)].words = std::move(paired[n].second);
         }
         change.end[index(Layout::Sides)]  = rowCount(Layout::Sides);
         change.end[index(Layout::Inline)] = rowCount(Layout::Inline);

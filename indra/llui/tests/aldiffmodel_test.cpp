@@ -112,9 +112,9 @@ namespace tut
     void aldiffmodel_object::test<1>()
     {
         set_test_name("side by side: each text as it is, its lines lined up, a row of nothing beside a line the other has; what each line is");
-        m.setTexts("a\nb\nc", "a\nx\nc\nd");
-        ensure_equals("the left as it is", m.text(Column::Left), std::string("a\nb\nc"));
-        ensure_equals("the right as it is", m.text(Column::Right), std::string("a\nx\nc\nd"));
+        m.setTexts("a\nb = 1\nc", "a\nb = 2\nc\nd");
+        ensure_equals("the left as it is", m.text(Column::Left), std::string("a\nb = 1\nc"));
+        ensure_equals("the right as it is", m.text(Column::Right), std::string("a\nb = 2\nc\nd"));
         ensure("numbered as their own", numbersOf(Column::Left) == std::vector<S32>{ 1, 2, 3 } && numbersOf(Column::Right) == std::vector<S32>{ 1, 2, 3, 4 });
         ensure_equals("the left: the same, one changed, the same", kindsOf(Column::Left), std::string("=-="));
         ensure_equals("the right: and one put in", kindsOf(Column::Right), std::string("=+=+"));
@@ -132,8 +132,8 @@ namespace tut
     void aldiffmodel_object::test<2>()
     {
         set_test_name("inline: what was taken out above what was put in, numbered as the right, a line taken out unnumbered");
-        m.setTexts("a\nb\nc", "a\nx\nc\nd");
-        ensure_equals("one text", m.text(Column::Inline), std::string("a\nb\nx\nc\nd"));
+        m.setTexts("a\nb = 1\nc", "a\nb = 2\nc\nd");
+        ensure_equals("one text", m.text(Column::Inline), std::string("a\nb = 1\nb = 2\nc\nd"));
         ensure("numbered as the right", numbersOf(Column::Inline) == std::vector<S32>{ 1, 0, 2, 3, 4 });
         ensure_equals("what each is", kindsOf(Column::Inline), std::string("=-+=+"));
         ensure_equals("signed", signsOf(Column::Inline), std::string("\0-+\0+", 5));
@@ -146,7 +146,7 @@ namespace tut
     void aldiffmodel_object::test<3>()
     {
         set_test_name("changes: their rows each way and their lines in the texts; a line's change, under a change's gap too; steps from change to change");
-        m.setTexts("a\nb\nc", "a\nx\nc\nd");
+        m.setTexts("a\nb = 1\nc", "a\nb = 2\nc\nd");
         ensure_equals("two", m.changeCount(), 2);
         ensure("the first's rows", m.changeFirst(Layout::Sides, 0) == 1 && m.changeEnd(Layout::Sides, 0) == 2 && m.changeFirst(Layout::Inline, 0) == 1 &&
                                        m.changeEnd(Layout::Inline, 0) == 3);
@@ -189,7 +189,7 @@ namespace tut
     void aldiffmodel_object::test<5>()
     {
         set_test_name("a long run the same folds beyond three lines of context, with its own row after it, each way; each column's lines of it and the line under its row");
-        m.setTexts(lines(30).c_str(), lines(30, { { 2, "two" }, { 27, "twenty-seven" } }).c_str());
+        m.setTexts(lines(30).c_str(), lines(30, { { 2, "line two" }, { 27, "line 27 changed" } }).c_str());
         ensure("one, folded", m.foldCount() == 1 && m.foldedCount() == 1 && !m.foldOpen(0));
         // Side by side: 0-1 the same, 2 a change, 3-5 context, 6-23 the run,
         // its row 24, 25-27 context, 28 a change, 29-30 the same.
@@ -211,7 +211,7 @@ namespace tut
         ensure("all folded again", m.foldedCount() == 1 && m.foldsSame());
         m.setFoldSame(false);
         ensure("all opened", m.foldedCount() == 0 && !m.foldsSame());
-        m.setTexts(lines(30).c_str(), lines(30, { { 2, "two" } }).c_str());
+        m.setTexts(lines(30).c_str(), lines(30, { { 2, "line two" } }).c_str());
         ensure("a new text folded as asked, not", m.foldCount() == 1 && m.foldedCount() == 0);
     }
 
@@ -240,9 +240,9 @@ namespace tut
     void aldiffmodel_object::test<7>()
     {
         set_test_name("swapped: the right's text on the left, its lines taken out; a change's lines still the texts' as given; the runs as open as they were");
-        m.setTexts("a\nb\nc", "a\nx\nc\nd");
+        m.setTexts("a\nb = 1\nc", "a\nb = 2\nc\nd");
         m.setSwapped(true);
-        ensure("the right's on the left", m.text(Column::Left) == "a\nx\nc\nd" && m.text(Column::Right) == "a\nb\nc");
+        ensure("the right's on the left", m.text(Column::Left) == "a\nb = 2\nc\nd" && m.text(Column::Right) == "a\nb = 1\nc");
         ensure_equals("its lines taken out", kindsOf(Column::Left), std::string("=-=-"));
         ensure("the gap now the right's", paddingOf(Column::Right) == std::vector<S32>{ 0, 0, 0, 1 });
         ensure_equals("the column showing the right's text", static_cast<S32>(m.rightColumn()), static_cast<S32>(Column::Left));
@@ -250,12 +250,12 @@ namespace tut
         ensure("the line put in still the right's", last.rightFirst == 3 && last.rightCount == 1 && last.leftCount == 0);
         ensure("from the left, the right's own line and column", m.rightAt(Column::Left, 1, 1) == std::make_pair(1, 1));
         ensure("from the right, the line beside it, its start", m.rightAt(Column::Right, 2, 1) == std::make_pair(2, 0));
-        ensure_equals("inline, the right's lines taken out", m.text(Column::Inline), std::string("a\nx\nb\nc\nd"));
+        ensure_equals("inline, the right's lines taken out", m.text(Column::Inline), std::string("a\nb = 2\nb = 1\nc\nd"));
         ensure("a line of the right's, inline, is its own", m.rightAt(Column::Inline, 1, 1) == std::make_pair(1, 1));
         ensure("one of the left's: the right's next, from its start", m.rightAt(Column::Inline, 2, 1) == std::make_pair(2, 0));
 
         m.setSwapped(false);
-        m.setTexts(lines(30).c_str(), lines(30, { { 2, "two" }, { 27, "twenty-seven" } }).c_str());
+        m.setTexts(lines(30).c_str(), lines(30, { { 2, "line two" }, { 27, "line 27 changed" } }).c_str());
         m.setFoldOpen(0, true);
         m.setSwapped(true);
         ensure("swapped, open still", m.foldCount() == 1 && m.foldOpen(0));
@@ -287,14 +287,14 @@ namespace tut
     void aldiffmodel_object::test<9>()
     {
         set_test_name("the right made anew: where each of its lines went, the runs as open as they were, the anchors carried with their lines, changed or not");
-        const std::string right = lines(30, { { 2, "two" }, { 27, "twenty-seven" } });
+        const std::string right = lines(30, { { 2, "line two" }, { 27, "line 27 changed" } });
         m.setTexts(lines(30).c_str(), right.c_str());
         m.setFoldOpen(0, true);
         const ALDiffModel::LineMap map = m.setRightText("inserted\n" + right);
         ensure("each line one further down, still as it was", map.line(25) == 26 && map.kept(25) && map.line(0) == 1);
         ensure_equals("compared again: a change more", m.changeCount(), 3);
         ensure("the run as open as it was", m.foldCount() == 1 && m.foldOpen(0));
-        const ALDiffModel::LineMap gone = m.setRightText("inserted\n" + lines(30, { { 2, "two" }, { 27, "twenty-seven" }, { 25, "changed" } }));
+        const ALDiffModel::LineMap gone = m.setRightText("inserted\n" + lines(30, { { 2, "line two" }, { 27, "line 27 changed" }, { 25, "changed" } }));
         ensure("a line changed: to the line it became, not kept", gone.line(26) == 26 && !gone.kept(26) && gone.kept(25));
         ensure("past the end: the last", gone.line(400) == 30);
 
@@ -372,5 +372,32 @@ namespace tut
         m.setSwapped(false);
         m.setRightText(std::string("-- a line more\n") + slua);
         ensure("carried with the right's lines", m.ranges()[2].rightFirst == 3 && m.ranges()[2].rightLast == 5 && beside(4, 3) && beside(5, 6));
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<12>()
+    {
+        set_test_name("a change's lines paired by likeness: a line taken out among lines edited stands alone, each edited line beside what it became; nothing alike, nothing paired");
+        // Six lines edited, the third of them taken out as well.
+        m.setTexts("a = 1;\nb = 2;\nc = 3;\nd = 4;\ne = 5;\nf = 6;", "a = 10;\nb = 20;\nd = 40;\ne = 50;\nf = 60;");
+        ensure_equals("one change", m.changeCount(), 1);
+        ensure_equals("the left: two paired, one alone, the rest paired", signsOf(Column::Left), std::string("~~-~~~"));
+        ensure_equals("the right: all paired", signsOf(Column::Right), std::string("~~~~~"));
+        ensure("each beside what it became", beside(0, 0) && beside(1, 1) && beside(3, 2) && beside(4, 3) && beside(5, 4));
+        ensure("the one taken out beside a row of nothing", m.line(Column::Right, 2).padding == 1 && m.rowCount(Layout::Sides) == 6);
+        ensure("an edited pair's number marked, alone", m.line(Column::Left, 3).words.size() == 1 && m.line(Column::Right, 2).words.size() == 1);
+        ensure("the line alone unmarked", m.line(Column::Left, 2).words.empty());
+        ensure("inline, the pairs' words where they are", m.line(Column::Inline, 3).words.size() == 1 && m.line(Column::Inline, 2).words.empty() &&
+                                                            m.line(Column::Inline, 8).words.size() == 1);
+
+        // A line changed into nothing like it: taken out, then put in.
+        m.setTexts("x\n}\ny", "x\nend\ny");
+        ensure("each alone", signsOf(Column::Left) == std::string("\0-\0", 3) && signsOf(Column::Right) == std::string("\0+\0", 3));
+        ensure("on rows of their own: what was taken out first", m.rowCount(Layout::Sides) == 4 && m.rowOfLine(Column::Left, 1) == 1 && m.rowOfLine(Column::Right, 1) == 2);
+        ensure("no words marked", m.line(Column::Left, 1).words.empty() && m.line(Column::Right, 1).words.empty());
+
+        // Lines kept beside each other by a range: a pair however unlike.
+        m.setTexts("default\n{\n    touch_start(integer d)", "-- x\nLLEvents:on(\"touch_start\", function(detected)", { { 2, 2, 1, 1 } });
+        ensure("the anchored pair paired", beside(2, 1) && m.line(Column::Left, 2).sign == '~');
     }
 }

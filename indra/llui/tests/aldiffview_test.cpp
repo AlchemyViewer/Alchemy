@@ -153,9 +153,9 @@ namespace tut
     void aldiffview_object::test<1>()
     {
         set_test_name("side by side: each text as it is, lined up, a line one side has beside a gap on the other, and each change tinted");
-        ALDiffView& d = make("a\nb\nc", "a\nx\nc\nd");
-        ensure_equals("the left as it is", d.left()->text(), std::string("a\nb\nc"));
-        ensure_equals("the right as it is", d.right()->text(), std::string("a\nx\nc\nd"));
+        ALDiffView& d = make("a\nb = 1\nc", "a\nb = 2\nc\nd");
+        ensure_equals("the left as it is", d.left()->text(), std::string("a\nb = 1\nc"));
+        ensure_equals("the right as it is", d.right()->text(), std::string("a\nb = 2\nc\nd"));
         ensure("numbered as each text's own", numbersOf(d.left()) == std::vector<S32>{ 1, 2, 3 });
         ensure("the right's", numbersOf(d.right()) == std::vector<S32>{ 1, 2, 3, 4 });
         ensure("a row of nothing below the left, to stand beside d", gapsOf(d.left()) == std::vector<S32>{ 0, 0, 0, 1 });
@@ -173,14 +173,14 @@ namespace tut
     void aldiffview_object::test<2>()
     {
         set_test_name("inline: what was taken out above what was put in, numbered as the right; and back side by side");
-        ALDiffView& d = make("a\nb\nc", "a\nx\nc\nd", true);
-        ensure_equals("one text", d.inlined()->text(), std::string("a\nb\nx\nc\nd"));
+        ALDiffView& d = make("a\nb = 1\nc", "a\nb = 2\nc\nd", true);
+        ensure_equals("one text", d.inlined()->text(), std::string("a\nb = 1\nb = 2\nc\nd"));
         ensure("the line taken out without a number", numbersOf(d.inlined()) == std::vector<S32>{ 1, 0, 2, 3, 4 });
         ensure("tinted", tinted(*d.inlined(), 1) && tinted(*d.inlined(), 2) && !tinted(*d.inlined(), 3) && tinted(*d.inlined(), 4));
         ensure("the one shown", d.shown() == d.inlined() && d.inlined()->getVisible() && !d.left()->getVisible());
         d.setInline(false);
         ensure("side by side again", d.left()->getVisible() && d.right()->getVisible() && !d.inlined()->getVisible());
-        ensure_equals("as before", d.left()->text(), std::string("a\nb\nc"));
+        ensure_equals("as before", d.left()->text(), std::string("a\nb = 1\nc"));
     }
 
     template<> template<>
@@ -364,12 +364,12 @@ namespace tut
     void aldiffview_object::test<10>()
     {
         set_test_name("swapped: the right shown on the left, its titles with it; and what is typed still goes to the right's text, at its line");
-        ALDiffView& d = make("a\nb\nc", "a\nx\nc\nd");
+        ALDiffView& d = make("a\nb = 1\nc", "a\nb = 2\nc\nd");
         d.setTitles("Saved", "Now");
         press(d, "swap");
         ensure("swapped, and lit", d.isSwapped() && ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("swap"))->getToggleState());
-        ensure_equals("the right's text on the left", d.left()->text(), std::string("a\nx\nc\nd"));
-        ensure_equals("the left's on the right", d.right()->text(), std::string("a\nb\nc"));
+        ensure_equals("the right's text on the left", d.left()->text(), std::string("a\nb = 2\nc\nd"));
+        ensure_equals("the left's on the right", d.right()->text(), std::string("a\nb = 1\nc"));
         ensure("lined up, the gap below it", gapsOf(d.right()) == std::vector<S32>{ 0, 0, 0, 1 });
         ensure("its lines now the ones put in", tinted(*d.right(), 1) && !tinted(*d.right(), 0));
         ensure_equals("the titles with them", d.getChild<LLUICtrl>("left_title")->getValue().asString(), std::string("Now"));
@@ -392,14 +392,14 @@ namespace tut
         ensure("from the other, the right's line beside it, its start", at_line == 2 && at_column == 0);
 
         d.setInline(true);
-        ensure_equals("inline, the right's lines taken out", d.inlined()->text(), std::string("a\nx\nb\nc\nd"));
+        ensure_equals("inline, the right's lines taken out", d.inlined()->text(), std::string("a\nb = 2\nb = 1\nc\nd"));
         d.inlined()->goTo(ALTextPos(1, 1));
         ensure("a line of the right's, inline, is its own", d.rightAtCaret() == std::make_pair(1, 1));
         d.inlined()->goTo(ALTextPos(2, 1));
         ensure("one of the left's: the right's next, from its start", d.rightAtCaret() == std::make_pair(2, 0));
         d.setInline(false);
         d.setSwapped(false);
-        ensure_equals("back as it was", d.left()->text(), std::string("a\nb\nc"));
+        ensure_equals("back as it was", d.left()->text(), std::string("a\nb = 1\nc"));
         ensure_equals("titles too", d.getChild<LLUICtrl>("left_title")->getValue().asString(), std::string("Saved"));
     }
 
@@ -550,7 +550,7 @@ namespace tut
     void aldiffview_object::test<15>()
     {
         set_test_name("the ruler down each side marks its own changes and, beside a gap, the other side's: either alone shows them all; inline, each line's");
-        ALDiffView& d      = make("a\nb\nc\ne", "a\nx\nc\nd\ne");
+        ALDiffView& d      = make("a\nb = 1\nc\ne", "a\nb = 2\nc\nd\ne");
         const auto  marked = [](const ALCodeEditor* side, S32 row) {
             return side->lineAnnotation(row).rulerTint.mV[VALPHA] > 0.f;
         };
@@ -573,7 +573,7 @@ namespace tut
     void aldiffview_object::test<16>()
     {
         set_test_name("beside the numbers, what each line is, so a change reads without its colour: ~ changed, - taken out, + put in");
-        ALDiffView& d = make("a\nb\nc\ne\nf", "a\nx\nc\nd\ne");
+        ALDiffView& d = make("a\nb = 1\nc\ne\nf", "a\nb = 2\nc\nd\ne");
         ensure("the left: the line changed, the one taken out", signsOf(d.left()) == std::string("\0~\0\0-", 5));
         ensure("the right: the line changed, the one put in", signsOf(d.right()) == std::string("\0~\0+\0", 5));
         d.setInline(true);
@@ -659,8 +659,8 @@ namespace tut
         ensure("swapped, the right's two lines made the left's one", d.takeBack(0) && source->text() == "one\ntwo\nthree" && d.changeCount() == 0);
 
         d.setSwapped(false);
-        d.setTexts("one\ntwo\nthree", "one\n2\nthree");
-        source->setText("one\n2\nthree");
+        d.setTexts("one\nx = 2\nthree", "one\nx = two\nthree");
+        source->setText("one\nx = two\nthree");
         const LLRect frame = d.right()->getRect();
         const LLRect text  = d.right()->textRect();
         const S32    row_h = d.right()->layout().lineHeight(1);
@@ -669,7 +669,7 @@ namespace tut
         d.handleMouseDown(gap_x, y + row_h, MASK_NONE);
         ensure("beside a line the same, nothing", d.changeCount() == 1);
         ensure("the arrow pressed", d.handleMouseDown(gap_x, y, MASK_NONE));
-        ensure("taken back", d.changeCount() == 0 && source->text() == "one\ntwo\nthree");
+        ensure("taken back", d.changeCount() == 0 && source->text() == "one\nx = 2\nthree");
         source->die();
     }
 

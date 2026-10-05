@@ -41,6 +41,11 @@
 // another, the fewest words. Pure: what a diff view shows, and what a test
 // can hold it to.
 //
+// This is what is compared and how, and the ways in; the work is done
+// beside it, a part a file: the ways lines are found (ALLineDiff), the
+// words a line is cut into (ALDiffTokens), and which lines of a change
+// stand for each other (ALLinePairs).
+//
 // A text's lines are its own to split; a line holds no line break.
 namespace ALTextDiff
 {

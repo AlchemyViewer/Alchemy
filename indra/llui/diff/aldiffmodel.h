@@ -37,7 +37,10 @@
 // ways at once. Side by side, two columns, the left and the right, each
 // its own text as it is, their lines lined up in rows: a row of nothing
 // where a column has no line, which is a row of the gap above its next
-// line. Inline, one column: what was taken out above what was put in. In
+// line; within a change, the lines taken out and put in that stand for
+// each other (ALLinePairs) on one row, the rest alone beside
+// rows of nothing. Inline, one column: what was taken out above what was
+// put in. In
 // both, a run of lines the same beyond FOLD_CONTEXT lines either side of
 // a change -- none at the text's start or end -- where that leaves
 // FOLD_LEAST or more, is folded away, with a row of its own after it that

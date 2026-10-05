@@ -1,0 +1,464 @@
+/**
+ * @file allinediff.cpp
+ * @brief Which lines of two texts stay and which change: the ways of finding it.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "allinediff.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
+
+#include <algorithm>
+#include <cstdlib>
+
+using ALLineDiff::push;
+using ALLineDiff::Run;
+using ALLineDiff::Kind;
+
+// A stretch added after the last, joined to it where it is of the same
+// kind and carries straight on from it.
+void ALLineDiff::push(std::vector<Run>& out, Kind kind, S32 left, S32 right, S32 count)
+{
+    if (count <= 0)
+    {
+        return;
+    }
+    if (!out.empty() && out.back().kind == kind)
+    {
+        Run&       last = out.back();
+        const bool on   = kind == Kind::Same      ? last.left + last.count == left && last.right + last.count == right
+                          : kind == Kind::Removed ? last.left + last.count == left && last.right == right
+                                                  : last.right + last.count == right && last.left == left;
+        if (on)
+        {
+            last.count += count;
+            return;
+        }
+    }
+    out.push_back(Run{ kind, left, right, count });
+}
+
+namespace
+{
+    // The fewest taken out of `a` and put in from `b` that make the one the
+    // other, where they begin at `left` and `right` in their texts (Myers):
+    // the middle of the shortest way found by walking from both ends at
+    // once, and each half on its own, in space as much as the texts, not
+    // their square. All of each where the walking runs past `work`.
+    void myersAt(const S32* a, S32 n, const S32* b, S32 m, S32 left, S32 right, S64& work, std::vector<Run>& out)
+    {
+        // What the two share at either end, first.
+        S32 head = 0;
+        while (head < n && head < m && a[head] == b[head])
+        {
+            ++head;
+        }
+        S32 tail = 0;
+        while (tail < n - head && tail < m - head && a[n - 1 - tail] == b[m - 1 - tail])
+        {
+            ++tail;
+        }
+        push(out, Kind::Same, left, right, head);
+        a += head;
+        b += head;
+        n -= head + tail;
+        m -= head + tail;
+        left += head;
+        right += head;
+        const auto finish = [&]() { push(out, Kind::Same, left + n, right + m, tail); };
+        if (n == 0 || m == 0 || work <= 0)
+        {
+            push(out, Kind::Removed, left, right, n);
+            push(out, Kind::Added, left + n, right, m);
+            finish();
+            return;
+        }
+        // The furthest along each diagonal k = x - y from the start, and
+        // from the end the other way; a diagonal not reached -1.
+        const S32        most   = (n + m + 1) / 2;
+        const S32        offset = most + 1;
+        const S32        width  = 2 * most + 3;
+        std::vector<S32> forward(static_cast<size_t>(width), -1);
+        std::vector<S32> backward(static_cast<size_t>(width), -1);
+        forward[static_cast<size_t>(offset + 1)]  = 0;
+        backward[static_cast<size_t>(offset + 1)] = 0;
+        const S32  delta = n - m;
+        const bool odd   = (delta & 1) != 0;
+        // Diagonals that ran off the texts' edges, not walked again.
+        S32 k1_start = 0, k1_end = 0, k2_start = 0, k2_end = 0;
+        for (S32 d = 0; d < most; ++d)
+        {
+            work -= 2 * d + 2;
+            if (work <= 0)
+            {
+                break;
+            }
+            for (S32 k1 = -d + k1_start; k1 <= d - k1_end; k1 += 2)
+            {
+                const S32 at = offset + k1;
+                S32       x1 = (k1 == -d || (k1 != d && forward[at - 1] < forward[at + 1])) ? forward[at + 1] : forward[at - 1] + 1;
+                S32       y1 = x1 - k1;
+                while (x1 < n && y1 < m && a[x1] == b[y1])
+                {
+                    ++x1;
+                    ++y1;
+                }
+                forward[at] = x1;
+                if (x1 > n)
+                {
+                    k1_end += 2;
+                }
+                else if (y1 > m)
+                {
+                    k1_start += 2;
+                }
+                else if (odd)
+                {
+                    const S32 other = offset + delta - k1;
+                    if (other >= 0 && other < width && backward[other] != -1 && x1 >= n - backward[other])
+                    {
+                        // Met: each side of the meeting on its own.
+                        myersAt(a, x1, b, y1, left, right, work, out);
+                        myersAt(a + x1, n - x1, b + y1, m - y1, left + x1, right + y1, work, out);
+                        finish();
+                        return;
+                    }
+                }
+            }
+            for (S32 k2 = -d + k2_start; k2 <= d - k2_end; k2 += 2)
+            {
+                const S32 at = offset + k2;
+                S32       x2 = (k2 == -d || (k2 != d && backward[at - 1] < backward[at + 1])) ? backward[at + 1] : backward[at - 1] + 1;
+                S32       y2 = x2 - k2;
+                while (x2 < n && y2 < m && a[n - x2 - 1] == b[m - y2 - 1])
+                {
+                    ++x2;
+                    ++y2;
+                }
+                backward[at] = x2;
+                if (x2 > n)
+                {
+                    k2_end += 2;
+                }
+                else if (y2 > m)
+                {
+                    k2_start += 2;
+                }
+                else if (!odd)
+                {
+                    const S32 other = offset + delta - k2;
+                    if (other >= 0 && other < width && forward[other] != -1)
+                    {
+                        const S32 x1 = forward[other];
+                        const S32 y1 = offset + x1 - other;
+                        if (x1 >= n - x2)
+                        {
+                            myersAt(a, x1, b, y1, left, right, work, out);
+                            myersAt(a + x1, n - x1, b + y1, m - y1, left + x1, right + y1, work, out);
+                            finish();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        // Nothing found within the walking allowed, or nothing shared.
+        push(out, Kind::Removed, left, right, n);
+        push(out, Kind::Added, left + n, right, m);
+        finish();
+    }
+
+    // Lines of a text that come up more often than this are no help in
+    // finding where two texts line up: a brace, a blank line.
+    constexpr S32 MOST_OCCURRENCES = 64;
+    // How deep the splitting may go before what is left is walked instead.
+    constexpr S32 MOST_DEPTH = 256;
+
+    // A histogram diff, as git's: the stretch the two share whose lines are
+    // the rarest in the left -- longest of those as rare -- kept, and the
+    // stretches before it and after it diffed the same way; where nothing
+    // shared is rare enough, the fewest changes (Myers). Code's braces and
+    // blank lines, common everywhere, do not pair a function with another's.
+    void histogramAt(const S32* a, S32 n, const S32* b, S32 m, S32 left, S32 right, S32 depth, S64& work, std::vector<Run>& out)
+    {
+        // What the two share at the end, set aside to put last.
+        S32 tail = 0;
+        while (tail < n && tail < m && a[n - 1 - tail] == b[m - 1 - tail])
+        {
+            ++tail;
+        }
+        n -= tail;
+        m -= tail;
+        const S32 tail_left  = left + n;
+        const S32 tail_right = right + m;
+        // Each stretch kept, what is before it diffed on its own and what is
+        // after it gone on with.
+        while (true)
+        {
+            S32 head = 0;
+            while (head < n && head < m && a[head] == b[head])
+            {
+                ++head;
+            }
+            push(out, Kind::Same, left, right, head);
+            a += head;
+            b += head;
+            n -= head;
+            m -= head;
+            left += head;
+            right += head;
+            if (n == 0 || m == 0)
+            {
+                push(out, Kind::Removed, left, right, n);
+                push(out, Kind::Added, left + n, right, m);
+                break;
+            }
+            if (depth > MOST_DEPTH)
+            {
+                myersAt(a, n, b, m, left, right, work, out);
+                break;
+            }
+            // How often each line comes up in the left, and where, for
+            // those rare enough to be worth trying.
+            struct Seen
+            {
+                S32              count = 0;
+                std::vector<S32> at;
+            };
+            boost::unordered_flat_map<S32, Seen> seen;
+            for (S32 i = 0; i < n; ++i)
+            {
+                Seen& one = seen[a[i]];
+                if (++one.count <= MOST_OCCURRENCES)
+                {
+                    one.at.push_back(i);
+                }
+            }
+            S32  best_a = -1, best_b = -1, best_len = 0, best_rarity = MOST_OCCURRENCES + 1;
+            bool shared = false;
+            for (S32 j = 0; j < m;)
+            {
+                const auto found = seen.find(b[j]);
+                if (found == seen.end())
+                {
+                    ++j;
+                    continue;
+                }
+                shared = true;
+                if (found->second.count > best_rarity)
+                {
+                    ++j;
+                    continue;
+                }
+                S32 next = j + 1;
+                for (const S32 i : found->second.at)
+                {
+                    // The stretch the two share through this line, and the
+                    // rarest of its lines.
+                    S32 sa = i, sb = j;
+                    while (sa > 0 && sb > 0 && a[sa - 1] == b[sb - 1])
+                    {
+                        --sa;
+                        --sb;
+                    }
+                    S32 ea = i + 1, eb = j + 1;
+                    while (ea < n && eb < m && a[ea] == b[eb])
+                    {
+                        ++ea;
+                        ++eb;
+                    }
+                    S32 rarity = found->second.count;
+                    for (S32 k = sa; k < ea && rarity > 1; ++k)
+                    {
+                        rarity = std::min(rarity, seen.find(a[k])->second.count);
+                    }
+                    work -= ea - sa;
+                    if (rarity < best_rarity || (rarity == best_rarity && ea - sa > best_len))
+                    {
+                        best_a      = sa;
+                        best_b      = sb;
+                        best_len    = ea - sa;
+                        best_rarity = rarity;
+                    }
+                    next = std::max(next, eb);
+                }
+                j = next;
+            }
+            if (best_len == 0)
+            {
+                // Nothing rare enough: the fewest changes; nothing shared at
+                // all: all of each.
+                if (shared)
+                {
+                    myersAt(a, n, b, m, left, right, work, out);
+                }
+                else
+                {
+                    push(out, Kind::Removed, left, right, n);
+                    push(out, Kind::Added, left + n, right, m);
+                }
+                break;
+            }
+            histogramAt(a, best_a, b, best_b, left, right, depth + 1, work, out);
+            push(out, Kind::Same, left + best_a, right + best_b, best_len);
+            const S32 skip_a = best_a + best_len;
+            const S32 skip_b = best_b + best_len;
+            a += skip_a;
+            b += skip_b;
+            n -= skip_a;
+            m -= skip_b;
+            left += skip_a;
+            right += skip_b;
+        }
+        push(out, Kind::Same, tail_left, tail_right, tail);
+    }
+
+    // How far a line is indented, a tab to the next of four; a blank line
+    // none, which is told apart by `blank`.
+    S32 indentOf(std::string_view line, bool& empty)
+    {
+        S32 width = 0;
+        for (const char c : line)
+        {
+            if (c == ' ')
+            {
+                ++width;
+            }
+            else if (c == '\t')
+            {
+                width += 4 - width % 4;
+            }
+            else
+            {
+                empty = false;
+                return width;
+            }
+        }
+        empty = true;
+        return 0;
+    }
+}
+
+std::vector<ALLineDiff::Run> ALLineDiff::myers(const std::vector<S32>& a, const std::vector<S32>& b, S64 work)
+{
+    std::vector<Run> out;
+    myersAt(a.data(), static_cast<S32>(a.size()), b.data(), static_cast<S32>(b.size()), 0, 0, work, out);
+    return out;
+}
+
+std::vector<ALLineDiff::Run> ALLineDiff::histogram(const std::vector<S32>& a, const std::vector<S32>& b)
+{
+    std::vector<Run> out;
+    S64              work = MOST_WORK;
+    histogramAt(a.data(), static_cast<S32>(a.size()), b.data(), static_cast<S32>(b.size()), 0, 0, 0, work, out);
+    return out;
+}
+
+// Where a run of lines taken out or put in between two the same could
+// as well stand a line or more up or down -- its first line the same as
+// the one after it, or its last as the one before -- it goes where code
+// reads it as one thing: its first line the least indented, a blank
+// line at its end rather than its start. Ties keep it where it was.
+void ALLineDiff::slide(std::vector<Run>& runs, const std::vector<S32>& a, const std::vector<S32>& b, const std::vector<std::string>& left,
+           const std::vector<std::string>& right)
+{
+    for (size_t i = 1; i + 1 < runs.size(); ++i)
+    {
+        Run& before = runs[i - 1];
+        Run& hunk   = runs[i];
+        Run& after  = runs[i + 1];
+        if (hunk.kind == Kind::Same || before.kind != Kind::Same || after.kind != Kind::Same || hunk.count <= 0)
+        {
+            continue;
+        }
+        const std::vector<std::string>& text  = hunk.kind == Kind::Added ? right : left;
+        const std::vector<S32>&         ids   = hunk.kind == Kind::Added ? b : a;
+        const S32                       first = hunk.kind == Kind::Added ? hunk.right : hunk.left;
+        const S32                       count = hunk.count;
+        // How far it may go each way.
+        S32 up = 0;
+        while (up < before.count && ids[static_cast<size_t>(first - up - 1)] == ids[static_cast<size_t>(first + count - up - 1)])
+        {
+            ++up;
+        }
+        S32 down = 0;
+        while (down < after.count && ids[static_cast<size_t>(first + down)] == ids[static_cast<size_t>(first + count + down)])
+        {
+            ++down;
+        }
+        if (up == 0 && down == 0)
+        {
+            continue;
+        }
+        // What a place costs: its first line's indent; starting at a
+        // line less indented than the one before it, which takes a
+        // block's closing line from its body, or ending at one less
+        // indented than the one after it, which opens a block whose
+        // body is outside it; a blank line to start rather than end.
+        const auto cost = [&](S32 shift) {
+            const S32 start = first + shift;
+            const S32 end   = start + count - 1;
+            bool      first_blank = false, last_blank = false, before_blank = true, after_blank = true;
+            const S32 first_in  = indentOf(text[static_cast<size_t>(start)], first_blank);
+            const S32 last_in   = indentOf(text[static_cast<size_t>(end)], last_blank);
+            const S32 before_in = start > 0 ? indentOf(text[static_cast<size_t>(start - 1)], before_blank) : 0;
+            const S32 after_in  = end + 1 < static_cast<S32>(text.size()) ? indentOf(text[static_cast<size_t>(end + 1)], after_blank) : 0;
+            S32       c         = first_blank ? 1000 : first_in * 10;
+            c -= last_blank ? 5 : 0;
+            c += !first_blank && !before_blank && first_in < before_in ? 50 : 0;
+            c += !last_blank && !after_blank && after_in > last_in ? 50 : 0;
+            return c;
+        };
+        S32 best = 0;
+        S32 best_cost = cost(0);
+        for (S32 shift = -up; shift <= down; ++shift)
+        {
+            const S32 c = cost(shift);
+            if (c < best_cost || (c == best_cost && std::abs(shift) < std::abs(best)))
+            {
+                best      = shift;
+                best_cost = c;
+            }
+        }
+        if (best == 0)
+        {
+            continue;
+        }
+        // The hunk moved, the line the same before it growing or giving
+        // way as the one after it gives way or grows.
+        hunk.left += best;
+        hunk.right += best;
+        before.count += best;
+        after.left += best;
+        after.right += best;
+        after.count -= best;
+    }
+    // Runs gone to nothing let go of, and those then side by side made one.
+    std::vector<Run> kept;
+    kept.reserve(runs.size());
+    for (const Run& run : runs)
+    {
+        push(kept, run.kind, run.left, run.right, run.count);
+    }
+    runs.swap(kept);
+}
