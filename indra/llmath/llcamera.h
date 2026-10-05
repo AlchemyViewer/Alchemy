@@ -54,8 +54,26 @@ constexpr F32 SK_RECONSTRUCT_FAR = 1000000.0f;
 constexpr F32 FORWARD_Z_MAX_FAR_CLIP = 512.0f;
 // The fixed projection far plane forward-Z depth keeps, and what an infinite request falls back to there.
 constexpr F32 SK_FORWARD_Z_PROJECTION_FAR = FORWARD_Z_MAX_FAR_CLIP * 2.0f;
-// Stored depth the sky dome is pinned at under reverse-Z (LLGLSquashToFarClip, layer 0); nearer than any reach.
+// Stored depth upstream pins the sky dome at under reverse-Z (LLGLSquashToFarClip, layer 0), kept by finite projections.
 constexpr F32 SK_SKY_PIN_DEPTH = 0.000005f;
+// Under the infinite reverse-Z projection the sky sits far past all content, in upstream's order. Front to back:
+// the pin, 2^-27 (~13,400 km at a 0.1 m near plane), which squash layers SK_SKY_PIN_LAYERS and up sit at; lower
+// layers step back by powers of two to the dome, layer 0, at 2^-31 (~215,000 km); then the moon and the sun at
+// their real distances at the standard 0.1 m near plane; then the stars at 0.
+constexpr F32 SK_SKY_PIN_DEPTH_INFINITE = 0x1p-27f;
+constexpr U32 SK_SKY_PIN_LAYERS = 4;
+// The moon and sun at their real distances (mean, and 1 AU) as stored at the viewer's standard 0.1 m near plane.
+constexpr F32 SK_SKY_MOON_DEPTH_INFINITE = (F32)(0.1 / 384400000.0);
+constexpr F32 SK_SKY_SUN_DEPTH_INFINITE = (F32)(0.1 / 149597870700.0);
+// The reverse-Z stored depth of squash layer `layer`: upstream's under a finite projection, the layout above otherwise.
+inline F32 skSkyLayerDepth(U32 layer, bool infinite)
+{
+    if (!infinite)
+    {
+        return SK_SKY_PIN_DEPTH + 0.00005f * layer;
+    }
+    return ldexpf(SK_SKY_PIN_DEPTH_INFINITE, -(S32)(SK_SKY_PIN_LAYERS - llmin(layer, SK_SKY_PIN_LAYERS)));
+}
 // </SK:Nexii>
 
 constexpr F32 MIN_ASPECT_RATIO  = 0.02f;

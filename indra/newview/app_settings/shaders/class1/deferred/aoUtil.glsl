@@ -60,6 +60,7 @@ vec4 getPositionAo(vec2 pos_screen)
     vec4 ndc = vec4(sc.x, sc.y, 2.0*depth-1.0, 1.0);
 #endif
     vec4 pos = inv_proj * ndc;
+    pos.w = max(pos.w, 0.000001); // <SK:Nexii> render/farplane: deferredUtil's SK_RECONSTRUCT_W_FLOOR
     pos /= pos.w;
     pos.w = 1.0;
     return pos;

@@ -604,6 +604,13 @@ public:
 
         SH_PARTIAL,                         //  "shPartial"  (row partial sums of the probe SH projection)
 
+        // <SK:Nexii> render/farplane
+        SK_SKY_RAMP,                        //  "sk_sky_ramp"  lens flare sky ramp under an infinite projection
+        SK_SKY_PIN,                         //  "sk_sky_pin"   haze: pinned sky threshold and legacy distance
+        SK_WATER_FAR,                       //  "sk_water_far" water: wave clamp, edge fade
+        SK_SKY_BODY_DEPTH,                  //  "sk_sky_body_depth" sun/moon pin under the infinite projection
+        // </SK:Nexii>
+
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
     // clang-format on

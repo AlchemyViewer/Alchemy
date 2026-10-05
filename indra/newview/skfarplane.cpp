@@ -68,7 +68,7 @@ SKSkyDepth skSkyDepth(F32 near_plane, F32 projection_far)
     }
     constexpr F32 legacy_far = SK_FORWARD_Z_PROJECTION_FAR;
     sky.mReachDepth = near_plane / SK_REACH_TERRAIN;
-    sky.mThreshold = 0.5f * (SK_SKY_PIN_DEPTH + near_plane / skFarthestWater());
+    sky.mThreshold = sqrtf(SK_SKY_PIN_DEPTH_INFINITE * (near_plane / skFarthestWater()));
     sky.mLegacyDistance = near_plane * legacy_far / (near_plane + SK_SKY_PIN_DEPTH * (legacy_far - near_plane));
     return sky;
 }

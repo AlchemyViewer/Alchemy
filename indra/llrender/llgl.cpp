@@ -43,7 +43,7 @@
 #include "llmath.h"
 #include "m4math.h"
 #include "llstring.h"
-#include "llcamera.h" // <SK:Nexii> render/farplane: SK_SKY_PIN_DEPTH
+#include "llcamera.h" // <SK:Nexii> render/farplane: skSkyLayerDepth
 
 #include "llglheaders.h"
 #include "llglslshader.h"
@@ -3789,7 +3789,7 @@ void LLGLSquashToFarClip::setProjectionMatrix(LLMatrix4a projection, U32 layer)
     // of projection, so only the far-plane constant mirrors under reverse-Z (far = 0).
     // Under ZERO_TO_ONE ndc==window, so mirror the forward WINDOW depth (0.999995 - 5e-5*layer,
     // i.e. ndc*0.5+0.5), not the raw ndc distance -- matching the sundisc/moon pins.
-    F32 depth = LLRender::sReverseZ ? (SK_SKY_PIN_DEPTH + 0.00005f * layer) // <SK:Nexii> render/farplane: was 0.000005f
+    F32 depth = LLRender::sReverseZ ? skSkyLayerDepth(layer, al_projection_is_infinite(projection)) // <SK:Nexii> render/farplane: was 0.000005f + 0.00005f * layer
                                     : (0.99999f - 0.0001f * layer);
 
     // the depth column is the w column scaled: clip z = depth * clip w

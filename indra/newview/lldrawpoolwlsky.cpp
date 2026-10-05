@@ -48,6 +48,7 @@
 #include "llsettingsvo.h"
 #include "llviewercontrol.h"
 #include "llappviewer.h" // gFrameIntervalSeconds
+#include "skfarplane.h" // <SK:Nexii> render/farplane
 
 extern bool gCubeSnapshot;
 
@@ -124,6 +125,13 @@ void LLDrawPoolWLSky::renderDome(const LLVector3& camPosLocal, F32 camHeightLoca
 }
 
 extern LLPointer<LLImageGL> gEXRImage;
+
+// <SK:Nexii> render/farplane: whether this pass draws under the infinite projection; the sky box squash hides it from the matrix.
+static bool skInfiniteSky()
+{
+    return LLRender::sReverseZ && !gCubeSnapshot && skIsInfinite(LLViewerCamera::getInstance()->getProjectionFar());
+}
+// </SK:Nexii>
 
 static bool use_hdri_sky()
 {
@@ -480,6 +488,7 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
 
                 sun_shader->uniform4fv(LLShaderMgr::DIFFUSE_COLOR, 1, color.mV);
                 sun_shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
+                sun_shader->uniform1f(LLShaderMgr::SK_SKY_BODY_DEPTH, skInfiniteSky() ? SK_SKY_SUN_DEPTH_INFINITE : 0.f); // <SK:Nexii> render/farplane
 
                 face->renderIndexed();
 
@@ -503,6 +512,7 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
         if (can_use_vertex_shaders && can_use_windlight_shaders && (tex_a || tex_b))
         {
             moon_shader->bind();
+            moon_shader->uniform1f(LLShaderMgr::SK_SKY_BODY_DEPTH, skInfiniteSky() ? SK_SKY_MOON_DEPTH_INFINITE : 0.f); // <SK:Nexii> render/farplane
 
             if (tex_a && (!tex_b || (tex_a == tex_b)))
             {

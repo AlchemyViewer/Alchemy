@@ -14,6 +14,10 @@ FadeTime, a slew cap relative to a running reference luminance, and adaptive
 damping keyed off direction reversals of the raw target, detected as
 displacement from an anchor so the verdict does not depend on frame rate.
 Replayed at 30/60/144 fps.  Pure Python on purpose (no numpy).
+Model C -- skyOf: which stored depths count as unoccluded sky, under the
+finite projections and under the infinite reverse-Z one (render/farplane),
+where 1 km stores 1e-4 and the nearest sky (the pin) is 2^-27, ~13,400 km out,
+the dome 2^-31, then the moon and sun at their real distances.
 
     python check_lens_flare_state.py          # verify the chosen constants
     python check_lens_flare_state.py --grid   # compare tap counts and patterns
@@ -455,11 +459,67 @@ def model_b(p=P):
           "drive p-p %.4f, instability peak %.3f" % (max(last) - min(last), imax))
 
 
+# ---- Model C: skyOf ----------------------------------------------------------
+SKY_PIN = 5e-6        # llcamera.h SK_SKY_PIN_DEPTH, the dome under a finite reverse-Z projection
+SUN_PIN = 5e-7        # sunDiscV.glsl, finite
+MOON_PIN = 4.5e-6     # moonV.glsl, finite
+INF_PIN = 2.0 ** -27  # llcamera.h SK_SKY_PIN_DEPTH_INFINITE, the nearest sky under the infinite projection
+INF_DOME = 2.0 ** -31 # skSkyLayerDepth(0, true)
+INF_MOON = 0.1 / 384400000.0     # SK_SKY_MOON_DEPTH_INFINITE
+INF_SUN = 0.1 / 149597870700.0   # SK_SKY_SUN_DEPTH_INFINITE
+NEAR = 0.1            # MIN_NEAR_PLANE
+REACH = 8192.0        # SK_REACH_TERRAIN
+EDGE = 256000.0       # SK_EDGE_WATER_STRETCH
+SHADER = __file__.replace("\\", "/").rsplit("/scripts/", 1)[0] +     "/indra/newview/app_settings/shaders/class1/alchemy/lensFlareStateF.glsl"
+
+
+def smoothstep(e0, e1, x):
+    t = min(max((x - e0) / (e1 - e0), 0.0), 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def sky_of(d, reverse, ramp=(0.0, 0.0)):
+    """lensFlareStateF.glsl skyOf; ramp is sk_sky_ramp, (pin, reach depth) under an infinite projection."""
+    if reverse:
+        if ramp[1] > 0.0:
+            return 1.0 - smoothstep(ramp[0], ramp[1], d)
+        return smoothstep(0.9999, 1.0, 1.0 - d)
+    return smoothstep(0.9999, 1.0, d)
+
+
+def model_c():
+    print("Model C: skyOf")
+    src = open(SHADER).read()
+    check("shader parity", "return 1.0 - smoothstep(sk_sky_ramp.x, sk_sky_ramp.y, d);" in src
+          and "return smoothstep(0.9999, 1.0, 1.0 - d);" in src and "return smoothstep(0.9999, 1.0, d);" in src,
+          "skyOf expressions match the mirror")
+    fwd_sky = sky_of(1.0 - SKY_PIN, False)
+    check("finite reverse mirrors forward", abs(sky_of(SKY_PIN, True) - fwd_sky) < 1e-9,
+          "sky pin %.4f forward, %.4f reverse" % (fwd_sky, sky_of(SKY_PIN, True)))
+    ramp = (INF_PIN, NEAR / REACH)  # pipeline.cpp: sk_sky_ramp = (SK_SKY_PIN_DEPTH_INFINITE, near / reach)
+    pins = [sky_of(d, True, ramp) for d in (0.0, INF_SUN, INF_MOON, INF_DOME, INF_PIN)]
+    check("infinite: sky layers are sky", min(pins) == 1.0, "cleared/sun/moon/dome/pin %s" % pins)
+    check("infinite: sky order", 0.0 < INF_SUN < INF_MOON < INF_DOME < INF_PIN, "sun < moon < dome < pin in depth")
+    # skfarplane.cpp skSkyDepth: threshold is the geometric mean of the pin and the farthest water.
+    edge = EDGE + 2048.0
+    farthest = math.sqrt(2.0 * edge * edge + EDGE * EDGE)
+    threshold = math.sqrt(INF_PIN * NEAR / farthest)
+    check("infinite: sky threshold between the pin and the farthest water",
+          INF_PIN * 5.0 < threshold < (NEAR / farthest) / 5.0,
+          "threshold %.4g (%.0f km), farthest water %.0f km" % (threshold, NEAR / threshold / 1000.0, farthest / 1000.0))
+    geo = [sky_of(NEAR / z, True, ramp) for z in (1000.0, 2000.0, 4000.0, 8000.0, REACH)]
+    check("infinite: geometry within reach occludes", max(geo) == 0.0,
+          "1, 2, 4, 8, 8.192 km -> %s" % geo)
+    old = sky_of(NEAR / 2000.0, True)
+    check("the old ramp would count 2 km as half sky", old > 0.4, "2 km under the finite ramp %.3f" % old)
+
+
 if __name__ == "__main__":
     if "--grid" in sys.argv:
         grid()
         sys.exit(0)
     model_a()
     model_b()
+    model_c()
     print("%d failure(s)" % len(FAIL))
     sys.exit(1 if FAIL else 0)

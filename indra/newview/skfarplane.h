@@ -64,11 +64,11 @@ bool skWaterVisibleFrom(F32 camera_z, F32 water_height, F32 projection_far);
 F32 skFrustumFarWindowDepth(bool infinite, F32 near_plane, F32 window_far);
 
 // How the shaders tell the pinned sky from real content under an infinite reverse-Z projection, where the
-// pin (SK_SKY_PIN_DEPTH) sits 20 km out instead of the old ~974 m. Under a finite projection nothing is
+// nearest sky (SK_SKY_PIN_DEPTH_INFINITE) sits ~13,400 km out instead of the old ~974 m. Under a finite projection nothing is
 // classified: mThreshold is -1 and mReachDepth 0, so every stored depth is left as it was.
 struct SKSkyDepth
 {
-    F32 mThreshold = -1.f;      // stored depths at or below this are sky; midway between the pin and the farthest water
+    F32 mThreshold = -1.f;      // stored depths at or below this are sky; the geometric mean of the pin and the farthest water
     F32 mReachDepth = 0.f;      // the smallest depth content within reach stores, near / reach
     F32 mLegacyDistance = 0.f;  // eye depth the pin had under the old 1024 m projection, which haze keeps
 };

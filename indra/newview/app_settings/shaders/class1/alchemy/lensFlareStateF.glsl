@@ -116,11 +116,21 @@ const float I_DEADZONE  = 0.30; // one reversal (an ordinary reveal) slows nothi
 const float K_DAMP      = 20.0; // tau multiplier slope above the dead zone
 const float SNAP_FLOOR  = 1e-4; // drive luminance below which a black target snaps to exact zero
 
+// <SK:Nexii> render/farplane: (sky pin, reach depth) under an infinite reverse-Z projection, (0, 0) otherwise.
+uniform vec2 sk_sky_ramp;
+// </SK:Nexii>
+
 float skyOf(float d)
 {
     // Only the far layers count as unoccluded: the sun disc is pinned at
-    // 0.999999 and the sky dome at 0.99999 (forward); mirrored under reverse-Z.
+    // 0.999999 and the sky dome at 0.99999 (forward); mirrored under reverse-Z, and far past every reach under the infinite projection (sk_sky_ramp).
 #ifdef REVERSE_Z
+    // <SK:Nexii> render/farplane: an infinite projection puts 1 km at 1e-4, so the ramp runs from the pin to the reach instead.
+    if (sk_sky_ramp.y > 0.0)
+    {
+        return 1.0 - smoothstep(sk_sky_ramp.x, sk_sky_ramp.y, d);
+    }
+    // </SK:Nexii>
     return smoothstep(0.9999, 1.0, 1.0 - d);
 #else
     return smoothstep(0.9999, 1.0, d);
