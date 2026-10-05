@@ -774,6 +774,10 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     const LLRect local = bodyRect();
     const LLRect gutter(leftEdge(), local.mTop, leftEdge() + width, local.mBottom);
     gl_rect_2d(gutter, gutterColor() % alpha);
+    // What goes by row only where the rows are: a row scrolled partly out
+    // of sight cut at the text's edge, not drawn over what is above or
+    // below the view, or over the band.
+    LLLocalClipRect clip(LLRect(gutter.mLeft, text.mTop, gutter.mRight, text.mBottom));
 
     const LLFontGL* font   = getFont();
     const S32       row_h  = layout().rowHeight();

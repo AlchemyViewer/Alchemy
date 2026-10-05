@@ -1442,6 +1442,8 @@ private:
         ALTextRange operator()(const Atom& atom) const { return ALTextRange(atom.at, ALTextPos(atom.at.line, atom.at.column + atom.length)); }
     };
     ALAnchoredRanges<Atom, AtomRange>  mAtoms;
+    // Over the text, holding the atoms' views, each drawn only within it.
+    LLView*                            mAtomLayer = nullptr;
     ALAnchoredRanges<Style>            mStyles;
     ALLineTable<LineAnnotation>        mAnnotations;
     // What is said of the line one past the last: the gap below the text.

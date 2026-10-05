@@ -299,6 +299,26 @@ ALTextView::Params::Params()
 {
 }
 
+namespace
+{
+    // A layer over the text that holds the atoms' views and draws them
+    // only within itself: one scrolled partly out of sight is cut at the
+    // text's edge, rather than drawn over the gutter, the band, or what is
+    // beside the view. The mouse passes through it to what is under it,
+    // an atom's view or the text.
+    class ALAtomLayer : public LLView
+    {
+    public:
+        explicit ALAtomLayer(const LLView::Params& p) : LLView(p) {}
+
+        void draw() override
+        {
+            LLLocalClipRect clip(getLocalRect());
+            LLView::draw();
+        }
+    };
+}
+
 ALTextView::ALTextView(const Params& p)
 :   LLUICtrl(p),
     mUndo(mDocument),
@@ -328,6 +348,13 @@ ALTextView::ALTextView(const Params& p)
     ruler.follows.flags = FOLLOWS_NONE;
     mRuler              = LLUICtrlFactory::create<ALTextRuler>(ruler);
     addChild(mRuler);
+    // Then the atoms' layer, over the text and under all else.
+    LLView::Params layer(LLUICtrlFactory::getDefaultParams<LLView>());
+    layer.name          = "atoms";
+    layer.mouse_opaque  = false;
+    layer.follows.flags = FOLLOWS_NONE;
+    mAtomLayer          = new ALAtomLayer(layer);
+    addChild(mAtomLayer);
 
     const S32 tab_width = p.tab_width;
     mTabWidth           = llmax(1, tab_width);
@@ -404,7 +431,7 @@ ALTextView::~ALTextView()
     {
         if (atom.view)
         {
-            removeChild(atom.view);
+            mAtomLayer->removeChild(atom.view);
             atom.view->die();
             atom.view = nullptr;
         }
@@ -1560,7 +1587,7 @@ void ALTextView::setAtoms(std::vector<Atom> atoms)
             if (!kept)
             {
                 letGoOfAtomView(atom.view);
-                removeChild(atom.view);
+                mAtomLayer->removeChild(atom.view);
                 atom.view->die();
             }
             atom.view = nullptr;
@@ -1575,9 +1602,9 @@ void ALTextView::setAtoms(std::vector<Atom> atoms)
         {
             continue;
         }
-        if (atom.view && atom.view->getParent() != this)
+        if (atom.view && atom.view->getParent() != mAtomLayer)
         {
-            addChild(atom.view);
+            mAtomLayer->addChild(atom.view);
         }
         if (atom.view)
         {
@@ -1596,15 +1623,15 @@ void ALTextView::addAtom(Atom atom)
     const auto at = std::lower_bound(mAtoms.begin(), mAtoms.end(), atom.at, [](const Atom& a, const ALTextPos& p) { return a.at < p; });
     if ((at != mAtoms.end() && at->at < atomRange(atom).end) || (at != mAtoms.begin() && atom.at < atomRange(*(at - 1)).end))
     {
-        if (atom.view && atom.view->getParent() != this)
+        if (atom.view && atom.view->getParent() != mAtomLayer)
         {
             atom.view->die();
         }
         return;
     }
-    if (atom.view && atom.view->getParent() != this)
+    if (atom.view && atom.view->getParent() != mAtomLayer)
     {
-        addChild(atom.view);
+        mAtomLayer->addChild(atom.view);
     }
     if (atom.view)
     {
@@ -1663,6 +1690,11 @@ void ALTextView::placeAtomViews()
 {
     const LLRect text  = textRect();
     const S32    row_h = mLayout.rowHeight();
+    // The layer over the text as it now is; the atoms' boxes in it.
+    if (mAtomLayer->getRect() != text)
+    {
+        mAtomLayer->setShape(text);
+    }
     for (Atom& atom : mAtoms)
     {
         if (!atom.view)
@@ -1686,8 +1718,8 @@ void ALTextView::placeAtomViews()
             const S32 height = mLayout.rowHeightOf(atom.at.line, row);
             if (top > text.mBottom && top - height < text.mTop)
             {
-                const F32    left = static_cast<F32>(text.mLeft) - mScrollX;
-                const LLRect box(static_cast<S32>(left + x0), top, static_cast<S32>(left + x1), top - height);
+                const F32    left = -mScrollX;
+                const LLRect box(static_cast<S32>(left + x0), top - text.mBottom, static_cast<S32>(left + x1), top - height - text.mBottom);
                 if (atom.view->getRect() != box)
                 {
                     atom.view->setShape(box);
@@ -2176,7 +2208,7 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
                 if (atom.view)
                 {
                     letGoOfAtomView(atom.view);
-                    removeChild(atom.view);
+                    mAtomLayer->removeChild(atom.view);
                     atom.view->die();
                 }
             });
@@ -5526,6 +5558,8 @@ void ALTextView::drawBand(F32 alpha)
     const LLColor4& ink   = textColor();
     gl_rect_2d(band, ALSurface::ground(paper, ink) % alpha);
     gl_rect_2d(band.mLeft, band.mTop, band.mRight, band.mTop - 1, ALSurface::frame(ink, alpha));
+    // Its words and caret within it, however long the line typed.
+    std::optional<LLLocalClipRect> clip(std::in_place, band);
     const LLFontGL* font = getFont();
     if (!font)
     {
@@ -5593,6 +5627,10 @@ void ALTextView::drawBand(F32 alpha)
     {
         const S32    gap = band_shown.gap;
         const LLRect row(local.mLeft, band.mTop + mLayout.rowHeight() + 2, local.mRight, band.mTop);
+        // Its own row, over the text's last; slid left so that the one
+        // chosen shows, those before it cut at the view's edge.
+        clip.reset();
+        clip.emplace(row);
         gl_rect_2d(row, lerp(paper, ink, 0.12f) % alpha);
         S32 slide = 0;
         if (chosen >= 0 && chosen < static_cast<S32>(items.size()))

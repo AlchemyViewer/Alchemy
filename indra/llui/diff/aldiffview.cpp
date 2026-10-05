@@ -490,6 +490,9 @@ void ALDiffView::drawArrows()
     const LLColor4  ink    = mRight->textColor() % (0.7f * alpha);
     const LLColor4  lit    = mRight->cursorColor() % alpha;
     const char*     arrow  = mModel.swapped() ? "\xE2\x86\x90" : "\xE2\x86\x92";
+    // A change's first row partly out of sight cut at the sides' edge, not
+    // drawn over the titles or the bar.
+    LLLocalClipRect clip(LLRect(half, top, half + gap(), frame.mBottom + text.mBottom));
     for (S32 n = 0; n < changeCount(); ++n)
     {
         const S32 row_t = top - (topOfRow(mRight, mModel.changeFirst(Layout::Sides, n)) - mRight->scrollY());

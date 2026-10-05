@@ -117,6 +117,7 @@ void ALTextRuler::drawRuler(F32 alpha)
     const LLRect          ruler    = getLocalRect();
     const LLColor4&       ink      = mView.textColor();
     const F32             shown    = mView.barAlpha() * alpha;
+    LLLocalClipRect       clip(ruler);
     ALTextLayout&         layout   = mView.layout();
     const ALTextDocument& document = mView.document();
     const ALTextFeatures* features = mView.features();

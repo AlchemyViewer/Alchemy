@@ -626,10 +626,10 @@ namespace tut
         widget.view  = button;
         widget.height = v.layout().rowHeight() * 2;
         v.setAtoms({ widget });
-        ensure("the button is the view's child", button->getParent() == &v);
+        ensure("the button in the view, in its layer over the text", button->getParent() && button->getParent()->getParent() == &v);
         ensure("hidden until placed", !button->getVisible());
         v.placeAtomViews();
-        ensure("shown once placed, as a frame places it", button->getVisible());
+        ensure("shown once placed, as a frame places it, the layer over the text", button->getVisible() && button->getParent()->getRect() == v.textRect());
         ensure("in the box, which is as tall as asked", button->getRect().getWidth() == 40 && button->getRect().getHeight() == v.layout().rowHeight() * 2);
         ensure("the row grew to it", v.layout().lineHeight(0) == v.layout().rowHeight() * 2);
         // A click in the taller row's upper part is still on the row.
