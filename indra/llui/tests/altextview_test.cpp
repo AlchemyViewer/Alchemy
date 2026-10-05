@@ -2420,4 +2420,36 @@ namespace tut
         ensure("the other caret let go going back", !v.hasOtherSelections());
         ensure("at the match before", v.selection().normalised() == spanRange(0, 0, 3));
     }
+
+    template<> template<>
+    void altextview_object::test<78>()
+    {
+        set_test_name("what a host says of each line slides with the lines; a line an edit makes or replaces says nothing; a new text nothing at all");
+        ALTextView& v = make("zero\none\ntwo\nthree\nfour");
+        typedef ALTextView::LineAnnotation Said;
+        std::vector<Said> lines(5);
+        lines[1].tint   = LLColor4(1.f, 0.f, 0.f, 0.5f);
+        lines[2].sign   = '+';
+        lines[3].number = 0;
+        lines[3].spacer = true;
+        lines[4].number = 9;
+        U32 was = v.annotationsRevision();
+        v.setLineAnnotations(lines);
+        ensure("said", v.annotated() && v.annotationsRevision() != was);
+        ensure("each its own", v.lineAnnotation(1).tint.mV[VALPHA] > 0.f && v.lineAnnotation(2).sign == '+' && v.spacerLine(3) && v.lineAnnotation(4).number == 9);
+        ensure("nothing of a line unsaid, or past the text", v.lineAnnotation(0).number == Said::OWN_NUMBER && v.lineAnnotation(7).sign == 0);
+        ensure_equals("a copy leaves a spacer out", v.copiedText(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 4))), std::string("two\nfour"));
+
+        was = v.annotationsRevision();
+        v.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "new\n");
+        ensure("a line made above: they slide down", v.lineAnnotation(2).tint.mV[VALPHA] > 0.f && v.lineAnnotation(3).sign == '+' && v.spacerLine(4) &&
+                                                       v.lineAnnotation(5).number == 9);
+        ensure("the line made says nothing", v.lineAnnotation(0).number == Said::OWN_NUMBER && v.lineAnnotation(1).tint.mV[VALPHA] == 0.f);
+        ensure("which moved them", v.annotationsRevision() != was);
+        v.document().replace(ALTextRange(ALTextPos(3, 0), ALTextPos(3, 3)), "TWO");
+        ensure("a line typed over says nothing", v.lineAnnotation(3).sign == 0 && v.spacerLine(4));
+
+        v.setText("other");
+        ensure("a new text: nothing said", v.lineAnnotation(0).number == Said::OWN_NUMBER && !v.spacerLine(0) && v.lineAnnotation(0).tint.mV[VALPHA] == 0.f);
+    }
 }

@@ -106,9 +106,30 @@ namespace tut
 
         static bool hidden(ALCodeEditor* side, S32 row) { return side->layout().hidden(row); }
 
+        // What a side is told of its lines, a row each: its numbers, its
+        // signs ('\0' for none).
+        static std::vector<S32> numbersOf(const ALCodeEditor* side)
+        {
+            std::vector<S32> out;
+            for (S32 row = 0; row < side->document().lineCount(); ++row)
+            {
+                out.push_back(side->lineAnnotation(row).number);
+            }
+            return out;
+        }
+        static std::string signsOf(const ALCodeEditor* side)
+        {
+            std::string out;
+            for (S32 row = 0; row < side->document().lineCount(); ++row)
+            {
+                out.push_back(side->lineAnnotation(row).sign);
+            }
+            return out;
+        }
+
         static bool tinted(const ALCodeEditor& side, S32 line)
         {
-            return line < static_cast<S32>(side.lineTints().size()) && side.lineTints()[static_cast<size_t>(line)].mV[VALPHA] > 0.f;
+            return side.lineAnnotation(line).tint.mV[VALPHA] > 0.f;
         }
     };
     typedef test_group<aldiffview_data> aldiffview_group;
@@ -122,8 +143,8 @@ namespace tut
         ALDiffView& d = make("a\nb\nc", "a\nx\nc\nd");
         ensure_equals("the left, with a line to stand beside d", d.left()->text(), std::string("a\nb\nc\n"));
         ensure_equals("the right as it is", d.right()->text(), std::string("a\nx\nc\nd"));
-        ensure("numbered as each text's own, the empty line none", d.left()->lineNumbers() == std::vector<S32>{ 1, 2, 3, 0 });
-        ensure("the right's", d.right()->lineNumbers() == std::vector<S32>{ 1, 2, 3, 4 });
+        ensure("numbered as each text's own, the empty line none", numbersOf(d.left()) == std::vector<S32>{ 1, 2, 3, 0 });
+        ensure("the right's", numbersOf(d.right()) == std::vector<S32>{ 1, 2, 3, 4 });
         ensure("what is the same untinted", !tinted(*d.left(), 0) && !tinted(*d.right(), 2));
         ensure("what was taken out, and what was put in, tinted", tinted(*d.left(), 1) && tinted(*d.right(), 1) && tinted(*d.right(), 3));
         ensure("the empty line too, quieter", tinted(*d.left(), 3));
@@ -138,7 +159,7 @@ namespace tut
         set_test_name("inline: what was taken out above what was put in, numbered as the right; and back side by side");
         ALDiffView& d = make("a\nb\nc", "a\nx\nc\nd", true);
         ensure_equals("one text", d.inlined()->text(), std::string("a\nb\nx\nc\nd"));
-        ensure("the line taken out without a number", d.inlined()->lineNumbers() == std::vector<S32>{ 1, 0, 2, 3, 4 });
+        ensure("the line taken out without a number", numbersOf(d.inlined()) == std::vector<S32>{ 1, 0, 2, 3, 4 });
         ensure("tinted", tinted(*d.inlined(), 1) && tinted(*d.inlined(), 2) && !tinted(*d.inlined(), 3) && tinted(*d.inlined(), 4));
         ensure("the one shown", d.shown() == d.inlined() && d.inlined()->getVisible() && !d.left()->getVisible());
         d.setInline(false);
@@ -198,8 +219,8 @@ namespace tut
         set_test_name("anchored: lines known to stand for each other side by side however they differ; and typing goes to whoever shows it, at the right's line");
         ALDiffView& d = make("", "");
         d.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 2 } });
-        const std::vector<S32>& left_numbers  = d.left()->lineNumbers();
-        const std::vector<S32>& right_numbers = d.right()->lineNumbers();
+        const std::vector<S32>& left_numbers  = numbersOf(d.left());
+        const std::vector<S32>& right_numbers = numbersOf(d.right());
         S32                     say           = -1;
         for (S32 row = 0; row < static_cast<S32>(left_numbers.size()); ++row)
         {
@@ -433,8 +454,8 @@ namespace tut
         {
             ensure("context shown, the row shown", !hidden(side, 5) && !hidden(side, 6) && !hidden(side, 25));
             ensure("the run hidden", hidden(side, 7) && hidden(side, 16) && hidden(side, 24));
-            ensure("its row a line of neither text", side->lineNumbers()[6] == 0 && side->spacerLine(6));
-            ensure_equals("numbers true past it", side->lineNumbers()[7], 7);
+            ensure("its row a line of neither text", numbersOf(side)[6] == 0 && side->spacerLine(6));
+            ensure_equals("numbers true past it", numbersOf(side)[7], 7);
         }
         LLClipboard& clipboard = LLClipboard::instance();
         std::string  copied;
@@ -472,7 +493,7 @@ namespace tut
         ALDiffView&       d     = make(left.c_str(), right.c_str());
         ensure_equals("one, at the start", d.foldCount(), 1);
         ensure("its row first, no context before it", !hidden(d.right(), 0) && hidden(d.right(), 1) && hidden(d.right(), 16) && !hidden(d.right(), 17));
-        ensure_equals("the first line it hides numbered as itself", d.right()->lineNumbers()[1], 1);
+        ensure_equals("the first line it hides numbered as itself", numbersOf(d.right())[1], 1);
 
         d.setTexts(lines(15).c_str(), lines(15, { { 0, "zero" }, { 14, "fourteen" } }).c_str());
         ensure_equals("thirteen between changes: seven beyond context, not enough", d.foldCount(), 0);
@@ -507,10 +528,10 @@ namespace tut
         set_test_name("the ruler down each side marks its own changes and, beside a gap, the other side's: either alone shows them all; inline, each line's");
         ALDiffView& d      = make("a\nb\nc\ne", "a\nx\nc\nd\ne");
         const auto  marked = [](const ALCodeEditor* side, S32 row) {
-            return row < static_cast<S32>(side->rulerTints().size()) && side->rulerTints()[static_cast<size_t>(row)].mV[VALPHA] > 0.f;
+            return side->lineAnnotation(row).rulerTint.mV[VALPHA] > 0.f;
         };
         const auto  red = [](const ALCodeEditor* side, S32 row) {
-            const LLColor4& c = side->rulerTints()[static_cast<size_t>(row)];
+            const LLColor4& c = side->lineAnnotation(row).rulerTint;
             return c.mV[VRED] > c.mV[VGREEN];
         };
         ensure("nothing the same marked", !marked(d.left(), 0) && !marked(d.right(), 0) && !marked(d.right(), 2) && !marked(d.left(), 4));
@@ -525,10 +546,10 @@ namespace tut
     {
         set_test_name("beside the numbers, what each line is, so a change reads without its colour: ~ changed, - taken out, + put in");
         ALDiffView& d = make("a\nb\nc\ne\nf", "a\nx\nc\nd\ne");
-        ensure("the left: the line changed, the one taken out", d.left()->lineSigns() == std::string("\0~\0\0\0-", 6));
-        ensure("the right: the line changed, the one put in, nothing beside the gap", d.right()->lineSigns() == std::string("\0~\0+\0\0", 6));
+        ensure("the left: the line changed, the one taken out", signsOf(d.left()) == std::string("\0~\0\0\0-", 6));
+        ensure("the right: the line changed, the one put in, nothing beside the gap", signsOf(d.right()) == std::string("\0~\0+\0\0", 6));
         d.setInline(true);
-        ensure("inline: taken out and put in", d.inlined()->lineSigns() == std::string("\0-+\0+\0-", 7));
+        ensure("inline: taken out and put in", signsOf(d.inlined()) == std::string("\0-+\0+\0-", 7));
     }
 
     template<> template<>
@@ -556,8 +577,8 @@ namespace tut
 
         d.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 2 } });
         d.setRightText("-- written\n-- and more\n\nll.Say(0, \"hi\")");
-        const std::vector<S32>& left_numbers  = d.left()->lineNumbers();
-        const std::vector<S32>& right_numbers = d.right()->lineNumbers();
+        const std::vector<S32>& left_numbers  = numbersOf(d.left());
+        const std::vector<S32>& right_numbers = numbersOf(d.right());
         bool                    beside        = false;
         for (size_t row = 0; row < left_numbers.size() && row < right_numbers.size(); ++row)
         {
@@ -566,9 +587,9 @@ namespace tut
         ensure("the LSL's call beside the SLua's, a line further down", beside);
         d.setRightText("-- written\n-- and more\n\nll.Say(0, \"bye\")");
         bool still = false;
-        for (size_t row = 0; row < d.left()->lineNumbers().size() && row < d.right()->lineNumbers().size(); ++row)
+        for (size_t row = 0; row < numbersOf(d.left()).size() && row < numbersOf(d.right()).size(); ++row)
         {
-            still = still || (d.left()->lineNumbers()[row] == 5 && d.right()->lineNumbers()[row] == 4);
+            still = still || (numbersOf(d.left())[row] == 5 && numbersOf(d.right())[row] == 4);
         }
         ensure("its line changed: beside it still", still);
     }
@@ -684,7 +705,7 @@ namespace tut
         ensure_equals("as they are: the re-indented lines changed", d.changeCount(), 1);
         ensure("off", !d.ignoresWhitespace());
         d.right()->setFocus(true);
-        d.right()->goTo(ALTextPos(d.right()->lineNumbers().size() - 1, 0));
+        d.right()->goTo(ALTextPos(numbersOf(d.right()).size() - 1, 0));
         const S32 line = d.rightAtCaret().first;
         press(d, "ignore_whitespace");
         ensure("on, and lit", d.ignoresWhitespace() && ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore_whitespace"))->getToggleState());

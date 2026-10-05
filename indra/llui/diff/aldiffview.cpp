@@ -51,21 +51,18 @@ namespace
 
     LLColor4 colorOf(const char* name, const LLColor4& otherwise) { return LLUIColorTable::instance().getColor(name, otherwise).get(); }
 
-    // One side's text as it is shown: its lines, each's number (0 for a
-    // line put in to line the sides up), its tint, the words marked, which
-    // lines are only there to line the sides up, which a copy leaves out,
-    // and the mark each has on the ruler down the side, for what changed
-    // there on either side.
+    // One side's text as it is shown: its lines, and what the side is told
+    // of each (ALTextView::LineAnnotation) -- its number, nought for a line
+    // put in only to line the sides up, which a copy leaves out; its tint;
+    // its mark on the ruler, for what changed there on either side; its
+    // sign -- and the words marked. Each row's number kept as well, for the
+    // view's own lookups.
     struct Shown
     {
-        std::string                            text;
-        std::vector<S32>                       numbers;
-        std::vector<LLColor4>                  tints;
-        std::vector<ALCodeEditor::Decoration>  words;
-        std::vector<bool>                      spacers;
-        std::vector<LLColor4>                  marks;
-        // Beside each line's number: '+', '-', '~' or nought.
-        std::string                            signs;
+        std::string                             text;
+        std::vector<ALTextView::LineAnnotation> lines;
+        std::vector<S32>                        numbers;
+        std::vector<ALCodeEditor::Decoration>   words;
 
         S32 add(const std::string& line, S32 number, const LLColor4& tint, bool spacer = false, const LLColor4& mark = LLColor4::transparent)
         {
@@ -74,15 +71,17 @@ namespace
                 text += '\n';
             }
             text += line;
+            ALTextView::LineAnnotation& said = lines.emplace_back();
+            said.number                      = number;
+            said.tint                        = tint;
+            said.rulerTint                   = mark;
+            said.spacer                      = spacer;
             numbers.push_back(number);
-            tints.push_back(tint);
-            spacers.push_back(spacer);
-            marks.push_back(mark);
-            signs.push_back('\0');
             return static_cast<S32>(numbers.size()) - 1;
         }
 
-        void sign(S32 row, char said) { signs[static_cast<size_t>(row)] = said; }
+        // Beside a line's number: '+', '-' or '~'.
+        void sign(S32 row, char said) { lines[static_cast<size_t>(row)].sign = said; }
 
         void mark(S32 row, const ALTextDiff::spans_t& spans, const LLColor4& color)
         {
@@ -98,14 +97,10 @@ namespace
 
         void into(ALCodeEditor& editor)
         {
-            // The text first: putting it in clears what is about lines.
+            // The text first: a new text clears what is said of its lines.
             editor.setText(text);
-            editor.setLineNumbers(std::move(numbers));
-            editor.setLineTints(std::move(tints));
-            editor.setSpacerLines(std::move(spacers));
+            editor.setLineAnnotations(std::move(lines));
             editor.setDecorations(std::move(words));
-            editor.setRulerTints(std::move(marks));
-            editor.setLineSigns(std::move(signs));
         }
     };
 }

@@ -238,17 +238,6 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     hideCard();
-    // Numbers, signs, tints and spacers were for the text they were given
-    // with, as were the ruler's tints.
-    mLineNumbers.clear();
-    mLineSigns.clear();
-    if (!mRulerTints.empty())
-    {
-        mRulerTints.clear();
-        ++mMarksRevision;
-    }
-    setLineTints({});
-    setSpacerLines({});
     // Each run of lines an edit replaced -- one, or a batch's several.
     const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
     const S32                                         lines = document().lineCount();
@@ -864,10 +853,12 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         if (mShowLineNumbers)
         {
             // The caret's line in the text's own ink, the rest quieter;
-            // counted from the caret's line where that is asked for.
-            const S32 shown = !mLineNumbers.empty()                    ? (line < static_cast<S32>(mLineNumbers.size()) ? mLineNumbers[static_cast<size_t>(line)] : 0)
-                              : mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line)
-                                                                           : line + 1 + mLineNumberBase;
+            // counted from the caret's line where that is asked for; the
+            // host's number where it says one.
+            const LineAnnotation& said  = lineAnnotation(line);
+            const S32             shown = said.number != LineAnnotation::OWN_NUMBER ? said.number
+                                          : mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line)
+                                                                                       : line + 1 + mLineNumberBase;
             if (shown > 0)
             {
                 number(shown, static_cast<F32>(numbers_right), static_cast<F32>(screen_top - ascent), line == caret_line ? lit : ink);
@@ -915,12 +906,11 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
                     gl_circle_2d(static_cast<F32>(box.mRight), static_cast<F32>(box.mBottom) + 1.f, 2.f, 8, true);
                 }
             }
-            else if (line < static_cast<S32>(mLineSigns.size()) && mLineSigns[static_cast<size_t>(line)])
+            else if (said.sign)
             {
-                // A diff's sign, where the mark goes, in the numbers' ink.
-                const char  sign = mLineSigns[static_cast<size_t>(line)];
-                const char* said = sign == '-' ? "\xE2\x88\x92" : sign == '+' ? "+" : "~";
-                font->renderUTF8(said, 0, gutter.mLeft + MARK_INSET + MARK_SIZE / 2, screen_top - ascent, line == caret_line ? lit : ink, LLFontGL::HCENTER,
+                // The host's sign, where the mark goes, in the numbers' ink.
+                const char* glyph = said.sign == '-' ? "\xE2\x88\x92" : said.sign == '+' ? "+" : "~";
+                font->renderUTF8(glyph, 0, gutter.mLeft + MARK_INSET + MARK_SIZE / 2, screen_top - ascent, line == caret_line ? lit : ink, LLFontGL::HCENTER,
                                  LLFontGL::BASELINE);
             }
         }
@@ -2866,11 +2856,12 @@ void ALCodeEditor::showFixPreview()
     LLColor4       faded     = textColor();
     faded.mV[VALPHA] *= 0.7f;
     std::vector<ALTextView::Style> styles;
-    std::vector<LLColor4>          tints;
+    std::vector<LineAnnotation>    lines;
     for (S32 line = 0; line < box.document().lineCount() && line < static_cast<S32>(kinds.size()); ++line)
     {
         const char kind = kinds[static_cast<size_t>(line)];
-        tints.push_back(kind == '-' ? gone_band : kind == '+' ? come_band : LLColor4::transparent);
+        LineAnnotation& said = lines.emplace_back();
+        said.tint            = kind == '-' ? gone_band : kind == '+' ? come_band : LLColor4::transparent;
         if (kind == '-')
         {
             ALTextView::Style gone;
@@ -2885,7 +2876,7 @@ void ALCodeEditor::showFixPreview()
         }
     }
     box.setStyles(std::move(styles));
-    box.setLineTints(std::move(tints));
+    box.setLineAnnotations(std::move(lines));
     popup->placeSide();
 }
 
@@ -3264,11 +3255,6 @@ bool ALCodeEditor::mapMark(S32 line, LLColor4& color) const
     const Mark mark = markAt(line);
     if (mark == Mark::None)
     {
-        if (line >= 0 && line < static_cast<S32>(mRulerTints.size()) && mRulerTints[static_cast<size_t>(line)].mV[VALPHA] > 0.f)
-        {
-            color = mRulerTints[static_cast<size_t>(line)];
-            return true;
-        }
         return false;
     }
     color = markColor(mark);

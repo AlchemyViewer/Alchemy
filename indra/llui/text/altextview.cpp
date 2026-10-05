@@ -2089,6 +2089,13 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
     // drawn; the ones below slide.
     mSpelling.edited(edit, mDocument.lineCount());
     mSpellTimer.reset();
+    // What a host said of each line slides with the lines; a line the
+    // edit made says nothing.
+    if (annotated())
+    {
+        mAnnotations.applySpans(edit.lineSpans(), mDocument.lineCount(), LineAnnotation(), LineAnnotation());
+        ++mAnnotationsRevision;
+    }
     // What the find bar found slides with the text, and so do the carets
     // besides the main one, which whoever made the edit puts.
     mFind.edited(edit);
@@ -3712,9 +3719,22 @@ void ALTextView::copy()
     LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
 }
 
+void ALTextView::setLineAnnotations(std::vector<LineAnnotation> lines)
+{
+    mAnySpacer = std::any_of(lines.begin(), lines.end(), [](const LineAnnotation& line) { return line.spacer; });
+    mAnnotations.assign(std::make_move_iterator(lines.begin()), std::make_move_iterator(lines.end()));
+    ++mAnnotationsRevision;
+}
+
+const ALTextView::LineAnnotation& ALTextView::lineAnnotation(S32 line) const
+{
+    static const LineAnnotation nothing;
+    return line >= 0 && line < static_cast<S32>(mAnnotations.size()) ? mAnnotations[line] : nothing;
+}
+
 std::string ALTextView::copiedText(const ALTextRange& range) const
 {
-    if (mSpacerLines.empty())
+    if (!mAnySpacer)
     {
         return mDocument.text(range);
     }
@@ -5230,15 +5250,16 @@ void ALTextView::draw()
     }
     const LLRect text = textRect();
     // A tint behind each line that has one, under everything else.
-    if (!mLineTints.empty())
+    if (annotated())
     {
         // The first and last rows in sight may be partly out of it.
         LLLocalClipRect clip(text);
         const S32 row_h = layout().rowHeight();
         forEachVisibleRow(text, [&](S32 line, S32, S32 screen_top) {
-            if (line < static_cast<S32>(mLineTints.size()) && mLineTints[static_cast<size_t>(line)].mV[VALPHA] > 0.f)
+            const LLColor4& tint = lineAnnotation(line).tint;
+            if (tint.mV[VALPHA] > 0.f)
             {
-                gl_rect_2d(text.mLeft, screen_top, text.mRight, screen_top - row_h, mLineTints[static_cast<size_t>(line)] % alpha);
+                gl_rect_2d(text.mLeft, screen_top, text.mRight, screen_top - row_h, tint % alpha);
             }
         });
     }

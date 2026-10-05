@@ -33,7 +33,8 @@ class ALTextView;
 
 // The bar down the side of a text view. A ruler at its right while the
 // text is taller than the view: the caret, the find bar's matches and the
-// marks the view's features give (ALTextFeatures::mapMark) down it, and a
+// marks the view's features give (ALTextFeatures::mapMark) or its host
+// (ALTextView::LineAnnotation) down it, and a
 // thumb that fades once the mouse has left and the text has settled. Or,
 // where the view asks for one, a map of the text in its place, at the right
 // or the left: the lines drawn small, the rows on screen as a window over
@@ -140,12 +141,16 @@ private:
         std::vector<MapRun> runs;
     };
     MapRuns mMapRuns;
-    // The ruler's lines with a mark, as of the text's version and the
-    // marks' revision.
+    // A line's mark: a problem's (ALTextFeatures::mapMark), else what the
+    // host says of the line (ALTextView::LineAnnotation::rulerTint).
+    bool markOf(S32 line, LLColor4& color) const;
+    // The ruler's lines with a mark, as of the text's version, the marks'
+    // revision and what the host says of each line.
     std::vector<S32> mMarkLines;
-    bool             mMarksValid    = false;
-    U32              mMarksVersion  = 0;
-    U32              mMarksRevision = 0;
+    bool             mMarksValid          = false;
+    U32              mMarksVersion        = 0;
+    U32              mMarksRevision       = 0;
+    U32              mAnnotationsRevision = 0;
     // Each pixel row of the ruler's track with a match on it, as last found:
     // for which matches, which track and which text's height.
     std::vector<U8> mMatchRows;

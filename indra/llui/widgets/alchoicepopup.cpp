@@ -155,7 +155,7 @@ ALTextView& ALChoicePopup::side()
     }
     mSide->setBackgroundColor(mGround);
     mSide->setTextColor(mInk);
-    mSide->setLineTints({});
+    mSide->setLineAnnotations({});
     return *mSide;
 }
 

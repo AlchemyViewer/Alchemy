@@ -94,6 +94,23 @@ void ALTextRuler::scrollToRulerY(S32 y, S32 offset)
     mView.setScrollY(static_cast<S32>(static_cast<F32>(track.mTop - top) / static_cast<F32>(travel) * static_cast<F32>(llmax(0, total - page))));
 }
 
+bool ALTextRuler::markOf(S32 line, LLColor4& color) const
+{
+    // A problem's mark, else the host's for the line: a comparison's change.
+    const ALTextFeatures* features = mView.features();
+    if (features && features->mapMark(line, color))
+    {
+        return true;
+    }
+    const LLColor4& tint = mView.lineAnnotation(line).rulerTint;
+    if (tint.mV[VALPHA] <= 0.f)
+    {
+        return false;
+    }
+    color = tint;
+    return true;
+}
+
 void ALTextRuler::drawRuler(F32 alpha)
 {
     // The caret and the marks always, the thumb while wanted.
@@ -112,26 +129,29 @@ void ALTextRuler::drawRuler(F32 alpha)
     // marks have changed; their colours asked every frame, which a
     // change of theme may change.
     const U32 marks_revision = features ? features->marksRevision() : 0;
-    if (mMarksVersion != document.version() || mMarksRevision != marks_revision || !mMarksValid)
+    if (mMarksVersion != document.version() || mMarksRevision != marks_revision || mAnnotationsRevision != mView.annotationsRevision() ||
+        !mMarksValid)
     {
         mMarkLines.clear();
         LLColor4  unused;
-        const S32 count = features ? document.lineCount() : 0;
+        // A text with neither -- a log -- not read through at all.
+        const S32 count = features || mView.annotated() ? document.lineCount() : 0;
         for (S32 line = 0; line < count; ++line)
         {
-            if (features->mapMark(line, unused))
+            if (markOf(line, unused))
             {
                 mMarkLines.push_back(line);
             }
         }
-        mMarksVersion  = document.version();
-        mMarksRevision = marks_revision;
-        mMarksValid    = true;
+        mMarksVersion        = document.version();
+        mMarksRevision       = marks_revision;
+        mAnnotationsRevision = mView.annotationsRevision();
+        mMarksValid          = true;
     }
     LLColor4 mark;
     for (const S32 line : mMarkLines)
     {
-        if (features->mapMark(line, mark))
+        if (markOf(line, mark))
         {
             const S32 y = yOf(line);
             gl_rect_2d(middle, y, ruler.mRight - 2, y - 2, mark % alpha);
@@ -478,7 +498,7 @@ void ALTextRuler::drawMap(F32 alpha)
         }
         // A mark beside the line, and a match in it.
         LLColor4 mark;
-        if (features && features->mapMark(line, mark))
+        if (markOf(line, mark))
         {
             gl_rect_2d_in_batch(mark_left, top, mark_left + MAP_MARK_W, bottom - 1, mark % alpha);
         }

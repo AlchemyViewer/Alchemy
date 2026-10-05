@@ -36,6 +36,7 @@
 #include "altextlayout.h"
 #include "altextsearch.h"
 #include "altextundo.h"
+#include "allinetable.h"
 #include "lleditmenuhandler.h"
 #include "llframetimer.h"
 #include "llpreeditor.h"
@@ -504,19 +505,37 @@ public:
     void                      addStyle(Style style);
     void                      clearStyles() { setStyles({}); }
     const std::vector<Style>& styles() const { return mStyles.items(); }
-    // A tint behind each line, the width of the text, none where its
-    // alpha is 0: each one a line, from the first, under everything else.
-    // For a text shown rather than edited -- a side of a diff.
-    void                         setLineTints(std::vector<LLColor4> tints) { mLineTints = std::move(tints); }
-    const std::vector<LLColor4>& lineTints() const { return mLineTints; }
-    // Lines shown that are no part of the text -- the empty rows a diff
-    // lines its sides up with -- which a copy leaves out: each one a line,
-    // from the first, true for a spacer.
-    void                         setSpacerLines(std::vector<bool> spacers) { mSpacerLines = std::move(spacers); }
-    bool                         spacerLine(S32 line) const
+    // --- what a host says of each line -------------------------------------------
+
+    // What the host showing the text says of a line, beside what the text
+    // is: the number the gutter shows for it where that is not the line's
+    // own (0 for none); a sign beside the number, so that what the line is
+    // reads without colour; a tint behind it, the width of the text; a mark
+    // on the ruler down the side, where a problem's leaves it none; and
+    // whether it is no part of the text at all -- an empty row a
+    // comparison lines its sides up with -- which a copy leaves out. What
+    // a comparison's sides are made of, a fix's preview, a choice's pane.
+    struct LineAnnotation
     {
-        return line >= 0 && line < static_cast<S32>(mSpacerLines.size()) && mSpacerLines[static_cast<size_t>(line)];
-    }
+        static constexpr S32 OWN_NUMBER = -1;
+        S32                  number     = OWN_NUMBER;
+        // '+' put in, '-' taken out, '~' changed into another; 0 none.
+        char                 sign       = 0;
+        LLColor4             tint       = LLColor4::transparent;
+        LLColor4             rulerTint  = LLColor4::transparent;
+        bool                 spacer     = false;
+    };
+    // A line each, from the first; kept a line each as the text is edited,
+    // sliding with the lines, a line an edit makes or replaces saying
+    // nothing. Set after the text, which a new text clears.
+    void setLineAnnotations(std::vector<LineAnnotation> lines);
+    // What is said of a line: nothing, where nothing was.
+    const LineAnnotation& lineAnnotation(S32 line) const;
+    // Moves on whenever what is said of any line may have changed.
+    U32                   annotationsRevision() const { return mAnnotationsRevision; }
+    // Whether anything is said of the lines at all.
+    bool                  annotated() const { return !mAnnotations.empty(); }
+    bool                  spacerLine(S32 line) const { return lineAnnotation(line).spacer; }
 
     // --- atoms ---------------------------------------------------------------
 
@@ -1378,8 +1397,11 @@ private:
     };
     ALAnchoredRanges<Atom, AtomRange>  mAtoms;
     ALAnchoredRanges<Style>            mStyles;
-    std::vector<LLColor4>              mLineTints;
-    std::vector<bool>                  mSpacerLines;
+    ALLineTable<LineAnnotation>        mAnnotations;
+    U32                                mAnnotationsRevision = 0;
+    // Whether any line was said to be a spacer, so that a copy of a text
+    // with none of them is the text as it is.
+    bool                               mAnySpacer = false;
     LLUIColor                          mLinkColor;
     link_signal_t                      mLinkClicked;
     drop_handler_t                     mDropHandler;

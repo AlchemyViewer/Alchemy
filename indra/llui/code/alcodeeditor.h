@@ -311,25 +311,15 @@ public:
 
     void setShowLineNumbers(bool show);
     bool getShowLineNumbers() const { return mShowLineNumbers; }
-    // For a text shown rather than edited -- a side of a diff -- the
-    // number each line shows in the gutter, where its lines are not the
-    // ones counted: none, for a line of 0, which a diff pads with. Each
-    // one a line, from the first; an edit clears them, and the lines'
-    // tints (ALTextView::setLineTints).
-    void                         setLineNumbers(std::vector<S32> numbers) { mLineNumbers = std::move(numbers); }
+    // The number a line shows, and the sign beside it, where its host says
+    // (ALTextView::LineAnnotation): a side of a comparison, whose lines are
+    // not the ones counted.
     // For a text that is part of a larger one -- a script's code under
     // its envelope, which a runtime error's line counts -- the lines
     // counted from there: the first shows base + 1. Or -1, the lines
     // counted from 0, as a script reads a notecard's.
     void                         setLineNumberBase(S32 base) { mLineNumberBase = llmax(-1, base); }
     S32                          lineNumberBase() const override { return mLineNumberBase; }
-    const std::vector<S32>&      lineNumbers() const { return mLineNumbers; }
-    // For a side of a diff too, what each line is beside its number, so
-    // that a change reads without its colour: '+' put in, '-' taken out,
-    // '~' changed into another, nought nothing. Where a problem's mark
-    // leaves the line none; cleared as the numbers are.
-    void                         setLineSigns(std::string signs) { mLineSigns = std::move(signs); }
-    const std::string&           lineSigns() const { return mLineSigns; }
     // Whether a line was changed since the text was last saved: the
     // gutter bars it, and a save clears them all.
     bool lineChanged(S32 line) const;
@@ -601,15 +591,6 @@ public:
     // the caret lands on one; what it leaves hidden there is shown anyway.
     typedef std::function<void(S32 line)> line_revealer_t;
     void setLineRevealer(line_revealer_t revealer) { mLineRevealer = std::move(revealer); }
-    // A colour for each line on the ruler down the side, where the marks
-    // on it leave the line none: what a comparison changed there. Cleared
-    // by an empty list; a line past its end has none.
-    void setRulerTints(std::vector<LLColor4> tints)
-    {
-        mRulerTints = std::move(tints);
-        ++mMarksRevision;
-    }
-    const std::vector<LLColor4>& rulerTints() const { return mRulerTints; }
     typedef std::function<void(const LLSD& value)> fix_handler_t;
     void setFixHandler(fix_handler_t handler) { mFixHandler = std::move(handler); }
     // What the problems on a line offer: any fix at all -- a suppression
@@ -908,8 +889,6 @@ private:
     LLColor4 changedColor() const;
 
     bool mShowLineNumbers      = true;
-    std::vector<S32>      mLineNumbers;
-    std::string           mLineSigns;
     S32                   mLineNumberBase = 0;
     bool mShowFoldMarkers      = true;
     bool mFoldable             = true;
@@ -1022,7 +1001,6 @@ private:
     ALLineTable<Mark>                  mMarks;
     // Moves on as marks are set or cleared, for the ruler's list of them.
     U32                                mMarksRevision = 0;
-    std::vector<LLColor4>              mRulerTints;
     // One per line: changed since the last save.
     ALLineTable<U8>                    mChanged;
     // The mouse over the gutter, and the line it is on there: the fold
