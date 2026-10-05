@@ -132,6 +132,9 @@ public:
     void setIgnoreCase(bool ignore);
     bool ignoresCase() const { return mModel.likeness().ignoreCase; }
     void setOffersIgnoreCase(bool offers);
+    // Words that mean the same in the two texts (ALDiffSame) -- an LSL
+    // function and the SLua it became -- left unmarked; compared again.
+    void                  setSame(ALTextDiff::same_t same);
     // How the lines that stay are chosen (ALTextDiff::Algorithm), compared
     // again, the caret kept; Histogram unless asked.
     void                  setAlgorithm(ALTextDiff::Algorithm algorithm);

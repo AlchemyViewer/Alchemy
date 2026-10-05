@@ -140,6 +140,9 @@ public:
     // How lines are told the same: the runs folded as foldsSame() says,
     // since they are others now.
     void    setLikeness(const ALTextDiff::Likeness& like);
+    // Words that mean the same in the two texts (ALDiffSame), the whole
+    // comparison's; a range may have its own besides.
+    void    setSame(ALTextDiff::same_t same);
     // How the lines that stay are chosen (ALTextDiff::Algorithm).
     void    setAlgorithm(ALTextDiff::Algorithm algorithm);
     // How lines are cut into words -- a grammar's tokens, or none for their

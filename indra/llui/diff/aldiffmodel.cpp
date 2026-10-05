@@ -26,6 +26,7 @@
 
 #include "aldiffmodel.h"
 
+#include "aldiffsame.h"
 #include "allinepairs.h"
 
 #include <algorithm>
@@ -135,6 +136,12 @@ void ALDiffModel::setLikeness(const ALTextDiff::Likeness& like)
     build();
 }
 
+void ALDiffModel::setSame(ALTextDiff::same_t same)
+{
+    mOptions.same = std::move(same);
+    build(foldsOpen());
+}
+
 void ALDiffModel::setAlgorithm(ALTextDiff::Algorithm algorithm)
 {
     if (mOptions.algorithm != algorithm)
@@ -216,6 +223,56 @@ void ALDiffModel::build(const std::vector<bool>& open)
     }
     const auto regionsOf = [](const std::vector<ALTextDiff::regions_t>* regions, S32 line) {
         return regions ? &(*regions)[static_cast<size_t>(line)] : nullptr;
+    };
+    // The words that mean the same in a pair: the innermost range's that
+    // holds both its lines and has a table of its own, with the whole
+    // comparison's; else the whole's. By each line of the text given as
+    // the left, the ranges with tables over it, the narrowest first.
+    std::vector<std::vector<S32>> tabled;
+    std::vector<ALTextDiff::same_t> joined(mRanges.size());
+    for (size_t n = 0; n < mRanges.size(); ++n)
+    {
+        const ALTextDiff::Range& range = mRanges[n];
+        if (!range.same)
+        {
+            continue;
+        }
+        tabled.resize(std::max(tabled.size(), static_cast<size_t>(std::max(range.leftLast + 1, 0))));
+        for (S32 line = std::max(range.leftFirst, 0); line <= range.leftLast; ++line)
+        {
+            tabled[static_cast<size_t>(line)].push_back(static_cast<S32>(n));
+        }
+    }
+    for (std::vector<S32>& over : tabled)
+    {
+        std::sort(over.begin(), over.end(), [this](S32 a, S32 b) {
+            const ALTextDiff::Range& x = mRanges[static_cast<size_t>(a)];
+            const ALTextDiff::Range& y = mRanges[static_cast<size_t>(b)];
+            return x.leftLast - x.leftFirst + x.rightLast - x.rightFirst < y.leftLast - y.leftFirst + y.rightLast - y.rightFirst;
+        });
+    }
+    ALTextDiff::Options with = mOptions;
+    const auto          optionsOf = [&](S32 shown_left, S32 shown_right) -> const ALTextDiff::Options& {
+        const S32 given_left  = mSwapped ? shown_right : shown_left;
+        const S32 given_right = mSwapped ? shown_left : shown_right;
+        if (given_left >= 0 && given_left < static_cast<S32>(tabled.size()))
+        {
+            for (const S32 n : tabled[static_cast<size_t>(given_left)])
+            {
+                const ALTextDiff::Range& range = mRanges[static_cast<size_t>(n)];
+                if (given_right >= range.rightFirst && given_right <= range.rightLast)
+                {
+                    ALTextDiff::same_t& table = joined[static_cast<size_t>(n)];
+                    if (!table)
+                    {
+                        table = ALDiffSame::joined(mOptions.same, range.same);
+                    }
+                    with.same = table;
+                    return with;
+                }
+            }
+        }
+        return mOptions;
     };
     for (ColumnData& c : mColumns)
     {
@@ -342,8 +399,8 @@ void ALDiffModel::build(const std::vector<bool>& open)
             add(Column::Left, left[static_cast<size_t>(gone[g])], gone[g] + 1, Kind::Removed, '~');
             add(Column::Right, right[static_cast<size_t>(made[d])], made[d] + 1, Kind::Added, '~');
             auto& [lspans, rspans] = paired.emplace_back();
-            ALTextDiff::words(left[static_cast<size_t>(gone[g])], right[static_cast<size_t>(made[d])], lspans, rspans, mOptions, regionsOf(left_regions, gone[g]),
-                              regionsOf(right_regions, made[d]));
+            ALTextDiff::words(left[static_cast<size_t>(gone[g])], right[static_cast<size_t>(made[d])], lspans, rspans, optionsOf(gone[g], made[d]),
+                              regionsOf(left_regions, gone[g]), regionsOf(right_regions, made[d]));
             of(Column::Left).lines.back().words  = lspans;
             of(Column::Right).lines.back().words = rspans;
             ++g;

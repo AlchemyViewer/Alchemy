@@ -307,6 +307,14 @@ void ALDiffView::setOffersIgnoreCase(bool offers)
     }
 }
 
+void ALDiffView::setSame(ALTextDiff::same_t same)
+{
+    const Place place = placeOfCaret();
+    mModel.setSame(std::move(same));
+    fill();
+    restorePlace(place);
+}
+
 void ALDiffView::setAlgorithm(ALTextDiff::Algorithm algorithm)
 {
     if (algorithm == mModel.options().algorithm)

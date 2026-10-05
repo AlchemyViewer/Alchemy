@@ -27,6 +27,7 @@
 #include "alworddiff.h"
 
 #include "aldiffids.h"
+#include "aldiffsame.h"
 #include "aldifftokens.h"
 #include "allinediff.h"
 
@@ -132,9 +133,14 @@ void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff:
     const ALTextDiff::Likeness& like = options.like;
     // Each side's words as compared: blanks, where they are let go of,
     // none.
-    const auto compared = [&like](std::string_view line, const ALTextDiff::regions_t* regions) {
+    const ALDiffSame* same     = options.same.get();
+    const auto        compared = [&like, same](std::string_view line, const ALTextDiff::regions_t* regions) {
         tokens_t all;
         ALDiffTokens::cut(line, regions, all);
+        if (same)
+        {
+            same->join(line, all);
+        }
         if (like.ignoreWhitespace)
         {
             std::erase_if(all, [line](const Token& token) { return ALDiffTokens::isBlank(line, token); });
@@ -146,6 +152,11 @@ void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff:
     ALDiffIds        ids;
     const auto       idOf = [&](std::string_view line, const Token& token) {
         const std::string_view word = line.substr(static_cast<size_t>(token.begin), static_cast<size_t>(token.end - token.begin));
+        if (const S32 cls = same ? same->classOf(word) : -1; cls >= 0)
+        {
+            // Every word the table makes one, one id: not a word's text.
+            return ids.idOfMade("\x01" + std::to_string(cls));
+        }
         return like.ignoreCase ? ids.idOfMade(ALTextDiff::likenessOf(word, ALTextDiff::Likeness{ false, true })) : ids.idOf(word);
     };
     std::vector<S32> a;

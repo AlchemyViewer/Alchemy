@@ -28,6 +28,7 @@
 #include "stdtypes.h"
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -48,6 +49,8 @@
 // compared (ALWordDiff), and which lines of a change stand for each other
 // (ALLinePairs).
 //
+class ALDiffSame;
+
 // A text's lines are its own to split; a line holds no line break.
 namespace ALTextDiff
 {
@@ -135,27 +138,36 @@ namespace ALTextDiff
     // What it answers stays its own until it is asked again.
     typedef std::function<const std::vector<regions_t>&(const std::vector<std::string>& lines)> lexer_t;
 
+    // Words that mean the same in the two texts though written otherwise
+    // (ALDiffSame): none, or a table made once and shared.
+    typedef std::shared_ptr<const ALDiffSame> same_t;
+
     // How two texts are compared: by what way, what is let go of, where
-    // they are known to line up, and how their lines are cut into words.
+    // they are known to line up, how their lines are cut into words, and
+    // which words mean the same.
     struct Options
     {
         Algorithm algorithm = Algorithm::Histogram;
         Likeness  like;
         anchors_t anchors;
         lexer_t   lexer;
+        same_t    same;
     };
 
     // The runs that make the left the right, compared as `options` says.
     std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options = Options());
     // Stretches known to stand for each other -- an LSL statement and the
     // SLua lines written of it -- each the first and the last line of the
-    // left and of the right, counted from nought.
+    // left and of the right, counted from nought; and the words that mean
+    // the same within it, beside the whole comparison's, where it has its
+    // own.
     struct Range
     {
-        S32 leftFirst  = 0;
-        S32 leftLast   = 0;
-        S32 rightFirst = 0;
-        S32 rightLast  = 0;
+        S32    leftFirst  = 0;
+        S32    leftLast   = 0;
+        S32    rightFirst = 0;
+        S32    rightLast  = 0;
+        same_t same;
 
         bool operator==(const Range& other) const = default;
     };

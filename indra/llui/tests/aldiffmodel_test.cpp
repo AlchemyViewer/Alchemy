@@ -26,6 +26,8 @@
 
 #include "aldiffmodel.h"
 
+#include "aldiffsame.h"
+
 #include "../test/lltut.h"
 
 #include <deque>
@@ -434,5 +436,24 @@ namespace tut
         ensure("minimal: the line out at the top and in at the bottom", m.changeCount() == 2 && beside(1, 0) && m.options().algorithm == ALTextDiff::Algorithm::Minimal);
         m.setAlgorithm(ALTextDiff::Algorithm::Patience);
         ensure("patience: as histogram here", beside(0, 4));
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<15>()
+    {
+        set_test_name("words that mean the same: the whole comparison's in every pair; a range's own only in it");
+        const char* lsl  = "llSay(0, a);\nllSay(0, b);";
+        const char* slua = "ll.Say(0, a);\nll.Say(0, b);";
+        ALTextDiff::Range range{ 0, 0, 0, 0 };
+        range.same = ALDiffSame::make({ { "llSay", "ll.Say" } });
+        m.setTexts(lsl, slua, { range });
+        ensure("in the range: nothing marked", m.line(Column::Left, 0).words.empty() && m.line(Column::Right, 0).words.empty());
+        ensure("outside it: marked", !m.line(Column::Left, 1).words.empty() && !m.line(Column::Right, 1).words.empty());
+        m.setSwapped(true);
+        ensure("swapped: as before", m.line(Column::Left, 0).words.empty() && !m.line(Column::Left, 1).words.empty());
+        m.setSwapped(false);
+        m.setTexts(lsl, slua);
+        m.setSame(ALDiffSame::make({ { "llSay", "ll.Say" } }));
+        ensure("the whole comparison's: nothing marked anywhere", m.line(Column::Left, 0).words.empty() && m.line(Column::Left, 1).words.empty());
     }
 }

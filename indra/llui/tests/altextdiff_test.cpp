@@ -26,6 +26,7 @@
 
 #include "altextdiff.h"
 
+#include "aldiffsame.h"
 #include "allinepairs.h"
 
 #include "../test/lltut.h"
@@ -644,5 +645,29 @@ namespace tut
         ensure_equals("histogram: a b a kept", walk(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Histogram))), 2);
         ensure_equals("patience: X kept", walk(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Patience))), 6);
         ensure_equals("minimal: the fewest", walk(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Minimal))), 2);
+    }
+
+    template<> template<>
+    void altextdiff_object::test<17>()
+    {
+        set_test_name("words that mean the same: a run spelling one of the table's one word, and its pair not marked; pairs joined; without the table, marked");
+        typedef ALTextDiff::spans_t S;
+        ALTextDiff::Options same;
+        same.same = ALDiffSame::make({ { "llSay", "ll.Say" }, { "!=", "~=" }, { "ll.Say", "ll.say" } });
+        S left, right;
+        ALTextDiff::words("llSay(0, s)", "ll.Say(0, s)", left, right, same);
+        ensure("llSay beside ll.Say: nothing", left.empty() && right.empty());
+        ALTextDiff::words("llSay(0, s)", "ll.say(0, s)", left, right, same);
+        ensure("and beside what ll.Say is the same as", left.empty() && right.empty());
+        ALTextDiff::words("if (a != b)", "if (a ~= b)", left, right, same);
+        ensure("!= beside ~=, though cut as two bytes each: nothing", left.empty() && right.empty());
+        ALTextDiff::words("llSay(0, s);", "ll.Say(0, t)", left, right, same);
+        ensure("what else differs still marked, the lone ) between with it", left == S{ { 9, 12 } } && right == S{ { 10, 12 } });
+        ALTextDiff::words("llSay(0, s)", "ll.Say(0, s)", left, right);
+        ensure("without the table: marked", !left.empty() && !right.empty());
+        ensure("a pair's lines more alike by it", ALLinePairs::alike("llSay(0, s)", "ll.Say(0, s)", same) == 1.f &&
+                                                     ALLinePairs::alike("llSay(0, s)", "ll.Say(0, s)") < 1.f);
+        ensure("a table of nothing joined with one: that one", ALDiffSame::joined(nullptr, same.same) == same.same &&
+                                                                  ALDiffSame::joined(same.same, ALDiffSame::make({}))->pairs().size() == 3);
     }
 }
