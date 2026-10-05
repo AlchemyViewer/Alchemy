@@ -7790,9 +7790,10 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
         return;
     }
     // Named after it, beside it: in the prim it is in, as the scripter
-    // would put it, or in the inventory's scripts folder, as a new script
-    // is made there; opened with the SLua put in unsaved, and set beside
-    // the LSL once it has loaded.
+    // would put it; in the folder of the agent's inventory it is in; or,
+    // for a file, or one in the trash or the Library, in the inventory's
+    // scripts folder, as a new script is made there. Opened with the SLua
+    // put in unsaved, and set beside the LSL once it has loaded.
     const std::string         name     = getString("ConvertName", args);
     const std::string         lsl      = expanded ? *doc.expanded.text : source;
     const std::string         text     = converted.text;
@@ -7854,7 +7855,17 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
         });
         std::string desc;
         LLViewerAssetType::generateDescriptionFor(LLAssetType::AT_LSL_TEXT, desc);
-        create_inventory_item(gAgent.getID(), gAgent.getSessionID(), gInventory.findCategoryUUIDForType(LLFolderType::FT_LSL_TEXT),
+        LLUUID folder = gInventory.findCategoryUUIDForType(LLFolderType::FT_LSL_TEXT);
+        if (const LLViewerInventoryItem* original = doc.ref.inInventory() ? gInventory.getItem(doc.ref.item) : nullptr)
+        {
+            const LLUUID parent = original->getParentUUID();
+            if (parent.notNull() && gInventory.isObjectDescendentOf(parent, gInventory.getRootFolderID()) &&
+                !gInventory.isObjectDescendentOf(parent, gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH)))
+            {
+                folder = parent;
+            }
+        }
+        create_inventory_item(gAgent.getID(), gAgent.getSessionID(), folder,
                               LLTransactionID::tnull, name, desc, LLAssetType::AT_LSL_TEXT, LLInventoryType::IT_LSL, SST_LUA,
                               LLFloaterPerms::getNextOwnerPerms("Scripts"), made);
     }
