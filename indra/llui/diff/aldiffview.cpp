@@ -91,6 +91,11 @@ ALDiffView::ALDiffView(const Params& p)
         takeBack(changeAtCaret());
         side->setFocus(true);
     });
+    mBar->onSettle([this](ALTextMerge::Take take) {
+        ALCodeEditor* side = shown();
+        settle(changeAtCaret(), take);
+        side->setFocus(true);
+    });
     mBar->onDone([this]() {
         if (mEscape)
         {
@@ -167,7 +172,15 @@ ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::
 void ALDiffView::setTexts(std::string_view left, std::string_view right, const ALTextDiff::ranges_t& ranges)
 {
     mModel.setTexts(left, right, ranges);
+    mBar->setMerging(false);
     fill();
+}
+
+void ALDiffView::setMergeBase(std::optional<std::string_view> base)
+{
+    mModel.setMergeBase(base);
+    mBar->setMerging(mModel.merging());
+    refreshBar();
 }
 
 void ALDiffView::setRightText(std::string_view right)
@@ -688,6 +701,46 @@ void ALDiffView::drawCurrentChange()
     }
 }
 
+void ALDiffView::drawConflicts()
+{
+    // Down the text's left edge, from the top of its first row to the top
+    // of the row after its last, its gap alike: on each side, so that it
+    // reads whichever is looked at.
+    if (!mModel.merging() || mModel.conflictCount() == 0)
+    {
+        return;
+    }
+    const F32           alpha   = getDrawContext().mAlpha;
+    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
+    for (ALCodeEditor* side : sides)
+    {
+        if (!side)
+        {
+            continue;
+        }
+        const LLRect    frame = side->getRect();
+        const LLRect    text  = side->textRect();
+        const S32       top   = frame.mBottom + text.mTop;
+        LLLocalClipRect clip(LLRect(frame.mLeft + text.mLeft, top, frame.mLeft + text.mRight, frame.mBottom + text.mBottom));
+        for (S32 change = 0; change < changeCount(); ++change)
+        {
+            const S32 first = mModel.changeFirst(layoutOf(side), change);
+            const S32 end   = mModel.changeEnd(layoutOf(side), change);
+            if (!mModel.changeConflicts(change) || end <= first)
+            {
+                continue;
+            }
+            const S32 from = top - (topOfRow(side, first) - side->scrollY());
+            const S32 to   = top - (topOfRow(side, end) - side->scrollY());
+            if (to >= top || from <= frame.mBottom + text.mBottom)
+            {
+                continue;
+            }
+            gl_rect_2d(frame.mLeft + text.mLeft, from, frame.mLeft + text.mLeft + CONFLICT_EDGE, to, mConflictColor % alpha);
+        }
+    }
+}
+
 // --- folds -----------------------------------------------------------------------------
 
 void ALDiffView::setFoldSame(bool fold)
@@ -1045,6 +1098,24 @@ bool ALDiffView::takeBack(S32 change)
     return true;
 }
 
+bool ALDiffView::settle(S32 change, ALTextMerge::Take take)
+{
+    // The edit, where it needs one, made by whoever shows it; the base
+    // taken as theirs there either way, and the conflicts found again.
+    const std::optional<ALDiffMerge::Settling> settling = mModel.settle(change, take);
+    if (!settling || (settling->edits && (!mTakeBack || !mTakeBack(settling->range, settling->text))))
+    {
+        return false;
+    }
+    mModel.settled(settling->base);
+    if (settling->edits)
+    {
+        setRightText(settling->made);
+    }
+    refreshBar();
+    return true;
+}
+
 S32 ALDiffView::changeAtCaret() const
 {
     const ALCodeEditor* side = shown();
@@ -1162,6 +1233,10 @@ void ALDiffView::refreshBar()
     mBar->setCount(changeAtCaret(), changeCount());
     mBar->setTakeBackShown(mTakeBack != nullptr);
     mBar->setTakeBackEnabled(mTakeBack && changeAtCaret() >= 0);
+    if (mModel.merging())
+    {
+        mBar->setConflicts(mModel.conflictCount(), mTakeBack && mModel.changeConflicts(changeAtCaret()));
+    }
     const ALCodeEditor* side = shown();
     mBar->setSteps(mModel.changeStep(columnOf(side), side->caret().line, false) >= 0, mModel.changeStep(columnOf(side), side->caret().line, true) >= 0);
 }
@@ -1187,9 +1262,10 @@ void ALDiffView::refreshColors()
     }
     mColorsGeneration = LLUIColorTable::instance().generation();
     mBar->setColors(mRight->backgroundColor(), mRight->textColor());
-    mCurrentColor = colorOf("CodeDiffCurrentColor", mRight->cursorColor());
-    mDividerColor = colorOf("CodeDiffDividerColor", LLColor4(0.5f, 0.5f, 0.5f, 0.5f));
-    mLinkedColor  = colorOf("CodeDiffLinkedColor", LLColor4(0.45f, 0.65f, 1.f, 1.f));
+    mCurrentColor  = colorOf("CodeDiffCurrentColor", mRight->cursorColor());
+    mDividerColor  = colorOf("CodeDiffDividerColor", LLColor4(0.5f, 0.5f, 0.5f, 0.5f));
+    mLinkedColor   = colorOf("CodeDiffLinkedColor", LLColor4(0.45f, 0.65f, 1.f, 1.f));
+    mConflictColor = colorOf("CodeDiffConflictColor", LLColor4(1.f, 0.6f, 0.1f, 1.f));
 }
 
 void ALDiffView::draw()
@@ -1198,6 +1274,7 @@ void ALDiffView::draw()
     LLUICtrl::draw();
     drawFoldRows();
     drawLinked();
+    drawConflicts();
     drawCurrentChange();
     if (!mInline)
     {

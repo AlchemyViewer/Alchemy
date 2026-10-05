@@ -918,4 +918,64 @@ namespace tut
         typed("/six\n");
         ensure("inline", d.inlined()->caret().line == d.inlined()->document().lineCount() - 1 && edits == 0);
     }
+
+    template<> template<>
+    void aldiffview_object::test<28>()
+    {
+        set_test_name("a merge: the conflicts counted on the bar, the one the caret is in settled with theirs, mine or both; let go of with new texts");
+        // Theirs changed lines 0 and 6, ours lines 2 and 6; begun with
+        // theirs's line 0 taken.
+        const std::string base   = lines(8);
+        const std::string theirs = lines(8, { { 0, "theirs 0" }, { 6, "theirs 6" } });
+        const std::string ours   = lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } });
+        ALDiffView&       d      = make(theirs.c_str(), ours.c_str());
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name               = "source";
+        p.rect               = LLRect(0, 100, 300, 0);
+        ALCodeEditor* source = LLUICtrlFactory::create<ALCodeEditor>(p);
+        S32           asked  = 0;
+        d.setOnTakeBack([&](const ALTextRange& range, const std::string& text) {
+            ++asked;
+            return source->replaceAll({ { range, text } });
+        });
+        ensure("no buttons to settle before a merge", !d.bar()->getChild<LLView>("take_theirs")->getVisible());
+        const auto begin = [&]() {
+            d.setTexts(theirs, ours);
+            source->setText(ours);
+            d.setMergeBase(base);
+        };
+        begin();
+        ensure("merging", d.merging() && d.conflictCount() == 1);
+        ensure("the buttons shown", d.bar()->getChild<LLView>("take_theirs")->getVisible() && d.bar()->getChild<LLView>("keep_both")->getVisible());
+        ensure("the count says one left", d.bar()->countSaid().find("1 conflict left") != std::string::npos);
+        d.right()->setFocus(true);
+        d.right()->goTo(ALTextPos(2, 0));
+        ensure("not lit in ours's own change", !enabled(d, "take_theirs") && !enabled(d, "keep_mine") && !enabled(d, "keep_both"));
+        ensure("nor settled from it", !d.settle(d.changeAtCaret(), ALTextMerge::Take::Theirs));
+        d.right()->goTo(ALTextPos(6, 0));
+        ensure("lit in the conflict", enabled(d, "take_theirs") && enabled(d, "keep_mine") && enabled(d, "keep_both"));
+
+        press(d, "keep_both");
+        ensure_equals("mine then theirs", source->text(), lines(9, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" }, { 7, "theirs 6" }, { 8, "line 7" } }));
+        ensure_equals("compared again", d.rightText(), source->text());
+        ensure("none left", d.conflictCount() == 0 && d.bar()->countSaid().find("no conflicts left") != std::string::npos);
+        ensure_equals("one edit", asked, 1);
+
+        begin();
+        d.right()->goTo(ALTextPos(6, 0));
+        press(d, "keep_mine");
+        ensure("mine: nothing edited", asked == 1 && source->text() == ours && d.rightText() == ours);
+        ensure("and settled", d.conflictCount() == 0);
+
+        begin();
+        d.right()->goTo(ALTextPos(6, 0));
+        press(d, "take_theirs");
+        ensure_equals("theirs", source->text(), lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "theirs 6" } }));
+        ensure("settled", asked == 2 && d.conflictCount() == 0);
+
+        d.setTexts(theirs, ours);
+        ensure("new texts let it go", !d.merging() && !d.bar()->getChild<LLView>("take_theirs")->getVisible() &&
+                                          d.bar()->countSaid().find("conflict") == std::string::npos);
+        source->die();
+    }
 }

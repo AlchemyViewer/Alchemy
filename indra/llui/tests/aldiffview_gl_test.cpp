@@ -283,4 +283,29 @@ namespace tut
         const std::vector<U8> plain = drawn(d);
         ensure("no edge", count(plain, edge, edge + ALDiffView::LINKED_EDGE, block.bottom + 1, block.top - 1, blue) == 0);
     }
+
+    template<> template<>
+    void aldiffview_gl_object::test<5>()
+    {
+        set_test_name("a merge's conflict edged down its rows on each side; ours's own change not");
+        ALDiffView&       d      = make();
+        const std::string base   = "zero\none\ntwo\nthree\nfour\nfive\nsix\nseven";
+        const std::string theirs = "zero\none\ntwo\nthree\nfour\nfive\nsix theirs\nseven";
+        const std::string ours   = "zero\none\ntwo mine\nthree\nfour\nfive\nsix mine\nseven";
+        d.setFoldSame(false);
+        d.setTexts(theirs, ours);
+        d.right()->setFocus(true);
+        d.right()->goTo(ALTextPos(0, 0));
+        const auto orange = [](U8 r, U8 g, U8 b) { return r > 200 && g > 110 && g < 180 && b < 70; };
+        const Band right  = band(d.right(), 6, 6);
+        const Band left   = band(d.left(), 6, 6);
+        const Band own    = band(d.right(), 2, 2);
+        const S32  edge   = ALDiffView::CONFLICT_EDGE;
+        ensure("no edge before a merge", count(drawn(d), right.left, right.left + edge, right.bottom + 1, right.top - 1, orange) == 0);
+        d.setMergeBase(base);
+        const std::vector<U8> merged = drawn(d);
+        ensure("down the conflict on the right", count(merged, right.left, right.left + edge, right.bottom + 1, right.top - 1, orange) >= right.top - right.bottom - 2);
+        ensure("and on the left", count(merged, left.left, left.left + edge, left.bottom + 1, left.top - 1, orange) >= left.top - left.bottom - 2);
+        ensure("not down ours's own change", count(merged, own.left, own.left + edge, own.bottom + 1, own.top - 1, orange) == 0);
+    }
 }

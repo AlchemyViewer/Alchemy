@@ -415,6 +415,17 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="DiffBarNone">No changes</string>
 	<!-- After the count, where a comparison by structure compared a change by lines. -->
 	<string name="DiffBarByLines">· by lines where too large to compare by structure</string>
+	<!-- After the count, while a merge is settled: the conflicts left. -->
+	<string name="DiffBarConflictsA">· [COUNT] conflict left</string>
+	<string name="DiffBarConflictsB">· [COUNT] conflicts left</string>
+	<string name="DiffBarConflictsNone">· no conflicts left</string>
+	<!-- Settling the conflict the caret is in, in a merge. -->
+	<string name="DiffBarTheirs">Theirs</string>
+	<string name="DiffBarTheirsTip">Settle this conflict with the other side's lines</string>
+	<string name="DiffBarMine">Mine</string>
+	<string name="DiffBarMineTip">Settle this conflict keeping your lines</string>
+	<string name="DiffBarBoth">Both</string>
+	<string name="DiffBarBothTip">Settle this conflict with your lines, then the other side's</string>
 	<!-- A comparison's row standing for lines the same folded away. -->
 	<string name="DiffFoldedLinesA">⋯ 1 line the same ⋯</string>
 	<string name="DiffFoldedLinesB">⋯ [COUNT] lines the same ⋯</string>

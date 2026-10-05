@@ -136,7 +136,9 @@ target_sources(
     fields/alcolorsheet.cpp
     base/aldeferredrebuild.cpp
     diff/aldiffbar.cpp
+    diff/aldiffedit.cpp
     diff/aldifflexer.cpp
+    diff/aldiffmerge.cpp
     diff/aldiffmodel.cpp
     diff/aldiffmoves.cpp
     diff/aldiffrangesame.cpp
@@ -363,8 +365,10 @@ target_sources(
         fields/alcolorsheet.h
         base/aldeferredrebuild.h
         diff/aldiffbar.h
+        diff/aldiffedit.h
         diff/aldiffids.h
         diff/aldifflexer.h
+        diff/aldiffmerge.h
         diff/aldiffmodel.h
         diff/aldiffmoves.h
         diff/aldiffrangesame.h
@@ -550,6 +554,7 @@ if(AL_BUILD_TESTS)
   # What comparing two texts is made of, compiled in, below the view.
   set(
     diff_sources
+    diff/aldiffedit.cpp
     diff/aldiffmoves.cpp
     diff/aldiffrangesame.cpp
     diff/aldiffsame.cpp
@@ -562,12 +567,22 @@ if(AL_BUILD_TESTS)
     diff/alworddiff.cpp
   )
   al_add_test(altextdiff UNIT PROJECT llui DIR diff SOURCES ${diff_sources} LIBRARIES ${test_libs})
+  # A merge settled in a comparison, and lines of a text put in place of
+  # others as one edit of it.
+  al_add_test(
+    aldiffmerge
+    UNIT
+    PROJECT llui
+    DIR diff
+    SOURCES diff/altextdiff.cpp ${diff_sources}
+    LIBRARIES ${test_libs}
+  )
   al_add_test(
     aldiffmodel
     UNIT
     PROJECT llui
     DIR diff
-    SOURCES diff/altextdiff.cpp ${diff_sources}
+    SOURCES diff/altextdiff.cpp diff/aldiffmerge.cpp ${diff_sources}
     LIBRARIES ${test_libs}
   )
   # A grammar's regions for a comparison, read again only where a text

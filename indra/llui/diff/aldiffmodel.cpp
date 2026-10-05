@@ -26,6 +26,7 @@
 
 #include "aldiffmodel.h"
 
+#include "aldiffedit.h"
 #include "aldiffrangesame.h"
 #include "allinepairs.h"
 #include "alstructuraldiff.h"
@@ -44,6 +45,7 @@ ALDiffModel::ALDiffModel()
 void ALDiffModel::setTexts(std::string_view left, std::string_view right, const ALTextDiff::ranges_t& ranges)
 {
     mNotes.clear();
+    mMerge.reset();
     mLeftText   = std::string(left);
     mRightText  = std::string(right);
     mLeftLines  = ALTextDiff::split(mLeftText);
@@ -86,6 +88,10 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
     std::vector<std::string> before = std::move(mRightLines);
     mRightText                      = std::string(right);
     mRightLines                     = std::move(now);
+    if (mMerge)
+    {
+        mMerge->setOurs(mRightLines);
+    }
     mRanges                         = std::move(ranges);
     const ALTextDiff::Options options = shownOptions();
     const bool spliced = mSwapped ? ALDiffSplice::splice(mRuns, before, mRightLines, mLeftLines, mLeftLines, options)
@@ -129,6 +135,10 @@ void ALDiffModel::setSwapped(bool swapped)
 void ALDiffModel::setLikeness(const ALTextDiff::Likeness& like)
 {
     mOptions.like = like;
+    if (mMerge)
+    {
+        mMerge->setOptions(mOptions);
+    }
     build();
 }
 
@@ -629,6 +639,7 @@ void ALDiffModel::layout(const std::vector<bool>& open)
     }
     mFolds = std::move(folds);
     findBracketed();
+    findConflicts();
 }
 
 // --- a column's lines ----------------------------------------------------------
@@ -828,46 +839,64 @@ bool ALDiffModel::takeBack(S32 change, ALTextRange& range, std::string& text, st
     {
         return false;
     }
-    // The right's lines of it in the left's place: the lines between, a
-    // line's break with the lines taken out or put in, at the text's end
-    // the one before them.
-    const ChangeLines&             c     = mChanges[static_cast<size_t>(change)].lines;
-    const std::vector<std::string>& left  = mLeftLines;
-    const std::vector<std::string>& right = mRightLines;
-    std::string                     lines;
-    for (S32 n = 0; n < c.leftCount; ++n)
+    // The right's lines of it in the left's place, as one edit of the
+    // right's text (ALDiffEdit).
+    const ChangeLines&             c = mChanges[static_cast<size_t>(change)].lines;
+    const std::vector<std::string> left(mLeftLines.begin() + c.leftFirst, mLeftLines.begin() + c.leftFirst + c.leftCount);
+    return ALDiffEdit::replaceLines(mRightText, mRightLines, c.rightFirst, c.rightCount, left, range, text, made);
+}
+
+// --- a merge ---------------------------------------------------------------------------
+
+void ALDiffModel::setMergeBase(std::optional<std::string_view> base)
+{
+    mMerge.reset();
+    if (base)
     {
-        lines += (n ? "\n" : "") + left[static_cast<size_t>(c.leftFirst + n)];
+        // Theirs the left as given, ours the right.
+        mMerge.emplace(ALTextDiff::split(*base), mLeftLines, mOptions);
+        mMerge->setOurs(mRightLines);
     }
-    const S32  last = static_cast<S32>(right.size()) - 1;
-    const auto ends = [&](S32 line) { return ALTextPos(line, static_cast<S32>(right[static_cast<size_t>(line)].size())); };
-    text.clear();
-    if (c.rightCount > 0 && c.leftCount > 0)
+    findConflicts();
+}
+
+void ALDiffModel::findConflicts()
+{
+    mConflicted.assign(mChanges.size(), false);
+    for (size_t i = 0; mMerge && i < mChanges.size(); ++i)
     {
-        range = ALTextRange(ALTextPos(c.rightFirst, 0), ends(c.rightFirst + c.rightCount - 1));
-        text  = lines;
+        const ChangeLines& c = mChanges[i].lines;
+        mConflicted[i]       = !mMerge->conflictsIn(c.leftFirst, c.leftCount, c.rightFirst, c.rightCount).empty();
     }
-    else if (c.rightCount > 0)
+}
+
+S32 ALDiffModel::conflictCount() const
+{
+    return mMerge ? mMerge->conflictCount() : 0;
+}
+
+bool ALDiffModel::changeConflicts(S32 change) const
+{
+    return change >= 0 && change < static_cast<S32>(mConflicted.size()) && mConflicted[static_cast<size_t>(change)];
+}
+
+std::optional<ALDiffMerge::Settling> ALDiffModel::settle(S32 change, ALTextMerge::Take take) const
+{
+    if (!changeConflicts(change))
     {
-        const S32 after = c.rightFirst + c.rightCount;
-        range           = after <= last          ? ALTextRange(ALTextPos(c.rightFirst, 0), ALTextPos(after, 0))
-                          : c.rightFirst > 0 ? ALTextRange(ends(c.rightFirst - 1), ends(last))
-                                             : ALTextRange(ALTextPos(0, 0), ends(last));
+        return std::nullopt;
     }
-    else
+    const ChangeLines& c = mChanges[static_cast<size_t>(change)].lines;
+    return mMerge->settle(mMerge->conflictsIn(c.leftFirst, c.leftCount, c.rightFirst, c.rightCount), take, mRightText);
+}
+
+void ALDiffModel::settled(ALDiffMerge::lines_t base)
+{
+    if (mMerge)
     {
-        range = c.rightFirst <= last ? ALTextRange(ALTextPos(c.rightFirst, 0), ALTextPos(c.rightFirst, 0)) : ALTextRange(ends(last), ends(last));
-        text  = c.rightFirst <= last ? lines + "\n" : "\n" + lines;
+        mMerge->settled(std::move(base));
+        findConflicts();
     }
-    // The right as it will be, by where each line of it starts in the text.
-    std::vector<size_t> starts{ 0 };
-    for (size_t at = mRightText.find('\n'); at != std::string::npos; at = mRightText.find('\n', at + 1))
-    {
-        starts.push_back(at + 1);
-    }
-    const auto offset = [&](const ALTextPos& pos) { return starts[static_cast<size_t>(pos.line)] + static_cast<size_t>(pos.column); };
-    made              = mRightText.substr(0, offset(range.begin)) + text + mRightText.substr(offset(range.end));
-    return true;
 }
 
 // --- moves ---------------------------------------------------------------------------

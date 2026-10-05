@@ -25,11 +25,13 @@
 #ifndef AL_ALDIFFMODEL_H
 #define AL_ALDIFFMODEL_H
 
+#include "aldiffmerge.h"
 #include "aldiffmoves.h"
 #include "aldiffsplice.h"
 #include "altextdiff.h"
 #include "altextdocument.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -220,6 +222,24 @@ public:
     // there -- and the right's text as it will be. False for no change.
     bool               takeBack(S32 change, ALTextRange& range, std::string& text, std::string& made) const;
 
+    // --- a merge -----------------------------------------------------------------
+
+    // The left saved elsewhere and the right made here, each from a text
+    // both were (the base): merged as the right changes (ALDiffMerge), and
+    // each change that has a line in a conflict of it said so. Given after
+    // the texts, which let it go; nothing for none.
+    void                                 setMergeBase(std::optional<std::string_view> base);
+    bool                                 merging() const { return mMerge.has_value(); }
+    // How many conflicts there are, and whether a change is in one.
+    S32                                  conflictCount() const;
+    bool                                 changeConflicts(S32 change) const;
+    // The conflicts a change is in settled (ALDiffMerge::settle); nothing
+    // where it is in none.
+    std::optional<ALDiffMerge::Settling> settle(S32 change, ALTextMerge::Take take) const;
+    // The base as a settling leaves it, and the conflicts found again: the
+    // right made anew after, where the settling edits it.
+    void                                 settled(ALDiffMerge::lines_t base);
+
     // --- moves -------------------------------------------------------------------
 
     // Blocks of lines taken out in one place and put in at another, the
@@ -351,6 +371,9 @@ private:
     ALTextDiff::Options shownOptions() const;
     // Which ranges are bracketed, worked out as each layout is made.
     void              findBracketed();
+    // Which changes are in a conflict of the merge, worked out as each
+    // layout is made and each conflict settled.
+    void              findConflicts();
 
     std::string           mLeftText;
     std::string           mRightText;
@@ -378,6 +401,10 @@ private:
     std::vector<bool>                mByTokens[2];
     bool                             mFellBack = false;
     std::vector<Change>   mChanges;
+    // The merge, where there is one, and whether each change is in a
+    // conflict of it.
+    std::optional<ALDiffMerge> mMerge;
+    std::vector<bool>     mConflicted;
     std::vector<Move>     mMoves;
     std::vector<Fold>     mFolds;
 };

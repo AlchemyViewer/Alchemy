@@ -26,6 +26,7 @@
 #define AL_ALDIFFBAR_H
 
 #include "almenuslot.h"
+#include "altextmerge.h"
 #include "alviewtype.h"
 #include "lluicolor.h"
 #include "llpanel.h"
@@ -43,8 +44,10 @@ class LLTextBox;
 // the change taken back, where whoever shows it can; what is the same
 // folded away, what is let go of in telling lines the same -- a menu, lit
 // while anything is -- the comparison inline or side by side, its sides
-// swapped; and done, back to what it was made from. In the comparison's colours, as
-// the find bar is in its view's.
+// swapped; and done, back to what it was made from. Merging, how many
+// conflicts are left, and the one the caret is in settled with theirs,
+// mine, or both. In the comparison's colours, as the find bar is in its
+// view's.
 //
 // It holds what it shows and nothing else: the view tells it the count
 // and the state of its toggles, and it says what was pressed.
@@ -86,6 +89,11 @@ public:
     // Whether a change can be taken back at all, and the caret's now.
     void        setTakeBackShown(bool shown);
     void        setTakeBackEnabled(bool enabled);
+    // Whether a merge is being settled; and how many conflicts it has left,
+    // said after the count, and whether the caret's change is one, which
+    // the buttons that settle it are lit for.
+    void        setMerging(bool merging);
+    void        setConflicts(S32 left, bool here);
 
     // The colours of the comparison it is over: its glyphs and its count
     // in the sides' ink, its ground a shade off their paper.
@@ -102,6 +110,8 @@ public:
     boost::signals2::connection onSwap(const signal_t::slot_type& cb) { return mSwap.connect(cb); }
     boost::signals2::connection onDone(const signal_t::slot_type& cb) { return mDone.connect(cb); }
     boost::signals2::connection onTakeBack(const signal_t::slot_type& cb) { return mTakeBack.connect(cb); }
+    typedef boost::signals2::signal<void(ALTextMerge::Take)> settle_signal_t;
+    boost::signals2::connection onSettle(const settle_signal_t::slot_type& cb) { return mSettle.connect(cb); }
 
     void draw() override;
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
@@ -112,6 +122,9 @@ protected:
 
 private:
     ALFlatButton* flat(const std::string& name, const std::string& glyph, bool toggle, const std::string& tip);
+    // The count as it is said: the change, how it was compared, and the
+    // conflicts left.
+    void          refreshSaid();
     void          layout();
     // The menu of what to let go of (menu_diff_ignore.xml), under its
     // button.
@@ -122,6 +135,8 @@ private:
     S32           mCurrent = -2;
     S32           mTotal   = -1;
     bool          mFellBack = false;
+    // The conflicts left, -1 where nothing is merged.
+    S32           mConflicts = -1;
     Ignores       mIgnores;
     ALMenuSlot    mIgnoreMenu;
 
@@ -134,8 +149,13 @@ private:
     ALFlatButton* mSwapButton     = nullptr;
     ALFlatButton* mDoneButton     = nullptr;
     ALFlatButton* mTakeBackButton = nullptr;
+    // Settling a conflict: in words, which a glyph would not say.
+    ALFlatButton* mTheirsButton   = nullptr;
+    ALFlatButton* mMineButton     = nullptr;
+    ALFlatButton* mBothButton     = nullptr;
 
-    signal_t mPrevious, mNext, mFold, mInline, mSwap, mDone, mTakeBack;
+    signal_t        mPrevious, mNext, mFold, mInline, mSwap, mDone, mTakeBack;
+    settle_signal_t mSettle;
 };
 
 #endif // AL_ALDIFFBAR_H

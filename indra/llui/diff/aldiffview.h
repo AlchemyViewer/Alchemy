@@ -33,6 +33,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -192,6 +193,21 @@ public:
     // The change, counted from nought, taken back; false where it was not.
     bool takeBack(S32 change);
 
+    // A merge settled here (ALDiffMerge): the left saved elsewhere and the
+    // right made here, each from a text both were, the base. Each change
+    // in a conflict is marked down its rows on each side, the bar says how
+    // many are left, and the one the caret is in is settled from it --
+    // with theirs, mine, or mine then theirs -- an edit of the right made
+    // as a change taken back is, by whoever shows it. Given after the
+    // texts, which let it go; nothing for none.
+    static constexpr S32 CONFLICT_EDGE = 3;
+    void setMergeBase(std::optional<std::string_view> base);
+    bool merging() const { return mModel.merging(); }
+    S32  conflictCount() const { return mModel.conflictCount(); }
+    // The change, counted from nought, settled; false where it is in no
+    // conflict, or an edit it needs was not made.
+    bool settle(S32 change, ALTextMerge::Take take);
+
     // The side the keyboard is in, else the right, or the one inline:
     // what a find or a copy works on.
     ALCodeEditor* shown() const;
@@ -285,6 +301,8 @@ private:
     void          goToMoved(ALCodeEditor* side, S32 line);
     // A line round the change the caret is in, on each side shown.
     void          drawCurrentChange();
+    // An edge down each change in a conflict, on each side shown.
+    void          drawConflicts();
     // The range the caret is in (ALDiffModel::rangeAt), side by side: each
     // side's rows of it washed, and its band brighter.
     void          refreshLinked();
@@ -326,6 +344,7 @@ private:
     LLColor4                  mDividerColor;
     // The linked range's hue, washed and edged at alphas of its own.
     LLColor4                  mLinkedColor;
+    LLColor4                  mConflictColor;
     // The range the caret is in, -1 for none.
     S32                       mLinked = -1;
     // The grammar words are cut by: none for prose.

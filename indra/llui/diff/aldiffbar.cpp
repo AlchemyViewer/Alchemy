@@ -90,6 +90,18 @@ ALDiffBar::ALDiffBar(const Params& p)
     mDoneButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mDone(); });
     mTakeBackButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mTakeBack(); });
     mTakeBackButton->setVisible(false);
+    mTheirsButton = flat("take_theirs", alSaid("DiffBarTheirs", "Theirs"), false,
+                         alSaid("DiffBarTheirsTip", "Settle this conflict with the other side's lines"));
+    mMineButton   = flat("keep_mine", alSaid("DiffBarMine", "Mine"), false, alSaid("DiffBarMineTip", "Settle this conflict keeping your lines"));
+    mBothButton   = flat("keep_both", alSaid("DiffBarBoth", "Both"), false,
+                         alSaid("DiffBarBothTip", "Settle this conflict with your lines, then the other side's"));
+    mTheirsButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSettle(ALTextMerge::Take::Theirs); });
+    mMineButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSettle(ALTextMerge::Take::Ours); });
+    mBothButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSettle(ALTextMerge::Take::OursThenTheirs); });
+    for (ALFlatButton* word : { mTheirsButton, mMineButton, mBothButton })
+    {
+        word->setVisible(false);
+    }
 
     setCount(-1, 0);
     layout();
@@ -112,36 +124,46 @@ void ALDiffBar::setFellBack(bool fell_back)
     if (mFellBack != fell_back)
     {
         mFellBack = fell_back;
-        const S32 total = mTotal;
-        mTotal          = -2;
-        setCount(mCurrent, total);
+        refreshSaid();
     }
 }
 
 void ALDiffBar::setCount(S32 current, S32 total)
 {
-    if (current == mCurrent && total == mTotal)
+    if (current != mCurrent || total != mTotal)
     {
-        return;
+        mCurrent = current;
+        mTotal   = total;
+        refreshSaid();
     }
-    mCurrent = current;
-    mTotal   = total;
+}
+
+void ALDiffBar::refreshSaid()
+{
     std::string said;
-    if (total == 0)
+    if (mTotal == 0)
     {
         said = alSaid("DiffBarNone", "No changes");
     }
-    else if (current >= 0)
+    else if (mCurrent >= 0)
     {
-        said = alSaid("DiffBarOf", "Change [CURRENT] of [TOTAL]", { { "[CURRENT]", std::to_string(current + 1) }, { "[TOTAL]", std::to_string(total) } });
+        said = alSaid("DiffBarOf", "Change [CURRENT] of [TOTAL]", { { "[CURRENT]", std::to_string(mCurrent + 1) }, { "[TOTAL]", std::to_string(mTotal) } });
     }
     else
     {
-        said = alSaidCount("DiffBarChanges", total, "[COUNT] change", "[COUNT] changes");
+        said = alSaidCount("DiffBarChanges", mTotal, "[COUNT] change", "[COUNT] changes");
+    }
+    // The skin's strings lose the blank before them.
+    if (mConflicts > 0)
+    {
+        said += " " + alSaidCount("DiffBarConflicts", mConflicts, "\xC2\xB7 [COUNT] conflict left", "\xC2\xB7 [COUNT] conflicts left");
+    }
+    else if (mConflicts == 0)
+    {
+        said += " " + alSaid("DiffBarConflictsNone", "\xC2\xB7 no conflicts left");
     }
     if (mFellBack)
     {
-        // The skin's string loses the blank before it.
         said += " " + alSaid("DiffBarByLines", "\xC2\xB7 by lines where too large to compare by structure");
     }
     mCount->setText(said);
@@ -228,12 +250,43 @@ void ALDiffBar::setTakeBackEnabled(bool enabled)
     mTakeBackButton->setEnabled(enabled);
 }
 
+void ALDiffBar::setMerging(bool merging)
+{
+    if (mTheirsButton->getVisible() != merging)
+    {
+        for (ALFlatButton* word : { mTheirsButton, mMineButton, mBothButton })
+        {
+            word->setVisible(merging);
+        }
+        layout();
+    }
+    if (!merging && mConflicts >= 0)
+    {
+        mConflicts = -1;
+        refreshSaid();
+    }
+}
+
+void ALDiffBar::setConflicts(S32 left, bool here)
+{
+    if (left != mConflicts)
+    {
+        mConflicts = left;
+        refreshSaid();
+    }
+    for (ALFlatButton* word : { mTheirsButton, mMineButton, mBothButton })
+    {
+        word->setEnabled(here);
+    }
+}
+
 void ALDiffBar::setColors(const LLColor4& background, const LLColor4& ink)
 {
     mBgColor              = ALSurface::ground(background, ink);
     mInkColor             = ink;
     const LLColor4 chosen = ALSurface::chosen(background, ink);
-    for (ALFlatButton* glyph : { mPreviousButton, mNextButton, mFoldButton, mIgnoreButton, mInlineButton, mSwapButton, mDoneButton, mTakeBackButton })
+    for (ALFlatButton* glyph : { mPreviousButton, mNextButton, mFoldButton, mIgnoreButton, mInlineButton, mSwapButton, mDoneButton, mTakeBackButton,
+                                 mTheirsButton, mMineButton, mBothButton })
     {
         glyph->setInk(ink);
         glyph->setLit(chosen);
@@ -259,8 +312,9 @@ void ALDiffBar::draw()
 void ALDiffBar::layout()
 {
     // The buttons at the right, in ones, twos and threes -- the steps,
-    // taking a change back, the ways of showing, done -- and the count over
-    // what is left at the left.
+    // taking a change back, settling a conflict, the ways of showing, done
+    // -- and the count over what is left at the left. A word's button as
+    // wide as its word.
     const S32 width = getRect().getWidth();
     const S32 top   = getRect().getHeight() - PAD;
     S32       right = width - PAD;
@@ -278,6 +332,16 @@ void ALDiffBar::layout()
     place(mIgnoreButton);
     place(mFoldButton);
     right -= GAP;
+    if (mTheirsButton->getVisible())
+    {
+        for (ALFlatButton* word : { mBothButton, mMineButton, mTheirsButton })
+        {
+            const S32 wide = llmax(SMALL_W, LLFontGL::getFontSansSerifSmall()->getWidth(word->glyph()) + 2 * GAP);
+            word->setShape(LLRect(right - wide, top, right, top - ROW));
+            right -= wide + 1;
+        }
+        right -= GAP;
+    }
     if (mTakeBackButton->getVisible())
     {
         place(mTakeBackButton);

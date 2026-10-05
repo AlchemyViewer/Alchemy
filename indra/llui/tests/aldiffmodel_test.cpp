@@ -650,4 +650,43 @@ namespace tut
         ensure("the SLua's then and end", marked(Column::Right, 1) <= 10);
         ensure("far less than without", bare_left > 10 && bare_right > 15);
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<22>()
+    {
+        set_test_name("a merge: the changes in a conflict said so, kept as the right is made anew, let go of with new texts; settled through the model");
+        // Theirs changed line 0 and line 6, ours line 2 and line 6; begun
+        // with theirs's line 0 taken.
+        const std::string base   = lines(8);
+        const std::string theirs = lines(8, { { 0, "theirs 0" }, { 6, "theirs 6" } });
+        const std::string ours   = lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } });
+        m.setTexts(theirs, ours);
+        ensure("not merging before asked", !m.merging() && m.conflictCount() == 0);
+        ensure_equals("two changes", m.changeCount(), 2);
+        m.setMergeBase(base);
+        ensure("merging", m.merging());
+        ensure_equals("one conflict", m.conflictCount(), 1);
+        ensure("ours's own change is none", !m.changeConflicts(0));
+        ensure("the both-changed line is one", m.changeConflicts(1));
+        ensure("nothing past the changes", !m.changeConflicts(2) && !m.changeConflicts(-1));
+        ensure("nothing to settle in ours's own", !m.settle(0, ALTextMerge::Take::Theirs));
+
+        // Typed elsewhere in the right: still the one conflict, its change
+        // the second still.
+        m.setRightText(lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 4, "mine 4" }, { 6, "mine 6" } }));
+        ensure_equals("three changes", m.changeCount(), 3);
+        ensure("the conflict's change found again", !m.changeConflicts(1) && m.changeConflicts(2) && m.conflictCount() == 1);
+
+        // Settled as both: the edit and the base, then the right made anew.
+        const std::optional<ALDiffMerge::Settling> settling = m.settle(2, ALTextMerge::Take::OursThenTheirs);
+        ensure("an edit", settling && settling->edits);
+        ensure_equals("ours then theirs", settling->made, lines(9, { { 0, "theirs 0" }, { 2, "mine 2" }, { 4, "mine 4" }, { 6, "mine 6" }, { 7, "theirs 6" }, { 8, "line 7" } }));
+        m.settled(settling->base);
+        m.setRightText(settling->made);
+        ensure_equals("none left", m.conflictCount(), 0);
+        ensure("no change a conflict", !m.changeConflicts(0) && !m.changeConflicts(1) && !m.changeConflicts(2));
+
+        m.setTexts(theirs, ours);
+        ensure("new texts let it go", !m.merging() && !m.changeConflicts(1));
+    }
 }
