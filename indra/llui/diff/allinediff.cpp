@@ -195,12 +195,126 @@ namespace
     // How deep the splitting may go before what is left is walked instead.
     constexpr S32 MOST_DEPTH = 256;
 
+    // Where each line of the left is, by its id, made once for a whole
+    // histogram diff: how often a line comes up in a stretch of the left,
+    // and where, asked of it rather than counted again for each stretch.
+    // Ids from 0, few enough to index by; others made so first.
+    struct Places
+    {
+        std::vector<S32> a;
+        std::vector<S32> b;
+        const S32*       left = nullptr;
+        // Each id's places in the left, in order, from offsets[id] to
+        // offsets[id + 1].
+        std::vector<S32> offsets;
+        std::vector<S32> places;
+
+        Places(const std::vector<S32>& in_a, const std::vector<S32>& in_b)
+        {
+            S32 least = 0;
+            S32 most  = -1;
+            for (const std::vector<S32>* text : { &in_a, &in_b })
+            {
+                for (const S32 id : *text)
+                {
+                    least = std::min(least, id);
+                    most  = std::max(most, id);
+                }
+            }
+            // A stretch of a long text carries the whole text's ids: made
+            // few again where they would make the arrays far longer than
+            // the lines.
+            const S64 lines = static_cast<S64>(in_a.size() + in_b.size());
+            S32       ids   = most + 1;
+            if (least < 0 || static_cast<S64>(ids) > 4 * lines + 64)
+            {
+                boost::unordered_flat_map<S32, S32> dense;
+                dense.reserve(in_a.size() + in_b.size());
+                for (const auto& [from, to] : { std::pair(&in_a, &a), std::pair(&in_b, &b) })
+                {
+                    to->reserve(from->size());
+                    for (const S32 id : *from)
+                    {
+                        to->push_back(dense.try_emplace(id, static_cast<S32>(dense.size())).first->second);
+                    }
+                }
+                ids = static_cast<S32>(dense.size());
+            }
+            const std::vector<S32>& lines_a = a.empty() && !in_a.empty() ? in_a : a;
+            left                            = lines_a.data();
+            offsets.assign(static_cast<size_t>(ids) + 1, 0);
+            for (const S32 id : lines_a)
+            {
+                ++offsets[static_cast<size_t>(id) + 1];
+            }
+            for (size_t i = 1; i < offsets.size(); ++i)
+            {
+                offsets[i] += offsets[i - 1];
+            }
+            places.resize(lines_a.size());
+            mStamp.assign(static_cast<size_t>(ids), 0U);
+            mStart.assign(static_cast<size_t>(ids), 0);
+            std::vector<S32> next(offsets.begin(), offsets.end() - 1);
+            for (S32 i = 0; i < static_cast<S32>(lines_a.size()); ++i)
+            {
+                places[static_cast<size_t>(next[static_cast<size_t>(lines_a[static_cast<size_t>(i)])]++)] = i;
+            }
+        }
+        const std::vector<S32>& textA(const std::vector<S32>& in) const { return a.empty() ? in : a; }
+        const std::vector<S32>& textB(const std::vector<S32>& in) const { return b.empty() ? in : b; }
+
+        // A scan of a stretch of the left begun: where each id's places
+        // in it start, found once in a scan and kept for the rest of it.
+        void scanFrom(S32 from) const
+        {
+            if (++mScan == 0)
+            {
+                std::fill(mStamp.begin(), mStamp.end(), 0U);
+                mScan = 1;
+            }
+            mFrom = from;
+        }
+        // An id's places from where the scan's stretch begins, to the last
+        // of its places anywhere in the left.
+        std::pair<const S32*, const S32*> fromScan(S32 id) const
+        {
+            const size_t at   = static_cast<size_t>(id);
+            const S32*   last = places.data() + offsets[at + 1];
+            if (mStamp[at] != mScan)
+            {
+                const S32* first = places.data() + offsets[at];
+                mStamp[at]       = mScan;
+                mStart[at]       = static_cast<S32>((last - first <= 1 ? (first != last && *first < mFrom ? last : first)
+                                                                    : std::lower_bound(first, last, mFrom)) -
+                                                    places.data());
+            }
+            return { places.data() + mStart[at], last };
+        }
+        // How often an id comes up in the scan's stretch, up to `to`, told
+        // only as far as `most`: no more than that is asked.
+        static S32 countTo(const S32* first, const S32* last, S32 to, S32 most)
+        {
+            const S32* bound = last - first > most ? first + most : last;
+            return static_cast<S32>(std::lower_bound(first, bound, to) - first);
+        }
+
+        Places(const Places&)            = delete;
+        Places& operator=(const Places&) = delete;
+
+    private:
+        mutable std::vector<U32> mStamp;
+        mutable std::vector<S32> mStart;
+        mutable U32              mScan = 0;
+        mutable S32              mFrom = 0;
+    };
+
     // A histogram diff, as git's: the stretch the two share whose lines are
     // the rarest in the left -- longest of those as rare -- kept, and the
     // stretches before it and after it diffed the same way; where nothing
     // shared is rare enough, the fewest changes (Myers). Code's braces and
     // blank lines, common everywhere, do not pair a function with another's.
-    void histogramAt(const S32* a, S32 n, const S32* b, S32 m, S32 left, S32 right, S32 depth, S64& work, std::vector<Run>& out)
+    void histogramAt(const Places& places, const S32* a, S32 n, const S32* b, S32 m, S32 left, S32 right, S32 depth, S64& work,
+                     std::vector<Run>& out)
     {
         // What the two share at the end, set aside to put last.
         S32 tail = 0;
@@ -239,41 +353,35 @@ namespace
                 myersAt(a, n, b, m, left, right, work, out);
                 break;
             }
-            // How often each line comes up in the left, and where, for
-            // those rare enough to be worth trying.
-            struct Seen
-            {
-                S32              count = 0;
-                std::vector<S32> at;
-            };
-            boost::unordered_flat_map<S32, Seen> seen;
-            for (S32 i = 0; i < n; ++i)
-            {
-                Seen& one = seen[a[i]];
-                if (++one.count <= MOST_OCCURRENCES)
-                {
-                    one.at.push_back(i);
-                }
-            }
-            S32  best_a = -1, best_b = -1, best_len = 0, best_rarity = MOST_OCCURRENCES + 1;
-            bool shared = false;
+            // How often each line comes up in this stretch of the left,
+            // and where, the first so many of those rare enough to be
+            // worth trying.
+            const S32 from   = static_cast<S32>(a - places.left);
+            const S32 to     = from + n;
+            S32       best_a = -1, best_b = -1, best_len = 0, best_rarity = MOST_OCCURRENCES + 1;
+            bool      shared = false;
+            places.scanFrom(from);
             for (S32 j = 0; j < m;)
             {
-                const auto found = seen.find(b[j]);
-                if (found == seen.end())
+                const auto [first, last] = places.fromScan(b[j]);
+                if (first == last || *first >= to)
                 {
                     ++j;
                     continue;
                 }
                 shared = true;
-                if (found->second.count > best_rarity)
+                // More often than the rarest found: passed over, counted
+                // no further than that.
+                if (last - first > best_rarity && first[best_rarity] < to)
                 {
                     ++j;
                     continue;
                 }
-                S32 next = j + 1;
-                for (const S32 i : found->second.at)
+                const S32 count = Places::countTo(first, last, to, best_rarity);
+                S32       next  = j + 1;
+                for (const S32* at = first; at < first + std::min(count, MOST_OCCURRENCES); ++at)
                 {
+                    const S32 i = *at - from;
                     // The stretch the two share through this line, and the
                     // rarest of its lines.
                     S32 sa = i, sb = j;
@@ -288,10 +396,11 @@ namespace
                         ++ea;
                         ++eb;
                     }
-                    S32 rarity = found->second.count;
+                    S32 rarity = count;
                     for (S32 k = sa; k < ea && rarity > 1; ++k)
                     {
-                        rarity = std::min(rarity, seen.find(a[k])->second.count);
+                        const auto [line_first, line_last] = places.fromScan(a[k]);
+                        rarity                             = std::min(rarity, Places::countTo(line_first, line_last, to, rarity));
                     }
                     work -= ea - sa;
                     if (rarity < best_rarity || (rarity == best_rarity && ea - sa > best_len))
@@ -320,7 +429,7 @@ namespace
                 }
                 break;
             }
-            histogramAt(a, best_a, b, best_b, left, right, depth + 1, work, out);
+            histogramAt(places, a, best_a, b, best_b, left, right, depth + 1, work, out);
             push(out, Kind::Same, left + best_a, right + best_b, best_len);
             const S32 skip_a = best_a + best_len;
             const S32 skip_b = best_b + best_len;
@@ -492,9 +601,12 @@ std::vector<ALLineDiff::Run> ALLineDiff::minimal(const std::vector<S32>& a, cons
 
 std::vector<ALLineDiff::Run> ALLineDiff::histogram(const std::vector<S32>& a, const std::vector<S32>& b)
 {
-    std::vector<Run> out;
-    S64              work = MOST_WORK;
-    histogramAt(a.data(), static_cast<S32>(a.size()), b.data(), static_cast<S32>(b.size()), 0, 0, 0, work, out);
+    std::vector<Run>        out;
+    S64                     work   = MOST_WORK;
+    const Places            places(a, b);
+    const std::vector<S32>& ids_a  = places.textA(a);
+    const std::vector<S32>& ids_b  = places.textB(b);
+    histogramAt(places, ids_a.data(), static_cast<S32>(ids_a.size()), ids_b.data(), static_cast<S32>(ids_b.size()), 0, 0, 0, work, out);
     return out;
 }
 

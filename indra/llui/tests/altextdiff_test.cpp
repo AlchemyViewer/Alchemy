@@ -29,6 +29,7 @@
 #include "aldiffmoves.h"
 #include "aldiffsame.h"
 #include "aldiffsplice.h"
+#include "allinediff.h"
 #include "allinepairs.h"
 #include "alstructuraldiff.h"
 #include "altextmerge.h"
@@ -1053,6 +1054,67 @@ namespace tut
             {
                 ensure("theirs unchanged: ours", ALTextMerge::merged(start, mine, theirs_now, walked, nullptr) == mine);
             }
+        }
+    }
+
+    template<> template<>
+    void altextdiff_object::test<23>()
+    {
+        set_test_name("histogram: the same lines kept whatever numbers the lines are given -- few from nought, or a long text's spread far apart");
+        std::mt19937 random(23);
+        for (S32 round = 0; round < 400; ++round)
+        {
+            const S32        kinds = 1 + static_cast<S32>(random() % (round % 2 ? 6 : 300));
+            std::vector<S32> a(random() % 400);
+            for (S32& line : a)
+            {
+                line = static_cast<S32>(random() % kinds);
+            }
+            std::vector<S32> b;
+            for (const S32 line : a)
+            {
+                const U32 roll = random() % 10;
+                if (roll < 7)
+                {
+                    b.push_back(line);
+                }
+                else if (roll == 7)
+                {
+                    b.push_back(static_cast<S32>(random() % kinds));
+                }
+                else if (roll == 8)
+                {
+                    b.push_back(line);
+                    b.push_back(static_cast<S32>(random() % kinds));
+                }
+            }
+            std::vector<S32> far_a = a;
+            std::vector<S32> far_b = b;
+            for (std::vector<S32>* text : { &far_a, &far_b })
+            {
+                for (S32& line : *text)
+                {
+                    line = line * 997 + 50000;
+                }
+            }
+            const std::vector<Run> near = ALLineDiff::histogram(a, b);
+            ensure("the same, spread apart", near == ALLineDiff::histogram(far_a, far_b));
+            // And a walk from one to the other.
+            S32 left = 0, right = 0;
+            for (const Run& run : near)
+            {
+                ensure("in order", run.left == left && run.right == right);
+                if (run.kind == Kind::Same)
+                {
+                    for (S32 i = 0; i < run.count; ++i)
+                    {
+                        ensure("kept the same", a[static_cast<size_t>(left + i)] == b[static_cast<size_t>(right + i)]);
+                    }
+                }
+                left += run.kind != Kind::Added ? run.count : 0;
+                right += run.kind != Kind::Removed ? run.count : 0;
+            }
+            ensure("all of each", left == static_cast<S32>(a.size()) && right == static_cast<S32>(b.size()));
         }
     }
 }
