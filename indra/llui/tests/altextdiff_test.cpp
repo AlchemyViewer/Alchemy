@@ -92,6 +92,13 @@ namespace tut
         }
         static ALTextDiff::Options as(const ALTextDiff::Likeness& like) { return at({}, like); }
 
+        static ALTextDiff::Options by(ALTextDiff::Algorithm algorithm)
+        {
+            ALTextDiff::Options options;
+            options.algorithm = algorithm;
+            return options;
+        }
+
         static std::vector<std::string> numbered(S32 count, const char* prefix = "line ")
         {
             std::vector<std::string> out;
@@ -549,5 +556,93 @@ namespace tut
 
         ALTextDiff::words("the quick brown fox", "the quick red fox", left, right);
         ensure("prose as it was", left == S{ { 10, 15 } } && right == S{ { 10, 13 } });
+    }
+
+    template<> template<>
+    void altextdiff_object::test<16>()
+    {
+        set_test_name("patience and minimal: each walks any two texts; minimal as few as a longest common run leaves; patience keeps a function whole; where the three differ");
+        typedef ALTextDiff::Algorithm A;
+        std::mt19937                       random(4321);
+        const std::vector<std::string>     pieces = { "{", "}", "", "a", "b", "c", "    x;", "    y;", "if (q)", "return;" };
+        std::uniform_int_distribution<int> piece(0, static_cast<int>(pieces.size()) - 1);
+        std::uniform_int_distribution<int> length(0, 40);
+        for (S32 round = 0; round < 300; ++round)
+        {
+            std::vector<std::string> left;
+            std::vector<std::string> right;
+            for (S32 i = length(random); i > 0; --i)
+            {
+                left.push_back(pieces[static_cast<size_t>(piece(random))]);
+            }
+            for (const std::string& line : left)
+            {
+                const int what = piece(random);
+                if (what == 0)
+                {
+                    continue;
+                }
+                if (what == 1)
+                {
+                    right.push_back(pieces[static_cast<size_t>(piece(random))]);
+                }
+                right.push_back(what == 2 ? pieces[static_cast<size_t>(piece(random))] : line);
+            }
+            std::vector<std::vector<S32>> lcs(left.size() + 1, std::vector<S32>(right.size() + 1, 0));
+            for (size_t i = left.size(); i-- > 0;)
+            {
+                for (size_t j = right.size(); j-- > 0;)
+                {
+                    lcs[i][j] = left[i] == right[j] ? lcs[i + 1][j + 1] + 1 : std::max(lcs[i + 1][j], lcs[i][j + 1]);
+                }
+            }
+            const S32 fewest = static_cast<S32>(left.size() + right.size()) - 2 * lcs[0][0];
+            ensure_equals("minimal: the fewest", walk(left, right, ALTextDiff::lines(left, right, by(A::Minimal))), fewest);
+            ensure("patience: no fewer", walk(left, right, ALTextDiff::lines(left, right, by(A::Patience))) >= fewest);
+            ensure("histogram: no fewer", walk(left, right, ALTextDiff::lines(left, right, by(A::Histogram))) >= fewest);
+        }
+
+        const std::vector<std::string> was = {
+            "#include <stdio.h>", "", "// Frobs foo heartily", "int frobnitz(int foo)", "{", "    int i;", "    for(i = 0; i < 10; i++)", "    {",
+            "        printf(\"Your answer is: \");", "        printf(\"%d\\n\", foo);", "    }", "}", "", "int fact(int n)", "{", "    if(n > 1)", "    {",
+            "        return fact(n-1) * n;", "    }", "    return 1;", "}", "", "int main(int argc, char **argv)", "{", "    frobnitz(fact(10));", "}" };
+        const std::vector<std::string> now = {
+            "#include <stdio.h>", "", "int fib(int n)", "{", "    if(n > 2)", "    {", "        return fib(n-1) + fib(n-2);", "    }", "    return 1;", "}", "",
+            "// Frobs foo heartily", "int frobnitz(int foo)", "{", "    int i;", "    for(i = 0; i < 10; i++)", "    {", "        printf(\"%d\\n\", foo);", "    }", "}", "",
+            "int main(int argc, char **argv)", "{", "    frobnitz(fib(10));", "}" };
+        const auto beside = [](const std::vector<Run>& runs, S32 line) {
+            for (const Run& run : runs)
+            {
+                if (run.kind == Kind::Same && line >= run.left && line < run.left + run.count)
+                {
+                    return run.right + line - run.left;
+                }
+            }
+            return -1;
+        };
+        const std::vector<Run> patience = ALTextDiff::lines(was, now, by(A::Patience));
+        const std::vector<Run> minimal  = ALTextDiff::lines(was, now, by(A::Minimal));
+        walk(was, now, patience);
+        walk(was, now, minimal);
+        ensure("patience: frobnitz's head beside its own", beside(patience, 3) == 12 && beside(patience, 4) == 13 && beside(patience, 11) == 19);
+        ensure("minimal: fewer or as few as patience", walk(was, now, minimal) <= walk(was, now, patience));
+        ensure("all three alike here: minimal no more", walk(was, now, minimal) <= walk(was, now, patience));
+
+        // Where they differ. A line moved from the top to the bottom past
+        // lines all alike: histogram and patience keep the line that is
+        // once in each, minimal the four alike.
+        const std::vector<std::string> top    = { "u", "c", "c", "c", "c" };
+        const std::vector<std::string> bottom = { "c", "c", "c", "c", "u" };
+        ensure_equals("histogram: the moved line kept", walk(top, bottom, ALTextDiff::lines(top, bottom, by(A::Histogram))), 8);
+        ensure_equals("patience likewise", walk(top, bottom, ALTextDiff::lines(top, bottom, by(A::Patience))), 8);
+        ensure_equals("minimal: the moved line out and in", walk(top, bottom, ALTextDiff::lines(top, bottom, by(A::Minimal))), 2);
+        // Lines once in each that cross: patience keeps one -- the later
+        // -- where histogram keeps the run around the other, which is
+        // also the fewest.
+        const std::vector<std::string> crossed_left  = { "a", "b", "a", "X" };
+        const std::vector<std::string> crossed_right = { "X", "a", "b", "a" };
+        ensure_equals("histogram: a b a kept", walk(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Histogram))), 2);
+        ensure_equals("patience: X kept", walk(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Patience))), 6);
+        ensure_equals("minimal: the fewest", walk(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Minimal))), 2);
     }
 }

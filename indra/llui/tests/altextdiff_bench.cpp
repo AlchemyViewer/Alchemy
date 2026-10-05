@@ -196,6 +196,7 @@ namespace
         ALDiffModel model;
         model.setLikeness(options.like);
         model.setLexer(options.lexer);
+        model.setAlgorithm(options.algorithm);
         model.setTexts(left, right);
         S32 removed = 0, added = 0, paired = 0, marks = 0;
         for (S32 line = 0; line < model.lineCount(ALDiffModel::Column::Left); ++line)
@@ -211,7 +212,7 @@ namespace
             added += one.kind == ALDiffModel::Kind::Added;
             marks += static_cast<S32>(one.words.size());
         }
-        std::printf("  %-36s %8d %8d %8d %8d %8d\n", name, model.changeCount(), removed, added, paired, marks);
+        std::printf("  %-44s %8d %8d %8d %8d %8d\n", name, model.changeCount(), removed, added, paired, marks);
     }
 }
 #endif // LL_RELEASE
@@ -246,6 +247,14 @@ int main(int, char**)
         const ALTextDiff::Options histogram;
         row("histogram, ten edits", lines(small, small10, histogram), lines(big, big10, histogram));
         row("histogram, a thousand edits", lines(small, small1k, histogram), lines(big, big1k, histogram));
+        ALTextDiff::Options patience;
+        patience.algorithm = ALTextDiff::Algorithm::Patience;
+        row("patience, ten edits", lines(small, small10, patience), lines(big, big10, patience));
+        row("patience, a thousand edits", lines(small, small1k, patience), lines(big, big1k, patience));
+        ALTextDiff::Options minimal;
+        minimal.algorithm = ALTextDiff::Algorithm::Minimal;
+        row("minimal, ten edits", lines(small, small10, minimal), lines(big, big10, minimal));
+        row("minimal, a thousand edits", lines(small, small1k, minimal), lines(big, big1k, minimal));
     }
 
     std::printf("\nLaid out (ALDiffModel: lines, pairs, words, rows)\n");
@@ -292,7 +301,7 @@ int main(int, char**)
     row("a keystroke, a thousand edits, LSL's grammar", typed(small_t, small1kt, true), typed(big_t, big1kt, true));
 
     std::printf("\nWhat it says (5,000 lines)\n");
-    std::printf("  %-36s %8s %8s %8s %8s %8s\n", "", "changes", "out", "in", "paired", "words");
+    std::printf("  %-44s %8s %8s %8s %8s %8s\n", "", "changes", "out", "in", "paired", "words");
     ALTextDiff::Options by_grammar;
     by_grammar.lexer = lexer();
     says("ten edits", small_t, small10t);
@@ -311,6 +320,14 @@ int main(int, char**)
         says("one taken out among six changed", small_t, joined(right));
     }
     says("a thousand edits, LSL's grammar", small_t, small1kt, by_grammar);
+    for (const auto& [algorithm, name] : { std::make_pair(ALTextDiff::Algorithm::Patience, "patience"), std::make_pair(ALTextDiff::Algorithm::Minimal, "minimal") })
+    {
+        ALTextDiff::Options by;
+        by.algorithm = algorithm;
+        says((std::string("a thousand edits, ") + name).c_str(), small_t, small1kt, by);
+        says((std::string("a function moved, ") + name).c_str(), small_t, joined(moved(small)), by);
+        says((std::string("calls and braces reformatted, ") + name).c_str(), small_t, joined(reformatted(small, 200, 200)), by);
+    }
 
     std::printf("\n(checksum %zu)\n", static_cast<size_t>(g_sink));
     return 0;

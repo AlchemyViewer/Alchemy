@@ -307,6 +307,19 @@ void ALDiffView::setOffersIgnoreCase(bool offers)
     }
 }
 
+void ALDiffView::setAlgorithm(ALTextDiff::Algorithm algorithm)
+{
+    if (algorithm == mModel.options().algorithm)
+    {
+        return;
+    }
+    // The runs folded are others now: folded or not as asked.
+    const Place place = placeOfCaret();
+    mModel.setAlgorithm(algorithm);
+    fill();
+    restorePlace(place);
+}
+
 void ALDiffView::setLikeness(const ALTextDiff::Likeness& like)
 {
     mBar->setIgnoreWhitespace(like.ignoreWhitespace);

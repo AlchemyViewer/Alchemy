@@ -99,10 +99,15 @@ namespace ALTextDiff
     typedef std::vector<std::pair<S32, S32>> anchors_t;
 
     // How the lines that stay are chosen: each stretch the two share whose
-    // lines are rarest kept, and the rest found the same way (Histogram).
+    // lines are rarest kept, and the rest found the same way (Histogram,
+    // the default); the lines that come once in each kept, and the rest
+    // found the same way (Patience); or the fewest lines taken out and put
+    // in, whatever they are (Minimal).
     enum class Algorithm : U8
     {
-        Histogram
+        Histogram,
+        Patience,
+        Minimal
     };
 
     // What a stretch of a line is, as its words are cut: code, cut as a

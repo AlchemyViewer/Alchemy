@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <limits>
 
 using ALLineDiff::push;
 using ALLineDiff::Run;
@@ -333,6 +334,116 @@ namespace
         push(out, Kind::Same, tail_left, tail_right, tail);
     }
 
+    // Patience, between `a` and `b` where they begin at `left` and `right`.
+    void patienceAt(const S32* a, S32 n, const S32* b, S32 m, S32 left, S32 right, S32 depth, S64& work, std::vector<Run>& out)
+    {
+        // What the two share at either end, first.
+        S32 head = 0;
+        while (head < n && head < m && a[head] == b[head])
+        {
+            ++head;
+        }
+        S32 tail = 0;
+        while (tail < n - head && tail < m - head && a[n - 1 - tail] == b[m - 1 - tail])
+        {
+            ++tail;
+        }
+        push(out, Kind::Same, left, right, head);
+        a += head;
+        b += head;
+        n -= head + tail;
+        m -= head + tail;
+        left += head;
+        right += head;
+        const auto finish = [&]() { push(out, Kind::Same, left + n, right + m, tail); };
+        if (n == 0 || m == 0)
+        {
+            push(out, Kind::Removed, left, right, n);
+            push(out, Kind::Added, left + n, right, m);
+            finish();
+            return;
+        }
+        // Each line's count on each side and where it is, for those that
+        // come once in both.
+        struct Seen
+        {
+            S32 inA = 0;
+            S32 inB = 0;
+            S32 atA = 0;
+            S32 atB = 0;
+        };
+        boost::unordered_flat_map<S32, Seen> seen;
+        for (S32 i = 0; i < n; ++i)
+        {
+            Seen& one = seen[a[i]];
+            ++one.inA;
+            one.atA = i;
+        }
+        for (S32 j = 0; j < m; ++j)
+        {
+            if (const auto found = seen.find(b[j]); found != seen.end())
+            {
+                ++found->second.inB;
+                found->second.atB = j;
+            }
+        }
+        work -= n + m;
+        // The unique lines in the left's order, and the longest run of them
+        // rising on the right (patience sorting).
+        std::vector<std::pair<S32, S32>> unique;
+        for (S32 i = 0; i < n; ++i)
+        {
+            const Seen& one = seen.find(a[i])->second;
+            if (one.inA == 1 && one.inB == 1)
+            {
+                unique.emplace_back(i, one.atB);
+            }
+        }
+        if (unique.empty() || work <= 0 || depth > MOST_DEPTH)
+        {
+            myersAt(a, n, b, m, left, right, work, out);
+            finish();
+            return;
+        }
+        std::vector<size_t> tops;
+        std::vector<size_t> before(unique.size(), std::numeric_limits<size_t>::max());
+        for (size_t k = 0; k < unique.size(); ++k)
+        {
+            const auto at = std::lower_bound(tops.begin(), tops.end(), unique[k].second,
+                                             [&unique](size_t top, S32 second) { return unique[top].second < second; });
+            if (at != tops.begin())
+            {
+                before[k] = *(at - 1);
+            }
+            if (at == tops.end())
+            {
+                tops.push_back(k);
+            }
+            else
+            {
+                *at = k;
+            }
+        }
+        std::vector<std::pair<S32, S32>> kept;
+        for (size_t k = tops.back(); k != std::numeric_limits<size_t>::max(); k = before[k])
+        {
+            kept.push_back(unique[k]);
+        }
+        std::reverse(kept.begin(), kept.end());
+        // The stretches between them on their own, each kept line the same.
+        S32 i = 0;
+        S32 j = 0;
+        for (const auto& [ka, kb] : kept)
+        {
+            patienceAt(a + i, ka - i, b + j, kb - j, left + i, right + j, depth + 1, work, out);
+            push(out, Kind::Same, left + ka, right + kb, 1);
+            i = ka + 1;
+            j = kb + 1;
+        }
+        patienceAt(a + i, n - i, b + j, m - j, left + i, right + j, depth + 1, work, out);
+        finish();
+    }
+
     // How far a line is indented, a tab to the next of four; a blank line
     // none, which is told apart by `blank`.
     S32 indentOf(std::string_view line, bool& empty)
@@ -364,6 +475,19 @@ std::vector<ALLineDiff::Run> ALLineDiff::myers(const std::vector<S32>& a, const 
     std::vector<Run> out;
     myersAt(a.data(), static_cast<S32>(a.size()), b.data(), static_cast<S32>(b.size()), 0, 0, work, out);
     return out;
+}
+
+std::vector<ALLineDiff::Run> ALLineDiff::patience(const std::vector<S32>& a, const std::vector<S32>& b)
+{
+    std::vector<Run> out;
+    S64              work = MOST_WORK;
+    patienceAt(a.data(), static_cast<S32>(a.size()), b.data(), static_cast<S32>(b.size()), 0, 0, 0, work, out);
+    return out;
+}
+
+std::vector<ALLineDiff::Run> ALLineDiff::minimal(const std::vector<S32>& a, const std::vector<S32>& b)
+{
+    return myers(a, b, MOST_WORK * 10);
 }
 
 std::vector<ALLineDiff::Run> ALLineDiff::histogram(const std::vector<S32>& a, const std::vector<S32>& b)

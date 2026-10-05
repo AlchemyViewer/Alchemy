@@ -423,4 +423,16 @@ namespace tut
         ensure("as code: the operator whole", m.line(Column::Left, 1).words == ALTextDiff::spans_t{ { 6, 8 } } &&
                                                  m.line(Column::Right, 1).words == ALTextDiff::spans_t{ { 6, 8 } });
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<14>()
+    {
+        set_test_name("the way lines are chosen: a line moved past lines alike kept by histogram, out and in by minimal; the runs folded as asked");
+        m.setTexts("u\nc\nc\nc\nc", "c\nc\nc\nc\nu");
+        ensure("histogram: the line kept, the rest out and in", m.changeCount() == 2 && beside(0, 4));
+        m.setAlgorithm(ALTextDiff::Algorithm::Minimal);
+        ensure("minimal: the line out at the top and in at the bottom", m.changeCount() == 2 && beside(1, 0) && m.options().algorithm == ALTextDiff::Algorithm::Minimal);
+        m.setAlgorithm(ALTextDiff::Algorithm::Patience);
+        ensure("patience: as histogram here", beside(0, 4));
+    }
 }

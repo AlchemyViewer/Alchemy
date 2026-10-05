@@ -132,6 +132,10 @@ public:
     void setIgnoreCase(bool ignore);
     bool ignoresCase() const { return mModel.likeness().ignoreCase; }
     void setOffersIgnoreCase(bool offers);
+    // How the lines that stay are chosen (ALTextDiff::Algorithm), compared
+    // again, the caret kept; Histogram unless asked.
+    void                  setAlgorithm(ALTextDiff::Algorithm algorithm);
+    ALTextDiff::Algorithm algorithm() const { return mModel.options().algorithm; }
     // How many runs there are to fold, and how many are folded.
     S32  foldCount() const { return mModel.foldCount(); }
     S32  foldedCount() const { return mModel.foldedCount(); }

@@ -135,6 +135,15 @@ void ALDiffModel::setLikeness(const ALTextDiff::Likeness& like)
     build();
 }
 
+void ALDiffModel::setAlgorithm(ALTextDiff::Algorithm algorithm)
+{
+    if (mOptions.algorithm != algorithm)
+    {
+        mOptions.algorithm = algorithm;
+        build();
+    }
+}
+
 void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer)
 {
     mOptions.lexer = std::move(lexer);

@@ -65,8 +65,9 @@ std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like)
 namespace
 {
     // As lines(), without anchors.
-    std::vector<Run> plainLines(const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Likeness& like)
+    std::vector<Run> plainLines(const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Options& options)
     {
+        const ALTextDiff::Likeness& like = options.like;
         // Each line as compared, kept while its id is.
         std::vector<std::string> keys;
         if (like.any())
@@ -94,15 +95,18 @@ namespace
         {
             b.push_back(ids.idOf(like.any() ? keys[left.size() + i] : right[i]));
         }
-        std::vector<Run> out = ALLineDiff::histogram(a, b);
+        std::vector<Run> out = options.algorithm == ALTextDiff::Algorithm::Patience  ? ALLineDiff::patience(a, b)
+                               : options.algorithm == ALTextDiff::Algorithm::Minimal ? ALLineDiff::minimal(a, b)
+                                                                                     : ALLineDiff::histogram(a, b);
         ALLineDiff::slide(out, a, b, left, right);
         return out;
     }
 
     // As lines(), lined up at anchors.
-    std::vector<Run> anchoredLines(const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::anchors_t& anchors,
-                                   const ALTextDiff::Likeness& like)
+    std::vector<Run> anchoredLines(const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Options& options)
     {
+        const ALTextDiff::anchors_t& anchors = options.anchors;
+        const ALTextDiff::Likeness&  like    = options.like;
         // The pairs kept: within both texts, by the right then the left the
         // other way, so that of two on one line of the right the longest
         // rising run takes one at most; then that run, rising on the left.
@@ -172,7 +176,7 @@ namespace
             // The stretch before the pair, on its own.
             const std::vector<std::string> some_left(left.begin() + l, left.begin() + to_left);
             const std::vector<std::string> some_right(right.begin() + r, right.begin() + to_right);
-            for (Run run : plainLines(some_left, some_right, like))
+            for (Run run : plainLines(some_left, some_right, options))
             {
                 run.left += l;
                 run.right += r;
@@ -207,7 +211,7 @@ namespace
 
 std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options)
 {
-    return options.anchors.empty() ? plainLines(left, right, options.like) : anchoredLines(left, right, options.anchors, options.like);
+    return options.anchors.empty() ? plainLines(left, right, options) : anchoredLines(left, right, options);
 }
 
 ALTextDiff::anchors_t ALTextDiff::anchorsOf(const ranges_t& ranges)

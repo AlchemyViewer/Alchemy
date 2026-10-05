@@ -54,6 +54,14 @@ namespace ALLineDiff
     // where nothing shared is rare enough.
     std::vector<Run> histogram(const std::vector<S32>& a, const std::vector<S32>& b);
 
+    // Lines that come once in each text kept, the longest run of them in
+    // order, and the stretches between found the same way (patience, as
+    // git's); the fewest changes where none comes once in each.
+    std::vector<Run> patience(const std::vector<S32>& a, const std::vector<S32>& b);
+    // The fewest taken out and put in, and nothing else: Myers alone, with
+    // ten times the walking.
+    std::vector<Run> minimal(const std::vector<S32>& a, const std::vector<S32>& b);
+
     // Each change that could as well stand a line up or down put where it
     // reads as one thing, by the lines' text.
     void slide(std::vector<Run>& runs, const std::vector<S32>& a, const std::vector<S32>& b, const std::vector<std::string>& left,
