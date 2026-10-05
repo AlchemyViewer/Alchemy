@@ -828,6 +828,7 @@ bool idle_startup()
             {
                 gAudiop = (LLAudioEngine *) new LLAudioEngine_FMODSTUDIO(
                     gSavedSettings.getBOOL("FMODExProfilerEnable"),
+                    gSavedSettings.getU32("FMODResampleMethod"),
                     gSavedSettings.getString("AudioFMODOutputDevice"));
             }
 #endif

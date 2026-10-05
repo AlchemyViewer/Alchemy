@@ -1014,6 +1014,17 @@
             <key>Value</key>
             <string></string>
         </map>
+        <key>FMODResampleMethod</key>
+        <map>
+            <key>Comment</key>
+            <string>The resampler FMOD Studio uses for a sound whose sample rate is not the output's: 0 Linear, 1 Cubic, 2 Spline, the slowest and the best. Takes effect when audio next starts.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>2</integer>
+        </map>
         <key>AudioFAudioInnerRadius</key>
         <map>
             <key>Comment</key>

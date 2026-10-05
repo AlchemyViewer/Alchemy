@@ -49,10 +49,12 @@ typedef struct FMOD_DSP_DESCRIPTION FMOD_DSP_DESCRIPTION;
 class LLAudioEngine_FMODSTUDIO : public LLAudioEngine
 {
 public:
-    // preferred_device_id is a FMOD driver GUID serialised as
+    // resample_method is the FMODResampleMethod setting: 0 linear, 1 cubic,
+    // 2 spline. preferred_device_id is a FMOD driver GUID serialised as
     // "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" — see guid_to_string in
     // the cpp. Empty string uses driver 0 (FMOD's system default).
     LLAudioEngine_FMODSTUDIO(bool enable_profiler,
+                              U32 resample_method,
                               std::string preferred_device_id = std::string());
     ~LLAudioEngine_FMODSTUDIO() override;
 
@@ -128,6 +130,7 @@ protected:
     FMOD::DSP *mWindDSP;
     FMOD::System *mSystem;
     bool mEnableProfiler;
+    U32 mResampleMethod;
 
     std::string mPreferredDeviceId;
     std::string mActiveDeviceId;

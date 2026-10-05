@@ -158,11 +158,13 @@ namespace
 }
 
 LLAudioEngine_FMODSTUDIO::LLAudioEngine_FMODSTUDIO(bool enable_profiler,
+                                                     U32 resample_method,
                                                      std::string preferred_device_id)
 :   mInited(false),
     mWindDSP(nullptr),
     mSystem(nullptr),
     mEnableProfiler(enable_profiler),
+    mResampleMethod(resample_method),
     mWindDSPDesc(nullptr),
     mPreferredDeviceId(std::move(preferred_device_id))
 {
@@ -212,7 +214,28 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
     FMOD_ADVANCEDSETTINGS settings;
     memset(&settings, 0, sizeof(settings));
     settings.cbSize = sizeof(FMOD_ADVANCEDSETTINGS);
+    // FMODResampleMethod, which is read only here: FMOD takes the resampler
+    // with the settings it initialises with.
+    const char* resampler = "spline";
     settings.resamplerMethod = FMOD_DSP_RESAMPLER_SPLINE;
+    switch (mResampleMethod)
+    {
+    case 0:
+        resampler = "linear";
+        settings.resamplerMethod = FMOD_DSP_RESAMPLER_LINEAR;
+        break;
+    case 1:
+        resampler = "cubic";
+        settings.resamplerMethod = FMOD_DSP_RESAMPLER_CUBIC;
+        break;
+    case 2:
+        break;
+    default:
+        LL_WARNS("AppInit") << "FMODResampleMethod " << mResampleMethod << " is none of 0 (linear), 1 (cubic) "
+                            << "and 2 (spline); using spline" << LL_ENDL;
+        break;
+    }
+    LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): resampler " << resampler << LL_ENDL;
 
     result = mSystem->setAdvancedSettings(&settings);
     Check_FMOD_Error(result, "FMOD::System::setAdvancedSettings");
