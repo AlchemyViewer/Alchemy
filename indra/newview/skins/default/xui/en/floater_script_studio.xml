@@ -510,6 +510,9 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ExplorerNothingToCompare">Nothing listed in the Explorer is like [NAME] to compare it with. Pin or select the other object first.</floater.string>
     <floater.string name="CompareSaved">As last saved</floater.string>
     <floater.string name="CompareWithTitle">Compare [NAME] with</floater.string>
+    <floater.string name="SelectionLine">[NAME], line [FIRST]</floater.string>
+    <floater.string name="SelectionLines">[NAME], lines [FIRST]–[LAST]</floater.string>
+    <floater.string name="SelectionHeld">Holding [TITLE] to compare. Select something else, here or in another tab, then choose View > Compare with Held Selection.</floater.string>
     <floater.string name="CompareWithPlaceholder">Type to find a tab, a file, or a script in an object</floater.string>
     <floater.string name="CompareWithSavedDetail">this tab's text when it was last saved</floater.string>
     <floater.string name="CompareWithSavedThereDetail">what was saved over it from elsewhere</floater.string>
@@ -1295,6 +1298,14 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
             <menu_item_call label="Compare With..." layout="topleft" name="compare_with">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_with" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_with" />
+            </menu_item_call>
+            <menu_item_call label="Select for Compare" layout="topleft" name="compare_hold_selection">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_hold_selection" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_hold_selection" />
+            </menu_item_call>
+            <menu_item_call label="Compare with Held Selection" layout="topleft" name="compare_selections">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_selections" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_selections" />
             </menu_item_call>
             <menu_item_check label="Show Comparison" layout="topleft" name="compare_shown">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_shown" />

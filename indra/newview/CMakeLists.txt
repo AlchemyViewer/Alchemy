@@ -227,6 +227,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiohistory.cpp
     alscriptstudiomerging.cpp
     alscriptstudiorecovery.cpp
+    alscriptstudioselections.cpp
     alrecovery.cpp
     alrecoverykeeper.cpp
     alscriptstudiosaving.cpp
@@ -1076,6 +1077,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiohistory.h
     alscriptstudiomerging.h
     alscriptstudiorecovery.h
+    alscriptstudioselections.h
     alrecovery.h
     alrecoverykeeper.h
     alscriptstudiosaving.h
@@ -2627,6 +2629,16 @@ if(AL_BUILD_TESTS)
   # comparisons: begun, settled, and compared where they cannot be.
   al_add_test(
     alscriptstudiomerging
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A Script Studio window's selections held and compared, over tabs of
+  # their own editors and comparisons.
+  al_add_test(
+    alscriptstudioselections
     UNIT
     PROJECT ${test_project}
     LIBRARIES al_studio_test_common llui alscript ${test_libs}

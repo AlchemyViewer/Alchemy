@@ -1802,6 +1802,7 @@ void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const
         // Given again where the comparison follows the tab.
         doc.compareView->setOnTakeBack(nullptr);
     }
+    const std::string id = doc.id;
     if (!doc.compareView)
     {
         // In the editors' place, in their colours and face; unwrapped, since
@@ -1817,27 +1818,25 @@ void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const
         doc.compareView->setVisible(false);
         applyCompareOptions(*doc.compareView);
         doc.compareView->setOnInline([this](bool inline_view) { setCompareInline(inline_view); });
-        const std::string id = doc.id;
         doc.compareView->setOnEscape([this, id]() {
             if (Doc* found = findDoc(id))
             {
                 showView(*found, Doc::View::Source, true);
             }
         });
-        // Its right is the tab's text, which can be changed only in the
-        // source: typing goes on there, where the caret was.
-        doc.compareView->setOnEdit([this, id](S32 line, S32 column) -> LLView* {
-            Doc* found = findDoc(id);
-            if (!found || !found->loaded || !found->modifiable || found->editor->isReadOnly())
-            {
-                return nullptr;
-            }
-            showView(*found, Doc::View::Source, true);
-            found->editor->goTo(ALTextPos(line, column));
-            return found->editor;
-        });
         mEditorHost->addChild(doc.compareView);
     }
+    // Its right is the tab's text, which can be changed only in the
+    // source: typing goes on there, where the caret was. Given again for
+    // each comparison, whose right may stand for less of the tab.
+    doc.compareView->setOnEdit([this, id](S32 line, S32 column) -> LLView* {
+        Doc* found = findDoc(id);
+        if (!found || !found->loaded || !found->modifiable || found->editor->isReadOnly())
+        {
+            return nullptr;
+        }
+        return typeInSource(*found, ALTextPos(line, column));
+    });
     doc.compareView->setGrammar(doc.editor->highlighter().grammar());
     doc.compareView->setInline(mCompareInline);
     doc.compareView->setTexts(left, right, ranges);
@@ -6302,6 +6301,13 @@ std::optional<std::string> ALFloaterScriptStudio::clipboardText() const
     return text;
 }
 
+LLView* ALFloaterScriptStudio::typeInSource(Doc& doc, const ALTextPos& at)
+{
+    showView(doc, Doc::View::Source, true);
+    doc.editor->goTo(at);
+    return doc.editor;
+}
+
 void ALFloaterScriptStudio::loadWorld(Doc& doc, std::function<void(Doc& doc, const std::string& text, const LLUUID& asset)> loaded)
 {
     // The item as the world has it now, out of its envelope.
@@ -8929,6 +8935,31 @@ void ALFloaterScriptStudio::addViewCommands()
         [this]() {
             const Doc* doc = active();
             return doc && ALScriptStudioCompareWith::canCompare(*doc);
+        });
+    // A selection held, and compared with another, in this tab or another.
+    mCommands.add(
+        "compare_hold_selection",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                mSelections.hold(*doc);
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && ALScriptStudioSelections::canHold(*doc);
+        });
+    mCommands.add(
+        "compare_selections",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                mSelections.compare(*doc);
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && mSelections.canCompare(*doc);
         });
     // The tab's comparison and its source in turn: back to a comparison
     // that typing in it left for the source, as the tab now is.
