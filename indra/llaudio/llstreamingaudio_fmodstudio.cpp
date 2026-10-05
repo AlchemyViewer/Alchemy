@@ -34,6 +34,9 @@
 #include <fmod.hpp>
 #include <fmod_errors.h>
 
+#include <cstring>
+#include <optional>
+
 inline bool Check_FMOD_Stream_Error(FMOD_RESULT result, const char *string)
 {
     if (result == FMOD_OK)
@@ -61,6 +64,46 @@ protected:
 
     std::string mInternetStreamURL;
 };
+
+namespace
+{
+    // A number tag's value. FMOD gives an integer as 1, 2, 4 or 8 bytes and
+    // a float as 4 or 8, as the tag's length says, and a tag can come with no
+    // data at all; anything it does not describe is not read.
+    std::optional<LLSD> tag_number(const FMOD_TAG& tag)
+    {
+        if (!tag.data)
+        {
+            return std::nullopt;
+        }
+        if (tag.datatype == FMOD_TAGDATATYPE_INT)
+        {
+            switch (tag.datalen)
+            {
+            case 1: { U8 v;  memcpy(&v, tag.data, sizeof(v)); return LLSD(LLSD::Integer(v)); }
+            case 2: { U16 v; memcpy(&v, tag.data, sizeof(v)); return LLSD(LLSD::Integer(v)); }
+            case 4: { S32 v; memcpy(&v, tag.data, sizeof(v)); return LLSD(LLSD::Integer(v)); }
+            case 8:
+            {
+                S64 v;
+                memcpy(&v, tag.data, sizeof(v));
+                return LLSD(LLSD::Integer(llclamp<S64>(v, S32_MIN, S32_MAX)));
+            }
+            default: break;
+            }
+        }
+        else if (tag.datatype == FMOD_TAGDATATYPE_FLOAT)
+        {
+            switch (tag.datalen)
+            {
+            case 4: { F32 v; memcpy(&v, tag.data, sizeof(v)); return LLSD(LLSD::Real(v)); }
+            case 8: { F64 v; memcpy(&v, tag.data, sizeof(v)); return LLSD(LLSD::Real(v)); }
+            default: break;
+            }
+        }
+        return std::nullopt;
+    }
+}
 
 LLMutex gWaveDataMutex;    //Just to be extra strict.
 const U32 WAVE_BUFFER_SIZE = 1024;
@@ -277,9 +320,9 @@ void LLStreamingAudio_FMODSTUDIO::update()
         return;
     }
 
-    unsigned int progress;
-    bool starving;
-    bool diskbusy;
+    unsigned int progress = 0;
+    bool starving = false;
+    bool diskbusy = false;
     FMOD_OPENSTATE open_state = mCurrentInternetStreamp->getOpenState(&progress, &starving, &diskbusy);
 
     if (open_state == FMOD_OPENSTATE_READY)
@@ -346,6 +389,10 @@ void LLStreamingAudio_FMODSTUDIO::update()
                     if (sound->getTag(nullptr, i, &tag) != FMOD_OK)
                         continue;
 
+                    // A tag can come with no data; there is nothing to show.
+                    if (!tag.data || !tag.datalen)
+                        continue;
+
                     std::string name = tag.name;
                     switch (tag.type)
                     {
@@ -369,10 +416,12 @@ void LLStreamingAudio_FMODSTUDIO::update()
                         }
                         case FMOD_TAGTYPE_FMOD:
                         {
-                            if (LLStringUtil::isEqualInsensitiveASCII(name, "Sample Rate Change"))
+                            const std::optional<LLSD> rate = tag_number(tag);
+                            if (LLStringUtil::isEqualInsensitiveASCII(name, "Sample Rate Change") && rate)
                             {
-                                LL_INFOS("FMOD") << "Stream forced changing sample rate to " << *((float *)tag.data) << LL_ENDL;
-                                Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setFrequency(*((float *)tag.data)), "FMOD::Channel::setFrequency");
+                                const F32 frequency = (F32)rate->asReal();
+                                LL_INFOS("FMOD") << "Stream forced changing sample rate to " << frequency << LL_ENDL;
+                                Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setFrequency(frequency), "FMOD::Channel::setFrequency");
                             }
                             continue;
                         }
@@ -385,13 +434,15 @@ void LLStreamingAudio_FMODSTUDIO::update()
                     switch (tag.datatype)
                     {
                         case(FMOD_TAGDATATYPE_INT):
-                           mMetadata[name]=*(LLSD::Integer*)(tag.data);
-                            LL_INFOS("FMOD") << tag.name << ": " << *(int*)(tag.data) << LL_ENDL;
-                            break;
                         case(FMOD_TAGDATATYPE_FLOAT):
-                            mMetadata[name]=*(LLSD::Real*)(tag.data);
-                            LL_INFOS("FMOD") << tag.name << ": " << *(float*)(tag.data) << LL_ENDL;
+                        {
+                            if (const std::optional<LLSD> value = tag_number(tag))
+                            {
+                                mMetadata[name] = *value;
+                                LL_INFOS("FMOD") << tag.name << ": " << *value << LL_ENDL;
+                            }
                             break;
+                        }
                         case(FMOD_TAGDATATYPE_STRING):
                         {
                             std::string out = rawstr_to_utf8(std::string((char*)tag.data,tag.datalen));
@@ -662,11 +713,20 @@ bool LLAudioStreamManagerFMODSTUDIO::stopStream()
 
 FMOD_OPENSTATE LLAudioStreamManagerFMODSTUDIO::getOpenState(unsigned int* percentbuffered, bool* starving, bool* diskbusy)
 {
-    FMOD_OPENSTATE state;
+    // No stream, when createStream failed outright, or a stream that failed
+    // to open or lost its connection, which FMOD reports in the result: an
+    // error either way, which update() retries.
+    if (!mInternetStream)
+    {
+        return FMOD_OPENSTATE_ERROR;
+    }
+
+    FMOD_OPENSTATE state = FMOD_OPENSTATE_ERROR;
     FMOD_RESULT result = mInternetStream->getOpenState(&state, percentbuffered, starving, diskbusy);
     if (result != FMOD_OK)
     {
         LL_WARNS("FMOD") << FMOD_ErrorString(result) << LL_ENDL;
+        return FMOD_OPENSTATE_ERROR;
     }
     return state;
 }
