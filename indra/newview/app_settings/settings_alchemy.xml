@@ -2097,6 +2097,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>SKRenderFarPlaneForce</key>
+        <map>
+            <key>Comment</key>
+            <string>Debug A/B for the main projection: 0 automatic (infinite on reverse-Z, finite 1024 m on forward-Z), 1 force the finite plane the viewer used before, twice the draw distance and never under 1024 m, 2 force infinite on reverse-Z (forward-Z ignores it). Reflection probes are never forced.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRenderMemoryDrawDistanceLimit</key>
         <map>
             <key>Comment</key>

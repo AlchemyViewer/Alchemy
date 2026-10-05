@@ -38,6 +38,7 @@
 #include "llvolume.h"
 #include "llvolumeoctree.h"
 #include "llviewercamera.h"
+#include "skfarplane.h" // <SK:Nexii> render/farplane
 #include "llface.h"
 #include "llfloatertools.h"
 #include "llviewercontrol.h"
@@ -1111,6 +1112,39 @@ public:
     }
 };
 
+// <SK:Nexii> render/farplane: LLOctreeCullNoFarClip held to a sphere, for terrain once the projection
+// no longer clips them (skTerrainReach).
+class LLOctreeCullReach : public LLOctreeCullNoFarClip
+{
+public:
+    LLOctreeCullReach(LLCamera* camera, F32 reach)
+        : LLOctreeCullNoFarClip(camera), mReach(reach) { }
+
+    S32 frustumCheck(const LLViewerOctreeGroup* group) override
+    {
+        S32 res = AABBInFrustumNoFarClipGroupBounds(group);
+        if (res != 0)
+        {
+            res = llmin(res, AABBSphereIntersect(group->getExtents()[0], group->getExtents()[1], mCamera->getOrigin(), mReach));
+        }
+        return res;
+    }
+
+    S32 frustumCheckObjects(const LLViewerOctreeGroup* group) override
+    {
+        S32 res = AABBInFrustumNoFarClipObjectBounds(group);
+        if (res != 0)
+        {
+            res = llmin(res, AABBSphereIntersect(group->getObjectExtents()[0], group->getObjectExtents()[1], mCamera->getOrigin(), mReach));
+        }
+        return res;
+    }
+
+private:
+    F32 mReach;
+};
+// </SK:Nexii>
+
 class LLOctreeCullShadow : public LLOctreeCull
 {
 public:
@@ -1448,6 +1482,16 @@ S32 LLSpatialPartition::cull(LLCamera &camera, bool do_occlusion)
         LLOctreeCullShadow culler(&camera);
         culler.traverse(mOctree);
     }
+    // <SK:Nexii> render/farplane: terrain in the main view, when an infinite projection no longer bounds it. Water is
+    // a flat plane drawn out to its stretch, so it is not held to the reach.
+    else if (const F32 reach = skTerrainReach(LLViewerCamera::getInstance()->getProjectionFar());
+             mInfiniteFarClip && reach > 0.f && !gCubeSnapshot && &camera == LLViewerCamera::getInstance() &&
+             mPartitionType != LLViewerRegion::PARTITION_WATER && mPartitionType != LLViewerRegion::PARTITION_VOIDWATER)
+    {
+        LLOctreeCullReach culler(&camera, reach);
+        culler.traverse(mOctree);
+    }
+    // </SK:Nexii>
     else if (mInfiniteFarClip || (!LLPipeline::sUseFarClip && !gCubeSnapshot))
     {
         LLOctreeCullNoFarClip culler(&camera);

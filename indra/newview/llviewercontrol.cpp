@@ -43,6 +43,7 @@
 #endif
 #include "llagent.h"
 #include "llagentcamera.h"
+#include "skfarplane.h" // <SK:Nexii> render/farplane
 #include "llconsole.h"
 #include "lldrawpoolbump.h"
 #include "llfontgl.h"
@@ -138,7 +139,7 @@ static bool handleRenderFarClipChanged(const LLSD& newvalue)
 {
     if (LLStartUp::getStartupState() >= STATE_STARTED)
     {
-        F32 draw_distance = (F32)newvalue.asReal();
+        F32 draw_distance = skClampDrawDistance((F32)newvalue.asReal(), LLRender::sReverseZ); // <SK:Nexii> render/farplane: forward-Z keeps 512 m
     gAgentCamera.mDrawDistance = draw_distance;
     LLWorld::getInstance()->setLandFarClip(draw_distance);
     return true;

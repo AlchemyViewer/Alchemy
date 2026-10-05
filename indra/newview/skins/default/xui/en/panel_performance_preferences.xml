@@ -203,6 +203,7 @@
    width="40">
     Faster
   </text>
+  <!-- <SK:Nexii> render/farplane: draw distance up to MAX_FAR_CLIP, was 512 -->
   <slider
     control_name="RenderFarClip"
     decimal_digits="0"
@@ -214,7 +215,7 @@
     label_width="90"
     layout="topleft"
     min_val="64"
-    max_val="512"
+    max_val="2048"
     name="draw_distance"
     left_pad="5"
     width="250">

@@ -14,6 +14,7 @@
    layout="topleft"
    value="Draw Distance:"
    name="draw_distance_label"/>
+  <!-- <SK:Nexii> render/farplane: draw distance up to MAX_FAR_CLIP, was 512 -->
   <slider_bar
    top_pad="-16"
    height="20"
@@ -21,12 +22,13 @@
    initial_value="96"
    follows="left|top|right"
    layout="topleft"
-   max_val="512"
+   max_val="2048"
    min_val="64"
    left="93"
    right="-68"
    name="draw_dist_slider_bar"
    control_name="RenderFarClip"/>
+  <!-- <SK:Nexii> render/farplane: draw distance up to MAX_FAR_CLIP, was 512 -->
   <spinner
    top_pad="-21"
    height="20"
@@ -36,7 +38,7 @@
    decimal_digits="0"
    follows="top|right"
    layout="topleft"
-   max_val="512"
+   max_val="2048"
    min_val="64"
    width="55"
    increment="32"

@@ -3051,6 +3051,14 @@ void LLPipeline::updateReverseZ()
 
     LLRender::sReverseZ = effective;
 
+    // <SK:Nexii> render/farplane: the draw distance ceiling follows the depth convention, for every consumer.
+    if (changed && LLStartUp::getStartupState() >= STATE_STARTED)
+    {
+        gAgentCamera.mDrawDistance = skClampDrawDistance(gSavedSettings.getF32("RenderFarClip"), effective);
+        LLWorld::getInstance()->setLandFarClip(gAgentCamera.mDrawDistance);
+    }
+    // </SK:Nexii>
+
     // Issued unconditionally, not just on a change. These are the only writers of clip control
     // and clear depth in the tree, so if GL is ever reset underneath us -- a context restore,
     // an external state reset -- a change-gated latch would have no path back and would leave

@@ -1007,6 +1007,7 @@ if(AL_BUILD_VIEWER)
     rlvinventory.cpp
     rlvlocks.cpp
     rlvui.cpp
+    skfarplane.cpp
   )
 
   set(
@@ -1879,6 +1880,7 @@ if(AL_BUILD_VIEWER)
     rlvmodifiers.h
     rlvui.h
     roles_constants.h
+    skfarplane.h
   )
 
   # Discord rich presence, over the SDK from the private registry.

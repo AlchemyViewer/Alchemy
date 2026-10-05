@@ -50,6 +50,8 @@
 #include "llvoavatarself.h"
 #include "llvolume.h"
 #include "llvolumemessage.h"
+#include "llrender.h" // <SK:Nexii> render/farplane
+#include "skfarplane.h" // <SK:Nexii> render/farplane
 
 #include <iterator>
 
@@ -163,7 +165,7 @@ bool ALChatCommand::parseCommand(std::string data)
             F32 dist;
             if (input >> dist)
             {
-                dist = llclamp(dist, 16.f, 512.f);
+                dist = skClampDrawDistance(llclamp(dist, 16.f, MAX_FAR_CLIP), LLRender::sReverseZ); // <SK:Nexii> render/farplane: was llclamp(dist, 16.f, 512.f)
                 gSavedSettings.setF32("RenderFarClip", dist);
                 gAgentCamera.mDrawDistance = dist;
                 return true;

@@ -31,6 +31,7 @@
 #include "alfloaterprogressview.h"
 #include "aluniformbuffer.h"
 #include "fsyspath.h"
+#include "skfarplane.h" // <SK:Nexii> render/farplane
 #include "hexdump.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -210,7 +211,10 @@ void display_update_camera()
 
     // Cut draw distance in half when customizing avatar,
     // but on the viewer only.
-    F32 final_far = gAgentCamera.mDrawDistance;
+    // <SK:Nexii> render/farplane: forward-Z depth keeps the old draw-distance ceiling.
+    const bool reverse_z = LLRender::sReverseZ;
+    F32 final_far = llmin(gAgentCamera.mDrawDistance, skDrawDistanceCeiling(reverse_z));
+    // </SK:Nexii>
     if (gCubeSnapshot)
     {
         if (gPipeline.mHeroProbeManager.isMirrorPass())
@@ -235,6 +239,20 @@ void display_update_camera()
         final_far = llmax(32.f, final_far / mem_factor);
     }
     LLViewerCamera::getInstance()->setFar(final_far);
+
+    // <SK:Nexii> render/farplane: the camera far plane above stays the draw distance; the projection's is
+    // infinite whenever reverse-Z is on (skfarplane.h), and is applied by setup3DRender() below.
+    static LLCachedControl<S32> force_projection(gSavedSettings, "SKRenderFarPlaneForce", 0);
+    LLViewerCamera::getInstance()->setProjectionFar(skForcedProjectionFar(skProjectionFar(reverse_z, gCubeSnapshot), force_projection(),
+                                                                          gAgentCamera.mDrawDistance, reverse_z, gCubeSnapshot));
+    // Edge water stretches with the main view's projection, which reverse-Z or the debug force can switch at runtime.
+    LLViewerCamera* camera = LLViewerCamera::getInstance();
+    if (!gCubeSnapshot && skIsInfinite(camera->getProjectionFar()) != camera->isMainViewInfinite())
+    {
+        camera->setMainViewInfinite(!camera->isMainViewInfinite());
+        LLWorld::getInstance()->updateWaterObjects();
+    }
+    // </SK:Nexii>
     LLVOAvatar::sRenderDistance = llclamp(final_far, 16.f, 256.f);
     gViewerWindow->setup3DRender();
 

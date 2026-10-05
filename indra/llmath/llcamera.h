@@ -43,7 +43,20 @@ constexpr F32 DEFAULT_FAR_PLANE     = 64.f; // far reaches across two horizontal
 constexpr F32 MAX_ASPECT_RATIO  = 50.0f;
 constexpr F32 MAX_NEAR_PLANE    = 1023.9f;   // Clamp the near plane just before the skybox ends
 constexpr F32 MAX_FAR_PLANE     = 100000.0f; //1000000.0f; // Max allowed. Not good Z precision though.
-constexpr F32 MAX_FAR_CLIP      = 512.0f;
+constexpr F32 MAX_FAR_CLIP      = 2048.0f; // <SK:Nexii> render/farplane: was 512, which forward-Z depth keeps (FORWARD_Z_MAX_FAR_CLIP)
+// <SK:Nexii> render/farplane: how far depth-tested content reaches once the reverse-Z projection is infinite;
+// past it is sky. Terrain and water, whose partitions ignore the draw distance.
+constexpr F32 SK_REACH_TERRAIN = 8192.0f;
+// Depth reconstruction never places a point past this (the cleared far depth would otherwise be infinite);
+// the shaders' copy is deferredUtil.glsl's SK_RECONSTRUCT_W_FLOOR = 1 / this.
+constexpr F32 SK_RECONSTRUCT_FAR = 1000000.0f;
+// The draw-distance ceiling forward 24-bit depth was tuned for, and what MAX_FAR_CLIP was before.
+constexpr F32 FORWARD_Z_MAX_FAR_CLIP = 512.0f;
+// The fixed projection far plane forward-Z depth keeps, and what an infinite request falls back to there.
+constexpr F32 SK_FORWARD_Z_PROJECTION_FAR = FORWARD_Z_MAX_FAR_CLIP * 2.0f;
+// Stored depth the sky dome is pinned at under reverse-Z (LLGLSquashToFarClip, layer 0); nearer than any reach.
+constexpr F32 SK_SKY_PIN_DEPTH = 0.000005f;
+// </SK:Nexii>
 
 constexpr F32 MIN_ASPECT_RATIO  = 0.02f;
 constexpr F32 MIN_NEAR_PLANE    = 0.1f;

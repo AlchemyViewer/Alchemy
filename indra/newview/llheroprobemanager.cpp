@@ -381,7 +381,7 @@ void LLHeroProbeManager::updateProbeFace(LLReflectionMap* probe, U32 face, bool 
 
             gReflectionMipProgram.uniform1f(LLShaderMgr::RES_SCALE, 1.f / (mProbeResolution * 2));
             gReflectionMipProgram.uniform1f(LLShaderMgr::ZNEAR, probe->getNearClip());
-            gReflectionMipProgram.uniform1f(LLShaderMgr::ZFAR, MAX_FAR_CLIP);
+            gReflectionMipProgram.uniform1f(LLShaderMgr::ZFAR, FORWARD_Z_MAX_FAR_CLIP); // <SK:Nexii> render/farplane: was MAX_FAR_CLIP
 
             gPipeline.mScreenTriangleVB->setBuffer();
             gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
