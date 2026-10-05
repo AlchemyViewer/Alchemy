@@ -101,6 +101,32 @@ namespace
         return samples[2];
     }
 
+    // As ms_per_item, a pass at a time, but each pass's own setup -- an
+    // editor emptied before a load -- left out of what is timed.
+    double ms_per_item_after(const std::function<void()>& setup, const std::function<void()>& pass)
+    {
+        setup();
+        pass();
+        double samples[5];
+        for (double& sample : samples)
+        {
+            size_t          passes = 0;
+            clock::duration spent{};
+            const auto      start = clock::now();
+            do
+            {
+                setup();
+                const auto from = clock::now();
+                pass();
+                spent += clock::now() - from;
+                ++passes;
+            } while (clock::now() - start < std::chrono::milliseconds(50));
+            sample = std::chrono::duration<double, std::milli>(spent).count() / double(passes);
+        }
+        std::sort(samples, samples + 5);
+        return samples[2];
+    }
+
     // One language's editor, over its big script.
     struct Subject
     {
@@ -181,6 +207,18 @@ namespace
         }
         row(name, ms[0], ms[1]);
     }
+
+    template <typename S, typename F>
+    void bothAfter(const char* name, Subject (&subjects)[2], S&& setup, F&& op)
+    {
+        double ms[2];
+        for (int i = 0; i < 2; ++i)
+        {
+            ALCodeEditor& e = *subjects[i].editor;
+            ms[i]           = ms_per_item_after([&] { setup(subjects[i], e); }, [&] { op(subjects[i], e); });
+        }
+        row(name, ms[0], ms[1]);
+    }
 }
 #endif // LL_RELEASE
 
@@ -212,7 +250,12 @@ int main(int, char**)
     countRow("bytes", subjects[0].text.size(), subjects[1].text.size());
 
     std::printf("\nLoading and highlighting\n");
-    both("load: setText", subjects, 1, [](Subject& s, ALCodeEditor& e) { e.setText(s.text); });
+    // Into an editor holding nothing, as a script opened is; and over the
+    // same text again, as one loaded again is, whose lines are made in
+    // the strings of the lines they replace.
+    bothAfter("load: setText into an empty text", subjects, [](Subject&, ALCodeEditor& e) { e.setText(std::string_view()); },
+              [](Subject& s, ALCodeEditor& e) { e.setText(s.text); });
+    both("load: setText over the same text", subjects, 1, [](Subject& s, ALCodeEditor& e) { e.setText(s.text); });
     both("full highlight: every line lexed", subjects, 1, [](Subject&, ALCodeEditor& e) {
         e.highlighter().wordsChanged();
         g_sink = g_sink + e.highlighter().tokens(lastLine(e)).size();

@@ -813,12 +813,17 @@ S32 ALTextLayout::trim(S32 first, S32 last)
 
 S32 ALTextLayout::countedHeight(S32 index) const
 {
+    return countedHeight(index, rowHeight());
+}
+
+S32 ALTextLayout::countedHeight(S32 index, S32 row_h) const
+{
     if (mHidden[index])
     {
         return 0;
     }
     const S32 height = mLines[index].height;
-    return (height > 0 ? height : rowHeight()) + gapHeight(index);
+    return (height > 0 ? height : row_h) + (mGaps ? gapRows(index) * row_h : 0);
 }
 
 void ALTextLayout::ensureHeights()
@@ -828,10 +833,12 @@ void ALTextLayout::ensureHeights()
     {
         return;
     }
+    // The font's row asked once, not once a line.
+    const S32 row_h = rowHeight();
     mHeightScratch.resize(mLines.size());
     for (size_t i = 0; i < mLines.size(); ++i)
     {
-        mHeightScratch[i] = countedHeight(static_cast<S32>(i));
+        mHeightScratch[i] = countedHeight(static_cast<S32>(i), row_h);
     }
     mHeights.assign(mHeightScratch);
     mEndGap       = mGaps ? llmax(0, mGaps(lineCount())) : 0;

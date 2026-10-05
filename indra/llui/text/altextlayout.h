@@ -365,7 +365,9 @@ private:
     void wrapLine(S32 index, Line& out);
     // What a line counts for in the column: nothing hidden; its gap and
     // its height once laid out, even since thrown away; a row before.
+    // With the row's height given, for a pass over every line.
     S32  countedHeight(S32 index) const;
+    S32  countedHeight(S32 index, S32 row_h) const;
     // Every line's height summed afresh, where lines were made or taken
     // away, hidden or everything thrown away since.
     void ensureHeights();

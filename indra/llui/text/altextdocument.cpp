@@ -88,6 +88,31 @@ namespace
         }
         return out;
     }
+
+    // Text with its line endings as LF: CRLF and a lone CR read as LF.
+    std::string withLineFeeds(std::string_view text)
+    {
+        if (text.find('\r') == std::string_view::npos)
+        {
+            return std::string(text);
+        }
+        std::string out;
+        out.reserve(text.size());
+        for (size_t i = 0; i < text.size(); ++i)
+        {
+            if (text[i] != '\r')
+            {
+                out.push_back(text[i]);
+                continue;
+            }
+            out.push_back('\n');
+            if (i + 1 < text.size() && text[i + 1] == '\n')
+            {
+                ++i;
+            }
+        }
+        return out;
+    }
 }
 
 // --- Edit --------------------------------------------------------------------
@@ -381,22 +406,28 @@ std::string ALTextDocument::text(const ALTextRange& range_in) const
     {
         return mLines[range.begin.line].substr(range.begin.column, range.end.column - range.begin.column);
     }
-    // As long as it will be, before any of it: a whole text is long.
-    size_t size = mLines[range.begin.line].size() - static_cast<size_t>(range.begin.column) + static_cast<size_t>(range.end.column) + 1;
+    // As long as it will be, and each line copied into its place: a
+    // whole text is long.
+    const std::string& head = mLines[range.begin.line];
+    const size_t       from = static_cast<size_t>(range.begin.column);
+    const size_t       tail = static_cast<size_t>(range.end.column);
+    size_t             size = head.size() - from + 1 + tail;
     for (S32 l = range.begin.line + 1; l < range.end.line; ++l)
     {
         size += mLines[l].size() + 1;
     }
     std::string out;
-    out.reserve(size);
-    out.append(mLines[range.begin.line], static_cast<size_t>(range.begin.column), std::string::npos);
-    for (S32 l = range.begin.line + 1; l < range.end.line; ++l)
-    {
-        out.push_back('\n');
-        out += mLines[l];
-    }
-    out.push_back('\n');
-    out.append(mLines[range.end.line], 0, range.end.column);
+    out.resize_and_overwrite(size, [&](char* buffer, size_t) {
+        char* at = std::copy(head.begin() + static_cast<std::ptrdiff_t>(from), head.end(), buffer);
+        for (S32 l = range.begin.line + 1; l < range.end.line; ++l)
+        {
+            *at++ = '\n';
+            at    = std::copy(mLines[l].begin(), mLines[l].end(), at);
+        }
+        *at++ = '\n';
+        std::copy(mLines[range.end.line].begin(), mLines[range.end.line].begin() + static_cast<std::ptrdiff_t>(tail), at);
+        return size;
+    });
     return out;
 }
 
@@ -407,11 +438,6 @@ const std::string& ALTextDocument::line(S32 index) const
         return EMPTY_LINE;
     }
     return mLines[index];
-}
-
-S32 ALTextDocument::lineLength(S32 index) const
-{
-    return static_cast<S32>(line(index).size());
 }
 
 size_t ALTextDocument::byteCount() const
@@ -486,9 +512,7 @@ ALTextDocument::Edit ALTextDocument::replaceMany(std::vector<std::pair<ALTextRan
         append(this->text(ALTextRange(at, range.begin)));
         if (piece.find('\r') != std::string::npos)
         {
-            std::vector<std::string> lines;
-            splitLines(piece, lines);
-            piece = joinLines(lines);
+            piece = withLineFeeds(piece);
         }
         Edit::Part part;
         part.before       = range;
@@ -507,21 +531,10 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
     range = clampBytes(range.normalised());
 
     Edit edit;
-    edit.range   = range;
-    edit.removed = this->text(range);
-
-    // What is put in, its line endings as LF: as it came where it has
-    // no CR, else joined again from its lines.
-    std::vector<std::string> pieces;
-    splitLines(text, pieces);
-    if (text.find('\r') == std::string_view::npos)
-    {
-        edit.inserted.assign(text);
-    }
-    else
-    {
-        edit.inserted = joinLines(pieces);
-    }
+    edit.range    = range;
+    edit.removed  = this->text(range);
+    // What is put in, its line endings as LF.
+    edit.inserted = withLineFeeds(text);
     if (edit.nothing() || edit.removed == edit.inserted)
     {
         // Nothing changes: answered as nothing, where it was asked for.
@@ -533,13 +546,51 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
     edit.keepEnd();
     edit.parts = std::move(parts);
 
-    // The line the range starts in keeps what came before it, the line it
-    // ends in keeps what comes after, and the pieces go between: in place
-    // where there are as many as the lines they replace.
-    pieces.front().insert(0, mLines[range.begin.line], 0, range.begin.column);
-    pieces.back().append(mLines[range.end.line], range.end.column, std::string::npos);
-    mLines.replace(static_cast<size_t>(range.begin.line), static_cast<size_t>(range.end.line - range.begin.line + 1),
-                   std::make_move_iterator(pieces.begin()), std::make_move_iterator(pieces.end()));
+    const size_t           first = static_cast<size_t>(range.begin.line);
+    const size_t           last  = static_cast<size_t>(range.end.line);
+    const std::string_view put   = edit.inserted;
+    if (first == last && put.find('\n') == std::string_view::npos)
+    {
+        // Within a line, and none broken: the line changed where it is.
+        mLines[first].replace(static_cast<size_t>(range.begin.column), static_cast<size_t>(range.end.column - range.begin.column), put);
+    }
+    else
+    {
+        // The line the range starts in keeps what came before it, the line
+        // it ends in keeps what comes after, and the lines put in go
+        // between. Each made in the string of a line it replaces, while
+        // there are any, which keeps what that held room for: a text put
+        // in over another -- loaded again, a comparison made again --
+        // makes and lets go of next to nothing.
+        const std::string after = mLines[last].substr(static_cast<size_t>(range.end.column));
+        std::vector<std::string> made;
+        made.reserve(static_cast<size_t>(std::count(put.begin(), put.end(), '\n')) + 1);
+        size_t reuse = first;
+        size_t start = 0;
+        while (true)
+        {
+            const size_t           at    = put.find('\n', start);
+            const std::string_view piece = put.substr(start, at == std::string_view::npos ? std::string_view::npos : at - start);
+            std::string            line  = reuse <= last ? std::move(mLines[reuse++]) : std::string();
+            if (made.empty())
+            {
+                line.resize(static_cast<size_t>(range.begin.column));
+                line.append(piece);
+            }
+            else
+            {
+                line.assign(piece);
+            }
+            made.push_back(std::move(line));
+            if (at == std::string_view::npos)
+            {
+                break;
+            }
+            start = at + 1;
+        }
+        made.back().append(after);
+        mLines.replace(first, last - first + 1, std::make_move_iterator(made.begin()), std::make_move_iterator(made.end()));
+    }
 
     ++mVersion;
     // The whole text kept, if it was, is made again when next asked

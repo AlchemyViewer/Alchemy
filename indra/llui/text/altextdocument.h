@@ -218,7 +218,10 @@ public:
 
     S32                lineCount() const { return static_cast<S32>(mLines.size()); }
     const std::string& line(S32 index) const;
-    S32                lineLength(S32 index) const;
+    S32                lineLength(S32 index) const
+    {
+        return index >= 0 && index < lineCount() ? static_cast<S32>(mLines[static_cast<size_t>(index)].size()) : 0;
+    }
     // The bytes of text(), line endings counted.
     size_t             byteCount() const;
     bool               empty() const { return mLines.size() == 1 && mLines.front().empty(); }
