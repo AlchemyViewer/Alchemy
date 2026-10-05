@@ -16,6 +16,10 @@
 	<floater.string name="last_used_days">[COUNT]d</floater.string>
 	<floater.string name="no_gestures">Brak gestów</floater.string>
 	<floater.string name="no_matching_gestures">Brak pasujących gestów</floater.string>
+	<floater.string name="menu_activate">Aktywuj</floater.string>
+	<floater.string name="menu_deactivate">Deaktywuj</floater.string>
+	<floater.string name="menu_play">Odtwarzaj</floater.string>
+	<floater.string name="menu_stop">Zatrzymaj</floater.string>
 	<filter_editor label="Filtruj według nazwy, czatu lub klawisza" name="gesture_filter" tool_tip="Filtruj gesty według nazwy, tekstu wywołującego w czacie lub skrótu klawiszowego" />
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Nazwa" name="name" />
@@ -29,7 +33,7 @@
 		<button name="activate_btn" tool_tip="Aktywuj/Dezaktywuj wybrany gest" />
 		<button name="del_btn" tool_tip="Usuń gest" />
 	</panel>
-	<button label="Edytuj" name="edit_btn" />
+	<button label="Otwórz" name="edit_btn" />
 	<button label="Odtwarzaj" name="play_btn" />
 	<button label="Zatrzymaj" name="stop_btn" />
 </floater>

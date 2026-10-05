@@ -16,6 +16,10 @@
 	<floater.string name="last_used_days">[COUNT]d</floater.string>
 	<floater.string name="no_gestures">Ingen bevægelser</floater.string>
 	<floater.string name="no_matching_gestures">Ingen matchende bevægelser</floater.string>
+	<floater.string name="menu_activate">Aktivér</floater.string>
+	<floater.string name="menu_deactivate">Deaktivér</floater.string>
+	<floater.string name="menu_play">Afspil</floater.string>
+	<floater.string name="menu_stop">Stop</floater.string>
 	<filter_editor label="Filtrér efter navn, chat eller tast" name="gesture_filter" tool_tip="Filtrér bevægelser efter navn, chatudløser eller genvejstast"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Navn" name="name"/>
@@ -30,7 +34,7 @@
 		<button name="activate_btn" tool_tip="Aktivér/Deaktivér valgte bevægelse"/>
 		<button name="del_btn" tool_tip="Slet denne bevægelse"/>
 	</panel>
-	<button label="Redigér" name="edit_btn"/>
+	<button label="åben" name="edit_btn"/>
 	<button label="Afspil" name="play_btn"/>
 	<button label="Stop" name="stop_btn"/>
 </floater>

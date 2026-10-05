@@ -16,6 +16,10 @@
 	<floater.string name="last_used_days">[COUNT]d</floater.string>
 	<floater.string name="no_gestures">Nenhum gesto</floater.string>
 	<floater.string name="no_matching_gestures">Nenhum gesto correspondente</floater.string>
+	<floater.string name="menu_activate">Ativar</floater.string>
+	<floater.string name="menu_deactivate">Desativar</floater.string>
+	<floater.string name="menu_play">Executar</floater.string>
+	<floater.string name="menu_stop">Parar</floater.string>
 	<filter_editor label="Filtrar por nome, bate-papo ou tecla" name="gesture_filter" tool_tip="Filtrar gestos por nome, gatilho no bate-papo ou tecla de atalho"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Nome" name="name"/>
@@ -29,7 +33,7 @@
 		<button name="activate_btn" tool_tip="Ativar/Desativar gesto selecionado"/>
 		<button name="del_btn" tool_tip="Excluir este gesto"/>
 	</panel>
-	<button label="Editar" name="edit_btn" tool_tip="Abrir janela para edição do gesto selecionado."/>
+	<button label="Abrir" name="edit_btn" tool_tip="Abrir janela para edição do gesto selecionado."/>
 	<button label="Executar" name="play_btn" tool_tip="Executar o gesto selecionado no mundo."/>
 	<button label="Parar" name="stop_btn"/>
 </floater>

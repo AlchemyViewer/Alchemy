@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="gesture_context">
+	<menu_item_call name="share" label="Поделиться"/>
+	<menu_item_call name="open" label="Открыть"/>
+	<menu_item_call name="reveal" label="Показать вещь из инвентаря"/>
+	<menu_item_call name="rename" label="Переименовать"/>
+	<menu_item_call name="copy_gesture" label="Копировать"/>
+	<menu_item_call name="paste" label="Вставить"/>
+	<menu_item_call name="copy_uuid" label="Копировать UUID"/>
+	<menu_item_call name="play" label="Проиграть"/>
+	<menu_item_call name="activate" label="Активировать"/>
+	<menu_item_call name="save_to_outfit" label="Сохранить в текущий костюм"/>
+	<menu_item_call name="delete" label="Удалить"/>
+</context_menu>

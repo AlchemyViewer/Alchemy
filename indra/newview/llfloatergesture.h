@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "llfloater.h"
+#include "almenuslot.h"
 #include "llframetimer.h"
 #include "llinventoryobserver.h"
 
@@ -94,6 +95,9 @@ private:
      */
     void onActivateBtnClick();
     void onClickEdit();
+    void onContextMenu(S32 x, S32 y);
+    void onShare();
+    void onRevealInInventory();
     void onClickPlay();
     void onClickNew();
     void onCommitList();
@@ -109,6 +113,7 @@ private:
     LLScrollListCtrl* mGestureList = nullptr;
     std::string mFilter;
     LLFrameTimer mLastUsedRefreshTimer;
+    ALMenuSlot mContextMenu;
 
     LLFloaterGestureObserver* mObserver;
 };

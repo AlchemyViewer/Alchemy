@@ -16,6 +16,10 @@
 	<floater.string name="last_used_days">[COUNT]д</floater.string>
 	<floater.string name="no_gestures">Нет жестов</floater.string>
 	<floater.string name="no_matching_gestures">Нет подходящих жестов</floater.string>
+	<floater.string name="menu_activate">Активировать</floater.string>
+	<floater.string name="menu_deactivate">Деактивировать</floater.string>
+	<floater.string name="menu_play">Проиграть</floater.string>
+	<floater.string name="menu_stop">Стоп</floater.string>
 	<filter_editor label="Фильтр по названию, чату или клавише" name="gesture_filter" tool_tip="Фильтр жестов по названию, фразе активации в чате или сочетанию клавиш"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Название" name="name"/>
@@ -29,7 +33,7 @@
 		<button name="activate_btn" tool_tip="Активировать/деактивировать выбранный жест"/>
 		<button name="del_btn" tool_tip="Удалить этот жест"/>
 	</panel>
-	<button label="Изменить" name="edit_btn" tool_tip="Откройте окно для редактирования выбранного жеста."/>
+	<button label="Открыть" name="edit_btn" tool_tip="Откройте окно для редактирования выбранного жеста."/>
 	<button label="Проиграть" name="play_btn" tool_tip="Выполните выбранный жест в игровом мире."/>
 	<button label="Стоп" name="stop_btn"/>
 </floater>

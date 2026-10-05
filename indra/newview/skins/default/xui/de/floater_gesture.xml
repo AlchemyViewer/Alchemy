@@ -16,6 +16,10 @@
 	<floater.string name="last_used_days">[COUNT]T</floater.string>
 	<floater.string name="no_gestures">Keine Gesten</floater.string>
 	<floater.string name="no_matching_gestures">Keine passenden Gesten</floater.string>
+	<floater.string name="menu_activate">Aktivieren</floater.string>
+	<floater.string name="menu_deactivate">Deaktivieren</floater.string>
+	<floater.string name="menu_play">Abspielen</floater.string>
+	<floater.string name="menu_stop">Stopp</floater.string>
 	<filter_editor label="Nach Name, Chat oder Taste filtern" name="gesture_filter" tool_tip="Gesten nach Name, Chat-Auslöser oder Tastenkürzel filtern"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Name" name="name"/>
@@ -30,7 +34,7 @@
 		<button name="activate_btn" tool_tip="Ausgewählte Geste aktivieren/deaktivieren"/>
 		<button name="del_btn" tool_tip="Diese Geste löschen"/>
 	</panel>
-	<button label="Bearbeiten" name="edit_btn" tool_tip="Fenster zum Bearbeiten der ausgewählten Geste öffnen."/>
+	<button label="Öffnen" name="edit_btn" tool_tip="Fenster zum Bearbeiten der ausgewählten Geste öffnen."/>
 	<button label="Abspielen" name="play_btn" tool_tip="Ausgewählte Geste inworld ausführen."/>
 	<button label="Stopp" name="stop_btn"/>
 </floater>

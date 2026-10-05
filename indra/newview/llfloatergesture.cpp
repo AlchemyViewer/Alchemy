@@ -35,6 +35,7 @@
 #include "llclipboard.h"
 
 #include "llagent.h"
+#include "llavataractions.h"
 #include "llappearancemgr.h"
 #include "llclipboard.h"
 #include "llgesturemgr.h"
@@ -142,6 +143,11 @@ LLFloaterGesture::LLFloaterGesture(const LLSD& key)
     mCommitCallbackRegistrar.add("Gesture.Action.SaveToCOF", boost::bind(&LLFloaterGesture::addToCurrentOutFit, this));
     mCommitCallbackRegistrar.add("Gesture.Action.Rename", boost::bind(&LLFloaterGesture::onRenameSelected, this));
 
+    mCommitCallbackRegistrar.add("Gesture.Action.Play", boost::bind(&LLFloaterGesture::onClickPlay, this));
+    mCommitCallbackRegistrar.add("Gesture.Action.Delete", boost::bind(&LLFloaterGesture::onDeleteSelected, this));
+    mCommitCallbackRegistrar.add("Gesture.Action.Share", boost::bind(&LLFloaterGesture::onShare, this));
+    mCommitCallbackRegistrar.add("Gesture.Action.Reveal", boost::bind(&LLFloaterGesture::onRevealInInventory, this));
+
     mEnableCallbackRegistrar.add("Gesture.EnableAction", boost::bind(&LLFloaterGesture::isActionEnabled, this, _2));
 }
 
@@ -211,6 +217,9 @@ bool LLFloaterGesture::postBuild()
     setTitle(label);
     mGestureList = getChild<LLScrollListCtrl>("gesture_list");
     mGestureList->setCommitCallback(boost::bind(&LLFloaterGesture::onCommitList, this));
+    mContextMenu.make("menu_gesture_context.xml");
+    mGestureList->setRightMouseDownCallback(
+        [this](LLUICtrl*, S32 x, S32 y, MASK) { onContextMenu(x, y); });
     mGestureList->setDoubleClickCallback(boost::bind(&LLFloaterGesture::onClickPlay, this));
     mGestureList->setSortCallback([](S32 column, const LLScrollListItem* lhs, const LLScrollListItem* rhs)
     {
@@ -438,7 +447,6 @@ void LLFloaterGesture::getSelectedIds(uuid_vec_t& ids)
 
 bool LLFloaterGesture::isActionEnabled(const LLSD& command)
 {
-    // paste copy_uuid edit_gesture
     std::string command_name = command.asString();
     if("paste" == command_name)
     {
@@ -458,9 +466,11 @@ bool LLFloaterGesture::isActionEnabled(const LLSD& command)
         }
         return false;
     }
-    else if("copy_uuid" == command_name || "edit_gesture" == command_name)
+    else if (command_name == "copy_uuid" || command_name == "edit_gesture"
+             || command_name == "play" || command_name == "reveal")
     {
-        return  mGestureList->getAllSelected().size() == 1;
+        return mGestureList->getAllSelected().size() == 1
+            && gInventory.getItem(mGestureList->getCurrentID());
     }
     else if ("rename_gesture" == command_name)
     {
@@ -475,7 +485,62 @@ bool LLFloaterGesture::isActionEnabled(const LLSD& command)
         }
         return false;
     }
+    const auto selected = mGestureList->getAllSelected();
+    if (selected.empty())
+        return false;
+
+    for (const LLScrollListItem* row : selected)
+    {
+        const LLViewerInventoryItem* item = gInventory.getItem(row->getUUID());
+        if (!item)
+            return false;
+        if (command_name == "share" && !can_share_item(item->getUUID()))
+            return false;
+        if (command_name == "copy_gesture" && !item->getPermissions().allowCopyBy(gAgentID))
+            return false;
+        if (command_name == "delete" && !gInventory.isObjectDescendentOf(item->getUUID(), gInventory.getRootFolderID()))
+            return false;
+    }
     return true;
+}
+
+void LLFloaterGesture::onContextMenu(S32 x, S32 y)
+{
+    LLScrollListItem* row = mGestureList->hitItem(x, y);
+    if (!row || !row->getEnabled())
+        return;
+
+    if (!row->getSelected())
+        mGestureList->selectItemAt(x, y, MASK_NONE);
+    onCommitList();
+
+    if (LLContextMenu* menu = mContextMenu.get())
+    {
+        const auto selected = mGestureList->getAllSelected();
+        const bool all_active = std::all_of(selected.begin(), selected.end(), [](const LLScrollListItem* item)
+        {
+            return LLGestureMgr::instance().isGestureActive(item->getUUID());
+        });
+        menu->getChild<LLMenuItemGL>("activate")->setLabel(getString(all_active ? "menu_deactivate" : "menu_activate"));
+        menu->getChild<LLMenuItemGL>("play")->setLabel(getString(
+            LLGestureMgr::instance().isGesturePlaying(mGestureList->getCurrentID()) ? "menu_stop" : "menu_play"));
+        mContextMenu.show(mGestureList, x, y);
+    }
+}
+
+void LLFloaterGesture::onShare()
+{
+    if (!isActionEnabled("share"))
+        return;
+    uuid_vec_t ids;
+    getSelectedIds(ids);
+    LLAvatarActions::shareWithAvatars(uuid_set_t(ids.begin(), ids.end()), this);
+}
+
+void LLFloaterGesture::onRevealInInventory()
+{
+    if (isActionEnabled("reveal"))
+        show_item_original(mGestureList->getCurrentID());
 }
 
 void LLFloaterGesture::onClickPlay()

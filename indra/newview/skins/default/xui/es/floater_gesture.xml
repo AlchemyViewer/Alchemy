@@ -16,6 +16,10 @@
 	<floater.string name="last_used_days">[COUNT]d</floater.string>
 	<floater.string name="no_gestures">No hay gestos</floater.string>
 	<floater.string name="no_matching_gestures">No hay gestos coincidentes</floater.string>
+	<floater.string name="menu_activate">Activar</floater.string>
+	<floater.string name="menu_deactivate">Desactivar</floater.string>
+	<floater.string name="menu_play">Reproducir</floater.string>
+	<floater.string name="menu_stop">Parar</floater.string>
 	<filter_editor label="Filtrar por nombre, chat o tecla" name="gesture_filter" tool_tip="Filtrar gestos por nombre, palabra clave de chat o tecla de acceso directo"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Nombre" name="name"/>
@@ -29,7 +33,7 @@
 		<button name="activate_btn" tool_tip="Activar/Desactivar el gesto elegido"/>
 		<button name="del_btn" tool_tip="Borrar este gesto"/>
 	</panel>
-	<button label="Editar" name="edit_btn" tool_tip="Abrir la ventana para editar el gesto seleccionado."/>
+	<button label="Abrir" name="edit_btn" tool_tip="Abrir la ventana para editar el gesto seleccionado."/>
 	<button label="Reproducir" name="play_btn" tool_tip="Realizar gesto seleccionado en el mundo."/>
 	<button label="Parar" name="stop_btn"/>
 </floater>

@@ -16,6 +16,10 @@
 	<floater.string name="last_used_days">[COUNT]天</floater.string>
 	<floater.string name="no_gestures">沒有姿勢</floater.string>
 	<floater.string name="no_matching_gestures">沒有符合條件的姿勢</floater.string>
+	<floater.string name="menu_activate">啟動</floater.string>
+	<floater.string name="menu_deactivate">停用</floater.string>
+	<floater.string name="menu_play">播放</floater.string>
+	<floater.string name="menu_stop">停止</floater.string>
 	<filter_editor label="依名稱、聊天或按鍵篩選" name="gesture_filter" tool_tip="依名稱、聊天觸發文字或快捷鍵篩選姿勢"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="名稱" name="name"/>
@@ -29,7 +33,7 @@
 		<button name="activate_btn" tool_tip="啟動/停止所選姿勢"/>
 		<button name="del_btn" tool_tip="刪除這個姿勢"/>
 	</panel>
-	<button label="編輯" name="edit_btn" tool_tip="開啓視窗以便編輯所選姿勢。"/>
+	<button label="打開" name="edit_btn" tool_tip="開啓視窗以便編輯所選姿勢。"/>
 	<button label="播放" name="play_btn" tool_tip="在虛擬世界裡執行所選姿勢。"/>
 	<button label="停止" name="stop_btn"/>
 </floater>

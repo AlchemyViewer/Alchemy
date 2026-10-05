@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="gesture_context">
+	<menu_item_call name="share" label="分享"/>
+	<menu_item_call name="open" label="打開"/>
+	<menu_item_call name="reveal" label="顯示收納區物品"/>
+	<menu_item_call name="rename" label="更名"/>
+	<menu_item_call name="copy_gesture" label="複製"/>
+	<menu_item_call name="paste" label="貼上"/>
+	<menu_item_call name="copy_uuid" label="覆製 UUID"/>
+	<menu_item_call name="play" label="播放"/>
+	<menu_item_call name="activate" label="啟動"/>
+	<menu_item_call name="save_to_outfit" label="儲存到目前裝扮"/>
+	<menu_item_call name="delete" label="刪除"/>
+</context_menu>

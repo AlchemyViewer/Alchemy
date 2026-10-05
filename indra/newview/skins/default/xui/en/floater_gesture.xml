@@ -32,6 +32,10 @@
     <floater.string name="last_used_days">[COUNT]d</floater.string>
     <floater.string name="no_gestures">No gestures</floater.string>
     <floater.string name="no_matching_gestures">No matching gestures</floater.string>
+    <floater.string name="menu_activate">Activate</floater.string>
+    <floater.string name="menu_deactivate">Deactivate</floater.string>
+    <floater.string name="menu_play">Play</floater.string>
+    <floater.string name="menu_stop">Stop</floater.string>
     <filter_editor
      follows="left|top|right"
      height="22"
@@ -146,8 +150,8 @@
     <button
      follows="left|bottom"
      height="23"
-     label="Edit"
-     tool_tip="Open window for editing selected gesture."
+     label="Open"
+     tool_tip="Open selected gesture."
      layout="topleft"
      left="6"
      name="edit_btn"

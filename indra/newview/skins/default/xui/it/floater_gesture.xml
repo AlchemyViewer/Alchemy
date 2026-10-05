@@ -16,6 +16,10 @@
 	<floater.string name="last_used_days">[COUNT]g</floater.string>
 	<floater.string name="no_gestures">Nessuna gesture</floater.string>
 	<floater.string name="no_matching_gestures">Nessuna gesture corrispondente</floater.string>
+	<floater.string name="menu_activate">Attiva</floater.string>
+	<floater.string name="menu_deactivate">Disattiva</floater.string>
+	<floater.string name="menu_play">Play</floater.string>
+	<floater.string name="menu_stop">Stop</floater.string>
 	<filter_editor label="Filtra per nome, chat o tasto" name="gesture_filter" tool_tip="Filtra le gesture per nome, parole chiave in chat o tasto di scelta rapida"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Nome" name="name"/>
@@ -29,7 +33,7 @@
 		<button name="activate_btn" tool_tip="Attiva/Disattiva gesture selezionata"/>
 		<button name="del_btn" tool_tip="Elimina questa gesture"/>
 	</panel>
-	<button label="Modifica" name="edit_btn" tool_tip="Apri la finestra per modificare il movimento selezionato."/>
+	<button label="Apri" name="edit_btn" tool_tip="Apri la finestra per modificare il movimento selezionato."/>
 	<button label="Play" name="play_btn" tool_tip="Esegui il movimento selezionato nel mondo virtuale."/>
 	<button label="Stop" name="stop_btn"/>
 </floater>

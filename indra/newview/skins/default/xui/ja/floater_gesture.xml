@@ -16,6 +16,10 @@
 	<floater.string name="last_used_days">[COUNT]日</floater.string>
 	<floater.string name="no_gestures">ジェスチャーがありません</floater.string>
 	<floater.string name="no_matching_gestures">一致するジェスチャーがありません</floater.string>
+	<floater.string name="menu_activate">有効化</floater.string>
+	<floater.string name="menu_deactivate">無効化</floater.string>
+	<floater.string name="menu_play">再生</floater.string>
+	<floater.string name="menu_stop">停止</floater.string>
 	<filter_editor label="名前、チャット、キーで絞り込み" name="gesture_filter" tool_tip="名前、チャットのトリガー、ショートカットキーでジェスチャーを絞り込みます"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="名前" name="name"/>
@@ -29,7 +33,7 @@
 		<button name="activate_btn" tool_tip="選択したジェスチャーの有効化／無効化します。"/>
 		<button name="del_btn" tool_tip="このジェスチャーを削除します。"/>
 	</panel>
-	<button label="編集" name="edit_btn" tool_tip="選択したジェスチャーの編集ウィンドウを開きます。"/>
+	<button label="開く" name="edit_btn" tool_tip="選択したジェスチャーの編集ウィンドウを開きます。"/>
 	<button label="再生" name="play_btn" tool_tip="インワールドで選択したジェスチャーを実行します。"/>
 	<button label="停止" name="stop_btn"/>
 </floater>

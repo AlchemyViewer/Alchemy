@@ -62,7 +62,7 @@
          function="Gesture.Action.SaveToCOF" />
     </menu_item_call>
     <menu_item_call
-     label="Edit"
+     label="Open"
      layout="topleft"
      name="edit_gesture">
         <on_click
