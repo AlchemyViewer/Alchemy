@@ -2545,6 +2545,15 @@ namespace tut
         v.pump();
         ensure("rows above it: the view still on its line", v.firstVisibleLine() == top && v.scrollY() == layout.lineTop(45));
         ensure_equals("which is further down, past both gaps", layout.lineTop(45), (45 + 3 + 5) * row_h);
+
+        // At the very top, rows put over the first line: there still, the
+        // rows in sight above it.
+        v.setScrollY(0);
+        Said over;
+        over.gap = 2;
+        v.setLineAnnotation(0, over);
+        v.pump();
+        ensure("at the top still, the rows over the first line in sight", v.scrollY() == 0 && layout.lineTop(0) == 2 * row_h);
     }
     template<> template<>
     void altextview_object::test<81>()

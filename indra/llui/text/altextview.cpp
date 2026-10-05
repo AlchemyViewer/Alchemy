@@ -693,11 +693,12 @@ bool ALTextView::hasHorizontalScrollbar() const
 void ALTextView::syncScrollbar()
 {
     // Heights above the view moved since it was last scrolled: back to the
-    // line it was on, as far into it as it was.
+    // line it was on, as far into it as it was; or at the very top, there
+    // still, rows put over the first line shown with it.
     if (!mScrollAsked && mLayout.heightsRevision() != mAnchorHeights && mDocument.lineCount() > 0)
     {
         const S32 line = llclamp(mAnchorLine, 0, mDocument.lineCount() - 1);
-        mScrollY       = mLayout.lineTop(line) + llclamp(mAnchorOffset, -mLayout.gapHeight(line), llmax(0, mLayout.lineHeight(line) - 1));
+        mScrollY       = mAnchorAtTop ? 0 : mLayout.lineTop(line) + llclamp(mAnchorOffset, -mLayout.gapHeight(line), llmax(0, mLayout.lineHeight(line) - 1));
     }
     // The ruler takes room the wrap width depends on, so the need for it
     // is decided again once the first decision has been applied.
@@ -728,6 +729,7 @@ void ALTextView::syncScrollbar()
     // Where the top of the view is now, in the text.
     mAnchorLine    = mLayout.lineAtY(mScrollY);
     mAnchorOffset  = mScrollY - mLayout.lineTop(mAnchorLine);
+    mAnchorAtTop   = mScrollY == 0;
     mAnchorHeights = mLayout.heightsRevision();
     mScrollAsked   = false;
     placeRuler();
