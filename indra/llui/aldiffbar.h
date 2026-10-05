@@ -39,7 +39,8 @@ class LLTextBox;
 // The thin bar over a comparison's titles (ALDiffView): which change the
 // caret is in, of how many, and the arrows to the one before and the next;
 // the change taken back, where whoever shows it can; what is the same
-// folded away, the comparison inline or side by side, its sides swapped;
+// folded away, blanks and, where offered, case let go of in telling lines
+// the same, the comparison inline or side by side, its sides swapped;
 // and done, back to what it was made from. In the comparison's colours, as
 // the find bar is in its view's.
 //
@@ -62,6 +63,10 @@ public:
     // Whether there is a change before the caret, and one after it.
     void        setSteps(bool previous, bool next);
     void        setFolded(bool folded);
+    void        setIgnoreWhitespace(bool ignore);
+    void        setIgnoreCase(bool ignore);
+    // Whether letting case go is offered at all: for prose, not code.
+    void        setIgnoreCaseShown(bool shown);
     void        setInline(bool inline_view);
     void        setSwapped(bool swapped);
     // Whether there is anywhere to go back to.
@@ -81,6 +86,8 @@ public:
     boost::signals2::connection onPrevious(const signal_t::slot_type& cb) { return mPrevious.connect(cb); }
     boost::signals2::connection onNext(const signal_t::slot_type& cb) { return mNext.connect(cb); }
     boost::signals2::connection onFold(const signal_t::slot_type& cb) { return mFold.connect(cb); }
+    boost::signals2::connection onWhitespace(const signal_t::slot_type& cb) { return mWhitespace.connect(cb); }
+    boost::signals2::connection onCase(const signal_t::slot_type& cb) { return mCase.connect(cb); }
     boost::signals2::connection onInline(const signal_t::slot_type& cb) { return mInline.connect(cb); }
     boost::signals2::connection onSwap(const signal_t::slot_type& cb) { return mSwap.connect(cb); }
     boost::signals2::connection onDone(const signal_t::slot_type& cb) { return mDone.connect(cb); }
@@ -106,12 +113,14 @@ private:
     ALFlatButton* mPreviousButton = nullptr;
     ALFlatButton* mNextButton     = nullptr;
     ALFlatButton* mFoldButton     = nullptr;
+    ALFlatButton* mBlanksButton   = nullptr;
+    ALFlatButton* mCaseButton     = nullptr;
     ALFlatButton* mInlineButton   = nullptr;
     ALFlatButton* mSwapButton     = nullptr;
     ALFlatButton* mDoneButton     = nullptr;
     ALFlatButton* mTakeBackButton = nullptr;
 
-    signal_t mPrevious, mNext, mFold, mInline, mSwap, mDone, mTakeBack;
+    signal_t mPrevious, mNext, mFold, mWhitespace, mCase, mInline, mSwap, mDone, mTakeBack;
 };
 
 #endif // AL_ALDIFFBAR_H

@@ -370,7 +370,8 @@ namespace
     // the one after it, or its last as the one before -- it goes where code
     // reads it as one thing: its first line the least indented, a blank
     // line at its end rather than its start. Ties keep it where it was.
-    void slide(std::vector<Run>& runs, const std::vector<std::string>& left, const std::vector<std::string>& right)
+    void slide(std::vector<Run>& runs, const std::vector<S32>& a, const std::vector<S32>& b, const std::vector<std::string>& left,
+               const std::vector<std::string>& right)
     {
         for (size_t i = 1; i + 1 < runs.size(); ++i)
         {
@@ -382,16 +383,17 @@ namespace
                 continue;
             }
             const std::vector<std::string>& text  = hunk.kind == Kind::Added ? right : left;
+            const std::vector<S32>&         ids   = hunk.kind == Kind::Added ? b : a;
             const S32                       first = hunk.kind == Kind::Added ? hunk.right : hunk.left;
             const S32                       count = hunk.count;
             // How far it may go each way.
             S32 up = 0;
-            while (up < before.count && text[static_cast<size_t>(first - up - 1)] == text[static_cast<size_t>(first + count - up - 1)])
+            while (up < before.count && ids[static_cast<size_t>(first - up - 1)] == ids[static_cast<size_t>(first + count - up - 1)])
             {
                 ++up;
             }
             S32 down = 0;
-            while (down < after.count && text[static_cast<size_t>(first + down)] == text[static_cast<size_t>(first + count + down)])
+            while (down < after.count && ids[static_cast<size_t>(first + down)] == ids[static_cast<size_t>(first + count + down)])
             {
                 ++down;
             }
@@ -529,28 +531,75 @@ namespace
 }
 
 // static
+std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like)
+{
+    std::string out;
+    out.reserve(text.size());
+    bool blanks = false;
+    for (const char c : text)
+    {
+        if (like.ignoreWhitespace && blank(static_cast<unsigned char>(c)))
+        {
+            blanks = true;
+            continue;
+        }
+        if (blanks && !out.empty())
+        {
+            out += ' ';
+        }
+        blanks = false;
+        out += like.ignoreCase && c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+    }
+    return out;
+}
+
 std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right)
 {
+    return lines(left, right, Likeness());
+}
+
+std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Likeness& like)
+{
+    // Each line as compared, kept while its id is.
+    std::vector<std::string> keys;
+    if (like.any())
+    {
+        keys.reserve(left.size() + right.size());
+        for (const std::string& line : left)
+        {
+            keys.push_back(likenessOf(line, like));
+        }
+        for (const std::string& line : right)
+        {
+            keys.push_back(likenessOf(line, like));
+        }
+    }
     Interned         ids;
     std::vector<S32> a;
     std::vector<S32> b;
     a.reserve(left.size());
     b.reserve(right.size());
-    for (const std::string& line : left)
+    for (size_t i = 0; i < left.size(); ++i)
     {
-        a.push_back(ids.idOf(line));
+        a.push_back(ids.idOf(like.any() ? keys[i] : left[i]));
     }
-    for (const std::string& line : right)
+    for (size_t i = 0; i < right.size(); ++i)
     {
-        b.push_back(ids.idOf(line));
+        b.push_back(ids.idOf(like.any() ? keys[left.size() + i] : right[i]));
     }
     std::vector<Run> out = runs(a, b, true);
-    slide(out, left, right);
+    slide(out, a, b, left, right);
     return out;
 }
 
 // static
 std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const anchors_t& anchors)
+{
+    return lines(left, right, anchors, Likeness());
+}
+
+std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const anchors_t& anchors,
+                                               const Likeness& like)
 {
     // The pairs kept: within both texts, by the right then the left the
     // other way, so that of two on one line of the right the longest
@@ -621,7 +670,7 @@ std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& l
         // The stretch before the pair, on its own.
         const std::vector<std::string> some_left(left.begin() + l, left.begin() + to_left);
         const std::vector<std::string> some_right(right.begin() + r, right.begin() + to_right);
-        for (Run run : lines(some_left, some_right))
+        for (Run run : lines(some_left, some_right, like))
         {
             run.left += l;
             run.right += r;
@@ -631,7 +680,8 @@ std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& l
         {
             break;
         }
-        if (left[static_cast<size_t>(to_left)] == right[static_cast<size_t>(to_right)])
+        if (like.any() ? likenessOf(left[static_cast<size_t>(to_left)], like) == likenessOf(right[static_cast<size_t>(to_right)], like)
+                       : left[static_cast<size_t>(to_left)] == right[static_cast<size_t>(to_right)])
         {
             push(Run{ Kind::Same, to_left, to_right, 1 });
         }
@@ -677,20 +727,47 @@ std::vector<std::string> ALTextDiff::split(std::string_view text)
 // static
 void ALTextDiff::words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out)
 {
+    words(left, right, left_out, right_out, Likeness());
+}
+
+void ALTextDiff::words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out, const Likeness& like)
+{
     left_out.clear();
     right_out.clear();
-    const std::vector<std::pair<S32, S32>> lw = wordsOf(left);
-    const std::vector<std::pair<S32, S32>> rw = wordsOf(right);
-    Interned                               ids;
-    std::vector<S32>                       a;
-    std::vector<S32>                       b;
+    // Each side's words as compared: blanks, where they are let go of, none.
+    const auto compared = [&like](std::string_view line) {
+        std::vector<std::pair<S32, S32>> kept;
+        for (const auto& word : wordsOf(line))
+        {
+            if (!like.ignoreWhitespace || !blank(static_cast<unsigned char>(line[static_cast<size_t>(word.first)])))
+            {
+                kept.push_back(word);
+            }
+        }
+        return kept;
+    };
+    const std::vector<std::pair<S32, S32>> lw = compared(left);
+    const std::vector<std::pair<S32, S32>> rw = compared(right);
+    std::vector<std::string>               keys;
+    keys.reserve(lw.size() + rw.size());
     for (const auto& [begin, end] : lw)
     {
-        a.push_back(ids.idOf(left.substr(static_cast<size_t>(begin), static_cast<size_t>(end - begin))));
+        keys.push_back(likenessOf(left.substr(static_cast<size_t>(begin), static_cast<size_t>(end - begin)), Likeness{ false, like.ignoreCase }));
     }
     for (const auto& [begin, end] : rw)
     {
-        b.push_back(ids.idOf(right.substr(static_cast<size_t>(begin), static_cast<size_t>(end - begin))));
+        keys.push_back(likenessOf(right.substr(static_cast<size_t>(begin), static_cast<size_t>(end - begin)), Likeness{ false, like.ignoreCase }));
+    }
+    Interned         ids;
+    std::vector<S32> a;
+    std::vector<S32> b;
+    for (size_t i = 0; i < lw.size(); ++i)
+    {
+        a.push_back(ids.idOf(keys[i]));
+    }
+    for (size_t i = 0; i < rw.size(); ++i)
+    {
+        b.push_back(ids.idOf(keys[lw.size() + i]));
     }
     for (const Run& run : runs(a, b, false))
     {

@@ -108,6 +108,15 @@ public:
     static constexpr S32 FOLD_LEAST   = 8;
     void setFoldSame(bool fold);
     bool foldsSame() const { return mFoldSame; }
+    // Lines told the same with their blanks let go of -- re-indented or
+    // re-spaced -- or their case (ALTextDiff::Likeness), and shown as they
+    // are; off unless asked. Letting case go is on the bar only where the
+    // host offers it: for prose, not code.
+    void setIgnoreWhitespace(bool ignore);
+    bool ignoresWhitespace() const { return mLike.ignoreWhitespace; }
+    void setIgnoreCase(bool ignore);
+    bool ignoresCase() const { return mLike.ignoreCase; }
+    void setOffersIgnoreCase(bool offers);
     // How many runs there are to fold, and how many are folded.
     S32  foldCount() const { return static_cast<S32>(mFolds.size()); }
     S32  foldedCount() const;
@@ -193,6 +202,8 @@ private:
         S32 fold     = -1;
     };
     Place                   placeOfCaret();
+    // Made again as lines are now told the same, the caret kept.
+    void                    rebuildLikeness();
     void                    restorePlace(const Place& place);
     // A run of lines the same, folded away or not: the row before it that
     // stands for it while it is, side by side and inline, and how many
@@ -271,6 +282,7 @@ private:
     S32                   mArrowHover = -1;
     std::vector<Fold>     mFolds;
     bool                  mFoldSame = true;
+    ALTextDiff::Likeness  mLike;
     // Where the two sides were last scrolled to, to follow the one moved.
     S32                   mScrolledY = 0;
     F32                   mScrolledX = 0.f;

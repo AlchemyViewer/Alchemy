@@ -630,6 +630,8 @@ void LLPreviewNotecard::toggleCompare()
         mCompare->setVisible(false);
         mCompare->setFont(mText->getFont());
         mCompare->setOnEscape([this]() { toggleCompare(); });
+        // A notecard is prose: a change of case alone may be let go of.
+        mCompare->setOffersIgnoreCase(true);
         host->addChild(mCompare);
     }
     const bool comparing = !mCompare->getVisible() && (mSavedThere || mHistoryShown);

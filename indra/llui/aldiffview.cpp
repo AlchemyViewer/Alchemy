@@ -137,6 +137,8 @@ ALDiffView::ALDiffView(const Params& p)
         }
     });
     mBar->onFold([this]() { setFoldSame(!mFoldSame); });
+    mBar->onWhitespace([this]() { setIgnoreWhitespace(!mLike.ignoreWhitespace); });
+    mBar->onCase([this]() { setIgnoreCase(!mLike.ignoreCase); });
     mBar->onSwap([this]() { setSwapped(!mSwapped); });
     mBar->onTakeBack([this]() {
         ALCodeEditor* side = shown();
@@ -369,6 +371,43 @@ void ALDiffView::setSwapped(bool swapped)
     restorePlace(place);
 }
 
+void ALDiffView::setIgnoreWhitespace(bool ignore)
+{
+    if (mLike.ignoreWhitespace != ignore)
+    {
+        mLike.ignoreWhitespace = ignore;
+        rebuildLikeness();
+    }
+}
+
+void ALDiffView::setIgnoreCase(bool ignore)
+{
+    if (mLike.ignoreCase != ignore)
+    {
+        mLike.ignoreCase = ignore;
+        rebuildLikeness();
+    }
+}
+
+void ALDiffView::setOffersIgnoreCase(bool offers)
+{
+    mBar->setIgnoreCaseShown(offers);
+    if (!offers)
+    {
+        setIgnoreCase(false);
+    }
+}
+
+void ALDiffView::rebuildLikeness()
+{
+    mBar->setIgnoreWhitespace(mLike.ignoreWhitespace);
+    mBar->setIgnoreCase(mLike.ignoreCase);
+    // The runs folded are others now: folded or not as asked.
+    const Place place = placeOfCaret();
+    rebuild();
+    restorePlace(place);
+}
+
 void ALDiffView::setOnEscape(std::function<void()> escape)
 {
     mEscape = std::move(escape);
@@ -425,7 +464,7 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
             std::swap(from, to);
         }
     }
-    const std::vector<ALTextDiff::Run> runs = anchors.empty() ? ALTextDiff::lines(left, right) : ALTextDiff::lines(left, right, anchors);
+    const std::vector<ALTextDiff::Run> runs = anchors.empty() ? ALTextDiff::lines(left, right, mLike) : ALTextDiff::lines(left, right, anchors, mLike);
     const LLColor4                      none(0.f, 0.f, 0.f, 0.f);
     const LLColor4                      out       = colorOf("CodeDiffRemovedColor", LLColor4(0.85f, 0.25f, 0.25f, 0.18f));
     const LLColor4                      in        = colorOf("CodeDiffAddedColor", LLColor4(0.25f, 0.75f, 0.35f, 0.18f));
@@ -520,6 +559,7 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
         }
         mChangeLines.push_back(lines);
         const size_t rows = std::max(gone.size(), made.size());
+        std::vector<std::pair<ALTextDiff::spans_t, ALTextDiff::spans_t>> paired;
         std::vector<S32> gone_rows;
         for (size_t n = 0; n < rows; ++n)
         {
@@ -538,9 +578,9 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
             }
             if (has_out && has_in)
             {
-                ALTextDiff::spans_t lspans;
-                ALTextDiff::spans_t rspans;
-                ALTextDiff::words(left[static_cast<size_t>(gone[n])], right[static_cast<size_t>(made[n])], lspans, rspans);
+                // The words that differ, once for both ways of showing.
+                auto& [lspans, rspans] = paired.emplace_back();
+                ALTextDiff::words(left[static_cast<size_t>(gone[n])], right[static_cast<size_t>(made[n])], lspans, rspans, mLike);
                 ls.mark(lrow, lspans, out_words);
                 rs.mark(rrow, rspans, in_words);
             }
@@ -558,13 +598,10 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
             is.sign(is.add(right[static_cast<size_t>(line)], line + 1, in, false, in_mark), '+');
             mInlineLeftRows.push_back(0);
         }
-        for (size_t n = 0; n < gone.size() && n < made.size(); ++n)
+        for (size_t n = 0; n < paired.size(); ++n)
         {
-            ALTextDiff::spans_t lspans;
-            ALTextDiff::spans_t rspans;
-            ALTextDiff::words(left[static_cast<size_t>(gone[n])], right[static_cast<size_t>(made[n])], lspans, rspans);
-            is.mark(first_out + static_cast<S32>(n), lspans, out_words);
-            is.mark(first_in + static_cast<S32>(n), rspans, in_words);
+            is.mark(first_out + static_cast<S32>(n), paired[n].first, out_words);
+            is.mark(first_in + static_cast<S32>(n), paired[n].second, in_words);
         }
         mChangeEnds.push_back(mInline ? static_cast<S32>(is.numbers.size()) : static_cast<S32>(ls.numbers.size()));
     }

@@ -675,4 +675,34 @@ namespace tut
             ensure("unwrapped", !each->getWordWrap());
         }
     }
+
+    template<> template<>
+    void aldiffview_object::test<21>()
+    {
+        set_test_name("whitespace let go of from the bar: re-indented lines the same, shown as they are, the caret kept; case only where offered");
+        ALDiffView& d = make("default\n{\nstate_entry()\n{\nllSay(0, \"a\");\n}\n}", "default\n{\n    state_entry()\n    {\n        llSay(0,  \"b\");\n    }\n}");
+        ensure_equals("as they are: the re-indented lines changed", d.changeCount(), 1);
+        ensure("off", !d.ignoresWhitespace());
+        d.right()->setFocus(true);
+        d.right()->goTo(ALTextPos(d.right()->lineNumbers().size() - 1, 0));
+        const S32 line = d.rightAtCaret().first;
+        press(d, "ignore_whitespace");
+        ensure("on, and lit", d.ignoresWhitespace() && ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore_whitespace"))->getToggleState());
+        ensure_equals("one line changed: the word, not its indent", d.changeCount(), 1);
+        ensure("the right shown as it is", d.right()->text().find("\n    state_entry()\n") != std::string::npos);
+        ensure("the caret kept", d.rightAtCaret().first == line);
+        const S32 say = 4;
+        ensure("the changed line's word marked, not its blanks", d.right()->decorations().size() == 1);
+        ensure("the line before it the same", !tinted(*d.right(), say - 1));
+
+        ensure("case not offered", !d.bar()->getChild<LLView>("ignore_case")->getVisible());
+        d.setTexts("Hello there", "hello there");
+        ensure_equals("a change of case a change", d.changeCount(), 1);
+        d.setOffersIgnoreCase(true);
+        ensure("offered", d.bar()->getChild<LLView>("ignore_case")->getVisible());
+        press(d, "ignore_case");
+        ensure("let go of", d.ignoresCase() && d.changeCount() == 0);
+        d.setOffersIgnoreCase(false);
+        ensure("not offered: not let go of", !d.ignoresCase() && d.changeCount() == 1);
+    }
 }

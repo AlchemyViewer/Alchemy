@@ -70,7 +70,20 @@ public:
         }
     };
 
+    // How two lines, or two words, are told the same: as they are; or with
+    // their blanks let go of -- trimmed, a run of them as one -- and a
+    // word of blanks nothing; or their case. What is shown is the text as
+    // it is either way.
+    struct Likeness
+    {
+        bool ignoreWhitespace = false;
+        bool ignoreCase       = false;
+
+        bool any() const { return ignoreWhitespace || ignoreCase; }
+    };
+
     static std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right);
+    static std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Likeness& like);
     // Lines known to stand for each other -- an LSL statement and the SLua
     // it was written as -- each a line of the left and one of the right,
     // counted from nought. Lined up whatever they say: each pair kept beside
@@ -82,6 +95,8 @@ public:
     // of its own, the first lines of it the pair's; a Same run of no lines
     // goes before it, to part it from a change just before.
     static std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const anchors_t& anchors);
+    static std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const anchors_t& anchors,
+                                  const Likeness& like);
 
     // A text's lines, for lines().
     static std::vector<std::string> split(std::string_view text);
@@ -91,6 +106,9 @@ public:
     // identifiers and numbers, runs of blanks, each other character.
     typedef std::vector<std::pair<S32, S32>> spans_t;
     static void words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out);
+    static void words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out, const Likeness& like);
+    // A line or a word as it is compared, told the same so.
+    static std::string likenessOf(std::string_view text, const Likeness& like);
 };
 
 #endif // AL_ALTEXTDIFF_H
