@@ -32,10 +32,14 @@
 #include <utility>
 #include <vector>
 
-// How one text becomes another: the fewest lines taken out and put in
-// (Myers), the lines the two share at either end first set aside; and,
-// within a line changed into another, the words that differ, by the same
-// means. Pure: what a diff view shows, and what a test can hold it to.
+// How one text becomes another, by lines: each stretch the two share whose
+// lines are rarest in them kept, and what is either side of it found the
+// same way (a histogram diff, as git's), so that a function's braces and
+// blank lines, which are everywhere, stay with their own function; and
+// where nothing shared is rare enough, the fewest lines taken out and put
+// in (Myers, in space as much as the texts). Within a line changed into
+// another, the fewest words. Pure: what a diff view shows, and what a test
+// can hold it to.
 //
 // A text's lines are its own to split; a line holds no line break.
 class ALTextDiff
@@ -65,11 +69,6 @@ public:
             return kind == other.kind && left == other.left && right == other.right && count == other.count;
         }
     };
-
-    // Past this many lines taken out and put in, what is between the lines
-    // the two share at either end is answered as all of it taken out and
-    // all of it put in: finding the fewest costs the square of this.
-    static constexpr S32 MOST_CHANGES = 1000;
 
     static std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right);
     // Lines known to stand for each other -- an LSL statement and the SLua
