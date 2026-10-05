@@ -593,6 +593,18 @@ void LLViewerShaderMgr::setShaders()
     LLGLSLShader::sIndexedGLTFChannels = llclamp(gGLManager.mNumTextureImageUnits / 4, 1,
                                                 LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS);
 
+    // GLOn12 crashes inside the driver on the first indexed legacy material draw. Mesa's
+    // d3d12 links the program but translates it to DXIL lazily, at that draw, and its
+    // variant selection writes through the result without checking that the translation
+    // succeeded -- so no GL call can report the failure first. The indexed programs are not
+    // built there at all; zero channels is the state a failed load already leaves, and the
+    // pools fall back to their scalar paths.
+    if (gGLManager.mIsD3D12)
+    {
+        LL_INFOS("ShaderLoading") << "Indexed material batching disabled on GLOn12." << LL_ENDL;
+        LLGLSLShader::sIndexedGLTFChannels = 0;
+    }
+
     reentrance = true;
 
     // Make sure the compiled shader map is cleared before we recompile shaders.

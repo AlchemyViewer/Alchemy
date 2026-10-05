@@ -157,6 +157,9 @@ public:
     // True for any Mesa driver (radeonsi, iris, llvmpipe, zink, ...). Detected
     // from the GL_VERSION string; used to gate Mesa-specific workarounds.
     bool mIsMesa = false;
+    // True for Mesa's d3d12 driver: GLOn12, Microsoft's GL over D3D12 and the only GL on
+    // Windows on Arm. Detected from its "D3D12 (<adapter>)" GL_RENDERER.
+    bool mIsD3D12 = false;
 
     // hints to the render pipe
     U32 mDownScaleMethod = 0; // see settings.xml RenderDownScaleMethod

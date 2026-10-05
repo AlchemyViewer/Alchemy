@@ -1654,6 +1654,7 @@ bool LLGLManager::initGL()
         LLStringUtil::toUpper(ver_upper);
         mIsMesa = ver_upper.find("MESA") != std::string::npos;
     }
+    mIsD3D12 = mIsMesa && mGLRenderer.rfind("D3D12", 0) == 0;
 
     if (mGLVersion >= 2.f)
     {
