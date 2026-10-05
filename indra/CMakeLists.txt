@@ -147,11 +147,12 @@ cmake_dependent_option(
 
 # FMOD Studio comes from the same registry, and is built for every platform
 # the viewer is; see cmake/FMODSTUDIO.cmake. It takes precedence over the
-# other audio engines when the viewer starts.
+# other audio engines when the viewer starts, so a proprietary build plays
+# through it.
 cmake_dependent_option(
   AL_USE_FMODSTUDIO
   "Enable support for the FMOD Studio audio engine"
-  OFF
+  ON
   "AL_ENABLE_PROPRIETARY"
   OFF
 )

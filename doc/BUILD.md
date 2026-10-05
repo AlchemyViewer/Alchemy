@@ -321,7 +321,7 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 |:--------------------|:--------|:---------------------------------------------------------------------|
 | `AL_USE_FAUDIO`     | ON      | FAudio audio engine                                                  |
 | `AL_USE_OPENAL`     | OFF     | OpenAL audio engine                                                  |
-| `AL_USE_FMODSTUDIO` | OFF     | FMOD Studio audio engine, which takes precedence over the others (needs `AL_ENABLE_PROPRIETARY` and access to the private registry) |
+| `AL_USE_FMODSTUDIO` | ON      | FMOD Studio audio engine, which takes precedence over the others (needs `AL_ENABLE_PROPRIETARY`, so off in `-os` builds, and access to the private registry) |
 
 ### Proprietary SDKs
 
