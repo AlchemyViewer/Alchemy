@@ -150,9 +150,48 @@ void ALTextLayout::refreshIfFontsChanged()
     invalidateAll();
 }
 
+ALTextLayout::Entry::Entry(const Entry& other)
+:   height(other.height),
+    width(other.width),
+    valid(other.valid),
+    trimmed(other.trimmed),
+    laid(other.laid ? std::make_unique<Line>(*other.laid) : nullptr)
+{
+}
+
+ALTextLayout::Entry& ALTextLayout::Entry::operator=(const Entry& other)
+{
+    if (this != &other)
+    {
+        height  = other.height;
+        width   = other.width;
+        valid   = other.valid;
+        trimmed = other.trimmed;
+        laid    = other.laid ? std::make_unique<Line>(*other.laid) : nullptr;
+    }
+    return *this;
+}
+
 void ALTextLayout::invalidateAll()
 {
-    mLines.assign(mDocument ? mDocument->lineCount() : 0, Line());
+    // Every line laid out again when next asked for: where the lines are
+    // the same lines, each keeps what it was laid out into, for the next
+    // layout to fill again rather than make anew.
+    const size_t count = mDocument ? static_cast<size_t>(mDocument->lineCount()) : 0;
+    if (mLines.size() == count)
+    {
+        for (Entry& entry : mLines)
+        {
+            entry.height  = 0;
+            entry.width   = 0.f;
+            entry.valid   = false;
+            entry.trimmed = false;
+        }
+    }
+    else
+    {
+        mLines.assign(count, Entry());
+    }
     mLinesHeld = 0;
     // What is folded stays folded through a change of font; a document of
     // another length is another document.
@@ -196,7 +235,7 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
     }
     if (moved)
     {
-        mLines.applySpans(spans, line_count, Line());
+        mLines.applySpans(spans, line_count, Entry());
     }
     else
     {
@@ -354,7 +393,6 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
 {
     ++mLinesLaidOut;
     ++mLinesHeld;
-    out.trimmed = false;
     out.placed.clear();
     out.glyphs.clear();
     out.rows.clear();
@@ -754,26 +792,35 @@ const ALTextLayout::Line& ALTextLayout::line(S32 index)
     {
         return EMPTY_LINE;
     }
-    Line& entry = mLines[index];
-    if (!entry.valid || entry.wrappedAt != mWrapWidth)
+    Entry& entry = mLines[index];
+    if (!entry.laid)
+    {
+        entry.laid = std::make_unique<Line>();
+    }
+    Line& laid = *entry.laid;
+    if (!entry.valid || laid.wrappedAt != mWrapWidth)
     {
         // Shaped again, or only cut into rows again where its glyphs are
         // current and the wrap width moved.
         if (entry.valid)
         {
-            wrapLine(index, entry);
+            wrapLine(index, laid);
         }
         else
         {
-            layoutLine(index, entry);
+            layoutLine(index, laid);
         }
+        entry.valid   = true;
+        entry.trimmed = false;
+        entry.height  = laid.height;
+        entry.width   = laid.width;
         if (!mHeightsStale && static_cast<size_t>(index) < mHeights.size() && mHeights.at(static_cast<size_t>(index)) != countedHeight(index))
         {
             mHeights.set(static_cast<size_t>(index), countedHeight(index));
             ++mHeightsRevision;
         }
     }
-    return entry;
+    return laid;
 }
 
 S32 ALTextLayout::trim(S32 first, S32 last)
@@ -783,9 +830,8 @@ S32 ALTextLayout::trim(S32 first, S32 last)
     S32 held   = 0;
     for (size_t i = 0; i < mLines.size(); ++i)
     {
-        Line&      entry = mLines[i];
-        const bool holds = entry.placed.capacity() > 0 || entry.glyphs.capacity() > 0 || entry.rows.capacity() > 0;
-        if (!holds)
+        Entry& entry = mLines[i];
+        if (!entry.laid)
         {
             continue;
         }
@@ -797,14 +843,9 @@ S32 ALTextLayout::trim(S32 first, S32 last)
         }
         // Its height stays as it counts in the column, and its width, where
         // it was current, as the widest line's.
-        entry.trimmed   = entry.valid || entry.trimmed;
-        entry.valid     = false;
-        entry.wrappedAt = -1;
-        std::vector<LLFontGL::Placed>().swap(entry.placed);
-        std::vector<Glyph>().swap(entry.glyphs);
-        std::vector<Row>().swap(entry.rows);
-        std::vector<std::pair<size_t, const LLFontGL*>>().swap(entry.fonts);
-        std::vector<std::pair<size_t, S32>>().swap(entry.boxes);
+        entry.trimmed = entry.valid || entry.trimmed;
+        entry.valid   = false;
+        entry.laid.reset();
         ++let_go;
     }
     mLinesHeld = held;

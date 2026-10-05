@@ -33,6 +33,7 @@
 #include <boost/signals2.hpp>
 
 #include <functional>
+#include <memory>
 #include <vector>
 
 // The layout of a document's lines: each line shaped once, into glyphs with
@@ -191,9 +192,6 @@ public:
         S32                                             wrappedAt = -1;
         std::vector<std::pair<size_t, const LLFontGL*>> fonts;
         std::vector<std::pair<size_t, S32>>             boxes;
-        // Let go of by trim(): its glyphs and rows gone, its height and
-        // width still those of its text.
-        bool                                            trimmed = false;
     };
 
     ALTextLayout();
@@ -383,7 +381,33 @@ private:
     const LLFontGL*                    mFont      = nullptr;
     S32                                mWrapWidth = 0;
     S32                                mTabWidth  = 4;
-    ALLineTable<Line>                  mLines;
+    // Each line's place in the column -- what it measured when it was
+    // last laid out, which is the height it counts for and the width it
+    // is until it is laid out again -- in a few bytes; and apart from it,
+    // made as it is laid out and let go of whole by trim(), its glyphs
+    // and rows. A text of tens of thousands of lines, few of them ever in
+    // sight, keeps a short table and little else, and the passes over
+    // every line's height or width read only that.
+    struct Entry
+    {
+        S32                   height = 0;
+        F32                   width  = 0.f;
+        // Laid out as the text now is, though perhaps at another wrap
+        // width; and let go of by trim(), its height and width still those
+        // of its text.
+        bool                  valid   = false;
+        bool                  trimmed = false;
+        std::unique_ptr<Line> laid;
+
+        Entry() = default;
+        // A copy with the other's layout, should it have one: tables are
+        // filled with copies of an empty entry.
+        Entry(const Entry& other);
+        Entry& operator=(const Entry& other);
+        Entry(Entry&&) noexcept            = default;
+        Entry& operator=(Entry&&) noexcept = default;
+    };
+    ALLineTable<Entry>                 mLines;
     ALLineTable<U8>                    mHidden;
     S32                                mHiddenCount = 0;
     // Each line's height as it counts, summed so that one changing moves
