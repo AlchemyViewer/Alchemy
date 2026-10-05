@@ -643,12 +643,15 @@ jobs:
           mv "Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}-Setup.exe" ".installer/${IMAGENAME}_Setup.exe"
           mv "Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}-Portable.zip" "Releases/${IMAGENAME}_Portable.zip"
 
+      # .installer is itself hidden, and upload-artifact leaves out what is
+      # hidden unless told otherwise, the directory it was given included.
       - name: Post the installer
         uses: actions/upload-artifact@v7
         with:
           name: "Windows${{ needs.setup.outputs.build_suffix }}-${{ matrix.arch }}-installer"
           path: .installer/
           if-no-files-found: error
+          include-hidden-files: true
 
       - name: Upload Velopack releases
         uses: actions/upload-artifact@v7
