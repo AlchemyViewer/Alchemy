@@ -724,7 +724,7 @@ jobs:
         uses: ./.github/actions/python-tools
         with:
           requirements: |
-            cmake==4.4.3
+            cmake==4.4.4
             dmgbuild[badge_icons]==1.6.7
 
       - name: Fetch macOS app

@@ -119,10 +119,10 @@ runs:
       with:
         requirements: |
           cmake==4.0.0; sys_platform == "linux"
-          cmake==4.4.3; sys_platform != "linux"
+          cmake==4.4.4; sys_platform != "linux"
           ninja==1.13.2
           llsd==1.2.4
-          sentry-cli==3.7.0
+          sentry-cli==3.8.0
 
     - name: Bootstrap vcpkg Windows
       if: runner.os == 'Windows'
