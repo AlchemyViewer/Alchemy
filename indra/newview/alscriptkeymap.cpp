@@ -537,6 +537,9 @@ namespace ALScriptKeymap
 #endif
             { "next_problem", KEY_F8, MASK_NONE },
             { "previous_problem", KEY_F8, MASK_SHIFT },
+            // Changes since the save, as Visual Studio Code steps them.
+            { "next_change", KEY_F5, MASK_ALT },
+            { "previous_change", KEY_F5, MASK_ALT | MASK_SHIFT },
             // What is left from LSL, as F8 walks every problem.
             { "next_migration", KEY_F8, MASK_ALT },
             { "previous_migration", KEY_F8, MASK_ALT | MASK_SHIFT },

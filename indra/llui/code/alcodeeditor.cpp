@@ -652,6 +652,11 @@ LLColor4 ALCodeEditor::changedColor() const
     return mChangedColorSet ? mChangedColor.get() : ALSurface::shade(backgroundColor(), LLColor4(0.35f, 0.6f, 0.95f, 1.f), 0.9f);
 }
 
+bool ALCodeEditor::stepChange(bool forward)
+{
+    return mChangeStepper ? mChangeStepper(forward) : ALChangePeek::stepFrom(*this, forward);
+}
+
 bool ALCodeEditor::peekChange(S32 line)
 {
     if (!mPeek)
@@ -1724,8 +1729,12 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
     for (size_t index = 0; index < mHighlights.size(); ++index)
     {
         // The name's other places more lightly: they are only what is
-        // written alike, lit without being asked for.
-        const LLColor4 ink = index == static_cast<size_t>(Highlight::Occurrences) ? wash % 0.5f : wash;
+        // written alike, lit without being asked for. A change's words as a
+        // comparison marks words put in.
+        static const LLUIColor changed = LLUIColorTable::instance().getColor("CodeDiffAddedWordColor", LLColor4(0.25f, 0.85f, 0.35f, 0.4f));
+        const LLColor4 ink = index == static_cast<size_t>(Highlight::Occurrences) ? wash % 0.5f
+                             : index == static_cast<size_t>(Highlight::Change)    ? changed.get() % alpha
+                                                                                   : wash;
         const auto     on  = mHighlights[index].onLine(line);
         for (auto it = on.first; it != on.second; ++it)
         {

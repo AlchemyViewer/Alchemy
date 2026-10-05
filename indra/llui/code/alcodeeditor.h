@@ -249,10 +249,12 @@ public:
     // Stretches washed over, each by what lit it, so that one does not
     // put out another: a search's matches, vim's visual block, the places
     // a substitution asks about, the places a name stands as found, the
-    // other places the name under the caret stands as written. Each until
-    // it is cleared -- the references also as the caret leaves them all,
-    // the occurrences as it leaves the name; an edit slides them as it
-    // does the decorations.
+    // other places the name under the caret stands as written, the words
+    // of a line changed since it was saved, as a peek at its change marks
+    // them (ALChangePeek), in the colour a comparison marks words put in.
+    // Each until it is cleared -- the references also as the caret leaves
+    // them all, the occurrences as it leaves the name; an edit slides them
+    // as it does the decorations.
     enum class Highlight : U8
     {
         Search,
@@ -260,6 +262,7 @@ public:
         Confirm,
         References,
         Occurrences,
+        Change,
         COUNT
     };
     void                            setHighlights(Highlight layer, std::vector<ALTextRange> ranges);
@@ -592,10 +595,11 @@ public:
     // The innermost function holding a stretch and more besides.
     std::optional<ALTextRange> functionAround(const ALTextRange& range) const override;
     // A comparison's changes, where the text is a side of one: what vim's
-    // ]c and [c step through, answered by the comparison.
+    // ]c and [c step through, answered by the comparison. Elsewhere, the
+    // text's changes since it was saved (ALChangePeek::stepFrom).
     typedef std::function<bool(bool forward)> change_stepper_t;
     void setChangeStepper(change_stepper_t stepper) { mChangeStepper = std::move(stepper); }
-    bool stepChange(bool forward) override { return mChangeStepper && mChangeStepper(forward); }
+    bool stepChange(bool forward) override;
     // The lines a host hides (ALTextLayout::HiddenBy::Host) -- a
     // comparison's runs the same -- shown by the host as it sees fit where
     // the caret lands on one, or unfolds next to one; what it leaves

@@ -511,6 +511,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="CompareSaved">As last saved</floater.string>
     <floater.string name="CompareWithTitle">Compare [NAME] with</floater.string>
     <floater.string name="PeekNoChange">The caret's line has not changed since the script was saved.</floater.string>
+    <floater.string name="NoChangeAfter">No change since the save after this line.</floater.string>
+    <floater.string name="NoChangeBefore">No change since the save before this line.</floater.string>
     <floater.string name="ComparePreprocessed">Preprocessed, as a save sends it</floater.string>
     <floater.string name="SelectionLine">[NAME], line [FIRST]</floater.string>
     <floater.string name="SelectionLines">[NAME], lines [FIRST]–[LAST]</floater.string>
@@ -1179,6 +1181,14 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
             <menu_item_call label="Previous Problem" layout="topleft" name="previous_problem">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_problem" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_problem" />
+            </menu_item_call>
+            <menu_item_call label="Next Change" layout="topleft" name="next_change">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_change" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_change" />
+            </menu_item_call>
+            <menu_item_call label="Previous Change" layout="topleft" name="previous_change">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_change" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_change" />
             </menu_item_call>
             <menu_item_call label="Next Left From LSL" layout="topleft" name="next_migration">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_migration" />

@@ -66,6 +66,11 @@ public:
     };
     // The changes of a text from a saved one, in order.
     static std::vector<Change> changesOf(const std::vector<std::string>& saved, const std::vector<std::string>& now);
+    // The change after the caret's line of an editor's text, or before it:
+    // the caret put at its first line, and a peek open there gone with it.
+    // What vim's ]c and [c step through outside a comparison. False where
+    // there is none that way, or nothing saved to tell one by.
+    static bool stepFrom(ALCodeEditor& host, bool forward);
     // The change a line of the text now is in: for lines only taken out,
     // the line they were taken from, or at the text's end the line before
     // it, where the editor bars it. -1 for none.
@@ -107,8 +112,12 @@ public:
 
 private:
     // Its lines and its bar for the change shown, and the gap opened for
-    // them; the gap shut.
+    // them; the gap shut. The words that changed in each line paired with
+    // what it became marked, on the line as saved here and on the line now
+    // in the editor; and let go of.
     void fill();
+    void markWords();
+    void unmarkWords();
     void openGap(S32 line, S32 rows);
     void shutGap();
     // How tall it stands: its bar, and the lines it shows.
@@ -122,6 +131,7 @@ private:
     ALFlatButton*            mNext     = nullptr;
     ALFlatButton*            mClose    = nullptr;
     std::vector<std::string> mSavedLines;
+    std::vector<std::string> mNowLines;
     std::vector<Change>      mChanges;
     S32                      mShown   = -1;
     // The line whose gap it opened, and the gap it had before; -1 for none.

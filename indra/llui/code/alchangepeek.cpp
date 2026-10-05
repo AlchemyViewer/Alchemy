@@ -31,6 +31,7 @@
 #include "alflatbutton.h"
 #include "alsaid.h"
 #include "alsurface.h"
+#include "allinepairs.h"
 #include "altextdiff.h"
 
 #include "lllocalcliprect.h"
@@ -88,6 +89,43 @@ S32 ALChangePeek::changeAt(const std::vector<Change>& changes, S32 line)
         }
     }
     return -1;
+}
+
+// static
+bool ALChangePeek::stepFrom(ALCodeEditor& host, bool forward)
+{
+    const std::optional<std::string> saved = host.undoJournal().savedText();
+    if (!saved)
+    {
+        return false;
+    }
+    // The start of the next change after the caret's line, or of the last
+    // before it: from within a change, back is to its own start.
+    const std::vector<Change> changes = changesOf(ALTextDiff::split(*saved), ALTextDiff::split(host.wholeText()));
+    const S32                 line    = host.caret().line;
+    const Change*             to      = nullptr;
+    for (const Change& c : changes)
+    {
+        if (forward ? c.now > line : c.now < line)
+        {
+            to = &c;
+            if (forward)
+            {
+                break;
+            }
+        }
+    }
+    if (!to)
+    {
+        return false;
+    }
+    const S32 at = llmin(to->now, host.document().lineCount() - 1);
+    host.goTo(ALTextPos(at, 0));
+    if (ALChangePeek* peek = host.changePeek(); peek && peek->isOpen())
+    {
+        peek->showAt(at);
+    }
+    return true;
 }
 
 ALChangePeek::ALChangePeek(ALCodeEditor& host)
@@ -164,7 +202,8 @@ bool ALChangePeek::showAt(S32 line)
         return false;
     }
     mSavedLines = ALTextDiff::split(*saved);
-    mChanges    = changesOf(mSavedLines, ALTextDiff::split(mHost.wholeText()));
+    mNowLines   = ALTextDiff::split(mHost.wholeText());
+    mChanges    = changesOf(mSavedLines, mNowLines);
     const S32 at = changeAt(mChanges, line);
     if (at < 0)
     {
@@ -211,6 +250,7 @@ bool ALChangePeek::takeBack()
         return false;
     }
     shutGap();
+    unmarkWords();
     mEditing        = true;
     const bool done = mHost.replaceAll({ { range, put } });
     mEditing        = false;
@@ -222,7 +262,8 @@ bool ALChangePeek::takeBack()
     // On to the change that was after it, now at this one's place.
     const S32 next = mShown;
     mShown         = -1;
-    mChanges       = changesOf(mSavedLines, ALTextDiff::split(mHost.wholeText()));
+    mNowLines      = ALTextDiff::split(mHost.wholeText());
+    mChanges       = changesOf(mSavedLines, mNowLines);
     if (next < changeCount())
     {
         mShown = next;
@@ -238,6 +279,7 @@ bool ALChangePeek::takeBack()
 void ALChangePeek::close()
 {
     shutGap();
+    unmarkWords();
     mShown = -1;
     setVisible(false);
 }
@@ -285,6 +327,7 @@ void ALChangePeek::fill()
     }
     mSaved->setLineAnnotations(std::move(lines));
     mSaved->setVisible(c.savedCount > 0);
+    markWords();
     mSaid->setText(said());
     mSaid->setColor(mHost.textColor());
     mTakeBack->setEnabled(!mHost.isReadOnly());
@@ -296,6 +339,53 @@ void ALChangePeek::fill()
     openGap(c.now + c.nowCount, rows);
     setVisible(true);
     place();
+}
+
+void ALChangePeek::markWords()
+{
+    // Each line as saved beside the line now it became, as a comparison
+    // pairs them; their words that differ marked on each.
+    const Change&    c = change();
+    std::vector<S32> gone;
+    std::vector<S32> made;
+    for (S32 n = 0; n < c.savedCount; ++n)
+    {
+        gone.push_back(c.saved + n);
+    }
+    for (S32 n = 0; n < c.nowCount; ++n)
+    {
+        made.push_back(c.now + n);
+    }
+    const LLColor4 out_words = LLUIColorTable::instance().getColor("CodeDiffRemovedWordColor", LLColor4(0.9f, 0.25f, 0.25f, 0.4f));
+    std::vector<ALCodeEditor::Decoration> was;
+    std::vector<ALTextRange>              now;
+    for (const auto& [at_gone, at_made] : ALLinePairs::pair(mSavedLines, mNowLines, gone, made))
+    {
+        const S32           saved_line = gone[static_cast<size_t>(at_gone)];
+        const S32           now_line   = made[static_cast<size_t>(at_made)];
+        ALTextDiff::spans_t out;
+        ALTextDiff::spans_t in;
+        ALTextDiff::words(mSavedLines[static_cast<size_t>(saved_line)], mNowLines[static_cast<size_t>(now_line)], out, in);
+        for (const auto& [begin, end] : out)
+        {
+            ALCodeEditor::Decoration d;
+            d.range = ALTextRange(ALTextPos(saved_line - c.saved, begin), ALTextPos(saved_line - c.saved, end));
+            d.style = ALCodeEditor::Decoration::Style::Background;
+            d.color = out_words;
+            was.push_back(d);
+        }
+        for (const auto& [begin, end] : in)
+        {
+            now.emplace_back(ALTextPos(now_line, begin), ALTextPos(now_line, end));
+        }
+    }
+    mSaved->setDecorations(std::move(was));
+    mHost.setHighlights(ALCodeEditor::Highlight::Change, std::move(now));
+}
+
+void ALChangePeek::unmarkWords()
+{
+    mHost.clearHighlights(ALCodeEditor::Highlight::Change);
 }
 
 void ALChangePeek::openGap(S32 line, S32 rows)

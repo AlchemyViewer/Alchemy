@@ -8703,6 +8703,34 @@ void ALFloaterScriptStudio::addGoCommands()
                 return doc && doc->loaded && !doc->shown().empty();
             });
     }
+    // The next change since the script was saved, or the one before, as
+    // vim's ]c and [c step: in a comparison its changes, in the source the
+    // script's own, a peek open there going along.
+    for (const auto& [name, forward] : { std::pair{ "next_change", true }, std::pair{ "previous_change", false } })
+    {
+        mCommands.add(
+            name,
+            [this, forward]() {
+                Doc* doc = active();
+                if (!doc || !doc->loaded)
+                {
+                    return;
+                }
+                if (doc->shownView() == Doc::View::Compare)
+                {
+                    doc->compareView->goToChange(forward);
+                }
+                else if (doc->shownView() == Doc::View::Source && !doc->editor->stepChange(forward))
+                {
+                    setStatus(getString(forward ? "NoChangeAfter" : "NoChangeBefore"));
+                }
+            },
+            [this]() {
+                const Doc* doc = active();
+                return doc && doc->loaded &&
+                       (doc->shownView() == Doc::View::Compare || (doc->shownView() == Doc::View::Source && doc->editor->isDirty()));
+            });
+    }
     mCommands.add("next_tab", [this]() { cycleTab(1); });
     // The tab in front before this one, as vim's Ctrl-^ has it.
     mCommands.add(

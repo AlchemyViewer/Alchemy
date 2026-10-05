@@ -28,6 +28,7 @@
 
 #include "alcodeeditor.h"
 #include "alflatbutton.h"
+#include "alvimkeymap.h"
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
 
@@ -182,5 +183,68 @@ namespace tut
         const S32 same = text.mTop - (e.layout().lineTop(0) - e.scrollY()) - e.layout().lineHeight(0) / 2;
         e.handleMouseDown(e.leftEdge() + 1, same, MASK_NONE);
         ensure("a line not barred: no peek", !e.changePeek()->isOpen());
+    }
+
+    template<> template<>
+    void alchangepeek_object::test<5>()
+    {
+        set_test_name("the words that changed marked: on the line as saved in the peek, and on the line now in the editor; let go of as it closes");
+        ALCodeEditor& e = make("integer count = 1;\nstring s;", "integer total = 2;\nstring s;");
+        e.peekChange(0);
+        ALChangePeek& peek = *e.changePeek();
+        const auto    has  = [](const ALTextRange& range, S32 line, S32 begin, S32 end) {
+            return range.begin.line == line && range.begin.column <= begin && range.end.column >= end;
+        };
+        const std::vector<ALCodeEditor::Decoration>& was = peek.savedText()->decorations();
+        ensure("the word as saved", std::any_of(was.begin(), was.end(), [&](const ALCodeEditor::Decoration& d) { return has(d.range, 0, 8, 13); }));
+        ensure("and its number", std::any_of(was.begin(), was.end(), [&](const ALCodeEditor::Decoration& d) { return has(d.range, 0, 16, 17); }));
+        ensure("nothing else of the line", std::none_of(was.begin(), was.end(), [&](const ALCodeEditor::Decoration& d) { return has(d.range, 0, 0, 7); }));
+        const std::vector<ALTextRange>& now = e.highlights(ALCodeEditor::Highlight::Change);
+        ensure("the word now, in the editor", std::any_of(now.begin(), now.end(), [&](const ALTextRange& r) { return has(r, 0, 8, 13); }));
+        ensure("only on the line changed", std::none_of(now.begin(), now.end(), [](const ALTextRange& r) { return r.begin.line != 0; }));
+        peek.close();
+        ensure("let go of", e.highlights(ALCodeEditor::Highlight::Change).empty());
+
+        // A line put in alone has nothing to mark against.
+        editor->die();
+        editor          = nullptr;
+        ALCodeEditor& f = make("a\nb", "a\nput in\nb");
+        f.peekChange(1);
+        ensure("nothing marked", f.highlights(ALCodeEditor::Highlight::Change).empty() && f.changePeek()->savedText()->decorations().empty());
+    }
+
+    template<> template<>
+    void alchangepeek_object::test<6>()
+    {
+        set_test_name("vim's ]c and [c in the source step through its changes since saved, a count as far as there are; a peek open goes along");
+        ALCodeEditor& e = make("a\nb\nc\nd\ne\nf\ng", "a\nB\nc\nd\nE\nE2\nf\ng\nh");
+        e.setModalKeymap(std::make_unique<ALVimKeymap>());
+        e.setFocus(true);
+        e.goTo(ALTextPos(0, 0));
+        const auto typed = [&e](const char* keys) {
+            for (const char* c = keys; *c; ++c)
+            {
+                e.handleUnicodeChar(static_cast<llwchar>(*c), false);
+            }
+        };
+        const std::string text = e.wholeText();
+        typed("]c");
+        ensure_equals("the first change", e.caret().line, 1);
+        typed("]c");
+        ensure_equals("the next", e.caret().line, 4);
+        typed("j[c");
+        ensure_equals("back, from within it, to its start", e.caret().line, 4);
+        typed("[c");
+        ensure_equals("the one before", e.caret().line, 1);
+        typed("5]c");
+        ensure_equals("a count, as far as there are", e.caret().line, 8);
+        ensure("nothing typed", e.wholeText() == text);
+
+        ensure("peeked at", e.peekChange(1) && e.changePeek()->changeShown() == 0);
+        e.goTo(ALTextPos(1, 0));
+        typed("]c");
+        ensure("the peek gone along", e.caret().line == 4 && e.changePeek()->isOpen() && e.changePeek()->changeShown() == 1);
+        ensure("as the editor steps without vim", e.stepChange(false) && e.caret().line == 1 && e.changePeek()->changeShown() == 0);
+        ensure("none before the first", !e.stepChange(false) && e.caret().line == 1);
     }
 }
