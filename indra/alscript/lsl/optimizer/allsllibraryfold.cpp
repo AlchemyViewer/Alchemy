@@ -35,12 +35,14 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <functional>
 #include <optional>
+#include <type_traits>
 
 namespace ALLSLPasses
 {
@@ -1035,6 +1037,16 @@ namespace
         return c.single(once);
     }
 
+    // Either zero made +0, by its bits: under /fp:fast a comparison with 0
+    // may hand back the -0 it was given.
+    template <class T>
+    T unsignedZero(T r)
+    {
+        using Bits      = std::conditional_t<sizeof(T) == sizeof(uint64_t), uint64_t, uint32_t>;
+        const Bits bits = std::bit_cast<Bits>(r);
+        return std::bit_cast<T>(static_cast<Bits>(bits << 1) == 0 ? Bits(0) : bits);
+    }
+
     // Whether an argument is exactly a single: what sin, cos and tan take on
     // Luau, whose SLua takes its double as it is where the others round it.
     bool exactSingle(const Args& a, size_t i)
@@ -1099,8 +1111,8 @@ namespace
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double b, e;
                   if (!argFloat(a, 0, b) || !argFloat(a, 1, e) || !std::isfinite(b) || !std::isfinite(e)) return nullptr;
-                  const auto zero = [](auto r) { return r == 0 ? decltype(r)(0) : r; };
-                  return agreedSingle(c, [&] { return zero(std::pow(b, e)); }, [&] { return zero(std::pow(static_cast<float>(b), static_cast<float>(e))); });
+                  return agreedSingle(c, [&] { return unsignedZero(std::pow(b, e)); },
+                                      [&] { return unsignedZero(std::pow(static_cast<float>(b), static_cast<float>(e))); });
               } },
             { "llSin",
               [](Ctx& c, const Args& a) -> LSLConstant* {
@@ -1124,9 +1136,8 @@ namespace
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   double y, x;
                   if (!argFloat(a, 0, y) || !argFloat(a, 1, x) || !std::isfinite(y) || !std::isfinite(x)) return nullptr;
-                  const auto zero = [](auto r) { return r == 0 ? decltype(r)(0) : r; };
-                  return agreedSingle(c, [&] { return zero(std::atan2(y, x)); },
-                                      [&] { return zero(std::atan2(static_cast<float>(y), static_cast<float>(x))); });
+                  return agreedSingle(c, [&] { return unsignedZero(std::atan2(y, x)); },
+                                      [&] { return unsignedZero(std::atan2(static_cast<float>(y), static_cast<float>(x))); });
               } },
             { "llLog",
               [](Ctx& c, const Args& a) -> LSLConstant* {
