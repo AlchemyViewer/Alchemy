@@ -227,6 +227,8 @@ void ALCodeEditor::clearHandlers()
     mFixesShown        = nullptr;
     mActionRequest     = nullptr;
     mCardLinkHandler   = nullptr;
+    mChangeStepper     = nullptr;
+    mLineRevealer      = nullptr;
     setDropHandler(nullptr);
 }
 
@@ -1861,7 +1863,17 @@ void ALCodeEditor::ensureRegions()
 
 const std::vector<ALCodeEditor::FoldRegion>& ALCodeEditor::foldRegions()
 {
-    return folds().regions(document(), getTabWidth());
+    static const std::vector<FoldRegion> none;
+    return mFoldable ? folds().regions(document(), getTabWidth()) : none;
+}
+
+void ALCodeEditor::setFoldable(bool foldable)
+{
+    if (!foldable && mFoldable)
+    {
+        unfoldAll();
+    }
+    mFoldable = foldable;
 }
 
 const ALCodeEditor::FoldRegion* ALCodeEditor::regionStartingAt(S32 line)
@@ -1985,6 +1997,10 @@ void ALCodeEditor::foldBlocksOn(S32 line, std::vector<ALFoldModel::Block>& out)
 
 bool ALCodeEditor::foldAt(S32 line)
 {
+    if (!mFoldable)
+    {
+        return false;
+    }
     const std::optional<FoldRegion> chosen = folds().fold(document(), getTabWidth(), line);
     if (!chosen)
     {
@@ -2047,6 +2063,10 @@ bool ALCodeEditor::unfoldAt(S32 line)
 
 void ALCodeEditor::foldAll()
 {
+    if (!mFoldable)
+    {
+        return;
+    }
     folds().foldAll(document(), getTabWidth());
     applyFolds();
     caretsOutOfFolds();
@@ -2341,6 +2361,10 @@ std::optional<ALTextRange> ALCodeEditor::grownSelection()
 bool ALCodeEditor::canFold(ALEditorCommand command) const
 {
     ALCodeEditor* self = const_cast<ALCodeEditor*>(this);
+    if (!mFoldable)
+    {
+        return false;
+    }
     switch (command)
     {
         case ALEditorCommand::Fold:

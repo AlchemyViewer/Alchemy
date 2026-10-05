@@ -648,4 +648,31 @@ namespace tut
         ensure("taken back", d.changeCount() == 0 && source->text() == "one\ntwo\nthree");
         source->die();
     }
+
+    template<> template<>
+    void aldiffview_object::test<20>()
+    {
+        set_test_name("a side folds nothing of its own, by any command, and wraps no line, whatever it is made with: its rows stay beside the other's");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALDiffView::Params p(LLUICtrlFactory::getDefaultParams<ALDiffView>());
+        p.name                 = "diff";
+        p.rect                 = LLRect(0, 300, 600, 0);
+        p.syntax               = "lsl";
+        ALCodeEditor::Params side(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        side.word_wrap         = true;
+        p.side                 = side;
+        view                   = LLUICtrlFactory::create<ALDiffView>(p);
+        view->setTexts("default\n{\n    state_entry()\n    {\n        a();\n    }\n}", "default\n{\n    state_entry()\n    {\n        b();\n    }\n}");
+        for (ALCodeEditor* each : { view->left(), view->right(), view->inlined() })
+        {
+            ensure("no blocks to fold", !each->foldable() && each->foldRegions().empty());
+            ensure("no command folds", !each->canPerform(ALEditorCommand::FoldAll) && !each->canPerform(ALEditorCommand::Fold));
+            each->foldAll();
+            ensure("nothing hidden", !each->layout().anyHidden());
+            ensure("unwrapped", !each->getWordWrap());
+        }
+    }
 }

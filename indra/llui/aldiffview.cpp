@@ -186,14 +186,17 @@ ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::
     p.rect                   = LLRect(0, 10, 10, 0);
     p.follows.flags          = FOLLOWS_NONE;
     p.read_only              = true;
-    // Folding one side would undo the lining up, and a line lit on one
-    // side and not the other says nothing.
+    // Folding one side would undo the lining up, and so would a line
+    // wrapped on one side and not the other; a line lit on one side and
+    // not the other says nothing. Whatever the host's editors do.
     p.show_fold_markers      = false;
+    p.word_wrap              = false;
     p.highlight_current_line = false;
     // Escape is the comparison's: back to what it was made from.
     p.pass_escape            = true;
     ALCodeEditor* made       = LLUICtrlFactory::create<ALCodeEditor>(p);
     addChild(made);
+    made->setFoldable(false);
     made->onCaretMoved([this]() { refreshBar(); });
     // Vim's ]c and [c, where the host puts vim over the sides.
     made->setChangeStepper([this](bool forward) { return goToChange(forward); });

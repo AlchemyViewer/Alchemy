@@ -343,6 +343,10 @@ public:
     // where lines were only taken away, the line they were taken from.
     void barChangesSince(std::string_view saved);
     void setShowFoldMarkers(bool show);
+    // Whether its blocks fold at all, by any command or vim's: not a side
+    // of a comparison, whose rows must stay beside the other side's.
+    void setFoldable(bool foldable);
+    bool foldable() const { return mFoldable; }
     bool getShowFoldMarkers() const { return mShowFoldMarkers; }
     // A faint line down each level of indentation, so that a block's
     // extent is seen without counting spaces.
@@ -908,6 +912,7 @@ private:
     std::string           mLineSigns;
     S32                   mLineNumberBase = 0;
     bool mShowFoldMarkers      = true;
+    bool mFoldable             = true;
     bool mHighlightCurrentLine = true;
     bool mMatchBrackets        = true;
     bool mAutoComplete         = true;
