@@ -731,6 +731,12 @@ void ALTextView::syncScrollbar()
     mAnchorHeights = mLayout.heightsRevision();
     mScrollAsked   = false;
     placeRuler();
+    if (mScrollY != mToldScrollY || mScrollX != mToldScrollX)
+    {
+        mToldScrollY = mScrollY;
+        mToldScrollX = mScrollX;
+        mScrolled();
+    }
 }
 
 void ALTextView::placeRuler()
@@ -5389,7 +5395,7 @@ void ALTextView::dragSelectTo(S32 x, S32 y)
     }
 }
 
-void ALTextView::draw()
+void ALTextView::pump()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     // A modal keymap's keys that wait on time; then its mode, moved by
@@ -5435,6 +5441,12 @@ void ALTextView::draw()
     publishPrimary();
     syncScrollbar();
     trimLayout();
+}
+
+void ALTextView::draw()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    pump();
     const F32 alpha = getDrawContext().mAlpha;
     if (mBgVisible)
     {

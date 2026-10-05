@@ -242,8 +242,15 @@ private:
     // A line round the change the caret is in, on each side shown.
     void          drawCurrentChange();
 
-    // The bar's count and steps, as the caret of the side in front has them.
+    // The bar's count and steps, as the caret of the side in front has
+    // them: told when a caret moves or the keyboard goes from one side to
+    // the other, not looked at each frame.
     void          refreshBar();
+    // Side by side, the other side scrolled where one is, there and then.
+    void          followScroll(ALCodeEditor* from);
+    // The colours drawn each frame, and the bar's, taken again only when
+    // the colour table changes.
+    void          refreshColors();
     // A step from the bar: the keyboard given to the side in front.
     void          stepFromBar(bool forward);
 
@@ -260,11 +267,18 @@ private:
     take_back_t               mTakeBack;
     // The change whose arrow the mouse is over, as last drawn.
     S32                       mArrowHover = -1;
-    // Where the two sides were last scrolled to, to follow the one moved.
-    S32                       mScrolledY = 0;
-    F32                       mScrolledX = 0.f;
-    // The colour table's generation the bar was last coloured for.
-    U32                       mBarColors = U32_MAX;
+    // A side scrolled to follow the other, which does not lead it back.
+    bool                      mFollowing = false;
+    // The colour table's generation the colours were last taken for, and
+    // those drawn each frame.
+    U32                       mColorsGeneration = U32_MAX;
+    LLColor4                  mCurrentColor;
+    LLColor4                  mDividerColor;
+    // What each folded row says, worked out as the comparison is filled.
+    std::vector<std::string>  mFoldSaid;
+    // The sides' signals, let go of before the sides are: a side losing
+    // the keyboard as it goes would tell a comparison already gone.
+    std::vector<boost::signals2::scoped_connection> mConnections;
     std::function<void()>     mEscape;
     std::function<void(bool)> mOnInline;
     edit_t                    mEdit;

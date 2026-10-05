@@ -5045,7 +5045,7 @@ void ALCodeEditor::onMouseLeave(S32 x, S32 y, MASK mask)
     ALTextView::onMouseLeave(x, y, mask);
 }
 
-void ALCodeEditor::draw()
+void ALCodeEditor::pump()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     // Edits made outside a command -- the whole text set -- fold again here.
@@ -5081,6 +5081,12 @@ void ALCodeEditor::draw()
         mHoverTried = true;
         hoverCardAt(mMouseX, mMouseY);
     }
+    ALTextView::pump();
+}
+
+void ALCodeEditor::draw()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     ALTextView::draw();
     if (mCards.signature())
     {

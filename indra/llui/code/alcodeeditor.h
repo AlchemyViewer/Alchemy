@@ -725,6 +725,10 @@ public:
     bool signatureShown() const;
     const Signature* signature() const { return mCards.signature(); }
 
+    // Its own work before a frame -- folds settled, a stale signature let
+    // go of, the name under the caret lit, a card for the mouse at rest --
+    // then the view's.
+    void pump() override;
     void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override;
     bool handleUnicodeCharHere(llwchar uni_char) override;

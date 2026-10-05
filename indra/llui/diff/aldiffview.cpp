@@ -142,7 +142,11 @@ ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::
     ALCodeEditor* made       = LLUICtrlFactory::create<ALCodeEditor>(p);
     addChild(made);
     made->setFoldable(false);
-    made->onCaretMoved([this]() { refreshBar(); });
+    mConnections.emplace_back(made->onCaretMoved([this]() { refreshBar(); }));
+    // The bar is of the side the keyboard is in.
+    mConnections.emplace_back(made->setFocusChangedCallback([this](LLFocusableElement*) { refreshBar(); }));
+    // The sides scrolled together: whichever moves, the other follows.
+    mConnections.emplace_back(made->onScrolled([this, made]() { followScroll(made); }));
     // Vim's ]c and [c, where the host puts vim over the sides.
     made->setChangeStepper([this](bool forward) { return goToChange(forward); });
     // The caret landing on a line folded away opens its fold, both sides
@@ -331,15 +335,7 @@ void ALDiffView::restorePlace(const Place& place)
             each->goTo(ALTextPos(mModel.caretLineOfRow(column, at), own ? place.column : 0));
         }
     }
-    const S32 scroll = llmax(0, side->layout().lineTop(side->caret().line) - place.belowTop);
-    for (ALCodeEditor* each : sides)
-    {
-        if (each)
-        {
-            each->setScrollY(scroll);
-        }
-    }
-    mScrolledY = side->scrollY();
+    side->setScrollY(llmax(0, side->layout().lineTop(side->caret().line) - place.belowTop));
 }
 
 void ALDiffView::fill()
@@ -404,8 +400,12 @@ void ALDiffView::fill()
         side->setLineAnnotations(std::move(said));
         side->setDecorations(std::move(words));
     }
-    mScrolledY = 0;
-    mScrolledX = 0.f;
+    mFoldSaid.clear();
+    for (S32 n = 0; n < foldCount(); ++n)
+    {
+        mFoldSaid.push_back(
+            alSaidCount("DiffFoldedLines", mModel.foldLines(n), "\xE2\x8B\xAF 1 line the same \xE2\x8B\xAF", "\xE2\x8B\xAF [COUNT] lines the same \xE2\x8B\xAF"));
+    }
     applyFolds();
     refreshBar();
 }
@@ -516,7 +516,7 @@ void ALDiffView::drawCurrentChange()
         const S32       from  = top - (topOfRow(side, first) - side->scrollY());
         const S32       to    = top - (topOfRow(side, end) - side->scrollY());
         LLLocalClipRect clip(LLRect(frame.mLeft + text.mLeft, top, frame.mLeft + text.mRight, frame.mBottom + text.mBottom));
-        gl_rect_2d(frame.mLeft + text.mLeft, from, frame.mLeft + text.mRight - 1, to, colorOf("CodeDiffCurrentColor", side->cursorColor()) % (0.8f * alpha), false);
+        gl_rect_2d(frame.mLeft + text.mLeft, from, frame.mLeft + text.mRight - 1, to, mCurrentColor % (0.8f * alpha), false);
     }
 }
 
@@ -540,7 +540,6 @@ void ALDiffView::setFoldSame(bool fold)
     {
         each->setScrollY(scroll);
     }
-    mScrolledY = mRight->scrollY();
 }
 
 void ALDiffView::applyFolds()
@@ -691,9 +690,7 @@ void ALDiffView::drawFoldRows()
                 gl_rect_2d(left, row_t, frame.mLeft + text.mRight, row_t - height, side->textColor() % (0.1f * alpha));
                 gl_rect_2d(left, row_t, frame.mLeft + text.mRight - 1, row_t - height + 1, side->cursorColor() % (0.8f * alpha), false);
             }
-            const std::string said = alSaidCount("DiffFoldedLines", mModel.foldLines(n), "\xE2\x8B\xAF 1 line the same \xE2\x8B\xAF",
-                                                 "\xE2\x8B\xAF [COUNT] lines the same \xE2\x8B\xAF");
-            font->renderUTF8(said, 0, left + 8, row_t - height / 2, ink, LLFontGL::LEFT, LLFontGL::VCENTER);
+            font->renderUTF8(mFoldSaid[static_cast<size_t>(n)], 0, left + 8, row_t - height / 2, ink, LLFontGL::LEFT, LLFontGL::VCENTER);
         }
     }
 }
@@ -900,43 +897,34 @@ void ALDiffView::refreshBar()
     mBar->setSteps(mModel.changeStep(columnOf(side), side->caret().line, false) >= 0, mModel.changeStep(columnOf(side), side->caret().line, true) >= 0);
 }
 
+void ALDiffView::followScroll(ALCodeEditor* from)
+{
+    if (mInline || mFollowing || from == mInlined)
+    {
+        return;
+    }
+    ALCodeEditor* other = from == mLeft ? mRight : mLeft;
+    mFollowing          = true;
+    other->setScrollY(from->scrollY());
+    other->setScrollX(from->scrollX());
+    mFollowing = false;
+}
+
+void ALDiffView::refreshColors()
+{
+    if (mColorsGeneration == LLUIColorTable::instance().generation())
+    {
+        return;
+    }
+    mColorsGeneration = LLUIColorTable::instance().generation();
+    mBar->setColors(mRight->backgroundColor(), mRight->textColor());
+    mCurrentColor = colorOf("CodeDiffCurrentColor", mRight->cursorColor());
+    mDividerColor = colorOf("CodeDiffDividerColor", LLColor4(0.5f, 0.5f, 0.5f, 0.5f));
+}
+
 void ALDiffView::draw()
 {
-    // The bar as the side in front has it, which the keyboard may have
-    // moved to; in the sides' colours as they are now.
-    refreshBar();
-    if (mBarColors != LLUIColorTable::instance().generation())
-    {
-        mBarColors = LLUIColorTable::instance().generation();
-        mBar->setColors(mRight->backgroundColor(), mRight->textColor());
-    }
-    // The sides scrolled together: whichever moved since the last frame,
-    // the other follows.
-    if (!mInline)
-    {
-        const S32 ly = mLeft->scrollY();
-        const S32 ry = mRight->scrollY();
-        if (ly != mScrolledY)
-        {
-            mRight->setScrollY(ly);
-        }
-        else if (ry != mScrolledY)
-        {
-            mLeft->setScrollY(ry);
-        }
-        mScrolledY = mRight->scrollY();
-        const F32 lx = mLeft->scrollX();
-        const F32 rx = mRight->scrollX();
-        if (lx != mScrolledX)
-        {
-            mRight->setScrollX(lx);
-        }
-        else if (rx != mScrolledX)
-        {
-            mLeft->setScrollX(rx);
-        }
-        mScrolledX = mRight->scrollX();
-    }
+    refreshColors();
     LLUICtrl::draw();
     drawFoldRows();
     drawCurrentChange();
@@ -946,8 +934,7 @@ void ALDiffView::draw()
         // arrows beside it where there are any.
         const S32 half   = (getRect().getWidth() - gap()) / 2;
         const S32 middle = half + gap() / 2;
-        gl_rect_2d(middle - GAP / 2 + 1, mLeft->getRect().mTop, middle - GAP / 2 + GAP - 1, 0,
-                   colorOf("CodeDiffDividerColor", LLColor4(0.5f, 0.5f, 0.5f, 0.5f)) % getDrawContext().mAlpha);
+        gl_rect_2d(middle - GAP / 2 + 1, mLeft->getRect().mTop, middle - GAP / 2 + GAP - 1, 0, mDividerColor % getDrawContext().mAlpha);
         drawArrows();
     }
 }

@@ -706,6 +706,10 @@ public:
     boost::signals2::connection onCaretMoved(const changed_signal_t::slot_type& slot) { return mCaretMoved.connect(slot); }
     // A change cut short, or not made, for the text being full (maxBytes).
     boost::signals2::connection onFull(const changed_signal_t::slot_type& slot) { return mFull.connect(slot); }
+    // Every time the view scrolls, down or across, by whatever means: the
+    // wheel, the ruler, the caret kept in sight, the view kept on its line
+    // as the heights above it change.
+    boost::signals2::connection onScrolled(const changed_signal_t::slot_type& slot) { return mScrolled.connect(slot); }
 
     // --- the input method ------------------------------------------------------
 
@@ -803,6 +807,12 @@ public:
 
     // --- LLView --------------------------------------------------------------
 
+    // What a frame does before it draws: keys a modal keymap holds on
+    // time, a drag held past an edge, the find bar's search, a misspelling
+    // sought, the selection offered, the scrollbars and the view's place,
+    // the layout let go of far from sight -- a subclass's own work first.
+    // draw() does it first; a test does it without drawing.
+    virtual void pump();
     void draw() override;
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
     // Out of sight -- a tab not looked at, a window closed -- the layout
@@ -1415,6 +1425,10 @@ private:
     changed_signal_t       mChanged;
     changed_signal_t       mCaretMoved;
     changed_signal_t       mFull;
+    changed_signal_t       mScrolled;
+    // Where the view was last said to have scrolled to.
+    S32                    mToldScrollY = 0;
+    F32                    mToldScrollX = 0.f;
     size_t                 mMaxBytes = 0;
 
     boost::signals2::scoped_connection mDocumentConnection;

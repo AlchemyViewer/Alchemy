@@ -2542,7 +2542,7 @@ namespace tut
         said.gap = 5;
         v.setLineAnnotation(10, said);
         // What a frame does first: the view put back on its line.
-        v.setScrollX(v.scrollX());
+        v.pump();
         ensure("rows above it: the view still on its line", v.firstVisibleLine() == top && v.scrollY() == layout.lineTop(45));
         ensure_equals("which is further down, past both gaps", layout.lineTop(45), (45 + 3 + 5) * row_h);
     }
@@ -2591,5 +2591,35 @@ namespace tut
         ensure("its gap let go of: out of it", v.caretGap() == -1);
         v.setCaret(ALTextPos(1, 0));
         ensure("no gap there now, no stop", v.perform(ALEditorCommand::MoveDown) && v.caret() == ALTextPos(2, 0) && v.caretGap() == -1);
+    }
+
+    template<> template<>
+    void altextview_object::test<82>()
+    {
+        set_test_name("told when the view scrolls, by whatever means, once a move, and not when it stays; a frame's work done without drawing");
+        std::string many;
+        for (S32 n = 0; n < 100; ++n)
+        {
+            many += (n ? "\n" : "") + std::string("line ") + std::to_string(n);
+        }
+        ALTextView& v = make(many.c_str());
+        S32 told = 0;
+        v.onScrolled([&told]() { ++told; });
+        v.setScrollY(60);
+        ensure_equals("scrolled", told, 1);
+        v.setScrollY(60);
+        ensure_equals("not moved: not told", told, 1);
+        v.setCaret(ALTextPos(90, 0));
+        ensure("the caret kept in sight", told == 2 && v.scrollY() > 60);
+        v.setCaret(ALTextPos(89, 0));
+        ensure_equals("in sight already: not told", told, 2);
+        // A line made above, heights moving: kept on its line by the next
+        // frame's work, and told.
+        const S32 at = v.scrollY();
+        v.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "new\n");
+        v.pump();
+        ensure("kept on its line, a row further down, and told", v.scrollY() == at + v.layout().rowHeight() && told == 3);
+        v.pump();
+        ensure_equals("nothing more to do: not told again", told, 3);
     }
 }

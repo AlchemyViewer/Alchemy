@@ -729,4 +729,48 @@ namespace tut
         d.setOffersIgnoreCase(false);
         ensure("not offered: not let go of", !d.ignoresCase() && d.changeCount() == 1);
     }
+
+    template<> template<>
+    void aldiffview_object::test<22>()
+    {
+        set_test_name("the sides scroll together as either is scrolled, there and then, down and across, with no frame drawn; inline, the one alone");
+        std::string left;
+        std::string right;
+        for (S32 n = 0; n < 200; ++n)
+        {
+            const std::string line = "line " + std::to_string(n) + " " + std::string(120, 'x');
+            left += (n ? "\n" : "") + line;
+            right += (n ? "\n" : "") + (n == 100 ? std::string("changed") : line);
+        }
+        ALDiffView& d = make(left.c_str(), right.c_str());
+        d.setFoldSame(false);
+        d.left()->setScrollY(300);
+        ensure_equals("the right followed the left down", d.right()->scrollY(), 300);
+        d.right()->setScrollY(120);
+        ensure_equals("and the left the right", d.left()->scrollY(), 120);
+        d.right()->setScrollX(40.f);
+        ensure_equals("across", d.left()->scrollX(), 40.f);
+        d.left()->goTo(ALTextPos(180, 0));
+        d.left()->scrollToCaret();
+        ensure("the caret kept in sight on one side: the other with it", d.left()->scrollY() > 300 && d.right()->scrollY() == d.left()->scrollY());
+        d.setInline(true);
+        const S32 left_at = d.left()->scrollY();
+        d.inlined()->setScrollY(10);
+        ensure_equals("inline, the sides not shown left where they were", d.left()->scrollY(), left_at);
+    }
+
+    template<> template<>
+    void aldiffview_object::test<23>()
+    {
+        set_test_name("the bar is of the side the keyboard is in, as the keyboard goes from one to the other, with no frame drawn");
+        ALDiffView& d = make("one\ntwo\nthree\nfour\nfive\nsix", "one\n2\nthree\nfour\nfive\nsix\nseven");
+        d.right()->setFocus(true);
+        d.left()->goTo(ALTextPos(1, 0));
+        d.right()->goTo(ALTextPos(3, 0));
+        ensure_equals("the right in front, between changes", d.bar()->countSaid(), std::string("2 changes"));
+        d.left()->setFocus(true);
+        ensure_equals("the keyboard to the left: its change", d.bar()->countSaid(), std::string("Change 1 of 2"));
+        d.right()->setFocus(true);
+        ensure_equals("and back", d.bar()->countSaid(), std::string("2 changes"));
+    }
 }
