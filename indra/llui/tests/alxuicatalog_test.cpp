@@ -24,8 +24,8 @@
 
 #include "linden_common.h"
 
-#include "../alxuicatalog.h"
-#include "../alxuiselection.h"
+#include "alxuicatalog.h"
+#include "alxuiselection.h"
 #include "../llbutton.h"
 #include "../llpanel.h"
 #include "../lluictrlfactory.h"

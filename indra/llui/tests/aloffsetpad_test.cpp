@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../aloffsetpad.h"
+#include "aloffsetpad.h"
 
 #include "../llfocusmgr.h"
 #include "../llspinctrl.h"

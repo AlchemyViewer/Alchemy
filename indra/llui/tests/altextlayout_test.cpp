@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../altextlayout.h"
+#include "altextlayout.h"
 
 #include "alfontshaping.h"
 #include "llfontfreetype.h"

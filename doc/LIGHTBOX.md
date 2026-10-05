@@ -283,7 +283,7 @@ taller than a slider); later rows chain with `top_pad`. Every value row gets an
  max_val="1" name="myfx_strength" tool_tip="..." control_name="RenderMyFxStrength" />
 ```
 
-`setting_row` (`indra/llui/alsettingrow.{h,cpp}`, tested by
+`setting_row` (`indra/llui/fields/alsettingrow.{h,cpp}`, tested by
 `alsettingrow_test`) is the slider and its reset glyph as one widget, and it
 takes the slider's attributes by the slider's names. What it does for you:
 

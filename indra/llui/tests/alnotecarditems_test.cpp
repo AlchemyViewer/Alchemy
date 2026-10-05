@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alnotecarditems.h"
+#include "alnotecarditems.h"
 
 #include "../test/lltut.h"
 

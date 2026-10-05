@@ -24,10 +24,10 @@
 
 #include "linden_common.h"
 
-#include "../altextspelling.h"
+#include "altextspelling.h"
 
-#include "../alsyntaxgrammar.h"
-#include "../alsyntaxhighlighter.h"
+#include "alsyntaxgrammar.h"
+#include "alsyntaxhighlighter.h"
 
 #include "../test/lltut.h"
 

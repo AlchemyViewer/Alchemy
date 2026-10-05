@@ -23,9 +23,9 @@
 
 #include "linden_common.h"
 
-#include "../alpanelist.h"
+#include "alpanelist.h"
 
-#include "../alemptystate.h"
+#include "alemptystate.h"
 
 #include "../llclipboard.h"
 #include "../llscrolllistcell.h"

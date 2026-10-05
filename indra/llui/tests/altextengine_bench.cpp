@@ -38,14 +38,14 @@
 
 #include "linden_common.h"
 
-#include "../alcodeeditor.h"
-#include "../alfindbar.h"
-#include "../alfoldmodel.h"
-#include "../aloutputview.h"
-#include "../alquickopen.h"
+#include "alcodeeditor.h"
+#include "alfindbar.h"
+#include "alfoldmodel.h"
+#include "aloutputview.h"
+#include "alquickopen.h"
 #include "../llspellcheckengine.h"
-#include "../altextsearch.h"
-#include "../alvimkeymap.h"
+#include "altextsearch.h"
+#include "alvimkeymap.h"
 
 #include "alheadlessui_fixture.h"
 #include "albigscript.h"

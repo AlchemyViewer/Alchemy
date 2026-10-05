@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alcornerfield.h"
+#include "alcornerfield.h"
 
 #include "../llcheckboxctrl.h"
 #include "../llspinctrl.h"

@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alfenwicktree.h"
+#include "alfenwicktree.h"
 
 #include "../test/lltut.h"
 

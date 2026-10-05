@@ -24,9 +24,9 @@
 
 #include "linden_common.h"
 
-#include "../altextdocument.h"
+#include "altextdocument.h"
 
-#include "../altextchars.h"
+#include "altextchars.h"
 #include "llstring.h"
 
 #include "../test/lltut.h"

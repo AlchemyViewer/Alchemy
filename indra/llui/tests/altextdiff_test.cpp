@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../altextdiff.h"
+#include "altextdiff.h"
 
 #include "../test/lltut.h"
 

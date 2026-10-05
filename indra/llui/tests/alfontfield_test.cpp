@@ -24,10 +24,10 @@
 
 #include "linden_common.h"
 
-#include "../alfontfield.h"
+#include "alfontfield.h"
 
-#include "../alpopover.h"
-#include "../alspecimenlist.h"
+#include "alpopover.h"
+#include "alspecimenlist.h"
 #include "../llcheckboxctrl.h"
 #include "../llcombobox.h"
 #include "../llfocusmgr.h"

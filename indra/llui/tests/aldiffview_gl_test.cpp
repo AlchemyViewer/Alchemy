@@ -28,8 +28,8 @@
 
 #include "../../llrender/tests/llheadlessgl_fixture.h"
 
-#include "../alcodeeditor.h"
-#include "../aldiffview.h"
+#include "alcodeeditor.h"
+#include "aldiffview.h"
 #include "../llfocusmgr.h"
 #include "../llui.h"
 #include "../lluictrlfactory.h"

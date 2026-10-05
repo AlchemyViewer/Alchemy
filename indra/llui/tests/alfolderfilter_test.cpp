@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alfolderfilter.h"
+#include "alfolderfilter.h"
 
 #include "../test/lltut.h"
 

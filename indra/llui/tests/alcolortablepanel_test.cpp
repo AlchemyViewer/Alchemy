@@ -24,9 +24,9 @@
 
 #include "linden_common.h"
 
-#include "../alcolortablepanel.h"
+#include "alcolortablepanel.h"
 
-#include "../alpropertygrid.h"
+#include "alpropertygrid.h"
 #include "llcallbacklist.h"
 #include "../llfloater.h"
 #include "../lluicolortable.h"

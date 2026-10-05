@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alsnippetsession.h"
+#include "alsnippetsession.h"
 
 #include "../test/lltut.h"
 

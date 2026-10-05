@@ -24,12 +24,12 @@
 
 #include "linden_common.h"
 
-#include "../alxuilint.h"
-#include "../alxuioverlay.h"
+#include "alxuilint.h"
+#include "alxuioverlay.h"
 #include "alxmllayermerge.h"
 
-#include "../alxuicatalog.h"
-#include "../alxuisourcemap.h"
+#include "alxuicatalog.h"
+#include "alxuisourcemap.h"
 #include "../llpanel.h"
 #include "../lluicolortable.h"
 #include "../lluictrlfactory.h"

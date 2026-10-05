@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alfuzzymatch.h"
+#include "alfuzzymatch.h"
 
 #include "../test/lltut.h"
 

@@ -24,12 +24,12 @@
 
 #include "linden_common.h"
 
-#include "../aldiffview.h"
+#include "aldiffview.h"
 
-#include "../alcodeeditor.h"
-#include "../aldiffbar.h"
-#include "../alflatbutton.h"
-#include "../alvimkeymap.h"
+#include "alcodeeditor.h"
+#include "aldiffbar.h"
+#include "alflatbutton.h"
+#include "alvimkeymap.h"
 #include "../llclipboard.h"
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"

@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alcolorsheet.h"
+#include "alcolorsheet.h"
 
 #include "../test/lltut.h"
 

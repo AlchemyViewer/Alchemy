@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alsyntaxhighlighter.h"
+#include "alsyntaxhighlighter.h"
 
 #include "../test/lltut.h"
 

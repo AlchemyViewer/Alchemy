@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alsyntaxgrammar.h"
+#include "alsyntaxgrammar.h"
 
 #include "albigscript.h"
 

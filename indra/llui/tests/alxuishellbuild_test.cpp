@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alxuishellbuild.h"
+#include "alxuishellbuild.h"
 #include "../llpanel.h"
 #include "../lluictrlfactory.h"
 

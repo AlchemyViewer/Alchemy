@@ -24,9 +24,9 @@
 
 #include "linden_common.h"
 
-#include "../alxuitranslate.h"
+#include "alxuitranslate.h"
 
-#include "../alxuiedit.h"
+#include "alxuiedit.h"
 
 #include "../test/lltut.h"
 

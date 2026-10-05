@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../altabstrip.h"
+#include "altabstrip.h"
 
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"

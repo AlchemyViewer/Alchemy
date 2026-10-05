@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alxuioverlay.h"
+#include "alxuioverlay.h"
 
 #include "alxmllayermerge.h"
 #include "llxmlnode.h"

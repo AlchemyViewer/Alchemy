@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alstringmatch.h"
+#include "alstringmatch.h"
 
 #include "../test/lltut.h"
 

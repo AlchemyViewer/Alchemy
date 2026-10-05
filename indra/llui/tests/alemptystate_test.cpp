@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alemptystate.h"
+#include "alemptystate.h"
 
 #include "../llbutton.h"
 #include "../lltextbox.h"

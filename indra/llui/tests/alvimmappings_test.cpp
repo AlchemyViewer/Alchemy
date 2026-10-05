@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alvimmappings.h"
+#include "alvimmappings.h"
 
 #include "../test/lltut.h"
 

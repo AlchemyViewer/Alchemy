@@ -24,12 +24,12 @@
 
 #include "linden_common.h"
 
-#include "../alcodeeditor.h"
+#include "alcodeeditor.h"
 
-#include "../alchoicelist.h"
-#include "../alchoicepopup.h"
-#include "../alfindbar.h"
-#include "../alsurface.h"
+#include "alchoicelist.h"
+#include "alchoicepopup.h"
+#include "alfindbar.h"
+#include "alsurface.h"
 #include "../llclipboard.h"
 
 #include "../llfocusmgr.h"

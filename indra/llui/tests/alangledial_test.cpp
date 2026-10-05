@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alangledial.h"
+#include "alangledial.h"
 
 #include "../llfocusmgr.h"
 #include "../llspinctrl.h"

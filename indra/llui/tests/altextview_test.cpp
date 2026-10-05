@@ -24,9 +24,9 @@
 
 #include "linden_common.h"
 
-#include "../alfindbar.h"
-#include "../altextruler.h"
-#include "../altextview.h"
+#include "alfindbar.h"
+#include "altextruler.h"
+#include "altextview.h"
 #include "../llclipboard.h"
 
 #include "../llbutton.h"

@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../aljumpbar.h"
+#include "aljumpbar.h"
 #include "../lltextbox.h"
 #include "llfontgl.h"
 

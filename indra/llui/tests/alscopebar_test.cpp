@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alscopebar.h"
+#include "alscopebar.h"
 
 #include "../llcombobox.h"
 #include "../lllineeditor.h"

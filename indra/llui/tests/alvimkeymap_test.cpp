@@ -24,8 +24,8 @@
 
 #include "linden_common.h"
 
-#include "../alcodeeditor.h"
-#include "../alvimkeymap.h"
+#include "alcodeeditor.h"
+#include "alvimkeymap.h"
 #include "../llclipboard.h"
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"

@@ -28,9 +28,9 @@
 
 #include "../../llrender/tests/llheadlessgl_fixture.h"
 
-#include "../alcodeeditor.h"
-#include "../altextruler.h"
-#include "../altextview.h"
+#include "alcodeeditor.h"
+#include "altextruler.h"
+#include "altextview.h"
 #include "../llui.h"
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"

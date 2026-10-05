@@ -24,10 +24,10 @@
 
 #include "linden_common.h"
 
-#include "../alimagefield.h"
+#include "alimagefield.h"
 
-#include "../alpopover.h"
-#include "../alspecimenlist.h"
+#include "alpopover.h"
+#include "alspecimenlist.h"
 #include "../llfloater.h"
 #include "../llfocusmgr.h"
 #include "../lllineeditor.h"

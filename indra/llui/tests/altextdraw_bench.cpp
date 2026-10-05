@@ -44,7 +44,7 @@
 
 #include "../../llrender/tests/llheadlessgl_fixture.h"
 
-#include "../alcodeeditor.h"
+#include "alcodeeditor.h"
 
 #include "alheadlessui_fixture.h"
 #include "albigscript.h"

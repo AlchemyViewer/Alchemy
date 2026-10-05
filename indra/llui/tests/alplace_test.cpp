@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alplace.h"
+#include "alplace.h"
 
 #include "../test/lltut.h"
 

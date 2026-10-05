@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alpopover.h"
+#include "alpopover.h"
 
 #include "../llfocusmgr.h"
 #include "../lllineeditor.h"

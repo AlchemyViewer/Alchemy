@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alundostack.h"
+#include "alundostack.h"
 
 #include "../test/lltut.h"
 

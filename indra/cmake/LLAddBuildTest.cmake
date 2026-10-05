@@ -20,7 +20,7 @@ else()
   set(AL_TEST_ENVIRONMENT "")
 endif()
 
-# al_add_test(<name> PROJECT <project> [UNIT] [PYTHON] [GL] [ISA_TIER <tier>]
+# al_add_test(<name> PROJECT <project> [UNIT] [DIR <folder>] [PYTHON] [GL] [ISA_TIER <tier>]
 #             [PCH <target>] [SOURCES <file>...] [LIBRARIES <target>...] [INCLUDES <dir>...]
 #             [DEFINES <define>...] [COMMAND <arg>...] [ENVIRONMENT <VAR=value>...])
 #
@@ -30,7 +30,8 @@ endif()
 # A UNIT test compiles the project's own <name>.cpp into the executable and
 # sees the project's include directories instead of linking the project, so
 # the test decides what that one file links against; <name>.h is listed with
-# it. Any other test links whatever LIBRARIES names. Both link the TUT runner,
+# it. DIR is the folder of the project the two are in, where they are not at
+# its top. Any other test links whatever LIBRARIES names. Both link the TUT runner,
 # and a unit test also links llcommon and llmath, the libraries every source
 # file in the tree reaches for.
 #
@@ -64,7 +65,7 @@ function(al_add_test name)
     PARSE_ARGV 1
     arg
     "UNIT;PYTHON;GL"
-    "PROJECT;ISA_TIER;PCH"
+    "PROJECT;ISA_TIER;PCH;DIR"
     "SOURCES;LIBRARIES;INCLUDES;DEFINES;COMMAND;ENVIRONMENT"
   )
   if(NOT arg_PROJECT)
@@ -87,7 +88,13 @@ function(al_add_test name)
   if(arg_UNIT)
     set(target PROJECT_${arg_PROJECT}_TEST_${name}${suffix})
     set(test_name ${target})
-    set(sources ${name}.cpp tests/${name}_test.cpp ${arg_SOURCES} ${name}.h)
+    # The unit's own file, in the folder of the project it is in where DIR
+    # says, beside its test.
+    set(dir "")
+    if(arg_DIR)
+      set(dir "${arg_DIR}/")
+    endif()
+    set(sources ${dir}${name}.cpp tests/${name}_test.cpp ${arg_SOURCES} ${dir}${name}.h)
     set(libraries lltut_runner_lib llcommon ll::tut)
     if(NOT arg_PROJECT STREQUAL "llmath")
       list(APPEND libraries llmath)
@@ -120,6 +127,8 @@ function(al_add_test name)
       ${INDRA_SOURCE_DIR}/test
       ${INDRA_SOURCE_DIR}/llmath
       ${INDRA_SOURCE_DIR}/llui
+      # llui's own folders, which its top-level headers name theirs from.
+      $<TARGET_PROPERTY:llui,INTERFACE_INCLUDE_DIRECTORIES>
   )
   target_compile_definitions(${target} PRIVATE "LL_TEST=${name}" "LL_TEST_${name}" ${arg_DEFINES})
   set_target_properties(${target} PROPERTIES FOLDER "Tests/${arg_PROJECT}")

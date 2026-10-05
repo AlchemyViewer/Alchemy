@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alanchoredranges.h"
+#include "alanchoredranges.h"
 
 #include "../test/lltut.h"
 

@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alspecimenlist.h"
+#include "alspecimenlist.h"
 #include "llfontgl.h"
 
 #include "../llbutton.h"

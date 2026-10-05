@@ -24,11 +24,11 @@
 
 #include "linden_common.h"
 
-#include "../alstudiofloater.h"
+#include "alstudiofloater.h"
 
-#include "../alkeychord.h"
-#include "../alpopover.h"
-#include "../alsurface.h"
+#include "alkeychord.h"
+#include "alpopover.h"
+#include "alsurface.h"
 #include "../llfocusmgr.h"
 #include "../lllineeditor.h"
 #include "../llmenugl.h"

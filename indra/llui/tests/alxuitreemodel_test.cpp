@@ -24,9 +24,9 @@
 
 #include "linden_common.h"
 
-#include "../alxuiselection.h"
-#include "../alxuisourcemap.h"
-#include "../alxuitreemodel.h"
+#include "alxuiselection.h"
+#include "alxuisourcemap.h"
+#include "alxuitreemodel.h"
 #include "../lldraghandle.h"
 #include "../llfloater.h"
 #include "../llfolderview.h"
