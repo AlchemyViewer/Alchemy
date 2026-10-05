@@ -1,12 +1,16 @@
 # Velopack's C API, velopack_libc: src/ and include/ are velopack's
-# src/lib-cpp at the release this names, unchanged. It is not published, so
-# it is built here over the velopack crate from crates.io, which its own
-# workspace takes by path. build.rs, which writes include/Velopack.h again
-# with cbindgen on every build, is left out: the header is the released one.
+# src/lib-cpp at the release this names, but for the lines marked Alchemy.
+# return_cstr in src/types.rs wrote its terminator one past a buffer the
+# string filled, and the three Velopack.hpp wrappers over it relied on that.
+# It is not published, so it is built here over the velopack crate from
+# crates.io, which its own workspace takes by path. build.rs, which writes
+# include/Velopack.h again with cbindgen on every build, is left out: the
+# header is the released one.
 #
 # To move to a new release: copy src/ and include/ from src/lib-cpp at its
-# tag, set both versions below, and run `cargo update -p velopack` in
-# indra/rust, which moves only what the new velopack needs.
+# tag, keep the lines marked Alchemy unless the release has fixed them, set
+# both versions below, and run `cargo update -p velopack` in indra/rust,
+# which moves only what the new velopack needs.
 [package]
 name = "velopack_libc"
 version = "1.2.161"

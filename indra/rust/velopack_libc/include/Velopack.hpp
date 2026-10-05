@@ -20,9 +20,11 @@ namespace Velopack {
 
 static inline void throw_last_error()
 {
+    // Alchemy: room for the terminator, which the C API writes inside the size it is given.
     size_t neededSize = vpkc_get_last_error(nullptr, 0);
-    std::string strError(neededSize, '\0');
-    vpkc_get_last_error(&strError[0], neededSize);
+    std::string strError(neededSize + 1, '\0');
+    vpkc_get_last_error(&strError[0], neededSize + 1);
+    strError.resize(neededSize);
     throw std::runtime_error(strError);
 }
 
@@ -1013,8 +1015,9 @@ public:
      */
     std::string GetCurrentVersion() noexcept {
         size_t neededSize = vpkc_get_current_version(m_pManager, nullptr, 0);
-        std::string strVersion(neededSize, '\0');
-        vpkc_get_current_version(m_pManager, &strVersion[0], neededSize);
+        std::string strVersion(neededSize + 1, '\0');
+        vpkc_get_current_version(m_pManager, &strVersion[0], neededSize + 1);
+        strVersion.resize(neededSize);
         return strVersion;
     };
 
@@ -1023,8 +1026,9 @@ public:
      */
     std::string GetAppId() noexcept {
         size_t neededSize = vpkc_get_app_id(m_pManager, nullptr, 0);
-        std::string strId(neededSize, '\0');
-        vpkc_get_app_id(m_pManager, &strId[0], neededSize);
+        std::string strId(neededSize + 1, '\0');
+        vpkc_get_app_id(m_pManager, &strId[0], neededSize + 1);
+        strId.resize(neededSize);
         return strId;
     };
 

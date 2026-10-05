@@ -97,9 +97,11 @@ pub unsafe fn free_PathBuf(psz: *mut c_char) {
 
 pub fn return_cstr(psz: *mut c_char, c: size_t, s: &str) -> size_t {
     if !psz.is_null() && c > 0 {
-        let cstr = CString::new(s).unwrap();
-        let bytes = cstr.as_bytes_with_nul();
-        let len = bytes.len().min(c);
+        // Alchemy: at most c - 1 bytes and the terminator, all inside the
+        // caller's c. Velopack's own wrote the terminator at psz[c] whenever
+        // the string filled the buffer, and panicked on an interior NUL.
+        let bytes = s.as_bytes();
+        let len = bytes.len().min(c - 1);
         unsafe {
             std::ptr::copy_nonoverlapping(bytes.as_ptr(), psz as *mut u8, len);
             *psz.add(len) = 0;
