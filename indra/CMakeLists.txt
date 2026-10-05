@@ -126,8 +126,8 @@ cmake_dependent_option(
   OFF
 )
 
-# The Discord Social SDK is downloaded per application from Discord and
-# points to by AL_DISCORD_SDK_DIR; see cmake/Discord.cmake.
+# The Discord Social SDK comes from AlchemyViewer's private vcpkg registry;
+# see cmake/Discord.cmake.
 cmake_dependent_option(
   AL_USE_DISCORD
   "Enable Discord presence and friends through the Discord Social SDK"
@@ -268,6 +268,10 @@ endif()
 
 if(AL_USE_KDU)
   list(APPEND VCPKG_MANIFEST_FEATURES "kdu")
+endif()
+
+if(AL_USE_DISCORD)
+  list(APPEND VCPKG_MANIFEST_FEATURES "discord")
 endif()
 
 # Setup Tracy feature flags

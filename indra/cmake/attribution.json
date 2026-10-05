@@ -36,6 +36,7 @@
     "bzip2": { "holder": "Copyright (C) 1996-2019 Julian R Seward" },
     "cef-bin": { "holder": "Copyright (c) 2008-2020 Marshall A. Greenblatt. Portions Copyright (c) 2006-2009 Google Inc." },
     "curl": { "holder": "Copyright (c) 1996-2017 Daniel Stenberg and many contributors" },
+    "discord-social-sdk": { "holder": "Copyright (c) Discord Inc.", "license": "LicenseRef-Discord" },
     "freetype": { "holder": "Copyright 1996-2002, 2006 David Turner, Robert Wilhelm, and Werner Lemberg" },
     "libiconv": { "holder": "Copyright (C) Free Software Foundation, Inc.; written by Bruno Haible", "license": "LGPL-2.1-or-later" },
     "libjpeg-turbo": { "holder": "Copyright (C) 2009-2026 D. R. Commander; Copyright (C) 1991-2020 Thomas G. Lane, Guido Vollbeding" },
@@ -99,14 +100,6 @@
       "license": "LicenseRef-FMOD",
       "homepage": "https://www.fmod.com",
       "notice": "Audio engine: FMOD Studio by Firelight Technologies Pty Ltd. Used under the FMOD End User Licence Agreement, https://www.fmod.com/legal."
-    },
-    {
-      "name": "Discord Social SDK",
-      "when": "AL_USE_DISCORD",
-      "holder": "Copyright (c) Discord Inc.",
-      "license": "LicenseRef-Discord",
-      "homepage": "https://discord.com/developers/docs/discord-social-sdk/overview",
-      "notice": "The Discord Social SDK is used under the Discord Developer Terms of Service, https://discord.com/developers/docs/policies-and-agreements/developer-terms-of-service."
     }
   ]
 }

@@ -192,23 +192,15 @@ if(AL_USE_FMODSTUDIO AND FMOD_LIBRARY_RELEASE)
   )
   al_install_shared_library("${FMOD_LIBRARY_DEBUG}" CONFIGURATIONS Debug)
 endif()
+
+# Discord's prebuilt SDK, a shared library on every platform, from the
+# private registry.
 if(AL_USE_DISCORD)
-  if(WINDOWS)
-    install(
-      FILES "${DISCORD_SDK_RUNTIME_DIR}/discord_partner_sdk.dll"
-      DESTINATION "${AL_INSTALL_LIBDIR}"
-      COMPONENT viewer
-    )
-  elseif(DARWIN)
-    install(
-      FILES "${DISCORD_SDK_RUNTIME_DIR}/libdiscord_partner_sdk.dylib"
-      DESTINATION "${AL_INSTALL_LIBDIR}"
-      COMPONENT viewer
-    )
-  else()
-    file(GLOB al_discord_libraries "${DISCORD_SDK_RUNTIME_DIR}/libdiscord_partner_sdk.so*")
-    install(FILES ${al_discord_libraries} DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer)
-  endif()
+  install(
+    IMPORTED_RUNTIME_ARTIFACTS unofficial::discord-social-sdk::discord-social-sdk
+    RUNTIME DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer
+    LIBRARY DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer
+  )
 endif()
 
 # The crash reporter. Its out-of-process handler sits beside the executable,

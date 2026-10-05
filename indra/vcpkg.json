@@ -161,6 +161,12 @@
     }
   ],
   "features": {
+    "discord": {
+      "description": "Build with Discord presence and friends through the Discord Social SDK",
+      "dependencies": [
+        "discord-social-sdk"
+      ]
+    },
     "dullahan-example": {
       "description": "Build with support for Dullahan OpenGL example application",
       "dependencies": [

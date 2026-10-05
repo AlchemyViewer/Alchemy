@@ -329,7 +329,22 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 |:-----------------|:--------|:----------------------------------------------------------------------------|
 | `AL_ENABLE_PROPRIETARY` | OFF | Allow the non-free libraries below                                     |
 | `AL_USE_KDU`     | ON      | Kakadu JPEG2000 codec (needs `AL_ENABLE_PROPRIETARY`)                       |
-| `AL_USE_DISCORD` | OFF     | Discord presence through the Social SDK (needs `AL_ENABLE_PROPRIETARY`; `AL_DISCORD_SDK_DIR` names the SDK unpacked from the developer portal) |
+| `AL_USE_DISCORD` | OFF     | Discord presence through the Social SDK (needs `AL_ENABLE_PROPRIETARY` and access to the private registry) |
+
+Some proprietary ports come from AlchemyViewer's private vcpkg registry,
+`https://github.com/AlchemyViewer/private-registry`, which
+`indra/vcpkg-configuration.json` lists beside the public one. vcpkg fetches it
+with plain git, and only when an option above asks for one of its ports, so an
+open-source build never touches it. To use it, `git ls-remote` on that URL
+must succeed without a prompt, through Git Credential Manager or
+`gh auth setup-git`. With SSH keys only, send the organisation's HTTPS URLs
+over SSH:
+
+```
+git config --global url."git@github.com:AlchemyViewer/".insteadOf "https://github.com/AlchemyViewer/"
+```
+
+The registry's README covers CI and adding ports.
 
 ### Profiling
 
