@@ -370,6 +370,8 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 |:-----------------|:------------|:-------------------------------------------------------|
 | `AL_USE_OPENXR`     | OFF         | OpenXR VR support (experimental)                       |
 | `AL_USE_SDL_WINDOW` | ON on Linux | SDL-based window management (Linux only; GL through EGL on Wayland and X11 alike) |
+| `AL_SIGNING_IDENTITY` | empty     | macOS Developer ID the bundle is signed with; empty signs ad-hoc |
+| `AL_NOTARY_PROFILE`   | empty     | macOS notarytool keychain profile the `velopack` target notarizes with; empty skips notarization |
 
 ### Crash reporting
 
@@ -461,11 +463,24 @@ cpack --config build-<OS>-<preset>/CPackSourceConfig.cmake
 
 (or the `package_source` target under Ninja). Uncommitted changes are not in it, and cpack says so.
 
-The Windows installer and the update packages come from [Velopack](https://velopack.io): configure with `-DAL_USE_VELOPACK=ON`, run `dotnet tool restore` once so the `vpk` tool is available, and build the `velopack` target. It installs into `newview/velopack/<Config>/app` and writes the installer and the update feed to `newview/velopack/<Config>/Releases`. Each Windows architecture has its own Velopack channel, named for its runtime, since an installed viewer updates from its channel's feed: `win-x64` and `win-arm64`. The channel also names the feed, `releases.win-x64.json` or `releases.win-arm64.json`, and the files vpk writes.
+The Windows installer and the update packages for Windows and macOS come from [Velopack](https://velopack.io): configure with `-DAL_USE_VELOPACK=ON`, run `dotnet tool restore` once so the `vpk` tool is available, and build the `velopack` target. It installs into `newview/velopack/<Config>/app` and writes the update feed, and on Windows the installer, to `newview/velopack/<Config>/Releases`. Each platform and architecture has its own Velopack channel, named for its runtime, since an installed viewer updates from its channel's feed: `win-x64`, `win-arm64`, `osx-arm64` and `osx-x64`. The channel also names the feed, `releases.<channel>.json`, and the files vpk writes. On macOS vpk adds its updater to the bundle and seals it again, with `AL_SIGNING_IDENTITY` or ad-hoc, and notarizes it when `AL_NOTARY_PROFILE` names a profile stored with `xcrun notarytool store-credentials`.
 
 The third-party attribution is generated, not kept by hand: `cmake/Attribution.cmake` reads every installed port's `vcpkg.spdx.json` and `copyright` and writes `app_settings/packages-info.txt` (what the About floater's Licences tab shows) and `licenses.txt` (every licence text). What vcpkg cannot know — the pieces under `indra/externals/`, the SDKs from outside vcpkg, and a holder or licence a port's files do not state — is in `cmake/attribution.json`, as is the list of installed ports that ship nothing and are skipped: build tools, empty ports that stand for a system library, and what is built only for those. A newly added port whose `vcpkg.json` declares no `license` stops the build with its name; fix the port, add an override to the table, or, if the viewer ships none of it, skip it with the reason (and the platform, when the port is empty only on some).
 
-On macOS the install step signs the bundle inside out — ad-hoc, or with `-DAL_ENABLE_SIGNING=ON -DAL_SIGNING_IDENTITY=<Developer ID>` — so the CEF helpers keep their sandbox entitlements. On Linux the binaries carry an `$ORIGIN`-relative RPATH and find the data one directory above the executable, so the tree runs from wherever it is unpacked.
+On macOS the install step signs the bundle inside out — ad-hoc, or with `-DAL_SIGNING_IDENTITY=<Developer ID>` — so the CEF helpers keep their sandbox entitlements, and the package step seals it again after stripping the executable. The disk image is APFS: HFS+ decomposes file names, which breaks the seal over the font stand-ins with Japanese names. On Linux the binaries carry an `$ORIGIN`-relative RPATH and find the data one directory above the executable, so the tree runs from wherever it is unpacked.
+
+The hosted build (`.github/workflows/build.yaml`) packages Windows and macOS in jobs of their own, after the build, from the build's install tree or stripped bundle and its `newview/package.env`. Pull requests are packaged unsigned; other builds are signed when the repository has the secrets, and without them are packaged unsigned with a notice:
+
+| Secret | What |
+|:--|:--|
+| `AZURE_KEY_VAULT_URI`, `AZURE_KEY_VAULT_CERTIFICATE` | The Azure Key Vault and the name of the Windows code-signing certificate in it |
+| `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` | The Entra application AzureSignTool signs as |
+| `MACOS_CERTIFICATE`, `MACOS_CERTIFICATE_PASSWORD` | The Developer ID Application certificate and key, as a base64 `.p12`, and its password |
+| `MACOS_NOTARY_KEY`, `MACOS_NOTARY_KEY_ID`, `MACOS_NOTARY_ISSUER_ID` | An App Store Connect API key (the `.p8`'s text) and its key ID, to notarize with, and the issuer ID of a team key; an individual key has none |
+
+`scripts/signing/macos_signing_secrets.py` makes the macOS secrets from the exported `.p12` and the API key's `.p8`, checking each as the build will use it, and stores them with `gh secret set` (`--repo`) or writes them to files (`--output`); its header says where each comes from.
+
+vpk signs every Windows binary, its `Setup.exe` and `Update.exe` through AzureSignTool. On macOS the job signs the bundle inside out with `ViewerCodeSign.cmake`, vpk adds its updater, seals, notarizes and staples the bundle, and the job builds the disk image from that bundle with [dmgbuild](https://dmgbuild.readthedocs.io) (`indra/newview/installers/darwin/dmg_settings.py`), then signs, notarizes and staples the image.
 
 ## Troubleshooting
 

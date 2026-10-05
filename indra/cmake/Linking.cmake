@@ -3,10 +3,8 @@
 include_guard()
 include(Variables)
 
-set(
-  SYMBOLS_STAGING_DIR
-  ${INDRA_BINARY_DIR}/symbols/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>/,>${AL_CHANNEL}
-)
+# The symbol store; see ViewerSymbols.cmake.
+set(SYMBOLS_DIR ${INDRA_BINARY_DIR}/symbols$<$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>:/$<CONFIG>>)
 
 if(WINDOWS OR DARWIN)
   set(

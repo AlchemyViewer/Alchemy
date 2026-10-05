@@ -200,9 +200,20 @@ cmake_dependent_option(
 # WebRTC voice. Off in sanitized builds, which cannot link libwebrtc.
 option(AL_USE_WEBRTC "Build with WebRTC voice" ON)
 
-# Signing
-option(AL_ENABLE_SIGNING "Enable signing the viewer" OFF)
-set(AL_SIGNING_IDENTITY "" CACHE STRING "Specifies the signing identity to use, if necessary.")
+# macOS signing. The install step always signs the bundle: with this
+# identity, or ad-hoc when it is empty.
+set(
+  AL_SIGNING_IDENTITY
+  ""
+  CACHE STRING
+  "The macOS Developer ID to sign the bundle with; empty signs ad-hoc"
+)
+set(
+  AL_NOTARY_PROFILE
+  ""
+  CACHE STRING
+  "The notarytool keychain profile the macOS velopack target notarizes with; empty skips notarization"
+)
 
 # Warn about any option name from before the AL_ scheme.
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/RetiredOptions.cmake)
