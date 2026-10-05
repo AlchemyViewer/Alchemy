@@ -26,6 +26,7 @@
 
 #include "aldiffsplice.h"
 
+#include "aldiffedit.h"
 #include "allinediff.h"
 
 #include <algorithm>
@@ -37,26 +38,6 @@ namespace
     typedef ALTextDiff::Kind Kind;
 
     S32 sLastCompared = 0;
-
-    // Where two texts, one as it was and one as it is, first differ, and
-    // how many lines they then share at their ends: the changed stretch is
-    // [head, size - tail) of each.
-    void edges(const std::vector<std::string>& was, const std::vector<std::string>& now, S32& head, S32& tail)
-    {
-        const size_t most = std::min(was.size(), now.size());
-        size_t       h    = 0;
-        while (h < most && was[h] == now[h])
-        {
-            ++h;
-        }
-        size_t t = 0;
-        while (t < most - h && was[was.size() - 1 - t] == now[now.size() - 1 - t])
-        {
-            ++t;
-        }
-        head = static_cast<S32>(h);
-        tail = static_cast<S32>(t);
-    }
 
     // A place in both texts: so many lines of the left and of the right.
     struct Place
@@ -79,9 +60,10 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const std::vector<std::string>
     {
         return false;
     }
-    S32 lh = 0, lt = 0, rh = 0, rt = 0;
-    edges(left_was, left, lh, lt);
-    edges(right_was, right, rh, rt);
+    // The changed stretch is [head, size - tail) of each; a side passed as
+    // itself is not read.
+    const auto [lh, lt] = ALDiffEdit::edgesOf(left_was, left);
+    const auto [rh, rt] = ALDiffEdit::edgesOf(right_was, right);
     const S32 ln_was = static_cast<S32>(left_was.size());
     const S32 rn_was = static_cast<S32>(right_was.size());
     const bool left_same  = lh == ln_was && ln_was == static_cast<S32>(left.size());
@@ -257,9 +239,7 @@ ALDiffSplice::LineMap ALDiffSplice::lineMap(const std::vector<std::string>& was,
     map.to.assign(was.size() + 1, static_cast<S32>(now.size()));
     map.same.assign(was.size(), false);
     map.last  = std::max(0, static_cast<S32>(now.size()) - 1);
-    S32 head = 0;
-    S32 tail = 0;
-    edges(was, now, head, tail);
+    const auto [head, tail] = ALDiffEdit::edgesOf(was, now);
     for (S32 line = 0; line < head; ++line)
     {
         map.to[static_cast<size_t>(line)]   = line;

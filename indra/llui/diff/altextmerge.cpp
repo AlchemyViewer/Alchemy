@@ -28,53 +28,45 @@
 
 #include <algorithm>
 
-namespace
+ALTextMerge::changes_t ALTextMerge::changesOf(const std::vector<std::string>& base, const std::vector<std::string>& text, const ALTextDiff::Options& options)
 {
-    // A change one text made of the base: the base's lines [base, base_end)
-    // become its lines [at, at_end).
-    struct Change
+    const std::vector<ALTextDiff::Run> runs = ALTextDiff::lines(base, text, options);
+    changes_t                          out;
+    for (size_t i = 0; i < runs.size();)
     {
-        S32 base    = 0;
-        S32 baseEnd = 0;
-        S32 at      = 0;
-        S32 atEnd   = 0;
-    };
-
-    std::vector<Change> changesOf(const std::vector<ALTextDiff::Run>& runs)
-    {
-        std::vector<Change> out;
-        for (size_t i = 0; i < runs.size();)
+        if (runs[i].kind == ALTextDiff::Kind::Same)
         {
-            if (runs[i].kind == ALTextDiff::Kind::Same)
-            {
-                ++i;
-                continue;
-            }
-            Change change{ runs[i].left, runs[i].left, runs[i].right, runs[i].right };
-            for (; i < runs.size() && runs[i].kind != ALTextDiff::Kind::Same; ++i)
-            {
-                if (runs[i].kind == ALTextDiff::Kind::Removed)
-                {
-                    change.baseEnd = runs[i].left + runs[i].count;
-                }
-                else
-                {
-                    change.atEnd = runs[i].right + runs[i].count;
-                }
-            }
-            change.baseEnd = std::max(change.baseEnd, change.base);
-            change.atEnd   = std::max(change.atEnd, change.at);
-            out.push_back(change);
+            ++i;
+            continue;
         }
-        return out;
+        Change change{ runs[i].left, runs[i].left, runs[i].right, runs[i].right };
+        for (; i < runs.size() && runs[i].kind != ALTextDiff::Kind::Same; ++i)
+        {
+            if (runs[i].kind == ALTextDiff::Kind::Removed)
+            {
+                change.baseEnd = runs[i].left + runs[i].count;
+            }
+            else
+            {
+                change.atEnd = runs[i].right + runs[i].count;
+            }
+        }
+        change.baseEnd = std::max(change.baseEnd, change.base);
+        change.atEnd   = std::max(change.atEnd, change.at);
+        out.push_back(change);
     }
+    return out;
 }
 
 ALTextMerge::hunks_t ALTextMerge::merge(const std::vector<std::string>& base, const std::vector<std::string>& ours, const std::vector<std::string>& theirs,
                                         const ALTextDiff::Options& options)
 {
-    const std::vector<Change> mine  = changesOf(ALTextDiff::lines(base, ours, options));
-    const std::vector<Change> other = changesOf(ALTextDiff::lines(base, theirs, options));
+    return merge(static_cast<S32>(base.size()), changesOf(base, ours, options), changesOf(base, theirs, options), ours, theirs, options);
+}
+
+ALTextMerge::hunks_t ALTextMerge::merge(S32 base_lines, const changes_t& mine, const changes_t& other, const std::vector<std::string>& ours,
+                                        const std::vector<std::string>& theirs, const ALTextDiff::Options& options)
+{
     hunks_t                   out;
     size_t                    i      = 0;
     size_t                    j      = 0;
@@ -145,7 +137,7 @@ ALTextMerge::hunks_t ALTextMerge::merge(const std::vector<std::string>& base, co
         off_o += grew_o;
         off_t += grew_t;
     }
-    same(static_cast<S32>(base.size()));
+    same(base_lines);
     return out;
 }
 

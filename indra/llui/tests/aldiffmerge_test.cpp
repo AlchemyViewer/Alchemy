@@ -47,7 +47,7 @@ namespace tut
             ALTextRange range;
             std::string put;
             std::string made;
-            if (!ALDiffEdit::replaceLines(text, ALTextDiff::split(text), first, count, with, range, put, made))
+            if (!ALDiffEdit::replaceLines(ALTextDiff::split(text), first, count, with, range, put, made))
             {
                 return "none";
             }
@@ -90,7 +90,7 @@ namespace tut
         // made, the base as it is left.
         void settle(S32 line, ALTextMerge::Take take)
         {
-            const std::optional<ALDiffMerge::Settling> settling = merge->settle(inOurs(line, 1), take, ours);
+            const std::optional<ALDiffMerge::Settling> settling = merge->settle(inOurs(line, 1), take);
             ensure("settled", settling.has_value());
             merge->settled(settling->base);
             if (settling->edits)
@@ -167,7 +167,7 @@ namespace tut
         ensure_equals("settled", merge->conflictCount(), 0);
 
         begin(b, o, t);
-        const std::optional<ALDiffMerge::Settling> kept = merge->settle(inOurs(1, 1), ALTextMerge::Take::Ours, ours);
+        const std::optional<ALDiffMerge::Settling> kept = merge->settle(inOurs(1, 1), ALTextMerge::Take::Ours);
         ensure("ours: no edit", kept && !kept->edits);
         ensure_equals("the base taken as theirs there", joined(kept->base), t);
         merge->settled(kept->base);
@@ -192,14 +192,14 @@ namespace tut
         ensure_equals("two", merge->conflictCount(), 2);
         const std::vector<size_t> both = inOurs(0, 5);
         ensure_equals("both by a stretch over them", both.size(), 2U);
-        const std::optional<ALDiffMerge::Settling> settling = merge->settle(both, ALTextMerge::Take::Theirs, ours);
+        const std::optional<ALDiffMerge::Settling> settling = merge->settle(both, ALTextMerge::Take::Theirs);
         ensure("an edit", settling && settling->edits);
         ensure_equals("each theirs, the lines between kept", settling->made, t);
         merge->settled(settling->base);
         becomes(settling->made);
         ensure_equals("none left", merge->conflictCount(), 0);
-        ensure("nothing to settle", !merge->settle({ 0 }, ALTextMerge::Take::Theirs, ours));
-        ensure("nor past the hunks", !merge->settle({ 99 }, ALTextMerge::Take::Theirs, ours));
+        ensure("nothing to settle", !merge->settle({ 0 }, ALTextMerge::Take::Theirs));
+        ensure("nor past the hunks", !merge->settle({ 99 }, ALTextMerge::Take::Theirs));
     }
 
     template<> template<>
@@ -219,5 +219,33 @@ namespace tut
         loose.algorithm = ALTextDiff::Algorithm::Structural;
         merge->setOptions(loose);
         ensure_equals("still none", merge->conflictCount(), 0);
+    }
+
+    template<> template<>
+    void aldiffmerge_object::test<7>()
+    {
+        set_test_name("the edit that makes one text another, between their edges, made with LF whatever the text's line ends; theirs's changes found again with the options");
+        const lines_t was = ALTextDiff::split("a\nb\nc");
+        ALTextRange   range;
+        std::string   put;
+        std::string   made;
+        ensure("lines put in between", ALDiffEdit::becoming(was, ALTextDiff::split("a\nx\ny\nc"), range, put, made));
+        ensure("in place of the line between", range == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 1)) && put == "x\ny" && made == "a\nx\ny\nc");
+        ensure("the same: nothing", !ALDiffEdit::becoming(was, ALTextDiff::split("a\nb\nc"), range, put, made));
+        const ALDiffEdit::Edges self = ALDiffEdit::edgesOf(was, was);
+        const ALDiffEdit::Edges copy = ALDiffEdit::edgesOf(was, lines_t(was));
+        ensure("a text with itself as with its copy", self.head == 3 && self.tail == 0 && copy.head == 3 && copy.tail == 0);
+        const ALDiffEdit::Edges ends = ALDiffEdit::edgesOf(ALTextDiff::split("a\nb\nc\nd"), ALTextDiff::split("a\nx\nd"));
+        ensure("the lines shared at either end", ends.head == 1 && ends.tail == 1);
+        ensure_equals("lines a CR ends: LF made", replaced("a\r\nb\rc", 1, 1, { "x" }), std::string("a\nx\nc"));
+
+        // Theirs changed only blanks, ours the line: a conflict as they are,
+        // none with blanks let go of -- theirs's change found again.
+        begin("y = 2;", "y = 5;", "y  =  2;");
+        ensure_equals("as they are, a conflict", merge->conflictCount(), 1);
+        ALTextDiff::Options loose;
+        loose.like.ignoreWhitespace = true;
+        merge->setOptions(loose);
+        ensure_equals("theirs no change: none", merge->conflictCount(), 0);
     }
 }

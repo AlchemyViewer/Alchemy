@@ -51,7 +51,8 @@ namespace ALDiffSplice
 
     // The runs of `left` and `right`, from those of what they were; false,
     // leaving them as they were, where the whole must be compared again.
-    // The options' anchors are of the texts as they are.
+    // The options' anchors are of the texts as they are. A side that did
+    // not change is passed as itself, both as it was and as it is.
     bool splice(std::vector<ALTextDiff::Run>& runs, const std::vector<std::string>& left_was, const std::vector<std::string>& left,
                 const std::vector<std::string>& right_was, const std::vector<std::string>& right, const ALTextDiff::Options& options);
 

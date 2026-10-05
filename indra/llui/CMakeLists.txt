@@ -378,6 +378,7 @@ target_sources(
         diff/aldiffsplice.h
         diff/aldifftokens.h
         diff/aldiffview.h
+        text/allinebreaks.h
         diff/allinediff.h
         diff/allinepairs.h
         diff/alstructuraldiff.h

@@ -83,20 +83,23 @@ public:
         std::string made;
         lines_t     base;
     };
-    std::optional<Settling> settle(const std::vector<size_t>& conflicts, ALTextMerge::Take take, const std::string& ours_text) const;
+    std::optional<Settling> settle(const std::vector<size_t>& conflicts, ALTextMerge::Take take) const;
     // The base as a settling leaves it: the merge found again.
     void settled(lines_t base);
 
 private:
+    // The merge found again from ours; and theirs's changes of the base
+    // found again first, which only the base and the options change.
     void find();
-    // The options a merge compares by: lines, as told the same.
-    static ALTextDiff::Options linesOnly(const ALTextDiff::Options& options);
+    void findTheirs();
 
-    lines_t              mBase;
-    lines_t              mTheirs;
-    lines_t              mOurs;
-    ALTextDiff::Options  mOptions;
-    ALTextMerge::hunks_t mHunks;
+    lines_t                mBase;
+    lines_t                mTheirs;
+    lines_t                mOurs;
+    // By lines alone, as told the same (ALTextDiff::linesOnly).
+    ALTextDiff::Options    mOptions;
+    ALTextMerge::changes_t mTheirChanges;
+    ALTextMerge::hunks_t   mHunks;
 };
 
 #endif // AL_ALDIFFMERGE_H

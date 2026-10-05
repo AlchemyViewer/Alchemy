@@ -129,4 +129,12 @@ namespace tut
         ensure_equals("nothing, blank lines let go of", diff("a\nb\n", "a\n\nb\n", lines), std::string());
         ensure_equals("but within another's stretch, said", diff("a\nb\n", "a\n\nc\n", lines), std::string("--- a\n+++ b\n@@ -1,2 +1,3 @@\n a\n-b\n+\n+c\n"));
     }
+
+    template<> template<>
+    void alunifieddiff_object::test<6>()
+    {
+        set_test_name("lines ended by CR LF or a lone CR read as an editor reads them, a last one ending its line");
+        ensure_equals("CR LF", diff("a\r\nb\r\n", "a\r\nc\r\n"), std::string("--- a\n+++ b\n@@ -1,2 +1,2 @@\n a\n-b\n+c\n"));
+        ensure_equals("a lone CR", diff("a\rb\r", "a\rc\r"), std::string("--- a\n+++ b\n@@ -1,2 +1,2 @@\n a\n-b\n+c\n"));
+    }
 }

@@ -794,4 +794,21 @@ namespace tut
         m.setLexer(nullptr);
         ensure("let go of no longer", !m.likeness().ignoreComments && m.changeCount() == 1);
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<25>()
+    {
+        set_test_name("texts ended by CR LF or a lone CR: lines as an editor reads them, the texts with LF, a side's text the whole of it");
+        m.setTexts("a\rb\r\nc", "a\rB\nc");
+        ensure_equals("the texts with LF", m.leftText(), std::string("a\nb\nc"));
+        ensure_equals("a lone CR a break", m.lineCount(Column::Left), 3);
+        ensure("the changed line the second", m.changeCount() == 1 && m.changeLines(0).leftFirst == 1 && m.changeLines(0).rightFirst == 1);
+        ensure("a side's text the whole", m.text(Column::Left) == m.leftText() && m.text(Column::Right) == m.rightText());
+        ensure_equals("inline, both's lines", m.text(Column::Inline), std::string("a\nb\nB\nc"));
+        m.setSwapped(true);
+        ensure("swapped, each the other's", m.text(Column::Left) == m.rightText() && m.text(Column::Right) == m.leftText());
+        ensure_equals("inline, the right's taken out", m.text(Column::Inline), std::string("a\nB\nb\nc"));
+        m.setRightText("a\r\nB\r\nc\r\nd");
+        ensure("made anew with CR LF: LF, a line put in", m.rightText() == "a\nB\nc\nd" && m.changeCount() == 2);
+    }
 }

@@ -124,10 +124,13 @@ namespace tut
     template<> template<>
     void altextdiff_object::test<1>()
     {
-        set_test_name("a text split into its lines, as a document has them");
+        set_test_name("a text split into its lines, as a document has them: CR LF and a lone CR breaks");
         ensure("one empty line", ALTextDiff::split("") == std::vector<std::string>{ "" });
         ensure("a last line after the last break", ALTextDiff::split("a\nb\n") == std::vector<std::string>{ "a", "b", "" });
         ensure("CR LF as one", ALTextDiff::split("a\r\nb") == std::vector<std::string>{ "a", "b" });
+        // A lone CR a break too, as an editor reads it, so that a line here
+        // is a line of the editor the text is shown in.
+        ensure("a lone CR a break", ALTextDiff::split("a\rb\r\nc\r") == std::vector<std::string>{ "a", "b", "c", "" });
     }
 
     template<> template<>

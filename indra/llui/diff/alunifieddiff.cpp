@@ -42,7 +42,7 @@ namespace
     {
         Text out;
         out.lines  = ALTextDiff::split(text);
-        out.broken = text.empty() || text.back() == '\n';
+        out.broken = text.empty() || text.back() == '\n' || text.back() == '\r';
         if (out.broken)
         {
             out.lines.pop_back();
@@ -86,10 +86,8 @@ std::string ALUnifiedDiff::write(std::string_view left, std::string_view right, 
     }
     // By lines, as told the same; nothing lined up, cut by a grammar, or
     // read as tokens.
-    ALTextDiff::Options by_lines;
-    by_lines.algorithm = options.algorithm == ALTextDiff::Algorithm::Structural ? ALTextDiff::Algorithm::Histogram : options.algorithm;
-    by_lines.like      = options.like;
-    const std::vector<ALTextDiff::Run> runs = ALTextDiff::lines(compared_left, compared_right, by_lines);
+    const ALTextDiff::Options          by_lines = ALTextDiff::linesOnly(options);
+    const std::vector<ALTextDiff::Run> runs     = ALTextDiff::lines(compared_left, compared_right, by_lines);
 
     // Each line of the diff, a change's taken out before its put in; and
     // each change's first and last, where it is more than lines let go of.

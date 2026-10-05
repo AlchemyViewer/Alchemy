@@ -28,6 +28,7 @@
 
 #include "aldiffedit.h"
 #include "aldiffrangesame.h"
+#include "allinebreaks.h"
 #include "allinepairs.h"
 #include "alstructuraldiff.h"
 
@@ -46,8 +47,8 @@ void ALDiffModel::setTexts(std::string_view left, std::string_view right, const 
 {
     mNotes.clear();
     mMerge.reset();
-    mLeftText   = std::string(left);
-    mRightText  = std::string(right);
+    mLeftText   = ALLineBreaks::withLineFeeds(left);
+    mRightText  = ALLineBreaks::withLineFeeds(right);
     mLeftLines  = ALTextDiff::split(mLeftText);
     mRightLines = ALTextDiff::split(mRightText);
     mRanges     = ranges;
@@ -86,7 +87,7 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
     }
     // Compared again where it changed (ALDiffSplice), else all of it.
     std::vector<std::string> before = std::move(mRightLines);
-    mRightText                      = std::string(right);
+    mRightText                      = ALLineBreaks::withLineFeeds(right);
     mRightLines                     = std::move(now);
     if (mMerge)
     {
@@ -176,11 +177,14 @@ void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer)
 S32 ALDiffModel::add(Column column, const std::string& text, S32 number, Kind kind, char sign)
 {
     ColumnData& c = of(column);
-    if (!c.lines.empty())
+    if (column == Column::Inline)
     {
-        c.text += '\n';
+        if (!c.lines.empty())
+        {
+            mInlineText += '\n';
+        }
+        mInlineText += text;
     }
-    c.text += text;
     Line& line   = c.lines.emplace_back();
     line.kind    = kind;
     line.sign    = sign;
@@ -311,8 +315,17 @@ void ALDiffModel::layout(const std::vector<bool>& open)
     }
     for (ColumnData& c : mColumns)
     {
-        c = ColumnData();
+        c.lines.clear();
+        c.lineOf.clear();
+        c.rowOf.clear();
+        c.pending    = 0;
+        c.endPadding = 0;
     }
+    of(Column::Left).lines.reserve(left.size());
+    of(Column::Right).lines.reserve(right.size());
+    of(Column::Inline).lines.reserve(right.size());
+    mInlineText.clear();
+    mInlineText.reserve((mSwapped ? mLeftText : mRightText).size());
     mChanges.clear();
     std::vector<Fold> folds;
     // Each inline row's line of the left and of the right as shown.
@@ -839,7 +852,7 @@ bool ALDiffModel::takeBack(S32 change, ALTextRange& range, std::string& text, st
     // right's text (ALDiffEdit).
     const ChangeLines&             c = mChanges[static_cast<size_t>(change)].lines;
     const std::vector<std::string> left(mLeftLines.begin() + c.leftFirst, mLeftLines.begin() + c.leftFirst + c.leftCount);
-    return ALDiffEdit::replaceLines(mRightText, mRightLines, c.rightFirst, c.rightCount, left, range, text, made);
+    return ALDiffEdit::replaceLines(mRightLines, c.rightFirst, c.rightCount, left, range, text, made);
 }
 
 std::string ALDiffModel::changeText(S32 change, bool given_left) const
@@ -901,7 +914,7 @@ std::optional<ALDiffMerge::Settling> ALDiffModel::settle(S32 change, ALTextMerge
         return std::nullopt;
     }
     const ChangeLines& c = mChanges[static_cast<size_t>(change)].lines;
-    return mMerge->settle(mMerge->conflictsIn(c.leftFirst, c.leftCount, c.rightFirst, c.rightCount), take, mRightText);
+    return mMerge->settle(mMerge->conflictsIn(c.leftFirst, c.leftCount, c.rightFirst, c.rightCount), take);
 }
 
 void ALDiffModel::settled(ALDiffMerge::lines_t base)

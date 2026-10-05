@@ -239,13 +239,12 @@ bool ALChangePeek::takeBack()
     {
         return false;
     }
-    const Change                   c   = change();
-    const std::string              now = mHost.wholeText();
+    const Change                   c = change();
     const std::vector<std::string> was(mSavedLines.begin() + c.saved, mSavedLines.begin() + c.saved + c.savedCount);
     ALTextRange                    range;
     std::string                    put;
     std::string                    made;
-    if (!ALDiffEdit::replaceLines(now, ALTextDiff::split(now), c.now, c.nowCount, was, range, put, made))
+    if (!ALDiffEdit::replaceLines(ALTextDiff::split(mHost.wholeText()), c.now, c.nowCount, was, range, put, made))
     {
         return false;
     }

@@ -170,6 +170,11 @@ namespace ALTextDiff
         same_t    same;
     };
 
+    // The options by lines alone, as told the same: no anchors, no grammar,
+    // no words alike, and lines found as Histogram finds them where
+    // structure was asked for -- what a merge and a unified diff compare by.
+    Options linesOnly(const Options& options);
+
     // The runs that make the left the right, compared as `options` says.
     std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options = Options());
     // Stretches known to stand for each other -- an LSL statement and the
@@ -200,7 +205,9 @@ namespace ALTextDiff
     // that wrote nothing of its own.
     anchors_t anchorsOf(const ranges_t& ranges);
 
-    // A text's lines, for lines().
+    // A text's lines, for lines(), read as a document reads them
+    // (ALLineBreaks): CRLF and a lone CR as LF, so that a line here is a
+    // line of the editor the text is shown in.
     std::vector<std::string> split(std::string_view text);
 
     // Within one line changed into another, the stretches of each, as

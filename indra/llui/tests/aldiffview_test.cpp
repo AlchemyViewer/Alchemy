@@ -1111,4 +1111,15 @@ namespace tut
         ensure("no grammar: not let go of, nor offered, the bar unlit", !d.ignores("comments") && !d.offersIgnore("comments") && d.changeCount() == 1 &&
                                                                        !ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
     }
+
+    template<> template<>
+    void aldiffview_object::test<33>()
+    {
+        set_test_name("a lone CR a line break to the comparison as to its editors: each change tinted on the line it is on");
+        ALDiffView& d = make("a\rb\rc\rd", "a\rb\rC\rd");
+        ensure_equals("four lines a side", d.left()->document().lineCount(), 4);
+        ensure("the third tinted, its neighbours not", tinted(*d.left(), 2) && !tinted(*d.left(), 1) && !tinted(*d.left(), 3) && tinted(*d.right(), 2));
+        d.setRightText("a\rb\rC\rd\re");
+        ensure("typed in: the line put in the fifth", tinted(*d.right(), 4) && !tinted(*d.right(), 3) && d.right()->document().lineCount() == 5);
+    }
 }

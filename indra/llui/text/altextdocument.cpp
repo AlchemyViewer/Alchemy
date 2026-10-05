@@ -26,6 +26,7 @@
 
 #include "altextdocument.h"
 
+#include "allinebreaks.h"
 #include "altextchars.h"
 #include "llstring.h"
 
@@ -34,85 +35,6 @@
 namespace
 {
     const std::string EMPTY_LINE;
-
-    // Lines out of text, whatever its line endings: CRLF and a lone CR read
-    // as LF. The breaks are counted first, so that the list is made once,
-    // and each line is made at once, as long as it is: a script loaded is
-    // tens of thousands of lines.
-    void splitLines(std::string_view text, std::vector<std::string>& out)
-    {
-        out.clear();
-        out.reserve(static_cast<size_t>(std::count(text.begin(), text.end(), '\n')) + 1);
-        // The next CR, found again only once it is behind: a text with
-        // none, or one far on, is not searched for it at every line.
-        constexpr size_t NONE    = std::string_view::npos;
-        size_t           next_cr = text.find('\r');
-        size_t           start   = 0;
-        while (true)
-        {
-            if (next_cr != NONE && next_cr < start)
-            {
-                next_cr = text.find('\r', start);
-            }
-            const size_t at = std::min(text.find('\n', start), next_cr);
-            if (at == NONE)
-            {
-                out.emplace_back(text.substr(start));
-                return;
-            }
-            out.emplace_back(text.substr(start, at - start));
-            start = at + 1;
-            if (text[at] == '\r' && start < text.size() && text[start] == '\n')
-            {
-                ++start;
-            }
-        }
-    }
-
-    std::string joinLines(const std::vector<std::string>& lines)
-    {
-        size_t size = lines.size();
-        for (const std::string& line : lines)
-        {
-            size += line.size();
-        }
-        std::string out;
-        out.reserve(size);
-        for (size_t i = 0; i < lines.size(); ++i)
-        {
-            if (i)
-            {
-                out.push_back('\n');
-            }
-            out += lines[i];
-        }
-        return out;
-    }
-
-    // Text with its line endings as LF: CRLF and a lone CR read as LF.
-    std::string withLineFeeds(std::string_view text)
-    {
-        if (text.find('\r') == std::string_view::npos)
-        {
-            return std::string(text);
-        }
-        std::string out;
-        out.reserve(text.size());
-        for (size_t i = 0; i < text.size(); ++i)
-        {
-            if (text[i] != '\r')
-            {
-                out.push_back(text[i]);
-                continue;
-            }
-            out.push_back('\n');
-            if (i + 1 < text.size() && text[i + 1] == '\n')
-            {
-                ++i;
-            }
-        }
-        return out;
-    }
 }
 
 // --- Edit --------------------------------------------------------------------
@@ -357,7 +279,7 @@ ALTextDocument::ALTextDocument()
 ALTextDocument::ALTextDocument(std::string_view text)
 {
     std::vector<std::string> lines;
-    splitLines(text, lines);
+    ALLineBreaks::split(text, lines);
     mLines.swap(lines);
 }
 
@@ -368,7 +290,7 @@ ALTextDocument::Edit ALTextDocument::setText(std::string_view text)
 
 std::string ALTextDocument::text() const
 {
-    return joinLines(mLines.rows());
+    return ALLineBreaks::join(mLines.rows());
 }
 
 const std::string& ALTextDocument::wholeText() const
@@ -512,7 +434,7 @@ ALTextDocument::Edit ALTextDocument::replaceMany(std::vector<std::pair<ALTextRan
         append(this->text(ALTextRange(at, range.begin)));
         if (piece.find('\r') != std::string::npos)
         {
-            piece = withLineFeeds(piece);
+            piece = ALLineBreaks::withLineFeeds(piece);
         }
         Edit::Part part;
         part.before       = range;
@@ -534,7 +456,7 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
     edit.range    = range;
     edit.removed  = this->text(range);
     // What is put in, its line endings as LF.
-    edit.inserted = withLineFeeds(text);
+    edit.inserted = ALLineBreaks::withLineFeeds(text);
     if (edit.nothing() || edit.removed == edit.inserted)
     {
         // Nothing changes: answered as nothing, where it was asked for.

@@ -151,6 +151,7 @@ public:
     // let go of.
     void    setLexer(ALTextDiff::lexer_t lexer);
 
+    // The texts as given, their line endings LF as an editor reads them.
     const std::string&           leftText() const { return mLeftText; }
     const std::string&           rightText() const { return mRightText; }
     const ALTextDiff::ranges_t&  ranges() const { return mRanges; }
@@ -162,7 +163,12 @@ public:
 
     // --- a column's lines --------------------------------------------------
 
-    const std::string& text(Column column) const { return of(column).text; }
+    // Its lines joined: side by side, the whole text it shows, as given;
+    // inline, the lines of both as they are laid out.
+    const std::string& text(Column column) const
+    {
+        return column == Column::Inline ? mInlineText : (column == Column::Left) != mSwapped ? mLeftText : mRightText;
+    }
     S32                lineCount(Column column) const { return static_cast<S32>(of(column).lines.size()); }
     // Its line; nothing, past its lines.
     const Line&        line(Column column, S32 line) const;
@@ -328,11 +334,12 @@ public:
     S32               foldGapLine(Column column, S32 fold) const;
 
 private:
-    // One column as it is made: its text, its lines, each row's line and
-    // each line's row, and the rows of nothing waiting for its next line.
+    // One column as it is made: its lines, each row's line and each line's
+    // row, and the rows of nothing waiting for its next line. Cleared, not
+    // made anew, as the comparison is laid out again: what it holds is as
+    // long as it was.
     struct ColumnData
     {
-        std::string       text;
         std::vector<Line> lines;
         std::vector<S32>  lineOf;
         std::vector<S32>  rowOf;
@@ -400,6 +407,8 @@ private:
     bool                  mSwapped  = false;
     bool                  mFoldSame = true;
     ColumnData            mColumns[3];
+    // The inline column's lines joined; a side's is the text it shows.
+    std::string           mInlineText;
     // Each row's line of the right's text, side by side and inline.
     std::vector<S32>      mRightRows[2];
     // The inline line showing each line of the left as shown, and of the

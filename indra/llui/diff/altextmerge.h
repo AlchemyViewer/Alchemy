@@ -70,6 +70,22 @@ namespace ALTextMerge
     hunks_t merge(const std::vector<std::string>& base, const std::vector<std::string>& ours, const std::vector<std::string>& theirs,
                   const ALTextDiff::Options& options = ALTextDiff::Options());
 
+    // What a text changed of the base, in order: the base's lines [base,
+    // baseEnd) became its [at, atEnd).
+    struct Change
+    {
+        S32 base    = 0;
+        S32 baseEnd = 0;
+        S32 at      = 0;
+        S32 atEnd   = 0;
+    };
+    typedef std::vector<Change> changes_t;
+    changes_t changesOf(const std::vector<std::string>& base, const std::vector<std::string>& text, const ALTextDiff::Options& options);
+    // Merged from each side's changes of the base, found apart: what one
+    // side made, which stays as the other is worked on, found once.
+    hunks_t   merge(S32 base_lines, const changes_t& ours_changes, const changes_t& theirs_changes, const std::vector<std::string>& ours,
+                    const std::vector<std::string>& theirs, const ALTextDiff::Options& options);
+
     // A conflict settled: ours, theirs, or ours then theirs.
     enum class Take : U8
     {

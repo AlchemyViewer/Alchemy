@@ -27,6 +27,7 @@
 #include "altextdiff.h"
 
 #include "aldiffids.h"
+#include "allinebreaks.h"
 #include "aldifftokens.h"
 #include "allinediff.h"
 #include "alstructuraldiff.h"
@@ -383,23 +384,15 @@ ALTextDiff::anchors_t ALTextDiff::anchorsOf(const ranges_t& ranges)
 
 std::vector<std::string> ALTextDiff::split(std::string_view text)
 {
-    std::vector<std::string> out;
-    size_t                   start = 0;
-    while (true)
-    {
-        const size_t end  = text.find('\n', start);
-        std::string_view line = text.substr(start, end == std::string_view::npos ? std::string_view::npos : end - start);
-        if (!line.empty() && line.back() == '\r')
-        {
-            line.remove_suffix(1);
-        }
-        out.emplace_back(line);
-        if (end == std::string_view::npos)
-        {
-            return out;
-        }
-        start = end + 1;
-    }
+    return ALLineBreaks::split(text);
+}
+
+ALTextDiff::Options ALTextDiff::linesOnly(const Options& options)
+{
+    Options out;
+    out.algorithm = options.algorithm == Algorithm::Structural ? Algorithm::Histogram : options.algorithm;
+    out.like      = options.like;
+    return out;
 }
 
 void ALTextDiff::words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out, const Options& options,

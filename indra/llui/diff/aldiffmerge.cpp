@@ -27,6 +27,7 @@
 #include "aldiffmerge.h"
 
 #include "aldiffedit.h"
+#include "allinebreaks.h"
 
 #include <algorithm>
 
@@ -37,34 +38,14 @@ namespace
     {
         return count > 0 && other_count > 0 && first < other_first + other_count && other_first < first + count;
     }
-
-    std::string joined(const std::vector<std::string>& lines)
-    {
-        std::string out;
-        for (size_t n = 0; n < lines.size(); ++n)
-        {
-            out += (n ? "\n" : "") + lines[n];
-        }
-        return out;
-    }
 }
 
 ALDiffMerge::ALDiffMerge(lines_t base, lines_t theirs, const ALTextDiff::Options& options)
 :   mBase(std::move(base)),
     mTheirs(std::move(theirs)),
-    mOptions(linesOnly(options))
+    mOptions(ALTextDiff::linesOnly(options))
 {
-}
-
-// static
-ALTextDiff::Options ALDiffMerge::linesOnly(const ALTextDiff::Options& options)
-{
-    // By lines alone, as told the same: no anchors, no words, and a way of
-    // finding lines rather than tokens.
-    ALTextDiff::Options out;
-    out.algorithm = options.algorithm == ALTextDiff::Algorithm::Structural ? ALTextDiff::Algorithm::Histogram : options.algorithm;
-    out.like      = options.like;
-    return out;
+    findTheirs();
 }
 
 // static
@@ -73,13 +54,14 @@ std::string ALDiffMerge::start(std::string_view base, std::string_view ours, std
     const lines_t              b     = ALTextDiff::split(base);
     const lines_t              o     = ALTextDiff::split(ours);
     const lines_t              t     = ALTextDiff::split(theirs);
-    const ALTextMerge::hunks_t hunks = ALTextMerge::merge(b, o, t, linesOnly(options));
-    return joined(ALTextMerge::merged(b, o, t, hunks, [](S32) { return ALTextMerge::Take::Ours; }));
+    const ALTextMerge::hunks_t hunks = ALTextMerge::merge(b, o, t, ALTextDiff::linesOnly(options));
+    return ALLineBreaks::join(ALTextMerge::merged(b, o, t, hunks, [](S32) { return ALTextMerge::Take::Ours; }));
 }
 
 void ALDiffMerge::setOptions(const ALTextDiff::Options& options)
 {
-    mOptions = linesOnly(options);
+    mOptions = ALTextDiff::linesOnly(options);
+    findTheirs();
     find();
 }
 
@@ -92,12 +74,18 @@ void ALDiffMerge::setOurs(lines_t ours)
 void ALDiffMerge::settled(lines_t base)
 {
     mBase = std::move(base);
+    findTheirs();
     find();
+}
+
+void ALDiffMerge::findTheirs()
+{
+    mTheirChanges = ALTextMerge::changesOf(mBase, mTheirs, mOptions);
 }
 
 void ALDiffMerge::find()
 {
-    mHunks = ALTextMerge::merge(mBase, mOurs, mTheirs, mOptions);
+    mHunks = ALTextMerge::merge(static_cast<S32>(mBase.size()), ALTextMerge::changesOf(mBase, mOurs, mOptions), mTheirChanges, mOurs, mTheirs, mOptions);
 }
 
 S32 ALDiffMerge::conflictCount() const
@@ -121,8 +109,7 @@ std::vector<size_t> ALDiffMerge::conflictsIn(S32 theirs_first, S32 theirs_count,
     return out;
 }
 
-std::optional<ALDiffMerge::Settling> ALDiffMerge::settle(const std::vector<size_t>& conflicts, ALTextMerge::Take take,
-                                                         const std::string& ours_text) const
+std::optional<ALDiffMerge::Settling> ALDiffMerge::settle(const std::vector<size_t>& conflicts, ALTextMerge::Take take) const
 {
     std::vector<const ALTextMerge::Hunk*> settling;
     for (const size_t i : conflicts)
@@ -174,7 +161,7 @@ std::optional<ALDiffMerge::Settling> ALDiffMerge::settle(const std::vector<size_
     }
     if (!std::equal(made.begin(), made.end(), mOurs.begin() + first, mOurs.begin() + end))
     {
-        out.edits = ALDiffEdit::replaceLines(ours_text, mOurs, first, end - first, made, out.range, out.text, out.made);
+        out.edits = ALDiffEdit::replaceLines(mOurs, first, end - first, made, out.range, out.text, out.made);
     }
     return out;
 }

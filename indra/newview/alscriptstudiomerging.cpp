@@ -104,26 +104,9 @@ bool ALScriptStudioMerging::merge(Doc& doc, const std::string& theirs, const std
 // static
 bool ALScriptStudioMerging::becomes(Doc& doc, const std::string& text)
 {
-    const std::string              now  = doc.editor->wholeText();
-    const std::vector<std::string> was  = ALTextDiff::split(now);
-    const std::vector<std::string> will = ALTextDiff::split(text);
-    size_t                         head = 0;
-    while (head < was.size() && head < will.size() && was[head] == will[head])
-    {
-        ++head;
-    }
-    size_t tail = 0;
-    while (tail < was.size() - head && tail < will.size() - head && was[was.size() - 1 - tail] == will[will.size() - 1 - tail])
-    {
-        ++tail;
-    }
-    const std::vector<std::string> with(will.begin() + head, will.end() - tail);
-    ALTextRange                    range;
-    std::string                    put;
-    std::string                    made;
-    if (!ALDiffEdit::replaceLines(now, was, static_cast<S32>(head), static_cast<S32>(was.size() - head - tail), with, range, put, made))
-    {
-        return false;
-    }
-    return doc.editor->replaceAll({ { range, put } });
+    ALTextRange range;
+    std::string put;
+    std::string made;
+    return ALDiffEdit::becoming(ALTextDiff::split(doc.editor->wholeText()), ALTextDiff::split(text), range, put, made) &&
+           doc.editor->replaceAll({ { range, put } });
 }
