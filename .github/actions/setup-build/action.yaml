@@ -99,25 +99,30 @@ runs:
       with:
         python-version: "3.14"
 
-    # Linux builds with the CMake floor, so the floor is a floor; the Visual
-    # Studio 2026 generator needs a newer one. Both are pinned: vcpkg builds
-    # the ports with this CMake and hashes its version into every package
-    # ABI, so a CMake release on PyPI would otherwise miss the whole binary
-    # cache until a protected build filled it again.
-    - name: Install python dependencies
-      shell: bash
-      run: |
-        if [[ "$RUNNER_OS" == "Linux" ]]
-        then pip3 install llsd cmake==4.0.0 ninja==1.13.2
-        else pip3 install llsd cmake==4.4.3 ninja==1.13.2
-        fi
-
     # What a Developer Command Prompt has, for the runner's architecture,
     # but Visual Studio's CMake, Ninja and vcpkg.
     - name: MSVC environment
       if: runner.os == 'Windows' && inputs.msvc-environment == 'true'
       shell: pwsh
       run: python scripts/ci/msvc_environment.py
+
+    # After the MSVC environment, so nothing it puts on the path comes ahead
+    # of these. Linux builds with the CMake floor, so the floor is a floor;
+    # the Visual Studio 2026 generator needs a newer one. Both are pinned:
+    # vcpkg builds the ports with this CMake and hashes its version into
+    # every package ABI, so a CMake release on PyPI would otherwise miss the
+    # whole binary cache until a protected build filled it again. llsd is
+    # for the tests that spawn a Python peer, sentry-cli uploads the debug
+    # files.
+    - name: Python tools
+      uses: ./.github/actions/python-tools
+      with:
+        requirements: |
+          cmake==4.0.0; sys_platform == "linux"
+          cmake==4.4.3; sys_platform != "linux"
+          ninja==1.13.2
+          llsd==1.2.4
+          sentry-cli==3.7.0
 
     - name: Bootstrap vcpkg Windows
       if: runner.os == 'Windows'

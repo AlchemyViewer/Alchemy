@@ -515,8 +515,7 @@ jobs:
             exit 1
           fi
 
-          pip3 install sentry-cli==3.7.0
-
+          # sentry-cli is one of the setup's Python tools.
           cmake --build "$BUILD_DIRECTORY" --config Release --target symbols
           sentry-cli debug-files upload --include-sources --wait "$BUILD_DIRECTORY/symbols/Release"
 
@@ -683,8 +682,8 @@ jobs:
       NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
     steps:
       # The app and its metadata come from the build's artifacts; the tree
-      # contributes the .NET tool manifest, the signing script, the
-      # entitlements and the disk image's layout.
+      # contributes the .NET tool manifest, the Python tools' action, the
+      # signing script, the entitlements and the disk image's layout.
       - name: Checkout code
         uses: actions/checkout@v7
         with:
@@ -692,6 +691,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           sparse-checkout: |
             /dotnet-tools.json
+            /.github/actions/python-tools/
+            /scripts/ci/python_tools.py
             /indra/cmake/ViewerCodeSign.cmake
             /indra/newview/slplugin.entitlements
             /indra/newview/installers/darwin/
@@ -717,9 +718,14 @@ jobs:
         with:
           python-version: "3.14"
 
-      # The badge_icons extra badges the volume icon through Quartz.
+      # CMake runs the signing script; the badge_icons extra badges the
+      # volume icon through Quartz.
       - name: Install CMake and dmgbuild
-        run: pip install cmake "dmgbuild[badge_icons]==1.6.7"
+        uses: ./.github/actions/python-tools
+        with:
+          requirements: |
+            cmake==4.4.3
+            dmgbuild[badge_icons]==1.6.7
 
       - name: Fetch macOS app
         uses: actions/download-artifact@v8
