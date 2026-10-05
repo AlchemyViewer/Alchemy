@@ -61,6 +61,9 @@ namespace ALDiffTokens
     // Whether a word is a run of blanks; of word bytes.
     bool isBlank(std::string_view line, const Token& token);
     bool isWord(std::string_view line, const Token& token);
+    // A stretch of a line marked, after those before it: made one with the
+    // last where it is beside it, or only blanks are between them.
+    void mark(ALTextDiff::spans_t& spans, std::string_view line, S32 begin, S32 end);
 }
 
 #endif // AL_ALDIFFTOKENS_H

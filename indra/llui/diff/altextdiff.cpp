@@ -280,25 +280,7 @@ std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& l
     // Lined up at the anchors: each stretch between two on its own.
     const anchors_t  kept = keptAnchors(options.anchors, n, m);
     std::vector<Run> out;
-    const auto       push = [&out](const Run& run) {
-        if (run.count <= 0 && run.kind != Kind::Same)
-        {
-            return;
-        }
-        if (run.count > 0 && !out.empty() && out.back().kind == run.kind && out.back().count > 0)
-        {
-            Run&       last = out.back();
-            const bool next = run.kind == Kind::Same      ? last.left + last.count == run.left && last.right + last.count == run.right
-                              : run.kind == Kind::Removed ? last.left + last.count == run.left && last.right == run.right
-                                                          : last.right + last.count == run.right && last.left == run.left;
-            if (next)
-            {
-                last.count += run.count;
-                return;
-            }
-        }
-        out.push_back(run);
-    };
+    const auto       push = [&out](const Run& run) { ALLineDiff::keep(out, run); };
     S32 l = 0;
     S32 r = 0;
     for (size_t i = 0; i <= kept.size(); ++i)
@@ -333,6 +315,22 @@ std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& l
         r = to_right + 1;
     }
     return out;
+}
+
+size_t ALTextDiff::changeAt(const std::vector<Run>& runs, size_t from, std::vector<S32>& gone, std::vector<S32>& made)
+{
+    gone.clear();
+    made.clear();
+    size_t i = from;
+    for (; i < runs.size() && runs[i].kind != Kind::Same; ++i)
+    {
+        const bool out = runs[i].kind == Kind::Removed;
+        for (S32 n = 0; n < runs[i].count; ++n)
+        {
+            (out ? gone : made).push_back((out ? runs[i].left : runs[i].right) + n);
+        }
+    }
+    return i;
 }
 
 ALTextDiff::anchors_t ALTextDiff::anchorsOf(const ranges_t& ranges)

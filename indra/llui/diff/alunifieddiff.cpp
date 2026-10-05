@@ -84,10 +84,19 @@ std::string ALUnifiedDiff::write(std::string_view left, std::string_view right, 
     {
         compared_right.back() += '\n';
     }
-    // By lines, as told the same; nothing lined up, cut by a grammar, or
-    // read as tokens.
-    const ALTextDiff::Options          by_lines = ALTextDiff::linesOnly(options);
-    const std::vector<ALTextDiff::Run> runs     = ALTextDiff::lines(compared_left, compared_right, by_lines);
+    // By lines, as told the same; nothing lined up or read as tokens, and
+    // a grammar only to say where comments are let go of.
+    ALTextDiff::Options by_lines = ALTextDiff::linesOnly(options);
+    if (options.like.ignoreComments)
+    {
+        by_lines.lexer = options.lexer;
+    }
+    const std::vector<ALTextDiff::Run>        runs          = ALTextDiff::lines(compared_left, compared_right, by_lines);
+    const std::vector<ALTextDiff::regions_t>* left_regions  = by_lines.lexer ? &by_lines.lexer(compared_left) : nullptr;
+    const std::vector<ALTextDiff::regions_t>* right_regions = by_lines.lexer ? &by_lines.lexer(compared_right) : nullptr;
+    const auto                                regionsOf     = [](const std::vector<ALTextDiff::regions_t>* regions, S32 line) {
+        return regions && line < static_cast<S32>(regions->size()) ? &(*regions)[static_cast<size_t>(line)] : nullptr;
+    };
 
     // Each line of the diff, a change's taken out before its put in; and
     // each change's first and last, where it is more than lines let go of.
@@ -114,7 +123,8 @@ std::string ALUnifiedDiff::write(std::string_view left, std::string_view right, 
             {
                 const S32 at = (removed ? runs[i].left : runs[i].right) + n;
                 (removed ? out : in).push_back({ removed ? '-' : '+', removed ? at : runs[i].left, removed ? runs[i].right : at });
-                ignorable = ignorable && ALTextDiff::ignorable((removed ? l : r).lines[static_cast<size_t>(at)], by_lines.like);
+                ignorable = ignorable && ALTextDiff::ignorable((removed ? l : r).lines[static_cast<size_t>(at)], by_lines.like,
+                                                               regionsOf(removed ? left_regions : right_regions, at));
             }
         }
         const S32 first = static_cast<S32>(ops.size());

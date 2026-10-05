@@ -101,28 +101,6 @@ namespace
         return at >= text.size() || (static_cast<unsigned char>(text[at]) & 0xC0) != 0x80;
     }
 
-    // Spans side by side, or with only blanks between them, made one.
-    void add(ALTextDiff::spans_t& out, std::string_view line, S32 begin, S32 end)
-    {
-        if (begin >= end)
-        {
-            return;
-        }
-        if (!out.empty() && out.back().second <= begin)
-        {
-            S32 at = out.back().second;
-            while (at < begin && ALDiffTokens::blank(line[static_cast<size_t>(at)]))
-            {
-                ++at;
-            }
-            if (at == begin)
-            {
-                out.back().second = std::max(out.back().second, end);
-                return;
-            }
-        }
-        out.emplace_back(begin, end);
-    }
 }
 
 void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff::spans_t& left_out, ALTextDiff::spans_t& right_out,
@@ -136,11 +114,7 @@ void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff:
     const ALDiffSame* same     = options.same.get();
     const auto        compared = [&like, same](std::string_view line, const ALTextDiff::regions_t* regions) {
         tokens_t all;
-        ALDiffTokens::cut(line, regions, all);
-        if (same)
-        {
-            same->join(line, all);
-        }
+        ALDiffSame::cut(line, regions, same, all);
         // Comments, where they are let go of; then blanks at the end,
         // where those are or a comment was.
         const size_t had = all.size();
@@ -165,13 +139,7 @@ void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff:
     const tokens_t rw = compared(right, right_regions);
     ALDiffIds        ids;
     const auto       idOf = [&](std::string_view line, const Token& token) {
-        const std::string_view word = line.substr(static_cast<size_t>(token.begin), static_cast<size_t>(token.end - token.begin));
-        if (const S32 cls = same ? same->classOf(word) : -1; cls >= 0)
-        {
-            // Every word the table makes one, one id: not a word's text.
-            return ids.idOfMade("\x01" + std::to_string(cls));
-        }
-        return like.ignoreCase ? ids.idOfMade(ALTextDiff::likenessOf(word, ALTextDiff::Likeness{ false, true })) : ids.idOf(word);
+        return ALDiffSame::idOf(ids, line.substr(static_cast<size_t>(token.begin), static_cast<size_t>(token.end - token.begin)), same, like.ignoreCase);
     };
     std::vector<S32> a;
     std::vector<S32> b;
@@ -245,19 +213,19 @@ void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff:
                 }
                 if (most >= REFINED_LEAST && head + tail > 0 && 2 * (head + tail) >= most)
                 {
-                    add(left_out, left, l.begin + static_cast<S32>(head), l.end - static_cast<S32>(tail));
-                    add(right_out, right, r.begin + static_cast<S32>(head), r.end - static_cast<S32>(tail));
+                    ALDiffTokens::mark(left_out, left, l.begin + static_cast<S32>(head), l.end - static_cast<S32>(tail));
+                    ALDiffTokens::mark(right_out, right, r.begin + static_cast<S32>(head), r.end - static_cast<S32>(tail));
                     continue;
                 }
             }
         }
         for (S32 i = op.left[0]; i < op.left[1]; ++i)
         {
-            add(left_out, left, lw[static_cast<size_t>(i)].begin, lw[static_cast<size_t>(i)].end);
+            ALDiffTokens::mark(left_out, left, lw[static_cast<size_t>(i)].begin, lw[static_cast<size_t>(i)].end);
         }
         for (S32 i = op.right[0]; i < op.right[1]; ++i)
         {
-            add(right_out, right, rw[static_cast<size_t>(i)].begin, rw[static_cast<size_t>(i)].end);
+            ALDiffTokens::mark(right_out, right, rw[static_cast<size_t>(i)].begin, rw[static_cast<size_t>(i)].end);
         }
     }
 }

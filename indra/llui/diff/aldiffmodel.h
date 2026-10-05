@@ -373,7 +373,9 @@ private:
     const std::vector<std::string>& shownLeft() const { return mSwapped ? mRightLines : mLeftLines; }
     const std::vector<std::string>& shownRight() const { return mSwapped ? mLeftLines : mRightLines; }
     // Each line's regions of the texts as shown, where a grammar cuts their
-    // words and answers a line each; none else.
+    // words and answers a line each; none else. Asked of the lexer once a
+    // rebuild, which reads and lays out by them as many times as it needs:
+    // a text it holds is compared whole to be known again.
     typedef const std::vector<ALTextDiff::regions_t>* line_regions_t;
     std::pair<line_regions_t, line_regions_t> shownRegions() const;
     const ColumnData& of(Column column) const { return mColumns[static_cast<size_t>(column)]; }
@@ -433,6 +435,8 @@ private:
     std::vector<bool>     mConflicted;
     std::vector<Move>     mMoves;
     std::vector<Fold>     mFolds;
+    // The regions asked for this rebuild, let go of as the next begins.
+    mutable std::optional<std::pair<line_regions_t, line_regions_t>> mRegions;
 };
 
 #endif // AL_ALDIFFMODEL_H

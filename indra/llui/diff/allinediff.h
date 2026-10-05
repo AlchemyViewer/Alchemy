@@ -46,6 +46,10 @@ namespace ALLineDiff
     // A stretch added after the last, joined to it where it is of the same
     // kind and carries straight on from it.
     void push(std::vector<Run>& out, Kind kind, S32 left, S32 right, S32 count);
+    // A run added as push adds it, but a Same run of no lines kept: what
+    // parts a stretch lined up at an anchor from a change just before it
+    // (ALTextDiff::lines), and is carried as it is when runs are spliced.
+    void keep(std::vector<Run>& out, const Run& run);
 
     // The fewest taken out and put in (Myers), in space as much as the
     // texts; all of each where the walking runs past `work`.

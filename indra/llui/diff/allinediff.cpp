@@ -44,7 +44,7 @@ void ALLineDiff::push(std::vector<Run>& out, Kind kind, S32 left, S32 right, S32
     {
         return;
     }
-    if (!out.empty() && out.back().kind == kind)
+    if (!out.empty() && out.back().kind == kind && out.back().count > 0)
     {
         Run&       last = out.back();
         const bool on   = kind == Kind::Same      ? last.left + last.count == left && last.right + last.count == right
@@ -59,8 +59,39 @@ void ALLineDiff::push(std::vector<Run>& out, Kind kind, S32 left, S32 right, S32
     out.push_back(Run{ kind, left, right, count });
 }
 
+void ALLineDiff::keep(std::vector<Run>& out, const Run& run)
+{
+    if (run.count <= 0 && run.kind == Kind::Same)
+    {
+        out.push_back(run);
+        return;
+    }
+    push(out, run.kind, run.left, run.right, run.count);
+}
+
 namespace
 {
+    // How many lines two stretches share at their start; and then at their
+    // end, of what is left.
+    S32 sharedHead(const S32* a, S32 n, const S32* b, S32 m)
+    {
+        S32 head = 0;
+        while (head < n && head < m && a[head] == b[head])
+        {
+            ++head;
+        }
+        return head;
+    }
+    S32 sharedTail(const S32* a, S32 n, const S32* b, S32 m)
+    {
+        S32 tail = 0;
+        while (tail < n && tail < m && a[n - 1 - tail] == b[m - 1 - tail])
+        {
+            ++tail;
+        }
+        return tail;
+    }
+
     // The fewest taken out of `a` and put in from `b` that make the one the
     // other, where they begin at `left` and `right` in their texts (Myers):
     // the middle of the shortest way found by walking from both ends at
@@ -69,16 +100,8 @@ namespace
     void myersAt(const S32* a, S32 n, const S32* b, S32 m, S32 left, S32 right, S64& work, std::vector<Run>& out)
     {
         // What the two share at either end, first.
-        S32 head = 0;
-        while (head < n && head < m && a[head] == b[head])
-        {
-            ++head;
-        }
-        S32 tail = 0;
-        while (tail < n - head && tail < m - head && a[n - 1 - tail] == b[m - 1 - tail])
-        {
-            ++tail;
-        }
+        const S32 head = sharedHead(a, n, b, m);
+        const S32 tail = sharedTail(a + head, n - head, b + head, m - head);
         push(out, Kind::Same, left, right, head);
         a += head;
         b += head;
@@ -317,11 +340,7 @@ namespace
                      std::vector<Run>& out)
     {
         // What the two share at the end, set aside to put last.
-        S32 tail = 0;
-        while (tail < n && tail < m && a[n - 1 - tail] == b[m - 1 - tail])
-        {
-            ++tail;
-        }
+        const S32 tail = sharedTail(a, n, b, m);
         n -= tail;
         m -= tail;
         const S32 tail_left  = left + n;
@@ -330,11 +349,7 @@ namespace
         // after it gone on with.
         while (true)
         {
-            S32 head = 0;
-            while (head < n && head < m && a[head] == b[head])
-            {
-                ++head;
-            }
+            const S32 head = sharedHead(a, n, b, m);
             push(out, Kind::Same, left, right, head);
             a += head;
             b += head;
@@ -447,16 +462,8 @@ namespace
     void patienceAt(const S32* a, S32 n, const S32* b, S32 m, S32 left, S32 right, S32 depth, S64& work, std::vector<Run>& out)
     {
         // What the two share at either end, first.
-        S32 head = 0;
-        while (head < n && head < m && a[head] == b[head])
-        {
-            ++head;
-        }
-        S32 tail = 0;
-        while (tail < n - head && tail < m - head && a[n - 1 - tail] == b[m - 1 - tail])
-        {
-            ++tail;
-        }
+        const S32 head = sharedHead(a, n, b, m);
+        const S32 tail = sharedTail(a + head, n - head, b + head, m - head);
         push(out, Kind::Same, left, right, head);
         a += head;
         b += head;

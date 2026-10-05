@@ -1122,4 +1122,20 @@ namespace tut
         d.setRightText("a\rb\rC\rd\re");
         ensure("typed in: the line put in the fifth", tinted(*d.right(), 4) && !tinted(*d.right(), 3) && d.right()->document().lineCount() == 5);
     }
+
+    template<> template<>
+    void aldiffview_object::test<34>()
+    {
+        set_test_name("copied as a unified diff, what the comparison lets go of let go of: a comment reworded or put in none where comments are");
+        ALDiffView& d = make("a = 1; // one\nb = 2;\n", "a = 1; // two\nb = 3;\n");
+        ensure("as they are, the comment said", d.unifiedDiff().find("-a = 1; // one\n") != std::string::npos);
+        d.setIgnore("comments", true);
+        const std::string diff = d.unifiedDiff();
+        ensure("the change still said", diff.find("-b = 2;\n+b = 3;\n") != std::string::npos);
+        ensure("the comment reworded the same, as the right has it", diff.find("-a = 1;") == std::string::npos && diff.find("\n a = 1; // two\n") != std::string::npos);
+        d.setTexts("x = 1; // one", "x = 1; // two");
+        ensure("a comment reworded alone: nothing to copy", d.changeCount() == 0 && d.unifiedDiff().empty());
+        d.setTexts("x = 1;\n", "x = 1;\n// a note put in\n");
+        ensure("a line of comment put in: nothing to copy", d.changeCount() == 0 && d.unifiedDiff().empty());
+    }
 }

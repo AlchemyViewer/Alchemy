@@ -28,6 +28,7 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -134,5 +135,52 @@ namespace tut
         ensure("the left kept: nothing read", pair.lastRead() == 0);
         pair.regions(edited);
         ensure("nor the right", pair.lastRead() == 0);
+    }
+
+    template<> template<>
+    void aldifflexer_object::test<3>()
+    {
+        set_test_name("edit after edit -- lines changed, put in, taken out, comments opened and closed -- each answer as read afresh, two texts in turn");
+        ensure("the LSL grammar", lsl != nullptr);
+        const std::vector<std::string> kinds = { "integer v = 1; // a note", "string s = \"a /* not a comment */\";", "/* opened", "still in it",
+                                                 "closed */ x = 2;", "llSay(0, \"line\");", "", "    if (x) { y(); }" };
+        U32        seed = 12345;
+        const auto next = [&seed](U32 below) {
+            seed = seed * 1103515245U + 12345U;
+            return (seed >> 16) % below;
+        };
+        std::vector<std::string> texts[2];
+        for (std::vector<std::string>& text : texts)
+        {
+            for (S32 n = 0; n < 60; ++n)
+            {
+                text.push_back(kinds[next(static_cast<U32>(kinds.size()))]);
+            }
+        }
+        ALDiffLexer lexer(lsl);
+        for (S32 round = 0; round < 300; ++round)
+        {
+            std::vector<std::string>& text = texts[round % 2];
+            const size_t              at   = next(static_cast<U32>(text.size()));
+            switch (next(3))
+            {
+                case 0:
+                    text[at] = kinds[next(static_cast<U32>(kinds.size()))];
+                    break;
+                case 1:
+                    text.insert(text.begin() + static_cast<std::ptrdiff_t>(at), next(3) + 1, kinds[next(static_cast<U32>(kinds.size()))]);
+                    break;
+                default:
+                    if (text.size() > 4)
+                    {
+                        text.erase(text.begin() + static_cast<std::ptrdiff_t>(at), text.begin() + static_cast<std::ptrdiff_t>(std::min(text.size(), at + 3)));
+                    }
+                    break;
+            }
+            const auto& read = lexer.regions(text);
+            ALDiffLexer fresh(lsl);
+            ensure("as read afresh", read == fresh.regions(text));
+            ensure("the other text still known", lexer.regions(texts[(round + 1) % 2]) == fresh.regions(texts[(round + 1) % 2]));
+        }
     }
 }

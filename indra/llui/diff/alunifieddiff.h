@@ -36,8 +36,10 @@
 // counted from one: the lines the same as the right has them, those taken
 // out after "-", those put in after "+", and a text's last line without a
 // line break said so. By lines, as told the same; a change of nothing but
-// lines let go of -- blank ones, where those are -- starts no stretch of
-// its own. Pure.
+// lines let go of -- blank ones, or comments where a lexer given says
+// where they are -- starts no stretch of its own. A lexer given reads the
+// texts here, which a comparison's own, holding its texts, should not.
+// Pure.
 namespace ALUnifiedDiff
 {
     constexpr S32 CONTEXT = 3;

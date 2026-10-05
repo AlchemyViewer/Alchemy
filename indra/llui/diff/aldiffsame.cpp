@@ -26,6 +26,8 @@
 
 #include "aldiffsame.h"
 
+#include "aldiffids.h"
+
 #include <algorithm>
 #include <numeric>
 
@@ -138,4 +140,24 @@ S32 ALDiffSame::classOf(std::string_view word) const
 {
     const auto found = mClasses.find(word);
     return found == mClasses.end() ? -1 : found->second;
+}
+
+// static
+void ALDiffSame::cut(std::string_view line, const ALTextDiff::regions_t* regions, const ALDiffSame* same, ALDiffTokens::tokens_t& out)
+{
+    ALDiffTokens::cut(line, regions, out);
+    if (same)
+    {
+        same->join(line, out);
+    }
+}
+
+// static
+S32 ALDiffSame::idOf(ALDiffIds& ids, std::string_view word, const ALDiffSame* same, bool ignore_case)
+{
+    if (const S32 cls = same ? same->classOf(word) : -1; cls >= 0)
+    {
+        return ids.idOfMade("\x01" + std::to_string(cls));
+    }
+    return ignore_case ? ids.idOfMade(ALTextDiff::likenessOf(word, ALTextDiff::Likeness{ false, true })) : ids.idOf(word);
 }

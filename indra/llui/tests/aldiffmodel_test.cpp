@@ -32,6 +32,7 @@
 
 #include <deque>
 #include <initializer_list>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -810,5 +811,29 @@ namespace tut
         ensure_equals("inline, the right's taken out", m.text(Column::Inline), std::string("a\nB\nb\nc"));
         m.setRightText("a\r\nB\r\nc\r\nd");
         ensure("made anew with CR LF: LF, a line put in", m.rightText() == "a\nB\nc\nd" && m.changeCount() == 2);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<26>()
+    {
+        set_test_name("the lexer asked for each text once a rebuild, by lines or by structure: a text it holds is compared whole to be known again");
+        // A text's regions, none, held by the text they are of.
+        S32                                                                   asked = 0;
+        std::map<const std::vector<std::string>*, std::vector<ALTextDiff::regions_t>> held;
+        const auto lexer = [&](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            ++asked;
+            std::vector<ALTextDiff::regions_t>& out = held[&lines];
+            out.assign(lines.size(), {});
+            return out;
+        };
+        m.setLexer(lexer);
+        m.setTexts(lines(20, { { 3, "three" } }), lines(20, { { 3, "THREE" }, { 9, "nine" } }));
+        asked = 0;
+        m.setRightText(lines(20, { { 3, "THREE" }, { 9, "nine!" } }));
+        ensure_equals("by lines: each once", asked, 2);
+        m.setAlgorithm(ALTextDiff::Algorithm::Structural);
+        asked = 0;
+        m.setRightText(lines(20, { { 3, "THREE" }, { 9, "nine?" } }));
+        ensure_equals("by structure, read as tokens and laid out: each once", asked, 2);
     }
 }

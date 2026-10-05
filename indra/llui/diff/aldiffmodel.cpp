@@ -33,6 +33,7 @@
 #include "alstructuraldiff.h"
 
 #include <algorithm>
+#include <limits>
 
 // --- what is compared ---------------------------------------------------------
 
@@ -86,6 +87,7 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
         }
     }
     // Compared again where it changed (ALDiffSplice), else all of it.
+    mRegions.reset();
     std::vector<std::string> before = std::move(mRightLines);
     mRightText                      = ALLineBreaks::withLineFeeds(right);
     mRightLines                     = std::move(now);
@@ -227,22 +229,27 @@ ALTextDiff::Options ALDiffModel::shownOptions() const
 
 std::pair<ALDiffModel::line_regions_t, ALDiffModel::line_regions_t> ALDiffModel::shownRegions() const
 {
-    if (!mOptions.lexer)
+    if (mRegions)
     {
-        return { nullptr, nullptr };
+        return *mRegions;
     }
-    // Read in turn: the lexer holds the last two it read.
-    const line_regions_t left  = &mOptions.lexer(shownLeft());
-    const line_regions_t right = &mOptions.lexer(shownRight());
-    if (left->size() != shownLeft().size() || right->size() != shownRight().size())
+    mRegions.emplace(nullptr, nullptr);
+    if (mOptions.lexer)
     {
-        return { nullptr, nullptr };
+        // Read in turn: the lexer holds the last two it read.
+        const line_regions_t left  = &mOptions.lexer(shownLeft());
+        const line_regions_t right = &mOptions.lexer(shownRight());
+        if (left->size() == shownLeft().size() && right->size() == shownRight().size())
+        {
+            mRegions.emplace(left, right);
+        }
     }
-    return { left, right };
+    return *mRegions;
 }
 
 void ALDiffModel::build(const std::vector<bool>& open)
 {
+    mRegions.reset();
     const std::vector<std::string>& left    = shownLeft();
     const std::vector<std::string>& right   = shownRight();
     const ALTextDiff::Options       options = shownOptions();
@@ -294,6 +301,22 @@ void ALDiffModel::layout(const std::vector<bool>& open)
     // The words that mean the same in a pair, by the ranges its lines are
     // in (of the texts as given).
     ALDiffRangeSame     same(mRanges, mOptions.same);
+    // The anchors by their lines of the left, of which a change's pairing
+    // is told only those within it: a converted script has one or two a
+    // line, which ALLinePairs would look through for every pair it weighs.
+    ALTextDiff::anchors_t by_left = options.anchors;
+    std::sort(by_left.begin(), by_left.end());
+    ALTextDiff::Options pairing = options;
+    const auto          pairingOf = [&](const std::vector<S32>& gone_lines) -> const ALTextDiff::Options& {
+        pairing.anchors.clear();
+        if (!gone_lines.empty())
+        {
+            const auto from = std::lower_bound(by_left.begin(), by_left.end(), std::make_pair(gone_lines.front(), std::numeric_limits<S32>::min()));
+            const auto to   = std::upper_bound(from, by_left.end(), std::make_pair(gone_lines.back(), std::numeric_limits<S32>::max()));
+            pairing.anchors.assign(from, to);
+        }
+        return pairing;
+    };
     ALTextDiff::Options with      = mOptions;
     const auto          optionsOf = [&](S32 shown_left, S32 shown_right) -> const ALTextDiff::Options& {
         with.same = mSwapped ? same.at(shown_right, shown_left) : same.at(shown_left, shown_right);
@@ -446,14 +469,7 @@ void ALDiffModel::layout(const std::vector<bool>& open)
         std::vector<S32> made;
         change.lines.leftFirst  = runs[i].left;
         change.lines.rightFirst = runs[i].right;
-        for (; i < runs.size() && runs[i].kind != Kind::Same; ++i)
-        {
-            const bool out = runs[i].kind == Kind::Removed;
-            for (S32 n = 0; n < runs[i].count; ++n)
-            {
-                (out ? gone : made).push_back((out ? runs[i].left : runs[i].right) + n);
-            }
-        }
+        i                       = ALTextDiff::changeAt(runs, i, gone, made);
         if (told_same)
         {
             // No change: its lines as the same are shown, side by side
@@ -523,7 +539,7 @@ void ALDiffModel::layout(const std::vector<bool>& open)
                 made_at.push_back(static_cast<S32>(n));
             }
         }
-        ALLinePairs::pairs_t pairs = ALLinePairs::pair(left, right, gone_free, made_free, options, left_regions, right_regions);
+        ALLinePairs::pairs_t pairs = ALLinePairs::pair(left, right, gone_free, made_free, pairingOf(gone_free), left_regions, right_regions);
         for (auto& [g, d] : pairs)
         {
             g = gone_at[static_cast<size_t>(g)];

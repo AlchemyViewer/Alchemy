@@ -155,28 +155,7 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const std::vector<std::string>
     std::vector<Run> made;
     made.reserve(runs.size() + 8);
     // What is before the start as it was, the run the start is in cut there.
-    const auto keep = [&made](const Run& run) {
-        if (run.count <= 0 && run.kind != Kind::Same)
-        {
-            return;
-        }
-        if (run.count > 0 && !made.empty() && made.back().kind == run.kind && made.back().count > 0)
-        {
-            Run&       last = made.back();
-            const bool next = run.kind == Kind::Same      ? last.left + last.count == run.left && last.right + last.count == run.right
-                              : run.kind == Kind::Removed ? last.left + last.count == run.left && last.right == run.right
-                                                          : last.right + last.count == run.right && last.left == run.left;
-            if (next)
-            {
-                last.count += run.count;
-                return;
-            }
-        }
-        if (run.count > 0 || run.kind == Kind::Same)
-        {
-            made.push_back(run);
-        }
-    };
+    const auto keep = [&made](const Run& run) { ALLineDiff::keep(made, run); };
     if (start_run < runs.size())
     {
         for (size_t i = 0; i < start_run; ++i)

@@ -39,25 +39,14 @@ namespace
     std::vector<S32> bagOf(std::string_view line, const ALTextDiff::Options& options, ALDiffIds& ids, const ALTextDiff::regions_t* regions)
     {
         ALDiffTokens::tokens_t words;
-        ALDiffTokens::cut(line, regions, words);
-        if (options.same)
-        {
-            options.same->join(line, words);
-        }
+        ALDiffSame::cut(line, regions, options.same.get(), words);
         std::vector<S32> out;
         for (const ALDiffTokens::Token& token : words)
         {
             if (!ALDiffTokens::isBlank(line, token))
             {
-                const std::string_view word = line.substr(static_cast<size_t>(token.begin), static_cast<size_t>(token.end - token.begin));
-                if (const S32 cls = options.same ? options.same->classOf(word) : -1; cls >= 0)
-                {
-                    out.push_back(ids.idOfMade("\x01" + std::to_string(cls)));
-                }
-                else
-                {
-                    out.push_back(options.like.ignoreCase ? ids.idOfMade(ALTextDiff::likenessOf(word, ALTextDiff::Likeness{ false, true })) : ids.idOf(word));
-                }
+                out.push_back(ALDiffSame::idOf(ids, line.substr(static_cast<size_t>(token.begin), static_cast<size_t>(token.end - token.begin)),
+                                               options.same.get(), options.like.ignoreCase));
             }
         }
         std::sort(out.begin(), out.end());

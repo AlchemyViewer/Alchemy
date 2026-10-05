@@ -177,6 +177,10 @@ namespace ALTextDiff
 
     // The runs that make the left the right, compared as `options` says.
     std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options = Options());
+    // A change: from a run that is not the same, the lines taken out and
+    // those put in until one that is -- a parting of none ends it too --
+    // each in order; and where that run is, or the end.
+    size_t           changeAt(const std::vector<Run>& runs, size_t from, std::vector<S32>& gone, std::vector<S32>& made);
     // Stretches known to stand for each other -- an LSL statement and the
     // SLua lines written of it -- each the first and the last line of the
     // left and of the right, counted from nought; and the words that mean

@@ -1149,9 +1149,13 @@ bool ALDiffView::frontShowsLeft() const
 
 std::string ALDiffView::unifiedDiff() const
 {
+    // Comments let go of as the comparison does, by a lexer of its own:
+    // the comparison's holds the texts it compares.
+    ALTextDiff::Options options = mModel.options();
+    options.lexer = mLexedBy && options.like.ignoreComments ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(mLexedBy)) : ALTextDiff::lexer_t();
     const bool swapped = mModel.swapped();
     return ALUnifiedDiff::write(swapped ? mModel.rightText() : mModel.leftText(), swapped ? mModel.leftText() : mModel.rightText(),
-                                swapped ? mRightTitle : mLeftTitle, swapped ? mLeftTitle : mRightTitle, mModel.options());
+                                swapped ? mRightTitle : mLeftTitle, swapped ? mLeftTitle : mRightTitle, options);
 }
 
 bool ALDiffView::copyUnifiedDiff()

@@ -54,30 +54,17 @@ namespace
         for (const S32 n : which)
         {
             const std::string& text = lines[static_cast<size_t>(n)];
-            ALDiffTokens::cut(text, regions && regions->size() == lines.size() ? &(*regions)[static_cast<size_t>(n)] : nullptr, words);
-            if (options.same)
-            {
-                options.same->join(text, words);
-            }
+            ALDiffSame::cut(text, regions && regions->size() == lines.size() ? &(*regions)[static_cast<size_t>(n)] : nullptr, options.same.get(), words);
             for (const ALDiffTokens::Token& token : words)
             {
                 if (ALDiffTokens::isBlank(text, token))
                 {
                     continue;
                 }
-                const std::string_view word = std::string_view(text).substr(static_cast<size_t>(token.begin), static_cast<size_t>(token.end - token.begin));
-                S32                    id   = 0;
-                if (const S32 cls = options.same ? options.same->classOf(word) : -1; cls >= 0)
-                {
-                    id = ids.idOfMade("\x01" + std::to_string(cls));
-                }
-                else
-                {
-                    id = options.like.ignoreCase ? ids.idOfMade(ALTextDiff::likenessOf(word, ALTextDiff::Likeness{ false, true })) : ids.idOf(word);
-                }
                 out.line.push_back(n);
                 out.token.push_back(token);
-                out.id.push_back(id);
+                out.id.push_back(ALDiffSame::idOf(ids, std::string_view(text).substr(static_cast<size_t>(token.begin), static_cast<size_t>(token.end - token.begin)),
+                                                  options.same.get(), options.like.ignoreCase));
             }
         }
     }
@@ -111,24 +98,6 @@ namespace
         return other;
     }
 
-    // Spans side by side, or with only blanks between them, made one.
-    void mark(ALTextDiff::spans_t& out, const std::string& line, S32 begin, S32 end)
-    {
-        if (!out.empty() && out.back().second <= begin)
-        {
-            S32 at = out.back().second;
-            while (at < begin && ALDiffTokens::blank(line[static_cast<size_t>(at)]))
-            {
-                ++at;
-            }
-            if (at == begin)
-            {
-                out.back().second = end;
-                return;
-            }
-        }
-        out.emplace_back(begin, end);
-    }
 }
 
 ALStructuralDiff::Result ALStructuralDiff::compare(const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Options& options,
@@ -161,14 +130,7 @@ ALStructuralDiff::Result ALStructuralDiff::read(const std::vector<std::string>& 
         }
         std::vector<S32> gone;
         std::vector<S32> made;
-        for (; i < result.runs.size() && result.runs[i].kind != Kind::Same; ++i)
-        {
-            const Run& run = result.runs[i];
-            for (S32 k = 0; k < run.count; ++k)
-            {
-                (run.kind == Kind::Removed ? gone : made).push_back((run.kind == Kind::Removed ? run.left : run.right) + k);
-            }
-        }
+        i = ALTextDiff::changeAt(result.runs, i, gone, made);
         ALDiffIds ids;
         Tokens    a;
         Tokens    b;
@@ -224,7 +186,7 @@ ALStructuralDiff::Result ALStructuralDiff::read(const std::vector<std::string>& 
             if (kept_a[t] < 0)
             {
                 const size_t line = static_cast<size_t>(a.line[t]);
-                mark(result.leftMarks[line], left[line], a.token[t].begin, a.token[t].end);
+                ALDiffTokens::mark(result.leftMarks[line], left[line], a.token[t].begin, a.token[t].end);
             }
         }
         for (size_t t = 0; t < kept_b.size(); ++t)
@@ -232,7 +194,7 @@ ALStructuralDiff::Result ALStructuralDiff::read(const std::vector<std::string>& 
             if (kept_b[t] < 0)
             {
                 const size_t line = static_cast<size_t>(b.line[t]);
-                mark(result.rightMarks[line], right[line], b.token[t].begin, b.token[t].end);
+                ALDiffTokens::mark(result.rightMarks[line], right[line], b.token[t].begin, b.token[t].end);
             }
         }
     }

@@ -28,6 +28,8 @@
 #include "aldifftokens.h"
 #include "llstl.h"
 
+class ALDiffIds;
+
 #include <boost/unordered/unordered_flat_map.hpp>
 
 #include <limits>
@@ -68,6 +70,14 @@ public:
     // one; DROPPED for one it lets go of.
     static constexpr S32 DROPPED = std::numeric_limits<S32>::max();
     S32            classOf(std::string_view word) const;
+
+    // What the comparisons by words share, a table or none: a line's words
+    // as they are weighed -- cut (ALDiffTokens), and run together where
+    // the table spells one of its own -- and a word's id: one for every
+    // word the table makes one, not any word's text; else its text, its
+    // case let go of where that is.
+    static void cut(std::string_view line, const ALTextDiff::regions_t* regions, const ALDiffSame* same, ALDiffTokens::tokens_t& out);
+    static S32  idOf(ALDiffIds& ids, std::string_view word, const ALDiffSame* same, bool ignore_case);
 
 private:
     pairs_t                                                                             mPairs;

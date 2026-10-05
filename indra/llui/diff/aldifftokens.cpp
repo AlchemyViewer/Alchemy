@@ -217,3 +217,25 @@ bool ALDiffTokens::isWord(std::string_view line, const Token& token)
 {
     return token.end > token.begin && alWordByte(line[static_cast<size_t>(token.begin)]);
 }
+
+void ALDiffTokens::mark(ALTextDiff::spans_t& spans, std::string_view line, S32 begin, S32 end)
+{
+    if (begin >= end)
+    {
+        return;
+    }
+    if (!spans.empty() && spans.back().second <= begin)
+    {
+        S32 at = spans.back().second;
+        while (at < begin && blank(line[static_cast<size_t>(at)]))
+        {
+            ++at;
+        }
+        if (at == begin)
+        {
+            spans.back().second = std::max(spans.back().second, end);
+            return;
+        }
+    }
+    spans.emplace_back(begin, end);
+}
