@@ -236,9 +236,10 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     hideCard();
-    // Numbers and tints were for the text they were given with.
+    // Numbers, tints and spacers were for the text they were given with.
     mLineNumbers.clear();
     setLineTints({});
+    setSpacerLines({});
     // Each run of lines an edit replaced -- one, or a batch's several.
     const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
     const S32                                         lines = document().lineCount();
@@ -1426,6 +1427,9 @@ void ALCodeEditor::drawBeforeRows(const LLRect& text)
         S32 row;
         layout().xOf(caret().line, caret().column, &row);
         const S32 top = screenTopOf(text, caret().line, row);
+        // Drawn before the text's clip, and the caret's line may be
+        // scrolled partly or wholly out of sight.
+        LLLocalClipRect clip(text);
         gl_rect_2d(text.mLeft, top, text.mRight, top - layout().rowHeight(), currentLineColor() % alpha);
     }
     drawGutter(text, alpha);

@@ -1,2 +1,5 @@
-# Python modules for the tests that spawn a Python peer
+# Python modules for the tests that spawn a Python peer, and for
+# lsl-definitions' generator, which writes LL's LSL compiler's generated
+# parts for the tests (PyYAML too)
 llsd
+PyYAML

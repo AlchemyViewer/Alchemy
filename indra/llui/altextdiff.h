@@ -72,6 +72,17 @@ public:
     static constexpr S32 MOST_CHANGES = 1000;
 
     static std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right);
+    // Lines known to stand for each other -- an LSL statement and the SLua
+    // it was written as -- each a line of the left and one of the right,
+    // counted from nought. Lined up whatever they say: each pair kept beside
+    // each other, and the stretches between them compared on their own.
+    // Only pairs in order on both sides can be kept: of those given, the
+    // most that are, and none outside either text.
+    typedef std::vector<std::pair<S32, S32>> anchors_t;
+    // As lines(), lined up at the anchors. A pair that differs is a change
+    // of its own, the first lines of it the pair's; a Same run of no lines
+    // goes before it, to part it from a change just before.
+    static std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const anchors_t& anchors);
 
     // A text's lines, for lines().
     static std::vector<std::string> split(std::string_view text);

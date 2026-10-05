@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes indra/alscript/allsltraits.inc and allsluuids.inc from lsl_definitions.yaml.
+"""Writes indra/alscript/lsl/allsltraits.inc and allsluuids.inc from lsl_definitions.yaml.
 
 The optimizer folds a call to a library function only when the definitions
 say the function has no side effects, and refuses to drop a call whose
@@ -119,7 +119,7 @@ def main(argv):
         print(__doc__)
         return 2
     source = Path(argv[1])
-    out = Path(__file__).resolve().parents[2] / "indra" / "alscript" / "allsltraits.inc"
+    out = Path(__file__).resolve().parents[2] / "indra" / "alscript" / "lsl" / "allsltraits.inc"
     uuids_out = out.with_name("allsluuids.inc")
     # What SLua declares in ll and in llcompat, by their bare names; and
     # what it marks deprecated in ll.

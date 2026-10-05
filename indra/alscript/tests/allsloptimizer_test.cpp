@@ -25,11 +25,11 @@
 
 #include "linden_common.h"
 
-#include "../alscriptengine.h"
-#include "../allslinliner.h"
-#include "../allsloptimizer.h"
-#include "../allslservice.h"
-#include "../allsltraits.h"
+#include "../core/alscriptengine.h"
+#include "../lsl/optimizer/allslinliner.h"
+#include "../lsl/optimizer/allsloptimizer.h"
+#include "../lsl/allslservice.h"
+#include "../lsl/allsltraits.h"
 
 #include "../test/lltut.h"
 
@@ -90,6 +90,13 @@ namespace tut
             const size_t     at = text.find(declaration + " = ");
             if (at == std::string::npos)
             {
+                // Declared with no value, where its default is the smaller
+                // (ALLSLCosts::drop*Default): the default.
+                if (text.find(declaration + ";") != std::string::npos)
+                {
+                    const std::string type = declaration.substr(0, declaration.find(' '));
+                    return type == "vector" ? std::vector<F32>{ 0.f, 0.f, 0.f } : type == "rotation" ? std::vector<F32>{ 0.f, 0.f, 0.f, 1.f } : std::vector<F32>{ 0.f };
+                }
                 return out;
             }
             const char* p = text.c_str() + at + declaration.size() + 3;
@@ -99,6 +106,20 @@ namespace tut
             }
             while (true)
             {
+                // A negative part may be written as its cast, on Mono.
+                while (*p == ' ')
+                {
+                    ++p;
+                }
+                bool cast = false;
+                for (const char* spelt : { "((float)", "((integer)" })
+                {
+                    if (std::strncmp(p, spelt, std::strlen(spelt)) == 0)
+                    {
+                        p += std::strlen(spelt);
+                        cast = true;
+                    }
+                }
                 char*     end = nullptr;
                 const F32 v   = std::strtof(p, &end);
                 if (end == p)
@@ -107,6 +128,10 @@ namespace tut
                 }
                 out.push_back(v);
                 p = end;
+                if (cast && *p == ')')
+                {
+                    ++p;
+                }
                 if (*p != ',')
                 {
                     break;
@@ -145,6 +170,38 @@ namespace tut
         {
             return globals + "default\n{\n    state_entry()\n    {\n" + body + "    }\n}\n";
         }
+
+        // A script optimized for a target with the defaults, what it became
+        // checked to compile there.
+        static std::string optimized(const std::string& source, ALLSLOptimizer::Target target)
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            ALLSLService service;
+            for (const ALScriptProblem& p : service.check(r.text, target != ALLSLOptimizer::Target::LSO))
+            {
+                ensure("no error in what was written: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+            }
+            return r.text;
+        }
+
+        static bool in(const std::string& text, const std::string& what) { return text.find(what) != std::string::npos; }
+
+        // A script whose default state also says each of `globals` when
+        // touched: read before anything there sets them, they hold what was
+        // set before, and stay globals (localizeGlobals).
+        static std::string kept(const std::string& source, std::initializer_list<const char*> globals)
+        {
+            std::string said;
+            for (const char* g : globals)
+            {
+                said += std::string("        llOwnerSay((string)") + g + ");\n";
+            }
+            const size_t end = source.rfind("}\n");
+            return source.substr(0, end) + "    touch_start(integer kept)\n    {\n" + said + "    }\n}\n";
+        }
     };
 
     // Past TUT's fifty tests a group runs only what it is told it has.
@@ -171,9 +228,9 @@ namespace tut
     void allsloptimizer_object::test<2>()
     {
         set_test_name("floats fold in single precision and print so that they read back exactly");
-        // Each variable is assigned again later, so that it stays a
-        // variable and the fold shows in its declaration.
-        const std::string source = wrap("", "        float a = 0.1 + 0.2;\n        float b = PI * 2;\n        float c = 1.0 / 3;\n        llSay(0, (string)a + (string)b + (string)c);\n        a = b = c = 0;\n");
+        // Each variable may be assigned again before it is read, so that
+        // it stays a variable and the fold shows in its declaration.
+        const std::string source = wrap("", "        float a = 0.1 + 0.2;\n        float b = PI * 2;\n        float c = 1.0 / 3;\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = 0;\n        }\n        llSay(0, (string)a + (string)b + (string)c);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
         ensure("optimized", r.optimized);
         // 0.1f + 0.2f is 0.3 exactly as a single, PI * 2 is 6.2831855f,
@@ -184,7 +241,7 @@ namespace tut
 
         // A float that is a whole number prints as an integer where LSL
         // would convert one, and stays a float where it would not.
-        r = ALLSLOptimizer::run(wrap("", "        float f = 2.0;\n        list l = [2.0];\n        string s = (string)2.0;\n        vector v = <1.0, 2.0, 3.5>;\n        llSay(0, (string)f + llList2CSV(l) + s + (string)v);\n        f = 0; l = []; s = \"\"; v = ZERO_VECTOR;\n"), options());
+        r = ALLSLOptimizer::run(wrap("", "        float f = 2.0;\n        list l = [2.0];\n        string s = (string)2.0;\n        vector v = <1.0, 2.0, 3.5>;\n        if (llFrand(1) < 0.5)\n        {\n            f = 0; l = []; s = \"\"; v = ZERO_VECTOR;\n        }\n        llSay(0, (string)f + llList2CSV(l) + s + (string)v);\n"), options());
         ensure("whole float as integer: " + r.text, r.text.find("float f = 2;") != std::string::npos);
         // As the cast of an integer on Mono, where that is smaller (ALLSLCosts::castForWholeFloat).
         ensure("list element stays a float: " + r.text, r.text.find("list l = (list)((float)2);") != std::string::npos);
@@ -201,7 +258,8 @@ namespace tut
         ensure("optimized", r.optimized);
         ensure("wrapped: " + r.text, r.text.find("llSay(0, \"-2147483648\");") != std::string::npos);
         ensure("zero stays", r.text.find("(string)(1 / 0)") != std::string::npos);
-        ensure("the overflow stays", r.text.find("(string)(-2147483648 / -1)") != std::string::npos);
+        // On Mono, each negative number as its cast (ALLSLCosts::castForNegative).
+        ensure("the overflow stays: " + r.text, r.text.find("(string)(((integer)-2147483648) / ((integer)-1))") != std::string::npos);
         ensure("integer division", r.text.find("llSay(0, \"6\");") != std::string::npos);
         ensure("a wide shift stays", r.text.find("(string)(1 << 40)") != std::string::npos);
         ensure("modulo keeps the sign", r.text.find("llSay(0, \"-1\");") != std::string::npos);
@@ -211,7 +269,7 @@ namespace tut
     void allsloptimizer_object::test<4>()
     {
         set_test_name("pure library calls with constant arguments are evaluated, others left");
-        const std::string source = wrap("", "        integer a = llAbs(-3);\n        float b = llSqrt(16);\n        string c = llToUpper(\"abc\");\n        string d = llGetSubString(\"abcdef\", 4, 1);\n        string e = llDeleteSubString(\"abcdef\", 1, 3);\n        integer f = llStringLength(\"hello\");\n        string g = llEscapeURL(\"a b\");\n        string h = llBase64ToString(llStringToBase64(\"hi\"));\n        integer i = llList2Integer([1, 2, 3], -1);\n        string j = llList2String([1, 2.5, <1,2,3>], 1);\n        list k = llList2List([1, 2, 3, 4], 1, 2);\n        integer l = llFloor(2.7) + llCeil(2.2);\n        string m = llGetSubString(\"h\xc3\xa9llo\", 0, 1);\n        integer n = llGetUnixTime();\n        string o = llList2CSV([1, \"a\", 2.0]);\n        llSay(0, (string)a + (string)b + c + d + e + (string)f + g + h + (string)i + j + llList2CSV(k) + (string)l + m + (string)n + o);\n        a = f = i = l = n = 0; b = 0; c = d = e = g = h = j = m = o = \"\"; k = [];\n");
+        const std::string source = wrap("", "        integer a = llAbs(-3);\n        float b = llSqrt(16);\n        string c = llToUpper(\"abc\");\n        string d = llGetSubString(\"abcdef\", 4, 1);\n        string e = llDeleteSubString(\"abcdef\", 1, 3);\n        integer f = llStringLength(\"hello\");\n        string g = llEscapeURL(\"a b\");\n        string h = llBase64ToString(llStringToBase64(\"hi\"));\n        integer i = llList2Integer([1, 2, 3], -1);\n        string j = llList2String([1, 2.5, <1,2,3>], 1);\n        list k = llList2List([1, 2, 3, 4], 1, 2);\n        integer l = llFloor(2.7) + llCeil(2.2);\n        string m = llGetSubString(\"h\xc3\xa9llo\", 0, 1);\n        integer n = llGetUnixTime();\n        string o = llList2CSV([1, \"a\", 2.0]);\n        if (llFrand(1) < 0.5)\n        {\n            a = f = i = l = n = 0; b = 0; c = d = e = g = h = j = m = o = \"\"; k = [];\n        }\n        llSay(0, (string)a + (string)b + c + d + e + (string)f + g + h + (string)i + j + llList2CSV(k) + (string)l + m + (string)n + o);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
         ensure("optimized", r.optimized);
         ensure("abs: " + r.text, r.text.find("integer a = 3;") != std::string::npos);
@@ -241,17 +299,21 @@ namespace tut
         ensure("optimized", r.optimized);
         ensure("plus zero: " + r.text, r.text.find("integer a = g;") != std::string::npos);
         ensure("times one", r.text.find("integer b = g;") != std::string::npos);
-        ensure("minus minus", r.text.find("integer c = g + 1;") != std::string::npos);
+        // One more as -~g on Mono, whose ldc.i4 1 is five bytes
+        // (ALLSLCosts::negateComplementForIncrement).
+        ensure("minus minus: " + r.text, r.text.find("integer c = -~g;") != std::string::npos);
         // And on Mono, two less as ~-~-g (ALLSLCosts::complementNegateForDecrement).
         ensure("plus minus: " + r.text, r.text.find("integer d = ~-~-g;") != std::string::npos);
         ensure("cast", r.text.find("integer e = g;") != std::string::npos);
-        ensure("times zero", r.text.find("integer f = 0;") != std::string::npos);
+        // Left at its default on Mono (ALLSLCosts::dropIntegerDefault).
+        ensure("times zero: " + r.text, r.text.find("integer f;") != std::string::npos);
         ensure("equals zero", r.text.find("integer i = (!g);") != std::string::npos);
         ensure("not equal zero as condition", r.text.find("if (g)\n            h = 1;") != std::string::npos);
         ensure("double not", r.text.find("if (g)\n            h = 2;") != std::string::npos);
         // As a ^ on Mono, where only truth counts (ALLSLCosts::xorForNotEqual).
         ensure("not equals: " + r.text, r.text.find("if (g ^ h)\n            h = 3;") != std::string::npos);
-        ensure("swapped", r.text.find("if (g)\n            h = 5;\n        else\n            h = 4;") != std::string::npos);
+        // Turned round off its !, then a choice of two numbers as arithmetic.
+        ensure("swapped, then chosen by arithmetic: " + r.text, r.text.find("h = !!g + 4;") != std::string::npos);
     }
 
     template<> template<>
@@ -285,10 +347,11 @@ namespace tut
         ensure("list add: " + r.text, r.text.find("l = (list)1 + \"a\";") != std::string::npos);
         ensure("an empty list stays", r.text.find("l = [];") != std::string::npos);
 
-        // On Mono the comparison is not; nor is the sum here, one sum not
-        // paying for the helper it would be the script's only use of.
+        // On Mono the comparison is not, though one more is -~x there too;
+        // nor is the sum here, one sum not paying for the helper it would
+        // be the script's only use of.
         r = ALLSLOptimizer::run(source, options());
-        ensure("no comparison on Mono: " + r.text, r.text.find("llGetListLength(l) + 1") != std::string::npos && r.text.find("l != []") == std::string::npos);
+        ensure("no comparison on Mono: " + r.text, r.text.find("integer n = -~llGetListLength(l);") != std::string::npos && r.text.find("l != []") == std::string::npos);
         ensure("one sum not worth its helper on Mono: " + r.text, r.text.find("l = [1, \"a\"];") != std::string::npos);
 
         // On Luau neither.
@@ -383,7 +446,7 @@ namespace tut
     void allsloptimizer_object::test<11>()
     {
         set_test_name("the rotation functions fold over unit rotations by the viewer's own quaternion, and leave the rest");
-        const std::string source = wrap("", "        rotation a = llEuler2Rot(<0, 0, PI_BY_TWO>);\n        vector b = llRot2Euler(<0, 0, 0.7071068, 0.7071068>);\n        rotation c = llAxisAngle2Rot(<0, 0, 2>, PI);\n        vector d = llRot2Axis(<0, 0, 0.7071068, 0.7071068>);\n        float e = llRot2Angle(<0, 0, 0.7071068, 0.7071068>);\n        vector f = llRot2Fwd(<0, 0, 0.7071068, 0.7071068>);\n        vector h = llRot2Up(<0.7071068, 0, 0, 0.7071068>);\n        vector i = llRot2Axis(<0, 0, 0, 1>);\n        vector j = llRot2Fwd(<0, 0, 2, 2>);\n        llSay(0, (string)a + (string)b + (string)c + (string)d + (string)e + (string)f + (string)h + (string)i + (string)j);\n        a = c = ZERO_ROTATION; b = d = f = h = i = j = ZERO_VECTOR; e = 0;\n");
+        const std::string source = wrap("", "        rotation a = llEuler2Rot(<0, 0, PI_BY_TWO>);\n        vector b = llRot2Euler(<0, 0, 0.7071068, 0.7071068>);\n        rotation c = llAxisAngle2Rot(<0, 0, 2>, PI);\n        vector d = llRot2Axis(<0, 0, 0.7071068, 0.7071068>);\n        float e = llRot2Angle(<0, 0, 0.7071068, 0.7071068>);\n        vector f = llRot2Fwd(<0, 0, 0.7071068, 0.7071068>);\n        vector h = llRot2Up(<0.7071068, 0, 0, 0.7071068>);\n        vector i = llRot2Axis(<0, 0, 0, 1>);\n        vector j = llRot2Fwd(<0, 0, 2, 2>);\n        if (llFrand(1) < 0.5)\n        {\n            a = c = ZERO_ROTATION; b = d = f = h = i = j = ZERO_VECTOR; e = 0;\n        }\n        llSay(0, (string)a + (string)b + (string)c + (string)d + (string)e + (string)f + (string)h + (string)i + (string)j);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
         ensure("optimized", r.optimized);
         auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
@@ -394,7 +457,7 @@ namespace tut
         ensure("the axis back: " + r.text, about(numbers(r.text, "vector d"), { 0.f, 0.f, 1.f }));
         ensure("the angle back: " + r.text, about(numbers(r.text, "float e"), { 1.5707964f }));
         ensure("fwd of a quarter turn is left: " + r.text, !has("llRot2Fwd(<0, 0, 0.7071068, 0.7071068>)") && has("vector f = <"));
-        ensure("up of a roll: " + r.text, !has("llRot2Up(") && has("vector h = <0, -"));
+        ensure("up of a roll: " + r.text, !has("llRot2Up(") && has("vector h = <0, ((float)-"));
         ensure("no rotation has no axis: left", has("llRot2Axis(<0, 0, 0, 1>)"));
         ensure("not a unit rotation: left", has("llRot2Fwd(<0, 0, 2, 2>)"));
     }
@@ -402,7 +465,7 @@ namespace tut
     void allsloptimizer_object::test<12>()
     {
         set_test_name("llJsonGetValue folds a string or a plain number out of strict JSON, and leaves the rest to the simulator");
-        const std::string source = wrap("", "        string a = llJsonGetValue(\"{\\\"name\\\": \\\"Ann\\\", \\\"tags\\\": [\\\"x\\\", 7, {\\\"k\\\": \\\"v\\\"}]}\", [\"name\"]);\n        string b = llJsonGetValue(\"{\\\"tags\\\": [\\\"x\\\", -7]}\", [\"tags\", 1]);\n        string c = llJsonGetValue(\"{\\\"tags\\\": [\\\"x\\\", 7, {\\\"k\\\": \\\"v\\\"}]}\", [\"tags\", 2, \"k\"]);\n        string d = llJsonGetValue(\"[1.5]\", [0]);\n        string e = llJsonGetValue(\"[true]\", [0]);\n        string f = llJsonGetValue(\"[1]\", [3]);\n        string g = llJsonGetValue(\"{\\\"a\\\": 1, \\\"a\\\": 2}\", [\"a\"]);\n        string h = llJsonGetValue(\"[1,]\", [0]);\n        string i = llJsonGetValue(\"[\\\"a\\\\\\\"b\\\"]\", [0]);\n        llSay(0, a + b + c + d + e + f + g + h + i);\n        a = b = c = d = e = f = g = h = i = \"\";\n");
+        const std::string source = wrap("", "        string a = llJsonGetValue(\"{\\\"name\\\": \\\"Ann\\\", \\\"tags\\\": [\\\"x\\\", 7, {\\\"k\\\": \\\"v\\\"}]}\", [\"name\"]);\n        string b = llJsonGetValue(\"{\\\"tags\\\": [\\\"x\\\", -7]}\", [\"tags\", 1]);\n        string c = llJsonGetValue(\"{\\\"tags\\\": [\\\"x\\\", 7, {\\\"k\\\": \\\"v\\\"}]}\", [\"tags\", 2, \"k\"]);\n        string d = llJsonGetValue(\"[1.5]\", [0]);\n        string e = llJsonGetValue(\"[true]\", [0]);\n        string f = llJsonGetValue(\"[1]\", [3]);\n        string g = llJsonGetValue(\"{\\\"a\\\": 1, \\\"a\\\": 2}\", [\"a\"]);\n        string h = llJsonGetValue(\"[1,]\", [0]);\n        string i = llJsonGetValue(\"[\\\"a\\\\\\\"b\\\"]\", [0]);\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = d = e = f = g = h = i = \"\";\n        }\n        llSay(0, a + b + c + d + e + f + g + h + i);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
         ensure("optimized", r.optimized);
         auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
@@ -416,7 +479,7 @@ namespace tut
         ensure("a trailing comma is left", has("string h = llJsonGetValue"));
         ensure("an escape unescaped: " + r.text, has("string i = \"a\\\"b\";"));
         // The answers that are constants are the constants' names.
-        const std::string more = wrap("", "        string a = llJsonGetValue(\"[true, null]\", [0]);\n        string b = llJsonGetValue(\"[1]\", [3]);\n        string c = llJsonValueType(\"{\\\"a\\\": [1, {}]}\", [\"a\", 1]);\n        string d = llJsonValueType(\"{\\\"a\\\": 1}\", [\"b\"]);\n        string e = llJsonValueType(\"[1,]\", []);\n        string f = llList2Json(JSON_OBJECT, [\"name\", \"Ann Lee\", \"count\", 3]);\n        string g = llList2Json(JSON_ARRAY, [1, \"true\"]);\n        string h = llList2Json(JSON_ARRAY, [1.5]);\n        list i = llJson2List(\"[1, \\\"two\\\", -3]\");\n        list j = llJson2List(\"{\\\"k\\\": \\\"v\\\"}\");\n        list k = llJson2List(\"[true]\");\n        llSay(0, a + b + c + d + e + f + g + h + llList2CSV(i) + llList2CSV(j) + llList2CSV(k));\n        a = b = c = d = e = f = g = h = \"\"; i = j = k = [];\n");
+        const std::string more = wrap("", "        string a = llJsonGetValue(\"[true, null]\", [0]);\n        string b = llJsonGetValue(\"[1]\", [3]);\n        string c = llJsonValueType(\"{\\\"a\\\": [1, {}]}\", [\"a\", 1]);\n        string d = llJsonValueType(\"{\\\"a\\\": 1}\", [\"b\"]);\n        string e = llJsonValueType(\"[1,]\", []);\n        string f = llList2Json(JSON_OBJECT, [\"name\", \"Ann Lee\", \"count\", 3]);\n        string g = llList2Json(JSON_ARRAY, [1, \"true\"]);\n        string h = llList2Json(JSON_ARRAY, [1.5]);\n        list i = llJson2List(\"[1, \\\"two\\\", -3]\");\n        list j = llJson2List(\"{\\\"k\\\": \\\"v\\\"}\");\n        list k = llJson2List(\"[true]\");\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = d = e = f = g = h = \"\"; i = j = k = [];\n        }\n        llSay(0, a + b + c + d + e + f + g + h + llList2CSV(i) + llList2CSV(j) + llList2CSV(k));\n");
         ALLSLOptimizer::Result m = ALLSLOptimizer::run(more, options());
         ensure("optimized", m.optimized);
         auto hasm = [&m](const char* text) { return m.text.find(text) != std::string::npos; };
@@ -428,12 +491,12 @@ namespace tut
         ensure("an object from plain strings and integers: " + m.text, hasm("string f = \"{\\\"name\\\":\\\"Ann Lee\\\",\\\"count\\\":3}\";"));
         ensure("a string that reads as a JSON word is left: " + m.text, hasm("string g = llList2Json"));
         ensure("a float is left: " + m.text, hasm("string h = llList2Json"));
-        ensure("an array to a list: " + m.text, hasm("list i = [1, \"two\", -3];"));
+        ensure("an array to a list: " + m.text, hasm("list i = [1, \"two\", ((integer)-3)];"));
         ensure("an object to a list: " + m.text, hasm("list j = [\"k\", \"v\"];"));
         ensure("a true in it is left: " + m.text, hasm("list k = llJson2List"));
         // A nested value comes out written the compact way; a set puts a
         // value in, at a key or an index, where the document is plain.
-        const std::string sets = wrap("", "        string a = llJsonGetValue(\"{\\\"a\\\": [1, {\\\"b\\\": true}, \\\"c\\\"]}\", [\"a\"]);\n        string b = llJsonSetValue(\"{\\\"a\\\": 1}\", [\"b\"], \"two\");\n        string c = llJsonSetValue(\"[1, 2]\", [1], \"9\");\n        string d = llJsonSetValue(\"[1, 2]\", [JSON_APPEND], JSON_TRUE);\n        string e = llJsonSetValue(\"[1, 2]\", [5], \"9\");\n        string f = llJsonSetValue(\"{}\", [\"a\", \"b\"], \"x\");\n        string g = llJsonSetValue(\"[1]\", [0], \"1.5\");\n        string h = llJsonGetValue(\"[1.5]\", []);\n        llSay(0, a + b + c + d + e + f + g + h);\n        a = b = c = d = e = f = g = h = \"\";\n");
+        const std::string sets = wrap("", "        string a = llJsonGetValue(\"{\\\"a\\\": [1, {\\\"b\\\": true}, \\\"c\\\"]}\", [\"a\"]);\n        string b = llJsonSetValue(\"{\\\"a\\\": 1}\", [\"b\"], \"two\");\n        string c = llJsonSetValue(\"[1, 2]\", [1], \"9\");\n        string d = llJsonSetValue(\"[1, 2]\", [JSON_APPEND], JSON_TRUE);\n        string e = llJsonSetValue(\"[1, 2]\", [5], \"9\");\n        string f = llJsonSetValue(\"{}\", [\"a\", \"b\"], \"x\");\n        string g = llJsonSetValue(\"[1]\", [0], \"1.5\");\n        string h = llJsonGetValue(\"[1.5]\", []);\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = d = e = f = g = h = \"\";\n        }\n        llSay(0, a + b + c + d + e + f + g + h);\n");
         ALLSLOptimizer::Result n = ALLSLOptimizer::run(sets, options());
         ensure("optimized", n.optimized);
         auto hasn = [&n](const char* text) { return n.text.find(text) != std::string::npos; };
@@ -445,7 +508,7 @@ namespace tut
         ensure("a path to create is left: " + n.text, hasn("string f = llJsonSetValue"));
         ensure("a value that is a fraction is left: " + n.text, hasn("string g = llJsonSetValue"));
         ensure("a document with a fraction is left: " + n.text, hasn("string h = llJsonGetValue"));
-        const std::string dels = wrap("", "        string a = llJsonSetValue(\"{\\\"a\\\": 1, \\\"b\\\": 2}\", [\"a\"], JSON_DELETE);\n        string b = llJsonSetValue(\"[1, 2, 3]\", [1], JSON_DELETE);\n        string c = llJsonSetValue(\"[1, 2, 3]\", [7], JSON_DELETE);\n        llSay(0, a + b + c);\n        a = b = c = \"\";\n");
+        const std::string dels = wrap("", "        string a = llJsonSetValue(\"{\\\"a\\\": 1, \\\"b\\\": 2}\", [\"a\"], JSON_DELETE);\n        string b = llJsonSetValue(\"[1, 2, 3]\", [1], JSON_DELETE);\n        string c = llJsonSetValue(\"[1, 2, 3]\", [7], JSON_DELETE);\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = \"\";\n        }\n        llSay(0, a + b + c);\n");
         ALLSLOptimizer::Result q = ALLSLOptimizer::run(dels, options());
         auto hasq = [&q](const char* text) { return q.text.find(text) != std::string::npos; };
         ensure("a key deleted: " + q.text, hasq("string a = \"{\\\"b\\\":2}\";"));
@@ -1321,7 +1384,7 @@ namespace tut
         ensure("optimized: " + notes(r), r.optimized);
         auto has = [&r](const std::string& text) { return r.text.find(text) != std::string::npos; };
         ensure("b goes where it is read: " + r.text, !has("integer b") && has("llOwnerSay((string)(g * 2));"));
-        ensure("c's g is written between: it stays: " + r.text, has("integer c = g + 1;"));
+        ensure("c's g is written between: it stays: " + r.text, has("integer c = -~g;"));
         ensure("d is read twice: " + r.text, has("integer d = g * 3;"));
         ensure("e is read round a loop: " + r.text, has("integer e = g * 4;"));
         ensure("f is read in a branch, a statement of its own: " + r.text, has("integer f = g * 5;"));
@@ -1493,7 +1556,7 @@ namespace tut
     void allsloptimizer_object::test<40>()
     {
         set_test_name("-1 tests, one and two either way, increments and list elements are written as each target has them smaller, and compile");
-        const std::string source = wrap("list l;\ninteger g;\n",
+        const std::string source = kept(wrap("list l;\ninteger g;\n",
                                         "        integer a = (integer)llFrand(9);\n        integer b = (integer)llFrand(9);\n        string s = llGetObjectName();\n"
                                         "        integer found = llListFindList(l, [a]);\n"
                                         "        if (a != -1) g = 1;\n"
@@ -1514,7 +1577,7 @@ namespace tut
                                         "        l = l + (list)s;\n"
                                         "        l += [b];\n"
                                         "        l = l + [llFrand(1), llFrand(2)];\n"
-                                        "        llOwnerSay((string)g + (string)l + (string)a + (string)b);\n");
+                                        "        llOwnerSay((string)g + (string)l + (string)a + (string)b);\n"), { "g" });
         const auto run = [&](ALLSLOptimizer::Target target) {
             ALLSLOptimizer::Options o = allsloptimizer_data::options();
             o.target                  = target;
@@ -1542,7 +1605,7 @@ namespace tut
         ensure("x - 2 as ~-~-x, a minus bracketed after a minus", has(lso, "g = ~-~-(-a);"));
         ensure("x != -1 as a value stays", has(lso, "g = a != -1;"));
         ensure("an increment before", has(lso, "++a;"));
-        ensure("and a for's step", has(lso, "--b)"));
+        ensure("and a for's step, the loop a do on LSO, its first check known", has(lso, "--b"));
         ensure("l + [a] as l + a", has(lso, "l = l + a;"));
         ensure("l + [a, s] as l + a + s", has(lso, "l = l + a + s;"));
         ensure("[s] + l as s + l", has(lso, "l = s + l;"));
@@ -1552,8 +1615,9 @@ namespace tut
 
         const std::string mono = run(ALLSLOptimizer::Target::Mono);
         ensure("Mono: x != -1 as ~x: " + mono, has(mono, "if (~a)"));
-        ensure("Mono: x == -1 stays", has(mono, "g = a == -1;"));
-        ensure("Mono: x + 1 stays", has(mono, "g = a + 1;"));
+        // Mono's ldc.i4 is five bytes, -1 and 1 too.
+        ensure("Mono: x == -1 as !~x: " + mono, has(mono, "g = !~a;"));
+        ensure("Mono: x + 1 as -~x", has(mono, "g = -~a;"));
         ensure("Mono: x - 1 as ~-x", has(mono, "g = ~-b;"));
         ensure("Mono: ++a", has(mono, "++a;"));
         ensure("Mono: what it wrote weighs what it says", mono.find("l = l") != std::string::npos);
@@ -1665,7 +1729,8 @@ namespace tut
             ensure("a loop's counter never read: " + r.text, !has("i = 0") && !has("i++") && !has("integer i") && has("for (; ") && has(" > 5; )"));
             ensure("a global read stays", has("shown = llGetUnixTime();"));
             ensure("a comparison left empty turned around the other way: " + r.text, has("if (llGetObjectName() != \"on\")"));
-            ensure("anything else, what it negates bracketed", has("if (!(llGetUnixTime() & 1))"));
+            ensure("anything else, what it negates bracketed; Luau's odd test a remainder",
+                   has(target == ALLSLOptimizer::Target::Luau ? "if (!(llGetUnixTime() % 2))" : "if (!(llGetUnixTime() & 1))"));
             ensure("said, as set and never read", std::any_of(r.problems.begin(), r.problems.end(), [](const ALScriptProblem& p) {
                        return p.key == "OptimizerRemovedWriteOnly" && p.args.size() == 1 && p.args[0] == "count";
                    }));
@@ -1710,9 +1775,9 @@ namespace tut
             ensure("of strings, ==: " + r.text, has("s != \"x\"") && !has("!(s == \"x\")"));
             ensure("not of lists, whose != is a length", has("!(l == m)"));
             ensure("not of floats, which may be no number", has("!(f < g)"));
-            ensure("!= where only truth counts", has(lso || mono ? "if (a ^ b)" : "if (a != b)"));
+            ensure("!= where only truth counts, a difference on Luau", has(lso || mono ? "if (a ^ b)" : "if (a - b)"));
             ensure("an if on ==, its branches swapped",
-                   lso || mono ? has("if (a ^ b)\n            llOwnerSay(\"ne\");\n        else\n            llOwnerSay(\"eq\");") : has("if (a == b)"));
+                   lso || mono ? has("if (a ^ b)\n            llOwnerSay(\"ne\");\n        else\n            llOwnerSay(\"eq\");") : has("if (!(a - b))"));
             ensure("inclusive against a constant", has(mono ? "if (a > 4)" : "if (a >= 5)") && has(mono ? "if (b < 6)" : "if (b <= 5)"));
             ensure("not past the largest integer", has("if (b <= 2147483647)"));
             ensure("|| where only truth counts", has(mono ? "while (a | b)" : "while (a || b)"));
@@ -1903,7 +1968,7 @@ namespace tut
                                    "default\n{\n    touch_start(integer n)\n    {\n"
                                    "        integer busy = n;\n        busy = busy * busy + busy;\n        busy = busy - busy / 3;\n"
                                    "        counted = busy;\n        llOwnerSay(\"Q\" + (string)counted);\n        state waiting;\n    }\n}\n"
-                                   "state waiting\n{\n    touch_start(integer n)\n    {\n        state default;\n    }\n}\n";
+                                   "state waiting\n{\n    touch_start(integer n)\n    {\n        llOwnerSay((string)counted);\n        state default;\n    }\n}\n";
         const auto run = [&source](ALLSLOptimizer::Target target) {
             ALLSLOptimizer::Options o = allsloptimizer_data::options();
             o.target                  = target;
@@ -1932,5 +1997,732 @@ namespace tut
         plain.target                   = ALLSLOptimizer::Target::LSO;
         const ALScriptWeight asLso = ALScriptWeigh::mono(ALLSLOptimizer::run(source, plain).text);
         ensure("smaller on Mono than named for LSO", named.compiled && asLso.compiled && named.total < asLso.total);
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<51>()
+    {
+        set_test_name("a pure call made again, given what nothing between changes, is kept in a local where the target has that no larger (L12); "
+                      "not across a write or a label, nor begun where its statement may not come to it");
+        ALLSLOptimizer::Options lso = options();
+        lso.target                  = ALLSLOptimizer::Target::LSO;
+        const std::string head      = "default\n{\n    touch_start(integer n)\n    {\n        string s = llDetectedName(0);\n";
+        const std::string tail      = "    }\n}\n";
+        const auto        body      = [&](const ALLSLOptimizer::Result& r) {
+            const size_t at = r.text.find("        string s = llDetectedName(0);\n");
+            return at == std::string::npos ? r.text : r.text.substr(at + 38);
+        };
+
+        const std::string three  = head + "        llOwnerSay(llToUpper(s));\n        llSay(0, llToUpper(s));\n        llWhisper(0, llToUpper(s));\n" + tail;
+        ALLSLOptimizer::Result r = ALLSLOptimizer::run(three, lso);
+        ensure("optimized: " + notes(r), r.optimized);
+        ensure_equals("kept", body(r), "        string toUpper = llToUpper(s);\n        llOwnerSay(toUpper);\n        llSay(0, toUpper);\n        llWhisper(0, toUpper);\n" + tail);
+        ensure("noted: " + notes(r), has(r, "kept llToUpper(s) in the local toUpper, which its 3 places read"));
+        // On Mono a call given one variable is smaller than a local.
+        r = ALLSLOptimizer::run(three, options());
+        ensure("not on Mono: " + r.text, r.text.find("toUpper") == std::string::npos);
+
+        // A place in a loop after one its statement always comes to.
+        r = ALLSLOptimizer::run(head + "        llSay(0, llToUpper(s));\n        integer i;\n        for (i = 0; i < n; ++i)\n            llSay(i, llToUpper(s));\n" + tail, lso);
+        ensure("into the loop: " + r.text, r.text.find("string toUpper = llToUpper(s);\n        llSay(0, toUpper);") != std::string::npos &&
+                                               r.text.find("llSay(i, toUpper);") != std::string::npos);
+
+        // The outermost call, and the call it is given with it.
+        r = ALLSLOptimizer::run(head + "        llSay(0, llGetSubString(llToUpper(s), 0, 2));\n        llSay(1, llGetSubString(llToUpper(s), 0, 2));\n" + tail, lso);
+        ensure_equals("outermost", body(r),
+                      "        string getSubString = llGetSubString(llToUpper(s), 0, 2);\n        llSay(0, getSubString);\n        llSay(1, getSubString);\n" + tail);
+
+        // A name the script has is not taken again.
+        r = ALLSLOptimizer::run(head + "        string toUpper = llDetectedName(1);\n        llSay(0, toUpper);\n        llSay(0, llToUpper(s));\n        llSay(1, llToUpper(s));\n" + tail, lso);
+        ensure("numbered: " + r.text, r.text.find("string toUpper2 = llToUpper(s);") != std::string::npos);
+
+        // What it is given written between: two places, each alone.
+        const std::string written = head + "        llSay(0, llToUpper(s));\n        s = llDetectedName(1);\n        llSay(0, llToUpper(s));\n        llSay(0, s);\n" + tail;
+        r                         = ALLSLOptimizer::run(written, lso);
+        ensure("not across a write: " + r.text, r.text.find("toUpper") == std::string::npos);
+        // A label between, which a jump could bring the code in by.
+        r = ALLSLOptimizer::run(head + "        llSay(0, llToUpper(s));\n        @again;\n        llSay(0, llToUpper(s));\n        if (llFrand(1) < 0.5)\n            jump again;\n" + tail, lso);
+        ensure("not across a label: " + r.text, r.text.find("toUpper") == std::string::npos);
+        // The first place in a branch: kept, it would run where it did not.
+        r = ALLSLOptimizer::run(head + "        if (n)\n            llSay(0, llToUpper(s));\n        llSay(0, llToUpper(s));\n" + tail, lso);
+        ensure("not begun in a branch: " + r.text, r.text.find("toUpper") == std::string::npos);
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<52>()
+    {
+        set_test_name("two vectors' dot and cross products fold to what the VM gives: each part by the same part, and a vector by itself crossed to nothing");
+        // Each may be set again before it is read, so that its fold shows
+        // in its declaration.
+        const std::string source = wrap("", "        float d = <1, 3, -5> * <4, -2, -1>;\n        vector c = <1.0, 2.0, 3.0> % <4.0, 5.0, 6.0>;\n"
+                                            "        vector z = <44608876.0, 125129528.0, 357885664.0> % <44608876.0, 125129528.0, 357885664.0>;\n"
+                                            "        if (llFrand(1) < 0.5)\n        {\n            d = 0;\n            c = z = ZERO_VECTOR;\n        }\n"
+                                            "        llSay(0, (string)d + (string)c + (string)z);\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::LSO })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            ensure("dot: " + r.text, about(numbers(r.text, "float d"), { 3.f }));
+            ensure("cross: " + r.text, about(numbers(r.text, "vector c"), { -3.f, 6.f, -3.f }));
+            ensure("crossed by itself: " + r.text, about(numbers(r.text, "vector z"), { 0.f, 0.f, 0.f }));
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<53>()
+    {
+        set_test_name("a local set to a constant is that constant where it is read before it is set again, on every way there (L15); "
+                      "not where the ways disagree, in a loop that sets it, past a label, nor after a write in the same statement");
+        const std::string head = "default\n{\n    touch_start(integer n)\n    {\n";
+        const std::string tail = "    }\n}\n";
+        ALLSLOptimizer::Result r =
+            ALLSLOptimizer::run(head + "        integer x = 5;\n        llSay(0, (string)x);\n        x = 7;\n        llSay(0, (string)x);\n        n = 3;\n        llSay(n, \"n\");\n" + tail, options());
+        ensure("optimized: " + notes(r), r.optimized);
+        ensure_equals("each read its value, and the variable gone", r.text,
+                      head + "        llSay(0, \"5\");\n        llSay(0, \"7\");\n        llSay(3, \"n\");\n" + tail);
+        ensure("noted: " + notes(r), has(r, "folded (string)x to \"7\"") && has(r, "inlined n to 3") && has(r, "removed x, which is set and never read"));
+
+        // The ways of an if: what both say goes on, what they do not stops.
+        r = ALLSLOptimizer::run(head + "        integer x = 1;\n        integer y = 1;\n        if (n)\n        {\n            x = 2;\n            llSay(0, \"a\");\n        }\n"
+                                       "        else\n        {\n            llSay(0, \"b\");\n        }\n        llSay(x, (string)y);\n        x = y = 0;\n" + tail,
+                                options());
+        ensure("agreed: " + r.text, r.text.find("llSay(x, \"1\");") != std::string::npos);
+        // A way that returns says nothing of what comes after.
+        r = ALLSLOptimizer::run(head + "        integer x = 1;\n        if (n)\n        {\n            x = 2;\n            return;\n        }\n        llSay(x, \"c\");\n        x = 0;\n" + tail,
+                                options());
+        ensure("a way that ends: " + r.text, r.text.find("llSay(1, \"c\");") != std::string::npos);
+
+        // A loop that sets it: not inside, nor after.
+        r = ALLSLOptimizer::run(head + "        integer i = 0;\n        while (i < n)\n        {\n            llSay(i, \"d\");\n            ++i;\n        }\n        llSay(i, \"e\");\n" + tail,
+                                options());
+        ensure("in a loop: " + r.text, r.text.find("llSay(i, \"d\");") != std::string::npos && r.text.find("llSay(i, \"e\");") != std::string::npos);
+        // Past a label, which a jump may come to with anything.
+        r = ALLSLOptimizer::run(head + "        integer x = 1;\n        @top;\n        llSay(x, \"f\");\n        x = 2;\n        if (llFrand(1) < 0.5)\n            jump top;\n" + tail,
+                                options());
+        ensure("past a label: " + r.text, r.text.find("llSay(x, \"f\");") != std::string::npos);
+        // A loop holding a label forgets everything as it begins.
+        r = ALLSLOptimizer::run(head + "        integer x = 1;\n        while (llFrand(1) < 0.5)\n        {\n            @in;\n            llSay(x, \"g\");\n        }\n"
+                                       "        x = 2;\n        if (llFrand(1) < 0.5)\n            jump in;\n" + tail,
+                                options());
+        ensure("a loop with a label: " + r.text, r.text.find("llSay(x, \"g\");") != std::string::npos);
+        // LSL runs a binary operator's right side first: the read on the
+        // left comes after the write.
+        r = ALLSLOptimizer::run(head + "        integer x = 1;\n        llSay(0, (string)(x + (x = 3)));\n        llSay(x, \"h\");\n" + tail, options());
+        ensure("after a write in the statement: " + r.text, r.text.find("(string)(x + (x = 3))") != std::string::npos);
+        // A read left where another read of the variable is not known: a
+        // literal in place of a read is no smaller, and the variable stays.
+        r = ALLSLOptimizer::run(head + "        string s = \"a long string of text\";\n        llSay(0, s);\n        if (n)\n            s = llDetectedName(0);\n        llSay(1, s);\n" + tail,
+                                options());
+        ensure("not one read alone: " + r.text, r.text.find("llSay(0, s);") != std::string::npos);
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<54>()
+    {
+        set_test_name("a comparison settled by what each side can be (L16): a count never below nought, a find never below -1, llFrand of a positive "
+                      "magnitude, a truth 1 or 0, a type within its constants; not where the ranges meet, nor where a side changes something");
+        const std::string source = "integer said() { llOwnerSay(\"said\"); return 1; }\n"
+                                   "default\n{\n    touch_start(integer n)\n    {\n"
+                                   "        list l = llParseString2List(llDetectedName(0), [\" \"], []);\n"
+                                   "        if (llGetListLength(l) < 0) llSay(0, \"a\");\n"
+                                   "        integer count = llGetListLength(l);\n"
+                                   "        if (count >= 0) llSay(0, \"b\");\n"
+                                   "        if (llFrand(10.0) < 0) llSay(0, \"c\");\n"
+                                   "        if (llListFindList(l, [\"x\"]) > -2) llSay(0, \"d\");\n"
+                                   "        if (llGetListEntryType(l, 0) == 9) llSay(0, \"e\");\n"
+                                   "        if (llSameGroup(llDetectedKey(0)) == 2) llSay(0, \"f\");\n"
+                                   "        if (llFrand(10.0) < 5) llSay(0, \"g\");\n"
+                                   "        if (llGetListLength(l) > 0) llSay(0, \"h\");\n"
+                                   "        if (llStringLength(llList2String(l, said())) < 0) llSay(0, \"i\");\n"
+                                   "    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::LSO })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            const auto said = [&r](const char* what) { return r.text.find(std::string("llSay(0, \"") + what + "\")") != std::string::npos; };
+            ensure("a count below nought never: " + r.text, !said("a"));
+            ensure("a count's local nought or more always: " + r.text, said("b") && r.text.find("count") == std::string::npos);
+            ensure("llFrand of ten never below nought: " + r.text, !said("c"));
+            ensure("a find above -2 always: " + r.text, said("d") && r.text.find("llListFindList") == std::string::npos);
+            ensure("a type past TYPE_ROTATION never: " + r.text, !said("e"));
+            ensure("a truth never 2: " + r.text, !said("f"));
+            ensure("where the ranges meet, kept: " + r.text, said("g") && said("h"));
+            ensure("where a side changes something, kept: " + r.text, said("i"));
+            ensure("noted: " + notes(r), has(r, "settled llGetListLength(l) < 0 to 0") || has(r, "settled (l != []) < 0 to 0") || has(r, "settled l != [] < 0 to 0"));
+        }
+    }
+    template<> template<>
+    void allsloptimizer_object::test<55>()
+    {
+        set_test_name("the folding arithmetic is IEEE's whatever the build's float flags: llVecNorm folds where dividing by the length and "
+                      "multiplying by its reciprocal agree, as LLVector3 does, and not where they differ; a negative zero keeps its sign");
+        // Each may be set again before it is read, so that its fold shows
+        // in its declaration.
+        const std::string source = wrap("", "        vector a = llVecNorm(<0.75, 3, 1>);\n        vector b = llVecNorm(<0, 3, 4>);\n"
+                                            "        float m = llVecMag(<0, 3, 4>);\n        list l = [-0.0];\n"
+                                            "        if (llFrand(1) < 0.5)\n        {\n            a = b = ZERO_VECTOR;\n            m = 0;\n            l = [];\n        }\n"
+                                            "        llSay(0, (string)a + (string)b + (string)m + llList2CSV(l));\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::LSO })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            // 0.75 / 3.25 is 0.230769232 as a single, 0.75 * (1 / 3.25)
+            // 0.230769247: which the VM gives is not known, so it is left.
+            // Built with the viewer's float flags, the compiler made the
+            // division a product with the reciprocal, and this folded.
+            ensure("left where the two differ: " + r.text, r.text.find("vector a = llVecNorm(<0.75, ") != std::string::npos);
+            const std::vector<F32> b = numbers(r.text, "vector b");
+            ensure("folded where they agree: " + r.text, b.size() == 3 && b[0] == 0.0f && b[1] == 3.0f / 5.0f && b[2] == 4.0f / 5.0f);
+            ensure("a length both ways the same: " + r.text, numbers(r.text, "float m") == std::vector<F32>{ 5.0f });
+            const size_t at = r.text.find("list l = ");
+            ensure("a negative zero keeps its sign: " + r.text,
+                   at != std::string::npos && r.text.substr(at, r.text.find('\n', at) - at).find("-0.0") != std::string::npos);
+        }
+    }
+    template<> template<>
+    void allsloptimizer_object::test<56>()
+    {
+        set_test_name("bit tests of one value merged (L18): one-bit tests all asked as !~(x | ~mask), all clear as !(x & mask), an | of them as "
+                      "x & mask, an || of them so where only truth counts; not of two values, of a test of more than one bit, nor where x changes");
+        const std::string source = "integer said() { llOwnerSay(\"said\"); return 4; }\n"
+                                   "default\n{\n    touch_start(integer n)\n    {\n"
+                                   "        integer m = llGetLinkNumber();\n"
+                                   "        if ((n & 4) && (n & 8)) llSay(0, \"a\");\n"
+                                   "        integer v = (n & 4) && (n & 8) && (n & 1);\n"
+                                   "        if (!(n & 4) && !(n & 8)) llSay(0, \"b\");\n"
+                                   "        if ((n & 4) || (n & 16)) llSay(0, \"c\");\n"
+                                   "        integer w = (n & 3) | (n & 12);\n"
+                                   "        if ((n & 4) && (m & 8)) llSay(0, \"d\");\n"
+                                   "        if ((n & 6) && (n & 8)) llSay(0, \"e\");\n"
+                                   "        if ((said() & 4) && (said() & 8)) llSay(0, \"f\");\n"
+                                   "        llSay(v, (string)w);\n"
+                                   "    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Luau })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            const auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
+            // -13 as its cast on Mono (ALLSLCosts::castForNegative).
+            ensure("all set: " + r.text, has("if (!~(n | -13))") || has("if (!~(n | ((integer)-13)))"));
+            // v and w are read once, and their values go where they are read.
+            ensure("three, a value: " + r.text, has("llSay(!~(n | -14), ") || has("llSay(!~(n | ((integer)-14)), "));
+            ensure("all clear: " + r.text, has("if (!(n & 12))"));
+            ensure("any, where only truth counts: " + r.text, has("if (n & 20)"));
+            ensure("an | of them: " + r.text, has("(string)(n & 15)"));
+            ensure("two values left: " + r.text, has("(n & 4)") && has("(m & 8)"));
+            ensure("more than one bit left: " + r.text, has("(n & 6)") && has("(n & 8)"));
+            ensure("what changes left: " + r.text, has("(said() & 4)") && has("(said() & 8)"));
+            ensure("noted: " + notes(r), allsloptimizer_data::has(r, "wrote (n & 4) && (n & 8) as !~(n | -13)"));
+        }
+    }
+    template<> template<>
+    void allsloptimizer_object::test<57>()
+    {
+        set_test_name("more of the library folded where the two VMs cannot part (L17): parsing, CSV and sorting where no edge is in play; a "
+                      "rotation between vectors, the angle between rotations and a rotation from axes where every way of working it out agrees");
+        // Each may be set again before it is read, so that its fold shows
+        // in its declaration.
+        const std::string source = wrap("", "        list p = llParseString2List(\"a,b;;c\", [\",\"], [\";\"]);\n"
+                                            "        list k = llParseStringKeepNulls(\"a,,b,\", [\",\"], []);\n"
+                                            "        list x = llParseString2List(\"ab\", [\"a\", \"ab\"], []);\n"
+                                            "        list v = llCSV2List(\"a,b,c\");\n"
+                                            "        list w = llCSV2List(\"a, b\");\n"
+                                            "        list s = llListSort([3, \"c\", 1, \"a\", 2, \"b\"], 2, TRUE);\n"
+                                            "        list t = llListSort([\"pear\", \"apple\", \"fig\"], 1, FALSE);\n"
+                                            "        list u = llListSort([2, 1, 2], 1, TRUE);\n"
+                                            "        list m = llListSort([\"b\", \"A\"], 1, TRUE);\n"
+                                            "        rotation r = llRotBetween(<1, 0, 0>, <0, 1, 0>);\n"
+                                            "        rotation q = llRotBetween(<1, 0, 0>, <1, 0, 0>);\n"
+                                            "        rotation n = llRotBetween(<1, 0, 0>, <0, 0, 2>);\n"
+                                            "        float h = llAngleBetween(<0, 0, 0, 1>, <0, 0, 0, 1>);\n"
+                                            "        rotation z = llAxes2Rot(<1, 0, 0>, <0, 1, 0>, <0, 0, 1>);\n"
+                                            "        rotation e = llAxes2Rot(<0, 1, 0>, <-1, 0, 0>, <0, 0, 1>);\n"
+                                            "        if (llFrand(1) < 0.5)\n        {\n            p = k = x = v = w = s = t = u = m = [];\n"
+                                            "            r = q = n = z = e = ZERO_ROTATION;\n            h = 1;\n        }\n"
+                                            "        llOwnerSay(llList2CSV(p + k + x + v + w + s + t + u + m) + (string)[r, q, n, h, z, e]);\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::LSO })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            const auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
+            ensure("split, spacers kept: " + r.text, has("list p = [\"a\", \"b\", \";\", \";\", \"c\"];"));
+            ensure("split, empties kept: " + r.text, has("list k = [\"a\", \"\", \"b\", \"\"];"));
+            ensure("a separator the start of another: left: " + r.text, has("list x = llParseString2List("));
+            ensure("CSV: " + r.text, has("list v = [\"a\", \"b\", \"c\"];"));
+            ensure("a value starting with a space: left: " + r.text, has("list w = llCSV2List("));
+            ensure("sorted by stride: " + r.text, has("list s = [1, \"a\", 2, \"b\", 3, \"c\"];"));
+            ensure("sorted down: " + r.text, has("list t = [\"pear\", \"fig\", \"apple\"];"));
+            ensure("two keys the same: left: " + r.text, has("list u = llListSort("));
+            ensure("keys of two cases: left: " + r.text, has("list m = llListSort("));
+            const float half = static_cast<float>(std::sqrt(0.5));
+            ensure("a quarter turn between: " + r.text, numbers(r.text, "rotation r") == std::vector<F32>{ 0.f, 0.f, half, half });
+            ensure("parallel: left: " + r.text, has("rotation q = llRotBetween("));
+            ensure("a quarter turn the other way: " + r.text, numbers(r.text, "rotation n") == std::vector<F32>{ 0.f, -half, 0.f, half });
+            ensure("no angle between the same: " + r.text, numbers(r.text, "float h") == std::vector<F32>{ 0.f });
+            ensure("the axes themselves: " + r.text, numbers(r.text, "rotation z") == std::vector<F32>{ 0.f, 0.f, 0.f, 1.f });
+            // Made unit, as LLQuaternion does today, a quarter turn is a bit
+            // larger in its last place than left as it was, as in 2007.
+            ensure("ways that part by a bit: left: " + r.text, has("rotation e = llAxes2Rot("));
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<58>()
+    {
+        set_test_name("Mono's ++x for x = x + 1, a default left out, and a negative number as its cast; each where its target has it smaller, and what "
+                      "must stay stays");
+        const std::string source = "integer gz = 0;\n"
+                                   "integer gn = -5;\n"
+                                   "default\n"
+                                   "{\n"
+                                   "    state_entry()\n"
+                                   "    {\n"
+                                   "        integer i = (integer)llFrand(9);\n"
+                                   "        integer j = (integer)llFrand(9);\n"
+                                   "        float f = llFrand(9);\n"
+                                   "        vector v = llGetPos();\n"
+                                   "        i = i + 1;\n"
+                                   "        j -= 1;\n"
+                                   "        j = i = 1 + i;\n"
+                                   "        f = f + 1;\n"
+                                   "        v.x = v.x + 1;\n"
+                                   "        integer z = 0;\n"
+                                   "        float y = 0.0;\n"
+                                   "        float n = -0.0;\n"
+                                   "        key k = \"\";\n"
+                                   "        key nk = NULL_KEY;\n"
+                                   "        string s = \"\";\n"
+                                   "        vector w = ZERO_VECTOR;\n"
+                                   "        rotation r = ZERO_ROTATION;\n"
+                                   "        if (llFrand(1) < 0.5)\n"
+                                   "        {\n"
+                                   "            z = 3; y = 1.5; n = 2.5; k = llGetOwner(); nk = llGetOwner(); s = \"a\"; w = llGetPos(); r = llGetRot();\n"
+                                   "        }\n"
+                                   "        llSay(-5, \"x\");\n"
+                                   "        llSetText(\"\", <-1.5, 0, 0>, 1);\n"
+                                   "        llOwnerSay((string)[i, j, f, v, z, y, n, k, nk, s, w, r, gz, gn]);\n"
+                                   "    }\n"
+                                   "    touch_start(integer t)\n"
+                                   "    {\n"
+                                   "        gz = t;\n"
+                                   "        gn = t;\n"
+                                   "    }\n"
+                                   "}\n";
+        const auto run = [&](ALLSLOptimizer::Target target) {
+            ALLSLOptimizer::Options o = allsloptimizer_data::options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + allsloptimizer_data::notes(r), r.optimized);
+            ALLSLService           service;
+            const ALScriptProblems said = service.check(r.text, target != ALLSLOptimizer::Target::LSO);
+            for (const ALScriptProblem& p : said)
+            {
+                ensure("no error in what was written: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+            }
+            return r.text;
+        };
+        const auto has = [](const std::string& text, const std::string& what) { return text.find(what) != std::string::npos; };
+
+        const std::string mono = run(ALLSLOptimizer::Target::Mono);
+        ensure("Mono: x = x + 1 as ++x: " + mono, has(mono, "++i;"));
+        ensure("Mono: x -= 1 as --x", has(mono, "--j;"));
+        ensure("Mono: as a value, 1 + x", has(mono, "j = ++i;"));
+        ensure("Mono: a float's stays", !has(mono, "++f") && !has(mono, "f;"));
+        ensure("Mono: a vector's part stays", !has(mono, "++v.x"));
+        ensure("Mono: an integer's default left out", has(mono, "integer z;"));
+        ensure("Mono: an integer global's too", has(mono, "integer gz;"));
+        ensure("Mono: a float's is not, there", !has(mono, "float y;"));
+        ensure("Mono: a negative number as its cast", has(mono, "llSay(((integer)-5), "));
+        ensure("Mono: a vector's negative part", has(mono, "<((float)-1.5), 0, 0>"));
+        ensure("Mono: never in a global's value", has(mono, "integer gn = -5;"));
+
+        const std::string lso = run(ALLSLOptimizer::Target::LSO);
+        ensure("LSO: x = x + 1 stays as LSO has it smaller: " + lso, !has(lso, "++i;") && !has(lso, "--j;"));
+        ensure("LSO: a float's default left out", has(lso, "float y;"));
+        ensure("LSO: -0.0 is not the default", !has(lso, "float n;"));
+        ensure("LSO: a key's default, \"\"", has(lso, "key k;"));
+        ensure("LSO: NULL_KEY is not a key's default", !has(lso, "key nk;"));
+        ensure("LSO: a string's never", !has(lso, "string s;"));
+        ensure("LSO: a vector's and a rotation's", has(lso, "vector w;") && has(lso, "rotation r;"));
+        ensure("LSO: an integer's is not, there", !has(lso, "integer z;"));
+        ensure("LSO: no casts of negative numbers", !has(lso, "((integer)-") && !has(lso, "((float)-"));
+
+        const std::string luau = run(ALLSLOptimizer::Target::Luau);
+        ensure("Luau: a key's default left out: " + luau, has(luau, "key k;"));
+        ensure("Luau: nothing else", !has(luau, "integer z;") && !has(luau, "++i;") && !has(luau, "((integer)-"));
+    }
+
+
+    template<> template<>
+    void allsloptimizer_object::test<59>()
+    {
+        set_test_name("operators as each target has them smaller: && of truths as &, a - b as a + -b, -1 - x as ~x, a shift left as a product, a "
+                      "doubling as a sum, a float halved as a product, x * -1 as -x; Luau's bitwise tests as arithmetic");
+        const std::string source = kept(wrap("integer g;\nfloat h;\n",
+                                        "        integer a = (integer)llFrand(9);\n        integer b = (integer)llFrand(9);\n"
+                                        "        integer c = llStringLength(llGetObjectName());\n        float f = llFrand(9);\n        float e = llFrand(9);\n"
+                                        "        g = a - b;\n"
+                                        "        g -= b;\n"
+                                        "        h = f - e;\n"
+                                        "        g = a << 3;\n"
+                                        "        g = -1 - b;\n"
+                                        "        g = a * 2;\n"
+                                        "        h = f / 4;\n"
+                                        "        g = b * -1;\n"
+                                        "        if (a < b && b > 2)\n            llOwnerSay(\"both\");\n"
+                                        "        if (a & 1)\n            llOwnerSay(\"odd\");\n"
+                                        "        g = a == b;\n"
+                                        "        g = c >> 2;\n"
+                                        "        g = c & 7;\n"
+                                        "        g = a >> 2;\n"
+                                        "        llOwnerSay((string)[a, b, c, f, e, g, h]);\n"), { "g", "h" });
+        const std::string mono = optimized(source, ALLSLOptimizer::Target::Mono);
+        ensure("Mono: a - b as a + -b: " + mono, in(mono, "g = a + -b;"));
+        ensure("Mono: -= as += -", in(mono, "g += -b;"));
+        ensure("Mono: of floats", in(mono, "h = f + -e;"));
+        ensure("Mono: a shift as a product", in(mono, "g = a * 8;"));
+        ensure("Mono: -1 - x as ~x", in(mono, "g = ~b;"));
+        ensure("Mono: a doubling as a sum", in(mono, "g = a + a;"));
+        ensure("Mono: a float by a power of two as a product", in(mono, "h = f * 0.25;"));
+        ensure("Mono: x * -1 as -x", in(mono, "g = -b;"));
+        ensure("Mono: && of truths as &", in(mono, "if (a < b & b > 2)"));
+        ensure("Mono: the bitwise stay", in(mono, "if (a & 1)") && in(mono, "g = c >> 2;") && in(mono, "g = c & 7;"));
+
+        const std::string lso = optimized(source, ALLSLOptimizer::Target::LSO);
+        ensure("LSO: a - b stays: " + lso, in(lso, "g = a - b;") && in(lso, "g -= b;") && in(lso, "h = f - e;"));
+        ensure("LSO: -1 - x as ~x", in(lso, "g = ~b;"));
+        ensure("LSO: x * -1 as -x", in(lso, "g = -b;"));
+        ensure("LSO: the rest stays", in(lso, "g = a << 3;") && in(lso, "g = a * 2;") && in(lso, "h = f / 4;") && in(lso, "if (a < b && b > 2)"));
+
+        const std::string luau = optimized(source, ALLSLOptimizer::Target::Luau);
+        ensure("Luau: a shift as a product: " + luau, in(luau, "g = a * 8;"));
+        ensure("Luau: a doubling as a sum", in(luau, "g = a + a;"));
+        ensure("Luau: -1 - x stays, ~ a call there", in(luau, "g = -1 - b;"));
+        ensure("Luau: an odd test as a remainder", in(luau, "if (a % 2)"));
+        ensure("Luau: == as the ! of a difference", in(luau, "g = !(a - b);"));
+        ensure("Luau: a shift right and a mask of a count as a quotient and a remainder", in(luau, "g = c / 4;") && in(luau, "g = c % 8;"));
+        ensure("Luau: not of what may be below nought", in(luau, "g = a >> 2;"));
+        ensure("Luau: a - b stays", in(luau, "g = a - b;"));
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<60>()
+    {
+        set_test_name("branches in fewer jumps: a truth returned or set, a select as arithmetic, a value set before an if, ways the same once, an "
+                      "else after a return dropped, a jump over statements as an else, an empty if gone, nested ifs merged");
+        const std::string source = "integer g;\nstring t;\n"
+                                   "integer big(integer a)\n{\n    if (a > 3)\n        return TRUE;\n    return FALSE;\n}\n"
+                                   "integer none(integer a)\n{\n    if (a)\n        return FALSE;\n    else\n        return TRUE;\n}\n"
+                                   "integer pick(integer a)\n{\n    if (a)\n    {\n        llOwnerSay(\"one\");\n        return 1;\n    }\n    else\n    {\n"
+                                   "        llOwnerSay(\"other\");\n    }\n    return 2;\n}\n"
+                                   "default\n{\n    state_entry()\n    {\n"
+                                   "        integer a = (integer)llFrand(9);\n        integer b = (integer)llFrand(9);\n"
+                                   "        if (a > 2)\n            g = 1;\n        else\n            g = 0;\n"
+                                   "        if (b > 2)\n            g = 5;\n        else\n            g = 7;\n"
+                                   "        if (b)\n            g = 5;\n        else\n            g = 7;\n"
+                                   "        string u;\n        if (a > 4)\n            u = llGetObjectName();\n        else\n            u = \"none\";\n"
+                                   "        if (a > 5)\n            t = llGetObjectName();\n        else\n            t = \"global\";\n"
+                                   "        if (llFrand(1) > 0.5)\n            llOwnerSay(\"same\");\n        else\n            llOwnerSay(\"same\");\n"
+                                   "        if (a == b)\n        {\n            llOwnerSay(\"eq\");\n            llOwnerSay(\"end\");\n        }\n"
+                                   "        else\n        {\n            llOwnerSay(\"ne\");\n            llOwnerSay(\"end\");\n        }\n"
+                                   "        if (b)\n        {\n            llOwnerSay(\"x\");\n            jump past;\n        }\n"
+                                   "        llOwnerSay(\"y\");\n        @past;\n"
+                                   "        if (a < 3)\n        {\n        }\n"
+                                   "        if (a > 1)\n            if (b < 4)\n                llOwnerSay(\"inner\");\n"
+                                   "        if (a)\n            if (b)\n                llOwnerSay(\"both\");\n"
+                                   "        if (a)\n            if (100 / b)\n                llOwnerSay(\"faults\");\n"
+                                   "        llOwnerSay((string)[big(a), none(b), pick(a), g, t, u]);\n    }\n"
+                                   "    touch_start(integer n)\n    {\n        llOwnerSay((string)g + t);\n    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            const std::string text = optimized(source, target);
+            const bool        lso  = target == ALLSLOptimizer::Target::LSO;
+            const bool        mono = target == ALLSLOptimizer::Target::Mono;
+            ensure("a truth returned: " + text, in(text, "return a > 3;"));
+            ensure("its ! the other way", in(text, "return !a;"));
+            ensure("a truth set", in(text, "g = a > 2;"));
+            ensure("a select of a truth as arithmetic, on every target: " + text, in(text, "g = (b > 2) * ") && in(text, " + 7;"));
+            ensure("of anything else, on LSO and Mono", lso || mono ? in(text, "g = !!b * ") : !in(text, "g = !!b"));
+            ensure("a local's value set before the if: " + text, in(text, "u = \"none\";\n        if (a > 4)"));
+            ensure("not a global's, which a call in the check could read", in(text, "t = \"global\";\n") && !in(text, "t = \"global\";\n        if"));
+            ensure("ways the same written once", !in(text, "else\n            llOwnerSay(\"same\")") && in(text, "llOwnerSay(\"same\");"));
+            ensure("what both ways end with once, after", in(text, "llOwnerSay(\"end\");") && text.find("llOwnerSay(\"end\")") == text.rfind("llOwnerSay(\"end\")"));
+            ensure("an else after a return dropped", !in(text, "else\n    {\n        llOwnerSay(\"other\")"));
+            ensure("a jump over statements as an else", !in(text, "jump past") && !in(text, "@past"));
+            ensure("an empty if gone", !in(text, "a < 3"));
+            ensure("nested ifs of truths merged on LSO and Mono: " + text, lso || mono ? in(text, "if ((a > 1) & (b < 4))") : in(text, "if (a > 1)\n            if (b < 4)"));
+            ensure("nested ifs merged with && on LSO", lso ? in(text, "if (a && b)") : !in(text, "if (a && b)"));
+            ensure("not where the inner may stop the script", in(text, "100 / b"));
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<61>()
+    {
+        set_test_name("loops: a for or a while whose first check passes run as a do on LSO and Mono, the step in its check; a counter read nowhere else "
+                      "counted down; not where the check is not known, nor the counter read");
+        const std::string source = "default\n{\n    state_entry()\n    {\n"
+                                   "        list l = llParseString2List(llGetObjectName(), [\" \"], []);\n"
+                                   "        integer i;\n        integer j;\n        integer k;\n        integer m;\n        integer n = (integer)llFrand(9);\n"
+                                   "        for (i = 0; i < 10; ++i)\n            llOwnerSay((string)i);\n"
+                                   "        for (j = 0; j < 3; ++j)\n            llOwnerSay(\"three\");\n"
+                                   "        for (k = 0; k < llGetListLength(l); ++k)\n            llOwnerSay(\"each\");\n"
+                                   "        for (m = n; m < 10; ++m)\n            llOwnerSay((string)m);\n"
+                                   "        integer w = 0;\n        while (w < 5)\n        {\n            llOwnerSay((string)w);\n            w += 2;\n        }\n"
+                                   "        integer z;\n        for (z = 5; z < 3; ++z)\n            llOwnerSay(\"never\");\n"
+                                   "        llOwnerSay((string)z);\n"
+                                   "    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            const std::string text = optimized(source, target);
+            const bool        luau = target == ALLSLOptimizer::Target::Luau;
+            ensure("a for known to run as a do, its step in the check: " + text, luau ? in(text, "for (i = 0; i < 10; ++i)") : in(text, "while(++i < 10);"));
+            ensure("a counter read nowhere else counted down", in(text, "j = 3;") && in(text, "while(--j);"));
+            ensure("to a count never below nought: " + text, (in(text, "integer k = llGetListLength(l);") || in(text, "integer k = (l != []);")) && in(text, "while (k--)"));
+            ensure("not where the first check is not known", in(text, "for (m = n; m < 10; ++m)"));
+            ensure("a while known to run as a do", luau ? in(text, "while (w < 5)") : in(text, "while(w < 5);"));
+            ensure("a loop known never to run gone, its first part kept: " + text, !in(text, "never") && in(text, "llOwnerSay(\"5\");"));
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<62>()
+    {
+        set_test_name("a key that is a key found or NULL_KEY tested as itself: k != NULL_KEY as k, k == NULL_KEY as k with its ways turned round; "
+                      "not of a key that may be any string");
+        const std::string source = "default\n{\n"
+                                   "    touch_start(integer d)\n    {\n"
+                                   "        key owner = llGetOwner();\n"
+                                   "        if (owner != NULL_KEY)\n            llOwnerSay(\"owned\");\n"
+                                   "        if (llDetectedKey(0) == NULL_KEY)\n            llOwnerSay(\"nobody\");\n        else\n            llOwnerSay(\"somebody\");\n"
+                                   "        key sitter = llAvatarOnSitTarget();\n"
+                                   "        if (sitter == NULL_KEY)\n            llOwnerSay(\"empty\");\n"
+                                   "        key given = (key)llGetObjectDesc();\n"
+                                   "        if (given != NULL_KEY)\n            llOwnerSay(\"given\");\n"
+                                   "    }\n"
+                                   "    listen(integer c, string n, key id, string m)\n    {\n"
+                                   "        if (id != NULL_KEY)\n            llOwnerSay(m);\n    }\n"
+                                   "    link_message(integer s, integer num, string str, key id)\n    {\n"
+                                   "        if (id != NULL_KEY)\n            llOwnerSay(str);\n    }\n"
+                                   "}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            const std::string text = optimized(source, target);
+            ensure("a local set to the owner: " + text, in(text, "if (owner)"));
+            ensure("a detected key, its ways turned round", in(text, "if (llDetectedKey(0))\n            llOwnerSay(\"somebody\");\n        else\n            llOwnerSay(\"nobody\");"));
+            ensure("a lone == turned round", in(text, "if (sitter)\n            ;\n        else\n            llOwnerSay(\"empty\");"));
+            ensure("a listen's speaker: " + text, in(text, "if (id)\n            llOwnerSay(m);"));
+            ensure("not a key cast from a string", in(text, "if (given != "));
+            ensure("not a link message's key, which is any string", in(text, "if (id != ") && in(text, "llOwnerSay(str);"));
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<63>()
+    {
+        set_test_name("functions given and giving what their calls need: a parameter never read taken away with what each call gives it, one every "
+                      "call gives the same constant made a local, a value no call reads no longer returned; not where a call's argument does "
+                      "something, the calls differ, the parameter is set, or a call reads the value");
+        const std::string source = "integer got;\n"
+                                   "say(integer channel, string message, integer unused)\n{\n    llSay(channel, message);\n}\n"
+                                   "tell(integer quiet, string message)\n{\n    llOwnerSay(message);\n}\n"
+                                   "integer noisy(integer n)\n{\n    llOwnerSay((string)n);\n    return n * 2;\n}\n"
+                                   "integer read(integer n)\n{\n    return n + 1;\n}\n"
+                                   "set(integer n)\n{\n    n = n + 1;\n    llOwnerSay((string)n);\n}\n"
+                                   "default\n{\n    state_entry()\n    {\n"
+                                   "        say(0, \"a\", 1);\n        say(0, \"b\", 2);\n"
+                                   "        tell(llListen(5, \"\", \"\", \"\"), \"c\");\n        tell(3, \"d\");\n"
+                                   "        noisy(llGetUnixTime());\n        noisy(4);\n"
+                                   "        got = read(llGetUnixTime());\n"
+                                   "        set(7);\n        set(7);\n"
+                                   "    }\n"
+                                   "    touch_start(integer t)\n    {\n        llOwnerSay((string)got);\n    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            const std::string text = optimized(source, target);
+            ensure("a parameter never read gone, and its arguments: " + text, in(text, "say(string message)") && in(text, "say(\"a\");"));
+            ensure("one every call gives the same constant made its value", in(text, "llSay(0, message);"));
+            ensure("not where a call's argument does something", in(text, "tell(integer quiet, string message)") && in(text, "llListen(5"));
+            ensure("a value no call reads no longer returned", in(text, "\nnoisy(integer n)") && !in(text, "integer noisy"));
+            ensure("what it returned still worked out where it does something, or gone", !in(text, "return n * 2") || in(text, "n * 2;"));
+            ensure("not where a call reads it", in(text, "integer read(integer n)"));
+            ensure("not a parameter that is set", in(text, "set(integer n)") && in(text, "set(7);"));
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<64>()
+    {
+        set_test_name("a value set again before it is read is not set; a global every handler sets before it reads made a local of each -- on "
+                      "Mono, whose locals each cost a frame, only where that is less than the global; not one read before it is set, nor one a "
+                      "function also sets; a || 1 and a && 0 settled");
+        const std::string source = "integer scratch;\n"
+                                   "integer twice;\n"
+                                   "integer kept = 3;\n"
+                                   "integer shared;\n"
+                                   "poke(integer n)\n{\n    shared = n;\n}\n"
+                                   "default\n{\n"
+                                   "    state_entry()\n    {\n"
+                                   "        integer i = llGetUnixTime();\n        i = (integer)llFrand(9);\n        llOwnerSay((string)i);\n"
+                                   "        integer j = 4;\n        for (j = 0; j < (integer)llFrand(9); ++j)\n            llOwnerSay((string)j);\n"
+                                   "        scratch = llGetUnixTime();\n        llOwnerSay((string)scratch);\n"
+                                   "        twice = llGetUnixTime();\n        llOwnerSay((string)twice);\n"
+                                   "        shared = 1;\n        poke(2);\n        llOwnerSay((string)shared);\n"
+                                   "        if ((integer)llFrand(2) || 1)\n            llOwnerSay(\"always\");\n"
+                                   "        if ((integer)llFrand(2) && 0)\n            llOwnerSay(\"never\");\n"
+                                   "    }\n"
+                                   "    touch_start(integer t)\n    {\n        twice = t;\n        llOwnerSay((string)twice + (string)kept);\n"
+                                   "        kept = t;\n    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            const std::string text = optimized(source, target);
+            // A read of the clock changes nothing, and goes with it.
+            ensure("a value set again before it is read not set: " + text, in(text, "integer i = (integer)llFrand(9);"));
+            ensure("a for's first part sets again", !in(text, "integer j = 4;"));
+            ensure("a global one handler sets before it reads made a local", in(text, "integer scratch = llGetUnixTime();") && !in(text, "integer scratch;\n"));
+            ensure("one two handlers set before they read, a local of each but on Mono",
+                   target == ALLSLOptimizer::Target::Mono ? in(text, "integer twice;\n") : in(text, "integer twice = llGetUnixTime();") && in(text, "llOwnerSay((string)t + "));
+            ensure("not one read before it is set", in(text, "integer kept"));
+            ensure("not one a function sets too", in(text, "integer shared"));
+            ensure("a || 1 settled true", in(text, "llOwnerSay(\"always\")") && !in(text, "|| 1"));
+            ensure("a && 0 settled false", !in(text, "never"));
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<65>()
+    {
+        set_test_name("a global the script sets read again and again read once into a local, where nothing between sets it; a constant written at "
+                      "many places kept once, in a global where the target holds one smaller so, else in a local; each on its target, Mono's "
+                      "locals paying for their frames");
+        const std::string source = "integer channel;\n"
+                                   "integer never = 7;\n"
+                                   "default\n{\n"
+                                   "    state_entry()\n    {\n        channel = (integer)llFrand(1000);\n    }\n"
+                                   "    touch_start(integer n)\n    {\n"
+                                   "        llSay(channel, \"one\");\n        llSay(channel, \"two\");\n        llSay(channel, \"three\");\n"
+                                   "        channel = n;\n        llSay(channel, (string)never);\n        llSay(never, (string)never);\n"
+                                   "        llOwnerSay(\"a sentence long enough to be worth holding\");\n"
+                                   "        llOwnerSay(\"a sentence long enough to be worth holding\");\n"
+                                   "        llOwnerSay(\"a sentence long enough to be worth holding\");\n"
+                                   "        llSetPos(llGetPos() + <1.5, 2.5, 3.5>);\n        llSetPos(llGetPos() + <1.5, 2.5, 3.5>);\n"
+                                   "        llSetPos(llGetPos() + <1.5, 2.5, 3.5>);\n        llSetPos(llGetPos() + <1.5, 2.5, 3.5>);\n"
+                                   "    }\n}\n";
+        const std::string lso = optimized(source, ALLSLOptimizer::Target::LSO);
+        ensure("LSO: a long string at three places kept in a global: " + lso, in(lso, "string s = \"a sentence long enough to be worth holding\";") &&
+                                                                              in(lso, "llOwnerSay(s);"));
+        ensure("LSO: a vector at four places, in a global", in(lso, "vector v = <1.5, 2.5, 3.5>;"));
+        ensure("LSO: a global's reads stay, as large as a local's there", in(lso, "llSay(channel, \"one\");"));
+
+        const std::string luau = optimized(source, ALLSLOptimizer::Target::Luau);
+        ensure("Luau: a global read three times read once: " + luau, in(luau, "integer localChannel = channel;") && in(luau, "llSay(localChannel, \"one\");"));
+        ensure("Luau: not across where it is set", in(luau, "channel = n;"));
+        ensure("Luau: never one the script never sets, which is the folder's", !in(luau, "localNever"));
+        ensure("Luau: constants held once in a function already", !in(luau, "string s = "));
+
+        const std::string mono = optimized(source, ALLSLOptimizer::Target::Mono);
+        ensure("Mono: a vector at four places kept in a local, its frame paid for: " + mono, in(mono, "vector v = <1.5, 2.5, 3.5>;"));
+        ensure("Mono: three reads of a global not worth a local's frame", !in(mono, "localChannel"));
+        ensure("Mono: a string held once already", !in(mono, "string s = "));
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<66>()
+    {
+        set_test_name("two string literals joined on LSO, which writes each where it is used, and where the option says elsewhere; a loop that "
+                      "never ends run by a jump back on LSO and Mono");
+        const std::string source = "default\n{\n    touch_start(integer n)\n    {\n"
+                                   "        llOwnerSay(\"Hello, \" + \"world\");\n"
+                                   "        while (TRUE)\n        {\n            llOwnerSay((string)llFrand(1));\n"
+                                   "            if (llFrand(1) > 0.5)\n                jump out;\n        }\n"
+                                   "        @out;\n        llOwnerSay(\"done\");\n    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            const std::string text = optimized(source, target);
+            const bool        lso  = target == ALLSLOptimizer::Target::LSO;
+            const bool        luau = target == ALLSLOptimizer::Target::Luau;
+            ensure("two literals joined on LSO alone, by default: " + text, lso ? in(text, "\"Hello, world\"") : in(text, "\"Hello, \" + \"world\""));
+            ensure("a loop that never ends by a jump back, not on Luau", luau ? in(text, "while (TRUE)") : in(text, "@loop;") && in(text, "jump loop;"));
+            // Its jump out and back made one jump back where the check fails.
+            ensure("what follows it still reached: " + text, in(text, "llOwnerSay(\"done\");") && (luau || in(text, "jump loop;\n        llOwnerSay(\"done\");")));
+        }
+        ALLSLOptimizer::Options o = options();
+        o.addstrings              = true;
+        ensure("joined on Mono where the option asks", in(ALLSLOptimizer::run(source, o).text, "\"Hello, world\""));
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<67>()
+    {
+        set_test_name("a string cast to an integer folds as the grid's 32-bit hosts cast one, past 0xFFFFFFFF -1; a JSON number past 32 bits "
+                      "is left to the simulator");
+        const std::string source = "default\n{\n    touch_start(integer n)\n    {\n"
+                                   "        llOwnerSay((string)((integer)\"4294967296\"));\n"
+                                   "        llOwnerSay((string)((integer)\"-4294967296\"));\n"
+                                   "        llOwnerSay((string)((integer)\"0x1FFFFFFFF\"));\n"
+                                   "        llOwnerSay((string)((integer)\"99999999999999999999\"));\n"
+                                   "        llOwnerSay((string)((integer)\"3000000000\"));\n"
+                                   "        llOwnerSay((string)((integer)\" 12abc\"));\n"
+                                   "        llOwnerSay((string)((integer)\"0x10\"));\n"
+                                   "        llOwnerSay((string)((integer)\"-0x10\"));\n"
+                                   "        llOwnerSay(llList2CSV(llJson2List(\"[9999999999]\")) + llList2CSV(llJson2List(\"[2147483647, -2147483648]\")));\n"
+                                   "    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            const std::string text = optimized(source, target);
+            size_t minus_ones = 0;
+            for (size_t at = text.find("llOwnerSay(\"-1\");"); at != std::string::npos; at = text.find("llOwnerSay(\"-1\");", at + 1))
+            {
+                ++minus_ones;
+            }
+            ensure("past 0xFFFFFFFF, -1, its minus or not: " + text, minus_ones == 4);
+            ensure("within it, wrapped below nought: " + text, in(text, "llOwnerSay(\"-1294967296\");"));
+            ensure("spaces and what follows the number, hexadecimal only from a leading 0x: " + text,
+                   in(text, "llOwnerSay(\"12\");") && in(text, "llOwnerSay(\"16\");") && in(text, "llOwnerSay(\"0\");"));
+            ensure("a JSON number past 32 bits left: " + text, in(text, "llJson2List(\"[9999999999]\")"));
+            ensure("one within them folded: " + text, in(text, "2147483647") && !in(text, "llJson2List(\"[2147483647"));
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<68>()
+    {
+        set_test_name("a float function of the library folds where in double rounded once and in single precision it agrees, to a single on "
+                      "every target, as each VM answers; a pow or an atan2 of -0 is 0; on Luau, sin of no single and a length no single "
+                      "is are left");
+        const std::string source = "default\n{\n    touch_start(integer n)\n    {\n"
+                                   "        llOwnerSay((string)llPow(2.0, 10.0));\n"
+                                   "        llOwnerSay((string)llSqrt(2.0));\n"
+                                   "        llOwnerSay((string)llAtan2(-0.0, 1.0));\n"
+                                   "        llOwnerSay((string)llPow(-0.0, 3.0));\n"
+                                   "        llOwnerSay((string)llSin(1.0));\n"
+                                   "        llOwnerSay((string)llSin(0.1 + 0.2));\n"
+                                   "        llOwnerSay((string)llVecMag(<1, 1, 0>));\n"
+                                   "        llOwnerSay((string)llVecMag(<0, 3, 4>));\n"
+                                   "    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono })
+        {
+            const std::string text = optimized(source, target);
+            ensure("each folded as the VM's single: " + text,
+                   in(text, "llOwnerSay(\"1024.000000\");") && in(text, "llOwnerSay(\"1.414214\");") && in(text, "llOwnerSay(\"0.841471\");") &&
+                       in(text, "llOwnerSay(\"0.295520\");") && in(text, "llOwnerSay(\"5.000000\");") && !in(text, "llSin") && !in(text, "llVecMag"));
+            ensure("-0 made 0, not -0: " + text, !in(text, "-0.000000"));
+        }
+        const std::string luau = optimized(source, ALLSLOptimizer::Target::Luau);
+        ensure("a single, not the double: " + luau, in(luau, "(string)0.8414709568023682") && in(luau, "(string)1.4142135381698608"));
+        ensure("exact, folded: " + luau, in(luau, "(string)1024.0") && in(luau, "(string)5.0"));
+        ensure("-0 made 0: " + luau, !in(luau, "-0.0"));
+        ensure("sin of what is no single, which SLua takes as it is, left: " + luau, in(luau, "llSin(0.30000000447034836)"));
+        ensure("a length no single is, which the simulator gives by a way not known, left: " + luau, in(luau, "llVecMag("));
     }
 } // namespace tut

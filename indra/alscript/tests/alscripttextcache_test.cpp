@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alscripttextcache.h"
+#include "../preprocessor/alscripttextcache.h"
 
 #include "../test/lltut.h"
 

@@ -25,7 +25,7 @@
 
 #include "linden_common.h"
 
-#include "../alscriptlexicon.h"
+#include "../core/alscriptlexicon.h"
 
 #include "../test/lltut.h"
 

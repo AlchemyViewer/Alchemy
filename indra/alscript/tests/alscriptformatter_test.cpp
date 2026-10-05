@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alscriptformatter.h"
+#include "../core/alscriptformatter.h"
 
 #include "../test/lltut.h"
 

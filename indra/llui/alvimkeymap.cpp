@@ -2184,7 +2184,7 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 mRecorded.clear();
                 // Into its register alone: what was typed is not what the
                 // clipboard holds.
-                mRegisters.record(into, keys);
+                mShared->registers.record(into, keys);
                 clearPending();
                 return true;
             }
@@ -3644,12 +3644,12 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
 
 void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, bool yanked)
 {
-    mRegisters.store(name, std::move(text), linewise, block, yanked, mShared->unnamedClipboard);
+    mShared->registers.store(name, std::move(text), linewise, block, yanked, mShared->unnamedClipboard);
 }
 
 ALVimKeymap::Register ALVimKeymap::fetch(char name) const
 {
-    return mRegisters.fetch(name, mShared->unnamedClipboard);
+    return mShared->registers.fetch(name, mShared->unnamedClipboard);
 }
 
 void ALVimKeymap::tooMuch(size_t bytes)

@@ -26,6 +26,7 @@
 
 #include "alchoicelist.h"
 
+#include "lllocalcliprect.h"
 #include "llrender.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
@@ -218,6 +219,9 @@ void ALChoiceList::drawBeforeRows(const LLRect& text)
     const LLRect local = getLocalRect();
     const S32    top   = screenTopOf(text, mChosen, 0);
     const S32    h     = layout().rowHeightOf(mChosen, 0);
+    // Drawn before the text's clip, and the list scrolls the chosen row
+    // partly or wholly out of sight: only what of it is in the text.
+    LLLocalClipRect clip(LLRect(local.mLeft + 1, text.mTop, local.mRight - 1, text.mBottom));
     gl_rect_2d(local.mLeft + 1, top, local.mRight - 1, top - h, selectionColor() % alpha);
 }
 

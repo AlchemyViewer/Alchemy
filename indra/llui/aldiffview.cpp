@@ -43,15 +43,18 @@ namespace
     LLColor4 colorOf(const char* name, const LLColor4& otherwise) { return LLUIColorTable::instance().getColor(name, otherwise).get(); }
 
     // One side's text as it is shown: its lines, each's number (0 for a
-    // line put in to line the sides up), its tint, and the words marked.
+    // line put in to line the sides up), its tint, the words marked, and
+    // which lines are only there to line the sides up, which a copy leaves
+    // out.
     struct Shown
     {
         std::string                            text;
         std::vector<S32>                       numbers;
         std::vector<LLColor4>                  tints;
         std::vector<ALCodeEditor::Decoration>  words;
+        std::vector<bool>                      spacers;
 
-        S32 add(const std::string& line, S32 number, const LLColor4& tint)
+        S32 add(const std::string& line, S32 number, const LLColor4& tint, bool spacer = false)
         {
             if (!numbers.empty())
             {
@@ -60,6 +63,7 @@ namespace
             text += line;
             numbers.push_back(number);
             tints.push_back(tint);
+            spacers.push_back(spacer);
             return static_cast<S32>(numbers.size()) - 1;
         }
 
@@ -81,6 +85,7 @@ namespace
             editor.setText(text);
             editor.setLineNumbers(std::move(numbers));
             editor.setLineTints(std::move(tints));
+            editor.setSpacerLines(std::move(spacers));
             editor.setDecorations(std::move(words));
         }
     };
@@ -141,10 +146,11 @@ ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::
     return made;
 }
 
-void ALDiffView::setTexts(std::string_view left, std::string_view right)
+void ALDiffView::setTexts(std::string_view left, std::string_view right, const ALTextDiff::anchors_t& anchors)
 {
     mLeftText  = std::string(left);
     mRightText = std::string(right);
+    mAnchors   = anchors;
     rebuild();
 }
 
@@ -199,7 +205,7 @@ void ALDiffView::rebuild()
 {
     const std::vector<std::string>      left  = ALTextDiff::split(mLeftText);
     const std::vector<std::string>      right = ALTextDiff::split(mRightText);
-    const std::vector<ALTextDiff::Run>  runs  = ALTextDiff::lines(left, right);
+    const std::vector<ALTextDiff::Run>  runs  = mAnchors.empty() ? ALTextDiff::lines(left, right) : ALTextDiff::lines(left, right, mAnchors);
     const LLColor4                      none(0.f, 0.f, 0.f, 0.f);
     const LLColor4                      out       = colorOf("CodeDiffRemovedColor", LLColor4(0.85f, 0.25f, 0.25f, 0.18f));
     const LLColor4                      in        = colorOf("CodeDiffAddedColor", LLColor4(0.25f, 0.75f, 0.35f, 0.18f));
@@ -243,8 +249,8 @@ void ALDiffView::rebuild()
         {
             const bool      has_out = n < gone.size();
             const bool      has_in  = n < made.size();
-            const S32       lrow = has_out ? ls.add(left[static_cast<size_t>(gone[n])], gone[n] + 1, out) : ls.add(std::string(), 0, padding);
-            const S32       rrow = has_in ? rs.add(right[static_cast<size_t>(made[n])], made[n] + 1, in) : rs.add(std::string(), 0, padding);
+            const S32       lrow = has_out ? ls.add(left[static_cast<size_t>(gone[n])], gone[n] + 1, out) : ls.add(std::string(), 0, padding, true);
+            const S32       rrow = has_in ? rs.add(right[static_cast<size_t>(made[n])], made[n] + 1, in) : rs.add(std::string(), 0, padding, true);
             if (has_out && has_in)
             {
                 ALTextDiff::spans_t lspans;
@@ -274,6 +280,8 @@ void ALDiffView::rebuild()
             is.mark(first_in + static_cast<S32>(n), rspans, in_words);
         }
     }
+    mRightRows  = rs.numbers;
+    mInlineRows = is.numbers;
     ls.into(*mLeft);
     rs.into(*mRight);
     is.into(*mInlined);
@@ -360,8 +368,67 @@ bool ALDiffView::goToChange(bool forward)
     return true;
 }
 
+std::pair<S32, S32> ALDiffView::rightAtCaret() const
+{
+    const ALCodeEditor*     side = shown();
+    const std::vector<S32>& rows = side == mInlined ? mInlineRows : mRightRows;
+    const S32               row  = side->caret().line;
+    if (rows.empty())
+    {
+        return { 0, 0 };
+    }
+    const S32 at = llclamp(row, 0, static_cast<S32>(rows.size()) - 1);
+    if (rows[static_cast<size_t>(at)] > 0)
+    {
+        // The column where the caret stands in the right's own text: the
+        // right side's, or a line inline that the right has.
+        return { rows[static_cast<size_t>(at)] - 1, side == mLeft ? 0 : side->caret().column };
+    }
+    for (S32 n = at + 1; n < static_cast<S32>(rows.size()); ++n)
+    {
+        if (rows[static_cast<size_t>(n)] > 0)
+        {
+            return { rows[static_cast<size_t>(n)] - 1, 0 };
+        }
+    }
+    for (S32 n = at - 1; n >= 0; --n)
+    {
+        if (rows[static_cast<size_t>(n)] > 0)
+        {
+            return { rows[static_cast<size_t>(n)] - 1, 0 };
+        }
+    }
+    return { 0, 0 };
+}
+
+bool ALDiffView::handleUnicodeCharHere(llwchar uni_char)
+{
+    // A character the side in front would not take, being read only.
+    if (mEdit && uni_char >= 0x20 && uni_char != 0x7F)
+    {
+        const auto [line, column] = rightAtCaret();
+        if (LLView* to = mEdit(line, column))
+        {
+            return to->handleUnicodeChar(uni_char, true);
+        }
+    }
+    return LLUICtrl::handleUnicodeCharHere(uni_char);
+}
+
 bool ALDiffView::handleKeyHere(KEY key, MASK mask)
 {
+    // A key the side in front would not take, being read only, that
+    // changes the text: a line broken or joined, a tab, a paste or a cut.
+    const bool edits = ((key == KEY_RETURN || key == KEY_BACKSPACE || key == KEY_DELETE || key == KEY_TAB) && (mask == MASK_NONE || mask == MASK_SHIFT)) ||
+                       ((key == 'V' || key == 'X') && mask == MASK_CONTROL);
+    if (mEdit && edits)
+    {
+        const auto [line, column] = rightAtCaret();
+        if (LLView* to = mEdit(line, column))
+        {
+            return to->handleKey(key, mask, true);
+        }
+    }
     if (key == KEY_F7 && (mask == MASK_NONE || mask == MASK_SHIFT))
     {
         goToChange(mask == MASK_NONE);

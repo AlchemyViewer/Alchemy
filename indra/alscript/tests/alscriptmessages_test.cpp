@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alscriptmessages.h"
+#include "../core/alscriptmessages.h"
 
 #include "../test/lltut.h"
 

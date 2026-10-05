@@ -27,6 +27,7 @@
 #include "../aldiffview.h"
 
 #include "../alcodeeditor.h"
+#include "../llclipboard.h"
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
 
@@ -160,5 +161,88 @@ namespace tut
         ensure("then the comparison's", d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false) && told == 1);
         d.setOnEscape(nullptr);
         ensure("nobody to tell: kept, and the keyboard with it", d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false) && d.right()->hasFocus());
+    }
+
+    template<> template<>
+    void aldiffview_object::test<6>()
+    {
+        set_test_name("anchored: lines known to stand for each other side by side however they differ; and typing goes to whoever shows it, at the right's line");
+        ALDiffView& d = make("", "");
+        d.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 2 } });
+        const std::vector<S32>& left_numbers  = d.left()->lineNumbers();
+        const std::vector<S32>& right_numbers = d.right()->lineNumbers();
+        S32                     say           = -1;
+        for (S32 row = 0; row < static_cast<S32>(left_numbers.size()); ++row)
+        {
+            if (left_numbers[static_cast<size_t>(row)] == 5)
+            {
+                say = row;
+            }
+        }
+        ensure("the LSL's call shown", say >= 0 && say < static_cast<S32>(right_numbers.size()));
+        ensure_equals("beside the SLua's", right_numbers[static_cast<size_t>(say)], 3);
+
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name                 = "source";
+        p.rect                 = LLRect(0, 100, 300, 0);
+        ALCodeEditor* source   = LLUICtrlFactory::create<ALCodeEditor>(p);
+        source->setText("-- written\n\nll.Say(0, \"hi\")");
+        S32 at_line = -1;
+        S32 at_column = -1;
+        d.setOnEdit([&](S32 line, S32 column) -> LLView* {
+            at_line   = line;
+            at_column = column;
+            source->goTo(ALTextPos(line, column));
+            return source;
+        });
+        d.right()->setFocus(true);
+        d.right()->goTo(ALTextPos(say, 2));
+        ensure("a character typed on the right", d.right()->handleUnicodeChar('x', false));
+        ensure("told where: the right's line and column", at_line == 2 && at_column == 2);
+        ensure_equals("typed there instead", source->text(), std::string("-- written\n\nllx.Say(0, \"hi\")"));
+        ensure("the comparison as it was", d.right()->isReadOnly() && d.right()->text().find("llx") == std::string::npos);
+
+        // From the left, the line beside it, from its start; from a line
+        // the right has none of, the next it has.
+        d.left()->setFocus(true);
+        d.left()->goTo(ALTextPos(say, 5));
+        ensure("a line broken on the left", d.left()->handleKey(KEY_RETURN, MASK_NONE, false));
+        ensure("the right's line beside it, its start", at_line == 2 && at_column == 0);
+        ensure_equals("broken there", source->text(), std::string("-- written\n\n\nllx.Say(0, \"hi\")"));
+        d.left()->goTo(ALTextPos(0, 0));
+        ensure_equals("before any line of the right: its first after", d.rightAtCaret().first, 0);
+
+        // Nobody to tell: nothing typed anywhere.
+        d.setOnEdit(nullptr);
+        at_line = -1;
+        d.right()->setFocus(true);
+        d.right()->handleUnicodeChar('y', false);
+        ensure("nothing told, nothing typed", at_line == -1 && source->text() == "-- written\n\n\nllx.Say(0, \"hi\")");
+        source->die();
+    }
+
+    template<> template<>
+    void aldiffview_object::test<7>()
+    {
+        set_test_name("a copy takes each side's text as it is: not the empty lines that line the sides up");
+        ALDiffView& d = make("one\nfour", "one\ntwo\nthree\nfour\nfive");
+        ensure_equals("lined up", d.left()->text(), std::string("one\n\n\nfour\n"));
+        LLClipboard& clipboard = LLClipboard::instance();
+        std::string  copied;
+
+        d.left()->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 0)));
+        d.left()->copy();
+        clipboard.pasteFromClipboard(copied);
+        ensure_equals("all of the left, as its text has it", copied, std::string("one\nfour"));
+
+        d.left()->setSelection(ALTextRange(ALTextPos(0, 1), ALTextPos(2, 0)));
+        d.left()->copy();
+        clipboard.pasteFromClipboard(copied);
+        ensure_equals("into the gap: the line's break, which the text has", copied, std::string("ne\n"));
+
+        d.right()->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 4)));
+        d.right()->copy();
+        clipboard.pasteFromClipboard(copied);
+        ensure_equals("the right, which has no gap, whole", copied, std::string("one\ntwo\nthree\nfour\nfive"));
     }
 }

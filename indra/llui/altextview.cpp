@@ -3682,7 +3682,11 @@ void ALTextView::copy()
             {
                 text += '\n';
             }
-            text += one.empty() ? mDocument.line(one.end.line) : mDocument.text(one);
+            if (one.empty() && spacerLine(one.end.line))
+            {
+                continue;
+            }
+            text += one.empty() ? mDocument.line(one.end.line) : copiedText(one);
             any = true;
         }
         if (any)
@@ -3694,7 +3698,7 @@ void ALTextView::copy()
     }
     if (!hasSelection())
     {
-        if (!mClipsLines)
+        if (!mClipsLines || spacerLine(mCaret.line))
         {
             return;
         }
@@ -3706,6 +3710,40 @@ void ALTextView::copy()
     sClippedLine.clear();
     const std::string text = selectedText();
     LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
+}
+
+std::string ALTextView::copiedText(const ALTextRange& range) const
+{
+    if (mSpacerLines.empty())
+    {
+        return mDocument.text(range);
+    }
+    // Each line's part that is in the range, and its break where the range
+    // goes on past it and the text has a line after it: a spacer gives
+    // neither, and the text's last line has no break of its own to give,
+    // whatever spacers are shown after it.
+    const ALTextRange ordered = range.normalised();
+    S32               last    = mDocument.lineCount() - 1;
+    while (last > 0 && spacerLine(last))
+    {
+        --last;
+    }
+    std::string text;
+    for (S32 line = ordered.begin.line; line <= ordered.end.line; ++line)
+    {
+        if (spacerLine(line))
+        {
+            continue;
+        }
+        const S32 from = line == ordered.begin.line ? ordered.begin.column : 0;
+        const S32 to   = line == ordered.end.line ? ordered.end.column : static_cast<S32>(mDocument.line(line).size());
+        text += mDocument.text(ALTextRange(ALTextPos(line, from), ALTextPos(line, to)));
+        if (line < ordered.end.line && line < last)
+        {
+            text += '\n';
+        }
+    }
+    return text;
 }
 
 bool ALTextView::canPaste() const
@@ -5194,6 +5232,8 @@ void ALTextView::draw()
     // A tint behind each line that has one, under everything else.
     if (!mLineTints.empty())
     {
+        // The first and last rows in sight may be partly out of it.
+        LLLocalClipRect clip(text);
         const S32 row_h = layout().rowHeight();
         forEachVisibleRow(text, [&](S32 line, S32, S32 screen_top) {
             if (line < static_cast<S32>(mLineTints.size()) && mLineTints[static_cast<size_t>(line)].mV[VALPHA] > 0.f)

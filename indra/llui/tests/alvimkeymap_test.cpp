@@ -2856,4 +2856,36 @@ namespace tut
         ensure_equals("undone", e.text(), std::string("jxone\njxtwo"));
         ensure("one caret in normal mode after it", !e.hasOtherSelections());
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<97>()
+    {
+        set_test_name("the registers are the shared vim's: what is yanked in one buffer is put in another, the clipboard off, and a macro played there");
+        make("alpha\nbeta");
+        const std::string outside("outside");
+        LLClipboard::instance().copyToClipboard(outside, 0, static_cast<S32>(outside.size()));
+        const std::shared_ptr<ALVimKeymap::Shared> shared = vim->sharedState();
+        ensure("off, as vim has it", !shared->unnamedClipboard);
+        keys("\"ayy");
+        keys("jyy");
+        keys("qqA!<Esc>q");
+
+        // Another buffer, its keymap sharing the first's state.
+        make("gamma");
+        vim->share(shared);
+        keys("p");
+        ensure_equals("the unnamed register, from the other buffer", flat(editor->text()), std::string("gamma|beta"));
+        keys("\"ap");
+        ensure_equals("a named one", flat(editor->text()), std::string("gamma|beta|alpha"));
+        keys("@q");
+        ensure_equals("a macro recorded there", flat(editor->text()), std::string("gamma|beta|alpha!"));
+        std::string held;
+        LLClipboard::instance().pasteFromClipboard(held);
+        ensure_equals("the clipboard left alone", held, outside);
+
+        // One that shares nothing has its own.
+        make("delta");
+        keys("p");
+        ensure_equals("nothing to put", flat(editor->text()), std::string("delta"));
+    }
 }

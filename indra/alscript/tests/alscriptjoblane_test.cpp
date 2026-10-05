@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alscriptjoblane.h"
+#include "../preprocessor/alscriptjoblane.h"
 
 #include "../test/lltut.h"
 

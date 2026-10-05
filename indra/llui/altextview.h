@@ -342,7 +342,10 @@ public:
     ALTextRange selection() const { return ALTextRange(mAnchor, mCaret); }
     bool        hasSelection() const { return mAnchor != mCaret; }
     void        setSelection(const ALTextRange& range);
-    std::string selectedText() const { return mDocument.text(selection()); }
+    // The selection's text, as a copy takes it: but for spacer lines.
+    std::string selectedText() const { return copiedText(selection()); }
+    // A range's text but for the spacer lines in it, each with its break.
+    std::string copiedText(const ALTextRange& range) const;
     // The identifier the caret is at the end of: letters, digits and
     // underscores back from the caret. Empty at anything else.
     std::string wordBeforeCaret() const;
@@ -506,6 +509,14 @@ public:
     // For a text shown rather than edited -- a side of a diff.
     void                         setLineTints(std::vector<LLColor4> tints) { mLineTints = std::move(tints); }
     const std::vector<LLColor4>& lineTints() const { return mLineTints; }
+    // Lines shown that are no part of the text -- the empty rows a diff
+    // lines its sides up with -- which a copy leaves out: each one a line,
+    // from the first, true for a spacer.
+    void                         setSpacerLines(std::vector<bool> spacers) { mSpacerLines = std::move(spacers); }
+    bool                         spacerLine(S32 line) const
+    {
+        return line >= 0 && line < static_cast<S32>(mSpacerLines.size()) && mSpacerLines[static_cast<size_t>(line)];
+    }
 
     // --- atoms ---------------------------------------------------------------
 
@@ -1368,6 +1379,7 @@ private:
     ALAnchoredRanges<Atom, AtomRange>  mAtoms;
     ALAnchoredRanges<Style>            mStyles;
     std::vector<LLColor4>              mLineTints;
+    std::vector<bool>                  mSpacerLines;
     LLUIColor                          mLinkColor;
     link_signal_t                      mLinkClicked;
     drop_handler_t                     mDropHandler;

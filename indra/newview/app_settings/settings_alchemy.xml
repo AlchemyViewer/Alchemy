@@ -621,7 +621,7 @@
         <key>ALScriptConvertHandlerFields</key>
         <map>
             <key>Comment</key>
-            <string>Convert to SLua assigns handlers to LLEvents' fields (LLEvents.touch_start = function ...), one for each event, rather than putting them on with LLEvents:on.</string>
+            <string>Convert to SLua assigns handlers to LLEvents' fields (LLEvents.touch_start = function ...) rather than putting them on with LLEvents:on. SLua puts an assigned handler on as LLEvents:on does, beside any others.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -644,6 +644,17 @@
         <map>
             <key>Comment</key>
             <string>Convert to SLua writes a -- LSL: comment over each place where SLua means something else than LSL did, or has a way of its own.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptConvertKeepComments</key>
+        <map>
+            <key>Comment</key>
+            <string>Convert to SLua carries the script's own comments over, each over what it stood over, or after it where it was after it on its line: // as --, and /* */ as --[[ ]].</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

@@ -439,9 +439,29 @@ private:
     // a notecard, its items with it -- and the tab closed once it is.
     void saveCopyToInventory(Doc& doc) override;
     // An LSL tab written again as SLua (ALLSLToSLua) in a new SLua script
-    // of the inventory's, its text put in unsaved and set beside the LSL;
-    // the LSL script left as it is.
+    // beside it -- in the prim the LSL is in, or the inventory's scripts
+    // folder for one in the inventory -- its text put in unsaved and set
+    // beside the LSL; the LSL script left as it is.
     void convertToSLua(Doc& doc);
+    // A script written as SLua into a prim, waited for until the prim lists
+    // it: by the id the region gave, or by its name where it gave none, as
+    // one of that name that was not there before.
+    struct ConvertedWaiting
+    {
+        LLUUID              prim;
+        LLUUID              item;
+        std::string         name;
+        std::vector<LLUUID> before;
+        std::string         text;
+        Doc::PendingCompare compare;
+    };
+    std::vector<ConvertedWaiting>      mConvertedWaiting;
+    boost::signals2::scoped_connection mConvertedContents;
+    void convertedMade(const ALScriptCreated& made, ConvertedWaiting waiting);
+    void convertedListed(const ALScriptContents& contents);
+    // The new SLua script opened with its text unsaved, and set beside the
+    // LSL once it has loaded.
+    void openConverted(const ALScriptRef& ref, const std::string& name, const std::string& text, const Doc::PendingCompare& compare);
 
     // --- problems and checks -----------------------------------------------------------
 
@@ -636,6 +656,10 @@ private:
     void addBuildCommands();
     void addHelpCommands();
     void addEditorCommand(const std::string& name, ALEditorCommand command, bool changes);
+    // One of the text's own that no item of the menus gives: reached by its
+    // keys alone.
+    void addUnlistedEditorCommand(const std::string& name, ALEditorCommand command, bool changes);
+    void editorCommand(const std::string& name, ALEditorCommand command, bool changes, bool listed);
     void onCompileTarget();
     // A notecard's grammar picked from the strip.
     void onNotecardGrammar();
@@ -809,6 +833,14 @@ private:
     void                         takeOffer(Doc& doc, const std::string& action) override { outputAction(doc, action); }
     void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
                  const std::string& right_title) override;
+    // A comparison shown in the tab's editor's place, lined up at the
+    // anchors where there are any; what is typed in it goes to the source,
+    // at the line the caret is on.
+    void showCompare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title, const std::string& right_title,
+                     const std::vector<std::pair<S32, S32>>& anchors);
+    // A comparison whose right is the tab's text titled again, unsaved or
+    // not as the tab now is.
+    void retitleCompare(const Doc& doc) const;
     void endCompare(Doc& doc) override;
     // A tab made to hold a kept text with nothing loaded under it: unsaved,
     // with whatever its script or file was.
@@ -1290,7 +1322,8 @@ private:
     boost::signals2::scoped_connection mCompiledConnection;
     boost::signals2::scoped_connection mSavedConnection;
     boost::signals2::scoped_connection mDefinitionsConnection;
-    // The vimrc changed: read again into this window's vim.
+    // The vimrc changed: read again into the studio's vim, which every
+    // window shares, and this window's editors set again from it.
     boost::signals2::scoped_connection mVimrcConnection;
     // The settings the window follows as they change: the lints and the
     // Luau mode, the preprocessor's, vim's clipboard.

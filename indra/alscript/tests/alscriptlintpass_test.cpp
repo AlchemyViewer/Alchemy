@@ -24,11 +24,11 @@
 
 #include "linden_common.h"
 
-#include "../allslservice.h"
-#include "../allsltoslua.h"
-#include "../alluauservice.h"
-#include "../alscriptfixes.h"
-#include "../alscriptlintpass.h"
+#include "../lsl/allslservice.h"
+#include "../lsl/allsltoslua.h"
+#include "../luau/alluauservice.h"
+#include "../lint/alscriptfixes.h"
+#include "../lint/alscriptlintpass.h"
 
 #include "../test/lltut.h"
 
@@ -909,5 +909,33 @@ namespace tut
                found("--!nolint SlGlobalFunction\nfunction onTouch() end\nfunction reset() onTouch = nil end\nreset()\nonTouch()\n", "SlGlobalAssign",
                      ALScriptProblem::Severity::Note)
                    .find("LuauLintSlGlobalInFunction") == std::string::npos);
+    }
+
+    template<> template<>
+    void object::test<24>()
+    {
+        set_test_name("SlIntegerPast32Bits: a whole number past 0xFFFFFFFF, decimal or hexadecimal, read as -1 and as 1 with a minus before it; "
+                      "not one within 32 bits, a float, or one in a string or a comment");
+        ensure("builtins: " + error, lslLoaded);
+        ensure_equals("LSL", found("integer a = 4294967296;\n"
+                                   "integer b = 0x100000000;\n"
+                                   "integer c = -4294967296;\n"
+                                   "integer d = 99999999999999999999999;\n"
+                                   "integer e = 4294967295; integer f = 0xFFFFFFFF; integer g = 2147483648;\n"
+                                   "float h = 4294967296.0; float i = 1e10; string j = \"4294967296\"; // 4294967296\n"
+                                   "default { state_entry() {\n"
+                                   "    integer k = a - 4294967296;\n"
+                                   "    vector v = <4294967296, 0, 0>;\n"
+                                   "    llOwnerSay((string)(k + b + c + d + e + f + g) + (string)h + (string)i + j + (string)v);\n"
+                                   "} }\n",
+                                   "SlIntegerPast32Bits", ALScriptProblem::Severity::Warning, false),
+                      std::string("0 LSLSlIntegerPast32Bits|4294967296|-1\n"
+                                  "1 LSLSlIntegerPast32Bits|0x100000000|-1\n"
+                                  "2 LSLSlIntegerPast32Bits|-4294967296|1\n"
+                                  "3 LSLSlIntegerPast32Bits|99999999999999999999999|-1\n"
+                                  "7 LSLSlIntegerPast32Bits|4294967296|-1\n"
+                                  "8 LSLSlIntegerPast32Bits|4294967296|-1\n"));
+        ensure_equals("not SLua's, whose numbers are doubles", found("local a = 4294967296\n", "SlIntegerPast32Bits", ALScriptProblem::Severity::Warning, true),
+                      std::string());
     }
 }

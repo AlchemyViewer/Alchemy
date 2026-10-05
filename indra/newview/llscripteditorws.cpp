@@ -106,7 +106,7 @@ namespace
 
     // Creates a uniquely-named LLEventMailDrop under "<prefix>.<uuid>", passes
     // its name to kickoff (which arranges for one post to that pump), then
-    // suspends the current coroutine up to 	imeout seconds for the result.
+    // suspends the current coroutine up to timeout seconds for the result.
     // Throws RequestTimeoutError(timeout_msg) if the deadline elapses.
     template <typename Kickoff>
     LLSD await_async_result(const std::string& pump_prefix,

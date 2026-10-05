@@ -25,8 +25,8 @@
 
 #include "linden_common.h"
 
-#include "../allslservice.h"
-#include "../alpreprocessor.h"
+#include "../lsl/allslservice.h"
+#include "../preprocessor/alpreprocessor.h"
 
 #include "../test/lltut.h"
 

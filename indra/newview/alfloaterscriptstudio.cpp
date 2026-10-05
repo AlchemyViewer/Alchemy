@@ -931,8 +931,10 @@ void ALFloaterScriptStudio::listenToWorld()
             mOrphansDirty = true;
         }
     });
-    // The vimrc read again into this window's vim whenever it changes: its
-    // file saved, a notecard dropped on the preferences' box, or saved.
+    mConvertedContents = ALScriptWorkspace::instance().contentsIndex().onHeard([this](const ALScriptContents& contents) { convertedListed(contents); });
+    // The vimrc read again into the studio's vim whenever it changes: its
+    // file saved, a notecard dropped on the preferences' box, or saved;
+    // each window's editors set again from it.
     mVimrcConnection = ALScriptStudioVimrc::instance().onChanged([this]() {
         if (mVim.sourced())
         {
@@ -1769,6 +1771,13 @@ ALCodeEditor::Params ALFloaterScriptStudio::editorParams(const std::string& id, 
 void ALFloaterScriptStudio::compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
                                     const std::string& right_title)
 {
+    showCompare(doc, left, right, left_title, right_title, {});
+}
+
+void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
+                                        const std::string& right_title, const std::vector<std::pair<S32, S32>>& anchors)
+{
+    doc.compareTitles.reset();
     if (!doc.compareView)
     {
         // In the editors' place, in their colours and face; unwrapped, since
@@ -1790,11 +1799,23 @@ void ALFloaterScriptStudio::compare(Doc& doc, const std::string& left, const std
                 showView(*found, Doc::View::Source, true);
             }
         });
+        // Its right is the tab's text, which can be changed only in the
+        // source: typing goes on there, where the caret was.
+        doc.compareView->setOnEdit([this, id](S32 line, S32 column) -> LLView* {
+            Doc* found = findDoc(id);
+            if (!found || !found->loaded || !found->modifiable || found->editor->isReadOnly())
+            {
+                return nullptr;
+            }
+            showView(*found, Doc::View::Source, true);
+            found->editor->goTo(ALTextPos(line, column));
+            return found->editor;
+        });
         mEditorHost->addChild(doc.compareView);
     }
     doc.compareView->setGrammar(doc.editor->highlighter().grammar());
     doc.compareView->setInline(mCompareInline);
-    doc.compareView->setTexts(left, right);
+    doc.compareView->setTexts(left, right, anchors);
     doc.compareView->setTitles(left_title, right_title);
     showView(doc, Doc::View::Compare, true);
 }
@@ -3233,6 +3254,10 @@ void ALFloaterScriptStudio::fillTabs()
     }
     mTabFacts       = facts;
     mTabFactsActive = mActive;
+    for (const std::unique_ptr<Doc>& doc : mDocs)
+    {
+        retitleCompare(*doc);
+    }
 
     std::vector<ALTabStrip::Tab> tabs;
     tabs.reserve(mDocs.size());
@@ -3270,6 +3295,7 @@ void ALFloaterScriptStudio::fillTabs(const Doc& doc)
     const bool renamed = facts.name != mTabFacts[index].name;
     mTabFacts[index]   = std::move(facts);
     mTabs->setTab(tabOf(doc, mTabFacts[index]));
+    retitleCompare(doc);
     if (renamed && index == mActive)
     {
         setTitle(words("WindowTitleNamed", { { "[NAME]", doc.name } }));
@@ -6206,15 +6232,27 @@ void ALFloaterScriptStudio::comparePending(Doc& doc)
     }
     const Doc::PendingCompare pending = std::move(*doc.pendingCompare);
     doc.pendingCompare.reset();
-    // This tab's text as it stands, which it says where it is not saved.
-    std::string own = pending.ownTitle;
+    // This tab's text as it stands, which it says where it is not saved,
+    // for as long as it is not.
+    showCompare(doc, pending.text, doc.editor->wholeText(), pending.theirTitle, pending.ownTitle, pending.anchors);
+    doc.compareTitles = Doc::CompareTitles{ pending.theirTitle, pending.ownTitle };
+    retitleCompare(doc);
+}
+
+void ALFloaterScriptStudio::retitleCompare(const Doc& doc) const
+{
+    if (!doc.compareView || !doc.compareTitles)
+    {
+        return;
+    }
+    std::string own = doc.compareTitles->own;
     if (doc.unsaved())
     {
         LLStringUtil::format_map_t args;
         args["[TITLE]"] = own;
         own             = getString("CompareUnsaved", args);
     }
-    compare(doc, pending.text, doc.editor->wholeText(), pending.theirTitle, own);
+    doc.compareView->setTitles(doc.compareTitles->theirs, own);
 }
 
 // --- windows ---------------------------------------------------------------------------
@@ -7603,6 +7641,7 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     options.handlers      = gSavedSettings.getBOOL("ALScriptConvertHandlerFields") ? ALLSLToSLua::Options::Handlers::Field : ALLSLToSLua::Options::Handlers::On;
     options.types         = gSavedSettings.getBOOL("ALScriptConvertTypes");
     options.comments      = gSavedSettings.getBOOL("ALScriptConvertComments");
+    options.keepComments  = gSavedSettings.getBOOL("ALScriptConvertKeepComments");
     // Its notes, and its comments, in the skin's words.
     options.words = alScriptKeyedWords;
     const std::string   source    = doc.editor->wholeText();
@@ -7627,41 +7666,121 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
         report(getString("ConvertFailed", args), true, &doc);
         return;
     }
-    // Named after it, in the inventory's scripts folder, as a new script
-    // is made; opened with the SLua put in unsaved, and set beside the LSL
-    // once it has loaded.
+    // Named after it, beside it: in the prim it is in, as the scripter
+    // would put it, or in the inventory's scripts folder, as a new script
+    // is made there; opened with the SLua put in unsaved, and set beside
+    // the LSL once it has loaded.
     const std::string         name     = getString("ConvertName", args);
     const std::string         lsl      = expanded ? *doc.expanded.text : source;
     const std::string         text     = converted.text;
-    const std::string         theirs   = getString(expanded ? "ConvertExpandedTitle" : "ConvertLSLTitle", args);
-    const std::string         own      = getString("ConvertSLuaTitle");
+    const Doc::PendingCompare compare{ lsl, getString(expanded ? "ConvertExpandedTitle" : "ConvertLSLTitle", args), getString("ConvertSLuaTitle"),
+                                       converted.anchors };
     const LLHandle<LLFloater> handle   = getHandle();
-    LLPointer<LLBoostFuncInventoryCallback> made = new LLBoostFuncInventoryCallback(create_script_cb);
-    made->addOnFireFunc([handle, text, lsl, theirs, own](const LLUUID& item_id) {
-        ALFloaterScriptStudio*       studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-        const LLViewerInventoryItem* item   = item_id.notNull() ? gInventory.getItem(item_id) : nullptr;
-        if (!studio || !item)
+    if (!doc.ref.inInventory() && doc.file.empty())
+    {
+        ConvertedWaiting waiting{ doc.ref.object, LLUUID::null, name, {}, text, compare };
+        for (const ALScriptContents::Item& item : ALScriptWorkspace::instance().contentsIndex().items(doc.ref.object))
         {
-            return;
-        }
-        const ALScriptRef ref(LLUUID::null, item_id);
-        studio->openScript(ref, item->getName(), text);
-        if (Doc* opened = studio->findDoc(ref))
-        {
-            opened->pendingCompare = Doc::PendingCompare{ lsl, theirs, own };
-            if (opened->loaded)
+            if (item.name == name)
             {
-                studio->comparePending(*opened);
+                waiting.before.push_back(item.id);
             }
         }
-    });
-    std::string desc;
-    LLViewerAssetType::generateDescriptionFor(LLAssetType::AT_LSL_TEXT, desc);
-    create_inventory_item(gAgent.getID(), gAgent.getSessionID(), gInventory.findCategoryUUIDForType(LLFolderType::FT_LSL_TEXT), LLTransactionID::tnull,
-                          name, desc, LLAssetType::AT_LSL_TEXT, LLInventoryType::IT_LSL, SST_LUA, LLFloaterPerms::getNextOwnerPerms("Scripts"), made);
+        std::string error;
+        const bool  asked = ALScriptWorkspace::instance().create(
+            doc.ref.object, false, true, name,
+            [handle, waiting](const ALScriptCreated& made) {
+                if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+                {
+                    studio->convertedMade(made, waiting);
+                }
+            },
+            error);
+        if (!asked)
+        {
+            report(error, true, &doc);
+            return;
+        }
+    }
+    else
+    {
+        LLPointer<LLBoostFuncInventoryCallback> made = new LLBoostFuncInventoryCallback(create_script_cb);
+        made->addOnFireFunc([handle, text, compare](const LLUUID& item_id) {
+            ALFloaterScriptStudio*       studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+            const LLViewerInventoryItem* item   = item_id.notNull() ? gInventory.getItem(item_id) : nullptr;
+            if (studio && item)
+            {
+                studio->openConverted(ALScriptRef(LLUUID::null, item_id), item->getName(), text, compare);
+            }
+        });
+        std::string desc;
+        LLViewerAssetType::generateDescriptionFor(LLAssetType::AT_LSL_TEXT, desc);
+        create_inventory_item(gAgent.getID(), gAgent.getSessionID(), gInventory.findCategoryUUIDForType(LLFolderType::FT_LSL_TEXT),
+                              LLTransactionID::tnull, name, desc, LLAssetType::AT_LSL_TEXT, LLInventoryType::IT_LSL, SST_LUA,
+                              LLFloaterPerms::getNextOwnerPerms("Scripts"), made);
+    }
     args["[NEW]"]   = name;
     args["[NOTES]"] = counted("ConvertNotes", static_cast<S32>(converted.notes.size()));
     report(getString(expanded ? "ConvertedExpanded" : "Converted", args), false, &doc);
+}
+
+void ALFloaterScriptStudio::convertedMade(const ALScriptCreated& made, ConvertedWaiting waiting)
+{
+    if (!made.error.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"]  = made.name;
+        args["[ERROR]"] = made.error;
+        report(getString("CreateFailed", args), true);
+        return;
+    }
+    waiting.item = made.item;
+    waiting.name = made.name;
+    mConvertedWaiting.push_back(std::move(waiting));
+    // Asked of the region now, rather than once the object hears that its
+    // contents changed.
+    ALScriptWorkspace::instance().contentsIndex().ask(made.prim, true, true);
+}
+
+void ALFloaterScriptStudio::convertedListed(const ALScriptContents& contents)
+{
+    // Taken off the list before any is opened, since opening one can list
+    // the prim again.
+    std::vector<std::pair<ALScriptContents::Item, ConvertedWaiting>> listed;
+    for (auto waiting = mConvertedWaiting.begin(); waiting != mConvertedWaiting.end();)
+    {
+        const auto item = waiting->prim != contents.prim
+                              ? contents.items.end()
+                              : std::find_if(contents.items.begin(), contents.items.end(), [&waiting](const ALScriptContents::Item& item) {
+                                    return waiting->item.notNull() ? item.id == waiting->item
+                                                                   : item.name == waiting->name &&
+                                                                         std::find(waiting->before.begin(), waiting->before.end(), item.id) == waiting->before.end();
+                                });
+        if (item == contents.items.end())
+        {
+            ++waiting;
+            continue;
+        }
+        listed.emplace_back(*item, std::move(*waiting));
+        waiting = mConvertedWaiting.erase(waiting);
+    }
+    for (const auto& [item, waiting] : listed)
+    {
+        openConverted(ALScriptRef(waiting.prim, item.id), item.name, waiting.text, waiting.compare);
+    }
+}
+
+void ALFloaterScriptStudio::openConverted(const ALScriptRef& ref, const std::string& name, const std::string& text, const Doc::PendingCompare& compare)
+{
+    openScript(ref, name, text);
+    if (Doc* opened = findDoc(ref))
+    {
+        opened->pendingCompare = compare;
+        if (opened->loaded)
+        {
+            comparePending(*opened);
+        }
+    }
 }
 
 // --- copying from a list -------------------------------------------------------------
@@ -7894,21 +8013,37 @@ void ALFloaterScriptStudio::addCommands()
 
 void ALFloaterScriptStudio::addEditorCommand(const std::string& name, ALEditorCommand command, bool changes)
 {
+    editorCommand(name, command, changes, true);
+}
+
+void ALFloaterScriptStudio::addUnlistedEditorCommand(const std::string& name, ALEditorCommand command, bool changes)
+{
+    editorCommand(name, command, changes, false);
+}
+
+void ALFloaterScriptStudio::editorCommand(const std::string& name, ALEditorCommand command, bool changes, bool listed)
+{
     // The view in front's, as every command of the text's own is: the
     // expansion being read says it cannot, where the source out of
     // sight would have done it unseen.
-    mCommands.add(
-        name,
-        [this, command]() {
-            if (Doc* doc = active())
-            {
-                doc->shownText()->perform(command);
-            }
-        },
-        [this, command, changes]() {
-            Doc* doc = active();
-            return doc && (!changes || doc->modifiable) && doc->shownText()->canPerform(command);
-        });
+    const ALScriptStudioCommands::run_t run = [this, command]() {
+        if (Doc* doc = active())
+        {
+            doc->shownText()->perform(command);
+        }
+    };
+    const ALScriptStudioCommands::test_t enabled = [this, command, changes]() {
+        Doc* doc = active();
+        return doc && (!changes || doc->modifiable) && doc->shownText()->canPerform(command);
+    };
+    if (listed)
+    {
+        mCommands.add(name, run, enabled);
+    }
+    else
+    {
+        mCommands.addUnlisted(name, run, enabled);
+    }
 }
 
 void ALFloaterScriptStudio::addFileCommands()
@@ -8134,10 +8269,10 @@ void ALFloaterScriptStudio::addEditCommands()
     addEditorCommand("add_caret_below", ALEditorCommand::AddCaretBelow, false);
     // Keys a step at a time rather than menu items: Shift-Alt-drag puts a
     // column with the mouse.
-    addEditorCommand("column_select_left", ALEditorCommand::ColumnSelectLeft, false);
-    addEditorCommand("column_select_right", ALEditorCommand::ColumnSelectRight, false);
-    addEditorCommand("column_select_up", ALEditorCommand::ColumnSelectUp, false);
-    addEditorCommand("column_select_down", ALEditorCommand::ColumnSelectDown, false);
+    addUnlistedEditorCommand("column_select_left", ALEditorCommand::ColumnSelectLeft, false);
+    addUnlistedEditorCommand("column_select_right", ALEditorCommand::ColumnSelectRight, false);
+    addUnlistedEditorCommand("column_select_up", ALEditorCommand::ColumnSelectUp, false);
+    addUnlistedEditorCommand("column_select_down", ALEditorCommand::ColumnSelectDown, false);
     mCommands.add(
         "convert_slua",
         [this]() {

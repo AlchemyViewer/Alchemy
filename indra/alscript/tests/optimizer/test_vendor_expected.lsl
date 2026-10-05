@@ -9,18 +9,18 @@ default
 {
     state_entry()
     {
-        integer i = 0;
+        integer i;
         llSetText(describe(), <1, 1, 1>, 1);
         while (i < 3)
         {
-            i = i + 1;
+            ++i;
         }
     }
 
     touch_start(integer total)
     {
-        listener = llListen(-12345, "", llDetectedKey(0), "");
-        llDialog(llDetectedKey(0), describe(), BUTTONS, -12345);
+        listener = llListen(((integer)-12345), "", llDetectedKey(0), "");
+        llDialog(llDetectedKey(0), describe(), BUTTONS, ((integer)-12345));
         if (total)
             llSetTimerEvent(30);
     }
@@ -32,7 +32,7 @@ default
             llSay(0, "Thanks!");
             return;
         }
-        else if (message == "Info")
+        if (message == "Info")
             llSay(0, describe());
         llListenRemove(listener);
         llSetTimerEvent(0);

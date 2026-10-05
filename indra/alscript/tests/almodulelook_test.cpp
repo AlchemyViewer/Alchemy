@@ -23,9 +23,9 @@
 
 #include "linden_common.h"
 
-#include "../almodulelook.h"
+#include "../preprocessor/almodulelook.h"
 
-#include "../alincludeidentity.h"
+#include "../preprocessor/alincludeidentity.h"
 #include "fsyspath.h"
 #include "llfile.h"
 

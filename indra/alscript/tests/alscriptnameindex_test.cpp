@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alscriptnameindex.h"
+#include "../core/alscriptnameindex.h"
 
 #include "../test/lltut.h"
 

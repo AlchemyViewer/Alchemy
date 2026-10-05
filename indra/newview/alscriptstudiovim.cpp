@@ -56,6 +56,16 @@ namespace
         return name.size() >= shortest && name.size() <= strlen(whole) && std::string_view(whole).substr(0, name.size()) == name;
     }
 
+    // The vim every studio window shares, made with the first and kept for
+    // the session: a register yanked into in one window is put from in
+    // another, as vim's are across its buffers, though the windows come
+    // and go. Never freed, so that nothing of it is torn down at exit.
+    std::shared_ptr<ALVimKeymap::Shared> sessionVim()
+    {
+        static auto* const shared = new std::shared_ptr<ALVimKeymap::Shared>(std::make_shared<ALVimKeymap::Shared>());
+        return *shared;
+    }
+
     // A count or a tab's number: digits alone; -1 for anything else.
     S32 numberOf(const std::string& text)
     {
@@ -68,7 +78,7 @@ namespace
 }
 
 ALScriptStudioVim::ALScriptStudioVim(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, ALScriptNavigation& navigation, ALScriptStudioCommands& commands, Window& window)
-    : mServices(services), mTabs(tabs), mSaves(saves), mNavigation(navigation), mCommands(commands), mWindow(window)
+    : mServices(services), mTabs(tabs), mSaves(saves), mNavigation(navigation), mCommands(commands), mWindow(window), mShared(sessionVim())
 {
 }
 
@@ -164,7 +174,7 @@ void ALScriptStudioVim::source(bool show)
 
 void ALScriptStudioVim::sourceText(const std::string& text, const std::string& whence, bool show)
 {
-    mSourced = true;
+    mShared->sourced = true;
     std::vector<std::string> errors;
     ALVimKeymap::source(*mShared, text, [this](const std::string& option) { return setOption(option, nullptr); }, errors);
     if (!errors.empty())

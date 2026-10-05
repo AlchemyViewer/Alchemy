@@ -581,14 +581,25 @@ struct ALScriptStudioDoc
     std::vector<PendingEdit>                   pendingEdits;
     // Another item's text to set this one's beside once it has loaded --
     // the Explorer's Compare, asked before the tab had its text -- under
-    // the other's title and its own.
+    // the other's title and its own; lined up where lines of the two are
+    // known to stand for each other (ALTextDiff's anchors): the LSL a
+    // conversion was made from and the SLua it wrote.
     struct PendingCompare
     {
-        std::string text;
-        std::string theirTitle;
-        std::string ownTitle;
+        std::string                      text;
+        std::string                      theirTitle;
+        std::string                      ownTitle;
+        std::vector<std::pair<S32, S32>> anchors;
     };
     std::optional<PendingCompare>              pendingCompare;
+    // The titles of a comparison shown whose right is this tab's text, its
+    // own said unsaved for as long as the tab is.
+    struct CompareTitles
+    {
+        std::string theirs;
+        std::string own;
+    };
+    std::optional<CompareTitles>               compareTitles;
     // A save of its item compared with it (ALScriptStudioHistory), until
     // the comparison ends: offered back by the notice.
     std::optional<ALSavedText>                 historyShown;

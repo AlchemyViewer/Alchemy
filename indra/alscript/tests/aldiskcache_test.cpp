@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../aldiskcache.h"
+#include "../preprocessor/aldiskcache.h"
 
 #include "fsyspath.h"
 #include "llfile.h"

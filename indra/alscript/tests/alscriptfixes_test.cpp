@@ -24,16 +24,16 @@
 
 #include "linden_common.h"
 
-#include "../alscriptfixes.h"
-#include "../alscriptweight.h"
+#include "../lint/alscriptfixes.h"
+#include "../core/alscriptweight.h"
 
-#include "../allslexports.h"
-#include "../alluauexports.h"
+#include "../lsl/allslexports.h"
+#include "../luau/alluauexports.h"
 
-#include "../allslservice.h"
-#include "../alluauservice.h"
-#include "../alpreprocessor.h"
-#include "../allsloptimizer.h"
+#include "../lsl/allslservice.h"
+#include "../luau/alluauservice.h"
+#include "../preprocessor/alpreprocessor.h"
+#include "../lsl/optimizer/allsloptimizer.h"
 
 #include "../test/lltut.h"
 

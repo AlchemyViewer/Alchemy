@@ -24,10 +24,10 @@
 
 #include "linden_common.h"
 
-#include "../alscriptweight.h"
+#include "../core/alscriptweight.h"
 
-#include "../allslservice.h"
-#include "../alsourcemap.h"
+#include "../lsl/allslservice.h"
+#include "../preprocessor/alsourcemap.h"
 
 #include "../test/lltut.h"
 

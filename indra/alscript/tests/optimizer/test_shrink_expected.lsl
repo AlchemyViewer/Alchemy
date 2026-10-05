@@ -14,16 +14,14 @@ default
     touch_start(integer f)
     {
         integer d;
-        for (d = 0; d < f; d = d + 1)
+        for (d = 0; d < f; ++d)
         {
-            b = b + 1;
+            ++b;
             c((string)b);
         }
         @g;
-        if (b > 100)
-            jump h;
-        jump g;
-        @h;
+        if (b < 101)
+            jump g;
         state a;
     }
 }

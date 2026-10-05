@@ -69,6 +69,7 @@
     <floater.string name="LintLSLSlCostlyListen">A listen on channel 0 for anyone, which hears every line of chat (the studio's own)</floater.string>
     <floater.string name="LintLSLSlFastTimer">A timer under a tenth of a second (the studio's own)</floater.string>
     <floater.string name="LintLSLSlFastSensor">A sensor repeat under a second (the studio's own)</floater.string>
+    <floater.string name="LintLSLSlIntegerPast32Bits">A whole number past 0xFFFFFFFF, which LSL reads as -1 (the studio's own)</floater.string>
     <floater.string name="LintLSLSlStringBuild">A string joined to in a loop, which makes it anew each time round (the studio's own)</floater.string>
     <floater.string name="LintLSLSlRepeatedCall">The same answer asked for again in one handler, llGetOwner() and its kin (the studio's own)</floater.string>
     <floater.string name="LintLuauUnknownGlobal">An unknown global (the type checker also reports it)</floater.string>
@@ -1644,7 +1645,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="convert_fields"
-             tool_tip="LLEvents.touch_start = function(detected) ... end, one for each event. Off: LLEvents:on, which lets other code listen to the event too."
+             tool_tip="LLEvents.touch_start = function(detected) ... end. SLua puts an assigned handler on as LLEvents:on does, beside any others, but only LLEvents:handlers finds it again for LLEvents:off. Off: LLEvents:on."
              top_pad="4"
              width="700" />
             <check_box
@@ -1667,6 +1668,17 @@ end</floater.string>
              left="12"
              name="convert_comments"
              tool_tip="Each place SLua means something else than LSL did, or has a way of its own, said over its line. Off: said only in Output."
+             top_pad="4"
+             width="700" />
+            <check_box
+             control_name="ALScriptConvertKeepComments"
+             follows="left|top"
+             height="20"
+             label="The script's own comments, each over what it stood over"
+             layout="topleft"
+             left="12"
+             name="convert_keep_comments"
+             tool_tip="// as --, and /* */ as --[[ ]], each over the global, function, handler or statement it stood over, after it where it was after it on its line, or at the end of what held it; rules of stars or slashes as dashes, and //* ... //*/ as ---[[ ... --]]. Off: the SLua has none of them."
              top_pad="4"
              width="700" />
         </panel>
