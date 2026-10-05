@@ -492,6 +492,7 @@ void ALDiffView::fill()
         side->setText(mModel.text(column));
         side->setLineAnnotations(std::move(said));
         side->setDecorations(std::move(words));
+        applyNotes(side);
     }
     // The bands, and the gap as wide as they need, or not.
     const S32 was = gap();
@@ -517,6 +518,61 @@ void ALDiffView::fill()
     }
     applyFolds();
     refreshBar();
+}
+
+void ALDiffView::setNotes(std::vector<ALDiffModel::Note> notes)
+{
+    mModel.setNotes(std::move(notes));
+    for (ALCodeEditor* side : { mLeft, mRight, mInlined })
+    {
+        applyNotes(side);
+    }
+}
+
+void ALDiffView::applyNotes(ALCodeEditor* side)
+{
+    std::vector<ALCodeEditor::LineNote> said;
+    for (const ALDiffModel::Note& note : mModel.notesIn(columnOf(side)))
+    {
+        said.push_back(ALCodeEditor::LineNote{ note.line, note.text, note.tip });
+    }
+    side->setLineNotes(said);
+}
+
+void ALDiffView::refreshLinked()
+{
+    // The range the caret of the side in front is in, side by side.
+    const ALCodeEditor* side = shown();
+    mLinked                  = mInline ? -1 : mModel.rangeAt(columnOf(side), side->caret().line);
+}
+
+void ALDiffView::drawLinked()
+{
+    // Each side's rows of it washed, an edge down their left: what the
+    // line the caret is on became, or was made from, and where it stands.
+    if (mLinked < 0 || mInline)
+    {
+        return;
+    }
+    const F32 alpha = getDrawContext().mAlpha;
+    for (ALCodeEditor* side : { mLeft, mRight })
+    {
+        const auto [first, end] = mModel.rangeRows(mLinked, columnOf(side));
+        if (end <= first)
+        {
+            continue;
+        }
+        const LLRect    frame = side->getRect();
+        const LLRect    text  = side->textRect();
+        const S32       top   = frame.mBottom + text.mTop;
+        const S32       from  = top - (topOfRow(side, first) - side->scrollY());
+        const S32       to    = top - (topOfRow(side, end) - side->scrollY());
+        LLLocalClipRect clip(LLRect(frame.mLeft + text.mLeft, top, frame.mLeft + text.mRight, frame.mBottom + text.mBottom));
+        // The edge inside the change's outline, which may be over it.
+        const S32 edge = frame.mLeft + text.mLeft + LINKED_INSET;
+        gl_rect_2d(frame.mLeft + text.mLeft, from, frame.mLeft + text.mRight, to, mLinkedColor % (0.1f * alpha), true);
+        gl_rect_2d(edge, from - LINKED_INSET, edge + LINKED_EDGE, to + LINKED_INSET, mLinkedColor % (0.8f * alpha), true);
+    }
 }
 
 S32 ALDiffView::topOfRow(ALCodeEditor* side, S32 row) const
@@ -947,10 +1003,12 @@ void ALDiffView::drawRanges()
     const S32    bottom = frame.mBottom + text.mBottom;
     const auto   yOf    = [&](ALCodeEditor* side, S32 row) { return top - (topOfRow(side, row) - side->scrollY()); };
     LLLocalClipRect clip(LLRect(half, top, half + gap(), bottom));
-    const LLColor4  band = mRight->textColor() % (0.08f * alpha);
-    const LLColor4  edge = mRight->textColor() % (0.35f * alpha);
     for (const S32 n : mBands)
     {
+        // The one the caret is in, as its rows are, brighter.
+        const bool     linked = n == mLinked;
+        const LLColor4 band   = linked ? mLinkedColor % (0.2f * alpha) : mRight->textColor() % (0.08f * alpha);
+        const LLColor4 edge   = linked ? mLinkedColor % (0.8f * alpha) : mRight->textColor() % (0.35f * alpha);
         const auto [lf, le] = mModel.rangeRows(n, Column::Left);
         const auto [rf, re] = mModel.rangeRows(n, Column::Right);
         const S32 lt = yOf(mLeft, lf);
@@ -1098,6 +1156,7 @@ bool ALDiffView::handleKeyHere(KEY key, MASK mask)
 
 void ALDiffView::refreshBar()
 {
+    refreshLinked();
     // The change the caret is in, and the steps there are from it.
     mBar->setFellBack(mModel.fellBack());
     mBar->setCount(changeAtCaret(), changeCount());
@@ -1130,6 +1189,7 @@ void ALDiffView::refreshColors()
     mBar->setColors(mRight->backgroundColor(), mRight->textColor());
     mCurrentColor = colorOf("CodeDiffCurrentColor", mRight->cursorColor());
     mDividerColor = colorOf("CodeDiffDividerColor", LLColor4(0.5f, 0.5f, 0.5f, 0.5f));
+    mLinkedColor  = colorOf("CodeDiffLinkedColor", LLColor4(0.45f, 0.65f, 1.f, 1.f));
 }
 
 void ALDiffView::draw()
@@ -1137,6 +1197,7 @@ void ALDiffView::draw()
     refreshColors();
     LLUICtrl::draw();
     drawFoldRows();
+    drawLinked();
     drawCurrentChange();
     if (!mInline)
     {

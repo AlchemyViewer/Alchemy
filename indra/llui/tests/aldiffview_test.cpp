@@ -837,4 +837,35 @@ namespace tut
         LLMortician::updateClass();
         delete holder;
     }
+
+    template<> template<>
+    void aldiffview_object::test<26>()
+    {
+        set_test_name("LSL beside SLua: the caret on a line links the range it is in, from either side; inline none; the converter's notes beside the LSL, inline too");
+        const char* lsl  = "default\n{\n    touch_start(integer d)\n    {\n        if (d > 1) llSay(0, \"many\");\n        llSay(0, \"one\");\n    }\n}";
+        const char* slua = "LLEvents:on(\"touch_start\", function(detected)\n    local d = #detected\n    if d > 1 then\n        ll.Say(0, \"many\")\n    end\n"
+                           "    ll.Say(0, \"one\")\nend)";
+        ALDiffView& d = make("", "");
+        d.setTexts(lsl, slua, { { 0, 7, 0, 6 }, { 2, 6, 0, 6 }, { 4, 4, 2, 4 }, { 4, 4, 3, 3 }, { 5, 5, 5, 5 } });
+        ensure_equals("nothing yet: the caret at the right's top, in the state", d.linkedRange(), 0);
+        d.left()->setFocus(true);
+        d.left()->goTo(ALTextPos(4, 0));
+        ensure_equals("an LSL if: linked to its SLua", d.linkedRange(), 2);
+        d.right()->setFocus(true);
+        d.right()->goTo(ALTextPos(5, 0));
+        ensure_equals("a SLua call: linked to its LSL", d.linkedRange(), 4);
+        d.setInline(true);
+        ensure_equals("inline: none", d.linkedRange(), -1);
+        d.setInline(false);
+
+        d.setNotes({ { 4, "LSL: integer division rounds toward zero", "the whole note" } });
+        ensure("beside the LSL line", d.left()->noteAt(4).find("integer division") != std::string::npos);
+        ensure("not on the SLua", d.right()->noteAt(4).empty());
+        const S32 inlined = d.model().lineShowing(ALDiffModel::Column::Inline, true, 4);
+        ensure("inline, beside where the line is", inlined >= 0 && !d.inlined()->noteAt(inlined).empty());
+        d.setRightText(std::string("-- one more\n") + slua);
+        ensure("kept as the right is made anew", !d.left()->noteAt(4).empty());
+        d.setTexts(lsl, slua);
+        ensure("let go of with new texts", d.left()->noteAt(4).empty());
+    }
 }

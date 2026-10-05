@@ -43,6 +43,7 @@ ALDiffModel::ALDiffModel()
 
 void ALDiffModel::setTexts(std::string_view left, std::string_view right, const ALTextDiff::ranges_t& ranges)
 {
+    mNotes.clear();
     mLeftText   = std::string(left);
     mRightText  = std::string(right);
     mLeftLines  = ALTextDiff::split(mLeftText);
@@ -601,6 +602,20 @@ void ALDiffModel::layout(const std::vector<bool>& open)
         c.endPadding = c.pending;
         c.pending    = 0;
     }
+    // Each line of either side's inline line, by the rows it is on.
+    for (size_t side = 0; side < 2; ++side)
+    {
+        mInlineOf[side].assign(side == 0 ? left.size() : right.size(), -1);
+        const std::vector<S32>& by_row = side == 0 ? inline_left : inline_right;
+        const ColumnData&       column = of(Column::Inline);
+        for (size_t row = 0; row < by_row.size() && row < column.lineOf.size(); ++row)
+        {
+            if (by_row[row] >= 0 && column.lineOf[row] >= 0)
+            {
+                mInlineOf[side][static_cast<size_t>(by_row[row])] = column.lineOf[row];
+            }
+        }
+    }
     // The right's lines by row: side by side, the column showing it;
     // inline, the right's as shown, or swapped the left's.
     mRightRows[index(Layout::Sides)] = of(rightColumn()).lineOf;
@@ -919,6 +934,38 @@ void ALDiffModel::findBracketed()
     }
 }
 
+S32 ALDiffModel::rangeAt(Column column, S32 line) const
+{
+    if (column == Column::Inline || line < 0)
+    {
+        return -1;
+    }
+    // The left shows the text given as the left, but swapped.
+    const bool given = (column == Column::Left) != mSwapped;
+    S32        best  = -1;
+    S32        span  = 0;
+    S32        other = 0;
+    for (size_t n = 0; n < mRanges.size(); ++n)
+    {
+        const ALTextDiff::Range& r     = mRanges[n];
+        const S32                first = given ? r.leftFirst : r.rightFirst;
+        const S32                last  = given ? r.leftLast : r.rightLast;
+        if (line < first || line > last)
+        {
+            continue;
+        }
+        const S32 mine   = last - first;
+        const S32 theirs = given ? r.rightLast - r.rightFirst : r.leftLast - r.leftFirst;
+        if (best < 0 || mine < span || (mine == span && theirs > other))
+        {
+            best  = static_cast<S32>(n);
+            span  = mine;
+            other = theirs;
+        }
+    }
+    return best;
+}
+
 std::pair<S32, S32> ALDiffModel::rangeRows(S32 range, Column column) const
 {
     if (column == Column::Inline || range < 0 || range >= static_cast<S32>(mRanges.size()) || lineCount(column) == 0)
@@ -932,6 +979,53 @@ std::pair<S32, S32> ALDiffModel::rangeRows(S32 range, Column column) const
     const S32                first = llclamp(given ? r.leftFirst : r.rightFirst, 0, last);
     const S32                end   = llclamp(given ? r.leftLast : r.rightLast, first, last);
     return { rowOfLine(column, first), rowOfLine(column, end) + 1 };
+}
+
+// --- notes ---------------------------------------------------------------------------
+
+void ALDiffModel::setNotes(std::vector<Note> notes)
+{
+    mNotes = std::move(notes);
+}
+
+S32 ALDiffModel::lineShowing(Column column, bool given_left, S32 line) const
+{
+    // Shown on the left is the text given as the left, but swapped.
+    const bool left_shown = given_left != mSwapped;
+    if (column == Column::Inline)
+    {
+        const std::vector<S32>& of = mInlineOf[left_shown ? 0 : 1];
+        return line >= 0 && line < static_cast<S32>(of.size()) ? of[static_cast<size_t>(line)] : -1;
+    }
+    if ((column == Column::Left) != left_shown)
+    {
+        return -1;
+    }
+    return line >= 0 && line < lineCount(column) ? line : -1;
+}
+
+std::vector<ALDiffModel::Note> ALDiffModel::notesIn(Column column) const
+{
+    std::vector<Note> out;
+    for (const Note& note : mNotes)
+    {
+        const S32 line = lineShowing(column, true, note.line);
+        if (line < 0)
+        {
+            continue;
+        }
+        const auto same = std::find_if(out.begin(), out.end(), [line](const Note& one) { return one.line == line; });
+        if (same == out.end())
+        {
+            out.push_back(Note{ line, note.text, note.tip });
+        }
+        else
+        {
+            same->text += " \xC2\xB7 " + note.text;
+            same->tip += "\n" + note.tip;
+        }
+    }
+    return out;
 }
 
 // --- folds ---------------------------------------------------------------------------

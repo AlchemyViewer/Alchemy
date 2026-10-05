@@ -256,4 +256,31 @@ namespace tut
         d.setTexts("a();\nb();", "a()\nb()", { { 0, 0, 0, 0 }, { 1, 1, 1, 1 } });
         ensure("ranges all level line for line: no bands, the gap as narrow as ever", d.right()->getRect().mLeft - d.left()->getRect().mRight == narrow);
     }
+
+    template<> template<>
+    void aldiffview_gl_object::test<4>()
+    {
+        set_test_name("the caret on an LSL line washes the SLua it became, an edge down its left, and the line's own rows; none where it is in no range");
+        ALDiffView& d = make();
+        d.setTexts("default\n{\n    if (a) b();\n    c();\n}", "if a then\n    b()\nend\nc()", { { 2, 2, 0, 2 }, { 3, 3, 3, 3 } });
+        d.left()->setFocus(true);
+        d.left()->goTo(ALTextPos(2, 0));
+        ensure_equals("linked to the if", d.linkedRange(), 0);
+        const std::vector<U8> linked = drawn(d);
+        // The edge's blue over the sides' dark ground.
+        const auto blue  = [](U8 r, U8 g, U8 b) { return b > 150 && b > r + 40; };
+        const Band block = band(d.right(), 0, 2);
+        const Band after = band(d.right(), 3, 3);
+        // Inside the change's outline, which the caret's line is also in.
+        const S32 edge = block.left + ALDiffView::LINKED_INSET;
+        ensure("an edge down the three SLua lines", count(linked, edge, edge + ALDiffView::LINKED_EDGE, block.bottom + 1, block.top - 1, blue) >= (block.top - block.bottom - 2));
+        ensure("none beside the call after", count(linked, edge, edge + ALDiffView::LINKED_EDGE, after.bottom + 1, after.top - 1, blue) == 0);
+        const Band own = band(d.left(), 2, 2);
+        ensure("and down the LSL line's own row", count(linked, own.left + ALDiffView::LINKED_INSET, own.left + ALDiffView::LINKED_INSET + ALDiffView::LINKED_EDGE,
+                                                        own.bottom + 1, own.top - 1, blue) > 0);
+        d.left()->goTo(ALTextPos(0, 0));
+        ensure_equals("in none", d.linkedRange(), -1);
+        const std::vector<U8> plain = drawn(d);
+        ensure("no edge", count(plain, edge, edge + ALDiffView::LINKED_EDGE, block.bottom + 1, block.top - 1, blue) == 0);
+    }
 }

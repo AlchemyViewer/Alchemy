@@ -36,6 +36,7 @@
 #include "alscripttypes.h"
 #include "alsourcemap.h"
 #include "alstringmatch.h"
+#include "aldiffmodel.h"
 #include "altextdiff.h"
 #include "altextdocument.h"
 #include "llstl.h"
@@ -588,13 +589,16 @@ struct ALScriptStudioDoc
     // the Explorer's Compare, asked before the tab had its text -- under
     // the other's title and its own; lined up where lines of the two are
     // known to stand for each other (ALTextDiff's ranges): the LSL a
-    // conversion was made from and the SLua it wrote.
+    // conversion was made from and the SLua it wrote, with its notes.
     struct PendingCompare
     {
         std::string                      text;
         std::string                      theirTitle;
         std::string                      ownTitle;
         ALTextDiff::ranges_t             ranges;
+        // Words beside lines of the other's text: a conversion's notes
+        // beside the LSL they are about.
+        std::vector<ALDiffModel::Note>   notes;
     };
     std::optional<PendingCompare>              pendingCompare;
     // The titles of a comparison shown whose right is this tab's text, its

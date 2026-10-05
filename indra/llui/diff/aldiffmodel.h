@@ -244,6 +244,32 @@ public:
     // it is in, but a block whose statements were not lined up, an if on
     // one line of LSL written as three of SLua.
     bool                rangeBracketed(S32 range) const { return mBracketed[static_cast<size_t>(range)]; }
+    // The narrowest range a line of a column side by side is in -- of the
+    // text the column shows; of two as narrow, the wider on the other side,
+    // which says all the line became: an LSL line holding an if and the
+    // call in it, the if's SLua -- -1 for none, and inline: what both sides
+    // outline when the caret is on it.
+    S32                 rangeAt(Column column, S32 line) const;
+
+    // --- notes -------------------------------------------------------------------
+
+    // Words about a line of the text given as the left, said beside it
+    // wherever it is shown -- the converter's notes beside the LSL they
+    // are about. A new text lets them go; the right made anew keeps them.
+    struct Note
+    {
+        S32         line = 0;
+        std::string text;
+        std::string tip;
+    };
+    void                     setNotes(std::vector<Note> notes);
+    const std::vector<Note>& notes() const { return mNotes; }
+    // The line of a column showing a line of the text given as the left,
+    // or as the right; -1 where it shows none.
+    S32                      lineShowing(Column column, bool given_left, S32 line) const;
+    // The notes on a column's lines, each at its line there, those on one
+    // line said together.
+    std::vector<Note>        notesIn(Column column) const;
 
     // --- folds -------------------------------------------------------------------
 
@@ -336,6 +362,10 @@ private:
     ColumnData            mColumns[3];
     // Each row's line of the right's text, side by side and inline.
     std::vector<S32>      mRightRows[2];
+    // The inline line showing each line of the left as shown, and of the
+    // right; -1 for none.
+    std::vector<S32>      mInlineOf[2];
+    std::vector<Note>     mNotes;
     // Each text's lines, and the runs the texts as shown were last found
     // to have: what a right made anew is compared again from.
     std::vector<std::string>     mLeftLines;

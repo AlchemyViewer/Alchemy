@@ -6281,6 +6281,10 @@ void ALFloaterScriptStudio::comparePending(Doc& doc)
     const Doc::PendingCompare pending = std::move(*doc.pendingCompare);
     doc.pendingCompare.reset();
     compareWithTab(doc, pending.text, pending.theirTitle, pending.ownTitle, pending.ranges);
+    if (doc.compareView && !pending.notes.empty())
+    {
+        doc.compareView->setNotes(pending.notes);
+    }
 }
 
 void ALFloaterScriptStudio::compareWithTab(Doc& doc, const std::string& theirs, const std::string& their_title, const std::string& own_title,
@@ -7796,8 +7800,15 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     {
         ranges.push_back({ span.lslFirst, span.lslLast, span.sluaFirst, span.sluaLast });
     }
+    // Its notes beside the LSL they are about, as the SLua has them over
+    // the lines written of it.
+    std::vector<ALDiffModel::Note> notes;
+    for (const ALScriptProblem& note : converted.notes)
+    {
+        notes.push_back(ALDiffModel::Note{ note.line, note.message, note.message });
+    }
     const Doc::PendingCompare compare{ lsl, getString(expanded ? "ConvertExpandedTitle" : "ConvertLSLTitle", args), getString("ConvertSLuaTitle"),
-                                       std::move(ranges) };
+                                       std::move(ranges), std::move(notes) };
     const LLHandle<LLFloater> handle   = getHandle();
     if (!doc.ref.inInventory() && doc.file.empty())
     {

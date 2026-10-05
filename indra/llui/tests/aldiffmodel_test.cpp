@@ -572,4 +572,53 @@ namespace tut
         m.setRightText(flown);
         ensure("typed back: none again", m.changeCount() == 0);
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<20>()
+    {
+        set_test_name("the range a line is in, the narrowest, from either side; notes beside lines of the left wherever they are shown, said together on one line");
+        const char* lsl  = "default\n"                               // 0
+                           "{\n"                                     // 1
+                           "    touch_start(integer d)\n"            // 2
+                           "    {\n"                                 // 3
+                           "        if (d > 1) llSay(0, \"many\");\n" // 4
+                           "        llSay(0, \"one\");\n"            // 5
+                           "    }\n"                                 // 6
+                           "}";                                       // 7
+        const char* slua = "LLEvents:on(\"touch_start\", function(detected)\n" // 0
+                           "    local d = #detected\n"                         // 1
+                           "    if d > 1 then\n"                               // 2
+                           "        ll.Say(0, \"many\")\n"                    // 3
+                           "    end\n"                                         // 4
+                           "    ll.Say(0, \"one\")\n"                         // 5
+                           "end)";                                            // 6
+        const ALTextDiff::ranges_t ranges = { { 0, 7, 0, 6 }, { 2, 6, 0, 6 }, { 4, 4, 2, 4 }, { 4, 4, 3, 3 }, { 5, 5, 5, 5 } };
+        m.setTexts(lsl, slua, ranges);
+        ensure_equals("the if's line: the if, all of its SLua, not the call on it", m.rangeAt(Column::Left, 4), 2);
+        ensure_equals("the call after it", m.rangeAt(Column::Left, 5), 4);
+        ensure_equals("the handler's brace: the handler", m.rangeAt(Column::Left, 3), 1);
+        ensure_equals("the state's line: the state", m.rangeAt(Column::Left, 0), 0);
+        ensure_equals("from the SLua: the if's end, the if", m.rangeAt(Column::Right, 4), 2);
+        ensure_equals("the call in it", m.rangeAt(Column::Right, 3), 3);
+        ensure("none inline, none past the text", m.rangeAt(Column::Inline, 4) == -1 && m.rangeAt(Column::Left, -1) == -1);
+        m.setSwapped(true);
+        ensure("swapped: the SLua on the left", m.rangeAt(Column::Left, 5) == 4 && m.rangeAt(Column::Right, 5) == 4);
+        m.setSwapped(false);
+
+        m.setNotes({ { 4, "integer division", "tip one" }, { 4, "a list compared", "tip two" }, { 7, "the end", "" } });
+        const std::vector<ALDiffModel::Note> left = m.notesIn(Column::Left);
+        ensure("the left: two lines, the two on one said together",
+               left.size() == 2 && left[0].line == 4 && left[0].text == "integer division \xC2\xB7 a list compared" && left[0].tip == "tip one\ntip two");
+        ensure("none on the right, which shows the other text", m.notesIn(Column::Right).empty());
+        const std::vector<ALDiffModel::Note> inlined = m.notesIn(Column::Inline);
+        ensure("inline, where the line is shown", inlined.size() == 2 && inlined[0].line == m.lineShowing(Column::Inline, true, 4) &&
+                                                       m.line(Column::Inline, inlined[0].line).kind == Kind::Removed);
+        m.setSwapped(true);
+        ensure("swapped: on the right", m.notesIn(Column::Left).empty() && m.notesIn(Column::Right).size() == 2);
+        m.setSwapped(false);
+        m.setRightText(std::string("-- a line more\n") + slua);
+        ensure("the right made anew: kept", m.notesIn(Column::Left).size() == 2);
+        m.setTexts(lsl, slua, ranges);
+        ensure("new texts: let go of", m.notes().empty());
+    }
 }

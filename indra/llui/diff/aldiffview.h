@@ -122,6 +122,10 @@ public:
     // this off or on. On unless asked; never where nothing changed.
     static constexpr S32 FOLD_CONTEXT = ALDiffModel::FOLD_CONTEXT;
     static constexpr S32 FOLD_LEAST   = ALDiffModel::FOLD_LEAST;
+    // How wide the edge down a linked range's rows is, and how far in from
+    // the text's left and its rows' ends: inside a change's outline.
+    static constexpr S32 LINKED_EDGE  = 2;
+    static constexpr S32 LINKED_INSET = 2;
     void setFoldSame(bool fold);
     bool foldsSame() const { return mModel.foldsSame(); }
     // Lines told the same with their blanks let go of -- re-indented or
@@ -157,6 +161,15 @@ public:
     // How many changes there are: each run of lines taken out, put in, or
     // both, between lines the same.
     S32 changeCount() const { return mModel.changeCount(); }
+    // Words beside lines of the text given as the left, wherever they are
+    // shown (ALDiffModel::Note): the converter's notes beside the LSL they
+    // are about. Given after the texts, which let them go.
+    void setNotes(std::vector<ALDiffModel::Note> notes);
+    // The range the caret of the side in front is in, side by side, whose
+    // rows on both sides are washed: the SLua an LSL line became, or the
+    // LSL a SLua line was made from. -1 for none.
+    S32  linkedRange() const { return mLinked; }
+
     // The change the caret of the side in front is in, counted from
     // nought; -1 where it is in none. Where the side has none of a
     // change's lines, the caret on the line under its gap is in it.
@@ -272,6 +285,12 @@ private:
     void          goToMoved(ALCodeEditor* side, S32 line);
     // A line round the change the caret is in, on each side shown.
     void          drawCurrentChange();
+    // The range the caret is in (ALDiffModel::rangeAt), side by side: each
+    // side's rows of it washed, and its band brighter.
+    void          refreshLinked();
+    void          drawLinked();
+    // A side's notes, as the model has them for its column.
+    void          applyNotes(ALCodeEditor* side);
 
     // The bar's count and steps, as the caret of the side in front has
     // them: told when a caret moves or the keyboard goes from one side to
@@ -305,6 +324,10 @@ private:
     U32                       mColorsGeneration = U32_MAX;
     LLColor4                  mCurrentColor;
     LLColor4                  mDividerColor;
+    // The linked range's hue, washed and edged at alphas of its own.
+    LLColor4                  mLinkedColor;
+    // The range the caret is in, -1 for none.
+    S32                       mLinked = -1;
     // The grammar words are cut by: none for prose.
     std::shared_ptr<const ALSyntaxGrammar> mLexedBy;
     // Whether letting case go is offered.
