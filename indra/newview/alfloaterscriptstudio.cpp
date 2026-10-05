@@ -6363,6 +6363,10 @@ void ALFloaterScriptStudio::comparePending(Doc& doc)
     {
         doc.compareView->setNotes(pending.notes);
     }
+    if (pending.shown)
+    {
+        pending.shown(doc);
+    }
 }
 
 void ALFloaterScriptStudio::compareWithTab(Doc& doc, const std::string& theirs, const std::string& their_title, const std::string& own_title,

@@ -42,7 +42,8 @@ class ALScriptStudioServices;
 // with when, how long, and how much longer or shorter than the one before;
 // one chosen is compared with the tab's text as it is now, and the notice
 // over the editor offers it back -- as one step to undo, not a save, which
-// stays the scripter's to make.
+// stays the scripter's to make. The comparison has a slider over the
+// item's saves, oldest to newest, which steps its left through them.
 class ALScriptStudioHistory
 {
 public:
@@ -64,6 +65,8 @@ public:
                           std::function<void(const std::string& value)> chosen, std::function<void(const std::string& value)> dropped) = 0;
         // The notice over the editor said again, for the tab in front.
         virtual void refreshNotice() = 0;
+        // A comparison's titles said again, as the tab's own are.
+        virtual void retitleCompare(const Doc& doc) const = 0;
 
     protected:
         ~Window() = default;
@@ -92,6 +95,12 @@ public:
     bool compare(Doc& doc, ALSavedText saved);
 
 private:
+    // The comparison of a save given the item's saves to step through,
+    // oldest first, the one shown among them; and one stepped to, put on
+    // the left in its place.
+    void versions(Doc& doc);
+    void step(const std::string& id, ALSavedText saved);
+
     ALScriptStudioServices& mServices;
     Window&                 mWindow;
     // Whether this is still here, for what the list calls back.

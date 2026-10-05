@@ -32,6 +32,7 @@
 
 #include "llfontgl.h"
 #include "llrender2dutils.h"
+#include "llslider.h"
 #include "lltextbox.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
@@ -44,6 +45,8 @@ namespace
     constexpr S32 PAD     = 2;
     constexpr S32 GAP     = 6;
     constexpr S32 SMALL_W = 22;
+    // The slider over the versions of the left.
+    constexpr S32 SLIDER_W = 120;
 }
 
 ALDiffBar::Params::Params()
@@ -101,6 +104,26 @@ ALDiffBar::ALDiffBar(const Params& p)
     for (ALFlatButton* word : { mTheirsButton, mMineButton, mBothButton })
     {
         word->setVisible(false);
+    }
+    mOlderButton = flat("older", "\xE2\x97\x82", false, alSaid("DiffBarOlder", "An older version on the left"));
+    mNewerButton = flat("newer", "\xE2\x96\xB8", false, alSaid("DiffBarNewer", "A newer version on the left"));
+    mOlderButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { chooseVersion(mVersion - 1); });
+    mNewerButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { chooseVersion(mVersion + 1); });
+    LLSlider::Params sp;
+    sp.name          = "versions";
+    sp.rect          = LLRect(0, ROW, SLIDER_W, 0);
+    sp.min_value     = 0.f;
+    sp.max_value     = 1.f;
+    sp.increment     = 1.f;
+    sp.initial_value = 0.f;
+    sp.follows.flags = FOLLOWS_NONE;
+    sp.tool_tip      = alSaid("DiffBarVersions", "Which version is on the left, oldest to newest");
+    mVersions        = LLUICtrlFactory::create<LLSlider>(sp);
+    mVersions->setCommitCallback([this](LLUICtrl*, const LLSD&) { chooseVersion(ll_round(mVersions->getValueF32())); });
+    addChild(mVersions);
+    for (LLView* version : std::initializer_list<LLView*>{ mOlderButton, mNewerButton, mVersions })
+    {
+        version->setVisible(false);
     }
 
     setCount(-1, 0);
@@ -280,13 +303,47 @@ void ALDiffBar::setConflicts(S32 left, bool here)
     }
 }
 
+void ALDiffBar::setVersions(S32 count, S32 current)
+{
+    const bool shown = count > 1;
+    mVersionCount    = shown ? count : 0;
+    mVersion         = shown ? llclamp(current, 0, count - 1) : 0;
+    if (shown)
+    {
+        mVersions->setMaxValue(static_cast<F32>(count - 1));
+        mVersions->setValue(static_cast<F32>(mVersion));
+        mOlderButton->setEnabled(mVersion > 0);
+        mNewerButton->setEnabled(mVersion < count - 1);
+    }
+    if (mVersions->getVisible() != shown)
+    {
+        for (LLView* version : std::initializer_list<LLView*>{ mOlderButton, mNewerButton, mVersions })
+        {
+            version->setVisible(shown);
+        }
+        layout();
+    }
+}
+
+void ALDiffBar::chooseVersion(S32 version)
+{
+    // The slider says where it was let go, which may be where it was.
+    if (mVersionCount < 2 || version < 0 || version >= mVersionCount || version == mVersion)
+    {
+        mVersions->setValue(static_cast<F32>(mVersion));
+        return;
+    }
+    setVersions(mVersionCount, version);
+    mVersionChosen(version);
+}
+
 void ALDiffBar::setColors(const LLColor4& background, const LLColor4& ink)
 {
     mBgColor              = ALSurface::ground(background, ink);
     mInkColor             = ink;
     const LLColor4 chosen = ALSurface::chosen(background, ink);
     for (ALFlatButton* glyph : { mPreviousButton, mNextButton, mFoldButton, mIgnoreButton, mInlineButton, mSwapButton, mDoneButton, mTakeBackButton,
-                                 mTheirsButton, mMineButton, mBothButton })
+                                 mTheirsButton, mMineButton, mBothButton, mOlderButton, mNewerButton })
     {
         glyph->setInk(ink);
         glyph->setLit(chosen);
@@ -312,9 +369,9 @@ void ALDiffBar::draw()
 void ALDiffBar::layout()
 {
     // The buttons at the right, in ones, twos and threes -- the steps,
-    // taking a change back, settling a conflict, the ways of showing, done
-    // -- and the count over what is left at the left. A word's button as
-    // wide as its word.
+    // taking a change back, settling a conflict, the versions of the left,
+    // the ways of showing, done -- and the count over what is left at the
+    // left. A word's button as wide as its word.
     const S32 width = getRect().getWidth();
     const S32 top   = getRect().getHeight() - PAD;
     S32       right = width - PAD;
@@ -349,6 +406,14 @@ void ALDiffBar::layout()
     }
     place(mNextButton);
     place(mPreviousButton);
+    if (mVersions->getVisible())
+    {
+        right -= GAP;
+        place(mNewerButton);
+        mVersions->setShape(LLRect(right - SLIDER_W, top, right, top - ROW));
+        right -= SLIDER_W + 1;
+        place(mOlderButton);
+    }
     mCount->setShape(LLRect(PAD, top, llmax(PAD, right - GAP), top - ROW));
 }
 

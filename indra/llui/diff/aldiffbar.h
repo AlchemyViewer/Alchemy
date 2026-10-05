@@ -37,6 +37,7 @@
 #include <string>
 
 class ALFlatButton;
+class LLSlider;
 class LLTextBox;
 
 // The thin bar over a comparison's titles (ALDiffView): which change the
@@ -46,8 +47,9 @@ class LLTextBox;
 // while anything is -- the comparison inline or side by side, its sides
 // swapped; and done, back to what it was made from. Merging, how many
 // conflicts are left, and the one the caret is in settled with theirs,
-// mine, or both. In the comparison's colours, as the find bar is in its
-// view's.
+// mine, or both. Where the left is one of several versions -- a script's
+// saves -- a slider over them, oldest to newest, and a step either way. In
+// the comparison's colours, as the find bar is in its view's.
 //
 // It holds what it shows and nothing else: the view tells it the count
 // and the state of its toggles, and it says what was pressed.
@@ -94,6 +96,11 @@ public:
     // the buttons that settle it are lit for.
     void        setMerging(bool merging);
     void        setConflicts(S32 left, bool here);
+    // How many versions the left may be, oldest first, and which it is:
+    // the slider, and a step older and newer where there is one; none for
+    // fewer than two.
+    void        setVersions(S32 count, S32 current);
+    S32         versionShown() const { return mVersion; }
 
     // The colours of the comparison it is over: its glyphs and its count
     // in the sides' ink, its ground a shade off their paper.
@@ -112,6 +119,10 @@ public:
     boost::signals2::connection onTakeBack(const signal_t::slot_type& cb) { return mTakeBack.connect(cb); }
     typedef boost::signals2::signal<void(ALTextMerge::Take)> settle_signal_t;
     boost::signals2::connection onSettle(const settle_signal_t::slot_type& cb) { return mSettle.connect(cb); }
+    // A version chosen by the slider or a step, by its place, oldest
+    // first.
+    typedef boost::signals2::signal<void(S32)> version_signal_t;
+    boost::signals2::connection onVersion(const version_signal_t::slot_type& cb) { return mVersionChosen.connect(cb); }
 
     void draw() override;
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
@@ -125,6 +136,8 @@ private:
     // The count as it is said: the change, how it was compared, and the
     // conflicts left.
     void          refreshSaid();
+    // A version chosen: shown on the slider and the steps, and told.
+    void          chooseVersion(S32 version);
     void          layout();
     // The menu of what to let go of (menu_diff_ignore.xml), under its
     // button.
@@ -153,9 +166,16 @@ private:
     ALFlatButton* mTheirsButton   = nullptr;
     ALFlatButton* mMineButton     = nullptr;
     ALFlatButton* mBothButton     = nullptr;
+    // The versions of the left: the steps, and the slider between them.
+    ALFlatButton* mOlderButton    = nullptr;
+    ALFlatButton* mNewerButton    = nullptr;
+    LLSlider*     mVersions       = nullptr;
+    S32           mVersionCount   = 0;
+    S32           mVersion        = 0;
 
     signal_t        mPrevious, mNext, mFold, mInline, mSwap, mDone, mTakeBack;
-    settle_signal_t mSettle;
+    settle_signal_t  mSettle;
+    version_signal_t mVersionChosen;
 };
 
 #endif // AL_ALDIFFBAR_H

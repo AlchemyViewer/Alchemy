@@ -33,6 +33,7 @@
 #include "../llclipboard.h"
 #include "../llfocusmgr.h"
 #include "../llmenugl.h"
+#include "../llslider.h"
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
@@ -977,5 +978,46 @@ namespace tut
         ensure("new texts let it go", !d.merging() && !d.bar()->getChild<LLView>("take_theirs")->getVisible() &&
                                           d.bar()->countSaid().find("conflict") == std::string::npos);
         source->die();
+    }
+
+    template<> template<>
+    void aldiffview_object::test<29>()
+    {
+        set_test_name("the left's versions: a slider and steps on the bar for two or more, each chosen told; the left made another keeps the caret; new texts let them go");
+        ALDiffView& d       = make("v0\nsame\nmore", "now\nsame\nmore");
+        LLView*     slider  = d.bar()->getChild<LLView>("versions");
+        ensure("none at first", !slider->getVisible() && !d.bar()->getChild<LLView>("older")->getVisible());
+        std::vector<S32> chosen;
+        d.setVersions(1, 0, [&](S32 version) { chosen.push_back(version); });
+        ensure("not for one", !slider->getVisible());
+        d.setVersions(3, 1, [&](S32 version) {
+            chosen.push_back(version);
+            d.setLeftText("v" + std::to_string(version) + "\nsame\nmore");
+        });
+        ensure("shown for three", slider->getVisible() && d.bar()->getChild<LLView>("older")->getVisible() && d.bar()->versionShown() == 1);
+        ensure("both steps", enabled(d, "older") && enabled(d, "newer"));
+
+        d.right()->setFocus(true);
+        d.right()->goTo(ALTextPos(2, 2));
+        press(d, "newer");
+        ensure("the newest told", chosen.size() == 1 && chosen[0] == 2);
+        ensure_equals("made the left", d.leftText(), std::string("v2\nsame\nmore"));
+        ensure("the caret kept on its line of the right", d.rightAtCaret() == std::make_pair(2, 2));
+        ensure("no newer than the newest", !enabled(d, "newer") && enabled(d, "older"));
+        press(d, "older");
+        press(d, "older");
+        ensure("then the oldest", chosen.size() == 3 && chosen[2] == 0 && d.leftText() == "v0\nsame\nmore" && !enabled(d, "older"));
+        LLSlider* bar = dynamic_cast<LLSlider*>(slider);
+        ensure("a slider", bar != nullptr);
+        bar->setValue(2.f);
+        bar->onCommit();
+        ensure("the slider let go at the newest", chosen.size() == 4 && chosen[3] == 2 && d.leftText() == "v2\nsame\nmore");
+        bar->onCommit();
+        ensure("let go where it was: nothing told", chosen.size() == 4);
+
+        d.setTexts("a", "b");
+        ensure("new texts let them go", !slider->getVisible());
+        press(d, "newer");
+        ensure("nothing told", chosen.size() == 4);
     }
 }

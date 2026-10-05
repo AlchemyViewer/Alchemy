@@ -96,6 +96,16 @@ public:
     // the runs folded as open as they were, and the anchors carried to
     // where their lines of the right now are, changed or not.
     void setRightText(std::string_view right);
+    // The left made another -- another version of it -- and compared again:
+    // the caret kept on its line of the right, which is as it was.
+    void setLeftText(std::string_view left);
+    // How many versions the left may be, oldest first -- a script's saves
+    // -- and which it is: a slider over them on the bar, and a step older
+    // and newer, each version chosen told to whoever gave them, who sets
+    // its text (setLeftText). Given after the texts, which let them go;
+    // none for fewer than two.
+    typedef std::function<void(S32 version)> version_t;
+    void setVersions(S32 count, S32 current, version_t chosen);
     const std::string& leftText() const { return mModel.leftText(); }
     const std::string& rightText() const { return mModel.rightText(); }
     // What is compared, laid out: what a host or a test reads of it.
@@ -361,6 +371,7 @@ private:
     std::function<void()>     mEscape;
     std::function<void(bool)> mOnInline;
     edit_t                    mEdit;
+    version_t                 mVersionChosen;
 };
 
 #endif // AL_ALDIFFVIEW_H

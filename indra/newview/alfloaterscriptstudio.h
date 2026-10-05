@@ -853,7 +853,7 @@ private:
                      const ALTextDiff::ranges_t& ranges);
     // A comparison whose right is the tab's text titled again, unsaved or
     // not as the tab now is.
-    void retitleCompare(const Doc& doc) const;
+    void retitleCompare(const Doc& doc) const override;
     // Another text beside the tab's own, which the comparison follows as
     // the tab changes: under the other's title and the tab's, "now" where
     // none is given; lined up at the ranges where there are any -- the LSL

@@ -426,6 +426,10 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="DiffBarMineTip">Settle this conflict keeping your lines</string>
 	<string name="DiffBarBoth">Both</string>
 	<string name="DiffBarBothTip">Settle this conflict with your lines, then the other side's</string>
+	<!-- Stepping the left through its versions: a script's saves. -->
+	<string name="DiffBarOlder">An older version on the left</string>
+	<string name="DiffBarNewer">A newer version on the left</string>
+	<string name="DiffBarVersions">Which version is on the left, oldest to newest</string>
 	<!-- A comparison's row standing for lines the same folded away. -->
 	<string name="DiffFoldedLinesA">⋯ 1 line the same ⋯</string>
 	<string name="DiffFoldedLinesB">⋯ [COUNT] lines the same ⋯</string>

@@ -91,6 +91,12 @@ ALDiffView::ALDiffView(const Params& p)
         takeBack(changeAtCaret());
         side->setFocus(true);
     });
+    mBar->onVersion([this](S32 version) {
+        if (mVersionChosen)
+        {
+            mVersionChosen(version);
+        }
+    });
     mBar->onSettle([this](ALTextMerge::Take take) {
         ALCodeEditor* side = shown();
         settle(changeAtCaret(), take);
@@ -173,7 +179,29 @@ void ALDiffView::setTexts(std::string_view left, std::string_view right, const A
 {
     mModel.setTexts(left, right, ranges);
     mBar->setMerging(false);
+    mBar->setVersions(0, 0);
+    mVersionChosen = nullptr;
     fill();
+}
+
+void ALDiffView::setLeftText(std::string_view left)
+{
+    if (left == mModel.leftText())
+    {
+        return;
+    }
+    // The right as it was, and the caret on its line of it.
+    const Place       place = placeOfCaret();
+    const std::string right = mModel.rightText();
+    mModel.setTexts(left, right, mModel.ranges());
+    fill();
+    restorePlace(place);
+}
+
+void ALDiffView::setVersions(S32 count, S32 current, version_t chosen)
+{
+    mVersionChosen = count > 1 ? std::move(chosen) : nullptr;
+    mBar->setVersions(count, current);
 }
 
 void ALDiffView::setMergeBase(std::optional<std::string_view> base)

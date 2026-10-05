@@ -46,6 +46,7 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -599,6 +600,9 @@ struct ALScriptStudioDoc
         // Words beside lines of the other's text: a conversion's notes
         // beside the LSL they are about.
         std::vector<ALDiffModel::Note>   notes;
+        // What is done once it is shown: a save of the history given the
+        // other saves to step through.
+        std::function<void(ALScriptStudioDoc& doc)> shown;
     };
     std::optional<PendingCompare>              pendingCompare;
     // The titles of a comparison shown whose right is this tab's text, its
