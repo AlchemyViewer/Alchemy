@@ -510,6 +510,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ExplorerNothingToCompare">Nothing listed in the Explorer is like [NAME] to compare it with. Pin or select the other object first.</floater.string>
     <floater.string name="CompareSaved">As last saved</floater.string>
     <floater.string name="CompareWithTitle">Compare [NAME] with</floater.string>
+    <floater.string name="ComparePreprocessed">Preprocessed, as a save sends it</floater.string>
     <floater.string name="SelectionLine">[NAME], line [FIRST]</floater.string>
     <floater.string name="SelectionLines">[NAME], lines [FIRST]–[LAST]</floater.string>
     <floater.string name="SelectionHeld">Holding [TITLE] to compare. Select something else, here or in another tab, then choose View > Compare with Held Selection.</floater.string>
@@ -1298,6 +1299,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
             <menu_item_call label="Compare With..." layout="topleft" name="compare_with">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_with" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_with" />
+            </menu_item_call>
+            <menu_item_call label="Compare with Preprocessed" layout="topleft" name="compare_preprocessed">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_preprocessed" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_preprocessed" />
             </menu_item_call>
             <menu_item_call label="Select for Compare" layout="topleft" name="compare_hold_selection">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_hold_selection" />

@@ -218,6 +218,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiochecking.cpp
     alscriptstudiocommands.cpp
     alscriptstudiocomparewith.cpp
+    alscriptstudioexpandedcompare.cpp
     alscriptstudiodoc.cpp
     alscriptstudiofileio.cpp
     alscriptstudioglue.cpp
@@ -1067,6 +1068,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiochecking.h
     alscriptstudiocommands.h
     alscriptstudiocomparewith.h
+    alscriptstudioexpandedcompare.h
     alscriptstudiodoc.h
     alscriptstudiofileio.h
     alscriptstudioglue.h
@@ -2621,6 +2623,16 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     SOURCES alscriptstudiohistory.cpp
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A Script Studio window's source beside what a save sends of it, lined
+  # up by the preprocessor's map, over tabs of their own editors.
+  al_add_test(
+    alscriptstudioexpandedcompare
+    UNIT
+    PROJECT ${test_project}
     LIBRARIES al_studio_test_common llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )

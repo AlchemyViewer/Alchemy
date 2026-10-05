@@ -89,6 +89,9 @@ public:
     // Builds the indexes; nothing answers until it has been called.
     void finish();
     bool empty() const { return mSegments.empty(); }
+    // Every segment, in output order: what a comparison of the output
+    // with its source lines the two up by.
+    const std::vector<Segment>& segments() const { return mSegments; }
 
     // The source position an output position came from: exact within a
     // verbatim segment, the invocation's for a macro's product, and for a

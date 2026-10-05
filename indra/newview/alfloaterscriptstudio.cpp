@@ -2570,6 +2570,8 @@ void ALFloaterScriptStudio::showExpanded(Doc& doc, const std::string& text)
     // counts too; from one where it goes up plain.
     const bool plain = doc.uploaded.valid && doc.uploaded.disabled;
     doc.expandedEditor->setLineNumberBase(plain ? 0 : doc.envelopeFor(text, saveOptions().program).codeLine());
+    // A comparison with the source that waited on this.
+    mExpandedCompare.expanded(doc);
     if (&doc != active())
     {
         return;
@@ -8939,6 +8941,19 @@ void ALFloaterScriptStudio::addViewCommands()
         [this]() {
             const Doc* doc = active();
             return doc && ALScriptStudioCompareWith::canCompare(*doc);
+        });
+    // The source beside what a save sends of it, lined up by the map.
+    mCommands.add(
+        "compare_preprocessed",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                mExpandedCompare.compare(*doc);
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && ALScriptStudioExpandedCompare::canCompare(*doc);
         });
     // A selection held, and compared with another, in this tab or another.
     mCommands.add(

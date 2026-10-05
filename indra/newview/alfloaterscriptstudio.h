@@ -35,6 +35,7 @@
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiocomparewith.h"
+#include "alscriptstudioexpandedcompare.h"
 #include "alscriptstudiohistory.h"
 #include "alscriptstudiomerging.h"
 #include "alscriptstudioselections.h"
@@ -135,7 +136,7 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptStudioCaret::Window, public ALScriptStudioChecking::Window,
                                     public ALScriptObjectCheck::Window, public ALScriptRecompile::Window, public ALScriptStudioHistory::Window,
                                     public ALScriptStudioCompareWith::Window, public ALScriptStudioMerging::Window,
-                                    public ALScriptStudioSelections::Window
+                                    public ALScriptStudioSelections::Window, public ALScriptStudioExpandedCompare::Window
 {
     friend class LLFloaterReg;
 
@@ -991,6 +992,14 @@ private:
     void loadWorld(Doc& doc, std::function<void(Doc& doc, const std::string& text, const LLUUID& asset)> loaded) override;
     // What comparing selections asks of the window (ALScriptStudioSelections::Window).
     LLView* typeInSource(Doc& doc, const ALTextPos& at) override;
+    // What comparing the source with its expansion asks of the window
+    // (ALScriptStudioExpandedCompare::Window).
+    void compareRanged(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
+                       const std::string& right_title, const ALTextDiff::ranges_t& ranges) override
+    {
+        showCompare(doc, left, right, left_title, right_title, ranges);
+    }
+    void preprocess(Doc& doc) override { mSaving.preprocess(doc); }
     // What the Search tab asks of the window (ALScriptSearchPane::Window).
     void listObjects(const LLUUID& only, std::function<void(std::vector<ALScriptSearchPane::Window::Object>)> told) override;
     std::string                                     objectName(const LLUUID& root) const override;
@@ -1308,6 +1317,8 @@ private:
     ALScriptStudioMerging              mMerging{ *this, *this };
     // A selection held, to compare with another.
     ALScriptStudioSelections           mSelections{ *this, *this };
+    // The source beside what a save sends of it.
+    ALScriptStudioExpandedCompare      mExpandedCompare{ *this, *this };
     // What the region said an object reserves, heard.
     boost::signals2::scoped_connection mRegionUsageConnection;
     // Saving and compiling the tabs.
