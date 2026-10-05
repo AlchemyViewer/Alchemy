@@ -33,6 +33,8 @@
 #include "../test/lltut.h"
 
 #include <algorithm>
+#include <deque>
+#include <memory>
 #include <random>
 #include <string>
 #include <vector>
@@ -717,5 +719,69 @@ namespace tut
         const std::vector<std::string> braces = { "a();", "}", "b();", "c();" };
         const std::vector<std::string> later  = { "a();", "b();", "c();", "}" };
         ensure("a brace moved: too small to count", ALDiffMoves::find(braces, later, ALTextDiff::lines(braces, later)).empty());
+    }
+
+    template<> template<>
+    void altextdiff_object::test<19>()
+    {
+        set_test_name("more to let go of: blanks at a line's end, blank lines, comments by a grammar's regions; each alone and together");
+        typedef ALTextDiff::Region R;
+        ALTextDiff::Likeness trailing;
+        trailing.ignoreTrailing = true;
+        ensure_equals("blanks at the end", ALTextDiff::likenessOf("x = 1;  \t", trailing), std::string("x = 1;"));
+        ensure_equals("not inside", ALTextDiff::likenessOf("x  = 1;", trailing), std::string("x  = 1;"));
+        ensure_equals("one changed at its end alone: none", walk({ "a", "b  " }, { "a", "b" }, ALTextDiff::lines({ "a", "b  " }, { "a", "b" }, as(trailing)), false, trailing), 0);
+
+        ALTextDiff::Likeness blank;
+        blank.ignoreBlankLines = true;
+        ensure("a blank line nothing, and no change", ALTextDiff::likenessOf("   ", blank).empty() && ALTextDiff::ignorable("   ", blank) && !ALTextDiff::ignorable("x", blank));
+        ensure("not unless asked", !ALTextDiff::ignorable("", trailing));
+
+        ALTextDiff::Likeness comments;
+        comments.ignoreComments                 = true;
+        const ALTextDiff::regions_t code_note   = { { 0, 7, R::Code }, { 7, 13, R::Comment } };
+        const ALTextDiff::regions_t note        = { { 0, 9, R::Comment } };
+        ensure_equals("a comment left out, the blanks before it with it", ALTextDiff::likenessOf("x = 1; // one", comments, &code_note), std::string("x = 1;"));
+        ensure("without regions, as it is", ALTextDiff::likenessOf("x = 1; // one", comments) == "x = 1; // one");
+        ensure("a line of a comment alone no change", ALTextDiff::ignorable("// a note", comments, &note) && !ALTextDiff::ignorable("x = 1; // one", comments, &code_note));
+        ensure("a blank line still a change, unless blank lines are let go of", !ALTextDiff::ignorable("", comments, &note));
+
+        // Lines by a lexer: a comment from "//" on.
+        auto said  = std::make_shared<std::deque<std::vector<ALTextDiff::regions_t>>>();
+        ALTextDiff::Options by_comments;
+        by_comments.like  = comments;
+        by_comments.lexer = [said](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            std::vector<ALTextDiff::regions_t>& out = said->emplace_back();
+            for (const std::string& line : lines)
+            {
+                const size_t at = line.find("//");
+                ALTextDiff::regions_t one;
+                if (at != 0)
+                {
+                    one.push_back({ 0, static_cast<S32>(at == std::string::npos ? line.size() : at), R::Code });
+                }
+                if (at != std::string::npos)
+                {
+                    one.push_back({ static_cast<S32>(at), static_cast<S32>(line.size()), R::Comment });
+                }
+                out.push_back(one);
+            }
+            return out;
+        };
+        const std::vector<std::string> was = { "x = 1; // one", "y = 2;" };
+        const std::vector<std::string> now = { "x = 1; // uno", "y = 2;" };
+        ensure("a comment reworded: the lines the same", ALTextDiff::lines(was, now, by_comments) == std::vector<Run>{ Run{ Kind::Same, 0, 0, 2 } });
+        ensure("without: a change", ALTextDiff::lines(was, now).size() > 1);
+        ALTextDiff::spans_t left, right;
+        const ALTextDiff::regions_t one_note = { { 0, 7, R::Code }, { 7, 13, R::Comment } };
+        const ALTextDiff::regions_t two_note = { { 0, 7, R::Code }, { 7, 13, R::Comment } };
+        ALTextDiff::words("x = 1; // one", "x = 2; // two", left, right, by_comments, &one_note, &two_note);
+        ensure("in words, the comment not marked", left == ALTextDiff::spans_t{ { 4, 5 } } && right == ALTextDiff::spans_t{ { 4, 5 } });
+
+        ALTextDiff::Likeness all = comments;
+        all.ignoreBlankLines     = true;
+        all.ignoreTrailing       = true;
+        const ALTextDiff::regions_t spaced = { { 0, 9, R::Code }, { 9, 17, R::Comment } };
+        ensure("together", ALTextDiff::likenessOf("x = 1;   // one  ", all, &spaced) == "x = 1;" && ALTextDiff::ignorable("  ", all));
     }
 }

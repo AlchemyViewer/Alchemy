@@ -73,8 +73,7 @@ ALDiffBar::ALDiffBar(const Params& p)
     // The ways of showing lit by the view, as it is once it has done what
     // was asked: a press only asks, and turns nothing itself.
     mFoldButton     = flat("fold", "\xE2\x8B\xAF", false, alSaid("DiffBarFold", "Fold away what is the same"));
-    mBlanksButton   = flat("ignore_whitespace", "\xE2\x90\xA3", false, alSaid("DiffBarWhitespace", "Ignore changes of whitespace"));
-    mCaseButton     = flat("ignore_case", "Aa", false, alSaid("DiffBarCase", "Ignore changes of case"));
+    mIgnoreButton   = flat("ignore", "\xE2\x90\xA3", false, alSaid("DiffBarIgnore", "What to ignore: whitespace, blank lines, comments, case"));
     mInlineButton   = flat("inline", "\xE2\x96\xA4", false, alSaid("DiffBarInline", "Show the changes inline, in one text"));
     mSwapButton     = flat("swap", "\xE2\x87\x84", false, alSaid("DiffBarSwap", "Swap the sides"));
     mDoneButton     = flat("done", "\xC3\x97", false, alSaid("DiffBarDone", "Back to the text"));
@@ -85,9 +84,7 @@ ALDiffBar::ALDiffBar(const Params& p)
     mPreviousButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mPrevious(); });
     mNextButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mNext(); });
     mFoldButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mFold(); });
-    mBlanksButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mWhitespace(); });
-    mCaseButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mCase(); });
-    mCaseButton->setVisible(false);
+    mIgnoreButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mIgnore(); });
     mInlineButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mInline(); });
     mSwapButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSwap(); });
     mDoneButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mDone(); });
@@ -150,23 +147,14 @@ void ALDiffBar::setFolded(bool folded)
     mFoldButton->setToggleState(folded);
 }
 
-void ALDiffBar::setIgnoreWhitespace(bool ignore)
+void ALDiffBar::setIgnoring(bool ignoring)
 {
-    mBlanksButton->setToggleState(ignore);
+    mIgnoreButton->setToggleState(ignoring);
 }
 
-void ALDiffBar::setIgnoreCase(bool ignore)
+LLView* ALDiffBar::ignoreButton() const
 {
-    mCaseButton->setToggleState(ignore);
-}
-
-void ALDiffBar::setIgnoreCaseShown(bool shown)
-{
-    if (mCaseButton->getVisible() != shown)
-    {
-        mCaseButton->setVisible(shown);
-        layout();
-    }
+    return mIgnoreButton;
 }
 
 void ALDiffBar::setInline(bool inline_view)
@@ -204,7 +192,7 @@ void ALDiffBar::setColors(const LLColor4& background, const LLColor4& ink)
     mBgColor              = ALSurface::ground(background, ink);
     mInkColor             = ink;
     const LLColor4 chosen = ALSurface::chosen(background, ink);
-    for (ALFlatButton* glyph : { mPreviousButton, mNextButton, mFoldButton, mBlanksButton, mCaseButton, mInlineButton, mSwapButton, mDoneButton, mTakeBackButton })
+    for (ALFlatButton* glyph : { mPreviousButton, mNextButton, mFoldButton, mIgnoreButton, mInlineButton, mSwapButton, mDoneButton, mTakeBackButton })
     {
         glyph->setInk(ink);
         glyph->setLit(chosen);
@@ -246,11 +234,7 @@ void ALDiffBar::layout()
     }
     place(mSwapButton);
     place(mInlineButton);
-    if (mCaseButton->getVisible())
-    {
-        place(mCaseButton);
-    }
-    place(mBlanksButton);
+    place(mIgnoreButton);
     place(mFoldButton);
     right -= GAP;
     if (mTakeBackButton->getVisible())

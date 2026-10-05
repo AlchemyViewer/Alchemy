@@ -404,8 +404,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="DiffBarPrevious">Previous change</string>
 	<string name="DiffBarNext">Next change</string>
 	<string name="DiffBarFold">Fold away what is the same</string>
-	<string name="DiffBarWhitespace">Ignore changes of whitespace</string>
-	<string name="DiffBarCase">Ignore changes of case</string>
+	<string name="DiffBarIgnore">What to ignore: whitespace, blank lines, comments, case</string>
 	<string name="DiffBarInline">Show the changes inline, in one text</string>
 	<string name="DiffBarSwap">Swap the sides</string>
 	<string name="DiffBarDone">Back to the text</string>

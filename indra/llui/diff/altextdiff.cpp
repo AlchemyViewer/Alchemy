@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <span>
 
 namespace
 {
@@ -40,13 +41,35 @@ namespace
     typedef ALTextDiff::Kind Kind;
 }
 
-std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like)
+std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like, const regions_t* regions)
 {
     std::string out;
     out.reserve(text.size());
+    // What of it is compared: all of it, or what no comment covers.
+    const auto commented = [&](size_t at) {
+        if (!like.ignoreComments || !regions)
+        {
+            return false;
+        }
+        for (const Piece& piece : *regions)
+        {
+            if (piece.region == Region::Comment && static_cast<S32>(at) >= piece.begin && static_cast<S32>(at) < piece.end)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
     bool blanks = false;
-    for (const char c : text)
+    bool cut    = false;
+    for (size_t at = 0; at < text.size(); ++at)
     {
+        const char c = text[at];
+        if (commented(at))
+        {
+            cut = true;
+            continue;
+        }
         if (like.ignoreWhitespace && ALDiffTokens::blank(c))
         {
             blanks = true;
@@ -59,61 +82,79 @@ std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like)
         blanks = false;
         out += like.ignoreCase && c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
     }
+    // Blanks at its end let go of where they are, or where a comment after
+    // them was; a line of blanks alone nothing where blank lines are.
+    const size_t end = out.find_last_not_of(" \t");
+    if (end == std::string::npos)
+    {
+        if (like.ignoreBlankLines || like.ignoreTrailing || cut)
+        {
+            out.clear();
+        }
+    }
+    else if (like.ignoreTrailing || cut)
+    {
+        out.resize(end + 1);
+    }
     return out;
+}
+
+bool ALTextDiff::ignorable(std::string_view line, const Likeness& like, const regions_t* regions)
+{
+    if (!like.ignoreBlankLines && !like.ignoreComments)
+    {
+        return false;
+    }
+    const bool blank = line.find_first_not_of(" \t") == std::string_view::npos;
+    if (blank)
+    {
+        return like.ignoreBlankLines;
+    }
+    if (!like.ignoreComments || !regions)
+    {
+        return false;
+    }
+    // Nothing but a comment and blanks.
+    const bool has_comment = std::any_of(regions->begin(), regions->end(), [](const Piece& piece) { return piece.region == Region::Comment; });
+    return has_comment && likenessOf(line, Likeness{ true, false, true, true, true }, regions).empty();
 }
 
 namespace
 {
-    // As lines(), without anchors.
-    std::vector<Run> plainLines(const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Options& options)
+    // The lines of a stretch of each text, from `l` to `l_end` of the left
+    // and `r` to `r_end` of the right, by their ids: found the way asked,
+    // slid, and counted in the whole texts.
+    std::vector<Run> stretch(const std::vector<S32>& a, const std::vector<S32>& b, const std::vector<std::string>& left, const std::vector<std::string>& right,
+                             S32 l, S32 l_end, S32 r, S32 r_end, ALTextDiff::Algorithm algorithm)
     {
-        const ALTextDiff::Likeness& like = options.like;
-        // Each line as compared, kept while its id is.
-        std::vector<std::string> keys;
-        if (like.any())
+        const std::vector<S32> some_a(a.begin() + l, a.begin() + l_end);
+        const std::vector<S32> some_b(b.begin() + r, b.begin() + r_end);
+        std::vector<Run>       out = algorithm == ALTextDiff::Algorithm::Patience  ? ALLineDiff::patience(some_a, some_b)
+                                     : algorithm == ALTextDiff::Algorithm::Minimal ? ALLineDiff::minimal(some_a, some_b)
+                                                                                   : ALLineDiff::histogram(some_a, some_b);
+        ALLineDiff::slide(out, some_a, some_b, std::span<const std::string>(left).subspan(static_cast<size_t>(l), static_cast<size_t>(l_end - l)),
+                          std::span<const std::string>(right).subspan(static_cast<size_t>(r), static_cast<size_t>(r_end - r)));
+        if (l != 0 || r != 0)
         {
-            keys.reserve(left.size() + right.size());
-            for (const std::string& line : left)
+            for (Run& run : out)
             {
-                keys.push_back(ALTextDiff::likenessOf(line, like));
-            }
-            for (const std::string& line : right)
-            {
-                keys.push_back(ALTextDiff::likenessOf(line, like));
+                run.left += l;
+                run.right += r;
             }
         }
-        ALDiffIds        ids;
-        std::vector<S32> a;
-        std::vector<S32> b;
-        a.reserve(left.size());
-        b.reserve(right.size());
-        for (size_t i = 0; i < left.size(); ++i)
-        {
-            a.push_back(ids.idOf(like.any() ? keys[i] : left[i]));
-        }
-        for (size_t i = 0; i < right.size(); ++i)
-        {
-            b.push_back(ids.idOf(like.any() ? keys[left.size() + i] : right[i]));
-        }
-        std::vector<Run> out = options.algorithm == ALTextDiff::Algorithm::Patience  ? ALLineDiff::patience(a, b)
-                               : options.algorithm == ALTextDiff::Algorithm::Minimal ? ALLineDiff::minimal(a, b)
-                                                                                     : ALLineDiff::histogram(a, b);
-        ALLineDiff::slide(out, a, b, left, right);
         return out;
     }
 
-    // As lines(), lined up at anchors.
-    std::vector<Run> anchoredLines(const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Options& options)
+    // The anchors that can be kept: within both texts, by the right then
+    // the left the other way, so that of two on one line of the right the
+    // longest rising run takes one at most; then that run, rising on the
+    // left.
+    ALTextDiff::anchors_t keptAnchors(const ALTextDiff::anchors_t& anchors, S32 left_size, S32 right_size)
     {
-        const ALTextDiff::anchors_t& anchors = options.anchors;
-        const ALTextDiff::Likeness&  like    = options.like;
-        // The pairs kept: within both texts, by the right then the left the
-        // other way, so that of two on one line of the right the longest
-        // rising run takes one at most; then that run, rising on the left.
         ALTextDiff::anchors_t given;
         for (const std::pair<S32, S32>& pair : anchors)
         {
-            if (pair.first >= 0 && pair.second >= 0 && pair.first < static_cast<S32>(left.size()) && pair.second < static_cast<S32>(right.size()))
+            if (pair.first >= 0 && pair.second >= 0 && pair.first < left_size && pair.second < right_size)
             {
                 given.push_back(pair);
             }
@@ -146,72 +187,117 @@ namespace
             kept.push_back(given[i]);
         }
         std::reverse(kept.begin(), kept.end());
-
-        std::vector<Run> out;
-        const auto push = [&out](const Run& run) {
-            if (run.count <= 0 && run.kind != Kind::Same)
-            {
-                return;
-            }
-            if (run.count > 0 && !out.empty() && out.back().kind == run.kind && out.back().count > 0)
-            {
-                Run&       last = out.back();
-                const bool next = run.kind == Kind::Same      ? last.left + last.count == run.left && last.right + last.count == run.right
-                                  : run.kind == Kind::Removed ? last.left + last.count == run.left && last.right == run.right
-                                                              : last.right + last.count == run.right && last.left == run.left;
-                if (next)
-                {
-                    last.count += run.count;
-                    return;
-                }
-            }
-            out.push_back(run);
-        };
-        S32 l = 0;
-        S32 r = 0;
-        for (size_t i = 0; i <= kept.size(); ++i)
-        {
-            const S32 to_left  = i < kept.size() ? kept[i].first : static_cast<S32>(left.size());
-            const S32 to_right = i < kept.size() ? kept[i].second : static_cast<S32>(right.size());
-            // The stretch before the pair, on its own.
-            const std::vector<std::string> some_left(left.begin() + l, left.begin() + to_left);
-            const std::vector<std::string> some_right(right.begin() + r, right.begin() + to_right);
-            for (Run run : plainLines(some_left, some_right, options))
-            {
-                run.left += l;
-                run.right += r;
-                push(run);
-            }
-            if (i == kept.size())
-            {
-                break;
-            }
-            if (like.any() ? ALTextDiff::likenessOf(left[static_cast<size_t>(to_left)], like) == ALTextDiff::likenessOf(right[static_cast<size_t>(to_right)], like)
-                           : left[static_cast<size_t>(to_left)] == right[static_cast<size_t>(to_right)])
-            {
-                push(Run{ Kind::Same, to_left, to_right, 1 });
-            }
-            else
-            {
-                // Parted from a change just before, so that the pair stands
-                // first in its own.
-                if (!out.empty() && out.back().kind != Kind::Same)
-                {
-                    out.push_back(Run{ Kind::Same, to_left, to_right, 0 });
-                }
-                push(Run{ Kind::Removed, to_left, to_right, 1 });
-                push(Run{ Kind::Added, to_left + 1, to_right, 1 });
-            }
-            l = to_left + 1;
-            r = to_right + 1;
-        }
-        return out;
+        return kept;
     }
 }
 
 std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options)
 {
-    return options.anchors.empty() ? plainLines(left, right, options) : anchoredLines(left, right, options);
+    const Likeness& like = options.like;
+    // Each line's regions, where comments are let go of and a grammar says
+    // where they are.
+    const std::vector<regions_t>* left_regions  = nullptr;
+    const std::vector<regions_t>* right_regions = nullptr;
+    if (like.ignoreComments && options.lexer)
+    {
+        left_regions  = &options.lexer(left);
+        right_regions = &options.lexer(right);
+        if (left_regions->size() != left.size() || right_regions->size() != right.size())
+        {
+            left_regions  = nullptr;
+            right_regions = nullptr;
+        }
+    }
+    // Each line as compared, kept while its id is; the ids of both texts
+    // made once, whatever stretches they are then compared in.
+    std::vector<std::string> keys;
+    if (like.any())
+    {
+        keys.reserve(left.size() + right.size());
+        for (size_t i = 0; i < left.size(); ++i)
+        {
+            keys.push_back(likenessOf(left[i], like, left_regions ? &(*left_regions)[i] : nullptr));
+        }
+        for (size_t i = 0; i < right.size(); ++i)
+        {
+            keys.push_back(likenessOf(right[i], like, right_regions ? &(*right_regions)[i] : nullptr));
+        }
+    }
+    ALDiffIds        ids;
+    std::vector<S32> a;
+    std::vector<S32> b;
+    a.reserve(left.size());
+    b.reserve(right.size());
+    for (size_t i = 0; i < left.size(); ++i)
+    {
+        a.push_back(ids.idOf(like.any() ? keys[i] : left[i]));
+    }
+    for (size_t i = 0; i < right.size(); ++i)
+    {
+        b.push_back(ids.idOf(like.any() ? keys[left.size() + i] : right[i]));
+    }
+    const S32 n = static_cast<S32>(left.size());
+    const S32 m = static_cast<S32>(right.size());
+    if (options.anchors.empty())
+    {
+        return stretch(a, b, left, right, 0, n, 0, m, options.algorithm);
+    }
+    // Lined up at the anchors: each stretch between two on its own.
+    const anchors_t  kept = keptAnchors(options.anchors, n, m);
+    std::vector<Run> out;
+    const auto       push = [&out](const Run& run) {
+        if (run.count <= 0 && run.kind != Kind::Same)
+        {
+            return;
+        }
+        if (run.count > 0 && !out.empty() && out.back().kind == run.kind && out.back().count > 0)
+        {
+            Run&       last = out.back();
+            const bool next = run.kind == Kind::Same      ? last.left + last.count == run.left && last.right + last.count == run.right
+                              : run.kind == Kind::Removed ? last.left + last.count == run.left && last.right == run.right
+                                                          : last.right + last.count == run.right && last.left == run.left;
+            if (next)
+            {
+                last.count += run.count;
+                return;
+            }
+        }
+        out.push_back(run);
+    };
+    S32 l = 0;
+    S32 r = 0;
+    for (size_t i = 0; i <= kept.size(); ++i)
+    {
+        const S32 to_left  = i < kept.size() ? kept[i].first : n;
+        const S32 to_right = i < kept.size() ? kept[i].second : m;
+        // The stretch before the pair, on its own.
+        for (const Run& run : stretch(a, b, left, right, l, to_left, r, to_right, options.algorithm))
+        {
+            push(run);
+        }
+        if (i == kept.size())
+        {
+            break;
+        }
+        if (a[static_cast<size_t>(to_left)] == b[static_cast<size_t>(to_right)])
+        {
+            push(Run{ Kind::Same, to_left, to_right, 1 });
+        }
+        else
+        {
+            // Parted from a change just before, so that the pair stands
+            // first in its own.
+            if (!out.empty() && out.back().kind != Kind::Same)
+            {
+                out.push_back(Run{ Kind::Same, to_left, to_right, 0 });
+            }
+            push(Run{ Kind::Removed, to_left, to_right, 1 });
+            push(Run{ Kind::Added, to_left + 1, to_right, 1 });
+        }
+        l = to_left + 1;
+        r = to_right + 1;
+    }
+    return out;
 }
 
 ALTextDiff::anchors_t ALTextDiff::anchorsOf(const ranges_t& ranges)

@@ -474,4 +474,21 @@ namespace tut
         ensure("no words marked", m.line(Column::Left, 0).words.empty());
         ensure_equals("still changes, stepped through", m.changeCount(), 2);
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<17>()
+    {
+        set_test_name("a change of blank lines alone no change where they are let go of: beside nothing, untinted, not counted; mixed, still a change");
+        m.setTexts("a\nb\nc", "a\n\nb\nc");
+        ensure_equals("as they are: a line put in", m.changeCount(), 1);
+        ALTextDiff::Likeness blank;
+        blank.ignoreBlankLines = true;
+        m.setLikeness(blank);
+        ensure_equals("let go of: none", m.changeCount(), 0);
+        ensure("the blank line shown, the same, beside a row of nothing", kindsOf(Column::Right) == "====" && signsOf(Column::Right) == std::string(4, '\0') &&
+                                                                            m.line(Column::Left, 1).padding == 1);
+        ensure_equals("inline, the right's lines", m.text(Column::Inline), std::string("a\n\nb\nc"));
+        m.setTexts("a\nb\nc", "a\n\nnew\nb\nc");
+        ensure_equals("a blank line with another: a change", m.changeCount(), 1);
+    }
 }

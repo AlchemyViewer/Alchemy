@@ -27,6 +27,7 @@
 
 #include "alcodeeditor.h"
 #include "aldiffmodel.h"
+#include "almenuslot.h"
 #include "altextdiff.h"
 #include "alviewtype.h"
 #include "lluictrl.h"
@@ -126,8 +127,18 @@ public:
     bool foldsSame() const { return mModel.foldsSame(); }
     // Lines told the same with their blanks let go of -- re-indented or
     // re-spaced -- or their case (ALTextDiff::Likeness), and shown as they
-    // are; off unless asked. Letting case go is on the bar only where the
+    // are; off unless asked. Letting case go is offered only where the
     // host offers it: for prose, not code.
+    //
+    // Besides those, blanks at a line's end alone, blank lines, and
+    // comments where a grammar says where they are: each by its name --
+    // "whitespace", "trailing", "blank_lines", "comments", "case" -- as the
+    // bar's menu of them has it.
+    void setLikeness(const ALTextDiff::Likeness& like);
+    const ALTextDiff::Likeness& likeness() const { return mModel.likeness(); }
+    bool ignores(const std::string& what) const;
+    bool offersIgnore(const std::string& what) const;
+    void setIgnore(const std::string& what, bool ignore);
     void setIgnoreWhitespace(bool ignore);
     bool ignoresWhitespace() const { return mModel.likeness().ignoreWhitespace; }
     void setIgnoreCase(bool ignore);
@@ -228,8 +239,8 @@ private:
     };
     Place         placeOfCaret();
     void          restorePlace(const Place& place);
-    // Compared again as lines are now told the same, the caret kept.
-    void          setLikeness(const ALTextDiff::Likeness& like);
+    // The menu of what to let go of, under the bar's button.
+    void          showIgnoreMenu();
     // Words cut by a grammar's tokens, where it is one of code; compared
     // again, the caret kept.
     void          compareBy(const std::shared_ptr<const ALSyntaxGrammar>& grammar);
@@ -299,6 +310,10 @@ private:
     LLColor4                  mDividerColor;
     // The grammar words are cut by: none for prose.
     std::shared_ptr<const ALSyntaxGrammar> mLexedBy;
+    // Whether letting case go is offered; and the menu of what is let go
+    // of, while it is open.
+    bool                      mOffersCase = false;
+    ALMenuSlot                mIgnoreMenu;
     // What each folded row says, and the ranges drawn as bands, worked out
     // as the comparison is filled.
     std::vector<std::string>  mFoldSaid;

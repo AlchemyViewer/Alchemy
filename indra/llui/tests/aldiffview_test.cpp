@@ -32,6 +32,7 @@
 #include "alvimkeymap.h"
 #include "../llclipboard.h"
 #include "../llfocusmgr.h"
+#include "../llmenugl.h"
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
@@ -703,15 +704,15 @@ namespace tut
     template<> template<>
     void aldiffview_object::test<21>()
     {
-        set_test_name("whitespace let go of from the bar: re-indented lines the same, shown as they are, the caret kept; case only where offered");
+        set_test_name("whitespace let go of: re-indented lines the same, shown as they are, the caret kept, the bar lit; case only where offered");
         ALDiffView& d = make("default\n{\nstate_entry()\n{\nllSay(0, \"a\");\n}\n}", "default\n{\n    state_entry()\n    {\n        llSay(0,  \"b\");\n    }\n}");
         ensure_equals("as they are: the re-indented lines changed", d.changeCount(), 1);
         ensure("off", !d.ignoresWhitespace());
         d.right()->setFocus(true);
         d.right()->goTo(ALTextPos(numbersOf(d.right()).size() - 1, 0));
         const S32 line = d.rightAtCaret().first;
-        press(d, "ignore_whitespace");
-        ensure("on, and lit", d.ignoresWhitespace() && ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore_whitespace"))->getToggleState());
+        d.setIgnore("whitespace", true);
+        ensure("on, and the bar's button lit", d.ignoresWhitespace() && ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
         ensure_equals("one line changed: the word, not its indent", d.changeCount(), 1);
         ensure("the right shown as it is", d.right()->text().find("\n    state_entry()\n") != std::string::npos);
         ensure("the caret kept", d.rightAtCaret().first == line);
@@ -719,12 +720,14 @@ namespace tut
         ensure("the changed line's word marked, not its blanks", d.right()->decorations().size() == 1);
         ensure("the line before it the same", !tinted(*d.right(), say - 1));
 
-        ensure("case not offered", !d.bar()->getChild<LLView>("ignore_case")->getVisible());
+        ensure("case not offered", !d.offersIgnore("case"));
+        d.setIgnore("case", true);
+        ensure("nor taken", !d.ignoresCase());
         d.setTexts("Hello there", "hello there");
         ensure_equals("a change of case a change", d.changeCount(), 1);
         d.setOffersIgnoreCase(true);
-        ensure("offered", d.bar()->getChild<LLView>("ignore_case")->getVisible());
-        press(d, "ignore_case");
+        ensure("offered", d.offersIgnore("case"));
+        d.setIgnore("case", true);
         ensure("let go of", d.ignoresCase() && d.changeCount() == 0);
         d.setOffersIgnoreCase(false);
         ensure("not offered: not let go of", !d.ignoresCase() && d.changeCount() == 1);
@@ -800,5 +803,38 @@ namespace tut
         d.left()->setFocus(true);
         d.handleMouseDown(frame.mLeft + text.mLeft + 20, y, MASK_NONE);
         ensure("a click in the text is the text's", d.right()->caret().line == 4 && !d.right()->hasFocus());
+    }
+
+    template<> template<>
+    void aldiffview_object::test<25>()
+    {
+        set_test_name("the bar's menu of what to let go of: each checked as it is, comments with a grammar, case where offered; an item turns its own");
+        ALDiffView& d = make("x = 1; // one\n\ny = 2;", "x = 1; // uno\ny = 2;   ");
+        // A menu holder, as the viewer's window has one.
+        LLMenuHolderGL::Params hp;
+        hp.name                  = "menu_holder";
+        hp.rect                  = LLRect(0, 1080, 1920, 0);
+        hp.mouse_opaque          = false;
+        LLMenuHolderGL* holder   = LLUICtrlFactory::create<LLMenuHolderGL>(hp);
+        LLMenuGL::sMenuContainer = holder;
+        press(d, "ignore");
+        LLContextMenu* menu = holder->findChild<LLContextMenu>("menu_diff_ignore");
+        ensure("shown", menu != nullptr);
+        if (menu)
+        {
+            menu->arrangeAndClear();
+            ensure("comments offered, with LSL's grammar", menu->findChild<LLMenuItemGL>("comments")->getVisible());
+            ensure("case not, for code", !menu->findChild<LLMenuItemGL>("case")->getVisible());
+            LLMenuItemGL* trailing = menu->findChild<LLMenuItemGL>("trailing");
+            trailing->onCommit();
+            ensure("an item turns its own on", d.ignores("trailing") && !d.ignores("whitespace"));
+        }
+        d.setIgnore("comments", true);
+        d.setIgnore("blank_lines", true);
+        ensure_equals("a comment reworded, a blank line gone and blanks at an end: no change", d.changeCount(), 0);
+        ensure("lit", ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
+        LLMenuGL::sMenuContainer = nullptr;
+        LLMortician::updateClass();
+        delete holder;
     }
 }

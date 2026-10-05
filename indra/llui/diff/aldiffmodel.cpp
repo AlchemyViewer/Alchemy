@@ -297,12 +297,44 @@ void ALDiffModel::build(const std::vector<bool>& open)
     // Each inline row's line of the left and of the right as shown.
     std::vector<S32>  inline_left;
     std::vector<S32>  inline_right;
+    // Which changes are none, as lines are told the same: each of their
+    // lines blank, or a comment, where those are let go of. By each of
+    // their runs.
+    const ALTextDiff::Likeness& like = mOptions.like;
+    std::vector<bool>           ignored(runs.size(), false);
+    if (like.ignoreBlankLines || like.ignoreComments)
+    {
+        for (size_t i = 0; i < runs.size();)
+        {
+            if (runs[i].kind == Kind::Same)
+            {
+                ++i;
+                continue;
+            }
+            bool   none = true;
+            size_t j    = i;
+            for (; j < runs.size() && runs[j].kind != Kind::Same; ++j)
+            {
+                const bool out = runs[j].kind == Kind::Removed;
+                for (S32 n = 0; n < runs[j].count && none; ++n)
+                {
+                    const S32 line = (out ? runs[j].left : runs[j].right) + n;
+                    none = ALTextDiff::ignorable(out ? left[static_cast<size_t>(line)] : right[static_cast<size_t>(line)], like,
+                                                 regionsOf(out ? left_regions : right_regions, line));
+                }
+            }
+            for (; i < j; ++i)
+            {
+                ignored[i] = none;
+            }
+        }
+    }
     // The last run that is a change: the runs the same after it are at
     // the text's end. Where none is, nothing is folded.
     size_t last_change = runs.size();
     for (size_t i = runs.size(); i-- > 0;)
     {
-        if (runs[i].kind != Kind::Same)
+        if (runs[i].kind != Kind::Same && !ignored[i])
         {
             last_change = i;
             break;
@@ -356,6 +388,48 @@ void ALDiffModel::build(const std::vector<bool>& open)
                 same(n);
             }
             ++i;
+            continue;
+        }
+        if (ignored[i])
+        {
+            // No change: its lines as the same are shown, side by side
+            // beside each other as they fall, the rest beside nothing;
+            // inline, the right's alone.
+            std::vector<S32> gone;
+            std::vector<S32> made;
+            for (; i < runs.size() && runs[i].kind != Kind::Same; ++i)
+            {
+                const bool out = runs[i].kind == Kind::Removed;
+                for (S32 n = 0; n < runs[i].count; ++n)
+                {
+                    (out ? gone : made).push_back((out ? runs[i].left : runs[i].right) + n);
+                }
+            }
+            for (size_t n = 0; n < std::max(gone.size(), made.size()); ++n)
+            {
+                if (n < gone.size())
+                {
+                    add(Column::Left, left[static_cast<size_t>(gone[n])], gone[n] + 1, Kind::Same);
+                }
+                else
+                {
+                    pad(Column::Left);
+                }
+                if (n < made.size())
+                {
+                    add(Column::Right, right[static_cast<size_t>(made[n])], made[n] + 1, Kind::Same);
+                }
+                else
+                {
+                    pad(Column::Right);
+                }
+            }
+            for (const S32 line : made)
+            {
+                add(Column::Inline, right[static_cast<size_t>(line)], line + 1, Kind::Same);
+                inline_left.push_back(-1);
+                inline_right.push_back(line);
+            }
             continue;
         }
         // A change: the lines taken out and put in between two the same,

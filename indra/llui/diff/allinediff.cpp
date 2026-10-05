@@ -503,8 +503,8 @@ std::vector<ALLineDiff::Run> ALLineDiff::histogram(const std::vector<S32>& a, co
 // the one after it, or its last as the one before -- it goes where code
 // reads it as one thing: its first line the least indented, a blank
 // line at its end rather than its start. Ties keep it where it was.
-void ALLineDiff::slide(std::vector<Run>& runs, const std::vector<S32>& a, const std::vector<S32>& b, const std::vector<std::string>& left,
-           const std::vector<std::string>& right)
+void ALLineDiff::slide(std::vector<Run>& runs, const std::vector<S32>& a, const std::vector<S32>& b, std::span<const std::string> left,
+                       std::span<const std::string> right)
 {
     for (size_t i = 1; i + 1 < runs.size(); ++i)
     {
@@ -515,7 +515,7 @@ void ALLineDiff::slide(std::vector<Run>& runs, const std::vector<S32>& a, const 
         {
             continue;
         }
-        const std::vector<std::string>& text  = hunk.kind == Kind::Added ? right : left;
+        const std::span<const std::string> text = hunk.kind == Kind::Added ? right : left;
         const std::vector<S32>&         ids   = hunk.kind == Kind::Added ? b : a;
         const S32                       first = hunk.kind == Kind::Added ? hunk.right : hunk.left;
         const S32                       count = hunk.count;

@@ -83,12 +83,21 @@ namespace ALTextDiff
     // their blanks let go of -- trimmed, a run of them as one -- and a
     // word of blanks nothing; or their case. What is shown is the text as
     // it is either way.
+    // Besides: blanks at a line's end alone let go of; blank lines let go
+    // of -- each nothing, and a change of nothing else no change; comments
+    // let go of, where a grammar says where they are (the options' lexer)
+    // -- a line's comment not compared, and a line of nothing else as a
+    // blank line is.
     struct Likeness
     {
         bool ignoreWhitespace = false;
         bool ignoreCase       = false;
+        bool ignoreTrailing   = false;
+        bool ignoreBlankLines = false;
+        bool ignoreComments   = false;
 
-        bool any() const { return ignoreWhitespace || ignoreCase; }
+        bool any() const { return ignoreWhitespace || ignoreCase || ignoreTrailing || ignoreBlankLines || ignoreComments; }
+        bool operator==(const Likeness& other) const = default;
     };
 
     // Lines known to stand for each other -- an LSL statement and the SLua
@@ -194,8 +203,14 @@ namespace ALTextDiff
     typedef std::vector<std::pair<S32, S32>> spans_t;
     void words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out, const Options& options = Options(),
                const regions_t* left_regions = nullptr, const regions_t* right_regions = nullptr);
-    // A line or a word as it is compared, told the same so.
-    std::string likenessOf(std::string_view text, const Likeness& like);
+    // A line or a word as it is compared, told the same so; a line's
+    // comments, by its regions, left out where they are let go of.
+    std::string likenessOf(std::string_view text, const Likeness& like, const regions_t* regions = nullptr);
+    // Whether a line taken out or put in is no change, as lines are told
+    // the same: blank, where blank lines are let go of; a comment and
+    // blanks, where comments are. A change of nothing but such lines is
+    // none.
+    bool        ignorable(std::string_view line, const Likeness& like, const regions_t* regions = nullptr);
 }
 
 #endif // AL_ALTEXTDIFF_H

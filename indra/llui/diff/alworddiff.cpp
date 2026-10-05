@@ -141,6 +141,20 @@ void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff:
         {
             same->join(line, all);
         }
+        // Comments, where they are let go of; then blanks at the end,
+        // where those are or a comment was.
+        const size_t had = all.size();
+        if (like.ignoreComments)
+        {
+            std::erase_if(all, [](const Token& token) { return token.region == ALTextDiff::Region::Comment; });
+        }
+        if (like.ignoreTrailing || all.size() != had)
+        {
+            while (!all.empty() && ALDiffTokens::isBlank(line, all.back()))
+            {
+                all.pop_back();
+            }
+        }
         if (like.ignoreWhitespace)
         {
             std::erase_if(all, [line](const Token& token) { return ALDiffTokens::isBlank(line, token); });

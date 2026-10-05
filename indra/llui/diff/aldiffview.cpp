@@ -27,6 +27,7 @@
 #include "aldiffview.h"
 
 #include "aldifflexer.h"
+#include "llmenugl.h"
 
 #include "alcodeeditor.h"
 #include "aldiffbar.h"
@@ -83,8 +84,7 @@ ALDiffView::ALDiffView(const Params& p)
         }
     });
     mBar->onFold([this]() { setFoldSame(!mModel.foldsSame()); });
-    mBar->onWhitespace([this]() { setIgnoreWhitespace(!ignoresWhitespace()); });
-    mBar->onCase([this]() { setIgnoreCase(!ignoresCase()); });
+    mBar->onIgnore([this]() { showIgnoreMenu(); });
     mBar->onSwap([this]() { setSwapped(!mModel.swapped()); });
     mBar->onTakeBack([this]() {
         ALCodeEditor* side = shown();
@@ -223,6 +223,13 @@ void ALDiffView::compareBy(const std::shared_ptr<const ALSyntaxGrammar>& grammar
         return;
     }
     mLexedBy = code;
+    if (!code && mModel.likeness().ignoreComments)
+    {
+        ALTextDiff::Likeness like = mModel.likeness();
+        like.ignoreComments       = false;
+        mModel.setLikeness(like);
+        mBar->setIgnoring(like.any());
+    }
     if (mModel.leftText().empty() && mModel.rightText().empty())
     {
         mModel.setLexer(code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t());
@@ -300,10 +307,74 @@ void ALDiffView::setIgnoreCase(bool ignore)
 
 void ALDiffView::setOffersIgnoreCase(bool offers)
 {
-    mBar->setIgnoreCaseShown(offers);
+    mOffersCase = offers;
     if (!offers)
     {
         setIgnoreCase(false);
+    }
+}
+
+bool ALDiffView::ignores(const std::string& what) const
+{
+    const ALTextDiff::Likeness& like = mModel.likeness();
+    return what == "whitespace"    ? like.ignoreWhitespace
+           : what == "trailing"    ? like.ignoreTrailing
+           : what == "blank_lines" ? like.ignoreBlankLines
+           : what == "comments"    ? like.ignoreComments
+           : what == "case"        ? like.ignoreCase
+                                   : false;
+}
+
+bool ALDiffView::offersIgnore(const std::string& what) const
+{
+    // Comments where a grammar says where they are; case where the host
+    // offers it; the rest always.
+    return what == "comments" ? mLexedBy != nullptr : what == "case" ? mOffersCase : true;
+}
+
+void ALDiffView::setIgnore(const std::string& what, bool ignore)
+{
+    if (!offersIgnore(what) && ignore)
+    {
+        return;
+    }
+    ALTextDiff::Likeness like = mModel.likeness();
+    bool* flag = what == "whitespace"    ? &like.ignoreWhitespace
+                 : what == "trailing"    ? &like.ignoreTrailing
+                 : what == "blank_lines" ? &like.ignoreBlankLines
+                 : what == "comments"    ? &like.ignoreComments
+                 : what == "case"        ? &like.ignoreCase
+                                         : nullptr;
+    if (flag && *flag != ignore)
+    {
+        *flag = ignore;
+        setLikeness(like);
+    }
+}
+
+void ALDiffView::showIgnoreMenu()
+{
+    // The menu calls back while it is open; the view may be gone by then.
+    const LLHandle<LLView>                            self = getHandle();
+    LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
+    LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
+    commit.add("DiffIgnore.Toggle", [self](LLUICtrl*, const LLSD& what) {
+        if (ALDiffView* view = ALViewType::as<ALDiffView>(self.get()))
+        {
+            view->setIgnore(what.asString(), !view->ignores(what.asString()));
+        }
+    });
+    enable.add("DiffIgnore.Checked", [self](LLUICtrl*, const LLSD& what) {
+        const ALDiffView* view = ALViewType::as<ALDiffView>(self.get());
+        return view && view->ignores(what.asString());
+    });
+    enable.add("DiffIgnore.Offered", [self](LLUICtrl*, const LLSD& what) {
+        const ALDiffView* view = ALViewType::as<ALDiffView>(self.get());
+        return view && view->offersIgnore(what.asString());
+    });
+    if (mIgnoreMenu.make("menu_diff_ignore.xml"))
+    {
+        mIgnoreMenu.show(mBar->ignoreButton(), 0, 0);
     }
 }
 
@@ -330,8 +401,7 @@ void ALDiffView::setAlgorithm(ALTextDiff::Algorithm algorithm)
 
 void ALDiffView::setLikeness(const ALTextDiff::Likeness& like)
 {
-    mBar->setIgnoreWhitespace(like.ignoreWhitespace);
-    mBar->setIgnoreCase(like.ignoreCase);
+    mBar->setIgnoring(like.any());
     // The runs folded are others now: folded or not as asked.
     const Place place = placeOfCaret();
     mModel.setLikeness(like);

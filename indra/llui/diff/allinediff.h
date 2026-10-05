@@ -27,6 +27,7 @@
 
 #include "altextdiff.h"
 
+#include <span>
 #include <string>
 #include <vector>
 
@@ -64,8 +65,8 @@ namespace ALLineDiff
 
     // Each change that could as well stand a line up or down put where it
     // reads as one thing, by the lines' text.
-    void slide(std::vector<Run>& runs, const std::vector<S32>& a, const std::vector<S32>& b, const std::vector<std::string>& left,
-               const std::vector<std::string>& right);
+    void slide(std::vector<Run>& runs, const std::vector<S32>& a, const std::vector<S32>& b, std::span<const std::string> left,
+               std::span<const std::string> right);
 }
 
 #endif // AL_ALLINEDIFF_H
