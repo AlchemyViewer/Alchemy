@@ -29,6 +29,7 @@
 #include "llpreviewnotecard.h"
 
 #include "aldiffview.h"
+#include "alscriptstudio.h"
 #include "alnotecardembedded.h"
 #include "alrecovery.h"
 #include "alsaid.h"
@@ -632,6 +633,8 @@ void LLPreviewNotecard::toggleCompare()
         mCompare->setOnEscape([this]() { toggleCompare(); });
         // A notecard is prose: a change of case alone may be let go of.
         mCompare->setOffersIgnoreCase(true);
+        // Its lines chosen as the studio's comparisons choose them.
+        mCompare->setAlgorithm(ALScriptStudio::compareAlgorithm());
         host->addChild(mCompare);
     }
     const bool comparing = !mCompare->getVisible() && (mSavedThere || mHistoryShown);

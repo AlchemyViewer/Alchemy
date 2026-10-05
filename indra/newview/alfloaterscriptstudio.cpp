@@ -1931,6 +1931,7 @@ void ALFloaterScriptStudio::applyEditorKeys(ALCodeEditor& editor)
 void ALFloaterScriptStudio::applyCompareOptions(ALDiffView& view)
 {
     view.setFont(ALScriptStudio::editorFont());
+    view.setAlgorithm(ALScriptStudio::compareAlgorithm());
     for (ALCodeEditor* side : { view.left(), view.right(), view.inlined() })
     {
         side->setOnZoomWheel([this](S32 steps) { zoomText(steps); });
@@ -6342,6 +6343,24 @@ void ALFloaterScriptStudio::retitleCompare(const Doc& doc) const
     doc.compareView->setTitles(doc.compareTitles->theirs, own);
 }
 
+void ALFloaterScriptStudio::setCompareAlgorithm(ALTextDiff::Algorithm algorithm)
+{
+    gSavedSettings.setString("ALScriptStudioDiffAlgorithm", ALTextDiff::algorithmName(algorithm));
+    for (const std::unique_ptr<Doc>& each : mDocs)
+    {
+        if (each->compareView)
+        {
+            each->compareView->setAlgorithm(algorithm);
+        }
+    }
+}
+
+ALTextDiff::Algorithm ALScriptStudio::compareAlgorithm()
+{
+    static LLCachedControl<std::string> algorithm(gSavedSettings, "ALScriptStudioDiffAlgorithm", "histogram");
+    return ALTextDiff::algorithmFromName(algorithm()).value_or(ALTextDiff::Algorithm::Histogram);
+}
+
 void ALFloaterScriptStudio::setCompareInline(bool inline_view)
 {
     mCompareInline = inline_view;
@@ -8849,6 +8868,35 @@ void ALFloaterScriptStudio::addViewCommands()
             return doc && doc->shownView() == Doc::View::Compare;
         },
         [this]() { return mCompareInline; });
+    // How comparisons choose the lines that stay: every comparison, and
+    // the ones to come.
+    for (const ALTextDiff::Algorithm algorithm : { ALTextDiff::Algorithm::Histogram, ALTextDiff::Algorithm::Patience, ALTextDiff::Algorithm::Minimal })
+    {
+        mCommands.add(
+            std::string("compare_") + ALTextDiff::algorithmName(algorithm), [this, algorithm]() { setCompareAlgorithm(algorithm); }, []() { return true; },
+            [algorithm]() { return ALScriptStudio::compareAlgorithm() == algorithm; });
+    }
+    // What the comparison shown lets go of, as its bar's menu has it.
+    for (const char* what : { "whitespace", "trailing", "blank_lines", "comments" })
+    {
+        const std::string named = what;
+        mCommands.add(
+            "compare_ignore_" + named,
+            [this, named]() {
+                if (Doc* doc = active(); doc && doc->shownView() == Doc::View::Compare)
+                {
+                    doc->compareView->setIgnore(named, !doc->compareView->ignores(named));
+                }
+            },
+            [this, named]() {
+                const Doc* doc = active();
+                return doc && doc->shownView() == Doc::View::Compare && doc->compareView->offersIgnore(named);
+            },
+            [this, named]() {
+                const Doc* doc = active();
+                return doc && doc->compareView && doc->compareView->ignores(named);
+            });
+    }
     mCommands.add(
         "expanded", [this]() { toggleExpanded(); },
         [this]() {

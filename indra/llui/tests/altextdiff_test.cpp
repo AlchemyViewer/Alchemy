@@ -649,6 +649,11 @@ namespace tut
         ensure_equals("histogram: a b a kept", walk(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Histogram))), 2);
         ensure_equals("patience: X kept", walk(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Patience))), 6);
         ensure_equals("minimal: the fewest", walk(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Minimal))), 2);
+        for (const A algorithm : { A::Histogram, A::Patience, A::Minimal })
+        {
+            ensure("each by its name and back", ALTextDiff::algorithmFromName(ALTextDiff::algorithmName(algorithm)) == algorithm);
+        }
+        ensure("a name of none, nothing", !ALTextDiff::algorithmFromName("myers").has_value());
     }
 
     template<> template<>

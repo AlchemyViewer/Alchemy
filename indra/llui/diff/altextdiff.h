@@ -29,6 +29,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -121,6 +122,10 @@ namespace ALTextDiff
         Patience,
         Minimal
     };
+    // Each by a name a setting can hold: "histogram", "patience",
+    // "minimal"; a name of none, nothing.
+    const char*              algorithmName(Algorithm algorithm);
+    std::optional<Algorithm> algorithmFromName(std::string_view name);
 
     // What a stretch of a line is, as its words are cut: code, cut as a
     // language's tokens are; or text written to be read -- a string's, a

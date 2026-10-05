@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "altextdiff.h"
+
 #include <string>
 
 class ALCodeEditor;
@@ -87,4 +89,7 @@ namespace ALScriptStudio
     // text has been, within ALFloaterScriptStudio's MIN_TEXT_POINTS and
     // MAX_TEXT_POINTS.
     const LLFontGL* editorFont();
+    // How comparisons choose the lines that stay, as the settings have it
+    // (ALScriptStudioDiffAlgorithm): the studio's and a notecard's.
+    ALTextDiff::Algorithm compareAlgorithm();
 }

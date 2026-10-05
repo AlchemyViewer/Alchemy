@@ -861,6 +861,9 @@ private:
     void refreshCompare(Doc& doc);
     // Every comparison inline or side by side, as the last was asked for.
     void setCompareInline(bool inline_view);
+    // How every comparison chooses the lines that stay, kept in the
+    // settings for those to come.
+    void setCompareAlgorithm(ALTextDiff::Algorithm algorithm);
     void endCompare(Doc& doc) override;
     // A tab made to hold a kept text with nothing loaded under it: unsaved,
     // with whatever its script or file was.

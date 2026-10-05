@@ -41,6 +41,31 @@ namespace
     typedef ALTextDiff::Kind Kind;
 }
 
+const char* ALTextDiff::algorithmName(Algorithm algorithm)
+{
+    switch (algorithm)
+    {
+        case Algorithm::Patience:
+            return "patience";
+        case Algorithm::Minimal:
+            return "minimal";
+        default:
+            return "histogram";
+    }
+}
+
+std::optional<ALTextDiff::Algorithm> ALTextDiff::algorithmFromName(std::string_view name)
+{
+    for (const Algorithm algorithm : { Algorithm::Histogram, Algorithm::Patience, Algorithm::Minimal })
+    {
+        if (name == algorithmName(algorithm))
+        {
+            return algorithm;
+        }
+    }
+    return std::nullopt;
+}
+
 std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like, const regions_t* regions)
 {
     std::string out;

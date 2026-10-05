@@ -673,6 +673,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALScriptStudioDiffAlgorithm</key>
+        <map>
+            <key>Comment</key>
+            <string>How Script Studio's comparisons, and a notecard's, choose the lines that stay: histogram, patience or minimal.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>histogram</string>
+        </map>
         <key>ALScriptStudioCaretStyle</key>
         <map>
             <key>Comment</key>

@@ -1280,6 +1280,50 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_inline" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_inline" />
             </menu_item_check>
+            <menu
+             label="Comparison"
+             layout="topleft"
+             mouse_opaque="false"
+             name="comparison_view_menu"
+             tear_off="false"
+             width="260">
+                <menu_item_check label="Histogram" layout="topleft" name="compare_histogram">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_histogram" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_histogram" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_histogram" />
+                </menu_item_check>
+                <menu_item_check label="Patience" layout="topleft" name="compare_patience">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_patience" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_patience" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_patience" />
+                </menu_item_check>
+                <menu_item_check label="Fewest Changes" layout="topleft" name="compare_minimal">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_minimal" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_minimal" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_minimal" />
+                </menu_item_check>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Ignore Whitespace" layout="topleft" name="compare_ignore_whitespace">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_ignore_whitespace" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_ignore_whitespace" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_ignore_whitespace" />
+                </menu_item_check>
+                <menu_item_check label="Ignore Whitespace at Line Ends" layout="topleft" name="compare_ignore_trailing">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_ignore_trailing" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_ignore_trailing" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_ignore_trailing" />
+                </menu_item_check>
+                <menu_item_check label="Ignore Blank Lines" layout="topleft" name="compare_ignore_blank_lines">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_ignore_blank_lines" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_ignore_blank_lines" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_ignore_blank_lines" />
+                </menu_item_check>
+                <menu_item_check label="Ignore Comments" layout="topleft" name="compare_ignore_comments">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_ignore_comments" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_ignore_comments" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_ignore_comments" />
+                </menu_item_check>
+            </menu>
             <menu_item_separator layout="topleft" />
             <menu_item_check label="Word Wrap" layout="topleft" name="word_wrap">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="word_wrap" />
