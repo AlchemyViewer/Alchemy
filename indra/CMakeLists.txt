@@ -83,8 +83,7 @@ option(AL_USE_LTO "Enable Link Time Optimization" OFF)
 option(AL_USE_OPENXR "Enable building with OpenXR support (Experimental)" OFF)
 option(AL_USE_PRECOMPILED_HEADERS "Enable use of precompiled header directives where supported." ON)
 
-# Audio Engines
-option(AL_USE_FMODSTUDIO "Enable support for the FMOD Studio audio engine" OFF)
+# Audio Engines; FMOD Studio is with the proprietary libraries below.
 option(AL_USE_FAUDIO "Enable support for the FAudio audio engine" ON)
 option(AL_USE_OPENAL "Enable support for the OpenAL audio engine" OFF)
 
@@ -143,6 +142,17 @@ cmake_dependent_option(
   "Enable Discord rich presence through the Discord Social SDK"
   ON
   "AL_ENABLE_PROPRIETARY;al_discord_supported"
+  OFF
+)
+
+# FMOD Studio comes from the same registry, and is built for every platform
+# the viewer is; see cmake/FMODSTUDIO.cmake. It takes precedence over the
+# other audio engines when the viewer starts.
+cmake_dependent_option(
+  AL_USE_FMODSTUDIO
+  "Enable support for the FMOD Studio audio engine"
+  OFF
+  "AL_ENABLE_PROPRIETARY"
   OFF
 )
 
@@ -282,6 +292,10 @@ endif()
 
 if(AL_USE_DISCORD)
   list(APPEND VCPKG_MANIFEST_FEATURES "discord")
+endif()
+
+if(AL_USE_FMODSTUDIO)
+  list(APPEND VCPKG_MANIFEST_FEATURES "fmodstudio")
 endif()
 
 # Setup Tracy feature flags

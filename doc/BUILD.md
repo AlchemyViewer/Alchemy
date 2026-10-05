@@ -296,7 +296,7 @@ Ninja and Xcode presets are multi-config; Visual Studio presets always are. Ever
 Override any option at configure time with `-D<NAME>=<VALUE>`. For example:
 
 ```
-cmake -S indra --preset ninja-os -DAL_BUILD_TESTS=ON -DAL_USE_FMODSTUDIO=ON
+cmake -S indra --preset ninja-os -DAL_BUILD_TESTS=ON -DAL_USE_OPENAL=ON
 ```
 
 Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The most commonly used:
@@ -321,7 +321,7 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 |:--------------------|:--------|:---------------------------------------------------------------------|
 | `AL_USE_FAUDIO`     | ON      | FAudio audio engine                                                  |
 | `AL_USE_OPENAL`     | OFF     | OpenAL audio engine                                                  |
-| `AL_USE_FMODSTUDIO` | OFF     | FMOD Studio audio engine (proprietary; `AL_FMODSTUDIO_SDK_DIR` names the SDK, or the Windows installer's registry entry does) |
+| `AL_USE_FMODSTUDIO` | OFF     | FMOD Studio audio engine, which takes precedence over the others (needs `AL_ENABLE_PROPRIETARY` and access to the private registry) |
 
 ### Proprietary SDKs
 

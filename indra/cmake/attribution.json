@@ -37,6 +37,7 @@
     "cef-bin": { "holder": "Copyright (c) 2008-2020 Marshall A. Greenblatt. Portions Copyright (c) 2006-2009 Google Inc." },
     "curl": { "holder": "Copyright (c) 1996-2017 Daniel Stenberg and many contributors" },
     "discord-social-sdk": { "holder": "Copyright (c) Discord Inc.", "license": "LicenseRef-Discord" },
+    "fmodstudio": { "holder": "Made with FMOD Studio by Firelight Technologies Pty Ltd.", "license": "LicenseRef-FMOD" },
     "freetype": { "holder": "Copyright 1996-2002, 2006 David Turner, Robert Wilhelm, and Werner Lemberg" },
     "libiconv": { "holder": "Copyright (C) Free Software Foundation, Inc.; written by Bruno Haible", "license": "LGPL-2.1-or-later" },
     "libjpeg-turbo": { "holder": "Copyright (C) 2009-2026 D. R. Commander; Copyright (C) 1991-2020 Thomas G. Lane, Guido Vollbeding" },
@@ -92,14 +93,6 @@
       "license": "MPL-2.0",
       "homepage": "https://curl.se/docs/caextract.html",
       "notice": "The certificate bundle (ca-bundle.crt) is extracted from Mozilla's root store by the mk-ca-bundle tool.\n\nThis Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, you can obtain one at https://mozilla.org/MPL/2.0/."
-    },
-    {
-      "name": "FMOD Studio",
-      "when": "AL_USE_FMODSTUDIO",
-      "holder": "Made with FMOD Studio by Firelight Technologies Pty Ltd.",
-      "license": "LicenseRef-FMOD",
-      "homepage": "https://www.fmod.com",
-      "notice": "Audio engine: FMOD Studio by Firelight Technologies Pty Ltd. Used under the FMOD End User Licence Agreement, https://www.fmod.com/legal."
     }
   ]
 }

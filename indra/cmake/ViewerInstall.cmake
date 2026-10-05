@@ -180,21 +180,16 @@ if(AL_USE_OPENAL AND NOT WINDOWS)
   )
 endif()
 
-# The SDKs from outside vcpkg ship the library the viewer loads at run time;
-# FMOD's logging build serves the Debug configuration.
-if(AL_USE_FMODSTUDIO AND FMOD_LIBRARY_RELEASE)
-  al_install_shared_library(
-    "${FMOD_LIBRARY_RELEASE}"
-    CONFIGURATIONS
-    OptDebug
-    RelWithDebInfo
-    Release
+# The prebuilt SDKs from the private registry, shared libraries on every
+# platform. Each configuration takes its own: FMOD's logging build is the
+# Debug one.
+if(AL_USE_FMODSTUDIO)
+  install(
+    IMPORTED_RUNTIME_ARTIFACTS unofficial::fmodstudio::fmod
+    RUNTIME DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer
+    LIBRARY DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer
   )
-  al_install_shared_library("${FMOD_LIBRARY_DEBUG}" CONFIGURATIONS Debug)
 endif()
-
-# Discord's prebuilt SDK, a shared library on every platform, from the
-# private registry.
 if(AL_USE_DISCORD)
   install(
     IMPORTED_RUNTIME_ARTIFACTS unofficial::discord-social-sdk::discord-social-sdk

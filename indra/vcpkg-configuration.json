@@ -45,11 +45,12 @@
     },
     {
       "kind": "git",
-      "baseline": "ad3a0c0ff927ee4e7d52a16207ddab592729f3ec",
+      "baseline": "103c8671192a6a84e5e36e8ab1aa5892ee6f12d3",
       "reference": "main",
       "repository": "https://github.com/AlchemyViewer/private-registry",
       "packages": [
-        "discord-social-sdk"
+        "discord-social-sdk",
+        "fmodstudio"
       ]
     }
   ],

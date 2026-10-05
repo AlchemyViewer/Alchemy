@@ -195,6 +195,12 @@
         "faudio"
       ]
     },
+    "fmodstudio": {
+      "description": "Build with support for the FMOD Studio audio engine",
+      "dependencies": [
+        "fmodstudio"
+      ]
+    },
     "hunspell": {
       "description": "Build with support for Hunspell spell-check engine",
       "dependencies": [
