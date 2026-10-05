@@ -31,6 +31,7 @@
 #include "alviewtype.h"
 #include "lluictrl.h"
 
+#include <array>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -156,10 +157,6 @@ public:
     bool ignores(const std::string& what) const;
     bool offersIgnore(const std::string& what) const;
     void setIgnore(const std::string& what, bool ignore);
-    void setIgnoreWhitespace(bool ignore);
-    bool ignoresWhitespace() const { return mModel.likeness().ignoreWhitespace; }
-    void setIgnoreCase(bool ignore);
-    bool ignoresCase() const { return mModel.likeness().ignoreCase; }
     void setOffersIgnoreCase(bool offers);
     // Words that mean the same in the two texts (ALDiffSame) -- an LSL
     // function and the SLua it became -- left unmarked; compared again.
@@ -273,13 +270,27 @@ private:
     typedef ALDiffModel::Layout Layout;
 
     ALCodeEditor* makeSide(const ALCodeEditor::Params& side, const std::string& name);
-    // Each editor filled from the model -- its text, what is said of each
-    // line, the words marked -- and the folds applied.
+    // The comparison as the model now has it: the layout shown filled, the
+    // other left until it is shown; the bands, the folded rows' words, and
+    // the bar.
     void          fill();
+    // Each editor of a layout filled from the model -- its text where that
+    // changed, what is said of each line, the words marked, the notes --
+    // and the folds applied.
+    void          fillLayout(Layout layout);
+    // Whether a layout's editors are as the model is: the one not shown is
+    // filled only as it is shown.
+    bool          filled(Layout layout) const { return !mStale[layout == Layout::Sides ? 0 : 1]; }
     void          arrange();
     // The column of the model an editor shows, and the rows it is in.
     Column        columnOf(const ALCodeEditor* side) const;
     Layout        layoutOf(const ALCodeEditor* side) const { return ALDiffModel::layoutOf(columnOf(side)); }
+    // The sides shown: the left and the right, or the one inline and none.
+    std::array<ALCodeEditor*, 2> shownSides() const { return { mInline ? mInlined : mLeft, mInline ? nullptr : mRight }; }
+    // A side's text, where it is drawn in the view; and how far up it the
+    // top of a row is (topOfRow), scrolled as the side is.
+    LLRect        textFrame(const ALCodeEditor* side) const;
+    S32           rowY(ALCodeEditor* side, S32 row) const;
     // Where the caret is, to keep across a rebuild that changes the rows:
     // its line of the right's text and its column there, and how far down
     // the view its line is.
@@ -291,6 +302,9 @@ private:
     };
     Place         placeOfCaret();
     void          restorePlace(const Place& place);
+    // The model changed and the editors filled again, the caret kept on its
+    // line of the right, which is as it was.
+    void          keepingPlace(const std::function<void()>& change);
     // Words cut by a grammar's tokens, where it is one of code; compared
     // again, the caret kept.
     void          compareBy(const std::shared_ptr<const ALSyntaxGrammar>& grammar);
@@ -311,9 +325,13 @@ private:
     void          drawArrows();
     // Each side's lines hidden and shown as the folds are, each folded
     // run's row a gap above the line after it, which the caret stops on,
-    // and a caret on a line hidden put beside the run.
+    // and a caret on a line hidden put beside the run: every side filled,
+    // or one.
     void          applyFolds();
+    void          applyFolds(ALCodeEditor* side);
     void          openFold(S32 fold);
+    // A folded run opened, and a side's caret put on the first line it hid.
+    void          openFoldAt(ALCodeEditor* side, S32 fold);
     // The side under a point of the view and the fold whose row is there,
     // folded; -1 for none.
     S32           foldAtPoint(S32 x, S32 y, ALCodeEditor** side = nullptr);
@@ -374,6 +392,9 @@ private:
     LLColor4                  mConflictColor;
     // The range the caret is in, -1 for none.
     S32                       mLinked = -1;
+    // Whether each layout's editors wait to be filled: side by side, and
+    // inline.
+    bool                      mStale[2] = { false, false };
     // The grammar words are cut by: none for prose.
     std::shared_ptr<const ALSyntaxGrammar> mLexedBy;
     // Whether letting case go is offered.

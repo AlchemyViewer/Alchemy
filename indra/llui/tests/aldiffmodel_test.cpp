@@ -689,4 +689,109 @@ namespace tut
         m.setTexts(theirs, ours);
         ensure("new texts let it go", !m.merging() && !m.changeConflicts(1));
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<23>()
+    {
+        set_test_name("the lookups that read rather than walk: a row's line below and the rows drawn to it, a change's lines in a column, the right's line's row; as the rows say, each way, swapped, folded and open");
+        // Lines put in alone, taken out alone, changed, a block moved and
+        // runs folded, a change at either end; each lookup against the rows
+        // it reads.
+        std::string left  = "head";
+        std::string right = "move a\nmove b\nmove c";
+        for (S32 n = 0; n < 60; ++n)
+        {
+            const std::string line = "line " + std::to_string(n);
+            left += "\n" + (n == 2 ? std::string("two") : n == 9 ? std::string("nine") : line);
+            if (n != 30)
+            {
+                right += "\n" + (n == 2 ? std::string("TWO") : n == 45 ? std::string("x") : line);
+            }
+            if (n == 38)
+            {
+                right += "\nput in\nput in too";
+            }
+        }
+        left += "\nmove a\nmove b\nmove c\ntail";
+        right += "\nmore\nmore\ntail!";
+        for (const bool swapped : { false, true })
+        {
+            m.setTexts(left, right);
+            m.setSwapped(swapped);
+            ensure("folded", m.foldCount() > 1);
+            bool alone[2] = { false, false };
+            for (S32 change = 0; change < m.changeCount(); ++change)
+            {
+                alone[0] = alone[0] || m.changeLines(change).rightCount == 0;
+                alone[1] = alone[1] || m.changeLines(change).leftCount == 0;
+            }
+            ensure("lines taken out alone, and put in alone", alone[0] && alone[1]);
+            for (const Column c : { Column::Left, Column::Right, Column::Inline })
+            {
+                const Layout layout = ALDiffModel::layoutOf(c);
+                for (S32 row = -1; row <= m.rowCount(layout) + 1; ++row)
+                {
+                    S32 below = m.lineCount(c);
+                    for (S32 at = llmax(0, row); at < m.rowCount(layout); ++at)
+                    {
+                        if (m.lineOfRow(c, at) >= 0)
+                        {
+                            below = m.lineOfRow(c, at);
+                            break;
+                        }
+                    }
+                    ensure_equals("the line below a row", m.lineBelowRow(c, row), below);
+                }
+                for (S32 change = 0; change < m.changeCount(); ++change)
+                {
+                    bool has = false;
+                    for (S32 row = m.changeFirst(layout, change); row < m.changeEnd(layout, change); ++row)
+                    {
+                        has = has || m.lineOfRow(c, row) >= 0;
+                    }
+                    ensure_equals("a change's lines in a column", m.hasLinesIn(c, change), has);
+                }
+                // How far up a gap a row is, its runs folded and open.
+                for (const bool open : { false, true })
+                {
+                    m.setFoldSame(!open);
+                    for (S32 row = -1; row <= m.rowCount(layout) + 1; ++row)
+                    {
+                        S32 drawn = 0;
+                        for (S32 at = llmax(0, row); at < m.rowCount(layout) && m.lineOfRow(c, at) < 0; ++at)
+                        {
+                            drawn += m.rowDrawn(layout, at) ? 1 : 0;
+                        }
+                        ensure_equals("the rows drawn from a row to the line below", m.gapRowsFrom(c, row), drawn);
+                    }
+                }
+                m.setFoldSame(true);
+            }
+            for (const Layout layout : { Layout::Sides, Layout::Inline })
+            {
+                for (S32 line = -1; line <= 36; ++line)
+                {
+                    S32 row = -1;
+                    for (S32 at = 0; at < m.rowCount(layout) && row < 0; ++at)
+                    {
+                        row = line >= 0 && m.rightLineOfRow(layout, at) == line ? at : -1;
+                    }
+                    ensure_equals("the right's line's row", m.rowOfRightLine(layout, line), row);
+                }
+            }
+        }
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<24>()
+    {
+        set_test_name("without a lexer nothing says where a comment is: comments let go of no longer");
+        ALTextDiff::Likeness like;
+        like.ignoreComments = true;
+        m.setLikeness(like);
+        m.setTexts("x = 1; // one", "x = 1; // two");
+        ensure("let go of, but told nothing of where comments are: a change", m.likeness().ignoreComments && m.changeCount() == 1);
+        m.setLexer(nullptr);
+        ensure("let go of no longer", !m.likeness().ignoreComments && m.changeCount() == 1);
+    }
 }

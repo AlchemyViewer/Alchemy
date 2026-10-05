@@ -56,6 +56,18 @@ namespace
     constexpr S32 BRACKET_GAP = 24;
 
     LLColor4 colorOf(const char* name, const LLColor4& otherwise) { return LLUIColorTable::instance().getColor(name, otherwise).get(); }
+
+    // What is let go of in telling lines the same, by the name the bar's
+    // menu has for it; none for a name it does not have.
+    bool* flagOf(ALTextDiff::Likeness& like, const std::string& what)
+    {
+        return what == "whitespace"    ? &like.ignoreWhitespace
+               : what == "trailing"    ? &like.ignoreTrailing
+               : what == "blank_lines" ? &like.ignoreBlankLines
+               : what == "comments"    ? &like.ignoreComments
+               : what == "case"        ? &like.ignoreCase
+                                       : nullptr;
+    }
 }
 
 ALDiffView::Params::Params()
@@ -194,12 +206,12 @@ void ALDiffView::setLeftText(std::string_view left)
     {
         return;
     }
-    // The right as it was, and the caret on its line of it.
-    const Place       place = placeOfCaret();
+    // The right as it was, and the caret on its line of it. What stood for
+    // what, what was said of the left and a merge with it were the other
+    // left's: let go of.
     const std::string right = mModel.rightText();
-    mModel.setTexts(left, right, mModel.ranges());
-    fill();
-    restorePlace(place);
+    keepingPlace([&]() { mModel.setTexts(left, right); });
+    mBar->setMerging(false);
 }
 
 void ALDiffView::setVersions(S32 count, S32 current, version_t chosen)
@@ -273,22 +285,17 @@ void ALDiffView::compareBy(const std::shared_ptr<const ALSyntaxGrammar>& grammar
         return;
     }
     mLexedBy = code;
-    if (!code && mModel.likeness().ignoreComments)
-    {
-        ALTextDiff::Likeness like = mModel.likeness();
-        like.ignoreComments       = false;
-        mModel.setLikeness(like);
-        mBar->setIgnoring(like.any());
-    }
+    // Without one, comments are let go of no longer (ALDiffModel::setLexer).
+    const auto lex = [this, &code]() { mModel.setLexer(code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t()); };
     if (mModel.leftText().empty() && mModel.rightText().empty())
     {
-        mModel.setLexer(code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t());
-        return;
+        lex();
     }
-    const Place place = placeOfCaret();
-    mModel.setLexer(code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t());
-    fill();
-    restorePlace(place);
+    else
+    {
+        keepingPlace(lex);
+    }
+    mBar->setIgnoring(mModel.likeness().any());
 }
 
 void ALDiffView::setFont(const LLFontGL* font)
@@ -309,6 +316,10 @@ void ALDiffView::setInline(bool inline_view)
     const bool  had_keys = hasFocus();
     const Place place    = placeOfCaret();
     mInline              = inline_view;
+    if (!filled(mInline ? Layout::Inline : Layout::Sides))
+    {
+        fillLayout(mInline ? Layout::Inline : Layout::Sides);
+    }
     mBar->setInline(mInline);
     arrange();
     refreshBar();
@@ -327,32 +338,11 @@ void ALDiffView::setSwapped(bool swapped)
     }
     // The keyboard left on the side it was on, which now shows the other
     // text: the place kept is the right's line, wherever that now is.
-    const Place place = placeOfCaret();
-    mModel.setSwapped(swapped);
-    mBar->setSwapped(swapped);
-    arrange();
-    fill();
-    restorePlace(place);
-}
-
-void ALDiffView::setIgnoreWhitespace(bool ignore)
-{
-    if (ignoresWhitespace() != ignore)
-    {
-        ALTextDiff::Likeness like = mModel.likeness();
-        like.ignoreWhitespace     = ignore;
-        setLikeness(like);
-    }
-}
-
-void ALDiffView::setIgnoreCase(bool ignore)
-{
-    if (ignoresCase() != ignore)
-    {
-        ALTextDiff::Likeness like = mModel.likeness();
-        like.ignoreCase           = ignore;
-        setLikeness(like);
-    }
+    keepingPlace([&]() {
+        mModel.setSwapped(swapped);
+        mBar->setSwapped(swapped);
+        arrange();
+    });
 }
 
 void ALDiffView::setOffersIgnoreCase(bool offers)
@@ -360,19 +350,15 @@ void ALDiffView::setOffersIgnoreCase(bool offers)
     mOffersCase = offers;
     if (!offers)
     {
-        setIgnoreCase(false);
+        setIgnore("case", false);
     }
 }
 
 bool ALDiffView::ignores(const std::string& what) const
 {
-    const ALTextDiff::Likeness& like = mModel.likeness();
-    return what == "whitespace"    ? like.ignoreWhitespace
-           : what == "trailing"    ? like.ignoreTrailing
-           : what == "blank_lines" ? like.ignoreBlankLines
-           : what == "comments"    ? like.ignoreComments
-           : what == "case"        ? like.ignoreCase
-                                   : false;
+    ALTextDiff::Likeness like = mModel.likeness();
+    const bool*          flag = flagOf(like, what);
+    return flag && *flag;
 }
 
 bool ALDiffView::offersIgnore(const std::string& what) const
@@ -389,12 +375,7 @@ void ALDiffView::setIgnore(const std::string& what, bool ignore)
         return;
     }
     ALTextDiff::Likeness like = mModel.likeness();
-    bool* flag = what == "whitespace"    ? &like.ignoreWhitespace
-                 : what == "trailing"    ? &like.ignoreTrailing
-                 : what == "blank_lines" ? &like.ignoreBlankLines
-                 : what == "comments"    ? &like.ignoreComments
-                 : what == "case"        ? &like.ignoreCase
-                                         : nullptr;
+    bool*                flag = flagOf(like, what);
     if (flag && *flag != ignore)
     {
         *flag = ignore;
@@ -404,10 +385,7 @@ void ALDiffView::setIgnore(const std::string& what, bool ignore)
 
 void ALDiffView::setSame(ALTextDiff::same_t same)
 {
-    const Place place = placeOfCaret();
-    mModel.setSame(std::move(same));
-    fill();
-    restorePlace(place);
+    keepingPlace([&]() { mModel.setSame(std::move(same)); });
 }
 
 void ALDiffView::setAlgorithm(ALTextDiff::Algorithm algorithm)
@@ -417,20 +395,14 @@ void ALDiffView::setAlgorithm(ALTextDiff::Algorithm algorithm)
         return;
     }
     // The runs folded are others now: folded or not as asked.
-    const Place place = placeOfCaret();
-    mModel.setAlgorithm(algorithm);
-    fill();
-    restorePlace(place);
+    keepingPlace([&]() { mModel.setAlgorithm(algorithm); });
 }
 
 void ALDiffView::setLikeness(const ALTextDiff::Likeness& like)
 {
     mBar->setIgnoring(like.any());
     // The runs folded are others now: folded or not as asked.
-    const Place place = placeOfCaret();
-    mModel.setLikeness(like);
-    fill();
-    restorePlace(place);
+    keepingPlace([&]() { mModel.setLikeness(like); });
 }
 
 void ALDiffView::setOnEscape(std::function<void()> escape)
@@ -442,6 +414,26 @@ void ALDiffView::setOnEscape(std::function<void()> escape)
 ALDiffView::Column ALDiffView::columnOf(const ALCodeEditor* side) const
 {
     return side == mInlined ? Column::Inline : side == mLeft ? Column::Left : Column::Right;
+}
+
+LLRect ALDiffView::textFrame(const ALCodeEditor* side) const
+{
+    const LLRect frame = side->getRect();
+    const LLRect text  = side->textRect();
+    return LLRect(frame.mLeft + text.mLeft, frame.mBottom + text.mTop, frame.mLeft + text.mRight, frame.mBottom + text.mBottom);
+}
+
+S32 ALDiffView::rowY(ALCodeEditor* side, S32 row) const
+{
+    return textFrame(side).mTop - (topOfRow(side, row) - side->scrollY());
+}
+
+void ALDiffView::keepingPlace(const std::function<void()>& change)
+{
+    const Place place = placeOfCaret();
+    change();
+    fill();
+    restorePlace(place);
 }
 
 ALDiffView::Place ALDiffView::placeOfCaret()
@@ -465,8 +457,7 @@ void ALDiffView::restorePlace(const Place& place)
     {
         return;
     }
-    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
-    for (ALCodeEditor* each : sides)
+    for (ALCodeEditor* each : shownSides())
     {
         if (each)
         {
@@ -479,6 +470,37 @@ void ALDiffView::restorePlace(const Place& place)
 }
 
 void ALDiffView::fill()
+{
+    // Both layouts are others now: the one shown filled, the other as it
+    // is shown.
+    mStale[0] = mStale[1] = true;
+    fillLayout(mInline ? Layout::Inline : Layout::Sides);
+    // The bands, and the gap as wide as they need, or not.
+    const S32 was = gap();
+    mBands.clear();
+    for (S32 n = 0; n < static_cast<S32>(mModel.ranges().size()); ++n)
+    {
+        const auto [lf, le] = mModel.rangeRows(n, Column::Left);
+        const auto [rf, re] = mModel.rangeRows(n, Column::Right);
+        if (mModel.rangeBracketed(n) && !(lf == rf && le == lf + 1 && re == rf + 1))
+        {
+            mBands.push_back(n);
+        }
+    }
+    if (gap() != was)
+    {
+        arrange();
+    }
+    mFoldSaid.clear();
+    for (S32 n = 0; n < foldCount(); ++n)
+    {
+        mFoldSaid.push_back(
+            alSaidCount("DiffFoldedLines", mModel.foldLines(n), "\xE2\x8B\xAF 1 line the same \xE2\x8B\xAF", "\xE2\x8B\xAF [COUNT] lines the same \xE2\x8B\xAF"));
+    }
+    refreshBar();
+}
+
+void ALDiffView::fillLayout(Layout layout)
 {
     const LLColor4 out       = colorOf("CodeDiffRemovedColor", LLColor4(0.85f, 0.25f, 0.25f, 0.18f));
     const LLColor4 in        = colorOf("CodeDiffAddedColor", LLColor4(0.25f, 0.75f, 0.35f, 0.18f));
@@ -498,7 +520,11 @@ void ALDiffView::fill()
         // its tint, its mark on the ruler and its sign, as it was taken
         // out or put in; the rows of nothing above it, beside lines the
         // other side has, marked as theirs; and the words that changed.
-        const Column                            column = columnOf(side);
+        const Column column = columnOf(side);
+        if (ALDiffModel::layoutOf(column) != layout)
+        {
+            continue;
+        }
         const S32                               count  = mModel.lineCount(column);
         const LLColor4&                         beside = column == Column::Left ? in_mark : out_mark;
         std::vector<ALTextView::LineAnnotation> said(static_cast<size_t>(count) + 1);
@@ -538,36 +564,24 @@ void ALDiffView::fill()
             below.gapTint      = padding;
             below.gapRulerTint = beside;
         }
-        // The text first: a new text clears what is said of its lines.
-        side->setText(mModel.text(column));
+        // The text first, where it changed: a new text clears what is said
+        // of its lines. A side's text is the whole of one of the texts, so
+        // only the one edited changes; one as it was keeps its place, but
+        // not the lines the folds hid, which are others now.
+        if (side->document().wholeText() != mModel.text(column))
+        {
+            side->setText(mModel.text(column));
+        }
+        else
+        {
+            side->layout().setHidden(ALTextLayout::HiddenBy::Host, 0, side->document().lineCount() - 1, false);
+        }
         side->setLineAnnotations(std::move(said));
         side->setDecorations(std::move(words));
         applyNotes(side);
+        applyFolds(side);
     }
-    // The bands, and the gap as wide as they need, or not.
-    const S32 was = gap();
-    mBands.clear();
-    for (S32 n = 0; n < static_cast<S32>(mModel.ranges().size()); ++n)
-    {
-        const auto [lf, le] = mModel.rangeRows(n, Column::Left);
-        const auto [rf, re] = mModel.rangeRows(n, Column::Right);
-        if (mModel.rangeBracketed(n) && !(lf == rf && le == lf + 1 && re == rf + 1))
-        {
-            mBands.push_back(n);
-        }
-    }
-    if (gap() != was)
-    {
-        arrange();
-    }
-    mFoldSaid.clear();
-    for (S32 n = 0; n < foldCount(); ++n)
-    {
-        mFoldSaid.push_back(
-            alSaidCount("DiffFoldedLines", mModel.foldLines(n), "\xE2\x8B\xAF 1 line the same \xE2\x8B\xAF", "\xE2\x8B\xAF [COUNT] lines the same \xE2\x8B\xAF"));
-    }
-    applyFolds();
-    refreshBar();
+    mStale[layout == Layout::Sides ? 0 : 1] = false;
 }
 
 void ALDiffView::setNotes(std::vector<ALDiffModel::Note> notes)
@@ -575,7 +589,10 @@ void ALDiffView::setNotes(std::vector<ALDiffModel::Note> notes)
     mModel.setNotes(std::move(notes));
     for (ALCodeEditor* side : { mLeft, mRight, mInlined })
     {
-        applyNotes(side);
+        if (filled(layoutOf(side)))
+        {
+            applyNotes(side);
+        }
     }
 }
 
@@ -612,15 +629,13 @@ void ALDiffView::drawLinked()
         {
             continue;
         }
-        const LLRect    frame = side->getRect();
-        const LLRect    text  = side->textRect();
-        const S32       top   = frame.mBottom + text.mTop;
-        const S32       from  = top - (topOfRow(side, first) - side->scrollY());
-        const S32       to    = top - (topOfRow(side, end) - side->scrollY());
-        LLLocalClipRect clip(LLRect(frame.mLeft + text.mLeft, top, frame.mLeft + text.mRight, frame.mBottom + text.mBottom));
+        const LLRect    text = textFrame(side);
+        const S32       from = rowY(side, first);
+        const S32       to   = rowY(side, end);
+        LLLocalClipRect clip(text);
         // The edge inside the change's outline, which may be over it.
-        const S32 edge = frame.mLeft + text.mLeft + LINKED_INSET;
-        gl_rect_2d(frame.mLeft + text.mLeft, from, frame.mLeft + text.mRight, to, mLinkedColor % (0.1f * alpha), true);
+        const S32 edge = text.mLeft + LINKED_INSET;
+        gl_rect_2d(text.mLeft, from, text.mRight, to, mLinkedColor % (0.1f * alpha), true);
         gl_rect_2d(edge, from - LINKED_INSET, edge + LINKED_EDGE, to + LINKED_INSET, mLinkedColor % (0.8f * alpha), true);
     }
 }
@@ -629,18 +644,10 @@ S32 ALDiffView::topOfRow(ALCodeEditor* side, S32 row) const
 {
     // A row with a line: the line's top. A row of nothing: up the gap
     // above the next line by as many rows of it as are drawn from it on.
-    const Column column = columnOf(side);
-    const Layout layout = layoutOf(side);
-    const S32    rows   = mModel.rowCount(layout);
-    S32          at     = llclamp(row, 0, rows);
-    S32          drawn  = 0;
-    for (; at < rows && mModel.lineOfRow(column, at) < 0; ++at)
-    {
-        drawn += mModel.rowDrawn(layout, at) ? 1 : 0;
-    }
-    ALTextLayout& lines = side->layout();
-    const S32     line  = at < rows ? mModel.lineOfRow(column, at) : side->document().lineCount();
-    return lines.lineTop(line) - drawn * lines.rowHeight();
+    const Column  column = columnOf(side);
+    ALTextLayout& lines  = side->layout();
+    const S32     line   = llmin(mModel.lineBelowRow(column, row), side->document().lineCount());
+    return lines.lineTop(line) - mModel.gapRowsFrom(column, row) * lines.rowHeight();
 }
 
 S32 ALDiffView::arrowAtPoint(S32 x, S32 y)
@@ -650,14 +657,13 @@ S32 ALDiffView::arrowAtPoint(S32 x, S32 y)
     {
         return -1;
     }
-    const S32    half  = (getRect().getWidth() - gap()) / 2;
-    const LLRect frame = mRight->getRect();
-    const LLRect text  = mRight->textRect();
-    if (x < half || x >= half + gap() || y > frame.mBottom + text.mTop || y < frame.mBottom + text.mBottom)
+    const S32    half = (getRect().getWidth() - gap()) / 2;
+    const LLRect text = textFrame(mRight);
+    if (x < half || x >= half + gap() || y > text.mTop || y < text.mBottom)
     {
         return -1;
     }
-    const S32 doc_y = (frame.mBottom + text.mTop - y) + mRight->scrollY();
+    const S32 doc_y = (text.mTop - y) + mRight->scrollY();
     const S32 row_h = mRight->layout().rowHeight();
     for (S32 n = 0; n < changeCount(); ++n)
     {
@@ -681,20 +687,18 @@ void ALDiffView::drawArrows()
     const F32       alpha  = getDrawContext().mAlpha;
     const LLFontGL* font   = LLFontGL::getFontSansSerifSmall();
     const S32       half   = (getRect().getWidth() - gap()) / 2;
-    const LLRect    frame  = mRight->getRect();
-    const LLRect    text   = mRight->textRect();
-    const S32       top    = frame.mBottom + text.mTop;
+    const LLRect    text   = textFrame(mRight);
     const S32       height = mRight->layout().rowHeight();
     const LLColor4  ink    = mRight->textColor() % (0.7f * alpha);
     const LLColor4  lit    = mRight->cursorColor() % alpha;
     const char*     arrow  = mModel.swapped() ? "\xE2\x86\x90" : "\xE2\x86\x92";
     // A change's first row partly out of sight cut at the sides' edge, not
     // drawn over the titles or the bar.
-    LLLocalClipRect clip(LLRect(half, top, half + gap(), frame.mBottom + text.mBottom));
+    LLLocalClipRect clip(LLRect(half, text.mTop, half + gap(), text.mBottom));
     for (S32 n = 0; n < changeCount(); ++n)
     {
-        const S32 row_t = top - (topOfRow(mRight, mModel.changeFirst(Layout::Sides, n)) - mRight->scrollY());
-        if (height <= 0 || row_t - height > top || row_t < frame.mBottom + text.mBottom)
+        const S32 row_t = rowY(mRight, mModel.changeFirst(Layout::Sides, n));
+        if (height <= 0 || row_t - height > text.mTop || row_t < text.mBottom)
         {
             continue;
         }
@@ -718,9 +722,8 @@ void ALDiffView::drawCurrentChange()
     {
         return;
     }
-    const F32           alpha   = getDrawContext().mAlpha;
-    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
-    for (ALCodeEditor* side : sides)
+    const F32 alpha = getDrawContext().mAlpha;
+    for (ALCodeEditor* side : shownSides())
     {
         const S32 first = side ? mModel.changeFirst(layoutOf(side), change) : 0;
         const S32 end   = side ? mModel.changeEnd(layoutOf(side), change) : 0;
@@ -728,13 +731,9 @@ void ALDiffView::drawCurrentChange()
         {
             continue;
         }
-        const LLRect    frame = side->getRect();
-        const LLRect    text  = side->textRect();
-        const S32       top   = frame.mBottom + text.mTop;
-        const S32       from  = top - (topOfRow(side, first) - side->scrollY());
-        const S32       to    = top - (topOfRow(side, end) - side->scrollY());
-        LLLocalClipRect clip(LLRect(frame.mLeft + text.mLeft, top, frame.mLeft + text.mRight, frame.mBottom + text.mBottom));
-        gl_rect_2d(frame.mLeft + text.mLeft, from, frame.mLeft + text.mRight - 1, to, mCurrentColor % (0.8f * alpha), false);
+        const LLRect    text = textFrame(side);
+        LLLocalClipRect clip(text);
+        gl_rect_2d(text.mLeft, rowY(side, first), text.mRight - 1, rowY(side, end), mCurrentColor % (0.8f * alpha), false);
     }
 }
 
@@ -747,18 +746,15 @@ void ALDiffView::drawConflicts()
     {
         return;
     }
-    const F32           alpha   = getDrawContext().mAlpha;
-    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
-    for (ALCodeEditor* side : sides)
+    const F32 alpha = getDrawContext().mAlpha;
+    for (ALCodeEditor* side : shownSides())
     {
         if (!side)
         {
             continue;
         }
-        const LLRect    frame = side->getRect();
-        const LLRect    text  = side->textRect();
-        const S32       top   = frame.mBottom + text.mTop;
-        LLLocalClipRect clip(LLRect(frame.mLeft + text.mLeft, top, frame.mLeft + text.mRight, frame.mBottom + text.mBottom));
+        const LLRect    text = textFrame(side);
+        LLLocalClipRect clip(text);
         for (S32 change = 0; change < changeCount(); ++change)
         {
             const S32 first = mModel.changeFirst(layoutOf(side), change);
@@ -767,13 +763,13 @@ void ALDiffView::drawConflicts()
             {
                 continue;
             }
-            const S32 from = top - (topOfRow(side, first) - side->scrollY());
-            const S32 to   = top - (topOfRow(side, end) - side->scrollY());
-            if (to >= top || from <= frame.mBottom + text.mBottom)
+            const S32 from = rowY(side, first);
+            const S32 to   = rowY(side, end);
+            if (to >= text.mTop || from <= text.mBottom)
             {
                 continue;
             }
-            gl_rect_2d(frame.mLeft + text.mLeft, from, frame.mLeft + text.mLeft + CONFLICT_EDGE, to, mConflictColor % alpha);
+            gl_rect_2d(text.mLeft, from, text.mLeft + CONFLICT_EDGE, to, mConflictColor % alpha);
         }
     }
 }
@@ -793,46 +789,50 @@ void ALDiffView::setFoldSame(bool fold)
     ALCodeEditor* side      = shown();
     const S32     below_top = side->layout().lineTop(side->caret().line) - side->scrollY();
     applyFolds();
-    const S32 scroll = llmax(0, side->layout().lineTop(side->caret().line) - below_top);
-    for (ALCodeEditor* each : { mLeft, mRight, mInlined })
-    {
-        each->setScrollY(scroll);
-    }
+    // Side by side, the other side follows.
+    side->setScrollY(llmax(0, side->layout().lineTop(side->caret().line) - below_top));
 }
 
 void ALDiffView::applyFolds()
 {
-    const LLColor4 folded = colorOf("CodeDiffFoldColor", LLColor4(0.5f, 0.5f, 0.5f, 0.14f));
     for (ALCodeEditor* side : { mLeft, mRight, mInlined })
     {
-        const Column  column = columnOf(side);
-        ALTextLayout& layout = side->layout();
-        for (S32 n = 0; n < foldCount(); ++n)
+        if (filled(layoutOf(side)))
         {
-            // Its lines, which are the same lines on every side and so a
-            // line each there; its own row the gap above the line after,
-            // a stop: the caret stops on it going up or down, and Return
-            // there opens it.
-            const bool open  = mModel.foldOpen(n);
-            const S32  first = mModel.foldFirstLine(column, n);
-            layout.setHidden(ALTextLayout::HiddenBy::Host, first, first + mModel.foldLines(n) - 1, !open);
-            const S32                  under = mModel.foldGapLine(column, n);
-            ALTextView::LineAnnotation said  = side->lineAnnotation(under);
-            said.gap                         = open ? 0 : 1;
-            said.gapTint                     = folded;
-            said.gapStop                     = true;
-            side->setLineAnnotation(under, said);
+            applyFolds(side);
         }
-        // A caret left on a line now hidden: under the run's row, or at
-        // the text's end on the line before the run.
-        const S32 at   = side->caret().line;
-        const S32 fold = mModel.foldOfRow(ALDiffModel::layoutOf(column), mModel.rowOfLine(column, at), true);
-        if (fold >= 0 && layout.hidden(at))
-        {
-            const S32 under = mModel.foldGapLine(column, fold);
-            const S32 last  = side->document().lineCount() - 1;
-            side->goTo(ALTextPos(under <= last ? under : llmax(0, mModel.foldFirstLine(column, fold) - 1), 0));
-        }
+    }
+}
+
+void ALDiffView::applyFolds(ALCodeEditor* side)
+{
+    const LLColor4 folded = colorOf("CodeDiffFoldColor", LLColor4(0.5f, 0.5f, 0.5f, 0.14f));
+    const Column   column = columnOf(side);
+    ALTextLayout&  layout = side->layout();
+    for (S32 n = 0; n < foldCount(); ++n)
+    {
+        // Its lines, which are the same lines on every side and so a line
+        // each there; its own row the gap above the line after, a stop: the
+        // caret stops on it going up or down, and Return there opens it.
+        const bool open  = mModel.foldOpen(n);
+        const S32  first = mModel.foldFirstLine(column, n);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, first, first + mModel.foldLines(n) - 1, !open);
+        const S32                  under = mModel.foldGapLine(column, n);
+        ALTextView::LineAnnotation said  = side->lineAnnotation(under);
+        said.gap                         = open ? 0 : 1;
+        said.gapTint                     = folded;
+        said.gapStop                     = true;
+        side->setLineAnnotation(under, said);
+    }
+    // A caret left on a line now hidden: under the run's row, or at the
+    // text's end on the line before the run.
+    const S32 at   = side->caret().line;
+    const S32 fold = mModel.foldOfRow(ALDiffModel::layoutOf(column), mModel.rowOfLine(column, at), true);
+    if (fold >= 0 && layout.hidden(at))
+    {
+        const S32 under = mModel.foldGapLine(column, fold);
+        const S32 last  = side->document().lineCount() - 1;
+        side->goTo(ALTextPos(under <= last ? under : llmax(0, mModel.foldFirstLine(column, fold) - 1), 0));
     }
 }
 
@@ -842,10 +842,16 @@ void ALDiffView::openFold(S32 fold)
     applyFolds();
 }
 
+void ALDiffView::openFoldAt(ALCodeEditor* side, S32 fold)
+{
+    const S32 first = mModel.foldFirstLine(columnOf(side), fold);
+    openFold(fold);
+    side->goTo(ALTextPos(first, 0));
+}
+
 S32 ALDiffView::foldAtPoint(S32 x, S32 y, ALCodeEditor** under)
 {
-    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
-    for (ALCodeEditor* side : sides)
+    for (ALCodeEditor* side : shownSides())
     {
         const LLRect frame = side ? side->getRect() : LLRect();
         if (!side || !frame.pointInRect(x, y))
@@ -875,8 +881,7 @@ S32 ALDiffView::foldAtPoint(S32 x, S32 y, ALCodeEditor** under)
 bool ALDiffView::moveAtPoint(S32 x, S32 y, ALCodeEditor** under, S32* at_line)
 {
     // In a side's gutter, beside a line of a block moved.
-    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
-    for (ALCodeEditor* side : sides)
+    for (ALCodeEditor* side : shownSides())
     {
         const LLRect frame = side ? side->getRect() : LLRect();
         if (!side || !frame.pointInRect(x, y))
@@ -916,8 +921,7 @@ void ALDiffView::goToMoved(ALCodeEditor* side, S32 line)
 
 bool ALDiffView::handleMouseDown(S32 x, S32 y, MASK mask)
 {
-    // A folded row opened, the caret put on the first line it hid, on the
-    // side pressed, which takes the keyboard.
+    // An arrow in the gap: its change taken back.
     if (const S32 change = arrowAtPoint(x, y); change >= 0)
     {
         takeBack(change);
@@ -931,15 +935,15 @@ bool ALDiffView::handleMouseDown(S32 x, S32 y, MASK mask)
         goToMoved(moved_side, moved_line);
         return true;
     }
+    // A folded row opened, the caret put on the first line it hid, on the
+    // side pressed, which takes the keyboard.
     ALCodeEditor* side = nullptr;
     const S32     fold = foldAtPoint(x, y, &side);
     if (fold < 0)
     {
         return LLUICtrl::handleMouseDown(x, y, mask);
     }
-    const S32 first = mModel.foldFirstLine(columnOf(side), fold);
-    openFold(fold);
-    side->goTo(ALTextPos(first, 0));
+    openFoldAt(side, fold);
     side->setFocus(true);
     return true;
 }
@@ -964,21 +968,17 @@ void ALDiffView::drawFoldRows()
 {
     // Over each folded run's row, how many lines it stands for: the row is
     // a gap, which the side draws tinted, and this is said over it.
-    const F32           alpha   = getDrawContext().mAlpha;
-    const LLFontGL*     font    = LLFontGL::getFontSansSerifSmall();
-    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
-    for (ALCodeEditor* side : sides)
+    const F32       alpha = getDrawContext().mAlpha;
+    const LLFontGL* font  = LLFontGL::getFontSansSerifSmall();
+    for (ALCodeEditor* side : shownSides())
     {
         if (!side)
         {
             continue;
         }
         const Column    column = columnOf(side);
-        const LLRect    frame  = side->getRect();
-        const LLRect    text   = side->textRect();
-        const S32       top    = frame.mBottom + text.mTop;
-        const S32       left   = frame.mLeft + text.mLeft;
-        LLLocalClipRect clip(LLRect(left, top, frame.mLeft + text.mRight, frame.mBottom + text.mBottom));
+        const LLRect    text   = textFrame(side);
+        LLLocalClipRect clip(text);
         const LLColor4  ink    = side->textColor() % (0.6f * alpha);
         const S32       height = side->layout().rowHeight();
         const S32       stood  = side->hasFocus() ? mModel.foldOfGap(column, side->caretGap()) : -1;
@@ -988,8 +988,8 @@ void ALDiffView::drawFoldRows()
             {
                 continue;
             }
-            const S32 row_t = top - (topOfRow(side, mModel.foldRow(layoutOf(side), n)) - side->scrollY());
-            if (row_t - height > top || row_t < frame.mBottom + text.mBottom)
+            const S32 row_t = rowY(side, mModel.foldRow(layoutOf(side), n));
+            if (row_t - height > text.mTop || row_t < text.mBottom)
             {
                 continue;
             }
@@ -997,10 +997,10 @@ void ALDiffView::drawFoldRows()
             // line the caret is on would be.
             if (n == stood)
             {
-                gl_rect_2d(left, row_t, frame.mLeft + text.mRight, row_t - height, side->textColor() % (0.1f * alpha));
-                gl_rect_2d(left, row_t, frame.mLeft + text.mRight - 1, row_t - height + 1, side->cursorColor() % (0.8f * alpha), false);
+                gl_rect_2d(text.mLeft, row_t, text.mRight, row_t - height, side->textColor() % (0.1f * alpha));
+                gl_rect_2d(text.mLeft, row_t, text.mRight - 1, row_t - height + 1, side->cursorColor() % (0.8f * alpha), false);
             }
-            font->renderUTF8(mFoldSaid[static_cast<size_t>(n)], 0, left + 8, row_t - height / 2, ink, LLFontGL::LEFT, LLFontGL::VCENTER);
+            font->renderUTF8(mFoldSaid[static_cast<size_t>(n)], 0, text.mLeft + 8, row_t - height / 2, ink, LLFontGL::LEFT, LLFontGL::VCENTER);
         }
     }
 }
@@ -1087,11 +1087,9 @@ void ALDiffView::drawRanges()
     const S32    half   = (getRect().getWidth() - gap()) / 2;
     const S32    x0     = half + 1;
     const S32    x1     = half + gap() - 2;
-    const LLRect frame  = mRight->getRect();
-    const LLRect text   = mRight->textRect();
-    const S32    top    = frame.mBottom + text.mTop;
-    const S32    bottom = frame.mBottom + text.mBottom;
-    const auto   yOf    = [&](ALCodeEditor* side, S32 row) { return top - (topOfRow(side, row) - side->scrollY()); };
+    const LLRect text   = textFrame(mRight);
+    const S32    top    = text.mTop;
+    const S32    bottom = text.mBottom;
     LLLocalClipRect clip(LLRect(half, top, half + gap(), bottom));
     for (const S32 n : mBands)
     {
@@ -1101,10 +1099,10 @@ void ALDiffView::drawRanges()
         const LLColor4 edge   = linked ? mLinkedColor % (0.8f * alpha) : mRight->textColor() % (0.35f * alpha);
         const auto [lf, le] = mModel.rangeRows(n, Column::Left);
         const auto [rf, re] = mModel.rangeRows(n, Column::Right);
-        const S32 lt = yOf(mLeft, lf);
-        const S32 lb = yOf(mLeft, le);
-        const S32 rt = yOf(mRight, rf);
-        const S32 rb = yOf(mRight, re);
+        const S32 lt = rowY(mLeft, lf);
+        const S32 lb = rowY(mLeft, le);
+        const S32 rt = rowY(mRight, rf);
+        const S32 rb = rowY(mRight, re);
         if ((lb > top && rb > top) || (lt < bottom && rt < bottom) || (lt == lb && rt == rb))
         {
             continue;
@@ -1203,10 +1201,7 @@ bool ALDiffView::goToChange(bool forward)
     }
     // Both sides, which are lined up, at the change: the one in front
     // scrolled to it, and the other following it there as it is drawn.
-    // (An array of their own: a list picked by ?: would be a temporary
-    // gone before the loop reads it.)
-    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
-    for (ALCodeEditor* each : sides)
+    for (ALCodeEditor* each : shownSides())
     {
         if (each)
         {
@@ -1246,9 +1241,7 @@ bool ALDiffView::handleKeyHere(KEY key, MASK mask)
         ALCodeEditor* side = shown();
         if (const S32 fold = mModel.foldOfGap(columnOf(side), side->caretGap()); fold >= 0)
         {
-            const S32 first = mModel.foldFirstLine(columnOf(side), fold);
-            openFold(fold);
-            side->goTo(ALTextPos(first, 0));
+            openFoldAt(side, fold);
             return true;
         }
     }
@@ -1293,16 +1286,19 @@ void ALDiffView::refreshBar()
 {
     refreshLinked();
     // The change the caret is in, and the steps there are from it.
+    const ALCodeEditor* side   = shown();
+    const Column        column = columnOf(side);
+    const S32           line   = side->caret().line;
+    const S32           change = mModel.changeOfLine(column, line);
     mBar->setFellBack(mModel.fellBack());
-    mBar->setCount(changeAtCaret(), changeCount());
+    mBar->setCount(change, changeCount());
     mBar->setTakeBackShown(mTakeBack != nullptr);
-    mBar->setTakeBackEnabled(mTakeBack && changeAtCaret() >= 0);
+    mBar->setTakeBackEnabled(mTakeBack && change >= 0);
     if (mModel.merging())
     {
-        mBar->setConflicts(mModel.conflictCount(), mTakeBack && mModel.changeConflicts(changeAtCaret()));
+        mBar->setConflicts(mModel.conflictCount(), mTakeBack && mModel.changeConflicts(change));
     }
-    const ALCodeEditor* side = shown();
-    mBar->setSteps(mModel.changeStep(columnOf(side), side->caret().line, false) >= 0, mModel.changeStep(columnOf(side), side->caret().line, true) >= 0);
+    mBar->setSteps(mModel.changeStep(column, line, false) >= 0, mModel.changeStep(column, line, true) >= 0);
 }
 
 void ALDiffView::followScroll(ALCodeEditor* from)

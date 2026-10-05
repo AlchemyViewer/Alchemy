@@ -147,7 +147,8 @@ public:
     bool    fellBack() const { return mFellBack; }
     // How lines are cut into words -- a grammar's tokens, or none for their
     // bytes alone -- and so which lines of a change pair and what is
-    // marked in them.
+    // marked in them. Without one nothing says where a comment is: none
+    // let go of.
     void    setLexer(ALTextDiff::lexer_t lexer);
 
     const std::string&           leftText() const { return mLeftText; }
@@ -187,6 +188,10 @@ public:
     // Whether a row with no line is drawn: a fold's own row only while its
     // run is folded.
     bool rowDrawn(Layout layout, S32 row) const;
+    // How many rows drawn there are from a row to the line below it, or to
+    // the text's end: how far up the gap above that line the row is.
+    // Nought for a row with a line.
+    S32  gapRowsFrom(Column column, S32 row) const;
     // The line of the right's text at a row, -1 for none; and the row
     // that has a line of it, -1 for none.
     S32  rightLineOfRow(Layout layout, S32 row) const;
@@ -356,6 +361,14 @@ private:
     };
 
     static size_t     index(Layout layout) { return layout == Layout::Sides ? 0 : 1; }
+    // The texts as shown on the left and on the right: as given, or
+    // swapped.
+    const std::vector<std::string>& shownLeft() const { return mSwapped ? mRightLines : mLeftLines; }
+    const std::vector<std::string>& shownRight() const { return mSwapped ? mLeftLines : mRightLines; }
+    // Each line's regions of the texts as shown, where a grammar cuts their
+    // words and answers a line each; none else.
+    typedef const std::vector<ALTextDiff::regions_t>* line_regions_t;
+    std::pair<line_regions_t, line_regions_t> shownRegions() const;
     const ColumnData& of(Column column) const { return mColumns[static_cast<size_t>(column)]; }
     ColumnData&       of(Column column) { return mColumns[static_cast<size_t>(column)]; }
     // A line added to a column, a row of nothing that is a row of the gap

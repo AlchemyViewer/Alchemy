@@ -708,12 +708,12 @@ namespace tut
         set_test_name("whitespace let go of: re-indented lines the same, shown as they are, the caret kept, the bar lit; case only where offered");
         ALDiffView& d = make("default\n{\nstate_entry()\n{\nllSay(0, \"a\");\n}\n}", "default\n{\n    state_entry()\n    {\n        llSay(0,  \"b\");\n    }\n}");
         ensure_equals("as they are: the re-indented lines changed", d.changeCount(), 1);
-        ensure("off", !d.ignoresWhitespace());
+        ensure("off", !d.ignores("whitespace"));
         d.right()->setFocus(true);
         d.right()->goTo(ALTextPos(numbersOf(d.right()).size() - 1, 0));
         const S32 line = d.rightAtCaret().first;
         d.setIgnore("whitespace", true);
-        ensure("on, and the bar's button lit", d.ignoresWhitespace() && ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
+        ensure("on, and the bar's button lit", d.ignores("whitespace") && ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
         ensure_equals("one line changed: the word, not its indent", d.changeCount(), 1);
         ensure("the right shown as it is", d.right()->text().find("\n    state_entry()\n") != std::string::npos);
         ensure("the caret kept", d.rightAtCaret().first == line);
@@ -723,15 +723,15 @@ namespace tut
 
         ensure("case not offered", !d.offersIgnore("case"));
         d.setIgnore("case", true);
-        ensure("nor taken", !d.ignoresCase());
+        ensure("nor taken", !d.ignores("case"));
         d.setTexts("Hello there", "hello there");
         ensure_equals("a change of case a change", d.changeCount(), 1);
         d.setOffersIgnoreCase(true);
         ensure("offered", d.offersIgnore("case"));
         d.setIgnore("case", true);
-        ensure("let go of", d.ignoresCase() && d.changeCount() == 0);
+        ensure("let go of", d.ignores("case") && d.changeCount() == 0);
         d.setOffersIgnoreCase(false);
-        ensure("not offered: not let go of", !d.ignoresCase() && d.changeCount() == 1);
+        ensure("not offered: not let go of", !d.ignores("case") && d.changeCount() == 1);
     }
 
     template<> template<>
@@ -1061,5 +1061,54 @@ namespace tut
         ensure("nothing copied", !d.copyChange(0) && clipboard() == "kept");
         d.setTexts("same", "same");
         ensure("the same: no diff", d.unifiedDiff().empty() && !d.copyUnifiedDiff() && clipboard() == "kept");
+    }
+
+    template<> template<>
+    void aldiffview_object::test<31>()
+    {
+        set_test_name("the layout not shown filled as it is shown; a side whose text is as it was not put in again, its folds as they now are");
+        ALDiffView& d = make(lines(40).c_str(), lines(40, { { 5, "five" } }).c_str());
+        ensure("side by side: inline not filled yet", d.inlined()->text().empty());
+        d.setInline(true);
+        ensure_equals("filled as it is shown", d.inlined()->text(), lines(5) + "\nline 5\nfive\n" + lines(40).substr(lines(6).size() + 1));
+        ensure("its folds", hidden(d.inlined(), 20));
+        d.setInline(false);
+
+        // Typed in the right far down: the left's text the same, its runs
+        // folded otherwise -- line 35 now beside the change's context.
+        ensure("folded to the end", hidden(d.left(), 35) && hidden(d.left(), 20));
+        const U32 left_was = d.left()->document().version();
+        d.setRightText(lines(40, { { 5, "five" }, { 30, "thirty" } }));
+        ensure_equals("the left not put in again", d.left()->document().version(), left_was);
+        ensure("its lines folded as the runs now are", !hidden(d.left(), 35) && hidden(d.left(), 20) && !hidden(d.left(), 30));
+        ensure("the right's too", !hidden(d.right(), 35) && hidden(d.right(), 20));
+        d.setInline(true);
+        ensure("inline filled again as it is shown", d.inlined()->text().find("thirty") != std::string::npos && !hidden(d.inlined(), 38));
+    }
+
+    template<> template<>
+    void aldiffview_object::test<32>()
+    {
+        set_test_name("another left lets a merge go, the bar's too, and the old left's ranges; a grammar gone lets comments go, the bar unlit");
+        const std::string base   = lines(8);
+        const std::string theirs = lines(8, { { 6, "theirs 6" } });
+        const std::string ours   = lines(8, { { 6, "mine 6" } });
+        ALDiffView&       d      = make(theirs.c_str(), ours.c_str());
+        d.setOnTakeBack([](const ALTextRange&, const std::string&) { return true; });
+        d.setTexts(theirs, ours, { { 6, 6, 6, 6 } });
+        d.setMergeBase(base);
+        ensure("merging", d.merging() && d.bar()->getChild<LLView>("take_theirs")->getVisible() && d.model().ranges().size() == 1);
+        d.setLeftText(lines(8, { { 6, "older 6" } }));
+        ensure("merging no longer, the bar too", !d.merging() && !d.bar()->getChild<LLView>("take_theirs")->getVisible() &&
+                                                       d.bar()->countSaid().find("conflict") == std::string::npos);
+        ensure("the ranges let go", d.model().ranges().empty());
+
+        d.setTexts("x = 1; // one", "x = 1; // two");
+        d.setIgnore("comments", true);
+        ensure("comments let go of: no change, the bar lit",
+               d.ignores("comments") && d.changeCount() == 0 && ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
+        d.setGrammar(nullptr);
+        ensure("no grammar: not let go of, nor offered, the bar unlit", !d.ignores("comments") && !d.offersIgnore("comments") && d.changeCount() == 1 &&
+                                                                       !ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
     }
 }
