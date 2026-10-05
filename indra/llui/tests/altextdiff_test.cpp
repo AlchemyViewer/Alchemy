@@ -31,6 +31,7 @@
 #include "aldiffsplice.h"
 #include "allinepairs.h"
 #include "alstructuraldiff.h"
+#include "altextmerge.h"
 
 #include "../test/lltut.h"
 
@@ -925,5 +926,133 @@ namespace tut
         const std::vector<std::string> theirs = numbered(ALStructuralDiff::MOST_TOKENS / 2 + 1, "theirs ");
         const Result                   big    = ALStructuralDiff::compare(mine, theirs, ALTextDiff::Options());
         ensure("too large: by lines, said so", big.tooLarge && !big.leftByTokens[0] && big.leftMarks[0].empty());
+    }
+
+    template<> template<>
+    void altextdiff_object::test<22>()
+    {
+        set_test_name("three ways: what each changed of the base in hunks -- the same, ours, theirs, both alike, a conflict; changes next to each other one; a block moved by one and changed by the other a conflict");
+        typedef ALTextMerge::Kind K;
+        typedef ALTextMerge::Hunk H;
+        const std::vector<std::string> base   = { "a", "b", "c", "d", "e", "f", "g", "h" };
+        std::vector<std::string>       ours   = base;
+        std::vector<std::string>       theirs = base;
+        ours[1]                               = "B";          // ours only
+        theirs[3]                             = "D";          // theirs only
+        ours[5]                               = "F";          // both alike
+        theirs[5]                             = "F";
+        ours[7]                               = "H mine";     // both otherwise
+        theirs[7]                             = "H theirs";
+        const ALTextMerge::hunks_t hunks = ALTextMerge::merge(base, ours, theirs);
+        std::vector<K>             kinds;
+        for (const H& hunk : hunks)
+        {
+            kinds.push_back(hunk.kind);
+        }
+        ensure("each kind, in order", kinds == std::vector<K>{ K::Same, K::Ours, K::Same, K::Theirs, K::Same, K::Both, K::Same, K::Conflict });
+        ensure("a hunk's lines in each", hunks[7] == H{ K::Conflict, 7, 1, 7, 1, 7, 1 } && hunks[0] == H{ K::Same, 0, 1, 0, 1, 0, 1 });
+        S32 covered = 0;
+        for (const H& hunk : hunks)
+        {
+            ensure_equals("in order, covering the base", hunk.base, covered);
+            covered += hunk.baseCount;
+        }
+        ensure_equals("all of it", covered, static_cast<S32>(base.size()));
+        const std::vector<std::string> taken = ALTextMerge::merged(base, ours, theirs, hunks, [](S32) { return ALTextMerge::Take::Theirs; });
+        ensure("merged: each side's own, the conflict as taken", taken == std::vector<std::string>{ "a", "B", "c", "D", "e", "F", "g", "H theirs" });
+        const std::vector<std::string> both = ALTextMerge::merged(base, ours, theirs, hunks, [](S32) { return ALTextMerge::Take::OursThenTheirs; });
+        ensure("or both", both.size() == 9 && both[7] == "H mine" && both[8] == "H theirs");
+
+        // Lines put in and taken out move the rest on.
+        std::vector<std::string> grown = base;
+        grown.insert(grown.begin() + 2, { "x", "y" });
+        std::vector<std::string> shrunk = base;
+        shrunk.erase(shrunk.begin() + 6);
+        const ALTextMerge::hunks_t moved_on = ALTextMerge::merge(base, grown, shrunk);
+        ensure("ours put in, theirs took out, apart: no conflict",
+               std::none_of(moved_on.begin(), moved_on.end(), [](const H& hunk) { return hunk.kind == K::Conflict; }));
+        ensure("merged: both", ALTextMerge::merged(base, grown, shrunk, moved_on, nullptr) ==
+                                   std::vector<std::string>{ "a", "b", "x", "y", "c", "d", "e", "f", "h" });
+
+        // Changes on lines next to each other: one hunk, a conflict.
+        std::vector<std::string> one = base;
+        std::vector<std::string> two = base;
+        one[2]                       = "C";
+        two[3]                       = "D";
+        const ALTextMerge::hunks_t near = ALTextMerge::merge(base, one, two);
+        ensure("next to each other: one conflict", std::count_if(near.begin(), near.end(), [](const H& hunk) { return hunk.kind == K::Conflict; }) == 1 &&
+                                                       near.size() == 3 && near[1].baseCount == 2);
+        // Both put lines in at the same place: a conflict, unless alike.
+        std::vector<std::string> in_one = base;
+        std::vector<std::string> in_two = base;
+        in_one.insert(in_one.begin() + 4, "mine");
+        in_two.insert(in_two.begin() + 4, "theirs");
+        ensure("put in at one place", ALTextMerge::merge(base, in_one, in_two)[1].kind == K::Conflict);
+        ensure("alike", ALTextMerge::merge(base, in_one, in_one)[1].kind == K::Both);
+
+        // A block moved down by ours, a line in it changed by theirs where
+        // it was: a conflict, left so.
+        const std::vector<std::string> blocky = { "keep", "m1", "m2", "m3", "x", "y", "z", "w" };
+        const std::vector<std::string> mover  = { "keep", "x", "y", "z", "w", "m1", "m2", "m3" };
+        std::vector<std::string>       editor = blocky;
+        editor[2]                             = "m2 changed";
+        const ALTextMerge::hunks_t crossed = ALTextMerge::merge(blocky, mover, editor);
+        ensure("a conflict", std::any_of(crossed.begin(), crossed.end(), [](const H& hunk) { return hunk.kind == K::Conflict; }));
+        ensure("nothing changed: one hunk the same", ALTextMerge::merge(base, base, base) == ALTextMerge::hunks_t{ H{ K::Same, 0, 8, 0, 8, 0, 8 } });
+
+        // Any three: the hunks cover each text in order, and taking ours of
+        // each conflict makes ours where theirs changed nothing.
+        std::mt19937                       random(31);
+        const std::vector<std::string>     pieces = { "{", "}", "", "a", "b", "c", "x;", "y;" };
+        std::uniform_int_distribution<int> piece(0, static_cast<int>(pieces.size()) - 1);
+        const auto                         edit = [&](std::vector<std::string> text) {
+            for (S32 n = static_cast<S32>(random() % 4); n > 0; --n)
+            {
+                const size_t at = text.empty() ? 0 : random() % text.size();
+                switch (random() % 3)
+                {
+                    case 0:
+                        text.insert(text.begin() + static_cast<std::ptrdiff_t>(at), pieces[static_cast<size_t>(piece(random))]);
+                        break;
+                    case 1:
+                        if (!text.empty())
+                        {
+                            text.erase(text.begin() + static_cast<std::ptrdiff_t>(at));
+                        }
+                        break;
+                    default:
+                        if (!text.empty())
+                        {
+                            text[at] += "!";
+                        }
+                        break;
+                }
+            }
+            return text;
+        };
+        for (S32 round = 0; round < 300; ++round)
+        {
+            std::vector<std::string> start;
+            for (S32 n = static_cast<S32>(random() % 30); n > 0; --n)
+            {
+                start.push_back(pieces[static_cast<size_t>(piece(random))]);
+            }
+            const std::vector<std::string> mine   = edit(start);
+            const std::vector<std::string> theirs_now = round % 4 == 0 ? start : edit(start);
+            const ALTextMerge::hunks_t     walked = ALTextMerge::merge(start, mine, theirs_now);
+            S32                            b = 0, o = 0, t = 0;
+            for (const H& hunk : walked)
+            {
+                ensure("in order", hunk.base == b && hunk.ours == o && hunk.theirs == t);
+                b += hunk.baseCount;
+                o += hunk.oursCount;
+                t += hunk.theirsCount;
+            }
+            ensure("covering all three", b == static_cast<S32>(start.size()) && o == static_cast<S32>(mine.size()) && t == static_cast<S32>(theirs_now.size()));
+            if (round % 4 == 0)
+            {
+                ensure("theirs unchanged: ours", ALTextMerge::merged(start, mine, theirs_now, walked, nullptr) == mine);
+            }
+        }
     }
 }

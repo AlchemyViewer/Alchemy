@@ -146,6 +146,7 @@ target_sources(
     diff/allinediff.cpp
     diff/allinepairs.cpp
     diff/alstructuraldiff.cpp
+    diff/altextmerge.cpp
     diff/alworddiff.cpp
     studio/aldockpanel.cpp
     studio/alemptystate.cpp
@@ -372,6 +373,7 @@ target_sources(
         diff/allinediff.h
         diff/allinepairs.h
         diff/alstructuraldiff.h
+        diff/altextmerge.h
         diff/alworddiff.h
         studio/aldockpanel.h
         studio/alemptystate.h
@@ -553,6 +555,7 @@ if(AL_BUILD_TESTS)
     diff/allinediff.cpp
     diff/allinepairs.cpp
     diff/alstructuraldiff.cpp
+    diff/altextmerge.cpp
     diff/alworddiff.cpp
   )
   al_add_test(altextdiff UNIT PROJECT llui DIR diff SOURCES ${diff_sources} LIBRARIES ${test_libs})
