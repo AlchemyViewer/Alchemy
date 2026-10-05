@@ -36,34 +36,37 @@ namespace
     const std::string EMPTY_LINE;
 
     // Lines out of text, whatever its line endings: CRLF and a lone CR read
-    // as LF.
+    // as LF. The breaks are counted first, so that the list is made once,
+    // and each line is made at once, as long as it is: a script loaded is
+    // tens of thousands of lines.
     void splitLines(std::string_view text, std::vector<std::string>& out)
     {
         out.clear();
-        std::string current;
-        for (size_t i = 0; i < text.size(); ++i)
+        out.reserve(static_cast<size_t>(std::count(text.begin(), text.end(), '\n')) + 1);
+        // The next CR, found again only once it is behind: a text with
+        // none, or one far on, is not searched for it at every line.
+        constexpr size_t NONE    = std::string_view::npos;
+        size_t           next_cr = text.find('\r');
+        size_t           start   = 0;
+        while (true)
         {
-            const char c = text[i];
-            if (c == '\r')
+            if (next_cr != NONE && next_cr < start)
             {
-                out.push_back(std::move(current));
-                current.clear();
-                if (i + 1 < text.size() && text[i + 1] == '\n')
-                {
-                    ++i;
-                }
+                next_cr = text.find('\r', start);
             }
-            else if (c == '\n')
+            const size_t at = std::min(text.find('\n', start), next_cr);
+            if (at == NONE)
             {
-                out.push_back(std::move(current));
-                current.clear();
+                out.emplace_back(text.substr(start));
+                return;
             }
-            else
+            out.emplace_back(text.substr(start, at - start));
+            start = at + 1;
+            if (text[at] == '\r' && start < text.size() && text[start] == '\n')
             {
-                current.push_back(c);
+                ++start;
             }
         }
-        out.push_back(std::move(current));
     }
 
     std::string joinLines(const std::vector<std::string>& lines)
@@ -378,7 +381,15 @@ std::string ALTextDocument::text(const ALTextRange& range_in) const
     {
         return mLines[range.begin.line].substr(range.begin.column, range.end.column - range.begin.column);
     }
-    std::string out = mLines[range.begin.line].substr(range.begin.column);
+    // As long as it will be, before any of it: a whole text is long.
+    size_t size = mLines[range.begin.line].size() - static_cast<size_t>(range.begin.column) + static_cast<size_t>(range.end.column) + 1;
+    for (S32 l = range.begin.line + 1; l < range.end.line; ++l)
+    {
+        size += mLines[l].size() + 1;
+    }
+    std::string out;
+    out.reserve(size);
+    out.append(mLines[range.begin.line], static_cast<size_t>(range.begin.column), std::string::npos);
     for (S32 l = range.begin.line + 1; l < range.end.line; ++l)
     {
         out.push_back('\n');
