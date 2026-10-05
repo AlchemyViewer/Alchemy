@@ -76,6 +76,7 @@ ALDiffBar::ALDiffBar(const Params& p)
     mInlineButton   = flat("inline", "\xE2\x96\xA4", false, alSaid("DiffBarInline", "Show the changes inline, in one text"));
     mSwapButton     = flat("swap", "\xE2\x87\x84", false, alSaid("DiffBarSwap", "Swap the sides"));
     mDoneButton     = flat("done", "\xC3\x97", false, alSaid("DiffBarDone", "Back to the text"));
+    mTakeBackButton = flat("take_back", "\xE2\x86\xB6", false, alSaid("DiffBarTakeBack", "Take this change back"));
     mPreviousButton->setKey(KEY_F7, MASK_SHIFT);
     mNextButton->setKey(KEY_F7, MASK_NONE);
     mDoneButton->setKey(KEY_ESCAPE, MASK_NONE);
@@ -85,6 +86,8 @@ ALDiffBar::ALDiffBar(const Params& p)
     mInlineButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mInline(); });
     mSwapButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSwap(); });
     mDoneButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mDone(); });
+    mTakeBackButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mTakeBack(); });
+    mTakeBackButton->setVisible(false);
 
     setCount(-1, 0);
     layout();
@@ -158,12 +161,26 @@ void ALDiffBar::setDoneShown(bool shown)
     layout();
 }
 
+void ALDiffBar::setTakeBackShown(bool shown)
+{
+    if (mTakeBackButton->getVisible() != shown)
+    {
+        mTakeBackButton->setVisible(shown);
+        layout();
+    }
+}
+
+void ALDiffBar::setTakeBackEnabled(bool enabled)
+{
+    mTakeBackButton->setEnabled(enabled);
+}
+
 void ALDiffBar::setColors(const LLColor4& background, const LLColor4& ink)
 {
     mBgColor              = ALSurface::ground(background, ink);
     mInkColor             = ink;
     const LLColor4 chosen = ALSurface::chosen(background, ink);
-    for (ALFlatButton* glyph : { mPreviousButton, mNextButton, mFoldButton, mInlineButton, mSwapButton, mDoneButton })
+    for (ALFlatButton* glyph : { mPreviousButton, mNextButton, mFoldButton, mInlineButton, mSwapButton, mDoneButton, mTakeBackButton })
     {
         glyph->setInk(ink);
         glyph->setLit(chosen);
@@ -188,8 +205,9 @@ void ALDiffBar::draw()
 
 void ALDiffBar::layout()
 {
-    // The buttons at the right, in twos and threes -- the steps, the ways
-    // of showing, done -- and the count over what is left at the left.
+    // The buttons at the right, in ones, twos and threes -- the steps,
+    // taking a change back, the ways of showing, done -- and the count over
+    // what is left at the left.
     const S32 width = getRect().getWidth();
     const S32 top   = getRect().getHeight() - PAD;
     S32       right = width - PAD;
@@ -206,6 +224,11 @@ void ALDiffBar::layout()
     place(mInlineButton);
     place(mFoldButton);
     right -= GAP;
+    if (mTakeBackButton->getVisible())
+    {
+        place(mTakeBackButton);
+        right -= GAP;
+    }
     place(mNextButton);
     place(mPreviousButton);
     mCount->setShape(LLRect(PAD, top, llmax(PAD, right - GAP), top - ROW));

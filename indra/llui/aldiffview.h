@@ -122,6 +122,18 @@ public:
     // the caret put at its first line. False where there is none that way.
     bool goToChange(bool forward);
 
+    // A change taken back: the right's lines of it made the left's again,
+    // an edit of the right's text that whoever shows it makes, told what
+    // stretch of the right's text to put what in, and answering whether it
+    // did; the comparison then compared again (setRightText). Offered -- an
+    // arrow in the gap between the sides at each change, a button on the
+    // bar -- only where there is someone to make it.
+    typedef std::function<bool(const ALTextRange& range, const std::string& text)> take_back_t;
+    void setOnTakeBack(take_back_t take);
+    bool canTakeBack() const { return mTakeBack != nullptr; }
+    // The change, counted from nought, taken back; false where it was not.
+    bool takeBack(S32 change);
+
     // The side the keyboard is in, else the right, or the one inline:
     // what a find or a copy works on.
     ALCodeEditor* shown() const;
@@ -192,6 +204,23 @@ private:
         S32  count     = 0;
         bool open      = false;
     };
+    // Each change's lines in the texts as given, swapped or not: where
+    // they start on the left and on the right, and how many each has.
+    struct ChangeLines
+    {
+        S32 leftFirst  = 0;
+        S32 leftCount  = 0;
+        S32 rightFirst = 0;
+        S32 rightCount = 0;
+    };
+    // The change a row of what is shown is in; -1 for none.
+    S32               changeOfRow(S32 row) const;
+    // The gap between the sides: wider where it holds the arrows that take
+    // a change back.
+    S32               gap() const;
+    // The change whose arrow is under a point of the view; -1 for none.
+    S32               arrowAtPoint(S32 x, S32 y);
+    void              drawArrows();
     // Each side's lines hidden and shown as the folds are, and a caret on
     // a line hidden put on the line that stands for it.
     void              applyFolds();
@@ -236,6 +265,10 @@ private:
     // of what is shown: the same on both sides, which are lined up.
     std::vector<S32>      mChanges;
     std::vector<S32>      mChangeEnds;
+    std::vector<ChangeLines> mChangeLines;
+    take_back_t           mTakeBack;
+    // The change whose arrow the mouse is over, as last drawn.
+    S32                   mArrowHover = -1;
     std::vector<Fold>     mFolds;
     bool                  mFoldSame = true;
     // Where the two sides were last scrolled to, to follow the one moved.

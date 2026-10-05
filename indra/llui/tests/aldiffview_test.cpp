@@ -572,4 +572,80 @@ namespace tut
         }
         ensure("its line changed: beside it still", still);
     }
+
+    template<> template<>
+    void aldiffview_object::test<18>()
+    {
+        set_test_name("a change taken back -- lines put in, a line taken out at the end, a line changed -- as one edit of the right's text, compared again after");
+        ALDiffView& d = make("a\nb\nc\nd\ne", "a\nB\nc\nx\ny\nd");
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name               = "source";
+        p.rect               = LLRect(0, 100, 300, 0);
+        ALCodeEditor* source = LLUICtrlFactory::create<ALCodeEditor>(p);
+        source->setText("a\nB\nc\nx\ny\nd");
+        ensure("nothing offered without anyone to make it", !d.canTakeBack() && !d.takeBack(0) && !d.bar()->getChild<LLView>("take_back")->getVisible());
+        const S32 narrow = d.right()->getRect().mLeft - d.left()->getRect().mRight;
+        S32       asked  = 0;
+        d.setOnTakeBack([&](const ALTextRange& range, const std::string& text) {
+            ++asked;
+            return source->replaceAll({ { range, text } });
+        });
+        ensure("offered", d.canTakeBack() && d.bar()->getChild<LLView>("take_back")->getVisible());
+        ensure("a gap wide enough for the arrows", d.right()->getRect().mLeft - d.left()->getRect().mRight > narrow);
+        ensure_equals("three changes", d.changeCount(), 3);
+
+        d.right()->setFocus(true);
+        d.right()->goTo(ALTextPos(4, 0));
+        ensure("the lines put in taken out", d.takeBack(d.changeAtCaret()));
+        ensure_equals("the right's text", source->text(), std::string("a\nB\nc\nd"));
+        ensure_equals("compared again", d.rightText(), source->text());
+        ensure_equals("a change fewer", d.changeCount(), 2);
+        ensure_equals("the caret where they were", d.rightAtCaret().first, 3);
+        ensure("the line taken out at the end put back", d.takeBack(1));
+        ensure_equals("after the last line", source->text(), std::string("a\nB\nc\nd\ne"));
+        ensure("the line changed made as it was", d.takeBack(0));
+        ensure_equals("all as the left", source->text(), std::string("a\nb\nc\nd\ne"));
+        ensure("nothing left to take back", d.changeCount() == 0 && !d.takeBack(0));
+        ensure_equals("each one edit", asked, 3);
+
+        d.setTexts("a\nb\n", "a\n");
+        source->setText("a\n");
+        ensure("a line put back before the text's last, empty, line", d.takeBack(0) && source->text() == "a\nb\n");
+        d.setTexts("a", "a\nz");
+        source->setText("a\nz");
+        ensure("a last line taken out, with the break before it", d.takeBack(0) && source->text() == "a");
+        source->die();
+    }
+
+    template<> template<>
+    void aldiffview_object::test<19>()
+    {
+        set_test_name("taking back, swapped: still the right's text, with the left's lines; refused, nothing changes; an arrow in the gap at each change takes it back");
+        ALDiffView& d = make("one\ntwo\nthree", "one\nx\ny\nthree");
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name               = "source";
+        p.rect               = LLRect(0, 100, 300, 0);
+        ALCodeEditor* source = LLUICtrlFactory::create<ALCodeEditor>(p);
+        source->setText("one\nx\ny\nthree");
+        bool allow = false;
+        d.setOnTakeBack([&](const ALTextRange& range, const std::string& text) { return allow && source->replaceAll({ { range, text } }); });
+        ensure("refused", !d.takeBack(0) && d.changeCount() == 1 && d.rightText() == "one\nx\ny\nthree");
+        d.setSwapped(true);
+        allow = true;
+        ensure("swapped, the right's two lines made the left's one", d.takeBack(0) && source->text() == "one\ntwo\nthree" && d.changeCount() == 0);
+
+        d.setSwapped(false);
+        d.setTexts("one\ntwo\nthree", "one\n2\nthree");
+        source->setText("one\n2\nthree");
+        const LLRect frame = d.right()->getRect();
+        const LLRect text  = d.right()->textRect();
+        const S32    row_h = d.right()->layout().lineHeight(1);
+        const S32    y     = frame.mBottom + text.mTop - (d.right()->layout().lineTop(1) - d.right()->scrollY()) - row_h / 2;
+        const S32    gap_x = (d.left()->getRect().mRight + frame.mLeft) / 2;
+        d.handleMouseDown(gap_x, y + row_h, MASK_NONE);
+        ensure("beside a line the same, nothing", d.changeCount() == 1);
+        ensure("the arrow pressed", d.handleMouseDown(gap_x, y, MASK_NONE));
+        ensure("taken back", d.changeCount() == 0 && source->text() == "one\ntwo\nthree");
+        source->die();
+    }
 }

@@ -407,6 +407,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="DiffBarInline">Show the changes inline, in one text</string>
 	<string name="DiffBarSwap">Swap the sides</string>
 	<string name="DiffBarDone">Back to the text</string>
+	<string name="DiffBarTakeBack">Take this change back</string>
 	<string name="DiffBarOf">Change [CURRENT] of [TOTAL]</string>
 	<string name="DiffBarChangesA">[COUNT] change</string>
 	<string name="DiffBarChangesB">[COUNT] changes</string>

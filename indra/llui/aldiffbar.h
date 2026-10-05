@@ -38,9 +38,10 @@ class LLTextBox;
 
 // The thin bar over a comparison's titles (ALDiffView): which change the
 // caret is in, of how many, and the arrows to the one before and the next;
-// what is the same folded away, the comparison inline or side by side, its
-// sides swapped; and done, back to what it was made from. In the comparison's colours, as the find bar
-// is in its view's.
+// the change taken back, where whoever shows it can; what is the same
+// folded away, the comparison inline or side by side, its sides swapped;
+// and done, back to what it was made from. In the comparison's colours, as
+// the find bar is in its view's.
 //
 // It holds what it shows and nothing else: the view tells it the count
 // and the state of its toggles, and it says what was pressed.
@@ -65,6 +66,9 @@ public:
     void        setSwapped(bool swapped);
     // Whether there is anywhere to go back to.
     void        setDoneShown(bool shown);
+    // Whether a change can be taken back at all, and the caret's now.
+    void        setTakeBackShown(bool shown);
+    void        setTakeBackEnabled(bool enabled);
 
     // The colours of the comparison it is over: its glyphs and its count
     // in the sides' ink, its ground a shade off their paper.
@@ -80,6 +84,7 @@ public:
     boost::signals2::connection onInline(const signal_t::slot_type& cb) { return mInline.connect(cb); }
     boost::signals2::connection onSwap(const signal_t::slot_type& cb) { return mSwap.connect(cb); }
     boost::signals2::connection onDone(const signal_t::slot_type& cb) { return mDone.connect(cb); }
+    boost::signals2::connection onTakeBack(const signal_t::slot_type& cb) { return mTakeBack.connect(cb); }
 
     void draw() override;
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
@@ -104,8 +109,9 @@ private:
     ALFlatButton* mInlineButton   = nullptr;
     ALFlatButton* mSwapButton     = nullptr;
     ALFlatButton* mDoneButton     = nullptr;
+    ALFlatButton* mTakeBackButton = nullptr;
 
-    signal_t mPrevious, mNext, mFold, mInline, mSwap, mDone;
+    signal_t mPrevious, mNext, mFold, mInline, mSwap, mDone, mTakeBack;
 };
 
 #endif // AL_ALDIFFBAR_H

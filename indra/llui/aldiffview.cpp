@@ -44,8 +44,10 @@ static LLDefaultChildRegistry::Register<ALDiffView> r("diff_view");
 
 namespace
 {
-    // The gap between the sides, where the line between them is drawn.
-    constexpr S32 GAP = 3;
+    // The gap between the sides, where the line between them is drawn; and
+    // as wide as it is where it holds the arrows that take a change back.
+    constexpr S32 GAP       = 3;
+    constexpr S32 ARROW_GAP = 18;
 
     LLColor4 colorOf(const char* name, const LLColor4& otherwise) { return LLUIColorTable::instance().getColor(name, otherwise).get(); }
 
@@ -136,6 +138,11 @@ ALDiffView::ALDiffView(const Params& p)
     });
     mBar->onFold([this]() { setFoldSame(!mFoldSame); });
     mBar->onSwap([this]() { setSwapped(!mSwapped); });
+    mBar->onTakeBack([this]() {
+        ALCodeEditor* side = shown();
+        takeBack(changeAtCaret());
+        side->setFocus(true);
+    });
     mBar->onDone([this]() {
         if (mEscape)
         {
@@ -428,6 +435,7 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
     const LLColor4                      in_mark   = colorOf("CodeDiffAddedMarkColor", LLColor4(0.3f, 0.8f, 0.4f, 0.85f));
     mChanges.clear();
     mChangeEnds.clear();
+    mChangeLines.clear();
     mInlineLeftRows.clear();
     std::vector<Fold> folds;
     // The last run that is a change: the runs the same after it are at
@@ -485,7 +493,11 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
             continue;
         }
         // A change: the lines taken out and put in between two the same,
-        // side by side, the first taken out beside the first put in.
+        // side by side, the first taken out beside the first put in. Where
+        // it starts on each side, whichever it begins with.
+        ChangeLines lines;
+        lines.leftFirst  = runs[i].left;
+        lines.rightFirst = runs[i].right;
         std::vector<S32> gone;
         std::vector<S32> made;
         for (; i < runs.size() && runs[i].kind != ALTextDiff::Kind::Same; ++i)
@@ -496,6 +508,14 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
             }
         }
         mChanges.push_back(mInline ? static_cast<S32>(is.numbers.size()) : static_cast<S32>(ls.numbers.size()));
+        lines.leftCount  = static_cast<S32>(gone.size());
+        lines.rightCount = static_cast<S32>(made.size());
+        if (mSwapped)
+        {
+            std::swap(lines.leftFirst, lines.rightFirst);
+            std::swap(lines.leftCount, lines.rightCount);
+        }
+        mChangeLines.push_back(lines);
         const size_t rows = std::max(gone.size(), made.size());
         std::vector<S32> gone_rows;
         for (size_t n = 0; n < rows; ++n)
@@ -563,6 +583,62 @@ void ALDiffView::rebuild(const std::vector<bool>& open)
     mFolds = std::move(folds);
     applyFolds();
     refreshBar();
+}
+
+S32 ALDiffView::arrowAtPoint(S32 x, S32 y)
+{
+    // In the gap, beside a change's first row.
+    if (!mTakeBack || mInline || mChanges.empty())
+    {
+        return -1;
+    }
+    const S32    half  = (getRect().getWidth() - gap()) / 2;
+    const LLRect frame = mRight->getRect();
+    const LLRect text  = mRight->textRect();
+    if (x < half || x >= half + gap() || y > frame.mBottom + text.mTop || y < frame.mBottom + text.mBottom)
+    {
+        return -1;
+    }
+    const S32 row    = mRight->posAtLocal(text.mLeft, y - frame.mBottom, false).line;
+    const S32 change = changeOfRow(row);
+    return change >= 0 && mChanges[static_cast<size_t>(change)] == row ? change : -1;
+}
+
+void ALDiffView::drawArrows()
+{
+    // An arrow at each change's first row in sight, pointing from the side
+    // whose lines it puts back to the side they go in.
+    if (!mTakeBack || mInline)
+    {
+        return;
+    }
+    const F32       alpha  = getDrawContext().mAlpha;
+    const LLFontGL* font   = LLFontGL::getFontSansSerifSmall();
+    const S32       half   = (getRect().getWidth() - gap()) / 2;
+    const LLRect    frame  = mRight->getRect();
+    const LLRect    text   = mRight->textRect();
+    const S32       top    = frame.mBottom + text.mTop;
+    ALTextLayout&   layout = mRight->layout();
+    const LLColor4  ink    = mRight->textColor() % (0.7f * alpha);
+    const LLColor4  lit    = mRight->cursorColor() % alpha;
+    const char*     arrow  = mSwapped ? "\xE2\x86\x90" : "\xE2\x86\x92";
+    for (size_t n = 0; n < mChanges.size(); ++n)
+    {
+        const S32 row    = mChanges[n];
+        const S32 row_t  = top - (layout.lineTop(row) - mRight->scrollY());
+        const S32 height = layout.lineHeight(row);
+        if (height <= 0 || row_t - height > top || row_t < frame.mBottom + text.mBottom)
+        {
+            continue;
+        }
+        const bool hover = static_cast<S32>(n) == mArrowHover;
+        if (hover)
+        {
+            gl_rect_2d(half, row_t, half + gap(), row_t - height, mRight->textColor() % (0.15f * alpha));
+        }
+        font->renderUTF8(arrow, 0, half + gap() / 2, row_t - height / 2, hover ? lit : ink, LLFontGL::HCENTER, LLFontGL::VCENTER);
+    }
+    mArrowHover = -1;
 }
 
 void ALDiffView::drawCurrentChange()
@@ -725,6 +801,11 @@ bool ALDiffView::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     // A folded row opened, the caret put on the first line it hid, on the
     // side pressed, which takes the keyboard.
+    if (const S32 change = arrowAtPoint(x, y); change >= 0)
+    {
+        takeBack(change);
+        return true;
+    }
     ALCodeEditor* side = nullptr;
     const S32     fold = foldAtPoint(x, y, &side);
     if (fold < 0)
@@ -740,7 +821,8 @@ bool ALDiffView::handleMouseDown(S32 x, S32 y, MASK mask)
 
 bool ALDiffView::handleHover(S32 x, S32 y, MASK mask)
 {
-    if (foldAtPoint(x, y) >= 0)
+    mArrowHover = arrowAtPoint(x, y);
+    if (mArrowHover >= 0 || foldAtPoint(x, y) >= 0)
     {
         if (LLWindow* window = getWindow())
         {
@@ -799,7 +881,7 @@ void ALDiffView::arrange()
     const S32    height = llmax(0, getRect().getHeight() - bar_h);
     const S32    head_h = LLFontGL::getFontSansSerifSmall()->getLineHeight() + 6;
     const S32    body   = llmax(0, height - head_h);
-    const S32    half   = (width - GAP) / 2;
+    const S32    half   = (width - gap()) / 2;
     mBar->setShape(LLRect(0, height + bar_h, width, height));
     mLeft->setVisible(!mInline);
     mRight->setVisible(!mInline);
@@ -815,9 +897,9 @@ void ALDiffView::arrange()
         return;
     }
     mLeft->setShape(LLRect(0, body, half, 0));
-    mRight->setShape(LLRect(half + GAP, body, width, 0));
+    mRight->setShape(LLRect(half + gap(), body, width, 0));
     mLeftHead->setShape(LLRect(4, height - 3, half - 4, body));
-    mRightHead->setShape(LLRect(half + GAP + 4, height - 3, width - 4, body));
+    mRightHead->setShape(LLRect(half + gap() + 4, height - 3, width - 4, body));
     mLeftHead->setText(mSwapped ? mRightTitle : mLeftTitle);
     mRightHead->setText(mSwapped ? mLeftTitle : mRightTitle);
 }
@@ -840,9 +922,83 @@ ALCodeEditor* ALDiffView::shown() const
     return mLeft->hasFocus() ? mLeft : mRight;
 }
 
+void ALDiffView::setOnTakeBack(take_back_t take)
+{
+    const bool had = mTakeBack != nullptr;
+    mTakeBack      = std::move(take);
+    if (had != (mTakeBack != nullptr))
+    {
+        arrange();
+    }
+    refreshBar();
+}
+
+S32 ALDiffView::gap() const
+{
+    return mTakeBack && !mInline ? ARROW_GAP : GAP;
+}
+
+bool ALDiffView::takeBack(S32 change)
+{
+    if (!mTakeBack || change < 0 || change >= static_cast<S32>(mChangeLines.size()))
+    {
+        return false;
+    }
+    // The right's lines of it in the left's place: the lines between, a
+    // line's break with the lines taken out or put in, at the text's end
+    // the one before them.
+    const ChangeLines&             c     = mChangeLines[static_cast<size_t>(change)];
+    const std::vector<std::string> left  = ALTextDiff::split(mLeftText);
+    const std::vector<std::string> right = ALTextDiff::split(mRightText);
+    std::string                    lines;
+    for (S32 n = 0; n < c.leftCount; ++n)
+    {
+        lines += (n ? "\n" : "") + left[static_cast<size_t>(c.leftFirst + n)];
+    }
+    const S32 last    = static_cast<S32>(right.size()) - 1;
+    const auto ends   = [&](S32 line) { return ALTextPos(line, static_cast<S32>(right[static_cast<size_t>(line)].size())); };
+    ALTextRange range;
+    std::string text;
+    if (c.rightCount > 0 && c.leftCount > 0)
+    {
+        range = ALTextRange(ALTextPos(c.rightFirst, 0), ends(c.rightFirst + c.rightCount - 1));
+        text  = lines;
+    }
+    else if (c.rightCount > 0)
+    {
+        const S32 after = c.rightFirst + c.rightCount;
+        range           = after <= last         ? ALTextRange(ALTextPos(c.rightFirst, 0), ALTextPos(after, 0))
+                          : c.rightFirst > 0 ? ALTextRange(ends(c.rightFirst - 1), ends(last))
+                                             : ALTextRange(ALTextPos(0, 0), ends(last));
+    }
+    else
+    {
+        range = c.rightFirst <= last ? ALTextRange(ALTextPos(c.rightFirst, 0), ALTextPos(c.rightFirst, 0)) : ALTextRange(ends(last), ends(last));
+        text  = c.rightFirst <= last ? lines + "\n" : "\n" + lines;
+    }
+    // The right as it will be, by where each line of it starts in the text.
+    std::vector<size_t> starts{ 0 };
+    for (size_t at = mRightText.find('\n'); at != std::string::npos; at = mRightText.find('\n', at + 1))
+    {
+        starts.push_back(at + 1);
+    }
+    const auto offset = [&](const ALTextPos& pos) { return starts[static_cast<size_t>(pos.line)] + static_cast<size_t>(pos.column); };
+    const std::string made = mRightText.substr(0, offset(range.begin)) + text + mRightText.substr(offset(range.end));
+    if (!mTakeBack(range, text))
+    {
+        return false;
+    }
+    setRightText(made);
+    return true;
+}
+
 S32 ALDiffView::changeAtCaret() const
 {
-    const S32  at   = shown()->caret().line;
+    return changeOfRow(shown()->caret().line);
+}
+
+S32 ALDiffView::changeOfRow(S32 at) const
+{
     const auto next = std::upper_bound(mChanges.begin(), mChanges.end(), at);
     if (next == mChanges.begin())
     {
@@ -1012,6 +1168,8 @@ void ALDiffView::refreshBar()
 {
     // The change the caret is in, and the steps there are from it.
     mBar->setCount(changeAtCaret(), changeCount());
+    mBar->setTakeBackShown(mTakeBack != nullptr);
+    mBar->setTakeBackEnabled(mTakeBack && changeAtCaret() >= 0);
     const S32 at = shown()->caret().line;
     mBar->setSteps(!mChanges.empty() && mChanges.front() < at, !mChanges.empty() && mChanges.back() > at);
 }
@@ -1058,7 +1216,12 @@ void ALDiffView::draw()
     drawCurrentChange();
     if (!mInline)
     {
-        const S32 half = (getRect().getWidth() - GAP) / 2;
-        gl_rect_2d(half + 1, mLeft->getRect().mTop, half + GAP - 1, 0, colorOf("CodeDiffDividerColor", LLColor4(0.5f, 0.5f, 0.5f, 0.5f)) % getDrawContext().mAlpha);
+        // The line between the sides down the middle of the gap, and the
+        // arrows beside it where there are any.
+        const S32 half   = (getRect().getWidth() - gap()) / 2;
+        const S32 middle = half + gap() / 2;
+        gl_rect_2d(middle - GAP / 2 + 1, mLeft->getRect().mTop, middle - GAP / 2 + GAP - 1, 0,
+                   colorOf("CodeDiffDividerColor", LLColor4(0.5f, 0.5f, 0.5f, 0.5f)) % getDrawContext().mAlpha);
+        drawArrows();
     }
 }
