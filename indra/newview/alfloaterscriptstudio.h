@@ -34,6 +34,7 @@
 #include "alscriptstudiocommands.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudiocomparewith.h"
 #include "alscriptstudiohistory.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudiosaving.h"
@@ -130,7 +131,8 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptReferencesPane::Window, public ALScriptOutlinePane::Window,
                                     public ALScriptCrumbsBar::Window, public ALScriptInspectorPane::Window,
                                     public ALScriptStudioCaret::Window, public ALScriptStudioChecking::Window,
-                                    public ALScriptObjectCheck::Window, public ALScriptRecompile::Window, public ALScriptStudioHistory::Window
+                                    public ALScriptObjectCheck::Window, public ALScriptRecompile::Window, public ALScriptStudioHistory::Window,
+                                    public ALScriptStudioCompareWith::Window
 {
     friend class LLFloaterReg;
 
@@ -974,6 +976,14 @@ private:
     void compareItems(const ALScriptRef& first, const std::string& name, const std::string& first_title, const ALScriptRef& second,
                       const std::string& second_title) override;
     void showHistory(const ALScriptRef& ref, const std::string& name) override;
+    // An item's text, once loaded, set beside a tab's under the two titles.
+    void compareWithLoaded(Doc& doc, const std::string& own_title, const ALScriptRef& other, const std::string& other_title);
+    // What Compare With asks of the window (ALScriptStudioCompareWith::Window).
+    void compareWithItem(Doc& doc, const ALScriptStudioCompareWith::Item& item, const std::string& title) override;
+    void offerHistory(Doc& doc) override { mHistory.show(doc); }
+    std::optional<std::string>                    clipboardText() const override;
+    std::vector<std::string>                      recentFiles() const override { return mFiles.recentFiles(); }
+    std::vector<ALScriptStudioCompareWith::Item> itemsLike(const Doc& doc) const override;
     // What the Search tab asks of the window (ALScriptSearchPane::Window).
     void listObjects(const LLUUID& only, std::function<void(std::vector<ALScriptSearchPane::Window::Object>)> told) override;
     std::string                                     objectName(const LLUUID& root) const override;
@@ -1285,6 +1295,8 @@ private:
     ALScriptStudioRecovery             mRecovery{ *this, *this, *this };
     // What its items were saved as before, to compare and put back.
     ALScriptStudioHistory              mHistory{ *this, *this };
+    // Whatever a tab may be set beside, picked from one list.
+    ALScriptStudioCompareWith          mCompareWith{ *this, *this };
     // What the region said an object reserves, heard.
     boost::signals2::scoped_connection mRegionUsageConnection;
     // Saving and compiling the tabs.

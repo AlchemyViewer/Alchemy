@@ -217,6 +217,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocaret.cpp
     alscriptstudiochecking.cpp
     alscriptstudiocommands.cpp
+    alscriptstudiocomparewith.cpp
     alscriptstudiodoc.cpp
     alscriptstudiofileio.cpp
     alscriptstudioglue.cpp
@@ -1063,6 +1064,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocaret.h
     alscriptstudiochecking.h
     alscriptstudiocommands.h
+    alscriptstudiocomparewith.h
     alscriptstudiodoc.h
     alscriptstudiofileio.h
     alscriptstudioglue.h
@@ -2604,6 +2606,17 @@ if(AL_BUILD_TESTS)
     alscriptstudiohistory
     UNIT
     PROJECT ${test_project}
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A Script Studio window's Compare With over tabs of their own editors:
+  # what a tab is offered, and each kind of thing chosen set beside it.
+  al_add_test(
+    alscriptstudiocomparewith
+    UNIT
+    PROJECT ${test_project}
+    SOURCES alscriptstudiohistory.cpp
     LIBRARIES al_studio_test_common llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )

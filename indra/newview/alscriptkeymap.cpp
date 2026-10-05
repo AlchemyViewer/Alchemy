@@ -599,6 +599,7 @@ namespace ALScriptKeymap
             after_k("inspector", '4'),
             after_k("expanded", 'P'),
             { "compare_saved", KEY_NONE, MASK_NONE },
+            { "compare_with", KEY_NONE, MASK_NONE },
             { "compare_inline", KEY_NONE, MASK_NONE },
             { "compare_shown", KEY_NONE, MASK_NONE },
             { "compare_take_back", KEY_NONE, MASK_NONE },

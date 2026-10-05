@@ -1790,6 +1790,13 @@ void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const
 {
     doc.compareTitles.reset();
     doc.compareStale = false;
+    // A save of its history is offered back only while it is what is
+    // compared: something else picked over it lets it go.
+    if (doc.historyShown && doc.historyShown->text != left)
+    {
+        doc.historyShown.reset();
+        refreshNotice();
+    }
     if (doc.compareView)
     {
         // Given again where the comparison follows the tab.
@@ -6205,11 +6212,21 @@ void ALFloaterScriptStudio::compareItems(const ALScriptRef& first, const std::st
     {
         activate(index);
     }
+    compareWithLoaded(*mDocs[index], first_title, second, second_title);
+}
+
+void ALFloaterScriptStudio::compareWithItem(Doc& doc, const ALScriptStudioCompareWith::Item& item, const std::string& title)
+{
+    compareWithLoaded(doc, getString("CompareNow"), item.ref, title);
+}
+
+void ALFloaterScriptStudio::compareWithLoaded(Doc& doc, const std::string& own_title, const ALScriptRef& other, const std::string& other_title)
+{
     // The other's text as the region has it, out of its envelope, set
     // beside this one's as it is now -- or once it has loaded.
     const LLHandle<LLFloater> handle = getHandle();
-    const std::string         id     = mDocs[index]->id;
-    ALScriptWorkspace::instance().load(second, [handle, id, first_title, second_title](const ALScriptLoaded& answer) {
+    const std::string         id     = doc.id;
+    ALScriptWorkspace::instance().load(other, [handle, id, own_title, other_title](const ALScriptLoaded& answer) {
         ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
         Doc*                   found  = studio ? studio->findDoc(id) : nullptr;
         if (!found)
@@ -6219,12 +6236,12 @@ void ALFloaterScriptStudio::compareItems(const ALScriptRef& first, const std::st
         if (!answer.error.empty())
         {
             LLStringUtil::format_map_t args;
-            args["[NAME]"]  = second_title;
+            args["[NAME]"]  = other_title;
             args["[ERROR]"] = answer.error;
             studio->setStatus(studio->getString("CompareNotLoaded", args), true);
             return;
         }
-        found->pendingCompare = Doc::PendingCompare{ answer.notecard ? answer.text : sourceOf(answer), second_title, first_title };
+        found->pendingCompare = Doc::PendingCompare{ answer.notecard ? answer.text : sourceOf(answer), other_title, own_title };
         if (found->loaded)
         {
             studio->comparePending(*found);
@@ -6271,6 +6288,39 @@ void ALFloaterScriptStudio::showHistory(const ALScriptRef& ref, const std::strin
         activate(index);
     }
     mHistory.show(*mDocs[index]);
+}
+
+std::optional<std::string> ALFloaterScriptStudio::clipboardText() const
+{
+    std::string text;
+    if (!LLClipboard::instance().isTextAvailable() || !LLClipboard::instance().pasteFromClipboard(text))
+    {
+        return std::nullopt;
+    }
+    // Its line breaks as an editor here keeps them.
+    LLStringUtil::removeCRLF(text);
+    return text;
+}
+
+std::vector<ALScriptStudioCompareWith::Item> ALFloaterScriptStudio::itemsLike(const Doc& doc) const
+{
+    // Of the scripts or notecards the explorer knows of in the objects in
+    // hand; a file is like none of them.
+    std::vector<ALScriptStudioCompareWith::Item> items;
+    if (!mExplorerPane || !doc.file.empty() || doc.ref.item.isNull())
+    {
+        return items;
+    }
+    ALScriptExplorerPane::Choice row;
+    row.prim   = doc.ref.object;
+    row.item   = doc.ref.item;
+    row.name   = doc.name;
+    row.script = !doc.notecard;
+    for (const ALScriptExplorerPane::Choice& one : mExplorerPane->comparable(row))
+    {
+        items.push_back({ one.ref(), one.name, mExplorerPane->model().placeOf(one) });
+    }
+    return items;
 }
 
 void ALFloaterScriptStudio::comparePending(Doc& doc)
@@ -8852,6 +8902,20 @@ void ALFloaterScriptStudio::addViewCommands()
         [this]() {
             const Doc* doc = active();
             return doc && doc->shownView() == Doc::View::Compare;
+        });
+    // The tab set beside whatever is picked: its saved text, another tab,
+    // the clipboard, a file, a save kept, an item like it elsewhere.
+    mCommands.add(
+        "compare_with",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                mCompareWith.show(*doc);
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && ALScriptStudioCompareWith::canCompare(*doc);
         });
     // The tab's comparison and its source in turn: back to a comparison
     // that typing in it left for the source, as the tab now is.

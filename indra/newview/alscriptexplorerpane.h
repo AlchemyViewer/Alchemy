@@ -135,6 +135,9 @@ public:
     // The rows chosen, in the tree's order.
     std::vector<Choice>   choice() const;
     const Model&          model() const { return mModel; }
+    // What an item may be compared with that the agent may read, those of
+    // its name first (Model::comparableWith).
+    std::vector<Choice>   comparable(const Choice& row) const;
 
     // The pins, kept between sessions.
     void saveState(LLSD& state) const { mModel.saveState(state); }
