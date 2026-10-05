@@ -6302,6 +6302,27 @@ std::optional<std::string> ALFloaterScriptStudio::clipboardText() const
     return text;
 }
 
+void ALFloaterScriptStudio::loadWorld(Doc& doc, std::function<void(Doc& doc, const std::string& text, const LLUUID& asset)> loaded)
+{
+    // The item as the world has it now, out of its envelope.
+    const LLHandle<LLFloater> handle = getHandle();
+    const std::string         id     = doc.id;
+    ALScriptWorkspace::instance().load(doc.ref, [handle, id, loaded](const ALScriptLoaded& answer) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        Doc*                   found  = studio ? studio->findDoc(id) : nullptr;
+        if (!found || !found->loaded)
+        {
+            return;
+        }
+        if (!answer.error.empty())
+        {
+            studio->setStatus(answer.error, true);
+            return;
+        }
+        loaded(*found, answer.notecard ? answer.text : sourceOf(answer), answer.assetId);
+    });
+}
+
 std::vector<ALScriptStudioCompareWith::Item> ALFloaterScriptStudio::itemsLike(const Doc& doc) const
 {
     // Of the scripts or notecards the explorer knows of in the objects in
@@ -7518,27 +7539,19 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
     }
     else if (action == "compare_world")
     {
-        const LLHandle<LLFloater> handle = getHandle();
-        const std::string         id     = doc.id;
-        ALScriptWorkspace::instance().load(doc.ref, [handle, id](const ALScriptLoaded& answer) {
-            ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-            Doc*                   found  = studio ? studio->findDoc(id) : nullptr;
-            if (!found || !found->loaded)
-            {
-                return;
-            }
-            if (!answer.error.empty())
-            {
-                studio->setStatus(answer.error, true);
-                return;
-            }
-            const std::string theirs = answer.notecard ? answer.text : sourceOf(answer);
-            studio->compareWithTab(*found, theirs, studio->getString("CompareWorld"));
-        });
+        loadWorld(doc, [this](Doc& found, const std::string& text, const LLUUID&) { compareWithTab(found, text, getString("CompareWorld")); });
+    }
+    else if (action == "merge_world")
+    {
+        mMerging.mergeWorld(doc);
     }
     else if (action == "compare_saved" && doc.savedThere)
     {
         compareWithTab(doc, *doc.savedThere, getString("CompareSavedThere"));
+    }
+    else if (action == "merge_saved")
+    {
+        mMerging.mergeSaved(doc);
     }
 }
 

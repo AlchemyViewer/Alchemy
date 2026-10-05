@@ -225,6 +225,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudioorphans.cpp
     alscriptstudioplaces.cpp
     alscriptstudiohistory.cpp
+    alscriptstudiomerging.cpp
     alscriptstudiorecovery.cpp
     alrecovery.cpp
     alrecoverykeeper.cpp
@@ -1073,6 +1074,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiopane.h
     alscriptstudioplaces.h
     alscriptstudiohistory.h
+    alscriptstudiomerging.h
     alscriptstudiorecovery.h
     alrecovery.h
     alrecoverykeeper.h
@@ -2617,6 +2619,16 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     SOURCES alscriptstudiohistory.cpp
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A Script Studio window's merges over tabs of their own editors and
+  # comparisons: begun, settled, and compared where they cannot be.
+  al_add_test(
+    alscriptstudiomerging
+    UNIT
+    PROJECT ${test_project}
     LIBRARIES al_studio_test_common llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )

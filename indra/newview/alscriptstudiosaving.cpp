@@ -387,7 +387,7 @@ void ALScriptStudioSaving::save(Doc& doc)
         case ALScriptSaveFlow::Route::StoppedByWorld:
             // Saved elsewhere since this tab had it: saving would replace
             // that. The author says whether to, to reload, or to compare.
-            mServices.report(mServices.words("SaveWorldMoved", args), true, &doc, { "save_anyway", "reload_world", "compare_world" });
+            mServices.report(mServices.words("SaveWorldMoved", args), true, &doc, { "save_anyway", "reload_world", "merge_world", "compare_world" });
             stopped(doc);
             return;
         case ALScriptSaveFlow::Route::Notecard:
@@ -619,7 +619,7 @@ void ALScriptStudioSaving::savedElsewhere(const ALScriptSaved& saved)
             args["[WHO]"]  = mServices.words(saved.sender.origin == ALScriptOrigin::Bridge   ? "SavedByBridge"
                                              : saved.sender.origin == ALScriptOrigin::Editor ? "SavedByEditor"
                                                                                                     : "SavedByQueue");
-            mServices.report(mServices.words("SavedElsewhereConflict", args), true, &doc, { "take_saved", "keep_saved", "compare_saved" });
+            mServices.report(mServices.words("SavedElsewhereConflict", args), true, &doc, { "take_saved", "keep_saved", "merge_saved", "compare_saved" });
             return;
         }
         case ALScriptSaved::Heard::Take:

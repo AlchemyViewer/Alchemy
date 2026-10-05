@@ -459,6 +459,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="NoticeTakeCompiled">Use Preprocessed Code</floater.string>
     <floater.string name="NoticeCompare">Compare</floater.string>
     <floater.string name="NoticeCompareTip">Show both texts side by side, with changes marked; Escape closes the comparison</floater.string>
+    <floater.string name="NoticeMerge">Merge</floater.string>
+    <floater.string name="NoticeMergeTip">Put in what only the other version changed, then settle each conflict in the comparison; undo takes the merge back</floater.string>
     <floater.string name="CompareNow">This tab now</floater.string>
     <floater.string name="CompareUnsaved">[TITLE] (unsaved)</floater.string>
     <floater.string name="FixAllAfter">After [FIXES]</floater.string>
@@ -591,6 +593,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ActionKeepSavedTip">Keep your changes; saving [NAME] replaces the version saved elsewhere</floater.string>
     <floater.string name="ActionCompareSaved">Compare</floater.string>
     <floater.string name="ActionCompareSavedTip">Compare the version saved elsewhere with this tab</floater.string>
+    <floater.string name="ActionMergeSaved">Merge</floater.string>
+    <floater.string name="ActionMergeSavedTip">Put what only the version saved elsewhere changed into [NAME], then settle each conflict in the comparison</floater.string>
     <floater.string name="SavedElsewhereConflict">[NAME] was saved by [WHO] while this tab had unsaved changes.</floater.string>
     <floater.string name="SavedElsewhereKept">Kept your changes to [NAME]; saving replaces the version saved elsewhere.</floater.string>
     <floater.string name="SavedByBridge">VS Code</floater.string>
@@ -629,6 +633,13 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ActionReloadWorldTip">Reload the saved [NAME]; your unsaved changes are kept in File &gt; Recover Unsaved Changes</floater.string>
     <floater.string name="ActionCompareWorld">Compare</floater.string>
     <floater.string name="ActionCompareWorldTip">Compare the saved [NAME] with the text in this tab</floater.string>
+    <floater.string name="ActionMergeWorld">Merge</floater.string>
+    <floater.string name="ActionMergeWorldTip">Put what only the saved [NAME] changed into this tab, then settle each conflict in the comparison</floater.string>
+    <floater.string name="MergeConflictsA">Merged into [NAME] what only the other version changed. 1 conflict is left to settle in the comparison; save to keep the merge.</floater.string>
+    <floater.string name="MergeConflictsB">Merged into [NAME] what only the other version changed. [COUNT] conflicts are left to settle in the comparison; save to keep the merge.</floater.string>
+    <floater.string name="MergeClean">Merged into [NAME] what only the other version changed; nothing conflicts. Save to keep the merge.</floater.string>
+    <floater.string name="MergeNoBase">What [NAME] was before both changes is no longer known here, so the two are compared as they are: take back each change you want.</floater.string>
+    <floater.string name="MergeReadOnly">[NAME] cannot be changed here, so the two are compared as they are.</floater.string>
     <floater.string name="CompareWorld">Currently saved</floater.string>
     <floater.string name="ActionExport">Export to a file</floater.string>
     <floater.string name="ActionExportTip">Save a copy of [NAME] to a file on this computer</floater.string>
@@ -2021,6 +2032,15 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                          height="22"
                          layout="topleft"
                          name="notice_third"
+                         right="-30"
+                         top="3"
+                         visible="false"
+                         width="86" />
+                        <button
+                         follows="right|top"
+                         height="22"
+                         layout="topleft"
+                         name="notice_fourth"
                          right="-30"
                          top="3"
                          visible="false"

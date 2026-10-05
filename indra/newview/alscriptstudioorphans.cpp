@@ -62,7 +62,7 @@ namespace
         for (const std::string& action : doc.offer->actions)
         {
             const bool external = action == "take_external" || action == "keep_here";
-            const bool there    = action == "take_saved" || action == "keep_saved" || action == "compare_saved";
+            const bool there    = action == "take_saved" || action == "keep_saved" || action == "merge_saved" || action == "compare_saved";
             if ((external && !doc.external->waiting) || (there && !doc.savedThere))
             {
                 continue;
@@ -77,6 +77,7 @@ namespace
                                 : action == "take_saved"    ? "NoticeTakeSaved"
                                 : action == "keep_saved"    ? "NoticeKeepSaved"
                                 : action == "compare_saved" || action == "compare_world" ? "NoticeCompare"
+                                : action == "merge_saved" || action == "merge_world"     ? "NoticeMerge"
                                 : action == "apply_fixes"                                ? "NoticeApplyFixes"
                                 : action == "make_strict"                                ? "NoticeMakeStrict"
                                                                                          : nullptr;

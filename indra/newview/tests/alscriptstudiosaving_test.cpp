@@ -777,7 +777,7 @@ namespace tut
         type(dirty, "\n// mine");
         saving.savedElsewhere(saved(dirty, "default {}\n// theirs", ALScriptOrigin::Bridge));
         ensure_equals("asked whose to keep", lastSaid(), std::string("SavedElsewhereConflict"));
-        ensure("with the three answers", services.reports.back().actions == Names{ "take_saved", "keep_saved", "compare_saved" });
+        ensure("with the four answers", services.reports.back().actions == Names{ "take_saved", "keep_saved", "merge_saved", "compare_saved" });
         ensure("nothing taken yet", dirty.editor->wholeText() == "default {}\n// mine" && dirty.savedThere);
         saving.takeSaved(dirty);
         ensure("theirs taken, and nothing to save", dirty.editor->wholeText() == "default {}\n// theirs" && !dirty.editor->isDirty());
@@ -832,7 +832,7 @@ namespace tut
         type(doc, "x");
         saving.save(doc);
         ensure_equals("moved: said", lastSaid(), std::string("SaveWorldMoved"));
-        ensure("with what can be done", services.reports.back().actions == Names{ "save_anyway", "reload_world", "compare_world" });
+        ensure("with what can be done", services.reports.back().actions == Names{ "save_anyway", "reload_world", "merge_world", "compare_world" });
         ensure("and not sent", studio.sent.size() == 1 && !doc.save.underway());
         saving.saveAsked(doc);
         ensure_equals("asked again: sent over it", studio.sent.size(), size_t(2));

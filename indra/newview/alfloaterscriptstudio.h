@@ -36,6 +36,7 @@
 #include "alscriptstudioservices.h"
 #include "alscriptstudiocomparewith.h"
 #include "alscriptstudiohistory.h"
+#include "alscriptstudiomerging.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudiosaving.h"
 #include "alscriptstudiotabs.h"
@@ -132,7 +133,7 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptCrumbsBar::Window, public ALScriptInspectorPane::Window,
                                     public ALScriptStudioCaret::Window, public ALScriptStudioChecking::Window,
                                     public ALScriptObjectCheck::Window, public ALScriptRecompile::Window, public ALScriptStudioHistory::Window,
-                                    public ALScriptStudioCompareWith::Window
+                                    public ALScriptStudioCompareWith::Window, public ALScriptStudioMerging::Window
 {
     friend class LLFloaterReg;
 
@@ -984,6 +985,8 @@ private:
     std::optional<std::string>                    clipboardText() const override;
     std::vector<std::string>                      recentFiles() const override { return mFiles.recentFiles(); }
     std::vector<ALScriptStudioCompareWith::Item> itemsLike(const Doc& doc) const override;
+    // What a merge asks of the window (ALScriptStudioMerging::Window).
+    void loadWorld(Doc& doc, std::function<void(Doc& doc, const std::string& text, const LLUUID& asset)> loaded) override;
     // What the Search tab asks of the window (ALScriptSearchPane::Window).
     void listObjects(const LLUUID& only, std::function<void(std::vector<ALScriptSearchPane::Window::Object>)> told) override;
     std::string                                     objectName(const LLUUID& root) const override;
@@ -1297,6 +1300,8 @@ private:
     ALScriptStudioHistory              mHistory{ *this, *this };
     // Whatever a tab may be set beside, picked from one list.
     ALScriptStudioCompareWith          mCompareWith{ *this, *this };
+    // A save that came up against another, settled conflict by conflict.
+    ALScriptStudioMerging              mMerging{ *this, *this };
     // What the region said an object reserves, heard.
     boost::signals2::scoped_connection mRegionUsageConnection;
     // Saving and compiling the tabs.
