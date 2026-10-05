@@ -35,14 +35,16 @@ namespace
 {
     // A line's words but its blanks, as ids, in order of their ids: what
     // two lines are weighed by.
-    std::vector<S32> bagOf(std::string_view line, const ALTextDiff::Likeness& like, ALDiffIds& ids)
+    std::vector<S32> bagOf(std::string_view line, const ALTextDiff::Likeness& like, ALDiffIds& ids, const ALTextDiff::regions_t* regions)
     {
+        ALDiffTokens::tokens_t words;
+        ALDiffTokens::cut(line, regions, words);
         std::vector<S32> out;
-        for (const auto& [begin, end] : ALDiffTokens::words(line))
+        for (const ALDiffTokens::Token& token : words)
         {
-            const std::string_view word = line.substr(static_cast<size_t>(begin), static_cast<size_t>(end - begin));
-            if (!ALDiffTokens::blank(word.front()))
+            if (!ALDiffTokens::isBlank(line, token))
             {
+                const std::string_view word = line.substr(static_cast<size_t>(token.begin), static_cast<size_t>(token.end - token.begin));
                 out.push_back(like.ignoreCase ? ids.idOfMade(ALTextDiff::likenessOf(word, ALTextDiff::Likeness{ false, true })) : ids.idOf(word));
             }
         }
@@ -79,14 +81,16 @@ namespace
     }
 }
 
-F32 ALLinePairs::alike(std::string_view left, std::string_view right, const ALTextDiff::Options& options)
+F32 ALLinePairs::alike(std::string_view left, std::string_view right, const ALTextDiff::Options& options, const ALTextDiff::regions_t* left_regions,
+                       const ALTextDiff::regions_t* right_regions)
 {
     ALDiffIds ids;
-    return diceOf(bagOf(left, options.like, ids), bagOf(right, options.like, ids));
+    return diceOf(bagOf(left, options.like, ids, left_regions), bagOf(right, options.like, ids, right_regions));
 }
 
 ALLinePairs::pairs_t ALLinePairs::pair(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<S32>& gone,
-                                        const std::vector<S32>& made, const ALTextDiff::Options& options)
+                                        const std::vector<S32>& made, const ALTextDiff::Options& options,
+                                        const std::vector<ALTextDiff::regions_t>* left_regions, const std::vector<ALTextDiff::regions_t>* right_regions)
 {
     const size_t n = gone.size();
     const size_t m = made.size();
@@ -100,11 +104,11 @@ ALLinePairs::pairs_t ALLinePairs::pair(const std::vector<std::string>& left, con
     std::vector<std::vector<S32>> b(m);
     for (size_t i = 0; i < n; ++i)
     {
-        a[i] = bagOf(left[static_cast<size_t>(gone[i])], options.like, ids);
+        a[i] = bagOf(left[static_cast<size_t>(gone[i])], options.like, ids, left_regions ? &(*left_regions)[static_cast<size_t>(gone[i])] : nullptr);
     }
     for (size_t j = 0; j < m; ++j)
     {
-        b[j] = bagOf(right[static_cast<size_t>(made[j])], options.like, ids);
+        b[j] = bagOf(right[static_cast<size_t>(made[j])], options.like, ids, right_regions ? &(*right_regions)[static_cast<size_t>(made[j])] : nullptr);
     }
     // A pair the anchors keep weighs more than all the rest could.
     const F32  kept   = static_cast<F32>(n + m + 1);

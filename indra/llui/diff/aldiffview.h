@@ -222,6 +222,9 @@ private:
     void          restorePlace(const Place& place);
     // Compared again as lines are now told the same, the caret kept.
     void          setLikeness(const ALTextDiff::Likeness& like);
+    // Words cut by a grammar's tokens, where it is one of code; compared
+    // again, the caret kept.
+    void          compareBy(const std::shared_ptr<const ALSyntaxGrammar>& grammar);
     // A row's top down a side's text: its line's, or as far down the gap
     // it is in as there are rows of it drawn before it. Past the last
     // row, the bottom of the text.
@@ -281,6 +284,8 @@ private:
     U32                       mColorsGeneration = U32_MAX;
     LLColor4                  mCurrentColor;
     LLColor4                  mDividerColor;
+    // The grammar words are cut by: none for prose.
+    std::shared_ptr<const ALSyntaxGrammar> mLexedBy;
     // What each folded row says, and the ranges drawn as bands, worked out
     // as the comparison is filled.
     std::vector<std::string>  mFoldSaid;

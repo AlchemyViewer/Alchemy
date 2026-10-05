@@ -41,6 +41,7 @@
 
 #include "linden_common.h"
 
+#include "aldifflexer.h"
 #include "aldiffmodel.h"
 #include "altextdiff.h"
 
@@ -53,6 +54,10 @@
 #include <random>
 #include <string>
 #include <vector>
+
+#ifndef LLUI_TEST_APP_DIR
+#  define LLUI_TEST_APP_DIR ""
+#endif
 
 #if defined(LL_RELEASE)
 namespace
@@ -190,6 +195,7 @@ namespace
     {
         ALDiffModel model;
         model.setLikeness(options.like);
+        model.setLexer(options.lexer);
         model.setTexts(left, right);
         S32 removed = 0, added = 0, paired = 0, marks = 0;
         for (S32 line = 0; line < model.lineCount(ALDiffModel::Column::Left); ++line)
@@ -243,20 +249,34 @@ int main(int, char**)
     }
 
     std::printf("\nLaid out (ALDiffModel: lines, pairs, words, rows)\n");
-    const auto laid = [&](const std::string& left, const std::string& right) {
+    // LSL's grammar, where the source tree has it, for words cut as code.
+    std::string                            error;
+    std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+    const auto lexer = [&lsl]() { return lsl ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)) : ALTextDiff::lexer_t(); };
+    const auto laid  = [&](const std::string& left, const std::string& right, bool grammar) {
         return ms_per_item(1, [&] {
             ALDiffModel model;
+            if (grammar)
+            {
+                model.setLexer(lexer());
+            }
             model.setTexts(left, right);
             g_sink = g_sink + static_cast<size_t>(model.rowCount(ALDiffModel::Layout::Sides));
         });
     };
-    row("ten edits", laid(small_t, small10t), laid(big_t, big10t));
-    row("a thousand edits", laid(small_t, small1kt), laid(big_t, big1kt));
+    row("ten edits", laid(small_t, small10t, false), laid(big_t, big10t, false));
+    row("a thousand edits", laid(small_t, small1kt, false), laid(big_t, big1kt, false));
+    row("ten edits, words by LSL's grammar", laid(small_t, small10t, true), laid(big_t, big10t, true));
+    row("a thousand edits, words by LSL's grammar", laid(small_t, small1kt, true), laid(big_t, big1kt, true));
     // A live comparison, the right typed in: a character put in a line
     // near the middle and compared again, then taken out and compared
     // again; per keystroke.
-    const auto typed = [&](const std::string& left, const std::string& right) {
+    const auto typed = [&](const std::string& left, const std::string& right, bool grammar = false) {
         ALDiffModel model;
+        if (grammar)
+        {
+            model.setLexer(lexer());
+        }
         model.setTexts(left, right);
         const size_t at   = right.find('\n', right.size() / 2);
         std::string  with = right;
@@ -269,9 +289,12 @@ int main(int, char**)
     };
     row("a keystroke, ten edits", typed(small_t, small10t), typed(big_t, big10t));
     row("a keystroke, a thousand edits", typed(small_t, small1kt), typed(big_t, big1kt));
+    row("a keystroke, a thousand edits, LSL's grammar", typed(small_t, small1kt, true), typed(big_t, big1kt, true));
 
     std::printf("\nWhat it says (5,000 lines)\n");
     std::printf("  %-36s %8s %8s %8s %8s %8s\n", "", "changes", "out", "in", "paired", "words");
+    ALTextDiff::Options by_grammar;
+    by_grammar.lexer = lexer();
     says("ten edits", small_t, small10t);
     says("a thousand edits", small_t, small1kt);
     says("a function moved", small_t, joined(moved(small)));
@@ -287,6 +310,7 @@ int main(int, char**)
         right.erase(right.begin() + 302);
         says("one taken out among six changed", small_t, joined(right));
     }
+    says("a thousand edits, LSL's grammar", small_t, small1kt, by_grammar);
 
     std::printf("\n(checksum %zu)\n", static_cast<size_t>(g_sink));
     return 0;

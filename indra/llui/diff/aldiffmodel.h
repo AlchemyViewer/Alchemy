@@ -140,6 +140,10 @@ public:
     // How lines are told the same: the runs folded as foldsSame() says,
     // since they are others now.
     void    setLikeness(const ALTextDiff::Likeness& like);
+    // How lines are cut into words -- a grammar's tokens, or none for their
+    // bytes alone -- and so which lines of a change pair and what is
+    // marked in them.
+    void    setLexer(ALTextDiff::lexer_t lexer);
 
     const std::string&           leftText() const { return mLeftText; }
     const std::string&           rightText() const { return mRightText; }

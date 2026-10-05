@@ -26,6 +26,8 @@
 
 #include "aldiffview.h"
 
+#include "aldifflexer.h"
+
 #include "alcodeeditor.h"
 #include "aldiffbar.h"
 #include "aldiffmodel.h"
@@ -200,6 +202,7 @@ void ALDiffView::setSyntax(const std::string& syntax)
     {
         side->setSyntax(syntax);
     }
+    compareBy(mLeft->highlighter().grammar());
 }
 
 void ALDiffView::setGrammar(std::shared_ptr<const ALSyntaxGrammar> grammar)
@@ -208,6 +211,27 @@ void ALDiffView::setGrammar(std::shared_ptr<const ALSyntaxGrammar> grammar)
     {
         side->setGrammar(grammar);
     }
+    compareBy(grammar);
+}
+
+void ALDiffView::compareBy(const std::shared_ptr<const ALSyntaxGrammar>& grammar)
+{
+    // Prose, or none: words by their bytes.
+    const std::shared_ptr<const ALSyntaxGrammar> code = grammar && !grammar->prose() ? grammar : nullptr;
+    if (code == mLexedBy)
+    {
+        return;
+    }
+    mLexedBy = code;
+    if (mModel.leftText().empty() && mModel.rightText().empty())
+    {
+        mModel.setLexer(code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t());
+        return;
+    }
+    const Place place = placeOfCaret();
+    mModel.setLexer(code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t());
+    fill();
+    restorePlace(place);
 }
 
 void ALDiffView::setFont(const LLFontGL* font)

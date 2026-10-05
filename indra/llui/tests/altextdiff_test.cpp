@@ -30,6 +30,7 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <random>
 #include <string>
 #include <vector>
@@ -184,7 +185,9 @@ namespace tut
         ALTextDiff::words("same", "same", left, right);
         ensure("nothing", left.empty() && right.empty());
         ALTextDiff::words("x = \xC3\xA9t\xC3\xA9;", "x = \xC3\xA9t\xC3\xA9s;", left, right);
-        ensure("a word past ASCII is one word", left.size() == 1 && left[0] == std::make_pair(4, 9) && right[0] == std::make_pair(4, 10));
+        ensure("a word past ASCII one word, a letter put on it marked alone", left.empty() && right.size() == 1 && right[0] == std::make_pair(9, 10));
+        ALTextDiff::words("caf\xC3\xA9", "caf\xC3\xA8", left, right);
+        ensure("a letter past ASCII changed: the whole letter, not half of it", left == ALTextDiff::spans_t{ { 3, 5 } } && right == ALTextDiff::spans_t{ { 3, 5 } });
     }
 
     template<> template<>
@@ -347,7 +350,7 @@ namespace tut
     template<> template<>
     void altextdiff_object::test<11>()
     {
-        set_test_name("within a line, the fewest changes: as many marked as a longest common run of words leaves");
+        set_test_name("within a line: what is not marked the same on both sides, and no less marked than a longest common run of words leaves");
         std::mt19937                       random(99);
         const std::string                  marks = ".,;:";
         std::uniform_int_distribution<int> mark(0, 3);
@@ -386,8 +389,26 @@ namespace tut
             {
                 put += end - begin;
             }
-            ensure_equals("taken out: " + left + " | " + right, taken, static_cast<S32>(left.size()) - lcs[0][0]);
-            ensure_equals("put in: " + left + " | " + right, put, static_cast<S32>(right.size()) - lcs[0][0]);
+            ensure("taken out, at least: " + left + " | " + right, taken >= static_cast<S32>(left.size()) - lcs[0][0]);
+            ensure("put in, at least: " + left + " | " + right, put >= static_cast<S32>(right.size()) - lcs[0][0]);
+            // What is left unmarked on each side reads the same.
+            const auto unmarked = [](const std::string& text, const ALTextDiff::spans_t& spans) {
+                std::string out;
+                for (size_t i = 0; i < text.size(); ++i)
+                {
+                    bool in = false;
+                    for (const auto& [begin, end] : spans)
+                    {
+                        in = in || (static_cast<S32>(i) >= begin && static_cast<S32>(i) < end);
+                    }
+                    if (!in)
+                    {
+                        out += text[i];
+                    }
+                }
+                return out;
+            };
+            ensure_equals("unmarked, the same: " + left + " | " + right, unmarked(left, lout), unmarked(right, rout));
         }
     }
 
@@ -422,7 +443,7 @@ namespace tut
 
         ALTextDiff::spans_t left, right;
         ALTextDiff::words("x  =  1;", "x = 2;", left, right);
-        ensure("as they are: the blanks marked too", left.size() == 2 && left[0] == std::make_pair(1, 3));
+        ensure("as they are: the blanks marked too, the lone = between them with them", left == ALTextDiff::spans_t{ { 1, 7 } } && right == ALTextDiff::spans_t{ { 1, 5 } });
         ALTextDiff::words("x  =  1;", "x = 2;", left, right, as(blanks));
         ensure("blanks let go of: the number alone", left.size() == 1 && left[0] == std::make_pair(6, 7) && right.size() == 1 && right[0] == std::make_pair(4, 5));
         ALTextDiff::words("Say(X)", "say(x)", left, right, as(ALTextDiff::Likeness{ false, true }));
@@ -492,5 +513,41 @@ namespace tut
         }
         const P placed = ALLinePairs::pair(many_left, many_right, gone, made);
         ensure("by place, the unlike first alone", placed.size() == 399 && placed.front() == std::make_pair(1, 1) && placed.back() == std::make_pair(399, 399));
+    }
+
+    template<> template<>
+    void altextdiff_object::test<15>()
+    {
+        set_test_name("words cleaned up: a lone dot or bracket between changes folded into them; a name with a letter more marked by it; code's operators, strings' and comments' words");
+        typedef ALTextDiff::spans_t S;
+        S left, right;
+        ALTextDiff::words("x.y(z)", "p.q(r)", left, right);
+        ensure("chaff folded: one mark each side", left == S{ { 0, 5 } } && right == S{ { 0, 5 } });
+        ALTextDiff::words("foo(a, b)", "bar(a, c)", left, right);
+        ensure("a match longer than the changes kept", left == S{ { 0, 3 }, { 7, 8 } } && right == S{ { 0, 3 }, { 7, 8 } });
+        ALTextDiff::words("integer count = 0;", "integer counts = 0;", left, right);
+        ensure("a letter put on a name: it alone", left.empty() && right == S{ { 13, 14 } });
+        ALTextDiff::words("helper12();", "helper13();", left, right);
+        ensure("a name's last digit", left == S{ { 7, 8 } } && right == S{ { 7, 8 } });
+        ALTextDiff::words("x = 4;", "x = 40;", left, right);
+        ensure("a short word: all of it", left == S{ { 4, 5 } } && right == S{ { 4, 6 } });
+
+        // By regions: code's operators whole, a string's and a comment's text
+        // cut as prose.
+        const std::string            was  = "if (a == b) llSay(0, \"hello world\"); // don't count these";
+        const std::string            now  = "if (a != b) llSay(0, \"hello earth\"); // do count those";
+        typedef ALTextDiff::Region   R;
+        const ALTextDiff::regions_t  was_regions = { { 0, 21, R::Code }, { 21, 34, R::String }, { 34, 37, R::Code }, { 37, 57, R::Comment } };
+        const ALTextDiff::regions_t  now_regions = { { 0, 21, R::Code }, { 21, 34, R::String }, { 34, 37, R::Code }, { 37, 54, R::Comment } };
+        ALTextDiff::words(was, now, left, right, ALTextDiff::Options(), &was_regions, &now_regions);
+        ensure("the operator whole", !left.empty() && left[0] == std::make_pair(6, 8) && right[0] == std::make_pair(6, 8));
+        ensure("the string's word", std::find(left.begin(), left.end(), std::make_pair(28, 33)) != left.end());
+        ensure("don't one word", std::find(left.begin(), left.end(), std::make_pair(40, 45)) != left.end() &&
+                                     std::find(right.begin(), right.end(), std::make_pair(40, 42)) != right.end());
+        ALTextDiff::words(was, now, left, right);
+        ensure("without them, by bytes: = and ! alone", !left.empty() && left[0] == std::make_pair(6, 7) && right[0] == std::make_pair(6, 7));
+
+        ALTextDiff::words("the quick brown fox", "the quick red fox", left, right);
+        ensure("prose as it was", left == S{ { 10, 15 } } && right == S{ { 10, 13 } });
     }
 }

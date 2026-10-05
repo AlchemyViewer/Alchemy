@@ -135,6 +135,12 @@ void ALDiffModel::setLikeness(const ALTextDiff::Likeness& like)
     build();
 }
 
+void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer)
+{
+    mOptions.lexer = std::move(lexer);
+    build(foldsOpen());
+}
+
 // --- made --------------------------------------------------------------------------
 
 S32 ALDiffModel::add(Column column, const std::string& text, S32 number, Kind kind, char sign)
@@ -186,6 +192,22 @@ void ALDiffModel::build(const std::vector<bool>& open)
     ALTextDiff::Options options = mOptions;
     options.anchors             = std::move(anchors);
     const std::vector<ALTextDiff::Run> runs = ALTextDiff::lines(left, right, options);
+    // Each text's lines' regions, where a grammar cuts their words.
+    const std::vector<ALTextDiff::regions_t>* left_regions  = nullptr;
+    const std::vector<ALTextDiff::regions_t>* right_regions = nullptr;
+    if (mOptions.lexer)
+    {
+        left_regions  = &mOptions.lexer(left);
+        right_regions = &mOptions.lexer(right);
+        if (left_regions->size() != left.size() || right_regions->size() != right.size())
+        {
+            left_regions  = nullptr;
+            right_regions = nullptr;
+        }
+    }
+    const auto regionsOf = [](const std::vector<ALTextDiff::regions_t>* regions, S32 line) {
+        return regions ? &(*regions)[static_cast<size_t>(line)] : nullptr;
+    };
     for (ColumnData& c : mColumns)
     {
         c = ColumnData();
@@ -286,7 +308,7 @@ void ALDiffModel::build(const std::vector<bool>& open)
         // once for both ways of showing; the rest taken out or put in alone,
         // beside a row of nothing, what was taken out before what was put
         // in between two pairs.
-        const ALLinePairs::pairs_t pairs = ALLinePairs::pair(left, right, gone, made, options);
+        const ALLinePairs::pairs_t pairs = ALLinePairs::pair(left, right, gone, made, options, left_regions, right_regions);
         std::vector<std::pair<ALTextDiff::spans_t, ALTextDiff::spans_t>> paired;
         size_t                                                           g = 0;
         size_t                                                           d = 0;
@@ -311,7 +333,8 @@ void ALDiffModel::build(const std::vector<bool>& open)
             add(Column::Left, left[static_cast<size_t>(gone[g])], gone[g] + 1, Kind::Removed, '~');
             add(Column::Right, right[static_cast<size_t>(made[d])], made[d] + 1, Kind::Added, '~');
             auto& [lspans, rspans] = paired.emplace_back();
-            ALTextDiff::words(left[static_cast<size_t>(gone[g])], right[static_cast<size_t>(made[d])], lspans, rspans, mOptions);
+            ALTextDiff::words(left[static_cast<size_t>(gone[g])], right[static_cast<size_t>(made[d])], lspans, rspans, mOptions, regionsOf(left_regions, gone[g]),
+                              regionsOf(right_regions, made[d]));
             of(Column::Left).lines.back().words  = lspans;
             of(Column::Right).lines.back().words = rspans;
             ++g;

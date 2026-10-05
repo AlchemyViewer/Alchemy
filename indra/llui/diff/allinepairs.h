@@ -51,13 +51,16 @@ namespace ALLinePairs
     // Of `gone`, lines of the left, and `made`, lines of the right, in
     // order, the pairs -- rising in both -- that are alike enough and alike
     // the most in all, the rest standing alone. A pair the options' anchors
-    // keep beside each other is a pair however unlike.
+    // keep beside each other is a pair however unlike. Each text's lines'
+    // regions, where it has them, cut its words.
     pairs_t pair(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<S32>& gone,
-                 const std::vector<S32>& made, const ALTextDiff::Options& options = ALTextDiff::Options());
-    // How alike two lines are: of the words both have -- not blanks --
-    // the share in common (Dice's: twice those in common over all of
-    // both), from nought to one; two lines of no words alike.
-    F32 alike(std::string_view left, std::string_view right, const ALTextDiff::Options& options = ALTextDiff::Options());
+                 const std::vector<S32>& made, const ALTextDiff::Options& options = ALTextDiff::Options(),
+                 const std::vector<ALTextDiff::regions_t>* left_regions = nullptr, const std::vector<ALTextDiff::regions_t>* right_regions = nullptr);
+    // How alike two lines are: of the words both have (ALDiffTokens) --
+    // not blanks -- the share in common (Dice's: twice those in common over
+    // all of both), from nought to one; two lines of no words alike.
+    F32 alike(std::string_view left, std::string_view right, const ALTextDiff::Options& options = ALTextDiff::Options(),
+              const ALTextDiff::regions_t* left_regions = nullptr, const ALTextDiff::regions_t* right_regions = nullptr);
 }
 
 #endif // AL_ALLINEPAIRS_H

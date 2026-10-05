@@ -29,6 +29,7 @@
 #include "aldiffids.h"
 #include "aldifftokens.h"
 #include "allinediff.h"
+#include "alworddiff.h"
 
 #include <algorithm>
 #include <limits>
@@ -37,17 +38,6 @@ namespace
 {
     typedef ALTextDiff::Run  Run;
     typedef ALTextDiff::Kind Kind;
-
-    // Spans side by side made one.
-    void add(ALTextDiff::spans_t& out, S32 begin, S32 end)
-    {
-        if (!out.empty() && out.back().second == begin)
-        {
-            out.back().second = end;
-            return;
-        }
-        out.emplace_back(begin, end);
-    }
 }
 
 std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like)
@@ -288,58 +278,8 @@ std::vector<std::string> ALTextDiff::split(std::string_view text)
     }
 }
 
-void ALTextDiff::words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out, const Options& options)
+void ALTextDiff::words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out, const Options& options,
+                       const regions_t* left_regions, const regions_t* right_regions)
 {
-    const Likeness& like = options.like;
-    left_out.clear();
-    right_out.clear();
-    // Each side's words as compared: blanks, where they are let go of, none.
-    const auto compared = [&like](std::string_view line) {
-        std::vector<std::pair<S32, S32>> kept;
-        for (const auto& word : ALDiffTokens::words(line))
-        {
-            if (!like.ignoreWhitespace || !ALDiffTokens::blank(line[static_cast<size_t>(word.first)]))
-            {
-                kept.push_back(word);
-            }
-        }
-        return kept;
-    };
-    const std::vector<std::pair<S32, S32>> lw = compared(left);
-    const std::vector<std::pair<S32, S32>> rw = compared(right);
-    std::vector<std::string>               keys;
-    keys.reserve(lw.size() + rw.size());
-    for (const auto& [begin, end] : lw)
-    {
-        keys.push_back(likenessOf(left.substr(static_cast<size_t>(begin), static_cast<size_t>(end - begin)), Likeness{ false, like.ignoreCase }));
-    }
-    for (const auto& [begin, end] : rw)
-    {
-        keys.push_back(likenessOf(right.substr(static_cast<size_t>(begin), static_cast<size_t>(end - begin)), Likeness{ false, like.ignoreCase }));
-    }
-    ALDiffIds        ids;
-    std::vector<S32> a;
-    std::vector<S32> b;
-    for (size_t i = 0; i < lw.size(); ++i)
-    {
-        a.push_back(ids.idOf(keys[i]));
-    }
-    for (size_t i = 0; i < rw.size(); ++i)
-    {
-        b.push_back(ids.idOf(keys[lw.size() + i]));
-    }
-    for (const Run& run : ALLineDiff::myers(a, b))
-    {
-        for (S32 i = 0; i < run.count; ++i)
-        {
-            if (run.kind == Kind::Removed)
-            {
-                add(left_out, lw[static_cast<size_t>(run.left + i)].first, lw[static_cast<size_t>(run.left + i)].second);
-            }
-            else if (run.kind == Kind::Added)
-            {
-                add(right_out, rw[static_cast<size_t>(run.right + i)].first, rw[static_cast<size_t>(run.right + i)].second);
-            }
-        }
-    }
+    ALWordDiff::diff(left, right, left_out, right_out, options, left_regions, right_regions);
 }

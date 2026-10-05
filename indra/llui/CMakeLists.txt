@@ -136,11 +136,13 @@ target_sources(
     fields/alcolorsheet.cpp
     base/aldeferredrebuild.cpp
     diff/aldiffbar.cpp
+    diff/aldifflexer.cpp
     diff/aldiffmodel.cpp
     diff/aldifftokens.cpp
     diff/aldiffview.cpp
     diff/allinediff.cpp
     diff/allinepairs.cpp
+    diff/alworddiff.cpp
     studio/aldockpanel.cpp
     studio/alemptystate.cpp
     fields/alflagsfield.cpp
@@ -356,11 +358,13 @@ target_sources(
         base/aldeferredrebuild.h
         diff/aldiffbar.h
         diff/aldiffids.h
+        diff/aldifflexer.h
         diff/aldiffmodel.h
         diff/aldifftokens.h
         diff/aldiffview.h
         diff/allinediff.h
         diff/allinepairs.h
+        diff/alworddiff.h
         studio/aldockpanel.h
         studio/alemptystate.h
         fields/alflagsfield.h
@@ -532,7 +536,13 @@ if(AL_BUILD_TESTS)
   al_add_test(llurlmatch UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(alkeymap UNIT PROJECT llui DIR code LIBRARIES ${test_libs})
   # What comparing two texts is made of, compiled in, below the view.
-  set(diff_sources diff/aldifftokens.cpp diff/allinediff.cpp diff/allinepairs.cpp)
+  set(
+    diff_sources
+    diff/aldifftokens.cpp
+    diff/allinediff.cpp
+    diff/allinepairs.cpp
+    diff/alworddiff.cpp
+  )
   al_add_test(altextdiff UNIT PROJECT llui DIR diff SOURCES ${diff_sources} LIBRARIES ${test_libs})
   al_add_test(
     aldiffmodel
@@ -541,6 +551,17 @@ if(AL_BUILD_TESTS)
     DIR diff
     SOURCES diff/altextdiff.cpp ${diff_sources}
     LIBRARIES ${test_libs}
+  )
+  # A grammar's regions for a comparison, read again only where a text
+  # changed: over the grammars the viewer ships.
+  al_add_test(
+    aldifflexer
+    UNIT
+    PROJECT llui
+    DIR diff
+    SOURCES code/alsyntaxgrammar.cpp diff/altextdiff.cpp ${diff_sources}
+    LIBRARIES ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
   al_add_test(alanchoredranges PROJECT llui SOURCES text/altextdocument.cpp LIBRARIES ${test_libs})
   al_add_test(alfenwicktree PROJECT llui LIBRARIES ${test_libs})
@@ -728,7 +749,13 @@ if(AL_BUILD_TESTS)
   # Comparing big scripts, by lines and laid out, and what each comparison
   # says of some edits: what each change to how texts are compared is
   # measured and judged by.
-  al_add_bench(altextdiff PROJECT llui LIBRARIES ${test_libs} INCLUDES ${INDRA_SOURCE_DIR}/test)
+  al_add_bench(
+    altextdiff
+    PROJECT llui
+    LIBRARIES ${test_libs}
+    INCLUDES ${INDRA_SOURCE_DIR}/test
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
   # The same editor drawn, a frame at a time, into llrender's hidden window:
   # what the drawing steps are measured by.
   al_add_bench(

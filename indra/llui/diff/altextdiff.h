@@ -27,6 +27,7 @@
 
 #include "stdtypes.h"
 
+#include <functional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -43,8 +44,9 @@
 //
 // This is what is compared and how, and the ways in; the work is done
 // beside it, a part a file: the ways lines are found (ALLineDiff), the
-// words a line is cut into (ALDiffTokens), and which lines of a change
-// stand for each other (ALLinePairs).
+// words a line is cut into (ALDiffTokens), the words of two lines
+// compared (ALWordDiff), and which lines of a change stand for each other
+// (ALLinePairs).
 //
 // A text's lines are its own to split; a line holds no line break.
 namespace ALTextDiff
@@ -103,13 +105,39 @@ namespace ALTextDiff
         Histogram
     };
 
-    // How two texts are compared: by what way, what is let go of, and
-    // where they are known to line up.
+    // What a stretch of a line is, as its words are cut: code, cut as a
+    // language's tokens are; or text written to be read -- a string's, a
+    // comment's -- cut as prose is.
+    enum class Region : U8
+    {
+        Code,
+        String,
+        Comment
+    };
+    struct Piece
+    {
+        S32    begin  = 0;
+        S32    end    = 0;
+        Region region = Region::Code;
+
+        bool operator==(const Piece& other) const = default;
+    };
+    // A line's stretches, in order, covering it; none, all of it code.
+    typedef std::vector<Piece> regions_t;
+    // A text's lines, the stretches of each, by a grammar: what a
+    // comparison of code is given by whoever knows its language. Without
+    // one, a line's words are cut by their bytes alone (prose, notecards).
+    // What it answers stays its own until it is asked again.
+    typedef std::function<const std::vector<regions_t>&(const std::vector<std::string>& lines)> lexer_t;
+
+    // How two texts are compared: by what way, what is let go of, where
+    // they are known to line up, and how their lines are cut into words.
     struct Options
     {
         Algorithm algorithm = Algorithm::Histogram;
         Likeness  like;
         anchors_t anchors;
+        lexer_t   lexer;
     };
 
     // The runs that make the left the right, compared as `options` says.
@@ -143,10 +171,12 @@ namespace ALTextDiff
     std::vector<std::string> split(std::string_view text);
 
     // Within one line changed into another, the stretches of each, as
-    // [begin, end) in bytes, that are not the other's: by words --
-    // identifiers and numbers, runs of blanks, each other character.
+    // [begin, end) in bytes, that are not the other's: by words, each
+    // line's stretches cut as their regions say (ALDiffTokens), the fewest
+    // changed, then cleaned up (ALWordDiff).
     typedef std::vector<std::pair<S32, S32>> spans_t;
-    void words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out, const Options& options = Options());
+    void words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out, const Options& options = Options(),
+               const regions_t* left_regions = nullptr, const regions_t* right_regions = nullptr);
     // A line or a word as it is compared, told the same so.
     std::string likenessOf(std::string_view text, const Likeness& like);
 }

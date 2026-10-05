@@ -28,7 +28,9 @@
 
 #include "../test/lltut.h"
 
+#include <deque>
 #include <initializer_list>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -399,5 +401,26 @@ namespace tut
         // Lines kept beside each other by a range: a pair however unlike.
         m.setTexts("default\n{\n    touch_start(integer d)", "-- x\nLLEvents:on(\"touch_start\", function(detected)", { { 2, 2, 1, 1 } });
         ensure("the anchored pair paired", beside(2, 1) && m.line(Column::Left, 2).sign == '~');
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<13>()
+    {
+        set_test_name("a lexer cuts words by regions: code's operators whole in a pair's marks; without one, by bytes");
+        m.setTexts("x = 1;\nif (a == b) go();", "x = 1;\nif (a != b) go();");
+        ensure("by bytes: the = alone", m.line(Column::Left, 1).words == ALTextDiff::spans_t{ { 6, 7 } });
+        // Every line all code, kept where what it answers stays put.
+        auto said = std::make_shared<std::deque<std::vector<ALTextDiff::regions_t>>>();
+        m.setLexer([said](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            std::vector<ALTextDiff::regions_t>& out = said->emplace_back();
+            for (const std::string& line : lines)
+            {
+                out.push_back({ ALTextDiff::Piece{ 0, static_cast<S32>(line.size()), ALTextDiff::Region::Code } });
+            }
+            return out;
+        });
+        ensure("asked for both texts", said->size() == 2);
+        ensure("as code: the operator whole", m.line(Column::Left, 1).words == ALTextDiff::spans_t{ { 6, 8 } } &&
+                                                 m.line(Column::Right, 1).words == ALTextDiff::spans_t{ { 6, 8 } });
     }
 }
