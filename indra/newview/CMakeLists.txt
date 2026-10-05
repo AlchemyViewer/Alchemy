@@ -2526,6 +2526,7 @@ if(AL_BUILD_TESTS)
     llvocache
     lutcube
     noise
+    skfarplane
   )
     al_add_test(${test} UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
   endforeach()
