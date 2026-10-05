@@ -388,7 +388,12 @@ if(AL_BUILD_TESTS)
       INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF
   )
   if(COMPILER_IS_MSVC)
-    target_compile_options(alsimd_asm_probe PRIVATE /FAs)
+    # Visual Studio points /Fa at the object's directory itself; Ninja leaves
+    # it to cl, which writes the listing to the build tree's root.
+    target_compile_options(
+      alsimd_asm_probe
+      PRIVATE /FAs "/Fa$<PATH:GET_PARENT_PATH,$<TARGET_OBJECTS:alsimd_asm_probe>>/"
+    )
     set(alsimd_asm_syntax masm)
   elseif(COMPILER_IS_CLANG_CL)
     target_compile_options(alsimd_asm_probe PRIVATE /clang:-save-temps=obj)
@@ -427,7 +432,10 @@ if(AL_BUILD_TESTS)
   # copies from mSelf, scalarised, for one read before it is set -- a false
   # positive on test 1's queue.getWeak(), and under -Werror a failed build.
   if(COMPILER_IS_GCC)
-    set_source_files_properties(tests/workqueue_test.cpp PROPERTIES COMPILE_OPTIONS -Wno-uninitialized)
+    set_source_files_properties(
+      tests/workqueue_test.cpp
+      PROPERTIES COMPILE_OPTIONS -Wno-uninitialized
+    )
   endif()
 
   # The viewer's own patterns under Boost.Regex and under RE2, side by side,
