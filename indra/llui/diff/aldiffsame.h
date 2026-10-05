@@ -30,6 +30,7 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -45,26 +46,32 @@
 // as they are: an LSL line is not the same as its SLua.
 //
 // A pair joins those already joined: llSay = ll.Say and ll.Say = llsay
-// make all three one.
+// make all three one. Besides the pairs, words one text has that the
+// other has nothing for -- LSL's semicolons -- may be let go of: neither
+// compared nor marked.
 class ALDiffSame
 {
 public:
     typedef std::vector<std::pair<std::string, std::string>> pairs_t;
 
-    static std::shared_ptr<const ALDiffSame> make(const pairs_t& pairs);
+    static std::shared_ptr<const ALDiffSame> make(const pairs_t& pairs, const std::vector<std::string>& dropped = {});
     // Both tables' pairs, either possibly none.
     static std::shared_ptr<const ALDiffSame> joined(const std::shared_ptr<const ALDiffSame>& a, const std::shared_ptr<const ALDiffSame>& b);
 
-    const pairs_t& pairs() const { return mPairs; }
+    const pairs_t&                  pairs() const { return mPairs; }
+    const std::vector<std::string>& dropped() const { return mDropped; }
     // The words of a line run together where they spell a word of the
-    // table -- the longest, from each word on -- and none of them blanks.
+    // table -- the longest, from each word on -- and none of them blanks;
+    // and those it lets go of left out.
     void           join(std::string_view line, ALDiffTokens::tokens_t& words) const;
     // A word's class, -1 for none: the same for every word the table makes
-    // one.
+    // one; DROPPED for one it lets go of.
+    static constexpr S32 DROPPED = std::numeric_limits<S32>::max();
     S32            classOf(std::string_view word) const;
 
 private:
     pairs_t                                                                             mPairs;
+    std::vector<std::string>                                                            mDropped;
     boost::unordered_flat_map<std::string, S32, ll::string_hash, std::equal_to<>>      mClasses;
     size_t                                                                              mLongest = 0;
 };

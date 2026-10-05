@@ -29,6 +29,7 @@
 #include "alscriptstudioaccount.h"
 
 #include "alcodeeditor.h"
+#include "aldiffsame.h"
 #include "aldiffview.h"
 #include "aldiskincludes.h"
 #include "allsltoslua.h"
@@ -7795,10 +7796,14 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     const std::string         name     = getString("ConvertName", args);
     const std::string         lsl      = expanded ? *doc.expanded.text : source;
     const std::string         text     = converted.text;
-    ALTextDiff::ranges_t      ranges;
+    // Each stretch beside the SLua written of it, with the words the SLua
+    // says otherwise -- llSay as ll.Say, != as ~= -- taken as the same in
+    // it, and the LSL's semicolons let go of: one table for them all.
+    const ALTextDiff::same_t same = ALDiffSame::make(converted.same, converted.dropped);
+    ALTextDiff::ranges_t     ranges;
     for (const ALLSLToSLua::Span& span : converted.spans)
     {
-        ranges.push_back({ span.lslFirst, span.lslLast, span.sluaFirst, span.sluaLast });
+        ranges.push_back({ span.lslFirst, span.lslLast, span.sluaFirst, span.sluaLast, same });
     }
     // Its notes beside the LSL they are about, as the SLua has them over
     // the lines written of it.

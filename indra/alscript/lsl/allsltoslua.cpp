@@ -42,6 +42,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <set>
+#include <cctype>
 #include <cerrno>
 #include <cmath>
 #include <cstdlib>
@@ -135,6 +137,39 @@ namespace
 
     // What marks a note in the SLua.
     constexpr std::string_view NOTE_MARK = "-- LSL:";
+
+    // What LSL says that SLua always says otherwise, as the writer writes
+    // it: its operators, its blocks, a declaration's type, its truths, a
+    // vector's and a rotation's brackets, a string joined, a cast.
+    const std::pair<std::string, std::string> SAID_OTHERWISE[] = {
+        { "!=", "~=" },
+        { "&&", "and" },
+        { "||", "or" },
+        { "!", "not" },
+        { "{", "then" },
+        { "{", "do" },
+        { "}", "end" },
+        { "integer", "local" },
+        { "float", "local" },
+        { "string", "local" },
+        { "key", "local" },
+        { "vector", "local" },
+        { "rotation", "local" },
+        { "list", "local" },
+        { "TRUE", "true" },
+        { "FALSE", "false" },
+        { "<", "vector(" },
+        { "<", "quaternion(" },
+        { ">", ")" },
+        { "+", ".." },
+        { "+=", "..=" },
+        { "(string)", "tostring" },
+        { "(integer)", "lslInteger" },
+        { "(float)", "lslFloat" },
+        { "(key)", "uuid" },
+        { "(vector)", "tovector" },
+        { "(rotation)", "toquaternion" },
+    };
     // Luau's precedence, loosest first: an if-expression holds everything to
     // its right, so it is bracketed wherever it is an operand.
     enum Prec : int
@@ -352,6 +387,9 @@ namespace
         std::string write();
         ALScriptProblems& notes() { return mNotes; }
         const std::vector<ALLSLToSLua::Span>& spans() const { return mSpans; }
+        // Each LSL word written otherwise, and how: a call's name, a name
+        // SLua holds for its own.
+        const std::set<std::pair<std::string, std::string>>& same() const { return mSame; }
 
     private:
         // --- where the two languages differ -----------------------------------------
@@ -480,6 +518,7 @@ namespace
         std::vector<size_t>        mLineStarts;
         Expr lvalue(LSLLValueExpression* e);
         Expr call(LSLFunctionExpression* e);
+        Expr writeCall(LSLFunctionExpression* e);
         Expr binary(LSLBinaryExpression* e);
         // A bit32 call as LSL's signed integer, but where `same` says its
         // answer is that already, or nothing asks for more.
@@ -762,6 +801,7 @@ namespace
         // node whose first line is written next, once its comments are; and
         // how many lines mText was counted to hold, and to where.
         std::vector<ALLSLToSLua::Span>                   mSpans;
+        std::set<std::pair<std::string, std::string>>    mSame;
         std::optional<std::pair<S32, S32>>               mAnchorPending;
         void                                             endSpans();
         size_t                                           mCounted      = 0;
@@ -935,6 +975,10 @@ namespace
         while (reservedName(name))
         {
             name += "_";
+        }
+        if (lsl && name != lsl)
+        {
+            mSame.emplace(lsl, name);
         }
         return name;
     }
@@ -2355,6 +2399,31 @@ namespace
     }
 
     Expr Writer::call(LSLFunctionExpression* e)
+    {
+        // What the call is named in SLua, where that is another name: the
+        // first name of what is written, past a bracket -- ll.Say,
+        // llcompat.List2String, math.abs -- before its arguments.
+        Expr              written = writeCall(e);
+        const std::string lsl     = e->getIdentifier()->getName();
+        const size_t      from    = written.text.find_first_not_of("( ");
+        size_t            to      = from;
+        while (to < written.text.size() && (std::isalnum(static_cast<unsigned char>(written.text[to])) || written.text[to] == '_' || written.text[to] == '.' ||
+                                            written.text[to] == ':'))
+        {
+            ++to;
+        }
+        if (from != std::string::npos && to > from && to < written.text.size() && written.text[to] == '(')
+        {
+            const std::string slua = written.text.substr(from, to - from);
+            if (slua != lsl)
+            {
+                mSame.emplace(lsl, slua);
+            }
+        }
+        return written;
+    }
+
+    Expr Writer::writeCall(LSLFunctionExpression* e)
     {
         LSLIdentifier* id     = e->getIdentifier();
         LSLSymbol*     symbol = id->getSymbol();
@@ -6483,6 +6552,11 @@ ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& op
         result.notes     = std::move(writer.notes());
         result.spans     = writer.spans();
         result.converted = true;
+        // What SLua always says otherwise, then what this script's calls
+        // and names were written as.
+        result.same.assign(std::begin(SAID_OTHERWISE), std::end(SAID_OTHERWISE));
+        result.same.insert(result.same.end(), writer.same().begin(), writer.same().end());
+        result.dropped = { ";" };
     });
     return result;
 }

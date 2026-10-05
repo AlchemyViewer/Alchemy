@@ -1612,4 +1612,30 @@ namespace tut
         ensure("the handler, over all of it", handler && handler->lslLast == 10 && handler->sluaFirst < block->sluaFirst && handler->sluaLast >= next->sluaLast);
         ensure("to its own end: " + trimmed(handler->sluaLast), trimmed(handler->sluaLast).find("end") == 0);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<48>()
+    {
+        set_test_name("what the SLua says otherwise: each call's name as written, SLua's own way's too, a name SLua holds for its own, the syntax always; semicolons let go of");
+        const ALLSLToSLua::Result r = convert("integer end = 1;\n"
+                                              "default\n"
+                                              "{\n"
+                                              "    state_entry()\n"
+                                              "    {\n"
+                                              "        if (end != 2 && TRUE) llSay(0, \"hi\");\n"
+                                              "        llOwnerSay((string)llAbs(end));\n"
+                                              "    }\n"
+                                              "}\n");
+        const auto has_pair = [&r](const std::string& lsl, const std::string& slua) {
+            return std::find(r.same.begin(), r.same.end(), std::make_pair(lsl, slua)) != r.same.end();
+        };
+        ensure("llSay as ll.Say: " + r.text, has_pair("llSay", "ll.Say"));
+        ensure("llOwnerSay as SLua's print: " + r.text, has_pair("llOwnerSay", "print"));
+        ensure("llAbs as SLua's own: " + r.text, has_pair("llAbs", "math.abs"));
+        ensure("a name Luau holds, marked", has_pair("end", "end_") && has(r, "local end_"));
+        ensure("the syntax", has_pair("!=", "~=") && has_pair("&&", "and") && has_pair("integer", "local") && has_pair("TRUE", "true") &&
+                                 has_pair("(string)", "tostring"));
+        ensure("each once", std::count(r.same.begin(), r.same.end(), std::make_pair(std::string("llSay"), std::string("ll.Say"))) == 1);
+        ensure("semicolons let go of", r.dropped == std::vector<std::string>{ ";" });
+    }
 }

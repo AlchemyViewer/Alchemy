@@ -621,4 +621,33 @@ namespace tut
         m.setTexts(lsl, slua, ranges);
         ensure("new texts: let go of", m.notes().empty());
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<21>()
+    {
+        set_test_name("LSL beside its SLua with the converter's table: a line written otherwise marked only where it says more; without it, nearly all of it");
+        const char* lsl  = "integer end = 1;\nif (end != 2 && TRUE) llSay(0, \"hi\");";
+        const char* slua = "local end_ = 1\nif end_ ~= 2 and true then ll.Say(0, \"hi\") end";
+        const ALTextDiff::same_t table =
+            ALDiffSame::make({ { "end", "end_" }, { "!=", "~=" }, { "&&", "and" }, { "TRUE", "true" }, { "llSay", "ll.Say" }, { "integer", "local" } }, { ";" });
+        const auto marked = [this](Column column, S32 line) {
+            S32 bytes = 0;
+            for (const auto& [begin, end] : m.line(column, line).words)
+            {
+                bytes += end - begin;
+            }
+            return bytes;
+        };
+        m.setTexts(lsl, slua, { { 0, 0, 0, 0 }, { 1, 1, 1, 1 } });
+        const S32 bare_left  = marked(Column::Left, 1);
+        const S32 bare_right = marked(Column::Right, 1);
+        ALTextDiff::ranges_t ranges = { { 0, 0, 0, 0, table }, { 1, 1, 1, 1, table } };
+        m.setTexts(lsl, slua, ranges);
+        ensure("the declaration: nothing", m.line(Column::Left, 0).words.empty() && m.line(Column::Right, 0).words.empty());
+        // What is left is the LSL's brackets round the condition, and the
+        // SLua's then and end, with the blanks beside them.
+        ensure("the if: the LSL's brackets", marked(Column::Left, 1) <= 3 && m.line(Column::Left, 1).words.front() == std::make_pair(3, 4));
+        ensure("the SLua's then and end", marked(Column::Right, 1) <= 10);
+        ensure("far less than without", bare_left > 10 && bare_right > 15);
+    }
 }

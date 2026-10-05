@@ -30,10 +30,11 @@
 #include <numeric>
 
 // static
-std::shared_ptr<const ALDiffSame> ALDiffSame::make(const pairs_t& pairs)
+std::shared_ptr<const ALDiffSame> ALDiffSame::make(const pairs_t& pairs, const std::vector<std::string>& dropped)
 {
-    auto same    = std::make_shared<ALDiffSame>();
-    same->mPairs = pairs;
+    auto same      = std::make_shared<ALDiffSame>();
+    same->mPairs   = pairs;
+    same->mDropped = dropped;
     // Each word a class of its own, then each pair's two classes made one.
     std::vector<S32> parent;
     const auto       find = [&parent](S32 at) {
@@ -67,23 +68,34 @@ std::shared_ptr<const ALDiffSame> ALDiffSame::make(const pairs_t& pairs)
     {
         cls = find(cls);
     }
+    // Those let go of, a class of their own past every pair's.
+    for (const std::string& word : dropped)
+    {
+        if (!word.empty())
+        {
+            same->mClasses[word] = DROPPED;
+            same->mLongest       = std::max(same->mLongest, word.size());
+        }
+    }
     return same;
 }
 
 // static
 std::shared_ptr<const ALDiffSame> ALDiffSame::joined(const std::shared_ptr<const ALDiffSame>& a, const std::shared_ptr<const ALDiffSame>& b)
 {
-    if (!a || a->mPairs.empty())
+    if (!a || (a->mPairs.empty() && a->mDropped.empty()))
     {
         return b;
     }
-    if (!b || b->mPairs.empty())
+    if (!b || (b->mPairs.empty() && b->mDropped.empty()))
     {
         return a;
     }
     pairs_t both = a->mPairs;
     both.insert(both.end(), b->mPairs.begin(), b->mPairs.end());
-    return make(both);
+    std::vector<std::string> dropped = a->mDropped;
+    dropped.insert(dropped.end(), b->mDropped.begin(), b->mDropped.end());
+    return make(both, dropped);
 }
 
 void ALDiffSame::join(std::string_view line, ALDiffTokens::tokens_t& words) const
@@ -113,7 +125,10 @@ void ALDiffSame::join(std::string_view line, ALDiffTokens::tokens_t& words) cons
         }
         ALDiffTokens::Token word = words[i];
         word.end                 = words[i + take - 1].end;
-        out.push_back(word);
+        if (classOf(line.substr(static_cast<size_t>(word.begin), static_cast<size_t>(word.end - word.begin))) != DROPPED)
+        {
+            out.push_back(word);
+        }
         i += take;
     }
     words.swap(out);

@@ -30,6 +30,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 // An LSL script written again as SLua, from Tailslide's tree of it: its
@@ -133,6 +134,13 @@ public:
         // written, which is not always the LSL's: what a diff of the two
         // lines up (ALTextDiff's ranges).
         std::vector<Span> spans;
+        // Each word of the LSL the SLua says otherwise, and what it says --
+        // a call's name (llSay, ll.Say), an operator (!=, ~=), a type a
+        // declaration's local stands for -- which a comparison of the two
+        // takes as one word; and the LSL's words the SLua has nothing for,
+        // its semicolons, which it lets go of (ALDiffSame).
+        std::vector<std::pair<std::string, std::string>> same;
+        std::vector<std::string>                         dropped;
     };
 
     static Result convert(std::string_view lsl, const Options& options);
