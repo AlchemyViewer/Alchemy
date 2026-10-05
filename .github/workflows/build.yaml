@@ -289,9 +289,11 @@ jobs:
       # the individual test fails.
       LOGFAIL: DEBUG
       master_message_template_checkout: ${{ github.workspace }}/.master-message-template
-      # vcpkg Setup
+      # vcpkg Setup. No local binary cache: nothing reads it again on a
+      # runner that lives for one job, and it would hold a zip of every port
+      # built. The setup adds the R2 cache where the job may use it.
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-      VCPKG_BINARY_SOURCES: "clear;default,readwrite"
+      VCPKG_BINARY_SOURCES: "clear"
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -367,7 +369,11 @@ jobs:
 
           echo "build_directory=$build_directory" >> "$GITHUB_OUTPUT"
 
+          # Each port's sources, build tree and staged package go once it is
+          # installed: a cache miss builds every port, and their leftovers
+          # would take the disk the viewer's own build needs.
           cmake -S indra --preset $cmake_preset_name \
+            -DVCPKG_INSTALL_OPTIONS=--clean-after-build \
             -DVCPKG_TARGET_TRIPLET="$vcpkg_triplet" \
             -DAL_BUILD_VIEWER:BOOL="$AL_BUILD_VIEWER" \
             -DAL_BUILD_APPEARANCE_UTILITY:BOOL="$AL_BUILD_APPEARANCE_UTILITY" \
@@ -451,6 +457,8 @@ jobs:
                 ;;
               *)
                 cpack --config "$BUILD_DIRECTORY/CPackConfig.cmake" -C "$cmake_config" -G TXZ -B "$RUNNER_TEMP/package"
+                # The copy of the tree CPack archived.
+                rm -rf "$RUNNER_TEMP/package/_CPack_Packages"
                 viewer_app="$(ls "$RUNNER_TEMP"/package/*.tar.xz 2>/dev/null | head -n 1 || true)"
                 if [[ -z "$viewer_app" ]]; then
                   echo "::error::No .tar.xz package under $RUNNER_TEMP/package"
@@ -561,6 +569,12 @@ jobs:
           done
 
           sentry-cli debug-files upload --include-sources --wait "${paths[@]}"
+
+      # The headroom the row finished with, failed or not.
+      - name: Report disk space
+        if: always()
+        shell: bash
+        run: df -h "$GITHUB_WORKSPACE"
 
       # - name: Upload appearance utility package
       #   uses: actions/upload-artifact@v7

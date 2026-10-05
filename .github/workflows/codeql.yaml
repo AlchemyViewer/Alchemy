@@ -72,7 +72,8 @@ jobs:
             category: /language:c-cpp/os:windows
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-      VCPKG_BINARY_SOURCES: "clear;default,readwrite"
+      # No local binary cache, as in the build: the runner lives for one job.
+      VCPKG_BINARY_SOURCES: "clear"
       # MSBuild keeps its worker nodes alive between builds. One started by
       # the configure, before tracing began, would compile untraced.
       MSBUILDDISABLENODEREUSE: 1

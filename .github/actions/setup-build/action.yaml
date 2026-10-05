@@ -62,18 +62,50 @@ runs:
       shell: bash
       run: brew install autoconf autoconf-archive automake libtool nasm unzip zip
 
+    # The image carries the Xcodes besides the one the build uses and an
+    # Android SDK, none of which the build reads. They go in the background,
+    # while the ports build, rather than holding the job up.
+    - name: macOS disk cleanup
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        df -h /
+        keep="$(cd "${DEVELOPER_DIR:-$(xcode-select -p)}/../.." && pwd -P)"
+        if [[ "$keep" != /Applications/*.app ]]; then
+          echo "::warning::The build's Xcode is not an application under /Applications ($keep); leaving the image as it is"
+          exit 0
+        fi
+        doomed=()
+        shopt -s nullglob
+        for xcode in /Applications/Xcode_*.app; do
+          if [[ "$(cd "$xcode" && pwd -P)" != "$keep" ]]; then
+            doomed+=("$xcode")
+          fi
+        done
+        if [[ -n "${ANDROID_HOME:-}" && -d "$ANDROID_HOME" ]]; then
+          doomed+=("$ANDROID_HOME")
+        fi
+        echo "Keeping $keep; removing ${doomed[*]}"
+        if (( ${#doomed[@]} )); then
+          nohup sudo rm -rf "${doomed[@]}" > /dev/null 2>&1 &
+        fi
+
     - name: Setup python
       uses: actions/setup-python@v7
       with:
         python-version: "3.14"
 
-    # Linux builds with the CMake floor, so the floor is a floor.
+    # Linux builds with the CMake floor, so the floor is a floor; the Visual
+    # Studio 2026 generator needs a newer one. Both are pinned: vcpkg builds
+    # the ports with this CMake and hashes its version into every package
+    # ABI, so a CMake release on PyPI would otherwise miss the whole binary
+    # cache until a protected build filled it again.
     - name: Install python dependencies
       shell: bash
       run: |
         if [[ "$RUNNER_OS" == "Linux" ]]
-        then pip3 install llsd cmake==4.0.0 ninja
-        else pip3 install llsd cmake ninja
+        then pip3 install llsd cmake==4.0.0 ninja==1.13.2
+        else pip3 install llsd cmake==4.4.3 ninja==1.13.2
         fi
 
     - name: Bootstrap vcpkg Windows
