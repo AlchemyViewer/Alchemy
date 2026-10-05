@@ -108,8 +108,9 @@ public:
     // Lines the same folded away: a run of them beyond FOLD_CONTEXT lines
     // either side of a change -- none at the text's start or end -- where
     // that leaves FOLD_LEAST or more, both sides at once, to one row of
-    // nothing after it that says how many. Each opened by a click on its
-    // row, unfolding on a line beside it (ALEditorCommand::Unfold), or the
+    // nothing after it that says how many, which the caret stops on going
+    // up or down. Each opened by a click on its row, Return on it,
+    // unfolding on a line beside it (ALEditorCommand::Unfold), or the
     // caret landing in it; all of them opened, or folded again, by turning
     // this off or on. On unless asked; never where nothing changed.
     static constexpr S32 FOLD_CONTEXT = 3;
@@ -278,6 +279,9 @@ private:
     // The fold whose own row a row of a side is, or with `lines` whose
     // lines it is one of too; -1 for none.
     S32               foldOfRow(const ALCodeEditor* side, S32 row, bool lines) const;
+    // The folded run whose own row is a side's gap above a line, or the
+    // one below the text; -1 for none.
+    S32               foldOfGap(const ALCodeEditor* side, S32 line) const;
     S32               firstOfFold(const ALCodeEditor* side, S32 fold) const;
     S32               rowOfFold(const ALCodeEditor* side, S32 fold) const;
     void              openFold(S32 fold);

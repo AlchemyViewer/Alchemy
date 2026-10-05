@@ -804,10 +804,13 @@ void ALDiffView::applyFolds()
             const Fold& fold  = mFolds[n];
             const S32   first = lineBelowRow(side, firstOfFold(side, static_cast<S32>(n)));
             layout.setHidden(ALTextLayout::HiddenBy::Host, first, first + fold.count - 1, !fold.open);
+            // A stop: the caret stops on it going up or down, and Return
+            // there opens it.
             const S32                  under = lineBelowRow(side, rowOfFold(side, static_cast<S32>(n)));
             ALTextView::LineAnnotation said  = side->lineAnnotation(under);
             said.gap                         = fold.open ? 0 : 1;
             said.gapTint                     = folded;
+            said.gapStop                     = true;
             side->setLineAnnotation(under, said);
         }
         // A caret left on a line now hidden: under the run's row, or at
@@ -821,6 +824,20 @@ void ALDiffView::applyFolds()
             side->goTo(ALTextPos(under <= last ? under : llmax(0, lineBelowRow(side, firstOfFold(side, fold)) - 1), 0));
         }
     }
+}
+
+S32 ALDiffView::foldOfGap(const ALCodeEditor* side, S32 line) const
+{
+    // The row before the line the gap is above, or the last row for the
+    // gap below the text: a folded run's own, where it is one.
+    if (line < 0)
+    {
+        return -1;
+    }
+    const Lines& lines = linesOf(side);
+    const S32    row   = (line < static_cast<S32>(lines.rowOf.size()) ? lines.rowOf[static_cast<size_t>(line)] : static_cast<S32>(lines.lineOf.size())) - 1;
+    const S32    fold  = foldOfRow(side, row, false);
+    return fold >= 0 && !mFolds[static_cast<size_t>(fold)].open ? fold : -1;
 }
 
 S32 ALDiffView::firstOfFold(const ALCodeEditor* side, S32 fold) const
@@ -873,17 +890,8 @@ S32 ALDiffView::foldAtPoint(S32 x, S32 y, ALCodeEditor** under)
         {
             return -1;
         }
-        // A gap, and the row before the line it is above: a folded run's
-        // own, where it is one.
-        const S32 gap_line = side->gapAtLocal(local_y);
-        if (gap_line < 0)
-        {
-            return -1;
-        }
-        const Lines& lines = linesOf(side);
-        const S32    row   = (gap_line < static_cast<S32>(lines.rowOf.size()) ? lines.rowOf[static_cast<size_t>(gap_line)] : static_cast<S32>(lines.lineOf.size())) - 1;
-        const S32    fold  = foldOfRow(side, row, false);
-        if (fold < 0 || mFolds[static_cast<size_t>(fold)].open)
+        const S32 fold = foldOfGap(side, side->gapAtLocal(local_y));
+        if (fold < 0)
         {
             return -1;
         }
@@ -963,6 +971,13 @@ void ALDiffView::drawFoldRows()
             if (row_t - height > top || row_t < frame.mBottom + text.mBottom)
             {
                 continue;
+            }
+            // The one the caret stands on, where the keyboard is: lit, as a
+            // line the caret is on would be.
+            if (side->hasFocus() && foldOfGap(side, side->caretGap()) == static_cast<S32>(n))
+            {
+                gl_rect_2d(left, row_t, frame.mLeft + text.mRight, row_t - height, side->textColor() % (0.1f * alpha));
+                gl_rect_2d(left, row_t, frame.mLeft + text.mRight - 1, row_t - height + 1, side->cursorColor() % (0.8f * alpha), false);
             }
             const std::string said = alSaidCount("DiffFoldedLines", fold.count, "\xE2\x8B\xAF 1 line the same \xE2\x8B\xAF",
                                                  "\xE2\x8B\xAF [COUNT] lines the same \xE2\x8B\xAF");
@@ -1324,6 +1339,18 @@ bool ALDiffView::handleUnicodeCharHere(llwchar uni_char)
 
 bool ALDiffView::handleKeyHere(KEY key, MASK mask)
 {
+    // Return on a folded row opens it, rather than going to the source:
+    // the caret on the first line it hid.
+    if (key == KEY_RETURN && mask == MASK_NONE)
+    {
+        ALCodeEditor* side = shown();
+        if (const S32 fold = foldOfGap(side, side->caretGap()); fold >= 0)
+        {
+            openFold(fold);
+            side->goTo(ALTextPos(lineBelowRow(side, firstOfFold(side, fold)), 0));
+            return true;
+        }
+    }
     // A key the side in front would not take, being read only, that
     // changes the text: a line broken or joined, a tab, a paste or a cut.
     const bool edits = ((key == KEY_RETURN || key == KEY_BACKSPACE || key == KEY_DELETE || key == KEY_TAB) && (mask == MASK_NONE || mask == MASK_SHIFT)) ||

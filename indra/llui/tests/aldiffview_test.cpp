@@ -455,7 +455,7 @@ namespace tut
     template<> template<>
     void aldiffview_object::test<13>()
     {
-        set_test_name("a long run the same folds beyond three lines of context, both sides, to a row of nothing after it; each text as it is, a copy takes it all; unfolding beside it, the bar, and the caret landing in it open it");
+        set_test_name("a long run the same folds beyond three lines of context, both sides, to a row of nothing after it; each text as it is, a copy takes it all; the caret stops on its row, and Return there, unfolding beside it, the bar, and the caret landing in it open it");
         const std::string left  = lines(30);
         const std::string right = lines(30, { { 2, "two" }, { 27, "twenty-seven" } });
         ALDiffView&       d     = make(left.c_str(), right.c_str());
@@ -483,19 +483,33 @@ namespace tut
         d.handleKey(KEY_F7, MASK_NONE, false);
         ensure_equals("the changes stepped through over it", d.right()->caret().line, 27);
 
-        d.right()->goTo(ALTextPos(24, 0));
-        ensure("unfolding offered under its row", d.right()->canPerform(ALEditorCommand::Unfold));
-        ensure("unfolded", d.right()->perform(ALEditorCommand::Unfold));
-        ensure("opened, both sides", d.foldedCount() == 0 && !hidden(d.left(), 6) && !hidden(d.right(), 23));
-        ensure("its row gone, the caret where it was", d.right()->layout().gapRows(24) == 0 && d.right()->caret().line == 24);
-        ensure("nothing more to unfold", !d.right()->canPerform(ALEditorCommand::Unfold));
+        // Down from the line over the run onto its row, on and back; Return
+        // there opens it.
+        ALCodeEditor* side = d.right();
+        side->goTo(ALTextPos(5, 3));
+        ensure("down onto its row", side->perform(ALEditorCommand::MoveDown) && side->caretGap() == 24 && side->caret() == ALTextPos(24, 0));
+        ensure("on down, to the line under it, as far across", side->perform(ALEditorCommand::MoveDown) && side->caretGap() == -1 && side->caret() == ALTextPos(24, 3));
+        ensure("up onto it again", side->perform(ALEditorCommand::MoveUp) && side->caretGap() == 24);
+        ensure("and on up over it", side->perform(ALEditorCommand::MoveUp) && side->caretGap() == -1 && side->caret() == ALTextPos(5, 3));
+        side->perform(ALEditorCommand::MoveDown);
+        ensure("Return on its row", side->handleKey(KEY_RETURN, MASK_NONE, false));
+        ensure("opened, both sides", d.foldedCount() == 0 && !hidden(d.left(), 6) && !hidden(side, 23));
+        ensure("its row gone, the caret on the first line it hid", side->layout().gapRows(24) == 0 && side->caret().line == 6 && side->caretGap() == -1);
 
         press(d, "fold");
         ensure("the bar: folding off, nothing folded", !d.foldsSame() && d.foldedCount() == 0);
-        d.right()->goTo(ALTextPos(12, 0));
+        side->goTo(ALTextPos(12, 0));
         press(d, "fold");
         ensure("and on: folded again", d.foldsSame() && d.foldedCount() == 1 && hidden(d.left(), 6));
-        ensure("the caret, on a line folded away, under the run's row", d.right()->caret().line == 24);
+        ensure("the caret, on a line folded away, under the run's row", side->caret().line == 24);
+
+        // Unfolding on the line beside it, as a fold of a script is.
+        ensure("unfolding offered under its row", side->canPerform(ALEditorCommand::Unfold));
+        ensure("unfolded", side->perform(ALEditorCommand::Unfold));
+        ensure("opened, the caret where it was", d.foldedCount() == 0 && side->layout().gapRows(24) == 0 && side->caret().line == 24);
+        ensure("nothing more to unfold", !side->canPerform(ALEditorCommand::Unfold));
+        d.setFoldSame(false);
+        d.setFoldSame(true);
 
         d.left()->goTo(ALTextPos(12, 0));
         ensure("the caret landing in it opens it, both sides", d.foldedCount() == 0 && !hidden(d.right(), 12) && d.left()->caret().line == 12);

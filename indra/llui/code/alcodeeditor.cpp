@@ -1431,9 +1431,11 @@ void ALCodeEditor::drawBeforeRows(const LLRect& text)
     }
     if (mHighlightCurrentLine && keyboardOnText() && !hasSelection())
     {
+        // The caret's row: its line's, or the gap's it stands in.
         S32 row;
         layout().xOf(caret().line, caret().column, &row);
-        const S32 top = screenTopOf(text, caret().line, row);
+        const S32 gap = caretGap();
+        const S32 top = gap >= 0 ? text.mTop - (layout().gapTop(gap) - scrollY()) : screenTopOf(text, caret().line, row);
         // Drawn before the text's clip, and the caret's line may be
         // scrolled partly or wholly out of sight.
         LLLocalClipRect clip(text);

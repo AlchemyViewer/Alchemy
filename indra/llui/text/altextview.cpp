@@ -909,8 +909,10 @@ void ALTextView::placeCaret(const ALTextPos& pos, bool extend)
 
 void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret)
 {
-    const ALTextRange was = selection();
-    mAnchor               = mDocument.clamp(anchor);
+    const ALTextRange was      = selection();
+    const bool        was_gap  = mCaretGap >= 0;
+    mCaretGap                  = -1;
+    mAnchor                    = mDocument.clamp(anchor);
     mCaret                = snapped(mDocument.clamp(caret), was.end);
     // The others it now meets become part of it.
     if (!mCarets.empty())
@@ -962,6 +964,11 @@ void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret)
         {
             mPrimaryStale = true;
         }
+    }
+    // Out of a gap onto the line under it is a move, though the place in
+    // the text is the one it had.
+    if (selection() != was || was_gap)
+    {
         mCaretMoved();
     }
 }
@@ -3286,6 +3293,10 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::SelectSubwordLeft:
         case C::SelectSubwordRight:
         {
+            if ((command == C::MoveUp || command == C::MoveDown) && stepGap(command == C::MoveDown))
+            {
+                return true;
+            }
             const ALTextRange to = moved(command, selection(), mDesiredX);
             placeSelection(to.begin, to.end);
             scrollToCaret();
@@ -3847,6 +3858,84 @@ void ALTextView::provideGaps()
     {
         mLayout.setGapProvider(nullptr);
     }
+}
+
+S32 ALTextView::caretGap() const
+{
+    // A gap since let go of, or hidden with its line, holds the caret no
+    // longer.
+    return mCaretGap >= 0 && gapStops(mCaretGap) ? mCaretGap : -1;
+}
+
+bool ALTextView::gapStops(S32 line) const
+{
+    return mAnyGap && lineAnnotation(line).gapStop && mLayout.gapRows(line) > 0;
+}
+
+bool ALTextView::stepGap(bool down)
+{
+    const S32 count = mDocument.lineCount();
+    if (const S32 gap = caretGap(); gap >= 0)
+    {
+        // On out of it: down to the line under it, up to the last row of
+        // the line over it; nowhere, where there is none.
+        const S32 line = down ? (gap < count ? gap : -1) : mLayout.visibleFrom(gap - 1, -1);
+        if (line >= 0)
+        {
+            const S32       row = down ? 0 : mLayout.rowCount(line) - 1;
+            const ALTextPos to(line, mLayout.columnAt(line, row, llmax(0.f, mDesiredX), true));
+            placeSelection(to, to);
+            scrollToCaret();
+        }
+        return true;
+    }
+    if (!mAnyGap || hasSelection())
+    {
+        return false;
+    }
+    // Into the stop the step would pass over: under the caret's line's last
+    // row, or over its first.
+    S32       row;
+    const F32 x   = mLayout.xOf(mCaret.line, mCaret.column, &row);
+    S32       gap = -1;
+    if (down)
+    {
+        if (row + 1 < mLayout.rowCount(mCaret.line))
+        {
+            return false;
+        }
+        const S32 next = mLayout.visibleFrom(mCaret.line + 1, 1);
+        gap            = next >= 0 ? next : count;
+    }
+    else if (row == 0)
+    {
+        gap = mCaret.line;
+    }
+    if (gap < 0 || !gapStops(gap))
+    {
+        return false;
+    }
+    if (mDesiredX < 0.f)
+    {
+        mDesiredX = x;
+    }
+    const ALTextPos at = gap < count ? ALTextPos(gap, 0) : mDocument.end();
+    placeSelection(at, at);
+    mCaretGap = gap;
+    mCaretMoved();
+    // The gap in sight, as a row is.
+    const S32 top    = mLayout.gapTop(gap);
+    const S32 height = mLayout.gapHeight(gap);
+    const S32 page   = llmax(1, textRect().getHeight());
+    if (top < mScrollY)
+    {
+        setScrollY(top);
+    }
+    else if (top + height > mScrollY + page)
+    {
+        setScrollY(top + height - page);
+    }
+    return true;
 }
 
 S32 ALTextView::gapAtLocal(S32 y)
@@ -5034,6 +5123,7 @@ void ALTextView::drawRows(const LLRect& text)
     const bool show_caret  = keyboardOnText() && gFocusMgr.getAppHasFocus() && !mReadOnly;
     const F32  blink       = mBlink.getElapsedTimeF32();
     const bool caret_on    = show_caret && (!mCaretBlink || blink < BLINK_DELAY || (static_cast<S32>(blink * 2.f) & 1));
+    const S32  in_gap      = caretGap();
     const ALTextRange sel  = selection().normalised();
     const F32  space       = mLayout.xOf(0, 0) + 6.f;  // what a selected line end is drawn as
 
@@ -5219,12 +5309,22 @@ void ALTextView::drawRows(const LLRect& text)
                     mCaretBoxes.push_back({ LLRect(x, row_screen_top, x + CARET_WIDTH, row_screen_top - row.height), mCursorColor.get() % alpha });
                 }
             };
-            caret(mCaret);
+            if (in_gap < 0)
+            {
+                caret(mCaret);
+            }
             for (auto [it, end] = mCarets.onLine(line); it != end; ++it)
             {
                 caret(it->end);
             }
         }
+    }
+    // A caret standing in a gap, at the start of its first row.
+    if (caret_on && in_gap >= 0)
+    {
+        const S32 top = text.mTop - (mLayout.gapTop(in_gap) - mScrollY);
+        const S32 x   = static_cast<S32>(left);
+        mCaretBoxes.push_back({ LLRect(x, top, x + CARET_WIDTH, top - mLayout.rowHeight()), mCursorColor.get() % alpha });
     }
     // The carets together, over every row's layers.
     if (!mCaretBoxes.empty())

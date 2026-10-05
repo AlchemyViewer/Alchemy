@@ -511,8 +511,9 @@ public:
     // on the ruler down the side, where a problem's leaves it none; and
     // rows of nothing above it (ALTextLayout's gap) -- a comparison's side
     // lined up with lines the other has, a row standing for lines hidden
-    // -- tinted, and marked on the ruler, as said. What a comparison's
-    // sides are made of, a fix's preview, a choice's pane.
+    // -- tinted, and marked on the ruler, as said, and where it is a stop,
+    // somewhere the caret stops on its way up or down (caretGap). What a
+    // comparison's sides are made of, a fix's preview, a choice's pane.
     struct LineAnnotation
     {
         static constexpr S32 OWN_NUMBER = -1;
@@ -524,6 +525,7 @@ public:
         S32                  gap          = 0;
         LLColor4             gapTint      = LLColor4::transparent;
         LLColor4             gapRulerTint = LLColor4::transparent;
+        bool                 gapStop      = false;
     };
     // A line each, from the first, and where there is one more, what is
     // said of the line one past the last: the gap below the text. Kept a
@@ -544,6 +546,15 @@ public:
     // The line whose gap a y of the view is in, one past the last for the
     // gap below the text; -1 where it is in none.
     S32                   gapAtLocal(S32 y);
+    // The line whose gap the caret stands in, one past the last for the
+    // gap below the text; -1 where it is on a line. Up or down onto a gap
+    // that is a stop, the caret stops there as on a row of its own, and the
+    // next step takes it on; a host acts on what it stands for -- Return
+    // on a comparison's folded run opens it. Its place in the text the
+    // while is the line under the gap, at its start, or under the text the
+    // last line's end, where anything typed goes in; anything that moves
+    // the caret takes it out of the gap.
+    S32                   caretGap() const;
 
     // --- atoms ---------------------------------------------------------------
 
@@ -1191,6 +1202,11 @@ private:
     // The layout asks for the lines' gaps where some line has one, and
     // not otherwise.
     void provideGaps();
+    // Whether a line's gap, or the one below the text, is a stop shown.
+    bool gapStops(S32 line) const;
+    // Up or down into a stop the caret meets, or on out of the one it is
+    // in; false where neither is the step's to take.
+    bool stepGap(bool down);
     // The first style that reaches a line, by the styles' order.
     std::vector<Style>::const_iterator firstStyleOn(S32 line) const;
     // A position inside what is shown as one thing, moved out to the side
@@ -1418,6 +1434,8 @@ private:
     // Whether any line was said to have a gap: the layout asks for them
     // only where one was.
     bool                               mAnyGap = false;
+    // The gap the caret stands in, as caretGap() says; -1 for none.
+    S32                                mCaretGap = -1;
     LLUIColor                          mLinkColor;
     link_signal_t                      mLinkClicked;
     drop_handler_t                     mDropHandler;

@@ -2546,4 +2546,50 @@ namespace tut
         ensure("rows above it: the view still on its line", v.firstVisibleLine() == top && v.scrollY() == layout.lineTop(45));
         ensure_equals("which is further down, past both gaps", layout.lineTop(45), (45 + 3 + 5) * row_h);
     }
+    template<> template<>
+    void altextview_object::test<81>()
+    {
+        set_test_name("a gap that is a stop: the caret stops in it going up or down, as on a row of its own, at the line under it; one that is not, it passes over");
+        ALTextView& v = make("zero\none\ntwo\nthree\nfour");
+        typedef ALTextView::LineAnnotation Said;
+        std::vector<Said> lines(6);
+        lines[2].gap     = 1;
+        lines[2].gapStop = true;
+        lines[4].gap     = 2;
+        lines[5].gap     = 1;
+        lines[5].gapStop = true;
+        v.setLineAnnotations(lines);
+        S32 moved = 0;
+        v.onCaretMoved([&moved]() { ++moved; });
+
+        v.setCaret(ALTextPos(1, 2));
+        moved = 0;
+        ensure("down into it", v.perform(ALEditorCommand::MoveDown) && v.caretGap() == 2);
+        ensure("its place the line under it, at its start", v.caret() == ALTextPos(2, 0) && !v.hasSelection());
+        ensure("told", moved > 0);
+        ensure("on down: the line, as far across as it was", v.perform(ALEditorCommand::MoveDown) && v.caretGap() == -1 && v.caret() == ALTextPos(2, 2));
+        ensure("up into it", v.perform(ALEditorCommand::MoveUp) && v.caretGap() == 2);
+        moved = 0;
+        ensure("on up: the line over it", v.perform(ALEditorCommand::MoveUp) && v.caretGap() == -1 && v.caret() == ALTextPos(1, 2));
+        ensure("told, too", moved > 0);
+
+        v.setCaret(ALTextPos(3, 1));
+        ensure("a gap no stop passed over", v.perform(ALEditorCommand::MoveDown) && v.caretGap() == -1 && v.caret() == ALTextPos(4, 1));
+        ensure("below the text, a stop", v.perform(ALEditorCommand::MoveDown) && v.caretGap() == 5 && v.caret() == v.document().end());
+        ensure("nowhere further down", v.perform(ALEditorCommand::MoveDown) && v.caretGap() == 5);
+        ensure("back up onto the last line", v.perform(ALEditorCommand::MoveUp) && v.caretGap() == -1 && v.caret().line == 4);
+
+        v.setCaret(ALTextPos(1, 0));
+        v.perform(ALEditorCommand::MoveDown);
+        v.setCaret(ALTextPos(0, 1));
+        ensure("put anywhere: out of it", v.caretGap() == -1);
+        v.setCaret(ALTextPos(1, 0));
+        v.perform(ALEditorCommand::MoveDown);
+        Said said   = v.lineAnnotation(2);
+        said.gap    = 0;
+        v.setLineAnnotation(2, said);
+        ensure("its gap let go of: out of it", v.caretGap() == -1);
+        v.setCaret(ALTextPos(1, 0));
+        ensure("no gap there now, no stop", v.perform(ALEditorCommand::MoveDown) && v.caret() == ALTextPos(2, 0) && v.caretGap() == -1);
+    }
 }
