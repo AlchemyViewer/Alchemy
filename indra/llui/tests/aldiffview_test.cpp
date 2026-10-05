@@ -518,7 +518,7 @@ namespace tut
     template<> template<>
     void aldiffview_object::test<14>()
     {
-        set_test_name("folds at the ends without context outside, none too short or where nothing changed; a click on a row opens it; inline and swapped, as open as they were");
+        set_test_name("a fold at the start, its row the gap above the context after it; a click on its row opens it; inline and swapped, as open as they were");
         const std::string left  = lines(20);
         const std::string right = lines(20, { { 19, "nineteen" } });
         ALDiffView&       d     = make(left.c_str(), right.c_str());
@@ -526,14 +526,6 @@ namespace tut
         ensure("no context before it, its row the gap above the context after", hidden(d.right(), 0) && hidden(d.right(), 15) && !hidden(d.right(), 16));
         ensure("the gap", gapsOf(d.right())[16] == 1 && d.right()->layout().lineTop(16) == d.right()->layout().rowHeight());
 
-        d.setTexts(lines(15).c_str(), lines(15, { { 0, "zero" }, { 14, "fourteen" } }).c_str());
-        ensure_equals("thirteen between changes: seven beyond context, not enough", d.foldCount(), 0);
-        d.setTexts(lines(16).c_str(), lines(16, { { 0, "zero" }, { 15, "fifteen" } }).c_str());
-        ensure_equals("fourteen: eight, enough", d.foldCount(), 1);
-        d.setTexts(left.c_str(), left.c_str());
-        ensure_equals("nothing changed: nothing folded", d.foldCount(), 0);
-
-        d.setTexts(left.c_str(), right.c_str());
         ALCodeEditor* side  = d.right();
         const LLRect  frame = side->getRect();
         const LLRect  text  = side->textRect();
@@ -591,7 +583,7 @@ namespace tut
     template<> template<>
     void aldiffview_object::test<17>()
     {
-        set_test_name("the right made anew: compared again, the caret on its line where it went, the runs as open as they were, the anchors carried with their lines, changed or not");
+        set_test_name("the right made anew: compared again, the caret on its line where it went, the runs as open as they were");
         const std::string left  = lines(30);
         const std::string right = lines(30, { { 2, "two" }, { 27, "twenty-seven" } });
         ALDiffView&       d     = make(left.c_str(), right.c_str());
@@ -610,12 +602,6 @@ namespace tut
         d.right()->goTo(ALTextPos(24, 0));
         d.setRightText("inserted\n" + right);
         ensure("under a folded row: under it again, folded", d.foldedCount() == 1 && d.right()->caret().line == 25 && d.right()->layout().gapRows(25) == 1);
-
-        d.setTexts("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}", "-- written\n\nll.Say(0, \"hi\")", { { 4, 2 } });
-        d.setRightText("-- written\n-- and more\n\nll.Say(0, \"hi\")");
-        ensure("the LSL's call beside the SLua's, a line further down", beside(d, 4, 3));
-        d.setRightText("-- written\n-- and more\n\nll.Say(0, \"bye\")");
-        ensure("its line changed: beside it still", beside(d, 4, 3));
     }
 
     template<> template<>
@@ -652,13 +638,6 @@ namespace tut
         ensure_equals("all as the left", source->text(), std::string("a\nb\nc\nd\ne"));
         ensure("nothing left to take back", d.changeCount() == 0 && !d.takeBack(0));
         ensure_equals("each one edit", asked, 3);
-
-        d.setTexts("a\nb\n", "a\n");
-        source->setText("a\n");
-        ensure("a line put back before the text's last, empty, line", d.takeBack(0) && source->text() == "a\nb\n");
-        d.setTexts("a", "a\nz");
-        source->setText("a\nz");
-        ensure("a last line taken out, with the break before it", d.takeBack(0) && source->text() == "a");
         source->die();
     }
 

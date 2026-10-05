@@ -136,6 +136,7 @@ target_sources(
     fields/alcolorsheet.cpp
     base/aldeferredrebuild.cpp
     diff/aldiffbar.cpp
+    diff/aldiffmodel.cpp
     diff/aldiffview.cpp
     studio/aldockpanel.cpp
     studio/alemptystate.cpp
@@ -351,6 +352,7 @@ target_sources(
         fields/alcolorsheet.h
         base/aldeferredrebuild.h
         diff/aldiffbar.h
+        diff/aldiffmodel.h
         diff/aldiffview.h
         studio/aldockpanel.h
         studio/alemptystate.h
@@ -523,6 +525,14 @@ if(AL_BUILD_TESTS)
   al_add_test(llurlmatch UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(alkeymap UNIT PROJECT llui DIR code LIBRARIES ${test_libs})
   al_add_test(altextdiff UNIT PROJECT llui DIR diff LIBRARIES ${test_libs})
+  al_add_test(
+    aldiffmodel
+    UNIT
+    PROJECT llui
+    DIR diff
+    SOURCES diff/altextdiff.cpp
+    LIBRARIES ${test_libs}
+  )
   al_add_test(alanchoredranges PROJECT llui SOURCES text/altextdocument.cpp LIBRARIES ${test_libs})
   al_add_test(alfenwicktree PROJECT llui LIBRARIES ${test_libs})
   al_add_test(allinetable PROJECT llui LIBRARIES ${test_libs})
