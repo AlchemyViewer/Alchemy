@@ -1008,6 +1008,7 @@ if(AL_BUILD_VIEWER)
     rlvlocks.cpp
     rlvui.cpp
     skfarplane.cpp
+    skfarprojectionoverlay.cpp
   )
 
   set(
@@ -1881,6 +1882,7 @@ if(AL_BUILD_VIEWER)
     rlvui.h
     roles_constants.h
     skfarplane.h
+    skfarprojectionoverlay.h
   )
 
   # Discord rich presence, over the SDK from the private registry.

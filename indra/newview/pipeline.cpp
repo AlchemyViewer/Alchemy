@@ -92,6 +92,7 @@
 #include "lltoolmgr.h"
 #include "llviewercamera.h"
 #include "skfarplane.h" // <SK:Nexii> render/farplane
+#include "skfarprojectionoverlay.h" // <SK:Nexii> render/farplane: Develop projection overlay
 #include "llviewermediafocus.h"
 #include "llviewertexturelist.h"
 #include "llviewerobject.h"
@@ -4874,6 +4875,10 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
         mHighlightFaces.clear();
 
         renderDebug();
+        if (!hasRenderType(LLPipeline::RENDER_TYPE_HUD))
+        {
+            skRenderFarProjectionOverlay(); // <SK:Nexii> render/farplane
+        }
     }
 
     if (gUseWireframe)

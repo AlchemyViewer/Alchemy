@@ -2108,6 +2108,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>SKRenderFarProjectionOverlay</key>
+        <map>
+            <key>Comment</key>
+            <string>Debug: draw column pairs from 500 m to 100 km around the camera with the main projection, nearer orange and farther cyan, depth tested against each other only and laid over the frame, to see where the projection clips and whether depth order holds. Ignores the scene, object culling and reach.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRenderMemoryDrawDistanceLimit</key>
         <map>
             <key>Comment</key>
