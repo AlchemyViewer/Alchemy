@@ -71,6 +71,13 @@ namespace ALScriptLexicon
 
     inline bool isKeyword(bool lua, std::string_view word) { return lua ? isLuauKeyword(word) : isLslKeyword(word); }
 
+    // What the studio offers after `--!`, the comments that say how an
+    // SLua script is checked: its modes, and nolint. Not optimize, until
+    // what the grid does with it is known, nor native, which nothing the
+    // grid or the viewer runs makes.
+    inline constexpr std::string_view LUAU_HOT_COMMENTS[] = { "strict", "nonstrict", "nocheck", "nolint" };
+    bool                              isLuauHotComment(std::string_view word);
+
     // The characters of a name, as both languages spell one: ASCII
     // letters, digits and '_', not beginning with a digit.
     constexpr bool isNameStart(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }

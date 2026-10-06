@@ -2834,4 +2834,33 @@ namespace tut
         ensure("the caret after it, and no signature asked", e.caret() == ALTextPos(0, 9) && asks.empty());
         ensure_equals("inside: its parameter to fill", take(ALCompletion::Brackets::Inside), std::string("handler(n)"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<79>()
+    {
+        set_test_name("a comment the grammar says completes, as SLua's --! does, opens the list on its own; any other comment does not");
+        ALCodeEditor& e = make("", "slua");
+        e.setCompletionProvider([](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+            for (const char* word : { "strict", "nonstrict" })
+            {
+                if (ALCodeEditor::matchTier(word, prefix) >= 0)
+                {
+                    ALCodeEditor::Completion c;
+                    c.text = word;
+                    c.kind = ALSyntaxKind::Keyword;
+                    out.push_back(c);
+                }
+            }
+        });
+        type("--!st");
+        ensure("open after --!", e.completionOpen() && e.completions()[0].text == "strict");
+        key(KEY_TAB);
+        ensure_equals("taken", e.text(), std::string("--!strict"));
+        e.setText("");
+        type("-- st");
+        ensure("not in a comment that says nothing of how the script is checked", !e.completionOpen());
+        e.setText("");
+        type("x = 1 --!st");
+        ensure("nor after code on its line", !e.completionOpen());
+    }
 }

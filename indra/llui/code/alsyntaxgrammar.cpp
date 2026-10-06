@@ -310,6 +310,7 @@ struct ALSyntaxGrammar::Impl
     std::vector<std::string> wordTables;
     std::string              lineComment;
     std::string              memberSeparators = ".";
+    std::vector<ALRegex>     completesIn;
     std::vector<std::pair<char, char>> pairs;
     bool                     prose = false;
     // What opens a block, searched for at the end of the text before the
@@ -1004,6 +1005,17 @@ bool ALSyntaxGrammar::load(const LLSD& description, std::string& error)
     {
         impl->memberSeparators = description["member_separators"].asString();
     }
+    const LLSD& completes_in = description["completes_in"];
+    for (LLSD::array_const_iterator it = completes_in.beginArray(); it != completes_in.endArray(); ++it)
+    {
+        ALRegex where(it->asString());
+        if (!where.ok())
+        {
+            error = "completes_in: " + where.error();
+            return false;
+        }
+        impl->completesIn.push_back(std::move(where));
+    }
     impl->prose       = description["prose"].asBoolean();
     const LLSD& pairs = description["pairs"];
     for (LLSD::array_const_iterator it = pairs.beginArray(); it != pairs.endArray(); ++it)
@@ -1220,6 +1232,18 @@ const std::string& ALSyntaxGrammar::lineComment() const
 const std::string& ALSyntaxGrammar::memberSeparators() const
 {
     return mImpl->memberSeparators;
+}
+
+bool ALSyntaxGrammar::completesIn(std::string_view before) const
+{
+    for (const ALRegex& where : mImpl->completesIn)
+    {
+        if (where.search(before))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 const std::vector<std::pair<char, char>>& ALSyntaxGrammar::pairs() const

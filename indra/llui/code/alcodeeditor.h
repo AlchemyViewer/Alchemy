@@ -546,6 +546,9 @@ public:
     // Whether what was typed just before a position is in a comment or a
     // string, by the grammar's tokens: prose, which nothing completes.
     bool        inProse(const ALTextPos& at);
+    // Whether what is typed at a position completes all the same, where
+    // the grammar says (ALSyntaxGrammar::completesIn).
+    bool        completesInProse(const ALTextPos& at);
     // The whole string literal a position is in, quotes and all: the run
     // of string and escape tokens around it, carried across lines while
     // one begins or ends inside a string, so that a long string is one

@@ -58,6 +58,11 @@ namespace ALScriptLexicon
         return WORDS.contains(word);
     }
 
+    bool isLuauHotComment(std::string_view word)
+    {
+        return std::find(std::begin(LUAU_HOT_COMMENTS), std::end(LUAU_HOT_COMMENTS), word) != std::end(LUAU_HOT_COMMENTS);
+    }
+
     bool isName(std::string_view word)
     {
         return !word.empty() && isNameStart(word.front()) && std::all_of(word.begin(), word.end(), isNameByte);

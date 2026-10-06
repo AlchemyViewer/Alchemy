@@ -29,6 +29,7 @@
 #include "../lint/alscriptfixes.h"
 #include "../lint/alscriptlintpass.h"
 #include "../lint/alselenefilters.h"
+#include "../core/alscriptlexicon.h"
 
 #include "../test/lltut.h"
 #include "llsdserialize.h"
@@ -1327,5 +1328,22 @@ namespace tut
         ensure("the event's handler offered", handler != nullptr);
         ensure_equals("taking what the event gives", handler->text, std::string("function(detected: {DetectedEvent})"));
         ensure("a body to fill: " + handler->snippet, handler->snippet.find("\n    $0\nend") != std::string::npos);
+    }
+
+    template<> template<>
+    void alluauservice_object::test<41>()
+    {
+        set_test_name("after --! the comments that say how a script is checked are offered, those the studio offers alone");
+        ensure("definitions loaded: " + error, loaded);
+        const std::vector<ALScriptCompletion> found = service.complete("--!st\nlocal x = 1\n", 0, 3);
+        std::string                           said;
+        for (const ALScriptCompletion& c : found)
+        {
+            said += " " + c.text;
+            ensure("a word of the language: " + c.text, c.kind == ALScriptSymbolKind::Keyword);
+            ensure("in a hot comment: " + c.text, c.context == ALScriptCompletion::Context::HotComment);
+            ensure("one the studio offers: " + c.text, ALScriptLexicon::isLuauHotComment(c.text));
+        }
+        ensure_equals("each of them:" + said, found.size(), std::size(ALScriptLexicon::LUAU_HOT_COMMENTS));
     }
 }

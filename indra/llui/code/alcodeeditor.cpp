@@ -3192,6 +3192,17 @@ bool ALCodeEditor::inProse(const ALTextPos& at)
     return false;
 }
 
+bool ALCodeEditor::completesInProse(const ALTextPos& at)
+{
+    const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar();
+    if (!grammar || at.line < 0 || at.line >= document().lineCount())
+    {
+        return false;
+    }
+    const std::string& line = document().line(at.line);
+    return grammar->completesIn(std::string_view(line).substr(0, std::min(line.size(), static_cast<size_t>(std::max(0, at.column)))));
+}
+
 ALTextRange ALCodeEditor::identifierAtCaret() const
 {
     ALTextRange word = identifierAt(caret());
@@ -4608,8 +4619,10 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
     const bool identifier = uni_char < 0x80 && alIdentifierByte(static_cast<char>(uni_char));
     // In a comment or a string what is typed is prose: the list does not
     // open on its own there, where a Return meant as a new line would
-    // otherwise put a call into the comment. Asked for, it still opens.
-    const bool prose = mAutoComplete && !was_open && inProse(caret());
+    // otherwise put a call into the comment. Asked for, it still opens;
+    // and on its own where the grammar says what is typed there is code
+    // all the same, as SLua's `--!strict` is.
+    const bool prose = mAutoComplete && !was_open && inProse(caret()) && !completesInProse(caret());
     // What comes between a name and its member: a dot, and SLua's colon.
     const std::string members = highlighter().grammar() ? highlighter().grammar()->memberSeparators() : std::string(".");
     const bool        member  = uni_char < 0x80 && members.find(static_cast<char>(uni_char)) != std::string::npos;

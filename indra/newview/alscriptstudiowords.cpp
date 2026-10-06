@@ -646,6 +646,32 @@ void ALScriptStudioWords::complete(bool lua, ALCodeEditor& editor, const ALTextP
                                    std::vector<ALCodeEditor::Completion>& out)
 {
     auto begins = [&prefix](const std::string& text) { return ALCodeEditor::matchTier(text, prefix) >= 0; };
+    // After an SLua `--!`, the comments that say how a script is checked,
+    // and nothing else.
+    if (lua)
+    {
+        const std::string& line   = editor.document().line(at.line);
+        const size_t       word   = static_cast<size_t>(std::max(0, at.column - static_cast<S32>(prefix.size())));
+        std::string_view   before = std::string_view(line).substr(0, std::min(word, line.size()));
+        while (!before.empty() && (before.front() == ' ' || before.front() == '\t'))
+        {
+            before.remove_prefix(1);
+        }
+        if (before == "--!")
+        {
+            for (std::string_view hot : ALScriptLexicon::LUAU_HOT_COMMENTS)
+            {
+                if (begins(std::string(hot)))
+                {
+                    ALCodeEditor::Completion c;
+                    c.text = std::string(hot);
+                    c.kind = ALSyntaxKind::Keyword;
+                    out.push_back(std::move(c));
+                }
+            }
+            return;
+        }
+    }
     // An LSL event's handler goes straight inside a state and nowhere
     // else, so a handler is offered only there; asked once, and only
     // if one matches.

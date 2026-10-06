@@ -28,6 +28,7 @@
 
 #include "alluaufrontend.h"
 #include "alluautypes.h"
+#include "alscriptlexicon.h"
 
 #include "Luau/Ast.h"
 #include "Luau/Autocomplete.h"
@@ -326,9 +327,16 @@ std::vector<ALScriptCompletion> ALLuauCompletion::complete(std::string_view sour
             case Luau::AutocompleteEntryKind::String:
                 completion.kind = ALScriptSymbolKind::Constant;
                 break;
+            case Luau::AutocompleteEntryKind::HotComment:
+                // Those the studio offers, as words of the language.
+                if (!ALScriptLexicon::isLuauHotComment(name))
+                {
+                    continue;
+                }
+                completion.kind = ALScriptSymbolKind::Keyword;
+                break;
             default:
-                // Require paths and hot comments: nothing the studio
-                // offers yet.
+                // Require paths: nothing the studio offers yet.
                 continue;
         }
         // Where a call's brackets go, for what Luau says may be called:
