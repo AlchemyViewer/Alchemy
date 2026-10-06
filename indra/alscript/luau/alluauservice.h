@@ -166,6 +166,11 @@ public:
     // The script's own shape: what it binds at the top and the functions
     // in it, each function's own one deeper.
     std::vector<ALScriptOutlineEntry> outline(std::string_view source);
+    // The same from a parse alone: no types beside the names, and nothing
+    // the service holds asked or changed -- what a comparison pairs two
+    // texts' functions by, neither of them perhaps the script checked. As
+    // much as a text broken in places parses to; on any thread.
+    static std::vector<ALScriptOutlineEntry> shape(std::string_view source);
     // Every name in the script by what the check found it to be: a
     // parameter, a local, a global, a field, a function, a type; whether
     // it is bound there, constant, from the definitions, or deprecated.
