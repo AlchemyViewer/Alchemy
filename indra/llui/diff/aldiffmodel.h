@@ -136,6 +136,16 @@ public:
     // as the right made anew is: what stood for what, what was said of the
     // left and a merge with it, which were the other's, let go of.
     void    setLeftText(std::string_view left);
+    // Stretches of the texts as given that stand for each other by what
+    // they are -- a function, an event or a state of the same name on each
+    // side -- by their first and last lines: the texts lined up there, each
+    // beside its other, so that what changed in one is compared with what
+    // it was and not with another's lines alike. Said of nothing else: no
+    // band, no link. Carried with their lines as either text is made
+    // anew; let go of with new texts; not used where there are ranges,
+    // which line the texts up more finely. False where nothing changed.
+    bool                        setPairs(ALTextDiff::ranges_t pairs);
+    const ALTextDiff::ranges_t& pairs() const { return mPairs; }
     // What the last rebuild laid out again, by column: all of it; or the
     // lines from `first`, `now` of them in place of `was`, and those after
     // moved along, their numbers by `numbered` and the first of them with
@@ -485,8 +495,11 @@ private:
     // read otherwise -- a block comment opened or closed -- which cuts
     // their words and tokens.
     std::vector<std::pair<S32, size_t>> readFrom(size_t side, S32 from) const;
+    // Each pair's or range's lines on one side, where they now are: those
+    // of a pair or range whose first line went taken back.
+    static ALTextDiff::ranges_t carried(const ALTextDiff::ranges_t& ranges, bool left, S32 was, const LineMap& map);
     // The options the texts as shown are compared by: the ranges' anchors,
-    // swapped where the texts are.
+    // or the pairs', swapped where the texts are.
     ALTextDiff::Options shownOptions() const;
     // Which ranges are bracketed, worked out as each layout is made.
     void              findBracketed();
@@ -497,6 +510,7 @@ private:
     std::string           mLeftText;
     std::string           mRightText;
     ALTextDiff::ranges_t  mRanges;
+    ALTextDiff::ranges_t  mPairs;
     std::vector<bool>     mBracketed;
     ALTextDiff::Options   mOptions;
     bool                  mSwapped  = false;

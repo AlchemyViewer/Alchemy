@@ -974,7 +974,7 @@ namespace tut
         };
         S32 rebuilds = 0;
         S32 reused   = 0;
-        for (S32 way = 0; way < 5; ++way)
+        for (S32 way = 0; way < 6; ++way)
         {
             // Two alike, given the same edits: one keeps what it can of its
             // layout, the other lays out every row again.
@@ -1000,6 +1000,17 @@ namespace tut
                 each->setAlgorithm(way == 4 ? ALTextDiff::Algorithm::Structural : ALTextDiff::Algorithm::Histogram);
                 each->setTexts(joinedOf(left), joinedOf(right), ranges);
                 each->setSwapped(way == 1);
+                if (way == 5)
+                {
+                    // Paired as functions are, a stretch every twenty lines,
+                    // carried with either text's lines.
+                    ALTextDiff::ranges_t pairs;
+                    for (S32 n = 0; n + 10 < 120; n += 20)
+                    {
+                        pairs.push_back({ n, n + 8, n + 2, n + 10 });
+                    }
+                    each->setPairs(pairs);
+                }
             }
             for (S32 step = 0; step < 60; ++step)
             {
@@ -1310,5 +1321,45 @@ namespace tut
         // Three edits as one, from the first to the last: the changes
         // between read again, as lines edited.
         both(right({ { 199, "last" } }), "taken back, three at once", 4);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<32>()
+    {
+        set_test_name("pairs line the texts up at a function's first and last lines, carried with either text's lines; not where there are ranges");
+        // A function put in above `a` with what `a` held, and `a` written
+        // anew: by lines alone the old body is the new function's.
+        const std::string left  = "function a()\n  x = 1\n  y = 2\n  z = 3\nend\nfunction b()\n  p = 1\nend";
+        const std::string right = "function c()\n  x = 1\n  y = 2\n  z = 3\nend\nfunction a()\n  q = 9\n  r = 8\nend\nfunction b()\n  p = 1\nend";
+        m.setTexts(left, right);
+        ensure("by lines: a's first line beside c's", beside(0, 0) && !beside(0, 5));
+        const ALTextDiff::ranges_t pairs = { { 0, 4, 5, 8 }, { 5, 7, 9, 11 } };
+        ensure("paired: laid out again", m.setPairs(pairs));
+        ensure("a beside a, its end beside its end, b beside b", beside(0, 5) && beside(4, 8) && beside(5, 9) && beside(7, 11));
+        ensure("the same again: nothing", !m.setPairs(pairs));
+
+        // Lines put in above on the right, then on the left: carried.
+        m.setRightText("-- a note\n" + right);
+        ensure_equals("the right's lines moved along", m.pairs()[0].rightFirst, 6);
+        ensure("still beside", beside(0, 6) && beside(4, 9));
+        m.setLeftText("-- a note\n" + left);
+        ensure_equals("the left's too", m.pairs()[0].leftFirst, 1);
+        ensure("beside", beside(1, 6) && beside(5, 9));
+        m.setSwapped(true);
+        ensure("swapped: the right's lines on the left", m.rowOfLine(Column::Left, 6) == m.rowOfLine(Column::Right, 1));
+        m.setSwapped(false);
+
+        // A function put in after `a` with what `a` held, `a` written
+        // anew: its end beside its end, not the new one's.
+        const std::string after_left  = "function a()\n  x = 1\nend\nfunction b()\nend";
+        const std::string after_right = "function a()\n  w = 5\nend\nfunction d()\n  x = 1\nend\nfunction b()\nend";
+        m.setTexts(after_left, after_right);
+        m.setPairs({ { 0, 2, 0, 2 }, { 3, 4, 6, 7 } });
+        ensure("a's end beside a's end", beside(2, 2));
+
+        // Ranges line the texts up finely: the pairs are not used.
+        m.setTexts(left, right, { { 0, 0, 0, 0 } });
+        ensure("new texts let the pairs go", m.pairs().empty());
+        ensure("with ranges: kept, not laid out again", !m.setPairs(pairs) && m.pairs() == pairs && beside(0, 0));
     }
 }

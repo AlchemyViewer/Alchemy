@@ -215,6 +215,15 @@ void ALDiffView::setLeftText(std::string_view left)
     mBar->setMerging(false);
 }
 
+void ALDiffView::setPairs(ALTextDiff::ranges_t pairs)
+{
+    if (pairs == mModel.pairs())
+    {
+        return;
+    }
+    keepingPlace([&]() { mModel.setPairs(std::move(pairs)); });
+}
+
 void ALDiffView::setVersions(S32 count, S32 current, version_t chosen)
 {
     mVersionChosen = count > 1 ? std::move(chosen) : nullptr;

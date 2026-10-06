@@ -103,7 +103,40 @@ void ALDiffModel::setTexts(std::string_view left, std::string_view right, const 
     mLeftLines  = ALTextDiff::split(mLeftText);
     mRightLines = ALTextDiff::split(mRightText);
     mRanges     = ranges;
+    mPairs.clear();
     build();
+}
+
+bool ALDiffModel::setPairs(ALTextDiff::ranges_t pairs)
+{
+    if (pairs == mPairs)
+    {
+        return false;
+    }
+    mPairs = std::move(pairs);
+    if (!mRanges.empty())
+    {
+        return false;
+    }
+    build(foldsOpen());
+    return true;
+}
+
+ALTextDiff::ranges_t ALDiffModel::carried(const ALTextDiff::ranges_t& ranges, bool left, S32 was, const LineMap& map)
+{
+    ALTextDiff::ranges_t out;
+    for (ALTextDiff::Range range : ranges)
+    {
+        S32& first = left ? range.leftFirst : range.rightFirst;
+        S32& last  = left ? range.leftLast : range.rightLast;
+        if (first >= 0 && first < was)
+        {
+            first = map.line(first);
+            last  = llmax(first, map.line(last));
+            out.push_back(std::move(range));
+        }
+    }
+    return out;
 }
 
 ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
@@ -118,17 +151,10 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
     const LineMap                   map  = ALDiffSplice::lineMap(was, now, edges);
     // A range goes with its lines, changed or not: an edit of the SLua a
     // statement became still stands for the statement. Two come to one
-    // line where one was taken out; lines() keeps those it can.
-    ALTextDiff::ranges_t ranges;
-    for (ALTextDiff::Range range : mRanges)
-    {
-        if (range.rightFirst >= 0 && range.rightFirst < static_cast<S32>(was.size()))
-        {
-            range.rightFirst = map.line(range.rightFirst);
-            range.rightLast  = llmax(range.rightFirst, map.line(range.rightLast));
-            ranges.push_back(range);
-        }
-    }
+    // line where one was taken out; lines() keeps those it can. So does a
+    // pair: a function typed in is still the function.
+    ALTextDiff::ranges_t ranges = carried(mRanges, false, static_cast<S32>(was.size()), map);
+    mPairs                      = carried(mPairs, false, static_cast<S32>(was.size()), map);
     // The runs open, by the first line of the right each hides.
     std::vector<S32>        opened;
     const std::vector<S32>& rows = rightRows(Layout::Sides);
@@ -165,6 +191,7 @@ void ALDiffModel::setLeftText(std::string_view left)
     ALDiffEdit::Edges        edges;
     std::vector<std::string> lines = linesAgain(mLeftLines, mLeftText, text, edges);
     mLeftText                      = std::move(text);
+    mPairs = carried(mPairs, true, static_cast<S32>(mLeftLines.size()), ALDiffSplice::lineMap(mLeftLines, lines, edges));
     if (!mRanges.empty())
     {
         // Nor what stood for what: lined up otherwise, compared afresh.
@@ -352,6 +379,15 @@ ALTextDiff::Options ALDiffModel::shownOptions() const
     // anchors, swapped where the texts are.
     ALTextDiff::Options options = mOptions;
     options.anchors             = ALTextDiff::anchorsOf(mRanges);
+    if (mRanges.empty())
+    {
+        // Each pair's first lines and its last, which close what it is.
+        for (const ALTextDiff::Range& pair : mPairs)
+        {
+            options.anchors.emplace_back(pair.leftFirst, pair.rightFirst);
+            options.anchors.emplace_back(pair.leftLast, pair.rightLast);
+        }
+    }
     if (mSwapped)
     {
         for (auto& [from, to] : options.anchors)

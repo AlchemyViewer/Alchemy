@@ -102,6 +102,10 @@ public:
     // The left made another -- another version of it -- and compared again:
     // the caret kept on its line of the right, which is as it was.
     void setLeftText(std::string_view left);
+    // Stretches of the texts that stand for each other by what they are --
+    // a function of the same name on each side -- lining them up there
+    // (ALDiffModel::setPairs): the caret's place kept.
+    void setPairs(ALTextDiff::ranges_t pairs);
     // How many versions the left may be, oldest first -- a script's saves
     // -- and which it is: a slider over them on the bar, and a step older
     // and newer, each version chosen told to whoever gave them, who sets
