@@ -287,14 +287,14 @@ int main(int, char**)
     // near the middle and compared again, then taken out and compared
     // again; per keystroke.
     const auto typed = [&](const std::string& left, const std::string& right, bool grammar = false,
-                           ALTextDiff::Algorithm algorithm = ALTextDiff::Algorithm::Histogram) {
+                           ALTextDiff::Algorithm algorithm = ALTextDiff::Algorithm::Histogram, const ALTextDiff::ranges_t& ranges = {}) {
         ALDiffModel model;
         if (grammar)
         {
             model.setLexer(lexer());
         }
         model.setAlgorithm(algorithm);
-        model.setTexts(left, right);
+        model.setTexts(left, right, ranges);
         const size_t at   = right.find('\n', right.size() / 2);
         std::string  with = right;
         with.insert(at, "x");
@@ -309,6 +309,42 @@ int main(int, char**)
     row("a keystroke, a thousand edits, LSL's grammar", typed(small_t, small1kt, true), typed(big_t, big1kt, true));
     row("a keystroke, a thousand edits, by structure", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Structural),
         typed(big_t, big1kt, true, ALTextDiff::Algorithm::Structural));
+    {
+        // Another version on the left, as a slider over a script's saves
+        // steps: a line apart from the one before.
+        const auto stepped = [&](const std::string& left, const std::string& right) {
+            ALDiffModel model;
+            model.setTexts(left, right);
+            const size_t at   = left.find('\n', left.size() / 3);
+            std::string  with = left;
+            with.insert(at, " // older");
+            return ms_per_item(2, [&] {
+                model.setLeftText(with);
+                model.setLeftText(left);
+                g_sink = g_sink + static_cast<size_t>(model.changeCount());
+            });
+        };
+        row("another version on the left, ten edits", stepped(small_t, small10t), stepped(big_t, big10t));
+    }
+    {
+        // A script beside what it was converted to: every line written
+        // otherwise, each anchored to its own, as the converter lines them up.
+        const auto converted = [](const std::vector<std::string>& lines, ALTextDiff::ranges_t& ranges) {
+            std::vector<std::string> out;
+            for (size_t n = 0; n < lines.size(); ++n)
+            {
+                out.push_back(lines[n] + " -- as SLua");
+                ranges.push_back({ static_cast<S32>(n), static_cast<S32>(n), static_cast<S32>(n), static_cast<S32>(n) });
+            }
+            return joined(out);
+        };
+        ALTextDiff::ranges_t small_ranges;
+        ALTextDiff::ranges_t big_ranges;
+        const std::string    small_c = converted(small, small_ranges);
+        const std::string    big_c   = converted(big, big_ranges);
+        row("a keystroke, every line converted, anchored", typed(small_t, small_c, false, ALTextDiff::Algorithm::Histogram, small_ranges),
+            typed(big_t, big_c, false, ALTextDiff::Algorithm::Histogram, big_ranges));
+    }
 
     std::printf("\nWhat it says (5,000 lines)\n");
     std::printf("  %-44s %8s %8s %8s %8s %8s %8s\n", "", "changes", "out", "in", "paired", "words", "moved");

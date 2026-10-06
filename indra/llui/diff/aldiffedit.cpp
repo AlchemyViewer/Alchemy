@@ -30,27 +30,6 @@
 
 #include <algorithm>
 
-ALDiffEdit::Edges ALDiffEdit::edgesOf(const std::vector<std::string>& was, const std::vector<std::string>& now)
-{
-    // One text with itself: the same throughout, read nowhere.
-    if (&was == &now)
-    {
-        return Edges{ static_cast<S32>(was.size()), 0 };
-    }
-    const size_t most = std::min(was.size(), now.size());
-    size_t       head = 0;
-    while (head < most && was[head] == now[head])
-    {
-        ++head;
-    }
-    size_t tail = 0;
-    while (tail < most - head && was[was.size() - 1 - tail] == now[now.size() - 1 - tail])
-    {
-        ++tail;
-    }
-    return Edges{ static_cast<S32>(head), static_cast<S32>(tail) };
-}
-
 bool ALDiffEdit::replaceLines(const std::vector<std::string>& lines, S32 first, S32 count, const std::vector<std::string>& with, ALTextRange& range,
                               std::string& put, std::string& made)
 {

@@ -33,7 +33,43 @@
 #include "alstructuraldiff.h"
 
 #include <algorithm>
+#include <iterator>
 #include <limits>
+
+namespace
+{
+    // The lines of a text, with LF, that was a text and these lines of it:
+    // where the two first differ and how far they end alike, by their bytes,
+    // and so the lines wholly before and wholly after, by the breaks there
+    // -- those taken from the lines as they were rather than made again,
+    // only the lines between cut from the text. What lies between of the
+    // lines as they were is left where it was. A line the same beside the
+    // bytes that differ may be counted among those between, which only
+    // reads it again.
+    std::vector<std::string> linesAgain(std::vector<std::string>& was, std::string_view was_text, std::string_view text, ALDiffEdit::Edges& edges)
+    {
+        const size_t most   = std::min(was_text.size(), text.size());
+        const size_t before = static_cast<size_t>(std::mismatch(text.begin(), text.begin() + static_cast<std::ptrdiff_t>(most), was_text.begin()).first - text.begin());
+        const size_t after  = static_cast<size_t>(
+            std::mismatch(text.rbegin(), text.rbegin() + static_cast<std::ptrdiff_t>(most - before), was_text.rbegin()).first - text.rbegin());
+        const std::string_view ending = text.substr(text.size() - after);
+        edges.head = static_cast<S32>(std::count(text.begin(), text.begin() + static_cast<std::ptrdiff_t>(before), '\n'));
+        edges.tail = static_cast<S32>(std::count(ending.begin(), ending.end(), '\n'));
+        // The lines between: from after the last break before, to the first
+        // break of the lines after.
+        const size_t from = edges.head > 0 ? text.rfind('\n', before - 1) + 1 : 0;
+        const size_t to   = edges.tail > 0 ? text.size() - after + ending.find('\n') : text.size();
+        std::vector<std::string> now;
+        now.reserve(was.size() + 8);
+        std::move(was.begin(), was.begin() + edges.head, std::back_inserter(now));
+        for (const std::string_view line : ALLineBreaks::views(text.substr(from, to - from)))
+        {
+            now.emplace_back(line);
+        }
+        std::move(was.end() - edges.tail, was.end(), std::back_inserter(now));
+        return now;
+    }
+}
 
 // --- what is compared ---------------------------------------------------------
 
@@ -58,10 +94,14 @@ void ALDiffModel::setTexts(std::string_view left, std::string_view right, const 
 
 ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
 {
-    // Each line of the right as it was, where it now is.
-    std::vector<std::string>        now = ALTextDiff::split(right);
-    const std::vector<std::string>& was = mRightLines;
-    const LineMap                   map = ALDiffSplice::lineMap(was, now);
+    // Each line of the right as it was, where it now is: the lines the
+    // two share at either end taken from the right as it was, of which what
+    // lies between is still there to compare.
+    std::string                     text = ALLineBreaks::withLineFeeds(right);
+    ALDiffEdit::Edges               edges;
+    std::vector<std::string>        now  = linesAgain(mRightLines, mRightText, text, edges);
+    const std::vector<std::string>& was  = mRightLines;
+    const LineMap                   map  = ALDiffSplice::lineMap(was, now, edges);
     // A range goes with its lines, changed or not: an edit of the SLua a
     // statement became still stands for the statement. Two come to one
     // line where one was taken out; lines() keeps those it can.
@@ -77,7 +117,7 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
     }
     // The runs open, by the first line of the right each hides.
     std::vector<S32>        opened;
-    const std::vector<S32>& rows = mRightRows[index(Layout::Sides)];
+    const std::vector<S32>& rows = rightRows(Layout::Sides);
     for (const Fold& fold : mFolds)
     {
         const S32 first = fold.first[index(Layout::Sides)];
@@ -86,34 +126,10 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
             opened.push_back(map.line(rows[static_cast<size_t>(first)]));
         }
     }
-    // Compared again where it changed (ALDiffSplice), else all of it.
-    mRegions.reset();
-    std::vector<std::string> before = std::move(mRightLines);
-    mRightText                      = ALLineBreaks::withLineFeeds(right);
-    mRightLines                     = std::move(now);
-    if (mMerge)
-    {
-        mMerge->setOurs(mRightLines);
-    }
-    mRanges                         = std::move(ranges);
-    const ALTextDiff::Options options = shownOptions();
-    const bool spliced = mSwapped ? ALDiffSplice::splice(mRuns, before, mRightLines, mLeftLines, mLeftLines, options)
-                                  : ALDiffSplice::splice(mRuns, mLeftLines, mLeftLines, before, mRightLines, options);
-    if (spliced && options.algorithm == ALTextDiff::Algorithm::Structural)
-    {
-        // Its changes read as tokens again, the lines' runs as spliced.
-        readTokens();
-        layout();
-    }
-    else if (spliced)
-    {
-        layout();
-    }
-    else
-    {
-        build();
-    }
-    const std::vector<S32>& now_rows = mRightRows[index(Layout::Sides)];
+    mRightText = std::move(text);
+    mRanges    = std::move(ranges);
+    resplice(false, std::move(now), edges);
+    const std::vector<S32>& now_rows = rightRows(Layout::Sides);
     for (Fold& fold : mFolds)
     {
         const S32 first = fold.first[index(Layout::Sides)];
@@ -124,6 +140,65 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
         }
     }
     return map;
+}
+
+void ALDiffModel::setLeftText(std::string_view left)
+{
+    // What was said of the left, and a merge with it, were the other's.
+    mNotes.clear();
+    mMerge.reset();
+    std::string              text = ALLineBreaks::withLineFeeds(left);
+    ALDiffEdit::Edges        edges;
+    std::vector<std::string> lines = linesAgain(mLeftLines, mLeftText, text, edges);
+    mLeftText                      = std::move(text);
+    if (!mRanges.empty())
+    {
+        // Nor what stood for what: lined up otherwise, compared afresh.
+        mRanges.clear();
+        mLeftLines = std::move(lines);
+        build();
+        return;
+    }
+    resplice(true, std::move(lines), edges);
+}
+
+void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, const ALDiffEdit::Edges& edges)
+{
+    // Compared again where it changed (ALDiffSplice), else all of it: the
+    // side changed by where it differs, the other the same throughout.
+    std::vector<std::string>& side  = given_left ? mLeftLines : mRightLines;
+    const S32                 was   = static_cast<S32>(side.size());
+    const S32                 moved = static_cast<S32>(lines.size()) - was;
+    side                            = std::move(lines);
+    mRegions.reset();
+    if (mMerge && !given_left)
+    {
+        mMerge->setOurs(mRightLines);
+    }
+    const ALTextDiff::Options options    = shownOptions();
+    const bool                shown_left = given_left != mSwapped;
+    Relayout                  again;
+    again.runs                           = mRuns;
+    (shown_left ? again.left : again.right) = moved;
+    again.side                           = shown_left ? 0 : 1;
+    again.head                           = edges.head;
+    again.tail                           = edges.tail;
+    again.lines                          = was;
+    const std::vector<std::string>& other = given_left ? mRightLines : mLeftLines;
+    const ALDiffSplice::Side        changed{ side, was, edges };
+    const ALDiffSplice::Side        same{ other, static_cast<S32>(other.size()), ALDiffEdit::Edges{ static_cast<S32>(other.size()), 0 } };
+    const bool spliced = shown_left ? ALDiffSplice::splice(mRuns, changed, same, options) : ALDiffSplice::splice(mRuns, same, changed, options);
+    if (!spliced)
+    {
+        build();
+        return;
+    }
+    if (options.algorithm == ALTextDiff::Algorithm::Structural)
+    {
+        // Its changes read as tokens again, the lines' runs as spliced.
+        readTokens();
+    }
+    layout({}, &again);
 }
 
 void ALDiffModel::setSwapped(bool swapped)
@@ -181,11 +256,8 @@ S32 ALDiffModel::add(Column column, const std::string& text, S32 number, Kind ki
     ColumnData& c = of(column);
     if (column == Column::Inline)
     {
-        if (!c.lines.empty())
-        {
-            mInlineText += '\n';
-        }
         mInlineText += text;
+        mInlineText += '\n';
     }
     Line& line   = c.lines.emplace_back();
     line.kind    = kind;
@@ -285,7 +357,7 @@ void ALDiffModel::readTokens()
     mByTokens[1] = std::move(by_tokens.rightByTokens);
 }
 
-void ALDiffModel::layout(const std::vector<bool>& open)
+void ALDiffModel::layout(const std::vector<bool>& open, const Relayout* again)
 {
     // What is shown on the left and on the right: the texts as given, or
     // swapped, and their runs.
@@ -326,34 +398,14 @@ void ALDiffModel::layout(const std::vector<bool>& open)
     const ALDiffMoves::moves_t moves = ALDiffMoves::find(left, right, runs, options);
     std::vector<S32>           left_move(left.size(), -1);
     std::vector<S32>           right_move(right.size(), -1);
-    mMoves.assign(moves.size(), Move());
     for (size_t n = 0; n < moves.size(); ++n)
     {
-        mMoves[n].lines = moves[n];
         for (S32 k = 0; k < moves[n].count; ++k)
         {
             left_move[static_cast<size_t>(moves[n].left + k)]   = static_cast<S32>(n);
             right_move[static_cast<size_t>(moves[n].right + k)] = static_cast<S32>(n);
         }
     }
-    for (ColumnData& c : mColumns)
-    {
-        c.lines.clear();
-        c.lineOf.clear();
-        c.rowOf.clear();
-        c.pending    = 0;
-        c.endPadding = 0;
-    }
-    of(Column::Left).lines.reserve(left.size());
-    of(Column::Right).lines.reserve(right.size());
-    of(Column::Inline).lines.reserve(right.size());
-    mInlineText.clear();
-    mInlineText.reserve((mSwapped ? mLeftText : mRightText).size());
-    mChanges.clear();
-    std::vector<Fold> folds;
-    // Each inline row's line of the left and of the right as shown.
-    std::vector<S32>  inline_left;
-    std::vector<S32>  inline_right;
     // Which changes are none, as lines are told the same: each of their
     // lines blank, or a comment, where those are let go of. By each of
     // their runs.
@@ -411,8 +463,104 @@ void ALDiffModel::layout(const std::vector<bool>& open)
             break;
         }
     }
-    for (size_t i = 0; i < runs.size();)
+    // What of the layout before stands, after a splice; and where it does,
+    // the groups after the change set aside to be moved along, the rest
+    // after the groups kept let go of. Else all of it made again.
+    const std::optional<Reuse> reuse = again && mKeepsLayout ? reusable(*again, moves, last_change) : std::nullopt;
+    std::vector<Fold>          folds;
+    const Mark                 kept  = reuse ? mGroups[reuse->kept] : Mark();
+    const Mark                 moved = reuse ? mGroups[reuse->moved] : Mark();
+    std::vector<Line>          after_lines[3];
+    std::vector<S32>           after_line_of[3];
+    std::vector<S32>           after_row_of[3];
+    S32                        end_pending[3] = { 0, 0, 0 };
+    std::vector<S32>           after_inline[2];
+    std::vector<Change>        after_changes;
+    std::vector<Fold>          after_folds;
+    std::vector<Mark>          after_marks;
+    std::string                after_text;
+    if (reuse)
     {
+        for (size_t c = 0; c < 3; ++c)
+        {
+            ColumnData&  column = mColumns[c];
+            const size_t rows   = static_cast<size_t>(moved.rows[c == 2 ? 1 : 0]);
+            after_lines[c].assign(std::make_move_iterator(column.lines.begin() + moved.lines[c]), std::make_move_iterator(column.lines.end()));
+            after_line_of[c].assign(column.lineOf.begin() + static_cast<std::ptrdiff_t>(rows), column.lineOf.end());
+            after_row_of[c].assign(column.rowOf.begin() + moved.lines[c], column.rowOf.end());
+            end_pending[c] = column.endPadding;
+            column.lines.resize(static_cast<size_t>(kept.lines[c]));
+            column.lineOf.resize(static_cast<size_t>(kept.rows[c == 2 ? 1 : 0]));
+            column.rowOf.resize(static_cast<size_t>(kept.lines[c]));
+            column.pending    = kept.pending[c];
+            column.endPadding = 0;
+        }
+        for (size_t side = 0; side < 2; ++side)
+        {
+            after_inline[side].assign(mInlineRows[side].begin() + moved.rows[1], mInlineRows[side].end());
+            mInlineRows[side].resize(static_cast<size_t>(kept.rows[1]));
+        }
+        after_text = mInlineText.substr(moved.text);
+        mInlineText.resize(kept.text);
+        after_changes.assign(mChanges.begin() + static_cast<std::ptrdiff_t>(moved.changes), mChanges.end());
+        mChanges.resize(kept.changes);
+        after_folds.assign(mFolds.begin() + static_cast<std::ptrdiff_t>(moved.folds), mFolds.end());
+        folds.assign(mFolds.begin(), mFolds.begin() + static_cast<std::ptrdiff_t>(kept.folds));
+        after_marks.assign(mGroups.begin() + static_cast<std::ptrdiff_t>(reuse->moved), mGroups.end());
+        mGroups.resize(reuse->kept);
+    }
+    else
+    {
+        for (ColumnData& c : mColumns)
+        {
+            c.lines.clear();
+            c.lineOf.clear();
+            c.rowOf.clear();
+            c.pending    = 0;
+            c.endPadding = 0;
+        }
+        of(Column::Left).lines.reserve(left.size());
+        of(Column::Right).lines.reserve(right.size());
+        of(Column::Inline).lines.reserve(right.size());
+        mInlineText.clear();
+        mInlineText.reserve((mSwapped ? mLeftText : mRightText).size());
+        mChanges.clear();
+        mInlineRows[0].clear();
+        mInlineRows[1].clear();
+        mGroups.clear();
+        mMoves.assign(moves.size(), Move());
+    }
+    // Where each move's inline lines were: kept, moved along, or laid out
+    // again below.
+    std::vector<std::pair<bool, bool>> moved_ends(reuse ? mMoves.size() : 0);
+    for (size_t n = 0; n < moved_ends.size(); ++n)
+    {
+        moved_ends[n] = { mMoves[n].inlineLeft >= moved.lines[2], mMoves[n].inlineRight >= moved.lines[2] };
+    }
+    for (size_t n = 0; n < moves.size(); ++n)
+    {
+        mMoves[n].lines = moves[n];
+    }
+    // Where each group begins to be laid out.
+    const auto stateNow = [&](size_t run) {
+        Mark here;
+        here.run     = run;
+        here.rows[0] = rowCount(Layout::Sides);
+        here.rows[1] = rowCount(Layout::Inline);
+        for (size_t c = 0; c < 3; ++c)
+        {
+            here.lines[c]   = static_cast<S32>(mColumns[c].lines.size());
+            here.pending[c] = mColumns[c].pending;
+        }
+        here.changes = mChanges.size();
+        here.folds   = folds.size();
+        here.text    = mInlineText.size();
+        return here;
+    };
+    const auto mark = [&](size_t run) { mGroups.push_back(stateNow(run)); };
+    for (size_t i = reuse ? reuse->from : 0; i < (reuse ? reuse->to : runs.size());)
+    {
+        mark(i);
         const ALTextDiff::Run& run = runs[i];
         if (run.kind == Kind::Same)
         {
@@ -422,8 +570,8 @@ void ALDiffModel::layout(const std::vector<bool>& open)
                 add(Column::Left, left[static_cast<size_t>(l)], l + 1, Kind::Same);
                 add(Column::Right, right[static_cast<size_t>(r)], r + 1, Kind::Same);
                 add(Column::Inline, right[static_cast<size_t>(r)], r + 1, Kind::Same);
-                inline_left.push_back(l);
-                inline_right.push_back(r);
+                mInlineRows[0].push_back(l);
+                mInlineRows[1].push_back(r);
             };
             // Context kept beside a change, none at either end; what is
             // left folded away, where it is enough, and after it a row of
@@ -450,8 +598,8 @@ void ALDiffModel::layout(const std::vector<bool>& open)
                 none(Column::Left);
                 none(Column::Right);
                 none(Column::Inline);
-                inline_left.push_back(-1);
-                inline_right.push_back(-1);
+                mInlineRows[0].push_back(-1);
+                mInlineRows[1].push_back(-1);
                 folds.push_back(fold);
             }
             for (; n < run.count; ++n)
@@ -497,8 +645,8 @@ void ALDiffModel::layout(const std::vector<bool>& open)
             for (const S32 line : made)
             {
                 add(Column::Inline, right[static_cast<size_t>(line)], line + 1, Kind::Same);
-                inline_left.push_back(-1);
-                inline_right.push_back(line);
+                mInlineRows[0].push_back(-1);
+                mInlineRows[1].push_back(line);
             }
             continue;
         }
@@ -610,8 +758,8 @@ void ALDiffModel::layout(const std::vector<bool>& open)
                     }
                 }
                 alone(Column::Inline, out, line, out ? 0 : line + 1);
-                inline_left.push_back(out ? line : -1);
-                inline_right.push_back(out ? -1 : line);
+                mInlineRows[0].push_back(out ? line : -1);
+                mInlineRows[1].push_back(out ? -1 : line);
             }
         };
         const S32 first_out = lineCount(Column::Inline);
@@ -627,6 +775,125 @@ void ALDiffModel::layout(const std::vector<bool>& open)
         change.end[index(Layout::Inline)] = rowCount(Layout::Inline);
         mChanges.push_back(change);
     }
+    if (reuse)
+    {
+        // The groups after the change moved along: by as many rows and
+        // lines as laid out again gained or lost, their lines' numbers by
+        // as many as each side's lines moved; the rows of nothing above a
+        // column's first line there those now waiting for it, not those
+        // that were; and what each mark said of them likewise.
+        const Mark  here       = stateNow(reuse->to);
+        const S32   rows[2]    = { here.rows[0] - moved.rows[0], here.rows[1] - moved.rows[1] };
+        const S32   shift[3]   = { again->left, again->right, again->right };
+        const S32   given_left = mSwapped ? again->right : again->left;
+        const S32   given_right = mSwapped ? again->left : again->right;
+        S32         lines[3];
+        S32         pending[3];
+        for (size_t c = 0; c < 3; ++c)
+        {
+            ColumnData& column = mColumns[c];
+            lines[c]           = here.lines[c] - moved.lines[c];
+            pending[c]         = here.pending[c] - moved.pending[c];
+            for (size_t n = 0; n < after_lines[c].size(); ++n)
+            {
+                Line& line = after_lines[c][n];
+                // Inline, a line taken out has no number.
+                if (line.number > 0)
+                {
+                    line.number += shift[c];
+                }
+                if (n == 0)
+                {
+                    line.padding += pending[c];
+                }
+                column.lines.push_back(std::move(line));
+            }
+            for (S32 line : after_line_of[c])
+            {
+                column.lineOf.push_back(line >= 0 ? line + lines[c] : line);
+            }
+            for (const S32 row : after_row_of[c])
+            {
+                column.rowOf.push_back(row + rows[c == 2 ? 1 : 0]);
+            }
+            // The rows of nothing below the last line: as they were, where
+            // the column has a line after the change; else those waiting.
+            column.pending = after_lines[c].empty() ? end_pending[c] + pending[c] : end_pending[c];
+        }
+        for (size_t side = 0; side < 2; ++side)
+        {
+            for (const S32 line : after_inline[side])
+            {
+                mInlineRows[side].push_back(line >= 0 ? line + (side == 0 ? again->left : again->right) : line);
+            }
+        }
+        // The inline text after the change, each line its own break.
+        const S32 text = static_cast<S32>(here.text) - static_cast<S32>(moved.text);
+        mInlineText += after_text;
+        for (Change& change : after_changes)
+        {
+            for (size_t l = 0; l < 2; ++l)
+            {
+                change.first[l] += rows[l];
+                change.end[l] += rows[l];
+            }
+            change.lines.leftFirst += given_left;
+            change.lines.rightFirst += given_right;
+            mChanges.push_back(change);
+        }
+        for (Fold& fold : after_folds)
+        {
+            fold.first[0] += rows[0];
+            fold.first[1] += rows[1];
+            folds.push_back(fold);
+        }
+        // The moves' ends after the change: their inline lines moved along.
+        for (size_t n = 0; n < mMoves.size(); ++n)
+        {
+            mMoves[n].inlineLeft += moved_ends[n].first ? lines[2] : 0;
+            mMoves[n].inlineRight += moved_ends[n].second ? lines[2] : 0;
+        }
+        const S32    run_moved     = static_cast<S32>(runs.size()) - static_cast<S32>(again->runs.size());
+        const size_t changes_moved = mChanges.size() - after_changes.size() - moved.changes;
+        const size_t folds_moved   = folds.size() - after_folds.size() - moved.folds;
+        for (size_t m = 0; m + 1 < after_marks.size(); ++m)
+        {
+            Mark mark_after = after_marks[m];
+            mark_after.run  = static_cast<size_t>(static_cast<S32>(mark_after.run) + run_moved);
+            for (size_t l = 0; l < 2; ++l)
+            {
+                mark_after.rows[l] += rows[l];
+            }
+            for (size_t c = 0; c < 3; ++c)
+            {
+                // Rows of nothing waiting as they were, where a line of the
+                // column after the change came first.
+                if (mark_after.lines[c] == moved.lines[c])
+                {
+                    mark_after.pending[c] += pending[c];
+                }
+                mark_after.lines[c] += lines[c];
+            }
+            mark_after.changes += changes_moved;
+            mark_after.folds += folds_moved;
+            mark_after.text = static_cast<size_t>(static_cast<S32>(mark_after.text) + text);
+            mGroups.push_back(mark_after);
+        }
+        // What a view fills again: the lines laid out again, each column's.
+        mRelaid.whole = false;
+        for (size_t c = 0; c < 3; ++c)
+        {
+            mRelaid.first[c] = kept.lines[c];
+            mRelaid.was[c]   = moved.lines[c] - kept.lines[c];
+            mRelaid.now[c]   = here.lines[c] - kept.lines[c];
+        }
+    }
+    else
+    {
+        mRelaid = Relaid();
+    }
+    mark(runs.size());
+    mLastChange = last_change;
     for (ColumnData& c : mColumns)
     {
         c.endPadding = c.pending;
@@ -636,7 +903,7 @@ void ALDiffModel::layout(const std::vector<bool>& open)
     for (size_t side = 0; side < 2; ++side)
     {
         mInlineOf[side].assign(side == 0 ? left.size() : right.size(), -1);
-        const std::vector<S32>& by_row = side == 0 ? inline_left : inline_right;
+        const std::vector<S32>& by_row = mInlineRows[side];
         const ColumnData&       column = of(Column::Inline);
         for (size_t row = 0; row < by_row.size() && row < column.lineOf.size(); ++row)
         {
@@ -646,10 +913,6 @@ void ALDiffModel::layout(const std::vector<bool>& open)
             }
         }
     }
-    // The right's lines by row: side by side, the column showing it;
-    // inline, the right's as shown, or swapped the left's.
-    mRightRows[index(Layout::Sides)] = of(rightColumn()).lineOf;
-    mRightRows[index(Layout::Inline)] = mSwapped ? inline_left : inline_right;
     if (open.size() == folds.size())
     {
         for (size_t n = 0; n < folds.size(); ++n)
@@ -660,6 +923,111 @@ void ALDiffModel::layout(const std::vector<bool>& open)
     mFolds = std::move(folds);
     findBracketed();
     findConflicts();
+}
+
+std::optional<ALDiffModel::Reuse> ALDiffModel::reusable(const Relayout& again, const ALDiffMoves::moves_t& moves, size_t last_change) const
+{
+    const std::vector<ALTextDiff::Run>& was = again.runs;
+    const std::vector<ALTextDiff::Run>& now = mRuns;
+    if (mGroups.empty() || mGroups.back().run != was.size())
+    {
+        return std::nullopt;
+    }
+    // The runs before the change as they were, and those after it moved
+    // along by as many lines as each side gained or lost.
+    size_t before = 0;
+    while (before < was.size() && before < now.size() && was[before] == now[before])
+    {
+        ++before;
+    }
+    size_t after = 0;
+    while (after < was.size() - before && after < now.size() - before)
+    {
+        ALTextDiff::Run run = was[was.size() - 1 - after];
+        run.left += again.left;
+        run.right += again.right;
+        if (!(run == now[now.size() - 1 - after]))
+        {
+            break;
+        }
+        ++after;
+    }
+    // The groups wholly before the change; and the first wholly after it,
+    // at a group's edge in the runs as they now are too: a change after
+    // the change begins a group only after a run the same...
+    size_t kept = 0;
+    while (kept + 1 < mGroups.size() && mGroups[kept + 1].run <= before && mGroups[kept + 1].lines[again.side] <= again.head)
+    {
+        ++kept;
+    }
+    // ...ending at a group's edge in the runs as they now are: a change
+    // the runs now carry on past it is laid out again whole.
+    while (kept > 0 && mGroups[kept].run < now.size() &&
+           (now[mGroups[kept].run - 1].kind == Kind::Same) == (now[mGroups[kept].run].kind == Kind::Same))
+    {
+        --kept;
+    }
+    const S32 delta = static_cast<S32>(now.size()) - static_cast<S32>(was.size());
+    size_t    moved = kept;
+    while (moved + 1 < mGroups.size() && (mGroups[moved].run < was.size() - after || mGroups[moved].lines[again.side] < again.lines - again.tail))
+    {
+        ++moved;
+    }
+    for (; moved + 1 < mGroups.size(); ++moved)
+    {
+        const size_t at = static_cast<size_t>(static_cast<S32>(mGroups[moved].run) + delta);
+        if (at == 0 || (now[at - 1].kind == Kind::Same) != (now[at].kind == Kind::Same))
+        {
+            break;
+        }
+    }
+    const size_t from = mGroups[kept].run;
+    const size_t to   = static_cast<size_t>(static_cast<S32>(mGroups[moved].run) + delta);
+    // The first group stays the first, or not: its context is none.
+    if (to < from || (mGroups[moved].run == 0) != (to == 0))
+    {
+        return std::nullopt;
+    }
+    // A run the same is folded to the end where no change comes after it,
+    // and not at all where none is: each group kept with a change after it
+    // as before, or none -- a change after them both times, or the same
+    // last change among them -- which only the runs laid out again can
+    // alter, a change of blanks alone, let go of, keeping a run the same
+    // apart from them. The groups moved along are the same changes as they
+    // were, and so is whether one of them is the last.
+    const bool had_none = mLastChange == was.size();
+    const bool has_none = last_change == now.size();
+    if (had_none != has_none ||
+        (!had_none && !((mLastChange >= from && last_change >= from) || (mLastChange < from && last_change == mLastChange))))
+    {
+        return std::nullopt;
+    }
+    // The blocks moved those there were, in the same order, each end kept
+    // or moved along where it was, or laid out again: their lines' signs
+    // and their moves stand.
+    const Mark& k = mGroups[kept];
+    const Mark& g = mGroups[moved];
+    if (moves.size() != mMoves.size())
+    {
+        return std::nullopt;
+    }
+    for (size_t n = 0; n < moves.size(); ++n)
+    {
+        const ALDiffMoves::Move& block     = mMoves[n].lines;
+        const ALDiffMoves::Move& now_block = moves[n];
+        // An end where it was, where it was moved along to, or anywhere it
+        // is laid out again.
+        const auto ends = [&](S32 was_at, S32 now_at, size_t column, S32 shift) {
+            return was_at + block.count <= k.lines[column] ? now_at == was_at
+                   : was_at >= g.lines[column]             ? now_at == was_at + shift
+                                                           : true;
+        };
+        if (block.count != now_block.count || !ends(block.left, now_block.left, 0, again.left) || !ends(block.right, now_block.right, 1, again.right))
+        {
+            return std::nullopt;
+        }
+    }
+    return Reuse{ kept, moved, from, to };
 }
 
 // --- a column's lines ----------------------------------------------------------
@@ -726,7 +1094,7 @@ S32 ALDiffModel::gapRowsFrom(Column column, S32 row) const
 
 S32 ALDiffModel::rightLineOfRow(Layout layout, S32 row) const
 {
-    const std::vector<S32>& rows = mRightRows[index(layout)];
+    const std::vector<S32>& rows = rightRows(layout);
     return row >= 0 && row < static_cast<S32>(rows.size()) ? rows[static_cast<size_t>(row)] : -1;
 }
 
@@ -741,7 +1109,7 @@ S32 ALDiffModel::rowOfRightLine(Layout layout, S32 line) const
 
 std::pair<S32, S32> ALDiffModel::rightAt(Column column, S32 line, S32 at_column) const
 {
-    const std::vector<S32>& rows = mRightRows[index(layoutOf(column))];
+    const std::vector<S32>& rows = rightRows(layoutOf(column));
     if (rows.empty())
     {
         return { 0, 0 };

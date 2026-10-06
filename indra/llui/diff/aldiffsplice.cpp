@@ -55,17 +55,25 @@ S32 ALDiffSplice::lastCompared()
 bool ALDiffSplice::splice(std::vector<Run>& runs, const std::vector<std::string>& left_was, const std::vector<std::string>& left,
                           const std::vector<std::string>& right_was, const std::vector<std::string>& right, const ALTextDiff::Options& options)
 {
+    // A side passed as itself is not read.
+    return splice(runs, Side{ left, static_cast<S32>(left_was.size()), ALDiffEdit::edgesOf(left_was, left) },
+                  Side{ right, static_cast<S32>(right_was.size()), ALDiffEdit::edgesOf(right_was, right) }, options);
+}
+
+bool ALDiffSplice::splice(std::vector<Run>& runs, const Side& left_side, const Side& right_side, const ALTextDiff::Options& options)
+{
     sLastCompared = 0;
     if (options.like.ignoreComments)
     {
         return false;
     }
-    // The changed stretch is [head, size - tail) of each; a side passed as
-    // itself is not read.
-    const auto [lh, lt] = ALDiffEdit::edgesOf(left_was, left);
-    const auto [rh, rt] = ALDiffEdit::edgesOf(right_was, right);
-    const S32 ln_was = static_cast<S32>(left_was.size());
-    const S32 rn_was = static_cast<S32>(right_was.size());
+    // The changed stretch is [head, size - tail) of each.
+    const std::vector<std::string>& left  = left_side.lines;
+    const std::vector<std::string>& right = right_side.lines;
+    const auto [lh, lt]                   = left_side.edges;
+    const auto [rh, rt]                   = right_side.edges;
+    const S32 ln_was = left_side.was;
+    const S32 rn_was = right_side.was;
     const bool left_same  = lh == ln_was && ln_was == static_cast<S32>(left.size());
     const bool right_same = rh == rn_was && rn_was == static_cast<S32>(right.size());
     if (left_same && right_same)
@@ -200,44 +208,44 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const std::vector<std::string>
 
 S32 ALDiffSplice::LineMap::line(S32 was) const
 {
-    if (to.empty())
-    {
-        return 0;
-    }
-    return llclamp(to[static_cast<size_t>(llclamp(was, 0, static_cast<S32>(to.size()) - 1))], 0, last);
+    // One past the last goes past the last now.
+    const S32 at  = llclamp(was, 0, wasLines);
+    const S32 now = at < head ? at : at >= wasLines - tail ? at + nowLines - wasLines : to[static_cast<size_t>(at - head)];
+    return llclamp(now, 0, llmax(0, nowLines - 1));
 }
 
 bool ALDiffSplice::LineMap::kept(S32 was) const
 {
-    return was >= 0 && was < static_cast<S32>(same.size()) && same[static_cast<size_t>(was)];
+    if (was < 0 || was >= wasLines)
+    {
+        return false;
+    }
+    return was < head || was >= wasLines - tail || same[static_cast<size_t>(was - head)];
 }
 
 ALDiffSplice::LineMap ALDiffSplice::lineMap(const std::vector<std::string>& was, const std::vector<std::string>& now)
 {
+    return lineMap(was, now, ALDiffEdit::edgesOf(was, now));
+}
+
+ALDiffSplice::LineMap ALDiffSplice::lineMap(const std::vector<std::string>& was, const std::vector<std::string>& now, const ALDiffEdit::Edges& edges)
+{
+    // Only the lines between the edges kept, each where it went.
     LineMap map;
-    map.to.assign(was.size() + 1, static_cast<S32>(now.size()));
-    map.same.assign(was.size(), false);
-    map.last  = std::max(0, static_cast<S32>(now.size()) - 1);
-    const auto [head, tail] = ALDiffEdit::edgesOf(was, now);
-    for (S32 line = 0; line < head; ++line)
-    {
-        map.to[static_cast<size_t>(line)]   = line;
-        map.same[static_cast<size_t>(line)] = true;
-    }
-    const S32 was_size = static_cast<S32>(was.size());
-    const S32 now_size = static_cast<S32>(now.size());
-    for (S32 n = 0; n < tail; ++n)
-    {
-        map.to[static_cast<size_t>(was_size - tail + n)]   = now_size - tail + n;
-        map.same[static_cast<size_t>(was_size - tail + n)] = true;
-    }
+    const auto [head, tail] = edges;
+    map.head                = head;
+    map.tail                = tail;
+    map.wasLines            = static_cast<S32>(was.size());
+    map.nowLines            = static_cast<S32>(now.size());
+    map.to.assign(static_cast<size_t>(map.wasLines - head - tail), map.nowLines);
+    map.same.assign(map.to.size(), false);
     const std::vector<std::string> some_was(was.begin() + head, was.end() - tail);
     const std::vector<std::string> some_now(now.begin() + head, now.end() - tail);
     for (const Run& run : ALTextDiff::lines(some_was, some_now))
     {
         for (S32 n = 0; n < run.count && run.kind != Kind::Added; ++n)
         {
-            const size_t line = static_cast<size_t>(head + run.left + n);
+            const size_t line = static_cast<size_t>(run.left + n);
             map.to[line]      = head + (run.kind == Kind::Same ? run.right + n : run.right);
             map.same[line]    = run.kind == Kind::Same;
         }

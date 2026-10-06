@@ -25,6 +25,7 @@
 #ifndef AL_ALDIFFSPLICE_H
 #define AL_ALDIFFSPLICE_H
 
+#include "aldiffedit.h"
 #include "altextdiff.h"
 
 #include <string>
@@ -55,6 +56,15 @@ namespace ALDiffSplice
     // not change is passed as itself, both as it was and as it is.
     bool splice(std::vector<ALTextDiff::Run>& runs, const std::vector<std::string>& left_was, const std::vector<std::string>& left,
                 const std::vector<std::string>& right_was, const std::vector<std::string>& right, const ALTextDiff::Options& options);
+    // A side as it is, how many lines it had, and where the two differ
+    // (ALDiffEdit::edgesOf): where that is known already, not found again.
+    struct Side
+    {
+        const std::vector<std::string>& lines;
+        S32                             was = 0;
+        ALDiffEdit::Edges               edges;
+    };
+    bool splice(std::vector<ALTextDiff::Run>& runs, const Side& left, const Side& right, const ALTextDiff::Options& options);
 
     // How many lines the last splice compared again, on both sides: what a
     // test holds its cost to.
@@ -69,13 +79,21 @@ namespace ALDiffSplice
         // Whether it is still there as it was, where a column on it holds.
         bool kept(S32 was) const;
 
+        // The lines before the first changed and after the last, as they
+        // were, of so many then and now; and each of those between, where
+        // it went and whether it is still there as it was.
+        S32               head     = 0;
+        S32               tail     = 0;
+        S32               wasLines = 0;
+        S32               nowLines = 0;
         std::vector<S32>  to;
         std::vector<bool> same;
-        S32               last = 0;
     };
     // The lines before the first changed and after the last as they were,
     // those between compared.
     LineMap lineMap(const std::vector<std::string>& was, const std::vector<std::string>& now);
+    // Where they differ known already: only the lines between read.
+    LineMap lineMap(const std::vector<std::string>& was, const std::vector<std::string>& now, const ALDiffEdit::Edges& edges);
 }
 
 #endif // AL_ALDIFFSPLICE_H

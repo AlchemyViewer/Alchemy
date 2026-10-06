@@ -37,12 +37,12 @@
 // are built and tested without the document.
 namespace ALLineBreaks
 {
-    // The breaks counted first, so that the list is made once, and each
-    // line made at once, as long as it is: a script loaded is tens of
-    // thousands of lines.
-    inline void split(std::string_view text, std::vector<std::string>& out)
+    // The lines as views into the text, which must outlive them: what is
+    // compared before any is made. The breaks counted first, so that the
+    // list is made once: a script loaded is tens of thousands of lines.
+    inline std::vector<std::string_view> views(std::string_view text)
     {
-        out.clear();
+        std::vector<std::string_view> out;
         out.reserve(static_cast<size_t>(std::count(text.begin(), text.end(), '\n')) + 1);
         // The next CR, found again only once it is behind: a text with
         // none, or one far on, is not searched for it at every line.
@@ -58,15 +58,27 @@ namespace ALLineBreaks
             const size_t at = std::min(text.find('\n', start), next_cr);
             if (at == NONE)
             {
-                out.emplace_back(text.substr(start));
-                return;
+                out.push_back(text.substr(start));
+                return out;
             }
-            out.emplace_back(text.substr(start, at - start));
+            out.push_back(text.substr(start, at - start));
             start = at + 1;
             if (text[at] == '\r' && start < text.size() && text[start] == '\n')
             {
                 ++start;
             }
+        }
+    }
+
+    // The lines made, each at once, as long as it is.
+    inline void split(std::string_view text, std::vector<std::string>& out)
+    {
+        const std::vector<std::string_view> lines = views(text);
+        out.clear();
+        out.reserve(lines.size());
+        for (const std::string_view line : lines)
+        {
+            out.emplace_back(line);
         }
     }
 

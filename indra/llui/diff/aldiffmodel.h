@@ -131,6 +131,27 @@ public:
     // not, and the runs as open as they were, by the first line of the
     // right each hides. Where each of its lines went.
     LineMap setRightText(std::string_view right);
+    // The left made another -- another version of it -- and compared again
+    // as the right made anew is: what stood for what, what was said of the
+    // left and a merge with it, which were the other's, let go of.
+    void    setLeftText(std::string_view left);
+    // What the last rebuild laid out again, by column: all of it; or the
+    // lines from `first`, `now` of them in place of `was`, and those after
+    // moved along -- a layout made again after a splice keeps the groups of
+    // runs before the change and moves those after it, rather than laying
+    // out every row: what a view fills again.
+    struct Relaid
+    {
+        bool whole    = true;
+        S32  first[3] = { 0, 0, 0 };
+        S32  was[3]   = { 0, 0, 0 };
+        S32  now[3]   = { 0, 0, 0 };
+    };
+    const Relaid& relaid() const { return mRelaid; }
+    // Whether a layout made again after a splice keeps what it can of the
+    // one before; on unless asked. Off, every row is laid out again: what
+    // a test holds the layout kept to.
+    void          setKeepsLayout(bool keeps) { mKeepsLayout = keeps; }
     // Swapped or not: the runs as open as they were.
     void    setSwapped(bool swapped);
     // How lines are told the same: the runs folded as foldsSame() says,
@@ -165,9 +186,14 @@ public:
 
     // Its lines joined: side by side, the whole text it shows, as given;
     // inline, the lines of both as they are laid out.
-    const std::string& text(Column column) const
+    std::string_view text(Column column) const
     {
-        return column == Column::Inline ? mInlineText : (column == Column::Left) != mSwapped ? mLeftText : mRightText;
+        if (column == Column::Inline)
+        {
+            // Each line kept ended by its break: the last's is not the text's.
+            return std::string_view(mInlineText).substr(0, mInlineText.empty() ? 0 : mInlineText.size() - 1);
+        }
+        return (column == Column::Left) != mSwapped ? mLeftText : mRightText;
     }
     S32                lineCount(Column column) const { return static_cast<S32>(of(column).lines.size()); }
     // Its line; nothing, past its lines.
@@ -385,11 +411,64 @@ private:
     S32               add(Column column, const std::string& text, S32 number, Kind kind, char sign = 0);
     S32               pad(Column column);
     S32               none(Column column);
+    // What a layout made again after a splice may keep of the one before:
+    // the runs it was made from; how far the lines after the change moved,
+    // each side as shown; and the side changed, as shown, its lines from
+    // `head` to all but its last `tail` changed, of `lines` before.
+    struct Relayout
+    {
+        std::vector<ALTextDiff::Run> runs;
+        S32                          left  = 0;
+        S32                          right = 0;
+        size_t                       side  = 0;
+        S32                          head  = 0;
+        S32                          tail  = 0;
+        S32                          lines = 0;
+    };
+    // Where each group of runs -- a run the same, or the runs of a change --
+    // began to be laid out, and where the last ended: the rows of each
+    // layout, the lines and the rows of nothing waiting of each column, and
+    // the changes, folds and inline text made before it.
+    struct Mark
+    {
+        size_t run        = 0;
+        S32    rows[2]    = { 0, 0 };
+        S32    lines[3]   = { 0, 0, 0 };
+        S32    pending[3] = { 0, 0, 0 };
+        size_t changes    = 0;
+        size_t folds      = 0;
+        size_t text       = 0;
+    };
+    // What of the layout before stands: the groups [0, kept) as they were,
+    // those from `moved` on moved along, and the runs [from, to) between
+    // them laid out again.
+    struct Reuse
+    {
+        size_t kept  = 0;
+        size_t moved = 0;
+        size_t from  = 0;
+        size_t to    = 0;
+    };
+    // Where the layout before may be kept, after a splice: the runs before
+    // the change as they were and those after it moved along, at the edges
+    // of groups, and none of their lines among those changed -- a line
+    // edited in a change leaves its runs as they were; the last change where
+    // it was, before or after the change; and the blocks moved those there
+    // were, outside the change. Nothing where all of it is to be laid out
+    // again.
+    std::optional<Reuse> reusable(const Relayout& again, const ALDiffMoves::moves_t& moves, size_t last_change) const;
     // Compared again and made again from the texts; the runs as open as
     // given, where there are as many as there were. And made again from
-    // the runs as they are.
+    // the runs as they are: after a splice, only where it must be.
     void              build(const std::vector<bool>& open = {});
-    void              layout(const std::vector<bool>& open = {});
+    void              layout(const std::vector<bool>& open = {}, const Relayout* again = nullptr);
+    // A side's lines made anew, its text already so: compared again only
+    // where it changed (ALDiffSplice) where that is enough, and laid out
+    // again only there.
+    void              resplice(bool given_left, std::vector<std::string> lines, const ALDiffEdit::Edges& edges);
+    // The rows' lines of the right's text: side by side the column showing
+    // it, inline the right's as shown, or swapped the left's.
+    const std::vector<S32>& rightRows(Layout layout) const { return layout == Layout::Sides ? of(rightColumn()).lineOf : mInlineRows[mSwapped ? 0 : 1]; }
     // By structure, the runs' changes read as tokens (ALStructuralDiff).
     void              readTokens();
     // The options the texts as shown are compared by: the ranges' anchors,
@@ -409,13 +488,22 @@ private:
     bool                  mSwapped  = false;
     bool                  mFoldSame = true;
     ColumnData            mColumns[3];
-    // The inline column's lines joined; a side's is the text it shows.
+    // The inline column's lines, each ended by a line break, so that a
+    // stretch of them moves along as it is; a side's is the text it shows.
     std::string           mInlineText;
-    // Each row's line of the right's text, side by side and inline.
-    std::vector<S32>      mRightRows[2];
     // The inline line showing each line of the left as shown, and of the
     // right; -1 for none.
     std::vector<S32>      mInlineOf[2];
+    // Each inline row's line of the left and of the right as shown; -1 for
+    // none.
+    std::vector<S32>      mInlineRows[2];
+    // Where each group of runs began to be laid out, and the last ended;
+    // the run the last change ends at, the runs' count where none is; and
+    // what the last rebuild laid out again.
+    std::vector<Mark>     mGroups;
+    size_t                mLastChange = 0;
+    Relaid                mRelaid;
+    bool                  mKeepsLayout = true;
     std::vector<Note>     mNotes;
     // Each text's lines, and the runs the texts as shown were last found
     // to have: what a right made anew is compared again from.

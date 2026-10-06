@@ -836,4 +836,268 @@ namespace tut
         m.setRightText(lines(20, { { 3, "THREE" }, { 9, "nine?" } }));
         ensure_equals("by structure, read as tokens and laid out: each once", asked, 2);
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<27>()
+    {
+        set_test_name("laid out again only where an edit made it: the same as laid out afresh in everything it says, edit after edit, either side, every way of comparing");
+        U32        seed = 20261005;
+        const auto next = [&seed](U32 below) {
+            seed = seed * 1103515245U + 12345U;
+            return below ? (seed >> 16) % below : 0U;
+        };
+        // Lines of code, braces and blank lines among them, a block that
+        // comes twice to be moved, and changes far apart.
+        std::vector<std::string> base;
+        for (S32 n = 0; n < 160; ++n)
+        {
+            base.push_back(n % 9 == 0 ? std::string("}") : n % 11 == 0 ? std::string() : "statement " + std::to_string(n) + ";");
+        }
+        const auto joinedOf = [](const std::vector<std::string>& lines) {
+            std::string out;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                out += (i ? "\n" : "") + lines[i];
+            }
+            return out;
+        };
+        const auto edited = [&](std::vector<std::string> lines) {
+            const size_t at = next(static_cast<U32>(lines.size() + 1));
+            switch (next(5))
+            {
+                case 0:
+                    if (at < lines.size())
+                    {
+                        lines[at] += " edited";
+                    }
+                    break;
+                case 1:
+                    lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(at), next(3) + 1, "put in " + std::to_string(next(1000)));
+                    break;
+                case 2:
+                    if (at < lines.size())
+                    {
+                        lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(at), lines.begin() + static_cast<std::ptrdiff_t>(std::min(lines.size(), at + next(3) + 1)));
+                    }
+                    break;
+                case 3:
+                {
+                    // A block of lines moved elsewhere.
+                    if (lines.size() > 30)
+                    {
+                        const size_t from = next(static_cast<U32>(lines.size() - 12));
+                        std::vector<std::string> block(lines.begin() + static_cast<std::ptrdiff_t>(from), lines.begin() + static_cast<std::ptrdiff_t>(from + 8));
+                        lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(from), lines.begin() + static_cast<std::ptrdiff_t>(from + 8));
+                        const size_t to = next(static_cast<U32>(lines.size()));
+                        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(to), block.begin(), block.end());
+                    }
+                    break;
+                }
+                default:
+                    if (at < lines.size())
+                    {
+                        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(at), std::string());
+                    }
+                    break;
+            }
+            return lines;
+        };
+        const auto sameAs = [](const ALDiffModel& a, const ALDiffModel& b, const std::string& where) {
+            for (const Column c : { Column::Left, Column::Right, Column::Inline })
+            {
+                ensure_equals(where + ": lines", a.lineCount(c), b.lineCount(c));
+                ensure(where + ": text", a.text(c) == b.text(c));
+                ensure_equals(where + ": rows of nothing at the end", a.endPadding(c), b.endPadding(c));
+                for (S32 l = 0; l < a.lineCount(c); ++l)
+                {
+                    const ALDiffModel::Line& x = a.line(c, l);
+                    const ALDiffModel::Line& y = b.line(c, l);
+                    const std::string        at = where + ", line " + std::to_string(l);
+                    ensure(at + ": kind, sign, number, padding", x.kind == y.kind && x.sign == y.sign && x.number == y.number && x.padding == y.padding);
+                    ensure(at + ": words and move", x.words == y.words && x.move == y.move);
+                    ensure_equals(at + ": its row", a.rowOfLine(c, l), b.rowOfLine(c, l));
+                    ensure(at + ": its move's other end", a.moveOtherEnd(c, l) == b.moveOtherEnd(c, l));
+                }
+            }
+            for (const Layout layout : { Layout::Sides, Layout::Inline })
+            {
+                ensure_equals(where + ": rows", a.rowCount(layout), b.rowCount(layout));
+                for (S32 row = 0; row < a.rowCount(layout); ++row)
+                {
+                    ensure_equals(where + ": the right's line at a row", a.rightLineOfRow(layout, row), b.rightLineOfRow(layout, row));
+                    ensure(where + ": drawn", a.rowDrawn(layout, row) == b.rowDrawn(layout, row));
+                }
+                for (const Column c : { Column::Left, Column::Right, Column::Inline })
+                {
+                    if (ALDiffModel::layoutOf(c) == layout)
+                    {
+                        for (S32 row = 0; row < a.rowCount(layout); ++row)
+                        {
+                            ensure_equals(where + ": a row's line", a.lineOfRow(c, row), b.lineOfRow(c, row));
+                        }
+                    }
+                }
+            }
+            ensure_equals(where + ": changes", a.changeCount(), b.changeCount());
+            for (S32 n = 0; n < a.changeCount(); ++n)
+            {
+                const ALDiffModel::ChangeLines& x = a.changeLines(n);
+                const ALDiffModel::ChangeLines& y = b.changeLines(n);
+                ensure(where + ": a change's rows", a.changeFirst(Layout::Sides, n) == b.changeFirst(Layout::Sides, n) &&
+                                                        a.changeEnd(Layout::Sides, n) == b.changeEnd(Layout::Sides, n) &&
+                                                        a.changeFirst(Layout::Inline, n) == b.changeFirst(Layout::Inline, n) &&
+                                                        a.changeEnd(Layout::Inline, n) == b.changeEnd(Layout::Inline, n));
+                ensure(where + ": a change's lines", x.leftFirst == y.leftFirst && x.leftCount == y.leftCount && x.rightFirst == y.rightFirst &&
+                                                         x.rightCount == y.rightCount);
+            }
+            ensure_equals(where + ": folds", a.foldCount(), b.foldCount());
+            for (S32 n = 0; n < a.foldCount(); ++n)
+            {
+                ensure(where + ": a fold", a.foldFirst(Layout::Sides, n) == b.foldFirst(Layout::Sides, n) &&
+                                               a.foldFirst(Layout::Inline, n) == b.foldFirst(Layout::Inline, n) && a.foldLines(n) == b.foldLines(n) &&
+                                               a.foldOpen(n) == b.foldOpen(n));
+            }
+            ensure_equals(where + ": moves", a.moveCount(), b.moveCount());
+            for (const bool given_left : { true, false })
+            {
+                for (S32 line = 0; line < 200; ++line)
+                {
+                    ensure_equals(where + ": the inline line showing a line", a.lineShowing(Column::Inline, given_left, line),
+                                  b.lineShowing(Column::Inline, given_left, line));
+                }
+            }
+        };
+        S32 rebuilds = 0;
+        S32 reused   = 0;
+        for (S32 way = 0; way < 5; ++way)
+        {
+            // Two alike, given the same edits: one keeps what it can of its
+            // layout, the other lays out every row again.
+            ALDiffModel          model;
+            ALDiffModel          whole;
+            ALTextDiff::Likeness like;
+            like.ignoreBlankLines = way == 2;
+            whole.setKeepsLayout(false);
+            std::vector<std::string> left  = edited(edited(base));
+            std::vector<std::string> right = edited(edited(edited(base)));
+            ALTextDiff::ranges_t     ranges;
+            if (way == 3)
+            {
+                // Anchored as a conversion is, a stretch at a time.
+                for (S32 n = 0; n < 40; n += 4)
+                {
+                    ranges.push_back({ n, n + 1, n, n + 1 });
+                }
+            }
+            for (ALDiffModel* each : { &model, &whole })
+            {
+                each->setLikeness(like);
+                each->setAlgorithm(way == 4 ? ALTextDiff::Algorithm::Structural : ALTextDiff::Algorithm::Histogram);
+                each->setTexts(joinedOf(left), joinedOf(right), ranges);
+                each->setSwapped(way == 1);
+            }
+            for (S32 step = 0; step < 60; ++step)
+            {
+                // The right typed in, mostly; the left another now and then.
+                const bool on_left = way != 3 && next(4) == 0;
+                (on_left ? left : right) = edited(on_left ? left : right);
+                for (ALDiffModel* each : { &model, &whole })
+                {
+                    if (on_left)
+                    {
+                        each->setLeftText(joinedOf(left));
+                    }
+                    else
+                    {
+                        each->setRightText(joinedOf(right));
+                    }
+                }
+                ++rebuilds;
+                reused += model.relaid().whole ? 0 : 1;
+                ensure("the other laid out whole", whole.relaid().whole);
+                sameAs(model, whole, "way " + std::to_string(way) + ", step " + std::to_string(step));
+            }
+        }
+        ensure("laid out again only in part, mostly", reused * 2 > rebuilds);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<28>()
+    {
+        set_test_name("laid out again in part where blank lines are let go of: a run the same kept folded as it now ends, the inline text's breaks where its lines now are");
+        ALTextDiff::Likeness like;
+        like.ignoreBlankLines = true;
+        const auto both = [&](const std::string& left, const std::string& right) {
+            ALDiffModel model;
+            ALDiffModel whole;
+            whole.setKeepsLayout(false);
+            for (ALDiffModel* each : { &model, &whole })
+            {
+                each->setLikeness(like);
+                each->setTexts(left, right);
+            }
+            return std::make_pair(std::move(model), std::move(whole));
+        };
+        const auto same = [](const ALDiffModel& a, const ALDiffModel& b, const std::string& where) {
+            for (const Column c : { Column::Left, Column::Right, Column::Inline })
+            {
+                ensure(where + ": text", a.text(c) == b.text(c));
+                ensure_equals(where + ": lines", a.lineCount(c), b.lineCount(c));
+            }
+            ensure_equals(where + ": folds", a.foldCount(), b.foldCount());
+            for (S32 n = 0; n < a.foldCount(); ++n)
+            {
+                ensure(where + ": a fold", a.foldFirst(Layout::Sides, n) == b.foldFirst(Layout::Sides, n) && a.foldLines(n) == b.foldLines(n));
+            }
+        };
+
+        // A change, a long run the same, a blank line let go of, a run, and
+        // the last change: that one taken back, the run kept before the blank
+        // line comes after the last change now, folded to the end.
+        std::string left  = lines(60);
+        auto        right = [](bool last) {
+            std::vector<std::pair<S32, const char*>> said = { { 5, "five" } };
+            if (last)
+            {
+                said.push_back({ 50, "fifty" });
+            }
+            std::string text = lines(60, std::initializer_list<std::pair<S32, const char*>>{});
+            std::vector<std::string> out = ALTextDiff::split(text);
+            for (const auto& [at, word] : said)
+            {
+                out[static_cast<size_t>(at)] = word;
+            }
+            out.insert(out.begin() + 30, std::string());
+            std::string joined;
+            for (size_t i = 0; i < out.size(); ++i)
+            {
+                joined += (i ? "\n" : "") + out[i];
+            }
+            return joined;
+        };
+        auto [model, whole] = both(left, right(true));
+        for (ALDiffModel* each : { &model, &whole })
+        {
+            each->setRightText(right(false));
+        }
+        same(model, whole, "the last change taken back");
+
+        // Blank lines taken out at the start, let go of, and a line put in
+        // before them: inline, nothing before the lines after the change, then
+        // a line, then nothing again.
+        const std::string base = "\n\n" + lines(30, { { 29, "end" } });
+        auto [first, first_whole] = both(base, "put in\n" + lines(30, { { 29, "END" } }));
+        for (ALDiffModel* each : { &first, &first_whole })
+        {
+            each->setRightText(lines(30, { { 29, "END" } }));
+        }
+        same(first, first_whole, "the line before them taken out");
+        ensure("laid out again in part", !first.relaid().whole);
+        for (ALDiffModel* each : { &first, &first_whole })
+        {
+            each->setRightText("put in\n" + lines(30, { { 29, "END" } }));
+        }
+        same(first, first_whole, "and put back");
+        ensure("laid out again in part again", !first.relaid().whole);
+    }
 }

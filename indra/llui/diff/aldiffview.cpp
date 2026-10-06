@@ -207,11 +207,10 @@ void ALDiffView::setLeftText(std::string_view left)
     {
         return;
     }
-    // The right as it was, and the caret on its line of it. What stood for
-    // what, what was said of the left and a merge with it were the other
-    // left's: let go of.
-    const std::string right = mModel.rightText();
-    keepingPlace([&]() { mModel.setTexts(left, right); });
+    // The right as it was, and the caret on its line of it; compared again
+    // where the left changed (ALDiffModel::setLeftText), which lets go of
+    // what stood for what, what was said of the left and a merge with it.
+    keepingPlace([&]() { mModel.setLeftText(left); });
     mBar->setMerging(false);
 }
 

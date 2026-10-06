@@ -27,7 +27,9 @@
 
 #include "altextdocument.h"
 
+#include <algorithm>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 // Lines of a text put in place of others, as one edit of the text: what a
@@ -42,7 +44,31 @@ namespace ALDiffEdit
         S32 head = 0;
         S32 tail = 0;
     };
-    Edges edgesOf(const std::vector<std::string>& was, const std::vector<std::string>& now);
+    // Lines or views of them alike; one text with itself the same
+    // throughout, read nowhere.
+    template<typename Was, typename Now>
+    Edges edgesOf(const std::vector<Was>& was, const std::vector<Now>& now)
+    {
+        if constexpr (std::is_same_v<Was, Now>)
+        {
+            if (&was == &now)
+            {
+                return Edges{ static_cast<S32>(was.size()), 0 };
+            }
+        }
+        const size_t most = std::min(was.size(), now.size());
+        size_t       head = 0;
+        while (head < most && was[head] == now[head])
+        {
+            ++head;
+        }
+        size_t tail = 0;
+        while (tail < most - head && was[was.size() - 1 - tail] == now[now.size() - 1 - tail])
+        {
+            ++tail;
+        }
+        return Edges{ static_cast<S32>(head), static_cast<S32>(tail) };
+    }
 
     // `count` of a text's lines from `first`, counted from nought -- its
     // lines as ALTextDiff::split has them -- replaced by `with`: what
