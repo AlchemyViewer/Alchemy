@@ -636,4 +636,113 @@ namespace tut
         const size_t lines = within(weight, 0, 100);
         ensure("most of the whole on some line: " + std::to_string(lines) + " of " + std::to_string(weight.total), lines * 3 > weight.total * 2);
     }
+
+    // Each string the table keeps: what it takes up, how many instructions
+    // name it and how many load it as a value, the first line naming it,
+    // and a function's name as such. They come to the table, its count
+    // before them.
+    template<> template<>
+    void alscriptweight_object::test<13>()
+    {
+        const std::string script = "local function greet(name: string)\n"           // 0
+                                   "    ll.OwnerSay(\"hello \" .. name)\n"             // 1
+                                   "end\n"                                            // 2
+                                   "local t = {}\n"                                   // 3
+                                   "t.colour = \"red\"\n"                             // 4
+                                   "if t.colour == \"blue\" then greet(\"x\") end\n"  // 5
+                                   "greet(\"hello again\")\n"                         // 6
+                                   "greet(\"hello again\")\n";                        // 7
+        const ALScriptWeight w = ALScriptWeigh::slua(script);
+        ensure("compiled: " + w.error, w.compiled);
+        const auto of = [&w](const std::string& text) -> const ALScriptWeight::String* {
+            for (const ALScriptWeight::String& one : w.strings)
+            {
+                if (one.text == text)
+                {
+                    return &one;
+                }
+            }
+            return nullptr;
+        };
+        const ALScriptWeight::String* again = of("hello again");
+        ensure("a value loaded twice", again && again->uses == 2 && again->loads == 2 && again->line == 6 && again->bytes == 12);
+        const ALScriptWeight::String* colour = of("colour");
+        ensure("a field's name: named, never loaded", colour && colour->uses >= 2 && colour->loads == 0 && colour->line == 4);
+        const ALScriptWeight::String* blue = of("blue");
+        ensure("a comparison's: named, never loaded", blue && blue->uses == 1 && blue->loads == 0);
+        const ALScriptWeight::String* say = of("OwnerSay");
+        ensure("an import's path", say && say->uses >= 1 && say->loads == 0 && say->line == 1);
+        const ALScriptWeight::String* greet = of("greet");
+        ensure("a function's name, at the line it starts on", greet && greet->name && greet->uses == 0 && greet->line == 0);
+        size_t bytes = 0;
+        for (const ALScriptWeight::String& one : w.strings)
+        {
+            bytes += one.bytes;
+        }
+        const ALScriptWeight::Part* table = named(w, "strings");
+        ensure("they come to the table, with its count", table && table->bytes == bytes + 1);
+
+        // LSL compiled for Luau's VM: its strings, at the lines the lined
+        // compile says.
+        ensure("the builtins: " + error, lslLoaded);
+        const ALScriptWeight lsl = ALScriptWeigh::lslLuau(byLine());
+        bool found = false;
+        for (const ALScriptWeight::String& one : lsl.strings)
+        {
+            found = found || (one.text == "a sentence of some length, said to the owner on every start" && one.line == 15);
+        }
+        ensure("LSL on Luau's, placed", lsl.compiled && found);
+    }
+
+    // Strings that start alike: where keeping the start once and joining it
+    // back on would weigh less, what it would save -- the table's bytes
+    // before less after, less the join at each load and the local once.
+    // Only strings loaded as values; a short start saves nothing.
+    template<> template<>
+    void alscriptweight_object::test<14>()
+    {
+        const std::string start = "You have touched the object of the day: ";
+        const std::vector<std::string> rests = { "alpha", "bravo", "charlie", "delta" };
+        std::string script = "local t = {}\n";
+        for (const std::string& rest : rests)
+        {
+            script += "ll.OwnerSay(\"" + start + rest + "\")\n";
+        }
+        // Sharing a start with them, but a field's name too: never two.
+        script += "t[\"" + start + "zulu\"] = 1\nt.x = t[\"" + start + "zulu\"]\n";
+        // Two sharing a start too short to be worth it.
+        script += "ll.OwnerSay(\"short one\")\nll.OwnerSay(\"short two\")\n";
+        const ALScriptWeight w = ALScriptWeigh::slua(script);
+        ensure("compiled: " + w.error, w.compiled);
+        ensure_equals("one start worth keeping", w.sharedStarts.size(), size_t(1));
+        const ALScriptWeight::SharedStart& shared = w.sharedStarts.front();
+        ensure_equals("the start the four share", shared.start, start);
+        ensure_equals("the four, not the field's", shared.strings.size(), rests.size());
+        size_t before = 0;
+        size_t after  = 1 + start.size();
+        for (const std::string& rest : rests)
+        {
+            before += 1 + start.size() + rest.size();
+            after += 1 + rest.size();
+        }
+        const size_t cost = after + rests.size() * ALScriptWeigh::SHARED_START_PER_LOAD + ALScriptWeigh::SHARED_START_ONCE;
+        ensure_equals("what it saves", shared.saved, before - cost);
+        for (const size_t i : shared.strings)
+        {
+            ensure("each one of them", w.strings[i].text.rfind(start, 0) == 0 && w.strings[i].text != start + "zulu");
+        }
+
+        // Nothing where only two share a start: two loads cost more than
+        // one start saves, until the start is long.
+        ensure("two with a middling start: nothing",
+               ALScriptWeigh::slua("ll.OwnerSay(\"twenty bytes of start, then one\")\nll.OwnerSay(\"twenty bytes of start, then two\")\n").sharedStarts.empty());
+        ensure("two with a long one: worth it",
+               ALScriptWeigh::slua("ll.OwnerSay(\"a start long enough to be worth keeping once, then one\")\n"
+                                   "ll.OwnerSay(\"a start long enough to be worth keeping once, then two\")\n")
+                       .sharedStarts.size() == 1);
+        // Never inside a character.
+        const ALScriptWeight cut = ALScriptWeigh::slua("ll.OwnerSay(\"a start long enough to be worth keeping once \xC3\xA9t\xC3\xA9\")\n"
+                                                       "ll.OwnerSay(\"a start long enough to be worth keeping once \xC3\xA8re\")\n");
+        ensure("cut before the character", cut.sharedStarts.size() == 1 && cut.sharedStarts[0].start == "a start long enough to be worth keeping once ");
+    }
 }
