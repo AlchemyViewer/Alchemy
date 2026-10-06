@@ -26,6 +26,8 @@
 
 #include "alluaufrontend.h"
 
+#include <algorithm>
+
 #include "Luau/Ast.h"
 #include "Luau/BuiltinDefinitions.h"
 #include "Luau/Cancellation.h"
@@ -170,10 +172,57 @@ bool ALLuauFrontend::stoppedIn(bool checked)
     return true;
 }
 
+Luau::CheckResult ALLuauFrontend::checkWithModules(const Luau::FrontendOptions& options)
+{
+    // Autocomplete's module is the old solver's alone.
+    const bool autocomplete = options.forAutocomplete && solver == Luau::SolverMode::Old;
+    // Several modules the script requires, to be checked now: else as
+    // Luau's own check, which is the same on one thread.
+    const size_t modules = static_cast<size_t>(std::count_if(files.texts.begin(), files.texts.end(), [](const auto& text) {
+        return text.first.rfind("module:", 0) == 0;
+    }));
+    if (modules < 2 || !frontend->isDirty(moduleName, autocomplete))
+    {
+        return frontend->check(moduleName, options);
+    }
+    if (!modulePool)
+    {
+        modulePool = std::make_unique<ALLuauTaskPool>(ALLuauTaskPool::threadsWanted());
+    }
+    frontend->queueModuleCheck(moduleName);
+    const std::vector<Luau::ModuleName> checked =
+        frontend->checkQueuedModules(options, [this](std::vector<std::function<void()>> tasks) { modulePool->run(std::move(tasks)); });
+    // What each module checked now found, as Luau's check reports it.
+    Luau::CheckResult              result;
+    Luau::FrontendModuleResolver& resolver = autocomplete ? frontend->moduleResolverForAutocomplete : frontend->moduleResolver;
+    for (const Luau::ModuleName& name : checked)
+    {
+        const Luau::ModulePtr module = resolver.getModule(name);
+        if (!module)
+        {
+            continue;
+        }
+        if (module->cancelled)
+        {
+            return Luau::CheckResult();
+        }
+        if (module->timeout)
+        {
+            result.timeoutHits.push_back(name);
+        }
+        result.errors.insert(result.errors.end(), module->errors.begin(), module->errors.end());
+        if (name == moduleName)
+        {
+            result.lintResult = module->lintResult;
+        }
+    }
+    return result;
+}
+
 bool ALLuauFrontend::checkScript(Luau::CheckResult* result)
 {
     const bool        dirty = frontend->isDirty(moduleName);
-    Luau::CheckResult made  = frontend->check(moduleName, limited());
+    Luau::CheckResult made  = checkWithModules(limited());
     if (dirty)
     {
         ++checks;
@@ -220,7 +269,7 @@ Luau::ModulePtr ALLuauFrontend::queried(std::string_view source, bool completion
     }
     if (frontend->isDirty(moduleName, /*forAutocomplete*/ true))
     {
-        frontend->check(moduleName, autocompleteOptions());
+        checkWithModules(autocompleteOptions());
         ++checks;
         if (stoppedIn(true))
         {

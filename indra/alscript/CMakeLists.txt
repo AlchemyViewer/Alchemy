@@ -65,6 +65,7 @@ target_sources(
     luau/alluaunavigation.cpp
     luau/alluauservice.cpp
     luau/alluausharedstart.cpp
+    luau/alluautaskpool.cpp
     luau/alluautypes.cpp
     preprocessor/aldiskcache.cpp
     preprocessor/aldiskincludes.cpp
@@ -139,6 +140,7 @@ target_sources(
         luau/alluaunavigation.h
         luau/alluauservice.h
         luau/alluausharedstart.h
+        luau/alluautaskpool.h
         luau/alluautypes.h
         preprocessor/aldiskcache.h
         preprocessor/aldiskincludes.h

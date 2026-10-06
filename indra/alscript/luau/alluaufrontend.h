@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alluautaskpool.h"
 #include "alscriptlintpass.h"
 
 #include "llstl.h"
@@ -195,6 +196,15 @@ struct ALLuauFrontend
     // what a check reports, and what a question reads where it will do.
     // Whether it was checked now, and so could have been stopped.
     bool checkScript(Luau::CheckResult* result = nullptr);
+
+    // The script checked as Luau's check does, what it reports the same --
+    // each module checked now, the script's lints -- but where it needs
+    // several of its modules checked, each on a thread of the pool's as
+    // soon as the modules it requires are: a first look at a script that
+    // requires several large modules waits for the longest of them, not
+    // for all of them one after another.
+    Luau::CheckResult checkWithModules(const Luau::FrontendOptions& options);
+    std::unique_ptr<ALLuauTaskPool> modulePool;
 
     // The module a question reads, checked where it is not the text's
     // yet; none where the check was stopped. Under the new solver there is

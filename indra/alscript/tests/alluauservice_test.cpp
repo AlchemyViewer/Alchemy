@@ -1523,4 +1523,48 @@ namespace tut
         service.setFragments(false);
         service.setDocument("");
     }
+
+    template<> template<>
+    void alluauservice_object::test<45>()
+    {
+        set_test_name("a script requiring several modules has them checked together, each on a thread of its own as what it requires is checked: the same problems, each module checked once, and not again for an edit of the script alone");
+        ensure("definitions loaded: " + error, loaded);
+        service.setDocument("several");
+        service.setConfig(ALLuauConfig());
+        ALLuauService::Modules modules;
+        std::string            script = "--!strict\n";
+        for (int i = 1; i <= 4; ++i)
+        {
+            const std::string key = llformat("disk:/lib/m%d.luau", i);
+            // The last requires the first: one waits for another.
+            const std::string needs = i == 4 ? "local first = require(\"m1\")\n" : "\n";
+            modules.modules.push_back({ key, "--!strict\n" + needs + "local bad: number = \"x\"\nlocal M = {}\nfunction M.f(n: number): number\n    return n\nend\nreturn M\n" });
+            modules.reaches.push_back({ "", llformat("m%d", i), key });
+            script += llformat("local m%d = require(\"m%d\")\n", i, i);
+        }
+        modules.reaches.push_back({ "disk:/lib/m4.luau", "m1", "disk:/lib/m1.luau" });
+        service.setModules(modules);
+        script += "local s: string = m1.f(1) + m2.f(2) + m3.f(3) + m4.f(4)\n";
+        const size_t           before   = service.modulesChecked();
+        const ALScriptProblems problems = service.check(script);
+        ensure_equals("each module and the script checked once", service.modulesChecked() - before, size_t(5));
+        S32  in_modules = 0;
+        bool own        = false;
+        for (const ALScriptProblem& problem : problems)
+        {
+            in_modules += problem.file.rfind("disk:/lib/m", 0) == 0 && problem.line == 2 ? 1 : 0;
+            own |= problem.file.empty() && problem.line == 5 && problem.severity == ALScriptProblem::Severity::Error;
+        }
+        ensure_equals("each module's own problem, in its lines: " + said(problems), in_modules, 4);
+        ensure("and the script's: " + said(problems), own);
+
+        // The script typed in: only it, on its own.
+        const size_t again = service.modulesChecked();
+        const ALScriptProblems edited = service.check(script + "print(s)\n");
+        ensure_equals("the script alone", service.modulesChecked() - again, size_t(1));
+        ensure("its own problem still: " + said(edited), std::any_of(edited.begin(), edited.end(), [](const ALScriptProblem& problem) {
+                   return problem.file.empty() && problem.line == 5;
+               }));
+        service.setDocument("");
+    }
 }
