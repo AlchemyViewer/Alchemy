@@ -90,7 +90,7 @@ al_import(ll::pugixml      PACKAGE pugixml         CONFIG TARGETS pugixml::pugix
 al_import(ll::re2          PACKAGE re2             CONFIG TARGETS re2::re2)
 al_import(ll::simdjson     PACKAGE simdjson        CONFIG TARGETS simdjson::simdjson)
 al_import(ll::simdutf      PACKAGE simdutf                TARGETS simdutf::simdutf)
-al_import(ll::slua         PACKAGE unofficial-slua CONFIG TARGETS unofficial::slua::Luau.Analysis unofficial::slua::Luau.Compiler)
+al_import(ll::slua         PACKAGE unofficial-slua CONFIG TARGETS unofficial::slua::Luau.Analysis unofficial::slua::Luau.Compiler unofficial::slua::Luau.Require)
 al_import(ll::tailslide    PACKAGE unofficial-tailslide CONFIG TARGETS unofficial::tailslide::libtailslide)
 al_import(ll::tinyexr      PACKAGE tinyexr         CONFIG TARGETS unofficial::tinyexr::tinyexr)
 al_import(ll::vorbis       PACKAGE Vorbis          CONFIG TARGETS Vorbis::vorbisfile Vorbis::vorbisenc Vorbis::vorbis)
