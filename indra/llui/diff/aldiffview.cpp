@@ -1298,15 +1298,30 @@ void ALDiffView::refreshBar()
 
 void ALDiffView::followScroll(ALCodeEditor* from)
 {
-    if (mInline || mFollowing || from == mInlined)
+    if (mInline || from == mInlined)
     {
         return;
     }
-    ALCodeEditor* other = from == mLeft ? mRight : mLeft;
-    mFollowing          = true;
-    other->setScrollY(from->scrollY());
-    other->setScrollX(from->scrollX());
-    mFollowing = false;
+    // Only the axis that moved is told to the other side; a side that
+    // followed is noted too, at wherever it could go.
+    Told&     told = from == mLeft ? mToldLeft : mToldRight;
+    const S32 y    = from->scrollY();
+    const F32 x    = from->scrollX();
+    if (!mFollowing)
+    {
+        ALCodeEditor* other = from == mLeft ? mRight : mLeft;
+        mFollowing          = true;
+        if (y != told.y)
+        {
+            other->setScrollY(y);
+        }
+        if (x != told.x)
+        {
+            other->setScrollX(x);
+        }
+        mFollowing = false;
+    }
+    told = Told{ y, x };
 }
 
 void ALDiffView::refreshColors()

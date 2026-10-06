@@ -397,6 +397,17 @@ private:
     S32                       mArrowHover = -1;
     // A side scrolled to follow the other, which does not lead it back.
     bool                      mFollowing = false;
+    // Where each side was last seen scrolled to, so that following copies
+    // only the axis that moved: a side whose lines fit its width is clamped
+    // to the left edge, and scrolling it down must not drag the other back
+    // from where it was scrolled across.
+    struct Told
+    {
+        S32 y = 0;
+        F32 x = 0.f;
+    };
+    Told                      mToldLeft;
+    Told                      mToldRight;
     // The colour table's generation the colours were last taken for, and
     // those drawn each frame.
     U32                       mColorsGeneration = U32_MAX;

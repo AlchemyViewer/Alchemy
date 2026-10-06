@@ -769,7 +769,7 @@ namespace tut
         ensure_equals("as they are: the re-indented lines changed", d.changeCount(), 1);
         ensure("off", !d.ignores("whitespace"));
         d.right()->setFocus(true);
-        d.right()->goTo(ALTextPos(numbersOf(d.right()).size() - 1, 0));
+        d.right()->goTo(ALTextPos(static_cast<S32>(numbersOf(d.right()).size()) - 1, 0));
         const S32 line = d.rightAtCaret().first;
         d.setIgnore("whitespace", true);
         ensure("on, and the bar's button lit", d.ignores("whitespace") && ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
@@ -1371,12 +1371,12 @@ namespace tut
 
         // Lines put in at the end of the right, and taken out again: the
         // left's rows below its last line as many as they are.
-        both([](ALDiffView& d) { d.setTexts(lines(40, { { 5, "five" } }), lines(40, { { 5, "FIVE" } })); });
-        both([](ALDiffView& d) { d.setRightText(lines(40, { { 5, "FIVE" } }) + "\nput in\nand again"); });
+        both([](ALDiffView& d) { d.setTexts(aldiffview_data::lines(40, { { 5, "five" } }), aldiffview_data::lines(40, { { 5, "FIVE" } })); });
+        both([](ALDiffView& d) { d.setRightText(aldiffview_data::lines(40, { { 5, "FIVE" } }) + "\nput in\nand again"); });
         ensure("lines put in: a stretch at the end laid out again", at_end(ALDiffModel::Column::Left));
         sameShown(kept, whole, "put in at the end");
         ensure_equals("the left's rows below its last", kept.left()->layout().gapRows(40), 2);
-        both([](ALDiffView& d) { d.setRightText(lines(40, { { 5, "FIVE" } })); });
+        both([](ALDiffView& d) { d.setRightText(aldiffview_data::lines(40, { { 5, "FIVE" } })); });
         ensure("again", at_end(ALDiffModel::Column::Left));
         sameShown(kept, whole, "taken out again");
         ensure("none now but the row of the run folded to the end", kept.left()->layout().gapRows(40) == 1 && kept.left()->lineAnnotation(40).gapStop);
@@ -1386,15 +1386,15 @@ namespace tut
         // and that line's number is said again.
         both([](ALDiffView& d) {
             d.setInline(true);
-            d.setTexts(lines(40, { { 5, "five" } }), lines(40, { { 5, "five" }, { 39, "thirty-nine" } }));
+            d.setTexts(aldiffview_data::lines(40, { { 5, "five" } }), aldiffview_data::lines(40, { { 5, "five" }, { 39, "thirty-nine" } }));
         });
-        both([](ALDiffView& d) { d.setLeftText(lines(40, { { 5, "five" }, { 39, "line 39!" } })); });
+        both([](ALDiffView& d) { d.setLeftText(aldiffview_data::lines(40, { { 5, "five" }, { 39, "line 39!" } })); });
         ensure("the left's last line: a stretch at the end laid out again", at_end(ALDiffModel::Column::Inline));
         sameShown(kept, whole, "the left's last line");
         // Typed in a line put in at the end: the edit takes the line before
         // it from its end.
-        both([](ALDiffView& d) { d.setTexts(lines(40), lines(40) + "\nput in"); });
-        both([](ALDiffView& d) { d.setRightText(lines(40) + "\nput in!"); });
+        both([](ALDiffView& d) { d.setTexts(aldiffview_data::lines(40), aldiffview_data::lines(40) + "\nput in"); });
+        both([](ALDiffView& d) { d.setRightText(aldiffview_data::lines(40) + "\nput in!"); });
         ensure("typed at the end: a stretch at the end laid out again", at_end(ALDiffModel::Column::Inline));
         sameShown(kept, whole, "typed at the end");
     }
@@ -1421,5 +1421,35 @@ namespace tut
         ensure("the left not at all", kept.left()->highlighter().lastLexed() == 0);
         ensure("whole: lexed from the top", whole.right()->highlighter().lastLexed() > 2500);
         sameShown(kept, whole, "typed far down");
+    }
+
+    template<> template<>
+    void aldiffview_object::test<38>()
+    {
+        set_test_name("a side whose lines fit its width, scrolled down, leaves the other where it was scrolled across: following copies the axis that moved");
+        std::string left;
+        std::string right;
+        for (S32 n = 0; n < 200; ++n)
+        {
+            const std::string line = "line " + std::to_string(n);
+            left += (n ? "\n" : "") + line + " " + std::string(120, 'x');
+            right += (n ? "\n" : "") + (n == 100 ? std::string("changed") : line);
+        }
+        ALDiffView& d = make(left.c_str(), right.c_str());
+        d.setFoldSame(false);
+        d.left()->setScrollX(40.f);
+        ensure_equals("the left scrolled across", d.left()->scrollX(), 40.f);
+        ensure_equals("the right, with nothing past its edge, held at it", d.right()->scrollX(), 0.f);
+        d.right()->setScrollY(120);
+        ensure_equals("the left followed the right down", d.left()->scrollY(), 120);
+        ensure_equals("and kept its place across", d.left()->scrollX(), 40.f);
+        d.right()->goTo(ALTextPos(180, 0));
+        d.right()->scrollToCaret();
+        ensure("the caret kept in sight on the right: the left down with it", d.right()->scrollY() > 120 && d.left()->scrollY() == d.right()->scrollY());
+        ensure_equals("and still across", d.left()->scrollX(), 40.f);
+        d.left()->setScrollX(0.f);
+        ensure_equals("the left back to its edge: the right, there already, as it was", d.right()->scrollX(), 0.f);
+        d.left()->setScrollY(60);
+        ensure_equals("the right followed the left up", d.right()->scrollY(), 60);
     }
 }
