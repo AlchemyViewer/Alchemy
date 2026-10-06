@@ -183,4 +183,56 @@ namespace tut
             ensure("the other text still known", lexer.regions(texts[(round + 1) % 2]) == fresh.regions(texts[(round + 1) % 2]));
         }
     }
+
+    template<> template<>
+    void aldifflexer_object::test<4>()
+    {
+        set_test_name("a text read against another that differs from it here and there all through: only the lines that differ, or start otherwise, read; as read afresh");
+        ensure("the LSL grammar", lsl != nullptr);
+        std::vector<std::string> left;
+        for (S32 n = 0; n < 400; ++n)
+        {
+            left.push_back(n % 40 == 10 ? "/* a note" : n % 40 == 12 ? "   ends */ x = 1;" : "llSay(0, \"line " + std::to_string(n) + "\");");
+        }
+        // The first line and the last changed, a line put in, one taken out,
+        // and one more changed: the edges are the whole text.
+        std::vector<std::string> right = left;
+        right.front() = "integer first;";
+        right.back()  = "integer last;";
+        right.insert(right.begin() + 100, "string put_in;");
+        right.erase(right.begin() + 300);
+        right[200] = "llOwnerSay(\"changed\");";
+        ALDiffLexer lexer(lsl);
+        lexer.regions(left);
+        ensure_equals("the first read whole", lexer.lastRead(), 400);
+        const auto& read = lexer.regions(right);
+        ensure("only the lines that differ read: " + std::to_string(lexer.lastRead()), lexer.lastRead() <= 6);
+        ALDiffLexer fresh(lsl);
+        ensure("as read afresh", read == fresh.regions(right));
+
+        // Read again in place, as a comparison asks for its left and then
+        // its right typed in two places a hundred lines apart: the lines
+        // between taken as they were.
+        std::vector<std::string> apart = right;
+        apart[150]                     = "integer one;";
+        apart[250]                     = "integer two;";
+        lexer.regions(left);
+        const auto& again              = lexer.regions(apart);
+        ensure("the two read, those between taken: " + std::to_string(lexer.lastRead()), lexer.lastRead() <= 3);
+        ALDiffLexer fresh_apart(lsl);
+        ensure("as read afresh", again == fresh_apart.regions(apart));
+
+        // A comment opened above lines the same: each of those starts
+        // otherwise, and is read, to the first that closes it (line 52).
+        std::vector<std::string> opened = left;
+        opened[20]                      = "/* opened here";
+        opened[399]                     = "*/";
+        ALDiffLexer twice(lsl);
+        twice.regions(left);
+        const auto& commented = twice.regions(opened);
+        ALDiffLexer fresh2(lsl);
+        ensure("as read afresh, a comment's lines its", commented == fresh2.regions(opened) && commented[30].size() == 1 &&
+                                                            commented[30][0].region == ALTextDiff::Region::Comment);
+        ensure("those in it read, to where it closes: " + std::to_string(twice.lastRead()), twice.lastRead() >= 31 && twice.lastRead() <= 34);
+    }
 }

@@ -25,11 +25,16 @@
 #ifndef AL_ALDIFFLEXER_H
 #define AL_ALDIFFLEXER_H
 
+#include "aldiffedit.h"
 #include "altextdiff.h"
 #include "alsyntaxgrammar.h"
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // A text's lines read by a grammar into what ALTextDiff cuts their words
@@ -65,6 +70,42 @@ private:
         std::vector<ALTextDiff::regions_t> regions;
         U64                                used = 0;
     };
+
+    // Lines read already -- a text held, or what one held between where a
+    // text read in its place first and last differs from it -- of which a
+    // line of a text being read that is one, and starts in the state it
+    // did, takes what it was read as: two versions of a script differ in
+    // lines here and there all through, and the rest need not be read.
+    class Source
+    {
+    public:
+        explicit Source(const Text& text) : mText(text) {}
+        // Which of its lines a line is, starting in `state`: the next
+        // looked for, past the last taken, else the nearest place past it
+        // by its text; -1 for none. Each taken once, in order.
+        S32         find(const std::string& line, const ALSyntaxState& state);
+        const Text& text() const { return mText; }
+
+    private:
+        const Text& mText;
+        size_t      mNext    = 0;
+        bool        mIndexed = false;
+        boost::unordered_flat_map<std::string_view, std::vector<S32>, ll::string_hash, std::equal_to<>> mPlaces;
+    };
+
+    // A text mostly the one a slot held -- a keystroke's -- read again in
+    // place: only from where the two first differ until a line after the
+    // last starts as it did, what lies between taken from what it held
+    // where it can.
+    void readAgain(Text& text, const std::vector<std::string>& lines, const ALDiffEdit::Edges& edges);
+    // A text read whole, each line taken from what either text held where
+    // it can: the second of a comparison's texts read after the first.
+    void readWhole(Text& text, const std::vector<std::string>& lines, const Text& other);
+    // A line read into its regions from `state`, which it leaves as the
+    // line after starts; or taken from the first of the sources that has
+    // it.
+    void read(const std::string& line, ALSyntaxState& state, ALTextDiff::regions_t& out);
+    void readOrTake(const std::string& line, ALSyntaxState& state, ALTextDiff::regions_t& out, Source* sources, size_t count);
 
     std::shared_ptr<const ALSyntaxGrammar> mGrammar;
     ALSyntaxWords                          mWords;
