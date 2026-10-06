@@ -106,6 +106,30 @@ Luau::FrontendOptions ALLuauFrontend::limited() const
     return options;
 }
 
+Luau::FrontendOptions ALLuauFrontend::autocompleteOptions() const
+{
+    Luau::FrontendOptions options = limited();
+    options.runLintChecks         = false;
+    options.forAutocomplete       = true;
+    return options;
+}
+
+Luau::ModulePtr ALLuauFrontend::base() const
+{
+    return solver == Luau::SolverMode::New ? frontend->moduleResolver.getModule(moduleName)
+                                           : frontend->moduleResolverForAutocomplete.getModule(moduleName);
+}
+
+bool ALLuauFrontend::baseCurrent() const
+{
+    return !frontend->isDirty(moduleName, /*forAutocomplete*/ solver == Luau::SolverMode::Old);
+}
+
+Luau::FrontendOptions ALLuauFrontend::baseOptions() const
+{
+    return solver == Luau::SolverMode::New ? limited() : autocompleteOptions();
+}
+
 bool ALLuauFrontend::stopRequested() const
 {
     return stop && stop->requested();
@@ -178,10 +202,7 @@ Luau::ModulePtr ALLuauFrontend::queried(std::string_view source, bool completion
     }
     if (frontend->isDirty(moduleName, /*forAutocomplete*/ true))
     {
-        Luau::FrontendOptions options = limited();
-        options.runLintChecks         = false;
-        options.forAutocomplete       = true;
-        frontend->check(moduleName, options);
+        frontend->check(moduleName, autocompleteOptions());
         ++checks;
         if (stoppedIn(true))
         {

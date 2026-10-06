@@ -26,6 +26,7 @@
 
 #include "alluaucompletion.h"
 
+#include "alluaufragment.h"
 #include "alluaufrontend.h"
 #include "alluautypes.h"
 #include "alscriptlexicon.h"
@@ -254,26 +255,42 @@ namespace
     }
 }
 
-ALLuauCompletion::ALLuauCompletion(ALLuauFrontend& front)
+ALLuauCompletion::ALLuauCompletion(ALLuauFrontend& front, ALLuauFragment& fragment)
 :   mFront(front)
+,   mFragment(fragment)
 {
 }
 
 std::vector<ALScriptCompletion> ALLuauCompletion::complete(std::string_view source, S32 line, S32 column)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    const Luau::Position                 at       = ALLuauTypes::positionOf(line, column);
+    const Luau::StringCompletionCallback strings  = [](std::string, std::optional<const Luau::ExternType*>,
+                                                      std::optional<std::string>) -> std::optional<Luau::AutocompleteEntryMap> {
+        return std::nullopt;
+    };
+    // As the script is typed: the statement being typed checked alone
+    // against the last check, where that answers.
+    ALLuauFragment::Completion fragment = mFragment.complete(source, at, strings);
+    if (fragment.outcome == ALLuauFragment::Outcome::Nothing)
+    {
+        return {};
+    }
+    if (fragment.outcome == ALLuauFragment::Outcome::Answered)
+    {
+        return answer(fragment.found, *fragment.module, at);
+    }
     // Nothing offered from a check stopped part way.
     const Luau::ModulePtr module = mFront.queried(source, /*completion*/ true);
     if (!module)
     {
         return {};
     }
-    const Luau::Position     at    = ALLuauTypes::positionOf(line, column);
-    Luau::AutocompleteResult found = Luau::autocomplete(
-        *mFront.frontend, mFront.moduleName, at,
-        [](std::string, std::optional<const Luau::ExternType*>, std::optional<std::string>) -> std::optional<Luau::AutocompleteEntryMap> {
-            return std::nullopt;
-        });
+    return answer(Luau::autocomplete(*mFront.frontend, mFront.moduleName, at, strings), *module, at);
+}
+
+std::vector<ALScriptCompletion> ALLuauCompletion::answer(const Luau::AutocompleteResult& found, const Luau::Module& module, Luau::Position at) const
+{
 
     const ALScriptCompletion::Context context = contextOf(found.context);
     // The dot or the colon a member's name follows, where it follows one.
@@ -368,7 +385,7 @@ std::vector<ALScriptCompletion> ALLuauCompletion::complete(std::string_view sour
     // event takes.
     if (!stubbed)
     {
-        if (const std::optional<Luau::TypeId> wanted = overloadedCallbackAt(*module, found.ancestry, at))
+        if (const std::optional<Luau::TypeId> wanted = overloadedCallbackAt(module, found.ancestry, at))
         {
             out.push_back(stubCompletion(stubOf(writtenOf(*Luau::get<Luau::FunctionType>(*wanted))), wanted, context));
         }

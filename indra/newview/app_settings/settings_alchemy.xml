@@ -541,6 +541,17 @@
             <key>Value</key>
             <real>5.0</real>
         </map>
+        <key>ALScriptFragmentCompletion</key>
+        <map>
+            <key>Comment</key>
+            <string>As an SLua script is typed, answer a completion or signature help over the statement being typed, checked alone against the script's last check, rather than checking the whole script again first. Off, every keystroke that changed the script checks all of it before answering.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALScriptStudioAutoComplete</key>
         <map>
             <key>Comment</key>

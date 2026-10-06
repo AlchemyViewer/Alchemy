@@ -47,6 +47,7 @@ public:
         std::string         lslPath;
         U32                 generation = 0;
         bool                newSolver  = false;
+        bool                fragments  = false;
         F32                 seconds    = 0.f;
         ALLuauService::Stop stop;
     };

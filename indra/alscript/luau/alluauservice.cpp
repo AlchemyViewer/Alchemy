@@ -27,6 +27,7 @@
 #include "alluauservice.h"
 
 #include "alluaucompletion.h"
+#include "alluaufragment.h"
 #include "alluaufrontend.h"
 #include "alluautypes.h"
 
@@ -1109,7 +1110,8 @@ namespace
 
 ALLuauService::ALLuauService()
 :   mFrontend(std::make_unique<ALLuauFrontend>())
-,   mCompletion(std::make_unique<ALLuauCompletion>(*mFrontend))
+,   mFragment(std::make_unique<ALLuauFragment>(*mFrontend))
+,   mCompletion(std::make_unique<ALLuauCompletion>(*mFrontend, *mFragment))
 {
     setUpProcess();
     mFrontend->frontend = ALLuauFrontend::plainFrontend(mFrontend->files, mFrontend->configs, mFrontend->solver);
@@ -1248,9 +1250,24 @@ bool ALLuauService::stopped() const
     return mFrontend->wasStopped;
 }
 
+void ALLuauService::setFragments(bool use)
+{
+    mFrontend->useFragments = use;
+}
+
+bool ALLuauService::fragments() const
+{
+    return mFrontend->useFragments;
+}
+
 size_t ALLuauService::typeChecks() const
 {
     return mFrontend->checks;
+}
+
+size_t ALLuauService::fragmentsChecked() const
+{
+    return mFrontend->fragments;
 }
 
 size_t ALLuauService::modulesChecked() const
@@ -1835,137 +1852,187 @@ ALScriptHover ALLuauService::hover(std::string_view source, S32 line, S32 column
 
 // --- what a call here takes ----------------------------------------------------------
 
+namespace
+{
+    // The documentation symbol of a field a call calls, as the definitions
+    // gave it: `ll.Say`'s, which is the field's and not its function's. The
+    // module's types alone, which a fragment has, where Luau's own
+    // (getDocumentationSymbolAtPosition) wants the source the module was
+    // checked from.
+    std::optional<std::string> fieldSymbolOf(const Luau::Module& module, const Luau::AstExpr* callee)
+    {
+        const Luau::AstExprIndexName* index  = callee->as<Luau::AstExprIndexName>();
+        const Luau::TypeId*           parent = index ? module.astTypes.find(index->expr) : nullptr;
+        if (!parent)
+        {
+            return std::nullopt;
+        }
+        const Luau::TypeId of = Luau::follow(*parent);
+        if (const Luau::TableType* table = Luau::get<Luau::TableType>(of))
+        {
+            const auto it = table->props.find(index->index.value);
+            return it != table->props.end() ? it->second.documentationSymbol : std::nullopt;
+        }
+        for (const Luau::ExternType* type = Luau::get<Luau::ExternType>(of); type;
+             type = type->parent ? Luau::get<Luau::ExternType>(Luau::follow(*type->parent)) : nullptr)
+        {
+            if (const auto it = type->props.find(index->index.value); it != type->props.end())
+            {
+                return it->second.documentationSymbol;
+            }
+        }
+        return std::nullopt;
+    }
+
+    // What `call` takes, `at` in its brackets, read from `module`'s types:
+    // the whole script's, or a fragment's, whose source is none.
+    ALScriptSignature signatureOf(const ALLuauFrontend& front, const Luau::Module& module, const Luau::AstExprCall* call,
+                                  const Luau::SourceModule* source, Luau::Position at)
+    {
+        ALScriptSignature   answer;
+        const Luau::TypeId* callee = module.astTypes.find(call->func);
+        if (!callee)
+        {
+            return answer;
+        }
+        // Each form it has: one function, or an overloaded one's every part.
+        std::vector<const Luau::FunctionType*> forms;
+        if (const Luau::IntersectionType* overloads = Luau::get<Luau::IntersectionType>(Luau::follow(*callee)))
+        {
+            for (Luau::TypeId part : overloads->parts)
+            {
+                if (const Luau::FunctionType* one = Luau::get<Luau::FunctionType>(Luau::follow(part)))
+                {
+                    forms.push_back(one);
+                }
+            }
+        }
+        else if (const Luau::FunctionType* function = functionOf(*callee))
+        {
+            forms.push_back(function);
+        }
+        if (forms.empty())
+        {
+            return answer;
+        }
+        answer.found           = true;
+        const std::string name = nameOf(call->func);
+        Luau::ToStringOptions options;
+        options.functionTypeArguments = true;
+        // A form's label, and its parameters as they print, the first dropped
+        // when the call passes it as self; and whether it takes as many
+        // arguments as the call has.
+        const auto describe = [&](const Luau::FunctionType& function, ALScriptSignature::Overload& out) {
+            out.label = Luau::toStringNamedFunction(name.empty() ? "function" : name, function, options);
+            const auto [arg_types, tail] = Luau::flatten(function.argTypes);
+            // Only where the call itself passes it: a method called with a dot
+            // is given its object as its first argument, which is a parameter
+            // like any other there.
+            const size_t skip = call->self && !arg_types.empty() ? 1 : 0;
+            for (size_t i = skip; i < arg_types.size(); ++i)
+            {
+                std::string parameter;
+                if (i < function.argNames.size() && function.argNames[i])
+                {
+                    parameter = function.argNames[i]->name + ": ";
+                }
+                parameter += typeText(arg_types[i]);
+                out.parameters.push_back(std::move(parameter));
+            }
+            // A tail that takes more, where the function does: not a hidden one,
+            // which the new solver gives a function the script wrote, nor none.
+            const Luau::VariadicTypePack* variadic = tail ? Luau::get<Luau::VariadicTypePack>(Luau::follow(*tail)) : nullptr;
+            const bool                    more     = tail && !Luau::isEmpty(*tail) && !(variadic && variadic->hidden);
+            if (more)
+            {
+                out.parameters.push_back("..." + Luau::toString(*tail));
+            }
+            return more || out.parameters.size() >= call->args.size;
+        };
+        S32 fits = -1;
+        for (const Luau::FunctionType* form : forms)
+        {
+            ALScriptSignature::Overload one;
+            if (describe(*form, one) && fits < 0)
+            {
+                fits = static_cast<S32>(answer.overloads.size());
+            }
+            answer.overloads.push_back(std::move(one));
+        }
+        answer.overload   = llmax(0, fits);
+        answer.label      = answer.overloads[static_cast<size_t>(answer.overload)].label;
+        answer.parameters = answer.overloads[static_cast<size_t>(answer.overload)].parameters;
+        if (answer.overloads.size() < 2)
+        {
+            answer.overloads.clear();
+            answer.overload = 0;
+        }
+        // Which one the position is at: the argument that holds it, or the
+        // one after the last that ends before it.
+        S32 active = 0;
+        for (size_t i = 0; i < call->args.size; ++i)
+        {
+            const Luau::Location& where = call->args.data[i]->location;
+            if (where.containsClosed(at))
+            {
+                active = static_cast<S32>(i);
+                break;
+            }
+            if (where.end < at || where.end == at)
+            {
+                active = static_cast<S32>(i) + 1;
+            }
+        }
+        answer.active = active;
+        std::optional<std::string> symbol = Luau::follow(*callee)->documentationSymbol;
+        if (!symbol)
+        {
+            symbol = fieldSymbolOf(module, call->func);
+        }
+        if (!symbol && source)
+        {
+            symbol = Luau::getDocumentationSymbolAtPosition(*source, module, call->func->location.begin);
+        }
+        if (const ALLuauFrontend::Doc* doc = front.docFor(symbol))
+        {
+            answer.documentation = doc->documentation;
+        }
+        return answer;
+    }
+}
+
 ALScriptSignature ALLuauService::signature(std::string_view source, S32 line, S32 column)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    ALLuauFrontend& front = *mFrontend;
+    ALLuauFrontend&      front = *mFrontend;
+    const Luau::Position at    = positionOf(line, column);
+    // As the script is typed: the call's statement checked alone against
+    // the last check, where that answers; else the script checked whole.
+    const ALLuauFragment::Typed typed = mFragment->typecheck(source, at);
+    if (typed.outcome == ALLuauFragment::Outcome::Nothing)
+    {
+        return {};
+    }
+    if (typed.outcome == ALLuauFragment::Outcome::Answered)
+    {
+        return signatureOf(front, *typed.module, typed.call, nullptr, at);
+    }
     const Luau::ModulePtr     module        = front.queried(source);
-    ALScriptSignature         answer;
     const Luau::SourceModule* module_source = front.frontend->getSourceModule(front.moduleName);
     if (!module_source || !module)
     {
-        return answer;
+        return {};
     }
-    const Luau::Position at = positionOf(line, column);
     // The innermost call whose parentheses hold the position.
-    std::vector<Luau::AstNode*> ancestry = Luau::findAstAncestryOfPosition(*module_source, at);
-    Luau::AstExprCall*          call     = nullptr;
+    const std::vector<Luau::AstNode*> ancestry = Luau::findAstAncestryOfPosition(*module_source, at);
     for (auto it = ancestry.rbegin(); it != ancestry.rend(); ++it)
     {
-        if (Luau::AstExprCall* candidate = (*it)->as<Luau::AstExprCall>(); candidate && candidate->argLocation.containsClosed(at))
+        if (const Luau::AstExprCall* call = (*it)->as<Luau::AstExprCall>(); call && call->argLocation.containsClosed(at))
         {
-            call = candidate;
-            break;
+            return signatureOf(front, *module, call, module_source, at);
         }
     }
-    if (!call)
-    {
-        return answer;
-    }
-    const Luau::TypeId* callee = module->astTypes.find(call->func);
-    if (!callee)
-    {
-        return answer;
-    }
-    // Each form it has: one function, or an overloaded one's every part.
-    std::vector<const Luau::FunctionType*> forms;
-    if (const Luau::IntersectionType* overloads = Luau::get<Luau::IntersectionType>(Luau::follow(*callee)))
-    {
-        for (Luau::TypeId part : overloads->parts)
-        {
-            if (const Luau::FunctionType* one = Luau::get<Luau::FunctionType>(Luau::follow(part)))
-            {
-                forms.push_back(one);
-            }
-        }
-    }
-    else if (const Luau::FunctionType* function = functionOf(*callee))
-    {
-        forms.push_back(function);
-    }
-    if (forms.empty())
-    {
-        return answer;
-    }
-    answer.found = true;
-    const std::string name = nameOf(call->func);
-    Luau::ToStringOptions options;
-    options.functionTypeArguments = true;
-    // A form's label, and its parameters as they print, the first dropped
-    // when the call passes it as self; and whether it takes as many
-    // arguments as the call has.
-    const auto describe = [&](const Luau::FunctionType& function, ALScriptSignature::Overload& out) {
-        out.label = Luau::toStringNamedFunction(name.empty() ? "function" : name, function, options);
-        const auto [arg_types, tail] = Luau::flatten(function.argTypes);
-        // Only where the call itself passes it: a method called with a dot
-        // is given its object as its first argument, which is a parameter
-        // like any other there.
-        const size_t skip = call->self && !arg_types.empty() ? 1 : 0;
-        for (size_t i = skip; i < arg_types.size(); ++i)
-        {
-            std::string parameter;
-            if (i < function.argNames.size() && function.argNames[i])
-            {
-                parameter = function.argNames[i]->name + ": ";
-            }
-            parameter += typeText(arg_types[i]);
-            out.parameters.push_back(std::move(parameter));
-        }
-        // A tail that takes more, where the function does: not a hidden one,
-        // which the new solver gives a function the script wrote, nor none.
-        const Luau::VariadicTypePack* variadic = tail ? Luau::get<Luau::VariadicTypePack>(Luau::follow(*tail)) : nullptr;
-        const bool                    more     = tail && !Luau::isEmpty(*tail) && !(variadic && variadic->hidden);
-        if (more)
-        {
-            out.parameters.push_back("..." + Luau::toString(*tail));
-        }
-        return more || out.parameters.size() >= call->args.size;
-    };
-    S32 fits = -1;
-    for (const Luau::FunctionType* form : forms)
-    {
-        ALScriptSignature::Overload one;
-        if (describe(*form, one) && fits < 0)
-        {
-            fits = static_cast<S32>(answer.overloads.size());
-        }
-        answer.overloads.push_back(std::move(one));
-    }
-    answer.overload   = llmax(0, fits);
-    answer.label      = answer.overloads[static_cast<size_t>(answer.overload)].label;
-    answer.parameters = answer.overloads[static_cast<size_t>(answer.overload)].parameters;
-    if (answer.overloads.size() < 2)
-    {
-        answer.overloads.clear();
-        answer.overload = 0;
-    }
-    // Which one the position is at: the argument that holds it, or the
-    // one after the last that ends before it.
-    S32 active = 0;
-    for (size_t i = 0; i < call->args.size; ++i)
-    {
-        const Luau::Location& where = call->args.data[i]->location;
-        if (where.containsClosed(at))
-        {
-            active = static_cast<S32>(i);
-            break;
-        }
-        if (where.end < at || where.end == at)
-        {
-            active = static_cast<S32>(i) + 1;
-        }
-    }
-    answer.active = active;
-    std::optional<std::string> symbol = Luau::follow(*callee)->documentationSymbol;
-    if (!symbol)
-    {
-        symbol = Luau::getDocumentationSymbolAtPosition(*module_source, *module, call->func->location.begin);
-    }
-    if (const ALLuauFrontend::Doc* doc = front.docFor(symbol))
-    {
-        answer.documentation = doc->documentation;
-    }
-    return answer;
+    return {};
 }
 
 // --- where a name lives -------------------------------------------------------------

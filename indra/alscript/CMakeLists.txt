@@ -57,6 +57,7 @@ target_sources(
     lsl/optimizer/allslsignatures.cpp
     lsl/optimizer/allslsimplifier.cpp
     luau/alluaucompletion.cpp
+    luau/alluaufragment.cpp
     luau/alluauconfig.cpp
     luau/alluauexports.cpp
     luau/alluaufrontend.cpp
@@ -125,6 +126,7 @@ target_sources(
         lsl/optimizer/allslsignatures.h
         lsl/optimizer/allslsimplifier.h
         luau/alluaucompletion.h
+        luau/alluaufragment.h
         luau/alluauconfig.h
         luau/alluauexports.h
         luau/alluaufrontend.h

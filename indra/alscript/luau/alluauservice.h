@@ -40,6 +40,7 @@ namespace Luau
 }
 
 class ALLuauCompletion;
+class ALLuauFragment;
 struct ALLuauFrontend;
 
 // The SLua analyzer: Luau's front end from Second Life's fork, given the
@@ -93,6 +94,14 @@ public:
     static void cancel(const Stop& stop);
     void        setStop(Stop stop);
     bool        stopped() const;
+
+    // Whether a completion or signature help asked of a text changed since
+    // its last check is answered over the part that changed, checked alone
+    // against that check (ALLuauFragment), rather than after the whole
+    // script is checked again. Off until told; the whole script is still
+    // checked where there is no check to patch, or the fragment declines.
+    void setFragments(bool use);
+    bool fragments() const;
 
     // The documentation, as secondlife.docs.json has it: a map from a
     // symbol such as "@sl-slua/global/ll.Say" to its text and link.
@@ -158,7 +167,8 @@ public:
     // What could go at a position of the script: the keywords, the
     // bindings in scope, the fields of what is being indexed; each with
     // whether it fits there and where a call's brackets go
-    // (ALLuauCompletion). In no order: the editor ranks them.
+    // (ALLuauCompletion). In no order: the editor ranks them. Over a
+    // fragment where setFragments says so, as is signature help.
     std::vector<ALScriptCompletion> complete(std::string_view source, S32 line, S32 column);
     // What is at a position: its name and type, its documentation, and
     // where in the script it was bound.
@@ -200,6 +210,10 @@ public:
     // script is strict, or under the new solver -- in whatever order they
     // come. For the test that says so.
     size_t typeChecks() const;
+    // How many questions were answered over a fragment instead, for the
+    // test that says a question asked as the script is typed checks
+    // nothing whole.
+    size_t fragmentsChecked() const;
     // How many modules the front end has checked, the script's and those it
     // requires alike, since it was built: for the test that says a module
     // unchanged is not checked again.
@@ -207,8 +221,10 @@ public:
 
 private:
     // What is kept between questions (alluaufrontend.h), whose Luau
-    // headers stay out of this one; and what answers over it in a class
-    // of its own.
+    // headers stay out of this one; the fragment the questions asked as a
+    // script is typed are answered over; and what answers over them in a
+    // class of its own.
     std::unique_ptr<ALLuauFrontend>   mFrontend;
+    std::unique_ptr<ALLuauFragment>   mFragment;
     std::unique_ptr<ALLuauCompletion> mCompletion;
 };

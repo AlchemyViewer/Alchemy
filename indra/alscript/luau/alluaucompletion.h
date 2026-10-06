@@ -26,9 +26,18 @@
 
 #include "alscriptsymbol.h"
 
+#include "Luau/Location.h"
+
 #include <string_view>
 #include <vector>
 
+namespace Luau
+{
+    struct AutocompleteResult;
+    struct Module;
+}
+
+class ALLuauFragment;
 struct ALLuauFrontend;
 
 // What could go at a position of the script the front end is asked about,
@@ -38,15 +47,24 @@ struct ALLuauFrontend;
 // marks as indexed the wrong way, a method after a dot or a field after a
 // colon. In no order: the editor ranks them by what was typed.
 //
-// Over the service's front end, which it asks and does not keep; one
-// thread's, as the front end is.
+// As the script is typed, the statement being typed is checked alone
+// against the script's last check (ALLuauFragment), where that answers;
+// else the script is checked whole first, where it changed.
+//
+// Over the service's front end and fragment, which it asks and does not
+// keep; one thread's, as the front end is.
 class ALLuauCompletion
 {
 public:
-    explicit ALLuauCompletion(ALLuauFrontend& front);
+    ALLuauCompletion(ALLuauFrontend& front, ALLuauFragment& fragment);
 
     std::vector<ALScriptCompletion> complete(std::string_view source, S32 line, S32 column);
 
 private:
+    // What Luau found at `at`, in the studio's terms: `module` the one
+    // whose types the entries are, the fragment's or the script's.
+    std::vector<ALScriptCompletion> answer(const Luau::AutocompleteResult& found, const Luau::Module& module, Luau::Position at) const;
+
     ALLuauFrontend& mFront;
+    ALLuauFragment& mFragment;
 };

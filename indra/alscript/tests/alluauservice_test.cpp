@@ -83,6 +83,11 @@ namespace tut
             return count;
         }
 
+        static bool offers(const std::vector<ALScriptCompletion>& found, const std::string& text)
+        {
+            return std::any_of(found.begin(), found.end(), [&text](const ALScriptCompletion& c) { return c.text == text; });
+        }
+
         static bool mentions(const ALScriptProblems& problems, const char* word)
         {
             for (const ALScriptProblem& problem : problems)
@@ -1345,5 +1350,115 @@ namespace tut
             ensure("one the studio offers: " + c.text, ALScriptLexicon::isLuauHotComment(c.text));
         }
         ensure_equals("each of them:" + said, found.size(), std::size(ALScriptLexicon::LUAU_HOT_COMMENTS));
+    }
+
+    template<> template<>
+    void alluauservice_object::test<42>()
+    {
+        set_test_name("as a script is typed, a completion and signature help are answered over the statement typed, and nothing is checked whole");
+        ensure("definitions loaded: " + error, loaded);
+        const auto offered = [](const std::vector<ALScriptCompletion>& found, const std::string& text) -> const ALScriptCompletion* {
+            for (const ALScriptCompletion& c : found)
+            {
+                if (c.text == text)
+                {
+                    return &c;
+                }
+            }
+            return nullptr;
+        };
+        std::string why;
+        ensure("docs loaded", service.loadDocs("{\"@sl-slua/global/ll.Say\": {\"documentation\": \"Says it.\", \"learn_more_link\": \"x\"},"
+                                               " \"@sl-slua/global/ll\": {\"documentation\": \"The library.\", \"learn_more_link\": \"x\"}}",
+                                               why));
+        const std::string base = "local count: number = 1\n"
+                                 "local function twice(n: number): number return n * 2 end\n"
+                                 "local t = { a = 1, b = \"x\" }\n";
+        // Off until told: an edit, and the whole script is checked again.
+        service.check(base);
+        service.complete(base, 0, 0);
+        size_t checks = service.typeChecks();
+        service.complete(base + "local n: number = co\n", 3, 18);
+        ensure("off: checked whole", service.typeChecks() > checks);
+        ensure_equals("a call of a field documented as the field, not what holds it", service.signature(base + "ll.Say(0, )\n", 3, 10).documentation,
+                      std::string("Says it."));
+
+        service.setFragments(true);
+        ensure("on", service.fragments());
+        service.check(base);
+        service.complete(base, 0, 0);
+        checks                                = service.typeChecks();
+        const size_t                    parts = service.fragmentsChecked();
+        std::vector<ALScriptCompletion> found = service.complete(base + "local n: number = co\n", 3, 18);
+        const ALScriptCompletion*       count = offered(found, "count");
+        ensure("a local above offered", count != nullptr);
+        ensure("and fitting where a number is wanted", count->fits);
+        ensure("a function in scope offered", offered(found, "twice") != nullptr);
+        ensure("a table's fields", offered(service.complete(base + "local y = t.\n", 3, 12), "b") != nullptr);
+        found = service.complete(base + "LLEvents:\n", 3, 9);
+        ensure("an object's methods", offered(found, "on") && offered(found, "off"));
+
+        ALScriptSignature said = service.signature(base + "ll.Say(0, )\n", 3, 10);
+        ensure("a call's signature", said.found);
+        ensure_equals("its label", said.label, std::string("ll.Say(channel: number, msg: string): ()"));
+        ensure_equals("at its second argument", said.active, 1);
+        ensure_equals("documented as the field it calls", said.documentation, std::string("Says it."));
+        said = service.signature(base + "if twice() then end\n", 3, 9);
+        ensure("a call in a condition", said.found && said.label.find("twice(n: number)") == 0);
+
+        ensure("nothing offered in a comment", service.complete(base + "-- tw\n", 3, 5).empty());
+        ensure("no signature outside a call", !service.signature(base + "local q = 1\n", 3, 8).found);
+        ensure_equals("none of it checked whole", service.typeChecks(), checks);
+        ensure_equals("each answered over its statement", service.fragmentsChecked() - parts, size_t(5));
+        service.setFragments(false);
+    }
+
+    template<> template<>
+    void alluauservice_object::test<43>()
+    {
+        set_test_name("where a fragment cannot answer the whole script does; one stopped answers nothing; and the script's requires survive one");
+        ensure("definitions loaded: " + error, loaded);
+        service.setFragments(true);
+        // Nothing checked yet to patch: the whole script.
+        service.setDocument("unchecked");
+        size_t checks = service.typeChecks();
+        size_t parts  = service.fragmentsChecked();
+        const std::string base = "local count: number = 1\n";
+        ensure("answered", !service.complete(base + "local x = co\n", 1, 10).empty());
+        ensure("checked whole", service.typeChecks() > checks && service.fragmentsChecked() == parts);
+
+        // Stopped part way: nothing, and said so; the next, unstopped,
+        // answers over its statement.
+        ALLuauService::Stop stop = ALLuauService::newStop();
+        ALLuauService::cancel(stop);
+        service.setStop(stop);
+        ensure("nothing", service.complete(base + "local y = co\n", 1, 10).empty());
+        ensure("stopped", service.stopped());
+        service.setStop(nullptr);
+        checks = service.typeChecks();
+        ensure("answered again", !service.complete(base + "local y = co\n", 1, 10).empty() && !service.stopped());
+        ensure_equals("over its statement", service.typeChecks(), checks);
+
+        // A module the script requires, its requires traced when the text
+        // was parsed: a fragment between that parse and the next check
+        // leaves them, which Luau's own would forget, and that check finds
+        // what the module gives.
+        ALLuauConfig config;
+        service.setDocument("requires");
+        service.setConfig(config);
+        ALLuauService::Modules modules;
+        modules.modules.push_back({ "disk:/lib/util.luau", "local M = {}\nfunction M.twice(n: number): number\n    return n * 2\nend\nreturn M\n" });
+        modules.reaches.push_back({ "", "util", "disk:/lib/util.luau" });
+        service.setModules(modules);
+        const std::string script = "--!strict\nlocal util = require(\"util\")\n";
+        service.check(script);
+        service.complete(script, 1, 0);
+        const std::string typed = script + "local n = util.\n";
+        service.hover(typed, 1, 8);
+        ensure("the module's function, over the fragment", offers(service.complete(typed, 2, 15), "twice"));
+        service.setFragments(false);
+        ensure("and the whole check after it finds it too", offers(service.complete(typed, 2, 15), "twice"));
+        service.setModules({});
+        service.setDocument("");
     }
 }

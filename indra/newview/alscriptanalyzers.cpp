@@ -234,6 +234,7 @@ void ALLuauAnalyzer::answer(const Request& request, const std::string& text, con
     static const ALLuauService::Modules NONE;
     mService.setModules(request.modules ? *request.modules : NONE);
     mService.setTimeLimit(setup.seconds);
+    mService.setFragments(setup.fragments);
     mService.setStop(setup.stop);
     switch (request.kind)
     {

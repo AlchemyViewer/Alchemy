@@ -517,8 +517,9 @@ int main(int, char**)
         ALLuauService typing;
         typing.setNewSolver(new_solver, error);
         typing.loadDefinitions(readWhole(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau"), error);
-        std::vector<double> complete, again, signature, hover, expanded;
-        int                 found = 0;
+        std::vector<double> complete, again, signature, hover, expanded, fragment_complete, fragment_signature, fragment_expanded;
+        int                 found = 0, fragment_found = 0;
+        size_t              fragment_checks = 0;
         for (const int lines : { 1000, 5000, 20000 })
         {
             const std::string script = ll_test::bigSLua(lines);
@@ -565,7 +566,42 @@ int main(int, char**)
                     const ALPreprocessor::Result made = ALPreprocessor::run(text, options);
                     g_sink = g_sink + typing.complete(made.text, made_lines[directed.next], directed.column()).size();
                 }));
+                // The same over a fragment, against the expansion of the
+                // script as it was before the line was typed.
+                const std::string before = ALPreprocessor::run("--#define LIMIT 100\n" + script, options).text;
+                typing.check(before);
+                typing.complete(before, 0, 0);
+                typing.setFragments(true);
+                fragment_expanded.push_back(ms_per_run([&] {
+                    const std::string&           text = directed.text();
+                    const ALPreprocessor::Result made = ALPreprocessor::run(text, options);
+                    g_sink = g_sink + typing.complete(made.text, made_lines[directed.next], directed.column()).size();
+                }));
+                typing.setFragments(false);
             }
+            // Over a fragment (ALLuauFragment): the statement typed checked
+            // alone against the script's last check, the script as it was
+            // before the line was typed.
+            typing.check(script);
+            typing.complete(script, 0, 0);
+            typing.setFragments(true);
+            const size_t checks_before = typing.typeChecks();
+            if (lines == 1000)
+            {
+                const std::vector<ALScriptCompletion> offered = typing.complete(word.texts[1], word.line, word.columns[1]);
+                fragment_found += std::any_of(offered.begin(), offered.end(), [](const ALScriptCompletion& one) { return one.text == "helper12"; });
+                fragment_found += typing.signature(call.texts[1], call.line, call.columns[1]).found;
+            }
+            fragment_complete.push_back(ms_per_run([&] {
+                const std::string& text = word.text();
+                g_sink                  = g_sink + typing.complete(text, word.line, word.column()).size();
+            }));
+            fragment_signature.push_back(ms_per_run([&] {
+                const std::string& text = call.text();
+                g_sink                  = g_sink + typing.signature(text, call.line, call.column()).parameters.size();
+            }));
+            fragment_checks += typing.typeChecks() - checks_before;
+            typing.setFragments(false);
         }
         std::printf("\nSLua typing, the %s solver: an edit of one character, then the question\n\n", new_solver ? "new" : "old");
         std::printf("  %-52s %10s %10s %10s\n", "lines", "1,000", "5,000", "20,000");
@@ -575,6 +611,11 @@ int main(int, char**)
         sizes("signature help in a call after an edit", signature);
         sizes("hover after an edit", hover);
         sizes("complete after an edit of a script expanded", expanded);
+        std::printf("  %-52s %10d\n", "over a fragment, the questions answer (2 is right)", fragment_found);
+        std::printf("  %-52s %10zu\n", "  whole checks among them (0 is right)", fragment_checks);
+        sizes("complete after an edit, over a fragment", fragment_complete);
+        sizes("signature help after an edit, over a fragment", fragment_signature);
+        sizes("complete after an edit expanded, over a fragment", fragment_expanded);
     }
 
     // What the main thread does for a check before the preprocessor's

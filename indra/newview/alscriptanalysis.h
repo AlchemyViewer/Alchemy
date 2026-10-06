@@ -279,6 +279,7 @@ private:
         std::string                 lslPath;
         U32                         generation = 0;
         bool                        newSolver  = false;
+        bool                        fragments  = false;
         F32                         seconds    = 0.f;
         // Tailslide's work that is no question (runEngine), where it is one.
         std::function<void()>       engineWork;

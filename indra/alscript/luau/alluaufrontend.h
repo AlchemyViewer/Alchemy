@@ -142,11 +142,29 @@ struct ALLuauFrontend
     std::pair<size_t, size_t> docsHash{ 0, 0 };
 
     // How many times a script has been type checked, for a test that
-    // says a question asked again is not.
-    size_t  checks = 0;
+    // says a question asked again is not; and how many questions were
+    // answered over a fragment instead (ALLuauFragment).
+    size_t  checks    = 0;
+    size_t  fragments = 0;
+
+    // Whether a question asked as a script is typed -- a completion,
+    // signature help -- is answered over the part of the text that changed
+    // since its last check (ALLuauFragment), rather than after checking it
+    // all again.
+    bool    useFragments = false;
 
     // A check's options, held to the time limit and watching the stop.
     Luau::FrontendOptions limited() const;
+    // The same for autocomplete's module, which Luau checks strict and
+    // without lints.
+    Luau::FrontendOptions autocompleteOptions() const;
+    // What a fragment is checked against: autocomplete's module under the
+    // old solver, the one module under the new; none before a first check.
+    // Whether it is the text's, nothing changed since it was checked; and
+    // the options its check had, which a fragment's follow.
+    Luau::ModulePtr       base() const;
+    bool                  baseCurrent() const;
+    Luau::FrontendOptions baseOptions() const;
 
     bool stopRequested() const;
 

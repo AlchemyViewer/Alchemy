@@ -91,12 +91,14 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
     job.docsPath   = request.lua ? LLSyntaxDefCache::instance().getLuauDocsPath() : std::string();
     job.lslPath    = request.lua ? std::string() : LLSyntaxDefCache::instance().getLSLBuiltinsPath();
     job.generation = mDefinitionsGeneration;
-    // The solver and the time limit, which are settings, and so the main
-    // thread's to read.
+    // The solver, the time limit and whether typing is answered over a
+    // fragment, which are settings, and so the main thread's to read.
     static LLCachedControl<std::string> solver_setting(gSavedSettings, "ALScriptLuauSolver", "old");
     static LLCachedControl<F32>         seconds_setting(gSavedSettings, "ALScriptLuauCheckSeconds", 5.f);
+    static LLCachedControl<bool>        fragments_setting(gSavedSettings, "ALScriptFragmentCompletion", false);
     job.newSolver = std::string(solver_setting) == "new";
     job.seconds   = seconds_setting;
+    job.fragments = fragments_setting;
     // What is answered where the thread will not take the job -- the viewer
     // going -- so that nothing waits on it: nothing found.
     Result refused;
@@ -273,6 +275,7 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
     setup.lslPath    = job.lslPath;
     setup.generation = job.generation;
     setup.newSolver  = job.newSolver;
+    setup.fragments  = job.fragments;
     setup.seconds    = job.seconds;
     setup.stop       = stop;
     // The engines recurse on how the script nests; the pool's thread has
