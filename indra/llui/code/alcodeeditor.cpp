@@ -2706,6 +2706,22 @@ void ALCodeEditor::refreshCompletion()
     listCompletions(again);
 }
 
+void ALCodeEditor::reaskString()
+{
+    if (!mStringProvider || !mAutoComplete || completionOpen() || !hasFocus() || hasSelection() || hasOtherSelections() || !typingText())
+    {
+        return;
+    }
+    ALTextPos   start;
+    std::string typed;
+    mCompletionString = false;
+    if (stringOffers(caret(), start, typed))
+    {
+        mCompletionString = true;
+        openCompletion(true);
+    }
+}
+
 bool ALCodeEditor::stringOffers(const ALTextPos& at, ALTextPos& start, std::string& typed)
 {
     char                             opener = '\0';

@@ -473,6 +473,10 @@ private:
     };
     std::vector<ConvertedWaiting>      mConvertedWaiting;
     boost::signals2::scoped_connection mConvertedContents;
+    // The prims whose contents a string's item names were asked of before
+    // they were known: their scripts' editors asked again once they are.
+    std::set<LLUUID>                   mItemsAwaited;
+    boost::signals2::scoped_connection mItemsContents;
     void convertedMade(const ALScriptCreated& made, ConvertedWaiting waiting);
     void convertedListed(const ALScriptContents& contents);
     // The new SLua script opened with its text unsaved, and set beside the
@@ -953,6 +957,9 @@ private:
     // A part or a string chosen in the Memory tab's list: shown there, or
     // gone to.
     void onWeightChosen(ALPaneList* list, bool to_editor);
+    // A start several strings share kept once in the script the Memory tab
+    // shows (ALLuauSharedStart): one step to undo, said in the status.
+    void keepStartOnce(const std::string& start, const std::vector<std::string>& strings);
     // The outline (ALScriptOutlinePane): shown, which the bar at the
     // bottom is told of; a symbol chosen, gone to; its sort kept.
     void        outlineShown(Doc& doc) override { mCaret.placePath(doc); }

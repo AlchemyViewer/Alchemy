@@ -762,6 +762,11 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="WeightsSharedStart">Shared start: [START] in [COUNT] strings</floater.string>
     <floater.string name="WeightsSharedStartTip">[COUNT] strings start with these [LENGTH] bytes. Kept once and joined back on as each is loaded, the bytecode would be about [SAVED] bytes smaller. Luau joins constant strings as it compiles, a local that is never assigned again included, so the start must be kept apart: local start; start = [START]. Each join also builds the string while the script runs.</floater.string>
     <floater.string name="WeightsSaves">-[BYTES]</floater.string>
+    <floater.string name="WeightsSharedStartStrings">They are [STRINGS].</floater.string>
+    <floater.string name="WeightsSharedStartMore">[STRINGS] and [COUNT] more</floater.string>
+    <floater.string name="WeightsStringShares">It shares its start, [START], with [COUNT] other strings, which could be kept once.</floater.string>
+    <floater.string name="KeptStartOnce">Kept the start once in [COUNT] places, as [NAME].</floater.string>
+    <floater.string name="KeepStartFailed">Could not keep the start once: [ERROR]</floater.string>
     <floater.string name="WeightNote">[BYTES] bytes</floater.string>
     <floater.string name="WeightNoteEstimate">~[BYTES] bytes</floater.string>
     <floater.string name="WeightNoteNamed">[NAME] [NOTE]</floater.string>
@@ -2695,26 +2700,38 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                                  auto_resize="false"
                                  height="144"
                                  layout="topleft"
-                                 min_dim="160"
+                                 min_dim="200"
                                  name="weights_strings_panel"
                                  user_resize="true"
-                                 width="220">
+                                 width="300">
                                     <pane_list
                                      draw_heading="true"
                                      heading_height="18"
                                      follows="all"
-                                     height="144"
+                                     height="120"
                                      layout="topleft"
                                      left="0"
                                      name="weights_strings"
                                      tool_tip="Each string the compiled script keeps once, its bytes and how many instructions use it. Rows in italics are starts several strings share, which could be kept once. Double-click to go there."
                                      top="0"
-                                     width="220">
+                                     width="300">
                                         <pane_list.columns dynamic_width="true" label="String" name="string" />
                                         <pane_list.columns halign="right" label="Bytes" name="bytes" width="50" />
                                         <pane_list.columns halign="right" label="Uses" name="uses" width="40" />
+                                        <pane_list.columns halign="right" label="Since save" name="change" width="64" />
                                         <pane_list.columns label="Line" name="line" width="60" />
                                     </pane_list>
+                                    <button
+                                     enabled="false"
+                                     follows="left|bottom"
+                                     height="20"
+                                     label="Keep start once"
+                                     layout="topleft"
+                                     left="2"
+                                     name="weights_keep_start"
+                                     tool_tip="Write the chosen shared start once in the script, in a local of its own, and join it back onto each of its strings. SLua only; one step to undo."
+                                     top_pad="2"
+                                     width="130" />
                                 </layout_panel>
                             </layout_stack>
                         </panel>

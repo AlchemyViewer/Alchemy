@@ -492,6 +492,17 @@ end</floater.string>
              tool_tip="Off, Return starts a new line and closes the list; only Tab accepts a completion"
              top_pad="6"
              width="350" />
+            <check_box
+             control_name="ALScriptFragmentCompletion"
+             follows="left|top"
+             height="20"
+             label="Complete SLua from the statement being typed"
+             layout="topleft"
+             left="32"
+             name="fragment_completion"
+             tool_tip="Completion and signature help check only the statement being typed against the script's last check, and answer at once. Off, each keystroke that changed the script checks all of it before answering"
+             top_pad="4"
+             width="350" />
             <text
              follows="left|top"
              font="SansSerifBold"
@@ -1666,7 +1677,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="convert_types"
-             tool_tip="local count: number = 0, and function names(who: string): string, from LSL's types."
+             tool_tip="local count: number = 0, and function names(who: string): string, from LSL's types. Handlers the editor completes typed the same way: function LLEvents.on_rez(start_param: number)."
              top_pad="4"
              width="700" />
             <check_box

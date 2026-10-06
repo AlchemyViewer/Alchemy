@@ -488,6 +488,11 @@ public:
     // anything is answered; where nothing is, a string is prose as any
     // other, and what else completes in it still does.
     void setStringProvider(completion_provider_t provider) { mStringProvider = std::move(provider); }
+    // What the host names in strings may have changed -- an object's
+    // contents heard: where the caret is in a string and no list is open,
+    // the host asked again, and the list opened where it now names
+    // anything, as typing there would have opened it.
+    void reaskString();
     // `words` false where whoever answered says the document's own words
     // are no use there (ALCompletionModel::supply).
     void supplyCompletions(const ALTextPos& at, std::vector<Completion> more, bool words = true);

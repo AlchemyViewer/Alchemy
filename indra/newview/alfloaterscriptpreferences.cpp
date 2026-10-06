@@ -85,7 +85,8 @@ namespace
         "ALScriptSLuaAliases",
         "ALScriptStudioTabWidth",    "ALScriptStudioInsertSpaces", "ALScriptStudioDetectIndentation", "ALScriptStudioReindentOnPaste",
         "ALScriptLintLevels",        "ALScriptLuauMode",           "ALScriptLuauSolver",
-        "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptStudioAutoClose",
+        "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptFragmentCompletion",
+        "ALScriptStudioAutoClose",
         "ALScriptStudioCaretStyle",  "ALScriptStudioCaretBlink",   "ALScriptStudioHoverCards",  "ALScriptStudioHoverDelay",
         "ALScriptStudioVimClipboard",
         "ALScriptFormatBlankLines",  "ALScriptFormatSpacing",      "ALScriptFormatOnSave",      "ALScriptTrimOnSave",        "ALScriptFixOnSave",
@@ -214,7 +215,8 @@ bool ALFloaterScriptPreferences::postBuild()
     // they change -- by the settings' own signals, so a Cancel reaches
     // them as a click does.
     for (const char* setting : { "ALScriptStudioTabWidth", "ALScriptStudioInsertSpaces", "ALScriptStudioDetectIndentation", "ALScriptStudioReindentOnPaste",
-                                 "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptStudioAutoClose",
+                                 "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptFragmentCompletion",
+        "ALScriptStudioAutoClose",
                                  "ALScriptStudioCaretStyle", "ALScriptStudioCaretBlink", "ALScriptStudioHoverCards", "ALScriptStudioHoverDelay" })
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))

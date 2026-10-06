@@ -37,6 +37,7 @@
 #include "allinebreaks.h"
 #include "allsltoslua.h"
 #include "allsltraits.h"
+#include "alluausharedstart.h"
 #include "alscriptlexicon.h"
 #include "alscriptstudioviewer.h"
 #include "alserialworker.h"
@@ -311,36 +312,6 @@ namespace
         return text;
     }
 
-    // The call a place is in an argument of: the function by its name
-    // before the call's bracket, with the library it is in --
-    // `llSetLinkAlpha`, `ll.MessageLinked` -- and which argument from
-    // nought. False where it is in none.
-    bool callAround(ALCodeEditor& editor, const ALTextPos& at, std::string& callee, S32& argument)
-    {
-        ALTextPos open;
-        if (!editor.bracketIndex().enclosing(at, '(', 1, open))
-        {
-            return false;
-        }
-        const std::string& line = editor.document().line(open.line);
-        S32                end  = std::min<S32>(open.column, static_cast<S32>(line.size()));
-        while (end > 0 && (line[end - 1] == ' ' || line[end - 1] == '\t'))
-        {
-            --end;
-        }
-        S32 start = end;
-        while (start > 0 && (ALScriptLexicon::isNameByte(line[start - 1]) || line[start - 1] == '.'))
-        {
-            --start;
-        }
-        if (start == end)
-        {
-            return false;
-        }
-        callee   = line.substr(start, end - start);
-        argument = editor.argumentAt(open, at);
-        return true;
-    }
 
     // Whether an item of a type is of the kind an argument names.
     bool itemOfKind(ALLSLTraits::Item kind, LLAssetType::EType type)
@@ -835,6 +806,7 @@ void ALFloaterScriptStudio::wirePanes()
     mProblemsPane = getChild<ALScriptProblemsPane>("problems_tab");
     // Return and a double-click go to the part or the string chosen; escape
     // back to the script.
+    mWeightsPane->setKeepStart([this](const std::string& start, const std::vector<std::string>& strings) { keepStartOnce(start, strings); });
     for (ALPaneList* list : { mWeightsParts, mWeightsStrings })
     {
         list->setCommitCallback([this, list](LLUICtrl*, const LLSD&) { onWeightChosen(list, false); });
@@ -1009,6 +981,21 @@ void ALFloaterScriptStudio::listenToWorld()
         }
     });
     mConvertedContents = ALScriptWorkspace::instance().contentsIndex().onHeard([this](const ALScriptContents& contents) { convertedListed(contents); });
+    // A string waiting on what its prim holds offered the names once it is
+    // known, where the caret is still there.
+    mItemsContents = ALScriptWorkspace::instance().contentsIndex().onHeard([this](const ALScriptContents& contents) {
+        if (!contents.fetched || !mItemsAwaited.erase(contents.prim))
+        {
+            return;
+        }
+        for (const std::unique_ptr<Doc>& doc : mDocs)
+        {
+            if (doc->ref.object == contents.prim && doc->editor && !doc->notecard)
+            {
+                doc->editor->reaskString();
+            }
+        }
+    });
     // The vimrc read again into the studio's vim whenever it changes: its
     // file saved, a notecard dropped on the preferences' box, or saved;
     // each window's editors set again from it.
@@ -3100,7 +3087,8 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
         return ALScriptStudioWords::hoverText(lua, raw->editor->document(), at, word, text);
     });
     editor.setCompletionProvider([this, lua, raw](const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
-        ALScriptStudioWords::complete(lua, *raw->editor, at, prefix, snippets(lua), getString("SnippetDetail"), out);
+        ALScriptStudioWords::complete(lua, *raw->editor, at, prefix, snippets(lua), getString("SnippetDetail"), out,
+                                      gSavedSettings.getBOOL("ALScriptConvertTypes"));
         completeLinks(*raw, at, prefix, out);
     });
     // What could follow a path typed in a string that names a file: a
@@ -3252,7 +3240,7 @@ void ALFloaterScriptStudio::completeLinks(const Doc& doc, const ALTextPos& at, s
     }
     std::string callee;
     S32         argument = 0;
-    if (!callAround(*doc.editor, at, callee, argument) || !ALScriptStudioWords::linkArgument(doc.language.lua, callee, argument))
+    if (!ALScriptStudioWords::callAt(*doc.editor, at, callee, argument) || !ALScriptStudioWords::linkArgument(doc.language.lua, callee, argument))
     {
         return;
     }
@@ -3304,38 +3292,13 @@ void ALFloaterScriptStudio::completeItems(const Doc& doc, const ALTextPos& at, s
 {
     // Where the call wants an item of the object's by its name -- the
     // sound llPlaySound plays, the item ll.GiveInventory gives -- what the
-    // script's own prim holds of that kind, as the definitions say
-    // (ALLSLTraits::itemArg).
+    // script's own prim holds of that kind.
     if (doc.ref.inInventory() || doc.notecard || !doc.editor)
     {
         return;
     }
-    ALCodeEditor&     editor  = *doc.editor;
-    const ALTextRange literal = editor.stringAt(at);
-    if (literal.empty())
-    {
-        return;
-    }
-    // The string the whole of its argument, or its start: after the call's
-    // bracket or a comma, on its line or one of the few above.
-    char before = '\0';
-    for (S32 line = literal.begin.line; line >= 0 && line > literal.begin.line - 4 && !before; --line)
-    {
-        const std::string& text   = editor.document().line(line);
-        S32                column = line == literal.begin.line ? literal.begin.column : static_cast<S32>(text.size());
-        while (column > 0 && (text[column - 1] == ' ' || text[column - 1] == '\t' || text[column - 1] == '\r'))
-        {
-            --column;
-        }
-        before = column > 0 ? text[column - 1] : '\0';
-    }
-    std::string callee;
-    S32         argument = 0;
-    if ((before != '(' && before != ',') || !callAround(editor, literal.begin, callee, argument))
-    {
-        return;
-    }
-    const ALLSLTraits::Item kind = ALLSLTraits::itemArg(callee, argument);
+    char                    quote = '"';
+    const ALLSLTraits::Item kind  = ALScriptStudioWords::itemStringAt(*doc.editor, at, doc.language.lua, quote);
     if (kind == ALLSLTraits::Item::None)
     {
         return;
@@ -3344,13 +3307,13 @@ void ALFloaterScriptStudio::completeItems(const Doc& doc, const ALTextPos& at, s
     const ALScriptContentsIndex::Prim* prim  = index.prim(doc.ref.object);
     if (!prim || !prim->fetched)
     {
-        // Asked for, for the next time the list opens.
+        // Asked for, and the string asked again once it is known.
         index.ask(doc.ref.object);
+        mItemsAwaited.insert(doc.ref.object);
         return;
     }
     // Each put in whole, escaped as the string's quote wants it.
-    const char quote = editor.document().line(literal.begin.line)[literal.begin.column];
-    auto       offer = [&out, quote](const std::string& name, LLAssetType::EType type) {
+    auto offer = [&out, quote](const std::string& name, LLAssetType::EType type) {
         ALCodeEditor::Completion one;
         one.text = name;
         for (const char c : name)
@@ -3424,7 +3387,7 @@ void ALFloaterScriptStudio::insertFromLibrary(const std::string& what)
             {
                 return;
             }
-            chosen = ALScriptStudioWords::completionFor(*word, lua);
+            chosen = ALScriptStudioWords::completionFor(*word, lua, gSavedSettings.getBOOL("ALScriptConvertTypes"));
         }
         // In place of the selection, or at the caret.
         const ALTextRange selection = doc->editor->selection();
@@ -4903,6 +4866,36 @@ std::string ALFloaterScriptStudio::programVersion() const
 bool ALFloaterScriptStudio::weightsShown() const
 {
     return ALPaneFolds::inSight(mWeightsPane);
+}
+
+void ALFloaterScriptStudio::keepStartOnce(const std::string& start, const std::vector<std::string>& strings)
+{
+    const size_t index = indexOf(mWeightsPane->shownId());
+    if (index == NONE)
+    {
+        return;
+    }
+    Doc& doc = *mDocs[index];
+    if (!doc.loaded || !doc.modifiable || doc.notecard || !doc.language.lua || !doc.editor)
+    {
+        return;
+    }
+    ALLuauSharedStart::Rewrite rewrite;
+    std::string                error;
+    if (!ALLuauSharedStart::rewrite(doc.editor->wholeText(), start, strings, rewrite, error))
+    {
+        setStatus(getString("KeepStartFailed", LLStringUtil::format_map_t{ { "[ERROR]", error } }), true);
+        return;
+    }
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    for (const ALLuauSharedStart::Edit& edit : rewrite.edits)
+    {
+        edits.emplace_back(ALTextRange(ALTextPos(edit.line, edit.column), ALTextPos(edit.endLine, edit.endColumn)), edit.text);
+    }
+    if (doc.editor->replaceAll(std::move(edits)))
+    {
+        setStatus(getString("KeptStartOnce", LLStringUtil::format_map_t{ { "[COUNT]", std::to_string(rewrite.literals) }, { "[NAME]", rewrite.name } }));
+    }
 }
 
 void ALFloaterScriptStudio::onWeightChosen(ALPaneList* list, bool to_editor)

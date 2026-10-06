@@ -2974,6 +2974,12 @@ namespace tut
         key(KEY_TAB);
         ensure_equals("a name put in escaped", e.text(), std::string("llPlaySound(\"Say \\\"hi\\\"\")"));
 
+        // A name of several words found by any of them.
+        e.setText("");
+        type("llPlaySound(\"clo");
+        ensure("by a later word", e.completionOpen() && e.completions().size() == 1 && e.completions()[0].text == "Door Close");
+        key(KEY_ESCAPE);
+
         e.setText("");
         type("llSay(0, \"Do");
         ensure("not where the host names nothing: prose", !e.completionOpen());

@@ -654,7 +654,7 @@
         <key>ALScriptConvertTypes</key>
         <map>
             <key>Comment</key>
-            <string>Convert to SLua writes Luau types on locals, parameters and what functions return, from LSL's types.</string>
+            <string>Convert to SLua writes Luau types on locals, parameters and what functions return, from LSL's types; and the SLua handlers the editor completes have their parameters typed as the definitions type them.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

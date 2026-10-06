@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../alscriptweightspane.h"
+#include "llbutton.h"
 
 #include "alpanelist.h"
 #include "alrecoverystore.h"
@@ -457,7 +458,7 @@ namespace tut
                                                    texts[0].find("2 strings") != std::string::npos);
         ensure_equals("what it saves, as less", column(strings, 1)[0], std::string("-9"));
         ensure_equals("its strings' loads", column(strings, 2)[0], std::string("3"));
-        ensure_equals("at the first of them", column(strings, 3)[0], std::string("3"));
+        ensure_equals("at the first of them", column(strings, 4)[0], std::string("3"));
         ensure_equals("then the heaviest first, a break shown as one", joined(texts).substr(joined({ texts[0] }).size()),
                       std::string("|\"You have touched me, alpha\"|\"You have touched me, bravo\"|\"greet\"|\"x\\ny\""));
         ensure_equals("each one's uses, a function's name said as one", joined(column(strings, 2)), std::string("|3|1|2|name|1"));
@@ -474,6 +475,40 @@ namespace tut
         strings->selectByValue(LLSD(1));
         pane.show(shown);
         ensure("still chosen", strings->getFirstSelected() && strings->getFirstSelected()->getValue().asInteger() == 1);
+
+        // A start's tip names its strings; each of them says it shares one.
+        const auto tip = [&](S32 row) {
+            const LLScrollListItem* item = strings->getAllData()[static_cast<size_t>(row)];
+            return item->getColumn(0)->getToolTip();
+        };
+        ensure("the start's strings named: " + tip(0), tip(0).find("\"You have touched me, alpha\"") != std::string::npos &&
+                                                          tip(0).find("\"You have touched me, bravo\"") != std::string::npos);
+        ensure("a string of it says so: " + tip(1), tip(1).find("shares its start") != std::string::npos);
+        ensure("one that is not, nothing: " + tip(4), tip(4).find("shares its start") == std::string::npos);
+
+        // Since the save: a string not there then, new; a start's saving
+        // by how it moved.
+        ALScriptWeight then = slua;
+        then.strings.pop_back();
+        then.sharedStarts[0].saved = 4;
+        shown.saved                = { then };
+        pane.show(shown);
+        ensure_equals("since the save", joined(column(strings, 3)), std::string("|+5||||new"));
+
+        // Keeping the start once asks the window, with its strings.
+        std::string              kept;
+        std::vector<std::string> of;
+        pane.setKeepStart([&](const std::string& start, const std::vector<std::string>& texts) {
+            kept = start;
+            of   = texts;
+        });
+        strings->selectByValue(LLSD(0));
+        floater->findChild<LLButton>("weights_keep_start", true)->onCommit();
+        ensure("asked with the start and its strings", kept == "You have touched me, " && of.size() == 2 && of[1] == "You have touched me, bravo");
+        kept.clear();
+        strings->selectByValue(LLSD(1));
+        floater->findChild<LLButton>("weights_keep_start", true)->onCommit();
+        ensure("not for a string", kept.empty());
 
         // LSO has no table: no list.
         pane.show(lsl());

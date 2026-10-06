@@ -31,11 +31,13 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
 
 class ALPaneList;
+class LLButton;
 class LLScrollListItem;
 class LLTextBox;
 
@@ -107,6 +109,12 @@ public:
     std::optional<Place> chosenPlace(const ALPaneList* list) const;
     ALPaneList*          partsList() const { return mParts; }
     ALPaneList*          stringsList() const { return mStringsList; }
+    // What keeping a shared start once asks of the window: the start, and
+    // the strings that share it, to be written so in the script shown.
+    typedef std::function<void(const std::string& start, const std::vector<std::string>& strings)> keep_start_t;
+    void setKeepStart(keep_start_t keep) { mKeepStartCall = std::move(keep); }
+
+    void draw() override;
 
 private:
     // A part as listed: the part, and how its bytes moved since the text
@@ -138,7 +146,16 @@ private:
         size_t      uses  = 0;
         S32         line  = -1;
         std::string file;
+        // How it moved since the text was last saved: a start's saving; or
+        // new, where it was weighed then and this was not in it.
+        std::optional<S64>       change;
+        bool                     fresh = false;
+        // A start's strings.
+        std::vector<std::string> strings;
     };
+    // The shared start chosen in the strings list, where a start is chosen
+    // and it can be kept once: SLua's.
+    const StringRow* chosenStart() const;
 
     const ALScriptWeight* chosen() const;
     const ALScriptWeight* savedFor(ALScriptWeight::Target target) const;
@@ -162,6 +179,8 @@ private:
     ALPaneList*            mParts   = nullptr;
     LLView*                mStringsPanel = nullptr;
     ALPaneList*            mStringsList  = nullptr;
+    LLButton*              mKeepStart    = nullptr;
+    keep_start_t           mKeepStartCall;
     Shown                  mShown;
     ALScriptWeight::Target mChosen = ALScriptWeight::Target::SLua;
     std::vector<Row>       mRows;

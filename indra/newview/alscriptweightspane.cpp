@@ -28,10 +28,14 @@
 
 #include "alpanelist.h"
 #include "alrecoverystore.h"
+#include "llbutton.h"
 #include "llfloater.h"
 #include "llpanel.h"
 #include "llscrolllistitem.h"
 #include "lltextbox.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <map>
 #include <numeric>
@@ -61,8 +65,11 @@ namespace
         STRING_TEXT,
         STRING_BYTES,
         STRING_USES,
+        STRING_CHANGE,
         STRING_LINE
     };
+    // How many of a shared start's strings its tip names.
+    constexpr size_t STRINGS_NAMED = 6;
 
     // A string as a row shows it: quoted, on one line, its start where it
     // is long, never cut inside a character.
@@ -125,6 +132,16 @@ bool ALScriptWeightsPane::postBuild()
     mStringsPanel = getChild<LLView>("weights_strings_panel");
     mStringsList  = getChild<ALPaneList>("weights_strings");
     mStringsList->setComparison([this](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) { return compareStrings(column, a, b); });
+    mKeepStart = getChild<LLButton>("weights_keep_start");
+    mKeepStart->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        if (const StringRow* start = chosenStart(); start && mKeepStartCall)
+        {
+            // Copied: what the window does may refill the list.
+            const std::string              text    = start->text;
+            const std::vector<std::string> strings = start->strings;
+            mKeepStartCall(text, strings);
+        }
+    });
     // A target chosen shows its parts; the script's own until then.
     mTargets->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         if (LLScrollListItem* item = mTargets->getFirstSelected())
@@ -581,6 +598,30 @@ void ALScriptWeightsPane::fillStrings()
     {
         return;
     }
+    // What was weighed as the text was last saved, by text.
+    const ALScriptWeight*                                                                    saved = savedFor(weight->target);
+    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>                 saved_strings;
+    boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>>         saved_starts;
+    if (saved)
+    {
+        for (const ALScriptWeight::String& one : saved->strings)
+        {
+            saved_strings.insert(one.text);
+        }
+        for (const ALScriptWeight::SharedStart& one : saved->sharedStarts)
+        {
+            saved_starts.emplace(one.start, one.saved);
+        }
+    }
+    // Which start each string shares, by its place in the weight's.
+    boost::unordered_flat_map<size_t, size_t> start_of;
+    for (size_t i = 0; i < weight->sharedStarts.size(); ++i)
+    {
+        for (const size_t s : weight->sharedStarts[i].strings)
+        {
+            start_of.emplace(s, i);
+        }
+    }
     S32        select = -1;
     const auto add    = [&](StringRow one, const std::string& uses, const std::string& tip, bool italic) {
         const S32 index = static_cast<S32>(mStringRows.size());
@@ -597,6 +638,8 @@ void ALScriptWeightsPane::fillStrings()
                                                             : std::to_string(one.bytes);
         row["columns"][STRING_USES]["column"]   = "uses";
         row["columns"][STRING_USES]["value"]    = uses;
+        row["columns"][STRING_CHANGE]["column"] = "change";
+        row["columns"][STRING_CHANGE]["value"]  = changeText(one.change, one.fresh);
         row["columns"][STRING_LINE]["column"]   = "line";
         row["columns"][STRING_LINE]["value"]    = whereAt(one.file, one.line);
         for (S32 c = STRING_TEXT; c <= STRING_LINE; ++c)
@@ -635,6 +678,35 @@ void ALScriptWeightsPane::fillStrings()
                 one.file = with.file;
             }
         }
+        if (saved)
+        {
+            const auto before = saved_starts.find(shared.start);
+            one.fresh         = before == saved_starts.end();
+            if (!one.fresh)
+            {
+                one.change = S64(shared.saved) - S64(before->second);
+            }
+        }
+        // Its strings, named in its tip: the first few, and how many more.
+        std::string named;
+        for (const size_t s : shared.strings)
+        {
+            if (s >= weight->strings.size())
+            {
+                continue;
+            }
+            one.strings.push_back(weight->strings[s].text);
+            if (one.strings.size() <= STRINGS_NAMED)
+            {
+                named = named.empty() ? shownText(weight->strings[s].text)
+                                      : mStrings->getString("JoinList", { { "[FIRST]", named }, { "[SECOND]", shownText(weight->strings[s].text) } });
+            }
+        }
+        if (one.strings.size() > STRINGS_NAMED)
+        {
+            named = mStrings->getString("WeightsSharedStartMore",
+                                        { { "[STRINGS]", named }, { "[COUNT]", std::to_string(one.strings.size() - STRINGS_NAMED) } });
+        }
         LLStringUtil::format_map_t args;
         args["[START]"]  = shownText(shared.start);
         args["[COUNT]"]  = std::to_string(shared.strings.size());
@@ -642,7 +714,9 @@ void ALScriptWeightsPane::fillStrings()
         args["[SAVED]"]  = std::to_string(shared.saved);
         one.name         = mStrings->getString("WeightsSharedStart", args);
         const std::string uses = std::to_string(one.uses);
-        add(std::move(one), uses, mStrings->getString("WeightsSharedStartTip", args), true);
+        const std::string tip  = mStrings->getString("JoinSentences", { { "[FIRST]", mStrings->getString("WeightsSharedStartTip", args) },
+                                                                        { "[SECOND]", mStrings->getString("WeightsSharedStartStrings", { { "[STRINGS]", named } }) } });
+        add(std::move(one), uses, tip, true);
     }
     // Then each string, the heaviest first.
     std::vector<size_t> order(weight->strings.size());
@@ -659,12 +733,22 @@ void ALScriptWeightsPane::fillStrings()
         one.uses  = string.uses;
         one.line  = string.line;
         one.file  = string.file;
+        one.fresh = saved && !saved_strings.contains(string.text);
         LLStringUtil::format_map_t args;
         args["[BYTES]"] = std::to_string(string.bytes);
         args["[USES]"]  = std::to_string(string.uses);
         args["[LOADS]"] = std::to_string(string.loads);
-        add(std::move(one), string.name && string.uses == 0 ? mStrings->getString("WeightsStringName") : std::to_string(string.uses),
-            mStrings->getString(string.name && string.uses == 0 ? "WeightsStringNameTip" : "WeightsStringTip", args), false);
+        std::string tip = mStrings->getString(string.name && string.uses == 0 ? "WeightsStringNameTip" : "WeightsStringTip", args);
+        // Where it shares a start, which.
+        if (const auto shares = start_of.find(s); shares != start_of.end())
+        {
+            const ALScriptWeight::SharedStart& shared = weight->sharedStarts[shares->second];
+            tip = mStrings->getString("JoinSentences",
+                                      { { "[FIRST]", tip },
+                                        { "[SECOND]", mStrings->getString("WeightsStringShares", { { "[START]", shownText(shared.start) },
+                                                                                                   { "[COUNT]", std::to_string(shared.strings.size() - 1) } }) } });
+        }
+        add(std::move(one), string.name && string.uses == 0 ? mStrings->getString("WeightsStringName") : std::to_string(string.uses), tip, false);
     }
     mStringsList->updateSort();
     if (select >= 0)
@@ -672,6 +756,26 @@ void ALScriptWeightsPane::fillStrings()
         mStringsList->selectByValue(LLSD(select));
     }
     mStringsList->setScrollPos(scrolled);
+}
+
+const ALScriptWeightsPane::StringRow* ALScriptWeightsPane::chosenStart() const
+{
+    const ALScriptWeight*   weight = chosen();
+    const LLScrollListItem* item   = mStringsList->getFirstSelected();
+    if (!weight || weight->target != ALScriptWeight::Target::SLua || !item)
+    {
+        return nullptr;
+    }
+    const size_t index = static_cast<size_t>(std::max(0, item->getValue().asInteger()));
+    return index < mStringRows.size() && mStringRows[index].start ? &mStringRows[index] : nullptr;
+}
+
+void ALScriptWeightsPane::draw()
+{
+    // What can be kept once is what is chosen, which a click or a key may
+    // change at any time: asked as it is drawn.
+    mKeepStart->setEnabled(mKeepStartCall && chosenStart());
+    LLPanel::draw();
 }
 
 S32 ALScriptWeightsPane::compareStrings(S32 column, const LLScrollListItem* a, const LLScrollListItem* b) const
@@ -701,6 +805,9 @@ S32 ALScriptWeightsPane::compareStrings(S32 column, const LLScrollListItem* a, c
             break;
         case STRING_USES:
             said = order(S64(x.uses), S64(y.uses));
+            break;
+        case STRING_CHANGE:
+            said = order(x.fresh ? -x.bytes : x.change.value_or(0), y.fresh ? -y.bytes : y.change.value_or(0));
             break;
         case STRING_LINE:
             said = order(x.line < 0, y.line < 0);
