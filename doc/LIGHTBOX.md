@@ -29,6 +29,8 @@ statics), so edits preview live with no glue code.
 | Where every section and setting is, found once | `indra/newview/allightboxdirectory.{h,cpp}` |
 | Looks preset system + whitelist | `indra/newview/llpresetsmanager.{h,cpp}` |
 | Bundled starter Looks | `indra/newview/app_settings/looks/` |
+| A Look as a notecard's text: written, read, every value judged (§9b) | `indra/newview/allookformat.{h,cpp}` |
+| A Look notecard made in inventory, and one read back into the Looks | `indra/newview/allooknotecard.{h,cpp}` |
 | Colour wheel widget + its maths | `indra/newview/alcolorwheel{ctrl,model}.{h,cpp}` |
 | Curve/band graph widget + its maths (the spline, the split-tone ramps, and the `ALToneCurveSet` the renderer bakes) | `indra/newview/alcurve{editorctrl,model}.{h,cpp}` |
 | Scopes floater + measurement | `indra/newview/alfloaterscopes.{h,cpp}`, `alscopedata.{h,cpp}` |
@@ -42,11 +44,12 @@ statics), so edits preview live with no glue code.
 | A swatch handing its picker to its owner | `indra/newview/llcolorswatch.{h,cpp}` |
 | Anti-aliased 2D polyline and fill | `indra/llrender/llrender2dutils.{h,cpp}` |
 
-Seven of those have unit tests, and the tests are the reason the maths in them
+Eight of those have unit tests, and the tests are the reason the maths in them
 can be trusted: `alcolorwheelmodel_test`, `alcurvemodel_test`,
-`aldaycyclelandmarks_test`, `algradehistory_test`, `alscopedata_test`,
-`alwhitebalancesolver_test`, `lutcube_test`. Anything with arithmetic in it —
-including a parser fed files from the internet — belongs on that list.
+`aldaycyclelandmarks_test`, `algradehistory_test`, `allookformat_test`,
+`alscopedata_test`, `alwhitebalancesolver_test`, `lutcube_test`. Anything with
+arithmetic in it — including a parser fed files from the internet, which is
+what a Look notecard is — belongs on that list.
 
 ### What v2 added, and what it altered
 
@@ -839,8 +842,8 @@ refresh off each of those is more places to forget than a polled compare costs.
 
 **The bar** (`lightbox_topbar` in `floater_lightbox_settings.xml`) holds every
 button the floater has but one. Left to right: the Looks `combo_box`, then Save
-/ Save As / Delete / Revert, then Undo / Redo / History, then Scopes, then
-Find. **The one button that is not there is Pop-out**, at the right end of the
+/ Save As / Share / Delete / Revert, then Undo / Redo / History, then Scopes,
+then Find. **The one button that is not there is Pop-out**, at the right end of the
 tab strip: it acts on the tab that is up, so it sits at the end of the tabs.
 **Only a button about a tab belongs on the strip**; Scopes and Find were tried
 there and read as out of place, since neither is about a tab. The bar used to
@@ -848,12 +851,13 @@ hold Pop-out as well, and at `min_width` it had spent all 422px it had, which
 had pushed `min_width` from 420 to 430. With Pop-out on the strip, `min_width`
 is back to 420, and the bar has room to spare, which the Looks combo takes: it
 stretches with the floater instead of being the fixed 150px that was left over.
-It is 148 at `min_width` and 188 at the default 460.
+It is 123 at `min_width` and 163 at the default 460 (it was 148 and 188 before
+Share joined the Look group).
 
 The row was sized in XUI Studio: the bar is `left="6" top="16"`, 26 tall, and
 everything in it is 24 tall at `top="0"`. The buttons are 24×24. The combo
-takes `left="1" right="-261"` and follows the right edge; `left="1"` puts it at
-the floater's x 7, over the tab container's left edge. The nine buttons follow
+takes `left="1" right="-286"` and follows the right edge; `left="1"` puts it at
+the floater's x 7, over the tab container's left edge. The ten buttons follow
 `top|right` and are placed by `right` rather than `left_pad`: the last is 6 in
 from the edge, each one before it 25 further in (24 and a gap of 1), and 10 more
 where the group changes. **Four groups, separated by 11px where the buttons
@@ -862,7 +866,7 @@ are different kinds of thing: the first group acts on the Look, the second on
 the grade's own history, the third opens another window, and the fourth finds a
 place in this one. So keep it if you add another kind, and use 1px if you are
 extending a group. A new button here comes out of the combo's width: add 25 to
-the 261, or 35 if it starts a group of its own.
+the 286, or 35 if it starts a group of its own.
 
 **Every `top` in this file is measured from under the title bar**, not from the
 window's top edge. The floater sets no `legacy_header_height`, so once its
@@ -1380,6 +1384,77 @@ Seeding is recorded per name in `looks_seeded.xml` (user settings root, *not*
 the looks directory — anything `*.xml` in there is enumerated as a Look), so a
 Look bundled in a later release still reaches an existing user while one they
 deleted stays deleted. Nothing is ever copied over a file that already exists.
+
+### 9b. Looks as notecards
+
+A Look is given to someone else as a notecard: an inventory item, handed over
+the way any item is. The Share button on the bar writes one; dropping one on
+the Lightbox, or pressing **Apply Look** / **Add to Looks** on the notice line
+the notecard window shows for one, reads it back. Three files divide the work
+so that the part fed text from strangers can be tested without the viewer:
+
+- `allookformat.{h,cpp}` is the text. LLSD XML (`toPrettyXML`, with a static
+  `<!-- -->` note put under the declaration, exactly as Script Studio's
+  snippet notecards do it) holding one reserved key, `@AlchemyLook` — `@` can
+  never begin a setting's name, and sorts first, so the provenance (Format,
+  Name, Author, Viewer, Date) is written under the note — and then every
+  whitelisted setting as `{Type, Value}`. **Not** as a Look file: a Look file
+  carries each setting's `Comment` and `Persist` too, and with 151 settings
+  that is 76 KB against the 65,536 bytes a notecard holds. Without them it is
+  about 32 KB; with four hand-made 64-point curves even that runs over
+  indented, so the writer falls back to `toXML` run together, which the parser
+  reads alike, and refuses only if that is over too. `allookformat_test` keeps
+  the worst case under the limit. The same file judges every value (§9) and
+  cleans every name: control characters, `|` (which an inventory name may not
+  hold) and the U+100000+ characters the notecard editor shows as embedded
+  items come out, and a name is cut on a character boundary to 63 bytes —
+  `DB_INV_ITEM_NAME_STR_LEN`, and also what keeps `LLURI::escape` of a CJK name
+  inside a file system's path limit.
+- `allooknotecard.{h,cpp}` is the inventory. Share composes the text from the
+  live settings (`captureLookSettings`), refuses before anything is made where
+  it does not fit, and creates the notecard through
+  `ALScriptWorkspace::createNotecardWithText`, which Script Studio's snippets
+  use too: it checks the size and the upload capability *first*, so no empty
+  notecard is left where the upload would have refused it, and takes the item
+  away again if the upload then fails. The next owner always gets Copy and
+  Transfer on top of the account's defaults for notecards: the workspace can
+  only read a notecard with Copy, so without it the recipient could not import
+  at all, and without Transfer it could not be given. Import reads through
+  `ALScriptWorkspace::load` (Copy, RLVa `@viewnote`), parses, picks a name —
+  the Look's own, else the notecard's with the `Lightbox Look: ` prefix taken
+  off, else "Shared Look"; a name in use gets ` (2)`, ` (3)`…, **never
+  overwriting a different Look**, and a name whose Look is identical is simply
+  found — and writes it through `LLPresetsManager::saveSharedLook`, which
+  normalises it to a Look file like any other (live `Comment`, `Persist`,
+  `Type`), holding only the values that passed. Revert, Save and the `*`
+  then work for an imported Look exactly as for one saved here.
+- The Lightbox applies. `importSharedLookFromText` opens the floater if need
+  be and calls `applyLookAsOneUndoStep` (what choosing a Look and Revert call
+  too), so the apply is one step called "Imported Look: …". A drop reads
+  first and applies only if the window is still there; closed in between, the
+  Look joins the list without being put on.
+
+Rules that fall out of this:
+
+- **Opening a notecard applies nothing.** A notecard given with
+  `AutoAcceptNewInventory` opens on its own, so detection
+  (`looksLikeLookNotecard`, a substring glance at the first 4 KB, no parse)
+  only shows the offer; the click is the consent.
+- **The author line is plain text.** Show it as information, never as
+  verified; the item's creator is who actually shared it.
+- **Unknown settings are counted, not refused.** A newer viewer's Look applies
+  what this one knows and the toast says how many were left out; an older
+  Look falls under the snapshot rule above. The `Format` number is in the
+  file for the day a reading has to change.
+- **A LUT does not travel.** `RenderColorGradeLUT` names a file; the toast
+  names it when it is not installed. A `.cube` is far over 64 KB, so it cannot
+  ride along.
+- **Import is one-shot.** The Look does not follow the notecard as its author
+  edits it (`ALFollowedNotecard` is deliberately not used): a Look is a thing
+  you have, not a subscription.
+- A notecard in an object's contents cannot be dropped (the drop carries the
+  agent's own items), but its window makes the same offer, since it already
+  has the text.
 
 ### 10. Verify
 

@@ -29,6 +29,8 @@
 #include "llpreviewnotecard.h"
 
 #include "aldiffview.h"
+#include "alfloaterlightbox.h"
+#include "allookformat.h"
 #include "alscriptstudio.h"
 #include "alnotecardembedded.h"
 #include "alfilewrite.h"
@@ -403,6 +405,10 @@ void LLPreviewNotecard::loaded(const ALScriptLoaded& answer)
     mText->setMaxBytes(LLNotecard::MAX_SIZE);
     showModifiable(mModifiable);
     hideNotice();
+    // Before the link to a file and the recovery offers below, which take
+    // the line over where there is one: where saves go, and unsaved work,
+    // outrank a Look to try.
+    offerSharedLookImport(answer.text);
     showLinked();
     if (mCompare && mCompare->getVisible())
     {
@@ -421,6 +427,32 @@ void LLPreviewNotecard::loaded(const ALScriptLoaded& answer)
     {
         offerKept();
     }
+}
+
+void LLPreviewNotecard::offerSharedLookImport(const std::string& notecard_text)
+{
+    // A glance, not a parse: the Lightbox parses once, when asked. And
+    // asked it must be -- a notecard given can open on its own, so opening
+    // one applies nothing; the click is the consent.
+    if (!ALLookFormat::looksLikeLookNotecard(notecard_text))
+    {
+        return;
+    }
+    // The text as it was saved, which is what was shared, rather than
+    // whatever is typed over it here afterwards.
+    const std::string text = notecard_text;
+    showNotice(getString("LookOffer"),
+               { { getString("LookApply"),
+                   [this, text]() {
+                       hideNotice();
+                       ALFloaterLightBox::importSharedLookFromText(text, mNoteName, ALFloaterLightBox::SharedLookImport::SaveAndApply);
+                   } },
+                 { getString("LookAdd"),
+                   [this, text]() {
+                       hideNotice();
+                       ALFloaterLightBox::importSharedLookFromText(text, mNoteName, ALFloaterLightBox::SharedLookImport::SaveOnly);
+                   } },
+                 { getString("LookNotNow"), [this]() { hideNotice(); } } });
 }
 
 void LLPreviewNotecard::showUnloaded(const std::string& why)

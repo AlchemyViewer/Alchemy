@@ -257,6 +257,7 @@ if(AL_BUILD_VIEWER)
     allegacynotificationwellwindow.cpp
     allightboxdirectory.cpp
     allookformat.cpp
+    allooknotecard.cpp
     almotionpredictor.cpp
     alobjectproperties.cpp
     alagentlocationformat.cpp
@@ -1138,6 +1139,7 @@ if(AL_BUILD_VIEWER)
     allegacynotificationwellwindow.h
     allightboxdirectory.h
     allookformat.h
+    allooknotecard.h
     almotionpredictor.h
     alobjectproperties.h
     alagentlocationformat.h

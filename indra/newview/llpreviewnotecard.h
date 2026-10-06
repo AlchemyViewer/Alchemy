@@ -102,6 +102,10 @@ private:
     void loaded(const ALScriptLoaded& answer);
     // Nothing to show, and why: in place of the text, read-only.
     void showUnloaded(const std::string& why);
+    // A notecard that looks like a Lightbox Look offers to be taken into
+    // the Looks, in the notice line. Offers: opening a notecard applies
+    // nothing, since one given can open on its own.
+    void offerSharedLookImport(const std::string& notecard_text);
     // Whether the text may be changed, and the rest of the window with it:
     // the description, the lock, Edit and Save.
     void showModifiable(bool modifiable);

@@ -62,6 +62,11 @@ class LLSettingsWater;
 class LLSliderCtrl;
 class LLSpinCtrl;
 class LLTabContainer;
+class LLViewerInventoryItem;
+namespace ALLookNotecard
+{
+    struct ImportedLook;
+}
 
 class ALFloaterLightBox final : public ALStudioFloater
 {
@@ -72,6 +77,23 @@ public:
     ~ALFloaterLightBox() override;
     bool postBuild() override;
     void onOpen(const LLSD& key) override;
+
+    /// How a Look read from a notecard is taken in: saved to the Looks and
+    /// applied in the Lightbox as one undo step, or saved alone.
+    enum class SharedLookImport
+    {
+        SaveAndApply,
+        SaveOnly
+    };
+    /// A notecard's text as a Look: parsed, saved under its own name -- never
+    /// over a different Look -- and, SaveAndApply, applied in the Lightbox,
+    /// opened if need be, as one undo step. Says what came of it either way.
+    /// The notecard window calls this with the text it has, from a button
+    /// the user pressed: opening a notecard applies nothing by itself.
+    static void importSharedLookFromText(const std::string& notecard_text, const std::string& notecard_name, SharedLookImport what);
+    /// A Look notecard dropped anywhere on the window is imported.
+    bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept,
+                           std::string& tooltip_msg) override;
     /// Ctrl+Z / Ctrl+Y (and Ctrl+Shift+Z) drive the grade's undo stack.
     ///
     /// Floater-local rather than a global action, unlike the hold-to-compare
@@ -273,6 +295,20 @@ public:
     void onClickLookDelete();
     void onClickLookRevert();
     void refreshLooksBar();
+    /// Apply a saved Look as one undo step called @a history_label: what
+    /// choosing a Look, Revert and an import all do.
+    void applyLookAsOneUndoStep(const std::string& look_name, const std::string& history_label);
+    /// The settings as they stand, into a notecard named for the Look.
+    void onClickLookShare();
+    /// What a shared Look is called: the active Look; the last applied one
+    /// said to be edited, where the settings have moved since; or a name
+    /// of the floater's own where no Look was ever applied.
+    std::string nameForSharedLook() const;
+    /// A notecard dropped here, read and then taken in -- applied only if the
+    /// window is still here by then.
+    void importSharedLookFromInventoryItem(const LLViewerInventoryItem& notecard);
+    /// What an import came to, said, and the Look applied where it is to be.
+    static void finishSharedLookImport(const ALLookNotecard::ImportedLook& imported, const std::string& notecard_name, SharedLookImport what);
 
     /// The tab strip and its pages, in tab order: Look, Lens, Scene, Sky.
     LLTabContainer* mTabs = nullptr;

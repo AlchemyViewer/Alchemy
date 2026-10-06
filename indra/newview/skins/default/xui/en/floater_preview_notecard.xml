@@ -75,6 +75,10 @@
     <floater.string name="GoToLineGo">Go to line [LINE].</floater.string>
     <floater.string name="GoToLineGoColumn">Go to line [LINE], column [COL].</floater.string>
     <floater.string name="GoToLineNone">There is no line [LINE]. The last line is [COUNT].</floater.string>
+    <floater.string name="LookOffer">This notecard holds a Lightbox Look.</floater.string>
+    <floater.string name="LookApply">Apply Look</floater.string>
+    <floater.string name="LookAdd">Add to Looks</floater.string>
+    <floater.string name="LookNotNow">Not Now</floater.string>
     <icon
      follows="top|right"
      height="18"

@@ -9802,6 +9802,74 @@ This cannot be undone.
   </notification>
 
   <notification
+    icon="notifytip.tga"
+    name="LightBoxLookShared"
+    type="notifytip">
+Your Look &apos;[NAME]&apos; is in your Notecards folder as &apos;[NOTECARD]&apos;. Give it like any other item: drag it onto someone, or use Share in your inventory.
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookNotShared"
+    type="alertmodal">
+The Look &apos;[NAME]&apos; could not be saved to a notecard: [REASON].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookTooLarge"
+    type="alertmodal">
+The Look &apos;[NAME]&apos; comes to [SIZE] bytes, and a notecard holds [LIMIT].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookNotecardUnreadable"
+    type="alertmodal">
+The notecard &apos;[NAME]&apos; could not be read: [REASON].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookNotecardNotALook"
+    type="alertmodal">
+The notecard &apos;[NAME]&apos; does not hold a Lightbox Look, or holds one that is damaged. The Share button on the Lightbox makes one that does.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookNotImported"
+    type="alertmodal">
+The Look &apos;[NAME]&apos; could not be saved to your Looks.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookImported"
+    type="notifytip">
+Applied the Look &apos;[NAME]&apos; and added it to your Looks. Ctrl+Z in the Lightbox takes it back. [NOTE]
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookAdded"
+    type="notifytip">
+Added the Look &apos;[NAME]&apos; to your Looks. [NOTE]
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookLUTMissing"
+    type="notifytip">
+This Look uses the color LUT file &apos;[LUT]&apos;, which is not in your colorlut folder, so it is shown without it. Ask whoever gave you the Look for the file, then use Open Folder next to Color LUT on the Look tab.
+  </notification>
+
+  <notification
     icon="alertmodal.tga"
     name="PresetAlreadyExists"
     type="alertmodal">

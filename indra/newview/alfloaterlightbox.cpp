@@ -48,11 +48,14 @@
 #include "llfloaterreg.h"
 #include "alcurveeditorctrl.h"
 #include "alcurvemodel.h"
+#include "allookformat.h"
+#include "allooknotecard.h"
 #include "altoolscenepicker.h"
 #include "alwhitebalancesolver.h"
 #include "llagent.h"
 #include "llenvironment.h"
 #include "llfile.h"
+#include "llinventoryfunctions.h"
 #include "llnotificationsutil.h"
 #include "llpanel.h"
 #include "llpresetsmanager.h"
@@ -63,7 +66,9 @@
 #include "lltabcontainer.h"
 #include "lltimer.h"
 #include "lltoolmgr.h"
+#include "lltrans.h"
 #include "llviewercontrol.h"
+#include "llviewerinventory.h"
 #include "pipeline.h"
 #include "rlvactions.h"
 
@@ -225,6 +230,7 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.LookSaveAs", std::bind(&ALFloaterLightBox::onClickLookSaveAs, this));
     mCommitCallbackRegistrar.add("LightBox.LookDelete", std::bind(&ALFloaterLightBox::onClickLookDelete, this));
     mCommitCallbackRegistrar.add("LightBox.LookRevert", std::bind(&ALFloaterLightBox::onClickLookRevert, this));
+    mCommitCallbackRegistrar.add("LightBox.LookShare", std::bind(&ALFloaterLightBox::onClickLookShare, this));
     mCommitCallbackRegistrar.add("LightBox.Find", std::bind(&ALFloaterLightBox::openFind, this));
     addCommand({ "find", 'F', MASK_CONTROL, false }, [this]() { openFind(); return true; });
     mCommitCallbackRegistrar.add("LightBox.History", std::bind(&ALFloaterLightBox::openHistory, this));
@@ -564,8 +570,10 @@ void ALFloaterLightBox::populateAssetCombo(const std::string& combo_name,
 
 void ALFloaterLightBox::populateLUTCombo()
 {
-    static const std::vector<std::string> LUT_EXTENSIONS = { "cube", "tga", "png", "jpg", "jpeg", "bmp", "webp" };
-    populateAssetCombo("colorlut_combo", "colorlut", LUT_EXTENSIONS, "RenderColorGradeLUT");
+    // The one list of what a LUT may be, shared with the judgment a LUT
+    // name from a shared Look gets: a kind the picker offers is a kind an
+    // import lets through, and no other.
+    populateAssetCombo("colorlut_combo", "colorlut", ALLookFormat::colorLutExtensions(), "RenderColorGradeLUT");
 }
 
 // Parameterised by directory even though the colour LUT is once again the only
@@ -2258,18 +2266,23 @@ void ALFloaterLightBox::onWhiteBalancePicked(const LLColor3& sample)
     gSavedSettings.setF32("RenderColorGradeWhiteBalanceDuv", solved.mDuv);
 }
 
+void ALFloaterLightBox::applyLookAsOneUndoStep(const std::string& look_name, const std::string& history_label)
+{
+    // Applying a Look writes every whitelisted key it carries. That is one
+    // choice, so it is one undo step -- and it is the step a user most
+    // wants back, having tried a Look on top of work they liked.
+    ScopedHistoryGroup group(mHistory, history_label);
+    LLPresetsManager::getInstance()->loadLooksPreset(look_name);
+}
+
 void ALFloaterLightBox::onLookSelected()
 {
     const std::string name = mLooksCombo ? mLooksCombo->getSimple() : std::string();
     if (!name.empty())
     {
-        // Applying a Look writes every whitelisted key it carries. That is one
-        // choice, so it is one undo step -- and it is the step a user most
-        // wants back, having tried a Look on top of work they liked.
         LLStringUtil::format_map_t args;
         args["[NAME]"] = name;
-        ScopedHistoryGroup group(mHistory, getString("history_look", args));
-        LLPresetsManager::getInstance()->loadLooksPreset(name);
+        applyLookAsOneUndoStep(name, getString("history_look", args));
     }
 }
 
@@ -2304,12 +2317,162 @@ void ALFloaterLightBox::onClickLookRevert()
     const std::string last = gSavedSettings.getString("PresetLooksLastApplied");
     if (!last.empty())
     {
-        // Same reasoning as onLookSelected: a revert throws away every edit
-        // since the Look was applied, and that had better be one Ctrl+Z.
+        // A revert throws away every edit since the Look was applied, and
+        // that had better be one Ctrl+Z.
         LLStringUtil::format_map_t args;
         args["[NAME]"] = last;
-        ScopedHistoryGroup group(mHistory, getString("history_revert", args));
-        LLPresetsManager::getInstance()->loadLooksPreset(last);
+        applyLookAsOneUndoStep(last, getString("history_revert", args));
+    }
+}
+
+void ALFloaterLightBox::onClickLookShare()
+{
+    // The settings as they stand, under the name of the Look they came
+    // from: what is on screen is what is sent, edits and all.
+    ALLookNotecard::shareLookAsNotecard(nameForSharedLook(), LLPresetsManager::getInstance()->captureLookSettings());
+}
+
+std::string ALFloaterLightBox::nameForSharedLook() const
+{
+    const std::string active = gSavedSettings.getString("PresetLooksActive");
+    if (!active.empty())
+    {
+        return active;
+    }
+    // Changed since it was applied -- the state the bar marks with a * --
+    // and said to be, rather than passed off as the Look it was.
+    const std::string last = gSavedSettings.getString("PresetLooksLastApplied");
+    if (!last.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = last;
+        return getString("look_share_modified", args);
+    }
+    return getString("look_share_unnamed");
+}
+
+bool ALFloaterLightBox::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data,
+                                           EAcceptance* accept, std::string& tooltip_msg)
+{
+    if (cargo_type != DAD_NOTECARD)
+    {
+        return ALStudioFloater::handleDragAndDrop(x, y, mask, drop, cargo_type, cargo_data, accept, tooltip_msg);
+    }
+    // Anywhere on the window: the bar alone is a small target for something
+    // dragged across the screen, and nothing else here wants a notecard.
+    // One from an object's contents cannot be read from here -- the drop
+    // carries the agent's own -- but its own window makes the same offer.
+    const LLViewerInventoryItem* held = get_dropped_notecard(cargo_type, cargo_data);
+    if (!held)
+    {
+        *accept     = ACCEPT_NO;
+        tooltip_msg = getString("look_drop_inventory_only");
+        return true;
+    }
+    *accept     = ACCEPT_YES_SINGLE;
+    tooltip_msg = getString("look_drop_tooltip");
+    if (drop)
+    {
+        importSharedLookFromInventoryItem(*held);
+    }
+    return true;
+}
+
+void ALFloaterLightBox::importSharedLookFromInventoryItem(const LLViewerInventoryItem& notecard)
+{
+    // Read first, which takes a moment, and applied only if the window is
+    // still here by then: closed in between, the user has thought better of
+    // it, and the Look joins the list without being put on.
+    const LLHandle<ALFloaterLightBox> handle = getDerivedHandle<ALFloaterLightBox>();
+    const std::string                 name   = notecard.getName();
+    ALLookNotecard::importLookFromInventoryNotecard(notecard.getUUID(), [handle, name](const ALLookNotecard::ImportedLook& imported) {
+        finishSharedLookImport(imported, name, handle.isDead() ? SharedLookImport::SaveOnly : SharedLookImport::SaveAndApply);
+    });
+}
+
+// static
+void ALFloaterLightBox::importSharedLookFromText(const std::string& notecard_text, const std::string& notecard_name, SharedLookImport what)
+{
+    ALLookNotecard::importLookFromNotecardText(notecard_text, notecard_name, [notecard_name, what](const ALLookNotecard::ImportedLook& imported) {
+        finishSharedLookImport(imported, notecard_name, what);
+    });
+}
+
+// static
+void ALFloaterLightBox::finishSharedLookImport(const ALLookNotecard::ImportedLook& imported, const std::string& notecard_name, SharedLookImport what)
+{
+    typedef ALLookNotecard::ImportedLook::Failure Failure;
+    LLSD args;
+    args["NAME"] = notecard_name;
+    switch (imported.failure)
+    {
+        case Failure::Unreadable:
+            args["REASON"] = imported.reason;
+            LLNotificationsUtil::add("LightBoxLookNotecardUnreadable", args);
+            return;
+        case Failure::NotALook:
+            LLNotificationsUtil::add("LightBoxLookNotecardNotALook", args);
+            return;
+        case Failure::NotSaved:
+            args["NAME"] = imported.wantedName;
+            LLNotificationsUtil::add("LightBoxLookNotImported", args);
+            return;
+        case Failure::None:
+            break;
+    }
+
+    if (what == SharedLookImport::SaveAndApply)
+    {
+        // In the Lightbox, opened if need be, so that the apply is one undo
+        // step there: postBuild wires the history before showInstance returns.
+        ALFloaterLightBox* lightbox = LLFloaterReg::showTypedInstance<ALFloaterLightBox>("lightbox", LLSD(), true);
+        if (lightbox)
+        {
+            // A colour picker or the history up would be left holding what
+            // the settings were before the Look.
+            lightbox->closePopover(false);
+            LLStringUtil::format_map_t label;
+            label["[NAME]"] = imported.lookName;
+            lightbox->applyLookAsOneUndoStep(imported.lookName, lightbox->getString("history_look_import", label));
+        }
+    }
+
+    // What else there is to say: found here already, renamed, settings left
+    // out. Each a sentence, so the toast reads whatever came together.
+    std::string note;
+    const auto  say = [&note](const std::string& sentence) {
+        if (!note.empty())
+        {
+            note += ' ';
+        }
+        note += sentence;
+    };
+    LLStringUtil::format_map_t words;
+    words["[NAME]"]   = imported.lookName;
+    words["[WANTED]"] = imported.wantedName;
+    if (imported.lookName != imported.wantedName)
+    {
+        say(LLTrans::getString(imported.alreadyHad ? "LightBoxLookImportSameNote" : "LightBoxLookImportRenamedNote", words));
+    }
+    if (imported.counts.unknown > 0)
+    {
+        words["[COUNT]"] = std::to_string(imported.counts.unknown);
+        say(LLTrans::getString("LightBoxLookImportUnknownNote", words));
+    }
+    if (imported.counts.rejected > 0)
+    {
+        words["[COUNT]"] = std::to_string(imported.counts.rejected);
+        say(LLTrans::getString("LightBoxLookImportIgnoredNote", words));
+    }
+    args["NAME"] = imported.lookName;
+    args["NOTE"] = note;
+    LLNotificationsUtil::add(what == SharedLookImport::SaveAndApply ? "LightBoxLookImported" : "LightBoxLookAdded", args);
+
+    if (!imported.missingLut.empty())
+    {
+        LLSD lut;
+        lut["LUT"] = imported.missingLut;
+        LLNotificationsUtil::add("LightBoxLookLUTMissing", lut);
     }
 }
 
