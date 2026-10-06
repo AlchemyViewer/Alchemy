@@ -44,7 +44,7 @@
 //    true    true   Not allowed
 //
 LLDeadmanTimer::LLDeadmanTimer(F64 horizon, bool inc_cpu)
-    : mHorizon(U64L(0)),
+    : mHorizon(time_type(llmax(horizon, F64(0.0)) * get_timer_info().mClockFrequency)),
       mActive(false),           // If true, a timer is running.
       mDone(false),             // If true, timer has completed and can be read (once)
       mStarted(U64L(0)),
@@ -56,15 +56,7 @@ LLDeadmanTimer::LLDeadmanTimer(F64 horizon, bool inc_cpu)
       mUEndCPU(LLProcInfo::time_type(U64L(0))),
       mSStartCPU(LLProcInfo::time_type(U64L(0))),
       mSEndCPU(LLProcInfo::time_type(U64L(0)))
-{
-    // A timer constructed during static initialisation can come before
-    // anything has read the clock frequency, which would make the horizon 0.
-    if (!get_timer_info().mClockFrequency)
-    {
-        get_timer_info().update();
-    }
-    mHorizon = time_type(llmax(horizon, F64(0.0)) * get_timer_info().mClockFrequency);
-}
+{}
 
 
 // static
