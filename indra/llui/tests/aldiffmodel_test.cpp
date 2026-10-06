@@ -1056,7 +1056,7 @@ namespace tut
             return std::make_pair(std::move(model), std::move(whole));
         };
         const auto same = [](const ALDiffModel& a, const ALDiffModel& b, const std::string& where) {
-            for (const Column c : { Column::Left, Column::Right, Column::Inline })
+            for (const ALDiffModel::Column c : { ALDiffModel::Column::Left, ALDiffModel::Column::Right, ALDiffModel::Column::Inline })
             {
                 ensure(where + ": text", a.text(c) == b.text(c));
                 ensure_equals(where + ": lines", a.lineCount(c), b.lineCount(c));
@@ -1078,7 +1078,7 @@ namespace tut
             {
                 said.push_back({ 50, "fifty" });
             }
-            std::string text = lines(60, std::initializer_list<std::pair<S32, const char*>>{});
+            std::string text = aldiffmodel_data::lines(60, std::initializer_list<std::pair<S32, const char*>>{});
             std::vector<std::string> out = ALTextDiff::split(text);
             for (const auto& [at, word] : said)
             {
@@ -1228,7 +1228,7 @@ namespace tut
         // as a comment.
         const std::string left = lines(60, { { 5, "b = 1;" }, { 40, "if (a == b) go();" } });
         const auto        right = [](bool opened) {
-            std::string out = lines(60, { { 5, "b = 2;" }, { 20, opened ? "/* from here" : "line 20" }, { 40, "if (a != b) go();" } });
+            std::string out = aldiffmodel_data::lines(60, { { 5, "b = 2;" }, { 20, opened ? "/* from here" : "line 20" }, { 40, "if (a != b) go();" } });
             return out.insert(out.find("line 31"), "c = 3;\n");
         };
         S32 reused = 0;
@@ -1313,7 +1313,7 @@ namespace tut
             whole.setRightText(text);
             ensure_equals(where + ": every change read again, all of them", ALStructuralDiff::lastRead(), whole.changeCount());
             ensure_equals(where + ": read again", kept_read, read);
-            sameLayout(kept, whole, where);
+            aldiffmodel_data::sameLayout(kept, whole, where);
         };
         both(right({ { 90, "x = 90 - 12;" } }), "typed in a change", 1);
         both(right({ { 90, "x = 90 - 12;" }, { 60, "y = 60;" } }), "a change made where there was none", 1);
@@ -1392,7 +1392,7 @@ namespace tut
         const auto both = [&](const std::function<void(ALDiffModel&)>& done, const std::string& where) {
             done(kept);
             done(whole);
-            sameLayout(kept, whole, where);
+            aldiffmodel_data::sameLayout(kept, whole, where);
         };
         both([&](ALDiffModel& m) { m.setTexts(joined(base), joined(moved)); }, "moved");
         ensure_equals("a move", kept.moveCount(), 1);
@@ -1428,5 +1428,49 @@ namespace tut
         like.ignoreWhitespace = true;
         both([&](ALDiffModel& m) { m.setLikeness(like); }, "blanks let go of");
         ensure_equals("a move now", kept.moveCount(), 1);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<34>()
+    {
+        set_test_name("a block put in twice and taken out once, edited in the first copy: the move passes to the second, and the layout kept over the edit lays the second out as moved");
+        std::vector<std::string> base;
+        for (S32 n = 0; n < 100; ++n)
+        {
+            base.push_back("    statement number " + std::to_string(n) + " goes here;");
+        }
+        // Six lines taken out near the top, put in at 40 and again at 80.
+        const std::vector<std::string> block(base.begin() + 10, base.begin() + 16);
+        std::vector<std::string>       twice = base;
+        twice.erase(twice.begin() + 10, twice.begin() + 16);
+        twice.insert(twice.begin() + 40, block.begin(), block.end());
+        twice.insert(twice.begin() + 80, block.begin(), block.end());
+        const auto joined = [](const std::vector<std::string>& lines) {
+            std::string out;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                out += (i ? "\n" : "") + lines[i];
+            }
+            return out;
+        };
+        ALDiffModel kept;
+        ALDiffModel whole;
+        whole.setKeepsLayout(false);
+        const auto both = [&](const std::function<void(ALDiffModel&)>& done, const std::string& where) {
+            done(kept);
+            done(whole);
+            aldiffmodel_data::sameLayout(kept, whole, where);
+        };
+        both([&](ALDiffModel& m) { m.setTexts(joined(base), joined(twice)); }, "twice");
+        ensure_equals("one move, to the first copy", kept.moveCount(), 1);
+        // A line of the first copy changed: the whole block is now only the
+        // second copy, which the lines kept from before must say.
+        std::vector<std::string> edited = twice;
+        edited[42] += " and changed";
+        both([&](ALDiffModel& m) { m.setRightText(joined(edited)); }, "the first copy edited");
+        ensure_equals("one move still", kept.moveCount(), 1);
+        // And back: the move returns to the first copy.
+        both([&](ALDiffModel& m) { m.setRightText(joined(twice)); }, "the edit taken back");
+        ensure_equals("one move again", kept.moveCount(), 1);
     }
 }

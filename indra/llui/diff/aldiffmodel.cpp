@@ -1148,12 +1148,31 @@ std::optional<ALDiffModel::Reuse> ALDiffModel::reusable(const Relayout& again, c
     {
         const ALDiffMoves::Move& block     = mMoves[n].lines;
         const ALDiffMoves::Move& now_block = moves[n];
-        // An end where it was, where it was moved along to, or anywhere it
-        // is laid out again.
+        // An end where it was, where it was moved along to, or anywhere
+        // within what is laid out again; one over an edge of that stretch
+        // stands as its lines outside it do, which keep their marks.
         const auto ends = [&](S32 was_at, S32 now_at, size_t column, S32 shift) {
-            return was_at + block.count <= k.lines[column] ? now_at == was_at
-                   : was_at >= g.lines[column]             ? now_at == was_at + shift
-                                                           : true;
+            const S32 from = k.lines[column];
+            const S32 to   = g.lines[column];
+            if (was_at + block.count <= from)
+            {
+                return now_at == was_at;
+            }
+            if (was_at >= to)
+            {
+                return now_at == was_at + shift;
+            }
+            if (now_at >= from && now_at + block.count <= to + shift)
+            {
+                return true;
+            }
+            const bool before = was_at < from;
+            const bool after  = was_at + block.count > to;
+            if (before && after)
+            {
+                return shift == 0 && now_at == was_at;
+            }
+            return before ? now_at == was_at : now_at == was_at + shift;
         };
         if (block.count != now_block.count || !ends(block.left, now_block.left, 0, again.left) || !ends(block.right, now_block.right, 1, again.right))
         {
