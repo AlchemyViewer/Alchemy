@@ -28,6 +28,7 @@
 #include "aldiffmerge.h"
 #include "aldiffmoves.h"
 #include "aldiffsplice.h"
+#include "alstructuraldiff.h"
 #include "altextdiff.h"
 #include "altextdocument.h"
 
@@ -153,9 +154,10 @@ public:
     // How many layouts have been made: relaid() is of the last, from the
     // one before.
     U32           layouts() const { return mLayouts; }
-    // Whether a layout made again after a splice keeps what it can of the
-    // one before; on unless asked. Off, every row is laid out again: what
-    // a test holds the layout kept to.
+    // Whether a rebuild after a splice keeps what it can of the one before
+    // -- the layout, and by structure, the changes read as tokens; on
+    // unless asked. Off, every row is laid out and every change read
+    // again: what a test holds what is kept to.
     void          setKeepsLayout(bool keeps) { mKeepsLayout = keeps; }
     // Swapped or not: the runs as open as they were.
     void    setSwapped(bool swapped);
@@ -474,8 +476,15 @@ private:
     // The rows' lines of the right's text: side by side the column showing
     // it, inline the right's as shown, or swapped the left's.
     const std::vector<S32>& rightRows(Layout layout) const { return layout == Layout::Sides ? of(rightColumn()).lineOf : mInlineRows[mSwapped ? 0 : 1]; }
-    // By structure, the runs' changes read as tokens (ALStructuralDiff).
-    void              readTokens();
+    // By structure, the runs' changes read as tokens (ALStructuralDiff):
+    // after an edit, given the runs before it, only the changes that are
+    // not as they were.
+    void              readTokens(const std::vector<ALTextDiff::Run>* was = nullptr, const ALStructuralDiff::Edited* edited = nullptr);
+    // The lines of a side's changes from a line on, each with its regions
+    // as read (by a hash of them): what an edit before them may have made
+    // read otherwise -- a block comment opened or closed -- which cuts
+    // their words and tokens.
+    std::vector<std::pair<S32, size_t>> readFrom(size_t side, S32 from) const;
     // The options the texts as shown are compared by: the ranges' anchors,
     // swapped where the texts are.
     ALTextDiff::Options shownOptions() const;

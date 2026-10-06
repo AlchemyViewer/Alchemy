@@ -25,6 +25,7 @@
 #ifndef AL_ALSTRUCTURALDIFF_H
 #define AL_ALSTRUCTURALDIFF_H
 
+#include "aldiffedit.h"
 #include "altextdiff.h"
 
 #include <string>
@@ -70,6 +71,27 @@ namespace ALStructuralDiff
     Result read(const std::vector<std::string>& left, const std::vector<std::string>& right, std::vector<ALTextDiff::Run> runs,
                 const ALTextDiff::Options& options, const std::vector<ALTextDiff::regions_t>* left_regions = nullptr,
                 const std::vector<ALTextDiff::regions_t>* right_regions = nullptr);
+
+    // Where each text was edited: the lines the same at its start and at
+    // its end (ALDiffEdit::Edges), as far as the edit changed how lines
+    // read, and how many lines it had.
+    struct Edited
+    {
+        ALDiffEdit::Edges edges[2];
+        S32               was[2] = { 0, 0 };
+    };
+    // A result read from the runs as they were (`was`) read again after an
+    // edit, for the runs as they are: what it said of each line moved along
+    // with the texts, and of the changes now, only those that are not a
+    // change there was, outside the lines edited, read again -- a keystroke
+    // reads the change it is in, not every change. Its runs are left as
+    // they are; it is too large where one read again is.
+    void readAgain(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<ALTextDiff::Run>& was,
+                   const std::vector<ALTextDiff::Run>& runs, const Edited& edited, const ALTextDiff::Options& options,
+                   const std::vector<ALTextDiff::regions_t>* left_regions, const std::vector<ALTextDiff::regions_t>* right_regions, Result& result);
+    // How many changes the last read() or readAgain() read as tokens: what
+    // a test holds an edit's cost to.
+    S32 lastRead();
 }
 
 #endif // AL_ALSTRUCTURALDIFF_H

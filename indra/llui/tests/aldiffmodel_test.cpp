@@ -27,6 +27,7 @@
 #include "aldiffmodel.h"
 
 #include "aldiffsame.h"
+#include "alstructuraldiff.h"
 
 #include "../test/lltut.h"
 
@@ -1183,5 +1184,131 @@ namespace tut
             sameLayout(model, fresh, "step " + std::to_string(step));
         }
         ensure("laid out again only around each edit, mostly", relaid < 80 * 12);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<30>()
+    {
+        set_test_name("a block comment opened or closed by an edit: the lines after it read otherwise, laid out and read as tokens as afresh");
+        // Lines whole: a comment from a line starting /* to one holding */,
+        // the rest code.
+        const auto block_comments = [] {
+            auto said = std::make_shared<std::deque<std::vector<ALTextDiff::regions_t>>>();
+            return ALTextDiff::lexer_t([said](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+                if (said->size() > 4)
+                {
+                    said->pop_front();
+                }
+                std::vector<ALTextDiff::regions_t>& out = said->emplace_back();
+                bool                                comment = false;
+                for (const std::string& line : lines)
+                {
+                    comment = comment || line.rfind("/*", 0) == 0;
+                    out.push_back({ ALTextDiff::Piece{ 0, static_cast<S32>(line.size()), comment ? ALTextDiff::Region::Comment : ALTextDiff::Region::Code } });
+                    comment = comment && line.find("*/") == std::string::npos;
+                }
+                return out;
+            });
+        };
+        // Two changes, and a line put in between them, which a comment
+        // opened above it on the right takes in, as it does the second
+        // change's line there: an operator read whole as code, its bytes
+        // as a comment.
+        const std::string left = lines(60, { { 5, "b = 1;" }, { 40, "if (a == b) go();" } });
+        const auto        right = [](bool opened) {
+            std::string out = lines(60, { { 5, "b = 2;" }, { 20, opened ? "/* from here" : "line 20" }, { 40, "if (a != b) go();" } });
+            return out.insert(out.find("line 31"), "c = 3;\n");
+        };
+        S32 reused = 0;
+        for (const bool structural : { false, true })
+        {
+            for (const bool comments : { false, true })
+            {
+                ALDiffModel kept;
+                ALDiffModel whole;
+                whole.setKeepsLayout(false);
+                ALTextDiff::Likeness like;
+                like.ignoreComments = comments;
+                for (ALDiffModel* each : { &kept, &whole })
+                {
+                    each->setLexer(block_comments());
+                    each->setLikeness(like);
+                    each->setAlgorithm(structural ? ALTextDiff::Algorithm::Structural : ALTextDiff::Algorithm::Histogram);
+                    each->setTexts(left, right(false));
+                }
+                const std::string way = std::string(structural ? "by structure" : "by lines") + (comments ? ", comments let go of" : "");
+                for (const bool opened : { true, false })
+                {
+                    for (ALDiffModel* each : { &kept, &whole })
+                    {
+                        each->setRightText(right(opened));
+                    }
+                    reused += kept.relaid().whole ? 0 : 1;
+                    // The right's line 40 is 41 now, below the line put in.
+                    ensure(way + ": laid out again past the line read otherwise",
+                           kept.relaid().whole || kept.relaid().first[1] + kept.relaid().now[1] > 41);
+                    sameLayout(kept, whole, way + (opened ? ": opened" : ": closed"));
+                }
+            }
+        }
+        ensure("laid out again in part", reused > 0);
+    }
+
+
+    template<> template<>
+    void aldiffmodel_object::test<31>()
+    {
+        set_test_name("by structure, an edit reads as tokens only the changes it made, those it did not as they were: as all of them read again");
+        // A change every twenty lines, ten of them.
+        std::initializer_list<std::pair<S32, const char*>> was_left = { { 10, "x = 10 + 1;" }, { 30, "x = 30 + 1;" }, { 50, "x = 50 + 1;" },
+                                                                        { 70, "x = 70 + 1;" }, { 90, "x = 90 + 1;" }, { 110, "x = 110 + 1;" },
+                                                                        { 130, "x = 130 + 1;" }, { 150, "x = 150 + 1;" }, { 170, "x = 170 + 1;" },
+                                                                        { 190, "x = 190 + 1;" } };
+        const std::string left = lines(200, was_left);
+        const auto        right = [](std::initializer_list<std::pair<S32, const char*>> also) {
+            std::vector<std::pair<S32, const char*>> changed = { { 10, "x = 10 - 1;" }, { 30, "x = 30 - 1;" }, { 50, "x = 50 - 1;" },
+                                                                 { 70, "x = 70 - 1;" }, { 90, "x = 90 - 1;" }, { 110, "x = 110 - 1;" },
+                                                                 { 130, "x = 130 - 1;" }, { 150, "x = 150 - 1;" }, { 170, "x = 170 - 1;" },
+                                                                 { 190, "x = 190 - 1;" } };
+            for (const auto& one : also)
+            {
+                changed.push_back(one);
+            }
+            std::string out;
+            for (S32 n = 0; n < 200; ++n)
+            {
+                std::string line = "line " + std::to_string(n);
+                for (const auto& [at, said] : changed)
+                {
+                    line = at == n ? said : line;
+                }
+                out += (n ? "\n" : "") + line;
+            }
+            return out;
+        };
+        ALDiffModel kept;
+        ALDiffModel whole;
+        whole.setKeepsLayout(false);
+        for (ALDiffModel* each : { &kept, &whole })
+        {
+            each->setAlgorithm(ALTextDiff::Algorithm::Structural);
+            each->setTexts(left, right({}));
+        }
+        ensure_equals("read whole: every change", ALStructuralDiff::lastRead(), 10);
+        const auto both = [&](const std::string& text, const std::string& where, S32 read) {
+            kept.setRightText(text);
+            const S32 kept_read = ALStructuralDiff::lastRead();
+            whole.setRightText(text);
+            ensure_equals(where + ": every change read again, all of them", ALStructuralDiff::lastRead(), whole.changeCount());
+            ensure_equals(where + ": read again", kept_read, read);
+            sameLayout(kept, whole, where);
+        };
+        both(right({ { 90, "x = 90 - 12;" } }), "typed in a change", 1);
+        both(right({ { 90, "x = 90 - 12;" }, { 60, "y = 60;" } }), "a change made where there was none", 1);
+        both(right({ { 90, "x = 90 - 12;" }, { 60, "y = 60;" }, { 130, "x = 130 + 1;" } }), "a change taken back", 0);
+        both(right({ { 90, "x = 90 - 12;" }, { 60, "y = 60;" }, { 130, "x = 130 + 1;" }, { 199, "last" } }), "at the end", 1);
+        // Three edits as one, from the first to the last: the changes
+        // between read again, as lines edited.
+        both(right({ { 199, "last" } }), "taken back, three at once", 4);
     }
 }

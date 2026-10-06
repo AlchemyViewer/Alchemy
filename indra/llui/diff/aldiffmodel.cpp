@@ -33,6 +33,8 @@
 #include "alstructuraldiff.h"
 
 #include <algorithm>
+#include <boost/container_hash/hash.hpp>
+
 #include <iterator>
 #include <limits>
 
@@ -68,6 +70,18 @@ namespace
         }
         std::move(was.end() - edges.tail, was.end(), std::back_inserter(now));
         return now;
+    }
+
+    size_t hashOf(const ALTextDiff::regions_t& regions)
+    {
+        size_t hash = regions.size();
+        for (const ALTextDiff::Piece& piece : regions)
+        {
+            boost::hash_combine(hash, piece.begin);
+            boost::hash_combine(hash, piece.end);
+            boost::hash_combine(hash, static_cast<U8>(piece.region));
+        }
+        return hash;
     }
 }
 
@@ -166,17 +180,23 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, cons
 {
     // Compared again where it changed (ALDiffSplice), else all of it: the
     // side changed by where it differs, the other the same throughout.
-    std::vector<std::string>& side  = given_left ? mLeftLines : mRightLines;
-    const S32                 was   = static_cast<S32>(side.size());
-    const S32                 moved = static_cast<S32>(lines.size()) - was;
-    side                            = std::move(lines);
+    std::vector<std::string>& side       = given_left ? mLeftLines : mRightLines;
+    const S32                 was        = static_cast<S32>(side.size());
+    const S32                 moved      = static_cast<S32>(lines.size()) - was;
+    const bool                shown_left = given_left != mSwapped;
+    const size_t              shown      = shown_left ? 0 : 1;
+    // Where a grammar says how lines read, the regions the lines of the
+    // changes after the edit were read in, before it reads the side again.
+    const bool                           regioned = static_cast<bool>(mOptions.lexer);
+    const bool                           had      = regioned && (shown ? shownRegions().second : shownRegions().first);
+    const std::vector<std::pair<S32, size_t>> read_before = had ? readFrom(shown, was - edges.tail) : std::vector<std::pair<S32, size_t>>();
+    side = std::move(lines);
     mRegions.reset();
     if (mMerge && !given_left)
     {
         mMerge->setOurs(mRightLines);
     }
-    const ALTextDiff::Options options    = shownOptions();
-    const bool                shown_left = given_left != mSwapped;
+    const ALTextDiff::Options options = shownOptions();
     Relayout                  again;
     again.runs                           = mRuns;
     (shown_left ? again.left : again.right) = moved;
@@ -193,12 +213,55 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, cons
         build();
         return;
     }
+    // The edit reaches as far as the lines of changes after it now read
+    // otherwise -- a block comment opened or closed -- whose words and
+    // tokens are cut otherwise: laid out and read again to the last of
+    // them, or to the end where the grammar's regions are missing before
+    // or after.
+    if (regioned)
+    {
+        const line_regions_t now   = shown ? shownRegions().second : shownRegions().first;
+        S32                  reach = had && now ? -1 : static_cast<S32>(side.size());
+        for (const auto& [line, hash] : read_before)
+        {
+            if (reach < static_cast<S32>(side.size()) && hashOf((*now)[static_cast<size_t>(line + moved)]) != hash)
+            {
+                reach = line + moved + 1;
+            }
+        }
+        if (reach >= 0)
+        {
+            again.tail = std::min(again.tail, static_cast<S32>(side.size()) - reach);
+        }
+    }
     if (options.algorithm == ALTextDiff::Algorithm::Structural)
     {
-        // Its changes read as tokens again, the lines' runs as spliced.
-        readTokens();
+        // Its changes read as tokens again, the lines' runs as spliced:
+        // those outside the lines edited, as they were, kept.
+        ALStructuralDiff::Edited edited;
+        edited.edges[shown]     = ALDiffEdit::Edges{ again.head, again.tail };
+        edited.was[shown]       = was;
+        edited.edges[1 - shown] = ALDiffEdit::Edges{ static_cast<S32>(other.size()), 0 };
+        edited.was[1 - shown]   = static_cast<S32>(other.size());
+        readTokens(&again.runs, &edited);
     }
     layout({}, &again);
+}
+
+std::vector<std::pair<S32, size_t>> ALDiffModel::readFrom(size_t side, S32 from) const
+{
+    std::vector<std::pair<S32, size_t>> out;
+    const line_regions_t                regions = side ? shownRegions().second : shownRegions().first;
+    const Kind                          own     = side ? Kind::Added : Kind::Removed;
+    for (const ALTextDiff::Run& run : mRuns)
+    {
+        const S32 start = side ? run.right : run.left;
+        for (S32 line = std::max(start, from); run.kind == own && regions && line < start + run.count; ++line)
+        {
+            out.emplace_back(line, hashOf((*regions)[static_cast<size_t>(line)]));
+        }
+    }
+    return out;
 }
 
 void ALDiffModel::setSwapped(bool swapped)
@@ -345,9 +408,27 @@ void ALDiffModel::build(const std::vector<bool>& open)
     layout(open);
 }
 
-void ALDiffModel::readTokens()
+void ALDiffModel::readTokens(const std::vector<ALTextDiff::Run>* was, const ALStructuralDiff::Edited* edited)
 {
     const auto [left_regions, right_regions] = shownRegions();
+    // After an edit, what was read of the texts as they were standing --
+    // none of it too large -- only the changes that are not as they were.
+    if (was && edited && mKeepsLayout && !mFellBack && static_cast<S32>(mMarks[0].size()) == edited->was[0] && static_cast<S32>(mMarks[1].size()) == edited->was[1] &&
+        mByTokens[0].size() == mMarks[0].size() && mByTokens[1].size() == mMarks[1].size())
+    {
+        ALStructuralDiff::Result read;
+        read.leftMarks     = std::move(mMarks[0]);
+        read.rightMarks    = std::move(mMarks[1]);
+        read.leftByTokens  = std::move(mByTokens[0]);
+        read.rightByTokens = std::move(mByTokens[1]);
+        ALStructuralDiff::readAgain(shownLeft(), shownRight(), *was, mRuns, *edited, mOptions, left_regions, right_regions, read);
+        mMarks[0]    = std::move(read.leftMarks);
+        mMarks[1]    = std::move(read.rightMarks);
+        mByTokens[0] = std::move(read.leftByTokens);
+        mByTokens[1] = std::move(read.rightByTokens);
+        mFellBack    = read.tooLarge;
+        return;
+    }
     ALStructuralDiff::Result by_tokens       = ALStructuralDiff::read(shownLeft(), shownRight(), std::move(mRuns), mOptions, left_regions, right_regions);
     mRuns        = std::move(by_tokens.runs);
     mFellBack    = by_tokens.tooLarge;
