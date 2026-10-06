@@ -39,6 +39,8 @@ namespace Luau
     struct FrontendCancellationToken;
 }
 
+struct ALLuauFrontend;
+
 // The SLua analyzer: Luau's front end from Second Life's fork, given the
 // grid's definitions and asked about one script at a time: what is wrong
 // with it, what could go at a position, what is at one, what a call there
@@ -201,6 +203,7 @@ public:
     size_t modulesChecked() const;
 
 private:
-    struct Impl;
-    std::unique_ptr<Impl> mImpl;
+    // What is kept between questions (alluaufrontend.h), whose Luau
+    // headers stay out of this one.
+    std::unique_ptr<ALLuauFrontend> mFrontend;
 };

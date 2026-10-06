@@ -58,6 +58,7 @@ target_sources(
     lsl/optimizer/allslsimplifier.cpp
     luau/alluauconfig.cpp
     luau/alluauexports.cpp
+    luau/alluaufrontend.cpp
     luau/alluauservice.cpp
     preprocessor/aldiskcache.cpp
     preprocessor/aldiskincludes.cpp
@@ -123,6 +124,7 @@ target_sources(
         lsl/optimizer/allslsimplifier.h
         luau/alluauconfig.h
         luau/alluauexports.h
+        luau/alluaufrontend.h
         luau/alluauservice.h
         preprocessor/aldiskcache.h
         preprocessor/aldiskincludes.h
