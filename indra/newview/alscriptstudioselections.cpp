@@ -104,8 +104,15 @@ void ALScriptStudioSelections::compare(Doc& doc)
     const std::string   text  = shown->selectedText();
     const Held          held  = *mHeld;
     mWindow.compare(doc, held.text, text, held.title, titleOf(doc, range));
-    if (!own || !doc.compareView)
+    if (!doc.compareView)
     {
+        return;
+    }
+    if (!own)
+    {
+        // Text alone, from a view that is not the source: a keystroke has
+        // no place in the script to go to, so none is sent there.
+        doc.compareView->setOnEdit(nullptr);
         return;
     }
     // The right a stretch of the source, which the comparison follows as

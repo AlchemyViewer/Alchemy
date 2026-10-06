@@ -250,7 +250,7 @@ namespace tut
     template<> template<>
     void alscriptstudioselections_object::test<4>()
     {
-        set_test_name("a selection in what is not the source -- the preprocessed view -- compared as text alone: nothing taken back, typing as any comparison's");
+        set_test_name("a selection in what is not the source -- the preprocessed view -- compared as text alone: nothing taken back, and nothing typed into the script");
         if (!window.floater)
         {
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
@@ -269,7 +269,7 @@ namespace tut
         door.compareView->right()->setFocus(true);
         door.compareView->right()->goTo(ALTextPos(1, 2));
         door.compareView->right()->handleUnicodeChar('z', false);
-        ensure("typing as the window has it: at the same line and column", studio.typedAt.back() == ALTextPos(1, 2));
+        ensure("nothing typed into the script: the expansion is not it", studio.typedAt.empty());
     }
 
     template<> template<>
