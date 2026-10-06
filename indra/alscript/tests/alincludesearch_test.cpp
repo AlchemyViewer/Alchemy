@@ -318,4 +318,171 @@ namespace tut
         ensure("the disk not looked in: the disk's route", left.diskRoute && left.names == std::vector<std::string>{ "m" });
         ensure("nothing said: nothing left out", ALIncludeSearch::leftOut({}).names.empty());
     }
+
+    // The require parity suite (LA13): what a SLua require finds on disk,
+    // case by case from the two references -- Luau's own require tests
+    // (tests/RequireByString.test.cpp, over tests/require/) and Linden's VS
+    // Code plugin (resolveInclude and resolveFile, over its
+    // src/test/workspace/set_1) -- and ours. Each case says what it finds
+    // now, and what LAD9 has it find. Where those differ, or the references
+    // disagree, it says whose rule LAD9 picks: the plugin's, Luau's, or
+    // ours -- the nearest `.luaurc` wins, which the plugin reverses. The
+    // tree is a scripter's two folders on disk, world includes off as they
+    // are by default (LAD10). Studio aliases (LA22) come with LA22.
+    struct RequireCase
+    {
+        // What it shows, and whose case it is.
+        const char* what;
+        // The file asking, under the tree; "object" for a script in an
+        // object, which with world includes off reads nothing of the world.
+        const char* from;
+        const char* name;
+        // What it finds, under the tree, or nothing: now, and as LAD9 has it.
+        const char* now;
+        const char* chosen;
+        // Whose rule LAD9 picks, where the references or we disagree: and
+        // what Luau's navigator answers, where it differs from the choice.
+        const char* rule;
+        const char* luau;
+    };
+
+    template<> template<>
+    void alincludesearch_object::test<7>()
+    {
+        set_test_name("the require parity suite: each case from Luau's tests, the plugin's and ours, as it resolves now, beside what LAD9 picks");
+        Scratch s;
+        // Luau's without_config, in lw/.
+        s.write("proj/lw/dependency.luau", "return 'dependency'\n");
+        s.write("proj/lw/module.luau", "return require('./dependency')\n");
+        s.write("proj/lw/lua_dependency.lua", "return 'lua'\n");
+        s.write("proj/lw/luau/init.luau", "return 'init.luau'\n");
+        s.write("proj/lw/nested/init.luau", "return require('@self/submodule')\n");
+        s.write("proj/lw/nested/submodule.luau", "return 'submodule'\n");
+        s.write("proj/lw/ambiguous/file/dependency.luau", "return 'luau'\n");
+        s.write("proj/lw/ambiguous/file/dependency.lua", "return 'lua'\n");
+        s.write("proj/lw/ambiguous/directory/dependency.luau", "return 'file'\n");
+        s.write("proj/lw/ambiguous/directory/dependency/init.luau", "return 'folder'\n");
+        // The plugin's set_1 forms: an extension written, a path with no prefix.
+        s.write("proj/lw/extension.luau", "return 'extension'\n");
+        s.write("proj/lw/sub/deeper.luau", "return 'deeper'\n");
+        // A folder's init, with files beside it and beside its folder, and
+        // a `.luaurc` of its own.
+        s.write("proj/lw/dir/init.luau", "return require('./x')\n");
+        s.write("proj/lw/dir/x.luau", "return 'dir/x'\n");
+        s.write("proj/lw/dir/.luaurc", "{\"aliases\": {\"own\": \"./x\"}}");
+        s.write("proj/lw/x.luau", "return 'lw/x'\n");
+        s.write("proj/x.luau", "return 'proj/x'\n");
+        // A module's own folder, which @self names.
+        s.write("proj/lw/selfish.luau", "return require('@self/child')\n");
+        s.write("proj/lw/selfish/child.luau", "return 'child'\n");
+        // Aliases: the top `.luaurc`, and a nearer one that says `lib` again.
+        s.write("proj/.luaurc", "{\"aliases\": {\"lib\": \"./lib\", \"far\": \"./lib/far_target\", \"chain\": \"@lib/inner\", "
+                                "\"c1\": \"@c2\", \"c2\": \"@c1\", \"sl-std\": \"./lib\"}}");
+        s.write("proj/lib/util.luau", "return 'lib/util'\n");
+        s.write("proj/lib/inner.luau", "return 'lib/inner'\n");
+        s.write("proj/lib/far_target.luau", "return 'far'\n");
+        s.write("proj/lw/sub/.luaurc", "{\"aliases\": {\"lib\": \"./near_lib\"}}");
+        s.write("proj/lw/sub/near_lib/util.luau", "return 'near_lib/util'\n");
+        s.write("proj/lw/sub/asker.luau", "return require('@lib/util')\n");
+        // The scripter's other folder, which the old search falls back to.
+        s.write("elsewhere/only_here.luau", "return 'only here'\n");
+        // A folder nobody blessed.
+        s.write("outside/secret.luau", "return 'secret'\n");
+
+        const std::string                   ABSOLUTE   = s.at("proj/lw/dependency.luau");
+        const std::string                   UNBLESSED  = s.at("outside/secret.luau");
+        const std::vector<RequireCase>      cases      = {
+            // Where all three agree.
+            { "Luau RequireSimpleRelativePath: ./ beside the file", "proj/lw/module.luau", "./dependency", "proj/lw/dependency.luau",
+              "proj/lw/dependency.luau", "", "" },
+            { "Luau: ../ up a folder", "proj/lw/module.luau", "../x", "proj/x.luau", "proj/x.luau", "", "" },
+            { "Luau RequireLua: .lua where there is no .luau", "proj/lw/module.luau", "./lua_dependency", "proj/lw/lua_dependency.lua",
+              "proj/lw/lua_dependency.lua", "", "" },
+            { "Luau RequireInitLuau: a folder's init", "proj/lw/module.luau", "./luau", "proj/lw/luau/init.luau", "proj/lw/luau/init.luau", "",
+              "" },
+            { "Luau RequireSubmoduleUsingSelfIndirectly: a folder whose init requires @self", "proj/lw/module.luau", "./nested",
+              "proj/lw/nested/init.luau", "proj/lw/nested/init.luau", "", "" },
+            { "Luau RequirePathWithAlias: an alias's file", "proj/lw/module.luau", "@far", "proj/lib/far_target.luau", "proj/lib/far_target.luau",
+              "", "" },
+            { "Luau RequirePathWithAliasPointingToDirectory: under an alias's folder", "proj/lw/module.luau", "@lib/util", "proj/lib/util.luau",
+              "proj/lib/util.luau", "", "" },
+            { "Luau: an alias's name in any case", "proj/lw/module.luau", "@LIB/util", "proj/lib/util.luau", "proj/lib/util.luau", "", "" },
+            { "Luau RequireAliasThatDoesNotExist", "proj/lw/module.luau", "@missing/x", "", "", "", "@missing is not a valid alias" },
+            { "nothing so named", "proj/lw/module.luau", "./nowhere", "", "", "", "" },
+            { "a path out of the blessed folders", "proj/lw/module.luau", "../../outside/secret", "", "", "", "" },
+            { "an absolute path nobody blessed", "proj/lw/module.luau", UNBLESSED.c_str(), "", "", "", "" },
+
+            // The plugin's rules, which LAD9 takes where Luau's differ.
+            { "plugin: no prefix is ./ (Luau RequireUnprefixedPath refuses)", "proj/lw/module.luau", "dependency", "proj/lw/dependency.luau",
+              "proj/lw/dependency.luau", "plugin", "require path must start with a valid prefix: ./, ../, or @" },
+            { "plugin set_1 nested_with_paths: a path with no prefix", "proj/lw/module.luau", "sub/deeper", "proj/lw/sub/deeper.luau",
+              "proj/lw/sub/deeper.luau", "plugin", "require path must start with a valid prefix: ./, ../, or @" },
+            { "plugin set_1 test_require: an extension written", "proj/lw/module.luau", "./extension.luau", "proj/lw/extension.luau",
+              "proj/lw/extension.luau", "plugin", "could not resolve child component \"extension.luau\"" },
+            { "plugin: a folder's init named (Luau CannotRequireInitLuauDirectly)", "proj/lw/module.luau", "./nested/init",
+              "proj/lw/nested/init.luau", "proj/lw/nested/init.luau", "plugin", "could not resolve child component \"init\"" },
+            { "plugin: an absolute path, in a blessed folder (Luau RequireAbsolutePath refuses)", "proj/lw/module.luau", ABSOLUTE.c_str(),
+              "proj/lw/dependency.luau", "proj/lw/dependency.luau", "plugin", "require path must start with a valid prefix: ./, ../, or @" },
+            { "plugin (LAD2): ./ from a folder's init is beside the init", "proj/lw/dir/init.luau", "./x", "proj/lw/dir/x.luau",
+              "proj/lw/dir/x.luau", "plugin", "proj/lw/x.luau" },
+            { "plugin (LAD2): ../ from a folder's init is beside its folder", "proj/lw/dir/init.luau", "../x", "proj/lw/x.luau", "proj/lw/x.luau",
+              "plugin", "proj/x.luau" },
+            { "plugin (LAD2): a folder's init reads the .luaurc beside it", "proj/lw/dir/init.luau", "@own", "proj/lw/dir/x.luau",
+              "proj/lw/dir/x.luau", "plugin", "@own is not a valid alias" },
+            { "plugin (LAD3): .luau before .lua (Luau RequireWithFileAmbiguity)", "proj/lw/module.luau", "./ambiguous/file/dependency",
+              "proj/lw/ambiguous/file/dependency.luau", "proj/lw/ambiguous/file/dependency.luau", "plugin",
+              "could not resolve child component \"dependency\" (ambiguous)" },
+            { "plugin (LAD3): a file before a folder's init (Luau RequireWithDirectoryAmbiguity)", "proj/lw/module.luau",
+              "./ambiguous/directory/dependency", "proj/lw/ambiguous/directory/dependency.luau", "proj/lw/ambiguous/directory/dependency.luau",
+              "plugin", "could not resolve child component \"dependency\" (ambiguous)" },
+            { "plugin: no search -- a name not beside the file is not found in another folder", "proj/lw/module.luau", "only_here",
+              "elsewhere/only_here.luau", "", "plugin", "require path must start with a valid prefix: ./, ../, or @" },
+            { "plugin: no search -- ./ the same", "proj/lw/module.luau", "./only_here", "elsewhere/only_here.luau", "", "plugin",
+              "could not resolve child component \"only_here\"" },
+            { "plugin: @sl-* is reserved", "proj/lw/module.luau", "@sl-std/util", "proj/lib/util.luau", "", "plugin", "proj/lib/util.luau" },
+            { "plugin: an alias's path may not climb", "proj/lw/module.luau", "@lib/../lw/dependency", "proj/lw/dependency.luau", "", "plugin",
+              "proj/lw/dependency.luau" },
+            { "plugin and LAD10: a script in an object reads nothing of the disk but through an alias", "object", "./only_here",
+              "elsewhere/only_here.luau", "", "plugin", "" },
+            { "plugin and LAD10: nor with no prefix", "object", "only_here", "elsewhere/only_here.luau", "", "plugin", "" },
+
+            // Luau's forms, which the plugin has not.
+            { "Luau RequireSubmoduleUsingSelfDirectly: @self from a folder's init", "proj/lw/nested/init.luau", "@self/submodule", "",
+              "proj/lw/nested/submodule.luau", "luau", "" },
+            { "Luau: @self from a file is the folder of its name", "proj/lw/selfish.luau", "@self/child", "", "proj/lw/selfish/child.luau", "luau",
+              "" },
+            { "Luau RequireChainedAliasesSuccess: an alias that names another", "proj/lw/module.luau", "@chain", "", "proj/lib/inner.luau",
+              "luau", "" },
+            { "Luau RequireChainedAliasesFailureCyclic: a cycle of aliases", "proj/lw/module.luau", "@c1", "", "", "luau",
+              "detected alias cycle (@c1 -> @c2 -> @c1)" },
+
+            // Ours, against the plugin's.
+            { "ours: the nearest .luaurc that names an alias wins (the plugin lets the farther)", "proj/lw/sub/asker.luau", "@lib/util",
+              "proj/lw/sub/near_lib/util.luau", "proj/lw/sub/near_lib/util.luau", "ours", "" },
+        };
+
+        const ALIncludeSearch::Where disk = where(false, true, { s.at("proj"), s.at("elsewhere") });
+        const std::string            root = s.root.generic_string() + "/";
+        for (const RequireCase& one : cases)
+        {
+            const std::string             from = std::string(one.from) == "object" ? asking(true).self : ALIncludeIdentity::ofFile(s.at(one.from));
+            const ALIncludeSearch::Asking own{ from, true };
+            ALPreprocessor::Include       found;
+            std::vector<std::string>      aliases;
+            const ALPreprocessor::Found   said = search.resolve(ask(one.name, true, from), found, own, disk, nullptr, false, &aliases);
+            std::string                   file;
+            std::string                   under;
+            if (said == ALPreprocessor::Found::Yes && ALIncludeIdentity::fileOf(found.path, file))
+            {
+                under = fsyspath(file).generic_string();
+                under = under.compare(0, root.size(), root) == 0 ? under.substr(root.size()) : under;
+            }
+            ensure_equals(std::string(one.what) + ": now", under, std::string(one.now));
+            // A case where all agree is found as LAD9 has it already.
+            if (!*one.rule)
+            {
+                ensure_equals(std::string(one.what) + ": as LAD9 has it", std::string(one.chosen), std::string(one.now));
+            }
+        }
+    }
 }
