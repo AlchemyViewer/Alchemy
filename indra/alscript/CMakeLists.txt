@@ -59,6 +59,7 @@ target_sources(
     luau/alluaucompletion.cpp
     luau/alluaufragment.cpp
     luau/alluauconfig.cpp
+    luau/alluauconfigscript.cpp
     luau/alluauexports.cpp
     luau/alluaufrontend.cpp
     luau/alluaunavigation.cpp
@@ -131,6 +132,7 @@ target_sources(
         luau/alluaucompletion.h
         luau/alluaufragment.h
         luau/alluauconfig.h
+        luau/alluauconfigscript.h
         luau/alluauexports.h
         luau/alluaufrontend.h
         luau/alluaunavigation.h
