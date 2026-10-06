@@ -9804,6 +9804,7 @@ This cannot be undone.
   <notification
     icon="notifytip.tga"
     name="LightBoxLookShared"
+    log_to_chat="false"
     type="notifytip">
 Your Look &apos;[NAME]&apos; is in your Notecards folder as &apos;[NOTECARD]&apos;. Give it like any other item: drag it onto someone, or use Share in your inventory.
   </notification>
@@ -9851,6 +9852,7 @@ The Look &apos;[NAME]&apos; could not be saved to your Looks.
   <notification
     icon="notifytip.tga"
     name="LightBoxLookImported"
+    log_to_chat="false"
     type="notifytip">
 Applied the Look &apos;[NAME]&apos; and added it to your Looks. Ctrl+Z in the Lightbox takes it back. [NOTE]
   </notification>
@@ -9858,6 +9860,7 @@ Applied the Look &apos;[NAME]&apos; and added it to your Looks. Ctrl+Z in the Li
   <notification
     icon="notifytip.tga"
     name="LightBoxLookAdded"
+    log_to_chat="false"
     type="notifytip">
 Added the Look &apos;[NAME]&apos; to your Looks. [NOTE]
   </notification>
@@ -9865,6 +9868,7 @@ Added the Look &apos;[NAME]&apos; to your Looks. [NOTE]
   <notification
     icon="notifytip.tga"
     name="LightBoxLookLUTMissing"
+    log_to_chat="false"
     type="notifytip">
 This Look uses the color LUT file &apos;[LUT]&apos;, which is not in your colorlut folder, so it is shown without it. Ask whoever gave you the Look for the file, then use Open Folder next to Color LUT on the Look tab.
   </notification>

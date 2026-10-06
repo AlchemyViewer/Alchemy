@@ -53,6 +53,7 @@
 #include "altoolscenepicker.h"
 #include "alwhitebalancesolver.h"
 #include "llagent.h"
+#include "llapp.h"
 #include "llenvironment.h"
 #include "llfile.h"
 #include "llinventoryfunctions.h"
@@ -2402,6 +2403,12 @@ void ALFloaterLightBox::importSharedLookFromText(const std::string& notecard_tex
 void ALFloaterLightBox::finishSharedLookImport(const ALLookNotecard::ImportedLook& imported, const std::string& notecard_name, SharedLookImport what)
 {
     typedef ALLookNotecard::ImportedLook::Failure Failure;
+    if (LLApp::isExiting())
+    {
+        // A drop's notecard arrives after the asset store has been told to
+        // fail everything on the way out; the notifications are gone by then.
+        return;
+    }
     LLSD args;
     args["NAME"] = notecard_name;
     switch (imported.failure)

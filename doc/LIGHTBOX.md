@@ -1350,28 +1350,46 @@ coerces on the way out — a dropdown bound to an S32 writes its item's value
 as the *string* `"5"`, and a checkbox's Boolean has been seen stored as the
 *real* `1` (every bundled Look carries `RenderGlowNoise` so) — so the rules
 take exactly what that coercion would make sense of, and no more. By type:
-`F32` takes a finite Real or Integer, or a text that is a number and nothing
-else, as a Real; `S32` and `U32` take the same, whole and in range, as an
-Integer; `Boolean` takes a Boolean, 0 or 1 as an Integer or a Real, or the
-words `true`/`false`; `String` takes one without control characters, and for
-`RenderColorGradeLUT` cuts it to a bare file name with one of
+`F32` takes a Real or Integer, or a text that is a number and nothing else,
+as a Real — finite as the *float* the setting is, not merely as the double
+LLSD holds: `1e39` is a number in LLSD and an infinity by the time
+`convert_from_llsd<F32>` has cast it, which the first fuzz run of the reader
+found; `S32` and `U32` take the same, whole and in range, as an Integer;
+`Boolean` takes a Boolean, 0 or 1 as an Integer or a Real, or the words
+`true`/`false`; `String` takes well-formed UTF-8 without control characters,
+and for `RenderColorGradeLUT` cuts it to a bare file name with one of
 `colorLutExtensions()` — the renderer joins that name to the LUT folder, so a
-path in it would read any file on the disk; `Vector3` and `Color3` take three
-finite numbers, or four with the last ignored (an older colour picker wrote
-`[r, g, b, a]` into Color3 settings); `LLSD` takes a tone curve as
-`ALToneCurveSet::pointsFromLLSD` reads one, and nothing else. **Any other type,
-and any LLSD-typed setting that is not a curve, is refused** — a new kind of
-setting on the whitelist needs its shape added there, with a test in
-`allookformat_test`. A refused key is named in the log (`LL_WARNS("Presets")`);
-the toast only counts them. The first shared Look lost its tonemapper and its
-glow noise to a judgment written for the *declared* types rather than the
-stored ones, which is why `allookformat_test` now carries those two values
-verbatim. `LLControlVariable` has no range to check against, so
-nothing is clamped here; a setting that controls *work* rather than
-appearance (`RenderGlowIterations` is the number of full-screen passes) is
-clamped by the renderer where it is read, which protects Debug Settings and
-hand-edited files as well. `RenderLensFlareGhostCount` and
-`RenderCrossFilterPoints` already were.
+path in it would read any file on the disk — and refuses the stems older
+Windows opens as devices whatever the folder (`CON`, `COM1`…); `Vector3` and
+`Color3` take three numbers finite as floats, or four with the last ignored (an
+older colour picker wrote `[r, g, b, a]` into Color3 settings); `LLSD` takes a
+tone curve as `ALToneCurveSet::pointsFromLLSD` reads one, and nothing else.
+**Any other type, and any LLSD-typed setting that is not a curve, is
+refused** — a new kind of setting on the whitelist needs its shape added
+there, with a test in `allookformat_test`. A refused key is named in the log
+(`LL_WARNS("Presets")`) with its value if that is a scalar, and only
+described if it is a map or an array: streaming a nested value recurses once
+per level, and a notecard can nest one fifteen hundred deep in twenty
+kilobytes, which is the whole of the main thread's stack on Windows. The XML
+itself is read with `ALLookFormat::XML_DEPTH_LIMIT` (16; a Look is six deep),
+from a notecard and from a preset file alike — the parser keeps its state on
+the heap, but LLSD frees what it built recursively. The toast only counts the
+refused keys. The first shared Look lost its tonemapper and its glow noise to
+a judgment written for the *declared* types rather than the stored ones,
+which is why `allookformat_test` now carries those two values verbatim.
+`LLControlVariable` has no range to check against, so nothing is clamped
+here; a setting that controls *work* rather than appearance
+(`RenderGlowIterations` is the number of full-screen passes) is clamped by
+the renderer where it is read, which protects Debug Settings and hand-edited
+files as well. `RenderLensFlareGhostCount` and `RenderCrossFilterPoints`
+already were. So, since the security sweep, are the values whose *math* an
+absurd number breaks: the exposure range, compensation and speeds (an EV past
+the half-float history is stored as an infinity the history never leaves,
+however the settings are mended — `exposureF.glsl` starts over from the
+target when it reads one), and the tonemap whites and AgX contrast (inf / inf
+is a NaN frame). Every other whitelisted number was traced to a plain uniform
+or bounded math; `allookformat_test` test 19 feeds the reader mutated Looks
+and the deepest nesting a notecard can hold.
 
 A Look whose settings have since changed is shown as `Name *` in the combo, via
 the `look_name_modified` string — **on the name, not beside it**. A detached
@@ -1405,11 +1423,18 @@ so that the part fed text from strangers can be tested without the viewer:
   indented, so the writer falls back to `toXML` run together, which the parser
   reads alike, and refuses only if that is over too. `allookformat_test` keeps
   the worst case under the limit. The same file judges every value (§9) and
-  cleans every name: control characters, `|` (which an inventory name may not
-  hold) and the U+100000+ characters the notecard editor shows as embedded
-  items come out, and a name is cut on a character boundary to 63 bytes —
-  `DB_INV_ITEM_NAME_STR_LEN`, and also what keeps `LLURI::escape` of a CJK name
-  inside a file system's path limit.
+  cleans every name, decoding it a character at a time (`utf8str_decode_at`)
+  so that what is kept is well-formed UTF-8: control characters, `|` (which an
+  inventory name may not hold), the U+100000+ characters the notecard editor
+  shows as embedded items, the bidi and zero-width format characters (a
+  right-to-left override could make one Look's name read as another's), and
+  anything malformed come out, and a name is cut on a character boundary to
+  63 bytes — `DB_INV_ITEM_NAME_STR_LEN`, and also what keeps `LLURI::escape`
+  of a CJK name inside a file system's path limit. Well-formed matters more
+  than it looks: the applied Look's name is written into `settings.xml` as
+  `PresetLooksActive`, and a surrogate in it — which a character reference in
+  the XML could spell, until `LLSDXMLParser` was made to refuse those — would
+  have made the settings file unreadable at the next start.
 - `allooknotecard.{h,cpp}` is the inventory. Share composes the text from the
   live settings (`captureLookSettings`), refuses before anything is made where
   it does not fit, and creates the notecard through
@@ -1442,6 +1467,14 @@ Rules that fall out of this:
   only shows the offer; the click is the consent.
 - **The author line is plain text.** Show it as information, never as
   verified; the item's creator is who actually shared it.
+- **The toasts do not log to chat.** The four `notifytip`s carry the Look's
+  name and the LUT's, and nearby chat parses URLs where a toast does not: a
+  Look named `secondlife:///app/…` would have been a clickable line in the
+  system's voice. `log_to_chat="false"` on each.
+- **A drop is read only from the inventory's own drags.** `get_dropped_notecard`
+  refuses the sources for which `LLToolDragAndDrop` hands a handler the bare
+  id instead of an item (a person, a toolbar button, an item under neither
+  root), since reading an id as an item is a crash.
 - **Unknown settings are counted, not refused.** A newer viewer's Look applies
   what this one knows and the toast says how many were left out; an older
   Look falls under the snapshot rule above. The `Format` number is in the

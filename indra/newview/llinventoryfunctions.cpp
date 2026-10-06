@@ -109,6 +109,17 @@ const LLViewerInventoryItem* get_dropped_notecard(EDragAndDropType cargo_type, v
     {
         return nullptr;
     }
+    // The cargo is an item only for a drag that began from the inventory,
+    // the library, the world or a notecard. For the other sources
+    // LLToolDragAndDrop::dragOrDrop hands the handler the bare id instead
+    // (is_uuid_dragged) -- a drag of a person, a toolbar button, or an
+    // item the inventory holds under neither root -- and reading an id as
+    // an item is a crash. None of those carries a notecard to read.
+    const LLToolDragAndDrop::ESource source = LLToolDragAndDrop::getInstance()->getSource();
+    if (source == LLToolDragAndDrop::SOURCE_PEOPLE || source == LLToolDragAndDrop::SOURCE_VIEWER)
+    {
+        return nullptr;
+    }
     const LLInventoryItem*       item = static_cast<LLInventoryItem*>(cargo_data);
     const LLViewerInventoryItem* held = gInventory.getItem(item->getLinkedUUID());
     return held && held->getType() == LLAssetType::AT_NOTECARD ? held : nullptr;
