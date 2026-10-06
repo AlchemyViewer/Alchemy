@@ -272,7 +272,7 @@ void LLDebugVarMessageBox::draw()
     {
         if (mSlider1)
         {
-            F32 animated_val = clamp_rescale(fmodf((F32)LLFrameTimer::getElapsedSeconds() / 5.f, 1.f), 0.f, 1.f, 0.f, mSlider1->getMaxValue());
+            F32 animated_val = clamp_rescale(fmodf((F32)LLFrameTimer::getUptimeSeconds() / 5.f, 1.f), 0.f, 1.f, 0.f, mSlider1->getMaxValue());
             mSlider1->setValue(animated_val);
             sliderChanged(LLSD());
             if (mSlider2)

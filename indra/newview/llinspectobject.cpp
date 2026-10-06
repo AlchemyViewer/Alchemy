@@ -616,7 +616,8 @@ void LLInspectObject::onMouseLeave(S32 x, S32 y, MASK mask)
         return;
     }
 
-    mOpenTimer.unpause();
+    // The base unpauses only while the fade has not begun.
+    LLInspect::onMouseLeave(x, y, mask);
 }
 
 void LLInspectObject::onClickBuy()

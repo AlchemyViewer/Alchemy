@@ -278,7 +278,7 @@ namespace
 
         LLSettingsBase::Seconds getAdjustedNow() const
         {
-            LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch());
+            LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch() + gUTCOffset);
 
             return (now + mCycleOffset);
         }
@@ -2924,7 +2924,8 @@ void LLEnvironment::DayInstance::setBlenders(const LLSettingsBlender::ptr_t &sky
 
 LLSettingsBase::TrackPosition LLEnvironment::DayInstance::getProgress() const
 {
-    LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch());
+    // The region's day runs on the server's clock, not this machine's.
+    LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch() + gUTCOffset);
     now += mDayOffset;
 
     if ((mDayLength <= 0) || !mDayCycle)
@@ -2940,7 +2941,7 @@ LLSettingsBase::TrackPosition LLEnvironment::DayInstance::secondsToKeyframe(LLSe
 
 void LLEnvironment::DayInstance::animate()
 {
-    LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch());
+    LLSettingsBase::Seconds now(LLDate::now().secondsSinceEpoch() + gUTCOffset);
 
     now += mDayOffset;
 

@@ -340,6 +340,7 @@ if(AL_BUILD_TESTS)
     llstreamtools
     llstring
     llstring_utf
+    lltimer
     lltrace
     lltreeiterators
     llunits

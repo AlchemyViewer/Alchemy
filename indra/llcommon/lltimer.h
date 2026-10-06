@@ -66,8 +66,9 @@ public:
     static void cleanupClass();
 
     // Return a high precision number of seconds since the start of
-    // this application instance.
-    static F64SecondsImplicit getElapsedSeconds()
+    // this application instance. Static: it is not this timer's elapsed
+    // time, which is getElapsedTimeF64().
+    static F64SecondsImplicit getUptimeSeconds()
     {
         if (sTimer)
     {
@@ -91,7 +92,8 @@ public:
     void stop() { mStarted = false; }
     void reset();                               // Resets the timer
     void setLastClockCount(U64 current_count);      // Sets the timer so that the next elapsed call will be relative to this time
-    void setTimerExpirySec(F32SecondsImplicit expiration);
+    void setTimerExpirySec(F32SecondsImplicit expiration);      // Expires this long from now
+    void resetWithExpiry(F32SecondsImplicit expiration) { reset(); setTimerExpirySec(expiration); }
     bool checkExpirationAndReset(F32 expiration);
     bool hasExpired() const;
     F32SecondsImplicit getElapsedTimeAndResetF32(); // Returns elapsed time in seconds with reset

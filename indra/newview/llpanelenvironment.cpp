@@ -932,7 +932,7 @@ void LLPanelEnvironmentInfo::udpateApparentTimeOfDay()
     }
     mLabelApparentTime->setVisible(true);
 
-    S32Seconds now((S32)LLDate::now().secondsSinceEpoch());
+    S32Seconds now((S32)time_corrected());
 
     now += mCurrentEnvironment->mDayOffset;
 

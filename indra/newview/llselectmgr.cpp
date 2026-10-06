@@ -7601,7 +7601,7 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
             LLVector3 view_vector = LLViewerCamera::getInstance()->getOrigin() - objectp->getRenderPosition();
             silhouette_thickness = view_vector.magVec() * LLSelectMgr::sHighlightThickness * (LLViewerCamera::getInstance()->getView() / LLViewerCamera::getInstance()->getDefaultFOV());
         }
-        F32 animationTime = (F32)LLFrameTimer::getElapsedSeconds();
+        F32 animationTime = (F32)LLFrameTimer::getUptimeSeconds();
 
         F32 u_coord = fmod(animationTime * LLSelectMgr::sHighlightUAnim, 1.f);
         F32 v_coord = 1.f - fmod(animationTime * LLSelectMgr::sHighlightVAnim, 1.f);

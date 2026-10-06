@@ -213,6 +213,18 @@ void LLReflectionMap::syncToViewerObject()
     }
 }
 
+void LLReflectionMap::orphan()
+{
+    mGroup = nullptr;
+    mViewerObject = nullptr;
+    mOrphaned = true;
+
+    // The sort orders by priority before distance, so a placed probe left at 1 would still sort
+    // ahead of every automatic probe, take a place inside the budget for the update before it is
+    // deleted, and push the last automatic probe out of its cube slot.
+    mPriority = 0;
+}
+
 bool LLReflectionMap::eclipses(const LLReflectionMap* other, F32 margin) const
 {
     if (!other || other == this || !mViewerObject || mViewerObject->isDead())
@@ -382,6 +394,11 @@ bool LLReflectionMap::isActive() const
 bool LLReflectionMap::isRelevant() const
 {
     static LLCachedControl<S32> RenderReflectionProbeLevel(gSavedSettings, "RenderReflectionProbeLevel", 3);
+
+    if (mOrphaned)
+    { // whatever it was registered for is gone; the manager deletes it on its next update
+        return false;
+    }
 
     if (mViewerObject && RenderReflectionProbeLevel > 0)
     { // not an automatic probe

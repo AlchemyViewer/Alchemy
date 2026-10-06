@@ -51,18 +51,22 @@ void LLFrameTimer::updateFrameTime()
 
 void LLFrameTimer::start()
 {
-    reset();
     mStarted = true;
+    reset();
 }
 
 void LLFrameTimer::stop()
 {
-    mStarted = false;
+    // Frozen at the time run so far, as pause() leaves it: a stopped timer's
+    // elapsed time is otherwise read back as its absolute start time.
+    pause();
 }
 
 void LLFrameTimer::reset()
 {
-    mStartTime = sFrameTime;
+    // A paused timer keeps its elapsed time where a running one keeps its
+    // start, so a reset while paused zeroes that rather than writing a start.
+    mStartTime = mStarted ? sFrameTime : 0.0;
     mExpiry = sFrameTime;
 }
 
@@ -96,12 +100,12 @@ void LLFrameTimer::unpause()
 
 void LLFrameTimer::setTimerExpirySec(F32 expiration)
 {
-    mExpiry = expiration + mStartTime;
+    mExpiry = expiration + sFrameTime;
 }
 
 void LLFrameTimer::setExpiryAt(F64 seconds_since_epoch)
 {
-    mStartTime = sFrameTime;
+    reset();
     mExpiry = seconds_since_epoch - (USEC_TO_SEC_F64 * sStartTotalTime);
 }
 

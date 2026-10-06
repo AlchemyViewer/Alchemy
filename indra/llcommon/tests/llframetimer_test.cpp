@@ -112,10 +112,65 @@ namespace tut
         ensure("timer took too long to expire", iterations_until_expiration <= 10);
     }
 
-/*
     template<> template<>
     void frametimer_object_t::test<4>()
     {
+        set_test_name("an expiry counts from now, not from the timer's last reset");
+        LLFrameTimer timer;
+        // Longer than the expiry passes between the timer starting and the
+        // expiry being set.
+        ms_sleep(300);
+        LLFrameTimer::updateFrameTime();
+        timer.setTimerExpirySec(0.2f);
+        ensure("not expired the moment it is set", !timer.hasExpired());
+        ensure("the whole expiry still to run", timer.getTimeToExpireF32() > 0.19f);
     }
-*/
+
+    template<> template<>
+    void frametimer_object_t::test<5>()
+    {
+        set_test_name("a stopped timer keeps the time it ran, and resumes from it");
+        // Far enough from the start of the run that the absolute start time
+        // cannot pass for the time run.
+        ms_sleep(300);
+        LLFrameTimer::updateFrameTime();
+        LLFrameTimer timer;
+        timer.start();
+        ms_sleep(200);
+        LLFrameTimer::updateFrameTime();
+        const F32 ran = timer.getElapsedTimeF32();
+        timer.stop();
+        ensure("stopped", !timer.getStarted());
+        ensure_approximately_equals("the time it ran", timer.getElapsedTimeF32(), ran, 12);
+        ms_sleep(100);
+        LLFrameTimer::updateFrameTime();
+        ensure_approximately_equals("not running while stopped", timer.getElapsedTimeF32(), ran, 12);
+        timer.unpause();
+        ensure_approximately_equals("resumed from where it stopped", timer.getElapsedTimeF32(), ran, 12);
+    }
+
+    template<> template<>
+    void frametimer_object_t::test<6>()
+    {
+        set_test_name("a reset while paused zeroes the time run and leaves it paused");
+        ms_sleep(300);
+        LLFrameTimer::updateFrameTime();
+        LLFrameTimer timer;
+        timer.start();
+        ms_sleep(100);
+        LLFrameTimer::updateFrameTime();
+        timer.pause();
+        timer.reset();
+        ensure("still paused", !timer.getStarted());
+        ensure_approximately_equals("no time run", timer.getElapsedTimeF32(), 0.f, 12);
+        ms_sleep(100);
+        LLFrameTimer::updateFrameTime();
+        ensure_approximately_equals("not running while paused", timer.getElapsedTimeF32(), 0.f, 12);
+        timer.unpause();
+        ensure_approximately_equals("runs on from zero", timer.getElapsedTimeF32(), 0.f, 12);
+        timer.pause();
+        timer.start();
+        ensure("started", timer.getStarted());
+        ensure_approximately_equals("start() runs from zero, paused or not", timer.getElapsedTimeF32(), 0.f, 12);
+    }
 }

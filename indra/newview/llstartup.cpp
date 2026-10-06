@@ -2487,7 +2487,10 @@ bool idle_startup()
 
         LL_DEBUGS("SceneLoadTiming", "Start") << "Scene Load Started " << LL_ENDL;
         gRenderStartTime.reset();
+        gSimLastTime = 0.f;
+        gSimFrames = (F32)gFrameCount;
         gForegroundTime.reset();
+        gForegroundFrameCount = 0;
 
         // HACK: Inform simulator of window size.
         // Do this here so it's less likely to race with RegisterNewAgent.

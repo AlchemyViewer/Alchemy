@@ -741,6 +741,15 @@ LLViewerRegion::~LLViewerRegion()
         gObjectList.killObjects(this);
     }
 
+    // the reflection probe manager keeps this region's terrain probes until its next update
+    for (auto& probe : mReflectionMaps)
+    {
+        if (probe.notNull())
+        {
+            probe->orphan();
+        }
+    }
+
     delete mImpl->mCompositionp;
     delete mParcelOverlay;
     delete mImpl->mLandp;

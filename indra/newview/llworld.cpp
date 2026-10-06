@@ -1349,6 +1349,7 @@ void send_agent_pause()
     }
 
     gObjectList.mWasPaused = true;
+    gObjectList.mAgentPaused = true;
     LLViewerStats::instance().getRecording().stop();
 }
 
@@ -1409,7 +1410,9 @@ void send_agent_resume()
         gMessageSystem->sendReliable(regionp->getHost());
     }
 
-    // Resume data collection to ignore invalid rates
+    // Resume data collection to ignore invalid rates. The next frame's stats are still skipped, for
+    // the time this pause stalled it.
+    gObjectList.mAgentPaused = false;
     LLViewerStats::instance().getRecording().resume();
 
     LLAppViewer::instance()->resumeMainloopTimeout();

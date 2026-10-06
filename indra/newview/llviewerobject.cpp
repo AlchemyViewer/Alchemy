@@ -335,7 +335,7 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
     // Both clocks need it: an object whose first update is rejected before the timestamps are
     // stamped otherwise measures its update age from the start of the session, which is instantly
     // past every phase-out threshold.
-    mLastInterpUpdateSecs = LLFrameTimer::getElapsedSeconds();
+    mLastInterpUpdateSecs = LLFrameTimer::getUptimeSeconds();
     mLastMessageUpdateSecs = mLastInterpUpdateSecs;
 
     mPositionRegion = LLVector3(0.f, 0.f, 0.f);
@@ -356,7 +356,7 @@ LLViewerObject::~LLViewerObject()
     // unhook from reflection probe manager
     if (mReflectionProbe.notNull())
     {
-        mReflectionProbe->mViewerObject = nullptr;
+        mReflectionProbe->orphan();
         mReflectionProbe = nullptr;
     }
 
@@ -537,7 +537,7 @@ void LLViewerObject::markDead()
 
         if (mReflectionProbe.notNull())
         {
-            mReflectionProbe->mViewerObject = nullptr;
+            mReflectionProbe->orphan();
             mReflectionProbe = nullptr;
         }
 
@@ -568,7 +568,7 @@ void LLViewerObject::dump() const
 {
     LL_INFOS() << "Type: " << pCodeToString(mPrimitiveCode) << LL_ENDL;
     LL_INFOS() << "Drawable: " << (LLDrawable *)mDrawable << LL_ENDL;
-    LL_INFOS() << "Update Age: " << LLFrameTimer::getElapsedSeconds() - mLastMessageUpdateSecs << LL_ENDL;
+    LL_INFOS() << "Update Age: " << LLFrameTimer::getUptimeSeconds() - mLastMessageUpdateSecs << LL_ENDL;
 
     LL_INFOS() << "Parent: " << getParent() << LL_ENDL;
     LL_INFOS() << "ID: " << mID << LL_ENDL;
@@ -2535,7 +2535,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     // much jumping and hopping around...
 
 //  U32 ping_delay = mesgsys->mCircuitInfo.getPingDelay();
-    const F64 update_time = LLFrameTimer::getElapsedSeconds();
+    const F64 update_time = LLFrameTimer::getUptimeSeconds();
 
     // Before the clocks move: how far the prediction had drifted by the time the real answer
     // arrived. This is the reading that settles the direction of the timestep correction in
@@ -7255,7 +7255,7 @@ void    LLViewerObject::updateRegion(LLViewerRegion *regionp)
 {
 //  if (regionp)
 //  {
-//      F64 now = LLFrameTimer::getElapsedSeconds();
+//      F64 now = LLFrameTimer::getUptimeSeconds();
 //      LL_INFOS() << "Updating to region " << regionp->getName()
 //          << ", ms since last update message: " << (F32)((now - mLastMessageUpdateSecs) * 1000.0)
 //          << ", ms since last interpolation: " << (F32)((now - mLastInterpUpdateSecs) * 1000.0)

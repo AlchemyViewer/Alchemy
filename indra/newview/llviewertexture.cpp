@@ -2944,7 +2944,7 @@ void LLViewerFetchedTexture::readbackRawImage()
 
 void LLViewerFetchedTexture::destroySavedRawImage()
 {
-    if(mLastReferencedSavedRawImageTime < mKeptSavedRawImageTime)
+    if(getElapsedLastReferencedSavedRawImageTime() < mKeptSavedRawImageTime)
     {
         return; //keep the saved raw image.
     }

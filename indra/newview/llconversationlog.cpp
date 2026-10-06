@@ -142,6 +142,12 @@ const std::string LLConversation::createTimestamp(const U64Seconds& utc_time)
 bool LLConversation::isOlderThan(U32Days days) const
 {
     U64Seconds now(time_corrected());
+    if (mTime >= now)
+    {
+        // Stamped ahead of this clock, so no age at all; the unsigned
+        // difference would make it the oldest there is.
+        return false;
+    }
     U32Days age = now - mTime;
 
     return age > days;

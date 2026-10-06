@@ -4090,6 +4090,7 @@ void ALFloaterXUIStudio::documentRead(const std::string& status)
     fillHistory();
     setStatus(status);
     mRereadPending = true;
+    mRereadAt.reset();
     mRereadAt.setTimerExpirySec(REREAD_SECONDS);
 }
 

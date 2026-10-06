@@ -125,7 +125,7 @@ public:
     void clearHistory();
 
     void updateAvatarsArrivalTime(uuid_vec_t& uuids);
-    F32 getArrivalTimeByID(const LLUUID& id);
+    F64 getArrivalTimeByID(const LLUUID& id);
 
 private:
 

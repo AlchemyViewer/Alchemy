@@ -829,7 +829,7 @@ void LLToolBarView::updateAutoHide()
     S32 mouse_y = 0;
     LLUI::getInstance()->getMousePositionLocal(this, &mouse_x, &mouse_y);
 
-    const F64 now = LLFrameTimer::getElapsedSeconds();
+    const F64 now = LLFrameTimer::getUptimeSeconds();
     const F32 interp = LLSmoothInterpolation::getInterpolant(TOOLBAR_AUTO_HIDE_TIME_CONSTANT);
     const bool forced_visible = toolbars_forced_visible();
 

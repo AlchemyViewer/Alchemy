@@ -172,7 +172,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         has_normal_mips ? ALSamplers::AnisoWrap : ALSamplers::PointWrap;
 
     LLColor4      specular(sun_up ? psky->getSunlightColor() : psky->getMoonlightColor());
-    F32           phase_time = (F32) LLFrameTimer::getElapsedSeconds() * 0.5f;
+    F32           phase_time = (F32) LLFrameTimer::getUptimeSeconds() * 0.5f;
     LLGLSLShader *shader     = nullptr;
 
     // One pass, one of two shaders.  Void water and region water share state.

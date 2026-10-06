@@ -161,30 +161,16 @@ std::string LLLiveFile::filename() const
     return impl.mFilename;
 }
 
-namespace
-{
-    class LiveFileEventTimer : public LLEventTimer
-    {
-    public:
-        LiveFileEventTimer(LLLiveFile& f, F32 refresh)
-            : LLEventTimer(refresh), mLiveFile(f)
-            { }
-
-        bool tick()
-        {
-            mLiveFile.checkAndReload();
-            return false;
-        }
-
-    private:
-        LLLiveFile& mLiveFile;
-    };
-
-}
-
 void LLLiveFile::addToEventTimer()
 {
-    impl.mEventTimer = new LiveFileEventTimer(*this, impl.mRefreshPeriod);
+    // The event timer keeps the refresh period itself, so each tick checks.
+    // Asking the frame-quantised gate again could find a frame less than a
+    // period since the last check and skip one, doubling the period.
+    impl.mEventTimer = LLEventTimer::run_every(impl.mRefreshPeriod, [this]()
+        {
+            impl.mForceCheck = true;
+            checkAndReload();
+        });
 }
 
 void LLLiveFile::setRefreshPeriod(F32 seconds)

@@ -121,7 +121,6 @@ class LLVoiceVisualizer : public LLHUDEffect
             LLVector3               mPosition;
         };
 
-        LLFrameTimer            mTimer;                         // so I can ask the current time in seconds
         F64                     mStartTime;                     // time in seconds when speaking started
         F64                     mCurrentTime;                   // current time in seconds, captured every step
         F64                     mPreviousTime;                  // copy of "current time" from last frame

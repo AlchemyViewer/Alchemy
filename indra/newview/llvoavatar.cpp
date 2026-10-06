@@ -4011,7 +4011,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 
             for(; chat_iter != mChats.end(); ++chat_iter)
             {
-                F32 chat_fade_amt = llclamp((F32)((LLFrameTimer::getElapsedSeconds() - chat_iter->mTime) / CHAT_FADE_TIME), 0.f, 4.f);
+                F32 chat_fade_amt = llclamp((F32)((LLFrameTimer::getUptimeSeconds() - chat_iter->mTime) / CHAT_FADE_TIME), 0.f, 4.f);
                 LLFontGL::StyleFlags style;
                 switch(chat_iter->mChatType)
                 {
@@ -11342,7 +11342,7 @@ S32 LLVOAvatar::getUnbakedPixelAreaRank()
 // static, gets called once per frame from updateApparentAngles.
 void LLVOAvatar::cullAvatarsByPixelArea()
 {
-    F64 current_time = LLFrameTimer::getElapsedSeconds();
+    F64 current_time = LLFrameTimer::getUptimeSeconds();
     bool needs_resort = sAvatarCullNeedsUpdate || ((current_time - sLastCullUpdateTime) >= 1.0);
 
     if (needs_resort)

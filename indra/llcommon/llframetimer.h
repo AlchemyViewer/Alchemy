@@ -42,10 +42,10 @@ public:
     LLFrameTimer() : mStartTime( sFrameTime ), mExpiry(0), mStarted(true) {}
 
     // Return the number of seconds since the start of this
-    // application instance.
-    static F64SecondsImplicit getElapsedSeconds()
+    // application instance, as of the current frame. Static: it is not this
+    // timer's elapsed time, which is getElapsedTimeF32().
+    static F64SecondsImplicit getUptimeSeconds()
     {
-        // Loses msec precision after ~4.5 hours...
         return sFrameTime;
     }
 
@@ -82,12 +82,12 @@ public:
     void resetWithExpiry(F32 expiration);
     void pause();
     void unpause();
-    void setTimerExpirySec(F32 expiration);
+    void setTimerExpirySec(F32 expiration);         // Expires this long from now, as LLTimer's does
     void setExpiryAt(F64 seconds_since_epoch);
     bool checkExpirationAndReset(F32 expiration);
-    F32 getElapsedTimeAndResetF32()                 { F32 t = F32(sFrameTime - mStartTime); reset(); return t; }
+    F32 getElapsedTimeAndResetF32()                 { F32 t = getElapsedTimeF32(); reset(); return t; }
 
-    void setAge(const F64 age)                      { mStartTime = sFrameTime - age; }
+    void setAge(const F64 age)                      { mStartTime = mStarted ? sFrameTime - age : age; }
 
     // ACCESSORS
     bool hasExpired() const                         { return (sFrameTime >= mExpiry); }

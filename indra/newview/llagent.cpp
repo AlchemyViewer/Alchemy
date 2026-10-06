@@ -3622,7 +3622,7 @@ LLColor4 LLAgent::getEffectColor()
     if(AlchemyRainbowEffects)
     {
         LLColor3 rainbow;
-        rainbow.setHSL(fmodf((F32)LLFrameTimer::getElapsedSeconds()/4.f, 1.f), 1.f, 0.5f);
+        rainbow.setHSL(fmodf((F32)LLFrameTimer::getUptimeSeconds()/4.f, 1.f), 1.f, 0.5f);
         effect_color.set(rainbow, 1.0f);
     }
     return effect_color;

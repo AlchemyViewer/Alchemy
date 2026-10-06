@@ -374,7 +374,7 @@ void LLWorldMapView::draw()
 
     LLTextureView::clearDebugImages();
 
-    F64 current_time = LLTimer::getElapsedSeconds();
+    F64 current_time = LLTimer::getUptimeSeconds();
 
     mVisibleRegions.clear();
 

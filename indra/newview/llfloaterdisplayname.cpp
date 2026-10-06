@@ -73,7 +73,7 @@ void LLFloaterDisplayName::onOpen(const LLSD& key)
     LLAvatarName av_name;
     LLAvatarNameCache::get(gAgent.getID(), &av_name);
 
-    F64 now_secs = LLDate::now().secondsSinceEpoch();
+    F64 now_secs = (F64)time_corrected();
     mIsLockedOut = now_secs < av_name.mNextUpdate;
     if (mIsLockedOut)
     {

@@ -108,6 +108,7 @@ LLViewerObjectList::LLViewerObjectList()
     mNumOrphans = 0;
     mNumNewObjects = 0;
     mWasPaused = false;
+    mAgentPaused = false;
     mNumDeadObjectUpdates = 0;
     mNumUnknownUpdates = 0;
 }
@@ -962,7 +963,7 @@ void LLViewerObjectList::update(LLAgent &agent)
     //clear avatar LOD change counter
     LLVOAvatar::sNumLODChangesThisFrame = 0;
 
-    const F64 frame_time = LLFrameTimer::getElapsedSeconds();
+    const F64 frame_time = LLFrameTimer::getUptimeSeconds();
 
     LLViewerObject *objectp = NULL;
 
@@ -1073,6 +1074,7 @@ void LLViewerObjectList::update(LLAgent &agent)
     {
         LLViewerStats::getInstance()->updateFrameStats(time_diff);
     }
+    mWasPaused = mAgentPaused;
 
     /*
     // Debugging code for viewing orphans, and orphaned parents

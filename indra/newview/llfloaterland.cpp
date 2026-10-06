@@ -2500,7 +2500,7 @@ void LLPanelLandAccess::refresh()
                 if (entry.mTime != 0)
                 {
                     LLStringUtil::format_map_t args;
-                    S32 now = (S32)time(NULL);
+                    S32 now = (S32)time_corrected();
                     S32 seconds = entry.mTime - now;
                     if (seconds < 0) seconds = 0;
                     prefix.assign(" (");
@@ -2549,7 +2549,7 @@ void LLPanelLandAccess::refresh()
                 if (entry.mTime != 0)
                 {
                     LLStringUtil::format_map_t args;
-                    S32 now = (S32)time(NULL);
+                    S32 now = (S32)time_corrected();
                     seconds = entry.mTime - now;
                     if (seconds < 0) seconds = 0;
 
@@ -3063,7 +3063,7 @@ void LLPanelLandCovenant::refresh()
     }
 
     if (mLastRegionID != region->getRegionID()
-        || mNextUpdateTime < LLTimer::getElapsedSeconds())
+        || mNextUpdateTime < LLTimer::getUptimeSeconds())
     {
         // Request Covenant Info
         // Note: LLPanelLandCovenant doesn't change Covenant's content and any
@@ -3076,7 +3076,7 @@ void LLPanelLandCovenant::refresh()
         msg->sendReliable(region->getHost());
 
         mLastRegionID = region->getRegionID();
-        mNextUpdateTime = LLTimer::getElapsedSeconds() + COVENANT_REFRESH_TIME_SEC;
+        mNextUpdateTime = LLTimer::getUptimeSeconds() + COVENANT_REFRESH_TIME_SEC;
     }
 }
 

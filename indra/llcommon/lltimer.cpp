@@ -254,7 +254,11 @@ TimerInfo::TimerInfo()
 :   mClockFrequency(0.0),
     mTotalTimeClockCount(0),
     mLastTotalTimeClockCount(0)
-{}
+{
+    // Known from the first read, so a timer constructed during static initialisation, before
+    // anything else has touched the clock, never scales by a frequency of 0.
+    update();
+}
 
 void TimerInfo::update()
 {
@@ -319,11 +323,6 @@ U64MicrosecondsImplicit totalTime()
 
 LLTimer::LLTimer()
 {
-    if (!get_timer_info().mClockFrequency)
-    {
-        get_timer_info().update();
-    }
-
     mStarted = true;
     reset();
 }
