@@ -679,10 +679,12 @@ void send_viewer_stats(bool include_preferences)
     }
 
     // report time the viewer has spent in the foreground
-    agent["foreground_time"] = gForegroundTime.getElapsedTimeF32();
+    const F32 foreground_time = gForegroundTime.getElapsedTimeF32();
+    agent["foreground_time"] = foreground_time;
 
-    // send fps only for time app spends in foreground
-    agent["fps"] = (F32)gForegroundFrameCount / gForegroundTime.getElapsedTimeF32();
+    // send fps only for time app spends in foreground. There is none yet if the window has not had
+    // focus since the scene load started, and the division would send 0/0.
+    agent["fps"] = foreground_time > 0.f ? (F32)gForegroundFrameCount / foreground_time : 0.f;
 
     agent["normalized_session_jitter"] = LLViewerStats::instance().getLastNormalizedSessionJitter();
     agent["normalized_frametime_variance"] = LLViewerStats::instance().getLastNormalizedFrametimeVariance();
