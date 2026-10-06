@@ -292,6 +292,12 @@ def main(argv):
     if not functions:
         print("no functions found in " + str(source))
         return 1
+    # The key is the port's own patch's, not Linden Lab's: definitions
+    # without it are the port's patch dropped, and would leave Script
+    # Studio offering no item's name anywhere.
+    if not item_args:
+        print("no inventory-kind in " + str(source) + ": is the lsl-definitions port's inventory-kind.patch applied?")
+        return 1
     for fn in DETERMINISTIC:
         if fn not in functions:
             print("not in the definitions: " + fn)
