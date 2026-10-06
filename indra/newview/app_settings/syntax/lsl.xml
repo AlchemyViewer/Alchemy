@@ -35,6 +35,9 @@
   unless, what ends the comment.
   pairs: the brackets and quotes typed in pairs, each its opener and
   its closer, which the editor closes as the opener is typed.
+  path_strings: the strings that name a file, each a regex matched against
+  a line's text up to the string's opening quote; what is typed in one
+  completes as a path.
 -->
 <llsd>
   <map>
@@ -49,6 +52,10 @@
     </array>
     <key>line_comment</key>
     <string>//</string>
+    <key>path_strings</key>
+    <array>
+      <string>#include\s*$</string>
+    </array>
     <key>extensions</key>
     <array>
       <string>lsl</string>

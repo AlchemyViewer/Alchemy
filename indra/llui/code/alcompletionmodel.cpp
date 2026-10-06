@@ -243,7 +243,7 @@ bool ALCompletionModel::pooled(const ALTextPos& start, const std::string& head, 
 }
 
 void ALCompletionModel::pool(const ALTextPos& start, const ALTextPos& at, std::string_view prefix, const std::string& head, char separator,
-                             std::vector<ALCompletion> answered, const ALTextDocument& text)
+                             std::vector<ALCompletion> answered, const ALTextDocument& text, bool with_words)
 {
     mPoolStart  = start;
     mPoolHead   = head;
@@ -254,7 +254,7 @@ void ALCompletionModel::pool(const ALTextPos& start, const ALTextPos& at, std::s
     // After `ll.` the members of `ll` are wanted: the head was put before
     // the prefix for whoever answers by whole names, and is taken off what
     // they answer.
-    if (!head.empty())
+    if (!head.empty() && separator != '\0')
     {
         const std::string dotted = head + separator;
         for (ALCompletion& c : mPool)
@@ -271,7 +271,7 @@ void ALCompletionModel::pool(const ALTextPos& start, const ALTextPos& at, std::s
     {
         mPoolTargets.push_back(ALFuzzyMatch::prepare(c.text));
     }
-    if (!head.empty())
+    if (!head.empty() || !with_words)
     {
         return;
     }
@@ -348,6 +348,11 @@ bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std:
             {
                 have.brackets = c.brackets;
             }
+            if (have.path.empty())
+            {
+                have.path = c.path;
+            }
+            have.folder = have.folder || c.folder;
             continue;
         }
         listed.emplace(c.text, mList.size());

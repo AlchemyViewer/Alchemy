@@ -232,6 +232,8 @@ void ALCodeEditor::clearHandlers()
 {
     mProvider          = nullptr;
     mCompletionRequest = nullptr;
+    mPathProvider      = nullptr;
+    mPathRequest       = nullptr;
     mHover             = nullptr;
     mHoverRequest      = nullptr;
     mSignatureRequest  = nullptr;
@@ -2598,37 +2600,68 @@ void ALCodeEditor::vocabularyCompletions(std::string_view prefix, std::vector<Co
 
 void ALCodeEditor::refreshCompletion()
 {
-    const std::string prefix = wordBeforeCaret();
-    const ALTextPos   at     = caret();
-    const ALTextPos   start(at.line, at.column - static_cast<S32>(prefix.size()));
-    // After `ll.` the members of `ll` are wanted -- after `obj:` in SLua,
-    // its methods: the head is put before the prefix for whoever answers
-    // by whole names, and taken off what they answer.
-    std::string head;
-    char        separator = '.';
-    if (start.column >= 2)
+    const ALTextPos                  at   = caret();
+    const std::optional<ALTextRange> path = mPathProvider || mPathRequest ? pathAt(at) : std::nullopt;
+    std::string                      prefix;
+    std::string                      head;
+    char                             separator = '.';
+    ALTextPos                        start;
+    std::string                      asked;
+    if (path)
     {
-        const std::string members = highlighter().grammar() ? highlighter().grammar()->memberSeparators() : std::string(".");
-        const char        before  = document().line(start.line)[start.column - 1];
-        const ALTextRange name    = identifierAt(ALTextPos(start.line, start.column - 2));
-        if (members.find(before) != std::string::npos && !name.empty() && name.end.column == start.column - 1)
+        // In a string that names a file, the name after its last slash --
+        // the whole, where there is none -- with what comes before that as
+        // its head: `ut` and `./lib/` of `./lib/ut`. Asked of the whole.
+        const std::string& line = document().line(at.line);
+        S32                from = at.column;
+        while (from > path->begin.column && line[from - 1] != '/')
         {
-            head      = document().text(name);
-            separator = before;
+            --from;
         }
+        start     = ALTextPos(at.line, from);
+        prefix    = line.substr(from, at.column - from);
+        head      = line.substr(path->begin.column, from - path->begin.column);
+        separator = '\0';
+        asked     = head + prefix;
+    }
+    else
+    {
+        prefix = wordBeforeCaret();
+        start  = ALTextPos(at.line, at.column - static_cast<S32>(prefix.size()));
+        // After `ll.` the members of `ll` are wanted -- after `obj:` in
+        // SLua, its methods: the head is put before the prefix for whoever
+        // answers by whole names, and taken off what they answer.
+        if (start.column >= 2)
+        {
+            const std::string members = highlighter().grammar() ? highlighter().grammar()->memberSeparators() : std::string(".");
+            const char        before  = document().line(start.line)[start.column - 1];
+            const ALTextRange name    = identifierAt(ALTextPos(start.line, start.column - 2));
+            if (members.find(before) != std::string::npos && !name.empty() && name.end.column == start.column - 1)
+            {
+                head      = document().text(name);
+                separator = before;
+            }
+        }
+        asked = head.empty() ? prefix : head + separator + prefix;
     }
     if ((prefix.empty() && head.empty() && !mCompletionAsked) || hasSelection())
     {
         closeCompletion();
         return;
     }
-    const std::string asked = head.empty() ? prefix : head + separator + prefix;
     // What there is to choose from, asked for once while one identifier is
     // typed, and narrowed as it grows.
     if (!mCompletionModel.pooled(start, head, prefix))
     {
         std::vector<Completion> answered;
-        if (mProvider)
+        if (path)
+        {
+            if (mPathProvider)
+            {
+                mPathProvider(at, asked, answered);
+            }
+        }
+        else if (mProvider)
         {
             mProvider(at, asked, answered);
         }
@@ -2636,12 +2669,13 @@ void ALCodeEditor::refreshCompletion()
         {
             vocabularyCompletions(asked, answered);
         }
-        mCompletionModel.pool(start, at, prefix, head, separator, std::move(answered), document());
+        mCompletionModel.pool(start, at, prefix, head, separator, std::move(answered), document(), /*with_words*/ !path);
     }
-    const bool fresh = mCompletionModel.narrow(start, at, prefix);
-    if (fresh && mCompletionRequest)
+    const bool                  fresh   = mCompletionModel.narrow(start, at, prefix);
+    const completion_request_t& request = path ? mPathRequest : mCompletionRequest;
+    if (fresh && request)
     {
-        mCompletionRequest(start, prefix);
+        request(start, prefix);
     }
     if (mCompletionModel.list().empty())
     {
@@ -3172,6 +3206,63 @@ namespace
     }
 }
 
+std::optional<ALTextRange> ALCodeEditor::pathAt(const ALTextPos& pos)
+{
+    const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar();
+    if (!grammar || pos.line < 0 || pos.line >= document().lineCount())
+    {
+        return std::nullopt;
+    }
+    // The run of string and path tokens the position is in, or at the end
+    // of: an include's name is a path, a require's a string.
+    const auto quoted = [](ALSyntaxKind kind) { return isStringKind(kind) || kind == ALSyntaxKind::Path; };
+    const std::vector<ALSyntaxToken>& tokens = highlighter().tokens(pos.line);
+    size_t                            at     = tokens.size();
+    for (size_t t = 0; t < tokens.size(); ++t)
+    {
+        if (quoted(tokens[t].kind) && tokens[t].begin <= pos.column && pos.column <= tokens[t].end)
+        {
+            at = t;
+            break;
+        }
+    }
+    if (at == tokens.size())
+    {
+        return std::nullopt;
+    }
+    size_t first = at;
+    size_t last  = at;
+    while (first > 0 && quoted(tokens[first - 1].kind) && tokens[first - 1].end == tokens[first].begin)
+    {
+        --first;
+    }
+    while (last + 1 < tokens.size() && quoted(tokens[last + 1].kind) && tokens[last + 1].begin == tokens[last].end)
+    {
+        ++last;
+    }
+    const std::string& line  = document().line(pos.line);
+    const S32          begin = tokens[first].begin;
+    const S32          end   = std::min(tokens[last].end, static_cast<S32>(line.size()));
+    const char         open  = begin < end ? line[begin] : '\0';
+    if (open != '"' && open != '\'' && open != '`' && open != '<')
+    {
+        return std::nullopt;
+    }
+    if (!grammar->pathString(std::string_view(line).substr(0, begin)))
+    {
+        return std::nullopt;
+    }
+    // Between the quotes; to the line's end where the string is not
+    // closed.
+    const char close = open == '<' ? '>' : open;
+    const S32  held  = end - 1 > begin && line[end - 1] == close ? end - 1 : end;
+    if (pos.column <= begin || pos.column > held)
+    {
+        return std::nullopt;
+    }
+    return ALTextRange(ALTextPos(pos.line, begin + 1), ALTextPos(pos.line, held));
+}
+
 bool ALCodeEditor::inProse(const ALTextPos& at)
 {
     // The byte before the position: what was just typed, where a string
@@ -3497,6 +3588,32 @@ bool ALCodeEditor::acceptCompletion()
 
 void ALCodeEditor::complete(const Completion& chosen, const ALTextRange& range)
 {
+    // In a string that names a file: a whole path in place of what the
+    // string holds, its closing quote kept; else the name in place of the
+    // one typed. A folder is followed by a slash, and the list again.
+    if ((!chosen.path.empty() || chosen.folder) && !hasOtherSelections())
+    {
+        const std::optional<ALTextRange> held = pathAt(range.end);
+        ALTextRange                      over = range;
+        std::string                      put  = chosen.text;
+        if (!chosen.path.empty() && held)
+        {
+            over = *held;
+            put  = chosen.path;
+        }
+        if (chosen.folder && (put.empty() || put.back() != '/'))
+        {
+            put += '/';
+        }
+        setSelection(over);
+        insertText(put);
+        setFocus(true);
+        if (chosen.folder)
+        {
+            openCompletion(true);
+        }
+        return;
+    }
     if (hasOtherSelections())
     {
         // What it replaces either side of the main caret, which each other
@@ -4614,6 +4731,15 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
         // A command to a modal keymap -- a motion, an operator, a line
         // being typed -- put nothing in to complete or to call.
         dropTyping();
+        return true;
+    }
+    // In a string that names a file -- a require's, an include's -- what
+    // is typed completes as a path, where anyone answers there: the list
+    // at its opening quote and after each slash, narrowed as a name is
+    // typed. Its closing quote leaves the string, and the list with it.
+    if (mAutoComplete && !several && (mPathProvider || mPathRequest) && pathAt(caret()))
+    {
+        openCompletion(true);
         return true;
     }
     const bool identifier = uni_char < 0x80 && alIdentifierByte(static_cast<char>(uni_char));

@@ -189,6 +189,11 @@ public:
     // it (`completes_in`, each a regex matched against that text): SLua's
     // `--!` comments, which say how a script is checked.
     bool completesIn(std::string_view before) const;
+    // Whether a string opened after `before` -- a line's text up to the
+    // string's opening quote -- names a file, as a require's or an
+    // include's does (`path_strings`, each a regex matched against that
+    // text): what is typed in it completes as a path.
+    bool pathString(std::string_view before) const;
     // The brackets and quotes typed in pairs, each an opener and its
     // closer, where the file says (`pairs`, each two characters: "()",
     // "\"\""); a quote closes itself.

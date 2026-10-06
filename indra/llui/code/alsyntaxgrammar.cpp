@@ -311,6 +311,7 @@ struct ALSyntaxGrammar::Impl
     std::string              lineComment;
     std::string              memberSeparators = ".";
     std::vector<ALRegex>     completesIn;
+    std::vector<ALRegex>     pathStrings;
     std::vector<std::pair<char, char>> pairs;
     bool                     prose = false;
     // What opens a block, searched for at the end of the text before the
@@ -1016,6 +1017,17 @@ bool ALSyntaxGrammar::load(const LLSD& description, std::string& error)
         }
         impl->completesIn.push_back(std::move(where));
     }
+    const LLSD& path_strings = description["path_strings"];
+    for (LLSD::array_const_iterator it = path_strings.beginArray(); it != path_strings.endArray(); ++it)
+    {
+        ALRegex where(it->asString());
+        if (!where.ok())
+        {
+            error = "path_strings: " + where.error();
+            return false;
+        }
+        impl->pathStrings.push_back(std::move(where));
+    }
     impl->prose       = description["prose"].asBoolean();
     const LLSD& pairs = description["pairs"];
     for (LLSD::array_const_iterator it = pairs.beginArray(); it != pairs.endArray(); ++it)
@@ -1237,6 +1249,18 @@ const std::string& ALSyntaxGrammar::memberSeparators() const
 bool ALSyntaxGrammar::completesIn(std::string_view before) const
 {
     for (const ALRegex& where : mImpl->completesIn)
+    {
+        if (where.search(before))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ALSyntaxGrammar::pathString(std::string_view before) const
+{
+    for (const ALRegex& where : mImpl->pathStrings)
     {
         if (where.search(before))
         {

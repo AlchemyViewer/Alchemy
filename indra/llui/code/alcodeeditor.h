@@ -470,6 +470,14 @@ public:
     // about the same identifier.
     typedef std::function<void(const ALTextPos& at, std::string_view prefix)> completion_request_t;
     void setCompletionRequest(completion_request_t request) { mCompletionRequest = std::move(request); }
+    // The same in a string that names a file (pathAt): asked of the path
+    // typed so far, `./lib/ut`, and answering the names that could follow
+    // its last slash -- each one's whole path and whether it is a folder
+    // (ALCompletion::path, folder) -- with no words of the document's.
+    // Neither the provider of names nor its request is asked there; with
+    // neither of these, a string is prose as any other.
+    void setPathProvider(completion_provider_t provider) { mPathProvider = std::move(provider); }
+    void setPathRequest(completion_request_t request) { mPathRequest = std::move(request); }
     // `words` false where whoever answered says the document's own words
     // are no use there (ALCompletionModel::supply).
     void supplyCompletions(const ALTextPos& at, std::vector<Completion> more, bool words = true);
@@ -555,6 +563,12 @@ public:
     // literal rather than a line of one. Empty where the position is not
     // in a string.
     ALTextRange stringAt(const ALTextPos& pos) const;
+    // What a string that names a file holds -- between its quotes, or to
+    // the line's end where it is not closed; empty where it holds nothing
+    // yet -- where a position is in it or at its end: a string the grammar
+    // says names one, by what comes before its opening quote
+    // (ALSyntaxGrammar::pathString). None anywhere else.
+    std::optional<ALTextRange> pathAt(const ALTextPos& pos);
     // What to say about one: its size, which is what a scripter wants of
     // a string and what the type alone never says -- the bytes it comes
     // to, the characters where they are not the same number, and what it
@@ -1103,6 +1117,8 @@ private:
 
     completion_provider_t   mProvider;
     completion_request_t    mCompletionRequest;
+    completion_provider_t   mPathProvider;
+    completion_request_t    mPathRequest;
     hover_provider_t        mHover;
     hover_request_t         mHoverRequest;
     signature_request_t     mSignatureRequest;

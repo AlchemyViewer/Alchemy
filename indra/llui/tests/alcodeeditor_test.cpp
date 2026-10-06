@@ -2863,4 +2863,70 @@ namespace tut
         type("x = 1 --!st");
         ensure("nor after code on its line", !e.completionOpen());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<80>()
+    {
+        set_test_name("in a string that names a file the list opens at its quote and after each slash, narrows on the name typed, and puts a path or a folder in place");
+        ALCodeEditor&            e = make("", "slua");
+        std::vector<std::string> asked;
+        e.setPathProvider([&asked](const ALTextPos&, std::string_view path, std::vector<ALCodeEditor::Completion>& out) {
+            asked.emplace_back(path);
+            const auto add = [&out](const char* text, const char* whole, bool folder) {
+                ALCodeEditor::Completion c;
+                c.text   = text;
+                c.path   = whole;
+                c.folder = folder;
+                c.kind   = ALSyntaxKind::Namespace;
+                out.push_back(c);
+            };
+            if (path.rfind("lib/", 0) == 0)
+            {
+                add("util", "./lib/util", false);
+                add("net", "", true);
+            }
+            else
+            {
+                add("lib", "", true);
+                add("main", "./main", false);
+                add("quoted", "./a\\\"b", false);
+            }
+        });
+        e.setAutoClose(true);
+        type("require(\"");
+        ensure_equals("the quote closed for it", e.text(), std::string("require(\"\")"));
+        ensure("open at the quote, asked of nothing yet", e.completionOpen() && e.completions().size() == 3 && asked.back().empty());
+        type("li");
+        ensure("narrowed to the folder", e.completions().size() == 1 && e.completions()[0].text == "lib");
+        key(KEY_TAB);
+        ensure_equals("the folder, and a slash after it", e.text(), std::string("require(\"lib/\")"));
+        ensure("the list again, for what is in it", e.completionOpen() && asked.back() == "lib/");
+        type("ut");
+        ensure_equals("narrowed in the folder", e.completions()[0].text, std::string("util"));
+        key(KEY_TAB);
+        ensure_equals("the whole path in place, the quote kept", e.text(), std::string("require(\"./lib/util\")"));
+        ensure("and the list gone", !e.completionOpen());
+
+        e.setText("");
+        type("require(\"qu");
+        key(KEY_TAB);
+        ensure_equals("a path given escaped stays escaped", e.text(), std::string("require(\"./a\\\"b\")"));
+
+        e.setText("");
+        type("print(\"li");
+        ensure("not in a string that names nothing", !e.completionOpen());
+
+        e.setText("");
+        type("--#include \"m");
+        ensure("an include's name too", e.completionOpen() && e.completions()[0].text == "main");
+        key(KEY_ESCAPE);
+
+        // Not closed: the path runs to the line's end.
+        e.setAutoClose(false);
+        e.setText("");
+        type("require(\"ma");
+        ensure("open in a string not closed", e.completionOpen() && e.completions()[0].text == "main");
+        key(KEY_TAB);
+        ensure_equals("the path in place to the line's end", e.text(), std::string("require(\"./main"));
+    }
 }

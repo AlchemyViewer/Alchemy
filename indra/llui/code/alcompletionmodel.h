@@ -71,6 +71,12 @@ struct ALCompletion
         Inside
     };
     Brackets     brackets = Brackets::Guess;
+    // In a string that names a file: the whole path it puts in the string's
+    // place, where it names one -- else its text in place of the name
+    // being typed -- and whether it is a folder, which is followed by a
+    // slash and the list again.
+    std::string  path;
+    bool         folder = false;
     // The mark before it on the list, where the provider has one; else
     // the icon of its kind, or a badge where the icons are not to be had.
     LLUIImagePtr icon;
@@ -124,9 +130,11 @@ public:
     // so far still starting with what it was gathered for; and the pool
     // gathered: `answered` what the provider said of `head` and `prefix`,
     // the head and its separator still on each name.
+    // A separator of '\0' takes nothing off: a path's names are answered
+    // as they are. `with_words` false gathers none of the document's.
     bool pooled(const ALTextPos& start, const std::string& head, std::string_view prefix) const;
     void pool(const ALTextPos& start, const ALTextPos& at, std::string_view prefix, const std::string& head, char separator,
-              std::vector<ALCompletion> answered, const ALTextDocument& text);
+              std::vector<ALCompletion> answered, const ALTextDocument& text, bool with_words = true);
     // The list for an identifier starting at `start`, typed up to `at`,
     // `prefix` so far: the pool narrowed to it. True where the identifier
     // is one the list was not narrowing before, of which whoever answers
