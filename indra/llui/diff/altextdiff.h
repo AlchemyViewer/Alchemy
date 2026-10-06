@@ -208,6 +208,9 @@ namespace ALTextDiff
     // line of the left, the node that wrote it before the one around it
     // that wrote nothing of its own.
     anchors_t anchorsOf(const ranges_t& ranges);
+    // Of anchors, those lines() keeps: within both texts, of so many lines
+    // each, the most that are in order on both, in that order.
+    anchors_t keptAnchors(const anchors_t& anchors, S32 left_lines, S32 right_lines);
 
     // A text's lines, for lines(), read as a document reads them
     // (ALLineBreaks): CRLF and a lone CR as LF, so that a line here is a

@@ -108,6 +108,75 @@ namespace tut
         }
         // Whether two lines, one each side, are on the same row.
         bool beside(S32 left, S32 right) const { return m.rowOfLine(Column::Left, left) == m.rowOfLine(Column::Right, right); }
+        // Two models' layouts the same in everything they say: each
+        // column's lines, rows, changes, folds, moves and inline lines.
+        static void sameLayout(const ALDiffModel& a, const ALDiffModel& b, const std::string& where)
+        {
+            for (const Column c : { Column::Left, Column::Right, Column::Inline })
+            {
+                ensure_equals(where + ": lines", a.lineCount(c), b.lineCount(c));
+                ensure(where + ": text", a.text(c) == b.text(c));
+                ensure_equals(where + ": rows of nothing at the end", a.endPadding(c), b.endPadding(c));
+                for (S32 l = 0; l < a.lineCount(c); ++l)
+                {
+                    const ALDiffModel::Line& x = a.line(c, l);
+                    const ALDiffModel::Line& y = b.line(c, l);
+                    const std::string        at = where + ", line " + std::to_string(l);
+                    ensure(at + ": kind, sign, number, padding", x.kind == y.kind && x.sign == y.sign && x.number == y.number && x.padding == y.padding);
+                    ensure(at + ": words and move", x.words == y.words && x.move == y.move);
+                    ensure_equals(at + ": its row", a.rowOfLine(c, l), b.rowOfLine(c, l));
+                    ensure(at + ": its move's other end", a.moveOtherEnd(c, l) == b.moveOtherEnd(c, l));
+                }
+        }
+        for (const Layout layout : { Layout::Sides, Layout::Inline })
+        {
+            ensure_equals(where + ": rows", a.rowCount(layout), b.rowCount(layout));
+            for (S32 row = 0; row < a.rowCount(layout); ++row)
+            {
+                ensure_equals(where + ": the right's line at a row", a.rightLineOfRow(layout, row), b.rightLineOfRow(layout, row));
+                ensure(where + ": drawn", a.rowDrawn(layout, row) == b.rowDrawn(layout, row));
+            }
+            for (const Column c : { Column::Left, Column::Right, Column::Inline })
+            {
+                if (ALDiffModel::layoutOf(c) == layout)
+                {
+                    for (S32 row = 0; row < a.rowCount(layout); ++row)
+                    {
+                        ensure_equals(where + ": a row's line", a.lineOfRow(c, row), b.lineOfRow(c, row));
+                    }
+                }
+            }
+        }
+        ensure_equals(where + ": changes", a.changeCount(), b.changeCount());
+        for (S32 n = 0; n < a.changeCount(); ++n)
+        {
+            const ALDiffModel::ChangeLines& x = a.changeLines(n);
+            const ALDiffModel::ChangeLines& y = b.changeLines(n);
+            ensure(where + ": a change's rows", a.changeFirst(Layout::Sides, n) == b.changeFirst(Layout::Sides, n) &&
+                                                    a.changeEnd(Layout::Sides, n) == b.changeEnd(Layout::Sides, n) &&
+                                                    a.changeFirst(Layout::Inline, n) == b.changeFirst(Layout::Inline, n) &&
+                                                    a.changeEnd(Layout::Inline, n) == b.changeEnd(Layout::Inline, n));
+            ensure(where + ": a change's lines", x.leftFirst == y.leftFirst && x.leftCount == y.leftCount && x.rightFirst == y.rightFirst &&
+                                                     x.rightCount == y.rightCount);
+        }
+        ensure_equals(where + ": folds", a.foldCount(), b.foldCount());
+        for (S32 n = 0; n < a.foldCount(); ++n)
+        {
+            ensure(where + ": a fold", a.foldFirst(Layout::Sides, n) == b.foldFirst(Layout::Sides, n) &&
+                                           a.foldFirst(Layout::Inline, n) == b.foldFirst(Layout::Inline, n) && a.foldLines(n) == b.foldLines(n) &&
+                                           a.foldOpen(n) == b.foldOpen(n));
+        }
+        ensure_equals(where + ": moves", a.moveCount(), b.moveCount());
+        for (const bool given_left : { true, false })
+        {
+            for (S32 line = 0; line < 200; ++line)
+            {
+                ensure_equals(where + ": the inline line showing a line", a.lineShowing(Column::Inline, given_left, line),
+                              b.lineShowing(Column::Inline, given_left, line));
+            }
+        }
+        }
+
     };
     typedef test_group<aldiffmodel_data> aldiffmodel_group;
     typedef aldiffmodel_group::object    aldiffmodel_object;
@@ -902,71 +971,6 @@ namespace tut
             }
             return lines;
         };
-        const auto sameAs = [](const ALDiffModel& a, const ALDiffModel& b, const std::string& where) {
-            for (const Column c : { Column::Left, Column::Right, Column::Inline })
-            {
-                ensure_equals(where + ": lines", a.lineCount(c), b.lineCount(c));
-                ensure(where + ": text", a.text(c) == b.text(c));
-                ensure_equals(where + ": rows of nothing at the end", a.endPadding(c), b.endPadding(c));
-                for (S32 l = 0; l < a.lineCount(c); ++l)
-                {
-                    const ALDiffModel::Line& x = a.line(c, l);
-                    const ALDiffModel::Line& y = b.line(c, l);
-                    const std::string        at = where + ", line " + std::to_string(l);
-                    ensure(at + ": kind, sign, number, padding", x.kind == y.kind && x.sign == y.sign && x.number == y.number && x.padding == y.padding);
-                    ensure(at + ": words and move", x.words == y.words && x.move == y.move);
-                    ensure_equals(at + ": its row", a.rowOfLine(c, l), b.rowOfLine(c, l));
-                    ensure(at + ": its move's other end", a.moveOtherEnd(c, l) == b.moveOtherEnd(c, l));
-                }
-            }
-            for (const Layout layout : { Layout::Sides, Layout::Inline })
-            {
-                ensure_equals(where + ": rows", a.rowCount(layout), b.rowCount(layout));
-                for (S32 row = 0; row < a.rowCount(layout); ++row)
-                {
-                    ensure_equals(where + ": the right's line at a row", a.rightLineOfRow(layout, row), b.rightLineOfRow(layout, row));
-                    ensure(where + ": drawn", a.rowDrawn(layout, row) == b.rowDrawn(layout, row));
-                }
-                for (const Column c : { Column::Left, Column::Right, Column::Inline })
-                {
-                    if (ALDiffModel::layoutOf(c) == layout)
-                    {
-                        for (S32 row = 0; row < a.rowCount(layout); ++row)
-                        {
-                            ensure_equals(where + ": a row's line", a.lineOfRow(c, row), b.lineOfRow(c, row));
-                        }
-                    }
-                }
-            }
-            ensure_equals(where + ": changes", a.changeCount(), b.changeCount());
-            for (S32 n = 0; n < a.changeCount(); ++n)
-            {
-                const ALDiffModel::ChangeLines& x = a.changeLines(n);
-                const ALDiffModel::ChangeLines& y = b.changeLines(n);
-                ensure(where + ": a change's rows", a.changeFirst(Layout::Sides, n) == b.changeFirst(Layout::Sides, n) &&
-                                                        a.changeEnd(Layout::Sides, n) == b.changeEnd(Layout::Sides, n) &&
-                                                        a.changeFirst(Layout::Inline, n) == b.changeFirst(Layout::Inline, n) &&
-                                                        a.changeEnd(Layout::Inline, n) == b.changeEnd(Layout::Inline, n));
-                ensure(where + ": a change's lines", x.leftFirst == y.leftFirst && x.leftCount == y.leftCount && x.rightFirst == y.rightFirst &&
-                                                         x.rightCount == y.rightCount);
-            }
-            ensure_equals(where + ": folds", a.foldCount(), b.foldCount());
-            for (S32 n = 0; n < a.foldCount(); ++n)
-            {
-                ensure(where + ": a fold", a.foldFirst(Layout::Sides, n) == b.foldFirst(Layout::Sides, n) &&
-                                               a.foldFirst(Layout::Inline, n) == b.foldFirst(Layout::Inline, n) && a.foldLines(n) == b.foldLines(n) &&
-                                               a.foldOpen(n) == b.foldOpen(n));
-            }
-            ensure_equals(where + ": moves", a.moveCount(), b.moveCount());
-            for (const bool given_left : { true, false })
-            {
-                for (S32 line = 0; line < 200; ++line)
-                {
-                    ensure_equals(where + ": the inline line showing a line", a.lineShowing(Column::Inline, given_left, line),
-                                  b.lineShowing(Column::Inline, given_left, line));
-                }
-            }
-        };
         S32 rebuilds = 0;
         S32 reused   = 0;
         for (S32 way = 0; way < 5; ++way)
@@ -1015,7 +1019,7 @@ namespace tut
                 ++rebuilds;
                 reused += model.relaid().whole ? 0 : 1;
                 ensure("the other laid out whole", whole.relaid().whole);
-                sameAs(model, whole, "way " + std::to_string(way) + ", step " + std::to_string(step));
+                sameLayout(model, whole, "way " + std::to_string(way) + ", step " + std::to_string(step));
             }
         }
         ensure("laid out again only in part, mostly", reused * 2 > rebuilds);
@@ -1099,5 +1103,85 @@ namespace tut
         }
         same(first, first_whole, "and put back");
         ensure("laid out again in part again", !first.relaid().whole);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<29>()
+    {
+        set_test_name("lined up at an anchor a line, as a conversion is: an edit compared again only between the kept anchors either side, as compared afresh with the anchors carried, and laid out again only there");
+        U32        seed = 61005;
+        const auto next = [&seed](U32 below) {
+            seed = seed * 1103515245U + 12345U;
+            return below ? (seed >> 16) % below : 0U;
+        };
+        const auto joinedOf = [](const std::vector<std::string>& lines) {
+            std::string out;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                out += (i ? "\n" : "") + lines[i];
+            }
+            return out;
+        };
+        std::vector<std::string> left;
+        std::vector<std::string> right;
+        ALTextDiff::ranges_t     ranges;
+        for (S32 n = 0; n < 120; ++n)
+        {
+            left.push_back("integer v" + std::to_string(n) + " = 1;");
+            right.push_back("local v" + std::to_string(n) + " = 1");
+            ranges.push_back({ n, n, n, n });
+        }
+        ALDiffModel model;
+        model.setTexts(joinedOf(left), joinedOf(right), ranges);
+        // Two pairs side by side made the same, one run the same; then the
+        // first edited, the anchor after it inside that run.
+        for (const S32 at : { 100, 101 })
+        {
+            right[static_cast<size_t>(at)] = left[static_cast<size_t>(at)];
+            model.setRightText(joinedOf(right));
+        }
+        right[100] += " -- edited";
+        model.setRightText(joinedOf(right));
+        {
+            ALDiffModel fresh;
+            fresh.setTexts(joinedOf(left), joinedOf(right), model.ranges());
+            sameLayout(model, fresh, "cut inside a run the same");
+            ensure("laid out again around the edit", !model.relaid().whole && model.relaid().now[1] < 4);
+        }
+        S32 relaid = 0;
+        for (S32 step = 0; step < 80; ++step)
+        {
+            const size_t at = next(static_cast<U32>(right.size()));
+            switch (next(4))
+            {
+                case 0:
+                    right[at] += " -- edited";
+                    break;
+                case 1:
+                    right.insert(right.begin() + static_cast<std::ptrdiff_t>(at), "put in " + std::to_string(step));
+                    break;
+                case 2:
+                    right.erase(right.begin() + static_cast<std::ptrdiff_t>(at));
+                    break;
+                default:
+                    // Made the same as the line it stands for: a pair the
+                    // same among pairs that differ.
+                    for (const ALTextDiff::Range& range : model.ranges())
+                    {
+                        if (range.rightFirst == static_cast<S32>(at) && range.leftFirst < static_cast<S32>(left.size()))
+                        {
+                            right[at] = left[static_cast<size_t>(range.leftFirst)];
+                            break;
+                        }
+                    }
+                    break;
+            }
+            model.setRightText(joinedOf(right));
+            relaid += model.relaid().whole ? model.lineCount(Column::Right) : model.relaid().now[1];
+            ALDiffModel fresh;
+            fresh.setTexts(joinedOf(left), joinedOf(right), model.ranges());
+            sameLayout(model, fresh, "step " + std::to_string(step));
+        }
+        ensure("laid out again only around each edit, mostly", relaid < 80 * 12);
     }
 }

@@ -53,6 +53,8 @@ public:
         }
         return idOf(mMade.emplace_back(std::move(piece)));
     }
+    // How many there are: every id below it.
+    S32 count() const { return static_cast<S32>(mIds.size()); }
 
 private:
     boost::unordered_flat_map<std::string_view, S32, ll::string_hash, std::equal_to<>> mIds;

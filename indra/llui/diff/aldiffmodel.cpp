@@ -934,14 +934,16 @@ std::optional<ALDiffModel::Reuse> ALDiffModel::reusable(const Relayout& again, c
         return std::nullopt;
     }
     // The runs before the change as they were, and those after it moved
-    // along by as many lines as each side gained or lost.
+    // along by as many lines as each side gained or lost: where an edit
+    // inside a change left every run as it was, both all of them, the lines
+    // changed parting what is kept from what is moved.
     size_t before = 0;
     while (before < was.size() && before < now.size() && was[before] == now[before])
     {
         ++before;
     }
     size_t after = 0;
-    while (after < was.size() - before && after < now.size() - before)
+    while (after < was.size() && after < now.size())
     {
         ALTextDiff::Run run = was[was.size() - 1 - after];
         run.left += again.left;

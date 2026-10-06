@@ -28,7 +28,6 @@
 
 #include "aldiffids.h"
 
-#include <boost/unordered/unordered_flat_map.hpp>
 
 ALDiffMoves::moves_t ALDiffMoves::find(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<ALTextDiff::Run>& runs,
                                        const ALTextDiff::Options& options)
@@ -58,45 +57,51 @@ ALDiffMoves::moves_t ALDiffMoves::find(const std::vector<std::string>& left, con
     {
         return out;
     }
-    std::vector<std::string> keys;
+    // Only the lines changed are keyed: as they are, or as told the same
+    // where something is let go of, the key kept while its id is.
+    const bool               as_told = options.like.any();
     ALDiffIds                ids;
     std::vector<S32>         a(left.size(), -1);
     std::vector<S32>         b(right.size(), -1);
-    keys.reserve(left.size() + right.size());
-    // Only the lines changed are keyed; a line's key kept while its id is.
+    const auto               idOf = [&](const std::string& line) {
+        return as_told ? ids.idOfMade(ALTextDiff::likenessOf(line, options.like)) : ids.idOf(line);
+    };
     for (size_t i = 0; i < left.size(); ++i)
     {
         if (gone[i])
         {
-            keys.push_back(ALTextDiff::likenessOf(left[i], options.like));
+            a[i] = idOf(left[i]);
         }
     }
     for (size_t j = 0; j < right.size(); ++j)
     {
         if (made[j])
         {
-            keys.push_back(ALTextDiff::likenessOf(right[j], options.like));
+            b[j] = idOf(right[j]);
         }
     }
-    size_t key = 0;
-    for (size_t i = 0; i < left.size(); ++i)
-    {
-        if (gone[i])
-        {
-            a[i] = ids.idOf(keys[key++]);
-        }
-    }
-    // Where each line put in is, by its id.
-    boost::unordered_flat_map<S32, std::vector<S32>> where;
+    // Where each line put in is, by its id: the first MOST_TRIED of each,
+    // in order, from start[id] to start[id + 1].
+    std::vector<S32> start(static_cast<size_t>(ids.count()) + 1, 0);
     for (size_t j = 0; j < right.size(); ++j)
     {
-        if (made[j])
+        if (made[j] && start[static_cast<size_t>(b[j]) + 1] < MOST_TRIED)
         {
-            b[j] = ids.idOf(keys[key++]);
-            std::vector<S32>& at = where[b[j]];
-            if (at.size() < static_cast<size_t>(MOST_TRIED))
+            ++start[static_cast<size_t>(b[j]) + 1];
+        }
+    }
+    for (size_t id = 1; id < start.size(); ++id)
+    {
+        start[id] += start[id - 1];
+    }
+    std::vector<S32> places(static_cast<size_t>(start.back()));
+    {
+        std::vector<S32> next(start.begin(), start.end() - 1);
+        for (size_t j = 0; j < right.size(); ++j)
+        {
+            if (made[j] && next[static_cast<size_t>(b[j])] < start[static_cast<size_t>(b[j]) + 1])
             {
-                at.push_back(static_cast<S32>(j));
+                places[static_cast<size_t>(next[static_cast<size_t>(b[j])]++)] = static_cast<S32>(j);
             }
         }
     }
@@ -111,8 +116,7 @@ ALDiffMoves::moves_t ALDiffMoves::find(const std::vector<std::string>& left, con
     };
     for (size_t i = 0; i < left.size();)
     {
-        const auto found = gone[i] ? where.find(a[i]) : where.end();
-        if (found == where.end())
+        if (!gone[i] || start[static_cast<size_t>(a[i])] == start[static_cast<size_t>(a[i]) + 1])
         {
             ++i;
             continue;
@@ -121,8 +125,9 @@ ALDiffMoves::moves_t ALDiffMoves::find(const std::vector<std::string>& left, con
         // block yet.
         S32 best_at = -1;
         S32 best    = 0;
-        for (const S32 j : found->second)
+        for (S32 at = start[static_cast<size_t>(a[i])]; at < start[static_cast<size_t>(a[i]) + 1]; ++at)
         {
+            const S32 j = places[static_cast<size_t>(at)];
             if (!made[static_cast<size_t>(j)])
             {
                 continue;

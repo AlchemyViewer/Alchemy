@@ -45,6 +45,158 @@ namespace
         S32 left  = 0;
         S32 right = 0;
     };
+
+    // Where runs pass through a place of both texts together: the run it is
+    // in and how far into it -- a run beginning there, a parting of none
+    // first, or inside a run the same -- or past the last, at the texts'
+    // ends. False where they do not.
+    bool runsAt(const std::vector<Run>& runs, Place at, Place ends, size_t& index, S32& into)
+    {
+        for (size_t i = 0; i < runs.size(); ++i)
+        {
+            const Run& run = runs[i];
+            if (run.left == at.left && run.right == at.right)
+            {
+                index = i;
+                into  = 0;
+                return true;
+            }
+            if (run.kind == Kind::Same && at.left > run.left && at.left < run.left + run.count && at.right - run.right == at.left - run.left)
+            {
+                index = i;
+                into  = at.left - run.left;
+                return true;
+            }
+            if (run.left > at.left || run.right > at.right)
+            {
+                return false;
+            }
+        }
+        index = runs.size();
+        into  = 0;
+        return at.left == ends.left && at.right == ends.right;
+    }
+
+    // The runs of texts lined up at anchors, compared again only between
+    // the kept anchors either side of the change (`from` to `to`, the change
+    // as the texts now are): each stretch between two kept anchors is
+    // compared on its own (ALTextDiff::lines), so the runs outside stand as
+    // they were, where they pass through those anchors. A pair that differs
+    // just after a change is parted from it by a run the same of none,
+    // which is looked at again at both ends. False where the stretch is
+    // more than MOST_SHARE, or the runs do not pass through its anchors.
+    bool spliceAnchored(std::vector<Run>& runs, const std::vector<std::string>& left, const std::vector<std::string>& right, Place was, Place from,
+                        Place to, const ALTextDiff::Options& options, S32& compared)
+    {
+        const S32                   ln   = static_cast<S32>(left.size());
+        const S32                   rn   = static_cast<S32>(right.size());
+        const Place                 moved{ ln - was.left, rn - was.right };
+        const ALTextDiff::anchors_t kept = ALTextDiff::keptAnchors(options.anchors, ln, rn);
+        Place                       start;
+        Place                       end{ ln, rn };
+        bool                        at_end = false;
+        for (const auto& [l, r] : kept)
+        {
+            if (l < from.left && r < from.right)
+            {
+                start = Place{ l, r };
+            }
+            if (!at_end && l >= to.left && r >= to.right)
+            {
+                end    = Place{ l, r };
+                at_end = true;
+            }
+        }
+        compared = (end.left - start.left) + (end.right - start.right);
+        if (end.left < start.left || end.right < start.right || static_cast<F32>(compared) > ALDiffSplice::MOST_SHARE * static_cast<F32>(ln + rn))
+        {
+            return false;
+        }
+        size_t start_run = 0;
+        size_t end_run   = 0;
+        S32    start_k   = 0;
+        S32    end_k     = 0;
+        if (!runsAt(runs, start, was, start_run, start_k) || !runsAt(runs, Place{ end.left - moved.left, end.right - moved.right }, was, end_run, end_k))
+        {
+            return false;
+        }
+        ALTextDiff::Options some = options;
+        some.anchors.clear();
+        if (some.algorithm == ALTextDiff::Algorithm::Structural)
+        {
+            some.algorithm = ALTextDiff::Algorithm::Histogram;
+        }
+        for (const auto& [l, r] : kept)
+        {
+            if (l >= start.left && l < end.left && r >= start.right && r < end.right)
+            {
+                some.anchors.emplace_back(l - start.left, r - start.right);
+            }
+        }
+        const std::vector<std::string> some_left(left.begin() + start.left, left.begin() + end.left);
+        const std::vector<std::string> some_right(right.begin() + start.right, right.begin() + end.right);
+        std::vector<Run>               made;
+        made.reserve(runs.size() + 8);
+        const auto keep = [&made](const Run& run) { ALLineDiff::keep(made, run); };
+        // A pair that differs just after a change, parted from it.
+        const auto part = [&made](Place at, const Run& next) {
+            if (next.kind != Kind::Same && !made.empty() && made.back().kind != Kind::Same)
+            {
+                made.push_back(Run{ Kind::Same, at.left, at.right, 0 });
+            }
+        };
+        // Before the start as it was, the run the same it is in cut there,
+        // a parting there let go of: looked at again.
+        for (size_t i = 0; i < start_run; ++i)
+        {
+            keep(runs[i]);
+        }
+        if (start_k > 0)
+        {
+            Run cut   = runs[start_run];
+            cut.count = start_k;
+            keep(cut);
+        }
+        bool first = true;
+        for (Run run : ALTextDiff::lines(some_left, some_right, some))
+        {
+            run.left += start.left;
+            run.right += start.right;
+            if (first)
+            {
+                part(start, run);
+                first = false;
+            }
+            keep(run);
+        }
+        // After the end as it was, moved on, the run the same it is in cut
+        // there; a parting there let go of and looked at again.
+        first = true;
+        for (size_t i = end_run; i < runs.size(); ++i)
+        {
+            Run run = runs[i];
+            if (i == end_run && end_k > 0)
+            {
+                run.left += end_k;
+                run.right += end_k;
+                run.count -= end_k;
+            }
+            else if (i == end_run && run.kind == Kind::Same && run.count == 0)
+            {
+                continue;
+            }
+            run.left += moved.left;
+            run.right += moved.right;
+            if (first && at_end)
+            {
+                part(end, run);
+            }
+            first = false;
+            keep(run);
+        }
+        runs.swap(made);
+        return true;
+    }
 }
 
 S32 ALDiffSplice::lastCompared()
@@ -130,9 +282,22 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const Side& left_side, const S
     const S32 l_end   = end.left + dl;
     const S32 r_end   = end.right + dr;
     const S32 compared = (l_end - start.left) + (r_end - start.right);
+    // Lined up at anchors, which part runs the same: cut at the kept anchors
+    // either side of the change instead, where nothing the same is near it.
+    const auto anchored = [&]() {
+        S32 between = 0;
+        if (options.anchors.empty() ||
+            !spliceAnchored(runs, left, right, Place{ ln_was, rn_was }, Place{ l_from, r_from },
+                            Place{ left_same ? -FAR : static_cast<S32>(left.size()) - lt, right_same ? -FAR : static_cast<S32>(right.size()) - rt }, options, between))
+        {
+            return false;
+        }
+        sLastCompared = between;
+        return true;
+    };
     if (static_cast<F32>(compared) > MOST_SHARE * static_cast<F32>(left.size() + right.size()) || l_end < start.left || r_end < start.right)
     {
-        return false;
+        return anchored();
     }
     // Anchors inside it, counted from its start; one holding a line inside
     // it and one outside, the whole again.
@@ -150,7 +315,7 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const Side& left_side, const S
         const bool in_right = r >= start.right && r < r_end;
         if (in_left != in_right)
         {
-            return false;
+            return anchored();
         }
         if (in_left)
         {

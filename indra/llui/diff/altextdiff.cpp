@@ -174,50 +174,50 @@ namespace
         return out;
     }
 
-    // The anchors that can be kept: within both texts, by the right then
-    // the left the other way, so that of two on one line of the right the
-    // longest rising run takes one at most; then that run, rising on the
-    // left.
-    ALTextDiff::anchors_t keptAnchors(const ALTextDiff::anchors_t& anchors, S32 left_size, S32 right_size)
+}
+
+// The anchors that can be kept: within both texts, by the right then the
+// left the other way, so that of two on one line of the right the longest
+// rising run takes one at most; then that run, rising on the left.
+ALTextDiff::anchors_t ALTextDiff::keptAnchors(const anchors_t& anchors, S32 left_size, S32 right_size)
+{
+    ALTextDiff::anchors_t given;
+    for (const std::pair<S32, S32>& pair : anchors)
     {
-        ALTextDiff::anchors_t given;
-        for (const std::pair<S32, S32>& pair : anchors)
+        if (pair.first >= 0 && pair.second >= 0 && pair.first < left_size && pair.second < right_size)
         {
-            if (pair.first >= 0 && pair.second >= 0 && pair.first < left_size && pair.second < right_size)
-            {
-                given.push_back(pair);
-            }
+            given.push_back(pair);
         }
-        std::sort(given.begin(), given.end(), [](const std::pair<S32, S32>& a, const std::pair<S32, S32>& b) {
-            return a.second != b.second ? a.second < b.second : a.first > b.first;
-        });
-        std::vector<size_t> tails;  // the pair ending the best run of each length
-        std::vector<size_t> before(given.size(), std::numeric_limits<size_t>::max());
-        for (size_t i = 0; i < given.size(); ++i)
-        {
-            const auto at = std::lower_bound(tails.begin(), tails.end(), given[i].first,
-                                             [&given](size_t tail, S32 first) { return given[tail].first < first; });
-            if (at != tails.begin())
-            {
-                before[i] = *(at - 1);
-            }
-            if (at == tails.end())
-            {
-                tails.push_back(i);
-            }
-            else
-            {
-                *at = i;
-            }
-        }
-        ALTextDiff::anchors_t kept;
-        for (size_t i = tails.empty() ? std::numeric_limits<size_t>::max() : tails.back(); i != std::numeric_limits<size_t>::max(); i = before[i])
-        {
-            kept.push_back(given[i]);
-        }
-        std::reverse(kept.begin(), kept.end());
-        return kept;
     }
+    std::sort(given.begin(), given.end(), [](const std::pair<S32, S32>& a, const std::pair<S32, S32>& b) {
+        return a.second != b.second ? a.second < b.second : a.first > b.first;
+    });
+    std::vector<size_t> tails;  // the pair ending the best run of each length
+    std::vector<size_t> before(given.size(), std::numeric_limits<size_t>::max());
+    for (size_t i = 0; i < given.size(); ++i)
+    {
+        const auto at = std::lower_bound(tails.begin(), tails.end(), given[i].first,
+                                         [&given](size_t tail, S32 first) { return given[tail].first < first; });
+        if (at != tails.begin())
+        {
+            before[i] = *(at - 1);
+        }
+        if (at == tails.end())
+        {
+            tails.push_back(i);
+        }
+        else
+        {
+            *at = i;
+        }
+    }
+    ALTextDiff::anchors_t kept;
+    for (size_t i = tails.empty() ? std::numeric_limits<size_t>::max() : tails.back(); i != std::numeric_limits<size_t>::max(); i = before[i])
+    {
+        kept.push_back(given[i]);
+    }
+    std::reverse(kept.begin(), kept.end());
+    return kept;
 }
 
 std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options)
