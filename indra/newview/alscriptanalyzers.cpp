@@ -153,6 +153,10 @@ void ALLSLAnalyzer::answer(const Request& request, const std::string& text, cons
             // service last parsed may be another tab's.
             weigh(request, text, result);
             return;
+        case Kind::Shape:
+            // A parse mended as it must be, beside the tab's own check.
+            result.outline = mService.outline(text);
+            break;
     }
     result.parsed     = mService.parsed();
     result.understood = mService.understood();
@@ -209,6 +213,13 @@ void ALLuauAnalyzer::useSolver(bool use_new)
 void ALLuauAnalyzer::answer(const Request& request, const std::string& text, const Setup& setup, Result& result)
 {
     using Kind = ALScriptAnalysis::Kind;
+    if (request.kind == Kind::Shape)
+    {
+        // From a parse alone: nothing of the front end, which holds the
+        // tabs' modules, nor of the definitions.
+        result.outline = ALLuauService::shape(text);
+        return;
+    }
     useSolver(setup.newSolver);
     load(setup.luauPath, setup.docsPath, setup.generation);
     result.definitionsError = mError;
@@ -257,6 +268,8 @@ void ALLuauAnalyzer::answer(const Request& request, const std::string& text, con
             break;
         case Kind::Weigh:
             weigh(request, text, result);
+            break;
+        case Kind::Shape:
             break;
     }
 }

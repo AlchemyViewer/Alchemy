@@ -200,6 +200,10 @@ void ALDiffView::setTexts(std::string_view left, std::string_view right, const A
     mBar->setVersions(0, 0);
     mVersionChosen = nullptr;
     fill();
+    if (mOnTexts)
+    {
+        mOnTexts();
+    }
 }
 
 void ALDiffView::setLeftText(std::string_view left)
@@ -213,6 +217,10 @@ void ALDiffView::setLeftText(std::string_view left)
     // what stood for what, what was said of the left and a merge with it.
     keepingPlace([&]() { mModel.setLeftText(left); });
     mBar->setMerging(false);
+    if (mOnTexts)
+    {
+        mOnTexts();
+    }
 }
 
 void ALDiffView::setPairs(ALTextDiff::ranges_t pairs)
@@ -259,6 +267,10 @@ void ALDiffView::setRightText(std::string_view right)
     place.line = moved.line(place.line);
     fill();
     restorePlace(place);
+    if (mOnTexts)
+    {
+        mOnTexts();
+    }
 }
 
 void ALDiffView::setTitles(const std::string& left, const std::string& right)

@@ -1820,6 +1820,13 @@ void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const
         doc.compareView->setVisible(false);
         applyCompareOptions(*doc.compareView);
         doc.compareView->setOnInline([this](bool inline_view) { setCompareInline(inline_view); });
+        // Lined up by its texts' functions as either is another.
+        doc.compareView->setOnTexts([this, id]() {
+            if (Doc* found = findDoc(id))
+            {
+                mComparePairs.follow(*found);
+            }
+        });
         doc.compareView->setOnEscape([this, id]() {
             if (Doc* found = findDoc(id))
             {

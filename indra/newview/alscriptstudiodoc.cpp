@@ -35,6 +35,7 @@
 #include "alscriptlookup.h"
 #include "alscriptstudiocaret.h"
 #include "alscriptstudiochecking.h"
+#include "alscriptstudiocomparepairs.h"
 #include "alscriptstudioorphans.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudiorecovery.h"

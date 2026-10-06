@@ -620,6 +620,10 @@ struct ALScriptStudioDoc
     // A save of its item compared with it (ALScriptStudioHistory), until
     // the comparison ends: offered back by the notice.
     std::optional<ALSavedText>                 historyShown;
+    // Its comparison's texts' outlines, by which their functions are
+    // paired (ALScriptStudioComparePairs).
+    struct ComparePairs;
+    Part<ComparePairs>                         comparePairs;
     // The script held open in an external editor (ALScriptExternalEditor).
     struct External;
     Part<External>                             external;

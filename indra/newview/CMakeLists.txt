@@ -217,6 +217,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocaret.cpp
     alscriptstudiochecking.cpp
     alscriptstudiocommands.cpp
+    alscriptstudiocomparepairs.cpp
     alscriptstudiocomparewith.cpp
     alscriptstudioexpandedcompare.cpp
     alscriptstudiodoc.cpp
@@ -1067,6 +1068,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocaret.h
     alscriptstudiochecking.h
     alscriptstudiocommands.h
+    alscriptstudiocomparepairs.h
     alscriptstudiocomparewith.h
     alscriptstudioexpandedcompare.h
     alscriptstudiodoc.h
@@ -2623,6 +2625,17 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     SOURCES alscriptstudiohistory.cpp
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A Script Studio window's comparison lined up by its texts' functions,
+  # over tabs of their own editors: each text's outline asked for as it is
+  # another, and the two paired.
+  al_add_test(
+    alscriptstudiocomparepairs
+    UNIT
+    PROJECT ${test_project}
     LIBRARIES al_studio_test_common llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )

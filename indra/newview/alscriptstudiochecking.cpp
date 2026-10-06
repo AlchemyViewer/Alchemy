@@ -540,6 +540,9 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
         case ALScriptAnalysis::Kind::Weigh:
             mWindow.answeredElsewhere(doc, shown, at);
             break;
+        case ALScriptAnalysis::Kind::Shape:
+            // A comparison's, which it answers itself.
+            break;
     }
 }
 

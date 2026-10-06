@@ -34,6 +34,7 @@
 #include "alscriptstudiocommands.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudiocomparepairs.h"
 #include "alscriptstudiocomparewith.h"
 #include "alscriptstudioexpandedcompare.h"
 #include "alscriptstudiohistory.h"
@@ -136,7 +137,8 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptStudioCaret::Window, public ALScriptStudioChecking::Window,
                                     public ALScriptObjectCheck::Window, public ALScriptRecompile::Window, public ALScriptStudioHistory::Window,
                                     public ALScriptStudioCompareWith::Window, public ALScriptStudioMerging::Window,
-                                    public ALScriptStudioSelections::Window, public ALScriptStudioExpandedCompare::Window
+                                    public ALScriptStudioSelections::Window, public ALScriptStudioExpandedCompare::Window,
+                                    public ALScriptStudioComparePairs::Window
 {
     friend class LLFloaterReg;
 
@@ -1000,6 +1002,12 @@ private:
         showCompare(doc, left, right, left_title, right_title, ranges);
     }
     void preprocess(Doc& doc) override { mSaving.preprocess(doc); }
+    // What lining a comparison up by its functions asks of the window
+    // (ALScriptStudioComparePairs::Window).
+    void askShape(ALScriptAnalysis::Request request, ALScriptAnalysis::callback_t answered) override
+    {
+        ALScriptAnalysis::instance().ask(std::move(request), std::move(answered));
+    }
     // What the Search tab asks of the window (ALScriptSearchPane::Window).
     void listObjects(const LLUUID& only, std::function<void(std::vector<ALScriptSearchPane::Window::Object>)> told) override;
     std::string                                     objectName(const LLUUID& root) const override;
@@ -1319,6 +1327,8 @@ private:
     ALScriptStudioSelections           mSelections{ *this, *this };
     // The source beside what a save sends of it.
     ALScriptStudioExpandedCompare      mExpandedCompare{ *this, *this };
+    // A comparison lined up by its texts' functions.
+    ALScriptStudioComparePairs         mComparePairs{ *this, *this };
     // What the region said an object reserves, heard.
     boost::signals2::scoped_connection mRegionUsageConnection;
     // Saving and compiling the tabs.

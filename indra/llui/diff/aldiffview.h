@@ -252,6 +252,10 @@ public:
     void setOnEscape(std::function<void()> escape);
     // Told when its bar turns it inline or side by side, as it now is.
     void setOnInline(std::function<void(bool)> inlined) { mOnInline = std::move(inlined); }
+    // Told when either text is another -- the two set, the right typed in,
+    // the left stepped to another version -- once it is compared: what a
+    // host follows the texts by.
+    void setOnTexts(std::function<void()> texts) { mOnTexts = std::move(texts); }
     // Told when what is typed in it would change the right's text -- a
     // character, a line broken or joined, a paste -- with where, as a line
     // and column of the right's text; answered with the view to type in
@@ -421,6 +425,7 @@ private:
     std::vector<boost::signals2::scoped_connection> mConnections;
     std::function<void()>     mEscape;
     std::function<void(bool)> mOnInline;
+    std::function<void()>     mOnTexts;
     edit_t                    mEdit;
     version_t                 mVersionChosen;
 };
