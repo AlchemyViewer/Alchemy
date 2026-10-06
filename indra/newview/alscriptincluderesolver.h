@@ -100,6 +100,11 @@ public:
     bool                  folderOf(const std::string& item, std::string& folder, std::string& name) override;
     ALPreprocessor::Found folderAbove(const std::string& folder, std::string& out) override;
     ALPreprocessor::Found named(const std::string& folder, const std::string& name, std::vector<Item>& items, std::string& subfolder) override;
+    ALPreprocessor::Found contents(const std::string& folder, std::vector<Item>& items, std::vector<std::string>& folders) override;
+    // What could follow a path typed in a string that names a file
+    // (ALIncludeSearch::suggest), for a script the preprocessor is asked
+    // about.
+    std::vector<ALRequireNavigation::Suggestion> suggest(const Request& request, const std::string& typed, bool require);
 
 private:
     // Where a name is looked for, as the settings say now; who asks.

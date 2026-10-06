@@ -123,6 +123,11 @@ ALPreprocessor::Found ALScriptPreprocessor::lookUp(const Request& request, const
     return mResolver->lookUp(request, ask, out);
 }
 
+std::vector<ALRequireNavigation::Suggestion> ALScriptPreprocessor::suggestPaths(const Request& request, const std::string& typed, bool require)
+{
+    return mResolver->suggest(request, typed, require);
+}
+
 std::vector<ALPreprocessor::Include> ALScriptPreprocessor::includedBy(const Request& request)
 {
     return mResolver->includedBy(request);

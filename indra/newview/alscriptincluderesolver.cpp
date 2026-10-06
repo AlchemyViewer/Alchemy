@@ -591,6 +591,56 @@ ALPreprocessor::Found ALScriptIncludeResolver::named(const std::string& folder, 
     return items.empty() && subfolder.empty() ? ALPreprocessor::Found::No : ALPreprocessor::Found::Yes;
 }
 
+ALPreprocessor::Found ALScriptIncludeResolver::contents(const std::string& folder, std::vector<Item>& items, std::vector<std::string>& folders)
+{
+    LLUUID id;
+    if (idOf(folder, OBJECT_CONTENTS, id))
+    {
+        const auto listed = mContents.find(id);
+        if (listed == mContents.end())
+        {
+            return mUnanswered.contains(id) ? ALPreprocessor::Found::No : ALPreprocessor::Found::Pending;
+        }
+        for (const ALScriptContents::Item& held : listed->second)
+        {
+            items.push_back({ ALIncludeIdentity::ofItem(id, held.id), held.name, LLUUID::null });
+        }
+        return ALPreprocessor::Found::Yes;
+    }
+    if (!idOf(folder, INVENTORY_FOLDER, id))
+    {
+        return ALPreprocessor::Found::No;
+    }
+    LLInventoryModel::cat_array_t*  cats = nullptr;
+    LLInventoryModel::item_array_t* held = nullptr;
+    gInventory.getDirectDescendentsOf(id, cats, held);
+    if (!cats || !held)
+    {
+        return ALPreprocessor::Found::No;
+    }
+    for (const LLPointer<LLViewerInventoryItem>& item : *held)
+    {
+        if (item && (item->getType() == LLAssetType::AT_LSL_TEXT || item->getType() == LLAssetType::AT_NOTECARD))
+        {
+            items.push_back({ ALIncludeIdentity::ofItem(LLUUID::null, item->getUUID()), item->getName(), item->getAssetUUID() });
+        }
+    }
+    for (const LLPointer<LLViewerInventoryCategory>& category : *cats)
+    {
+        if (category)
+        {
+            folders.push_back(category->getName());
+        }
+    }
+    return ALPreprocessor::Found::Yes;
+}
+
+std::vector<ALRequireNavigation::Suggestion> ALScriptIncludeResolver::suggest(const Request& request, const std::string& typed, bool require)
+{
+    const ALIncludeSearch::Asking asking = askingOf(request);
+    return mSearch.suggest(asking.self, typed, require, asking, where());
+}
+
 bool ALScriptIncludeResolver::inWorld(const Request& request, const std::string& name)
 {
     const std::string item_name = ALIncludeSearch::itemNameOf(name);

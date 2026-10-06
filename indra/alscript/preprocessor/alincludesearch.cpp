@@ -97,6 +97,44 @@ namespace
         return name;
     }
 
+    // What a folder on disk holds, as a path names it: each file with one of
+    // `extensions` -- by its module name, the extension taken off, where
+    // `modules` -- and each folder but a hidden one; no more than a few
+    // hundred looked at.
+    constexpr size_t LISTED_MOST = 500;
+    void listFolder(const std::string& dir, const std::vector<std::string_view>& extensions, bool modules, std::vector<ALRequirePlaces::Child>& out)
+    {
+        std::error_code ec;
+        size_t          looked = 0;
+        for (std::filesystem::directory_iterator it(fsyspath(dir), ec), end; !ec && it != end && looked < LISTED_MOST; it.increment(ec), ++looked)
+        {
+            const std::string name = fsyspath(it->path().filename()).string();
+            if (name.empty() || name.front() == '.')
+            {
+                continue;
+            }
+            std::error_code kind;
+            if (it->is_directory(kind))
+            {
+                out.push_back({ name, true });
+                continue;
+            }
+            for (std::string_view extension : extensions)
+            {
+                if (name.size() > extension.size() &&
+                    std::equal(extension.begin(), extension.end(), name.end() - extension.size(),
+                               [](char a, char b) { return a == std::tolower(static_cast<unsigned char>(b)); }))
+                {
+                    out.push_back({ modules ? name.substr(0, name.size() - extension.size()) : name, false });
+                    break;
+                }
+            }
+        }
+        std::sort(out.begin(), out.end(), [](const ALRequirePlaces::Child& a, const ALRequirePlaces::Child& b) { return a.name < b.name; });
+        out.erase(std::unique(out.begin(), out.end(), [](const ALRequirePlaces::Child& a, const ALRequirePlaces::Child& b) { return a.name == b.name; }),
+                  out.end());
+    }
+
     bool isFolder(const std::string& path)
     {
         std::error_code ec;
@@ -343,6 +381,45 @@ public:
             }
         }
         return Known::No;
+    }
+
+    std::vector<std::string> studioAliasNames() override
+    {
+        std::vector<std::string> out;
+        if (mWhere.disk)
+        {
+            for (const auto& [name, path] : mWhere.aliases)
+            {
+                out.push_back(name);
+            }
+        }
+        return out;
+    }
+
+    Known children(const std::string& folder, std::vector<Child>& out) override
+    {
+        std::string dir;
+        if (diskDir(folder, dir))
+        {
+            listFolder(dir, { ".luau", ".lua" }, true, out);
+            return Known::Yes;
+        }
+        if (!inWorld(folder))
+        {
+            return Known::No;
+        }
+        std::vector<ALIncludeWorld::Item> items;
+        std::vector<std::string>          folders;
+        const ALPreprocessor::Found       found = mSearch.mWorld.contents(folder, items, folders);
+        for (const ALIncludeWorld::Item& item : items)
+        {
+            out.push_back({ stemOf(item.name), false });
+        }
+        for (const std::string& name : folders)
+        {
+            out.push_back({ name, true });
+        }
+        return found == ALPreprocessor::Found::Pending ? Known::Pending : Known::Yes;
     }
 
     void aliasReached(const std::string& config_folder, const std::string& folder) override
@@ -884,6 +961,53 @@ void ALIncludeSearch::searchedBefore(const ALPreprocessor::Ask& ask, const Askin
             }
         }
     }
+}
+
+std::vector<ALRequireNavigation::Suggestion> ALIncludeSearch::suggest(const std::string& from, const std::string& typed, bool require,
+                                                                     const Asking& asking, const Where& where)
+{
+    if (require && asking.lua)
+    {
+        std::vector<std::string> alias_folders;
+        Places                   places(*this, where, nullptr, false, alias_folders);
+        return ALRequireNavigation::suggest(places, from.empty() ? asking.self : from, typed);
+    }
+    // An include: the names under the folders its search looks in, the
+    // file's own first, each with its extension, and the folders.
+    std::vector<ALRequireNavigation::Suggestion> out;
+    if (!where.disk)
+    {
+        return out;
+    }
+    const size_t      slash = typed.find_last_of("/\\");
+    const std::string head  = slash == std::string::npos ? std::string() : typed.substr(0, slash + 1);
+    std::vector<std::string> dirs;
+    std::string              file;
+    if (ALIncludeIdentity::fileOf(from.empty() ? asking.self : from, file))
+    {
+        dirs.push_back(fsyspath(fsyspath(file).parent_path()).string());
+    }
+    for (const std::string& folder : ownFolders(where).includes.folders())
+    {
+        if (std::find(dirs.begin(), dirs.end(), folder) == dirs.end())
+        {
+            dirs.push_back(folder);
+        }
+    }
+    std::vector<ALRequirePlaces::Child> found;
+    for (const std::string& dir : dirs)
+    {
+        const std::vector<std::string_view> extensions = asking.lua ? std::vector<std::string_view>{ ".luau", ".lua" } : std::vector<std::string_view>{ ".lsl" };
+        listFolder(head.empty() ? dir : fsyspath(fsyspath(dir) / fsyspath(head)).string(), extensions, false, found);
+    }
+    std::sort(found.begin(), found.end(), [](const ALRequirePlaces::Child& a, const ALRequirePlaces::Child& b) { return a.name < b.name; });
+    found.erase(std::unique(found.begin(), found.end(), [](const ALRequirePlaces::Child& a, const ALRequirePlaces::Child& b) { return a.name == b.name; }),
+                found.end());
+    for (const ALRequirePlaces::Child& child : found)
+    {
+        out.push_back({ child.name, head + child.name, child.folder });
+    }
+    return out;
 }
 
 ALIncludeSearch::Candidate ALIncludeSearch::admitted(const std::string& real)

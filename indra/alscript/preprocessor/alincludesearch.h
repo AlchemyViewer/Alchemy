@@ -26,6 +26,7 @@
 #include "aldiskcache.h"
 #include "alluauconfig.h"
 #include "alpreprocessor.h"
+#include "alrequirenavigation.h"
 #include "alscripttextcache.h"
 #include "llstl.h"
 #include "lluuid.h"
@@ -81,6 +82,9 @@ public:
     virtual bool                  folderOf(const std::string& item, std::string& folder, std::string& name) = 0;
     virtual ALPreprocessor::Found folderAbove(const std::string& folder, std::string& out) = 0;
     virtual ALPreprocessor::Found named(const std::string& folder, const std::string& name, std::vector<Item>& items, std::string& subfolder) = 0;
+    // What a folder holds, for what a path typed may go on with: its
+    // scripts and notecards, and its folders' names.
+    virtual ALPreprocessor::Found contents(const std::string& folder, std::vector<Item>& items, std::vector<std::string>& folders) = 0;
 };
 
 // What an `#include` names, found as the preprocessor finds it -- in the
@@ -160,6 +164,15 @@ public:
     // its way.
     ALPreprocessor::Found configsFor(const std::string& from, const Asking& asking, const Where& where, wanted_t* wanted, bool retry,
                                      std::vector<Config>& out);
+    // What could follow a path typed so far in a string that names a file
+    // in `from` -- the script asking where empty: for a SLua require, as
+    // Luau's own suggester walks it by the require's rules
+    // (ALRequireNavigation::suggest); for an include, the names under the
+    // folders its search looks in on disk, the file's own first, each named
+    // with its extension, and the folders. What the world holds is offered
+    // only while world includes are on.
+    std::vector<ALRequireNavigation::Suggestion> suggest(const std::string& from, const std::string& typed, bool require, const Asking& asking,
+                                                         const Where& where);
     // resolve() with nothing fetched, and the aliases' folders blessed for
     // the asking.
     ALPreprocessor::Found lookUp(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Asking& asking, const Where& where);

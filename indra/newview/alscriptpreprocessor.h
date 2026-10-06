@@ -33,6 +33,7 @@
 #include "alscripttextcache.h"
 #include "alluauconfig.h"
 #include "alpreprocessor.h"
+#include "alrequirenavigation.h"
 #include "alscripttypes.h"
 #include "llinventorymodel.h"
 #include "llsingleton.h"
@@ -151,6 +152,10 @@ public:
     bool configOf(const Request& request, ALLuauConfig& out, const ALLuauConfig* base = nullptr);
     // The folders an include is looked for in on disk, in order, as the
     // setting holds them one to a line; and them put back.
+    // What could follow a path typed in a string that names a file -- a
+    // require's, by its rules, or an include's, by its search -- as the
+    // places stand now (ALIncludeSearch::suggest).
+    std::vector<ALRequireNavigation::Suggestion> suggestPaths(const Request& request, const std::string& typed, bool require);
     static std::vector<std::string> includeFolders();
     static void                     setIncludeFolders(const std::vector<std::string>& folders);
     // The SLua aliases the studio names (LA22): each name as a require

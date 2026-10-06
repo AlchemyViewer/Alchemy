@@ -81,6 +81,17 @@ public:
     // The folder a studio alias stands for, where no configuration names
     // the alias (LA22): Script Studio's own, by the name in lower case.
     virtual Known studioAlias(const std::string& alias, std::string& folder) = 0;
+    // Every studio alias's name, for what is offered after an @.
+    virtual std::vector<std::string> studioAliasNames() = 0;
+    // What a folder holds as a require names it: each script as a module,
+    // a script's extension taken off, and each folder; nothing where what
+    // it holds is not known, and no more than a few hundred.
+    struct Child
+    {
+        std::string name;
+        bool        folder = false;
+    };
+    virtual Known children(const std::string& folder, std::vector<Child>& out) = 0;
     // An alias of the configuration of `config_folder`, which is on disk,
     // has reached a folder: blessed for the run where the configuration
     // may bless it (ALDiskIncludes::blessFromConfig).
@@ -120,4 +131,19 @@ namespace ALRequireNavigation
         std::string error;
     };
     Path navigatorPath(const std::string& name, const std::string& stem);
+
+    // What could follow a require's path typed so far, as Luau's own
+    // suggester offers it (Luau::RequireSuggester) over the places, walked
+    // by the same rules as a require: before the first slash, the aliases
+    // in reach of the file and `./` and `../`; after it, what the folder
+    // the path reaches holds, and `..`. Each with the whole path it puts in
+    // the string, escaped as a string holds it, and whether it is a folder,
+    // which a path goes on through.
+    struct Suggestion
+    {
+        std::string label;
+        std::string path;
+        bool        folder = false;
+    };
+    std::vector<Suggestion> suggest(ALRequirePlaces& places, const std::string& from, const std::string& typed);
 }

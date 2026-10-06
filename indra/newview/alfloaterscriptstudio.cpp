@@ -2919,6 +2919,7 @@ void ALFloaterScriptStudio::speakFileLanguage(Doc& doc, const FileLanguage& lang
         ALCodeEditor& editor = *doc.editor;
         editor.setCompletionProvider(nullptr);
         editor.setCompletionRequest(nullptr);
+        editor.setPathProvider(nullptr);
         editor.setHoverProvider(nullptr);
         editor.setHoverRequest(nullptr);
         editor.setSignatureRequest(nullptr);
@@ -3043,6 +3044,24 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     editor.setCompletionProvider([this, lua, raw](const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
         ALScriptStudioWords::complete(lua, *raw->editor, at, prefix, snippets(lua), getString("SnippetDetail"), out);
         completeLinks(*raw, at, prefix, out);
+    });
+    // What could follow a path typed in a string that names a file: a
+    // require's by its own rules, through Luau's suggester, so that what is
+    // offered is what it finds; an include's by its search.
+    editor.setPathProvider([this, raw](const ALTextPos& at, std::string_view typed, std::vector<ALCodeEditor::Completion>& out) {
+        const std::optional<Doc::Named> named   = raw->namedAt(at);
+        const std::string&              line    = raw->editor->document().line(at.line);
+        const bool                      require = named ? named->require : line.find("#include") == std::string::npos;
+        const ALScriptPreprocessor::Request request = mChecking.preprocessRequest(*raw, /*with_source*/ false);
+        for (const ALRequireNavigation::Suggestion& one : ALScriptPreprocessor::instance().suggestPaths(request, std::string(typed), require))
+        {
+            ALCodeEditor::Completion c;
+            c.text   = one.label;
+            c.path   = one.path;
+            c.folder = one.folder;
+            c.kind   = ALSyntaxKind::Path;
+            out.push_back(std::move(c));
+        }
     });
 }
 

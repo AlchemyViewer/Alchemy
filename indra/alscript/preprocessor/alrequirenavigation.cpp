@@ -28,6 +28,7 @@
 
 #include "alluauconfig.h"
 
+#include "Luau/FileResolver.h"
 #include "Luau/RequireNavigator.h"
 
 #include <algorithm>
@@ -316,8 +317,200 @@ namespace
     };
 }
 
+namespace
+{
+    // Where a require's path stops, walked as a require is: none where it
+    // goes nowhere.
+    std::optional<Position> reach(ALRequirePlaces& places, const std::string& from, const std::string& typed)
+    {
+        std::string folder, stem;
+        const bool  placed = places.placeOf(from, folder, stem);
+        const ALRequireNavigation::Path said = ALRequireNavigation::navigatorPath(typed, placed ? stem : std::string());
+        if (!said.error.empty())
+        {
+            return std::nullopt;
+        }
+        Context                  context(places, Position{ placed ? folder : std::string(), placed ? stem : std::string() });
+        Said                     errors;
+        Luau::Require::Navigator navigator(context, errors);
+        if (navigator.navigate(said.path) != Luau::Require::Navigator::Status::Success)
+        {
+            return std::nullopt;
+        }
+        return context.at();
+    }
+
+    // The aliases in reach of a file: each `.luaurc`'s from its folder up,
+    // the nearest's first, then the studio's; none Second Life keeps.
+    std::vector<std::string> aliasesFrom(ALRequirePlaces& places, const std::string& from)
+    {
+        std::vector<std::string> out;
+        const auto               add = [&out](const std::string& alias) {
+            if (alias.compare(0, 3, "sl-") != 0 && alias != "self" && std::find(out.begin(), out.end(), alias) == out.end())
+            {
+                out.push_back(alias);
+            }
+        };
+        std::string folder, stem;
+        bool        more = places.placeOf(from, folder, stem);
+        for (size_t up = 0; up < 64; ++up)
+        {
+            std::string text, base;
+            bool        on_disk = false;
+            if (places.config(folder, text, on_disk, base) == Known::Yes)
+            {
+                ALLuauConfig parsed;
+                std::string  error;
+                if (ALLuauConfig::parse(text, parsed, error))
+                {
+                    for (const auto& [alias, value] : parsed.aliases)
+                    {
+                        add(alias);
+                    }
+                }
+            }
+            if (!more)
+            {
+                break;
+            }
+            std::string above;
+            more   = places.parentOf(folder, above) == Known::Yes;
+            folder = above;
+        }
+        for (const std::string& alias : places.studioAliasNames())
+        {
+            add(alias);
+        }
+        return out;
+    }
+
+    // A place in the tree Luau's suggester walks: the file asking, or
+    // where a path from it stops, or what a folder there holds.
+    class Node final : public Luau::RequireNode
+    {
+    public:
+        Node(ALRequirePlaces& places, std::string from, Position at, std::string component, bool folder)
+        :   mPlaces(places),
+            mFrom(std::move(from)),
+            mAt(std::move(at)),
+            mComponent(std::move(component)),
+            mFolder(folder)
+        {
+        }
+
+        std::string              getPathComponent() const override { return mComponent; }
+        std::vector<std::string> getTags() const override { return mFolder ? std::vector<std::string>{ "folder" } : std::vector<std::string>(); }
+
+        std::unique_ptr<Luau::RequireNode> resolvePathToNode(const std::string& path) const override
+        {
+            const std::optional<Position> at = reach(mPlaces, mFrom, path);
+            if (!at)
+            {
+                return nullptr;
+            }
+            return std::make_unique<Node>(mPlaces, mFrom, *at, at->name.value_or(std::string()), true);
+        }
+
+        std::vector<std::unique_ptr<Luau::RequireNode>> getChildren() const override
+        {
+            std::vector<std::unique_ptr<Luau::RequireNode>> out;
+            std::string                                     folder;
+            if (mAt.name)
+            {
+                if (mPlaces.subfolder(mAt.folder, *mAt.name, folder) != Known::Yes)
+                {
+                    return out;
+                }
+            }
+            else
+            {
+                folder = mAt.folder;
+            }
+            std::vector<ALRequirePlaces::Child> held;
+            mPlaces.children(folder, held);
+            for (const ALRequirePlaces::Child& child : held)
+            {
+                out.push_back(std::make_unique<Node>(mPlaces, mFrom, Position{ folder, child.name }, child.name, child.folder));
+            }
+            return out;
+        }
+
+        std::vector<Luau::RequireAlias> getAvailableAliases() const override
+        {
+            std::vector<Luau::RequireAlias> out;
+            for (const std::string& alias : aliasesFrom(mPlaces, mFrom))
+            {
+                out.emplace_back(alias, std::vector<std::string>{ "folder" });
+            }
+            return out;
+        }
+
+    private:
+        ALRequirePlaces& mPlaces;
+        std::string      mFrom;
+        Position         mAt;
+        std::string      mComponent;
+        bool             mFolder = false;
+    };
+
+    // Luau's suggester, over our places, for one file asking.
+    class Suggester final : public Luau::RequireSuggester
+    {
+    public:
+        Suggester(ALRequirePlaces& places, std::string from)
+        :   mPlaces(places),
+            mFrom(std::move(from))
+        {
+        }
+
+    protected:
+        std::unique_ptr<Luau::RequireNode> getNode(const Luau::ModuleName&) const override
+        {
+            std::string folder, stem;
+            const bool  placed = mPlaces.placeOf(mFrom, folder, stem);
+            return std::make_unique<Node>(mPlaces, mFrom, Position{ placed ? folder : std::string(), placed ? stem : std::string() }, stem,
+                                          false);
+        }
+
+    private:
+        ALRequirePlaces& mPlaces;
+        std::string      mFrom;
+    };
+}
+
 namespace ALRequireNavigation
 {
+    std::vector<Suggestion> suggest(ALRequirePlaces& places, const std::string& from, const std::string& typed)
+    {
+        // Asked of the path up to its last slash: what follows it is the
+        // name being typed, which the editor narrows to.
+        std::vector<Suggestion> out;
+        const size_t            slash = typed.find_last_of('/');
+        const std::string       asked = slash == std::string::npos ? typed : typed.substr(0, slash + 1);
+        const Suggester         suggester(places, from);
+        const std::optional<Luau::RequireSuggestions> found = suggester.getRequireSuggestions(from, asked);
+        if (!found)
+        {
+            return out;
+        }
+        for (const Luau::RequireSuggestion& one : *found)
+        {
+            Suggestion said;
+            said.label  = one.label;
+            said.path   = one.fullPath;
+            said.folder = std::find(one.tags.begin(), one.tags.end(), "folder") != one.tags.end() || one.label == "./" || one.label == "../";
+            if (one.label == "..")
+            {
+                // Up from where the path is: Luau's own gives the folder the
+                // path is in, which is where it already is.
+                said.path   = (slash == std::string::npos ? std::string() : typed.substr(0, slash + 1)) + "..";
+                said.folder = true;
+            }
+            out.push_back(std::move(said));
+        }
+        return out;
+    }
+
     Path navigatorPath(const std::string& name_in, const std::string& stem)
     {
         Path        out;

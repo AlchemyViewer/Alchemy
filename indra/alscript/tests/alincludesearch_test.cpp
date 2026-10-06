@@ -165,6 +165,24 @@ namespace
             }
             return items.empty() && subfolder.empty() ? ALPreprocessor::Found::No : ALPreprocessor::Found::Yes;
         }
+        ALPreprocessor::Found contents(const std::string& folder, std::vector<Item>& items, std::vector<std::string>& subfolders) override
+        {
+            const auto found = folders.find(folder);
+            if (found == folders.end())
+            {
+                return ALPreprocessor::Found::No;
+            }
+            if (!found->second.known)
+            {
+                return ALPreprocessor::Found::Pending;
+            }
+            items = found->second.items;
+            for (const auto& [name, id] : found->second.folders)
+            {
+                subfolders.push_back(name);
+            }
+            return ALPreprocessor::Found::Yes;
+        }
     };
 }
 
@@ -813,5 +831,67 @@ namespace tut
         ALIncludeSearch::explainMissing(problems, facts);
         ensure("the disk not looked in", problems[0].key == "PreprocModuleNotOnDisk" && problems[0].args == std::vector<std::string>{ "./nowhere" });
         ensure("left out", ALIncludeSearch::leftOut({ said }).names == std::vector<std::string>{ "./nowhere" });
+    }
+
+    template<> template<>
+    void alincludesearch_object::test<14>()
+    {
+        set_test_name("paths suggested as a require is typed, by Luau's own suggester over the places: aliases, ./ and ../ first, then a folder's modules and folders; every module offered resolves; an include's by its search");
+        Scratch           s;
+        const std::string script = s.write("proj/main.luau", "return require('./util')\n");
+        s.write("proj/util.luau", "return 1\n");
+        s.write("proj/lib/net.luau", "return 1\n");
+        s.write("proj/lib/http.lua", "return 1\n");
+        s.write("proj/lib/sub/deep.luau", "return 1\n");
+        s.write("proj/.hidden/x.luau", "return 1\n");
+        s.write("proj/readme.txt", "words\n");
+        s.write("proj/.luaurc", "{\"aliases\": {\"shared\": \"./lib\", \"sl-std\": \"./lib\"}}");
+        s.write("tools/t.luau", "return 1\n");
+        const std::string inc = s.write("proj/inc.lsl", "integer x;\n");
+        ALIncludeSearch::Where disk = where(false, true, { s.at("proj") });
+        disk.aliases                = { { "tools", s.at("tools") } };
+        const ALIncludeSearch::Asking own{ ALIncludeIdentity::ofFile(script), true };
+        const auto labels = [&](const std::string& typed, bool require = true) {
+            std::string out;
+            for (const ALRequireNavigation::Suggestion& one : search.suggest(own.self, typed, require, own, disk))
+            {
+                out += (out.empty() ? "" : " ") + one.label + (one.folder ? "/" : "");
+            }
+            return out;
+        };
+        ensure_equals("first: the aliases in reach, none reserved, then ./ and ../", labels(""), std::string("@shared/ @tools/ .// ..//"));
+        ensure_equals("the file's own folder: modules and folders, none hidden, nothing else", labels("./"), std::string("../ lib/ main util"));
+        ensure_equals("a name part typed: the same, for the editor to narrow", labels("./li"), labels("./"));
+        ensure_equals("in a folder: its own, and up", labels("./lib/"), std::string("../ http net sub/"));
+        ensure_equals("a name part typed there", labels("./lib/ne"), labels("./lib/"));
+        ensure_equals("through a .luaurc's alias", labels("@shared/"), std::string("../ http net sub/"));
+        ensure_equals("through the studio's", labels("@tools/"), std::string("../ t"));
+        ensure_equals("a reserved alias walks nowhere", labels("@sl-std/"), std::string());
+
+        // Every module offered is what a require of it finds.
+        for (const std::string& typed : { std::string("./"), std::string("./lib/"), std::string("./lib/sub/"), std::string("@shared/"), std::string("@tools/") })
+        {
+            for (const ALRequireNavigation::Suggestion& one : search.suggest(own.self, typed, true, own, disk))
+            {
+                if (one.folder || one.label == "..")
+                {
+                    continue;
+                }
+                ALPreprocessor::Include  found;
+                std::vector<std::string> aliases;
+                ensure("resolves: " + one.path, search.resolve(ask(one.path, true, own.self), found, own, disk, nullptr, false, &aliases) ==
+                                                    ALPreprocessor::Found::Yes);
+            }
+        }
+        ensure_equals("each one's whole path", search.suggest(own.self, "./lib/", true, own, disk)[1].path, std::string("./lib/http"));
+
+        // An include's: the file's own folder, by its search, names whole.
+        const ALIncludeSearch::Asking lsl{ ALIncludeIdentity::ofFile(inc), false };
+        std::string                   said;
+        for (const ALRequireNavigation::Suggestion& one : search.suggest(lsl.self, "", false, lsl, disk))
+        {
+            said += (said.empty() ? "" : " ") + one.path + (one.folder ? "/" : "");
+        }
+        ensure_equals("an LSL include's", said, std::string("inc.lsl lib/"));
     }
 }
