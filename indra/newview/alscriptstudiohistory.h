@@ -86,6 +86,9 @@ public:
     typedef std::function<std::string(const char* name, std::optional<S32> count)> words_t;
     static std::vector<ALQuickOpen::Candidate> candidatesOf(const std::vector<ALSavedText>& saves, const LLUUID& current, const words_t& words,
                                                             const std::function<std::string(const std::vector<std::string>&)>& listed);
+    // A save's text, where a listing left it out, read: false where it
+    // can no longer be.
+    static bool read(ALSavedText& saved);
     // A comparison of a save given the saves kept under its key to step
     // through, oldest first, the one at `shown` among them -- for the
     // notecard window's comparison as well as the studio's: each stepped

@@ -385,4 +385,31 @@ namespace tut
         ensure("the slider put back", view.bar()->versionShown() == 1);
         ensure("the left as it was", view.leftText() == "newer" && doc.historyShown->text == "newer");
     }
+
+    template<> template<>
+    void alscriptstudiohistory_object::test<9>()
+    {
+        set_test_name("a save stepped to is read once and kept: stepped back to after its file is gone, still there");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        studio.host = window.floater;
+        Doc& doc    = tab("door", "now");
+        saved(doc, "first", 300.0);
+        saved(doc, "second", 200.0);
+        saved(doc, "third", 100.0);
+        unit.show(doc);
+        studio.choose(studio.candidates[1].value);
+        ALDiffView&  view  = *doc.compareView;
+        const auto   press = [&view](const char* name) { ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>(name))->press(); };
+        press("older");
+        ensure_equals("the oldest", view.leftText(), std::string("first"));
+        press("newer");
+        const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
+        std::error_code                gone;
+        std::filesystem::remove(fsyspath(listed[2].path), gone);
+        press("older");
+        ensure("the oldest again, as it was read", view.leftText() == "first" && view.bar()->versionShown() == 0 && doc.historyShown->text == "first");
+    }
 }

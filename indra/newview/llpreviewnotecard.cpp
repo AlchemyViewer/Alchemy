@@ -745,10 +745,9 @@ void LLPreviewNotecard::showHistory()
 
 void LLPreviewNotecard::compareSave(ALSavedText saved)
 {
-    std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
-    LLStringUtil::format_map_t     args;
+    LLStringUtil::format_map_t args;
     args["[WHEN]"] = ALRecoveryEntry::sayWhen(saved.when);
-    if (!mLoaded || mSavedThere || (!saved.whole && (!history || !history->load(saved))))
+    if (!mLoaded || mSavedThere || !ALScriptStudioHistory::read(saved))
     {
         setStatus(getString("HistoryUnreadable", args), true);
         return;

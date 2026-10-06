@@ -111,13 +111,19 @@ void ALScriptStudioHistory::show(Doc& doc)
         nullptr);
 }
 
+// static
+bool ALScriptStudioHistory::read(ALSavedText& saved)
+{
+    const std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
+    return saved.whole || (history && history->load(saved));
+}
+
 bool ALScriptStudioHistory::compare(Doc& doc, ALSavedText saved)
 {
-    std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
-    LLStringUtil::format_map_t     args;
+    LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
     args["[WHEN]"] = ALRecoveryEntry::sayWhen(saved.when);
-    if (!saved.whole && (!history || !history->load(saved)))
+    if (!read(saved))
     {
         mServices.setStatus(mServices.words("HistoryUnreadable", args), true);
         return false;
@@ -178,16 +184,17 @@ void ALScriptStudioHistory::offerVersions(ALDiffView& view, const std::string& k
         {
             return;
         }
-        ALSavedText                          save    = listed->saves[static_cast<size_t>(version)];
-        const std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
-        if (!save.whole && (!history || !history->load(save)))
+        // Read once and kept in the list: a slider dragged back and forth
+        // passes the same saves again.
+        ALSavedText& save = listed->saves[static_cast<size_t>(version)];
+        if (!read(save))
         {
             unreadable(save);
             shows->showVersion(listed->current);
             return;
         }
         listed->current = version;
-        stepped(std::move(save));
+        stepped(save);
     });
 }
 

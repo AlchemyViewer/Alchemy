@@ -32,6 +32,7 @@
 #include "aldiffsame.h"
 #include "aldiffview.h"
 #include "aldiskincludes.h"
+#include "allinebreaks.h"
 #include "allsltoslua.h"
 #include "alscriptlexicon.h"
 #include "alscriptstudioviewer.h"
@@ -6299,9 +6300,9 @@ std::optional<std::string> ALFloaterScriptStudio::clipboardText() const
     {
         return std::nullopt;
     }
-    // Its line breaks as an editor here keeps them.
-    LLStringUtil::removeCRLF(text);
-    return text;
+    // Its line breaks as an editor here reads them: CR LF and a lone CR
+    // each one.
+    return ALLineBreaks::withLineFeeds(text);
 }
 
 LLView* ALFloaterScriptStudio::typeInSource(Doc& doc, const ALTextPos& at)
