@@ -43,10 +43,12 @@ class LLTextBox;
 // target it could be compiled for, side by side -- which is how to choose
 // one -- and what each part of it weighs for the target chosen there: its
 // bytes, its share of what the target runs a script in, and how that moved
-// since the text was last saved, sorted by whichever of them is asked. It
-// fills its lists from what it is given and says what is chosen; going
-// there is the window's. What a script allocates as it runs is in none of
-// it.
+// since the text was last saved, sorted by whichever of them is asked. For
+// a Luau target, each string its table keeps too -- its bytes, how many
+// instructions use it, where it is first named -- with the starts several
+// strings share that would weigh less kept once. It fills its lists from
+// what it is given and says what is chosen; going there is the window's.
+// What a script allocates as it runs is in none of it.
 class ALScriptWeightsPane : public LLPanel
 {
 public:
@@ -100,9 +102,11 @@ public:
     void showNothing(const std::string& why);
     const std::string& shownId() const { return mShown.id; }
 
-    // The part chosen in the list, where it has a place.
-    std::optional<Place> chosenPlace() const;
+    // What is chosen in one of its lists -- a part, a string, a shared
+    // start's first string -- where it has a place.
+    std::optional<Place> chosenPlace(const ALPaneList* list) const;
     ALPaneList*          partsList() const { return mParts; }
+    ALPaneList*          stringsList() const { return mStringsList; }
 
 private:
     // A part as listed: the part, and how its bytes moved since the text
@@ -120,10 +124,29 @@ private:
         std::string          name;
     };
 
+    // A string as listed, or a start several share: its place in the
+    // weight's strings or its shared starts, and what it shows, made once
+    // for the row and for sorting by it.
+    struct StringRow
+    {
+        bool        start = false;
+        size_t      index = 0;
+        // The string, or the start, itself: which row it is across a refill.
+        std::string text;
+        std::string name;
+        S64         bytes = 0;
+        size_t      uses  = 0;
+        S32         line  = -1;
+        std::string file;
+    };
+
     const ALScriptWeight* chosen() const;
     const ALScriptWeight* savedFor(ALScriptWeight::Target target) const;
     void                  fillTargets();
     void                  fillParts();
+    void                  fillStrings();
+    std::string           whereAt(const std::string& file, S32 line) const;
+    S32                   compareStrings(S32 column, const LLScrollListItem* a, const LLScrollListItem* b) const;
     std::string           partName(const ALScriptWeight::Part& part) const;
     std::string           kindName(ALScriptWeight::Part::Kind kind) const;
     std::string           where(const ALScriptWeight::Part& part) const;
@@ -137,7 +160,10 @@ private:
     LLTextBox*             mHead    = nullptr;
     ALPaneList*            mTargets = nullptr;
     ALPaneList*            mParts   = nullptr;
+    LLView*                mStringsPanel = nullptr;
+    ALPaneList*            mStringsList  = nullptr;
     Shown                  mShown;
     ALScriptWeight::Target mChosen = ALScriptWeight::Target::SLua;
     std::vector<Row>       mRows;
+    std::vector<StringRow> mStringRows;
 };

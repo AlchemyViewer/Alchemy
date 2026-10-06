@@ -756,6 +756,12 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="WeightsKindFrame">Overhead</floater.string>
     <floater.string name="WeightsStateTip">The state's handler table. Each handler is listed separately.</floater.string>
     <floater.string name="WeightsFrameTip">Fixed overhead for any script on this target.</floater.string>
+    <floater.string name="WeightsStringName">name</floater.string>
+    <floater.string name="WeightsStringTip">[BYTES] bytes in the string table, its length included. Used by [USES] instructions, [LOADS] of them as a value.</floater.string>
+    <floater.string name="WeightsStringNameTip">A function's name, which the line information keeps: [BYTES] bytes in the string table, its length included.</floater.string>
+    <floater.string name="WeightsSharedStart">Shared start: [START] in [COUNT] strings</floater.string>
+    <floater.string name="WeightsSharedStartTip">[COUNT] strings start with these [LENGTH] bytes. Kept once and joined back on as each is loaded, the bytecode would be about [SAVED] bytes smaller. Luau joins constant strings as it compiles, a local that is never assigned again included, so the start must be kept apart: local start; start = [START]. Each join also builds the string while the script runs.</floater.string>
+    <floater.string name="WeightsSaves">-[BYTES]</floater.string>
     <floater.string name="WeightNote">[BYTES] bytes</floater.string>
     <floater.string name="WeightNoteEstimate">~[BYTES] bytes</floater.string>
     <floater.string name="WeightNoteNamed">[NAME] [NOTE]</floater.string>
@@ -2683,6 +2689,31 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                                         <pane_list.columns halign="right" label="Share" name="share" width="50" />
                                         <pane_list.columns halign="right" label="Since save" name="change" width="64" />
                                         <pane_list.columns label="Line" name="line" width="84" />
+                                    </pane_list>
+                                </layout_panel>
+                                <layout_panel
+                                 auto_resize="false"
+                                 height="144"
+                                 layout="topleft"
+                                 min_dim="160"
+                                 name="weights_strings_panel"
+                                 user_resize="true"
+                                 width="220">
+                                    <pane_list
+                                     draw_heading="true"
+                                     heading_height="18"
+                                     follows="all"
+                                     height="144"
+                                     layout="topleft"
+                                     left="0"
+                                     name="weights_strings"
+                                     tool_tip="Each string the compiled script keeps once, its bytes and how many instructions use it. Rows in italics are starts several strings share, which could be kept once. Double-click to go there."
+                                     top="0"
+                                     width="220">
+                                        <pane_list.columns dynamic_width="true" label="String" name="string" />
+                                        <pane_list.columns halign="right" label="Bytes" name="bytes" width="50" />
+                                        <pane_list.columns halign="right" label="Uses" name="uses" width="40" />
+                                        <pane_list.columns label="Line" name="line" width="60" />
                                     </pane_list>
                                 </layout_panel>
                             </layout_stack>

@@ -950,7 +950,9 @@ private:
     // The Weights tab: whether it is looked at; and a part chosen there,
     // gone to.
     bool weightsShown() const override;
-    void onWeightChosen(bool to_editor);
+    // A part or a string chosen in the Memory tab's list: shown there, or
+    // gone to.
+    void onWeightChosen(ALPaneList* list, bool to_editor);
     // The outline (ALScriptOutlinePane): shown, which the bar at the
     // bottom is told of; a symbol chosen, gone to; its sort kept.
     void        outlineShown(Doc& doc) override { mCaret.placePath(doc); }
@@ -1314,6 +1316,7 @@ private:
     // The Weights tab, and its list of parts.
     ALScriptWeightsPane*               mWeightsPane = nullptr;
     ALPaneList*                        mWeightsParts      = nullptr;
+    ALPaneList*                        mWeightsStrings    = nullptr;
     ALScriptExplorerPane*              mExplorerPane  = nullptr;
     // What each of the menus' items does, whether it can, and whether it
     // is on, by the item's name.

@@ -794,6 +794,7 @@ void ALFloaterScriptStudio::findPanes()
     mOutlinePane   = getChild<ALScriptOutlinePane>("outline_pane");
     mWeightsPane   = getChild<ALScriptWeightsPane>("weights_tab");
     mWeightsParts  = mWeightsPane->partsList();
+    mWeightsStrings = mWeightsPane->stringsList();
     mInspectorPane = getChild<ALScriptInspectorPane>("inspector_pane");
     mExplorerPane  = getChild<ALScriptExplorerPane>("explorer_pane");
     mCompileTarget = getChild<LLComboBox>("compile_target");
@@ -832,11 +833,14 @@ void ALFloaterScriptStudio::wirePanes()
         }
     });
     mProblemsPane = getChild<ALScriptProblemsPane>("problems_tab");
-    mWeightsParts->setCommitCallback([this](LLUICtrl*, const LLSD&) { onWeightChosen(false); });
-    // Return and a double-click go to the part chosen; escape back to the
-    // script.
-    mWeightsParts->setGo([this]() { onWeightChosen(true); });
-    mWeightsParts->setBack([this]() { revealed(mWeightsParts, true); });
+    // Return and a double-click go to the part or the string chosen; escape
+    // back to the script.
+    for (ALPaneList* list : { mWeightsParts, mWeightsStrings })
+    {
+        list->setCommitCallback([this, list](LLUICtrl*, const LLSD&) { onWeightChosen(list, false); });
+        list->setGo([this, list]() { onWeightChosen(list, true); });
+        list->setBack([this, list]() { revealed(list, true); });
+    }
     mOutputPane = getChild<ALScriptOutputPane>("output_tab");
 
     mSearchPane = getChild<ALScriptSearchPane>("search_tab");
@@ -4901,14 +4905,14 @@ bool ALFloaterScriptStudio::weightsShown() const
     return ALPaneFolds::inSight(mWeightsPane);
 }
 
-void ALFloaterScriptStudio::onWeightChosen(bool to_editor)
+void ALFloaterScriptStudio::onWeightChosen(ALPaneList* list, bool to_editor)
 {
-    const std::optional<ALScriptWeightsPane::Place> place = mWeightsPane->chosenPlace();
+    const std::optional<ALScriptWeightsPane::Place> place = mWeightsPane->chosenPlace(list);
     if (!place)
     {
         return;
     }
-    if (!to_editor && mNavigation.deferOpen(mWeightsParts, place->file))
+    if (!to_editor && mNavigation.deferOpen(list, place->file))
     {
         return;
     }
@@ -4932,7 +4936,7 @@ void ALFloaterScriptStudio::onWeightChosen(bool to_editor)
         openIncludeAt(place->file, place->fileName, place->line, place->column, 0);
     }
     --mHoldPanes;
-    revealed(mWeightsParts, to_editor);
+    revealed(list, to_editor);
 }
 
 void ALFloaterScriptStudio::showPlace(Doc& doc, Doc::View view, const ALTextPos& at)
@@ -4970,9 +4974,9 @@ void ALFloaterScriptStudio::choosePreview(ALPaneList* list)
     {
         mSearchPane->choose(false);
     }
-    else if (list == mWeightsParts)
+    else if (list == mWeightsParts || list == mWeightsStrings)
     {
-        onWeightChosen(false);
+        onWeightChosen(list, false);
     }
 }
 
