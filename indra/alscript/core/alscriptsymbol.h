@@ -112,10 +112,15 @@ struct ALScriptHover
     std::string expected;
     std::string documentation;
     std::string link;
-    // Where it was declared, when it was declared in the script.
+    // Where it was declared, when it was declared in the script or in a
+    // module it requires.
     bool        hasDefinition = false;
     S32         definitionLine   = 0;
     S32         definitionColumn = 0;
+    // The module it was declared in, where it is not the script: by the
+    // key a problem's file has (ALLuauService::setModules), the place in
+    // the module's own lines.
+    std::string definitionFile;
 };
 
 // The call a position is inside, and which of its parameters the
@@ -148,16 +153,30 @@ struct ALScriptReferences
     bool               found = false;
     std::string        name;
     ALScriptSymbolKind kind = ALScriptSymbolKind::Variable;
-    // Where the script declares it. A builtin, or anything from the
-    // definitions, has no declaration here.
+    // Where the script, or a module it requires, declares it. A builtin,
+    // or anything from the definitions, has no declaration here.
     bool               hasDefinition = false;
     ALScriptSpan       definition;
+    // The module it is declared in, where it is not the script: by the key
+    // a problem's file has (ALLuauService::setModules), the span in the
+    // module's own lines.
+    std::string        definitionFile;
     // Whether every place it stands is the script's to change: declared
-    // here, and not a name the language fixes, as LSL's `default` is.
+    // here or in a module it requires, and not a name the language fixes,
+    // as LSL's `default` is.
     bool               renamable = false;
-    // Every place, the declaration among them, in order; each is the name
-    // alone, which is what a rename replaces.
+    // Every place in the script, the declaration among them, in order;
+    // each is the name alone, which is what a rename replaces.
     std::vector<ALScriptSpan> references;
+    // Every place in the modules the script requires, which the analyzer
+    // read apart: each module's in order, by its key, the declaration
+    // among them where it is in one.
+    struct Elsewhere
+    {
+        std::string  file;
+        ALScriptSpan span;
+    };
+    std::vector<Elsewhere> elsewhere;
 };
 
 // A stretch of the script coloured by what the analyzer knows it to be,

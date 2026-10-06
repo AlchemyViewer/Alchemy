@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alscriptspan.h"
 #include "stdtypes.h"
 
 #include "Luau/Location.h"
@@ -36,8 +37,10 @@
 // Luau's headers come with it, as with the front end's.
 namespace ALLuauTypes
 {
-    // A zero-based line and byte column as Luau has a position.
+    // A zero-based line and byte column as Luau has a position; and a
+    // stretch Luau found as the studio has one.
     Luau::Position positionOf(S32 line, S32 column);
+    ALScriptSpan   spanOf(const Luau::Location& where);
 
     // How a type prints beside a name: a table's first few fields and
     // how many more, since `ll` has hundreds and a tip is one glance.

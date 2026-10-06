@@ -61,6 +61,7 @@ target_sources(
     luau/alluauconfig.cpp
     luau/alluauexports.cpp
     luau/alluaufrontend.cpp
+    luau/alluaunavigation.cpp
     luau/alluauservice.cpp
     luau/alluautypes.cpp
     preprocessor/aldiskcache.cpp
@@ -130,6 +131,7 @@ target_sources(
         luau/alluauconfig.h
         luau/alluauexports.h
         luau/alluaufrontend.h
+        luau/alluaunavigation.h
         luau/alluauservice.h
         luau/alluautypes.h
         preprocessor/aldiskcache.h
@@ -218,6 +220,14 @@ if(AL_BUILD_TESTS)
       ${templates_define}
       "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
   )
+  # Where a name is declared and used, across a script and the modules it
+  # requires.
+  al_add_test(
+    alluaunavigation
+    PROJECT alscript
+    LIBRARIES alscript llcommon
+    DEFINES ${definitions_defines}
+  )
   al_add_test(
     allslservice
     PROJECT alscript
@@ -245,6 +255,7 @@ if(AL_BUILD_TESTS)
     test
     alluauservice
     alluaufragment
+    alluaunavigation
     alscriptfixes
     alscriptlintpass
     allsltoslua

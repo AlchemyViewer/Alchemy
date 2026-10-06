@@ -38,6 +38,16 @@ namespace ALLuauTypes
         return Luau::Position(static_cast<unsigned>(std::max(0, line)), static_cast<unsigned>(std::max(0, column)));
     }
 
+    ALScriptSpan spanOf(const Luau::Location& where)
+    {
+        ALScriptSpan span;
+        span.line      = static_cast<S32>(where.begin.line);
+        span.column    = static_cast<S32>(where.begin.column);
+        span.endLine   = static_cast<S32>(where.end.line);
+        span.endColumn = static_cast<S32>(where.end.column);
+        return span;
+    }
+
     std::string typeText(Luau::TypeId type)
     {
         Luau::ToStringOptions options;

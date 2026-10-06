@@ -42,6 +42,7 @@ namespace Luau
 class ALLuauCompletion;
 class ALLuauFragment;
 struct ALLuauFrontend;
+class ALLuauNavigation;
 
 // The SLua analyzer: Luau's front end from Second Life's fork, given the
 // grid's definitions and asked about one script at a time: what is wrong
@@ -178,12 +179,15 @@ public:
     // fragment where setFragments says so, as is signature help.
     std::vector<ALScriptCompletion> complete(std::string_view source, S32 line, S32 column);
     // What is at a position: its name and type, its documentation, and
-    // where in the script it was bound.
+    // where it was bound: in the script, or for a field or a type, in a
+    // module it requires.
     ALScriptHover hover(std::string_view source, S32 line, S32 column);
     // The call a position is inside, if any.
     ALScriptSignature signature(std::string_view source, S32 line, S32 column);
-    // The name at a position -- a local, a global, a field of something
-    // -- with where the script binds it and every place it stands.
+    // The name at a position -- a local, a global, a field of something,
+    // a type -- with where it is declared and every place it stands: in
+    // the script, and for a field or a type, in the modules it requires
+    // too (ALLuauNavigation).
     ALScriptReferences references(std::string_view source, S32 line, S32 column);
     // The script's own shape: what it binds at the top and the functions
     // in it, each function's own one deeper.
@@ -229,9 +233,10 @@ public:
 private:
     // What is kept between questions (alluaufrontend.h), whose Luau
     // headers stay out of this one; the fragment the questions asked as a
-    // script is typed are answered over; and what answers over them in a
-    // class of its own.
+    // script is typed are answered over; and what answers over them in
+    // classes of their own: completion, and where names are bound and used.
     std::unique_ptr<ALLuauFrontend>   mFrontend;
     std::unique_ptr<ALLuauFragment>   mFragment;
     std::unique_ptr<ALLuauCompletion> mCompletion;
+    std::unique_ptr<ALLuauNavigation> mNavigation;
 };
