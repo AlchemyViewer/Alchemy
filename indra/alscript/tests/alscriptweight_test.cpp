@@ -732,6 +732,23 @@ namespace tut
             ensure("each one of them", w.strings[i].text.rfind(start, 0) == 0 && w.strings[i].text != start + "zulu");
         }
 
+        // The costs against the compiler's own: the four written whole, and
+        // written with the start kept apart and joined back on, weigh about
+        // what was said apart.
+        std::string whole;
+        std::string apart = "local start\nstart = \"" + start + "\"\n";
+        for (const std::string& rest : rests)
+        {
+            whole += "ll.OwnerSay(\"" + start + rest + "\")\n";
+            apart += "ll.OwnerSay(start .. \"" + rest + "\")\n";
+        }
+        const ALScriptWeight as_whole = ALScriptWeigh::slua(whole);
+        const ALScriptWeight as_apart = ALScriptWeigh::slua(apart);
+        ensure("both compiled", as_whole.compiled && as_apart.compiled && as_whole.sharedStarts.size() == 1);
+        const S64 really = S64(as_whole.total) - S64(as_apart.total);
+        ensure(llformat("saves about what was said: %lld against %zu", (long long)really, as_whole.sharedStarts[0].saved),
+               std::abs(really - S64(as_whole.sharedStarts[0].saved)) <= 8);
+
         // Nothing where only two share a start: two loads cost more than
         // one start saves, until the start is long.
         ensure("two with a middling start: nothing",
