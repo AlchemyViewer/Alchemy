@@ -43,7 +43,6 @@
 #include <algorithm>
 #include <cctype>
 #include <set>
-#include <cctype>
 #include <cerrno>
 #include <cmath>
 #include <cstdlib>
@@ -139,16 +138,15 @@ namespace
     constexpr std::string_view NOTE_MARK = "-- LSL:";
 
     // What LSL says that SLua always says otherwise, as the writer writes
-    // it: its operators, its blocks, a declaration's type, its truths, a
-    // vector's and a rotation's brackets, a string joined, a cast.
+    // it: its operators, a declaration's type, its truths, a cast. Its
+    // braces, a vector's and a rotation's brackets and a string joined are
+    // said where the writer writes them so (Writer::sameAs): bare marks
+    // made the same everywhere would hide a > or a + changed.
     const std::pair<std::string, std::string> SAID_OTHERWISE[] = {
         { "!=", "~=" },
         { "&&", "and" },
         { "||", "or" },
         { "!", "not" },
-        { "{", "then" },
-        { "{", "do" },
-        { "}", "end" },
         { "integer", "local" },
         { "float", "local" },
         { "string", "local" },
@@ -158,11 +156,6 @@ namespace
         { "list", "local" },
         { "TRUE", "true" },
         { "FALSE", "false" },
-        { "<", "vector(" },
-        { "<", "quaternion(" },
-        { ">", ")" },
-        { "+", ".." },
-        { "+=", "..=" },
         { "(string)", "tostring" },
         { "(integer)", "lslInteger" },
         { "(float)", "lslFloat" },
@@ -194,6 +187,19 @@ namespace
         int         prec    = PRIMARY;
         bool        boolean = false;
     };
+
+    // Pairs of words, looked for by views of them without a copy.
+    struct PairLess
+    {
+        using is_transparent = void;
+        template<typename A, typename B>
+        bool operator()(const A& a, const B& b) const
+        {
+            return std::pair<std::string_view, std::string_view>(a.first, a.second) <
+                   std::pair<std::string_view, std::string_view>(b.first, b.second);
+        }
+    };
+    typedef std::set<std::pair<std::string, std::string>, PairLess> SamePairs;
 
     std::string bracketed(const Expr& e, int at_least)
     {
@@ -238,48 +244,25 @@ namespace
         return !node || node->getNodeType() == NODE_NULL;
     }
 
-    std::string luaString(std::string_view text)
-    {
-        std::string out = "\"";
-        for (const char c : text)
-        {
-            const unsigned char u = static_cast<unsigned char>(c);
-            switch (c)
-            {
-                case '\\': out += "\\\\"; break;
-                case '"': out += "\\\""; break;
-                case '\n': out += "\\n"; break;
-                case '\r': out += "\\r"; break;
-                case '\t': out += "\\t"; break;
-                default:
-                    if (u < 0x20 || u == 0x7f)
-                    {
-                        out += llformat("\\%03d", u);
-                    }
-                    else
-                    {
-                        out += c;
-                    }
-                    break;
-            }
-        }
-        return out + "\"";
-    }
-
-    // Text between Luau's backticks: a string's escapes, and the backtick
-    // and the opening brace, which would end it or begin an expression; a
-    // closing brace is text there. Luau's compiler escapes a % itself.
-    std::string luaTemplateText(std::string_view text)
+    // A string's escapes, and the quote that ends it. Between Luau's
+    // backticks the quote is the backtick, and the opening brace would begin
+    // an expression; a closing brace is text there, and Luau's compiler
+    // escapes a % itself.
+    std::string escaped(std::string_view text, char quote, bool braces)
     {
         std::string out;
         for (const char c : text)
         {
             const unsigned char u = static_cast<unsigned char>(c);
+            if (c == quote || (braces && c == '{'))
+            {
+                out += '\\';
+                out += c;
+                continue;
+            }
             switch (c)
             {
                 case '\\': out += "\\\\"; break;
-                case '`': out += "\\`"; break;
-                case '{': out += "\\{"; break;
                 case '\n': out += "\\n"; break;
                 case '\r': out += "\\r"; break;
                 case '\t': out += "\\t"; break;
@@ -296,6 +279,27 @@ namespace
             }
         }
         return out;
+    }
+
+    std::string luaString(std::string_view text)
+    {
+        return "\"" + escaped(text, '"', false) + "\"";
+    }
+
+    // Text between Luau's backticks.
+    std::string luaTemplateText(std::string_view text)
+    {
+        return escaped(text, '`', true);
+    }
+
+    // An expression with the brackets around it taken off.
+    LSLExpression* unbracketed(LSLExpression* e)
+    {
+        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
+        }
+        return e;
     }
 
     std::string number(double v)
@@ -332,10 +336,7 @@ namespace
     // SLua a uuid, as written.
     bool uuidConstant(LSLExpression* e)
     {
-        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-        {
-            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
-        }
+        e = unbracketed(e);
         if (!e || e->getNodeSubType() != NODE_LVALUE_EXPRESSION)
         {
             return false;
@@ -389,7 +390,7 @@ namespace
         const std::vector<ALLSLToSLua::Span>& spans() const { return mSpans; }
         // Each LSL word written otherwise, and how: a call's name, a name
         // SLua holds for its own.
-        const std::set<std::pair<std::string, std::string>>& same() const { return mSame; }
+        const SamePairs& same() const { return mSame; }
 
     private:
         // --- where the two languages differ -----------------------------------------
@@ -518,7 +519,9 @@ namespace
         std::vector<size_t>        mLineStarts;
         Expr lvalue(LSLLValueExpression* e);
         Expr call(LSLFunctionExpression* e);
-        Expr writeCall(LSLFunctionExpression* e);
+        // The call as written, and the name SLua calls it by where it is
+        // still a call by name: ll.Say, llcompat.List2String, math.abs.
+        Expr writeCall(LSLFunctionExpression* e, std::string& called);
         Expr binary(LSLBinaryExpression* e);
         // A bit32 call as LSL's signed integer, but where `same` says its
         // answer is that already, or nothing asks for more.
@@ -543,7 +546,7 @@ namespace
         std::string args(LSLASTNode* list, LSLParamList* params, U16 text = 0);
         // What SLua has in a library call's stead, where it means the same;
         // nothing where it has nothing.
-        std::optional<Expr> idiom(LSLFunctionExpression* e, const std::string& lsl);
+        std::optional<Expr> idiom(LSLFunctionExpression* e, const std::string& lsl, std::string& called);
         // What was detected, from the handler's own table.
         std::optional<Expr> detected(LSLFunctionExpression* e, const std::string& lsl);
         // A call to a function answering an index or -1, which ll answers
@@ -801,7 +804,9 @@ namespace
         // node whose first line is written next, once its comments are; and
         // how many lines mText was counted to hold, and to where.
         std::vector<ALLSLToSLua::Span>                   mSpans;
-        std::set<std::pair<std::string, std::string>>    mSame;
+        SamePairs                                        mSame;
+        // An LSL word written otherwise here, kept in mSame.
+        void                                             sameAs(std::string_view lsl, std::string_view slua);
         std::optional<std::pair<S32, S32>>               mAnchorPending;
         void                                             endSpans();
         size_t                                           mCounted      = 0;
@@ -976,11 +981,19 @@ namespace
         {
             name += "_";
         }
-        if (lsl && name != lsl)
+        if (lsl)
         {
-            mSame.emplace(lsl, name);
+            sameAs(lsl, name);
         }
         return name;
+    }
+
+    void Writer::sameAs(std::string_view lsl, std::string_view slua)
+    {
+        if (lsl != slua && mSame.find(std::pair<std::string_view, std::string_view>(lsl, slua)) == mSame.end())
+        {
+            mSame.emplace(lsl, slua);
+        }
     }
 
     std::string Writer::stateKey(const std::string& state) const
@@ -1008,6 +1021,20 @@ namespace
             const S32 at = linesWritten();
             mSpans.push_back(ALLSLToSLua::Span{ mAnchorPending->first, mAnchorPending->second, at, at });
             mAnchorPending.reset();
+        }
+        // A block LSL opened and closed with braces.
+        const std::string_view written(text);
+        if (written == "do" || (written.size() > 3 && written.substr(written.size() - 3) == " do"))
+        {
+            sameAs("{", "do");
+        }
+        else if (written.size() > 5 && written.substr(written.size() - 5) == " then")
+        {
+            sameAs("{", "then");
+        }
+        if (written.substr(0, 3) == "end" && (written.size() == 3 || !(std::isalnum(static_cast<unsigned char>(written[3])) || written[3] == '_')))
+        {
+            sameAs("}", "end");
         }
         mText += text.empty() ? std::string("\n") : indent() + text + "\n";
     }
@@ -1569,11 +1596,15 @@ namespace
             case NODE_VECTOR_CONSTANT:
             {
                 const Vector3* v = static_cast<LSLVectorConstant*>(c)->getValue();
+                sameAs("<", "vector(");
+                sameAs(">", ")");
                 return { "vector(" + number(v->x) + ", " + number(v->y) + ", " + number(v->z) + ")" };
             }
             case NODE_QUATERNION_CONSTANT:
             {
                 const Quaternion* q = static_cast<LSLQuaternionConstant*>(c)->getValue();
+                sameAs("<", "quaternion(");
+                sameAs(">", ")");
                 return { "quaternion(" + number(q->x) + ", " + number(q->y) + ", " + number(q->z) + ", " + number(q->s) + ")" };
             }
             case NODE_LIST_CONSTANT:
@@ -1778,11 +1809,7 @@ namespace
     Expr Writer::condition(LSLExpression* e)
     {
         // What stands for true or false outright.
-        LSLExpression* inner = e;
-        while (inner && inner->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-        {
-            inner = static_cast<LSLParenthesisExpression*>(inner)->getChildExpr();
-        }
+        LSLExpression* inner = unbracketed(e);
         if (inner && inner->getNodeSubType() == NODE_BOOL_CONVERSION_EXPRESSION)
         {
             return condition(static_cast<LSLBoolConversionExpression*>(inner)->getChildExpr());
@@ -1836,21 +1863,14 @@ namespace
 
     std::optional<Expr> Writer::bitTest(LSLExpression* e)
     {
-        const auto bare = [](LSLExpression* one) {
-            while (one && one->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-            {
-                one = static_cast<LSLParenthesisExpression*>(one)->getChildExpr();
-            }
-            return one;
-        };
-        LSLExpression* inner = bare(e);
+        LSLExpression* inner = unbracketed(e);
         if (!inner || inner->getNodeSubType() != NODE_BINARY_EXPRESSION || inner->getOperation() != OP_BIT_AND)
         {
             return std::nullopt;
         }
         std::string                                   all;
         const std::function<void(LSLExpression* one)> gather = [&](LSLExpression* one) {
-            LSLExpression* b = bare(one);
+            LSLExpression* b = unbracketed(one);
             if (b->getNodeSubType() == NODE_BINARY_EXPRESSION && b->getOperation() == OP_BIT_AND)
             {
                 gather(static_cast<LSLBinaryExpression*>(b)->getLHS());
@@ -1868,11 +1888,7 @@ namespace
         // `..` makes a number text as tostring does, and an integer's text
         // in LSL is its digits, which is what both write. Not a float's,
         // which LSL writes with six places, nor a key's, which `..` refuses.
-        LSLExpression* bare = e;
-        while (bare && bare->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-        {
-            bare = static_cast<LSLParenthesisExpression*>(bare)->getChildExpr();
-        }
+        LSLExpression* bare = unbracketed(e);
         if (bare && bare->getNodeSubType() == NODE_TYPECAST_EXPRESSION && bare->getIType() == LST_STRING)
         {
             LSLExpression* child = static_cast<LSLTypecastExpression*>(bare)->getChildExpr();
@@ -1889,10 +1905,7 @@ namespace
 
     bool Writer::joinsText(LSLExpression* e)
     {
-        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-        {
-            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
-        }
+        e = unbracketed(e);
         if (!e || e->getNodeSubType() != NODE_BINARY_EXPRESSION || static_cast<LSLBinaryExpression*>(e)->getOperation() != OP_PLUS)
         {
             return false;
@@ -1909,34 +1922,24 @@ namespace
             out.push_back(e);
             return;
         }
-        while (e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-        {
-            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
-        }
+        e = unbracketed(e);
         textPieces(static_cast<LSLBinaryExpression*>(e)->getLHS(), out);
         textPieces(static_cast<LSLBinaryExpression*>(e)->getRHS(), out);
     }
 
     std::optional<Expr> Writer::interpolated(const std::vector<LSLExpression*>& pieces)
     {
-        // What each piece is once its brackets are let go of; and, for one
-        // made text by a cast, what was cast.
-        const auto bare = [](LSLExpression* e) {
-            while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-            {
-                e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
-            }
-            return e;
-        };
-        const auto cast = [&](LSLExpression* e) -> LSLExpression* {
-            e = bare(e);
+        // For a piece made text by a cast, what was cast.
+        const auto cast = [](LSLExpression* e) -> LSLExpression* {
+            e = unbracketed(e);
             return e && e->getNodeSubType() == NODE_TYPECAST_EXPRESSION && e->getIType() == LST_STRING ? static_cast<LSLTypecastExpression*>(e)->getChildExpr()
                                                                                                          : nullptr;
         };
         // Anything but a string is made text: by `..` itself for a number,
         // which string.format does in fewer steps, else by a call.
         const auto converted = [&](LSLExpression* e) {
-            return (cast(e) ? slType(cast(e)) : slType(bare(e))) != LST_STRING;
+            LSLExpression* from = cast(e);
+            return slType(from ? from : unbracketed(e)) != LST_STRING;
         };
         if (pieces.size() < 2 || std::none_of(pieces.begin(), pieces.end(), converted))
         {
@@ -1945,7 +1948,7 @@ namespace
         std::string body;
         for (LSLExpression* piece : pieces)
         {
-            LSLExpression* e = bare(piece);
+            LSLExpression* e = unbracketed(piece);
             if (e->getNodeSubType() == NODE_CONSTANT_EXPRESSION && e->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
             {
                 body += luaTemplateText(static_cast<LSLStringConstant*>(e->getChild(0))->getValue());
@@ -1973,11 +1976,7 @@ namespace
             // Text written out that is no UUID, where only a uuid will do --
             // text is kept as text where SLua takes it (Writer::args,
             // Writer::varType) -- which uuid() stops the script on.
-            LSLExpression* inner = e;
-            while (inner && inner->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-            {
-                inner = static_cast<LSLParenthesisExpression*>(inner)->getChildExpr();
-            }
+            LSLExpression* inner = unbracketed(e);
             const bool constant = inner && inner->getNodeSubType() == NODE_CONSTANT_EXPRESSION;
             if (constant && inner->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
             {
@@ -2032,10 +2031,7 @@ namespace
         {
             return v >= 0;
         }
-        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-        {
-            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
-        }
+        e = unbracketed(e);
         if (!e || e->getNodeSubType() != NODE_LVALUE_EXPRESSION)
         {
             return false;
@@ -2116,10 +2112,7 @@ namespace
     // minus before it.
     bool wholeNumber(LSLExpression* e, int& v)
     {
-        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-        {
-            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
-        }
+        e = unbracketed(e);
         if (!e)
         {
             return false;
@@ -2190,10 +2183,7 @@ namespace
         {
             return std::to_string(v >= 0 ? v + 1 : v);
         }
-        while (e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-        {
-            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
-        }
+        e = unbracketed(e);
         // A counter, alone or with a whole number added.
         LSLExpression* counter = e;
         int            added   = 0;
@@ -2202,10 +2192,7 @@ namespace
             auto* b = static_cast<LSLBinaryExpression*>(e);
             counter = wholeNumber(b->getRHS(), added) ? b->getLHS() : wholeNumber(b->getLHS(), added) ? b->getRHS() : nullptr;
         }
-        while (counter && counter->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-        {
-            counter = static_cast<LSLParenthesisExpression*>(counter)->getChildExpr();
-        }
+        counter = unbracketed(counter);
         if (!counter || counter->getNodeSubType() != NODE_LVALUE_EXPRESSION || added < 0 ||
             !isNull(static_cast<LSLLValueExpression*>(counter)->getMember()))
         {
@@ -2277,7 +2264,7 @@ namespace
         return Expr{ "detected[" + at + "]:" + std::string(found->second) + "()", PRIMARY, found->second == "getGroup" };
     }
 
-    std::optional<Expr> Writer::idiom(LSLFunctionExpression* e, const std::string& lsl)
+    std::optional<Expr> Writer::idiom(LSLFunctionExpression* e, const std::string& lsl, std::string& called)
     {
         const auto arg = [&](int at) { return value(argumentAt(e, at)); };
         if (mOptions.sluaCalls)
@@ -2294,29 +2281,34 @@ namespace
         }
         if (lsl == "llVecMag" || lsl == "llVecNorm")
         {
-            return Expr{ std::string(lsl == "llVecMag" ? "vector.magnitude(" : "vector.normalize(") + arg(0).text + ")" };
+            called = lsl == "llVecMag" ? "vector.magnitude" : "vector.normalize";
+            return Expr{ called + "(" + arg(0).text + ")" };
         }
         if (lsl == "llVecDist")
         {
-            return Expr{ "vector.magnitude(" + bracketed(arg(0), ADD) + " - " + bracketed(arg(1), ADD + 1) + ")" };
+            called = "vector.magnitude";
+            return Expr{ called + "(" + bracketed(arg(0), ADD) + " - " + bracketed(arg(1), ADD + 1) + ")" };
         }
         if (lsl == "llRot2Fwd" || lsl == "llRot2Left" || lsl == "llRot2Up")
         {
-            const char* fn = lsl == "llRot2Fwd" ? "tofwd" : lsl == "llRot2Left" ? "toleft" : "toup";
-            return Expr{ std::string("quaternion.") + fn + "(" + arg(0).text + ")" };
+            called = std::string("quaternion.") + (lsl == "llRot2Fwd" ? "tofwd" : lsl == "llRot2Left" ? "toleft" : "toup");
+            return Expr{ called + "(" + arg(0).text + ")" };
         }
         if (lsl == "llGetUnixTime")
         {
+            called = "os.time";
             return Expr{ "os.time()" };
         }
         if (lsl == "llOwnerSay")
         {
+            called = "print";
             return Expr{ "print(" + coerced(argumentAt(e, 0), LST_STRING).text + ")" };
         }
         // Half up, as LSL rounds, where math.round rounds a half away from
         // nought.
         if (lsl == "llRound")
         {
+            called = "math.floor";
             return Expr{ "math.floor(" + bracketed(arg(0), ADD) + " + 0.5)" };
         }
         // Characters, as LSL counts them: its strings are always UTF-8,
@@ -2324,6 +2316,7 @@ namespace
         if (lsl == "llStringLength")
         {
             // Bracketed: after `::` Luau reads a < or a - as more type.
+            called = "utf8.len";
             return Expr{ "(utf8.len(" + coerced(argumentAt(e, 0), LST_STRING).text + ") :: number)" };
         }
         // Luau's math where it answers what LSL's did.
@@ -2344,17 +2337,15 @@ namespace
             {
                 out += (out.empty() ? "" : ", ") + value(static_cast<LSLExpression*>(a)).text;
             }
-            return Expr{ "math." + std::string(found->second) + "(" + out + ")" };
+            called = "math." + std::string(found->second);
+            return Expr{ called + "(" + out + ")" };
         }
         return std::nullopt;
     }
 
     LSLFunctionExpression* Writer::findCall(LSLExpression* e)
     {
-        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-        {
-            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
-        }
+        e = unbracketed(e);
         if (!mOptions.sluaCalls || !e || e->getNodeSubType() != NODE_FUNCTION_EXPRESSION)
         {
             return nullptr;
@@ -2400,30 +2391,17 @@ namespace
 
     Expr Writer::call(LSLFunctionExpression* e)
     {
-        // What the call is named in SLua, where that is another name: the
-        // first name of what is written, past a bracket -- ll.Say,
-        // llcompat.List2String, math.abs -- before its arguments.
-        Expr              written = writeCall(e);
-        const std::string lsl     = e->getIdentifier()->getName();
-        const size_t      from    = written.text.find_first_not_of("( ");
-        size_t            to      = from;
-        while (to < written.text.size() && (std::isalnum(static_cast<unsigned char>(written.text[to])) || written.text[to] == '_' || written.text[to] == '.' ||
-                                            written.text[to] == ':'))
+        // What the call is named in SLua, where that is another name.
+        std::string called;
+        Expr        written = writeCall(e, called);
+        if (!called.empty())
         {
-            ++to;
-        }
-        if (from != std::string::npos && to > from && to < written.text.size() && written.text[to] == '(')
-        {
-            const std::string slua = written.text.substr(from, to - from);
-            if (slua != lsl)
-            {
-                mSame.emplace(lsl, slua);
-            }
+            sameAs(e->getIdentifier()->getName(), called);
         }
         return written;
     }
 
-    Expr Writer::writeCall(LSLFunctionExpression* e)
+    Expr Writer::writeCall(LSLFunctionExpression* e, std::string& called)
     {
         LSLIdentifier* id     = e->getIdentifier();
         LSLSymbol*     symbol = id->getSymbol();
@@ -2441,6 +2419,7 @@ namespace
         }
         if (lsl == "llSetTimerEvent" && mTimers)
         {
+            called = "setTimer";
             return { "setTimer(" + args(e->getArguments(), params) + ")" };
         }
         if (mOptions.detectedTable && mInDetected)
@@ -2452,9 +2431,9 @@ namespace
         }
         if (mOptions.idioms)
         {
-            if (std::optional<Expr> said = idiom(e, lsl))
+            if (std::optional<Expr> written = idiom(e, lsl, called))
             {
-                return *said;
+                return *written;
             }
         }
         const ALLSLTraits::Trait* trait   = ALLSLTraits::of(lsl.c_str());
@@ -2483,17 +2462,19 @@ namespace
             {
                 noteOnce(e, "SluaUse", "SLua would use [1] for [2].", { trait->sluaUse, lsl });
             }
-            const std::string called =
+            const std::string args_text =
                 (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params, trait ? trait->sluaTextArgs : 0);
-            return { "ll." + bare + "(" + called + ")", PRIMARY, (slua & ALLSLTraits::SluaBool) != 0 };
+            called = "ll." + bare;
+            return { called + "(" + args_text + ")", PRIMARY, (slua & ALLSLTraits::SluaBool) != 0 };
         }
         // An index SLua's ll counts from 1, or nil for none, read as LSL's:
         // from 0, or -1.
         const U8 not_ll = compat_only & ~ALLSLTraits::SluaIndexResult;
         if (mOptions.sluaCalls && (slua & ALLSLTraits::SluaIndexResult) && !(slua & not_ll) && ll_indexes)
         {
-            const std::string called = (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params);
-            return { "(ll." + bare + "(" + called + ") or 0) - 1", ADD };
+            const std::string args_text = (slua & ALLSLTraits::SluaIndexArgs) ? llArgs(e, indexes) : args(e->getArguments(), params);
+            called                      = "ll." + bare;
+            return { "(" + called + "(" + args_text + ") or 0) - 1", ADD };
         }
         if (slua & ALLSLTraits::SluaRemoved)
         {
@@ -2552,7 +2533,8 @@ namespace
         {
             noteOnce(e, "SluaUse", "SLua would use [1] for [2].", { trait->sluaUse, lsl });
         }
-        return { "llcompat." + bare + "(" + args(e->getArguments(), params) + ")" };
+        called = "llcompat." + bare;
+        return { called + "(" + args(e->getArguments(), params) + ")" };
     }
 
     Expr Writer::signedUnless(bool same, const std::string& call, LSLASTNode* at)
@@ -2577,10 +2559,7 @@ namespace
         {
             return true;
         }
-        while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-        {
-            e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
-        }
+        e = unbracketed(e);
         if (e && e->getNodeSubType() == NODE_BINARY_EXPRESSION)
         {
             // An & with one, an | or ^ of two, a >> of one.
@@ -2671,11 +2650,7 @@ namespace
             {
                 std::string                                   all;
                 const std::function<void(LSLExpression* one)> gather = [&](LSLExpression* one) {
-                    LSLExpression* inner = one;
-                    while (inner->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-                    {
-                        inner = static_cast<LSLParenthesisExpression*>(inner)->getChildExpr();
-                    }
+                    LSLExpression* inner = unbracketed(one);
                     if (inner->getNodeSubType() == NODE_BINARY_EXPRESSION && inner->getOperation() == op)
                     {
                         gather(static_cast<LSLBinaryExpression*>(inner)->getLHS());
@@ -2719,6 +2694,7 @@ namespace
                     }
                     const Expr a = joinedPiece(lhs);
                     const Expr b = joinedPiece(rhs);
+                    sameAs("+", "..");
                     // Joining text is the same whichever way round it goes:
                     // a chain unbracketed.
                     return { bracketed(a, CONCAT) + " .. " + bracketed(b, CONCAT), CONCAT };
@@ -2829,11 +2805,7 @@ namespace
             {
                 // !(a == b) as a ~= b, and !(a != b) as a == b: not of two
                 // lists, whose != is how much longer the left is.
-                LSLExpression* inner = child;
-                while (inner->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-                {
-                    inner = static_cast<LSLParenthesisExpression*>(inner)->getChildExpr();
-                }
+                LSLExpression* inner = unbracketed(child);
                 const bool compare = inner->getNodeSubType() == NODE_BINARY_EXPRESSION &&
                                      (inner->getOperation() == OP_EQ || inner->getOperation() == OP_NEQ) &&
                                      !(static_cast<LSLBinaryExpression*>(inner)->getLHS()->getIType() == LST_LIST &&
@@ -3006,11 +2978,15 @@ namespace
             case NODE_VECTOR_EXPRESSION:
             {
                 auto* v = static_cast<LSLVectorExpression*>(e);
+                sameAs("<", "vector(");
+                sameAs(">", ")");
                 return { "vector(" + value(v->getX()).text + ", " + value(v->getY()).text + ", " + value(v->getZ()).text + ")" };
             }
             case NODE_QUATERNION_EXPRESSION:
             {
                 auto* q = static_cast<LSLQuaternionExpression*>(e);
+                sameAs("<", "quaternion(");
+                sameAs(">", ")");
                 return { "quaternion(" + value(q->getX()).text + ", " + value(q->getY()).text + ", " + value(q->getZ()).text + ", " +
                          value(q->getS()).text + ")" };
             }
@@ -3050,6 +3026,7 @@ namespace
                 case OP_POST_INCR:
                     if (t == LST_STRING)
                     {
+                        sameAs("+", "..");
                         return old + " .. " + bracketed(joinedPiece(rhs), CONCAT);
                     }
                     if (t == LST_LIST)
@@ -3124,6 +3101,7 @@ namespace
             }
             else
             {
+                sameAs("+", "..");
                 for (LSLExpression* part : parts)
                 {
                     piece += (piece.empty() ? "" : " .. ") + bracketed(parts.size() > 1 ? joinedPiece(part) : coerced(part, LST_STRING), CONCAT);
@@ -3152,11 +3130,13 @@ namespace
                 }
                 else
                 {
+                    sameAs("+", "..");
                     for (LSLExpression* part : parts)
                     {
                         joined += (joined.empty() ? "" : " .. ") + bracketed(joinedPiece(part), CONCAT);
                     }
                 }
+                sameAs("+=", "..=");
                 line(name + " ..= " + joined);
                 return;
             }
@@ -3165,11 +3145,18 @@ namespace
         // Luau's compound assignments where they mean LSL's.
         if (type != LST_LIST && op != OP_ASSIGN)
         {
+            // A piece joined on as s = s + piece has it.
+            if (type == LST_STRING && op == OP_ADD_ASSIGN && rhs)
+            {
+                sameAs("+=", "..=");
+                line(name + " ..= " + joinedPiece(rhs).text);
+                return;
+            }
             const Expr v = rhs ? value(rhs) : Expr{ "1" };
             switch (op)
             {
                 case OP_ADD_ASSIGN:
-                    line(name + (type == LST_STRING ? " ..= " : " += ") + (type == LST_STRING ? coerced(rhs, LST_STRING).text : v.text));
+                    line(name + " += " + v.text);
                     return;
                 case OP_PRE_INCR:
                 case OP_POST_INCR: line(name + " += 1"); return;
@@ -3768,11 +3755,7 @@ namespace
     {
         LSLExpression* unwrapped(LSLExpression* e)
         {
-            while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-            {
-                e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
-            }
-            return e;
+            return unbracketed(e);
         }
 
         // The variable an lvalue names, whole: none for a part of one.
@@ -5738,11 +5721,7 @@ namespace
         {
             return LST_KEY;
         }
-        LSLExpression* inner = e;
-        while (inner && inner->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-        {
-            inner = static_cast<LSLParenthesisExpression*>(inner)->getChildExpr();
-        }
+        LSLExpression* inner = unbracketed(e);
         if (inner && inner->getNodeSubType() == NODE_LVALUE_EXPRESSION && isNull(static_cast<LSLLValueExpression*>(inner)->getMember()))
         {
             return varType(static_cast<LSLLValueExpression*>(inner)->getIdentifier()->getSymbol(), e->getIType());
@@ -5823,10 +5802,7 @@ namespace
             }
         });
         const auto text = [&](LSLExpression* e) {
-            while (e && e->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
-            {
-                e = static_cast<LSLParenthesisExpression*>(e)->getChildExpr();
-            }
+            e = unbracketed(e);
             if (e && e->getNodeSubType() == NODE_CONSTANT_EXPRESSION && e->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
             {
                 const std::string_view value = static_cast<LSLStringConstant*>(e->getChild(0))->getValue();
@@ -6343,21 +6319,26 @@ end
             const size_t           first = text.find_first_not_of(" \t");
             return first != std::string_view::npos && text.substr(first, 2) != "--";
         };
+        const auto written = [&](S32 line) { return line < static_cast<S32>(lines.size()) ? depth(line) : 0; };
         for (size_t i = 0; i < mSpans.size(); ++i)
         {
             ALLSLToSLua::Span& span = mSpans[i];
             S32                end  = static_cast<S32>(lines.size()) - 1;
+            const size_t       own  = written(span.sluaFirst);
             for (size_t j = i + 1; j < mSpans.size(); ++j)
             {
                 const ALLSLToSLua::Span& next = mSpans[j];
-                if (next.lslFirst < span.lslFirst || next.lslLast > span.lslLast)
+                // Statements sharing an LSL line are side by side, not one
+                // in the other: told apart by the SLua, the inner written
+                // deeper.
+                const bool beside = next.lslFirst == span.lslFirst && next.lslLast == span.lslLast && written(next.sluaFirst) <= own;
+                if (next.lslFirst < span.lslFirst || next.lslLast > span.lslLast || beside)
                 {
                     end = next.sluaFirst - 1;
                     break;
                 }
             }
             end = std::min(end, static_cast<S32>(lines.size()) - 1);
-            const size_t own = span.sluaFirst < static_cast<S32>(lines.size()) ? depth(span.sluaFirst) : 0;
             while (end > span.sluaFirst && (!spoken(end) || depth(end) < own))
             {
                 --end;

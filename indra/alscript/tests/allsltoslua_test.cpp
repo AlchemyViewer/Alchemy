@@ -137,7 +137,7 @@ namespace tut
         }
     };
 
-    typedef test_group<allsltoslua_data> allsltoslua_group;
+    typedef test_group<allsltoslua_data, 100> allsltoslua_group;
     typedef allsltoslua_group::object    allsltoslua_object;
     tut::allsltoslua_group               allsltoslua_test("ALLSLToSLua");
 
@@ -1637,5 +1637,87 @@ namespace tut
                                  has_pair("(string)", "tostring"));
         ensure("each once", std::count(r.same.begin(), r.same.end(), std::make_pair(std::string("llSay"), std::string("ll.Say"))) == 1);
         ensure("semicolons let go of", r.dropped == std::vector<std::string>{ ";" });
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<49>()
+    {
+        set_test_name("an integer made text and added to a string with += joined on as s = s + it has it, by .. alone");
+        const ALLSLToSLua::Result r = convert("string gOut;\n"
+                                              "string gTwo;\n"
+                                              "default { state_entry() {\n"
+                                              "    integer n = llGetUnixTime();\n"
+                                              "    gOut += (string)n;\n"
+                                              "    gTwo = gTwo + (string)n;\n"
+                                              "    llOwnerSay(gOut + gTwo);\n"
+                                              "} }\n");
+        ensure("converted", r.converted);
+        ensure("+=: " + r.text, has(r, "gOut ..= n\n"));
+        ensure("s = s +: " + r.text, has(r, "gTwo ..= n\n"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<50>()
+    {
+        set_test_name("spans: statements sharing an LSL line side by side, not one inside the other");
+        const ALLSLToSLua::Result r = convert("integer x;\n"                  // 0
+                                              "integer y;\n"                  // 1
+                                              "default\n"                     // 2
+                                              "{\n"                           // 3
+                                              "    state_entry()\n"           // 4
+                                              "    {\n"                       // 5
+                                              "        x = 1; y = 2;\n"       // 6
+                                              "        llSay(0, (string)(x + y));\n" // 7
+                                              "    }\n"                       // 8
+                                              "}\n");                         // 9
+        std::vector<const ALLSLToSLua::Span*> shared;
+        std::string                           all;
+        for (const ALLSLToSLua::Span& each : r.spans)
+        {
+            all += std::to_string(each.lslFirst) + "-" + std::to_string(each.lslLast) + " : " + std::to_string(each.sluaFirst) + "-" +
+                   std::to_string(each.sluaLast) + "\n";
+            if (each.lslFirst == 6 && each.lslLast == 6)
+            {
+                shared.push_back(&each);
+            }
+        }
+        ensure_equals("two statements on the line\n" + all + r.text, shared.size(), size_t(2));
+        ensure("their SLua apart\n" + all + r.text, shared[0]->sluaLast < shared[1]->sluaFirst || shared[1]->sluaLast < shared[0]->sluaFirst);
+        // The handler, over more than one LSL line, still holds both.
+        for (const ALLSLToSLua::Span& each : r.spans)
+        {
+            if (each.lslFirst == 4)
+            {
+                ensure("the handler over both\n" + all, each.sluaFirst < shared[0]->sluaFirst && each.sluaLast >= shared[1]->sluaLast);
+            }
+        }
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<51>()
+    {
+        set_test_name("what the SLua says otherwise: a call by the name it was written with, not one inside it; marks only where written so");
+        const auto has_pair = [](const ALLSLToSLua::Result& r, const std::string& lsl, const std::string& slua) {
+            return std::find(r.same.begin(), r.same.end(), std::make_pair(lsl, slua)) != r.same.end();
+        };
+        const ALLSLToSLua::Result plain = convert("default { state_entry() {\n"
+                                                  "    integer n = 2;\n"
+                                                  "    if (n > 1) llSay(0, (string)llPow(llFrand(1.0), 2.0));\n"
+                                                  "} }\n");
+        ensure("llFrand as ll.Frand: " + plain.text, has_pair(plain, "llFrand", "ll.Frand"));
+        ensure("llPow, written as ^, not as the call inside it: " + plain.text,
+               std::none_of(plain.same.begin(), plain.same.end(), [](const auto& p) { return p.first == "llPow"; }));
+        ensure("a block's braces: " + plain.text, has_pair(plain, "{", "then") && has_pair(plain, "}", "end"));
+        ensure("no vector, no string joined: no marks for them: " + plain.text,
+               !has_pair(plain, ">", ")") && !has_pair(plain, "<", "vector(") && !has_pair(plain, "+", "..") && !has_pair(plain, "+=", "..="));
+        const ALLSLToSLua::Result marks = convert("string gOut;\n"
+                                                  "default { state_entry() {\n"
+                                                  "    vector v = <1, 2, llFrand(1.0)>;\n"
+                                                  "    gOut += llGetObjectName();\n"
+                                                  "    llSay(0, gOut + llGetObjectDesc() + (string)v.z);\n"
+                                                  "} }\n");
+        ensure("a vector's brackets: " + marks.text, has_pair(marks, "<", "vector(") && has_pair(marks, ">", ")"));
+        ensure("a string added to: " + marks.text, has_pair(marks, "+=", "..="));
     }
 }

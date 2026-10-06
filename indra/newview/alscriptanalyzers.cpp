@@ -154,8 +154,9 @@ void ALLSLAnalyzer::answer(const Request& request, const std::string& text, cons
             weigh(request, text, result);
             return;
         case Kind::Shape:
-            // A parse mended as it must be, beside the tab's own check.
-            result.outline = mService.outline(text);
+            // From a parse alone, mended where it must be; the tree kept for
+            // the tab is left be.
+            result.outline = mService.outline(text, false);
             break;
     }
     result.parsed     = mService.parsed();

@@ -856,4 +856,36 @@ namespace tut
                      "} }\n");
         ensure("not where the loop changes what it is given, itself or by a function, nor for a call that reads the world", said.empty());
     }
+
+    template<> template<>
+    void allslservice_object::test<25>()
+    {
+        set_test_name("the shape alone, from a parse: the outline but for the words of each declaration, mended where it must be, the tree kept left be");
+        ensure("builtins loaded: " + error, loaded);
+        const std::string script =
+            "integer count = 0;\n"
+            "float half(integer n) { return n / 2.0; }\n"
+            "default\n"
+            "{\n"
+            "    touch_start(integer total)\n"
+            "    {\n"
+            "    }\n"
+            "}\n";
+        const std::vector<ALScriptOutlineEntry> whole = service.outline(script);
+        const std::vector<ALScriptOutlineEntry> shape = service.outline(script, false);
+        ensure_equals("as many", shape.size(), whole.size());
+        for (size_t i = 0; i < shape.size(); ++i)
+        {
+            ensure("the same " + whole[i].name, shape[i].name == whole[i].name && shape[i].kind == whole[i].kind && shape[i].depth == whole[i].depth &&
+                                                    shape[i].span == whole[i].span && shape[i].nameSpan == whole[i].nameSpan);
+            ensure("no words of its declaration: " + shape[i].detail, shape[i].detail.empty());
+        }
+        // Another text's shape, broken: mended apart from the tree kept.
+        const std::string broken = "integer count;\ndefault {\n    state_entry() {\n        llSay(0, (string)count\n    }\n}\n";
+        const size_t      before = service.mendings();
+        const std::vector<ALScriptOutlineEntry> mended = service.outline(broken, false);
+        ensure("mended to its shape", mended.size() == 3 && mended[0].name == "count" && mended[2].name == "state_entry" && mended[2].depth == 1);
+        ensure_equals("the tree kept mended nothing", service.mendings(), before);
+        ensure("and still answers for its own text", service.parsed());
+    }
 }

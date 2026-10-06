@@ -1264,27 +1264,36 @@ struct ALLSLService::Impl
         slot.column      = column;
         slot.script      = nullptr;
         std::string copy = line >= 0 ? closedAt(source, offsetOf(source, line, column)) : std::string(source);
-        // Each try blanks a statement or closes the end; a handful mends
-        // what one pause in typing leaves, and a text broken in more
-        // places than that is left as it is.
+        slot.script      = mended(copy, slot.parser);
+        if (slot.script)
+        {
+            slot.script->collectSymbols();
+            slot.script->determineTypes();
+        }
+        understood = slot.script != nullptr;
+        return slot.script;
+    }
+
+    // A text parsed, mended until it does: each try blanks a statement or
+    // closes the end; a handful mends what one pause in typing leaves, and
+    // a text broken in more places than that is left as it is. The tree
+    // is the parser's, which `parser` holds.
+    static Tailslide::LSLScript* mended(std::string& copy, std::unique_ptr<Tailslide::ScopedScriptParser>& parser)
+    {
         for (int attempt = 0; attempt < 8; ++attempt)
         {
-            slot.parser = std::make_unique<Tailslide::ScopedScriptParser>(nullptr);
-            slot.script = slot.parser->parseLSLBytes(copy.data(), static_cast<int>(copy.size()));
-            if (slot.script)
+            parser = std::make_unique<Tailslide::ScopedScriptParser>(nullptr);
+            if (Tailslide::LSLScript* script = parser->parseLSLBytes(copy.data(), static_cast<int>(copy.size())))
             {
-                slot.script->collectSymbols();
-                slot.script->determineTypes();
-                break;
+                return script;
             }
-            const size_t at = stoppedAt(*slot.parser, copy);
+            const size_t at = stoppedAt(*parser, copy);
             if (at == std::string_view::npos || !mendAt(copy, at))
             {
                 break;
             }
         }
-        understood = slot.script != nullptr;
-        return slot.script;
+        return nullptr;
     }
 };
 
@@ -1813,15 +1822,27 @@ ALScriptReferences ALLSLService::references(std::string_view source, S32 line, S
 
 std::vector<ALScriptOutlineEntry> ALLSLService::outline(std::string_view source)
 {
+    return outline(source, true);
+}
+
+std::vector<ALScriptOutlineEntry> ALLSLService::outline(std::string_view source, bool detailed)
+{
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
-    Tailslide::LSLScript* script = mImpl->understand(source);
+    // Parsed apart from the tree kept, where only the shape is asked.
+    std::unique_ptr<Tailslide::ScopedScriptParser> own;
+    std::string                                    copy;
+    if (!detailed)
+    {
+        copy.assign(source);
+    }
+    Tailslide::LSLScript*             script = detailed ? mImpl->understand(source) : Impl::mended(copy, own);
     std::vector<ALScriptOutlineEntry> out;
     if (!script)
     {
         return out;
     }
-    auto entry = [&](Tailslide::LSLASTNode* node, ALScriptSymbolKind kind, S32 depth, bool detailed) {
+    auto entry = [&](Tailslide::LSLASTNode* node, ALScriptSymbolKind kind, S32 depth, bool declared) {
         Tailslide::LSLIdentifier* identifier = identifierOf(node);
         if (!identifier || identifier->getLoc()->first_line == 0)
         {
@@ -1833,7 +1854,7 @@ std::vector<ALScriptOutlineEntry> ALLSLService::outline(std::string_view source)
         one.depth    = depth;
         one.nameSpan = nameSpanOf(*identifier->getLoc(), identifier->getName());
         one.span     = node->getLoc()->first_line > 0 ? spanOf(*node->getLoc()) : one.nameSpan;
-        if (detailed && identifier->getSymbol())
+        if (detailed && declared && identifier->getSymbol())
         {
             one.detail = declarationOf(identifier->getSymbol());
         }
