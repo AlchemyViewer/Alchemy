@@ -370,8 +370,20 @@ namespace tut
         ensure("an integer: " + typed.text, has(typed, "function LLEvents.on_rez(param: number)"));
         ensure("a key a uuid: " + typed.text, has(typed, "function LLEvents.listen(c: number, n: string, id: uuid, m: string)"));
         ensure("link_message's id a string: " + typed.text, has(typed, "function LLEvents.link_message(s: number, num: number, str: string, id: string)"));
-        ensure("a key given text, left untyped: " + typed.text, has(typed, "function LLEvents.money(giver, amount: number)"));
+        ensure("a key the body takes as text, under a name of its own: " + typed.text,
+               has(typed, "function LLEvents.money(giverKey: uuid, amount: number)\n    local giver: string = tostring(giverKey)\n    giver = \"someone\"\n"));
         checksClean(typed);
+        // Strict as well, under the grid's solver: each handler as the
+        // definitions type it, the text key made text.
+        if (!newSolver)
+        {
+            std::string said;
+            for (const ALScriptProblem& p : service.check("--!strict\n" + typed.text))
+            {
+                said += p.severity == ALScriptProblem::Severity::Error ? p.message + "\n" : std::string();
+            }
+            ensure("strict:\n" + said + "---\n" + typed.text, said.empty());
+        }
         ALLSLToSLua::Options on = options;
         on.handlers             = ALLSLToSLua::Options::Handlers::On;
         ensure("typed with LLEvents:on too", has(ALLSLToSLua::convert(handlers, on), "LLEvents:on(\"on_rez\", function(param: number)"));
@@ -1749,7 +1761,7 @@ namespace tut
     void allsltoslua_object::test<52>()
     {
         set_test_name("a comment after a block's brace stays after the line that opens the block: then, else, elseif, a loop's do, repeat, a function, a "
-                      "handler; one over several lines still over what it opens; a one-line if with one after its brace kept on its lines");
+                      "handler; one over several lines too, running on; a one-line if with a block comment after its brace still on one line");
         const std::string lsl = "vector offset;\n"
                                 "list adjustments;\n"
                                 "integer count() { // how many\n"
@@ -1792,8 +1804,8 @@ namespace tut
         ensure("a for's do: " + r.text, has(r, " do -- each\n"));
         ensure("a function: " + r.text, has(r, "local function count() -- how many\n"));
         ensure("a handler: " + r.text, has(r, "LLEvents:on(\"touch_start\", function(detected) -- whoever touches\n"));
-        ensure("one over two lines, over the if: " + r.text, has(r, "    --[[ over\n") && r.text.find("--[[ over") < r.text.find("if i ~= 0 then"));
-        ensure("a one-line if kept apart: " + r.text, has(r, "then --[[ one ]]\n") && !has(r, "then --[[ one ]] ll.OwnerSay"));
+        ensure("one over two lines, running on: " + r.text, has(r, "    if i ~= 0 then --[[ over\n                    two lines ]]\n        print(\"x\")\n"));
+        ensure("a one-line if on one line still: " + r.text, has(r, "    if n ~= 0 then --[[ one ]] print(\"y\") end\n"));
         checksClean(r);
 
         // The same with the field style, and in a state's table.

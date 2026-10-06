@@ -457,11 +457,11 @@ namespace
         void commentsAfter(LSLASTNode* node, size_t from);
         // How long what commentsAfter put after each node's line was.
         boost::unordered_flat_map<LSLASTNode*, size_t> mTrailed;
-        // Those on the line a block's brace opens, before anything in it,
-        // each on a line of its own there: after the line that opens the
-        // block in SLua -- `if ... then`, `else`, `do`, a function's -- as
-        // the LSL had them after its brace. Called as that line is written;
-        // what no line took is written at the top of the block.
+        // Those on the line a block's brace opens, before anything in it:
+        // after the line that opens the block in SLua -- `if ... then`,
+        // `else`, `do`, a function's -- as the LSL had them after its brace,
+        // a long one running on over the lines after. Called as that line
+        // is written; what no line took is written at the top of the block.
         void trail(LSLASTNode* body);
 
         // Declarations on lines one after another that the LSL lined up --
@@ -794,7 +794,7 @@ namespace
         // before anything that could set it.
         void statesPreamble();
         void timersPreamble();
-        std::string handlerParams(LSLEventHandler* handler, std::string& lead);
+        std::string handlerParams(LSLEventHandler* handler, std::vector<std::string>& lead);
         void handlerBody(LSLEventHandler* handler);
         void helpers(std::string& out);
 
@@ -1371,17 +1371,12 @@ namespace
             if (body->getNodeSubType() == NODE_COMPOUND_STATEMENT)
             {
                 // On the line its brace opens, before anything in it: after
-                // the line that opens the block, where it is on that line
-                // alone -- `if (i < 0) { // none saved` -- else over what the
-                // block is the body of.
+                // the line that opens the block -- `if (i < 0) { // none
+                // saved` -- a long comment running on over the lines after.
                 LSLASTNode* first = body->getChild(0);
                 if (at.line == body->getLoc()->first_line &&
                     (!first || at < Pos{ first->getLoc()->first_line, first->getLoc()->first_column }))
                 {
-                    if (mComments[k].endLine != at.line)
-                    {
-                        return false;
-                    }
                     mCommentsOpening[body].push_back(k);
                     return true;
                 }
@@ -1543,12 +1538,14 @@ namespace
                 after += " " + c.text;
             }
         }
-        // At the end of the line just written, its break kept.
+        // At the end of the line just written, its break kept; the lines a
+        // long comment runs on over counted as written before it.
         const size_t end = mText.size() - 1;
         mText.insert(end, after);
         if (end < mCounted)
         {
             mCounted += after.size();
+            mCountedLines += static_cast<S32>(std::count(after.begin(), after.end(), '\n'));
         }
     }
 
@@ -3563,10 +3560,29 @@ namespace
             }
         }
         const std::string_view body = row(head + 1);
-        // Not where a comment trails the if's line, which would take the
-        // rest of the line with it.
-        if (row(head).substr(0, 3) != "if " || row(head).find(" --") != std::string_view::npos || body.empty() || body.substr(0, 2) == "--" ||
-            row(head + 2) != "end")
+        // Not where a line's comment trails the if's line, which would take
+        // the rest of the line with it; a long comment closes where it is.
+        const std::string_view if_row  = row(head);
+        const size_t           dashes  = if_row.find(" --");
+        bool                   trailed = false;
+        if (dashes != std::string_view::npos)
+        {
+            size_t level = dashes + 3;
+            if (level < if_row.size() && if_row[level] == '[')
+            {
+                ++level;
+                while (level < if_row.size() && if_row[level] == '=')
+                {
+                    ++level;
+                }
+                trailed = !(level < if_row.size() && if_row[level] == '[');
+            }
+            else
+            {
+                trailed = true;
+            }
+        }
+        if (if_row.substr(0, 3) != "if " || trailed || body.empty() || body.substr(0, 2) == "--" || row(head + 2) != "end")
         {
             return;
         }
@@ -5993,12 +6009,12 @@ namespace
         }
     }
 
-    std::string Writer::handlerParams(LSLEventHandler* handler, std::string& lead)
+    std::string Writer::handlerParams(LSLEventHandler* handler, std::vector<std::string>& lead)
     {
         // What LSL's handler took: the count of what was detected, made from
         // SLua's detected table. Where types are written, as the definitions
         // type SLua's handler: a key as a uuid, link_message's id as the
-        // string SLua passes; and none on a key the body takes as text.
+        // string SLua passes.
         const std::string event = handler->getIdentifier()->getName();
         std::string       params;
         LSLASTNode*       first = handler->getArguments() ? handler->getArguments()->getChild(0) : nullptr;
@@ -6006,7 +6022,7 @@ namespace
         {
             if (first)
             {
-                lead = "local " + nameOf(static_cast<LSLIdentifier*>(first)) + typed(LST_INTEGER) + " = #detected";
+                lead.push_back("local " + nameOf(static_cast<LSLIdentifier*>(first)) + typed(LST_INTEGER) + " = #detected");
             }
             return mOptions.types ? "detected: { DetectedEvent }" : "detected";
         }
@@ -6015,7 +6031,17 @@ namespace
         {
             auto*          id    = static_cast<LSLIdentifier*>(p);
             const LSLIType given = ALLSLTraits::eventTextParam(event, at) ? LST_STRING : p->getIType();
-            params += (params.empty() ? "" : ", ") + nameOf(id) + (varType(id->getSymbol(), given) == given ? typed(given) : std::string());
+            std::string    name  = nameOf(id);
+            if (varType(id->getSymbol(), given) != given)
+            {
+                // A key the body takes as text, which SLua passes as a
+                // uuid: taken under a name of its own and made the text the
+                // body reads as the handler begins, as LSL's key was.
+                const std::string text = name;
+                name                   = freshName(text + "Key");
+                lead.push_back("local " + text + typed(LST_STRING) + " = tostring(" + name + ")");
+            }
+            params += (params.empty() ? "" : ", ") + name + typed(given);
         }
         return params;
     }
@@ -6051,8 +6077,8 @@ namespace
                 line("");
                 continue;
             }
-            std::string lead;
-            const std::string params = handlerParams(handler, lead);
+            std::vector<std::string> lead;
+            const std::string        params = handlerParams(handler, lead);
             // The timer's handler, which LLTimers calls, where the script's
             // timer is on LLTimers.
             const bool timer = event == "timer" && mTimers;
@@ -6066,9 +6092,9 @@ namespace
                          : "LLEvents:on(" + luaString(event) + ", function(" + params + ")");
             trail(handler->getStatements());
             ++mDepth;
-            if (!lead.empty())
+            for (const std::string& one : lead)
             {
-                line(lead);
+                line(one);
             }
             handlerBody(handler);
             --mDepth;
@@ -6182,8 +6208,8 @@ namespace
             {
                 auto*             handler = static_cast<LSLEventHandler*>(h);
                 const std::string event   = handler->getIdentifier()->getName();
-                std::string       lead;
-                const std::string params = handlerParams(handler, lead);
+                std::vector<std::string> lead;
+                const std::string        params = handlerParams(handler, lead);
                 commentsBefore(handler);
                 if (event == "timer" && !mTimers)
                 {
@@ -6194,9 +6220,9 @@ namespace
                 line(event + " = function(" + params + ")");
                 trail(handler->getStatements());
                 ++mDepth;
-                if (!lead.empty())
+                for (const std::string& one : lead)
                 {
-                    line(lead);
+                    line(one);
                 }
                 handlerBody(handler);
                 --mDepth;
