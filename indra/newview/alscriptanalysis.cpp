@@ -95,7 +95,7 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
     // fragment, which are settings, and so the main thread's to read.
     static LLCachedControl<std::string> solver_setting(gSavedSettings, "ALScriptLuauSolver", "old");
     static LLCachedControl<F32>         seconds_setting(gSavedSettings, "ALScriptLuauCheckSeconds", 5.f);
-    static LLCachedControl<bool>        fragments_setting(gSavedSettings, "ALScriptFragmentCompletion", false);
+    static LLCachedControl<bool>        fragments_setting(gSavedSettings, "ALScriptFragmentCompletion", true);
     job.newSolver = std::string(solver_setting) == "new";
     job.seconds   = seconds_setting;
     job.fragments = fragments_setting;
