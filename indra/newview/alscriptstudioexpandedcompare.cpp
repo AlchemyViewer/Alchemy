@@ -31,6 +31,8 @@
 #include "alscriptstudioservices.h"
 #include "alsourcemap.h"
 
+#include <functional>
+
 ALScriptStudioExpandedCompare::ALScriptStudioExpandedCompare(ALScriptStudioServices& services, Window& window)
 :   mServices(services),
     mWindow(window)
@@ -100,25 +102,56 @@ void ALScriptStudioExpandedCompare::compare(Doc& doc)
         show(doc);
         return;
     }
-    mWaiting.insert(doc.id);
+    mWaiting[doc.id] = shownOf(doc);
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    mServices.setStatus(mServices.words("Preprocessing", args));
     mWindow.preprocess(doc);
+}
+
+// static
+ALScriptStudioExpandedCompare::Shown ALScriptStudioExpandedCompare::shownOf(const Doc& doc)
+{
+    Shown shown;
+    shown.view = doc.shownView();
+    if (shown.view == Doc::View::Compare)
+    {
+        shown.left = std::hash<std::string>()(doc.compareView->model().leftText());
+    }
+    return shown;
 }
 
 void ALScriptStudioExpandedCompare::forgetClosed()
 {
-    boost::unordered::erase_if(mWaiting, [this](const std::string& id) { return mServices.findDoc(id) == nullptr; });
+    boost::unordered::erase_if(mWaiting, [this](const auto& waiting) { return mServices.findDoc(waiting.first) == nullptr; });
 }
 
 void ALScriptStudioExpandedCompare::expanded(Doc& doc)
 {
     forgetClosed();
-    // Only where the run is of the text as it is: a run of an older text
-    // answering first leaves it waiting on the one after.
-    if (mWaiting.contains(doc.id) && doc.uploaded.valid && doc.uploaded.version == doc.editor->document().version())
+    const auto waiting = mWaiting.find(doc.id);
+    if (waiting == mWaiting.end())
     {
-        mWaiting.erase(doc.id);
-        show(doc);
+        return;
     }
+    // Asked for in place of what the tab showed then: where it shows
+    // something else now -- another comparison, or none -- the user has
+    // moved on, and it is let go of rather than put over that.
+    if (!canCompare(doc) || !(waiting->second == shownOf(doc)))
+    {
+        mWaiting.erase(waiting);
+        return;
+    }
+    // Only where the run is of the text as it is. A run of an older text
+    // -- one on its way when this was asked for, which kept it from
+    // asking its own -- is followed by one of the text now.
+    if (!doc.uploaded.valid || !doc.uploaded.text || doc.uploaded.version != doc.editor->document().version())
+    {
+        mWindow.preprocess(doc);
+        return;
+    }
+    mWaiting.erase(waiting);
+    show(doc);
 }
 
 void ALScriptStudioExpandedCompare::show(Doc& doc)

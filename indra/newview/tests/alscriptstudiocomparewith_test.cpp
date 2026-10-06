@@ -27,6 +27,7 @@
 #include "../alscriptstudiocomparewith.h"
 
 #include "../alrecovery.h"
+#include "../alscriptexplorermodel.h"
 #include "../alscriptstudiohistory.h"
 #include "alscriptstudio_fixture.h"
 #include "fsyspath.h"
@@ -184,7 +185,7 @@ namespace tut
         std::string file(const std::string& name, const std::string& bytes)
         {
             const std::string path = folder + "/" + name;
-            std::ofstream     out(fsyspath(path), std::ios::binary);
+            std::ofstream     out(static_cast<const std::filesystem::path&>(fsyspath(path)), std::ios::binary);
             out << bytes;
             return path;
         }
@@ -259,6 +260,13 @@ namespace tut
         ensure_equals("offered", studio.row("saved_there").label, said("CompareSavedThere"));
         studio.choose("saved_there");
         ensure_equals("set beside", listed(studio.did), listed(Names{ "compare door: theirs\n | mine\n (" + said("CompareSavedThere") + " | )" }));
+
+        // Settled since the list was made: nothing, and said.
+        doc.savedThere.reset();
+        studio.choose("saved_there");
+        ensure_equals("nothing more", studio.did.size(), 1U);
+        ensure_equals("said", services().statuses.back(), said("CompareSavedThereGone"));
+        ensure("as a failure", services().statusFailures.back());
     }
 
     template<> template<>
@@ -285,15 +293,21 @@ namespace tut
         studio.choose("tab:lamp");
         LLStringUtil::format_map_t unsaved;
         unsaved["[TITLE]"] = "lamp";
-        ensure_equals("unsaved, as it is now", studio.did.back(), "compare door: lamp later\n | door\n (" + said("CompareUnsaved", unsaved) + " | )");
+        // Titled as a copy of it as it was, which stays as it is.
+        const auto snapshot = [this](const std::string& name) { return this->said("CompareTabSnapshot", { { "[NAME]", name } }); };
+        ensure_equals("unsaved, as it is now", studio.did.back(),
+                      "compare door: lamp later\n | door\n (" + snapshot(said("CompareUnsaved", unsaved)) + " | )");
         studio.choose("tab:sign");
-        ensure_equals("saved, by its name", studio.did.back(), std::string("compare door: sign\n | door\n (sign | )"));
+        ensure_equals("saved, by its name", studio.did.back(), "compare door: sign\n | door\n (" + snapshot("sign") + " | )");
 
-        // Closed while the list was up: nothing.
+        // Closed while the list was up: nothing, and said, by the name it
+        // had in the list.
         sign.loaded = false;
         services().docs.erase(services().docs.begin() + 3);
         studio.choose("tab:sign");
         ensure_equals("nothing more", studio.did.size(), 2U);
+        ensure_equals("said", services().statuses.back(), said("CompareTabClosed", { { "[NAME]", "sign" } }));
+        ensure("as a failure", services().statusFailures.back());
     }
 
     template<> template<>
@@ -421,18 +435,19 @@ namespace tut
         {
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        Doc& doc     = tab("door", "door\n");
-        studio.items = { Item{ ALScriptRef(LLUUID::generateNewID(), LLUUID::generateNewID()), "door", "House \xE2\x96\xB8 Front" },
+        const std::string sep = ALScriptExplorerModel::PLACE_SEPARATOR;
+        Doc&              doc = tab("door", "door\n");
+        studio.items = { Item{ ALScriptRef(LLUUID::generateNewID(), LLUUID::generateNewID()), "door", "House" + sep + "Front" },
                          Item{ ALScriptRef(LLUUID::generateNewID(), LLUUID::generateNewID()), "door", "" } };
         studio.clipboard = "x";
         unit->show(doc);
         ensure_equals("after the rest", listed(studio.values()), listed(Names{ "clipboard", "file", "item:0", "item:1" }));
         ensure_equals("by name", studio.row("item:0").label, std::string("door"));
-        ensure_equals("and place", studio.row("item:0").detail, std::string("House \xE2\x96\xB8 Front"));
+        ensure_equals("and place", studio.row("item:0").detail, "House" + sep + "Front");
         studio.choose("item:0");
         studio.choose("item:1");
         ensure_equals("each under its place and name", listed(studio.did),
-                      listed(Names{ "item door: door (House \xE2\x96\xB8 Front \xE2\x96\xB8 door)", "item door: door (door)" }));
+                      listed(Names{ "item door: door (House" + sep + "Front" + sep + "door)", "item door: door (door)" }));
 
         // Its place is what is typed to find it.
         const std::vector<size_t> ranked = ALQuickOpen::rank(studio.candidates, "front");

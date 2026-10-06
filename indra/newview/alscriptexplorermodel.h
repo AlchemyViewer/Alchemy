@@ -59,6 +59,9 @@ public:
     // is 255 downloads of what each holds, and a question for every script
     // in it of whether it runs.
     static constexpr size_t LARGE_LINKSET = 16;
+    // What stands between the parts of a place in words: an object and its
+    // prim, a place and what is in it.
+    static constexpr char PLACE_SEPARATOR[] = " \xE2\x96\xB8 ";
 
     struct Prim
     {

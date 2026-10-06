@@ -28,6 +28,7 @@
 
 #include "alcodeeditor.h"
 #include "alrecovery.h"
+#include "alscriptexplorermodel.h"
 #include "alscriptstudiofileio.h"
 #include "alscriptstudiohistory.h"
 #include "alscriptstudioservices.h"
@@ -72,7 +73,7 @@ size_t ALScriptStudioCompareWith::savesKept(const Doc& doc)
 {
     const std::string                    key     = ALScriptStudioHistory::keyOf(doc);
     const std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
-    return history && !key.empty() ? history->list(key).size() : 0;
+    return history && !key.empty() ? history->count(key) : 0;
 }
 
 std::vector<ALQuickOpen::Candidate> ALScriptStudioCompareWith::candidatesFor(const Doc& doc, Offer& offer) const
@@ -105,6 +106,7 @@ std::vector<ALQuickOpen::Candidate> ALScriptStudioCompareWith::candidatesFor(con
         if (other != &doc && canCompare(*other))
         {
             add(other->name, mServices.words(other->unsaved() ? "CompareWithTabUnsaved" : "CompareWithTab"), valueOf("tab", other->id));
+            offer.tabs[other->id] = other->name;
         }
     }
     if (const std::optional<std::string> clipboard = mWindow.clipboardText(); clipboard && !clipboard->empty())
@@ -177,10 +179,13 @@ void ALScriptStudioCompareWith::chosen(Doc& doc, const std::string& value, const
     }
     else if (what == "saved_there")
     {
-        if (doc.savedThere)
+        // Gone where a save or a merge since settled it.
+        if (!doc.savedThere)
         {
-            mWindow.compareWithTab(doc, *doc.savedThere, mServices.words("CompareSavedThere"), std::string(), {});
+            mServices.setStatus(mServices.words("CompareSavedThereGone"), true);
+            return;
         }
+        mWindow.compareWithTab(doc, *doc.savedThere, mServices.words("CompareSavedThere"), std::string(), {});
     }
     else if (what == "tab")
     {
@@ -189,14 +194,22 @@ void ALScriptStudioCompareWith::chosen(Doc& doc, const std::string& value, const
         const Doc* other = mServices.findDoc(which);
         if (!other || other == &doc || !canCompare(*other))
         {
+            // Closed since the list was made: by the name it had there.
+            const auto named = offer.tabs.find(which);
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = named != offer.tabs.end() ? named->second : which;
+            mServices.setStatus(mServices.words("CompareTabClosed", args), true);
             return;
         }
-        std::string title = other->name;
+        std::string name = other->name;
         if (other->unsaved())
         {
-            title = mServices.words("CompareUnsaved", { { "[TITLE]", title } });
+            name = mServices.words("CompareUnsaved", { { "[TITLE]", name } });
         }
-        mWindow.compareWithTab(doc, other->editor->wholeText(), title, std::string(), {});
+        // Titled as what it is, a copy of the other as it was, which stays
+        // as it is as the other changes or closes.
+        const std::string title = mServices.words("CompareTabSnapshot", { { "[NAME]", name } });
+        mWindow.compareWithTab(doc, other->editor->wholeText(), title.empty() ? name : title, std::string(), {});
     }
     else if (what == "clipboard")
     {
@@ -231,7 +244,7 @@ void ALScriptStudioCompareWith::chosen(Doc& doc, const std::string& value, const
     else if (what == "item" && index < offer.items.size())
     {
         const Item& item = offer.items[index];
-        mWindow.compareWithItem(doc, item, item.place.empty() ? item.name : item.place + " \xE2\x96\xB8 " + item.name);
+        mWindow.compareWithItem(doc, item, item.place.empty() ? item.name : item.place + ALScriptExplorerModel::PLACE_SEPARATOR + item.name);
     }
 }
 

@@ -259,6 +259,12 @@ std::vector<ALSavedText> ALSaveHistory::list(const std::string& key) const
     return listLocked(key);
 }
 
+size_t ALSaveHistory::count(const std::string& key) const
+{
+    std::lock_guard lock(mLock);
+    return key.empty() ? 0 : savesIn(folderOf(key)).size();
+}
+
 bool ALSaveHistory::load(ALSavedText& saved) const
 {
     std::lock_guard lock(mLock);

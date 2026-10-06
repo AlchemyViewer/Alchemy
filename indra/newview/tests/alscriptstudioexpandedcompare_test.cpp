@@ -306,4 +306,59 @@ namespace tut
         ensure_equals("whose output is what it made", view.model().ranges()[static_cast<size_t>(call)].rightFirst, where("llOwnerSay"));
         ensure("the directives in none", view.model().rangeAt(ALDiffModel::Column::Left, 0) < 0 && view.model().rangeAt(ALDiffModel::Column::Left, 1) < 0);
     }
+
+    template<> template<>
+    void alscriptstudioexpandedcompare_object::test<5>()
+    {
+        set_test_name("a run of an older text answering, its own dropped while that one was on its way, asks again; said while it waits; let go of once the tab shows something else");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        Doc& door = tab("door");
+        door.editor->goTo(ALTextPos(0, 0));
+        door.editor->insertText("// ");
+        unit->compare(door);
+        ensure("a run asked", studio.runs == 1);
+        ensure_equals("said while it waits", services().statuses.back(), services().words("Preprocessing", { { "[NAME]", "door" } }));
+        // The window was busy: the run that answers is the one before.
+        unit->expanded(door);
+        ensure("asked again rather than left waiting", studio.runs == 2 && studio.compares == 0 && unit->waiting("door"));
+        door.uploaded.version = door.editor->document().version();
+        unit->expanded(door);
+        ensure("shown once the run of the text now answers", studio.compares == 1 && !unit->waiting("door"));
+
+        // Another comparison started while it waits: let go of, not put
+        // over it.
+        door.view = Doc::View::Source;
+        door.editor->insertText("// ");
+        unit->compare(door);
+        ensure("waiting", unit->waiting("door"));
+        studio.compareRanged(door, "other", door.editor->wholeText(), "other", "door", {});
+        door.view = Doc::View::Compare;
+        door.uploaded.version = door.editor->document().version();
+        const S32 runs = studio.runs;
+        unit->expanded(door);
+        ensure("let go of", !unit->waiting("door"));
+        ensure("the other comparison left as it is", studio.compares == 2 && studio.runs == runs && studio.titles == "other | door");
+
+        // Asked from a comparison, which is then closed: let go of.
+        door.editor->insertText("// ");
+        unit->compare(door);
+        ensure("waiting again", unit->waiting("door"));
+        door.view = Doc::View::Source;
+        door.uploaded.version = door.editor->document().version();
+        unit->expanded(door);
+        ensure("closed: let go of", !unit->waiting("door") && studio.compares == 2);
+
+        // Still in the comparison it was asked from, which follows the
+        // tab: shown over it.
+        door.view = Doc::View::Compare;
+        door.editor->insertText("// ");
+        unit->compare(door);
+        door.compareView->setRightText(door.editor->wholeText());
+        door.uploaded.version = door.editor->document().version();
+        unit->expanded(door);
+        ensure("shown", studio.compares == 3 && !unit->waiting("door"));
+    }
 }

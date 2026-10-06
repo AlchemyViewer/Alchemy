@@ -691,7 +691,7 @@ std::string ALScriptExplorerModel::placeOf(const Choice& row) const
         {
             if (prim.id == row.prim && !prim.name.empty())
             {
-                place += " \xE2\x96\xB8 " + prim.name;
+                place += PLACE_SEPARATOR + prim.name;
                 break;
             }
         }

@@ -28,6 +28,7 @@
 #include "alscriptstudiodoc.h"
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -102,6 +103,8 @@ private:
     {
         std::vector<std::string> recent;
         std::vector<Item>        items;
+        // The other tabs' names by id, for one closed before it is chosen.
+        std::map<std::string, std::string> tabs;
     };
     std::vector<ALQuickOpen::Candidate> candidatesFor(const Doc& doc, Offer& offer) const;
     // A row's value, chosen for the tab.

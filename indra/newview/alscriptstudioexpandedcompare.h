@@ -27,7 +27,7 @@
 #include "alscriptstudiodoc.h"
 #include "altextdiff.h"
 
-#include <boost/unordered/unordered_flat_set.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <memory>
 #include <string>
@@ -83,18 +83,31 @@ public:
     // The comparison shown, now where the expansion is of the text as it
     // is, else once it has been made again.
     void compare(Doc& doc);
-    // A tab's expansion made: its comparison shown, where one waits on it.
+    // A tab's expansion made: its comparison shown, where one waits on it;
+    // made again where it is of an older text.
     void expanded(Doc& doc);
     // Whether a tab's comparison waits on an expansion.
     bool waiting(const std::string& id) const { return mWaiting.contains(id); }
 
 private:
+    // What a tab showed when its comparison was asked for: its view, and
+    // a comparison's left, which another comparison sets anew.
+    struct Shown
+    {
+        Doc::View   view = Doc::View::Source;
+        size_t      left = 0;
+
+        bool operator==(const Shown& other) const { return view == other.view && left == other.left; }
+    };
+    static Shown shownOf(const Doc& doc);
+
     void show(Doc& doc);
     // The tabs closed while they waited let go of.
     void forgetClosed();
 
-    ALScriptStudioServices&                    mServices;
-    Window&                                    mWindow;
-    // The tabs whose comparison waits on an expansion, by id.
-    boost::unordered_flat_set<std::string>     mWaiting;
+    ALScriptStudioServices&                         mServices;
+    Window&                                         mWindow;
+    // The tabs whose comparison waits on an expansion, by id, with what
+    // each showed then.
+    boost::unordered_flat_map<std::string, Shown>   mWaiting;
 };
