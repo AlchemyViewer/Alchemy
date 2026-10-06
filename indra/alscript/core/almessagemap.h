@@ -56,4 +56,12 @@ public:
     static bool luauLint(std::string_view name, std::string_view message, Match& out);
     // A Luau type error by its words.
     static bool luauError(std::string_view message, Match& out);
+    // Why a SLua require found nothing, in the words of Luau's navigator
+    // or of the studio's rules for it (ALRequireNavigation): keyed as the
+    // whole problem, `could not find module '[1]': ` and the reason, so
+    // that [1] is left for the module's name and the reason's words are
+    // [2] on.
+    static bool luauRequire(std::string_view message, Match& out);
+    // Whether a key is one of those: a module found nowhere, and why.
+    static bool requireReason(std::string_view key);
 };

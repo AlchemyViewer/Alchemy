@@ -220,6 +220,7 @@ namespace
                 return NavigateResult::NotFound;
             }
             const Target target = mTargets[index];
+            mMissedTarget       = target.value;
             std::string  value  = target.value;
             std::replace(value.begin(), value.end(), '\\', '/');
             while (value.size() > 1 && value.back() == '/')
@@ -260,8 +261,12 @@ namespace
                     mPlaces.aliasReached(target.base, folder);
                 }
             }
+            mMissedTarget.clear();
             return NavigateResult::Success;
         }
+        // What the last alias the walk went through stood for, where it was
+        // not there: Luau names it by our own word for it.
+        const std::string& missedTarget() const { return mMissedTarget; }
 
         const Position& at() const { return mAt; }
         bool            pending() const { return mPending; }
@@ -300,6 +305,7 @@ namespace
         mutable std::string         mConfigBase;
         mutable bool                mConfigOnDisk = false;
         mutable std::vector<Target> mTargets;
+        std::string                 mMissedTarget;
     };
 
     // Luau's words for what went wrong, the last it said.
@@ -389,7 +395,8 @@ namespace ALRequireNavigation
             if (navigator.navigate(path) != Luau::Require::Navigator::Status::Success)
             {
                 out.found = context.pending() ? Known::Pending : Known::No;
-                out.error = errors.what;
+                out.error = context.missedTarget().empty() ? errors.what
+                                                           : "the alias stands for '" + context.missedTarget() + "', which is not there";
                 return out;
             }
         }

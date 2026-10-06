@@ -780,4 +780,38 @@ namespace tut
                search.resolve(ask("./both.luau", true, own.self), named, own, disk, nullptr, false, &aliases) == ALPreprocessor::Found::Yes &&
                    named.passedOver.empty());
     }
+
+    template<> template<>
+    void alincludesearch_object::test<13>()
+    {
+        set_test_name("why a require found nothing, in Luau's navigator's words or the studio's rules'; said as a module not found, and as the disk not looked in where it was not");
+        Scratch           s;
+        const std::string script = s.write("proj/main.luau", "return require('./nowhere')\n");
+        s.write("proj/.luaurc", "{\"aliases\": {\"gone\": \"./gone\", \"c1\": \"@c2\", \"c2\": \"@c1\", \"lib\": \"./lib\"}}");
+        const ALIncludeSearch::Where  disk = where(false, true, { s.at("proj") });
+        const ALIncludeSearch::Asking own{ ALIncludeIdentity::ofFile(script), true };
+        const auto why = [&](const std::string& name) {
+            ALPreprocessor::Include  found;
+            std::vector<std::string> aliases;
+            search.resolve(ask(name, true, own.self), found, own, disk, nullptr, false, &aliases);
+            return found.why;
+        };
+        ensure_equals("nothing so named", why("./nowhere"), std::string("could not resolve child component \"nowhere\""));
+        ensure_equals("an alias nobody names", why("@missing/x"), std::string("@missing is not a valid alias"));
+        ensure_equals("aliases in a circle", why("@c1"), std::string("detected alias cycle (@c1 -> @c2 -> @c1)"));
+        ensure_equals("an alias whose folder is not there", why("@gone/x"), std::string("the alias stands for './gone', which is not there"));
+        ensure("reserved", why("@sl-std/x").find("reserved") != std::string::npos);
+        ensure("climbing", why("@lib/../x").find("may not climb") != std::string::npos);
+
+        // Said as a module not found, for what explains it.
+        ALScriptProblem said;
+        said.key  = "PreprocRequireNoChild";
+        said.args = { "./nowhere", "nowhere" };
+        ALScriptProblems problems{ said };
+        ALIncludeSearch::Missing facts;
+        facts.disk = false;
+        ALIncludeSearch::explainMissing(problems, facts);
+        ensure("the disk not looked in", problems[0].key == "PreprocModuleNotOnDisk" && problems[0].args == std::vector<std::string>{ "./nowhere" });
+        ensure("left out", ALIncludeSearch::leftOut({ said }).names == std::vector<std::string>{ "./nowhere" });
+    }
 }

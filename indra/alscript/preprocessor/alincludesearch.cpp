@@ -26,6 +26,7 @@
 #include "alincludesearch.h"
 
 #include "alincludeidentity.h"
+#include "almessagemap.h"
 #include "alrequirenavigation.h"
 #include "fsyspath.h"
 #include "llstl.h"
@@ -728,6 +729,7 @@ ALPreprocessor::Found ALIncludeSearch::resolveRequire(const ALPreprocessor::Ask&
         }
         return found;
     }
+    out.why = walked.error;
     searchedBefore(ask, asking, where, alias_folders, out);
     return ALPreprocessor::Found::No;
 }
@@ -1081,6 +1083,17 @@ bool ALIncludeSearch::configOf(const Asking& asking, const Where& where, ALLuauC
     return ALLuauConfig::parseChain(texts, out, base);
 }
 
+namespace
+{
+    // A module found nowhere, however it was said: as it was, why Luau's
+    // navigator found nothing, or with a reason of no known shape.
+    bool moduleMissing(const ALScriptProblem& problem)
+    {
+        return !problem.args.empty() &&
+               (problem.key == "PreprocModuleNotFound" || problem.key == "PreprocModuleNotFoundWhy" || ALMessageMap::requireReason(problem.key));
+    }
+}
+
 // static
 void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& facts)
 {
@@ -1090,7 +1103,7 @@ void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& 
     if (facts.objectUnanswered)
     {
         const bool missing = std::any_of(problems.begin(), problems.end(), [](const ALScriptProblem& p) {
-            return p.key == "PreprocIncludeNotFound" || p.key == "PreprocModuleNotFound";
+            return p.key == "PreprocIncludeNotFound" || moduleMissing(p);
         });
         if (missing)
         {
@@ -1110,11 +1123,12 @@ void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& 
     {
         for (ALScriptProblem& problem : problems)
         {
-            const bool include = problem.key == "PreprocIncludeNotFound";
-            if ((!include && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1 || !facts.inWorld || !facts.inWorld(problem.args[0]))
+            const bool include = problem.key == "PreprocIncludeNotFound" && problem.args.size() == 1;
+            if ((!include && !moduleMissing(problem)) || !facts.inWorld || !facts.inWorld(problem.args[0]))
             {
                 continue;
             }
+            problem.args.resize(1);
             problem.key     = include ? "PreprocIncludeInWorld" : "PreprocModuleInWorld";
             problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': one so named is in the object or the inventory, but "
                                                               "includes from there are off. Includes come from folders on disk: turn on Build > "
@@ -1135,8 +1149,8 @@ void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& 
     std::string file;
     for (ALScriptProblem& problem : problems)
     {
-        const bool include = problem.key == "PreprocIncludeNotFound";
-        if ((!include && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1)
+        const bool include = problem.key == "PreprocIncludeNotFound" && problem.args.size() == 1;
+        if (!include && !moduleMissing(problem))
         {
             continue;
         }
@@ -1145,6 +1159,7 @@ void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& 
         {
             continue;
         }
+        problem.args.resize(1);
         problem.key     = include ? "PreprocIncludeNotOnDisk" : "PreprocModuleNotOnDisk";
         problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': the disk was not looked in. Includes come from "
                                                           "folders on disk: turn on Build > Include from Disk, and add the folder with Build > "
@@ -1164,7 +1179,9 @@ ALIncludeSearch::LeftOut ALIncludeSearch::leftOut(const ALScriptProblems& proble
     {
         const bool in_world = problem.key == "PreprocIncludeInWorld" || problem.key == "PreprocModuleInWorld";
         const bool off_disk = problem.key == "PreprocIncludeNotOnDisk" || problem.key == "PreprocModuleNotOnDisk";
-        if ((!in_world && !off_disk && problem.key != "PreprocIncludeNotFound" && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1)
+        const bool missing  = (problem.key == "PreprocIncludeNotFound" && problem.args.size() == 1) || moduleMissing(problem) ||
+                             problem.key == "PreprocModuleSearched";
+        if ((!in_world && !off_disk && !missing) || problem.args.empty())
         {
             continue;
         }

@@ -1777,4 +1777,21 @@ namespace tut
         ensure("naming both", said.args == std::vector<std::string>({ "./both", "both.luau", "/proj/both/init.luau" }));
         ensure("the module taken", r.text.find("return 1") != std::string::npos);
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<47>()
+    {
+        set_test_name("a require found nowhere said with why: keyed where the reason has a known shape, the module's name first, else in Luau's words");
+        ALPreprocessor::Options o = options(true);
+        o.resolve                 = [](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
+            out.why = ask.name == "./a" ? "could not resolve child component \"a\"" : ask.name == "./b" ? "something odd" : "";
+            return ALPreprocessor::Found::No;
+        };
+        const ALPreprocessor::Result r = ALPreprocessor::run("require('./a')\nrequire('./b')\nrequire('./c')\n", o);
+        ensure_equals("each said", r.problems.size(), size_t(3));
+        ensure("keyed", r.problems[0].key == "PreprocRequireNoChild" && r.problems[0].args == std::vector<std::string>({ "./a", "a" }) &&
+                            r.problems[0].message == "could not find module './a': could not resolve child component \"a\"");
+        ensure("in Luau's words", r.problems[1].key == "PreprocModuleNotFoundWhy" && r.problems[1].args == std::vector<std::string>({ "./b", "something odd" }));
+        ensure("no reason: as before", r.problems[2].key == "PreprocModuleNotFound" && r.problems[2].args == std::vector<std::string>{ "./c" });
+    }
 }

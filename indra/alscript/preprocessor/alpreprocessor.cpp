@@ -27,6 +27,8 @@
 
 #include "alpreprocessor.h"
 
+#include "almessagemap.h"
+
 #include "alscriptfixes.h"
 #include "alscriptlexicon.h"
 #include "alscriptweight.h"
@@ -4530,6 +4532,33 @@ namespace
         }
 
     private:
+        // A module found nowhere, said with why where that is known: keyed
+        // where the reason is one the map knows, so that a skin may say it
+        // in its own words, else in Luau's.
+        void notFound(const std::string& name, const std::string& why, const Token& at)
+        {
+            if (why.empty())
+            {
+                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocModuleNotFound", "could not find module '[1]'", { name }, at);
+                return;
+            }
+            ALMessageMap::Match known;
+            if (!ALMessageMap::luauRequire(why, known))
+            {
+                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocModuleNotFoundWhy", "could not find module '[1]': [2]", { name, why }, at);
+                return;
+            }
+            std::vector<std::string> args = std::move(known.args);
+            if (args.empty())
+            {
+                args.emplace_back();
+            }
+            args[0] = name;
+            mEngine.problem(ALScriptProblem::Severity::Error, "could not find module '" + name + "': " + why, at);
+            mResult.problems.back().key  = known.key;
+            mResult.problems.back().args = std::move(args);
+        }
+
         // What a require found by the search before may be written as now,
         // each as a fix to the problem just said: the string put in the
         // name's place, the studio alias it needs named first. Only for a
@@ -4609,7 +4638,7 @@ namespace
             {
                 if (found.searched.empty())
                 {
-                    mEngine.problem(ALScriptProblem::Severity::Error, "PreprocModuleNotFound", "could not find module '[1]'", { name }, at);
+                    notFound(name, found.why, at);
                     return false;
                 }
                 // Found by the search before a require followed the

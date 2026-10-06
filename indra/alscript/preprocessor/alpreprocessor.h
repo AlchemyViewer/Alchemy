@@ -93,6 +93,10 @@ public:
         };
         std::string       searched;
         std::vector<Move> moves;
+        // Why a SLua require found nothing, in the words of Luau's
+        // navigator or of the studio's rules for it (ALMessageMap::
+        // luauRequire); nothing where it is not known.
+        std::string why;
         // A SLua require where a file and a folder's init of the same name
         // are both there: the file is taken (LAD3), and the init passed
         // over is this, by the name it is said by.
