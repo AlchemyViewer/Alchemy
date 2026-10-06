@@ -401,21 +401,6 @@ void LLReflectionMapManager::update()
     LLReflectionMap* oldestProbe = nullptr;
     LLReflectionMap* oldestOccluded = nullptr;
 
-    // A probe that stopped being relevant partway through its twelve passes is dropped rather than
-    // finished, by the same rule the scheduling loop below uses to skip one. Every remaining pass
-    // renders the whole scene for a probe that is about to lose its cube slot in the release pass,
-    // or, when whatever registered it is gone, to be deleted outright.
-    if (mUpdatingProbe != nullptr && mUpdatingProbe != mDefaultProbe && !mUpdatingProbe->isRelevant())
-    {
-        abandonProbeUpdate();
-    }
-
-    if (mUpdatingProbe != nullptr)
-    {
-        did_update = true;
-        doProbeUpdate();
-    }
-
     // Occlusion state only means anything for as long as the queries that produce it keep
     // running, and they stop whenever LLPipeline::sUseOcclusion drops out of its "query"
     // level -- the UseOcclusion setting, a feature-table veto, or simply turning on wireframe.
@@ -483,6 +468,24 @@ void LLReflectionMapManager::update()
 
             probe->mInsideManualProbe = eclipsed;
         }
+    }
+
+    // A probe that stopped being relevant partway through its twelve passes is dropped rather than
+    // finished, by the same rule the scheduling loop below uses to skip one. Every remaining pass
+    // renders the whole scene for a probe that is about to lose its cube slot in the release pass,
+    // or, when whatever registered it is gone, to be deleted outright. It comes after the eclipse
+    // pass above so that it judges on this frame's mInsideManualProbe, as the scheduling loop does:
+    // judged on last frame's, a probe whose eclipser had just gone would be abandoned here, found
+    // relevant again a few lines later, and start its twelve passes over.
+    if (mUpdatingProbe != nullptr && mUpdatingProbe != mDefaultProbe && !mUpdatingProbe->isRelevant())
+    {
+        abandonProbeUpdate();
+    }
+
+    if (mUpdatingProbe != nullptr)
+    {
+        did_update = true;
+        doProbeUpdate();
     }
 
     // Update distance to camera for all probes.
@@ -1867,10 +1870,9 @@ void LLReflectionMapManager::cleanup()
     mCreateList.clear();
 
     mReflectionMaps.clear();
-    mUpdatingFace = 0;
+    abandonProbeUpdate();
 
     mDefaultProbe = nullptr;
-    mUpdatingProbe = nullptr;
 
     mUBO.release();
 
