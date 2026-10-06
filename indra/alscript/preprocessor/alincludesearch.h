@@ -136,7 +136,8 @@ public:
         bool        lua = false;
     };
     typedef boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> wanted_t;
-    // A `.luaurc` of a chain, by its identity, and its text.
+    // A configuration of a chain, by its identity, and its text as a
+    // `.luaurc` reads: a `.config.luau`'s is what it returned.
     struct Config
     {
         std::string path;
@@ -270,6 +271,25 @@ private:
     ALDiskCache::Blessed& blessedFor(const ALPreprocessor::Ask& ask, const Asking& asking, const Where& where,
                                      const std::vector<std::string>& alias_folders);
     ALDiskCache::Blessed& ownFolders(const Where& where);
+    // A folder on disk's configuration: its `.luaurc` and its
+    // `.config.luau`, where each is, either empty; both is ambiguous.
+    struct DiskConfig
+    {
+        std::string dir;
+        std::string luaurc;
+        std::string luau;
+    };
+    // A folder's own; each folder's from one up to the root that has
+    // either, nearest first; and at the top of each of the scripter's
+    // include folders that has either, in their order.
+    DiskConfig              configIn(const std::string& dir);
+    std::vector<DiskConfig> configsUp(const std::string& dir, const Where& where);
+    std::vector<DiskConfig> configsAtTop(const Where& where);
+    // One read as a `.luaurc` reads: its `.luaurc`, or its `.config.luau`
+    // run (ALLuauConfigScript) -- no text, and why, where that fails -- or
+    // ambiguous, with both. False where it has neither, or the file cannot
+    // be read.
+    bool readConfig(const DiskConfig& config, ALRequirePlaces::Config& out);
     // A file on disk a blessed folder admits, where it stands: what may be
     // asked the text of from now on.
     Candidate admitted(const std::string& real);

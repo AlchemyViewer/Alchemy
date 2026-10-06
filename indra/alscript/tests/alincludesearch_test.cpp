@@ -894,4 +894,94 @@ namespace tut
         }
         ensure_equals("an LSL include's", said, std::string("inc.lsl lib/"));
     }
+
+    template<> template<>
+    void alincludesearch_object::test<15>()
+    {
+        set_test_name("a .config.luau on disk is read as the .luaurc it says: its aliases walked and suggested, its mode the analyzer's, in the chain as Luau reads one; a folder with both reads as neither; one that fails is passed over; at the top of the scripter's folder for a script in the world");
+        Scratch           s;
+        const std::string script = s.write("proj/src/main.luau", "return require('@lib/net')\n");
+        const std::string net    = s.write("proj/modules/net.luau", "return 1\n");
+        const std::string luau   = s.write("proj/.config.luau", "local root = './modules'\nreturn { luau = { languagemode = 'strict', aliases = { lib = root } } }\n");
+        const ALIncludeSearch::Asking own{ ALIncludeIdentity::ofFile(script), true };
+        // Each step's disk read again, as a change of settings has it.
+        U32        generation = 0;
+        const auto disk       = [&]() {
+            ALIncludeSearch::Where out = where(false, true, { s.at("proj") });
+            out.generation             = ++generation;
+            return out;
+        };
+        const auto resolved = [&](const std::string& name, std::string* why = nullptr) {
+            ALPreprocessor::Include  found;
+            std::vector<std::string> aliases;
+            const bool yes = search.resolve(ask(name, true, own.self), found, own, disk(), nullptr, false, &aliases) == ALPreprocessor::Found::Yes;
+            if (why)
+            {
+                *why = found.why;
+            }
+            return yes ? found.path : std::string();
+        };
+        const auto chain = [&]() {
+            std::vector<ALIncludeSearch::Config> out;
+            search.configsFor(own.self, own, disk(), nullptr, false, out);
+            std::string said;
+            for (const ALIncludeSearch::Config& one : out)
+            {
+                std::string file;
+                ALIncludeIdentity::fileOf(one.path, file);
+                said += (said.empty() ? "" : " ") + fsyspath(fs::path(fsyspath(file)).filename()).string();
+            }
+            return said;
+        };
+        const auto suggested = [&]() {
+            std::string out;
+            for (const ALRequireNavigation::Suggestion& one : search.suggest(own.self, "", true, own, disk()))
+            {
+                out += (out.empty() ? "" : " ") + one.label;
+            }
+            return out;
+        };
+        ALLuauConfig config;
+
+        ensure_equals("through its alias", resolved("@lib/net"), ALIncludeIdentity::ofFile(net));
+        ensure_equals("in the chain by its own name", chain(), std::string(".config.luau"));
+        ensure("its mode the analyzer's", search.configOf(own, disk(), config) && config.mode == "strict");
+        ensure_equals("its alias suggested", suggested(), std::string("@lib ./ ../"));
+
+        // A nearer .luaurc over it, as Luau reads a chain.
+        s.write("proj/src/.luaurc", "{\"languageMode\": \"nonstrict\"}");
+        ensure_equals("both, the nearer first", chain(), std::string(".luaurc .config.luau"));
+        ensure("the nearer's mode", search.configOf(own, disk(), config) && config.mode == "nonstrict");
+        ensure_equals("the further one's alias still", resolved("@lib/net"), ALIncludeIdentity::ofFile(net));
+
+        // Both in one folder: neither, as Luau reads it.
+        const std::string rc = s.write("proj/.luaurc", "{\"aliases\": {\"lib\": \"./modules\"}}");
+        std::string       why;
+        ensure("both: not found", resolved("@lib/net", &why).empty());
+        ensure_equals("in Luau's words", why, std::string("could not resolve alias \"lib\" (ambiguous configuration file)"));
+        ensure_equals("passed over in the chain", chain(), std::string(".luaurc"));
+        ensure_equals("nor suggested", suggested(), std::string("./ ../"));
+        std::error_code ec;
+        fs::remove(fsyspath(rc), ec);
+
+        // One that does not run: passed over, as a .luaurc that does not
+        // parse is.
+        s.write("proj/.config.luau", "error('broken')\n");
+        ensure("broken: its alias gone", resolved("@lib/net", &why).empty() && why == "@lib is not a valid alias");
+        ensure_equals("not in the chain", chain(), std::string(".luaurc"));
+
+        // A script in the world, world includes off: the one at the top of
+        // the scripter's include folder governs it.
+        s.write("inc/.config.luau", "return { luau = { aliases = { top = './libs' } } }\n");
+        const std::string            x   = s.write("inc/libs/x.luau", "return 'x'\n");
+        const ALIncludeSearch::Where off = where(false, true, { s.at("inc") });
+        ALPreprocessor::Include      found;
+        std::vector<std::string>     aliases;
+        ensure("a world script, through the top's alias",
+               search.resolve(ask("@top/x", true, asking(true).self), found, asking(true), off, nullptr, false, &aliases) == ALPreprocessor::Found::Yes &&
+                   found.path == ALIncludeIdentity::ofFile(x));
+        std::vector<ALIncludeSearch::Config> top;
+        ensure("and its chain", search.configsFor(asking(true).self, asking(true), off, nullptr, false, top) == ALPreprocessor::Found::Yes &&
+                                    top.size() == 1 && top[0].text.find("\"top\": \"./libs\"") != std::string::npos);
+    }
 }

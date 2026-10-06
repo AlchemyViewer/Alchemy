@@ -192,6 +192,8 @@ namespace tut
                               m.args[1] == "@a -> @b -> @a");
         ensure("the studio's own", ALMessageMap::luauRequire("the alias '@sl-std' is reserved: aliases starting @sl- are Second Life's", m) &&
                                        m.key == "PreprocRequireReserved" && m.args[1] == "sl-std");
+        ensure("a folder with both configurations", ALMessageMap::luauRequire("could not resolve alias \"lib\" (ambiguous configuration file)", m) &&
+                                                        m.key == "PreprocRequireConfigAmbiguous" && m.args[1] == "lib");
         ensure("a reason of no known shape", !ALMessageMap::luauRequire("something else went wrong", m));
         ensure("its keys known as such", ALMessageMap::requireReason("PreprocRequireNoChild") && !ALMessageMap::requireReason("PreprocRequireTooDeep"));
     }

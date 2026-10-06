@@ -654,6 +654,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocRequireNoChild">could not find module '[1]': there is no '[2]'</string>
 	<string name="PreprocRequireNotAlias">could not find module '[1]': no .luaurc, and no SLua alias of Script Studio's, names @[2]</string>
 	<string name="PreprocRequireAliasCycle">could not find module '[1]': its aliases name each other in a circle ([2])</string>
+	<string name="PreprocRequireConfigAmbiguous">could not find module '[1]': a folder on the way to @[2] has both a .luaurc and a .config.luau, which Luau reads as neither</string>
 	<string name="PreprocRequireAliasUnresolved">could not find module '[1]': the alias "[2]" could not be read</string>
 	<string name="PreprocRequireNoParentOf">could not find module '[1]': there is no folder above '[2]'</string>
 	<string name="PreprocRequireNoParent">could not find module '[1]': there is no folder above this script</string>

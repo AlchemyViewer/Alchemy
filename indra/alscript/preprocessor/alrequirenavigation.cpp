@@ -174,9 +174,14 @@ namespace
             {
                 return ConfigStatus::Absent;
             }
-            mConfigText.clear();
-            mConfigBase.clear();
-            return known(mPlaces.config(mAt.folder, mConfigText, mConfigOnDisk, mConfigBase)) ? ConfigStatus::PresentJson : ConfigStatus::Absent;
+            // A `.config.luau` comes as the `.luaurc` it says, which is all
+            // the navigator is given: it never runs one itself (LA19).
+            mConfig = ALRequirePlaces::Config();
+            if (!known(mPlaces.config(mAt.folder, mConfig)))
+            {
+                return ConfigStatus::Absent;
+            }
+            return mConfig.ambiguous ? ConfigStatus::Ambiguous : ConfigStatus::PresentJson;
         }
 
         ConfigBehavior getConfigBehavior() const override { return ConfigBehavior::GetConfig; }
@@ -189,7 +194,7 @@ namespace
         {
             ALLuauConfig parsed;
             std::string  error;
-            if (!ALLuauConfig::parse(mConfigText, parsed, error))
+            if (!ALLuauConfig::parse(mConfig.text, parsed, error))
             {
                 return std::string("{}");
             }
@@ -201,7 +206,7 @@ namespace
                 if (said.empty() || said.front() != '@')
                 {
                     said = std::string(TARGET) + std::to_string(mTargets.size());
-                    mTargets.push_back({ mConfigBase, value, mConfigOnDisk });
+                    mTargets.push_back({ mConfig.base, value, mConfig.onDisk });
                 }
                 json += (first ? "" : ", ") + jsonString(alias) + ": " + jsonString(said);
                 first = false;
@@ -298,15 +303,13 @@ namespace
             bool        onDisk = false;
         };
 
-        ALRequirePlaces&            mPlaces;
-        Position                    mRequirer;
-        Position                    mAt;
-        mutable bool                mPending      = false;
-        mutable std::string         mConfigText;
-        mutable std::string         mConfigBase;
-        mutable bool                mConfigOnDisk = false;
-        mutable std::vector<Target> mTargets;
-        std::string                 mMissedTarget;
+        ALRequirePlaces&                mPlaces;
+        Position                        mRequirer;
+        Position                        mAt;
+        mutable bool                    mPending = false;
+        mutable ALRequirePlaces::Config mConfig;
+        mutable std::vector<Target>     mTargets;
+        std::string                     mMissedTarget;
     };
 
     // Luau's words for what went wrong, the last it said.
@@ -340,8 +343,10 @@ namespace
         return context.at();
     }
 
-    // The aliases in reach of a file: each `.luaurc`'s from its folder up,
-    // the nearest's first, then the studio's; none Second Life keeps.
+    // The aliases in reach of a file: each configuration's from its folder
+    // up, the nearest's first, then the studio's; none Second Life keeps.
+    // A folder with both a `.luaurc` and a `.config.luau` ends the walk, as
+    // it ends the navigator's with an error: only what is nearer reaches.
     std::vector<std::string> aliasesFrom(ALRequirePlaces& places, const std::string& from)
     {
         std::vector<std::string> out;
@@ -355,13 +360,17 @@ namespace
         bool        more = places.placeOf(from, folder, stem);
         for (size_t up = 0; up < 64; ++up)
         {
-            std::string text, base;
-            bool        on_disk = false;
-            if (places.config(folder, text, on_disk, base) == Known::Yes)
+            ALRequirePlaces::Config config;
+            const Known             said = places.config(folder, config);
+            if (said == Known::Yes && config.ambiguous)
+            {
+                return out;
+            }
+            if (said == Known::Yes)
             {
                 ALLuauConfig parsed;
                 std::string  error;
-                if (ALLuauConfig::parse(text, parsed, error))
+                if (ALLuauConfig::parse(config.text, parsed, error))
                 {
                     for (const auto& [alias, value] : parsed.aliases)
                     {

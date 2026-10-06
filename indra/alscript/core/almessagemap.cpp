@@ -276,6 +276,7 @@ namespace
         { "PreprocRequireNoChild", "could not resolve child component \"[2]\"" },
         { "PreprocRequireNotAlias", "@[2] is not a valid alias" },
         { "PreprocRequireAliasCycle", "detected alias cycle ([2])" },
+        { "PreprocRequireConfigAmbiguous", "could not resolve alias \"[2]\" (ambiguous configuration file)" },
         { "PreprocRequireAliasUnresolved", "could not resolve alias \"[2]\"" },
         { "PreprocRequireNoParentOf", "could not get parent of component \"[2]\"" },
         { "PreprocRequireNoParent", "could not get parent of requiring context" },

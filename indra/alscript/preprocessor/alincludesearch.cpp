@@ -27,6 +27,7 @@
 
 #include "alincludeidentity.h"
 #include "almessagemap.h"
+#include "alluauconfigscript.h"
 #include "alrequirenavigation.h"
 #include "fsyspath.h"
 #include "llstl.h"
@@ -322,32 +323,33 @@ public:
         return pending ? Known::Pending : out.empty() ? Known::No : Known::Yes;
     }
 
-    Known config(const std::string& folder, std::string& text, bool& on_disk, std::string& base) override
+    Known config(const std::string& folder, ALRequirePlaces::Config& out) override
     {
         std::string dir;
         if (diskDir(folder, dir))
         {
-            const std::string path = fsyspath(fsyspath(dir) / fsyspath(CONFIG_NAME)).string();
-            on_disk                = true;
-            base                   = folder;
-            return isFile(path) && mSearch.mDisk.read(path, text) ? Known::Yes : Known::No;
+            out.onDisk = true;
+            out.base   = folder;
+            return mSearch.readConfig(mSearch.configIn(dir), out) ? Known::Yes : Known::No;
         }
         if (folder.compare(0, ABOVE.size(), ABOVE) == 0)
         {
-            const size_t                    index = std::strtoul(folder.c_str() + ABOVE.size(), nullptr, 10);
-            const std::vector<std::string>& tops  = atTop();
+            const size_t                                    index = std::strtoul(folder.c_str() + ABOVE.size(), nullptr, 10);
+            const std::vector<ALIncludeSearch::DiskConfig>& tops  = atTop();
             if (index >= tops.size())
             {
                 return Known::No;
             }
-            on_disk = true;
-            base    = std::string(DISK_FOLDER) + fsyspath(fsyspath(tops[index]).parent_path()).string();
-            return mSearch.mDisk.read(tops[index], text) ? Known::Yes : Known::No;
+            out.onDisk = true;
+            out.base   = std::string(DISK_FOLDER) + tops[index].dir;
+            return mSearch.readConfig(tops[index], out) ? Known::Yes : Known::No;
         }
         if (!inWorld(folder))
         {
             return Known::No;
         }
+        // In the world a `.luaurc` alone: a `.config.luau` is run only from
+        // the disk.
         std::vector<ALIncludeWorld::Item> items;
         std::string                       sub;
         if (mSearch.mWorld.named(folder, CONFIG_NAME, items, sub) == ALPreprocessor::Found::Pending)
@@ -358,11 +360,11 @@ public:
         {
             return Known::No;
         }
-        on_disk = false;
-        base    = folder;
+        out.onDisk = false;
+        out.base   = folder;
         std::string                 asset;
         const ALPreprocessor::Found found =
-            mSearch.textOf({ items.front().path, CONFIG_NAME, items.front().assetId, std::string() }, mWanted, mRetry, text, asset);
+            mSearch.textOf({ items.front().path, CONFIG_NAME, items.front().assetId, std::string() }, mWanted, mRetry, out.text, asset);
         return found == ALPreprocessor::Found::Yes ? Known::Yes : found == ALPreprocessor::Found::Pending ? Known::Pending : Known::No;
     }
 
@@ -463,11 +465,11 @@ private:
         out = std::string(ABOVE) + std::to_string(index);
         return Known::Yes;
     }
-    const std::vector<std::string>& atTop()
+    const std::vector<ALIncludeSearch::DiskConfig>& atTop()
     {
         if (!mTops)
         {
-            mTops = mSearch.mDisk.atTop(mSearch.ownFolders(mWhere), CONFIG_NAME);
+            mTops = mSearch.configsAtTop(mWhere);
         }
         return *mTops;
     }
@@ -477,7 +479,7 @@ private:
     wanted_t*                               mWanted;
     bool                                    mRetry;
     std::vector<std::string>&               mAliasFolders;
-    std::optional<std::vector<std::string>> mTops;
+    std::optional<std::vector<ALIncludeSearch::DiskConfig>> mTops;
 };
 
 ALIncludeSearch::ALIncludeSearch(ALScriptTextCache& texts, ALIncludeWorld& world) : mTexts(texts), mWorld(world) {}
@@ -674,12 +676,13 @@ ALPreprocessor::Found ALIncludeSearch::textOf(const Candidate& c, wanted_t* want
 ALPreprocessor::Found ALIncludeSearch::configsFor(const std::string& from, const Asking& asking, const Where& where, wanted_t* wanted, bool retry,
                                                   std::vector<Config>& out)
 {
-    static const std::string CONFIG_NAME(".luaurc");
     out.clear();
-    std::vector<Candidate> chain;
-    std::string            file;
+    std::vector<Candidate>  chain;
+    std::vector<DiskConfig> disk;
+    std::string             file;
     // A configuration in the world only where the world is let in: an
-    // object is not asked what it holds otherwise, and would never say.
+    // object is not asked what it holds otherwise, and would never say. A
+    // `.luaurc` alone there: a `.config.luau` is run only from the disk.
     const bool in_world = ALIncludeIdentity::inWorld(from);
     if (in_world && where.world)
     {
@@ -696,10 +699,7 @@ ALPreprocessor::Found ALIncludeSearch::configsFor(const std::string& from, const
     else if (!in_world && ALIncludeIdentity::fileOf(from, file))
     {
         // Up the directories from the file's own, every one to the root.
-        for (const std::string& config : mDisk.upwards(dirOf(file), CONFIG_NAME, where.generation, where.now))
-        {
-            chain.push_back({ ALIncludeIdentity::ofFile(config), CONFIG_NAME, LLUUID::null, config });
-        }
+        disk = configsUp(dirOf(file), where);
     }
     if (in_world)
     {
@@ -707,10 +707,7 @@ ALPreprocessor::Found ALIncludeSearch::configsFor(const std::string& from, const
         // scripter's include folders, while the disk is read: a script in
         // the world has no folders on disk to look up through, and its
         // scripter's modules are read from those.
-        for (const std::string& top : mDisk.atTop(ownFolders(where), CONFIG_NAME))
-        {
-            chain.push_back({ ALIncludeIdentity::ofFile(top), CONFIG_NAME, LLUUID::null, top });
-        }
+        disk = configsAtTop(where);
     }
     // Every text asked for at once: Pending while any is on its way.
     bool pending = false;
@@ -733,7 +730,97 @@ ALPreprocessor::Found ALIncludeSearch::configsFor(const std::string& from, const
     {
         return ALPreprocessor::Found::Pending;
     }
+    // On disk, a folder with both is passed over, as Luau's analysis
+    // passes it over; and a `.config.luau` that did not run, as a
+    // `.luaurc` that does not parse is.
+    for (const DiskConfig& one : disk)
+    {
+        ALRequirePlaces::Config read;
+        if (readConfig(one, read) && !read.ambiguous && !read.text.empty())
+        {
+            out.push_back({ ALIncludeIdentity::ofFile(one.luaurc.empty() ? one.luau : one.luaurc), std::move(read.text) });
+        }
+    }
     return out.empty() ? ALPreprocessor::Found::No : ALPreprocessor::Found::Yes;
+}
+
+ALIncludeSearch::DiskConfig ALIncludeSearch::configIn(const std::string& dir)
+{
+    const std::string luaurc = fsyspath(fsyspath(dir) / fsyspath(CONFIG_NAME)).string();
+    const std::string luau   = fsyspath(fsyspath(dir) / fsyspath(ALLuauConfigScript::NAME)).string();
+    return { dir, isFile(luaurc) ? luaurc : std::string(), isFile(luau) ? luau : std::string() };
+}
+
+std::vector<ALIncludeSearch::DiskConfig> ALIncludeSearch::configsUp(const std::string& dir, const Where& where)
+{
+    // Each name's from the cache, a folder's two together, the nearest --
+    // the longest of the folders above one -- first. A copy of the first:
+    // asking the second may move what the cache keeps.
+    const std::vector<std::string> luaurcs = mDisk.upwards(dir, CONFIG_NAME, where.generation, where.now);
+    const std::vector<std::string>& luaus  = mDisk.upwards(dir, ALLuauConfigScript::NAME, where.generation, where.now);
+    std::vector<DiskConfig>         out;
+    const auto                      in = [&out](const std::string& folder) -> DiskConfig& {
+        for (DiskConfig& one : out)
+        {
+            if (one.dir == folder)
+            {
+                return one;
+            }
+        }
+        out.push_back({ folder, std::string(), std::string() });
+        return out.back();
+    };
+    for (const std::string& file : luaurcs)
+    {
+        in(dirOf(file)).luaurc = file;
+    }
+    for (const std::string& file : luaus)
+    {
+        in(dirOf(file)).luau = file;
+    }
+    std::stable_sort(out.begin(), out.end(), [](const DiskConfig& a, const DiskConfig& b) { return a.dir.size() > b.dir.size(); });
+    return out;
+}
+
+std::vector<ALIncludeSearch::DiskConfig> ALIncludeSearch::configsAtTop(const Where& where)
+{
+    ALDiskCache::Blessed&   own = ownFolders(where);
+    std::vector<DiskConfig> out;
+    for (const std::string& folder : own.includes.folders())
+    {
+        DiskConfig one;
+        one.luaurc = mDisk.admits(own, fsyspath(fsyspath(folder) / fsyspath(CONFIG_NAME)).string()).value_or(std::string());
+        one.luau   = mDisk.admits(own, fsyspath(fsyspath(folder) / fsyspath(ALLuauConfigScript::NAME)).string()).value_or(std::string());
+        if (!one.luaurc.empty() || !one.luau.empty())
+        {
+            one.dir = dirOf(one.luaurc.empty() ? one.luau : one.luaurc);
+            out.push_back(std::move(one));
+        }
+    }
+    return out;
+}
+
+bool ALIncludeSearch::readConfig(const DiskConfig& config, ALRequirePlaces::Config& out)
+{
+    if (!config.luaurc.empty() && !config.luau.empty())
+    {
+        out.ambiguous = true;
+        return true;
+    }
+    if (!config.luaurc.empty())
+    {
+        return mDisk.read(config.luaurc, out.text);
+    }
+    std::string source;
+    if (config.luau.empty() || !mDisk.read(config.luau, source))
+    {
+        return false;
+    }
+    if (!ALLuauConfigScript::asLuaurc(source, out.text, out.error))
+    {
+        out.text.clear();
+    }
+    return true;
 }
 
 ALPreprocessor::Found ALIncludeSearch::resolve(const ALPreprocessor::Ask& ask_in, ALPreprocessor::Include& out, const Asking& asking,

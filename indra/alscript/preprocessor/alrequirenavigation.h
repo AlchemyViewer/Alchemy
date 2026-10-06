@@ -73,11 +73,24 @@ public:
     // written where it has an extension; else the name with a script's
     // extensions, and in the world the item of the name itself.
     virtual Known files(const std::string& folder, const std::string& name, std::vector<File>& out) = 0;
-    // The `.luaurc` of a folder, whether it is on disk, and the folder its
-    // aliases' paths are from: its own, or for one at the top of a
-    // scripter's include folder, which governs a script in the world, that
-    // folder. Pending where its text is on its way.
-    virtual Known config(const std::string& folder, std::string& text, bool& on_disk, std::string& base) = 0;
+    // A folder's configuration, as a `.luaurc` reads: its `.luaurc`, or on
+    // disk its `.config.luau` run and read as one (ALLuauConfigScript).
+    struct Config
+    {
+        std::string text;
+        // Whether it is on disk, and the folder its aliases' paths are
+        // from: its own, or for one at the top of a scripter's include
+        // folder, which governs a script in the world, that folder.
+        bool        onDisk = false;
+        std::string base;
+        // Both a `.luaurc` and a `.config.luau` there, which Luau takes as
+        // neither; or a `.config.luau` that did not run, no text, and why.
+        bool        ambiguous = false;
+        std::string error;
+    };
+    // Yes where it has one, ambiguous or not; Pending where its text is on
+    // its way.
+    virtual Known config(const std::string& folder, Config& out) = 0;
     // The folder a studio alias stands for, where no configuration names
     // the alias (LA22): Script Studio's own, by the name in lower case.
     virtual Known studioAlias(const std::string& alias, std::string& folder) = 0;
