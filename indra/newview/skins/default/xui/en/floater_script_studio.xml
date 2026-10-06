@@ -139,6 +139,7 @@
     <floater.string name="FixChecking">Checking [NAME] for fixes...</floater.string>
     <floater.string name="FilterFixable">Fixable</floater.string>
     <floater.string name="FilterFixableCount">Fixable ([COUNT])</floater.string>
+    <floater.string name="AliasTaken">The SLua alias @[NAME] now names another folder. Check the script again to be offered another fix.</floater.string>
     <floater.string name="FixStale">The script changed since it was checked. Fixes will be offered again after the next check.</floater.string>
     <floater.string name="ProblemFixTip">Fix: [TITLE]</floater.string>
     <floater.string name="ScriptsA">1 script</floater.string>

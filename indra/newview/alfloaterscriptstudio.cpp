@@ -215,6 +215,21 @@ namespace
         {
             ALScriptModules::instance().fetchNearby(request, std::move(fetched));
         }
+        bool nameStudioAlias(const std::string& name, const std::string& folder) override
+        {
+            std::vector<ALScriptPreprocessor::StudioAlias> aliases = ALScriptPreprocessor::studioAliases();
+            for (const ALScriptPreprocessor::StudioAlias& alias : aliases)
+            {
+                if (LLStringUtil::compareInsensitive(alias.name, name) == 0)
+                {
+                    return alias.folder == folder;
+                }
+            }
+            aliases.push_back({ name, folder });
+            ALScriptPreprocessor::setStudioAliases(aliases);
+            gSavedSettings.setBOOL("ALScriptPreprocDiskIncludes", true);
+            return true;
+        }
     };
 
     // How long a tab to be restored waits for its object or its item to be

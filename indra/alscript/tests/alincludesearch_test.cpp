@@ -701,4 +701,57 @@ namespace tut
         ensure("an LSL include does not search an alias's folder",
                search.resolve(ask("helper.lsl"), include, asking(), disk, nullptr, false) == ALPreprocessor::Found::No);
     }
+
+    template<> template<>
+    void alincludesearch_object::test<11>()
+    {
+        set_test_name("a require the search found before, and finds nothing now: where it found it, and each way to say it now that finds that very file");
+        Scratch           s;
+        const std::string script = s.write("proj/main.luau", "return require('util')\n");
+        s.write("proj/.luaurc", "{\"aliases\": {\"shared\": \"../inc\"}}");
+        const std::string under  = s.write("proj/lib/util2.luau", "return 'util2'\n");
+        const std::string util   = s.write("inc/util.luau", "return 'util'\n");
+        const std::string solo   = s.write("other/solo.luau", "return 'solo'\n");
+        const std::string deep   = s.write("other/deep/net.luau", "return 'net'\n");
+        const ALIncludeSearch::Where  disk = where(false, true, { s.at("proj"), s.at("proj/lib"), s.at("inc"), s.at("other") });
+        const ALIncludeSearch::Asking from_disk{ ALIncludeIdentity::ofFile(script), true };
+        const ALIncludeSearch::Asking in_object = asking(true);
+        const auto missed = [&](const std::string& name, const ALIncludeSearch::Asking& who) {
+            ALPreprocessor::Include  include;
+            std::vector<std::string> aliases;
+            ensure(name + ": found nothing now", search.resolve(ask(name, true, who.self), include, who, disk, nullptr, false, &aliases) ==
+                                                     ALPreprocessor::Found::No);
+            return include;
+        };
+        const auto said = [](const ALPreprocessor::Include& include) {
+            std::string out;
+            for (const ALPreprocessor::Include::Move& move : include.moves)
+            {
+                out += (out.empty() ? "" : " ") + move.require + (move.alias.empty() ? std::string() : " +@" + move.alias);
+            }
+            return out;
+        };
+
+        ALPreprocessor::Include include = missed("util2", from_disk);
+        ensure_equals("found under the file's own folder", include.searched, under);
+        ensure_equals("written from beside it", said(include), std::string("./lib/util2"));
+
+        include = missed("util", from_disk);
+        ensure_equals("found in another include folder", include.searched, util);
+        ensure_equals("through the .luaurc's alias that reaches it", said(include), std::string("@shared/util"));
+
+        include = missed("util", in_object);
+        ensure_equals("from an object: through the alias of the .luaurc at the top of an include folder", said(include), std::string("@shared/util"));
+        include = missed("solo", in_object);
+        ensure_equals("from an object, where none reaches it", include.searched, solo);
+        ensure_equals("through a studio alias of the folder that holds it, named after it", said(include), std::string("@other/solo +@other"));
+        ensure_equals("the folder named", include.moves[0].folder, s.at("other"));
+        include = missed("deep/net", in_object);
+        ensure("a folder in it", include.searched == deep && said(include) == "@other/deep/net +@other");
+
+        include = missed("nowhere", from_disk);
+        ensure("nowhere before either", include.searched.empty() && include.moves.empty());
+        include = missed("@missing/util", from_disk);
+        ensure("an alias's is no searched name", include.searched.empty());
+    }
 }

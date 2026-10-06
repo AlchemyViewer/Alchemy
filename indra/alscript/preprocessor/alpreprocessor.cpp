@@ -4460,7 +4460,7 @@ namespace
                     {
                         const std::string name = tokens[b].text.substr(1, tokens[b].text.size() - 2);
                         std::string       key;
-                        if (resolve(name, from, t, key))
+                        if (resolve(name, from, t, tokens[b], key))
                         {
                             out.push_back(synth(Kind::Ident, "__modules", t));
                             out.push_back(synth(Kind::Punct, "[", t));
@@ -4530,6 +4530,50 @@ namespace
         }
 
     private:
+        // What a require found by the search before may be written as now,
+        // each as a fix to the problem just said: the string put in the
+        // name's place, the studio alias it needs named first. Only for a
+        // require the script itself says as written: one in a module is
+        // the module's to change.
+        void moveFixes(const std::vector<ALPreprocessor::Include::Move>& moves, const Token& said)
+        {
+            if (said.file != 0 || !said.verbatim || said.text.size() < 2)
+            {
+                return;
+            }
+            const char quote = said.text.front();
+            for (const ALPreprocessor::Include::Move& move : moves)
+            {
+                std::string written(1, quote);
+                for (const char c : move.require)
+                {
+                    if (c == quote || c == '\\')
+                    {
+                        written += '\\';
+                    }
+                    written += c;
+                }
+                written += quote;
+                ALScriptFix fix;
+                if (move.alias.empty())
+                {
+                    fix.key   = "ScriptFixRequireAs";
+                    fix.args  = { move.require };
+                    fix.title = ALScriptProblem::fill("Require it as '[1]'", fix.args);
+                }
+                else
+                {
+                    fix.key   = "ScriptFixRequireAlias";
+                    fix.args  = { move.require, move.alias, move.folder };
+                    fix.title = ALScriptProblem::fill("Name [3] as the SLua alias @[2], and require it as '[1]'", fix.args);
+                }
+                fix.edits.emplace_back(said.line, said.column, said.line, said.column + S32(said.text.size()), written);
+                // A studio alias is a setting: named only where asked.
+                fix.preferred = move.alias.empty() && moves.front().require == move.require;
+                mResult.problems.back().fixes.push_back(std::move(fix));
+            }
+        }
+
         // Whether the word last put out, past blanks, is a `.` or a `:`:
         // `t.require("x")` and `t:require("x")` are a table's, not the
         // global that finds a module.
@@ -4545,7 +4589,7 @@ namespace
             return false;
         }
 
-        bool resolve(const std::string& name, const std::string& from, const Token& at, std::string& key)
+        bool resolve(const std::string& name, const std::string& from, const Token& at, const Token& said, std::string& key)
         {
             ALPreprocessor::Ask ask;
             ask.name    = name;
@@ -4563,7 +4607,17 @@ namespace
             }
             if (answer == ALPreprocessor::Found::No)
             {
-                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocModuleNotFound", "could not find module '[1]'", { name }, at);
+                if (found.searched.empty())
+                {
+                    mEngine.problem(ALScriptProblem::Severity::Error, "PreprocModuleNotFound", "could not find module '[1]'", { name }, at);
+                    return false;
+                }
+                // Found by the search before a require followed the
+                // plugin's rules: said, with what to write instead.
+                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocModuleSearched",
+                                "could not find module '[1]': a require no longer searches the include folders, where it found [2]", { name, found.searched },
+                                at);
+                moveFixes(found.moves, said);
                 return false;
             }
             key = found.path.empty() ? name : found.path;

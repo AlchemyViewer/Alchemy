@@ -1727,4 +1727,34 @@ namespace tut
         ensure("else not", P::wanted(false, directives(false), false) == P::Wanted::No);
         ensure("by text", P::wanted("#define X 1\n", false, false, false) == P::Wanted::Directives);
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<45>()
+    {
+        set_test_name("a require found nowhere that the search before found: said where, with a fix for each way to say it now, the alias's not preferred");
+        ALPreprocessor::Options o = options(true);
+        o.resolve                 = [](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
+            if (ask.name == "util")
+            {
+                out.searched = "/inc/util.luau";
+                out.moves    = { { "@shared/util", "", "" }, { "@inc/util", "inc", "/inc" } };
+            }
+            return ALPreprocessor::Found::No;
+        };
+        const ALPreprocessor::Result r = ALPreprocessor::run("local util = require('util')\nlocal other = require(\"other\")\n", o);
+        ensure_equals("both said", r.problems.size(), size_t(2));
+        const ALScriptProblem& moved = r.problems[0];
+        ensure_equals("where the search found it", moved.key, std::string("PreprocModuleSearched"));
+        ensure("its words", moved.args == std::vector<std::string>({ "util", "/inc/util.luau" }) && moved.message.find("/inc/util.luau") != std::string::npos);
+        ensure_equals("a fix for each way", moved.fixes.size(), size_t(2));
+        const ALScriptFix& plain = moved.fixes[0];
+        ensure("the require's string put in, its quote kept", plain.edits.size() == 1 && plain.edits[0].text == "'@shared/util'" &&
+                                                                   plain.edits[0].line == 0 && plain.edits[0].column == 21 && plain.edits[0].endColumn == 27);
+        ensure("preferred", plain.preferred && plain.key == "ScriptFixRequireAs");
+        const ALScriptFix& alias = moved.fixes[1];
+        ensure("the alias's named in it, and not preferred", alias.key == "ScriptFixRequireAlias" && alias.args.size() == 3 && alias.args[1] == "inc" &&
+                                                                  !alias.preferred && !alias.safe);
+        ensure_equals("one the search never found: as before", r.problems[1].key, std::string("PreprocModuleNotFound"));
+        ensure("with no fix", r.problems[1].fixes.empty());
+    }
 }

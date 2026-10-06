@@ -648,6 +648,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocIncludeTooDeep">#include nested too deeply at '[1]'</string>
 	<string name="PreprocMacroRedefined">macro '[1]' redefined</string>
 	<string name="PreprocModuleNotFound">could not find module '[1]'</string>
+	<string name="PreprocModuleSearched">could not find module '[1]': a require no longer searches the include folders, where it found [2]</string>
 	<string name="PreprocNoVariableBefore">no variable before '[1]'</string>
 	<string name="PreprocNotAnInteger">'[1]' is not an integer constant</string>
 	<string name="PreprocOutsideLoop">[1] outside a loop</string>
@@ -772,6 +773,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixRemoveNoEffect">Remove what does nothing</string>
 	<string name="ScriptFixRequire">Require '[1]'</string>
 	<string name="ScriptFixRequireField">Take '[1]' from '[2]'</string>
+	<string name="ScriptFixRequireAs">Require it as '[1]'</string>
+	<string name="ScriptFixRequireAlias">Name [3] as the SLua alias @[2], and require it as '[1]'</string>
 	<string name="ScriptFixInclude">Include '[1]'</string>
 	<string name="ScriptFixCompoundAssign">Write it [1] [2]= ...</string>
 	<string name="ScriptFixHoistCall">Work out [1] once, before the loop</string>

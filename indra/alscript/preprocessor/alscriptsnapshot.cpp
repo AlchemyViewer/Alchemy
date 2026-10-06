@@ -66,7 +66,8 @@ ALPreprocessor::Result ALScriptSnapshot::run(std::string_view source)
             }
             return ALPreprocessor::Found::Pending;
         }
-        if (answer->second.found == ALPreprocessor::Found::Yes)
+        // Found, or not found and what the search before found instead.
+        if (answer->second.found != ALPreprocessor::Found::Pending)
         {
             out = answer->second.include;
         }

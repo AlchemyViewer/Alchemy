@@ -1388,4 +1388,33 @@ namespace tut
         ensure("Apply again: nothing waiting, and said", !checking.applyPreviewed(doc) && services.statuses.back() == "FixAllNotPreviewed" &&
                                                             services.statusFailures.back());
     }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<25>()
+    {
+        set_test_name("a fix that moves a require onto a SLua alias of the studio's own names the folder first, and is refused where the name is another folder's");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        std::vector<std::string> named;
+        bool                     free = true;
+        viewer.slots.nameStudioAlias = [&named, &free](const std::string& name, const std::string& folder) {
+            named.push_back(name + "=" + folder);
+            return free;
+        };
+        ALScriptFix moved = fix("Name /inc as the SLua alias @inc, and require it as '@inc/util'", 0, 8, 13, "total", false);
+        moved.key         = "ScriptFixRequireAlias";
+        moved.args        = { "@inc/util", "inc", "/inc" };
+        ensure("made", checking.applyFix(doc, moved, version(doc)));
+        ensure("the folder named first", named == std::vector<std::string>{ "inc=/inc" });
+        ensure_equals("and the text", doc.editor->document().line(0), std::string("integer total;"));
+        free = false;
+        ensure("the name another folder's: refused", !checking.applyFix(doc, moved, version(doc)));
+        ensure("said", services.statuses.back().find("AliasTaken [NAME]=inc") == 0 && services.statusFailures.back());
+        ensure_equals("the text as it was", doc.editor->document().line(0), std::string("integer total;"));
+        ALScriptFix plain = fix("Require it as './util'", 0, 8, 13, "sum", false);
+        plain.key         = "ScriptFixRequireAs";
+        plain.args        = { "./util" };
+        named.clear();
+        ensure("a plain one names nothing", checking.applyFix(doc, plain, version(doc)) && named.empty());
+    }
 }

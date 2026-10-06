@@ -1510,6 +1510,12 @@ bool ALScriptStudioChecking::applyFix(Doc& doc, const ALScriptFix& fix, U32 vers
         }
         edits.emplace_back(range, edit.text);
     }
+    // A require moved onto a SLua alias of the studio's own: the folder
+    // named first, as the fix said it would be, and the disk read.
+    if (fix.key == "ScriptFixRequireAlias" && fix.args.size() == 3 && !nameStudioAlias(fix.args[1], fix.args[2]))
+    {
+        return false;
+    }
     if (!source.replaceAll(std::move(edits)))
     {
         return false;
@@ -1518,6 +1524,19 @@ bool ALScriptStudioChecking::applyFix(Doc& doc, const ALScriptFix& fix, U32 vers
     mServices.setStatus(fix.title);
     schedule(doc, true);
     return true;
+}
+
+bool ALScriptStudioChecking::nameStudioAlias(const std::string& name, const std::string& folder)
+{
+    if (ALScriptStudioViewer::get().nameStudioAlias(name, folder))
+    {
+        return true;
+    }
+    // Named for another folder since the check: offered again after it.
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = name;
+    mServices.setStatus(mServices.words("AliasTaken", args), true);
+    return false;
 }
 
 void ALScriptStudioChecking::askFixAll(Doc& doc, const FixPick& pick)

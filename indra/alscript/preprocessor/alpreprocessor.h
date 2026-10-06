@@ -79,6 +79,20 @@ public:
         // One identity for `#pragma once` and the source map's file list:
         // the inventory path, the disk path, whatever tells two apart.
         std::string path;
+        // A SLua require that finds nothing, as the plugin's rules have it
+        // (LAD9), which the search before them found -- for one release,
+        // so that a script can be moved over: what the search found, by
+        // the name it is said by, and how the require may say it now, the
+        // form to prefer first: the name to write, and where it needs one,
+        // the studio alias to name first, by its name and folder.
+        struct Move
+        {
+            std::string require;
+            std::string alias;
+            std::string folder;
+        };
+        std::string       searched;
+        std::vector<Move> moves;
     };
     enum class Found : U8
     {

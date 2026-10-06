@@ -226,6 +226,18 @@ private:
     // text is there, or on its way, taken.
     ALPreprocessor::Found resolveRequire(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Asking& asking, const Where& where,
                                          wanted_t* wanted, bool retry, std::vector<std::string>& alias_folders);
+    // A file on disk a require walked to, where it stands, where a folder
+    // blessed for a require admits it: the scripter's, an alias's of a
+    // `.luaurc`, a studio alias's.
+    std::optional<std::string> requireAdmits(const ALPreprocessor::Ask& ask, const Asking& asking, const Where& where,
+                                             const std::vector<std::string>& alias_folders, const std::string& file);
+    // A require found nowhere: where the search before LAD9 found it, and
+    // the forms a require may say it by now that find that very file --
+    // relative to the file asking, through an alias that reaches it
+    // already, or otherwise through a studio alias of the include folder
+    // that holds it (Include::moves). For one release.
+    void searchedBefore(const ALPreprocessor::Ask& ask, const Asking& asking, const Where& where, std::vector<std::string>& alias_folders,
+                        ALPreprocessor::Include& out);
 
     // Something an include name could mean, in the order tried: in the
     // world, or a file on disk, read on the spot.

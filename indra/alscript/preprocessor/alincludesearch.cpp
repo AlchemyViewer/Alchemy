@@ -699,23 +699,16 @@ ALPreprocessor::Found ALIncludeSearch::resolveRequire(const ALPreprocessor::Ask&
 {
     Places                            places(*this, where, wanted, retry, alias_folders);
     const ALRequireNavigation::Walked walked = ALRequireNavigation::walk(places, ask.from, ask.name);
-    if (walked.found != ALRequirePlaces::Known::Yes)
+    if (walked.found == ALRequirePlaces::Known::Pending)
     {
-        return walked.found == ALRequirePlaces::Known::Pending ? ALPreprocessor::Found::Pending : ALPreprocessor::Found::No;
+        return ALPreprocessor::Found::Pending;
     }
     for (const ALRequirePlaces::File& file : walked.files)
     {
         Candidate c{ file.path, file.name, file.assetId, std::string() };
         if (!file.file.empty())
         {
-            // A file on disk only where a folder blessed admits it, the
-            // aliases' among them: a `.luaurc`'s, and the studio's own.
-            std::vector<std::string> blessing = alias_folders;
-            for (const auto& [name, folder] : where.aliases)
-            {
-                blessing.push_back(folder);
-            }
-            const std::optional<std::string> real = mDisk.admits(blessedFor(ask, asking, where, blessing), file.file);
+            const std::optional<std::string> real = requireAdmits(ask, asking, where, alias_folders, file.file);
             if (!real)
             {
                 continue;
@@ -731,7 +724,160 @@ ALPreprocessor::Found ALIncludeSearch::resolveRequire(const ALPreprocessor::Ask&
         out.path = c.path;
         return found;
     }
+    searchedBefore(ask, asking, where, alias_folders, out);
     return ALPreprocessor::Found::No;
+}
+
+std::optional<std::string> ALIncludeSearch::requireAdmits(const ALPreprocessor::Ask& ask, const Asking& asking, const Where& where,
+                                                          const std::vector<std::string>& alias_folders, const std::string& file)
+{
+    std::vector<std::string> blessing = alias_folders;
+    for (const auto& [name, folder] : where.aliases)
+    {
+        blessing.push_back(folder);
+    }
+    return mDisk.admits(blessedFor(ask, asking, where, blessing), file);
+}
+
+void ALIncludeSearch::searchedBefore(const ALPreprocessor::Ask& ask, const Asking& asking, const Where& where,
+                                     std::vector<std::string>& alias_folders, ALPreprocessor::Include& out)
+{
+    // Only a name the search took: not an alias's, nor a path from a root.
+    if (ask.name.empty() || ask.name.front() == '@' || ALLuauConfig::absolute(ask.name))
+    {
+        return;
+    }
+    bool                         unknown = false;
+    const std::vector<Candidate> found   = candidatesFor(ask, asking, where, alias_folders, unknown);
+    if (found.empty())
+    {
+        return;
+    }
+    const Candidate& was = found.front();
+    out.searched         = was.file.empty() ? was.name : was.file;
+    if (was.file.empty())
+    {
+        // In the world: said, and nothing offered to write instead.
+        return;
+    }
+    // A name under a folder, as a require writes it: its path from there,
+    // `/` between the parts, a script's extension taken off and a folder's
+    // init as the folder -- and as written, extension and all, should that
+    // be the one that walks to it.
+    const auto under = [&was](const std::string& folder) {
+        std::vector<std::string>    names;
+        std::error_code             ec;
+        const std::filesystem::path real     = std::filesystem::weakly_canonical(fsyspath(folder), ec);
+        const std::filesystem::path relative = fsyspath(was.file).lexically_relative(ec ? fsyspath(folder) : real);
+        std::string                 path     = relative.generic_string();
+        if (path.empty() || path == "." || path.compare(0, 2, "..") == 0)
+        {
+            return names;
+        }
+        std::string module = stemOf(path);
+        if (module == "init")
+        {
+            return names;
+        }
+        if (module.size() > 5 && module.compare(module.size() - 5, 5, "/init") == 0)
+        {
+            module.erase(module.size() - 5);
+        }
+        names.push_back(module);
+        names.push_back(path);
+        return names;
+    };
+    // Whether a require so written walks to the very file the search found.
+    const auto walks = [&](const std::string& name, const Where& in) {
+        std::vector<std::string>          blessed = alias_folders;
+        Places                            places(*this, in, nullptr, false, blessed);
+        const ALRequireNavigation::Walked walked = ALRequireNavigation::walk(places, ask.from, name);
+        for (const ALRequirePlaces::File& file : walked.files)
+        {
+            const std::optional<std::string> real = file.file.empty() ? std::nullopt : requireAdmits(ask, asking, in, blessed, file.file);
+            if (real && *real == was.file)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    const auto offer = [&out](const std::string& require, const std::string& alias = std::string(), const std::string& folder = std::string()) {
+        if (std::none_of(out.moves.begin(), out.moves.end(), [&require](const ALPreprocessor::Include::Move& move) { return move.require == require; }))
+        {
+            out.moves.push_back({ require, alias, folder });
+        }
+    };
+    // From beside the file asking.
+    std::string from_file;
+    if (ALIncludeIdentity::fileOf(ask.from, from_file))
+    {
+        for (const std::string& name : under(fsyspath(fsyspath(from_file).parent_path()).string()))
+        {
+            if (walks("./" + name, where))
+            {
+                offer("./" + name);
+                break;
+            }
+        }
+    }
+    // Through an alias that reaches it already: a `.luaurc`'s, or the
+    // studio's own.
+    std::vector<std::pair<std::string, std::string>> aliases;
+    for (const auto& [prefix, folder] : moduleFolders(asking, where))
+    {
+        if (!prefix.empty())
+        {
+            aliases.emplace_back(prefix.substr(1, prefix.size() - 2), folder);
+        }
+    }
+    aliases.insert(aliases.end(), where.aliases.begin(), where.aliases.end());
+    for (const auto& [alias, folder] : aliases)
+    {
+        for (const std::string& name : under(folder))
+        {
+            if (walks("@" + alias + "/" + name, where))
+            {
+                offer("@" + alias + "/" + name);
+                break;
+            }
+        }
+    }
+    if (!out.moves.empty())
+    {
+        return;
+    }
+    // Otherwise the include folder that holds it, named a studio alias
+    // after itself.
+    std::vector<std::string> taken;
+    for (const auto& [alias, folder] : where.aliases)
+    {
+        taken.push_back(alias);
+    }
+    for (const std::string& folder : where.folders)
+    {
+        const std::vector<std::string> names = under(folder);
+        if (names.empty())
+        {
+            continue;
+        }
+        std::filesystem::path at = fsyspath(folder);
+        if (!at.has_filename())
+        {
+            at = at.parent_path();
+        }
+        const std::string alias = ALLuauConfig::studioAliasFor(fsyspath(at.filename()).string(), taken);
+        Where             named = where;
+        named.aliases.emplace_back(alias, folder);
+        for (const std::string& name : names)
+        {
+            if (walks("@" + alias + "/" + name, named))
+            {
+                offer("@" + alias + "/" + name, alias, folder);
+                return;
+            }
+        }
+    }
 }
 
 ALIncludeSearch::Candidate ALIncludeSearch::admitted(const std::string& real)
