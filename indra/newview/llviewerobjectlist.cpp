@@ -108,6 +108,7 @@ LLViewerObjectList::LLViewerObjectList()
     mNumOrphans = 0;
     mNumNewObjects = 0;
     mWasPaused = false;
+    mAgentPaused = false;
     mNumDeadObjectUpdates = 0;
     mNumUnknownUpdates = 0;
 }
@@ -1073,7 +1074,7 @@ void LLViewerObjectList::update(LLAgent &agent)
     {
         LLViewerStats::getInstance()->updateFrameStats(time_diff);
     }
-    mWasPaused = false;
+    mWasPaused = mAgentPaused;
 
     /*
     // Debugging code for viewing orphans, and orphaned parents

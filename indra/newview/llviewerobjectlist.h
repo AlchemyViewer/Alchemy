@@ -185,6 +185,10 @@ public:
     // used to discount stats from this frame
     bool mWasPaused;
 
+    // between send_agent_pause() and send_agent_resume(): every frame is discounted, and so is the
+    // frame after the resume, which the pause stalled
+    bool mAgentPaused;
+
     void getUUIDFromLocal(LLUUID &id,
                                 const U32 local_id,
                                 const U32 ip,
