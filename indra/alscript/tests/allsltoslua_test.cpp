@@ -350,10 +350,33 @@ namespace tut
                                                            "default { touch_start(integer n) { string s = greet(\"x\"); gCount += n; llOwnerSay(s); } }\n",
                                                            options);
         ensure("converted", r.converted);
-        ensure("a field: " + r.text, has(r, "LLEvents.touch_start = function(detected)") && !has(r, "LLEvents:on"));
+        ensure("a field, as SLua's own scripts write one: " + r.text,
+               has(r, "function LLEvents.touch_start(detected: { DetectedEvent })") && !has(r, "LLEvents:on") && !has(r, "= function("));
+        ensure("the count typed: " + r.text, has(r, "local n: number = #detected"));
         ensure("typed: " + r.text, has(r, "local gCount: number = 2") && has(r, "local function greet(who: string): string") &&
                                        has(r, "local s: string = greet(\"x\")"));
         checksClean(r);
+
+        // Each parameter as the definitions type SLua's handler: a key a
+        // uuid, link_message's id the string SLua passes; none on a key the
+        // body takes as text.
+        const char* const handlers = "default {\n"
+                                     "    on_rez(integer param) { llOwnerSay((string)param); }\n"
+                                     "    listen(integer c, string n, key id, string m) { llOwnerSay(n + m + (string)c + (string)id); }\n"
+                                     "    link_message(integer s, integer num, string str, key id) { llOwnerSay(str + (string)id); }\n"
+                                     "    money(key giver, integer amount) { giver = \"someone\"; llOwnerSay((string)giver); }\n"
+                                     "}\n";
+        const ALLSLToSLua::Result typed = ALLSLToSLua::convert(handlers, options);
+        ensure("an integer: " + typed.text, has(typed, "function LLEvents.on_rez(param: number)"));
+        ensure("a key a uuid: " + typed.text, has(typed, "function LLEvents.listen(c: number, n: string, id: uuid, m: string)"));
+        ensure("link_message's id a string: " + typed.text, has(typed, "function LLEvents.link_message(s: number, num: number, str: string, id: string)"));
+        ensure("a key given text, left untyped: " + typed.text, has(typed, "function LLEvents.money(giver, amount: number)"));
+        checksClean(typed);
+        ALLSLToSLua::Options on = options;
+        on.handlers             = ALLSLToSLua::Options::Handlers::On;
+        ensure("typed with LLEvents:on too", has(ALLSLToSLua::convert(handlers, on), "LLEvents:on(\"on_rez\", function(param: number)"));
+        on.types = false;
+        ensure("and none where types are not written", has(ALLSLToSLua::convert(handlers, on), "LLEvents:on(\"on_rez\", function(param)"));
 
         const ALLSLToSLua::Result many = ALLSLToSLua::convert("default { touch_start(integer n) { state other; } }\n"
                                                               "state other { touch_start(integer n) { state default; } }\n",
@@ -362,6 +385,7 @@ namespace tut
         // LLEvents:off, as LLEvents:on's are.
         ensure("setState sets the fields: " + many.text, has(many, "(LLEvents :: any)[event] = handler") &&
                                                          has(many, "LLEvents:off(event :: any, handler)") && !has(many, "[event] = nil"));
+        ensure("a state's handlers typed in its table: " + many.text, has(many, "touch_start = function(detected: { DetectedEvent })"));
         checksClean(many);
     }
 

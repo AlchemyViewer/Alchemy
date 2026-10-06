@@ -5937,7 +5937,9 @@ namespace
     std::string Writer::handlerParams(LSLEventHandler* handler, std::string& lead)
     {
         // What LSL's handler took: the count of what was detected, made from
-        // SLua's detected table.
+        // SLua's detected table. Where types are written, as the definitions
+        // type SLua's handler: a key as a uuid, link_message's id as the
+        // string SLua passes; and none on a key the body takes as text.
         const std::string event = handler->getIdentifier()->getName();
         std::string       params;
         LSLASTNode*       first = handler->getArguments() ? handler->getArguments()->getChild(0) : nullptr;
@@ -5945,13 +5947,16 @@ namespace
         {
             if (first)
             {
-                lead = "local " + nameOf(static_cast<LSLIdentifier*>(first)) + " = #detected";
+                lead = "local " + nameOf(static_cast<LSLIdentifier*>(first)) + typed(LST_INTEGER) + " = #detected";
             }
-            return "detected";
+            return mOptions.types ? "detected: { DetectedEvent }" : "detected";
         }
-        for (LSLASTNode* p = first; p; p = p->getNext())
+        int at = 0;
+        for (LSLASTNode* p = first; p; p = p->getNext(), ++at)
         {
-            params += (params.empty() ? "" : ", ") + nameOf(static_cast<LSLIdentifier*>(p));
+            auto*          id    = static_cast<LSLIdentifier*>(p);
+            const LSLIType given = ALLSLTraits::eventTextParam(event, at) ? LST_STRING : p->getIType();
+            params += (params.empty() ? "" : ", ") + nameOf(id) + (varType(id->getSymbol(), given) == given ? typed(given) : std::string());
         }
         return params;
     }
@@ -5998,7 +6003,7 @@ namespace
             }
             const bool field = mOptions.handlers == ALLSLToSLua::Options::Handlers::Field;
             line(timer   ? "timerHandler = function()"
-                 : field ? "LLEvents." + event + " = function(" + params + ")"
+                 : field ? "function LLEvents." + event + "(" + params + ")"
                          : "LLEvents:on(" + luaString(event) + ", function(" + params + ")");
             ++mDepth;
             if (!lead.empty())

@@ -62,7 +62,12 @@ namespace
         LLSD keywords;
         keywords["functions"]["ll.Say"]   = LLSD().with("return", "()").with("arguments", LLSD().with(0, argument("channel", "number")));
         keywords["functions"]["math.pi"]  = LLSD().with("return", "number");
-        keywords["events"]["touch_start"] = LLSD().with("arguments", LLSD().with(0, argument("num_detected", "number")));
+        keywords["events"]["touch_start"] = LLSD().with("arguments", LLSD().with(0, argument("detected", "{DetectedEvent}")));
+        keywords["events"]["listen"] = LLSD().with("arguments", LLSD()
+                                                                    .with(0, argument("channel", "number"))
+                                                                    .with(1, argument("name", "string"))
+                                                                    .with(2, argument("id", "uuid"))
+                                                                    .with(3, argument("msg", "string")));
         return keywords;
     }
 }
@@ -193,7 +198,10 @@ namespace tut
         const ALCodeEditor::Completion lsl = Words::completionFor(*Words::word(false, "touch_start"), false);
         ensure_equals("LSL's handler", lsl.snippet, std::string("touch_start(integer num_detected)\n{\n    $0\n}"));
         const ALCodeEditor::Completion slua = Words::completionFor(*Words::word(true, "touch_start"), true);
-        ensure_equals("SLua's, set on LLEvents", slua.snippet, std::string("LLEvents.touch_start = function(num_detected)\n    $0\nend"));
+        ensure_equals("SLua's, a function of LLEvents', typed as the definitions type it", slua.snippet,
+                      std::string("function LLEvents.touch_start(detected: {DetectedEvent})\n    $0\nend"));
+        ensure_equals("each parameter typed", Words::completionFor(*Words::word(true, "listen"), true).snippet,
+                      std::string("function LLEvents.listen(channel: number, name: string, id: uuid, msg: string)\n    $0\nend"));
         const ALCodeEditor::Completion say = Words::completionFor(*Words::word(false, "llSay"), false);
         ensure("a function as itself", say.snippet.empty() && say.text == "llSay" && say.documentation && *say.documentation == "Says msg on channel.\nMore.");
 

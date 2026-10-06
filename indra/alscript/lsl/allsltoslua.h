@@ -55,9 +55,10 @@ public:
     // every one off.
     struct Options
     {
-        // A handler put on with LLEvents:on; or assigned, LLEvents.touch_start
-        // = ..., which SLua puts on as LLEvents:on does, beside any others,
-        // but gives back nothing for LLEvents:off to take off.
+        // A handler put on with LLEvents:on; or assigned, function
+        // LLEvents.touch_start(...), which SLua puts on as LLEvents:on does,
+        // beside any others, but gives back nothing for LLEvents:off to take
+        // off.
         enum class Handlers : U8
         {
             On,

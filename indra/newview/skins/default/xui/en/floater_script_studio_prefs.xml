@@ -160,7 +160,7 @@ local function half(n: number): number
     return n / 2
 end
 
-LLEvents.touch_start = function(detected)
+function LLEvents.touch_start(detected)
     ll.Say(PUBLIC_CHANNEL, `Hello {name}`)
     for i = 1, #detected do
         count += 1
@@ -1655,7 +1655,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="convert_fields"
-             tool_tip="LLEvents.touch_start = function(detected) ... end. SLua puts an assigned handler on as LLEvents:on does, beside any others, but only LLEvents:handlers finds it again for LLEvents:off. Off: LLEvents:on."
+             tool_tip="function LLEvents.touch_start(detected) ... end, as SLua's own scripts write one. SLua puts an assigned handler on as LLEvents:on does, beside any others, but only LLEvents:handlers finds it again for LLEvents:off. Off: LLEvents:on."
              top_pad="4"
              width="700" />
             <check_box

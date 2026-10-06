@@ -132,7 +132,7 @@ until ${1:condition}</string>
       <key>detail</key>
       <string>A handler for one of the object's events</string>
       <key>body</key>
-      <string>LLEvents.${1:touch_start} = function(${2:detected})
+      <string>function LLEvents.${1:touch_start}(${2:detected})
     $0
 end</string>
     </map>
@@ -179,7 +179,7 @@ end)</string>
       <string>Open a channel and handle what is said on it</string>
       <key>body</key>
       <string>ll.Listen(${1:0}, "", "", "")
-LLEvents.listen = function(channel, name, id, text)
+function LLEvents.listen(channel: number, name: string, id: uuid, text: string)
     $0
 end</string>
     </map>

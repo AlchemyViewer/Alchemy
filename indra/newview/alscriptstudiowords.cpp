@@ -443,15 +443,43 @@ ALCodeEditor::Completion ALScriptStudioWords::completionFor(const Vocab& word, b
     if (word.kind == ALSyntaxKind::Event)
     {
         // A handler to fill in: LSL's with its typed parameters as the
-        // detail reads them, SLua's as a function set on LLEvents.
+        // detail reads them; SLua's as a function of LLEvents', as SLua's
+        // own scripts write one, each parameter typed as the detail types
+        // it -- `type name` there, `name: type` here.
         if (lua)
         {
-            std::string params;
-            for (const std::string& name : ALCodeEditor::parameterNames(word.detail, word.text))
+            std::string  params;
+            const size_t open  = word.detail.find('(');
+            const size_t close = word.detail.rfind(')');
+            if (open != std::string::npos && close != std::string::npos && close > open)
             {
-                params += (params.empty() ? "" : ", ") + name;
+                S32    depth = 0;
+                size_t start = open + 1;
+                for (size_t i = open + 1; i <= close; ++i)
+                {
+                    const char ch = word.detail[i];
+                    if (i < close && ch != ',')
+                    {
+                        depth += (ch == '{' || ch == '[' || ch == '(') ? 1 : (ch == '}' || ch == ']' || ch == ')') ? -1 : 0;
+                        continue;
+                    }
+                    if (depth > 0)
+                    {
+                        continue;
+                    }
+                    std::string piece = word.detail.substr(start, i - start);
+                    LLStringUtil::trim(piece);
+                    start = i + 1;
+                    if (piece.empty())
+                    {
+                        continue;
+                    }
+                    const size_t space = piece.rfind(' ');
+                    params += (params.empty() ? "" : ", ") +
+                              (space == std::string::npos ? piece : piece.substr(space + 1) + ": " + piece.substr(0, space));
+                }
             }
-            c.snippet = "LLEvents." + word.text + " = function(" + params + ")\n    $0\nend";
+            c.snippet = "function LLEvents." + word.text + "(" + params + ")\n    $0\nend";
         }
         else
         {
