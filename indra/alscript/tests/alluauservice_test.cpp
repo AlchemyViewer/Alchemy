@@ -1296,4 +1296,36 @@ namespace tut
         ensure("all of them after a colon", entry(found, "on") && entry(found, "off") && entry(found, "handlers"));
         ensure("a script's own method after a colon", entry(service.complete(events, 4, 12), "greet") != nullptr);
     }
+
+    template<> template<>
+    void alluauservice_object::test<40>()
+    {
+        set_test_name("a function an argument wants is offered written out, to fill in: Luau's own stub, and an overloaded callee's from the overload chosen");
+        ensure("definitions loaded: " + error, loaded);
+        const auto stub = [](const std::vector<ALScriptCompletion>& found) -> const ALScriptCompletion* {
+            for (const ALScriptCompletion& c : found)
+            {
+                if (!c.snippet.empty())
+                {
+                    return &c;
+                }
+            }
+            return nullptr;
+        };
+        // At `f`, where the second argument begins.
+        const std::string                     each      = "local function each(n: number, f: (i: number) -> ()) end\neach(3, f)\n";
+        const std::vector<ALScriptCompletion> for_each  = service.complete(each, 1, 8);
+        const ALScriptCompletion*             own       = stub(for_each);
+        ensure("Luau's stub offered", own != nullptr);
+        ensure_equals("its head", own->text, std::string("function(i: number)"));
+        ensure_equals("its body to fill, then its end", own->snippet, std::string("function(i: number)\n    $0\nend"));
+        ensure("of the type wanted", own->fits);
+
+        const std::string                     events    = "LLEvents:on(\"touch_start\", f)\n";
+        const std::vector<ALScriptCompletion> for_event = service.complete(events, 0, 27);
+        const ALScriptCompletion*             handler   = stub(for_event);
+        ensure("the event's handler offered", handler != nullptr);
+        ensure_equals("taking what the event gives", handler->text, std::string("function(detected: {DetectedEvent})"));
+        ensure("a body to fill: " + handler->snippet, handler->snippet.find("\n    $0\nend") != std::string::npos);
+    }
 }
