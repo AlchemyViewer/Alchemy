@@ -452,7 +452,17 @@ void ALCodeEditor::setDecorations(std::vector<Decoration> decorations)
     {
         decorations[i].order = static_cast<U32>(i);
     }
+    mDecorationsGiven = static_cast<U32>(decorations.size());
     mDecorations.assign(std::move(decorations));
+}
+
+void ALCodeEditor::setDecorations(S32 first, S32 last, std::vector<Decoration> decorations)
+{
+    for (Decoration& each : decorations)
+    {
+        each.order = mDecorationsGiven++;
+    }
+    mDecorations.replaceLines(first, last, std::move(decorations));
 }
 
 std::vector<const ALCodeEditor::Decoration*> ALCodeEditor::decorationsOn(S32 line) const

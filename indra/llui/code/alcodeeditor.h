@@ -165,10 +165,14 @@ public:
         std::string message;
         // Where it came among those given, which is the order they are
         // listed in -- the worst first, as a checker gives them --
-        // whatever order they lie in. Set by setDecorations.
+        // whatever order they lie in; those given later after. Set by
+        // setDecorations.
         U32         order = 0;
     };
     void                           setDecorations(std::vector<Decoration> decorations);
+    // Those that begin on the lines from `first` to `last` in place of
+    // those that did: a stretch of lines the host says again.
+    void                           setDecorations(S32 first, S32 last, std::vector<Decoration> decorations);
     // In the order they lie in.
     const std::vector<Decoration>& decorations() const { return mDecorations.items(); }
     // Those that may lie on a line, in the order they were given: a
@@ -1037,6 +1041,8 @@ private:
     ALChangePeek*                      mPeek            = nullptr;
     S32                                mGutterHoverLine = -1;
     ALAnchoredRanges<Decoration>       mDecorations;
+    // How many decorations have been given since the last were given whole.
+    U32                                mDecorationsGiven = 0;
     std::array<ALAnchoredRanges<ALTextRange>, static_cast<size_t>(Highlight::COUNT)> mHighlights;
     ALAnchoredRanges<SemanticToken>    mSemantics;
     // An inlay is at a place, not over a range.

@@ -2631,4 +2631,42 @@ namespace tut
         v.pump();
         ensure_equals("nothing more to do: not told again", told, 3);
     }
+
+    template<> template<>
+    void altextview_object::test<83>()
+    {
+        set_test_name("a stretch replaced by the host: nothing to take back, nothing changed, the caret and what is said of the lines around it moved along; the host's numbers moved along from a line");
+        ALTextView& v = make("zero\none\ntwo\nthree\nfour");
+        typedef ALTextView::LineAnnotation Said;
+        std::vector<Said> lines(5);
+        lines[0].number = 1;
+        lines[1].number = 0;
+        lines[3].sign   = '+';
+        lines[4].number = 7;
+        type("x");
+        ensure("typed: to take back, and changed", v.canPerform(ALEditorCommand::Undo) && v.isDirty());
+        v.setLineAnnotations(lines);
+        v.setCaret(ALTextPos(4, 2));
+        U32 told = 0;
+        v.onTextChanged([&told]() { ++told; });
+        // Lines one and two, one line now.
+        v.replaceText(ALTextRange(ALTextPos(1, 0), ALTextPos(2, 3)), "ONE");
+        ensure_equals("the text", v.text(), std::string("xzero\nONE\nthree\nfour"));
+        ensure("nothing to take back, nothing changed, and told", !v.canPerform(ALEditorCommand::Undo) && !v.isDirty() && told == 1);
+        ensure("the caret moved along with its line", v.caret() == ALTextPos(3, 2));
+        ensure("said of the lines around it, moved along", v.lineAnnotation(0).number == 1 && v.lineAnnotation(2).sign == '+' && v.lineAnnotation(3).number == 7);
+        ensure("the line made says nothing", v.lineAnnotation(1).number == Said::OWN_NUMBER);
+        // The caret past what is left: at the end of it.
+        v.replaceText(ALTextRange(ALTextPos(2, 0), v.document().end()), "");
+        ensure("the caret where the text now ends", v.caret() == v.document().end());
+
+        v.setLineAnnotations(lines);
+        v.renumberLines(1, 3);
+        ensure("from line one: a number moved along, none and its own kept", v.lineAnnotation(0).number == 1 && v.lineAnnotation(1).number == 0 &&
+                                                                               v.lineAnnotation(2).number == Said::OWN_NUMBER);
+        v.setText("a\nb\nc\nd\ne");
+        v.setLineAnnotations(lines);
+        v.renumberLines(2, -2);
+        ensure("from line two", v.lineAnnotation(0).number == 1 && v.lineAnnotation(4).number == 5);
+    }
 }

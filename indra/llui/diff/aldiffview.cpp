@@ -31,6 +31,7 @@
 #include "alcodeeditor.h"
 #include "aldiffbar.h"
 #include "aldiffcolors.h"
+#include "aldifffill.h"
 #include "aldiffmodel.h"
 #include "altextdiff.h"
 #include "alunifieddiff.h"
@@ -471,9 +472,7 @@ void ALDiffView::restorePlace(const Place& place)
 
 void ALDiffView::fill()
 {
-    // Both layouts are others now: the one shown filled, the other as it
-    // is shown.
-    mStale[0] = mStale[1] = true;
+    // The layout shown filled; the other as it is shown.
     fillLayout(mInline ? Layout::Inline : Layout::Sides);
     // The bands, and the gap as wide as they need, or not.
     const S32 was = gap();
@@ -491,98 +490,42 @@ void ALDiffView::fill()
     {
         arrange();
     }
-    mFoldSaid.clear();
-    for (S32 n = 0; n < foldCount(); ++n)
-    {
-        mFoldSaid.push_back(
-            alSaidCount("DiffFoldedLines", mModel.foldLines(n), "\xE2\x8B\xAF 1 line the same \xE2\x8B\xAF", "\xE2\x8B\xAF [COUNT] lines the same \xE2\x8B\xAF"));
-    }
     refreshBar();
 }
 
 void ALDiffView::fillLayout(Layout layout)
 {
-    using ALDiffColors::Name;
-    const LLColor4 out       = ALDiffColors::get(Name::Removed).get();
-    const LLColor4 in        = ALDiffColors::get(Name::Added).get();
-    const LLColor4 padding   = ALDiffColors::get(Name::Padding).get();
-    const LLColor4 out_words = ALDiffColors::get(Name::RemovedWord).get();
-    const LLColor4 in_words  = ALDiffColors::get(Name::AddedWord).get();
-    // The ruler's: each side's own change, and beside a gap, the other's.
-    const LLColor4 out_mark  = ALDiffColors::get(Name::RemovedMark).get();
-    const LLColor4 in_mark   = ALDiffColors::get(Name::AddedMark).get();
-    // A block moved, at either end: neither red nor green.
-    const LLColor4 moved      = ALDiffColors::get(Name::Moved).get();
-    const LLColor4 moved_mark = ALDiffColors::get(Name::MovedMark).get();
+    // Again only where the last rebuild laid out again, where the editors
+    // are as the layout before it had them; else whole.
+    std::optional<U32>& filled_at = mFilledAt[layout == Layout::Sides ? 0 : 1];
+    const bool          again     = filled_at && *filled_at + 1 == mModel.layouts();
     for (ALCodeEditor* side : { mLeft, mRight, mInlined })
     {
-        // What the editor is told of each line of the column, and of the
-        // rows below its last: its number, where the text is not its own;
-        // its tint, its mark on the ruler and its sign, as it was taken
-        // out or put in; the rows of nothing above it, beside lines the
-        // other side has, marked as theirs; and the words that changed.
         const Column column = columnOf(side);
         if (ALDiffModel::layoutOf(column) != layout)
         {
             continue;
         }
-        const S32                               count  = mModel.lineCount(column);
-        const LLColor4&                         beside = column == Column::Left ? in_mark : out_mark;
-        std::vector<ALTextView::LineAnnotation> said(static_cast<size_t>(count) + 1);
-        std::vector<ALCodeEditor::Decoration>   words;
-        for (S32 l = 0; l < count; ++l)
+        const bool partly = again && ALDiffFill::again(*side, mModel, column);
+        if (!partly)
         {
-            const ALDiffModel::Line&    line = mModel.line(column, l);
-            ALTextView::LineAnnotation& each = said[static_cast<size_t>(l)];
-            const bool                  gone = line.kind == ALDiffModel::Kind::Removed;
-            const bool                  made = line.kind == ALDiffModel::Kind::Added;
-            if (column == Column::Inline)
-            {
-                each.number = line.number;
-            }
-            each.sign      = line.sign;
-            each.tint      = line.move >= 0 ? moved : gone ? out : made ? in : LLColor4::transparent;
-            each.rulerTint = line.move >= 0 ? moved_mark : gone ? out_mark : made ? in_mark : LLColor4::transparent;
-            each.gap       = line.padding;
-            if (line.padding > 0)
-            {
-                each.gapTint      = padding;
-                each.gapRulerTint = beside;
-            }
-            for (const auto& [begin, end] : line.words)
-            {
-                ALCodeEditor::Decoration d;
-                d.range = ALTextRange(ALTextPos(l, begin), ALTextPos(l, end));
-                d.style = ALCodeEditor::Decoration::Style::Background;
-                d.color = gone ? out_words : in_words;
-                words.push_back(d);
-            }
+            ALDiffFill::whole(*side, mModel, column);
         }
-        ALTextView::LineAnnotation& below = said.back();
-        below.gap                         = mModel.endPadding(column);
-        if (below.gap > 0)
+        applyNotes(side);
+        // Where it was filled again in part, the folds about the lines it
+        // was; the rest moved along with their lines.
+        if (partly)
         {
-            below.gapTint      = padding;
-            below.gapRulerTint = beside;
-        }
-        // The text first, where it changed: a new text clears what is said
-        // of its lines. A side's text is the whole of one of the texts, so
-        // only the one edited changes; one as it was keeps its place, but
-        // not the lines the folds hid, which are others now.
-        if (side->document().wholeText() != mModel.text(column))
-        {
-            side->setText(mModel.text(column));
+            const ALDiffModel::Relaid& relaid = mModel.relaid();
+            const size_t               c      = static_cast<size_t>(column);
+            applyFolds(side, relaid.first[c] - 1, relaid.first[c] + relaid.now[c]);
         }
         else
         {
-            side->layout().setHidden(ALTextLayout::HiddenBy::Host, 0, side->document().lineCount() - 1, false);
+            applyFolds(side);
         }
-        side->setLineAnnotations(std::move(said));
-        side->setDecorations(std::move(words));
-        applyNotes(side);
-        applyFolds(side);
     }
-    mStale[layout == Layout::Sides ? 0 : 1] = false;
+    filled_at = mModel.layouts();
 }
 
 void ALDiffView::setNotes(std::vector<ALDiffModel::Note> notes)
@@ -805,12 +748,27 @@ void ALDiffView::applyFolds()
     }
 }
 
-void ALDiffView::applyFolds(ALCodeEditor* side)
+void ALDiffView::applyFolds(ALCodeEditor* side, S32 from, S32 to)
 {
     const LLColor4 folded = ALDiffColors::get(ALDiffColors::Name::Fold).get();
     const Column   column = columnOf(side);
     ALTextLayout&  layout = side->layout();
-    for (S32 n = 0; n < foldCount(); ++n)
+    // In the order of their lines: the first whose row is not above the
+    // lines found by halves.
+    S32 n = 0;
+    for (S32 end = foldCount(); n < end;)
+    {
+        const S32 mid = n + (end - n) / 2;
+        if (mModel.foldGapLine(column, mid) < from)
+        {
+            n = mid + 1;
+        }
+        else
+        {
+            end = mid;
+        }
+    }
+    for (; n < foldCount() && mModel.foldFirstLine(column, n) <= to; ++n)
     {
         // Its lines, which are the same lines on every side and so a line
         // each there; its own row the gap above the line after, a stop: the
@@ -1001,9 +959,20 @@ void ALDiffView::drawFoldRows()
                 gl_rect_2d(text.mLeft, row_t, text.mRight, row_t - height, side->textColor() % (0.1f * alpha));
                 gl_rect_2d(text.mLeft, row_t, text.mRight - 1, row_t - height + 1, side->cursorColor() % (0.8f * alpha), false);
             }
-            font->renderUTF8(mFoldSaid[static_cast<size_t>(n)], 0, text.mLeft + 8, row_t - height / 2, ink, LLFontGL::LEFT, LLFontGL::VCENTER);
+            font->renderUTF8(foldSaid(mModel.foldLines(n)), 0, text.mLeft + 8, row_t - height / 2, ink, LLFontGL::LEFT, LLFontGL::VCENTER);
         }
     }
+}
+
+const std::string& ALDiffView::foldSaid(S32 lines)
+{
+    auto said = mFoldSaid.find(lines);
+    if (said == mFoldSaid.end())
+    {
+        said = mFoldSaid.emplace(lines, alSaidCount("DiffFoldedLines", lines, "\xE2\x8B\xAF 1 line the same \xE2\x8B\xAF",
+                                                    "\xE2\x8B\xAF [COUNT] lines the same \xE2\x8B\xAF")).first;
+    }
+    return said->second;
 }
 
 void ALDiffView::arrange()

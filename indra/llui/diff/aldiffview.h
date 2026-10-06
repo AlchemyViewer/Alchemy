@@ -31,6 +31,8 @@
 #include "alviewtype.h"
 #include "lluictrl.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 #include <array>
 #include <functional>
 #include <memory>
@@ -114,6 +116,10 @@ public:
     const std::string& rightText() const { return mModel.rightText(); }
     // What is compared, laid out: what a host or a test reads of it.
     const ALDiffModel& model() const { return mModel; }
+    // Whether a rebuild keeps what it can of the layout before, and the
+    // editors are filled again only where it changed; on unless asked.
+    // Off, both are made whole: what a test holds the two to.
+    void setKeepsLayout(bool keeps) { mModel.setKeepsLayout(keeps); }
     void setTitles(const std::string& left, const std::string& right);
     void setSyntax(const std::string& syntax);
     // The grammar both sides are coloured by, as another view has it.
@@ -271,16 +277,15 @@ private:
 
     ALCodeEditor* makeSide(const ALCodeEditor::Params& side, const std::string& name);
     // The comparison as the model now has it: the layout shown filled, the
-    // other left until it is shown; the bands, the folded rows' words, and
-    // the bar.
+    // other left until it is shown; the bands, and the bar.
     void          fill();
-    // Each editor of a layout filled from the model -- its text where that
-    // changed, what is said of each line, the words marked, the notes --
-    // and the folds applied.
+    // Each editor of a layout filled from the model (ALDiffFill) -- all of
+    // it, or what the last rebuild laid out again -- its notes, and the
+    // folds applied.
     void          fillLayout(Layout layout);
     // Whether a layout's editors are as the model is: the one not shown is
     // filled only as it is shown.
-    bool          filled(Layout layout) const { return !mStale[layout == Layout::Sides ? 0 : 1]; }
+    bool          filled(Layout layout) const { return mFilledAt[layout == Layout::Sides ? 0 : 1] == mModel.layouts(); }
     void          arrange();
     // The column of the model an editor shows, and the rows it is in.
     Column        columnOf(const ALCodeEditor* side) const;
@@ -326,9 +331,10 @@ private:
     // Each side's lines hidden and shown as the folds are, each folded
     // run's row a gap above the line after it, which the caret stops on,
     // and a caret on a line hidden put beside the run: every side filled,
-    // or one.
+    // or one; or of one, only the folds whose lines or row are among those
+    // from `from` to `to`.
     void          applyFolds();
-    void          applyFolds(ALCodeEditor* side);
+    void          applyFolds(ALCodeEditor* side, S32 from = 0, S32 to = S32_MAX);
     void          openFold(S32 fold);
     // A folded run opened, and a side's caret put on the first line it hid.
     void          openFoldAt(ALCodeEditor* side, S32 fold);
@@ -336,6 +342,7 @@ private:
     // folded; -1 for none.
     S32           foldAtPoint(S32 x, S32 y, ALCodeEditor** side = nullptr);
     void          drawFoldRows();
+    const std::string& foldSaid(S32 lines);
     // The side under a point of the view and the line in its gutter there,
     // where it is a line of a block moved; and the step from such a line to
     // the other end of its block, which takes the keyboard.
@@ -392,16 +399,18 @@ private:
     LLColor4                  mConflictColor;
     // The range the caret is in, -1 for none.
     S32                       mLinked = -1;
-    // Whether each layout's editors wait to be filled: side by side, and
-    // inline.
-    bool                      mStale[2] = { false, false };
+    // The model's layout each layout's editors were last filled from --
+    // side by side, and inline -- none before they are.
+    std::optional<U32>        mFilledAt[2];
     // The grammar words are cut by: none for prose.
     std::shared_ptr<const ALSyntaxGrammar> mLexedBy;
     // Whether letting case go is offered.
     bool                      mOffersCase = false;
-    // What each folded row says, and the ranges drawn as bands, worked out
-    // as the comparison is filled.
-    std::vector<std::string>  mFoldSaid;
+    // What a folded row says, by how many lines it stands for: worked out
+    // the first time a row of so many is drawn, not for every run each
+    // rebuild.
+    boost::unordered_flat_map<S32, std::string> mFoldSaid;
+    // The ranges drawn as bands, worked out as the comparison is filled.
     std::vector<S32>          mBands;
     // The sides' signals, let go of before the sides are: a side losing
     // the keyboard as it goes would tell a comparison already gone.

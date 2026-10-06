@@ -138,6 +138,7 @@ target_sources(
     diff/aldiffbar.cpp
     diff/aldiffcolors.cpp
     diff/aldiffedit.cpp
+    diff/aldifffill.cpp
     diff/aldifflexer.cpp
     diff/aldiffmerge.cpp
     diff/aldiffmodel.cpp
@@ -370,6 +371,7 @@ target_sources(
         diff/aldiffbar.h
         diff/aldiffcolors.h
         diff/aldiffedit.h
+        diff/aldifffill.h
         diff/aldiffids.h
         diff/aldifflexer.h
         diff/aldiffmerge.h

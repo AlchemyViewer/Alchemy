@@ -359,6 +359,7 @@ void ALDiffModel::readTokens()
 
 void ALDiffModel::layout(const std::vector<bool>& open, const Relayout* again)
 {
+    ++mLayouts;
     // What is shown on the left and on the right: the texts as given, or
     // swapped, and their runs.
     const std::vector<std::string>&     left    = shownLeft();
@@ -883,9 +884,10 @@ void ALDiffModel::layout(const std::vector<bool>& open, const Relayout* again)
         mRelaid.whole = false;
         for (size_t c = 0; c < 3; ++c)
         {
-            mRelaid.first[c] = kept.lines[c];
-            mRelaid.was[c]   = moved.lines[c] - kept.lines[c];
-            mRelaid.now[c]   = here.lines[c] - kept.lines[c];
+            mRelaid.first[c]    = kept.lines[c];
+            mRelaid.was[c]      = moved.lines[c] - kept.lines[c];
+            mRelaid.now[c]      = here.lines[c] - kept.lines[c];
+            mRelaid.numbered[c] = shift[c];
         }
     }
     else
@@ -962,6 +964,21 @@ std::optional<ALDiffModel::Reuse> ALDiffModel::reusable(const Relayout& again, c
     {
         ++kept;
     }
+    // ...and not after the last change as it was, or as it is, where that
+    // is another: a run the same is folded to the end where no change
+    // comes after it, and not at all where none is, so the runs from the
+    // last change before are folded otherwise now. A change after none,
+    // or none after one, lays out all of it again.
+    const bool had_none = mLastChange == was.size();
+    const bool has_none = last_change == now.size();
+    if (had_none != has_none)
+    {
+        return std::nullopt;
+    }
+    while (!had_none && last_change != mLastChange && kept > 0 && mGroups[kept].run > std::min(mLastChange, last_change))
+    {
+        --kept;
+    }
     // ...ending at a group's edge in the runs as they now are: a change
     // the runs now carry on past it is laid out again whole.
     while (kept > 0 && mGroups[kept].run < now.size() &&
@@ -987,20 +1004,6 @@ std::optional<ALDiffModel::Reuse> ALDiffModel::reusable(const Relayout& again, c
     const size_t to   = static_cast<size_t>(static_cast<S32>(mGroups[moved].run) + delta);
     // The first group stays the first, or not: its context is none.
     if (to < from || (mGroups[moved].run == 0) != (to == 0))
-    {
-        return std::nullopt;
-    }
-    // A run the same is folded to the end where no change comes after it,
-    // and not at all where none is: each group kept with a change after it
-    // as before, or none -- a change after them both times, or the same
-    // last change among them -- which only the runs laid out again can
-    // alter, a change of blanks alone, let go of, keeping a run the same
-    // apart from them. The groups moved along are the same changes as they
-    // were, and so is whether one of them is the last.
-    const bool had_none = mLastChange == was.size();
-    const bool has_none = last_change == now.size();
-    if (had_none != has_none ||
-        (!had_none && !((mLastChange >= from && last_change >= from) || (mLastChange < from && last_change == mLastChange))))
     {
         return std::nullopt;
     }

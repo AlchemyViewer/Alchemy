@@ -137,17 +137,22 @@ public:
     void    setLeftText(std::string_view left);
     // What the last rebuild laid out again, by column: all of it; or the
     // lines from `first`, `now` of them in place of `was`, and those after
-    // moved along -- a layout made again after a splice keeps the groups of
-    // runs before the change and moves those after it, rather than laying
-    // out every row: what a view fills again.
+    // moved along, their numbers by `numbered` and the first of them with
+    // the rows of nothing now waiting above it -- a layout made again after
+    // a splice keeps the groups of runs before the change and moves those
+    // after it, rather than laying out every row: what a view fills again.
     struct Relaid
     {
-        bool whole    = true;
-        S32  first[3] = { 0, 0, 0 };
-        S32  was[3]   = { 0, 0, 0 };
-        S32  now[3]   = { 0, 0, 0 };
+        bool whole       = true;
+        S32  first[3]    = { 0, 0, 0 };
+        S32  was[3]      = { 0, 0, 0 };
+        S32  now[3]      = { 0, 0, 0 };
+        S32  numbered[3] = { 0, 0, 0 };
     };
     const Relaid& relaid() const { return mRelaid; }
+    // How many layouts have been made: relaid() is of the last, from the
+    // one before.
+    U32           layouts() const { return mLayouts; }
     // Whether a layout made again after a splice keeps what it can of the
     // one before; on unless asked. Off, every row is laid out again: what
     // a test holds the layout kept to.
@@ -503,6 +508,7 @@ private:
     std::vector<Mark>     mGroups;
     size_t                mLastChange = 0;
     Relaid                mRelaid;
+    U32                   mLayouts = 0;
     bool                  mKeepsLayout = true;
     std::vector<Note>     mNotes;
     // Each text's lines, and the runs the texts as shown were last found

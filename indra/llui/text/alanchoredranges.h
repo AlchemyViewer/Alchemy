@@ -28,6 +28,7 @@
 #include "altextdocument.h"
 
 #include <algorithm>
+#include <iterator>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -88,6 +89,21 @@ public:
         const auto      at    = std::upper_bound(mItems.begin(), mItems.end(), begin, [](const ALTextPos& p, const T& t) { return p < RangeOf()(t).begin; });
         widen(item);
         mItems.insert(at, std::move(item));
+    }
+    // Those that begin on the lines from `first` to `last` let go of, and
+    // `items`, which begin there too, put in their place in the order they
+    // begin: a stretch of lines said again.
+    void replaceLines(S32 first, S32 last, items_t items)
+    {
+        std::stable_sort(items.begin(), items.end(), [](const T& a, const T& b) { return RangeOf()(a).begin < RangeOf()(b).begin; });
+        const auto begins_before = [](const T& t, S32 line) { return RangeOf()(t).begin.line < line; };
+        const auto from          = std::lower_bound(mItems.begin(), mItems.end(), first, begins_before);
+        const auto to            = std::lower_bound(from, mItems.end(), last + 1, begins_before);
+        for (const T& item : items)
+        {
+            widen(item);
+        }
+        mItems.insert(mItems.erase(from, to), std::make_move_iterator(items.begin()), std::make_move_iterator(items.end()));
     }
     // One more after all of them, which the caller keeps in order.
     void push_back(T item)

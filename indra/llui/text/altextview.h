@@ -205,6 +205,13 @@ public:
     // --- the text ------------------------------------------------------------
 
     void        setText(std::string_view text);
+    // A stretch of the text replaced by the host, not the person -- a
+    // comparison's side made again only where an edit made it -- and so
+    // as a text put in whole is: nothing to take back, nothing changed
+    // since a save. But what is said of the lines and laid over them
+    // around it stays, moved along with the text, and so do the carets,
+    // and the place the view is at.
+    void        replaceText(const ALTextRange& range, std::string_view text);
     // The text put in with the steps that led to it (ALTextUndo::asLLSD),
     // to take back and forward again: false, and nothing changed -- the
     // text, its steps, its saved mark -- where the history is not of it.
@@ -537,6 +544,10 @@ public:
     void setLineAnnotations(std::vector<LineAnnotation> lines);
     // What is said of one line, or of the line one past the last.
     void setLineAnnotation(S32 line, const LineAnnotation& said);
+    // The numbers the host gave the lines from one on, moved along by as
+    // many: lines put in or taken out above them. Those with none, or
+    // their own, keep it.
+    void renumberLines(S32 from, S32 by);
     // What is said of a line, or of the one past the last: nothing, where
     // nothing was.
     const LineAnnotation& lineAnnotation(S32 line) const;

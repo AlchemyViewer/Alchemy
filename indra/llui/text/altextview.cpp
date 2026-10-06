@@ -486,6 +486,33 @@ void ALTextView::setText(std::string_view text)
     mChanged();
 }
 
+void ALTextView::replaceText(const ALTextRange& range_in, std::string_view text)
+{
+    // As edit() measures it: without a composition, which goes.
+    ALTextRange range = range_in;
+    if (hasPreedit())
+    {
+        range = withoutComposition(range_in);
+        resetPreedit();
+    }
+    const ALTextDocument::Edit done = mDocument.replace(range, text);
+    if (done.nothing())
+    {
+        return;
+    }
+    // The steps the journal holds were of a text that is not there now,
+    // and the places changed are the host's, not the person's.
+    mUndo.clear();
+    mChanges.clear();
+    mChangeAt = 0;
+    resetDirty();
+    // The main caret, which whoever edits puts, moved along with the text.
+    mCaret  = mDocument.clamp(done.placed(mCaret));
+    mAnchor = mDocument.clamp(done.placed(mAnchor));
+    syncScrollbar();
+    mChanged();
+}
+
 bool ALTextView::setTextWithHistory(std::string_view text, const LLSD& history)
 {
     // Read against the text first, once: the journal can only be given a
@@ -3875,6 +3902,22 @@ void ALTextView::setLineAnnotation(S32 line, const LineAnnotation& said)
             mLayout.gapChanged(line);
         }
     }
+}
+
+void ALTextView::renumberLines(S32 from, S32 by)
+{
+    if (by == 0)
+    {
+        return;
+    }
+    for (size_t line = static_cast<size_t>(llmax(from, 0)); line < mAnnotations.size(); ++line)
+    {
+        if (mAnnotations[line].number > 0)
+        {
+            mAnnotations[line].number += by;
+        }
+    }
+    ++mAnnotationsRevision;
 }
 
 const ALTextView::LineAnnotation& ALTextView::lineAnnotation(S32 line) const

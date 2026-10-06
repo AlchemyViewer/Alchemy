@@ -40,6 +40,7 @@
 
 #include "../test/lltut.h"
 
+#include <functional>
 #include <initializer_list>
 #include <memory>
 #include <string>
@@ -62,9 +63,12 @@ namespace tut
         ~aldiffview_data()
         {
             gFocusMgr.setKeyboardFocus(nullptr);
-            if (view)
+            for (ALDiffView* each : { view, twin })
             {
-                view->die();
+                if (each)
+                {
+                    each->die();
+                }
             }
         }
 
@@ -107,6 +111,61 @@ namespace tut
         }
 
         static bool hidden(ALCodeEditor* side, S32 line) { return side->layout().hidden(line); }
+
+        // A second comparison, whose rebuilds lay out all of it again and
+        // fill its editors whole: what one filled again only where it was
+        // laid out again is held to.
+        ALDiffView* twin = nullptr;
+        ALDiffView& makeWhole()
+        {
+            ALDiffView::Params p(LLUICtrlFactory::getDefaultParams<ALDiffView>());
+            p.name   = "whole";
+            p.rect   = LLRect(0, 300, 600, 0);
+            p.syntax = "lsl";
+            twin     = LLUICtrlFactory::create<ALDiffView>(p);
+            twin->setKeepsLayout(false);
+            return *twin;
+        }
+
+        // What an editor holds and is told, all of it, as another's.
+        static void same(ALCodeEditor* a, ALCodeEditor* b, const std::string& where)
+        {
+            ensure(where + ": text", a->wholeText() == b->wholeText());
+            const S32 count = a->document().lineCount();
+            for (S32 l = 0; l <= count; ++l)
+            {
+                const ALTextView::LineAnnotation& x  = a->lineAnnotation(l);
+                const ALTextView::LineAnnotation& y  = b->lineAnnotation(l);
+                const std::string                 at = where + ", line " + std::to_string(l);
+                ensure(at + ": what is said of it", x.number == y.number && x.sign == y.sign && x.tint == y.tint && x.rulerTint == y.rulerTint);
+                ensure(at + ": the rows above it", x.gap == y.gap && x.gapTint == y.gapTint && x.gapRulerTint == y.gapRulerTint && x.gapStop == y.gapStop &&
+                                                       a->layout().gapRows(l) == b->layout().gapRows(l));
+                ensure(at + ": hidden or not", l == count || a->layout().hidden(l) == b->layout().hidden(l));
+                ensure(at + ": no bar: nobody changed it", !a->lineChanged(l));
+            }
+            const std::vector<ALCodeEditor::Decoration>& x = a->decorations();
+            const std::vector<ALCodeEditor::Decoration>& y = b->decorations();
+            ensure_equals(where + ": words", x.size(), y.size());
+            for (size_t i = 0; i < x.size(); ++i)
+            {
+                ensure(where + ": a word", x[i].range == y[i].range && x[i].color == y[i].color && x[i].style == y[i].style);
+            }
+            ensure(where + ": the caret", a->caret() == b->caret());
+            ensure_equals(where + ": the height", a->layout().totalHeight(), b->layout().totalHeight());
+        }
+        static void sameShown(ALDiffView& a, ALDiffView& b, const std::string& where)
+        {
+            ensure_equals(where + ": the layout shown", a.isInline(), b.isInline());
+            if (a.isInline())
+            {
+                same(a.inlined(), b.inlined(), where + ", inline");
+            }
+            else
+            {
+                same(a.left(), b.left(), where + ", left");
+                same(a.right(), b.right(), where + ", right");
+            }
+        }
 
         // What a side shows of its lines, a line each: the numbers in its
         // gutter, its signs ('\0' for none); and the rows of nothing above
@@ -1137,5 +1196,230 @@ namespace tut
         ensure("a comment reworded alone: nothing to copy", d.changeCount() == 0 && d.unifiedDiff().empty());
         d.setTexts("x = 1;\n", "x = 1;\n// a note put in\n");
         ensure("a line of comment put in: nothing to copy", d.changeCount() == 0 && d.unifiedDiff().empty());
+    }
+
+    template<> template<>
+    void aldiffview_object::test<35>()
+    {
+        set_test_name("filled again only where a rebuild laid out again: each editor as one filled whole from the same comparison, edit after edit, either side, either layout, every way of comparing");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        U32        seed = 20261006;
+        const auto next = [&seed](U32 below) {
+            seed = seed * 1103515245U + 12345U;
+            return below ? (seed >> 16) % below : 0U;
+        };
+        // Lines of code, braces and blank lines among them, changed at a
+        // line, lines put in or taken out, a block moved; at the start and
+        // at the end too.
+        std::vector<std::string> base;
+        for (S32 n = 0; n < 120; ++n)
+        {
+            base.push_back(n % 9 == 0 ? std::string("}") : n % 11 == 0 ? std::string() : "x = " + std::to_string(n) + ";");
+        }
+        const auto joined = [](const std::vector<std::string>& lines) {
+            std::string out;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                out += (i ? "\n" : "") + lines[i];
+            }
+            return out;
+        };
+        const auto edited = [&](std::vector<std::string> lines) {
+            const size_t at = next(static_cast<U32>(lines.size() + 1));
+            switch (next(5))
+            {
+                case 0:
+                    if (at < lines.size())
+                    {
+                        lines[at] += " + 1";
+                    }
+                    break;
+                case 1:
+                    lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(at), next(3) + 1, "y = " + std::to_string(next(1000)) + ";");
+                    break;
+                case 2:
+                    if (at < lines.size() && lines.size() > 4)
+                    {
+                        lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(at), lines.begin() + static_cast<std::ptrdiff_t>(std::min(lines.size(), at + next(3) + 1)));
+                    }
+                    break;
+                case 3:
+                    if (lines.size() > 30)
+                    {
+                        const size_t             from = next(static_cast<U32>(lines.size() - 12));
+                        std::vector<std::string> block(lines.begin() + static_cast<std::ptrdiff_t>(from), lines.begin() + static_cast<std::ptrdiff_t>(from + 8));
+                        lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(from), lines.begin() + static_cast<std::ptrdiff_t>(from + 8));
+                        const size_t to = next(static_cast<U32>(lines.size()));
+                        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(to), block.begin(), block.end());
+                    }
+                    break;
+                default:
+                    // The last line, or the first, said otherwise.
+                    lines[next(2) ? lines.size() - 1 : 0] += " // end";
+                    break;
+            }
+            return lines;
+        };
+        ALDiffView& kept  = make("", "");
+        ALDiffView& whole = makeWhole();
+        // Each edit an editor of the one kept is given: a stretch of it, or
+        // all of it.
+        S32                                            stretches = 0;
+        S32                                            edits     = 0;
+        std::vector<boost::signals2::scoped_connection> heard;
+        for (ALCodeEditor* side : { kept.left(), kept.right(), kept.inlined() })
+        {
+            heard.emplace_back(side->document().onChanged([&, side](const ALTextDocument::Edit& edit) {
+                S32 had = side->document().lineCount();
+                for (const ALTextDocument::Edit::LineSpan& span : edit.lineSpans())
+                {
+                    had += span.last - span.first + 1 - span.made;
+                }
+                const ALTextDocument::Edit::LineSpan& span = edit.lineSpans().front();
+                ++edits;
+                stretches += span.first > 0 || span.last < had - 1 ? 1 : 0;
+            }));
+        }
+        for (S32 way = 0; way < 6; ++way)
+        {
+            ALTextDiff::Likeness like;
+            like.ignoreBlankLines = way == 2;
+            std::vector<std::string> left  = edited(edited(base));
+            std::vector<std::string> right = edited(edited(edited(base)));
+            ALTextDiff::ranges_t     ranges;
+            if (way == 5)
+            {
+                // Anchored as a conversion is, a stretch at a time.
+                for (S32 n = 0; n < 40; n += 4)
+                {
+                    ranges.push_back({ n, n + 1, n, n + 1 });
+                }
+            }
+            for (ALDiffView* each : { &kept, &whole })
+            {
+                each->setInline(way == 1);
+                each->setLikeness(like);
+                each->setAlgorithm(way == 4 ? ALTextDiff::Algorithm::Structural : ALTextDiff::Algorithm::Histogram);
+                each->setTexts(joined(left), joined(right), ranges);
+                each->setSwapped(way == 3);
+            }
+            for (S32 step = 0; step < 40; ++step)
+            {
+                // The right typed in, mostly; the left another now and then.
+                const bool on_left = way != 5 && next(4) == 0;
+                (on_left ? left : right) = edited(on_left ? left : right);
+                const S32 reveal = static_cast<S32>(next(6));
+                for (ALDiffView* each : { &kept, &whole })
+                {
+                    if (on_left)
+                    {
+                        each->setLeftText(joined(left));
+                    }
+                    else
+                    {
+                        each->setRightText(joined(right));
+                    }
+                    if (step % 7 == 6)
+                    {
+                        // The other layout, filled as it is shown.
+                        each->setInline(!each->isInline());
+                    }
+                }
+                ALCodeEditor* front = kept.isInline() ? kept.inlined() : kept.right();
+                if (reveal == 0)
+                {
+                    // A run folded opened, as the caret landing in it does.
+                    for (S32 line = 0; line < front->document().lineCount(); ++line)
+                    {
+                        if (front->layout().hidden(line))
+                        {
+                            for (ALDiffView* each : { &kept, &whole })
+                            {
+                                (each->isInline() ? each->inlined() : each->right())->goTo(ALTextPos(line, 0));
+                            }
+                            break;
+                        }
+                    }
+                }
+                const std::string where = "way " + std::to_string(way) + ", step " + std::to_string(step);
+                sameShown(kept, whole, where);
+            }
+        }
+        ensure("filled again a stretch at a time, mostly", stretches * 2 > edits);
+    }
+
+    template<> template<>
+    void aldiffview_object::test<36>()
+    {
+        set_test_name("filled again at the text's end: the rows below the last as they now are; the line before the stretch said again where the edit took it from its end");
+        ALDiffView& kept  = make("", "");
+        ALDiffView& whole = makeWhole();
+        // Whether the last rebuild laid out again only a stretch, at the
+        // end of a column.
+        const auto at_end = [&](ALDiffModel::Column column) {
+            const ALDiffModel::Relaid& relaid = kept.model().relaid();
+            const size_t               c      = static_cast<size_t>(column);
+            return !relaid.whole && relaid.first[c] + relaid.now[c] == kept.model().lineCount(column);
+        };
+        const auto both = [&](const std::function<void(ALDiffView&)>& done) {
+            done(kept);
+            done(whole);
+        };
+
+        // Lines put in at the end of the right, and taken out again: the
+        // left's rows below its last line as many as they are.
+        both([](ALDiffView& d) { d.setTexts(lines(40, { { 5, "five" } }), lines(40, { { 5, "FIVE" } })); });
+        both([](ALDiffView& d) { d.setRightText(lines(40, { { 5, "FIVE" } }) + "\nput in\nand again"); });
+        ensure("lines put in: a stretch at the end laid out again", at_end(ALDiffModel::Column::Left));
+        sameShown(kept, whole, "put in at the end");
+        ensure_equals("the left's rows below its last", kept.left()->layout().gapRows(40), 2);
+        both([](ALDiffView& d) { d.setRightText(lines(40, { { 5, "FIVE" } })); });
+        ensure("again", at_end(ALDiffModel::Column::Left));
+        sameShown(kept, whole, "taken out again");
+        ensure("none now but the row of the run folded to the end", kept.left()->layout().gapRows(40) == 1 && kept.left()->lineAnnotation(40).gapStop);
+
+        // Inline, the left's last line another: the stretch begins with the
+        // line taken out, the edit takes the line before it from its end,
+        // and that line's number is said again.
+        both([](ALDiffView& d) {
+            d.setInline(true);
+            d.setTexts(lines(40, { { 5, "five" } }), lines(40, { { 5, "five" }, { 39, "thirty-nine" } }));
+        });
+        both([](ALDiffView& d) { d.setLeftText(lines(40, { { 5, "five" }, { 39, "line 39!" } })); });
+        ensure("the left's last line: a stretch at the end laid out again", at_end(ALDiffModel::Column::Inline));
+        sameShown(kept, whole, "the left's last line");
+        // Typed in a line put in at the end: the edit takes the line before
+        // it from its end.
+        both([](ALDiffView& d) { d.setTexts(lines(40), lines(40) + "\nput in"); });
+        both([](ALDiffView& d) { d.setRightText(lines(40) + "\nput in!"); });
+        ensure("typed at the end: a stretch at the end laid out again", at_end(ALDiffModel::Column::Inline));
+        sameShown(kept, whole, "typed at the end");
+    }
+
+    template<> template<>
+    void aldiffview_object::test<37>()
+    {
+        set_test_name("typed far down a long text: its editor's lines coloured again from the edit, not from the top, and the other side's not at all; the same of one filled whole");
+        const std::string left = lines(3000, { { 5, "five" } });
+        ALDiffView&       kept = make(left.c_str(), lines(3000).c_str());
+        ALDiffView&       whole = makeWhole();
+        whole.setTexts(left, lines(3000));
+        for (ALDiffView* each : { &kept, &whole })
+        {
+            for (ALCodeEditor* side : { each->left(), each->right() })
+            {
+                side->highlighter().tokens(2999);
+            }
+            each->setRightText(lines(3000, { { 2500, "typed" } }));
+            each->right()->highlighter().tokens(2502);
+            each->left()->highlighter().tokens(2999);
+        }
+        ensure("again: lexed from the edit", kept.right()->highlighter().lastLexed() <= 3);
+        ensure("the left not at all", kept.left()->highlighter().lastLexed() == 0);
+        ensure("whole: lexed from the top", whole.right()->highlighter().lastLexed() > 2500);
+        sameShown(kept, whole, "typed far down");
     }
 }
