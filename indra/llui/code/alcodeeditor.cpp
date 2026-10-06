@@ -2786,10 +2786,10 @@ void ALCodeEditor::showCompletionDoc()
     popup->sideSaid(says);
 }
 
-void ALCodeEditor::supplyCompletions(const ALTextPos& at, std::vector<Completion> more)
+void ALCodeEditor::supplyCompletions(const ALTextPos& at, std::vector<Completion> more, bool words)
 {
     // Only about the identifier the list is still narrowing.
-    if (hasSelection() || isReadOnly() || !mCompletionModel.supply(at, std::move(more)))
+    if (hasSelection() || isReadOnly() || !mCompletionModel.supply(at, std::move(more), words))
     {
         return;
     }
@@ -3419,6 +3419,52 @@ bool ALCodeEditor::signatureHelp()
     return true;
 }
 
+namespace
+{
+    // How a completion taken is written as a call, where the identifier it
+    // replaces ends at `end` of `line`: not at all where it is no call, or
+    // the brackets are there already; else with the parameters its detail
+    // names, to tab through, and whether the caret goes between the
+    // brackets. As whoever answered says, where they say: an empty pair
+    // with the caret after it, or the caret between them; else as its kind
+    // and its detail read.
+    struct CallShape
+    {
+        bool                     called = false;
+        bool                     takes  = false;
+        std::vector<std::string> names;
+    };
+
+    CallShape callShapeOf(const ALCompletion& chosen, const std::string& line, S32 end)
+    {
+        CallShape  shape;
+        const bool already = end < static_cast<S32>(line.size()) && line[end] == '(';
+        switch (chosen.brackets)
+        {
+            case ALCompletion::Brackets::Guess:
+                shape.called = chosen.kind == ALSyntaxKind::Function;
+                break;
+            case ALCompletion::Brackets::None:
+                shape.called = false;
+                break;
+            default:
+                shape.called = true;
+                break;
+        }
+        shape.called = shape.called && !already;
+        if (!shape.called || chosen.brackets == ALCompletion::Brackets::After)
+        {
+            return shape;
+        }
+        shape.names        = ALSnippetSession::parameterNames(chosen.detail, chosen.text);
+        const size_t open  = ALSnippetSession::parameterListAt(chosen.detail, chosen.text);
+        const size_t after = open == std::string::npos ? std::string::npos : chosen.detail.find_first_not_of(' ', open + 1);
+        shape.takes        = chosen.brackets == ALCompletion::Brackets::Inside || open == std::string::npos || after == std::string::npos ||
+                      chosen.detail[after] != ')';
+        return shape;
+    }
+}
+
 bool ALCodeEditor::acceptCompletion()
 {
     if (!completionOpen())
@@ -3475,9 +3521,8 @@ void ALCodeEditor::complete(const Completion& chosen, const ALTextRange& range)
     // A function called: its brackets, unless they are there already,
     // with the caret between them where it takes anything, and the
     // signature asked for.
-    const std::string& line   = document().line(range.end.line);
-    const bool         called = chosen.kind == ALSyntaxKind::Function && !(range.end.column < static_cast<S32>(line.size()) && line[range.end.column] == '(');
-    if (!called)
+    const CallShape shape = callShapeOf(chosen, document().line(range.end.line), range.end.column);
+    if (!shape.called)
     {
         insertText(chosen.text);
     }
@@ -3485,22 +3530,18 @@ void ALCodeEditor::complete(const Completion& chosen, const ALTextRange& range)
     {
         // Its parameters as placeholders, where the detail names them;
         // else the caret between the brackets where it takes anything.
-        const std::vector<std::string> names = parameterNames(chosen.detail, chosen.text);
-        const size_t open  = parameterListAt(chosen.detail, chosen.text);
-        size_t       after = open == std::string::npos ? std::string::npos : chosen.detail.find_first_not_of(' ', open + 1);
-        const bool   takes = open == std::string::npos || after == std::string::npos || chosen.detail[after] != ')';
-        std::string  call  = chosen.text + "(";
+        std::string              call = chosen.text + "(";
         std::vector<ALTextRange> places;
-        const ALTextPos begin = range.begin;
-        for (size_t i = 0; i < names.size(); ++i)
+        const ALTextPos          begin = range.begin;
+        for (size_t i = 0; i < shape.names.size(); ++i)
         {
             if (i > 0)
             {
                 call += ", ";
             }
             const S32 from = begin.column + static_cast<S32>(call.size());
-            call += names[i];
-            places.emplace_back(ALTextPos(begin.line, from), ALTextPos(begin.line, from + static_cast<S32>(names[i].size())));
+            call += shape.names[i];
+            places.emplace_back(ALTextPos(begin.line, from), ALTextPos(begin.line, from + static_cast<S32>(shape.names[i].size())));
         }
         call += ")";
         insertText(call);
@@ -3508,11 +3549,11 @@ void ALCodeEditor::complete(const Completion& chosen, const ALTextRange& range)
         {
             setPlaceholders(std::move(places), caret());
         }
-        else if (takes)
+        else if (shape.takes)
         {
             setCaret(ALTextPos(caret().line, caret().column - 1));
         }
-        if (takes && mSignatureRequest)
+        if (shape.takes && mSignatureRequest)
         {
             mSignatureRequest(caret());
         }
@@ -3540,19 +3581,16 @@ ALTextEditing::Change ALCodeEditor::completionAt(const Completion& chosen, const
     }
     // A function called, as complete() calls it: its first parameter
     // chosen, else the caret between its brackets where it takes anything.
-    const std::string& line   = document().line(over.end.line);
-    const bool         called = chosen.kind == ALSyntaxKind::Function && !(over.end.column < static_cast<S32>(line.size()) && line[over.end.column] == '(');
-    if (!called)
+    const CallShape shape = callShapeOf(chosen, document().line(over.end.line), over.end.column);
+    if (!shape.called)
     {
         one.replacements.push_back({ over, chosen.text });
         one.caret = ALTextEditing::endOf(over.begin, chosen.text);
         return one;
     }
-    const std::vector<std::string> names = parameterNames(chosen.detail, chosen.text);
-    const size_t                   open  = parameterListAt(chosen.detail, chosen.text);
-    const size_t after = open == std::string::npos ? std::string::npos : chosen.detail.find_first_not_of(' ', open + 1);
-    const bool   takes = open == std::string::npos || after == std::string::npos || chosen.detail[after] != ')';
-    std::string  call  = chosen.text + "(";
+    const std::vector<std::string>& names = shape.names;
+    const bool                      takes = shape.takes;
+    std::string                     call  = chosen.text + "(";
     for (size_t i = 0; i < names.size(); ++i)
     {
         call += (i > 0 ? ", " : "") + names[i];

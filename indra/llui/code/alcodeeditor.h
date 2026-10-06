@@ -470,7 +470,9 @@ public:
     // about the same identifier.
     typedef std::function<void(const ALTextPos& at, std::string_view prefix)> completion_request_t;
     void setCompletionRequest(completion_request_t request) { mCompletionRequest = std::move(request); }
-    void supplyCompletions(const ALTextPos& at, std::vector<Completion> more);
+    // `words` false where whoever answered says the document's own words
+    // are no use there (ALCompletionModel::supply).
+    void supplyCompletions(const ALTextPos& at, std::vector<Completion> more, bool words = true);
     bool completionOpen() const;
     void closeCompletion();
     // Whether the list opens on its own as an identifier is typed, or only

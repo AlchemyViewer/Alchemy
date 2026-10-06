@@ -56,10 +56,12 @@ target_sources(
     lsl/optimizer/allslshapes.cpp
     lsl/optimizer/allslsignatures.cpp
     lsl/optimizer/allslsimplifier.cpp
+    luau/alluaucompletion.cpp
     luau/alluauconfig.cpp
     luau/alluauexports.cpp
     luau/alluaufrontend.cpp
     luau/alluauservice.cpp
+    luau/alluautypes.cpp
     preprocessor/aldiskcache.cpp
     preprocessor/aldiskincludes.cpp
     preprocessor/alincludeidentity.cpp
@@ -122,10 +124,12 @@ target_sources(
         lsl/optimizer/allslshapes.h
         lsl/optimizer/allslsignatures.h
         lsl/optimizer/allslsimplifier.h
+        luau/alluaucompletion.h
         luau/alluauconfig.h
         luau/alluauexports.h
         luau/alluaufrontend.h
         luau/alluauservice.h
+        luau/alluautypes.h
         preprocessor/aldiskcache.h
         preprocessor/aldiskincludes.h
         preprocessor/alincludeidentity.h

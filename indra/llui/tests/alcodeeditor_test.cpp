@@ -2798,4 +2798,40 @@ namespace tut
         ensure_equals("no gutter", e.gutterWidth(), 0);
         ensure_equals("no bar", e.changeBarAt(e.leftEdge() + 1, rowY(1)), -1);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<78>()
+    {
+        set_test_name("a completion's brackets go where whoever answered says: none, after an empty pair, or between them; else as its kind reads");
+        ALCodeEditor&          e        = make("", "lsl");
+        ALCompletion::Brackets brackets = ALCompletion::Brackets::Guess;
+        e.setCompletionProvider([&brackets](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+            ALCodeEditor::Completion c;
+            c.text     = "handler";
+            c.detail   = "handler(integer n)";
+            c.kind     = ALSyntaxKind::Function;
+            c.brackets = brackets;
+            if (ALCodeEditor::matchTier(c.text, prefix) >= 0)
+            {
+                out.push_back(c);
+            }
+        });
+        std::vector<ALTextPos> asks;
+        e.setSignatureRequest([&](const ALTextPos& caret) { asks.push_back(caret); });
+        const auto take = [&](ALCompletion::Brackets said) {
+            brackets = said;
+            e.setText("");
+            asks.clear();
+            type("hand");
+            ensure("offered", e.completionOpen());
+            key(KEY_TAB);
+            return e.text();
+        };
+        ensure_equals("guessed: a function is called, its parameter to fill", take(ALCompletion::Brackets::Guess), std::string("handler(n)"));
+        ensure_equals("none: passed as it is", take(ALCompletion::Brackets::None), std::string("handler"));
+        ensure("and no signature asked", asks.empty());
+        ensure_equals("after: an empty pair", take(ALCompletion::Brackets::After), std::string("handler()"));
+        ensure("the caret after it, and no signature asked", e.caret() == ALTextPos(0, 9) && asks.empty());
+        ensure_equals("inside: its parameter to fill", take(ALCompletion::Brackets::Inside), std::string("handler(n)"));
+    }
 }

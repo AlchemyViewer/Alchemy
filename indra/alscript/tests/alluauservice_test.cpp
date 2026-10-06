@@ -1240,4 +1240,60 @@ namespace tut
         const std::vector<ALScriptOutlineEntry> broken = ALLuauService::shape("local function a()\n  x = \nend\nlocal function b()\nend\n");
         ensure("broken in a: both still there", broken.size() == 2 && broken[0].name == "a" && broken[1].name == "b" && broken[1].span.line == 3);
     }
+
+    template<> template<>
+    void alluauservice_object::test<39>()
+    {
+        set_test_name("completion says what fits where it goes and where a call's brackets go, and offers a method only after a colon");
+        ensure("definitions loaded: " + error, loaded);
+        const auto entry = [](const std::vector<ALScriptCompletion>& found, const std::string& text) -> const ALScriptCompletion* {
+            for (const ALScriptCompletion& c : found)
+            {
+                if (c.text == text)
+                {
+                    return &c;
+                }
+            }
+            return nullptr;
+        };
+        // What a number is wanted for. Asked as the studio asks, where the
+        // word being typed begins.
+        const std::string               typed = "local count: number = 1\nlocal name = \"x\"\nlocal n: number = c\n";
+        std::vector<ALScriptCompletion> found = service.complete(typed, 2, 18);
+        const ALScriptCompletion*       count = entry(found, "count");
+        const ALScriptCompletion*       name  = entry(found, "name");
+        ensure("both offered", count && name);
+        ensure("the number fits", count->fits);
+        ensure("the string does not", !name->fits);
+        ensure("said where an expression goes", count->context == ALScriptCompletion::Context::Expression);
+
+        // Where a call's brackets go: between them for what takes
+        // something, after them for what takes nothing, none for what is no
+        // call or is wanted as the function it is.
+        const std::string calls = "local function now(): number return 1 end\n"
+                                  "local function twice(n: number): number return n * 2 end\n"
+                                  "\n"
+                                  "local f: (number) -> number = t\n";
+        found                         = service.complete(calls, 2, 0);
+        const ALScriptCompletion* say = entry(found, "print");
+        const ALScriptCompletion* now = entry(found, "now");
+        const ALScriptCompletion* lib = entry(found, "ll");
+        ensure("print, between its brackets", say && say->brackets == ALScriptCompletion::Brackets::Inside);
+        ensure("now, after an empty pair", now && now->brackets == ALScriptCompletion::Brackets::After);
+        ensure("ll, no call to say anything of", lib && lib->brackets == ALScriptCompletion::Brackets::Guess);
+        found                           = service.complete(calls, 3, 30);
+        const ALScriptCompletion* twice = entry(found, "twice");
+        ensure("twice, wanted as it is", twice && twice->fits);
+        ensure("so no brackets", twice->brackets == ALScriptCompletion::Brackets::None);
+
+        // A method is called with a colon, and after a dot is no use. The
+        // grid's own declare theirs as fields taking self, which are called
+        // with a colon all the same.
+        const std::string events = "local a = LLEvents.\nlocal b = LLEvents:\nlocal t = {}\nfunction t:greet(): number return 1 end\nlocal d = t:\n";
+        found                    = service.complete(events, 0, 19);
+        ensure("none of LLEvents' methods after a dot", !entry(found, "on") && !entry(found, "off") && !entry(found, "handlers"));
+        found = service.complete(events, 1, 19);
+        ensure("all of them after a colon", entry(found, "on") && entry(found, "off") && entry(found, "handlers"));
+        ensure("a script's own method after a colon", entry(service.complete(events, 4, 12), "greet") != nullptr);
+    }
 }

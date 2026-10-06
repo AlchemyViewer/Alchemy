@@ -71,6 +71,17 @@ namespace
         }
     }
 
+    ALCompletion::Brackets bracketsOf(ALScriptCompletion::Brackets brackets)
+    {
+        switch (brackets)
+        {
+            case ALScriptCompletion::Brackets::None:   return ALCompletion::Brackets::None;
+            case ALScriptCompletion::Brackets::After:  return ALCompletion::Brackets::After;
+            case ALScriptCompletion::Brackets::Inside: return ALCompletion::Brackets::Inside;
+            default:                                   return ALCompletion::Brackets::Guess;
+        }
+    }
+
     // Each parameter's place in the label, found in order.
     std::vector<std::pair<S32, S32>> spansIn(const std::string& label, const std::vector<std::string>& parameters)
     {
@@ -496,6 +507,10 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
         {
             std::vector<ALCodeEditor::Completion> more;
             more.reserve(result.completions.size());
+            // The document's own words beside the answer, but where the
+            // analyzer says the place wants none of them: a type, a string,
+            // a comment that says how the script is checked.
+            bool words = true;
             for (const ALScriptCompletion& c : result.completions)
             {
                 ALCodeEditor::Completion completion;
@@ -504,9 +519,14 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
                 completion.kind          = syntaxKindOf(c.kind);
                 completion.deprecated    = c.deprecated;
                 completion.documentation = ALCompletion::shared(c.documentation);
+                completion.snippet       = c.snippet;
+                completion.fits          = c.fits;
+                completion.brackets      = bracketsOf(c.brackets);
                 more.push_back(std::move(completion));
+                words = words && c.context != ALScriptCompletion::Context::Type && c.context != ALScriptCompletion::Context::String &&
+                        c.context != ALScriptCompletion::Context::HotComment;
             }
-            doc.editor->supplyCompletions(at, std::move(more));
+            doc.editor->supplyCompletions(at, std::move(more), words);
             break;
         }
         case ALScriptAnalysis::Kind::Hover:

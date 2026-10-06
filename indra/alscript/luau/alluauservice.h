@@ -39,6 +39,7 @@ namespace Luau
     struct FrontendCancellationToken;
 }
 
+class ALLuauCompletion;
 struct ALLuauFrontend;
 
 // The SLua analyzer: Luau's front end from Second Life's fork, given the
@@ -155,7 +156,9 @@ public:
     ALScriptProblems check(std::string_view source);
 
     // What could go at a position of the script: the keywords, the
-    // bindings in scope, the fields of what is being indexed.
+    // bindings in scope, the fields of what is being indexed; each with
+    // whether it fits there and where a call's brackets go
+    // (ALLuauCompletion). In no order: the editor ranks them.
     std::vector<ALScriptCompletion> complete(std::string_view source, S32 line, S32 column);
     // What is at a position: its name and type, its documentation, and
     // where in the script it was bound.
@@ -204,6 +207,8 @@ public:
 
 private:
     // What is kept between questions (alluaufrontend.h), whose Luau
-    // headers stay out of this one.
-    std::unique_ptr<ALLuauFrontend> mFrontend;
+    // headers stay out of this one; and what answers over it in a class
+    // of its own.
+    std::unique_ptr<ALLuauFrontend>   mFrontend;
+    std::unique_ptr<ALLuauCompletion> mCompletion;
 };

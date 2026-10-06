@@ -178,4 +178,48 @@ namespace tut
         ensure_equals("the cap", many.size(), ALCompletionModel::CAP);
         ensure("the best of them, in order", many.front().text == "w000" && many.back().text == "w199");
     }
+
+    template<> template<>
+    void alcompletionmodel_object::test<7>()
+    {
+        set_test_name("what fits where it goes comes first among those that match as well; a later answer says so, and where brackets go");
+        std::vector<ALCompletion> list = { word("count", ALSyntaxKind::Variable), word("cost", ALSyntaxKind::Variable), word("colour", ALSyntaxKind::Variable),
+                                           word("covers", ALSyntaxKind::Function), word("core", ALSyntaxKind::Variable) };
+        list[3].fits = true;
+        list[4].fits = true;
+        ALCompletionModel::rank(list, "co");
+        ensure_equals("the two that fit first, a local before a function; then the rest", joined(list), std::string("core|covers|colour|cost|count"));
+        list = { word("count", ALSyntaxKind::Variable), word("acorn", ALSyntaxKind::Variable) };
+        list[1].fits = true;
+        ALCompletionModel::rank(list, "co");
+        ensure_equals("but a better match beats a fit", joined(list), std::string("count|acorn"));
+
+        // The provider's word, joined later by the analyzer's answer for it.
+        const ALTextDocument text("pr\n");
+        const ALTextPos      start(0, 0);
+        model.narrow(start, ALTextPos(0, 2), "pr", std::string(), { word("print"), word("pairs") }, text);
+        ensure("guessed until told", model.list()[0].brackets == ALCompletion::Brackets::Guess);
+        ALCompletion told = word("print");
+        told.fits         = true;
+        told.brackets     = ALCompletion::Brackets::None;
+        model.supply(start, { told });
+        model.narrow(start, ALTextPos(0, 2), "pr", std::string(), {}, text);
+        ensure("told it fits, and where its brackets go", model.list()[0].text == "print" && model.list()[0].fits &&
+                                                              model.list()[0].brackets == ALCompletion::Brackets::None);
+    }
+
+    template<> template<>
+    void alcompletionmodel_object::test<8>()
+    {
+        set_test_name("an answer that wants none of the document's words leaves them out until another identifier is asked about");
+        const ALTextDocument text("local number_of = 1\nlocal n: nu\n");
+        const ALTextPos      start(1, 9);
+        model.narrow(start, ALTextPos(1, 11), "nu", std::string(), {}, text);
+        ensure_equals("the document's word, asked nothing yet", joined(model.list()), std::string("number_of"));
+        ensure("told", model.supply(start, { word("number", ALSyntaxKind::Type) }, /*words*/ false));
+        model.narrow(start, ALTextPos(1, 11), "nu", std::string(), {}, text);
+        ensure_equals("the type alone", joined(model.list()), std::string("number"));
+        model.narrow(ALTextPos(0, 6), ALTextPos(0, 8), "nu", std::string(), {}, text);
+        ensure("another identifier has them again", joined(model.list()).find("number_of") != std::string::npos);
+    }
 }

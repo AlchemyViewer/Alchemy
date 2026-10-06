@@ -51,12 +51,47 @@ enum class ALScriptSymbolKind : U8
 // One thing that could go at a position.
 struct ALScriptCompletion
 {
+    // Where a call's brackets go once it is taken: as the editor guesses
+    // from its kind, where the analyzer does not say; none, for a function
+    // passed rather than called or one called already; after an empty
+    // pair, for one that takes nothing; or between them.
+    enum class Brackets : U8
+    {
+        Guess,
+        None,
+        After,
+        Inside
+    };
+    // What the position is, as the analyzer reads it, which every one of
+    // an answer shares: where an expression goes, a statement, a member
+    // after its table, a type, a keyword alone, a string, a comment that
+    // says how the script is checked; or nothing it could tell.
+    enum class Context : U8
+    {
+        Unknown,
+        Expression,
+        Statement,
+        Property,
+        Type,
+        Keyword,
+        String,
+        HotComment
+    };
+
     std::string        text;
     // Its type, or its signature: what the list shows beside it.
     std::string        detail;
     ALScriptSymbolKind kind       = ALScriptSymbolKind::Variable;
     bool               deprecated = false;
     std::string        documentation;
+    // What goes in its place where it is more than its name: a body with
+    // stops to tab through, as ALSnippetSession reads one.
+    std::string        snippet;
+    // Of the type wanted where it goes: first among those that match what
+    // was typed as well.
+    bool               fits     = false;
+    Brackets           brackets = Brackets::Guess;
+    Context            context  = Context::Unknown;
 };
 
 // What is at a position.

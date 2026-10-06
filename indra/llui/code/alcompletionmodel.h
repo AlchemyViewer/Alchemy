@@ -55,6 +55,22 @@ struct ALCompletion
     // Struck from the language: marked so on the list and last in it, but
     // completed as what it is -- a function with its brackets.
     bool         deprecated = false;
+    // Of the type wanted where it goes, as whoever answered knows: first
+    // among those that match what was typed as well.
+    bool         fits = false;
+    // Where a call's brackets go once it is taken, where whoever answered
+    // knows: else as the editor guesses from its kind, a function called;
+    // none, for a function passed rather than called; after an empty pair,
+    // for one that takes nothing; or between them. Never where they are
+    // there already.
+    enum class Brackets : U8
+    {
+        Guess,
+        None,
+        After,
+        Inside
+    };
+    Brackets     brackets = Brackets::Guess;
     // The mark before it on the list, where the provider has one; else
     // the icon of its kind, or a badge where the icons are not to be had.
     LLUIImagePtr icon;
@@ -93,10 +109,11 @@ public:
     static void documentWords(const ALTextDocument& text, const ALTextPos& at, std::string_view prefix, std::vector<ALCompletion>& out,
                               size_t most = CAP);
     // In the order offered: the start of the word as typed, then in either
-    // case, then a part of it, then letters of its parts. Among equals the
-    // script's own names -- a parameter, a local, a field -- then the
-    // language's words, then its constants, then what is deprecated, then
-    // the document's bare words; then the alphabet. No more than CAP.
+    // case, then a part of it, then letters of its parts. Among equals what
+    // fits where it goes; then the script's own names -- a parameter, a
+    // local, a field -- then the language's words, then its constants, then
+    // what is deprecated, then the document's bare words; then the
+    // alphabet. No more than CAP.
     static void rank(std::vector<ALCompletion>& list, std::string_view prefix);
 
     // What a list draws from while it narrows one identifier: what the
@@ -119,8 +136,11 @@ public:
     bool narrow(const ALTextPos& start, const ALTextPos& at, std::string_view prefix, const std::string& head, std::vector<ALCompletion> answered,
                 const ALTextDocument& text);
     // What was answered later about the identifier starting at `start`:
-    // kept, and true, where it is still the one the list narrows.
-    bool supply(const ALTextPos& start, std::vector<ALCompletion> more);
+    // kept, and true, where it is still the one the list narrows. `words`
+    // false where the answer says the document's own words are no use
+    // there -- a type, a string -- which then leave the list until it
+    // narrows another identifier.
+    bool supply(const ALTextPos& start, std::vector<ALCompletion> more, bool words = true);
     // The list let go of, and what the identifier was asked as with it;
     // and all of it, what was answered too, as the list closes.
     void hide();
@@ -141,8 +161,10 @@ private:
     std::string               mListedFor;
     ALTextPos                 mAsked{ -1, -1 };
     // What was answered later, kept through every narrowing of the same
-    // identifier until the list closes.
+    // identifier until the list closes; and whether it wants the
+    // document's words beside it.
     std::vector<ALCompletion> mSupplied;
+    bool                      mWords = true;
     // The pool (pooled): what the provider answered, and the document's
     // words apart, which are offered only where longer than what is typed.
     std::vector<ALCompletion>         mPool;

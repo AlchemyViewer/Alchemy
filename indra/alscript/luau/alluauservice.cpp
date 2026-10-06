@@ -26,7 +26,9 @@
 
 #include "alluauservice.h"
 
+#include "alluaucompletion.h"
 #include "alluaufrontend.h"
+#include "alluautypes.h"
 
 #include "alscriptfixes.h"
 #include "alscriptlintpass.h"
@@ -38,7 +40,6 @@
 #include "llstl.h"
 
 #include "Luau/AstQuery.h"
-#include "Luau/Autocomplete.h"
 #include "Luau/BuiltinDefinitions.h"
 #include "Luau/Cancellation.h"
 #include "Luau/Error.h"
@@ -67,6 +68,10 @@ namespace
     // so the two line up when hover documentation arrives.
     const char* const DEFINITIONS_PACKAGE = "@sl-slua";
 
+    using ALLuauTypes::functionOf;
+    using ALLuauTypes::positionOf;
+    using ALLuauTypes::typeText;
+
     ALScriptProblem problemAt(const Luau::Location& where,
                               ALScriptProblem::Severity severity,
                               ALScriptProblem::Source source,
@@ -83,23 +88,6 @@ namespace
         problem.code      = std::move(code);
         problem.message   = std::move(message);
         return problem;
-    }
-
-    Luau::Position positionOf(S32 line, S32 column)
-    {
-        return Luau::Position(static_cast<unsigned>(std::max(0, line)), static_cast<unsigned>(std::max(0, column)));
-    }
-
-    // How a type prints beside a name: a table's first few fields and
-    // how many more, since `ll` has hundreds and a tip is one glance.
-    std::string typeText(Luau::TypeId type)
-    {
-        Luau::ToStringOptions options;
-        options.functionTypeArguments = true;
-        options.hideNamedFunctionTypeParameters = false;
-        options.maxTableLength = 8;
-        options.maxTypeLength  = 1000;
-        return Luau::toString(type, options);
     }
 
     // The name a call or an index reads as: `ll.Say`, `print`, `t.x`.
@@ -123,28 +111,6 @@ namespace
             return (head.empty() ? std::string() : head + std::string(1, index->op)) + index->index.value;
         }
         return std::string();
-    }
-
-    // The function type a call's callee has, or the first of an
-    // overloaded one's.
-    const Luau::FunctionType* functionOf(Luau::TypeId type)
-    {
-        type = Luau::follow(type);
-        if (const Luau::FunctionType* function = Luau::get<Luau::FunctionType>(type))
-        {
-            return function;
-        }
-        if (const Luau::IntersectionType* overloads = Luau::get<Luau::IntersectionType>(type))
-        {
-            for (Luau::TypeId part : overloads->parts)
-            {
-                if (const Luau::FunctionType* function = Luau::get<Luau::FunctionType>(Luau::follow(part)))
-                {
-                    return function;
-                }
-            }
-        }
-        return nullptr;
     }
 
     // The property of a table or a class nearest a name that is not one,
@@ -1143,6 +1109,7 @@ namespace
 
 ALLuauService::ALLuauService()
 :   mFrontend(std::make_unique<ALLuauFrontend>())
+,   mCompletion(std::make_unique<ALLuauCompletion>(*mFrontend))
 {
     setUpProcess();
     mFrontend->frontend = ALLuauFrontend::plainFrontend(mFrontend->files, mFrontend->configs, mFrontend->solver);
@@ -1709,69 +1676,7 @@ ALScriptProblems ALLuauService::check(std::string_view source)
 
 std::vector<ALScriptCompletion> ALLuauService::complete(std::string_view source, S32 line, S32 column)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    ALLuauFrontend& front = *mFrontend;
-    // Nothing offered from a check stopped part way.
-    if (!front.queried(source, /*completion*/ true))
-    {
-        return {};
-    }
-    Luau::AutocompleteResult found = Luau::autocomplete(
-        *front.frontend, front.moduleName, positionOf(line, column),
-        [](std::string, std::optional<const Luau::ExternType*>, std::optional<std::string>) -> std::optional<Luau::AutocompleteEntryMap> {
-            return std::nullopt;
-        });
-
-    std::vector<ALScriptCompletion> out;
-    out.reserve(found.entryMap.size());
-    for (const auto& [name, entry] : found.entryMap)
-    {
-        ALScriptCompletion completion;
-        completion.text       = name;
-        completion.deprecated = entry.deprecated;
-        const bool callable   = entry.type && functionOf(*entry.type) != nullptr;
-        switch (entry.kind)
-        {
-            case Luau::AutocompleteEntryKind::Keyword:
-                completion.kind = ALScriptSymbolKind::Keyword;
-                break;
-            case Luau::AutocompleteEntryKind::Property:
-                completion.kind = callable ? ALScriptSymbolKind::Function : ALScriptSymbolKind::Field;
-                break;
-            case Luau::AutocompleteEntryKind::Binding:
-                completion.kind = callable ? ALScriptSymbolKind::Function : ALScriptSymbolKind::Variable;
-                break;
-            case Luau::AutocompleteEntryKind::Type:
-                completion.kind = ALScriptSymbolKind::Type;
-                break;
-            case Luau::AutocompleteEntryKind::Module:
-                completion.kind = ALScriptSymbolKind::Module;
-                break;
-            case Luau::AutocompleteEntryKind::String:
-                completion.kind = ALScriptSymbolKind::Constant;
-                break;
-            default:
-                // Generated functions, require paths and hot comments:
-                // nothing the studio offers yet.
-                continue;
-        }
-        if (entry.type)
-        {
-            completion.detail = typeText(*entry.type);
-        }
-        std::optional<std::string> symbol = entry.documentationSymbol;
-        if (!symbol && entry.type)
-        {
-            symbol = Luau::follow(*entry.type)->documentationSymbol;
-        }
-        if (const ALLuauFrontend::Doc* doc = front.docFor(symbol))
-        {
-            completion.documentation = doc->documentation;
-        }
-        out.push_back(std::move(completion));
-    }
-    std::sort(out.begin(), out.end(), [](const ALScriptCompletion& a, const ALScriptCompletion& b) { return a.text < b.text; });
-    return out;
+    return mCompletion->complete(source, line, column);
 }
 
 // --- what is here --------------------------------------------------------------------
