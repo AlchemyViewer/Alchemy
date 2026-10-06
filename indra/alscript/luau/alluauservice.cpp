@@ -1439,6 +1439,94 @@ std::vector<ALScriptCompletion> ALLuauService::complete(std::string_view source,
 
 // --- what is here --------------------------------------------------------------------
 
+namespace
+{
+    // A type's name in an annotation -- `Point` in `local p: Point`, in
+    // `util.Point` -- which Luau's own question of the type at a place
+    // passes over: the type it names, as its declaration reads, `type
+    // Point = { x: number, y: number }`, `type Box<T> = { value: T }`, `type
+    // number` for one that is only itself; where it was declared, in the
+    // script or a module it requires; and what the definitions say of it.
+    bool typeNameHover(const Luau::Module& module, const Luau::SourceModule& source, Luau::Position at, ALLuauFrontend& front,
+                       ALLuauNavigation& navigation, ALScriptHover& answer)
+    {
+        Luau::AstTypeReference* reference = nullptr;
+        const std::vector<Luau::AstNode*> ancestry = Luau::findAstAncestryOfPosition(source, at, /*includeTypes*/ true);
+        for (auto it = ancestry.rbegin(); it != ancestry.rend() && !reference; ++it)
+        {
+            reference = (*it)->as<Luau::AstTypeReference>();
+        }
+        if (!reference || !reference->nameLocation.containsClosed(at))
+        {
+            return false;
+        }
+        const Luau::ScopePtr scope = Luau::findScopeAtPosition(module, at);
+        if (!scope)
+        {
+            return false;
+        }
+        const std::string                  name = reference->name.value;
+        const std::optional<Luau::TypeFun> named =
+            reference->prefix ? scope->lookupImportedType(reference->prefix->value, name) : scope->lookupType(name);
+        if (!named)
+        {
+            return false;
+        }
+        std::string parameters;
+        for (const Luau::GenericTypeDefinition& one : named->typeParams)
+        {
+            parameters += (parameters.empty() ? "" : ", ") + Luau::toString(one.ty);
+        }
+        for (const Luau::GenericTypePackDefinition& one : named->typePackParams)
+        {
+            parameters += (parameters.empty() ? "" : ", ") + Luau::toString(one.tp);
+        }
+        const std::string shown = (reference->prefix ? std::string(reference->prefix->value) + "." : std::string()) + name +
+                                  (parameters.empty() ? std::string() : "<" + parameters + ">");
+        // What it stands for, not its own name again, which a named table
+        // would otherwise be said as.
+        Luau::ToStringOptions glance;
+        glance.functionTypeArguments = true;
+        glance.exhaustive            = true;
+        glance.maxTableLength        = 8;
+        glance.maxTypeLength         = 1000;
+        const std::string body       = Luau::toString(named->type, glance);
+        answer.found                 = true;
+        answer.label                 = body == name ? "type " + shown : "type " + shown + " = " + body;
+        Luau::ToStringOptions whole;
+        whole.functionTypeArguments = true;
+        whole.exhaustive            = true;
+        whole.useLineBreaks         = true;
+        whole.maxTableLength        = 200;
+        whole.maxTypeLength         = 20000;
+        if (const std::string full = Luau::toString(named->type, whole); body != name && (full != body || full.find('\n') != std::string::npos))
+        {
+            answer.typeDetail = full;
+        }
+        if (const ALLuauFrontend::Doc* doc = front.docFor(Luau::follow(named->type)->documentationSymbol))
+        {
+            answer.documentation = doc->documentation;
+            answer.link          = doc->link;
+        }
+        // Where it was declared: in a module it requires, by the module's
+        // key; else in the script, where Luau says.
+        if (const std::optional<ALLuauNavigation::Declared> declared = navigation.declaredAt(module, source, at))
+        {
+            answer.hasDefinition    = true;
+            answer.definitionLine   = static_cast<S32>(declared->where.begin.line);
+            answer.definitionColumn = static_cast<S32>(declared->where.begin.column);
+            answer.definitionFile   = declared->file;
+        }
+        else if (named->definitionLocation && !reference->prefix)
+        {
+            answer.hasDefinition    = true;
+            answer.definitionLine   = static_cast<S32>(named->definitionLocation->begin.line);
+            answer.definitionColumn = static_cast<S32>(named->definitionLocation->begin.column);
+        }
+        return true;
+    }
+}
+
 ALScriptHover ALLuauService::hover(std::string_view source, S32 line, S32 column)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
@@ -1450,7 +1538,12 @@ ALScriptHover ALLuauService::hover(std::string_view source, S32 line, S32 column
     {
         return answer;
     }
-    const Luau::Position        at   = positionOf(line, column);
+    const Luau::Position at = positionOf(line, column);
+    // A type's name in an annotation, which nothing below finds.
+    if (typeNameHover(*module, *module_source, at, front, *mNavigation, answer))
+    {
+        return answer;
+    }
     std::optional<Luau::TypeId> type = Luau::findTypeAtPosition(*module, *module_source, at);
 
     // What the name is, said before it as an editor would: a local, a

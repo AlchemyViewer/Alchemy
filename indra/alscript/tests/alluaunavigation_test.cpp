@@ -236,4 +236,33 @@ namespace tut
         ensure_equals("the module's declaration and the script's use", placesOf(whole), std::string("5:11 15:11"));
         service.setDocument("");
     }
+
+    template<> template<>
+    void alluaunavigation_object::test<5>()
+    {
+        set_test_name("a hover on a type's name says the type as its declaration reads, and where it was declared: a module's through its local, the script's own, a generic one, a built-in one");
+        ensure("definitions loaded: " + error, loaded);
+        open("a", true);
+        ALScriptHover hover = service.hover(SCRIPT_A, 4, 15); // `Point` in `util.Point`
+        ensure("found", hover.found);
+        ensure("the module's, by its name and fields: " + hover.label,
+               hover.label.rfind("type util.Point = ", 0) == 0 && hover.label.find("x: number") != std::string::npos);
+        ensure_equals("declared in the module", hover.definitionFile + "@" + llformat("%d:%d", hover.definitionLine, hover.definitionColumn),
+                      std::string(UTIL) + "@2:12");
+
+        const std::string own = "--!strict\n"                                   // 0
+                                "type Pair<T> = { first: T, second: T }\n"      // 1
+                                "local p: Pair<number> = { first = 1, second = 2 }\n" // 2
+                                "local n: number = p.first\n";                  // 3
+        open("own", false);
+        hover = service.hover(own, 2, 10); // `Pair`
+        ensure("the script's own, generic: " + hover.label, hover.found && hover.label.rfind("type Pair<T> = ", 0) == 0 &&
+                                                             hover.label.find("first: T") != std::string::npos);
+        ensure("declared in the script", hover.hasDefinition && hover.definitionFile.empty() && hover.definitionLine == 1);
+        hover = service.hover(own, 3, 10); // `number`
+        ensure_equals("a built-in one, only itself", hover.label, std::string("type number"));
+        hover = service.hover(own, 3, 6); // `n`, the local, as ever
+        ensure("a local still a local: " + hover.label, hover.label.rfind("local n", 0) == 0);
+        service.setDocument("");
+    }
 }
