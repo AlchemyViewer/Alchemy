@@ -1010,16 +1010,9 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
 
     if (ref.inInventory())
     {
-        LLViewerRegion* region = gAgent.getRegion();
-        if (!region)
+        std::string url;
+        if (!inventoryNotecardUploadUrl(url, error))
         {
-            error = LLTrans::getString("WorkspaceNoRegion");
-            return false;
-        }
-        const std::string url = region->getCapability("UpdateNotecardAgentInventory");
-        if (url.empty())
-        {
-            error = LLTrans::getString("WorkspaceRegionCannotUpdateNotecards");
             return false;
         }
         LLResourceUploadInfo::ptr_t info(std::make_shared<LLBufferedAssetUploadInfo>(
@@ -1052,6 +1045,97 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
         [answered](LLUUID, LLUUID, LLUUID new_asset_id, LLSD) { answered(new_asset_id, LLUUID::null); }, failed));
     mUnderway[sender.request] = ref;
     LLViewerAssetUpload::EnqueueInventoryUpload(url, info, SCRIPT_UPLOAD_POOL);
+    return true;
+}
+
+bool ALScriptWorkspace::inventoryNotecardUploadUrl(std::string& url, std::string& error) const
+{
+    LLViewerRegion* region = gAgent.getRegion();
+    if (!region)
+    {
+        error = LLTrans::getString("WorkspaceNoRegion");
+        return false;
+    }
+    url = region->getCapability("UpdateNotecardAgentInventory");
+    if (url.empty())
+    {
+        error = LLTrans::getString("WorkspaceRegionCannotUpdateNotecards");
+        return false;
+    }
+    return true;
+}
+
+namespace
+{
+    // An item made for a text that never went up, taken away again while
+    // it is still empty, so that no empty notecard is left in the inventory
+    // for the user to wonder at, or to give away as the one they meant.
+    void removeNotecardNeverWritten(const LLUUID& item_id)
+    {
+        const LLViewerInventoryItem* item = gInventory.getItem(item_id);
+        if (item && item->getAssetUUID().isNull())
+        {
+            remove_inventory_item(item_id, LLPointer<LLInventoryCallback>());
+        }
+    }
+} // namespace
+
+bool ALScriptWorkspace::createNotecardWithText(const std::string& name, const std::string& description, const LLUUID& folder,
+                                               const std::string& text, U32 next_owner_perm, ALScriptCompileCallback callback, std::string& error)
+{
+    // Refused before anything is made: an item whose text the upload would
+    // refuse, or that nothing could upload to, would be an empty notecard
+    // left in the inventory.
+    if (text.size() > static_cast<size_t>(LLNotecard::MAX_SIZE))
+    {
+        LLStringUtil::format_map_t args;
+        args["[SIZE]"]  = std::to_string(text.size());
+        args["[LIMIT]"] = std::to_string(static_cast<S32>(LLNotecard::MAX_SIZE));
+        error           = LLTrans::getString("WorkspaceNotecardTooLarge", args);
+        return false;
+    }
+    std::string url;
+    if (!inventoryNotecardUploadUrl(url, error))
+    {
+        return false;
+    }
+
+    // The item first, empty, and its text once it is here. A create that
+    // fails is never answered (LLInventoryCallbackManager::fire drops a
+    // null id), so nothing waits on it: a timer would race a late answer
+    // and could say both that it failed and that it was made.
+    LLPointer<LLBoostFuncInventoryCallback> made = new LLBoostFuncInventoryCallback(create_notecard_cb);
+    made->addOnFireFunc([text, callback](const LLUUID& item_id) {
+        const ALScriptRef ref(LLUUID::null, item_id);
+        std::string       why;
+        const bool        sent = ALScriptWorkspace::getInstance()->saveNotecard(
+            ref, text, {},
+            [callback](const ALScriptCompileResult& result) {
+                if (!result.success)
+                {
+                    removeNotecardNeverWritten(result.ref.item);
+                }
+                callback(result);
+            },
+            why);
+        if (!sent)
+        {
+            // The region, or its capability, gone between the create and now.
+            removeNotecardNeverWritten(item_id);
+            ALScriptCompileResult result;
+            result.ref   = ref;
+            result.kind  = ALScriptKind::Notecard;
+            result.error = why;
+            callback(result);
+        }
+    });
+    std::string desc = description;
+    if (desc.empty())
+    {
+        LLViewerAssetType::generateDescriptionFor(LLAssetType::AT_NOTECARD, desc);
+    }
+    create_inventory_item(gAgent.getID(), gAgent.getSessionID(), folder, LLTransactionID::tnull, name, desc, LLAssetType::AT_NOTECARD,
+                          LLInventoryType::IT_NOTECARD, NO_INV_SUBTYPE, next_owner_perm, made);
     return true;
 }
 

@@ -112,6 +112,18 @@ public:
     bool saveNotecard(const ALScriptRef& ref, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& embedded,
                       ALScriptCompileCallback callback, std::string& error, ALScriptSender sender = ALScriptSender());
 
+    // A new notecard in the agent's inventory with this text in it: of
+    // this name and description -- the asset type's own where none is
+    // given -- in this folder, with these permissions for the next owner.
+    // False, with why and nothing made, where the text is too long for a
+    // notecard or there is no way to upload one; the result otherwise
+    // reaches the callback as a save's does, its ref naming the item. A
+    // notecard whose text then could not go up is taken away again, so
+    // that nothing empty is left behind. The inventory never answers a
+    // create that failed, and such a one is never heard of again.
+    bool createNotecardWithText(const std::string& name, const std::string& description, const LLUUID& folder, const std::string& text,
+                                U32 next_owner_perm, ALScriptCompileCallback callback, std::string& error);
+
     // Something's text saved, whoever sent it (ALScriptSaved), for every
     // editor to hear.
     typedef boost::signals2::signal<void(const ALScriptSaved&)> saved_signal_t;
@@ -331,6 +343,10 @@ private:
     // A notecard's asset sent, and `text`, its text, said as saved.
     bool        uploadNotecard(const ALScriptRef& ref, const std::string& buffer, const std::string& text, bool carries,
                                ALScriptCompileCallback callback, std::string& error, ALScriptSender sender);
+    // Where a notecard in the inventory is uploaded to: the agent's
+    // region's capability for it. False, with why, where there is no
+    // region or it has none.
+    bool        inventoryNotecardUploadUrl(std::string& url, std::string& error) const;
     bool        scriptMessage(const ALScriptRef& ref, const char* message, bool running, bool with_running, std::string& error);
 
     compiled_signal_t             mCompiled;

@@ -103,6 +103,17 @@ LLUUID LLInventoryState::sWearNewClothingTransactionID;
 std::list<LLUUID> LLInventoryAction::sMarketplaceFolders;
 bool LLInventoryAction::sDeleteConfirmationDisplayed = false;
 
+const LLViewerInventoryItem* get_dropped_notecard(EDragAndDropType cargo_type, void* cargo_data)
+{
+    if (cargo_type != DAD_NOTECARD || !cargo_data)
+    {
+        return nullptr;
+    }
+    const LLInventoryItem*       item = static_cast<LLInventoryItem*>(cargo_data);
+    const LLViewerInventoryItem* held = gInventory.getItem(item->getLinkedUUID());
+    return held && held->getType() == LLAssetType::AT_NOTECARD ? held : nullptr;
+}
+
 // Helper function : callback to update a folder after inventory action happened in the background
 void update_folder_cb(const LLUUID& dest_folder)
 {
