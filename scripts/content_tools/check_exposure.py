@@ -93,9 +93,13 @@ def histogram(grid, settings):
 def exposure_params(settings, meter=True):
     low = min(max(settings["low_percent"] * 0.01, 0.0), 0.99)
     high = min(max(settings["high_percent"] * 0.01, low + 0.01), 1.0)
-    params = (math.log2(KEY) + settings["compensation"], min(settings["min_ev"], settings["max_ev"]),
-              max(settings["min_ev"], settings["max_ev"]), 1.0 if meter else 0.0)
-    params2 = (low, high, max(settings["speed_up"], 0.0), max(settings["speed_down"], 0.0))
+    # Held far inside the half-float range the history is kept in, as pipeline.cpp clamps them:
+    # an EV past it is stored as an infinity the history never leaves.
+    ev_a = min(max(settings["min_ev"], -32.0), 32.0)
+    ev_b = min(max(settings["max_ev"], -32.0), 32.0)
+    compensation = min(max(settings["compensation"], -16.0), 16.0)
+    params = (math.log2(KEY) + compensation, min(ev_a, ev_b), max(ev_a, ev_b), 1.0 if meter else 0.0)
+    params2 = (low, high, min(max(settings["speed_up"], 0.0), 100.0), min(max(settings["speed_down"], 0.0), 100.0))
     return params, params2
 
 
@@ -121,8 +125,11 @@ def exposure(bins, params, params2, prev=None, dt=0.0):
 
     ev = target
     if prev is not None:
+        # A history that reads as an infinity or a NaN is started over from the target.
+        if math.isnan(prev) or math.isinf(prev):
+            prev = target
         rate = params2[2] if target > prev else params2[3]
-        ev = prev + (target - prev) * (1.0 - math.exp(-rate * dt))
+        ev = min(max(prev + (target - prev) * (1.0 - math.exp(-rate * dt)), params[1]), params[2])
 
     if params[3] < 0.5:
         ev = 0.0
