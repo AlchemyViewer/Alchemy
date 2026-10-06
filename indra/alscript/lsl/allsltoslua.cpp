@@ -457,6 +457,12 @@ namespace
         void commentsAfter(LSLASTNode* node, size_t from);
         // How long what commentsAfter put after each node's line was.
         boost::unordered_flat_map<LSLASTNode*, size_t> mTrailed;
+        // Those on the line a block's brace opens, before anything in it,
+        // each on a line of its own there: after the line that opens the
+        // block in SLua -- `if ... then`, `else`, `do`, a function's -- as
+        // the LSL had them after its brace. Called as that line is written;
+        // what no line took is written at the top of the block.
+        void trail(LSLASTNode* body);
 
         // Declarations on lines one after another that the LSL lined up --
         // each one line, given a value, and their = at one column, or the
@@ -826,6 +832,7 @@ namespace
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsBefore;
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsAfter;
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsWithin;
+        boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsOpening;
         // The globals the script never sets, declared a number not below
         // nought; and declared any whole number, by what it is.
         boost::unordered_flat_set<LSLSymbol*>      mSteadyNonNegative;
@@ -1363,13 +1370,20 @@ namespace
             }
             if (body->getNodeSubType() == NODE_COMPOUND_STATEMENT)
             {
-                // On the line its brace opens, before anything in it: about
-                // what the block is the body of.
+                // On the line its brace opens, before anything in it: after
+                // the line that opens the block, where it is on that line
+                // alone -- `if (i < 0) { // none saved` -- else over what the
+                // block is the body of.
                 LSLASTNode* first = body->getChild(0);
                 if (at.line == body->getLoc()->first_line &&
                     (!first || at < Pos{ first->getLoc()->first_line, first->getLoc()->first_column }))
                 {
-                    return false;
+                    if (mComments[k].endLine != at.line)
+                    {
+                        return false;
+                    }
+                    mCommentsOpening[body].push_back(k);
+                    return true;
                 }
                 placeIn(k, body);
             }
@@ -1510,6 +1524,32 @@ namespace
             at = end + 1;
         }
         mText += indent() + after.substr(1) + "\n";
+    }
+
+    void Writer::trail(LSLASTNode* body)
+    {
+        const auto found = mCommentsOpening.find(body);
+        if (found == mCommentsOpening.end() || mText.empty() || mText.back() != '\n')
+        {
+            return;
+        }
+        std::string after;
+        for (size_t k : found->second)
+        {
+            Comment& c = mComments[k];
+            if (!c.written)
+            {
+                c.written = true;
+                after += " " + c.text;
+            }
+        }
+        // At the end of the line just written, its break kept.
+        const size_t end = mText.size() - 1;
+        mText.insert(end, after);
+        if (end < mCounted)
+        {
+            mCounted += after.size();
+        }
     }
 
     void Writer::commentsAtEnd(LSLASTNode* holder)
@@ -3300,6 +3340,14 @@ namespace
         }
         if (s->getNodeSubType() == NODE_COMPOUND_STATEMENT)
         {
+            // What was after its brace that no line opening it took.
+            if (const auto opening = mCommentsOpening.find(s); opening != mCommentsOpening.end())
+            {
+                for (size_t k : opening->second)
+                {
+                    writeComment(mComments[k]);
+                }
+            }
             for (LSLASTNode* child = s->getChild(0); child; child = child->getNext())
             {
                 statement(child, !child->getNext());
@@ -3515,7 +3563,10 @@ namespace
             }
         }
         const std::string_view body = row(head + 1);
-        if (row(head).substr(0, 3) != "if " || body.empty() || body.substr(0, 2) == "--" || row(head + 2) != "end")
+        // Not where a comment trails the if's line, which would take the
+        // rest of the line with it.
+        if (row(head).substr(0, 3) != "if " || row(head).find(" --") != std::string_view::npos || body.empty() || body.substr(0, 2) == "--" ||
+            row(head + 2) != "end")
         {
             return;
         }
@@ -3622,6 +3673,7 @@ namespace
                 const size_t text_at  = mText.size();
                 const size_t spans    = mSpans.size();
                 line("if " + condition(i->getCheckExpr()).text + " then");
+                trail(i->getTrueBranch());
                 for (;;)
                 {
                     ++mDepth;
@@ -3637,9 +3689,11 @@ namespace
                         i = static_cast<LSLIfStatement*>(otherwise);
                         commentsBefore(i);
                         line("elseif " + condition(i->getCheckExpr()).text + " then");
+                        trail(i->getTrueBranch());
                         continue;
                     }
                     line("else");
+                    trail(otherwise);
                     ++mDepth;
                     block(otherwise);
                     --mDepth;
@@ -3656,6 +3710,7 @@ namespace
             {
                 auto* w = static_cast<LSLWhileStatement*>(s);
                 line("while " + condition(w->getCheckExpr()).text + " do");
+                trail(w->getBody());
                 mLoops.push_back(nullptr);
                 ++mDepth;
                 block(w->getBody());
@@ -3668,6 +3723,7 @@ namespace
             {
                 auto* d = static_cast<LSLDoStatement*>(s);
                 line("repeat");
+                trail(d->getBody());
                 mLoops.push_back(nullptr);
                 ++mDepth;
                 block(d->getBody());
@@ -3693,6 +3749,7 @@ namespace
                 }
                 LSLExpression* check = f->getCheckExpr();
                 line("while " + (isNull(check) ? std::string("true") : condition(check).text) + " do");
+                trail(f->getBody());
                 mLoops.push_back(f);
                 ++mDepth;
                 block(f->getBody());
@@ -4067,6 +4124,7 @@ namespace
         {
             mWithin[c.var] = within;
         }
+        trail(f->getBody());
         if (from_one)
         {
             mFromOne.insert(c.var);
@@ -5924,6 +5982,7 @@ namespace
             commentsBefore(f);
             line(std::string(forward.contains(mFunction) ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +
                  (boolean(mFunction) ? std::string(mOptions.types ? ": boolean" : "") : typed(f->getIdentifier()->getIType())));
+            trail(f->getStatements());
             ++mDepth;
             prepareBody(f->getStatements());
             block(f->getStatements());
@@ -6005,6 +6064,7 @@ namespace
             line(timer   ? "timerHandler = function()"
                  : field ? "function LLEvents." + event + "(" + params + ")"
                          : "LLEvents:on(" + luaString(event) + ", function(" + params + ")");
+            trail(handler->getStatements());
             ++mDepth;
             if (!lead.empty())
             {
@@ -6132,6 +6192,7 @@ namespace
                              "did; LLTimers:every is SLua's own.");
                 }
                 line(event + " = function(" + params + ")");
+                trail(handler->getStatements());
                 ++mDepth;
                 if (!lead.empty())
                 {

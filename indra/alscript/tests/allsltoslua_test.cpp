@@ -1191,7 +1191,7 @@ namespace tut
     void allsltoslua_object::test<37>()
     {
         set_test_name("the script's comments carried over, each over what it stood over: the script's own at the top, a global's, those inside a list, "
-                      "a trailing one, a brace's, between branches, at a block's end; // as --, /* */ as --[[ ]] at a level nothing in it closes");
+                      "a trailing one, a brace's after its opening line, between branches, at a block's end; // as --, /* */ as --[[ ]] at a level nothing in it closes");
         const std::string lsl = "// Door script by Someone.\n"
                                 "// Do as you like with it.\n"
                                 "\n"
@@ -1240,7 +1240,7 @@ namespace tut
         ensure("those inside a list, over it: " + r.text, has(r, "-- when it is open\n-- when it is shut\nlocal NAMES = {\"open\", \"closed\"}\n"));
         ensure("a block comment as Luau's: " + r.text, has(r, "--[[ old code:\ninteger unused() { return 1; }\n]]\n"));
         ensure("over the function it stood over: " + r.text, at("--[[ old code:") > at("local NAMES") && at("--[[ old code:") < at("-- Turns the door."));
-        ensure("a brace's, over what it opens: " + r.text, has(r, "-- Turns the door.\n-- by degrees\nlocal function swing(by)\n"));
+        ensure("a brace's, after the line that opens it: " + r.text, has(r, "-- Turns the door.\nlocal function swing(by) -- by degrees\n"));
         ensure("over a statement: " + r.text, has(r, "    -- the rotation it turns by\n    local r = "));
         ensure("a trailing one, after its statement: " + r.text, has(r, "    ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_ROT_LOCAL, r * ll.GetLocalRot()}) -- turn\n"));
         ensure("between branches, over the elseif: " + r.text, has(r, "    -- when it shuts\n    elseif by < 0 then\n"));
@@ -1743,5 +1743,79 @@ namespace tut
                                                   "} }\n");
         ensure("a vector's brackets: " + marks.text, has_pair(marks, "<", "vector(") && has_pair(marks, ">", ")"));
         ensure("a string added to: " + marks.text, has_pair(marks, "+=", "..="));
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<52>()
+    {
+        set_test_name("a comment after a block's brace stays after the line that opens the block: then, else, elseif, a loop's do, repeat, a function, a "
+                      "handler; one over several lines still over what it opens; a one-line if with one after its brace kept on its lines");
+        const std::string lsl = "vector offset;\n"
+                                "list adjustments;\n"
+                                "integer count() { // how many\n"
+                                "    return llGetListLength(adjustments);\n"
+                                "}\n"
+                                "default {\n"
+                                "    touch_start(integer n) { // whoever touches\n"
+                                "        integer i = llListFindList(adjustments, [n]);\n"
+                                "        if (i < 0) { // no saved setting. use 0\n"
+                                "            offset = ZERO_VECTOR;\n"
+                                "        } else if (i > 100) { // too far\n"
+                                "            offset = <1, 1, 1>;\n"
+                                "        } else { // restore saved setting\n"
+                                "            offset = llList2Vector(adjustments, i+1);\n"
+                                "        }\n"
+                                "        while (i > 0) { // count down\n"
+                                "            --i;\n"
+                                "        }\n"
+                                "        do { /* at least once */\n"
+                                "            ++i;\n"
+                                "        } while (i < 3);\n"
+                                "        for (i = 0; i < count(); ++i) { // each\n"
+                                "            llOwnerSay((string)i);\n"
+                                "        }\n"
+                                "        if (i) { /* over\n"
+                                "                    two lines */\n"
+                                "            llOwnerSay(\"x\");\n"
+                                "        }\n"
+                                "        if (n) { /* one */ llOwnerSay(\"y\"); }\n"
+                                "    }\n"
+                                "}\n";
+        const ALLSLToSLua::Result r = convert(lsl);
+        ensure("converted", r.converted);
+        ensure("then: " + r.text, has(r, "    if i < 0 then -- no saved setting. use 0\n        offset = ZERO_VECTOR\n"));
+        ensure("elseif: " + r.text, has(r, "    elseif i > 100 then -- too far\n"));
+        ensure("else: " + r.text, has(r, "    else -- restore saved setting\n"));
+        ensure("not over the if: " + r.text, !has(r, "-- no saved setting. use 0\n    -- restore") && count(r, "restore saved setting") == 1);
+        ensure("a while's do: " + r.text, has(r, " do -- count down\n"));
+        ensure("repeat: " + r.text, has(r, "repeat --[[ at least once ]]\n"));
+        ensure("a for's do: " + r.text, has(r, " do -- each\n"));
+        ensure("a function: " + r.text, has(r, "local function count() -- how many\n"));
+        ensure("a handler: " + r.text, has(r, "LLEvents:on(\"touch_start\", function(detected) -- whoever touches\n"));
+        ensure("one over two lines, over the if: " + r.text, has(r, "    --[[ over\n") && r.text.find("--[[ over") < r.text.find("if i ~= 0 then"));
+        ensure("a one-line if kept apart: " + r.text, has(r, "then --[[ one ]]\n") && !has(r, "then --[[ one ]] ll.OwnerSay"));
+        checksClean(r);
+
+        // The same with the field style, and in a state's table.
+        ALLSLToSLua::Options field;
+        field.handlers = ALLSLToSLua::Options::Handlers::Field;
+        ensure("a field's handler: ", has(ALLSLToSLua::convert(lsl, field), "function LLEvents.touch_start(detected) -- whoever touches\n"));
+        const ALLSLToSLua::Result states = convert("default {\n"
+                                                   "    touch_start(integer n) { // first state\n"
+                                                   "        state other;\n"
+                                                   "    }\n"
+                                                   "}\n"
+                                                   "state other {\n"
+                                                   "    state_entry() { // entered\n"
+                                                   "        llOwnerSay(\"in\");\n"
+                                                   "    }\n"
+                                                   "}\n");
+        ensure("in a state's table: " + states.text, has(states, "touch_start = function(detected) -- first state\n") &&
+                                                         has(states, "state_entry = function() -- entered\n"));
+        checksClean(states);
+        // A single state's state_entry runs at the top: its comment at the
+        // top of what it ran.
+        const ALLSLToSLua::Result entry = convert("default {\n    state_entry() { // set up\n        llOwnerSay(\"hi\");\n    }\n}\n");
+        ensure("state_entry's, kept: " + entry.text, has(entry, "-- set up\n") && entry.text.find("-- set up") < entry.text.find("ll.OwnerSay"));
     }
 }
