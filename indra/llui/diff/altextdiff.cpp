@@ -425,6 +425,10 @@ ALTextDiff::Options ALTextDiff::linesOnly(const Options& options)
     Options out;
     out.algorithm = options.algorithm == Algorithm::Structural ? Algorithm::Histogram : options.algorithm;
     out.like      = options.like;
+    if (options.like.ignoreComments)
+    {
+        out.lexer = options.lexer;
+    }
     return out;
 }
 

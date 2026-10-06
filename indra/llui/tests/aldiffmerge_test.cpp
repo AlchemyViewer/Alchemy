@@ -27,6 +27,8 @@
 #include "aldiffmerge.h"
 
 #include "aldiffedit.h"
+#include "aldifflexer.h"
+#include "alsyntaxgrammar.h"
 
 #include "../test/lltut.h"
 
@@ -247,5 +249,25 @@ namespace tut
         loose.like.ignoreWhitespace = true;
         merge->setOptions(loose);
         ensure_equals("theirs no change: none", merge->conflictCount(), 0);
+
+        // Each side reworded the comment on a line: a conflict as they are,
+        // none with comments let go of -- the merge reads where they are by
+        // the grammar, as a compare does.
+        std::string                                  error;
+        const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+        ensure("the LSL grammar", lsl != nullptr);
+        begin("x = 1; // one", "x = 1; // uno", "x = 1; // eins");
+        ensure_equals("comments as they are, a conflict", merge->conflictCount(), 1);
+        ALTextDiff::Options commented;
+        commented.like.ignoreComments = true;
+        commented.lexer               = ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl));
+        merge->setOptions(commented);
+        ensure_equals("comments let go of: none", merge->conflictCount(), 0);
+        ensure("and no change by either", merge->hunks().size() == 1 && merge->hunks()[0].kind == ALTextMerge::Kind::Same);
+        // The same change of the code by both, each with a comment of its
+        // own: alike, but for the comments.
+        begin("x = 1; // one", "x = 2; // uno", "x = 2; // eins", commented);
+        ensure_equals("alike but for comments: no conflict", merge->conflictCount(), 0);
+        ensure("both took the one change", merge->hunks().size() == 1 && merge->hunks()[0].kind == ALTextMerge::Kind::Both);
     }
 }

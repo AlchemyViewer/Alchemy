@@ -86,11 +86,7 @@ std::string ALUnifiedDiff::write(std::string_view left, std::string_view right, 
     }
     // By lines, as told the same; nothing lined up or read as tokens, and
     // a grammar only to say where comments are let go of.
-    ALTextDiff::Options by_lines = ALTextDiff::linesOnly(options);
-    if (options.like.ignoreComments)
-    {
-        by_lines.lexer = options.lexer;
-    }
+    const ALTextDiff::Options by_lines = ALTextDiff::linesOnly(options);
     const std::vector<ALTextDiff::Run>        runs          = ALTextDiff::lines(compared_left, compared_right, by_lines);
     const std::vector<ALTextDiff::regions_t>* left_regions  = by_lines.lexer ? &by_lines.lexer(compared_left) : nullptr;
     const std::vector<ALTextDiff::regions_t>* right_regions = by_lines.lexer ? &by_lines.lexer(compared_right) : nullptr;

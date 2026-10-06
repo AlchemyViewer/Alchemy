@@ -594,8 +594,9 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT llui
     DIR diff
-    SOURCES diff/altextdiff.cpp ${diff_sources}
+    SOURCES diff/altextdiff.cpp diff/aldifflexer.cpp code/alsyntaxgrammar.cpp ${diff_sources}
     LIBRARIES ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
   al_add_test(
     aldiffmodel

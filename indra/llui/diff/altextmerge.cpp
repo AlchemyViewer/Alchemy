@@ -79,6 +79,20 @@ ALTextMerge::hunks_t ALTextMerge::merge(S32 base_lines, const changes_t& mine, c
             out.push_back(Hunk{ Kind::Same, at, to - at, at + off_o, to - at, at + off_t, to - at });
         }
     };
+    // Each side's regions, where comments are let go of and a grammar says
+    // where they are: what two sides are read by to be found alike.
+    const std::vector<ALTextDiff::regions_t>* ours_regions   = nullptr;
+    const std::vector<ALTextDiff::regions_t>* theirs_regions = nullptr;
+    if (options.like.ignoreComments && options.lexer)
+    {
+        ours_regions   = &options.lexer(ours);
+        theirs_regions = &options.lexer(theirs);
+        if (ours_regions->size() != ours.size() || theirs_regions->size() != theirs.size())
+        {
+            ours_regions   = nullptr;
+            theirs_regions = nullptr;
+        }
+    }
     while (i < mine.size() || j < other.size())
     {
         // The first change, and every change of either that overlaps or
@@ -126,10 +140,14 @@ ALTextMerge::hunks_t ALTextMerge::merge(S32 base_lines, const changes_t& mine, c
         }
         else
         {
-            const bool alike = hunk.oursCount == hunk.theirsCount &&
-                               std::equal(ours.begin() + o_from, ours.begin() + o_to, theirs.begin() + t_from, [&](const std::string& a, const std::string& b) {
-                                   return ALTextDiff::likenessOf(a, options.like) == ALTextDiff::likenessOf(b, options.like);
-                               });
+            bool alike = hunk.oursCount == hunk.theirsCount;
+            for (S32 k = 0; alike && k < hunk.oursCount; ++k)
+            {
+                const size_t o = static_cast<size_t>(o_from + k);
+                const size_t t = static_cast<size_t>(t_from + k);
+                alike          = ALTextDiff::likenessOf(ours[o], options.like, ours_regions ? &(*ours_regions)[o] : nullptr) ==
+                        ALTextDiff::likenessOf(theirs[t], options.like, theirs_regions ? &(*theirs_regions)[t] : nullptr);
+            }
             hunk.kind = alike ? Kind::Both : Kind::Conflict;
         }
         out.push_back(hunk);

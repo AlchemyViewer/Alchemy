@@ -170,9 +170,10 @@ namespace ALTextDiff
         same_t    same;
     };
 
-    // The options by lines alone, as told the same: no anchors, no grammar,
-    // no words alike, and lines found as Histogram finds them where
-    // structure was asked for -- what a merge and a unified diff compare by.
+    // The options by lines alone, as told the same: no anchors, no words
+    // alike, a grammar only to say where comments are let go of, and lines
+    // found as Histogram finds them where structure was asked for -- what a
+    // merge and a unified diff compare by.
     Options linesOnly(const Options& options);
 
     // The runs that make the left the right, compared as `options` says.
