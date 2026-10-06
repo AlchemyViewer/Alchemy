@@ -412,4 +412,29 @@ namespace tut
         press("older");
         ensure("the oldest again, as it was read", view.leftText() == "first" && view.bar()->versionShown() == 0 && doc.historyShown->text == "first");
     }
+
+    template<> template<>
+    void alscriptstudiohistory_object::test<10>()
+    {
+        set_test_name("a save let go of as its comparison is left takes its slider with it: shown again, nothing steps a left that is no longer the save's");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        studio.host = window.floater;
+        Doc& doc    = tab("door", "now");
+        saved(doc, "first", 300.0);
+        saved(doc, "second", 200.0);
+        unit.show(doc);
+        studio.choose(studio.candidates[0].value);
+        ALDiffView& view = *doc.compareView;
+        ensure("the slider", view.bar()->getChild<LLView>("versions")->getVisible() && view.bar()->versionCount() == 2);
+        // As leaving the comparison does: Escape, or a keystroke typed into
+        // the source.
+        ALScriptStudioHistory::letGo(doc);
+        ensure("let go of", !doc.historyShown);
+        ensure("and its slider", view.bar()->versionCount() == 0 && !view.bar()->getChild<LLView>("versions")->getVisible());
+        ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("older"))->press();
+        ensure_equals("nothing stepped", view.leftText(), std::string("second"));
+    }
 }

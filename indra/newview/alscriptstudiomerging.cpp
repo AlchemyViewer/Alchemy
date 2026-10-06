@@ -53,6 +53,9 @@ void ALScriptStudioMerging::mergeSaved(Doc& doc)
     const std::string theirs = *doc.savedThere;
     if (merge(doc, theirs, mServices.words("CompareSavedThere")))
     {
+        Doc::Merged merged;
+        merged.savedThere = std::move(doc.savedThere);
+        remember(doc, std::move(merged));
         doc.savedThere.reset();
         mWindow.refreshNotice();
     }
@@ -69,11 +72,95 @@ void ALScriptStudioMerging::mergeWorld(Doc& doc)
         // Merged, what the world holds is what the tab is made from now:
         // what was saved there is in the tab, and a save need not stop for
         // it.
-        if (merge(found, text, mServices.words("CompareWorld")) && asset.notNull())
+        const LLUUID was = found.assetId;
+        if (merge(found, text, mServices.words("CompareWorld")))
         {
-            found.assetId = asset;
+            if (asset.notNull())
+            {
+                found.assetId = asset;
+            }
+            Doc::Merged merged;
+            merged.world       = true;
+            merged.assetWas    = was;
+            merged.assetMerged = found.assetId;
+            remember(found, std::move(merged));
         }
     });
+}
+
+void ALScriptStudioMerging::textChanged(Doc& doc)
+{
+    // Only a step taken back or forward leaves one to step forward to:
+    // typing throws those away, and so is never asked where the journal
+    // stands, which would end its run.
+    if (!doc.merged || !doc.editor || !doc.editor->undoJournal().canRedo())
+    {
+        return;
+    }
+    // Steps are numbered in the order they are made, and never again: one
+    // older than the merge on top, and the merge has been undone.
+    if (doc.editor->savePoint().serial >= doc.merged->serial)
+    {
+        return;
+    }
+    Doc::Merged merged = std::move(*doc.merged);
+    doc.merged.reset();
+    // Put back only where nothing has taken its place since: another save
+    // landing meanwhile is the one to say.
+    if (merged.savedThere && !doc.savedThere)
+    {
+        doc.savedThere = std::move(merged.savedThere);
+    }
+    if (merged.world && doc.assetId == merged.assetMerged)
+    {
+        doc.assetId = merged.assetWas;
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    const std::vector<std::string> actions = merged.world ? std::vector<std::string>{ "reload_world", "merge_world", "compare_world" }
+                                                          : std::vector<std::string>{ "take_saved", "keep_saved", "merge_saved", "compare_saved" };
+    mServices.report(mServices.words("MergeTakenBack", args), true, &doc, actions);
+    mWindow.refreshNotice();
+}
+
+// static
+bool ALScriptStudioMerging::canSettle(const Doc& doc)
+{
+    // As the bar lights its buttons: a merge, someone to make the edit, and
+    // the caret in a conflict.
+    const ALDiffView* view = doc.compareView;
+    return view && doc.shownView() == Doc::View::Compare && view->merging() && view->canTakeBack() &&
+           view->model().changeConflicts(view->changeAtCaret());
+}
+
+// static
+bool ALScriptStudioMerging::settle(Doc& doc, ALTextMerge::Take take)
+{
+    return canSettle(doc) && doc.compareView->settle(doc.compareView->changeAtCaret(), take);
+}
+
+// static
+void ALScriptStudioMerging::remember(Doc& doc, Doc::Merged merged)
+{
+    // The step the merge made is the newest. Where it put nothing in, the
+    // newest is the one before it, and undoing that stands for undoing it:
+    // the guard comes back sooner, never later.
+    merged.serial = doc.editor->savePoint().serial;
+    // A merge over one not yet saved keeps what that one set aside too.
+    if (doc.merged)
+    {
+        if (!merged.savedThere)
+        {
+            merged.savedThere = std::move(doc.merged->savedThere);
+        }
+        if (doc.merged->world)
+        {
+            merged.assetMerged = merged.world ? merged.assetMerged : doc.merged->assetMerged;
+            merged.assetWas    = doc.merged->assetWas;
+            merged.world       = true;
+        }
+    }
+    doc.merged = std::move(merged);
 }
 
 bool ALScriptStudioMerging::merge(Doc& doc, const std::string& theirs, const std::string& title)
@@ -97,7 +184,16 @@ bool ALScriptStudioMerging::merge(Doc& doc, const std::string& theirs, const std
     }
     doc.compareView->setMergeBase(*base);
     const S32 conflicts = doc.compareView->conflictCount();
-    mServices.report(conflicts > 0 ? mServices.counted("MergeConflicts", conflicts, args) : mServices.words("MergeClean", args), false, &doc);
+    // Conflicts left are said over the source until they are settled: the
+    // comparison, which alone marks them, is left at a keystroke.
+    if (conflicts > 0)
+    {
+        mServices.report(mServices.counted("MergeConflicts", conflicts, args), true, &doc, { "show_compare" });
+    }
+    else
+    {
+        mServices.report(mServices.words("MergeClean", args), false, &doc);
+    }
     return true;
 }
 

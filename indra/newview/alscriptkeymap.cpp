@@ -603,11 +603,24 @@ namespace ALScriptKeymap
             after_k("expanded", 'P'),
             { "compare_saved", KEY_NONE, MASK_NONE },
             { "compare_with", KEY_NONE, MASK_NONE },
-            { "peek_change", KEY_NONE, MASK_NONE },
+            // As Visual Studio Code's Show Next Change peeks, beside its
+            // Alt-F5 step.
+            { "peek_change", KEY_F3, MASK_ALT },
             { "compare_preprocessed", KEY_NONE, MASK_NONE },
             { "compare_hold_selection", KEY_NONE, MASK_NONE },
             { "compare_selections", KEY_NONE, MASK_NONE },
             { "compare_inline", KEY_NONE, MASK_NONE },
+            // What the comparison's bar does by its buttons: a conflict
+            // settled with theirs, mine or both, the same folded away, the
+            // sides swapped, and the saves stepped through, each by the
+            // first letter of its word; the steps by < and >.
+            { "compare_settle_theirs", 'T', MASK_ALT },
+            { "compare_settle_mine", 'M', MASK_ALT },
+            { "compare_settle_both", 'B', MASK_ALT },
+            { "compare_fold", 'F', MASK_ALT },
+            { "compare_swap", 'S', MASK_ALT },
+            { "compare_older", ',', MASK_ALT },
+            { "compare_newer", '.', MASK_ALT },
             { "compare_shown", KEY_NONE, MASK_NONE },
             { "compare_take_back", KEY_NONE, MASK_NONE },
             { "compare_copy_change", KEY_NONE, MASK_NONE },

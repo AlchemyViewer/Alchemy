@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../alscriptstudiomerging.h"
+#include "../alscriptstudioorphans.h"
 
 #include "aldiffbar.h"
 #include "aldiffview.h"
@@ -247,5 +248,94 @@ namespace tut
         unit.reset();
         studio.world(lamp, theirs, moved);
         ensure("nothing", lamp.editor->wholeText() == ours && lamp.assetId == was);
+    }
+
+    template<> template<>
+    void alscriptstudiomerging_object::test<5>()
+    {
+        set_test_name("a merge undone before it is saved: what was saved elsewhere back, said, and offered again; a step forward leaves it so");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        Doc& doc       = tab("door");
+        doc.savedThere = theirs;
+        unit->mergeSaved(doc);
+        ensure("set aside", !doc.savedThere && doc.merged);
+        ensure("the conflicts said with the comparison to show", services().reports.back().actions == std::vector<std::string>{ "show_compare" });
+        // Typed in, or any change not a step back: nothing.
+        unit->textChanged(doc);
+        ensure("still merged", !doc.savedThere && doc.merged);
+
+        const S32 notices = studio.notices;
+        doc.editor->undo();
+        ensure_equals("back to ours", doc.editor->wholeText(), ours);
+        unit->textChanged(doc);
+        ensure("what was saved elsewhere back", doc.savedThere && *doc.savedThere == theirs && !doc.merged);
+        ensure_equals("said", services().reports.back().text, said("MergeTakenBack", named(doc)));
+        ensure("take, keep, merge and compare offered again",
+               services().reports.back().actions == std::vector<std::string>{ "take_saved", "keep_saved", "merge_saved", "compare_saved" });
+        ensure("the notice said again", studio.notices > notices);
+
+        // Stepped forward: the merge is back in the text, the other version
+        // still stands until it is merged again.
+        doc.editor->redo();
+        unit->textChanged(doc);
+        ensure("left so", doc.savedThere && *doc.savedThere == theirs && !doc.merged);
+        unit->mergeSaved(doc);
+        ensure("merged again: set aside again", !doc.savedThere && doc.merged);
+    }
+
+    template<> template<>
+    void alscriptstudiomerging_object::test<6>()
+    {
+        set_test_name("the world's item merged, then undone: the tab made from the asset it was again, so a save stops for the world");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        Doc&         doc   = tab("door");
+        const LLUUID was   = LLUUID::generateNewID();
+        const LLUUID moved = LLUUID::generateNewID();
+        doc.assetId        = was;
+        unit->mergeWorld(doc);
+        studio.world(doc, theirs, moved);
+        ensure("made from what the world holds", doc.assetId == moved && doc.merged);
+        doc.editor->undo();
+        unit->textChanged(doc);
+        ensure("made from what it was again", doc.assetId == was && !doc.merged);
+        ensure("reload, merge and compare offered again",
+               services().reports.back().actions == std::vector<std::string>{ "reload_world", "merge_world", "compare_world" });
+    }
+
+    template<> template<>
+    void alscriptstudiomerging_object::test<7>()
+    {
+        set_test_name("a conflict settled from the keyboard where the caret is in one; the notice says conflicts are left until none are");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        Doc& doc       = tab("door");
+        doc.savedThere = theirs;
+        unit->mergeSaved(doc);
+        // As the window keeps what was said, and shows the comparison.
+        doc.offer = Doc::Offer{ services().reports.back().text, services().reports.back().actions };
+        ensure("not while the comparison is not in front", !ALScriptStudioMerging::canSettle(doc));
+        doc.view = Doc::View::Compare;
+        ALScriptNoticeBar::Notice notice = ALScriptStudioOrphans::noticeFor(&doc, services());
+        ensure("the notice offers the comparison", notice.buttons[0].first == "show_compare" && notice.buttons[1].first.empty());
+
+        doc.compareView->right()->setFocus(true);
+        doc.compareView->right()->goTo(ALTextPos(2, 0));
+        ensure("not where the caret is in no conflict", !ALScriptStudioMerging::canSettle(doc));
+        doc.compareView->right()->goTo(ALTextPos(6, 0));
+        ensure("where it is in one", ALScriptStudioMerging::canSettle(doc));
+        ensure("settled with theirs", ALScriptStudioMerging::settle(doc, ALTextMerge::Take::Theirs));
+        ensure_equals("theirs in the tab", doc.editor->wholeText(), lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "theirs 6" } }));
+        ensure_equals("none left", doc.compareView->conflictCount(), 0);
+        ensure("nothing left to settle", !ALScriptStudioMerging::canSettle(doc));
+        notice = ALScriptStudioOrphans::noticeFor(&doc, services());
+        ensure("nor to say", notice.buttons[0].first.empty());
     }
 }

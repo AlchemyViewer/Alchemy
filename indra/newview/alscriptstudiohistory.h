@@ -104,6 +104,10 @@ public:
     // loaded, where it has not -- and offered back by the notice. False
     // where its text cannot be read.
     bool compare(Doc& doc, ALSavedText saved);
+    // The save compared let go of, as the comparison is left: its slider
+    // with it, which would step a comparison no longer the save's. Shown
+    // again, the comparison is of that save alone.
+    static void letGo(Doc& doc);
 
 private:
     // The comparison of a save given the item's saves to step through

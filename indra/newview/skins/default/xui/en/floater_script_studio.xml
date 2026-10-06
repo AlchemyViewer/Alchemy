@@ -526,6 +526,9 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="CompareWithLinesA">1 line</floater.string>
     <floater.string name="CompareWithLinesB">[COUNT] lines</floater.string>
     <floater.string name="CompareWithClipboardEmpty">The clipboard holds no text to compare with.</floater.string>
+    <floater.string name="CompareTabClosed">[NAME] is no longer open to compare with.</floater.string>
+    <floater.string name="CompareSavedThereGone">There is no longer a version saved elsewhere to compare with.</floater.string>
+    <floater.string name="CompareTabSnapshot">[NAME], as it was</floater.string>
     <floater.string name="CompareWithFile">File on Disk...</floater.string>
     <floater.string name="CompareWithFileDetail">choose a file to compare with</floater.string>
     <floater.string name="CompareWithHistory">Local History...</floater.string>
@@ -644,6 +647,12 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ActionMergeWorldTip">Put what only the saved [NAME] changed into this tab, then settle each conflict in the comparison</floater.string>
     <floater.string name="MergeConflictsA">Merged into [NAME] what only the other version changed. 1 conflict is left to settle in the comparison; save to keep the merge.</floater.string>
     <floater.string name="MergeConflictsB">Merged into [NAME] what only the other version changed. [COUNT] conflicts are left to settle in the comparison; save to keep the merge.</floater.string>
+    <floater.string name="MergeTakenBack">The merge into [NAME] was undone; the other version stands again.</floater.string>
+    <floater.string name="CompareLoading">Loading [NAME] to compare...</floater.string>
+    <floater.string name="NoticeShowCompare">Show Comparison</floater.string>
+    <floater.string name="NoticeShowCompareTip">Show the merge's comparison, where each conflict is marked and settled</floater.string>
+    <floater.string name="ActionShowCompare">Show Comparison</floater.string>
+    <floater.string name="ActionShowCompareTip">Show the comparison of [NAME], where each conflict is marked and settled</floater.string>
     <floater.string name="MergeClean">Merged into [NAME] what only the other version changed; nothing conflicts. Save to keep the merge.</floater.string>
     <floater.string name="MergeNoBase">What [NAME] was before both changes is no longer known here, so the two are compared as they are: take back each change you want.</floater.string>
     <floater.string name="MergeReadOnly">[NAME] cannot be changed here, so the two are compared as they are.</floater.string>
@@ -1349,6 +1358,38 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
              name="comparison_view_menu"
              tear_off="false"
              width="260">
+                <menu_item_call label="Settle with Theirs" layout="topleft" name="compare_settle_theirs">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_settle_theirs" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_settle_theirs" />
+                </menu_item_call>
+                <menu_item_call label="Settle with Mine" layout="topleft" name="compare_settle_mine">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_settle_mine" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_settle_mine" />
+                </menu_item_call>
+                <menu_item_call label="Settle with Both" layout="topleft" name="compare_settle_both">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_settle_both" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_settle_both" />
+                </menu_item_call>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Fold Unchanged Lines" layout="topleft" name="compare_fold">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_fold" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_fold" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_fold" />
+                </menu_item_check>
+                <menu_item_check label="Swap Sides" layout="topleft" name="compare_swap">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_swap" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_swap" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_swap" />
+                </menu_item_check>
+                <menu_item_call label="Older Save" layout="topleft" name="compare_older">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_older" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_older" />
+                </menu_item_call>
+                <menu_item_call label="Newer Save" layout="topleft" name="compare_newer">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_newer" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_newer" />
+                </menu_item_call>
+                <menu_item_separator layout="topleft" />
                 <menu_item_check label="Histogram" layout="topleft" name="compare_histogram">
                     <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_histogram" />
                     <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_histogram" />

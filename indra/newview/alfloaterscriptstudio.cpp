@@ -29,9 +29,11 @@
 #include "alscriptstudioaccount.h"
 
 #include "alcodeeditor.h"
+#include "aldiffbar.h"
 #include "aldiffsame.h"
 #include "aldiffview.h"
 #include "aldiskincludes.h"
+#include "alflatbutton.h"
 #include "allinebreaks.h"
 #include "allsltoslua.h"
 #include "alscriptlexicon.h"
@@ -1792,6 +1794,8 @@ void ALFloaterScriptStudio::showCompare(Doc& doc, const std::string& left, const
 {
     doc.compareTitles.reset();
     doc.compareStale = false;
+    // An item still loading to be compared is let go of.
+    ++doc.compareAsked;
     // A save of its history is offered back only while it is what is
     // compared: something else picked over it lets it go.
     if (doc.historyShown && doc.historyShown->text != left)
@@ -2137,6 +2141,14 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
             raw->compareStale     = true;
             raw->compareChangedAt = LLTimer::getTotalSeconds();
         }
+        // A merge undone before it was saved: the other version stands
+        // again.
+        mMerging.textChanged(*raw);
+        // A conflict settled: the notice saying how many are left, again.
+        if (raw == active() && raw->offer && raw->offer->offers("show_compare"))
+        {
+            refreshNotice();
+        }
     });
     // Typing stopped short, a notecard being full: said why. The editor
     // goes with the tab, and the connection with it.
@@ -2262,6 +2274,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptLoaded& answer)
         doc.name = answer.name;
     }
     doc.assetId          = answer.assetId;
+    doc.merged.reset();
     doc.language         = answer.language;
     doc.targetChosen     = false;
     doc.experienceChosen = false;
@@ -2657,7 +2670,7 @@ void ALFloaterScriptStudio::showView(Doc& doc, Doc::View view, bool focus)
     // and the notice offering it back with it.
     if (was == Doc::View::Compare && view != Doc::View::Compare && doc.historyShown)
     {
-        doc.historyShown.reset();
+        ALScriptStudioHistory::letGo(doc);
         refreshNotice();
     }
     if (&doc != active())
@@ -6234,12 +6247,18 @@ void ALFloaterScriptStudio::compareWithLoaded(Doc& doc, const std::string& own_t
 {
     // The other's text as the region has it, out of its envelope, set
     // beside this one's as it is now -- or once it has loaded.
+    // Said while it loads; and dropped where something else has been asked
+    // to be compared since, which is what the scripter is looking at.
+    LLStringUtil::format_map_t loading;
+    loading["[NAME]"] = other_title;
+    setStatus(getString("CompareLoading", loading));
     const LLHandle<LLFloater> handle = getHandle();
     const std::string         id     = doc.id;
-    ALScriptWorkspace::instance().load(other, [handle, id, own_title, other_title](const ALScriptLoaded& answer) {
+    const U32                 asked  = ++doc.compareAsked;
+    ALScriptWorkspace::instance().load(other, [handle, id, asked, own_title, other_title](const ALScriptLoaded& answer) {
         ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
         Doc*                   found  = studio ? studio->findDoc(id) : nullptr;
-        if (!found)
+        if (!found || found->compareAsked != asked)
         {
             return;
         }
@@ -6422,6 +6441,11 @@ void ALFloaterScriptStudio::refreshCompare(Doc& doc)
     }
     doc.compareStale = false;
     doc.compareView->setRightText(doc.editor->wholeText());
+    // How many conflicts are left, said over the source, as compared again.
+    if (&doc == active() && doc.offer && doc.offer->offers("show_compare"))
+    {
+        refreshNotice();
+    }
 }
 
 void ALFloaterScriptStudio::retitleCompare(const Doc& doc) const
@@ -7502,7 +7526,8 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
     // the text is still what was held -- a failed one tried again, a copy
     // into the inventory, a file. The notice offering it is answered.
     activate(indexOf(doc.id));
-    if (doc.offer && doc.offer->offers(action))
+    // Conflicts left are said until they are settled.
+    if (doc.offer && doc.offer->offers(action) && action != "show_compare")
     {
         doc.offer.reset();
         refreshNotice();
@@ -7573,6 +7598,11 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
     else if (action == "merge_saved")
     {
         mMerging.mergeSaved(doc);
+    }
+    else if (action == "show_compare" && doc.compareView && doc.compareTitles)
+    {
+        // As View > Show Comparison brings it back.
+        showView(doc, Doc::View::Compare, true);
     }
 }
 
@@ -9077,6 +9107,86 @@ void ALFloaterScriptStudio::addViewCommands()
             const Doc* doc = active();
             return doc && doc->shownView() == Doc::View::Compare && doc->compareView->canTakeBack() && doc->compareView->changeAtCaret() >= 0;
         });
+    // The conflict at the caret settled, as the bar's Theirs, Mine and
+    // Both do: from the keyboard too.
+    for (const auto& [name, take] : { std::pair{ "compare_settle_theirs", ALTextMerge::Take::Theirs },
+                                      std::pair{ "compare_settle_mine", ALTextMerge::Take::Ours },
+                                      std::pair{ "compare_settle_both", ALTextMerge::Take::OursThenTheirs } })
+    {
+        mCommands.add(
+            name,
+            [this, take]() {
+                Doc* doc = active();
+                if (doc && doc->shownView() == Doc::View::Compare)
+                {
+                    refreshCompare(*doc);
+                    ALScriptStudioMerging::settle(*doc, take);
+                }
+            },
+            [this]() {
+                const Doc* doc = active();
+                return doc && ALScriptStudioMerging::canSettle(*doc);
+            });
+    }
+    // What the bar's toggles do -- the same folded away, the sides swapped
+    // -- and its steps through the saves of the left.
+    mCommands.add(
+        "compare_fold",
+        [this]() {
+            if (Doc* doc = active(); doc && doc->shownView() == Doc::View::Compare)
+            {
+                doc->compareView->setFoldSame(!doc->compareView->foldsSame());
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->shownView() == Doc::View::Compare;
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->compareView && doc->compareView->foldsSame();
+        });
+    mCommands.add(
+        "compare_swap",
+        [this]() {
+            if (Doc* doc = active(); doc && doc->shownView() == Doc::View::Compare)
+            {
+                doc->compareView->setSwapped(!doc->compareView->isSwapped());
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->shownView() == Doc::View::Compare;
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->compareView && doc->compareView->isSwapped();
+        });
+    for (const auto& [name, newer] : { std::pair{ "compare_older", false }, std::pair{ "compare_newer", true } })
+    {
+        mCommands.add(
+            name,
+            [this, newer]() {
+                Doc* doc = active();
+                if (!doc || doc->shownView() != Doc::View::Compare)
+                {
+                    return;
+                }
+                // As its button on the bar, which steps only where there is
+                // a version that way -- and where the bar, given way at a
+                // narrow width, shows no button for it.
+                doc->compareView->stepVersion(newer ? 1 : -1);
+            },
+            [this, newer]() {
+                const Doc* doc = active();
+                if (!doc || doc->shownView() != Doc::View::Compare)
+                {
+                    return false;
+                }
+                const ALDiffBar* bar = doc->compareView->bar();
+                return bar->versionCount() > 1 && (newer ? bar->versionShown() < bar->versionCount() - 1 : bar->versionShown() > 0);
+            });
+    }
     // The comparison's change at the caret copied from the side in front,
     // or the whole of it as a unified diff.
     mCommands.add(

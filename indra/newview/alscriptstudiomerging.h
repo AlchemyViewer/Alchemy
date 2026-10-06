@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alscriptstudiodoc.h"
+#include "altextmerge.h"
 
 #include <functional>
 #include <memory>
@@ -78,11 +79,24 @@ public:
     // What the world's item holds now, once loaded, merged in: the tab
     // made from it from here on, so that a save no longer stops for it.
     void mergeWorld(Doc& doc);
+    // The tab's text changed: a merge stepped back before it was saved
+    // puts back what it set aside -- what was saved elsewhere, the asset
+    // the tab was made from -- so that a save stops for the other version
+    // again, and says so. Once put back, a step forward again does not
+    // take it away; merging again does.
+    void textChanged(Doc& doc);
+    // A merge's conflict settled from the keyboard, as the comparison's bar
+    // settles one: the one the caret is in, where the tab's comparison is
+    // a merge in front. Whether it was.
+    static bool canSettle(const Doc& doc);
+    static bool settle(Doc& doc, ALTextMerge::Take take);
 
 private:
     // Merged, where it can be, and said; else compared as they are. Whether
     // it was merged.
     bool merge(Doc& doc, const std::string& theirs, const std::string& title);
+    // The merge just put in the tab kept, with what it set aside.
+    static void remember(Doc& doc, Doc::Merged merged);
     // The tab's text made another as one step to undo: the lines between
     // those the two share at the start and at the end.
     static bool becomes(Doc& doc, const std::string& text);

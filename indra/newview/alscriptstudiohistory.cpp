@@ -198,6 +198,16 @@ void ALScriptStudioHistory::offerVersions(ALDiffView& view, const std::string& k
     });
 }
 
+// static
+void ALScriptStudioHistory::letGo(Doc& doc)
+{
+    doc.historyShown.reset();
+    if (doc.compareView)
+    {
+        doc.compareView->setVersions(0, 0, nullptr);
+    }
+}
+
 void ALScriptStudioHistory::versions(Doc& doc)
 {
     if (!doc.compareView || !doc.historyShown)

@@ -27,6 +27,7 @@
 #include "alscriptstudioorphans.h"
 
 #include "alcodeeditor.h"
+#include "aldiffview.h"
 #include "alrecoverystore.h"
 #include "alscriptexternaleditor.h"
 #include "alscriptstudiofiles.h"
@@ -63,7 +64,11 @@ namespace
         {
             const bool external = action == "take_external" || action == "keep_here";
             const bool there    = action == "take_saved" || action == "keep_saved" || action == "merge_saved" || action == "compare_saved";
-            if ((external && !doc.external->waiting) || (there && !doc.savedThere))
+            // Conflicts a merge left, while the comparison marking them is
+            // still the merge's and any are left.
+            const bool conflicts = action == "show_compare";
+            if ((external && !doc.external->waiting) || (there && !doc.savedThere) ||
+                (conflicts && !(doc.compareView && doc.compareView->merging() && doc.compareView->conflictCount() > 0)))
             {
                 continue;
             }
@@ -78,6 +83,7 @@ namespace
                                 : action == "keep_saved"    ? "NoticeKeepSaved"
                                 : action == "compare_saved" || action == "compare_world" ? "NoticeCompare"
                                 : action == "merge_saved" || action == "merge_world"     ? "NoticeMerge"
+                                : action == "show_compare"                               ? "NoticeShowCompare"
                                 : action == "apply_fixes"                                ? "NoticeApplyFixes"
                                 : action == "make_strict"                                ? "NoticeMakeStrict"
                                                                                          : nullptr;
@@ -415,8 +421,13 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
     }
     if (offerSaid(*doc) && (action == "close" || doc->offer->offers(action)))
     {
-        // The offer let go of, or taken up as its link in Output would be.
-        doc->offer.reset();
+        // The offer let go of, or taken up as its link in Output would be;
+        // conflicts left are said until they are settled, the comparison
+        // shown or not.
+        if (action != "show_compare")
+        {
+            doc->offer.reset();
+        }
         if (action != "close")
         {
             mWindow.takeOffer(*doc, action);
@@ -433,7 +444,13 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
         // Changes, once the notice is gone.
         doc->orphan->noticeDismissed = true;
         doc->recoverable.reset();
+        // A save of its history let go of with its slider: stepped, it
+        // would have nothing to follow (ALScriptStudioHistory::letGo).
         doc->historyShown.reset();
+        if (doc->compareView)
+        {
+            doc->compareView->setVersions(0, 0, nullptr);
+        }
         // An offer of nothing but a copy or a file is what a tab gone or
         // out of reach says of itself: hidden with it, not said next.
         if (doc->offer && std::ranges::all_of(doc->offer->actions, [](const std::string& each) { return each == "copy" || each == "export"; }))

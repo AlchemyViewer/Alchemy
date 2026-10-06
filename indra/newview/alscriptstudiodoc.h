@@ -437,6 +437,19 @@ struct ALScriptStudioDoc
     // queue -- that landed over changes made here: its text, until the
     // author says whose to keep.
     std::optional<std::string>                 savedThere;
+    // A merge put in the tab (ALScriptStudioMerging), until the save that
+    // carries it: the undo step it made, by its serial, and what it set
+    // aside -- what was saved elsewhere, the asset the tab was made from --
+    // put back should the merge be undone before it is saved.
+    struct Merged
+    {
+        U64                        serial = 0;
+        std::optional<std::string> savedThere;
+        bool                       world = false;
+        LLUUID                     assetWas;
+        LLUUID                     assetMerged;
+    };
+    std::optional<Merged>                      merged;
     std::optional<std::string>                 carriedTarget;
     std::optional<LLUUID>                      carriedExperience;
     // A line to go to once the script has loaded, or -1; and a
@@ -617,6 +630,9 @@ struct ALScriptStudioDoc
     std::optional<CompareTitles>               compareTitles;
     bool                                       compareStale     = false;
     F64                                        compareChangedAt = 0.0;
+    // Moved on by each comparison asked for, so that an item still loading
+    // to be compared is dropped once another has been asked for since.
+    U32                                        compareAsked     = 0;
     // A save of its item compared with it (ALScriptStudioHistory), until
     // the comparison ends: offered back by the notice.
     std::optional<ALSavedText>                 historyShown;

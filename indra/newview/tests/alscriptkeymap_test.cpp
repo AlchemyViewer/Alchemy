@@ -342,4 +342,23 @@ namespace tut
         ALScriptKeymap::setPreset("nothing of the kind");
         ensure("one not offered: the standard", ALScriptKeymap::preset() == ALScriptKeyPresets::STANDARD);
     }
+
+    template<> template<>
+    void alscriptkeymap_object::test<10>()
+    {
+        set_test_name("what the comparison's bar does has keys too, the first letter of each word; peeking at a change on Alt-F3, beside Alt-F5's step");
+        const std::pair<const char*, ALKeyChord> keys[] = {
+            { "compare_settle_theirs", ALKeyChord{ 'T', MASK_ALT } }, { "compare_settle_mine", ALKeyChord{ 'M', MASK_ALT } },
+            { "compare_settle_both", ALKeyChord{ 'B', MASK_ALT } },   { "compare_fold", ALKeyChord{ 'F', MASK_ALT } },
+            { "compare_swap", ALKeyChord{ 'S', MASK_ALT } },          { "compare_older", ALKeyChord{ ',', MASK_ALT } },
+            { "compare_newer", ALKeyChord{ '.', MASK_ALT } },         { "peek_change", ALKeyChord{ KEY_F3, MASK_ALT } },
+        };
+        for (const auto& [id, chord] : keys)
+        {
+            ensure(std::string("a menu command: ") + id, ALScriptKeymap::isMenuCommand(id));
+            ensure(std::string("its key: ") + id + " " + chord.describe(), ALScriptKeymap::menuKey(id) == chord);
+            ensure(std::string("no editor's: ") + id, ALScriptKeymap::current().lookup(chord.key, chord.mask) == C::None);
+        }
+        ensure("the step beside it", ALScriptKeymap::menuKey("next_change") == (ALKeyChord{ KEY_F5, MASK_ALT }));
+    }
 }

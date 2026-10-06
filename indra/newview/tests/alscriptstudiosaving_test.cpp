@@ -858,4 +858,34 @@ namespace tut
         ensure("typed, nothing known of the last save: asked", ALScriptSaved::heard("a", "b", true, last_was(std::nullopt)) == Heard::Ask);
         ensure_equals("asked where it was needed", asked, 3);
     }
+
+    template<> template<>
+    void alscriptstudiosaving_object::test<17>()
+    {
+        set_test_name("a merge is kept for good once a save that carries it is saved; a save sent before it leaves it to be undone");
+        ALScriptStudioSaving& saving = make();
+        // As ALScriptStudioMerging keeps a merge just put in: the step it
+        // made, and what it set aside.
+        const auto merged = [](Doc& doc) {
+            Doc::Merged made;
+            made.serial     = doc.editor->savePoint().serial;
+            made.savedThere = std::string("theirs");
+            doc.merged      = std::move(made);
+        };
+
+        Doc& doc = tab("a", "default {}");
+        type(doc, "\n// merged");
+        merged(doc);
+        saving.save(doc);
+        saving.compiled(answer(doc));
+        ensure("saved with it: kept for good", !doc.merged);
+
+        Doc& early = tab("b", "default {}");
+        type(early, "\n// typed");
+        saving.save(early);
+        type(early, "\n// merged while it went");
+        merged(early);
+        saving.compiled(answer(early));
+        ensure("sent before it: still to be undone", early.merged && early.merged->savedThere == std::string("theirs"));
+    }
 }
