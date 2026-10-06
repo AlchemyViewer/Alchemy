@@ -325,6 +325,25 @@ S32 ALTextLayout::visibleFrom(S32 index, S32 direction) const
     return -1;
 }
 
+S32 ALTextLayout::visibleAfter(S32 index)
+{
+    const S32 count = lineCount();
+    const S32 next  = llmax(index + 1, 0);
+    if (next >= count || !hidden(next))
+    {
+        return llmin(next, count);
+    }
+    ensureHeights();
+    if (rowHeight() <= 0)
+    {
+        const S32 found = visibleFrom(next, 1);
+        return found >= 0 ? found : count;
+    }
+    // A hidden line takes no height and one in sight always some, so the
+    // line the top of the hidden run falls in is the first in sight after it.
+    return llmin(static_cast<S32>(mHeights.reach(mHeights.before(static_cast<size_t>(next)))), count);
+}
+
 F32 ALTextLayout::spaceAdvance()
 {
     if (mSpaceAdvance < 0.f)
@@ -863,8 +882,10 @@ S32 ALTextLayout::countedHeight(S32 index, S32 row_h) const
     {
         return 0;
     }
+    // A line of the text, and not hidden: its gap asked straight, without
+    // gapRows' checks again, once a line where every height is summed.
     const S32 height = mLines[index].height;
-    return (height > 0 ? height : row_h) + (mGaps ? gapRows(index) * row_h : 0);
+    return (height > 0 ? height : row_h) + (mGaps ? llmax(0, mGaps(index)) * row_h : 0);
 }
 
 void ALTextLayout::ensureHeights()

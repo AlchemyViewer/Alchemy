@@ -553,6 +553,10 @@ public:
     const LineAnnotation& lineAnnotation(S32 line) const;
     // Moves on whenever what is said of any line may have changed.
     U32                   annotationsRevision() const { return mAnnotationsRevision; }
+    // Moves on only where a gap may have come, gone or changed its rows,
+    // or lines with gaps moved: not for a keystroke on a line, which
+    // resets what is said of it alone. For whoever lists the gaps.
+    U32                   gapsRevision() const { return mGapsRevision; }
     // Whether anything is said of the lines at all.
     bool                  annotated() const { return !mAnnotations.empty() || mAnyGap; }
     // The line whose gap a y of the view is in, one past the last for the
@@ -1009,8 +1013,9 @@ protected:
     void                 afterEdit();
     void                 placeCaret(const ALTextPos& pos, bool extend);
     // The selection put somewhere, anchor and caret at once, told to
-    // whoever follows the caret where either moved.
-    void                 placeSelection(const ALTextPos& anchor, const ALTextPos& caret);
+    // whoever follows the caret where either moved; the caret standing in
+    // a gap where one is given (caretGap), told once it does.
+    void                 placeSelection(const ALTextPos& anchor, const ALTextPos& caret, S32 gap = -1);
     // A range measured with a composition standing in the text, measured
     // as though it were not.
     ALTextRange          withoutComposition(const ALTextRange& range) const;
@@ -1461,6 +1466,7 @@ private:
     // What is said of the line one past the last: the gap below the text.
     LineAnnotation                     mEndAnnotation;
     U32                                mAnnotationsRevision = 0;
+    U32                                mGapsRevision        = 0;
     // Whether any line was said to have a gap: the layout asks for them
     // only where one was.
     bool                               mAnyGap = false;

@@ -137,22 +137,24 @@ void ALTextRuler::drawRuler(F32 alpha)
         mMarkLines.clear();
         mGapMarkLines.clear();
         LLColor4   unused;
-        // A text with neither -- a log -- not read through at all.
+        // A text with neither -- a log -- not read through at all; one
+        // pass for both lists, the gap below the text the last of it.
         const bool annotated = mView.annotated();
-        const S32  count     = features || annotated ? document.lineCount() : 0;
-        for (S32 line = 0; line < count; ++line)
+        const S32  count     = document.lineCount();
+        const S32  end       = annotated ? count + 1 : features ? count : 0;
+        for (S32 line = 0; line < end; ++line)
         {
-            if (markOf(line, unused))
+            if (line < count && markOf(line, unused))
             {
                 mMarkLines.push_back(line);
             }
-        }
-        for (S32 line = 0; annotated && line <= document.lineCount(); ++line)
-        {
-            const ALTextView::LineAnnotation& said = mView.lineAnnotation(line);
-            if (said.gap > 0 && said.gapRulerTint.mV[VALPHA] > 0.f)
+            if (annotated)
             {
-                mGapMarkLines.push_back(line);
+                const ALTextView::LineAnnotation& said = mView.lineAnnotation(line);
+                if (said.gap > 0 && said.gapRulerTint.mV[VALPHA] > 0.f)
+                {
+                    mGapMarkLines.push_back(line);
+                }
             }
         }
         mMarksVersion        = document.version();
@@ -237,7 +239,7 @@ S32 ALTextRuler::mapScroll(const LLRect& map)
     ALTextLayout& layout = mView.layout();
     const S32     count  = mView.document().lineCount();
     if (!mMapLinesValid || mMapLinesRevision != layout.hiddenRevision() || mMapLinesCount != count ||
-        mMapLinesAnnotations != mView.annotationsRevision())
+        mMapLinesGaps != mView.gapsRevision())
     {
         mMapLines.clear();
         mMapGaps.clear();
@@ -260,7 +262,7 @@ S32 ALTextRuler::mapScroll(const LLRect& map)
         gap(count);
         mMapLinesRevision    = layout.hiddenRevision();
         mMapLinesCount       = count;
-        mMapLinesAnnotations = mView.annotationsRevision();
+        mMapLinesGaps        = mView.gapsRevision();
         mMapLinesValid       = true;
     }
     const S32 doc_h = static_cast<S32>(mMapLines.size()) * MAP_LINE_H;

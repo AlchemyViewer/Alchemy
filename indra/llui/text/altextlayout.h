@@ -265,6 +265,10 @@ public:
     // The nearest line not hidden, starting at this one and looking in
     // this direction (1 or -1); -1 where there is none.
     S32 visibleFrom(S32 index, S32 direction) const;
+    // The first line not hidden after this one, the line count where there
+    // is none: found through the heights, not by stepping over a run of
+    // hidden lines one by one -- a comparison folds tens of thousands.
+    S32 visibleAfter(S32 index);
     // Moves on whenever which lines are hidden may have changed -- a line
     // hidden or shown, lines made or taken away -- for whoever keeps a list
     // of the lines in sight.

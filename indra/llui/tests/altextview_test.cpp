@@ -42,6 +42,8 @@
 
 #include "../test/lltut.h"
 
+#include <array>
+#include <functional>
 #include <map>
 #include <optional>
 #include <set>
@@ -68,6 +70,9 @@ namespace ll_test
         // Every selection, the main one among them, in the order they begin.
         static std::vector<ALTextRange> selections(const ALTextView& view) { return view.selectionsInOrder(); }
         static S32  heldMost() { return ALTextView::LAYOUT_HELD_MOST; }
+        // The rows and the gaps in sight, as the view walks them to draw.
+        static void visibleRows(ALTextView& view, const LLRect& text, const std::function<void(S32, S32, S32)>& visit) { view.forEachVisibleRow(text, visit); }
+        static void visibleGaps(ALTextView& view, const LLRect& text, const std::function<void(S32, S32, S32)>& visit) { view.forEachVisibleGap(text, visit); }
         // What a frame does before it draws, of what a test reaches:
         // Next Misspelling gone on with, and the primary selection offered.
         static void nextFrame(ALTextView& view)
@@ -2695,5 +2700,118 @@ namespace tut
         ensure("the heights below moved up by its rows", layout.heightsRevision() != heights && layout.lineTop(4) == 5 * row_h && layout.totalHeight() == 7 * row_h);
         ensure("the other gap kept", layout.gapRows(4) == 1);
         ensure_equals("the text as edited", v.text(), std::string("xzero\nONE\nTWO\nthree\nfour\nfive"));
+    }
+
+    template<> template<>
+    void altextview_object::test<85>()
+    {
+        set_test_name("a text put in, or a stretch of it replaced by the host, takes the caret out of the gap it stood in, though a stop is said there again");
+        ALTextView& v = make("zero\none\ntwo\nthree\nfour");
+        typedef ALTextView::LineAnnotation Said;
+        std::vector<Said> lines(6);
+        lines[2].gap     = 1;
+        lines[2].gapStop = true;
+        v.setLineAnnotations(lines);
+        v.setCaret(ALTextPos(1, 2));
+        ensure("down into it", v.perform(ALEditorCommand::MoveDown) && v.caretGap() == 2);
+        // A line made above: the caret moves on with its line, and a stop
+        // said again where the gap was is not where it stands.
+        v.replaceText(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 4)), "ZERO\nmore");
+        ensure("the caret moved along", v.caret() == ALTextPos(3, 0));
+        v.setLineAnnotation(2, lines[2]);
+        ensure("replaced: out of the gap", v.caretGap() == -1);
+
+        v.setCaret(ALTextPos(1, 2));
+        ensure("down into it again", v.perform(ALEditorCommand::MoveDown) && v.caretGap() == 2);
+        v.setText("zero\none\ntwo\nthree\nfour");
+        v.setLineAnnotations(lines);
+        ensure("a text put in: out of the gap", v.caretGap() == -1 && v.caret() == ALTextPos(0, 0));
+    }
+
+    template<> template<>
+    void altextview_object::test<86>()
+    {
+        set_test_name("the rows and the gaps in sight walked over ten thousand hidden lines: only the lines in sight visited, where they are");
+        std::string many = "first";
+        for (S32 n = 0; n < 10000; ++n)
+        {
+            many += "\nhidden";
+        }
+        many += "\nlast";
+        ALTextView& v = make(many.c_str());
+        typedef ALTextView::LineAnnotation Said;
+        ALTextLayout&     layout = v.layout();
+        const S32         row_h  = layout.rowHeight();
+        std::vector<Said> lines(10003);
+        lines[10001].gap = 1;
+        v.setLineAnnotations(lines);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 1, 10000, true);
+        ensure("the layout steps over the run at once", layout.visibleAfter(0) == 10001 && layout.visibleAfter(10001) == 10002);
+
+        const LLRect               text = v.textRect();
+        std::vector<std::array<S32, 3>> rows;
+        ll_test::TextViewProbe::visibleRows(v, text, [&rows](S32 line, S32 row, S32 screen_top) { rows.push_back({ line, row, screen_top }); });
+        ensure_equals("two rows visited", rows.size(), size_t(2));
+        ensure("the first line at the top", rows[0] == std::array<S32, 3>{ 0, 0, text.mTop });
+        ensure("the last under its gap", rows[1] == std::array<S32, 3>{ 10001, 0, text.mTop - 2 * row_h });
+
+        std::vector<std::array<S32, 3>> gaps;
+        ll_test::TextViewProbe::visibleGaps(v, text, [&gaps](S32 line, S32 screen_top, S32 height) { gaps.push_back({ line, screen_top, height }); });
+        ensure_equals("one gap visited", gaps.size(), size_t(1));
+        ensure("the last line's, over it", gaps[0] == std::array<S32, 3>{ 10001, text.mTop - row_h, row_h });
+    }
+
+    template<> template<>
+    void altextview_object::test<87>()
+    {
+        set_test_name("the gaps revision moves where a gap comes, goes or slides, and not for a keystroke or a tint");
+        ALTextView& v = make("zero\none\ntwo\nthree\nfour");
+        typedef ALTextView::LineAnnotation Said;
+        std::vector<Said> lines(6);
+        lines[2].gap = 1;
+        v.setLineAnnotations(lines);
+        U32 gaps        = v.gapsRevision();
+        U32 annotations = v.annotationsRevision();
+        v.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "x");
+        ensure("a keystroke: what is said moved, the gaps did not", v.annotationsRevision() != annotations && v.gapsRevision() == gaps);
+        v.document().replace(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), "y");
+        ensure("typed on the line with the gap: kept", v.gapsRevision() == gaps && v.lineAnnotation(2).gap == 1);
+        Said tinted    = v.lineAnnotation(3);
+        tinted.tint    = LLColor4(1.f, 0.f, 0.f, 0.5f);
+        v.setLineAnnotation(3, tinted);
+        ensure("a tint said: the gaps did not move", v.gapsRevision() == gaps);
+        Said gapped = v.lineAnnotation(4);
+        gapped.gap  = 2;
+        v.setLineAnnotation(4, gapped);
+        ensure("a gap said", v.gapsRevision() != gaps);
+        gaps = v.gapsRevision();
+        v.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "new\n");
+        ensure("a line made above: the gaps slid", v.gapsRevision() != gaps && v.lineAnnotation(3).gap == 1);
+        gaps = v.gapsRevision();
+        v.document().replace(ALTextRange(ALTextPos(2, 0), ALTextPos(3, 3)), "A\nB");
+        ensure("a line with a gap put over by as many: it went", v.gapsRevision() != gaps && v.lineAnnotation(3).gap == 0);
+    }
+
+    template<> template<>
+    void altextview_object::test<88>()
+    {
+        set_test_name("a step into a gap is told once, the caret standing in the gap when it is");
+        ALTextView& v = make("zero\none\ntwo\nthree");
+        typedef ALTextView::LineAnnotation Said;
+        std::vector<Said> lines(5);
+        lines[2].gap     = 1;
+        lines[2].gapStop = true;
+        v.setLineAnnotations(lines);
+        v.setCaret(ALTextPos(1, 2));
+        S32 told = 0;
+        S32 seen = -2;
+        v.onCaretMoved([&]() {
+            ++told;
+            seen = v.caretGap();
+        });
+        ensure("down into it", v.perform(ALEditorCommand::MoveDown) && v.caretGap() == 2);
+        ensure("told once, in the gap", told == 1 && seen == 2);
+        ensure("on down, out of it", v.perform(ALEditorCommand::MoveDown) && v.caretGap() == -1);
+        ensure("told once more, on its line", told == 2 && seen == -1);
     }
 }

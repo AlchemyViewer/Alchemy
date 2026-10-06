@@ -824,4 +824,30 @@ namespace tut
         layout.setGapProvider(nullptr);
         ensure("none asked of nobody", layout.gapRows(3) == 0 && layout.gapAtY(0) == -1);
     }
+
+    template<> template<>
+    void altextlayout_object::test<21>()
+    {
+        set_test_name("the first line in sight after one, over a run of ten thousand hidden lines, gaps or none; the line count where none is");
+        std::string many = "first";
+        for (S32 n = 0; n < 10000; ++n)
+        {
+            many += "\nhidden";
+        }
+        many += "\nlast";
+        ready(many.c_str());
+        ensure("none hidden: the next", layout.visibleAfter(0) == 1 && layout.visibleAfter(-5) == 0);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 1, 10000, true);
+        ensure("over the run", layout.visibleAfter(0) == 10001);
+        ensure("from inside the run", layout.visibleAfter(1) == 10001 && layout.visibleAfter(9999) == 10001);
+        ensure("past the last: the count", layout.visibleAfter(10001) == 10002);
+        std::vector<S32> gaps(10003, 0);
+        gaps[10001] = 2;
+        layout.setGapProvider([&gaps](S32 line) { return gaps[static_cast<size_t>(line)]; });
+        ensure("a gap over the line after the run: still that line", layout.visibleAfter(0) == 10001);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 9000, 10001, true);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 1, 8999, false);
+        ensure("a run to the end: none after it", layout.visibleAfter(8999) == 10002 && layout.visibleAfter(5) == 6);
+        layout.setGapProvider(nullptr);
+    }
 }

@@ -473,6 +473,7 @@ void ALTextView::setText(std::string_view text)
     // since the last save -- the gutter's bars -- starts clean too.
     resetDirty();
     mCaret = mAnchor = mDocument.start();
+    mCaretGap         = -1;
     mDesiredX         = -1.f;
     mScrollY          = 0;
     mScrollX          = 0.f;
@@ -507,8 +508,10 @@ void ALTextView::replaceText(const ALTextRange& range_in, std::string_view text)
     mChangeAt = 0;
     resetDirty();
     // The main caret, which whoever edits puts, moved along with the text.
-    mCaret  = mDocument.clamp(done.placed(mCaret));
-    mAnchor = mDocument.clamp(done.placed(mAnchor));
+    mCaret    = mDocument.clamp(done.placed(mCaret));
+    mAnchor   = mDocument.clamp(done.placed(mAnchor));
+    // Out of any gap it stood in, which the host says again or not.
+    mCaretGap = -1;
     syncScrollbar();
     mChanged();
 }
@@ -969,10 +972,10 @@ void ALTextView::placeCaret(const ALTextPos& pos, bool extend)
     placeSelection(extend ? mAnchor : caret, caret);
 }
 
-void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret)
+void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret, S32 gap)
 {
     const ALTextRange was      = selection();
-    const bool        was_gap  = mCaretGap >= 0;
+    const S32         was_gap  = mCaretGap;
     mCaretGap                  = -1;
     mAnchor                    = mDocument.clamp(anchor);
     mCaret                = snapped(mDocument.clamp(caret), was.end);
@@ -1027,9 +1030,10 @@ void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret)
             mPrimaryStale = true;
         }
     }
-    // Out of a gap onto the line under it is a move, though the place in
-    // the text is the one it had.
-    if (selection() != was || was_gap)
+    // Into a gap, or out of one onto the line under it, is a move, though
+    // the place in the text is the one it had.
+    mCaretGap = gap;
+    if (selection() != was || mCaretGap != was_gap)
     {
         mCaretMoved();
     }
@@ -2177,6 +2181,8 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
         // with them, as they now are: told to the layout one by one, since
         // no line moved for it to count every height again.
         std::vector<S32> gone;
+        // Whether lines came or went, sliding the gaps below them.
+        bool             slid = false;
         if (mAnyGap)
         {
             const S32 size  = static_cast<S32>(mAnnotations.size());
@@ -2197,6 +2203,7 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
                         }
                     }
                 }
+                slid = slid || span.made != span.last - span.first + 1;
                 moved += span.made - (span.last - span.first + 1);
             }
         }
@@ -2212,6 +2219,10 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
             }
         }
         ++mAnnotationsRevision;
+        if (slid || !gone.empty())
+        {
+            ++mGapsRevision;
+        }
         for (const S32 line : gone)
         {
             mLayout.gapChanged(line);
@@ -3692,7 +3703,7 @@ void ALTextView::forEachVisibleRow(const LLRect& text, const std::function<void(
     }
     const S32 count    = mDocument.lineCount();
     const S32 bottom_y = mScrollY + text.getHeight();
-    for (S32 line = mLayout.lineAtY(mScrollY); line < count; ++line)
+    for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
     {
         if (mLayout.hidden(line))
         {
@@ -3737,7 +3748,7 @@ void ALTextView::forEachVisibleGap(const LLRect& text, const std::function<void(
         }
         return top < bottom_y;
     };
-    for (S32 line = mLayout.lineAtY(mScrollY); line < count; ++line)
+    for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
     {
         if (!mLayout.hidden(line) && !shown(line))
         {
@@ -3877,6 +3888,7 @@ void ALTextView::setLineAnnotations(std::vector<LineAnnotation> lines)
     mAnyGap = mEndAnnotation.gap > 0 || std::any_of(lines.begin(), lines.end(), [](const LineAnnotation& line) { return line.gap > 0; });
     mAnnotations.assign(std::make_move_iterator(lines.begin()), std::make_move_iterator(lines.end()));
     ++mAnnotationsRevision;
+    ++mGapsRevision;
     if (mAnyGap || had_gap)
     {
         provideGaps();
@@ -3906,6 +3918,7 @@ void ALTextView::setLineAnnotation(S32 line, const LineAnnotation& said)
     ++mAnnotationsRevision;
     if (said.gap != had)
     {
+        ++mGapsRevision;
         if (!mAnyGap && said.gap > 0)
         {
             mAnyGap = true;
@@ -4017,9 +4030,7 @@ bool ALTextView::stepGap(bool down)
         mDesiredX = x;
     }
     const ALTextPos at = gap < count ? ALTextPos(gap, 0) : mDocument.end();
-    placeSelection(at, at);
-    mCaretGap = gap;
-    mCaretMoved();
+    placeSelection(at, at, gap);
     // The gap in sight, as a row is.
     const S32 top    = mLayout.gapTop(gap);
     const S32 height = mLayout.gapHeight(gap);
@@ -5232,7 +5243,7 @@ void ALTextView::drawRows(const LLRect& text)
     // things over the text lie over the next row's text, where they reach
     // it, rather than under.
     mRowsSeen.clear();
-    for (S32 line = mLayout.lineAtY(mScrollY); line < count; ++line)
+    for (S32 line = mLayout.lineAtY(mScrollY); line < count; line = mLayout.visibleAfter(line))
     {
         if (mLayout.hidden(line))
         {

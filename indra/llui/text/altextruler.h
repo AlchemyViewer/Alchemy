@@ -118,13 +118,13 @@ private:
     // The lines the map shows, a row each, and a row for each row of a
     // gap, which is the line it is above's (one past the last for the gap
     // below the text) and said to be a gap; as of the layout's hidden
-    // revision, the line count and what the host says of the lines.
+    // revision, the line count and the view's gaps revision.
     std::vector<S32>  mMapLines;
     std::vector<bool> mMapGaps;
     bool              mMapLinesValid       = false;
     U32               mMapLinesRevision    = 0;
     S32               mMapLinesCount       = 0;
-    U32               mMapLinesAnnotations = 0;
+    U32               mMapLinesGaps        = 0;
     // The map's runs of text for the lines in sight, by column, as last
     // read: kept while the text, its grammar and each line's tokens, the
     // tab width, the map's width and the lines in sight hold, so that an
