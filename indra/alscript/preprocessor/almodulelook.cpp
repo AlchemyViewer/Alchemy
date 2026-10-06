@@ -87,7 +87,20 @@ const std::vector<std::string>& ALModuleLook::exportsOf(const std::string& path,
 {
     // An open text by its version, which is not read again until it moves;
     // a held one by what it holds.
-    Read&        read = mRead[(lua ? "lua:" : "lsl:") + path];
+    Read& read = mRead[(lua ? "lua:" : "lsl:") + path];
+    // What the analysis found the module exports, where it checked this
+    // very text, over what its text alone says -- asked each time, since it
+    // may have checked it since the text was last read here.
+    if (lua)
+    {
+        if (std::optional<std::vector<std::string>> checked = ALLuauExports::checkedOf(path, text))
+        {
+            read.version = 0;
+            read.hash    = 0;
+            read.exports = std::move(*checked);
+            return read.exports;
+        }
+    }
     const size_t hash = version == 0 ? std::hash<std::string>()(text) : 0;
     if (version != 0 ? read.version != version : read.version != 0 || read.hash != hash || hash == 0)
     {
@@ -109,10 +122,20 @@ const std::vector<std::string>* ALModuleLook::fileExports(const std::string& fil
     OnDisk& on = mOnDisk[(lua ? "lua:" : "lsl:") + file];
     if (!(on.stamp == stamp))
     {
-        std::string text;
         on.stamp    = stamp;
-        on.readable = ALDiskIncludes::readOrdinary(file, text) && text.size() <= MODULE_BYTES;
-        on.exports  = on.readable ? (lua ? ALLuauExports::of(text) : ALLSLExports::of(text)) : std::vector<std::string>();
+        on.text.clear();
+        on.readable = ALDiskIncludes::readOrdinary(file, on.text) && on.text.size() <= MODULE_BYTES;
+        on.exports  = on.readable ? (lua ? ALLuauExports::of(on.text) : ALLSLExports::of(on.text)) : std::vector<std::string>();
+        on.checked  = false;
+    }
+    // What the analysis found, where it checked the file as it stands.
+    if (lua && on.readable && !on.checked)
+    {
+        if (std::optional<std::vector<std::string>> checked = ALLuauExports::checkedOf(ALIncludeIdentity::ofFile(file), on.text))
+        {
+            on.exports = std::move(*checked);
+            on.checked = true;
+        }
     }
     return on.readable ? &on.exports : nullptr;
 }

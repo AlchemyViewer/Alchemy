@@ -26,6 +26,7 @@
 #include "../preprocessor/almodulelook.h"
 
 #include "../preprocessor/alincludeidentity.h"
+#include "../luau/alluauexports.h"
 #include "fsyspath.h"
 #include "llfile.h"
 
@@ -139,5 +140,29 @@ namespace tut
         ensure("the same version: as read", named(look.look(input), "open")->exports == std::vector<std::string>{ "one" });
         input.texts[0].version = 2;
         ensure("a new one: read again", named(look.look(input), "open")->exports == std::vector<std::string>{ "two" });
+    }
+
+    template<> template<>
+    void almodulelook_object::test<3>()
+    {
+        set_test_name("SLua: what the analysis found a module exports, where it checked that very text, over what the text alone says; a file and an open text alike");
+        Scratch           s;
+        const std::string made_text = "local function make()\n    local t = {}\n    t.alpha = 1\n    t.beta = function() end\n    return t\nend\nreturn make()\n";
+        const std::string made      = s.write("mods/made.luau", made_text);
+        ALModuleLook::Input input;
+        input.lua     = true;
+        input.self    = "object:self";
+        input.folders = { { std::string(), s.at("mods") } };
+        ensure("the text alone says nothing of a table made by a call", named(look.look(input), "made")->exports.empty());
+        ALLuauExports::checked(ALIncludeIdentity::ofFile(made), made_text, { "alpha", "beta" });
+        ensure("checked: what its type says", named(look.look(input), "made")->exports == std::vector<std::string>({ "alpha", "beta" }));
+
+        auto text = std::make_shared<const std::string>(made_text);
+        input.texts.push_back({ "inventory:open", "open.luau", 1, text });
+        ALLuauExports::checked("inventory:open", made_text, { "gamma" });
+        ensure("an open text checked", named(look.look(input), "open")->exports == std::vector<std::string>{ "gamma" });
+        input.texts[0].text    = std::make_shared<const std::string>("local M = {}\nfunction M.delta() end\nreturn M\n");
+        input.texts[0].version = 2;
+        ensure("its text moved on since: read as it says", named(look.look(input), "open")->exports == std::vector<std::string>{ "delta" });
     }
 }

@@ -112,6 +112,10 @@ private:
         ALFileStamp              stamp;
         bool                     readable = false;
         std::vector<std::string> exports;
+        // Its text, for what the analysis found of it; and whether that
+        // has been taken.
+        std::string              text;
+        bool                     checked = false;
     };
     boost::unordered_flat_map<std::string, OnDisk, ll::string_hash, std::equal_to<>> mOnDisk;
 };

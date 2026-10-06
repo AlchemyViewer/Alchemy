@@ -26,6 +26,8 @@
 
 #include "alluauservice.h"
 
+#include "alluauexports.h"
+
 #include "alluaucompletion.h"
 #include "alluaufragment.h"
 #include "alluaufrontend.h"
@@ -381,6 +383,46 @@ namespace
             return true;
         }
     };
+
+    // The names of the table a checked module's type says it returns -- a
+    // metatable's own table for one returned with setmetatable -- in the
+    // order its fields were declared, those a script could write after a
+    // dot; nothing where its type is no table, as a nonstrict check may
+    // leave it.
+    std::optional<std::vector<std::string>> exportedNames(const Luau::Module& module)
+    {
+        const std::optional<Luau::TypeId> returned = Luau::first(module.returnType);
+        if (!returned)
+        {
+            return std::nullopt;
+        }
+        Luau::TypeId type = Luau::follow(*returned);
+        if (const Luau::MetatableType* meta = Luau::get<Luau::MetatableType>(type))
+        {
+            type = Luau::follow(meta->table);
+        }
+        const Luau::TableType* table = Luau::get<Luau::TableType>(type);
+        if (!table)
+        {
+            return std::nullopt;
+        }
+        std::vector<std::pair<Luau::Position, std::string>> found;
+        for (const auto& [name, field] : table->props)
+        {
+            if (ALScriptLexicon::isName(name))
+            {
+                found.emplace_back(field.location ? field.location->begin : Luau::Position(UINT32_MAX, 0), name);
+            }
+        }
+        std::sort(found.begin(), found.end(), [](const auto& a, const auto& b) { return a.first != b.first ? a.first < b.first : a.second < b.second; });
+        std::vector<std::string> out;
+        out.reserve(found.size());
+        for (auto& [at, name] : found)
+        {
+            out.push_back(std::move(name));
+        }
+        return out;
+    }
 
     SeleneFilters seleneFiltersOf(std::string_view source, const Luau::SourceModule* module)
     {
@@ -1409,6 +1451,21 @@ ALScriptProblems ALLuauService::check(std::string_view source)
         }
         const std::string   file      = name.substr(7);
         const SeleneFilters its       = seleneFiltersOf(text->second, module_of);
+        // What it exports, as its type says, for what is offered from it;
+        // with what its text says outright, so that nothing the text alone
+        // would have offered is lost. Its text alone where its type says
+        // nothing.
+        if (std::optional<std::vector<std::string>> names = exportedNames(*checked_module))
+        {
+            for (std::string& said : ALLuauExports::of(text->second))
+            {
+                if (std::find(names->begin(), names->end(), said) == names->end())
+                {
+                    names->push_back(std::move(said));
+                }
+            }
+            ALLuauExports::checked(file, text->second, std::move(*names));
+        }
         for (const Luau::LintWarning& warning : checked_module->lintResult.errors)
         {
             lint(its, warning, ALScriptProblem::Severity::Error, file);

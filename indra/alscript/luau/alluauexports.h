@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -48,4 +49,13 @@
 namespace ALLuauExports
 {
     std::vector<std::string> of(std::string_view source);
+
+    // What a module the analysis checked was found to export -- the names
+    // of the table its type says it returns, whatever built it, as a parse
+    // alone cannot see: one returned from a function, fields set in a loop
+    // over names given outright -- kept by the module's key and the text it
+    // was checked from, for a look at the same text to take in place of
+    // `of`. The latest few hundred kept; any thread's.
+    void                                    checked(const std::string& key, std::string_view text, std::vector<std::string> names);
+    std::optional<std::vector<std::string>> checkedOf(const std::string& key, std::string_view text);
 }

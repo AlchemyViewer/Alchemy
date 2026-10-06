@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../luau/alluauservice.h"
+#include "../luau/alluauexports.h"
 #include "../luau/alluauconfig.h"
 #include "../lint/alscriptfixes.h"
 #include "../lint/alscriptlintpass.h"
@@ -1609,6 +1610,47 @@ namespace tut
 
         const ALScriptProblems edited = service.check(script + "print(util)\n");
         ensure("an edit of the script alone: not the module's again", !in(edited, "disk:/lib/util.luau", "LocalUnused", 0));
+        service.setDocument("");
+    }
+
+    template<> template<>
+    void alluauservice_object::test<47>()
+    {
+        set_test_name("a module checked with the script has what it exports kept as its type says, in the order its fields were declared, for what is offered from it");
+        ensure("definitions loaded: " + error, loaded);
+        service.setDocument("exports");
+        service.setConfig(ALLuauConfig());
+        const std::string made = "--!strict\n"
+                                 "local function make()\n"
+                                 "    local t = {}\n"
+                                 "    t.alpha = 1\n"
+                                 "    t.beta = function() end\n"
+                                 "    return t\n"
+                                 "end\n"
+                                 "return make()\n";
+        ALLuauService::Modules modules;
+        modules.modules.push_back({ "disk:/lib/made.luau", made });
+        modules.reaches.push_back({ "", "made", "disk:/lib/made.luau" });
+        service.setModules(modules);
+        service.check("local made = require(\"made\")\nprint(made.alpha)\n");
+        const std::optional<std::vector<std::string>> kept = ALLuauExports::checkedOf("disk:/lib/made.luau", made);
+        ensure("kept as its type says", kept.has_value());
+        std::string listed;
+        for (const std::string& name : *kept)
+        {
+            listed += " " + name;
+        }
+        ensure("each field, in order:" + listed, *kept == std::vector<std::string>({ "alpha", "beta" }));
+        ensure("not for another text", !ALLuauExports::checkedOf("disk:/lib/made.luau", made + "\n"));
+
+        // Its type no table, as a nonstrict check may leave one: nothing
+        // kept, and its text alone says what it exports.
+        const std::string loose = "local M = {}\nfunction M.gamma() end\nreturn (M :: any)\n";
+        modules.modules.push_back({ "disk:/lib/loose.luau", loose });
+        modules.reaches.push_back({ "", "loose", "disk:/lib/loose.luau" });
+        service.setModules(modules);
+        service.check("local made = require(\"made\")\nlocal loose = require(\"loose\")\nprint(made.alpha, loose)\n");
+        ensure("no table, nothing kept", !ALLuauExports::checkedOf("disk:/lib/loose.luau", loose));
         service.setDocument("");
     }
 }
