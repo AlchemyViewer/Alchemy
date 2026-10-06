@@ -160,13 +160,17 @@ public:
     static void                     setIncludeFolders(const std::vector<std::string>& folders);
     // The SLua aliases the studio names (LA22): each name as a require
     // says it after the @ (ALLuauConfig::studioAliasName), and the folder
-    // on disk it stands for, in order, as the setting holds them one to a
-    // line; and them put back.
+    // on disk it stands for -- or an inventory folder, `folder:<id>`, read
+    // only while world includes are on -- in order, as the setting holds
+    // them one to a line; and them put back.
     struct StudioAlias
     {
         std::string name;
         std::string folder;
     };
+    // An inventory folder as a studio alias's folder names it, and back.
+    static std::string inventoryAliasFolder(const LLUUID& folder);
+    static bool        inventoryAliasFolder(const std::string& folder, LLUUID& out);
     static std::vector<StudioAlias> studioAliases();
     static void                     setStudioAliases(const std::vector<StudioAlias>& aliases);
     // The configuration fetched where it is in the world and not in hand,

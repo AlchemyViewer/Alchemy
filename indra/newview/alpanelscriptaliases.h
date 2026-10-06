@@ -26,6 +26,7 @@
 #pragma once
 
 #include "llpanel.h"
+#include "lluuid.h"
 
 #include <boost/signals2.hpp>
 
@@ -39,10 +40,12 @@ class LLTextBox;
 // Script Studio's SLua aliases (LA22), on the Build tab of its preferences:
 // each a name a require says after the @ and a folder on disk it stands
 // for, which naming it lets a require read -- how a script in an object
-// reaches a library on disk, and any script one kept apart from it. A
-// folder added is named after itself; the name chosen in the list can be
-// typed over. What it writes is the setting (ALScriptPreprocessor::
-// studioAliases), which the window's Cancel puts back.
+// reaches a library on disk, and any script one kept apart from it -- or
+// an inventory folder dropped on it, which a require reads while world
+// includes are on. A folder added is named after itself; the name chosen
+// in the list can be typed over. What it writes is the setting
+// (ALScriptPreprocessor::studioAliases), which the window's Cancel puts
+// back.
 class ALPanelScriptAliases final : public LLPanel
 {
 public:
@@ -54,9 +57,13 @@ public:
     bool postBuild() override;
     // The list as the setting has it, the one chosen kept chosen.
     void refresh() override;
+    // An inventory folder dropped on it named an alias too.
+    bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept,
+                           std::string& tooltip_msg) override;
 
 private:
     void onAdd();
+    void addInventoryFolder(const LLUUID& folder, const std::string& name);
     void onRemove();
     void onRename();
     // The name field and the buttons as the list and the disk's switch

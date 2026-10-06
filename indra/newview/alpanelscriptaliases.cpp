@@ -32,6 +32,8 @@
 #include "alscriptpreprocessor.h"
 #include "lldir.h"
 #include "lldirpicker.h"
+#include "llinventorymodel.h"
+#include "llviewerinventory.h"
 #include "lllineeditor.h"
 #include "lltextbox.h"
 #include "llviewercontrol.h"
@@ -58,7 +60,7 @@ bool ALPanelScriptAliases::postBuild()
     getChild<LLButton>("remove_alias")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onRemove(); });
     // The setting changed from anywhere -- a fix that named a folder, a
     // Cancel -- and the disk's switch, which the aliases read under.
-    for (const char* setting : { "ALScriptSLuaAliases", "ALScriptPreprocDiskIncludes" })
+    for (const char* setting : { "ALScriptSLuaAliases", "ALScriptPreprocDiskIncludes", "ALScriptPreprocWorldIncludes" })
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
         {
@@ -73,15 +75,32 @@ void ALPanelScriptAliases::refresh()
 {
     const std::string chosen = mList->getFirstSelected() ? mList->getFirstSelected()->getValue().asString() : std::string();
     mList->deleteAllItems();
+    const bool disk  = gSavedSettings.getBOOL("ALScriptPreprocDiskIncludes");
+    const bool world = ALScriptPreprocessor::worldIncludes();
     for (const ALScriptPreprocessor::StudioAlias& alias : ALScriptPreprocessor::studioAliases())
     {
+        // A folder on disk by its path; an inventory folder by its name,
+        // as the inventory has it now.
+        LLUUID      inventory;
+        std::string shown = alias.folder;
+        std::string tip   = alias.folder;
+        if (ALScriptPreprocessor::inventoryAliasFolder(alias.folder, inventory))
+        {
+            const LLViewerInventoryCategory* category = gInventory.getCategory(inventory);
+            shown = category ? getString("InventoryFolder", { { "[NAME]", category->getName() } }) : getString("InventoryFolderGone");
+            tip   = getString(world ? "InventoryFolderTip" : "InventoryFolderOffTip");
+        }
+        else if (!disk)
+        {
+            tip = getString("DiskFolderOffTip", { { "[FOLDER]", alias.folder } });
+        }
         LLSD row;
         row["value"]                  = alias.name;
         row["columns"][0]["column"]   = "alias";
         row["columns"][0]["value"]    = "@" + alias.name;
         row["columns"][1]["column"]   = "folder";
-        row["columns"][1]["value"]    = alias.folder;
-        row["columns"][1]["tool_tip"] = alias.folder;
+        row["columns"][1]["value"]    = shown;
+        row["columns"][1]["tool_tip"] = tip;
         mList->addElement(row);
     }
     if (!chosen.empty())
@@ -93,12 +112,11 @@ void ALPanelScriptAliases::refresh()
 
 void ALPanelScriptAliases::refreshChosen()
 {
-    const bool        disk   = gSavedSettings.getBOOL("ALScriptPreprocDiskIncludes");
+    // Each alias whichever switch it is read under: an inventory folder's
+    // is world includes', a folder on disk's the disk's, as its tip says.
     LLScrollListItem* chosen = mList->getFirstSelected();
-    mList->setEnabled(disk);
-    getChildView("add_alias")->setEnabled(disk);
-    getChildView("remove_alias")->setEnabled(disk && chosen);
-    mName->setEnabled(disk && chosen);
+    getChildView("remove_alias")->setEnabled(chosen != nullptr);
+    mName->setEnabled(chosen != nullptr);
     if (!mName->hasFocus())
     {
         mName->setText(chosen ? chosen->getValue().asString() : std::string());
@@ -132,6 +150,42 @@ void ALPanelScriptAliases::onAdd()
          },
          folders.empty() ? std::string() : folders.front()))
         ->getFile();
+}
+
+bool ALPanelScriptAliases::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data,
+                                             EAcceptance* accept, std::string& tooltip_msg)
+{
+    if (cargo_type != DAD_CATEGORY || !cargo_data)
+    {
+        return LLPanel::handleDragAndDrop(x, y, mask, drop, cargo_type, cargo_data, accept, tooltip_msg);
+    }
+    const LLInventoryCategory* category = static_cast<const LLInventoryCategory*>(cargo_data);
+    *accept                             = ACCEPT_YES_SINGLE;
+    tooltip_msg                         = getString("DropFolder");
+    if (drop)
+    {
+        addInventoryFolder(category->getUUID(), category->getName());
+    }
+    return true;
+}
+
+void ALPanelScriptAliases::addInventoryFolder(const LLUUID& folder, const std::string& name)
+{
+    // Named after itself, as a folder on disk is; never twice. World
+    // includes are the scripter's to turn on, not the drop's.
+    const std::string                              id      = ALScriptPreprocessor::inventoryAliasFolder(folder);
+    std::vector<ALScriptPreprocessor::StudioAlias> aliases = ALScriptPreprocessor::studioAliases();
+    std::vector<std::string>                       taken;
+    for (const ALScriptPreprocessor::StudioAlias& alias : aliases)
+    {
+        if (alias.folder == id)
+        {
+            return;
+        }
+        taken.push_back(alias.name);
+    }
+    aliases.push_back({ ALLuauConfig::studioAliasFor(name, taken), id });
+    ALScriptPreprocessor::setStudioAliases(aliases);
 }
 
 void ALPanelScriptAliases::onRemove()

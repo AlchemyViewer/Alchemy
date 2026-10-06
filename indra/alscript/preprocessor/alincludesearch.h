@@ -121,8 +121,10 @@ public:
         std::vector<std::string> folders;
         // SLua's studio aliases (LA22): each name, in lower case, and the
         // folder on disk it stands for, which naming it blesses for a
-        // require -- not for an include's search. A require goes to them
-        // after the `.luaurc` chain, so that a project's own wins.
+        // require -- not for an include's search -- or a folder of the
+        // world by the world's own id, an inventory folder, read only
+        // while the world is let in. A require goes to them after the
+        // `.luaurc` chain, so that a project's own wins.
         std::vector<std::pair<std::string, std::string>> aliases;
         // What the disk's settings have been through, and the time: what
         // the disk said is kept a moment (ALDiskCache).

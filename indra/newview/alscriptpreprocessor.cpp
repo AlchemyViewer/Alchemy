@@ -277,6 +277,20 @@ void ALScriptPreprocessor::setIncludeFolders(const std::vector<std::string>& fol
 }
 
 // static
+std::string ALScriptPreprocessor::inventoryAliasFolder(const LLUUID& folder)
+{
+    // As the include resolver knows an inventory folder a require walks.
+    return "folder:" + folder.asString();
+}
+
+// static
+bool ALScriptPreprocessor::inventoryAliasFolder(const std::string& folder, LLUUID& out)
+{
+    constexpr std::string_view KIND = "folder:";
+    return folder.compare(0, KIND.size(), KIND) == 0 && out.set(folder.substr(KIND.size()), false) && out.notNull();
+}
+
+// static
 std::vector<ALScriptPreprocessor::StudioAlias> ALScriptPreprocessor::studioAliases()
 {
     // One to a line, `name=folder`; the first of a name kept.

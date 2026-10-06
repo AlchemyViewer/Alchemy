@@ -984,4 +984,58 @@ namespace tut
         ensure("and its chain", search.configsFor(asking(true).self, asking(true), off, nullptr, false, top) == ALPreprocessor::Found::Yes &&
                                     top.size() == 1 && top[0].text.find("\"top\": \"./libs\"") != std::string::npos);
     }
+
+    template<> template<>
+    void alincludesearch_object::test<16>()
+    {
+        set_test_name("a studio alias naming a folder of the world, an inventory folder by its id: walked as the world is while the world is let in, and offered then; nothing of it otherwise, and nothing of it blessed on disk");
+        // An inventory folder of modules, by the id the world knows it by.
+        const auto add = [this](const std::string& folder, const std::string& name) {
+            const ALIncludeWorld::Item one{ ALIncludeIdentity::ofItem(LLUUID::null, LLUUID::generateNewID()), name, LLUUID::generateNewID() };
+            world.folders[folder].items.push_back(one);
+            world.itemFolders[one.path] = folder;
+            return one;
+        };
+        world.folders["libfolder"].parent  = std::string();
+        world.folders["net"].parent        = "libfolder";
+        world.folders["libfolder"].folders = { { "net", "net" } };
+        const ALIncludeWorld::Item util = add("libfolder", "util");
+        const ALIncludeWorld::Item http = add("net", "http");
+        texts.put(util.path, util.assetId, "return 'util'\n");
+        texts.put(http.path, http.assetId, "return 'http'\n");
+
+        ALIncludeSearch::Where on = where(true, false);
+        on.aliases                = { { "inv", "libfolder" } };
+        ALIncludeSearch::Where off = on;
+        off.world                  = false;
+        const ALIncludeSearch::Asking in_object = asking(true);
+        const auto found = [&](const std::string& name, const ALIncludeSearch::Where& in) {
+            ALPreprocessor::Include  include;
+            std::vector<std::string> aliases;
+            return search.resolve(ask(name, true, in_object.self), include, in_object, in, nullptr, false, &aliases) == ALPreprocessor::Found::Yes
+                       ? include.path
+                       : std::string();
+        };
+        ensure_equals("through the alias, the world let in", found("@inv/util", on), util.path);
+        ensure_equals("a folder under it", found("@inv/net/http", on), http.path);
+        ensure_equals("the world not let in: nothing", found("@inv/util", off), std::string());
+        const auto offered = [&](const ALIncludeSearch::Where& in) {
+            std::string out;
+            for (const ALRequireNavigation::Suggestion& one : search.suggest(in_object.self, "", true, in_object, in))
+            {
+                out += (out.empty() ? "" : " ") + one.label;
+            }
+            return out;
+        };
+        ensure("offered while the world is let in: " + offered(on), offered(on).find("@inv") != std::string::npos);
+        ensure("not otherwise: " + offered(off), offered(off).find("@inv") == std::string::npos);
+
+        // Beside a folder on disk, which is read only while the disk is.
+        Scratch           s;
+        const std::string disk_util = s.write("library/util.luau", "return 'disk'\n");
+        ALIncludeSearch::Where both = where(true, true);
+        both.aliases                = { { "inv", "libfolder" }, { "lib", s.at("library") } };
+        ensure_equals("each its own", found("@lib/util", both), ALIncludeIdentity::ofFile(disk_util));
+        ensure_equals("and the world's", found("@inv/util", both), util.path);
+    }
 }

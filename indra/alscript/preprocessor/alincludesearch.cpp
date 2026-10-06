@@ -370,17 +370,30 @@ public:
 
     Known studioAlias(const std::string& alias, std::string& folder) override
     {
-        if (!mWhere.disk)
-        {
-            return Known::No;
-        }
         for (const auto& [name, path] : mWhere.aliases)
         {
-            if (name == alias && isFolder(path))
+            if (name != alias)
             {
+                continue;
+            }
+            // A folder on disk, while the disk is read; or a folder of the
+            // world by the world's own id -- an inventory folder -- walked
+            // as the world is, while the world is let in.
+            if (ALLuauConfig::absolute(path))
+            {
+                if (!mWhere.disk || !isFolder(path))
+                {
+                    return Known::No;
+                }
                 folder = std::string(DISK_FOLDER) + path;
                 return Known::Yes;
             }
+            if (!mWhere.world)
+            {
+                return Known::No;
+            }
+            folder = path;
+            return Known::Yes;
         }
         return Known::No;
     }
@@ -388,9 +401,9 @@ public:
     std::vector<std::string> studioAliasNames() override
     {
         std::vector<std::string> out;
-        if (mWhere.disk)
+        for (const auto& [name, path] : mWhere.aliases)
         {
-            for (const auto& [name, path] : mWhere.aliases)
+            if (ALLuauConfig::absolute(path) ? mWhere.disk : mWhere.world)
             {
                 out.push_back(name);
             }
@@ -904,7 +917,10 @@ std::optional<std::string> ALIncludeSearch::requireAdmits(const ALPreprocessor::
     std::vector<std::string> blessing = alias_folders;
     for (const auto& [name, folder] : where.aliases)
     {
-        blessing.push_back(folder);
+        if (ALLuauConfig::absolute(folder))
+        {
+            blessing.push_back(folder);
+        }
     }
     return mDisk.admits(blessedFor(ask, asking, where, blessing), file);
 }
@@ -1001,7 +1017,13 @@ void ALIncludeSearch::searchedBefore(const ALPreprocessor::Ask& ask, const Askin
             aliases.emplace_back(prefix.substr(1, prefix.size() - 2), folder);
         }
     }
-    aliases.insert(aliases.end(), where.aliases.begin(), where.aliases.end());
+    for (const auto& [alias, folder] : where.aliases)
+    {
+        if (ALLuauConfig::absolute(folder))
+        {
+            aliases.emplace_back(alias, folder);
+        }
+    }
     for (const auto& [alias, folder] : aliases)
     {
         for (const std::string& name : under(folder))

@@ -8,7 +8,13 @@
  layout="topleft"
  name="aliases_panel"
  width="370">
-    <panel.string name="NoAlias">No aliases. Use Add... to name a folder.</panel.string>
+    <panel.string name="NoAlias">No aliases. Use Add... to name a folder, or drop one from your inventory.</panel.string>
+    <panel.string name="InventoryFolder">Inventory: [NAME]</panel.string>
+    <panel.string name="InventoryFolderGone">Inventory folder not found</panel.string>
+    <panel.string name="InventoryFolderTip">An inventory folder, which a require reads from while world includes are on.</panel.string>
+    <panel.string name="InventoryFolderOffTip">An inventory folder, which a require reads from only while world includes are on, which they are not.</panel.string>
+    <panel.string name="DiskFolderOffTip">[FOLDER], which a require reads from only while files on disk may be read, which they may not.</panel.string>
+    <panel.string name="DropFolder">Name this inventory folder an alias</panel.string>
     <panel.string name="NameTaken">'[NAME]' is already an alias.</panel.string>
     <panel.string name="NameBad">An alias's name is letters, digits, - _ and . -- not self, and not starting sl-.</panel.string>
     <text
@@ -31,7 +37,7 @@
      left="20"
      multi_select="false"
      name="aliases"
-     tool_tip="Each alias's name and its folder"
+     tool_tip="Each alias's name and its folder: one on disk, or one of your inventory's dropped here"
      top_pad="4"
      width="260">
         <pane_list.columns name="alias" width="70" />

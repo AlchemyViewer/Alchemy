@@ -37,6 +37,7 @@
 #include "allinebreaks.h"
 #include "allsltoslua.h"
 #include "allsltraits.h"
+#include "alluauconfig.h"
 #include "alluausharedstart.h"
 #include "alscriptlexicon.h"
 #include "alscriptstudioviewer.h"
@@ -4604,7 +4605,10 @@ std::vector<std::string> ALFloaterScriptStudio::diskCandidates(const Doc& doc)
     {
         for (const ALScriptPreprocessor::StudioAlias& alias : ALScriptPreprocessor::studioAliases())
         {
-            folders.push_back(alias.folder);
+            if (ALLuauConfig::absolute(alias.folder))
+            {
+                folders.push_back(alias.folder);
+            }
         }
     }
     return ALDiskIncludes::scriptsUnder(folders, doc.language.lua, DISK_DEPTH, DISK_SCRIPTS);
