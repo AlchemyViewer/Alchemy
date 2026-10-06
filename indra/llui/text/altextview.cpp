@@ -2173,15 +2173,29 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
     if (annotated())
     {
         std::vector<std::pair<S32, LineAnnotation>> gaps;
+        // The lines replaced by as many, after the first, whose gap goes
+        // with them, as they now are: told to the layout one by one, since
+        // no line moved for it to count every height again.
+        std::vector<S32> gone;
         if (mAnyGap)
         {
-            S32 moved = 0;
+            const S32 size  = static_cast<S32>(mAnnotations.size());
+            S32       moved = 0;
             for (const ALTextDocument::Edit::LineSpan& span : edit.lineSpans())
             {
-                if (span.made > 0 && span.first >= 0 && span.first < static_cast<S32>(mAnnotations.size()) &&
-                    mAnnotations[static_cast<size_t>(span.first)].gap > 0)
+                if (span.made > 0 && span.first >= 0 && span.first < size && mAnnotations[static_cast<size_t>(span.first)].gap > 0)
                 {
                     gaps.emplace_back(span.first + moved, mAnnotations[static_cast<size_t>(span.first)]);
+                }
+                if (span.made == span.last - span.first + 1)
+                {
+                    for (S32 l = llmax(span.first + 1, 0); l <= span.last && l < size; ++l)
+                    {
+                        if (mAnnotations[static_cast<size_t>(l)].gap > 0)
+                        {
+                            gone.push_back(l + moved);
+                        }
+                    }
                 }
                 moved += span.made - (span.last - span.first + 1);
             }
@@ -2198,9 +2212,9 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
             }
         }
         ++mAnnotationsRevision;
-        if (mAnyGap)
+        for (const S32 line : gone)
         {
-            mLayout.gapsChanged();
+            mLayout.gapChanged(line);
         }
     }
     // What the find bar found slides with the text, and so do the carets

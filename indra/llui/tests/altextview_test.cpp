@@ -2669,4 +2669,31 @@ namespace tut
         v.renumberLines(2, -2);
         ensure("from line two", v.lineAnnotation(0).number == 1 && v.lineAnnotation(4).number == 5);
     }
+
+    template<> template<>
+    void altextview_object::test<84>()
+    {
+        set_test_name("a keystroke in a view with gaps leaves its heights as they were; as many lines put over others take the gaps of all but the first, the heights below moving up");
+        ALTextView& v = make("zero\none\ntwo\nthree\nfour\nfive");
+        typedef ALTextView::LineAnnotation Said;
+        ALTextLayout&     layout = v.layout();
+        const S32         row_h  = layout.rowHeight();
+        std::vector<Said> lines(7);
+        lines[2].gap = 2;
+        lines[4].gap = 1;
+        v.setLineAnnotations(lines);
+        ensure("the gaps in the heights", layout.lineTop(4) == 7 * row_h && layout.totalHeight() == 9 * row_h);
+        const U32 heights = layout.heightsRevision();
+        v.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "x");
+        ensure("typed on a line without a gap: no height counted again", layout.heightsRevision() == heights && layout.lineTop(4) == 7 * row_h);
+        v.document().replace(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), "y");
+        ensure("typed on a line with one: its gap kept, no height counted again", layout.heightsRevision() == heights && layout.gapRows(2) == 2 && layout.lineTop(4) == 7 * row_h);
+        // Lines one and two put over by as many: the gap of line two, not
+        // the first line made, goes with it, and the lines below move up.
+        v.document().replace(ALTextRange(ALTextPos(1, 0), ALTextPos(2, 4)), "ONE\nTWO");
+        ensure("the gap gone with the line put over", layout.gapRows(2) == 0 && layout.gapRows(1) == 0 && v.lineAnnotation(2).gap == 0);
+        ensure("the heights below moved up by its rows", layout.heightsRevision() != heights && layout.lineTop(4) == 5 * row_h && layout.totalHeight() == 7 * row_h);
+        ensure("the other gap kept", layout.gapRows(4) == 1);
+        ensure_equals("the text as edited", v.text(), std::string("xzero\nONE\nTWO\nthree\nfour\nfive"));
+    }
 }
