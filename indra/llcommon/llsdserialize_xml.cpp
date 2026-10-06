@@ -340,7 +340,9 @@ public:
     Impl(bool emit_errors);
     ~Impl() = default;
 
-    S32 parse(std::istream& input, LLSD& data);
+    /// `max_depth` below zero is no limit; otherwise a document whose
+    /// elements nest deeper than that fails to parse.
+    S32 parse(std::istream& input, LLSD& data, S32 max_depth);
 
     void parsePart(const char* buf, llssize len);
 
@@ -436,6 +438,12 @@ private:
     LLSDRefStack mStack;
 
     int mDepth;
+    // The deepest nesting allowed, or -1 for any; and whether the document
+    // went past it, which fails the parse. The scanner keeps its state on
+    // the heap, but what it builds is freed recursively, and a text can
+    // nest for the sake of nesting.
+    int mMaxDepth;
+    bool mTooDeep;
     bool mSkipping;
     int mSkipThrough;
 
@@ -595,7 +603,13 @@ static bool resolve_entity(const char* p, size_t len, std::string& out)
         {
             return false;
         }
-        if (cp == 0 || cp > 0x10FFFF)
+        // The XML Char production: no control but tab, newline and return, no
+        // surrogate, and not the two non-characters that end the BMP. A
+        // surrogate in particular would be written as three bytes no UTF-8
+        // reader takes, and would ride in the text into whatever file the
+        // text is saved to -- the settings file, if it is a preset's name.
+        if (cp == 0 || cp > 0x10FFFF || (cp < 0x20 && cp != 0x9 && cp != 0xA && cp != 0xD) || (cp >= 0xD800 && cp <= 0xDFFF) || cp == 0xFFFE ||
+            cp == 0xFFFF)
         {
             return false;
         }
@@ -681,6 +695,8 @@ void LLSDXMLParser::Impl::reset()
     mInLLSDElement = false;
     mSawLLSDElement = false;
     mDepth = 0;
+    mMaxDepth = -1;
+    mTooDeep = false;
 
     mGracefullStop = false;
 
@@ -1225,6 +1241,11 @@ bool LLSDXMLParser::Impl::scanMarkup()
 void LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t attr_len)
 {
     ++mDepth;
+    if (mMaxDepth >= 0 && mDepth > mMaxDepth)
+    {
+        mTooDeep = true;
+        return;
+    }
     if (mSkipping)
     {
         return;
@@ -1466,7 +1487,7 @@ S32 LLSDXMLParser::Impl::run(std::istream& input, LLSD& data)
         && sb->pubseekoff(0, std::ios_base::cur, std::ios_base::in)
            != std::streambuf::pos_type(std::streambuf::off_type(-1));
 
-    while (!mGracefullStop)
+    while (!mGracefullStop && !mTooDeep)
     {
         if (!scanText())
         {
@@ -1489,11 +1510,11 @@ S32 LLSDXMLParser::Impl::run(std::istream& input, LLSD& data)
     mInput = nullptr;
     clear_eol(input);
 
-    if (!valid_chars || !mGracefullStop || !mSawLLSDElement)
+    if (!valid_chars || !mGracefullStop || !mSawLLSDElement || mTooDeep)
     {
         if (mEmitErrors)
         {
-            LL_INFOS() << "LLSDXMLParser: parse failure" << LL_ENDL;
+            LL_INFOS() << "LLSDXMLParser: parse failure" << (mTooDeep ? " (nested too deep)" : "") << LL_ENDL;
         }
         data = LLSD();
         return LLSDParser::PARSE_FAILURE;
@@ -1503,8 +1524,9 @@ S32 LLSDXMLParser::Impl::run(std::istream& input, LLSD& data)
     return mParseCount;
 }
 
-S32 LLSDXMLParser::Impl::parse(std::istream& input, LLSD& data)
+S32 LLSDXMLParser::Impl::parse(std::istream& input, LLSD& data, S32 max_depth)
 {
+    mMaxDepth = max_depth;
     return run(input, data);
 }
 
@@ -1543,7 +1565,7 @@ S32 LLSDXMLParser::doParse(std::istream& input, LLSD& data, S32 max_depth) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
 
-    return impl.parse(input, data);
+    return impl.parse(input, data, max_depth);
 }
 
 //  virtual
