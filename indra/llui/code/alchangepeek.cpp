@@ -146,6 +146,11 @@ ALChangePeek::ALChangePeek(ALCodeEditor& host)
     mPrevious->setCommitCallback([this](LLUICtrl*, const LLSD&) { step(false); });
     mNext->setCommitCallback([this](LLUICtrl*, const LLSD&) { step(true); });
     mClose->setCommitCallback([this](LLUICtrl*, const LLSD&) { close(); });
+    // The keys the editor steps and closes it by, as a comparison's bar
+    // has them.
+    mPrevious->setKey(KEY_F7, MASK_SHIFT);
+    mNext->setKey(KEY_F7, MASK_NONE);
+    mClose->setKey(KEY_ESCAPE, MASK_NONE);
 
     // The lines as saved: read only, unfolded, unwrapped, in the editor's
     // grammar, face and colours.
@@ -167,6 +172,9 @@ ALChangePeek::ALChangePeek(ALCodeEditor& host)
             close();
         }
     });
+    // Heard after the editor, which listened to its text first, has slid
+    // the gaps; and before the edit is told as a change, which closes it.
+    mEditConnection = host.document().onChanged([this](const ALTextDocument::Edit& edit) { slideGap(edit); });
 }
 
 ALChangePeek::~ALChangePeek() = default;
@@ -387,6 +395,47 @@ void ALChangePeek::shutGap()
     mGapWas  = 0;
 }
 
+void ALChangePeek::slideGap(const ALTextDocument::Edit& edit)
+{
+    const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
+    if (mGapLine < 0 || spans.empty())
+    {
+        return;
+    }
+    // Under the last line, the gap is the text's end's, which stays there.
+    const S32 lines = mHost.document().lineCount();
+    if (mGapLine >= lines - spans.back().shiftAfter)
+    {
+        mGapLine = lines;
+        return;
+    }
+    S32 moved = 0;
+    for (const ALTextDocument::Edit::LineSpan& span : spans)
+    {
+        if (mGapLine < span.first)
+        {
+            break;
+        }
+        if (mGapLine <= span.last)
+        {
+            // On the first line the edit replaced, the gap stays above the
+            // first line it made there; on a line after that, it went.
+            if (mGapLine == span.first && span.made > 0)
+            {
+                mGapLine = span.first + moved;
+            }
+            else
+            {
+                mGapLine = -1;
+                mGapWas  = 0;
+            }
+            return;
+        }
+        moved = span.shiftAfter;
+    }
+    mGapLine += moved;
+}
+
 void ALChangePeek::place()
 {
     if (!isOpen() || mGapLine < 0)
@@ -442,6 +491,11 @@ bool ALChangePeek::handleKeyHere(KEY key, MASK mask)
     {
         close();
         mHost.setFocus(true);
+        return true;
+    }
+    if (key == KEY_F7 && (mask == MASK_NONE || mask == MASK_SHIFT))
+    {
+        step(mask == MASK_NONE);
         return true;
     }
     return LLPanel::handleKeyHere(key, mask);

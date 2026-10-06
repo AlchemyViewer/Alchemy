@@ -342,6 +342,9 @@ public:
     // a line's bar does. False where the line is in none.
     bool          peekChange(S32 line);
     ALChangePeek* changePeek() const { return mPeek; }
+    // The changed line whose bar, at the gutter's edge, a point is on: what
+    // a press there peeks at. -1 for none, and without a gutter.
+    S32           changeBarAt(S32 x, S32 y);
     // A peek open closed: the text is saved, and what it shows was the
     // change since the save before.
     void          closePeek();

@@ -333,4 +333,83 @@ namespace tut
         e.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "z");
         ensure("the text as it is", e.changesSinceSaved()->now.front() == "za");
     }
+
+    template<> template<>
+    void alchangepeek_object::test<10>()
+    {
+        set_test_name("an edit above an open peek that adds or takes lines closes it with no gap left anywhere, its own or the text's end's");
+        ALCodeEditor& e     = make("a\nb\nc\nd\ne", "a\nB\nc\nx\nd");
+        const auto    clear = [&e]() {
+            for (S32 l = 0; l <= e.document().lineCount(); ++l)
+            {
+                if (e.lineAnnotation(l).gap != 0 || (l < e.document().lineCount() && e.layout().gapRows(l) != 0))
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
+        ensure("no gap before", clear());
+
+        // A line put in above it.
+        ensure("peeked", e.peekChange(1) && e.changePeek()->gapLine() == 2 && e.lineAnnotation(2).gap > 0);
+        e.goTo(ALTextPos(0, 1));
+        e.insertText("\n");
+        ensure("closed", !e.changePeek()->isOpen());
+        ensure("a line put in above: no gap left", clear());
+
+        // A line taken out above it.
+        ensure("peeked again", e.peekChange(4) && e.changePeek()->gapLine() == 5 && e.lineAnnotation(5).gap > 0);
+        e.goTo(ALTextPos(1, 0));
+        ensure("joined", e.handleKeyHere(KEY_BACKSPACE, MASK_NONE) && e.document().lineCount() == 5);
+        ensure("closed again", !e.changePeek()->isOpen());
+        ensure("a line taken out above: no gap left", clear());
+
+        // Under the last line, the text's end's gap, with a line put in.
+        const S32 last = e.document().lineCount() - 1;
+        ensure("peeked at the end", e.peekChange(last) && e.changePeek()->gapLine() == e.document().lineCount() &&
+                                        e.lineAnnotation(e.document().lineCount()).gap > 0);
+        e.goTo(ALTextPos(0, 0));
+        e.insertText("\n");
+        ensure("closed at the end", !e.changePeek()->isOpen());
+        ensure("the end's gap shut", clear());
+    }
+
+    template<> template<>
+    void alchangepeek_object::test<11>()
+    {
+        set_test_name("from the editor: F7 and Shift-F7 step the peek; Escape closes it once nothing else has it; and under vim");
+        ALCodeEditor& e = make("a\nb\nc\nd\ne", "a\nB\nc\nx\nd");
+        e.setFocus(true);
+        ensure("peeked", e.peekChange(1));
+        ALChangePeek& peek = *e.changePeek();
+        ensure("F7: the next", e.handleKeyHere(KEY_F7, MASK_NONE) && peek.changeShown() == 1);
+        ensure("Shift-F7: the one before", e.handleKeyHere(KEY_F7, MASK_SHIFT) && peek.changeShown() == 0);
+
+        e.selectAll();
+        ensure("Escape lets the selection go first", e.handleKeyHere(KEY_ESCAPE, MASK_NONE) && peek.isOpen() && !e.hasSelection());
+        ensure("then closes it", e.handleKeyHere(KEY_ESCAPE, MASK_NONE) && !peek.isOpen() && e.lineAnnotation(2).gap == 0);
+        ensure("closed, F7 is the text's again", !peek.isOpen());
+
+        e.setModalKeymap(std::make_unique<ALVimKeymap>());
+        ensure("peeked under vim", e.peekChange(1) && peek.isOpen());
+        ensure("Escape in its normal mode closes it", e.handleKeyHere(KEY_ESCAPE, MASK_NONE) && !peek.isOpen() && e.lineAnnotation(2).gap == 0);
+    }
+
+    template<> template<>
+    void alchangepeek_object::test<12>()
+    {
+        set_test_name("without a gutter, a press at the text's left edge on a changed line is the text's, not a peek");
+        ALCodeEditor& e = make("one\ntwo\nthree", "one\n2\nthree");
+        e.setShowLineNumbers(false);
+        e.setShowFoldMarkers(false);
+        ensure_equals("no gutter", e.gutterWidth(), 0);
+        const LLRect text = e.textRect();
+        const S32    y    = text.mTop - (e.layout().lineTop(1) - e.scrollY()) - e.layout().lineHeight(1) / 2;
+        ensure("barred", e.lineChanged(1));
+        ensure_equals("no bar to press", e.changeBarAt(e.leftEdge() + 1, y), -1);
+        e.handleMouseDown(e.leftEdge() + 1, y, MASK_NONE);
+        e.handleMouseUp(e.leftEdge() + 1, y, MASK_NONE);
+        ensure("no peek", !e.changePeek() || !e.changePeek()->isOpen());
+    }
 }

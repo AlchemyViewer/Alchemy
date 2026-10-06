@@ -119,6 +119,11 @@ private:
     void unmarkWords();
     void openGap(S32 line, S32 rows);
     void shutGap();
+    // The line its gap is on followed through an edit, as the editor
+    // slides the gaps it was told of: heard after the editor has moved
+    // them, and before the edit closes it, so that it shuts the gap where
+    // the gap now is.
+    void slideGap(const ALTextDocument::Edit& edit);
     // How tall it stands: its bar, and the lines it shows.
     S32  height() const;
 
@@ -141,6 +146,7 @@ private:
     // An edit of the text made from here, which does not close it.
     bool                     mEditing = false;
     boost::signals2::scoped_connection mChangedConnection;
+    boost::signals2::scoped_connection mEditConnection;
 };
 
 #endif // AL_ALCHANGEPEEK_H

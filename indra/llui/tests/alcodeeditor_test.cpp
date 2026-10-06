@@ -26,6 +26,7 @@
 
 #include "alcodeeditor.h"
 
+#include "alchangepeek.h"
 #include "alchoicelist.h"
 #include "alchoicepopup.h"
 #include "alfindbar.h"
@@ -2769,5 +2770,32 @@ namespace tut
         e.setLineRevealer(nullptr);
         e.goTo(ALTextPos(4, 0));
         ensure("nobody to ask: the line shown, the rest left", !e.layout().hidden(4) && e.layout().hidden(5));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<77>()
+    {
+        set_test_name("a changed line's bar is found by the mouse: taken on hover, and says what a press does, ahead of the gutter's own tips");
+        ALCodeEditor& e = make("one\ntwo\nthree");
+        e.resetDirty();
+        e.goTo(ALTextPos(1, 0));
+        e.insertText("2");
+        ensure("barred", e.lineChanged(1) && !e.lineChanged(0));
+        const LLRect text = e.textRect();
+        const auto   rowY = [&](S32 line) { return text.mTop - (e.layout().lineTop(line) - e.scrollY()) - e.layout().lineHeight(line) / 2; };
+        const S32    bar  = e.leftEdge() + 1;
+        ensure_equals("on the bar", e.changeBarAt(bar, rowY(1)), 1);
+        ensure_equals("a line not changed", e.changeBarAt(bar, rowY(0)), -1);
+        ensure_equals("past the bar", e.changeBarAt(e.leftEdge() + 5, rowY(1)), -1);
+        ensure("hovered: taken", e.handleHover(bar, rowY(1), MASK_NONE));
+        ensure("a tip, not a card", e.handleToolTip(bar, rowY(1), MASK_NONE) && !e.cardShown());
+        ensure("a press peeks", e.handleMouseDown(bar, rowY(1), MASK_NONE) && e.changePeek() && e.changePeek()->isOpen());
+        e.closePeek();
+
+        // No gutter: nothing to point at.
+        e.setShowLineNumbers(false);
+        e.setShowFoldMarkers(false);
+        ensure_equals("no gutter", e.gutterWidth(), 0);
+        ensure_equals("no bar", e.changeBarAt(e.leftEdge() + 1, rowY(1)), -1);
     }
 }

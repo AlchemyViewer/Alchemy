@@ -48,6 +48,7 @@
 #include "lluicolortable.h"
 #include "llurlaction.h"
 #include "lluictrlfactory.h"
+#include "llwindow.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
@@ -680,6 +681,17 @@ bool ALCodeEditor::peekChange(S32 line)
     return mPeek->showAt(line);
 }
 
+S32 ALCodeEditor::changeBarAt(S32 x, S32 y)
+{
+    const LLRect text = textRect();
+    if (gutterWidth() <= 0 || x < leftEdge() || x >= leftEdge() + CHANGE_BAR_HIT || y < text.mBottom || y > text.mTop)
+    {
+        return -1;
+    }
+    const S32 line = posAtLocal(text.mLeft, y, false).line;
+    return lineChanged(line) ? line : -1;
+}
+
 bool ALCodeEditor::lineChanged(S32 line) const
 {
     return line >= 0 && line < static_cast<S32>(mChanged.size()) && mChanged[static_cast<size_t>(line)] != 0;
@@ -712,8 +724,13 @@ void ALCodeEditor::barChangesSince(std::string_view saved)
     // The saved text's lines read as the document reads its own, whatever
     // ends them; what lies between where the two first differ and where
     // they end alike barred.
-    const std::vector<std::string> was   = ALLineBreaks::split(saved);
-    const std::vector<std::string> lines = ALLineBreaks::split(wholeText());
+    const std::vector<std::string> was = ALLineBreaks::split(saved);
+    std::vector<std::string>       lines;
+    lines.reserve(static_cast<size_t>(document().lineCount()));
+    for (S32 l = 0; l < document().lineCount(); ++l)
+    {
+        lines.push_back(document().line(l));
+    }
     const auto [first, last]             = ALDiffEdit::edgesOf(was, lines);
     const size_t now                     = lines.size();
     const size_t head                    = static_cast<size_t>(first);
@@ -863,6 +880,11 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         mNumberGlyphs.clear();
         mNumberColours.clear();
     };
+    // The host's sign for a line, centred on a column, in the numbers' ink.
+    const auto draw_sign = [&](char sign, S32 cx, S32 screen_top, const LLColor4& colour) {
+        const char* glyph = sign == '-' ? "\xE2\x88\x92" : sign == '+' ? "+" : sign == '>' ? "\xC2\xBB" : "~";
+        font->renderUTF8(glyph, 0, cx, screen_top - ascent, colour, LLFontGL::HCENTER, LLFontGL::BASELINE);
+    };
     // Down every row of a line: the bar of a line changed, and the heat of
     // one that made something, at least faintly and the warmest in the
     // heat's own colour; all in one batch.
@@ -950,16 +972,24 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
             }
             else if (said.sign)
             {
-                // The host's sign, where the mark goes, in the numbers' ink.
-                const char* glyph = said.sign == '-' ? "\xE2\x88\x92" : said.sign == '+' ? "+" : said.sign == '>' ? "\xC2\xBB" : "~";
-                font->renderUTF8(glyph, 0, gutter.mLeft + MARK_INSET + MARK_SIZE / 2, screen_top - ascent, line == caret_line ? lit : ink, LLFontGL::HCENTER,
-                                 LLFontGL::BASELINE);
+                // The host's sign, where the mark goes.
+                draw_sign(said.sign, gutter.mLeft + MARK_INSET + MARK_SIZE / 2, screen_top, line == caret_line ? lit : ink);
             }
         }
         // A marker at a block's first line: pointing right at a folded
         // one, always; pointing down at an open one, while the mouse is
         // over the gutter, so that the gutter is quiet otherwise.
-        if (mShowFoldMarkers && regionStartingAt(line) && (isFolded(line) || mGutterHover))
+        const bool marker = mShowFoldMarkers && regionStartingAt(line) && (isFolded(line) || mGutterHover);
+        if (!mShowLineNumbers && !marker && mShowFoldMarkers)
+        {
+            // Without the numbers there is no mark column: the host's sign
+            // in the fold column instead, where no marker stands.
+            if (const char sign = lineAnnotation(line).sign; sign)
+            {
+                draw_sign(sign, fold_right - FOLD_COLUMN / 2, screen_top, line == caret_line ? lit : ink);
+            }
+        }
+        if (marker)
         {
             const S32 cx = fold_right - FOLD_COLUMN / 2;
             const S32 cy = screen_top - row_h / 2;
@@ -4297,6 +4327,22 @@ void ALCodeEditor::dropTyping()
 bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 {
     hideCard();
+    // A peek open steps by the keys a comparison steps by, ahead of the
+    // misspellings they otherwise walk.
+    if (key == KEY_F7 && (mask == MASK_NONE || mask == MASK_SHIFT) && mPeek && mPeek->isOpen())
+    {
+        mPeek->step(mask == MASK_NONE);
+        return true;
+    }
+    // Escape closes a peek open once nothing else here would take it: the
+    // find bar, a selection, other carets, an atom's view, a modal
+    // keymap's command line.
+    const auto escapes_peek = [&]() {
+        std::string typed;
+        S32         at = 0;
+        return key == KEY_ESCAPE && mask == MASK_NONE && mPeek && mPeek->isOpen() && !findShown() && !hasSelection() && !hasOtherSelections() &&
+               !atomViewFocused() && !(modalKeymap() && modalKeymap()->typingLine(typed, at));
+    };
     // At several carets the signature and a snippet's stops are not in
     // play, each being about one place; the list is the main caret's.
     if (hasOtherSelections() && typingText())
@@ -4344,6 +4390,13 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
     if (!typingText())
     {
         dropTyping();
+        if (escapes_peek())
+        {
+            // What the keymap has pending let go of as well.
+            ALTextView::handleKeyHere(key, mask);
+            closePeek();
+            return true;
+        }
         return ALTextView::handleKeyHere(key, mask);
     }
     // Under a modal keymap one Escape closes whatever the typing has up
@@ -4462,6 +4515,11 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
         {
             mSignatureRequest(caret());
         }
+        return true;
+    }
+    if (escapes_peek())
+    {
+        closePeek();
         return true;
     }
     const bool taken = ALTextView::handleKeyHere(key, mask);
@@ -4794,13 +4852,9 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     const LLRect text         = textRect();
     const S32    gutter_right = leftEdge() + gutterWidth();
     // A changed line's bar, at the gutter's edge: a peek at its change.
-    if (x >= leftEdge() && x < leftEdge() + CHANGE_BAR_HIT && text.mBottom <= y && y <= text.mTop)
+    if (const S32 line = changeBarAt(x, y); line >= 0 && peekChange(line))
     {
-        const S32 line = posAtLocal(text.mLeft, y, false).line;
-        if (lineChanged(line) && peekChange(line))
-        {
-            return true;
-        }
+        return true;
     }
     // The mark column of a line whose problems offer fixes: its fixes,
     // listed as Control-. would list them.
@@ -4908,6 +4962,12 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
         return true;
     }
     const LLRect text = textRect();
+    // A changed line's bar says what a press on it does.
+    if (changeBarAt(x, y) >= 0)
+    {
+        LLToolTipMgr::instance().show(alSaid("CodePeekChange", "Peek at this change"));
+        return true;
+    }
     // A mark in the gutter says what is on its line: every problem there;
     // the strip of heat at its edge, what the line came to.
     if (x >= leftEdge() && x < leftEdge() + gutterWidth() && text.mBottom <= y && y <= text.mTop)
@@ -5087,7 +5147,17 @@ bool ALCodeEditor::handleHover(S32 x, S32 y, MASK mask)
     const S32 gutter_right = leftEdge() + gutterWidth();
     mGutterHover           = gutterWidth() > 0 && x >= leftEdge() && x < gutter_right && textRect().mBottom <= y && y <= textRect().mTop;
     mGutterHoverLine       = mGutterHover ? posAtLocal(textRect().mLeft, y, false).line : -1;
-    return ALTextView::handleHover(x, y, mask);
+    const bool taken = ALTextView::handleHover(x, y, mask);
+    // A changed line's bar is pressed for a peek at its change.
+    if (changeBarAt(x, y) >= 0)
+    {
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_HAND);
+        }
+        return true;
+    }
+    return taken;
 }
 
 void ALCodeEditor::onMouseLeave(S32 x, S32 y, MASK mask)
@@ -5137,16 +5207,17 @@ void ALCodeEditor::pump()
         hoverCardAt(mMouseX, mMouseY);
     }
     ALTextView::pump();
+    // In its gap as the text is scrolled, before the children are drawn:
+    // after the view has settled its scroll for a gap opened or shut.
+    if (mPeek && mPeek->isOpen())
+    {
+        mPeek->place();
+    }
 }
 
 void ALCodeEditor::draw()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    // In its gap as the text is scrolled, before the children are drawn.
-    if (mPeek && mPeek->isOpen())
-    {
-        mPeek->place();
-    }
     ALTextView::draw();
     if (mCards.signature())
     {

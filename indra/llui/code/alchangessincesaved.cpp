@@ -57,7 +57,12 @@ std::shared_ptr<const ALChangesSinceSaved::Known> ALChangesSinceSaved::of(const 
     {
         auto known     = std::make_shared<Known>();
         known->saved   = ALTextDiff::split(*saved);
-        known->now     = ALTextDiff::split(document.wholeText());
+        // The document's own lines, which hold no line breaks.
+        known->now.reserve(static_cast<size_t>(document.lineCount()));
+        for (S32 l = 0; l < document.lineCount(); ++l)
+        {
+            known->now.push_back(document.line(l));
+        }
         known->changes = between(known->saved, known->now);
         known->version = mVersion;
         mKnown         = std::move(known);
