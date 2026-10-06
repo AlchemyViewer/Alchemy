@@ -1757,4 +1757,24 @@ namespace tut
         ensure_equals("one the search never found: as before", r.problems[1].key, std::string("PreprocModuleNotFound"));
         ensure("with no fix", r.problems[1].fixes.empty());
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<46>()
+    {
+        set_test_name("a require of a file beside a folder's init of its name: taken, and a warning naming both");
+        ALPreprocessor::Options o = options(true);
+        o.resolve                 = [](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
+            out.text       = "return 1\n";
+            out.name       = "both.luau";
+            out.path       = "disk:/proj/both.luau";
+            out.passedOver = "/proj/both/init.luau";
+            return ALPreprocessor::Found::Yes;
+        };
+        const ALPreprocessor::Result r = ALPreprocessor::run("local both = require('./both')\n", o);
+        ensure_equals("one said", r.problems.size(), size_t(1));
+        const ALScriptProblem& said = r.problems[0];
+        ensure("a warning", said.severity == ALScriptProblem::Severity::Warning && said.key == "PreprocModuleBesideInit");
+        ensure("naming both", said.args == std::vector<std::string>({ "./both", "both.luau", "/proj/both/init.luau" }));
+        ensure("the module taken", r.text.find("return 1") != std::string::npos);
+    }
 }

@@ -754,4 +754,30 @@ namespace tut
         include = missed("@missing/util", from_disk);
         ensure("an alias's is no searched name", include.searched.empty());
     }
+
+    template<> template<>
+    void alincludesearch_object::test<12>()
+    {
+        set_test_name("a file and a folder's init of one name: the file taken, the init passed over said; either alone, nothing to say");
+        Scratch           s;
+        const std::string script = s.write("proj/main.luau", "return require('./both')\n");
+        const std::string file   = s.write("proj/both.luau", "return 'file'\n");
+        const std::string init   = s.write("proj/both/init.luau", "return 'init'\n");
+        s.write("proj/alone/init.luau", "return 'alone'\n");
+        const ALIncludeSearch::Where  disk = where(false, true, { s.at("proj") });
+        const ALIncludeSearch::Asking own{ ALIncludeIdentity::ofFile(script), true };
+        ALPreprocessor::Include       found;
+        std::vector<std::string>      aliases;
+        ensure("found", search.resolve(ask("./both", true, own.self), found, own, disk, nullptr, false, &aliases) == ALPreprocessor::Found::Yes);
+        ensure_equals("the file", found.path, ALIncludeIdentity::ofFile(file));
+        ensure_equals("the init passed over", found.passedOver, init);
+        ALPreprocessor::Include alone;
+        ensure("a folder's init alone", search.resolve(ask("./alone", true, own.self), alone, own, disk, nullptr, false, &aliases) ==
+                                            ALPreprocessor::Found::Yes &&
+                                            alone.passedOver.empty());
+        ALPreprocessor::Include named;
+        ensure("named with its extension: the file alone, nothing passed over",
+               search.resolve(ask("./both.luau", true, own.self), named, own, disk, nullptr, false, &aliases) == ALPreprocessor::Found::Yes &&
+                   named.passedOver.empty());
+    }
 }

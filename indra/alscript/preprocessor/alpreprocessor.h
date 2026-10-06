@@ -93,6 +93,10 @@ public:
         };
         std::string       searched;
         std::vector<Move> moves;
+        // A SLua require where a file and a folder's init of the same name
+        // are both there: the file is taken (LAD3), and the init passed
+        // over is this, by the name it is said by.
+        std::string passedOver;
     };
     enum class Found : U8
     {

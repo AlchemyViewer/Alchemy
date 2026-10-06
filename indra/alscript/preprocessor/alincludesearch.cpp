@@ -722,6 +722,10 @@ ALPreprocessor::Found ALIncludeSearch::resolveRequire(const ALPreprocessor::Ask&
         }
         out.name = c.name;
         out.path = c.path;
+        if (walked.passedOver)
+        {
+            out.passedOver = walked.passedOver->file.empty() ? walked.passedOver->name : walked.passedOver->file;
+        }
         return found;
     }
     searchedBefore(ask, asking, where, alias_folders, out);

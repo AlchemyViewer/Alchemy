@@ -4622,6 +4622,14 @@ namespace
             }
             key = found.path.empty() ? name : found.path;
             mResult.resolved.push_back({ from, name, true, key });
+            if (!found.passedOver.empty())
+            {
+                // A file and a folder's init both: the file, as the plugin
+                // takes it, said with the one not taken.
+                const std::string taken = found.name.empty() ? key : found.name;
+                mEngine.problem(ALScriptProblem::Severity::Warning, "PreprocModuleBesideInit",
+                                "'[1]' is both [2] and the folder's init [3]; the file is taken", { name, taken, found.passedOver }, at);
+            }
             if (mDone.count(key))
             {
                 return true;
