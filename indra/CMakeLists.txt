@@ -129,13 +129,16 @@ cmake_dependent_option(
 # see cmake/Discord.cmake. It is built for Windows and macOS, x64 and arm64,
 # and Linux x64, and the option is held off anywhere else. This runs before
 # project(), so on Linux the host stands for the target, as it does for the
-# triplet: nothing cross-compiles the viewer there.
+# triplet: nothing cross-compiles the viewer there. CMAKE_HOST_SYSTEM_PROCESSOR
+# is not set until project() runs, so the host is asked directly, as
+# cmake/BootstrapVcpkg.cmake does for the triplet.
 set(al_discord_supported ON)
-if(
-  CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux"
-  AND NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$"
-)
-  set(al_discord_supported OFF)
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+  cmake_host_system_information(RESULT al_host_arch QUERY OS_PLATFORM)
+  if(NOT al_host_arch MATCHES "^(x86_64|AMD64|amd64)$")
+    set(al_discord_supported OFF)
+  endif()
+  unset(al_host_arch)
 endif()
 cmake_dependent_option(
   AL_USE_DISCORD
