@@ -165,9 +165,10 @@ public:
     // one before.
     U32           layouts() const { return mLayouts; }
     // Whether a rebuild after a splice keeps what it can of the one before
-    // -- the layout, and by structure, the changes read as tokens; on
-    // unless asked. Off, every row is laid out and every change read
-    // again: what a test holds what is kept to.
+    // -- the layout, by structure the changes read as tokens, and the
+    // lines' ids the moves are found by; on unless asked. Off, every row is
+    // laid out, every change read and every line keyed again: what a test
+    // holds what is kept to.
     void          setKeepsLayout(bool keeps) { mKeepsLayout = keeps; }
     // Swapped or not: the runs as open as they were.
     void    setSwapped(bool swapped);
@@ -512,6 +513,9 @@ private:
     std::string           mRightText;
     ALTextDiff::ranges_t  mRanges;
     ALTextDiff::ranges_t  mPairs;
+    // The search for blocks moved, which keeps each line's id between
+    // rebuilds, told of every edit.
+    ALDiffMoves::Finder   mMoveFinder;
     std::vector<bool>     mBracketed;
     ALTextDiff::Options   mOptions;
     bool                  mSwapped  = false;

@@ -104,6 +104,7 @@ void ALDiffModel::setTexts(std::string_view left, std::string_view right, const 
     mRightLines = ALTextDiff::split(mRightText);
     mRanges     = ranges;
     mPairs.clear();
+    mMoveFinder.forget();
     build();
 }
 
@@ -197,6 +198,7 @@ void ALDiffModel::setLeftText(std::string_view left)
     {
         // Nor what stood for what: lined up otherwise, compared afresh.
         mRanges.clear();
+        mMoveFinder.edited(true, edges.head, static_cast<S32>(mLeftLines.size()) - edges.tail, static_cast<S32>(lines.size()) - edges.tail);
         mLeftLines = std::move(lines);
         build();
         return;
@@ -218,6 +220,8 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, cons
     const bool                           regioned = static_cast<bool>(mOptions.lexer);
     const bool                           had      = regioned && (shown ? shownRegions().second : shownRegions().first);
     const std::vector<std::pair<S32, size_t>> read_before = had ? readFrom(shown, was - edges.tail) : std::vector<std::pair<S32, size_t>>();
+    // The moves' ids of the lines edited let go of, those after moved along.
+    mMoveFinder.edited(given_left, edges.head, was - edges.tail, static_cast<S32>(lines.size()) - edges.tail);
     side = std::move(lines);
     mRegions.reset();
     if (mMerge && !given_left)
@@ -516,7 +520,11 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const std::vector<b
         return with;
     };
     // The blocks moved, and which each line of either side is in.
-    const ALDiffMoves::moves_t moves = ALDiffMoves::find(left, right, runs, options);
+    if (!mKeepsLayout)
+    {
+        mMoveFinder.forget();
+    }
+    const ALDiffMoves::moves_t moves = mMoveFinder.find(mLeftLines, mRightLines, runs, options, mSwapped);
     std::vector<S32>           left_move(left.size(), -1);
     std::vector<S32>           right_move(right.size(), -1);
     for (size_t n = 0; n < moves.size(); ++n)

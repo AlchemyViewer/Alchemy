@@ -26,6 +26,7 @@
 
 #include "altextdiff.h"
 
+#include "aldiffedit.h"
 #include "aldiffmoves.h"
 #include "aldiffsame.h"
 #include "aldiffsplice.h"
@@ -1183,5 +1184,83 @@ namespace tut
         std::reverse(shuffled.begin(), shuffled.end());
         std::swap(shuffled[1], shuffled[3]);
         ensure("whatever their order", ALTextDiff::anchorsOf(shuffled) == ALTextDiff::anchorsOf(ranges));
+    }
+
+    template<> template<>
+    void altextdiff_object::test<25>()
+    {
+        set_test_name("moves found keeping each line's id from one search to the next, told of each edit: the same as found afresh, either side edited, swapped or not, lines told the same or not; an edit keys only its own lines");
+        typedef ALDiffMoves::moves_t M;
+        std::mt19937 random(20261007);
+        std::vector<std::string> base;
+        for (S32 n = 0; n < 120; ++n)
+        {
+            base.push_back(n % 7 == 0 ? std::string("}") : "    statement number " + std::to_string(n) + " goes here;");
+        }
+        for (S32 way = 0; way < 4; ++way)
+        {
+            const bool          swapped = way & 1;
+            ALTextDiff::Options options;
+            options.like.ignoreWhitespace = way & 2;
+            std::vector<std::string> texts[2] = { base, base };
+            ALDiffMoves::Finder      finder;
+            for (S32 step = 0; step < 80; ++step)
+            {
+                // An edit of one text as given: a line changed, lines put in
+                // or taken out, or a block moved.
+                const size_t             side = random() % 2;
+                std::vector<std::string> was  = texts[side];
+                std::vector<std::string>& now = texts[side];
+                const size_t              at  = random() % now.size();
+                switch (random() % 4)
+                {
+                    case 0:
+                        now[at] += " changed";
+                        break;
+                    case 1:
+                        now.insert(now.begin() + static_cast<std::ptrdiff_t>(at), 1 + random() % 3, "    put in " + std::to_string(random() % 50) + ";");
+                        break;
+                    case 2:
+                        if (now.size() > 20)
+                        {
+                            now.erase(now.begin() + static_cast<std::ptrdiff_t>(at), now.begin() + static_cast<std::ptrdiff_t>(std::min(now.size(), at + 1 + random() % 3)));
+                        }
+                        break;
+                    default:
+                        if (now.size() > 30)
+                        {
+                            const size_t             from = random() % (now.size() - 10);
+                            std::vector<std::string> block(now.begin() + static_cast<std::ptrdiff_t>(from), now.begin() + static_cast<std::ptrdiff_t>(from + 6));
+                            now.erase(now.begin() + static_cast<std::ptrdiff_t>(from), now.begin() + static_cast<std::ptrdiff_t>(from + 6));
+                            const size_t to = random() % now.size();
+                            now.insert(now.begin() + static_cast<std::ptrdiff_t>(to), block.begin(), block.end());
+                        }
+                        break;
+                }
+                const ALDiffEdit::Edges edges = ALDiffEdit::edgesOf(was, now);
+                finder.edited(side == 0, edges.head, static_cast<S32>(was.size()) - edges.tail, static_cast<S32>(now.size()) - edges.tail);
+                const std::vector<std::string>& left  = swapped ? texts[1] : texts[0];
+                const std::vector<std::string>& right = swapped ? texts[0] : texts[1];
+                const std::vector<ALTextDiff::Run> runs = ALTextDiff::lines(left, right, options);
+                const M kept  = finder.find(texts[0], texts[1], runs, options, swapped);
+                const M fresh = ALDiffMoves::find(left, right, runs, options);
+                ensure("way " + std::to_string(way) + ", step " + std::to_string(step) + ": as found afresh", kept == fresh);
+            }
+        }
+
+        // A line changed far from a block moved: it, and the line beside it
+        // it is now a change with, keyed; nothing else.
+        std::vector<std::string> left = base;
+        std::vector<std::string> right = base;
+        std::vector<std::string> block(right.begin() + 10, right.begin() + 16);
+        right.erase(right.begin() + 10, right.begin() + 16);
+        right.insert(right.begin() + 80, block.begin(), block.end());
+        ALDiffMoves::Finder finder;
+        ensure_equals("the block found", finder.find(left, right, ALTextDiff::lines(left, right), ALTextDiff::Options()).size(), size_t(1));
+        ensure("its lines keyed", finder.lastKeyed() >= 12);
+        right[50] += " changed";
+        finder.edited(false, 50, 51, 51);
+        ensure_equals("found again", finder.find(left, right, ALTextDiff::lines(left, right), ALTextDiff::Options()).size(), size_t(1));
+        ensure("the line changed, and the line it is now a change with: " + std::to_string(finder.lastKeyed()), finder.lastKeyed() <= 2);
     }
 }

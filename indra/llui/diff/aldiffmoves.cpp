@@ -33,6 +33,55 @@
 ALDiffMoves::moves_t ALDiffMoves::find(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<ALTextDiff::Run>& runs,
                                        const ALTextDiff::Options& options)
 {
+    Finder finder;
+    return finder.find(left, right, runs, options);
+}
+
+void ALDiffMoves::Finder::edited(bool left, S32 head, S32 was_end, S32 now_end)
+{
+    std::vector<S32>& ids = mLineIds[left ? 0 : 1];
+    if (!mKeyed || head < 0 || head > was_end || static_cast<size_t>(was_end) > ids.size())
+    {
+        forget();
+        return;
+    }
+    const auto at = [&ids](S32 line) { return ids.begin() + static_cast<std::ptrdiff_t>(line); };
+    if (now_end < was_end)
+    {
+        ids.erase(at(now_end), at(was_end));
+    }
+    else if (now_end > was_end)
+    {
+        ids.insert(at(was_end), static_cast<size_t>(now_end - was_end), -1);
+    }
+    std::fill(at(head), at(now_end), -1);
+}
+
+void ALDiffMoves::Finder::forget()
+{
+    mKeyed = false;
+}
+
+ALDiffMoves::moves_t ALDiffMoves::Finder::find(const std::vector<std::string>& given_left, const std::vector<std::string>& given_right,
+                                               const std::vector<ALTextDiff::Run>& runs, const ALTextDiff::Options& options, bool swapped)
+{
+    // Keyed afresh where what the ids say no longer holds, or they have
+    // come to many more than the lines -- every edit of a line is another.
+    const size_t lines = given_left.size() + given_right.size();
+    if (!mKeyed || !(mLike == options.like) || mLineIds[0].size() != given_left.size() || mLineIds[1].size() != given_right.size() ||
+        static_cast<size_t>(mIds.count()) > 4 * lines + 1024)
+    {
+        mIds = ALDiffIds();
+        mLineIds[0].assign(given_left.size(), -1);
+        mLineIds[1].assign(given_right.size(), -1);
+        mLike  = options.like;
+        mKeyed = true;
+    }
+    mLastKeyed                            = 0;
+    const std::vector<std::string>& left  = swapped ? given_right : given_left;
+    const std::vector<std::string>& right = swapped ? given_left : given_right;
+    std::vector<S32>&               a     = mLineIds[swapped ? 1 : 0];
+    std::vector<S32>&               b     = mLineIds[swapped ? 0 : 1];
     moves_t out;
     // Which lines were taken out and put in, and each such line's id as
     // compared.
@@ -58,31 +107,33 @@ ALDiffMoves::moves_t ALDiffMoves::find(const std::vector<std::string>& left, con
     {
         return out;
     }
-    // Only the lines changed are keyed: as they are, or as told the same
-    // where something is let go of, the key kept while its id is. Those
-    // taken out each given one, room for them made once; a line put in is
-    // only looked up, and one like none taken out is in no block -- a
-    // conversion's, every line otherwise, is most of them.
-    const bool       as_told = options.like.any();
-    ALDiffIds        ids;
-    std::vector<S32> a(left.size(), -1);
-    std::vector<S32> b(right.size(), -1);
-    ids.reserve(static_cast<size_t>(std::count(gone.begin(), gone.end(), true)));
+    // Only the lines changed are keyed, and each once: as they are, or as
+    // told the same where something is let go of, the key kept with its
+    // id. A line put in like none taken out has an id none taken out has,
+    // and is in no block.
+    const bool as_told = options.like.any();
+    const auto keyed   = [&](std::vector<S32>& ids, const std::string& line, size_t at) {
+        if (ids[at] < 0)
+        {
+            ids[at] = mIds.idOfMade(as_told ? ALTextDiff::likenessOf(line, options.like) : line);
+            ++mLastKeyed;
+        }
+    };
     for (size_t i = 0; i < left.size(); ++i)
     {
         if (gone[i])
         {
-            a[i] = as_told ? ids.idOfMade(ALTextDiff::likenessOf(left[i], options.like)) : ids.idOf(left[i]);
+            keyed(a, left[i], i);
         }
     }
     for (size_t j = 0; j < right.size(); ++j)
     {
         if (made[j])
         {
-            b[j]    = as_told ? ids.find(ALTextDiff::likenessOf(right[j], options.like)) : ids.find(right[j]);
-            made[j] = b[j] >= 0;
+            keyed(b, right[j], j);
         }
     }
+    ALDiffIds& ids = mIds;
     // Where each line put in is, by its id: the first MOST_TRIED of each,
     // in order, from start[id] to start[id + 1].
     std::vector<S32> start(static_cast<size_t>(ids.count()) + 1, 0);

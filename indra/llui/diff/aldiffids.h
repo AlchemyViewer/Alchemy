@@ -40,6 +40,14 @@
 class ALDiffIds
 {
 public:
+    // Moved, never copied: a piece kept here is seen where it is kept, and
+    // a copy would see it in the one copied.
+    ALDiffIds()                            = default;
+    ALDiffIds(ALDiffIds&&)                 = default;
+    ALDiffIds& operator=(ALDiffIds&&)      = default;
+    ALDiffIds(const ALDiffIds&)            = delete;
+    ALDiffIds& operator=(const ALDiffIds&) = delete;
+
     S32 idOf(std::string_view piece)
     {
         const auto [it, added] = mIds.try_emplace(piece, static_cast<S32>(mIds.size()));
@@ -53,17 +61,8 @@ public:
         }
         return idOf(mMade.emplace_back(std::move(piece)));
     }
-    // A piece's id where it has one; -1 where it has none, which asking
-    // does not give it.
-    S32 find(std::string_view piece) const
-    {
-        const auto found = mIds.find(piece);
-        return found != mIds.end() ? found->second : -1;
-    }
     // How many there are: every id below it.
-    S32  count() const { return static_cast<S32>(mIds.size()); }
-    // Room for so many, made once.
-    void reserve(size_t count) { mIds.reserve(count); }
+    S32 count() const { return static_cast<S32>(mIds.size()); }
 
 private:
     boost::unordered_flat_map<std::string_view, S32, ll::string_hash, std::equal_to<>> mIds;

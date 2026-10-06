@@ -25,6 +25,7 @@
 #ifndef AL_ALDIFFMOVES_H
 #define AL_ALDIFFMOVES_H
 
+#include "aldiffids.h"
 #include "altextdiff.h"
 
 #include <string>
@@ -63,6 +64,41 @@ namespace ALDiffMoves
     // options say.
     moves_t find(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<ALTextDiff::Run>& runs,
                  const ALTextDiff::Options& options = ALTextDiff::Options());
+
+    // A comparison's search, which keeps each line's id from one search to
+    // the next: a line keyed -- its text, or its text as told the same --
+    // the first time it is taken out or put in, and again only once it is
+    // edited, rather than every line of every change each time. The same
+    // blocks as find(): a live comparison searches on every keystroke, and
+    // a converted script's every line is taken out and put in.
+    class Finder
+    {
+    public:
+        // Lines of a text as given -- the left, or the right -- replaced:
+        // those from `head` to `was_end` now to `now_end`, their ids let go
+        // of, and those after moved along.
+        void    edited(bool left, S32 head, S32 was_end, S32 now_end);
+        // Every id let go of: other texts.
+        void    forget();
+        // As find(), over the texts as given and the runs between them as
+        // they are shown, swapped or not. The ids are keyed again where the
+        // lines told the same are told otherwise, where a text is not as
+        // long as it was told, and where they have come to many more than
+        // the texts' lines.
+        moves_t find(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<ALTextDiff::Run>& runs,
+                     const ALTextDiff::Options& options, bool swapped = false);
+        // How many lines the last search keyed: what a test holds an
+        // edit's cost to.
+        S32     lastKeyed() const { return mLastKeyed; }
+
+    private:
+        ALDiffIds            mIds;
+        // Each line's id, of each text as given; -1 for none yet.
+        std::vector<S32>     mLineIds[2];
+        ALTextDiff::Likeness mLike;
+        bool                 mKeyed     = false;
+        S32                  mLastKeyed = 0;
+    };
 }
 
 #endif // AL_ALDIFFMOVES_H

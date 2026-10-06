@@ -32,6 +32,7 @@
 #include "../test/lltut.h"
 
 #include <deque>
+#include <functional>
 #include <initializer_list>
 #include <map>
 #include <memory>
@@ -1361,5 +1362,71 @@ namespace tut
         m.setTexts(left, right, { { 0, 0, 0, 0 } });
         ensure("new texts let the pairs go", m.pairs().empty());
         ensure("with ranges: kept, not laid out again", !m.setPairs(pairs) && m.pairs() == pairs && beside(0, 0));
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<33>()
+    {
+        set_test_name("the moves' ids kept between rebuilds let go of with new texts, kept in step with a left of another version where ranges are let go of, and keyed again where lines are told the same otherwise");
+        // A block of six lines moved from near the top to near the end.
+        std::vector<std::string> base;
+        for (S32 n = 0; n < 100; ++n)
+        {
+            base.push_back("    statement number " + std::to_string(n) + " goes here;");
+        }
+        std::vector<std::string> moved = base;
+        std::vector<std::string> block(moved.begin() + 10, moved.begin() + 16);
+        moved.erase(moved.begin() + 10, moved.begin() + 16);
+        moved.insert(moved.begin() + 80, block.begin(), block.end());
+        const auto joined = [](const std::vector<std::string>& lines) {
+            std::string out;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                out += (i ? "\n" : "") + lines[i];
+            }
+            return out;
+        };
+        ALDiffModel kept;
+        ALDiffModel whole;
+        whole.setKeepsLayout(false);
+        const auto both = [&](const std::function<void(ALDiffModel&)>& done, const std::string& where) {
+            done(kept);
+            done(whole);
+            sameLayout(kept, whole, where);
+        };
+        both([&](ALDiffModel& m) { m.setTexts(joined(base), joined(moved)); }, "moved");
+        ensure_equals("a move", kept.moveCount(), 1);
+
+        // Other texts as long: the block's lines others on each side.
+        std::vector<std::string> other_left  = base;
+        std::vector<std::string> other_right = moved;
+        for (S32 n = 0; n < 6; ++n)
+        {
+            other_left[static_cast<size_t>(10 + n)] += " on the left";
+            other_right[static_cast<size_t>(80 + n)] += " on the right";
+        }
+        both([&](ALDiffModel& m) { m.setTexts(joined(other_left), joined(other_right)); }, "other texts");
+        ensure_equals("no move", kept.moveCount(), 0);
+
+        // Ranges, and a left of another version as long: a line of the
+        // block changed, which parts it.
+        both([&](ALDiffModel& m) { m.setTexts(joined(base), joined(moved), { { 0, 0, 0, 0 } }); }, "with a range");
+        std::vector<std::string> stepped = base;
+        stepped[12] += " and changed";
+        both([&](ALDiffModel& m) { m.setLeftText(joined(stepped)); }, "another left");
+        ensure_equals("the block parted at the line changed: two moves, not the one", kept.moveCount(), 2);
+
+        // The block put in indented: a move only where blanks are let go of.
+        std::vector<std::string> indented = moved;
+        for (S32 n = 0; n < 6; ++n)
+        {
+            indented[static_cast<size_t>(80 + n)] = "  " + indented[static_cast<size_t>(80 + n)];
+        }
+        both([&](ALDiffModel& m) { m.setTexts(joined(base), joined(indented)); }, "indented");
+        ensure_equals("no move", kept.moveCount(), 0);
+        ALTextDiff::Likeness like;
+        like.ignoreWhitespace = true;
+        both([&](ALDiffModel& m) { m.setLikeness(like); }, "blanks let go of");
+        ensure_equals("a move now", kept.moveCount(), 1);
     }
 }
