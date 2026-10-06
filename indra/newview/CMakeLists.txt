@@ -180,6 +180,7 @@ if(AL_BUILD_VIEWER)
     alsceneexplorerpredicate.cpp
     alscopedata.cpp
     alscriptanalysis.cpp
+    alscriptanalysislane.cpp
     alscriptanalyzers.cpp
     alscriptcontentsindex.cpp
     alscriptcrumbsbar.cpp
@@ -1029,6 +1030,7 @@ if(AL_BUILD_VIEWER)
     alsceneexplorerpredicate.h
     alscopedata.h
     alscriptanalysis.h
+    alscriptanalysislane.h
     alscriptanalyzers.h
     alscriptcontentsindex.h
     alscriptcrumbsbar.h
@@ -2809,6 +2811,16 @@ if(AL_BUILD_TESTS)
   # What waits for the script analysis thread: the latest of each kind
   # about each script, by rank, a stale text passed over.
   al_add_test(alscriptjobqueue PROJECT ${test_project} LIBRARIES llcommon)
+
+  # One engine's analysis thread, over analyzers made to wait: a long
+  # check on one lane holding nothing of the other's, and another tab's
+  # check giving way to a question of the tab in front.
+  al_add_test(
+    alscriptanalysislane
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES alscript llui ll::slua ${test_libs}
+  )
 
   # Each language's analyzer, asked as the analysis thread asks it, over
   # the grid's own definitions.

@@ -26,27 +26,46 @@
 
 #include "alscriptanalysis.h"
 
+#include "alscriptanalysislane.h"
 #include "alscriptanalyzers.h"
 #include "alscriptlintpass.h"
-#include "alscriptstack.h"
 #include "llappviewer.h"
 #include "llviewercontrol.h"
 #include "llsyntaxid.h"
 #include "alsaid.h"
 #include "lltrans.h"
-#include "alserialworker.h"
 
 #include <algorithm>
 #include <optional>
 
-// What lives on the worker: each language's analyzer, made the first time
-// a question in its language comes -- a viewer that never opens an SLua
-// script builds no Luau front end.
-struct ALScriptAnalysis::Worker
+namespace
 {
-    std::unique_ptr<ALLuauAnalyzer> luau;
-    std::unique_ptr<ALLSLAnalyzer>  lsl;
-};
+    // An answer to whoever asked, on the main thread, in the viewer's
+    // language, where the strings are.
+    void answerOnMain(ALScriptAnalysis::Result result, std::shared_ptr<ALScriptAnalysis::callback_t> callback)
+    {
+        LLAppViewer::instance()->postToMainCoro([result = std::move(result), callback]() mutable {
+            alTranslateScriptProblems(result.problems);
+            for (ALScriptFix& action : result.actions)
+            {
+                action.title = alScriptKeyedWords(action.key, action.args, action.title);
+            }
+            // A definitions error of this code's own carries its key
+            // between the marks, with what it is about after.
+            if (!result.definitionsError.empty() && result.definitionsError[0] == '\x01')
+            {
+                const size_t end = result.definitionsError.find('\x01', 1);
+                if (end != std::string::npos)
+                {
+                    LLStringUtil::format_map_t args;
+                    args["[PATH]"] = result.definitionsError.substr(end + 1);
+                    result.definitionsError = LLTrans::getString(result.definitionsError.substr(1, end - 1), args);
+                }
+            }
+            (*callback)(result);
+        });
+    }
+}
 
 ALScriptAnalysis::ALScriptAnalysis() = default;
 
@@ -54,26 +73,29 @@ ALScriptAnalysis::~ALScriptAnalysis() = default;
 
 void ALScriptAnalysis::cleanupSingleton()
 {
-    if (mThread)
+    for (ALScriptAnalysisLane* lane : { mLuau.get(), mTailslide.get() })
     {
-        mThread->close();
+        if (lane)
+        {
+            lane->close();
+        }
     }
 }
 
 void ALScriptAnalysis::ensureStarted()
 {
-    if (!mThread)
+    if (mLuau)
     {
-        // What Luau keeps for the whole process, set here on the main
-        // thread before the worker reads it.
-        ALLuauService::setUpProcess();
-        // Closing, a check still running is stopped rather than waited
-        // for, and what waits is passed over.
-        mThread = std::make_unique<ALSerialWorker>("ScriptAnalysis", [this]() {
-            const std::lock_guard<std::mutex> lock(mQueueMutex);
-            ALLuauService::cancel(mRunningStop);
-        });
+        return;
     }
+    // What Luau keeps for the whole process, set here on the main thread
+    // before a lane reads it.
+    ALLuauService::setUpProcess();
+    const ALScriptAnalysisLane::Main main{ answerOnMain, [](std::function<void()> done) {
+                                              LLAppViewer::instance()->postToMainCoro([done = std::move(done)]() { done(); });
+                                          } };
+    mLuau      = std::make_unique<ALScriptAnalysisLane>("ScriptAnalysisLuau", [] { return std::make_unique<ALLuauAnalyzer>(); }, main);
+    mTailslide = std::make_unique<ALScriptAnalysisLane>("ScriptAnalysisLSL", [] { return std::make_unique<ALLSLAnalyzer>(); }, main);
 }
 
 void ALScriptAnalysis::definitionsChanged()
@@ -84,9 +106,9 @@ void ALScriptAnalysis::definitionsChanged()
 void ALScriptAnalysis::ask(Request request, callback_t callback)
 {
     ensureStarted();
-    Job job;
+    ALScriptAnalysisLane::Job job;
     // The paths are the syntax cache's, which is the main thread's; the
-    // worker reads what they name.
+    // lane reads what they name.
     job.luauPath   = request.lua ? LLSyntaxDefCache::instance().getLuauDefinitionsPath() : std::string();
     job.docsPath   = request.lua ? LLSyntaxDefCache::instance().getLuauDocsPath() : std::string();
     job.lslPath    = request.lua ? std::string() : LLSyntaxDefCache::instance().getLSLBuiltinsPath();
@@ -111,260 +133,47 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
     const auto answer = std::make_shared<callback_t>(std::move(callback));
     job.callback      = answer;
     // Waiting under the script and the kind of question, in place of what
-    // waited there.
-    const std::string key     = keyOf(request);
-    const U8          rank    = rankOf(request);
-    const std::string id      = request.id;
-    const U32         version = request.version;
+    // waited there; on SLua's lane or LSL's, weighing included.
+    const std::string key  = ALScriptAnalysisLane::keyOf(request);
+    const U8          rank = ALScriptAnalysisLane::rankOf(request);
     // Another tab's SLua check gives way to the front tab's questions:
     // stopped for one, and run again after it. LSL's are short, and the
     // rest is the front tab's own, or weighing.
-    const bool        yields  = request.lua && request.kind == Kind::Check && !request.front;
-    job.request               = std::move(request);
+    const bool            yields = request.lua && request.kind == Kind::Check && !request.front;
+    ALScriptAnalysisLane& lane   = request.lua ? *mLuau : *mTailslide;
+    job.request                  = std::move(request);
+    if (!lane.post(key, rank, yields, std::move(job)))
     {
-        const std::lock_guard<std::mutex> lock(mQueueMutex);
-        if (mQueue.add(key, id, version, rank, std::move(job), yields))
-        {
-            // What runs is answering something no longer wanted, or gives
-            // way to this.
-            ALLuauService::cancel(mRunningStop);
-        }
-    }
-    if (!mThread->post([this]() { runNext(); }))
-    {
-        {
-            const std::lock_guard<std::mutex> lock(mQueueMutex);
-            mQueue.forget(id);
-        }
         LLAppViewer::instance()->postToMainCoro([refused = std::move(refused), answer]() { (*answer)(refused); });
     }
-}
-
-// static
-std::string ALScriptAnalysis::keyOf(const Request& request)
-{
-    std::string key = request.id;
-    key += '\x1f';
-    key += static_cast<char>('0' + static_cast<int>(request.kind));
-    if (request.kind == Kind::Weigh)
-    {
-        key += static_cast<char>('0' + static_cast<int>(request.weighing));
-    }
-    return key;
-}
-
-// static
-U8 ALScriptAnalysis::rankOf(const Request& request)
-{
-    return request.kind == Kind::Weigh   ? 3
-           : !request.front              ? 4
-           : request.kind == Kind::Warm  ? 2
-           : request.kind == Kind::Check ? 1
-                                         : 0;
 }
 
 void ALScriptAnalysis::runEngine(std::function<void()> work, std::function<void()> done)
 {
     ensureStarted();
-    Job job;
+    ALScriptAnalysisLane::Job job;
     job.engineWork = std::move(work);
     job.engineDone = std::move(done);
-    // Each its own: one run's work does not stand in for another's.
+    // Each its own: one run's work does not stand in for another's. On
+    // Tailslide's lane, which every use of Tailslide is on.
     const std::string key  = "engine:" + std::to_string(++mEngineSerial);
     auto              then = std::make_shared<std::function<void()>>(job.engineDone);
+    job.request.id         = key;
+    if (!mTailslide->post(key, 1, false, std::move(job)))
     {
-        const std::lock_guard<std::mutex> lock(mQueueMutex);
-        mQueue.add(key, key, 0, 1, std::move(job));
-    }
-    if (!mThread->post([this]() { runNext(); }))
-    {
-        {
-            const std::lock_guard<std::mutex> lock(mQueueMutex);
-            mQueue.forget(key);
-        }
         LLAppViewer::instance()->postToMainCoro([then]() { (*then)(); });
     }
 }
 
 void ALScriptAnalysis::forget(const std::string& id)
 {
-    const std::lock_guard<std::mutex> lock(mQueueMutex);
-    mQueue.forget(id);
-}
-
-void ALScriptAnalysis::runNext()
-{
-    // The job as a whole, its definitions loaded included; what it asked
-    // of the service is the zone inside.
-    LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("script analysis job");
-    std::optional<std::pair<std::string, Job>> next;
-    // What stops it, where it is an SLua one.
-    ALLuauService::Stop stop;
+    for (ALScriptAnalysisLane* lane : { mLuau.get(), mTailslide.get() })
     {
-        const std::lock_guard<std::mutex> lock(mQueueMutex);
-        next = mQueue.take();
-        if (!next)
+        if (lane)
         {
-            return;
-        }
-        if (next->second.request.lua)
-        {
-            stop         = ALLuauService::newStop();
-            mRunningStop = stop;
+            lane->forget(id);
         }
     }
-    const Job& job = next->second;
-    if (job.engineWork)
-    {
-        // No question: the work, on a stack as deep as it needs, and then
-        // whoever waits on it told.
-        try
-        {
-            alScriptOnLargeStack(job.engineWork);
-        }
-        catch (const std::exception& e)
-        {
-            // Whoever gave it answers for what it throws; told, all the same.
-            LL_WARNS("ScriptAnalysis") << "Engine work failed: " << e.what() << LL_ENDL;
-        }
-        {
-            const std::lock_guard<std::mutex> lock(mQueueMutex);
-            mQueue.finished();
-        }
-        LLAppViewer::instance()->postToMainCoro([done = job.engineDone]() { done(); });
-        return;
-    }
-    Result result   = run(job, stop);
-    bool   unwanted = false;
-    bool   yielded  = false;
-    {
-        const std::lock_guard<std::mutex> lock(mQueueMutex);
-        unwanted = mQueue.superseded();
-        yielded  = mQueue.yielded();
-        mQueue.finished();
-        if (mRunningStop == stop)
-        {
-            mRunningStop.reset();
-        }
-    }
-    bool stopped = false;
-    if (stop && mWorker && mWorker->luau)
-    {
-        stopped = mWorker->luau->stopped();
-        mWorker->luau->forgetStop();
-    }
-    // Stopped as it gave way to the front tab, and wanted still: it waits
-    // again, behind what it gave way to, and answers after.
-    if (yielded && stopped && !unwanted)
-    {
-        const std::string id      = job.request.id;
-        const U32         version = job.request.version;
-        const U8          rank    = rankOf(job.request);
-        {
-            const std::lock_guard<std::mutex> lock(mQueueMutex);
-            mQueue.requeue(next->first, id, version, rank, std::move(next->second));
-        }
-        mThread->post([this]() { runNext(); });
-        return;
-    }
-    if (unwanted || stopped)
-    {
-        // Stopped, or asked again while it ran: what was asked since
-        // answers in its place.
-        return;
-    }
-    const Request& asked = job.request;
-    if (asked.kind == Kind::Warm)
-    {
-        return;
-    }
-    // The front tab's SLua check landed: what the next keystroke's fragment
-    // is checked against made the text's, before it asks. Under the old
-    // solver only, where that is autocomplete's module, which no check
-    // makes; under the new the check's module is it.
-    if (asked.kind == Kind::Check && asked.lua && asked.front && job.fragments && !job.newSolver)
-    {
-        Job warm          = job;
-        warm.callback     = nullptr;
-        warm.request.kind = Kind::Warm;
-        {
-            const std::lock_guard<std::mutex> lock(mQueueMutex);
-            mQueue.add(keyOf(warm.request), asked.id, asked.version, rankOf(warm.request), std::move(warm));
-        }
-        mThread->post([this]() { runNext(); });
-    }
-    const std::shared_ptr<callback_t> callback = job.callback;
-    // The words in the viewer's language, on the main thread, where
-    // the strings are.
-    LLAppViewer::instance()->postToMainCoro([result = std::move(result), callback]() mutable {
-        alTranslateScriptProblems(result.problems);
-        for (ALScriptFix& action : result.actions)
-        {
-            action.title = alScriptKeyedWords(action.key, action.args, action.title);
-        }
-        // A definitions error of this code's own carries its key
-        // between the marks, with what it is about after.
-        if (!result.definitionsError.empty() && result.definitionsError[0] == '\x01')
-        {
-            const size_t end = result.definitionsError.find('\x01', 1);
-            if (end != std::string::npos)
-            {
-                LLStringUtil::format_map_t args;
-                args["[PATH]"] = result.definitionsError.substr(end + 1);
-                result.definitionsError = LLTrans::getString(result.definitionsError.substr(1, end - 1), args);
-            }
-        }
-        (*callback)(result);
-    });
-}
-
-ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauService::Stop& stop)
-{
-    const Request& request = job.request;
-    static const std::string NOTHING;
-    const std::string&       text = request.text ? *request.text : NOTHING;
-    ALScriptAnalyzer::Setup  setup;
-    setup.luauPath   = job.luauPath;
-    setup.docsPath   = job.docsPath;
-    setup.lslPath    = job.lslPath;
-    setup.generation = job.generation;
-    setup.newSolver  = job.newSolver;
-    setup.fragments  = job.fragments;
-    setup.seconds    = job.seconds;
-    setup.stop       = stop;
-    // The engines recurse on how the script nests; the pool's thread has
-    // what the platform gives a thread, which on a Mac is half a megabyte.
-    // The work goes on a stack as deep as a script needs.
-    Result result;
-    alScriptOnLargeStack([&]() {
-        if (!mWorker)
-        {
-            mWorker = std::make_unique<Worker>();
-        }
-        result.kind    = request.kind;
-        result.id      = request.id;
-        result.version = request.version;
-        result.lua     = request.lua;
-        result.line    = request.line;
-        result.column  = request.column;
-        if (request.lua)
-        {
-            if (!mWorker->luau)
-            {
-                mWorker->luau = std::make_unique<ALLuauAnalyzer>();
-            }
-            mWorker->luau->answer(request, text, setup, result);
-        }
-        else
-        {
-            if (!mWorker->lsl)
-            {
-                mWorker->lsl = std::make_unique<ALLSLAnalyzer>();
-            }
-            mWorker->lsl->answer(request, text, setup, result);
-        }
-    });
-    return result;
 }
 
 std::string alScriptKeyedWords(const std::string& key, const std::vector<std::string>& args, const std::string& english)

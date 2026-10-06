@@ -26,7 +26,6 @@
 
 #include "alluauconfig.h"
 #include "alluauservice.h"
-#include "alscriptjobqueue.h"
 #include "alscriptproblem.h"
 #include "alscriptsymbol.h"
 #include "alscriptweight.h"
@@ -40,14 +39,14 @@
 #include <mutex>
 #include <string>
 
-class ALSerialWorker;
+class ALScriptAnalysisLane;
 namespace Luau
 {
     struct FrontendCancellationToken;
 }
 
-// The LSL and SLua analyzers, each owned by one worker thread and asked
-// about one script at a time:
+// The LSL and SLua analyzers, each owned by a thread of its own
+// (ALScriptAnalysisLane) and asked about one script at a time:
 // what is wrong with it and what it declares, what could go at a
 // position, what is at one, what a call there takes, and where a name is
 // bound and used. A request carries the document's version, the
@@ -265,51 +264,15 @@ private:
     void cleanupSingleton() override;
     void ensureStarted();
 
-    struct Worker;
-    // The one thread the services run on. Closed at cleanup, or as the
-    // viewer starts to quit, and kept closed: an ask after is answered
-    // with nothing rather than starting another.
-    std::unique_ptr<ALSerialWorker>                     mThread;
-    // Touched only from the worker's own tasks, which one thread runs one
-    // after another.
-    std::unique_ptr<Worker>                             mWorker;
-    U32                                                 mDefinitionsGeneration = 1;
-    // One job waiting: the question, who is answered, and what the main
-    // thread read for it -- the definitions' paths, the settings.
-    struct Job
-    {
-        Request                     request;
-        std::shared_ptr<callback_t> callback;
-        std::string                 luauPath;
-        std::string                 docsPath;
-        std::string                 lslPath;
-        U32                         generation = 0;
-        bool                        newSolver  = false;
-        bool                        fragments  = false;
-        F32                         seconds    = 0.f;
-        // Tailslide's work that is no question (runEngine), where it is one.
-        std::function<void()>       engineWork;
-        std::function<void()>       engineDone;
-    };
-    // Where a question waits: under its script and its kind -- and, for a
-    // weigh, which of its weighs. And how soon it goes, lower first: the
-    // front tab's questions, which someone is waiting on; its check; its
-    // warm job; weighing; everything else -- background tabs, lookups.
-    static std::string keyOf(const Request& request);
-    static U8          rankOf(const Request& request);
-    // Takes the next job and runs it, on the worker: one is posted for
-    // every question asked, and one that finds nothing waiting -- its
-    // question replaced by a later one -- does nothing.
-    void runNext();
-    Result run(const Job& job, const std::shared_ptr<Luau::FrontendCancellationToken>& stop);
-
-    // What waits, written on the main thread and taken on the worker, and
-    // the stop of the SLua job running, if any: a question that makes its
-    // answer pointless stops it, and so does the viewer closing. Both
-    // under the lock.
-    std::mutex                                       mQueueMutex;
-    ALScriptJobQueue<Job>                            mQueue;
-    std::shared_ptr<Luau::FrontendCancellationToken> mRunningStop;
+    // Each engine's own thread and queue (LAD8): SLua's on Luau's -- its
+    // checks, questions and weighs, Luau's compiler alone -- and LSL's on
+    // Tailslide's, LSL on Luau weighed there too, and the engine's work
+    // that is no question. Neither waits on the other. Made with the
+    // first question, closed at cleanup or as the viewer starts to quit,
+    // and kept closed: a question after is answered with nothing.
+    std::unique_ptr<ALScriptAnalysisLane> mLuau;
+    std::unique_ptr<ALScriptAnalysisLane> mTailslide;
+    U32                                   mDefinitionsGeneration = 1;
     // Numbers the engine's work, each its own key.
-    U32                                              mEngineSerial = 0;
+    U32                                   mEngineSerial = 0;
 };

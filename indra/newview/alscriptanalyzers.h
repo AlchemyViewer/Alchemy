@@ -57,6 +57,10 @@ public:
     // own fields already: its kind's answer, and a check's or a weigh's
     // weights.
     virtual void answer(const Request& request, const std::string& text, const Setup& setup, Result& result) = 0;
+    // Whether the last question was stopped part way by Setup::stop; the
+    // stop let go of. Only SLua's are stopped.
+    virtual bool stopped() const { return false; }
+    virtual void forgetStop() {}
 
     // A file's whole text, or nothing where it cannot be read.
     static std::string readWhole(const std::string& path);
@@ -90,9 +94,8 @@ class ALLuauAnalyzer final : public ALScriptAnalyzer
 {
 public:
     void answer(const Request& request, const std::string& text, const Setup& setup, Result& result) override;
-    // Whether the last question was stopped part way; the stop let go of.
-    bool stopped() const { return mService.stopped(); }
-    void forgetStop() { mService.setStop(nullptr); }
+    bool stopped() const override { return mService.stopped(); }
+    void forgetStop() override { mService.setStop(nullptr); }
 
 private:
     void load(const std::string& path, const std::string& docs_path, U32 generation);
