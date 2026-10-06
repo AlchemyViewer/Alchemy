@@ -51,9 +51,10 @@ struct ALLuauFrontend;
 // Each answer comes with whether to trust it: answered; nothing to answer,
 // the place being in a comment or the question stopped; or ask of the
 // whole script -- there is no check to patch yet, the last one is the
-// text's already, the fragment would be long enough to cost more than the
-// whole check, a module the script requires changed since, the fragment
-// did not parse, or Luau failed inside.
+// text's already, something was typed since above the fragment, the
+// fragment would be long enough to cost more than the whole check, a
+// module the script requires changed since, the fragment did not parse,
+// or Luau failed inside.
 //
 // What Luau changes of the front end for a fragment is put back: the time
 // out and the stop it marks on the module it patches, which would cost the
@@ -91,8 +92,8 @@ public:
     // The innermost call whose brackets hold `at`, found as the whole
     // script's is (findAstAncestryOfPosition), and the fragment's types,
     // its callee's among them: what signature help reads. The fragment
-    // runs to the end of the call, so that the call is whole however far
-    // the caret is into it. Nothing where no call holds `at`.
+    // runs to the end of the call at the least, so that the call is whole
+    // however far the caret is into it. Nothing where no call holds `at`.
     struct Typed
     {
         Outcome                  outcome = Outcome::Whole;
@@ -108,10 +109,13 @@ private:
     bool ready(std::string_view source);
     // Luau failed inside: said once, and the question asked whole.
     void failedInside();
-    // Whether the fragment Luau would check for `at` is short enough to be
-    // cheaper than checking the whole script: at most a sixteenth of it and
-    // a couple of hundred lines, or a few lines of any script.
-    bool narrow(Luau::Position at) const;
+    // Where the fragment for `at` ends: `least` at the least, or the end
+    // of the statement `at` is in as the text parses it, where that has no
+    // block of its own. None where it would be too long to be cheaper than
+    // checking the whole script: past a sixteenth of it or a couple of
+    // hundred lines, and a few lines of any script.
+    std::optional<Luau::Position> reach(Luau::Position at, Luau::Position least) const;
+    size_t                        offsetOf(Luau::Position at) const;
     static constexpr unsigned FEW_LINES  = 16;
     static constexpr unsigned MANY_LINES = 200;
 
@@ -123,6 +127,10 @@ private:
     Luau::ModulePtr                  mBase;
     std::unique_ptr<Luau::Allocator> mAllocator;
     Luau::ParseResult                mParse;
+    // Where its lines start, and where what was typed since the base was
+    // checked begins in it, where the base's text is known.
+    std::vector<size_t>   mLines;
+    std::optional<size_t> mTypedFrom;
     // Whether Luau failing inside has been said yet: once is enough.
     bool                             mToldIce = false;
 };

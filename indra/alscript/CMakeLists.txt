@@ -206,6 +206,18 @@ if(AL_BUILD_TESTS)
     LIBRARIES alscript llcommon
     DEFINES ${definitions_defines} ${templates_define}
   )
+  # Completion and signature help over a fragment, against the whole
+  # script, at the places a scripter asks, over every SLua script to hand;
+  # the places found by Luau's own lexer.
+  al_add_test(
+    alluaufragment
+    PROJECT alscript
+    LIBRARIES alscript llcommon ll::slua
+    DEFINES
+      ${definitions_defines}
+      ${templates_define}
+      "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
+  )
   al_add_test(
     allslservice
     PROJECT alscript
@@ -229,7 +241,14 @@ if(AL_BUILD_TESTS)
   # The SLua checks, and LSL written again as SLua, again with Luau's new
   # type solver, which a scripter may choose (ALScriptLuauSolver): the same
   # tests, told by the environment.
-  foreach(test alluauservice alscriptfixes alscriptlintpass allsltoslua)
+  foreach(
+    test
+    alluauservice
+    alluaufragment
+    alscriptfixes
+    alscriptlintpass
+    allsltoslua
+  )
     add_test(
       NAME INTEGRATION_TEST_RUNNER_${test}_newsolver
       COMMAND $<TARGET_FILE:INTEGRATION_TEST_${test}>

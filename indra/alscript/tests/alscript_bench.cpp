@@ -596,11 +596,14 @@ int main(int, char**)
                 const std::string& text = word.text();
                 g_sink                  = g_sink + typing.complete(text, word.line, word.column()).size();
             }));
+            fragment_checks += typing.typeChecks() - checks_before;
+            // Where the fragment finds no function to call -- here the new
+            // solver's at 20,000 lines, whose own check leaves the helpers'
+            // types blocked -- signature help asks the whole script.
             fragment_signature.push_back(ms_per_run([&] {
                 const std::string& text = call.text();
                 g_sink                  = g_sink + typing.signature(text, call.line, call.column()).parameters.size();
             }));
-            fragment_checks += typing.typeChecks() - checks_before;
             typing.setFragments(false);
         }
         std::printf("\nSLua typing, the %s solver: an edit of one character, then the question\n\n", new_solver ? "new" : "old");
@@ -612,7 +615,7 @@ int main(int, char**)
         sizes("hover after an edit", hover);
         sizes("complete after an edit of a script expanded", expanded);
         std::printf("  %-52s %10d\n", "over a fragment, the questions answer (2 is right)", fragment_found);
-        std::printf("  %-52s %10zu\n", "  whole checks among them (0 is right)", fragment_checks);
+        std::printf("  %-52s %10zu\n", "  whole checks among the completions (0 is right)", fragment_checks);
         sizes("complete after an edit, over a fragment", fragment_complete);
         sizes("signature help after an edit, over a fragment", fragment_signature);
         sizes("complete after an edit expanded, over a fragment", fragment_expanded);

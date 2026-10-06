@@ -130,6 +130,12 @@ Luau::FrontendOptions ALLuauFrontend::baseOptions() const
     return solver == Luau::SolverMode::New ? limited() : autocompleteOptions();
 }
 
+const std::string* ALLuauFrontend::baseText() const
+{
+    const auto found = baseTexts.find(moduleName);
+    return found != baseTexts.end() ? &found->second : nullptr;
+}
+
 bool ALLuauFrontend::stopRequested() const
 {
     return stop && stop->requested();
@@ -172,6 +178,18 @@ bool ALLuauFrontend::checkScript(Luau::CheckResult* result)
     {
         ++checks;
         timedOut(frontend->moduleResolver.getModule(moduleName));
+        // The new solver's base is this module.
+        if (solver == Luau::SolverMode::New)
+        {
+            if (stopRequested())
+            {
+                baseTexts.erase(moduleName);
+            }
+            else
+            {
+                baseTexts[moduleName] = files.texts[moduleName];
+            }
+        }
     }
     if (result)
     {
@@ -206,8 +224,10 @@ Luau::ModulePtr ALLuauFrontend::queried(std::string_view source, bool completion
         ++checks;
         if (stoppedIn(true))
         {
+            baseTexts.erase(moduleName);
             return nullptr;
         }
+        baseTexts[moduleName] = std::string(source);
         timedOut(frontend->moduleResolverForAutocomplete.getModule(moduleName));
     }
     return frontend->moduleResolverForAutocomplete.getModule(moduleName);

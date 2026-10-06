@@ -115,12 +115,12 @@ namespace
         std::optional<Luau::RequireTraceResult> mTrace;
     };
 
-    // Where the word that begins at `at` ends, where one does: the
+    // Where the word that begins at `at` ends: `at` where none does. The
     // studio asks at the start of what is being typed, and the fragment
-    // runs through it, as the whole text has it, rather than stopping
-    // where Luau stops, at the position -- where a fragment holds no word,
-    // nothing in it has the type the word is wanted to have.
-    std::optional<Luau::Position> wordEnd(std::string_view source, Luau::Position at)
+    // runs through it, as the text has it, rather than stopping at the
+    // position as Luau's does -- where a fragment holds no word, nothing in
+    // it has the type the word is wanted to have.
+    Luau::Position wordEnd(std::string_view source, Luau::Position at)
     {
         size_t offset = 0;
         for (unsigned line = 0; line < at.line; ++line)
@@ -128,7 +128,7 @@ namespace
             offset = source.find('\n', offset);
             if (offset == std::string_view::npos)
             {
-                return std::nullopt;
+                return at;
             }
             ++offset;
         }
@@ -139,11 +139,16 @@ namespace
         {
             ++length;
         }
-        if (length == 0)
-        {
-            return std::nullopt;
-        }
         return Luau::Position(at.line, at.column + length);
+    }
+
+    // A statement with no block of its own, whose whole a fragment may
+    // run to: one that holds a block starts its fragment part way in, in
+    // its head, and its end would close what the fragment never opened.
+    bool simple(const Luau::AstStat* statement)
+    {
+        return statement->is<Luau::AstStatExpr>() || statement->is<Luau::AstStatLocal>() || statement->is<Luau::AstStatAssign>() ||
+               statement->is<Luau::AstStatCompoundAssign>() || statement->is<Luau::AstStatReturn>();
     }
 }
 
@@ -168,6 +173,19 @@ bool ALLuauFragment::ready(std::string_view source)
     {
         return false;
     }
+    // A module the script requires changed since: the whole script, whose
+    // check checks it again. Luau's own test sees it only once it has been.
+    if (const auto required = mFront.requiredBy.find(mFront.moduleName); required != mFront.requiredBy.end())
+    {
+        const bool forAutocomplete = mFront.solver == Luau::SolverMode::Old;
+        for (const std::string& module : required->second)
+        {
+            if (mFront.frontend->isDirty(module, forAutocomplete))
+            {
+                return false;
+            }
+        }
+    }
     if (base != mBase || source != mText)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("fragment: the text parsed");
@@ -182,22 +200,114 @@ bool ALLuauFragment::ready(std::string_view source)
         mParse                     = Luau::Parser::parse(source.data(), source.size(), *base->names, *mAllocator, options);
         mText.assign(source);
         mBase = std::move(base);
+        mLines.assign(1, 0);
+        for (size_t i = 0; i < source.size(); ++i)
+        {
+            if (source[i] == '\n')
+            {
+                mLines.push_back(i + 1);
+            }
+        }
+        // Where what was typed since the base was checked begins: the first
+        // byte that differs, but for spaces. Nothing known where the base's
+        // text is not.
+        mTypedFrom.reset();
+        if (const std::string* before = mFront.baseText())
+        {
+            const size_t most = std::min(before->size(), source.size());
+            size_t       head = 0;
+            while (head < most && (*before)[head] == source[head])
+            {
+                ++head;
+            }
+            while (head < source.size() && std::isspace(static_cast<unsigned char>(source[head])))
+            {
+                ++head;
+            }
+            mTypedFrom = head;
+        }
     }
     return mParse.root != nullptr;
 }
 
-bool ALLuauFragment::narrow(Luau::Position at) const
+size_t ALLuauFragment::offsetOf(Luau::Position at) const
+{
+    return at.line < mLines.size() ? std::min(mLines[at.line] + at.column, mText.size()) : mText.size();
+}
+
+std::optional<Luau::Position> ALLuauFragment::reach(Luau::Position at, Luau::Position least) const
 {
     // Where Luau will start the fragment: the statement `at` is in, or the
     // first of its block that differs from the last check's, which after an
-    // edit elsewhere since that check can be far above. A line of fragment
-    // costs ten times a line of a whole check and more -- the type of each
-    // local it names cloned out of the check's, then solved apart -- and
-    // more the longer it is: past a sixteenth of the script, or a couple of
-    // hundred lines, the whole check is the cheaper.
-    const Luau::Position from  = Luau::findAncestryForFragmentParse(mBase->root, at, mParse.root).fragmentSelectionRegion.begin;
-    const unsigned       lines = mParse.root->location.end.line + 1;
-    return at.line < from.line || at.line - from.line <= std::max(FEW_LINES, std::min(MANY_LINES, lines / 16));
+    // edit elsewhere since that check can be far above.
+    const Luau::FragmentAutocompleteAncestryResult found = Luau::findAncestryForFragmentParse(mBase->root, at, mParse.root);
+    const Luau::Position                           from  = found.fragmentSelectionRegion.begin;
+    // The statement `at` is in, where one holds it.
+    const Luau::AstStat* statement = found.nearestStatement && found.nearestStatement->location.containsClosed(at) ? found.nearestStatement : nullptr;
+    // Where it ends: the end of that statement as the text parses it,
+    // where it is one with no block of its own. A line typed part way
+    // leaves the text's parse carrying its statement on into the lines
+    // after -- `ll.` then `print(x)` below it reads `ll.print(x)` -- and a
+    // fragment that stops sooner is another tree, set beside the text's
+    // to find what is at `at`, and nothing is found.
+    Luau::Position end = least;
+    if (statement && simple(statement))
+    {
+        // Luau's start is where the last check's first differing statement
+        // began, read in the text as it is now. Where the line typed has
+        // taken in the statement after it, that is part way into the
+        // statement, or past the position: no fragment holds what is there.
+        if (statement->location.begin < from)
+        {
+            return std::nullopt;
+        }
+        end = std::max(end, statement->location.end);
+    }
+    if (at < from)
+    {
+        return std::nullopt;
+    }
+    // Nothing typed since the last check above the statement the fragment
+    // is in, or the fragment is checked against what is no longer so: an
+    // edit made above -- a function's parameters, an include's text -- is
+    // no part of the scope it is checked in. Luau sets beside the last
+    // check only the block the position is in.
+    const Luau::Position first = statement ? std::min(from, statement->location.begin) : from;
+    if (!mTypedFrom || offsetOf(first) > *mTypedFrom)
+    {
+        return std::nullopt;
+    }
+    // And the end of the outermost expression around `at`, short of a
+    // function's body: in a block's head -- an `if`'s condition, say --
+    // what follows the position decides as much, a call's own brackets
+    // already there among it.
+    const std::vector<Luau::AstNode*> ancestry  = Luau::findAncestryAtPositionForAutocomplete(mParse.root, at);
+    const Luau::AstExpr*              outermost = nullptr;
+    for (auto it = ancestry.rbegin(); it != ancestry.rend() && (*it)->asExpr() && !(*it)->is<Luau::AstExprFunction>(); ++it)
+    {
+        outermost = (*it)->asExpr();
+    }
+    if (outermost)
+    {
+        // Luau starts some heads' fragments at the position -- a `while`'s
+        // condition -- which holds part of the expression and not the call
+        // it is in.
+        if (outermost->location.begin < from)
+        {
+            return std::nullopt;
+        }
+        end = std::max(end, outermost->location.end);
+    }
+    // A line of fragment costs ten times a line of a whole check and more
+    // -- the type of each local it names cloned out of the check's, then
+    // solved apart -- and more the longer it is: past a sixteenth of the
+    // script, or a couple of hundred lines, the whole check is the cheaper.
+    const unsigned lines = mParse.root->location.end.line + 1;
+    if (end.line > from.line && end.line - from.line > std::max(FEW_LINES, std::min(MANY_LINES, lines / 16)))
+    {
+        return std::nullopt;
+    }
+    return end;
 }
 
 void ALLuauFragment::failedInside()
@@ -212,12 +322,17 @@ void ALLuauFragment::failedInside()
 ALLuauFragment::Completion ALLuauFragment::complete(std::string_view source, Luau::Position at, Luau::StringCompletionCallback callback)
 {
     Completion answer;
-    if (!ready(source) || !narrow(at))
+    if (!ready(source))
+    {
+        return answer;
+    }
+    const std::optional<Luau::Position> end = reach(at, wordEnd(source, at));
+    if (!end)
     {
         return answer;
     }
     Waypoints                   waypoints;
-    const Luau::FragmentContext context{ source, mParse, mFront.baseOptions(), wordEnd(source, at), &waypoints };
+    const Luau::FragmentContext context{ source, mParse, mFront.baseOptions(), *end, &waypoints };
     Luau::FragmentAutocompleteStatusResult made{ Luau::FragmentAutocompleteStatus::Success, std::nullopt };
     {
         const Restored restored(*mFront.frontend, mFront.moduleName, *mBase);
@@ -276,7 +391,8 @@ ALLuauFragment::Typed ALLuauFragment::typecheck(std::string_view source, Luau::P
         answer.outcome = Outcome::Nothing;
         return answer;
     }
-    if (!narrow(at))
+    const std::optional<Luau::Position> end = reach(at, call->location.end);
+    if (!end)
     {
         return answer;
     }
@@ -286,12 +402,12 @@ ALLuauFragment::Typed ALLuauFragment::typecheck(std::string_view source, Luau::P
         const Restored restored(*mFront.frontend, mFront.moduleName, *mBase);
         try
         {
-            // To the end of the call, rather than Luau's own end at the
-            // position: a call cut there has no closing bracket, and the
-            // tree of what is cut is no longer the text's tree where the
-            // two are set side by side to find the call.
-            made = Luau::typecheckFragment(*mFront.frontend, mFront.moduleName, at, mFront.baseOptions(), source, call->location.end,
-                                           mParse.root, &waypoints);
+            // To the end of the call at the least, rather than Luau's own
+            // end at the position: a call cut there has no closing bracket,
+            // and the tree of what is cut is no longer the text's tree where
+            // the two are set side by side to find the call.
+            made = Luau::typecheckFragment(*mFront.frontend, mFront.moduleName, at, mFront.baseOptions(), source, *end, mParse.root,
+                                           &waypoints);
         }
         catch (const Luau::UserCancelError&)
         {

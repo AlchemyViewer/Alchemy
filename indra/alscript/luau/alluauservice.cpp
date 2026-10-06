@@ -1432,6 +1432,7 @@ void ALLuauService::setDocument(std::string_view id)
         kept.pop_back();
         std::vector<std::string> clear{ gone };
         front.files.texts.erase(gone);
+        front.baseTexts.erase(gone);
         front.configs.configs.erase(gone);
         front.askedModes.erase(gone);
         // Its modules too, where no script kept requires them.
@@ -1863,34 +1864,78 @@ ALScriptHover ALLuauService::hover(std::string_view source, S32 line, S32 column
 
 namespace
 {
-    // The documentation symbol of a field a call calls, as the definitions
-    // gave it: `ll.Say`'s, which is the field's and not its function's. The
-    // module's types alone, which a fragment has, where Luau's own
-    // (getDocumentationSymbolAtPosition) wants the source the module was
-    // checked from.
-    std::optional<std::string> fieldSymbolOf(const Luau::Module& module, const Luau::AstExpr* callee)
+    // The documentation symbol of a field `name` of a type, as the
+    // definitions gave it: a table's or an extern type's own, or its
+    // parent's; through each part of an intersection -- `vector`, a table
+    // that is also called -- and a primitive's metatable's __index, where a
+    // string's methods are. Where the definitions gave the field none,
+    // what holds it and its name: Luau marks an intersection, and not its
+    // table's fields.
+    std::optional<std::string> fieldSymbolOf(Luau::TypeId of, const std::string& name, std::optional<std::string> holder = std::nullopt,
+                                             int depth = 0)
     {
-        const Luau::AstExprIndexName* index  = callee->as<Luau::AstExprIndexName>();
-        const Luau::TypeId*           parent = index ? module.astTypes.find(index->expr) : nullptr;
-        if (!parent)
+        of = Luau::follow(of);
+        if (depth > 4)
         {
             return std::nullopt;
         }
-        const Luau::TypeId of = Luau::follow(*parent);
+        if (!holder)
+        {
+            holder = of->documentationSymbol;
+        }
+        const auto own = [&](const Luau::Property& field) -> std::optional<std::string> {
+            if (field.documentationSymbol)
+            {
+                return field.documentationSymbol;
+            }
+            return holder ? std::optional<std::string>(*holder + "." + name) : std::nullopt;
+        };
         if (const Luau::TableType* table = Luau::get<Luau::TableType>(of))
         {
-            const auto it = table->props.find(index->index.value);
-            return it != table->props.end() ? it->second.documentationSymbol : std::nullopt;
+            const auto it = table->props.find(name);
+            return it != table->props.end() ? own(it->second) : std::nullopt;
         }
         for (const Luau::ExternType* type = Luau::get<Luau::ExternType>(of); type;
              type = type->parent ? Luau::get<Luau::ExternType>(Luau::follow(*type->parent)) : nullptr)
         {
-            if (const auto it = type->props.find(index->index.value); it != type->props.end())
+            if (const auto it = type->props.find(name); it != type->props.end())
             {
-                return it->second.documentationSymbol;
+                return own(it->second);
+            }
+        }
+        if (const Luau::IntersectionType* parts = Luau::get<Luau::IntersectionType>(of))
+        {
+            for (Luau::TypeId part : parts->parts)
+            {
+                if (std::optional<std::string> symbol = fieldSymbolOf(part, name, holder, depth + 1))
+                {
+                    return symbol;
+                }
+            }
+        }
+        if (const Luau::PrimitiveType* primitive = Luau::get<Luau::PrimitiveType>(of); primitive && primitive->metatable)
+        {
+            if (const Luau::TableType* meta = Luau::get<Luau::TableType>(Luau::follow(*primitive->metatable)))
+            {
+                if (const auto index = meta->props.find("__index"); index != meta->props.end() && index->second.readTy)
+                {
+                    return fieldSymbolOf(*index->second.readTy, name, std::nullopt, depth + 1);
+                }
             }
         }
         return std::nullopt;
+    }
+
+    // The same of a field a call calls: `ll.Say`'s, which is the field's and
+    // not its function's. The module's types alone, which a fragment has,
+    // where Luau's own (getDocumentationSymbolAtPosition) wants the source
+    // the module was checked from, and at the callee's start finds what
+    // holds the field.
+    std::optional<std::string> fieldSymbolOf(const Luau::Module& module, const Luau::AstExpr* callee)
+    {
+        const Luau::AstExprIndexName* index  = callee->as<Luau::AstExprIndexName>();
+        const Luau::TypeId*           parent = index ? module.astTypes.find(index->expr) : nullptr;
+        return parent ? fieldSymbolOf(*parent, std::string(index->index.value)) : std::nullopt;
     }
 
     // What `call` takes, `at` in its brackets, read from `module`'s types:
@@ -1904,9 +1949,27 @@ namespace
         {
             return answer;
         }
+        // What is called: a function that may be nil -- a field read after
+        // `if t.f then` -- as the function it is where it is one.
+        Luau::TypeId called = Luau::follow(*callee);
+        if (const Luau::UnionType* options = Luau::get<Luau::UnionType>(called))
+        {
+            std::vector<Luau::TypeId> some;
+            for (Luau::TypeId option : options->options)
+            {
+                if (!Luau::isNil(Luau::follow(option)))
+                {
+                    some.push_back(Luau::follow(option));
+                }
+            }
+            if (some.size() == 1)
+            {
+                called = some.front();
+            }
+        }
         // Each form it has: one function, or an overloaded one's every part.
         std::vector<const Luau::FunctionType*> forms;
-        if (const Luau::IntersectionType* overloads = Luau::get<Luau::IntersectionType>(Luau::follow(*callee)))
+        if (const Luau::IntersectionType* overloads = Luau::get<Luau::IntersectionType>(called))
         {
             for (Luau::TypeId part : overloads->parts)
             {
@@ -1916,7 +1979,7 @@ namespace
                 }
             }
         }
-        else if (const Luau::FunctionType* function = functionOf(*callee))
+        else if (const Luau::FunctionType* function = functionOf(called))
         {
             forms.push_back(function);
         }
@@ -1993,7 +2056,7 @@ namespace
             }
         }
         answer.active = active;
-        std::optional<std::string> symbol = Luau::follow(*callee)->documentationSymbol;
+        std::optional<std::string> symbol = called->documentationSymbol;
         if (!symbol)
         {
             symbol = fieldSymbolOf(module, call->func);
@@ -2024,7 +2087,13 @@ ALScriptSignature ALLuauService::signature(std::string_view source, S32 line, S3
     }
     if (typed.outcome == ALLuauFragment::Outcome::Answered)
     {
-        return signatureOf(front, *typed.module, typed.call, nullptr, at);
+        // Where the fragment's callee is no function -- one that may be nil,
+        // read under an `if` that says it is not, which a fragment does not
+        // see -- the whole script says what it is.
+        if (ALScriptSignature answer = signatureOf(front, *typed.module, typed.call, nullptr, at); answer.found)
+        {
+            return answer;
+        }
     }
     const Luau::ModulePtr     module        = front.queried(source);
     const Luau::SourceModule* module_source = front.frontend->getSourceModule(front.moduleName);

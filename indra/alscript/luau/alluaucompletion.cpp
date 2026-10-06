@@ -178,6 +178,12 @@ namespace
     {
         for (auto it = ancestry.rbegin(); it != ancestry.rend(); ++it)
         {
+            // Inside a function or a statement, `at` is in no argument
+            // being written, however deep in one's body it is.
+            if ((*it)->is<Luau::AstExprFunction>() || (*it)->asStat())
+            {
+                return std::nullopt;
+            }
             const Luau::AstExprCall* call = (*it)->as<Luau::AstExprCall>();
             if (!call)
             {

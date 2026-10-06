@@ -165,6 +165,11 @@ struct ALLuauFrontend
     Luau::ModulePtr       base() const;
     bool                  baseCurrent() const;
     Luau::FrontendOptions baseOptions() const;
+    // The text each kept script's base was checked from, where its check
+    // finished: what a fragment tells the edits since by. None where a
+    // check of it was stopped.
+    boost::unordered_flat_map<std::string, std::string, ll::string_hash, std::equal_to<>> baseTexts;
+    const std::string*    baseText() const;
 
     bool stopRequested() const;
 

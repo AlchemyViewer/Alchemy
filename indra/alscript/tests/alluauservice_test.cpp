@@ -1369,7 +1369,9 @@ namespace tut
         };
         std::string why;
         ensure("docs loaded", service.loadDocs("{\"@sl-slua/global/ll.Say\": {\"documentation\": \"Says it.\", \"learn_more_link\": \"x\"},"
-                                               " \"@sl-slua/global/ll\": {\"documentation\": \"The library.\", \"learn_more_link\": \"x\"}}",
+                                               " \"@sl-slua/global/ll\": {\"documentation\": \"The library.\", \"learn_more_link\": \"x\"},"
+                                               " \"@sl-slua/global/vector\": {\"documentation\": \"Makes one.\", \"learn_more_link\": \"x\"},"
+                                               " \"@sl-slua/global/vector.magnitude\": {\"documentation\": \"Its length.\", \"learn_more_link\": \"x\"}}",
                                                why));
         const std::string base = "local count: number = 1\n"
                                  "local function twice(n: number): number return n * 2 end\n"
@@ -1382,6 +1384,10 @@ namespace tut
         ensure("off: checked whole", service.typeChecks() > checks);
         ensure_equals("a call of a field documented as the field, not what holds it", service.signature(base + "ll.Say(0, )\n", 3, 10).documentation,
                       std::string("Says it."));
+        // `vector` is a table that is also called, whose fields Luau gives
+        // no symbol of their own.
+        ensure_equals("and of a callable table's field", service.signature(base + "local m = vector.magnitude()\n", 3, 27).documentation,
+                      std::string("Its length."));
 
         service.setFragments(true);
         ensure("on", service.fragments());
@@ -1408,8 +1414,10 @@ namespace tut
 
         ensure("nothing offered in a comment", service.complete(base + "-- tw\n", 3, 5).empty());
         ensure("no signature outside a call", !service.signature(base + "local q = 1\n", 3, 8).found);
+        ensure_equals("a callable table's field over the fragment too", service.signature(base + "local m = vector.magnitude()\n", 3, 27).documentation,
+                      std::string("Its length."));
         ensure_equals("none of it checked whole", service.typeChecks(), checks);
-        ensure_equals("each answered over its statement", service.fragmentsChecked() - parts, size_t(5));
+        ensure_equals("each answered over its statement", service.fragmentsChecked() - parts, size_t(6));
         service.setFragments(false);
     }
 
@@ -1438,6 +1446,28 @@ namespace tut
         checks = service.typeChecks();
         ensure("answered again", !service.complete(base + "local y = co\n", 1, 10).empty() && !service.stopped());
         ensure_equals("over its statement", service.typeChecks(), checks);
+
+        // Something typed above since the last check, in another block
+        // than the line typed: Luau sets beside the last check only the
+        // block the line is in, so the scope the fragment would be checked
+        // in is no longer so, and the whole script answers. In the same
+        // block, the fragment starts at the edit and holds it.
+        service.setDocument("edited above");
+        const std::string two = "local function twice(n: number): number return n * 2 end\nlocal function main()\n    local count = 1\nend\n";
+        service.check(two);
+        service.warm(two);
+        checks = service.typeChecks();
+        parts  = service.fragmentsChecked();
+        const std::string changed = "local function twice(n: string): string return n end\nlocal function main()\n    local count = 1\n    local x = tw\nend\n";
+        const std::vector<ALScriptCompletion> found = service.complete(changed, 3, 14);
+        ensure("answered", offers(found, "twice"));
+        ensure("whole", service.typeChecks() > checks && service.fragmentsChecked() == parts);
+        bool string_now = false;
+        for (const ALScriptCompletion& c : found)
+        {
+            string_now |= c.text == "twice" && c.detail.find("string") != std::string::npos;
+        }
+        ensure("as it is now", string_now);
 
         // A module the script requires, its requires traced when the text
         // was parsed: a fragment between that parse and the next check
