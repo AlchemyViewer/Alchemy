@@ -93,6 +93,7 @@ void ALScriptStudioExpandedCompare::compare(Doc& doc)
     {
         return;
     }
+    forgetClosed();
     if (doc.uploaded.valid && doc.uploaded.text && doc.uploaded.version == doc.editor->document().version())
     {
         mWaiting.erase(doc.id);
@@ -103,8 +104,14 @@ void ALScriptStudioExpandedCompare::compare(Doc& doc)
     mWindow.preprocess(doc);
 }
 
+void ALScriptStudioExpandedCompare::forgetClosed()
+{
+    boost::unordered::erase_if(mWaiting, [this](const std::string& id) { return mServices.findDoc(id) == nullptr; });
+}
+
 void ALScriptStudioExpandedCompare::expanded(Doc& doc)
 {
+    forgetClosed();
     // Only where the run is of the text as it is: a run of an older text
     // answering first leaves it waiting on the one after.
     if (mWaiting.contains(doc.id) && doc.uploaded.valid && doc.uploaded.version == doc.editor->document().version())

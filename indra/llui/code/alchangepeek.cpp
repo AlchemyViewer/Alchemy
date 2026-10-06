@@ -409,20 +409,29 @@ void ALChangePeek::place()
     }
     // Across the text, down from its gap's top; its own gap's rows, under
     // whatever gap the line had before.
-    const LLRect text = mHost.textRect();
+    const LLRect  text   = mHost.textRect();
     ALTextLayout& layout = mHost.layout();
     const S32     top    = text.mTop - (layout.gapTop(mGapLine) + mGapWas * layout.rowHeight() - mHost.scrollY());
     const S32     tall   = height();
-    setShape(LLRect(text.mLeft, top, text.mRight, top - tall));
+    const S32     bottom = top - tall;
+    // Its own rectangle only the part of it in the text, which is where it
+    // takes the mouse: scrolled partly out, the rest goes on past its
+    // edges, drawn cut there, and a press there is the view's. What is
+    // inside it placed as the whole of it has them, from the bottom cut off.
+    const S32 shown_top    = llmin(top, text.mTop);
+    const S32 shown_bottom = llmin(llmax(bottom, text.mBottom), shown_top);
+    mCut                   = shown_bottom - bottom;
+    setShape(LLRect(text.mLeft, shown_top, text.mRight, shown_bottom));
     const S32 width = text.getWidth();
+    const S32 head  = tall - mCut;
     S32       right = width - PAD;
     for (ALFlatButton* button : { mClose, mNext, mPrevious, mTakeBack })
     {
-        button->setShape(LLRect(right - SMALL_W, tall - PAD, right, tall - PAD - ROW));
+        button->setShape(LLRect(right - SMALL_W, head - PAD, right, head - PAD - ROW));
         right -= SMALL_W + 1;
     }
-    mSaid->setShape(LLRect(PAD, tall - PAD, llmax(PAD, right - PAD), tall - PAD - ROW));
-    mSaved->setShape(LLRect(PAD, tall - PAD - ROW - PAD, width - PAD, PAD));
+    mSaid->setShape(LLRect(PAD, head - PAD, llmax(PAD, right - PAD), head - PAD - ROW));
+    mSaved->setShape(LLRect(PAD, head - PAD - ROW - PAD, width - PAD, PAD - mCut));
 }
 
 void ALChangePeek::draw()
@@ -434,8 +443,10 @@ void ALChangePeek::draw()
     const F32       alpha = getDrawContext().mAlpha;
     const LLColor4  paper = mHost.backgroundColor();
     const LLColor4  ink   = mHost.textColor();
-    gl_rect_2d(getLocalRect(), ALSurface::ground(paper, ink) % alpha);
-    gl_rect_2d(getLocalRect(), ALSurface::frame(ink, alpha), false);
+    // The whole of it, of which its rectangle is the part in sight.
+    const LLRect    whole(0, height() - mCut, getRect().getWidth(), -mCut);
+    gl_rect_2d(whole, ALSurface::ground(paper, ink) % alpha);
+    gl_rect_2d(whole, ALSurface::frame(ink, alpha), false);
     LLPanel::draw();
 }
 

@@ -85,9 +85,13 @@ public:
     void compare(Doc& doc);
     // A tab's expansion made: its comparison shown, where one waits on it.
     void expanded(Doc& doc);
+    // Whether a tab's comparison waits on an expansion.
+    bool waiting(const std::string& id) const { return mWaiting.contains(id); }
 
 private:
     void show(Doc& doc);
+    // The tabs closed while they waited let go of.
+    void forgetClosed();
 
     ALScriptStudioServices&                    mServices;
     Window&                                    mWindow;

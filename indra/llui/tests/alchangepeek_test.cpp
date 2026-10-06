@@ -271,4 +271,39 @@ namespace tut
         e.markSavedAt(point);
         ensure("saved at a point: closed", !e.changePeek()->isOpen());
     }
+
+    template<> template<>
+    void alchangepeek_object::test<8>()
+    {
+        set_test_name("scrolled partly out of the text: its rectangle the part in sight, what is inside it placed as the whole has them, the part cut off not its own");
+        std::string saved;
+        std::string now;
+        for (S32 n = 0; n < 80; ++n)
+        {
+            saved += (n ? "\n" : "") + std::string("line ") + std::to_string(n);
+            now += (n ? "\n" : "") + std::string(n >= 40 && n <= 47 ? "changed " : "line ") + std::to_string(n);
+        }
+        ALCodeEditor& e = make(saved, now);
+        ensure("a change", e.peekChange(40));
+        ALChangePeek& peek = *e.changePeek();
+        const LLRect  text = e.textRect();
+        // The change in sight, whole.
+        e.setScrollY(e.layout().lineTop(38));
+        peek.place();
+        const S32 tall = peek.getRect().getHeight();
+        ensure("whole while in sight", tall > 40 && peek.cutBelow() == 0);
+
+        // Its top above the text's.
+        e.setScrollY(e.layout().gapTop(peek.gapLine()) + 20);
+        peek.place();
+        ensure("cut at the text's top", peek.getRect().mTop == text.mTop && peek.getRect().getHeight() == tall - 20 && peek.cutBelow() == 0);
+
+        // Its top a little above the text's foot: the rest below, cut off.
+        e.setScrollY(e.layout().gapTop(peek.gapLine()) - (text.getHeight() - 30));
+        peek.place();
+        ensure("cut at the text's foot", peek.getRect().mBottom == text.mBottom && peek.getRect().getHeight() == 30 && peek.cutBelow() == tall - 30);
+        ensure("a point below the text not its own", !peek.getRect().pointInRect(text.mLeft + 10, text.mBottom - 1));
+        const LLRect bar = peek.getChild<LLView>("close")->getRect();
+        ensure("its bar at the top of what is in sight", bar.mTop == 30 - 2);
+    }
 }

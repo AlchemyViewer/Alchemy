@@ -105,8 +105,10 @@ public:
     const ALCodeEditor* savedText() const { return mSaved; }
 
     // Placed in its gap, as the editor is scrolled: before the editor
-    // draws what it holds.
+    // draws what it holds. Its rectangle is the part of it in the text.
     void place();
+    // How far the whole of it goes on below its rectangle, cut off there.
+    S32  cutBelow() const { return mCut; }
     void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override;
 
@@ -137,6 +139,8 @@ private:
     // The line whose gap it opened, and the gap it had before; -1 for none.
     S32                      mGapLine = -1;
     S32                      mGapWas  = 0;
+    // How far below its rectangle the whole of it goes, as last placed.
+    S32                      mCut     = 0;
     // An edit of the text made from here, which does not close it.
     bool                     mEditing = false;
     boost::signals2::scoped_connection mChangedConnection;

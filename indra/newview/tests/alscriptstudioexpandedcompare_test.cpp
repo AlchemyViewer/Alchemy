@@ -33,6 +33,8 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
+
 namespace
 {
     typedef ALScriptStudioDoc Doc;
@@ -206,7 +208,7 @@ namespace tut
     template<> template<>
     void alscriptstudioexpandedcompare_object::test<3>()
     {
-        set_test_name("an expansion older than the text made again first, and the comparison shown once one of the text as it is comes");
+        set_test_name("an expansion older than the text made again first, and the comparison shown once one of the text as it is comes; a tab closed while it waits let go of");
         if (!window.floater)
         {
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
@@ -223,6 +225,17 @@ namespace tut
         ensure("shown", studio.compares == 1);
         unit->expanded(door);
         ensure("once", studio.compares == 1);
+
+        // A tab closed while it waited is let go of as the next is asked.
+        Doc& gate = tab("gate");
+        gate.editor->insertText("// ");
+        unit->compare(gate);
+        ensure("waiting", unit->waiting("gate"));
+        services().docs.erase(std::remove_if(services().docs.begin(), services().docs.end(),
+                                             [](const std::unique_ptr<ALScriptStudioDoc>& doc) { return doc->id == "gate"; }),
+                              services().docs.end());
+        unit->expanded(door);
+        ensure("closed: let go of", !unit->waiting("gate"));
 
         Doc& lamp = tab("lamp");
         lamp.expandedEditor = nullptr;
