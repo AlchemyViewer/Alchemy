@@ -266,4 +266,46 @@ namespace tut
         inspector->inspected(doc, ALScriptAnalysis::Result(), ALTextPos(0, 8));
         ensure_equals("alone", shown(), std::string("Problem: Unused.\nProblem: Twice."));
     }
+
+    template<> template<>
+    void alscriptinspectorpane_object::test<6>()
+    {
+        set_test_name("declared in a module the script requires, which the analyzers read apart: said in its file, and linked there");
+        ALScriptInspectorPane* inspector = pane();
+        Doc&                   doc       = tab("a", "local util = require(\"util\")\nprint(util.twice(2))\n");
+        told().expanded                  = true;
+        // The module's own map, over the same files as the script's.
+        ALSourceMap module;
+        module.addFile("a", "object:a");
+        module.addFile("util.luau", "disk:/lib/util.luau");
+        ALSourceMap::Segment segment;
+        segment.outLine = 0;
+        segment.length  = 40;
+        segment.file    = 1;
+        segment.line    = 0;
+        for (S32 line = 0; line < 6; ++line)
+        {
+            segment.outLine = segment.line = line;
+            module.add(segment);
+        }
+        module.finish();
+        doc.expanded.moduleMaps.emplace_back("disk:/lib/util.luau", module);
+        ALScriptAnalysis::Result result = hover("function M.twice(n: number): number");
+        result.hover.hasDefinition      = true;
+        result.hover.definitionLine     = 3;
+        result.hover.definitionColumn   = 11;
+        result.hover.definitionFile     = "disk:/lib/util.luau";
+        inspector->inspected(doc, result, ALTextPos(0, 8));
+        ensure_equals("in the module", shown(), std::string("function M.twice(n: number): number\nDeclared in util.luau on line 4."));
+        const ALTextView::Substitution& to = inspector->view()->substitutions().back();
+        ensure("linked there", to.value["path"].asString() == "disk:/lib/util.luau" && to.value["line"].asInteger() == 3 &&
+                                   to.value["column"].asInteger() == 11);
+        result.hover.definitionFile = "disk:/lib/gone.luau";
+        inspector->inspected(doc, result, ALTextPos(0, 8));
+        ensure_equals("a module the expansion has not: not said", shown(), std::string("function M.twice(n: number): number"));
+        result.hover.definitionFile = "disk:/lib/util.luau";
+        told().expanded             = false;
+        inspector->inspected(doc, result, ALTextPos(0, 8));
+        ensure_equals("nor where the script is not expanded", shown(), std::string("function M.twice(n: number): number"));
+    }
 }

@@ -116,6 +116,7 @@ namespace
 
 using ALScriptPlaces::Declared;
 using ALScriptPlaces::declaredOf;
+using ALScriptPlaces::mapModuleSpan;
 using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::rangeOf;
 
@@ -1058,21 +1059,16 @@ void ALScriptStudioChecking::mapBack(std::vector<ALScriptProblem>& problems, con
         if (!problem.file.empty())
         {
             problem.fixes.clear();
-            const auto own = std::find_if(module_maps.begin(), module_maps.end(),
-                                          [&problem](const auto& module) { return module.first == problem.file; });
-            if (own == module_maps.end())
-            {
-                continue;
-            }
             ALScriptSpan span;
             span.line      = problem.line;
             span.column    = problem.column;
             span.endLine   = problem.endLine;
             span.endColumn = problem.endColumn;
-            const S32 file = mapSpan(own->second, span);
-            if (file >= 0)
+            std::string path;
+            std::string name;
+            if (mapModuleSpan(module_maps, problem.file, span, path, name))
             {
-                problem.file      = own->second.files()[file].path;
+                problem.file      = path;
                 problem.line      = span.line;
                 problem.column    = span.column;
                 problem.endLine   = span.endLine;

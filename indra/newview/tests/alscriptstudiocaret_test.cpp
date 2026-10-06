@@ -468,4 +468,55 @@ namespace tut
         ensure_equals("told now of a word", studio.asked.back(), std::string("inspect 1:26"));
         ensure("which is what it was last told", doc.caret->inspectAt == ALTextPos(1, 26) && doc.caret->inspectDue == 0.0);
     }
+
+    template<> template<>
+    void alscriptstudiocaret_object::test<9>()
+    {
+        set_test_name("declared in a module the script requires, which the analyzers read apart: opened there, through the module's own map");
+        ALScriptStudioCaret& caret = make();
+        Doc&                 doc   = tab("a");
+        studio.expanded            = true;
+        doc.expanded.valid         = true;
+        doc.expanded.map.addFile("a", "object:a");
+        ALSourceMap::Segment segment;
+        segment.length = 60;
+        for (S32 line = 0; line < 2; ++line)
+        {
+            segment.outLine = segment.line = line;
+            doc.expanded.map.add(segment);
+        }
+        doc.expanded.map.finish();
+        // The module's own map, over the same files as the script's.
+        ALSourceMap module;
+        module.addFile("a", "object:a");
+        module.addFile("util.luau", "disk:/lib/util.luau");
+        segment.file = 1;
+        for (S32 line = 0; line < 6; ++line)
+        {
+            segment.outLine = segment.line = line;
+            module.add(segment);
+        }
+        module.finish();
+        doc.expanded.moduleMaps.emplace_back("disk:/lib/util.luau", module);
+        const U32 v          = ask(doc, ALEditorCommand::GoToDefinition);
+        doc.expanded.version = v;
+        ALScriptAnalysis::Result result     = references(v);
+        result.references.definition        = span(3, 11, 5);
+        result.references.definitionFile    = "disk:/lib/util.luau";
+        result.references.references        = { span(1, 8, 5) };
+        caret.answered(doc, result, ALTextPos(0, 8));
+        ensure_equals("opened in the module", joined(studio.said), std::string("open disk:/lib/util.luau util.luau 3:11+5"));
+        ensure_equals("a jump noted", navigation->unit.places(false), size_t(1));
+
+        ask(doc, ALEditorCommand::GoToDefinition);
+        result.references.definitionFile = "disk:/lib/gone.luau";
+        caret.answered(doc, result, ALTextPos(0, 8));
+        ensure("a module the expansion has not: none", studio.said.size() == 1 && services.statuses.back().find("NoDefinition") == 0);
+
+        ask(doc, ALEditorCommand::GoToDefinition);
+        result.references.definitionFile = "disk:/lib/util.luau";
+        doc.expanded.version             = v + 3;
+        caret.answered(doc, result, ALTextPos(0, 8));
+        ensure("an expansion of another text: none", studio.said.size() == 1 && services.statuses.back().find("NoDefinition") == 0);
+    }
 }

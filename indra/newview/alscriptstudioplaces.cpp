@@ -29,6 +29,8 @@
 #include "alscriptenvelope.h"
 #include "alscriptlexicon.h"
 
+#include <algorithm>
+
 namespace ALScriptPlaces
 {
     ALTextRange rangeOf(const ALScriptSpan& span)
@@ -181,6 +183,26 @@ namespace ALScriptPlaces
         return begin.file;
     }
 
+    bool mapModuleSpan(const std::vector<std::pair<std::string, ALSourceMap>>& maps, const std::string& key, ALScriptSpan& span,
+                       std::string& path, std::string& name)
+    {
+        const auto own = std::find_if(maps.begin(), maps.end(), [&key](const auto& module) { return module.first == key; });
+        if (own == maps.end())
+        {
+            return false;
+        }
+        ALScriptSpan mapped = span;
+        const S32    file   = mapSpan(own->second, mapped);
+        if (file < 0)
+        {
+            return false;
+        }
+        span = mapped;
+        path = own->second.files()[file].path;
+        name = own->second.files()[file].name;
+        return true;
+    }
+
     void placeText(ALScriptStudioDoc::Place& place, const std::string& line)
     {
         // Trimmed for the row, and the name's place moved with the trimming.
@@ -262,6 +284,21 @@ namespace ALScriptPlaces
         }
         declared.line   = result.hover.definitionLine;
         declared.column = result.hover.definitionColumn;
+        if (!result.hover.definitionFile.empty())
+        {
+            // In a module the script requires, read apart: through the
+            // module's own map, to the file it came of.
+            ALScriptSpan span;
+            span.line = span.endLine = declared.line;
+            span.column = span.endColumn = declared.column;
+            if (!preprocessed || !mapModuleSpan(doc.expanded.moduleMaps, result.hover.definitionFile, span, declared.path, declared.name))
+            {
+                return Declared();
+            }
+            declared.line   = span.line;
+            declared.column = span.column;
+            return declared;
+        }
         if (preprocessed)
         {
             const ALSourceMap::Loc loc = doc.expanded.map.toSource(declared.line, declared.column);

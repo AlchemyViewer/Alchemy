@@ -40,6 +40,7 @@
 #include <optional>
 
 using ALScriptPlaces::lineOf;
+using ALScriptPlaces::mapModuleSpan;
 using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;
@@ -94,7 +95,13 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
     ALScriptSpan       definition    = refs.definition;
     std::string        homePath;
     std::string        homeName;
-    if (hasDefinition && map)
+    if (hasDefinition && !refs.definitionFile.empty())
+    {
+        // In a module the script requires, which the analyzers read apart:
+        // through the module's own map, to the file it came of.
+        hasDefinition = map && mapModuleSpan(doc.expanded.moduleMaps, refs.definitionFile, definition, homePath, homeName);
+    }
+    else if (hasDefinition && map)
     {
         const S32 file = mapSpan(*map, definition);
         if (file < 0)
