@@ -234,11 +234,11 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const Side& left_side, const S
     }
     // The changed stretch of each side as it was; a side the same holds no
     // place back.
-    constexpr S32 FAR    = std::numeric_limits<S32>::max() / 2;
-    const S32     l_from = left_same ? FAR : lh;
-    const S32     l_to   = left_same ? -FAR : ln_was - lt;
-    const S32     r_from = right_same ? FAR : rh;
-    const S32     r_to   = right_same ? -FAR : rn_was - rt;
+    constexpr S32 FAR_OFF = std::numeric_limits<S32>::max() / 2;
+    const S32     l_from = left_same ? FAR_OFF : lh;
+    const S32     l_to   = left_same ? -FAR_OFF : ln_was - lt;
+    const S32     r_from = right_same ? FAR_OFF : rh;
+    const S32     r_to   = right_same ? -FAR_OFF : rn_was - rt;
     // Where the stretch starts and ends, as places within runs the same,
     // which the runs before and after are kept from: the start the last
     // not past either change's start, the end the first not before either
@@ -288,7 +288,7 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const Side& left_side, const S
         S32 between = 0;
         if (options.anchors.empty() ||
             !spliceAnchored(runs, left, right, Place{ ln_was, rn_was }, Place{ l_from, r_from },
-                            Place{ left_same ? -FAR : static_cast<S32>(left.size()) - lt, right_same ? -FAR : static_cast<S32>(right.size()) - rt }, options, between))
+                            Place{ left_same ? -FAR_OFF : static_cast<S32>(left.size()) - lt, right_same ? -FAR_OFF : static_cast<S32>(right.size()) - rt }, options, between))
         {
             return false;
         }

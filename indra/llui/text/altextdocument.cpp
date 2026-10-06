@@ -339,7 +339,9 @@ std::string ALTextDocument::text(const ALTextRange& range_in) const
         size += mLines[l].size() + 1;
     }
     std::string out;
-    out.resize_and_overwrite(size, [&](char* buffer, size_t) {
+    out.resize(size);
+    {
+        char* buffer = out.data();
         char* at = std::copy(head.begin() + static_cast<std::ptrdiff_t>(from), head.end(), buffer);
         for (S32 l = range.begin.line + 1; l < range.end.line; ++l)
         {
@@ -348,8 +350,7 @@ std::string ALTextDocument::text(const ALTextRange& range_in) const
         }
         *at++ = '\n';
         std::copy(mLines[range.end.line].begin(), mLines[range.end.line].begin() + static_cast<std::ptrdiff_t>(tail), at);
-        return size;
-    });
+    }
     return out;
 }
 
