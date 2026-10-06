@@ -1260,6 +1260,15 @@ namespace tut
         ensure("llSetLinkPrimitiveParamsFast does not", ALLSLTraits::of("llSetLinkPrimitiveParamsFast")->sleep == 0.0f);
         ensure("llTextBox sleeps under LSO alone", ALLSLTraits::of("llTextBox")->sleep == 1.0f && ALLSLTraits::of("llTextBox")->monoSleep == 0.0f);
         ensure("llOpenFloater under Mono alone", ALLSLTraits::of("llOpenFloater")->sleep == 0.0f && ALLSLTraits::of("llOpenFloater")->monoSleep == 0.2f);
+        // What item of the object's an argument names, by its LSL name or SLua's.
+        using Item = ALLSLTraits::Item;
+        ensure("llPlaySound's first, a sound", ALLSLTraits::itemArg("llPlaySound", 0) == Item::Sound);
+        ensure("its second names nothing", ALLSLTraits::itemArg("llPlaySound", 1) == Item::None);
+        ensure("llGiveInventory's second, whatever it is", ALLSLTraits::itemArg("llGiveInventory", 1) == Item::Any);
+        ensure("llMakeFountain's seventh, a texture", ALLSLTraits::itemArg("llMakeFountain", 6) == Item::Texture);
+        ensure("SLua's ll.GetNotecardLine, a notecard", ALLSLTraits::itemArg("ll.GetNotecardLine", 0) == Item::Notecard);
+        ensure("llcompat's the same", ALLSLTraits::itemArg("llcompat.RezObject", 0) == Item::Object);
+        ensure("llSay names none", ALLSLTraits::itemArg("llSay", 1) == Item::None && ALLSLTraits::itemArg("ll.Say", 1) == Item::None);
     }
     template<> template<>
     void allsloptimizer_object::test<33>()

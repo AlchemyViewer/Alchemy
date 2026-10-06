@@ -104,6 +104,7 @@ target_sources(
         lsl/allsleffects.h
         lsl/allsleventtext.inc
         lsl/allslexports.h
+        lsl/allslitemargs.inc
         lsl/allslservice.h
         lsl/allsltoslua.h
         lsl/allsltraits.h

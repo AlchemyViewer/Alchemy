@@ -92,6 +92,39 @@ bool ALLSLTraits::eventTextParam(std::string_view event, int index)
 }
 
 // static
+ALLSLTraits::Item ALLSLTraits::itemArg(std::string_view function, int index)
+{
+    struct Row
+    {
+        std::string_view function;
+        int              index;
+        Item             item;
+    };
+    static constexpr Row ROWS[] = {
+#include "allslitemargs.inc"
+    };
+    // SLua's names are LSL's with the table's dot for the prefix.
+    std::string lsl;
+    for (const std::string_view table : { std::string_view("ll."), std::string_view("llcompat.") })
+    {
+        if (function.substr(0, table.size()) == table)
+        {
+            lsl = "ll" + std::string(function.substr(table.size()));
+            function = lsl;
+            break;
+        }
+    }
+    for (const Row& row : ROWS)
+    {
+        if (row.function == function && row.index == index)
+        {
+            return row.item;
+        }
+    }
+    return Item::None;
+}
+
+// static
 bool ALLSLTraits::isUuid(std::string_view text)
 {
     if (text.size() != 36)
