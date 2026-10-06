@@ -1333,10 +1333,41 @@ so a Look saved before a key existed applies that key at its default — which
 is what keeps "Neutral" neutral for a user whose seeded copies predate the
 key. Three fences: only a file carrying at least half the whitelist counts as
 a snapshot (a truncated or hand-trimmed file applies what it has and touches
-nothing else), a key that is present but malformed is skipped as it always
-was, and the `RenderColorGrade` master switch is never reset by absence. To refresh the bundled
-files after tuning: save the Look in the viewer, then copy the saved file from
-`<user_settings>/presets/looks/` over the bundled one.
+nothing else), a key whose value is refused is skipped (and still counts as
+carried), and the `RenderColorGrade` master switch is never reset by absence.
+To refresh the bundled files after tuning: save the Look in the viewer, then
+copy the saved file from `<user_settings>/presets/looks/` over the bundled one.
+
+**Every value is judged before it is written**, whether it came from a file on
+disk or a notecard from a stranger: `ALLookFormat::sanitizeLookValue` is asked,
+by the setting's own `Type` string, and `applyLookSettings` skips what it
+refuses. **The settings system stores whatever LLSD a widget hands it** and
+coerces on the way out — a dropdown bound to an S32 writes its item's value
+as the *string* `"5"`, and a checkbox's Boolean has been seen stored as the
+*real* `1` (every bundled Look carries `RenderGlowNoise` so) — so the rules
+take exactly what that coercion would make sense of, and no more. By type:
+`F32` takes a finite Real or Integer, or a text that is a number and nothing
+else, as a Real; `S32` and `U32` take the same, whole and in range, as an
+Integer; `Boolean` takes a Boolean, 0 or 1 as an Integer or a Real, or the
+words `true`/`false`; `String` takes one without control characters, and for
+`RenderColorGradeLUT` cuts it to a bare file name with one of
+`colorLutExtensions()` — the renderer joins that name to the LUT folder, so a
+path in it would read any file on the disk; `Vector3` and `Color3` take three
+finite numbers, or four with the last ignored (an older colour picker wrote
+`[r, g, b, a]` into Color3 settings); `LLSD` takes a tone curve as
+`ALToneCurveSet::pointsFromLLSD` reads one, and nothing else. **Any other type,
+and any LLSD-typed setting that is not a curve, is refused** — a new kind of
+setting on the whitelist needs its shape added there, with a test in
+`allookformat_test`. A refused key is named in the log (`LL_WARNS("Presets")`);
+the toast only counts them. The first shared Look lost its tonemapper and its
+glow noise to a judgment written for the *declared* types rather than the
+stored ones, which is why `allookformat_test` now carries those two values
+verbatim. `LLControlVariable` has no range to check against, so
+nothing is clamped here; a setting that controls *work* rather than
+appearance (`RenderGlowIterations` is the number of full-screen passes) is
+clamped by the renderer where it is read, which protects Debug Settings and
+hand-edited files as well. `RenderLensFlareGhostCount` and
+`RenderCrossFilterPoints` already were.
 
 A Look whose settings have since changed is shown as `Name *` in the combo, via
 the `look_name_modified` string — **on the name, not beside it**. A detached

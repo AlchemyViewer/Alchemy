@@ -31,10 +31,12 @@
 
 #include "llpresetsmanager.h"
 #include "alcurvemodel.h"
+#include "allookformat.h"
 
 #include "lldiriterator.h"
 #include "llfloater.h"
 #include "llsdserialize.h"
+#include "llsdutil.h"
 #include "lltrans.h"
 #include "lluictrlfactory.h"
 #include "llviewercontrol.h"
@@ -43,6 +45,9 @@
 #include "llfeaturemanager.h"
 #include "llagentcamera.h"
 #include "llfile.h"
+
+#include <algorithm>
+#include <set>
 
 #if !LL_RELEASE_FOR_DOWNLOAD
 // The Looks whitelist, the settings declarations, and the bundled Look files
@@ -574,7 +579,7 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
     // cannot smuggle unrelated settings.
     //
     // Static: the list never changes, and callers include per-save and
-    // per-apply paths, so build the ~110 strings once rather than every call.
+    // per-apply paths, so build the strings once rather than every call.
     static const std::vector<std::string> looks_controls = {
         // Exposure & tone
         "RenderExposure",
@@ -823,23 +828,7 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
         }
 
         // Add dynamic controls to default preset
-        for (std::vector<std::string>::iterator it = name_list.begin(); it != name_list.end(); ++it)
-        {
-            std::string ctrl_name = *it;
-
-            LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
-            if (ctrl)
-            {
-                std::string comment = ctrl->getComment();
-                std::string type = LLControlGroup::typeEnumToString(ctrl->type());
-                LLSD value = ctrl->getValue();
-
-                paramsData[ctrl_name]["Comment"] = comment;
-                paramsData[ctrl_name]["Persist"] = 1;
-                paramsData[ctrl_name]["Type"] = type;
-                paramsData[ctrl_name]["Value"] = value;
-            }
-        }
+        addLiveSettings(name_list, paramsData);
     }
     else
     {
@@ -866,44 +855,19 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
                 new_camera_preset = CAMERA_PRESET_CUSTOM;
             }
         }
-        for (std::vector<std::string>::iterator it = name_list.begin(); it != name_list.end(); ++it)
-        {
-            std::string ctrl_name = *it;
-
-            LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
-            if (ctrl)
-            {
-                std::string comment = ctrl->getComment();
-                std::string type = LLControlGroup::typeEnumToString(ctrl->type());
-                LLSD value = ctrl->getValue();
-
-                paramsData[ctrl_name]["Comment"] = comment;
-                paramsData[ctrl_name]["Persist"] = 1;
-                paramsData[ctrl_name]["Type"] = type;
-                paramsData[ctrl_name]["Value"] = value;
-            }
-        }
+        addLiveSettings(name_list, paramsData);
         if (IS_CAMERA)
         {
             gSavedSettings.setU32("CameraPresetType", new_camera_preset);
         }
     }
 
-    std::string pathName(getPresetsDir(subdirectory) + gDirUtilp->getDirDelimiter() + LLURI::escape(name) + ".xml");
-
- // If the active preset name is the only thing in the list, don't save the list
+    // If the active preset name is the only thing in the list, don't save the list
     if (paramsData.size() > 1)
     {
-        // write to file
-        llofstream presetsXML(pathName.c_str());
-        if (presetsXML.is_open())
+        if (writePresetFile(subdirectory, name, paramsData))
         {
-            LLPointer<LLSDFormatter> formatter = new LLSDXMLFormatter();
-            formatter->format(paramsData, presetsXML, LLSDFormatter::OPTIONS_PRETTY);
-            presetsXML.close();
             saved = true;
-
-            LL_DEBUGS() << "saved preset '" << name << "'; " << paramsData.size() << " parameters" << LL_ENDL;
 
             if (IS_GRAPHIC)
             {
@@ -926,10 +890,6 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
                 // signal interested parties
                 triggerChangeLooksSignal();
             }
-        }
-        else
-        {
-            LL_WARNS("Presets") << "Cannot open for output preset file " << pathName << LL_ENDL;
         }
     }
     else
@@ -975,7 +935,7 @@ void LLPresetsManager::loadPreset(const std::string& subdirectory, std::string n
         name = PRESETS_DEFAULT;
     }
 
-    std::string full_path(getPresetsDir(subdirectory) + gDirUtilp->getDirDelimiter() + LLURI::escape(name) + ".xml");
+    const std::string full_path = getPresetFilePath(subdirectory, name);
 
     LL_DEBUGS() << "attempting to load preset '"<<name<<"' from '"<<full_path<<"'" << LL_ENDL;
 
@@ -1020,26 +980,110 @@ void LLPresetsManager::loadPreset(const std::string& subdirectory, std::string n
     }
 }
 
-bool LLPresetsManager::loadLooksPreset(std::string name)
+// static
+std::string LLPresetsManager::getPresetFilePath(const std::string& subdirectory, const std::string& name)
 {
-    std::string full_path(getPresetsDir(PRESETS_LOOKS) + gDirUtilp->getDirDelimiter() + LLURI::escape(name) + ".xml");
+    return getPresetsDir(subdirectory) + gDirUtilp->getDirDelimiter() + LLURI::escape(name) + ".xml";
+}
 
-    llifstream preset_file(full_path.c_str());
+bool LLPresetsManager::readPresetFile(const std::string& subdirectory, const std::string& name, LLSD& params)
+{
+    const std::string full_path = getPresetFilePath(subdirectory, name);
+    llifstream        preset_file(full_path.c_str());
     if (!preset_file.is_open())
     {
-        LL_WARNS("Presets") << "Cannot open Look '" << name << "' at '" << full_path << "'" << LL_ENDL;
+        LL_WARNS("Presets") << "Cannot open preset '" << name << "' at '" << full_path << "'" << LL_ENDL;
         return false;
     }
-
-    LLSD params;
+    params.clear();
     LLSDSerialize::fromXML(params, preset_file);
     preset_file.close();
     if (!params.isMap() || params.size() == 0)
     {
-        LL_WARNS("Presets") << "Look '" << name << "' is not a valid preset file" << LL_ENDL;
+        LL_WARNS("Presets") << "Preset '" << name << "' at '" << full_path << "' is not a settings map" << LL_ENDL;
         return false;
     }
+    return true;
+}
 
+bool LLPresetsManager::writePresetFile(const std::string& subdirectory, const std::string& name, const LLSD& params)
+{
+    const std::string full_path = getPresetFilePath(subdirectory, name);
+    llofstream        preset_file(full_path.c_str());
+    if (!preset_file.is_open())
+    {
+        LL_WARNS("Presets") << "Cannot open for output preset file " << full_path << LL_ENDL;
+        return false;
+    }
+    LLPointer<LLSDFormatter> formatter = new LLSDXMLFormatter();
+    formatter->format(params, preset_file, LLSDFormatter::OPTIONS_PRETTY);
+    preset_file.close();
+    LL_DEBUGS("Presets") << "saved preset '" << name << "'; " << params.size() << " parameters" << LL_ENDL;
+    return true;
+}
+
+bool LLPresetsManager::presetExists(const std::string& subdirectory, const std::string& name)
+{
+    preset_name_list_t names;
+    loadPresetNamesFromDir(subdirectory, names, DEFAULT_HIDE);
+
+    // Case-insensitively, because the comparison stands in for the
+    // filesystem that will do the overwrite, and on Windows and macOS that
+    // filesystem does not care about case: saving "sunset" over
+    // "Sunset.xml" replaces it. Matching exactly here would let that pair
+    // slip past. On Linux this says yes for a name that would actually
+    // coexist, which errs the survivable way round.
+    std::string wanted(name);
+    LLStringUtil::toLower(wanted);
+    return std::any_of(names.begin(), names.end(), [&wanted](std::string existing) {
+        LLStringUtil::toLower(existing);
+        return existing == wanted;
+    });
+}
+
+// static
+LLSD LLPresetsManager::describeSetting(LLControlVariable& ctrl, const LLSD& value)
+{
+    // The shape every preset file has had: the setting's own description
+    // beside its value, so that a file reads to a person as well as to
+    // loadFromFile.
+    LLSD entry       = LLSD::emptyMap();
+    entry["Comment"] = ctrl.getComment();
+    entry["Persist"] = 1;
+    entry["Type"]    = LLControlGroup::typeEnumToString(ctrl.type());
+    entry["Value"]   = value;
+    return entry;
+}
+
+void LLPresetsManager::addLiveSettings(const std::vector<std::string>& names, LLSD& params)
+{
+    for (const std::string& ctrl_name : names)
+    {
+        LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
+        if (ctrl)
+        {
+            params[ctrl_name] = describeSetting(*ctrl, ctrl->getValue());
+        }
+    }
+}
+
+LLSD LLPresetsManager::captureLookSettings()
+{
+    std::vector<std::string> names;
+    getLooksControlNames(names);
+    LLSD params = LLSD::emptyMap();
+    addLiveSettings(names, params);
+    return params;
+}
+
+bool LLPresetsManager::sanitizeLookValueForControl(const std::string& ctrl_name, const LLSD& value, LLSD& clean)
+{
+    LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
+    return ctrl && ALLookFormat::sanitizeLookValue(ctrl_name, LLControlGroup::typeEnumToString(ctrl->type()), value, clean);
+}
+
+LLPresetsManager::LookSettingCounts LLPresetsManager::applyLookSettings(const LLSD& params)
+{
     // Whitelist-filtered apply: only recognized aesthetic keys are ever
     // written, so a shared Look file cannot alter unrelated settings.
     std::vector<std::string> allowed;
@@ -1055,7 +1099,7 @@ bool LLPresetsManager::loadLooksPreset(std::string name)
         return entry.isMap() && entry.has("Value");
     };
 
-    S32 applied = 0;
+    LookSettingCounts counts;
     mIgnoreChangedSignal = true;
     for (const std::string& ctrl_name : allowed)
     {
@@ -1063,12 +1107,22 @@ bool LLPresetsManager::loadLooksPreset(std::string name)
         {
             continue;
         }
-        LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
-        if (ctrl)
+        // Judged before it is written: a value of the wrong type, a NaN, a
+        // LUT name that reaches out of its folder. Skipped, as a malformed
+        // key always was, and counted so that the user can be told. A Look
+        // file is written by hand or shared as readily as a notecard is.
+        LLSD clean;
+        if (!sanitizeLookValueForControl(ctrl_name, params[ctrl_name]["Value"], clean))
         {
-            ctrl->set(params[ctrl_name]["Value"]);
-            ++applied;
+            // By name, so that a Look that loses a setting can be looked
+            // into: the toast only counts them.
+            LL_WARNS("Presets") << "Look setting '" << ctrl_name << "' refused and skipped: "
+                                << LLSDNotationStreamer(params[ctrl_name]["Value"]) << LL_ENDL;
+            ++counts.rejected;
+            continue;
         }
+        gSavedSettings.getControl(ctrl_name)->set(clean);
+        ++counts.accepted;
     }
 
     // A Look is a full snapshot of the whitelist, so a whitelisted key the
@@ -1079,10 +1133,11 @@ bool LLPresetsManager::loadLooksPreset(std::string name)
     // Only a file carrying at least half the whitelist counts as a snapshot,
     // so a truncated or hand-trimmed file applies what it has and touches
     // nothing else. A key that is present but malformed is skipped, as it
-    // always was, rather than reset. And the master switch is left alone: a
-    // file that omits it was edited by hand, and its other keys are evidently
-    // meant to be seen. resetToDefault fires only on a real change.
-    const bool snapshot = applied * 2 >= static_cast<S32>(allowed.size());
+    // always was, rather than reset -- and it still counts as carried. And
+    // the master switch is left alone: a file that omits it was edited by
+    // hand, and its other keys are evidently meant to be seen.
+    // resetToDefault fires only on a real change.
+    const bool snapshot = (counts.accepted + counts.rejected) * 2 >= static_cast<S32>(allowed.size());
     if (snapshot)
     {
         for (const std::string& ctrl_name : allowed)
@@ -1099,18 +1154,128 @@ bool LLPresetsManager::loadLooksPreset(std::string name)
         }
     }
     mIgnoreChangedSignal = false;
+    return counts;
+}
 
-    if (applied == 0)
+bool LLPresetsManager::loadLooksPreset(std::string name, LookSettingCounts* counts)
+{
+    LLSD params;
+    if (!readPresetFile(PRESETS_LOOKS, name, params))
+    {
+        return false;
+    }
+
+    const LookSettingCounts applied = applyLookSettings(params);
+    if (counts)
+    {
+        *counts = applied;
+    }
+    if (applied.accepted == 0)
     {
         LL_WARNS("Presets") << "Look '" << name << "' contained no applicable settings" << LL_ENDL;
         return false;
     }
 
-    LL_DEBUGS("Presets") << "Applied Look '" << name << "'; " << applied << " settings" << LL_ENDL;
+    LL_DEBUGS("Presets") << "Applied Look '" << name << "'; " << applied.accepted << " settings, " << applied.rejected << " skipped" << LL_ENDL;
     gSavedSettings.setString("PresetLooksActive", name);
     gSavedSettings.setString("PresetLooksLastApplied", name);
     triggerChangeLooksSignal();
 
+    return true;
+}
+
+bool LLPresetsManager::saveSharedLook(const std::string& name, const LLSD& shared_settings, LookSettingCounts& counts)
+{
+    counts = LookSettingCounts();
+    if (name.empty() || name == PRESETS_DEFAULT || name == LLTrans::getString(PRESETS_DEFAULT))
+    {
+        LL_WARNS("Presets") << "A shared Look cannot be saved as '" << name << "'" << LL_ENDL;
+        return false;
+    }
+    if (!shared_settings.isMap())
+    {
+        return false;
+    }
+
+    std::vector<std::string> allowed;
+    getLooksControlNames(allowed);
+
+    // Normalised to the shape a saved Look has -- the live setting's own
+    // Comment, Persist and Type beside the value -- and holding only the
+    // values that passed judgment. What loadLooksPreset then applies is a
+    // Look file like any other, so Revert, the dirty mark and Save behave
+    // for an imported Look exactly as they do for one saved here. A value
+    // skipped is not in the file, so a later apply resets that setting to
+    // its default along with every other the file lacks.
+    LLSD params = LLSD::emptyMap();
+    for (const std::string& ctrl_name : allowed)
+    {
+        if (!shared_settings.has(ctrl_name))
+        {
+            continue;
+        }
+        const LLSD&        entry = shared_settings[ctrl_name];
+        LLControlVariable* ctrl  = gSavedSettings.getControl(ctrl_name).get();
+        LLSD               clean;
+        if (!ctrl || !entry.isMap() || !entry.has("Value") || !sanitizeLookValueForControl(ctrl_name, entry["Value"], clean))
+        {
+            LL_WARNS("Presets") << "Shared Look '" << name << "': setting '" << ctrl_name << "' refused and left out: "
+                                << LLSDNotationStreamer(entry.isMap() ? entry["Value"] : entry) << LL_ENDL;
+            ++counts.rejected;
+            continue;
+        }
+        params[ctrl_name] = describeSetting(*ctrl, clean);
+        ++counts.accepted;
+    }
+    // Keys that are no Look's setting: another viewer's, or nobody's.
+    const std::set<std::string> whitelist(allowed.begin(), allowed.end());
+    for (LLSD::map_const_iterator it = shared_settings.beginMap(); it != shared_settings.endMap(); ++it)
+    {
+        if (whitelist.find(it->first) == whitelist.end() && it->first != ALLookFormat::METADATA_KEY)
+        {
+            ++counts.unknown;
+        }
+    }
+
+    if (counts.accepted == 0)
+    {
+        LL_WARNS("Presets") << "Shared Look '" << name << "' holds no usable settings" << LL_ENDL;
+        return false;
+    }
+    if (!writePresetFile(PRESETS_LOOKS, name, params))
+    {
+        return false;
+    }
+    triggerChangeLooksSignal();
+    return true;
+}
+
+bool LLPresetsManager::lookHoldsSameSettings(const std::string& name, const LLSD& shared_settings)
+{
+    LLSD params;
+    if (!shared_settings.isMap() || !readPresetFile(PRESETS_LOOKS, name, params))
+    {
+        return false;
+    }
+    std::vector<std::string> allowed;
+    getLooksControlNames(allowed);
+    for (const std::string& ctrl_name : allowed)
+    {
+        // Each side's value as it would be written, or none where the side
+        // lacks the setting or its value would be refused.
+        const auto written = [this, &ctrl_name](const LLSD& settings, LLSD& value) {
+            return settings.has(ctrl_name) && settings[ctrl_name].isMap() && settings[ctrl_name].has("Value") &&
+                   sanitizeLookValueForControl(ctrl_name, settings[ctrl_name]["Value"], value);
+        };
+        LLSD       mine;
+        LLSD       theirs;
+        const bool have_mine   = written(params, mine);
+        const bool have_theirs = written(shared_settings, theirs);
+        if (have_mine != have_theirs || (have_mine && !llsd_equals(mine, theirs)))
+        {
+            return false;
+        }
+    }
     return true;
 }
 

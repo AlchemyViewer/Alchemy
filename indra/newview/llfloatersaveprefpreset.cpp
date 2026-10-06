@@ -36,8 +36,6 @@
 #include "llpresetsmanager.h"
 #include "lltrans.h"
 
-#include <algorithm>
-
 namespace
 {
     void savePresetNamed(const std::string& subdirectory, const std::string& name)
@@ -48,27 +46,6 @@ namespace
             args["NAME"] = name;
             LLNotificationsUtil::add("PresetNotSaved", args);
         }
-    }
-
-    bool presetExists(const std::string& subdirectory, const std::string& name)
-    {
-        std::list<std::string> names;
-        LLPresetsManager::getInstance()->loadPresetNamesFromDir(subdirectory, names, DEFAULT_HIDE);
-
-        // Case-insensitively, because the comparison stands in for the
-        // filesystem that will do the overwrite, and on Windows and macOS that
-        // filesystem does not care about case: saving "sunset" over
-        // "Sunset.xml" replaces it. Matching exactly here would let that pair
-        // slip past the confirmation. On Linux this warns for a name that
-        // would actually coexist, which errs the survivable way round.
-        std::string wanted(name);
-        LLStringUtil::toLower(wanted);
-        return std::any_of(names.begin(), names.end(),
-            [&wanted](std::string existing)
-            {
-                LLStringUtil::toLower(existing);
-                return existing == wanted;
-            });
     }
 }
 
@@ -160,7 +137,7 @@ void LLFloaterSavePrefPreset::onBtnSave()
     // option here either -- the Lightbox's own Save button only ever
     // overwrites the *active* Look, so this is the only route to replacing any
     // other one.
-    if (PRESETS_LOOKS == mSubdirectory && presetExists(mSubdirectory, name))
+    if (PRESETS_LOOKS == mSubdirectory && LLPresetsManager::getInstance()->presetExists(mSubdirectory, name))
     {
         LLSD args;
         args["NAME"] = name;
