@@ -476,9 +476,10 @@ private:
     std::optional<Reuse> reusable(const Relayout& again, const ALDiffMoves::moves_t& moves, size_t last_change) const;
     // Compared again and made again from the texts; the runs as open as
     // given, where there are as many as there were. And made again from
-    // the runs as they are: after a splice, only where it must be.
+    // the runs as they are, by the options shown (worked out once a
+    // rebuild): after a splice, only where it must be.
     void              build(const std::vector<bool>& open = {});
-    void              layout(const std::vector<bool>& open = {}, const Relayout* again = nullptr);
+    void              layout(const ALTextDiff::Options& options, const std::vector<bool>& open = {}, const Relayout* again = nullptr);
     // A side's lines made anew, its text already so: compared again only
     // where it changed (ALDiffSplice) where that is enough, and laid out
     // again only there.

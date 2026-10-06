@@ -53,8 +53,17 @@ public:
         }
         return idOf(mMade.emplace_back(std::move(piece)));
     }
+    // A piece's id where it has one; -1 where it has none, which asking
+    // does not give it.
+    S32 find(std::string_view piece) const
+    {
+        const auto found = mIds.find(piece);
+        return found != mIds.end() ? found->second : -1;
+    }
     // How many there are: every id below it.
-    S32 count() const { return static_cast<S32>(mIds.size()); }
+    S32  count() const { return static_cast<S32>(mIds.size()); }
+    // Room for so many, made once.
+    void reserve(size_t count) { mIds.reserve(count); }
 
 private:
     boost::unordered_flat_map<std::string_view, S32, ll::string_hash, std::equal_to<>> mIds;

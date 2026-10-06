@@ -28,6 +28,7 @@
 
 #include "aldiffids.h"
 
+#include <algorithm>
 
 ALDiffMoves::moves_t ALDiffMoves::find(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<ALTextDiff::Run>& runs,
                                        const ALTextDiff::Options& options)
@@ -58,26 +59,28 @@ ALDiffMoves::moves_t ALDiffMoves::find(const std::vector<std::string>& left, con
         return out;
     }
     // Only the lines changed are keyed: as they are, or as told the same
-    // where something is let go of, the key kept while its id is.
-    const bool               as_told = options.like.any();
-    ALDiffIds                ids;
-    std::vector<S32>         a(left.size(), -1);
-    std::vector<S32>         b(right.size(), -1);
-    const auto               idOf = [&](const std::string& line) {
-        return as_told ? ids.idOfMade(ALTextDiff::likenessOf(line, options.like)) : ids.idOf(line);
-    };
+    // where something is let go of, the key kept while its id is. Those
+    // taken out each given one, room for them made once; a line put in is
+    // only looked up, and one like none taken out is in no block -- a
+    // conversion's, every line otherwise, is most of them.
+    const bool       as_told = options.like.any();
+    ALDiffIds        ids;
+    std::vector<S32> a(left.size(), -1);
+    std::vector<S32> b(right.size(), -1);
+    ids.reserve(static_cast<size_t>(std::count(gone.begin(), gone.end(), true)));
     for (size_t i = 0; i < left.size(); ++i)
     {
         if (gone[i])
         {
-            a[i] = idOf(left[i]);
+            a[i] = as_told ? ids.idOfMade(ALTextDiff::likenessOf(left[i], options.like)) : ids.idOf(left[i]);
         }
     }
     for (size_t j = 0; j < right.size(); ++j)
     {
         if (made[j])
         {
-            b[j] = idOf(right[j]);
+            b[j]    = as_told ? ids.find(ALTextDiff::likenessOf(right[j], options.like)) : ids.find(right[j]);
+            made[j] = b[j] >= 0;
         }
     }
     // Where each line put in is, by its id: the first MOST_TRIED of each,

@@ -125,6 +125,7 @@ bool ALDiffModel::setPairs(ALTextDiff::ranges_t pairs)
 ALTextDiff::ranges_t ALDiffModel::carried(const ALTextDiff::ranges_t& ranges, bool left, S32 was, const LineMap& map)
 {
     ALTextDiff::ranges_t out;
+    out.reserve(ranges.size());
     for (ALTextDiff::Range range : ranges)
     {
         S32& first = left ? range.leftFirst : range.rightFirst;
@@ -272,7 +273,7 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, cons
         edited.was[1 - shown]   = static_cast<S32>(other.size());
         readTokens(&again.runs, &edited);
     }
-    layout({}, &again);
+    layout(options, {}, &again);
 }
 
 std::vector<std::pair<S32, size_t>> ALDiffModel::readFrom(size_t side, S32 from) const
@@ -433,7 +434,7 @@ void ALDiffModel::build(const std::vector<bool>& open)
     if (options.algorithm != ALTextDiff::Algorithm::Structural)
     {
         mRuns = ALTextDiff::lines(left, right, options);
-        layout(open);
+        layout(options, open);
         return;
     }
     // By structure: the lines' runs, then their changes read as tokens.
@@ -441,7 +442,7 @@ void ALDiffModel::build(const std::vector<bool>& open)
     by_lines.algorithm           = ALTextDiff::Algorithm::Histogram;
     mRuns                        = ALTextDiff::lines(left, right, by_lines);
     readTokens();
-    layout(open);
+    layout(options, open);
 }
 
 void ALDiffModel::readTokens(const std::vector<ALTextDiff::Run>* was, const ALStructuralDiff::Edited* edited)
@@ -474,7 +475,7 @@ void ALDiffModel::readTokens(const std::vector<ALTextDiff::Run>* was, const ALSt
     mByTokens[1] = std::move(by_tokens.rightByTokens);
 }
 
-void ALDiffModel::layout(const std::vector<bool>& open, const Relayout* again)
+void ALDiffModel::layout(const ALTextDiff::Options& options, const std::vector<bool>& open, const Relayout* again)
 {
     ++mLayouts;
     // What is shown on the left and on the right: the texts as given, or
@@ -482,7 +483,6 @@ void ALDiffModel::layout(const std::vector<bool>& open, const Relayout* again)
     const std::vector<std::string>&     left    = shownLeft();
     const std::vector<std::string>&     right   = shownRight();
     const std::vector<ALTextDiff::Run>& runs    = mRuns;
-    const ALTextDiff::Options           options = shownOptions();
     // Each text's lines' regions, where a grammar cuts their words.
     const auto [left_regions, right_regions] = shownRegions();
     const auto regionsOf = [](line_regions_t regions, S32 line) {
@@ -495,7 +495,10 @@ void ALDiffModel::layout(const std::vector<bool>& open, const Relayout* again)
     // is told only those within it: a converted script has one or two a
     // line, which ALLinePairs would look through for every pair it weighs.
     ALTextDiff::anchors_t by_left = options.anchors;
-    std::sort(by_left.begin(), by_left.end());
+    if (!std::is_sorted(by_left.begin(), by_left.end()))
+    {
+        std::sort(by_left.begin(), by_left.end());
+    }
     ALTextDiff::Options pairing = options;
     const auto          pairingOf = [&](const std::vector<S32>& gone_lines) -> const ALTextDiff::Options& {
         pairing.anchors.clear();
@@ -1473,7 +1476,11 @@ void ALDiffModel::findBracketed()
             order.push_back(n);
         }
     }
-    std::sort(order.begin(), order.end(), [this](size_t a, size_t b) { return mRanges[a].leftFirst < mRanges[b].leftFirst; });
+    const auto by_first = [this](size_t a, size_t b) { return mRanges[a].leftFirst < mRanges[b].leftFirst; };
+    if (!std::is_sorted(order.begin(), order.end(), by_first))
+    {
+        std::sort(order.begin(), order.end(), by_first);
+    }
     for (size_t i = 0; i < order.size(); ++i)
     {
         const ALTextDiff::Range& outer = mRanges[order[i]];

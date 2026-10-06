@@ -1120,4 +1120,68 @@ namespace tut
             ensure("all of each", left == static_cast<S32>(a.size()) && right == static_cast<S32>(b.size()));
         }
     }
+
+    template<> template<>
+    void altextdiff_object::test<24>()
+    {
+        set_test_name("anchors kept: within both texts, a longest run rising both ways, those rising already as they are; anchors of ranges whatever their order");
+        typedef ALTextDiff::anchors_t A;
+        ensure("rising, two outside: the rest as they are", ALTextDiff::keptAnchors({ { -1, 0 }, { 0, 0 }, { 2, 1 }, { 5, 4 }, { 9, 4 } }, 9, 9) ==
+                                                              A{ { 0, 0 }, { 2, 1 }, { 5, 4 } });
+        ensure("one crossing: let go of", ALTextDiff::keptAnchors({ { 0, 0 }, { 4, 1 }, { 2, 2 }, { 5, 5 } }, 9, 9).size() == 3);
+        // Against every run's length, by a slow count.
+        std::mt19937 random(20261006);
+        for (S32 round = 0; round < 200; ++round)
+        {
+            A anchors;
+            for (S32 n = static_cast<S32>(random() % 12); n > 0; --n)
+            {
+                anchors.emplace_back(static_cast<S32>(random() % 14) - 2, static_cast<S32>(random() % 14) - 2);
+            }
+            if (round % 2)
+            {
+                std::sort(anchors.begin(), anchors.end());
+            }
+            const A kept = ALTextDiff::keptAnchors(anchors, 10, 10);
+            bool    good = true;
+            for (size_t i = 0; i < kept.size(); ++i)
+            {
+                good = good && kept[i].first >= 0 && kept[i].second >= 0 && kept[i].first < 10 && kept[i].second < 10 &&
+                       std::find(anchors.begin(), anchors.end(), kept[i]) != anchors.end() &&
+                       (i == 0 || (kept[i].first > kept[i - 1].first && kept[i].second > kept[i - 1].second));
+            }
+            // The longest such run: by their lines of the left, each the
+            // last of the longest ending there, of those before it.
+            A within;
+            for (const auto& pair : anchors)
+            {
+                if (pair.first >= 0 && pair.second >= 0 && pair.first < 10 && pair.second < 10)
+                {
+                    within.push_back(pair);
+                }
+            }
+            std::sort(within.begin(), within.end());
+            std::vector<size_t> longest(within.size(), 1);
+            size_t              most = 0;
+            for (size_t i = 0; i < within.size(); ++i)
+            {
+                for (size_t j = 0; j < i; ++j)
+                {
+                    if (within[j].first < within[i].first && within[j].second < within[i].second)
+                    {
+                        longest[i] = std::max(longest[i], longest[j] + 1);
+                    }
+                }
+                most = std::max(most, longest[i]);
+            }
+            ensure("round " + std::to_string(round) + ": a run rising, of them", good);
+            ensure_equals("round " + std::to_string(round) + ": as long as any", kept.size(), most);
+        }
+        // Ranges given out of order: the anchors of them in order.
+        const ALTextDiff::ranges_t ranges   = { { 0, 0, 0, 1 }, { 1, 2, 2, 2 }, { 4, 4, 2, 4 }, { 4, 4, 3, 3 }, { 6, 9, 6, 8 }, { 7, 8, 7, 7 } };
+        ALTextDiff::ranges_t       shuffled = ranges;
+        std::reverse(shuffled.begin(), shuffled.end());
+        std::swap(shuffled[1], shuffled[3]);
+        ensure("whatever their order", ALTextDiff::anchorsOf(shuffled) == ALTextDiff::anchorsOf(ranges));
+    }
 }

@@ -181,6 +181,27 @@ namespace
 // rising run takes one at most; then that run, rising on the left.
 ALTextDiff::anchors_t ALTextDiff::keptAnchors(const anchors_t& anchors, S32 left_size, S32 right_size)
 {
+    // Those within both texts rising both ways already, as anchorsOf
+    // leaves a conversion's: every one of them kept, as they are.
+    ALTextDiff::anchors_t within;
+    within.reserve(anchors.size());
+    bool rising = true;
+    for (const std::pair<S32, S32>& pair : anchors)
+    {
+        if (pair.first >= 0 && pair.second >= 0 && pair.first < left_size && pair.second < right_size)
+        {
+            rising = within.empty() || (pair.first > within.back().first && pair.second > within.back().second);
+            if (!rising)
+            {
+                break;
+            }
+            within.push_back(pair);
+        }
+    }
+    if (rising)
+    {
+        return within;
+    }
     ALTextDiff::anchors_t given;
     for (const std::pair<S32, S32>& pair : anchors)
     {
@@ -342,9 +363,16 @@ ALTextDiff::anchors_t ALTextDiff::anchorsOf(const ranges_t& ranges)
     {
         order[n] = n;
     }
-    std::sort(order.begin(), order.end(), [&ranges](size_t a, size_t b) {
+    // Each sort passed over where what it sorts is in order already, as a
+    // conversion's ranges are, one after another: a rebuild asks for them
+    // all again.
+    const auto by_first = [&ranges](size_t a, size_t b) {
         return ranges[a].leftFirst != ranges[b].leftFirst ? ranges[a].leftFirst < ranges[b].leftFirst : ranges[a].leftLast > ranges[b].leftLast;
-    });
+    };
+    if (!std::is_sorted(order.begin(), order.end(), by_first))
+    {
+        std::sort(order.begin(), order.end(), by_first);
+    }
     anchors_t           out;
     std::vector<size_t> open;
     out.reserve(ranges.size() * 2);
@@ -373,9 +401,16 @@ ALTextDiff::anchors_t ALTextDiff::anchorsOf(const ranges_t& ranges)
     }
     // One anchor a line each way: on a line of the left, the earliest of
     // the right; then on a line of the right, the latest of the left.
-    std::sort(out.begin(), out.end());
+    if (!std::is_sorted(out.begin(), out.end()))
+    {
+        std::sort(out.begin(), out.end());
+    }
     out.erase(std::unique(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.first == b.first; }), out.end());
-    std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.second != b.second ? a.second < b.second : a.first > b.first; });
+    const auto by_second = [](const auto& a, const auto& b) { return a.second != b.second ? a.second < b.second : a.first > b.first; };
+    if (!std::is_sorted(out.begin(), out.end(), by_second))
+    {
+        std::sort(out.begin(), out.end(), by_second);
+    }
     out.erase(std::unique(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.second == b.second; }), out.end());
     return out;
 }
