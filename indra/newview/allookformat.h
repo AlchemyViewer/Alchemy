@@ -61,6 +61,12 @@ namespace ALLookFormat
     inline constexpr size_t LOOK_NAME_BYTE_LIMIT = 63;
     // A LUT is named by its file name, and no file system takes a longer one.
     inline constexpr size_t LUT_NAME_BYTE_LIMIT = 255;
+    // How deep the XML of a Look -- or any preset file -- may nest before it
+    // is refused: <llsd><map><map><array><array><real> is six. The parser
+    // keeps its own state on the heap, but what it builds is freed
+    // recursively, and a text of sixty kilobytes can nest thousands deep for
+    // the sake of nesting.
+    inline constexpr S32 XML_DEPTH_LIMIT = 16;
     // What a Look's notecard is called in inventory: this before the Look's
     // name. Code, not a translated string, because the import takes the
     // Look's name back out of a notecard whose body has none.

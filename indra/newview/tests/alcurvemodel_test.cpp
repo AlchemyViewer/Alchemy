@@ -672,6 +672,8 @@ namespace tut
         mixed.append(map);
         mixed.append(pair(LLSD::Real(std::numeric_limits<F64>::quiet_NaN()), LLSD::Real(0.2)));
         mixed.append(pair(LLSD::Real(std::numeric_limits<F64>::infinity()), LLSD::Real(1.0)));
+        mixed.append(pair(LLSD::Real(1e39), LLSD::Real(1.0)));   // finite as a double, infinity as the float a point is
+        mixed.append(pair(LLSD::Real(0.5), LLSD::Real(-1e39)));
         mixed.append(LLSD::Real(0.3));
         mixed.append(pair(LLSD::Real(0.0), LLSD::Real(0.0)));
         mixed.append(pair(LLSD::Integer(1), LLSD::Integer(1)));   // integers are numbers too

@@ -105,6 +105,16 @@ namespace
         return false;
     }
 
+    // A finite number that is still finite as the single-precision float an
+    // F32, Vector3 or Color3 setting reads it as (convert_from_llsd in
+    // llcontrol.cpp casts). LLSD holds doubles, so 1e39 is finite here and
+    // infinity by the time the renderer sees it.
+    bool finiteSingle(const LLSD& value, F64& out)
+    {
+        // Compared, not cast: narrowing a double past float range is undefined.
+        return finiteNumber(value, out) && std::fabs(out) <= static_cast<F64>(std::numeric_limits<F32>::max());
+    }
+
     // A number that is whole and within an S32, as an Integer.
     bool wholeNumber(const LLSD& value, LLSD& out)
     {
@@ -219,8 +229,9 @@ bool ALLookFormat::parseNotecardText(std::string_view text, SharedLook& look)
     std::istringstream in{ std::string(text.substr(start)) };
     LLSD               body;
     // Quietly: this is a stranger's text, and a notecard that is not a Look
-    // is an answer, not an error worth a log line.
-    if (LLSDSerialize::fromXML(body, in, false) == LLSDParser::PARSE_FAILURE || !body.isMap() || !body.has(METADATA_KEY_STRING))
+    // is an answer, not an error worth a log line. And no deeper than a Look
+    // nests: see XML_DEPTH_LIMIT.
+    if (LLSDSerialize::fromXML(body, in, false, XML_DEPTH_LIMIT) == LLSDParser::PARSE_FAILURE || !body.isMap() || !body.has(METADATA_KEY_STRING))
     {
         return false;
     }
@@ -250,7 +261,7 @@ bool ALLookFormat::sanitizeLookValue(const std::string& control_name, const std:
     if (control_type == "F32")
     {
         F64 real = 0.0;
-        if (!finiteNumber(value, real))
+        if (!finiteSingle(value, real))
         {
             return false;
         }
@@ -308,7 +319,9 @@ bool ALLookFormat::sanitizeLookValue(const std::string& control_name, const std:
             return false;
         }
         std::string text = value.asString();
-        if (text.size() > LUT_NAME_BYTE_LIMIT || hasControlCharacters(text))
+        // Well-formed UTF-8 as well: the parser lets a character reference
+        // spell a surrogate, and a file written with one never reads again.
+        if (text.size() > LUT_NAME_BYTE_LIMIT || hasControlCharacters(text) || !utf8str_is_valid(text))
         {
             return false;
         }
@@ -335,7 +348,7 @@ bool ALLookFormat::sanitizeLookValue(const std::string& control_name, const std:
         for (S32 i = 0; i < 3; ++i)
         {
             F64 component = 0.0;
-            if (!finiteNumber(value[i], component))
+            if (!finiteSingle(value[i], component))
             {
                 return false;
             }
@@ -390,59 +403,73 @@ std::string ALLookFormat::lutFileNameOnly(const std::string& lut_setting)
     {
         return std::string();
     }
+    // Windows before 11 opens "CON.cube" or "COM1.png" as the device, whatever
+    // the folder, and the renderer opens the LUT at every start: a Look
+    // naming one could hang the viewer on a serial port. No LUT is called that.
+    std::string stem = name.substr(0, dot);
+    LLStringUtil::toUpper(stem);
+    static const char* const DEVICE_NAMES[] = { "CON",  "PRN",  "AUX",  "NUL",  "CONIN$", "CONOUT$", "COM0", "COM1", "COM2", "COM3", "COM4", "COM5",
+                                                "COM6", "COM7", "COM8", "COM9", "LPT0",   "LPT1",    "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7",
+                                                "LPT8", "LPT9" };
+    for (const char* device : DEVICE_NAMES)
+    {
+        if (stem == device)
+        {
+            return std::string();
+        }
+    }
     return name;
 }
 
+namespace
+{
+    // Whether a character may stand in a Look's name or provenance: one
+    // that draws. Out go the controls (C0, DEL, C1), the '|' an inventory
+    // name cannot hold, U+100000 and up (the notecard editor shows these as
+    // the slots of embedded items, ALNotecardItems, so a name holding one
+    // would open with a broken item button in it), the replacement
+    // character that malformed bytes decode to, the non-characters, and
+    // the format characters that draw nothing yet change how what is
+    // around them reads -- the bidi controls, which could make one Look's
+    // name read as another's in the list, and the zero-width ones.
+    bool drawsInName(llwchar cp)
+    {
+        if (cp < 0x20 || cp == 0x7F || (cp >= 0x80 && cp <= 0x9F) || cp == '|' || cp >= 0x100000 || cp == 0xFFFD)
+        {
+            return false;
+        }
+        if (cp == 0x061C || (cp >= 0x200B && cp <= 0x200F) || (cp >= 0x202A && cp <= 0x202E) || (cp >= 0x2060 && cp <= 0x206F) ||
+            cp == 0xFEFF || (cp >= 0xFFF9 && cp <= 0xFFFB) || (cp >= 0xFDD0 && cp <= 0xFDEF) || (cp & 0xFFFE) == 0xFFFE ||
+            (cp >= 0xE0000 && cp <= 0xE007F))
+        {
+            return false;
+        }
+        return true;
+    }
+} // namespace
+
 std::string ALLookFormat::cleanMetadataText(const std::string& raw, size_t byte_limit)
 {
+    // Decoded a character at a time (utf8str_decode_at), so that what is
+    // kept is well-formed UTF-8: a stray or missing continuation byte, an
+    // overlong form or an encoded surrogate decodes to U+FFFD over one byte
+    // and goes. Text that is not well-formed would be written as it is into
+    // whatever file the name reaches -- the settings file, as the active
+    // Look's -- and no reader would open that file again.
     std::string clean;
     clean.reserve(raw.size());
     for (size_t i = 0; i < raw.size();)
     {
-        const unsigned char lead = static_cast<unsigned char>(raw[i]);
-        // The length of the UTF-8 sequence this byte leads; a byte that
-        // leads nothing -- a stray continuation byte, 0xF5 and up -- is
-        // one byte of nothing worth keeping.
-        size_t length = lead < 0x80 ? 1 : (lead >> 5) == 0x6 ? 2 : (lead >> 4) == 0xE ? 3 : (lead >> 3) == 0x1E ? 4 : 1;
-        if (i + length > raw.size())
+        const LLCodepointAt at = utf8str_decode_at(raw, i);
+        if (at.cp == '\t' || at.cp == '\n' || at.cp == '\r')
         {
-            // A sequence cut short at the end of the text.
-            break;
+            clean.push_back(' ');
         }
-        bool keep = true;
-        if (length == 1)
+        else if (drawsInName(at.cp))
         {
-            if (lead == '\t' || lead == '\n' || lead == '\r')
-            {
-                clean.push_back(' ');
-                keep = false;
-            }
-            else
-            {
-                // Below 0x80 is a character of its own; a byte at or above
-                // it that led nothing is a stray continuation byte or an
-                // invalid lead, and goes.
-                keep = lead >= 0x20 && lead < 0x80 && lead != 0x7F && lead != '|';
-            }
+            clean.append(raw, i, at.next - i);
         }
-        else if (length == 2)
-        {
-            // U+0080 to U+009F, the C1 controls.
-            const unsigned char second = static_cast<unsigned char>(raw[i + 1]);
-            keep = !(lead == 0xC2 && second >= 0x80 && second <= 0x9F);
-        }
-        else if (length == 4)
-        {
-            // U+100000 and up: the notecard editor shows these as the
-            // slots of embedded items (ALNotecardItems), so a name holding
-            // one would open with a broken item button in it.
-            keep = lead != 0xF4;
-        }
-        if (keep)
-        {
-            clean.append(raw, i, length);
-        }
-        i += length;
+        i = at.next;
     }
     LLStringUtil::trim(clean);
     return utf8str_truncate(clean, static_cast<S32>(byte_limit));

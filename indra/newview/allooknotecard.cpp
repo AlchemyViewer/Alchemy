@@ -190,10 +190,13 @@ void ALLookNotecard::importLookFromNotecardText(const std::string& text, const s
     }
 
     // A LUT the Look names that is not here is shown without, silently, by
-    // the renderer; say so instead, by the bare name the setting was cut to.
-    if (look.settings.has("RenderColorGradeLUT"))
+    // the renderer; say so instead, by the name as it was written -- judged
+    // and cut to a bare file name -- never as the notecard spelt it.
+    LLSD lut_value;
+    if (look.settings.has("RenderColorGradeLUT") &&
+        ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", look.settings["RenderColorGradeLUT"]["Value"], lut_value))
     {
-        const std::string lut = ALLookFormat::lutFileNameOnly(look.settings["RenderColorGradeLUT"]["Value"].asString());
+        const std::string lut = lut_value.asString();
         if (!lut.empty() && !colorLutFileIsInstalled(lut))
         {
             imported.missingLut = lut;

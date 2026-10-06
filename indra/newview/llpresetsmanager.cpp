@@ -996,7 +996,9 @@ bool LLPresetsManager::readPresetFile(const std::string& subdirectory, const std
         return false;
     }
     params.clear();
-    LLSDSerialize::fromXML(params, preset_file);
+    // A preset file is six levels deep at most; one from outside that nests
+    // further is not one.
+    LLSDSerialize::fromXML(params, preset_file, true, ALLookFormat::XML_DEPTH_LIMIT);
     preset_file.close();
     if (!params.isMap() || params.size() == 0)
     {
@@ -1017,9 +1019,45 @@ bool LLPresetsManager::writePresetFile(const std::string& subdirectory, const st
     }
     LLPointer<LLSDFormatter> formatter = new LLSDXMLFormatter();
     formatter->format(params, preset_file, LLSDFormatter::OPTIONS_PRETTY);
+    const bool written = !preset_file.fail();
     preset_file.close();
+    if (!written || preset_file.fail())
+    {
+        // A full disk, say: the file is there and short, and must not be
+        // reported as saved.
+        LL_WARNS("Presets") << "Could not write preset file " << full_path << LL_ENDL;
+        return false;
+    }
     LL_DEBUGS("Presets") << "saved preset '" << name << "'; " << params.size() << " parameters" << LL_ENDL;
     return true;
+}
+
+// A refused value as a log line can show it. A scalar is shown, cut short;
+// a map or an array is only described: streaming one recurses once per
+// level of nesting, and a stranger's notecard can nest a value fifteen
+// hundred deep in twenty kilobytes, which is the main thread's whole
+// stack on Windows. The parser now refuses such a text, and this does not
+// rely on it.
+static std::string refusedValueText(const LLSD& value)
+{
+    if (value.isMap())
+    {
+        return "a map of " + std::to_string(value.size());
+    }
+    if (value.isArray())
+    {
+        return "an array of " + std::to_string(value.size());
+    }
+    constexpr size_t   SHOWN = 200;
+    std::ostringstream text;
+    text << LLSDNotationStreamer(value);
+    std::string shown = text.str();
+    if (shown.size() > SHOWN)
+    {
+        shown.resize(SHOWN);
+        shown += "...";
+    }
+    return shown;
 }
 
 bool LLPresetsManager::presetExists(const std::string& subdirectory, const std::string& name)
@@ -1116,8 +1154,8 @@ LLPresetsManager::LookSettingCounts LLPresetsManager::applyLookSettings(const LL
         {
             // By name, so that a Look that loses a setting can be looked
             // into: the toast only counts them.
-            LL_WARNS("Presets") << "Look setting '" << ctrl_name << "' refused and skipped: "
-                                << LLSDNotationStreamer(params[ctrl_name]["Value"]) << LL_ENDL;
+            LL_WARNS("Presets") << "Look setting '" << ctrl_name << "' refused and skipped: " << refusedValueText(params[ctrl_name]["Value"])
+                                << LL_ENDL;
             ++counts.rejected;
             continue;
         }
@@ -1220,7 +1258,7 @@ bool LLPresetsManager::saveSharedLook(const std::string& name, const LLSD& share
         if (!ctrl || !entry.isMap() || !entry.has("Value") || !sanitizeLookValueForControl(ctrl_name, entry["Value"], clean))
         {
             LL_WARNS("Presets") << "Shared Look '" << name << "': setting '" << ctrl_name << "' refused and left out: "
-                                << LLSDNotationStreamer(entry.isMap() ? entry["Value"] : entry) << LL_ENDL;
+                                << refusedValueText(entry.isMap() ? entry["Value"] : entry) << LL_ENDL;
             ++counts.rejected;
             continue;
         }

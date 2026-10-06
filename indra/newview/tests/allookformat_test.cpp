@@ -21,9 +21,11 @@
 #include "../alcurvemodel.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
+#include "llstring.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -306,6 +308,38 @@ namespace tut
         ensure("a Format from the future is read",
                ALLookFormat::parseNotecardText("<llsd><map><key>" + key + "</key><map><key>Format</key><integer>9</integer></map></map></llsd>", back));
         ensure_equals("and says so", back.metadata.format, 9);
+
+        // Character references hold to XML's Char production: a surrogate or
+        // a control would ride into the settings file, as the active Look's
+        // name, as bytes no reader takes, and the file would never open again.
+        const std::string head = "<llsd><map><key>" + key + "</key><map><key>Format</key><integer>1</integer><key>Name</key><string>";
+        const std::string tail = "</string></map></map></llsd>";
+        ensure("a surrogate reference refuses the text", !ALLookFormat::parseNotecardText(head + "Sunset&#xD800;" + tail, back));
+        ensure("a control reference refuses the text", !ALLookFormat::parseNotecardText(head + "Sun&#1;set" + tail, back));
+        ensure("a non-character reference refuses the text", !ALLookFormat::parseNotecardText(head + "Sun&#xFFFE;set" + tail, back));
+        ensure("a tab reference is read", ALLookFormat::parseNotecardText(head + "Sun&#x9;set" + tail, back));
+        ensure_equals("as a space", back.metadata.name, "Sun set");
+        ensure("a reference to an emoji is read", ALLookFormat::parseNotecardText(head + "Sun &#x1F305;" + tail, back));
+        ensure_equals("and kept", back.metadata.name, "Sun \xF0\x9F\x8C\x85");
+
+        // No deeper than a Look nests: a value wrapped past XML_DEPTH_LIMIT
+        // refuses the whole text, before anything is built from it.
+        const auto wrapped = [&key](S32 arrays) {
+            std::string text = "<llsd><map><key>" + key + "</key><map><key>Format</key><integer>1</integer></map><key>RenderExposure</key><map><key>Value</key>";
+            for (S32 i = 0; i < arrays; ++i)
+            {
+                text += "<array>";
+            }
+            text += "<real>1</real>";
+            for (S32 i = 0; i < arrays; ++i)
+            {
+                text += "</array>";
+            }
+            return text + "</map></map></llsd>";
+        };
+        // <llsd><map><map> are three, the <real> at the bottom is one more.
+        ensure("a value nested to the limit is read", ALLookFormat::parseNotecardText(wrapped(ALLookFormat::XML_DEPTH_LIMIT - 4), back));
+        ensure("one nested past it is refused", !ALLookFormat::parseNotecardText(wrapped(ALLookFormat::XML_DEPTH_LIMIT - 3), back));
     }
 
     // A real: finite, as a Real; never a NaN or an infinity, and never a
@@ -321,6 +355,12 @@ namespace tut
         ensure("NaN refused", !accepts("F32", std::numeric_limits<F64>::quiet_NaN()));
         ensure("infinity refused", !accepts("F32", std::numeric_limits<F64>::infinity()));
         ensure("negative infinity refused", !accepts("F32", -std::numeric_limits<F64>::infinity()));
+        // LLSD holds doubles and the setting is a float: a double past the
+        // float's range is finite here and infinity in the renderer.
+        ensure("a double past float range refused", !accepts("F32", 1e39));
+        ensure("a negative double past float range refused", !accepts("F32", -1e39));
+        ensure("a text past float range refused", !accepts("F32", "1e39"));
+        ensure("the largest float taken", accepts("F32", 3.0e38));
         // A dropdown writes its value as a string, so a numeric text is a
         // number; a text that is anything more is not.
         ensure("numeric text taken", accepts("F32", "0.5", &out));
@@ -436,6 +476,8 @@ namespace tut
         words.append("b");
         ensure("words refused", !accepts("Color3", words));
         ensure("NaN refused", !accepts("Vector3", triple(0.0, std::numeric_limits<F64>::quiet_NaN(), 0.0)));
+        ensure("a component past float range refused", !accepts("Vector3", triple(0.0, 1e39, 0.0)));
+        ensure("a colour component past float range refused", !accepts("Color3", triple(-1e39, 0.0, 0.0)));
         ensure("a map refused", !accepts("Vector3", LLSD::emptyMap()));
         ensure("a number refused", !accepts("Vector3", 1.0));
     }
@@ -450,6 +492,15 @@ namespace tut
         ensure("the most a file may hold taken", accepts("LLSD", curve(ALCurveModel::MAX_STORED_POINTS)));
         ensure("one point refused", !accepts("LLSD", curve(1)));
         ensure("one too many refused", !accepts("LLSD", curve(ALCurveModel::MAX_STORED_POINTS + 1)));
+        // A point past float range is finite as the double LLSD holds and
+        // infinity as the float a point is; the fuzz below found this one.
+        LLSD overflow = LLSD::emptyArray();
+        LLSD beyond   = LLSD::emptyArray(); // not "far": a Windows macro
+        beyond.append(1e39);
+        beyond.append(0.0);
+        overflow.append(beyond);
+        overflow.append(triple(1.0, 1.0, 0.0));
+        ensure("a point past float range refused", !accepts("LLSD", overflow));
         ensure("a string refused", !accepts("LLSD", "[[0,0],[1,1]]"));
         ensure("a map refused", !accepts("LLSD", LLSD::emptyMap()));
     }
@@ -469,11 +520,19 @@ namespace tut
         ensure_equals("not an image", ALLookFormat::lutFileNameOnly("notes.txt"), "");
         ensure_equals("no extension", ALLookFormat::lutFileNameOnly("warm"), "");
         ensure_equals("a bare dot at the end", ALLookFormat::lutFileNameOnly("warm."), "");
+        // Names older Windows opens as devices, whatever folder they are in.
+        for (const char* device : { "CON.cube", "con.png", "Nul.tga", "COM1.cube", "lpt9.jpg", "AUX.webp", "PRN.bmp", "CONOUT$.cube" })
+        {
+            ensure_equals(std::string("a device name is no LUT: ") + device, ALLookFormat::lutFileNameOnly(device), "");
+        }
+        ensure_equals("a name that merely starts like one is a LUT", ALLookFormat::lutFileNameOnly("console.cube"), "console.cube");
+        ensure_equals("and one with a dot in it", ALLookFormat::lutFileNameOnly("com1.warm.cube"), "com1.warm.cube");
 
         LLSD out;
         ensure("the setting goes through the same cut", ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", "..\\..\\x.cube", out));
         ensure_equals("and comes out bare", out.asString(), "x.cube");
         ensure("a control character refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", std::string("warm\n.cube"), out));
+        ensure("an encoded surrogate refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", std::string("warm\xED\xA0\x80.cube"), out));
         ensure("too long refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", std::string(300, 'x') + ".cube", out));
         ensure("a number refused", !ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", "String", 5, out));
         ensure("another string setting is not cut", ALLookFormat::sanitizeLookValue("RenderSomeName", "String", "a/b", out));
@@ -517,6 +576,18 @@ namespace tut
         ensure_equals("an embedded item slot goes", ALLookFormat::lookNameFromUntrustedText("Soft\xF4\x80\x80\x80" "Film"), "SoftFilm");
         ensure_equals("a stray continuation byte goes", ALLookFormat::lookNameFromUntrustedText("Soft\x80" "Film"), "SoftFilm");
         ensure_equals("a cut-short sequence goes", ALLookFormat::lookNameFromUntrustedText("Film\xE3\x81"), "Film");
+        // Not well-formed UTF-8 either, each decoded to nothing: an overlong
+        // form, an encoded surrogate, a lead whose continuation never comes.
+        ensure_equals("an overlong form goes", ALLookFormat::lookNameFromUntrustedText("Soft\xC0\x80" "Film"), "SoftFilm");
+        ensure_equals("an encoded surrogate goes", ALLookFormat::lookNameFromUntrustedText("Sunset\xED\xA0\x80"), "Sunset");
+        ensure_equals("a lead without its continuation goes and the rest stays", ALLookFormat::lookNameFromUntrustedText("A\xE2" "AAB"), "AAAB");
+        ensure("what is kept is well-formed", utf8str_is_valid(ALLookFormat::lookNameFromUntrustedText("\xE2\x82" "x\xF0\x9F\x98\x80" "\xC3")));
+        // Format characters that draw nothing and change how the rest reads.
+        ensure_equals("a bidi override goes", ALLookFormat::lookNameFromUntrustedText("Soft\xE2\x80\xAE" "Film"), "SoftFilm");
+        ensure_equals("a zero-width space goes", ALLookFormat::lookNameFromUntrustedText("Soft\xE2\x80\x8B" "Film"), "SoftFilm");
+        ensure_equals("a byte-order mark goes", ALLookFormat::lookNameFromUntrustedText("\xEF\xBB\xBF" "Soft Film"), "Soft Film");
+        ensure_equals("a replacement character goes", ALLookFormat::lookNameFromUntrustedText("Soft\xEF\xBF\xBD" "Film"), "SoftFilm");
+        ensure_equals("an emoji stays", ALLookFormat::lookNameFromUntrustedText("Soft \xF0\x9F\x8C\x85"), "Soft \xF0\x9F\x8C\x85");
         ensure_equals("trimmed", ALLookFormat::lookNameFromUntrustedText("  Soft Film  "), "Soft Film");
         ensure_equals("accents stay", ALLookFormat::lookNameFromUntrustedText("Caf\xC3\xA9"), "Caf\xC3\xA9");
         ensure_equals("spaces alone are nothing", ALLookFormat::lookNameFromUntrustedText("   "), "");
@@ -597,5 +668,307 @@ namespace tut
         ensure("and is on", clean.isBoolean() && clean.asBoolean());
         ensure("a boolean switch is a switch", ALLookFormat::sanitizeLookValue("RenderColorGrade", "Boolean", look.settings["RenderColorGrade"]["Value"], clean));
         ensure("and is on", clean.isBoolean() && clean.asBoolean());
+    }
+
+    // The reader under hostile text: a notecard is a stranger's bytes, so the
+    // reader is fed mutations of real Looks and the deepest nesting a
+    // notecard can hold, and what comes out is held to the shapes the
+    // sanitizer promises. Deterministic, so a failure can be re-run.
+    namespace
+    {
+        struct FuzzRng
+        {
+            U64 state;
+            explicit FuzzRng(U64 seed) : state(seed ? seed : 0x9E3779B97F4A7C15ull) {}
+            U64 next()
+            {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                return state;
+            }
+            size_t below(size_t n) { return n ? static_cast<size_t>(next() % n) : 0; }
+        };
+
+        void exerciseReader(const std::string& text, size_t& parsed_count)
+        {
+            ALLookFormat::looksLikeLookNotecard(text);
+            ALLookFormat::SharedLook look;
+            if (ALLookFormat::parseNotecardText(text, look))
+            {
+                ++parsed_count;
+                static const char* const types[] = { "F32", "S32", "U32", "Boolean", "String", "Vector3", "Color3", "LLSD", "Rect" };
+                for (LLSD::map_const_iterator it = look.settings.beginMap(); it != look.settings.endMap(); ++it)
+                {
+                    const LLSD& value = it->second["Value"];
+                    for (const char* type_name : types)
+                    {
+                        const std::string type(type_name);
+                        LLSD              clean;
+                        if (!ALLookFormat::sanitizeLookValue("RenderColorGradeLUT", type, value, clean))
+                        {
+                            continue;
+                        }
+                        // A value that passed must be of the promised shape.
+                        if (type == "F32")
+                        {
+                            ensure("F32 is a finite real", clean.isReal() && std::isfinite(clean.asReal()));
+                        }
+                        else if (type == "S32" || type == "U32")
+                        {
+                            ensure("S32 is an integer", clean.isInteger());
+                        }
+                        else if (type == "Boolean")
+                        {
+                            ensure("Boolean is a boolean", clean.isBoolean());
+                        }
+                        else if (type == "String")
+                        {
+                            ensure("String is short", clean.isString() && clean.asString().size() <= 255);
+                            const std::string s = clean.asString();
+                            ensure("LUT has no separator", s.find_first_of("/\\") == std::string::npos);
+                        }
+                        else if (type == "Vector3" || type == "Color3")
+                        {
+                            ensure("triple of finite reals", clean.isArray() && clean.size() == 3 && clean[0].isReal() && clean[1].isReal() && clean[2].isReal() &&
+                                                                 std::isfinite(clean[0].asReal()) && std::isfinite(clean[1].asReal()) && std::isfinite(clean[2].asReal()));
+                        }
+                        else if (type == "LLSD")
+                        {
+                            std::vector<ALCurveModel::Point> pts;
+                            // What the sanitizer wrote must read back as a
+                            // curve: 1e39 once passed as a double and came
+                            // out as infinity.
+                            ensure("curve re-reads", ALToneCurveSet::pointsFromLLSD(clean, pts));
+                            for (const ALCurveModel::Point& p : pts)
+                            {
+                                ensure("curve point finite", std::isfinite(p.mX) && std::isfinite(p.mY));
+                            }
+                        }
+                        else
+                        {
+                            ensure("Rect never passes", false);
+                        }
+                    }
+                }
+                ensure("name within limit", look.metadata.name.size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
+                ensure("numbered within limit", ALLookFormat::numberedLookName(look.metadata.name, 2).size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
+                ensure("numbered 999 within limit", ALLookFormat::numberedLookName(look.metadata.name, 999).size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
+                ensure("notecard name within limit", ALLookFormat::notecardNameForLook(look.metadata.name).size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
+                std::string composed_back;
+                ALLookFormat::composeNotecardText(look, composed_back);
+            }
+            // Raw bytes through the name cleaner and the LUT cut.
+            const std::string head    = text.substr(0, 300);
+            const std::string cleaned = ALLookFormat::cleanMetadataText(head, 63);
+            ensure("cleaned within limit", cleaned.size() <= 63);
+            ALLookFormat::lookNameFromUntrustedText(head);
+            ALLookFormat::lookNameFromNotecardName(head);
+            const std::string lut = ALLookFormat::lutFileNameOnly(head);
+            ensure("lut has no separator", lut.find_first_of("/\\") == std::string::npos);
+            ALLookFormat::numberedLookName(head, 2);
+        }
+    } // namespace
+
+    template<> template<> void object::test<19>()
+    {
+        set_test_name("mutated and deeply nested text");
+        LLSD small                            = LLSD::emptyMap();
+        small["RenderExposure"]               = entry("F32", 0.25);
+        small["RenderGlowIterations"]         = entry("S32", 3);
+        small["AlchemyExposureMeteringMode"]  = entry("U32", 1);
+        small["RenderColorGrade"]             = entry("Boolean", true);
+        small["RenderGlowNoise"]              = entry("Boolean", 1.0);
+        small["AlchemyRenderTonemapType"]     = entry("S32", "5");
+        small["RenderVignetteColor"]          = entry("Color3", triple(0.1, 0.2, 0.3));
+        small["RenderColorGradeLift"]         = entry("Vector3", triple(-0.1, 0.0, 0.1));
+        small["RenderColorGradeCurveRed"]     = entry("LLSD", curve(5));
+        small["RenderColorGradeLUT"]          = entry("String", "warm.cube");
+        std::vector<std::string> seeds;
+        seeds.push_back(composed(lookNamed("Seed Look \xC3\xA9", small)));
+        seeds.push_back(
+            "<?xml version=\"1.0\" ?>\n<llsd><map><key>@AlchemyLook</key><map><key>Format</key><integer>1</integer><key>Name</key><string>Hand</string>"
+            "<key>Date</key><date>2026-10-06T12:00:00Z</date><key>Author</key><string>A &amp; B &lt;c&gt; &#x41; &#66;</string></map>"
+            "<key>RenderA</key><map><key>Type</key><string>F32</string><key>Value</key><real>1.5e3</real></map>"
+            "<key>RenderB</key><map><key>Type</key><string>S32</string><key>Value</key><integer>-7</integer></map>"
+            "<key>RenderC</key><map><key>Type</key><string>Boolean</string><key>Value</key><boolean>true</boolean></map>"
+            "<key>RenderD</key><map><key>Type</key><string>Color3</string><key>Value</key><array><real>0.5</real><integer>1</integer><string>0.25</string><real>1</real></array></map>"
+            "<key>RenderE</key><map><key>Type</key><string>LLSD</string><key>Value</key><array><array><real>0</real><real>0</real></array><array><real>1</real><real>1</real></array></array></map>"
+            "<key>RenderF</key><map><key>Type</key><string>String</string><key>Value</key><string><![CDATA[a<b]]></string></map>"
+            "<key>RenderG</key><map><key>Value</key><binary encoding=\"base64\">AAECAw==</binary></map>"
+            "<key>RenderH</key><map><key>Value</key><uuid>6bad5ab6-6c4b-4c2a-8f1e-000000000000</uuid></map>"
+            "<key>RenderI</key><map><key>Value</key><uri>http://example.invalid/x</uri></map>"
+            "<key>RenderJ</key><map><key>Value</key><undef/></map>"
+            "<!-- a comment <with> brackets --></map></llsd>\n");
+        static const char* const dict[] = { "<array>", "</array>", "<map>", "</map>", "<key>", "</key>", "<integer>", "</integer>", "<real>", "</real>",
+                                            "<string>", "</string>", "<binary encoding=\"base64\">", "<binary>", "</binary>", "<uuid>", "</uuid>", "<date>",
+                                            "</date>", "<uri>", "</uri>", "<boolean>", "</boolean>", "<undef/>", "<undef>", "&#x", "&#", "&amp;", "&lt;", "&gt;",
+                                            "&quot;", "&apos;", "&", ";", "<![CDATA[", "]]>", "<!--", "-->", "<?xml", "?>", "<llsd>", "</llsd>", "nan", "inf", "-",
+                                            "+", ".", "e", "1e999", "0x10", "99999999999999999999", "-2147483649", "4294967296", "\xFF", "\xF4\x80\x80\x80",
+                                            "\xC0\x80", "\xED\xA0\x80", "\xE2\x82", "\x00", "<", ">", "/>", "\"", "=", "@AlchemyLook", "Format", "Value",
+                                            "Type", "Name", "|", "..", "\\", "/", ":", "\r\n", " ", "\t" };
+        const size_t dict_size = sizeof(dict) / sizeof(dict[0]);
+        FuzzRng      rng(0x5EEDu);
+        size_t       parsed     = 0;
+        const size_t iterations = 40000;
+        for (size_t iter = 0; iter < iterations; ++iter)
+        {
+            std::string  text      = seeds[rng.below(seeds.size())];
+            const size_t mutations = 1 + rng.below(8);
+            for (size_t m = 0; m < mutations && !text.empty(); ++m)
+            {
+                const size_t at = rng.below(text.size());
+                switch (rng.below(8))
+                {
+                    case 0:
+                        text[at] = static_cast<char>(rng.next());
+                        break;
+                    case 1:
+                        text.erase(at, 1 + rng.below(64));
+                        break;
+                    case 2:
+                    {
+                        const size_t len = 1 + rng.below(64);
+                        text.insert(at, text.substr(at, len));
+                        break;
+                    }
+                    case 3:
+                    {
+                        const char* tok = dict[rng.below(dict_size)];
+                        text.insert(at, tok, tok[0] == '\0' ? 1 : std::strlen(tok));
+                        break;
+                    }
+                    case 4:
+                    {
+                        std::string junk;
+                        for (size_t k = 0, n = 1 + rng.below(16); k < n; ++k)
+                        {
+                            junk.push_back(static_cast<char>(rng.next()));
+                        }
+                        text.insert(at, junk);
+                        break;
+                    }
+                    case 5:
+                        text.resize(at);
+                        break;
+                    case 6:
+                    {
+                        const size_t digits = text.find_first_of("0123456789", at);
+                        if (digits != std::string::npos)
+                        {
+                            text.replace(digits, 1, "99999999999999999999");
+                        }
+                        break;
+                    }
+                    case 7:
+                    {
+                        const size_t      b     = rng.below(text.size());
+                        const size_t      len   = 1 + rng.below(32);
+                        const std::string chunk = text.substr(at, len);
+                        text.replace(at, len, text.substr(b, len));
+                        text.insert(std::min(b, text.size()), chunk);
+                        break;
+                    }
+                }
+                if (text.size() > ALLookFormat::NOTECARD_BYTE_LIMIT)
+                {
+                    text.resize(ALLookFormat::NOTECARD_BYTE_LIMIT);
+                }
+            }
+            exerciseReader(text, parsed);
+        }
+        ensure("some mutants still read as Looks", parsed > 100);
+
+        // Nesting as deep as a notecard allows -- every shape cut to exactly
+        // what fits in NOTECARD_BYTE_LIMIT -- and long runs of one thing. The
+        // parser is iterative, but LLSD frees a nested value recursively, and
+        // the viewer's main thread has the default stack: nine thousand
+        // nested maps overflow it, which takes four notecards' worth of text.
+        {
+            const auto nested = [](const char* open_tag, const char* close_tag, bool close) {
+                const std::string head = "<llsd>";
+                const std::string tail = std::string(close ? "" : "") + "</llsd>";
+                const size_t      per  = std::strlen(open_tag) + (close ? std::strlen(close_tag) : 0);
+                const size_t      room = ALLookFormat::NOTECARD_BYTE_LIMIT - head.size() - tail.size();
+                const size_t      depth = room / per;
+                std::string       text = head;
+                for (size_t d = 0; d < depth; ++d)
+                {
+                    text += open_tag;
+                }
+                if (close)
+                {
+                    for (size_t d = 0; d < depth; ++d)
+                    {
+                        text += close_tag;
+                    }
+                }
+                text += tail;
+                ensure("fits a notecard", text.size() <= ALLookFormat::NOTECARD_BYTE_LIMIT);
+                return std::make_pair(text, depth);
+            };
+            struct Shape
+            {
+                const char* name;
+                const char* open_tag;
+                const char* close_tag;
+                bool        close;
+            };
+            const Shape shapes[] = {
+                { "unclosed arrays", "<array>", "</array>", false },
+                { "closed arrays", "<array>", "</array>", true },
+                { "unclosed maps with empty keys", "<map><key/>", "</map>", false },
+                { "unclosed maps with keys", "<map><key></key>", "</map>", false },
+                { "closed maps with keys", "<map><key>k</key>", "</map>", true },
+                { "unclosed maps", "<map>", "</map>", false },
+                { "unclosed llsd", "<llsd>", "</llsd>", false },
+                { "unclosed unknown elements", "<x>", "</x>", false },
+                { "unclosed arrays of maps", "<array><map><key/>", "</map></array>", false },
+            };
+            for (const Shape& shape : shapes)
+            {
+                const auto made = nested(shape.open_tag, shape.close_tag, shape.close);
+                ensure(std::string("nests: ") + shape.name, made.second > 2000);
+                exerciseReader(made.first, parsed);
+            }
+        }
+        exerciseReader("<llsd><string>" + std::string(65000, 'A') + "</string></llsd>", parsed);
+        exerciseReader("<llsd><string>" + std::string(65000, '&') + "</string></llsd>", parsed);
+        {
+            std::string ents = "<llsd><string>";
+            for (int k = 0; k < 8000; ++k)
+            {
+                ents += "&#x41;";
+            }
+            ents += "</string></llsd>";
+            exerciseReader(ents, parsed);
+        }
+        {
+            std::string ents = "<llsd><string>";
+            for (int k = 0; k < 6000; ++k)
+            {
+                ents += "&#99999999999;";
+            }
+            ents += "</string></llsd>";
+            exerciseReader(ents, parsed);
+        }
+        {
+            std::string ents = "<llsd><string>";
+            for (int k = 0; k < 6000; ++k)
+            {
+                ents += "&#x110000;";
+            }
+            ents += "</string></llsd>";
+            exerciseReader(ents, parsed);
+        }
+        exerciseReader("<llsd><binary encoding=\"base64\">" + std::string(65000, 'A') + "</binary></llsd>", parsed);
+        exerciseReader("<llsd><binary encoding=\"base64\">!!!!</binary></llsd>", parsed);
+        exerciseReader("<llsd><integer>" + std::string(60000, '9') + "</integer></llsd>", parsed);
+        exerciseReader("<llsd><real>" + std::string(60000, '9') + "</real></llsd>", parsed);
+        exerciseReader("<llsd><map><key>" + std::string(65000, 'k') + "</key><integer>1</integer></map></llsd>", parsed);
+        exerciseReader(std::string(65000, '<'), parsed);
+        exerciseReader("<llsd><map><key>@AlchemyLook</key><map><key>Format</key><integer>1</integer><key>Name</key><string>" + std::string(65000, '\xE3') +
+                           "</string></map></map></llsd>",
+                       parsed);
     }
 } // namespace tut

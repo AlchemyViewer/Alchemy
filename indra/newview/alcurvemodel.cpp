@@ -423,8 +423,11 @@ bool isFiniteNumber(const LLSD& v, F32& out)
     {
         return false;
     }
+    // Finite as the double LLSD holds, and within the float a point is:
+    // 1e39 is a number here and an infinity in the curve. Compared, not
+    // cast: narrowing a double past float range is undefined.
     const F64 d = v.asReal();
-    if (!std::isfinite(d))
+    if (!std::isfinite(d) || std::fabs(d) > static_cast<F64>(std::numeric_limits<F32>::max()))
     {
         return false;
     }
