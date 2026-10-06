@@ -126,7 +126,6 @@ function(al_add_test name)
       ${arg_INCLUDES}
       ${INDRA_SOURCE_DIR}/test
       ${INDRA_SOURCE_DIR}/llmath
-      ${INDRA_SOURCE_DIR}/llui
       # llui's own folders, which its top-level headers name theirs from.
       $<TARGET_PROPERTY:llui,INTERFACE_INCLUDE_DIRECTORIES>
   )

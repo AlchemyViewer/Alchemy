@@ -72,6 +72,12 @@ namespace
     constexpr char SETTING_SHARE_NAME[] = "ALDiscordShareName";
     constexpr char SETTING_SHARE_REGION[] = "ALDiscordShareLocationRegion";
     constexpr char SETTING_MAX_MATURITY[] = "ALDiscordShareRegionMaxMaturity";
+    constexpr char SETTING_LEGACY_CHECKED[] = "ALDiscordLegacyChecked";
+
+    // The global switch older viewers kept, no longer declared. The user's
+    // settings file still holds it when it was turned off there, and loading
+    // keeps a key it does not know.
+    constexpr char LEGACY_SETTING_ENABLE[] = "EnableDiscord";
 
     constexpr char FRAME_LISTENER[] = "ALDiscordManager";
 
@@ -83,6 +89,31 @@ namespace
     {
         using namespace std::chrono;
         return static_cast<std::uint64_t>(duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
+    }
+
+    // Older viewers had one switch for every account, on unless turned off.
+    // Each account now has its own, also on unless turned off, so someone who
+    // had turned Discord off would find it on again after the upgrade. Once
+    // per account, carry an old "off" over to the account's own switch, unless
+    // the account has already set it. The check is marked done so that turning
+    // it on again later sticks. This can go once no one upgrades from a viewer
+    // that kept EnableDiscord.
+    void carry_over_legacy_switch()
+    {
+        LLControlVariable* checked = gSavedPerAccountSettings.getControl(SETTING_LEGACY_CHECKED);
+        if (!checked || checked->getValue().asBoolean())
+        {
+            return;
+        }
+        checked->setValue(true);
+
+        LLControlVariable* legacy = gSavedSettings.getControl(LEGACY_SETTING_ENABLE);
+        LLControlVariable* integration = gSavedPerAccountSettings.getControl(SETTING_INTEGRATION);
+        if (legacy && !legacy->getValue().asBoolean() && integration && integration->isDefault())
+        {
+            LL_INFOS("Discord") << "Rich presence left off for this account, as it was before" << LL_ENDL;
+            integration->setValue(false);
+        }
     }
 }
 
@@ -178,6 +209,10 @@ void ALDiscordManager::onFrame()
 
 void ALDiscordManager::onLoginCompleted()
 {
+    // Before the login time is set, so the switch's own listener lets the
+    // change by.
+    carry_over_legacy_switch();
+
     mLoginTime = milliseconds_since_epoch();
     if (gSavedPerAccountSettings.getBOOL(SETTING_INTEGRATION))
     {

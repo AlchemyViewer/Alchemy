@@ -110,6 +110,19 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALDiscordLegacyChecked</key>
+        <map>
+            <key>Comment</key>
+            <string>Set once this account has taken over an older viewer's EnableDiscord being off</string>
+            <key>HideFromEditor</key>
+            <integer>1</integer>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALDiscordShareLocationRegion</key>
         <map>
             <key>Comment</key>

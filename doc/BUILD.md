@@ -338,11 +338,14 @@ with plain git, and only when an option above asks for one of its ports, so an
 open-source build never touches it. To use it, `git ls-remote` on that URL
 must succeed without a prompt, through Git Credential Manager or
 `gh auth setup-git`. With SSH keys only, send the organisation's HTTPS URLs
-over SSH:
+over SSH, from inside the viewer checkout so the rewrite stays with it:
 
 ```
-git config --global url."git@github.com:AlchemyViewer/".insteadOf "https://github.com/AlchemyViewer/"
+git config --local url."git@github.com:AlchemyViewer/".insteadOf "https://github.com/AlchemyViewer/"
 ```
+
+With `--global` instead, it applies to every AlchemyViewer clone on the
+machine.
 
 The registry's README covers CI and adding ports.
 

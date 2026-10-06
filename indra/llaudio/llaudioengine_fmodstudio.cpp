@@ -598,9 +598,13 @@ void LLAudioEngine_FMODSTUDIO::shutdown()
     LL_INFOS("FMOD") << "LLAudioEngine_FMODSTUDIO::shutdown() closing FMOD Studio" << LL_ENDL;
     if (mSystem)
     {
+        // No more device news: the engine it would reach is going.
+        Check_FMOD_Error(mSystem->setCallback(nullptr, FMOD_SYSTEM_CALLBACK_DEVICELISTCHANGED), "FMOD::System::setCallback");
         mSystem->close();
         mSystem->release();
+        mSystem = nullptr;
     }
+    mInited = false;
     LL_INFOS("FMOD") << "LLAudioEngine_FMODSTUDIO::shutdown() done closing FMOD Studio" << LL_ENDL;
 
     delete mListenerp;

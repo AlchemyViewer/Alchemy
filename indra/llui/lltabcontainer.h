@@ -270,8 +270,13 @@ private:
     S32 getScrollPosPixels() const      { return mScrollPosPixels; }
     void setScrollPosPixels(S32 pixels) { mScrollPosPixels = pixels; }
 
+public:
+    // Whether the row of tabs is shown: a host that takes every tab but one
+    // away hides the row and gives the page its room.
     void setTabsHidden(bool hidden)     { mTabsHidden = hidden; }
     bool getTabsHidden() const          { return mTabsHidden; }
+
+private:
 
     void scrollPrev() { mScrollPos = llmax(0, mScrollPos-1); } // No wrap
     void scrollNext() { mScrollPos = llmin(mScrollPos+1, mMaxScrollPos); } // No wrap

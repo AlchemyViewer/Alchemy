@@ -182,21 +182,23 @@ endif()
 
 # The prebuilt SDKs from the private registry, shared libraries on every
 # platform. Each configuration takes its own: FMOD's logging build is the
-# Debug one.
+# Debug one. On Windows the viewer's runtime DLLs above already carry these,
+# to the same folder; installing them twice is harmless.
+set(al_sdk_targets)
 if(AL_USE_FMODSTUDIO)
-  install(
-    IMPORTED_RUNTIME_ARTIFACTS unofficial::fmodstudio::fmod
-    RUNTIME DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer
-    LIBRARY DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer
-  )
+  list(APPEND al_sdk_targets unofficial::fmodstudio::fmod)
 endif()
 if(AL_USE_DISCORD)
+  list(APPEND al_sdk_targets unofficial::discord-social-sdk::discord-social-sdk)
+endif()
+foreach(target IN LISTS al_sdk_targets)
   install(
-    IMPORTED_RUNTIME_ARTIFACTS unofficial::discord-social-sdk::discord-social-sdk
+    IMPORTED_RUNTIME_ARTIFACTS ${target}
     RUNTIME DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer
     LIBRARY DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer
   )
-endif()
+endforeach()
+unset(al_sdk_targets)
 
 # The crash reporter. Its out-of-process handler sits beside the executable,
 # and on Windows the WER module beside the handler, which is where the client
