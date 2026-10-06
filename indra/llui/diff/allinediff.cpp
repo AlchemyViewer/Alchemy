@@ -212,6 +212,16 @@ namespace
         finish();
     }
 
+    // The fewest changes between a stretch that nothing better lines up,
+    // with walking of its own: a stretch that ran out of it earlier in the
+    // texts leaves every later one as it would be alone, not all of it
+    // taken out and put in.
+    void myersAlone(const S32* a, S32 n, const S32* b, S32 m, S32 left, S32 right, std::vector<Run>& out)
+    {
+        S64 work = ALLineDiff::MOST_WORK;
+        myersAt(a, n, b, m, left, right, work, out);
+    }
+
     // Lines of a text that come up more often than this are no help in
     // finding where two texts line up: a brace, a blank line.
     constexpr S32 MOST_OCCURRENCES = 64;
@@ -336,8 +346,7 @@ namespace
     // stretches before it and after it diffed the same way; where nothing
     // shared is rare enough, the fewest changes (Myers). Code's braces and
     // blank lines, common everywhere, do not pair a function with another's.
-    void histogramAt(const Places& places, const S32* a, S32 n, const S32* b, S32 m, S32 left, S32 right, S32 depth, S64& work,
-                     std::vector<Run>& out)
+    void histogramAt(const Places& places, const S32* a, S32 n, const S32* b, S32 m, S32 left, S32 right, S32 depth, std::vector<Run>& out)
     {
         // What the two share at the end, set aside to put last.
         const S32 tail = sharedTail(a, n, b, m);
@@ -365,7 +374,7 @@ namespace
             }
             if (depth > MOST_DEPTH)
             {
-                myersAt(a, n, b, m, left, right, work, out);
+                myersAlone(a, n, b, m, left, right, out);
                 break;
             }
             // How often each line comes up in this stretch of the left,
@@ -373,7 +382,7 @@ namespace
             // worth trying.
             const S32 from   = static_cast<S32>(a - places.left);
             const S32 to     = from + n;
-            S32       best_a = -1, best_b = -1, best_len = 0, best_rarity = MOST_OCCURRENCES + 1;
+            S32       best_a = -1, best_b = -1, best_len = 0, best_rarity = MOST_OCCURRENCES;
             bool      shared = false;
             places.scanFrom(from);
             for (S32 j = 0; j < m;)
@@ -417,7 +426,6 @@ namespace
                         const auto [line_first, line_last] = places.fromScan(a[k]);
                         rarity                             = std::min(rarity, Places::countTo(line_first, line_last, to, rarity));
                     }
-                    work -= ea - sa;
                     if (rarity < best_rarity || (rarity == best_rarity && ea - sa > best_len))
                     {
                         best_a      = sa;
@@ -435,7 +443,7 @@ namespace
                 // all: all of each.
                 if (shared)
                 {
-                    myersAt(a, n, b, m, left, right, work, out);
+                    myersAlone(a, n, b, m, left, right, out);
                 }
                 else
                 {
@@ -444,7 +452,7 @@ namespace
                 }
                 break;
             }
-            histogramAt(places, a, best_a, b, best_b, left, right, depth + 1, work, out);
+            histogramAt(places, a, best_a, b, best_b, left, right, depth + 1, out);
             push(out, Kind::Same, left + best_a, right + best_b, best_len);
             const S32 skip_a = best_a + best_len;
             const S32 skip_b = best_b + best_len;
@@ -517,35 +525,11 @@ namespace
         }
         if (unique.empty() || work <= 0 || depth > MOST_DEPTH)
         {
-            myersAt(a, n, b, m, left, right, work, out);
+            myersAlone(a, n, b, m, left, right, out);
             finish();
             return;
         }
-        std::vector<size_t> tops;
-        std::vector<size_t> before(unique.size(), std::numeric_limits<size_t>::max());
-        for (size_t k = 0; k < unique.size(); ++k)
-        {
-            const auto at = std::lower_bound(tops.begin(), tops.end(), unique[k].second,
-                                             [&unique](size_t top, S32 second) { return unique[top].second < second; });
-            if (at != tops.begin())
-            {
-                before[k] = *(at - 1);
-            }
-            if (at == tops.end())
-            {
-                tops.push_back(k);
-            }
-            else
-            {
-                *at = k;
-            }
-        }
-        std::vector<std::pair<S32, S32>> kept;
-        for (size_t k = tops.back(); k != std::numeric_limits<size_t>::max(); k = before[k])
-        {
-            kept.push_back(unique[k]);
-        }
-        std::reverse(kept.begin(), kept.end());
+        const std::vector<std::pair<S32, S32>> kept = ALLineDiff::longestRising(unique);
         // The stretches between them on their own, each kept line the same.
         S32 i = 0;
         S32 j = 0;
@@ -606,14 +590,46 @@ std::vector<ALLineDiff::Run> ALLineDiff::minimal(const std::vector<S32>& a, cons
     return myers(a, b, MOST_WORK * 10);
 }
 
+std::vector<std::pair<S32, S32>> ALLineDiff::longestRising(const std::vector<std::pair<S32, S32>>& pairs)
+{
+    // The pair ending the best run of each length so far, and the one
+    // before each pair in its run.
+    constexpr size_t    NONE = std::numeric_limits<size_t>::max();
+    std::vector<size_t> tails;
+    std::vector<size_t> before(pairs.size(), NONE);
+    for (size_t k = 0; k < pairs.size(); ++k)
+    {
+        const auto at = std::lower_bound(tails.begin(), tails.end(), pairs[k].second,
+                                         [&pairs](size_t tail, S32 second) { return pairs[tail].second < second; });
+        if (at != tails.begin())
+        {
+            before[k] = *(at - 1);
+        }
+        if (at == tails.end())
+        {
+            tails.push_back(k);
+        }
+        else
+        {
+            *at = k;
+        }
+    }
+    std::vector<std::pair<S32, S32>> out;
+    for (size_t k = tails.empty() ? NONE : tails.back(); k != NONE; k = before[k])
+    {
+        out.push_back(pairs[k]);
+    }
+    std::reverse(out.begin(), out.end());
+    return out;
+}
+
 std::vector<ALLineDiff::Run> ALLineDiff::histogram(const std::vector<S32>& a, const std::vector<S32>& b)
 {
     std::vector<Run>        out;
-    S64                     work   = MOST_WORK;
     const Places            places(a, b);
     const std::vector<S32>& ids_a  = places.textA(a);
     const std::vector<S32>& ids_b  = places.textB(b);
-    histogramAt(places, ids_a.data(), static_cast<S32>(ids_a.size()), ids_b.data(), static_cast<S32>(ids_b.size()), 0, 0, 0, work, out);
+    histogramAt(places, ids_a.data(), static_cast<S32>(ids_a.size()), ids_b.data(), static_cast<S32>(ids_b.size()), 0, 0, 0, out);
     return out;
 }
 

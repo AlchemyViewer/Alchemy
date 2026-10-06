@@ -35,34 +35,6 @@ bool ALDiffTokens::blank(char c)
     return c == ' ' || c == '\t';
 }
 
-ALTextDiff::spans_t ALDiffTokens::words(std::string_view line)
-{
-    ALTextDiff::spans_t out;
-    size_t              i = 0;
-    while (i < line.size())
-    {
-        const unsigned char c   = static_cast<unsigned char>(line[i]);
-        size_t              end = i + 1;
-        if (alWordByte(static_cast<char>(c)))
-        {
-            while (end < line.size() && alWordByte(line[end]))
-            {
-                ++end;
-            }
-        }
-        else if (blank(static_cast<char>(c)))
-        {
-            while (end < line.size() && blank(line[end]))
-            {
-                ++end;
-            }
-        }
-        out.emplace_back(static_cast<S32>(i), static_cast<S32>(end));
-        i = end;
-    }
-    return out;
-}
-
 namespace
 {
     typedef ALDiffTokens::Token    Token;
@@ -172,10 +144,8 @@ void ALDiffTokens::cut(std::string_view line, const ALTextDiff::regions_t* regio
     out.clear();
     if (!regions || regions->empty())
     {
-        for (const auto& [begin, end] : words(line))
-        {
-            out.push_back(Token{ begin, end, Region::Code });
-        }
+        // As prose: nothing says what its stretches are.
+        cutProse(line, 0, line.size(), Region::Code, out);
         return;
     }
     // Each region as it is cut; what none covers, code.

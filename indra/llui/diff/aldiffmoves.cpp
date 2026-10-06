@@ -40,7 +40,7 @@ ALDiffMoves::moves_t ALDiffMoves::find(const std::vector<std::string>& left, con
 void ALDiffMoves::Finder::edited(bool left, S32 head, S32 was_end, S32 now_end)
 {
     std::vector<S32>& ids = mLineIds[left ? 0 : 1];
-    if (!mKeyed || head < 0 || head > was_end || static_cast<size_t>(was_end) > ids.size())
+    if (!mKeyed || head < 0 || head > was_end || now_end < head || static_cast<size_t>(was_end) > ids.size())
     {
         forget();
         return;

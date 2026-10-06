@@ -88,7 +88,9 @@ namespace ALTextDiff
     // of -- each nothing, and a change of nothing else no change; comments
     // let go of, where a grammar says where they are (the options' lexer)
     // -- a line's comment not compared, and a line of nothing else as a
-    // blank line is.
+    // blank line is. Where the grammar says where strings are, a string's
+    // blanks and case are its own whatever is let go of: "a  b" is not
+    // "a b", nor "Hi" "hi".
     struct Likeness
     {
         bool ignoreWhitespace = false;
@@ -98,6 +100,9 @@ namespace ALTextDiff
         bool ignoreComments   = false;
 
         bool any() const { return ignoreWhitespace || ignoreCase || ignoreTrailing || ignoreBlankLines || ignoreComments; }
+        // Whether a line's regions change how it is told the same: where
+        // comments are let go of, or blanks or case, which a string keeps.
+        bool byRegions() const { return ignoreWhitespace || ignoreCase || ignoreComments; }
         bool operator==(const Likeness& other) const = default;
     };
 
@@ -171,13 +176,17 @@ namespace ALTextDiff
     };
 
     // The options by lines alone, as told the same: no anchors, no words
-    // alike, a grammar only to say where comments are let go of, and lines
+    // alike, a grammar only to say where comments and strings are where
+    // that changes what is told the same (Likeness::byRegions), and lines
     // found as Histogram finds them where structure was asked for -- what a
     // merge and a unified diff compare by.
     Options linesOnly(const Options& options);
 
     // The runs that make the left the right, compared as `options` says.
     std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options = Options());
+    // As lines(), found the way `algorithm` says whatever the options say:
+    // the lines a structural comparison reads its changes from.
+    std::vector<Run> linesBy(Algorithm algorithm, const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options);
     // A change: from a run that is not the same, the lines taken out and
     // those put in until one that is -- a parting of none ends it too --
     // each in order; and where that run is, or the end.
@@ -226,7 +235,8 @@ namespace ALTextDiff
     void words(std::string_view left, std::string_view right, spans_t& left_out, spans_t& right_out, const Options& options = Options(),
                const regions_t* left_regions = nullptr, const regions_t* right_regions = nullptr);
     // A line or a word as it is compared, told the same so; a line's
-    // comments, by its regions, left out where they are let go of.
+    // comments, by its regions, left out where they are let go of, and its
+    // strings as they are.
     std::string likenessOf(std::string_view text, const Likeness& like, const regions_t* regions = nullptr);
     // Whether a line taken out or put in is no change, as lines are told
     // the same: blank, where blank lines are let go of; a comment and

@@ -34,7 +34,6 @@
 #include "alworddiff.h"
 
 #include <algorithm>
-#include <limits>
 #include <span>
 
 namespace
@@ -70,61 +69,72 @@ std::optional<ALTextDiff::Algorithm> ALTextDiff::algorithmFromName(std::string_v
     return std::nullopt;
 }
 
+namespace
+{
+    // A line or a word as it is compared, put after what `out` holds: as
+    // likenessOf() says, but kept with others in one string rather than a
+    // string of its own each.
+    void appendLikeness(std::string& out, std::string_view text, const ALTextDiff::Likeness& like, const ALTextDiff::regions_t* regions)
+    {
+        typedef ALTextDiff::Region Region;
+        const size_t from = out.size();
+        // The region each byte is in, the pieces in order: a comment's left
+        // out where comments are let go of, a string's as it is.
+        size_t     piece    = 0;
+        const auto regionAt = [&](size_t at) {
+            if (!regions)
+            {
+                return Region::Code;
+            }
+            while (piece < regions->size() && static_cast<S32>(at) >= (*regions)[piece].end)
+            {
+                ++piece;
+            }
+            return piece < regions->size() && static_cast<S32>(at) >= (*regions)[piece].begin ? (*regions)[piece].region : Region::Code;
+        };
+        bool blanks = false;
+        bool cut    = false;
+        for (size_t at = 0; at < text.size(); ++at)
+        {
+            const char   c      = text[at];
+            const Region region = regionAt(at);
+            if (region == Region::Comment && like.ignoreComments)
+            {
+                cut = true;
+                continue;
+            }
+            const bool quoted = region == Region::String;
+            if (!quoted && like.ignoreWhitespace && ALDiffTokens::blank(c))
+            {
+                blanks = true;
+                continue;
+            }
+            if (blanks && out.size() > from)
+            {
+                out += ' ';
+            }
+            blanks = false;
+            out += !quoted && like.ignoreCase && c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+        }
+        // Blanks at its end let go of where they are, or where a comment after
+        // them was; a line of blanks alone nothing where blank lines are.
+        size_t end = out.size();
+        while (end > from && ALDiffTokens::blank(out[end - 1]))
+        {
+            --end;
+        }
+        if (end == from ? like.ignoreBlankLines || like.ignoreTrailing || cut : like.ignoreTrailing || cut)
+        {
+            out.resize(end);
+        }
+    }
+}
+
 std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like, const regions_t* regions)
 {
     std::string out;
     out.reserve(text.size());
-    // What of it is compared: all of it, or what no comment covers.
-    const auto commented = [&](size_t at) {
-        if (!like.ignoreComments || !regions)
-        {
-            return false;
-        }
-        for (const Piece& piece : *regions)
-        {
-            if (piece.region == Region::Comment && static_cast<S32>(at) >= piece.begin && static_cast<S32>(at) < piece.end)
-            {
-                return true;
-            }
-        }
-        return false;
-    };
-    bool blanks = false;
-    bool cut    = false;
-    for (size_t at = 0; at < text.size(); ++at)
-    {
-        const char c = text[at];
-        if (commented(at))
-        {
-            cut = true;
-            continue;
-        }
-        if (like.ignoreWhitespace && ALDiffTokens::blank(c))
-        {
-            blanks = true;
-            continue;
-        }
-        if (blanks && !out.empty())
-        {
-            out += ' ';
-        }
-        blanks = false;
-        out += like.ignoreCase && c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
-    }
-    // Blanks at its end let go of where they are, or where a comment after
-    // them was; a line of blanks alone nothing where blank lines are.
-    const size_t end = out.find_last_not_of(" \t");
-    if (end == std::string::npos)
-    {
-        if (like.ignoreBlankLines || like.ignoreTrailing || cut)
-        {
-            out.clear();
-        }
-    }
-    else if (like.ignoreTrailing || cut)
-    {
-        out.resize(end + 1);
-    }
+    appendLikeness(out, text, like, regions);
     return out;
 }
 
@@ -156,8 +166,18 @@ namespace
     std::vector<Run> stretch(const std::vector<S32>& a, const std::vector<S32>& b, const std::vector<std::string>& left, const std::vector<std::string>& right,
                              S32 l, S32 l_end, S32 r, S32 r_end, ALTextDiff::Algorithm algorithm)
     {
-        const std::vector<S32> some_a(a.begin() + l, a.begin() + l_end);
-        const std::vector<S32> some_b(b.begin() + r, b.begin() + r_end);
+        // Each text's ids as they are where the stretch is all of it, as it
+        // is without anchors; else the stretch's own.
+        const bool              whole = l == 0 && r == 0 && static_cast<size_t>(l_end) == a.size() && static_cast<size_t>(r_end) == b.size();
+        std::vector<S32>        part_a;
+        std::vector<S32>        part_b;
+        if (!whole)
+        {
+            part_a.assign(a.begin() + l, a.begin() + l_end);
+            part_b.assign(b.begin() + r, b.begin() + r_end);
+        }
+        const std::vector<S32>& some_a = whole ? a : part_a;
+        const std::vector<S32>& some_b = whole ? b : part_b;
         std::vector<Run>       out = algorithm == ALTextDiff::Algorithm::Patience  ? ALLineDiff::patience(some_a, some_b)
                                      : algorithm == ALTextDiff::Algorithm::Minimal ? ALLineDiff::minimal(some_a, some_b)
                                                                                    : ALLineDiff::histogram(some_a, some_b);
@@ -202,59 +222,46 @@ ALTextDiff::anchors_t ALTextDiff::keptAnchors(const anchors_t& anchors, S32 left
     {
         return within;
     }
+    // Each as (right, left), to rise in the left.
     ALTextDiff::anchors_t given;
     for (const std::pair<S32, S32>& pair : anchors)
     {
         if (pair.first >= 0 && pair.second >= 0 && pair.first < left_size && pair.second < right_size)
         {
-            given.push_back(pair);
+            given.emplace_back(pair.second, pair.first);
         }
     }
     std::sort(given.begin(), given.end(), [](const std::pair<S32, S32>& a, const std::pair<S32, S32>& b) {
-        return a.second != b.second ? a.second < b.second : a.first > b.first;
+        return a.first != b.first ? a.first < b.first : a.second > b.second;
     });
-    std::vector<size_t> tails;  // the pair ending the best run of each length
-    std::vector<size_t> before(given.size(), std::numeric_limits<size_t>::max());
-    for (size_t i = 0; i < given.size(); ++i)
+    ALTextDiff::anchors_t kept = ALLineDiff::longestRising(given);
+    for (std::pair<S32, S32>& pair : kept)
     {
-        const auto at = std::lower_bound(tails.begin(), tails.end(), given[i].first,
-                                         [&given](size_t tail, S32 first) { return given[tail].first < first; });
-        if (at != tails.begin())
-        {
-            before[i] = *(at - 1);
-        }
-        if (at == tails.end())
-        {
-            tails.push_back(i);
-        }
-        else
-        {
-            *at = i;
-        }
+        std::swap(pair.first, pair.second);
     }
-    ALTextDiff::anchors_t kept;
-    for (size_t i = tails.empty() ? std::numeric_limits<size_t>::max() : tails.back(); i != std::numeric_limits<size_t>::max(); i = before[i])
-    {
-        kept.push_back(given[i]);
-    }
-    std::reverse(kept.begin(), kept.end());
     return kept;
 }
 
 std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options)
 {
-    if (options.algorithm == Algorithm::Structural)
+    return linesBy(options.algorithm, left, right, options);
+}
+
+std::vector<ALTextDiff::Run> ALTextDiff::linesBy(Algorithm algorithm, const std::vector<std::string>& left, const std::vector<std::string>& right,
+                                                 const Options& options)
+{
+    if (algorithm == Algorithm::Structural)
     {
         const std::vector<regions_t>* left_regions  = options.lexer ? &options.lexer(left) : nullptr;
         const std::vector<regions_t>* right_regions = options.lexer ? &options.lexer(right) : nullptr;
         return ALStructuralDiff::compare(left, right, options, left_regions, right_regions).runs;
     }
     const Likeness& like = options.like;
-    // Each line's regions, where comments are let go of and a grammar says
-    // where they are.
+    // Each line's regions, where a grammar says where comments and strings
+    // are and that changes how lines are told the same.
     const std::vector<regions_t>* left_regions  = nullptr;
     const std::vector<regions_t>* right_regions = nullptr;
-    if (like.ignoreComments && options.lexer)
+    if (like.byRegions() && options.lexer)
     {
         left_regions  = &options.lexer(left);
         right_regions = &options.lexer(right);
@@ -264,21 +271,38 @@ std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& l
             right_regions = nullptr;
         }
     }
-    // Each line as compared, kept while its id is; the ids of both texts
-    // made once, whatever stretches they are then compared in.
-    std::vector<std::string> keys;
+    // Each line as compared, all of them in one string kept while their ids
+    // are, each where the one before it ends; the ids of both texts made
+    // once, whatever stretches they are then compared in.
+    std::string         keys;
+    std::vector<size_t> key_ends;
     if (like.any())
     {
-        keys.reserve(left.size() + right.size());
+        size_t bytes = 0;
+        for (const std::vector<std::string>* text : { &left, &right })
+        {
+            for (const std::string& line : *text)
+            {
+                bytes += line.size();
+            }
+        }
+        keys.reserve(bytes);
+        key_ends.reserve(left.size() + right.size());
         for (size_t i = 0; i < left.size(); ++i)
         {
-            keys.push_back(likenessOf(left[i], like, left_regions ? &(*left_regions)[i] : nullptr));
+            appendLikeness(keys, left[i], like, left_regions ? &(*left_regions)[i] : nullptr);
+            key_ends.push_back(keys.size());
         }
         for (size_t i = 0; i < right.size(); ++i)
         {
-            keys.push_back(likenessOf(right[i], like, right_regions ? &(*right_regions)[i] : nullptr));
+            appendLikeness(keys, right[i], like, right_regions ? &(*right_regions)[i] : nullptr);
+            key_ends.push_back(keys.size());
         }
     }
+    const auto keyOf = [&keys, &key_ends](size_t at) {
+        const size_t from = at == 0 ? 0 : key_ends[at - 1];
+        return std::string_view(keys).substr(from, key_ends[at] - from);
+    };
     ALDiffIds        ids;
     std::vector<S32> a;
     std::vector<S32> b;
@@ -286,17 +310,17 @@ std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& l
     b.reserve(right.size());
     for (size_t i = 0; i < left.size(); ++i)
     {
-        a.push_back(ids.idOf(like.any() ? keys[i] : left[i]));
+        a.push_back(ids.idOf(like.any() ? keyOf(i) : std::string_view(left[i])));
     }
     for (size_t i = 0; i < right.size(); ++i)
     {
-        b.push_back(ids.idOf(like.any() ? keys[left.size() + i] : right[i]));
+        b.push_back(ids.idOf(like.any() ? keyOf(left.size() + i) : std::string_view(right[i])));
     }
     const S32 n = static_cast<S32>(left.size());
     const S32 m = static_cast<S32>(right.size());
     if (options.anchors.empty())
     {
-        return stretch(a, b, left, right, 0, n, 0, m, options.algorithm);
+        return stretch(a, b, left, right, 0, n, 0, m, algorithm);
     }
     // Lined up at the anchors: each stretch between two on its own.
     const anchors_t  kept = keptAnchors(options.anchors, n, m);
@@ -309,7 +333,7 @@ std::vector<ALTextDiff::Run> ALTextDiff::lines(const std::vector<std::string>& l
         const S32 to_left  = i < kept.size() ? kept[i].first : n;
         const S32 to_right = i < kept.size() ? kept[i].second : m;
         // The stretch before the pair, on its own.
-        for (const Run& run : stretch(a, b, left, right, l, to_left, r, to_right, options.algorithm))
+        for (const Run& run : stretch(a, b, left, right, l, to_left, r, to_right, algorithm))
         {
             push(run);
         }
@@ -425,7 +449,7 @@ ALTextDiff::Options ALTextDiff::linesOnly(const Options& options)
     Options out;
     out.algorithm = options.algorithm == Algorithm::Structural ? Algorithm::Histogram : options.algorithm;
     out.like      = options.like;
-    if (options.like.ignoreComments)
+    if (options.like.byRegions())
     {
         out.lexer = options.lexer;
     }

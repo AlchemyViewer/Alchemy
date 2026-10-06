@@ -34,21 +34,13 @@
 
 namespace
 {
-    // A line's words but its blanks, as ids, in order of their ids: what
-    // two lines are weighed by.
+    // A line's words as their words are compared, but its blanks, as ids,
+    // in order of their ids: what two lines are weighed by.
     std::vector<S32> bagOf(std::string_view line, const ALTextDiff::Options& options, ALDiffIds& ids, const ALTextDiff::regions_t* regions)
     {
         ALDiffTokens::tokens_t words;
-        ALDiffSame::cut(line, regions, options.same.get(), words);
-        std::vector<S32> out;
-        for (const ALDiffTokens::Token& token : words)
-        {
-            if (!ALDiffTokens::isBlank(line, token))
-            {
-                out.push_back(ALDiffSame::idOf(ids, line.substr(static_cast<size_t>(token.begin), static_cast<size_t>(token.end - token.begin)),
-                                               options.same.get(), options.like.ignoreCase));
-            }
-        }
+        std::vector<S32>       out;
+        ALDiffSame::idsOf(line, regions, options.same.get(), options.like, true, ids, words, out);
         std::sort(out.begin(), out.end());
         return out;
     }

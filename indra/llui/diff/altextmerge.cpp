@@ -79,11 +79,12 @@ ALTextMerge::hunks_t ALTextMerge::merge(S32 base_lines, const changes_t& mine, c
             out.push_back(Hunk{ Kind::Same, at, to - at, at + off_o, to - at, at + off_t, to - at });
         }
     };
-    // Each side's regions, where comments are let go of and a grammar says
-    // where they are: what two sides are read by to be found alike.
+    // Each side's regions, where a grammar says where comments and strings
+    // are and that changes how lines are told the same: what two sides are
+    // read by to be found alike.
     const std::vector<ALTextDiff::regions_t>* ours_regions   = nullptr;
     const std::vector<ALTextDiff::regions_t>* theirs_regions = nullptr;
-    if (options.like.ignoreComments && options.lexer)
+    if (options.like.byRegions() && options.lexer)
     {
         ours_regions   = &options.lexer(ours);
         theirs_regions = &options.lexer(theirs);

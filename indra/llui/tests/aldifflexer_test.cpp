@@ -235,4 +235,33 @@ namespace tut
                                                             commented[30][0].region == ALTextDiff::Region::Comment);
         ensure("those in it read, to where it closes: " + std::to_string(twice.lastRead()), twice.lastRead() >= 31 && twice.lastRead() <= 34);
     }
+
+    template<> template<>
+    void aldifflexer_object::test<5>()
+    {
+        set_test_name("blanks and case let go of by LSL's grammar: a string's its own, the code's let go of; the same in a line's words");
+        ensure("the LSL grammar", lsl != nullptr);
+        ALDiffLexer         lexer(lsl);
+        ALTextDiff::Options options;
+        options.like.ignoreWhitespace = true;
+        options.like.ignoreCase       = true;
+        options.lexer                 = [&lexer](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            return lexer.regions(lines);
+        };
+        const auto same = [&options](const std::string& left, const std::string& right) {
+            return ALTextDiff::lines({ left }, { right }, options) == std::vector<ALTextDiff::Run>{ ALTextDiff::Run{ ALTextDiff::Kind::Same, 0, 0, 1 } };
+        };
+        ensure("blanks in a string: a change", !same("llSay(0, \"a  b\");", "llSay(0, \"a b\");"));
+        ensure("a string's case: a change", !same("llSay(0, \"Hello\");", "llSay(0, \"hello\");"));
+        ensure("blanks in the code: none", same("llSay(0,  \"a b\");", "llSay(0, \"a b\");"));
+        ensure("the code's case: none", same("LLSAY(0, \"a b\");", "llSay(0, \"a b\");"));
+
+        ALTextDiff::spans_t            left, right;
+        const std::vector<std::string> was = { "llSay(0, \"a  b\");" };
+        const std::vector<std::string> now = { "llSay(0,  \"a b\");" };
+        const ALTextDiff::regions_t    was_regions = lexer.regions(was)[0];
+        const ALTextDiff::regions_t    now_regions = lexer.regions(now)[0];
+        ALTextDiff::words(was[0], now[0], left, right, options, &was_regions, &now_regions);
+        ensure("in words, the string's blanks marked, the code's not", left == ALTextDiff::spans_t{ { 11, 13 } } && right == ALTextDiff::spans_t{ { 12, 13 } });
+    }
 }

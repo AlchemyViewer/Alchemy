@@ -155,9 +155,46 @@ void ALDiffSame::cut(std::string_view line, const ALTextDiff::regions_t* regions
 // static
 S32 ALDiffSame::idOf(ALDiffIds& ids, std::string_view word, const ALDiffSame* same, bool ignore_case)
 {
+    // A class an id of its own below nought, apart from every word's, with
+    // nothing made to stand for it.
     if (const S32 cls = same ? same->classOf(word) : -1; cls >= 0)
     {
-        return ids.idOfMade("\x01" + std::to_string(cls));
+        return -1 - cls;
     }
-    return ignore_case ? ids.idOfMade(ALTextDiff::likenessOf(word, ALTextDiff::Likeness{ false, true })) : ids.idOf(word);
+    // A word without capitals as it is, which is how it is told the same.
+    const bool capitals = ignore_case && std::any_of(word.begin(), word.end(), [](char c) { return c >= 'A' && c <= 'Z'; });
+    return capitals ? ids.idOfMade(ALTextDiff::likenessOf(word, ALTextDiff::Likeness{ false, true })) : ids.idOf(word);
+}
+
+// static
+void ALDiffSame::idsOf(std::string_view line, const ALTextDiff::regions_t* regions, const ALDiffSame* same, const ALTextDiff::Likeness& like,
+                       bool no_blanks, ALDiffIds& ids, ALDiffTokens::tokens_t& words, std::vector<S32>& out)
+{
+    typedef ALTextDiff::Region Region;
+    cut(line, regions, same, words);
+    const size_t had = words.size();
+    if (like.ignoreComments)
+    {
+        std::erase_if(words, [](const ALDiffTokens::Token& token) { return token.region == Region::Comment; });
+    }
+    if (like.ignoreTrailing || words.size() != had)
+    {
+        while (!words.empty() && ALDiffTokens::isBlank(line, words.back()))
+        {
+            words.pop_back();
+        }
+    }
+    if (no_blanks || like.ignoreWhitespace)
+    {
+        std::erase_if(words, [line, no_blanks](const ALDiffTokens::Token& token) {
+            return (no_blanks || token.region != Region::String) && ALDiffTokens::isBlank(line, token);
+        });
+    }
+    out.clear();
+    out.reserve(words.size());
+    for (const ALDiffTokens::Token& token : words)
+    {
+        out.push_back(idOf(ids, line.substr(static_cast<size_t>(token.begin), static_cast<size_t>(token.end - token.begin)), same,
+                           like.ignoreCase && token.region != Region::String));
+    }
 }

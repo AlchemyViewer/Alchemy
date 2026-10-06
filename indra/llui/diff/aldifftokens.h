@@ -30,20 +30,16 @@
 #include <string_view>
 #include <vector>
 
-// A line cut into the words a comparison weighs and marks. By its bytes
-// alone, where nothing says what its stretches are: a run of word bytes
-// (identifiers and numbers), a run of blanks, each other byte. By its
-// regions, where a grammar has said: code as a language's tokens -- a
-// name, a number with its point and its exponent, an operator of more than
-// one character, a run of blanks, each other character -- and a string's
-// or a comment's text as prose: a word with the apostrophes inside it, a
-// run of blanks, each other character.
+// A line cut into the words a comparison weighs and marks. As prose, where
+// nothing says what its stretches are: a run of word bytes (identifiers
+// and numbers) with the apostrophes inside it, a run of blanks, each other
+// byte. By its regions, where a grammar has said: code as a language's
+// tokens -- a name, a number with its point and its exponent, an operator
+// of more than one character, a run of blanks, each other character -- and
+// a string's or a comment's text as prose.
 namespace ALDiffTokens
 {
     bool blank(char c);
-    // Its words by their bytes alone, each as [begin, end) in it, covering
-    // it.
-    ALTextDiff::spans_t words(std::string_view line);
 
     // A word of a line, as [begin, end) in it, and the region it is in.
     struct Token

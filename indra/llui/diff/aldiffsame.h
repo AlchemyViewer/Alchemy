@@ -74,10 +74,17 @@ public:
     // What the comparisons by words share, a table or none: a line's words
     // as they are weighed -- cut (ALDiffTokens), and run together where
     // the table spells one of its own -- and a word's id: one for every
-    // word the table makes one, not any word's text; else its text, its
-    // case let go of where that is.
+    // word the table makes one, below nought and so not any word's text;
+    // else its text, its case let go of where that is.
     static void cut(std::string_view line, const ALTextDiff::regions_t* regions, const ALDiffSame* same, ALDiffTokens::tokens_t& out);
     static S32  idOf(ALDiffIds& ids, std::string_view word, const ALDiffSame* same, bool ignore_case);
+    // A line's words as they are compared, and each one's id: cut, then
+    // those let go of left out -- its comments where they are, then blanks
+    // at its end where those are or a comment was, and its blanks where
+    // they are let go of, a string's kept -- and a string's case its own.
+    // Every blank left out where `no_blanks`: words weighed, not marked.
+    static void idsOf(std::string_view line, const ALTextDiff::regions_t* regions, const ALDiffSame* same, const ALTextDiff::Likeness& like,
+                      bool no_blanks, ALDiffIds& ids, ALDiffTokens::tokens_t& words, std::vector<S32>& out);
 
 private:
     pairs_t                                                                             mPairs;

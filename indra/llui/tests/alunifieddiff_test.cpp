@@ -137,4 +137,12 @@ namespace tut
         ensure_equals("CR LF", diff("a\r\nb\r\n", "a\r\nc\r\n"), std::string("--- a\n+++ b\n@@ -1,2 +1,2 @@\n a\n-b\n+c\n"));
         ensure_equals("a lone CR", diff("a\rb\r", "a\rc\r"), std::string("--- a\n+++ b\n@@ -1,2 +1,2 @@\n a\n-b\n+c\n"));
     }
+
+    template<> template<>
+    void alunifieddiff_object::test<7>()
+    {
+        set_test_name("a context below nought as none: a change's own lines alone");
+        ensure_equals("one changed, nothing either side", ALUnifiedDiff::write(numbered(9), numbered(9, { { 5, "five" } }), "a", "b", {}, -2),
+                      std::string("--- a\n+++ b\n@@ -5 +5 @@\n-5\n+five\n"));
+    }
 }

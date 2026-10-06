@@ -41,10 +41,12 @@ namespace
     typedef ALTextDiff::Run  Run;
     typedef ALTextDiff::Kind Kind;
 
-    S32 sLastRead = 0;
+    // A test's hook, of the thread that read.
+    thread_local S32 sLastRead = 0;
 
-    // Some lines' tokens, blanks left out: each's line, where it is on it,
-    // and its id as compared.
+    // Some lines' tokens, blanks left out and those let go of as words are
+    // (ALDiffSame::idsOf): each's line, where it is on it, and its id as
+    // compared.
     struct Tokens
     {
         std::vector<S32>                 line;
@@ -56,21 +58,15 @@ namespace
                   const ALTextDiff::Options& options, ALDiffIds& ids, Tokens& out)
     {
         ALDiffTokens::tokens_t words;
+        std::vector<S32>       line_ids;
         for (const S32 n : which)
         {
             const std::string& text = lines[static_cast<size_t>(n)];
-            ALDiffSame::cut(text, regions && regions->size() == lines.size() ? &(*regions)[static_cast<size_t>(n)] : nullptr, options.same.get(), words);
-            for (const ALDiffTokens::Token& token : words)
-            {
-                if (ALDiffTokens::isBlank(text, token))
-                {
-                    continue;
-                }
-                out.line.push_back(n);
-                out.token.push_back(token);
-                out.id.push_back(ALDiffSame::idOf(ids, std::string_view(text).substr(static_cast<size_t>(token.begin), static_cast<size_t>(token.end - token.begin)),
-                                                  options.same.get(), options.like.ignoreCase));
-            }
+            ALDiffSame::idsOf(text, regions && regions->size() == lines.size() ? &(*regions)[static_cast<size_t>(n)] : nullptr, options.same.get(),
+                              options.like, true, ids, words, line_ids);
+            out.line.insert(out.line.end(), words.size(), n);
+            out.token.insert(out.token.end(), words.begin(), words.end());
+            out.id.insert(out.id.end(), line_ids.begin(), line_ids.end());
         }
     }
 
@@ -241,9 +237,7 @@ ALStructuralDiff::Result ALStructuralDiff::compare(const std::vector<std::string
                                                    const std::vector<ALTextDiff::regions_t>* left_regions,
                                                    const std::vector<ALTextDiff::regions_t>* right_regions)
 {
-    ALTextDiff::Options by_lines = options;
-    by_lines.algorithm           = ALTextDiff::Algorithm::Histogram;
-    return read(left, right, ALTextDiff::lines(left, right, by_lines), options, left_regions, right_regions);
+    return read(left, right, ALTextDiff::linesBy(ALTextDiff::Algorithm::Histogram, left, right, options), options, left_regions, right_regions);
 }
 
 ALStructuralDiff::Result ALStructuralDiff::read(const std::vector<std::string>& left, const std::vector<std::string>& right, std::vector<ALTextDiff::Run> runs,

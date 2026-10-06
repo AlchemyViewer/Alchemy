@@ -27,6 +27,7 @@
 #include "altextdiff.h"
 
 #include "aldiffedit.h"
+#include "aldiffids.h"
 #include "aldiffmoves.h"
 #include "aldiffsame.h"
 #include "aldiffsplice.h"
@@ -106,6 +107,31 @@ namespace tut
             ALTextDiff::Options options;
             options.algorithm = algorithm;
             return options;
+        }
+
+        // A line's regions as a grammar of quoted strings says: each from
+        // its quote to its other, the rest code.
+        static ALTextDiff::regions_t quoted(const std::string& line)
+        {
+            ALTextDiff::regions_t out;
+            S32                   at = 0;
+            while (at < static_cast<S32>(line.size()))
+            {
+                const size_t open  = line.find('"', static_cast<size_t>(at));
+                const size_t close = open == std::string::npos ? std::string::npos : line.find('"', open + 1);
+                const S32    begin = open == std::string::npos ? static_cast<S32>(line.size()) : static_cast<S32>(open);
+                const S32    end   = close == std::string::npos ? static_cast<S32>(line.size()) : static_cast<S32>(close) + 1;
+                if (begin > at)
+                {
+                    out.push_back({ at, begin, ALTextDiff::Region::Code });
+                }
+                if (begin < end)
+                {
+                    out.push_back({ begin, end, ALTextDiff::Region::String });
+                }
+                at = end;
+            }
+            return out;
         }
 
         static std::vector<std::string> numbered(S32 count, const char* prefix = "line ")
@@ -622,10 +648,10 @@ namespace tut
             "#include <stdio.h>", "", "int fib(int n)", "{", "    if(n > 2)", "    {", "        return fib(n-1) + fib(n-2);", "    }", "    return 1;", "}", "",
             "// Frobs foo heartily", "int frobnitz(int foo)", "{", "    int i;", "    for(i = 0; i < 10; i++)", "    {", "        printf(\"%d\\n\", foo);", "    }", "}", "",
             "int main(int argc, char **argv)", "{", "    frobnitz(fib(10));", "}" };
-        const auto beside = [](const std::vector<Run>& runs, S32 line) {
-            for (const Run& run : runs)
+        const auto beside = [](const std::vector<ALTextDiff::Run>& runs, S32 line) {
+            for (const ALTextDiff::Run& run : runs)
             {
-                if (run.kind == Kind::Same && line >= run.left && line < run.left + run.count)
+                if (run.kind == ALTextDiff::Kind::Same && line >= run.left && line < run.left + run.count)
                 {
                     return run.right + line - run.left;
                 }
@@ -984,9 +1010,9 @@ namespace tut
         std::vector<std::string> two = base;
         one[2]                       = "C";
         two[3]                       = "D";
-        const ALTextMerge::hunks_t near = ALTextMerge::merge(base, one, two);
-        ensure("next to each other: one conflict", std::count_if(near.begin(), near.end(), [](const H& hunk) { return hunk.kind == K::Conflict; }) == 1 &&
-                                                       near.size() == 3 && near[1].baseCount == 2);
+        const ALTextMerge::hunks_t touching = ALTextMerge::merge(base, one, two);
+        ensure("next to each other: one conflict", std::count_if(touching.begin(), touching.end(), [](const H& hunk) { return hunk.kind == K::Conflict; }) == 1 &&
+                                                       touching.size() == 3 && touching[1].baseCount == 2);
         // Both put lines in at the same place: a conflict, unless alike.
         std::vector<std::string> in_one = base;
         std::vector<std::string> in_two = base;
@@ -1101,11 +1127,11 @@ namespace tut
                     line = line * 997 + 50000;
                 }
             }
-            const std::vector<Run> near = ALLineDiff::histogram(a, b);
-            ensure("the same, spread apart", near == ALLineDiff::histogram(far_a, far_b));
+            const std::vector<Run> dense = ALLineDiff::histogram(a, b);
+            ensure("the same, spread apart", dense == ALLineDiff::histogram(far_a, far_b));
             // And a walk from one to the other.
             S32 left = 0, right = 0;
-            for (const Run& run : near)
+            for (const Run& run : dense)
             {
                 ensure("in order", run.left == left && run.right == right);
                 if (run.kind == Kind::Same)
@@ -1262,5 +1288,152 @@ namespace tut
         finder.edited(false, 50, 51, 51);
         ensure_equals("found again", finder.find(left, right, ALTextDiff::lines(left, right), ALTextDiff::Options()).size(), size_t(1));
         ensure("the line changed, and the line it is now a change with: " + std::to_string(finder.lastKeyed()), finder.lastKeyed() <= 2);
+    }
+
+    template<> template<>
+    void altextdiff_object::test<26>()
+    {
+        set_test_name("a string's blanks and case its own whatever is let go of, where regions say where strings are; outside them let go of as asked");
+        typedef ALTextDiff::Region R;
+        ALTextDiff::Likeness loose;
+        loose.ignoreWhitespace = true;
+        loose.ignoreCase       = true;
+        const std::string           spaced  = "llSay(0,  \"a  B\");";
+        const ALTextDiff::regions_t regions = { { 0, 10, R::Code }, { 10, 16, R::String }, { 16, 18, R::Code } };
+        ensure_equals("the string as it is", ALTextDiff::likenessOf(spaced, loose, &regions), std::string("llsay(0, \"a  B\");"));
+        ensure_equals("without regions, all of it let go of", ALTextDiff::likenessOf(spaced, loose), std::string("llsay(0, \"a b\");"));
+
+        // Lines by a grammar of quoted strings.
+        auto                said      = std::make_shared<std::deque<std::vector<ALTextDiff::regions_t>>>();
+        ALTextDiff::Options by_quotes = as(loose);
+        by_quotes.lexer               = [said](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            std::vector<ALTextDiff::regions_t>& out = said->emplace_back();
+            for (const std::string& line : lines)
+            {
+                out.push_back(altextdiff_data::quoted(line));
+            }
+            return out;
+        };
+        const std::vector<Run> same = { Run{ Kind::Same, 0, 0, 1 } };
+        ensure("blanks in a string: a change", ALTextDiff::lines({ "llSay(0, \"a  b\");" }, { "llSay(0, \"a b\");" }, by_quotes) != same);
+        ensure("a string's case: a change", ALTextDiff::lines({ "llSay(0, \"Hi\");" }, { "llSay(0, \"hi\");" }, by_quotes) != same);
+        ensure("blanks and case outside it: none", ALTextDiff::lines({ "llSay(0,  \"a b\");" }, { "LLSAY(0, \"a b\");" }, by_quotes) == same);
+        ensure("without the grammar, none", ALTextDiff::lines({ "llSay(0, \"a  b\");" }, { "llSay(0, \"a b\");" }, as(loose)) == same);
+        ensure("kept by the lines alone too", ALTextDiff::linesOnly(by_quotes).lexer != nullptr);
+
+        // And within the line: the string's blanks marked, the code's not.
+        ALTextDiff::spans_t left, right;
+        const std::string   was     = "llSay(0,  \"a  b\");";
+        const std::string   now     = "llSay(0, \"a b\");";
+        const auto          was_reg = quoted(was);
+        const auto          now_reg = quoted(now);
+        ALTextDiff::words(was, now, left, right, as(loose), &was_reg, &now_reg);
+        ensure("the string's blanks marked", left == ALTextDiff::spans_t{ { 12, 14 } } && right == ALTextDiff::spans_t{ { 11, 12 } });
+        const auto spaced_reg = quoted("llSay(0,  \"a b\");");
+        ALTextDiff::words("llSay(0,  \"a b\");", now, left, right, as(loose), &spaced_reg, &now_reg);
+        ensure("the code's not", left.empty() && right.empty());
+    }
+
+    template<> template<>
+    void altextdiff_object::test<27>()
+    {
+        set_test_name("histogram and patience: a stretch that runs out of walking leaves every later one its fewest changes; a line more than 64 times no anchor");
+        // Two halves swapped, which takes more walking than is allowed; a
+        // line once in each; then three lines changed around seventy of a
+        // line too common to keep.
+        std::vector<S32> a;
+        std::vector<S32> b;
+        a.insert(a.end(), 8000, 0);
+        a.insert(a.end(), 8000, 1);
+        b.insert(b.end(), 8000, 1);
+        b.insert(b.end(), 8000, 0);
+        a.push_back(2);
+        b.push_back(2);
+        a.push_back(8);
+        b.push_back(6);
+        a.insert(a.end(), 70, 3);
+        b.insert(b.end(), 70, 3);
+        a.push_back(9);
+        b.push_back(10);
+        // Lines changed after the line once in each.
+        const auto changed_after = [](const std::vector<ALTextDiff::Run>& runs) {
+            S32 changed = 0;
+            for (const ALTextDiff::Run& run : runs)
+            {
+                const bool after = run.kind == ALTextDiff::Kind::Removed ? run.left > 16000 : run.right > 16000;
+                changed += run.kind != ALTextDiff::Kind::Same && after ? run.count : 0;
+            }
+            return changed;
+        };
+        ensure_equals("histogram: the two changed after it", changed_after(ALLineDiff::histogram(a, b)), 4);
+        ensure_equals("patience likewise", changed_after(ALLineDiff::patience(a, b)), 4);
+
+        // A line 64 times kept as the stretch the two share; 65 times, not,
+        // and the fewest changes instead.
+        for (const S32 times : { 64, 65 })
+        {
+            std::vector<S32> left(static_cast<size_t>(times), 0);
+            left.insert(left.end(), 70, 1);
+            std::vector<S32> right(70, 1);
+            right.insert(right.end(), static_cast<size_t>(times), 0);
+            S32 changed = 0;
+            for (const Run& run : ALLineDiff::histogram(left, right))
+            {
+                changed += run.kind != Kind::Same ? run.count : 0;
+            }
+            ensure_equals(std::to_string(times) + " times", changed, times == 64 ? 140 : 130);
+        }
+    }
+
+    template<> template<>
+    void altextdiff_object::test<28>()
+    {
+        set_test_name("lines paired as their words are compared: a comment let go of not weighed");
+        typedef ALTextDiff::Region  R;
+        const std::string           was      = "x = 1; // the first value, set here once";
+        const std::string           now      = "x = 2; // a second one, which replaced it";
+        const ALTextDiff::regions_t was_note = { { 0, 7, R::Code }, { 7, static_cast<S32>(was.size()), R::Comment } };
+        const ALTextDiff::regions_t now_note = { { 0, 7, R::Code }, { 7, static_cast<S32>(now.size()), R::Comment } };
+        ensure("the comments weighed: not alike enough", ALLinePairs::alike(was, now, ALTextDiff::Options(), &was_note, &now_note) < ALLinePairs::PAIR_LEAST);
+        ALTextDiff::Options comments;
+        comments.like.ignoreComments = true;
+        ensure_equals("let go of: as alike as their code", ALLinePairs::alike(was, now, comments, &was_note, &now_note), 0.75f);
+        const std::vector<ALTextDiff::regions_t> left_regions  = { was_note };
+        const std::vector<ALTextDiff::regions_t> right_regions = { now_note };
+        ensure("and paired", ALLinePairs::pair({ was }, { now }, { 0 }, { 0 }, comments, &left_regions, &right_regions) == ALLinePairs::pairs_t{ { 0, 0 } });
+    }
+
+    template<> template<>
+    void altextdiff_object::test<29>()
+    {
+        set_test_name("words without regions cut as prose; a table's words one id below nought, apart from any word's; case let go of either way; an edit told backwards forgets the moves' ids");
+        ALDiffTokens::tokens_t tokens;
+        ALDiffTokens::cut("don't stop", nullptr, tokens);
+        ensure("an apostrophe inside a word, as a comment has it", tokens.size() == 3 && tokens[0].end == 5 && tokens[2].begin == 6);
+
+        ALDiffIds  ids;
+        const auto same = ALDiffSame::make({ { "llSay", "ll.Say" } });
+        const S32  say  = ALDiffSame::idOf(ids, "llSay", same.get(), false);
+        ensure("a pair one id", say == ALDiffSame::idOf(ids, "ll.Say", same.get(), false));
+        ensure("apart from any word's", say < 0 && ALDiffSame::idOf(ids, "llSay", nullptr, false) >= 0);
+        ensure("capitals after", ALDiffSame::idOf(ids, "count", nullptr, true) == ALDiffSame::idOf(ids, "Count", nullptr, true));
+        ensure("capitals first", ALDiffSame::idOf(ids, "TOTAL", nullptr, true) == ALDiffSame::idOf(ids, "total", nullptr, true));
+        ensure("not unless asked", ALDiffSame::idOf(ids, "Word", nullptr, false) != ALDiffSame::idOf(ids, "word", nullptr, false));
+
+        std::vector<std::string> left;
+        for (S32 n = 0; n < 40; ++n)
+        {
+            left.push_back("    statement number " + std::to_string(n) + " goes here;");
+        }
+        std::vector<std::string> right = left;
+        std::vector<std::string> block(right.begin() + 5, right.begin() + 11);
+        right.erase(right.begin() + 5, right.begin() + 11);
+        right.insert(right.begin() + 30, block.begin(), block.end());
+        const std::vector<Run> runs = ALTextDiff::lines(left, right);
+        ALDiffMoves::Finder    finder;
+        ensure_equals("the block found", finder.find(left, right, runs, ALTextDiff::Options()).size(), size_t(1));
+        finder.edited(false, 20, 21, 10);
+        ensure_equals("found again", finder.find(left, right, runs, ALTextDiff::Options()).size(), size_t(1));
+        ensure("keyed afresh: " + std::to_string(finder.lastKeyed()), finder.lastKeyed() >= 12);
     }
 }

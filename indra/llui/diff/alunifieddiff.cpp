@@ -32,11 +32,19 @@
 namespace
 {
     // A text's lines, a last line break ending the last line rather than
-    // starting another; and whether the text ends so.
+    // starting another; and whether the text ends so. A last line without
+    // a line break is not the same line with one: it is compared with a
+    // break of its own that no line split here holds, which is not shown.
     struct Text
     {
         std::vector<std::string> lines;
         bool                     broken = true;
+
+        std::string_view shown(S32 at) const
+        {
+            const std::string_view line = lines[static_cast<size_t>(at)];
+            return !broken && at == static_cast<S32>(lines.size()) - 1 ? line.substr(0, line.size() - 1) : line;
+        }
     };
     Text textOf(std::string_view text)
     {
@@ -46,6 +54,10 @@ namespace
         if (out.broken)
         {
             out.lines.pop_back();
+        }
+        else
+        {
+            out.lines.back() += '\n';
         }
         return out;
     }
@@ -70,34 +82,38 @@ namespace
 std::string ALUnifiedDiff::write(std::string_view left, std::string_view right, const std::string& left_name, const std::string& right_name,
                                  const ALTextDiff::Options& options, S32 context)
 {
+    context      = std::max(context, 0);
     const Text l = textOf(left);
     const Text r = textOf(right);
-    // A last line without a line break is not the same line with one: it
-    // is compared with a break of its own that no line split here holds.
-    std::vector<std::string> compared_left  = l.lines;
-    std::vector<std::string> compared_right = r.lines;
-    if (!l.broken && !compared_left.empty())
-    {
-        compared_left.back() += '\n';
-    }
-    if (!r.broken && !compared_right.empty())
-    {
-        compared_right.back() += '\n';
-    }
     // By lines, as told the same; nothing lined up or read as tokens, and
-    // a grammar only to say where comments are let go of.
-    const ALTextDiff::Options by_lines = ALTextDiff::linesOnly(options);
-    const std::vector<ALTextDiff::Run>        runs          = ALTextDiff::lines(compared_left, compared_right, by_lines);
-    const std::vector<ALTextDiff::regions_t>* left_regions  = by_lines.lexer ? &by_lines.lexer(compared_left) : nullptr;
-    const std::vector<ALTextDiff::regions_t>* right_regions = by_lines.lexer ? &by_lines.lexer(compared_right) : nullptr;
-    const auto                                regionsOf     = [](const std::vector<ALTextDiff::regions_t>* regions, S32 line) {
-        return regions && line < static_cast<S32>(regions->size()) ? &(*regions)[static_cast<size_t>(line)] : nullptr;
+    // a grammar only to say where comments and strings are.
+    const ALTextDiff::Options          by_lines = ALTextDiff::linesOnly(options);
+    const std::vector<ALTextDiff::Run> runs     = ALTextDiff::lines(l.lines, r.lines, by_lines);
+    // Each side's regions, asked for once a change could be of comments
+    // alone.
+    const bool                                by_comments   = by_lines.like.ignoreComments && by_lines.lexer;
+    const std::vector<ALTextDiff::regions_t>* left_regions  = nullptr;
+    const std::vector<ALTextDiff::regions_t>* right_regions = nullptr;
+    const auto                                regionsOf     = [&](bool of_left, S32 line) -> const ALTextDiff::regions_t* {
+        if (!by_comments)
+        {
+            return nullptr;
+        }
+        if (!left_regions)
+        {
+            left_regions  = &by_lines.lexer(l.lines);
+            right_regions = &by_lines.lexer(r.lines);
+        }
+        const std::vector<ALTextDiff::regions_t>* regions = of_left ? left_regions : right_regions;
+        return line < static_cast<S32>(regions->size()) ? &(*regions)[static_cast<size_t>(line)] : nullptr;
     };
 
     // Each line of the diff, a change's taken out before its put in; and
     // each change's first and last, where it is more than lines let go of.
     std::vector<Op>                  ops;
     std::vector<std::pair<S32, S32>> changes;
+    std::vector<Op>                  out;
+    std::vector<Op>                  in;
     for (size_t i = 0; i < runs.size();)
     {
         if (runs[i].kind == ALTextDiff::Kind::Same)
@@ -109,9 +125,9 @@ std::string ALUnifiedDiff::write(std::string_view left, std::string_view right, 
             ++i;
             continue;
         }
-        std::vector<Op> out;
-        std::vector<Op> in;
-        bool            ignorable = true;
+        out.clear();
+        in.clear();
+        bool ignorable = true;
         for (; i < runs.size() && runs[i].kind != ALTextDiff::Kind::Same; ++i)
         {
             const bool removed = runs[i].kind == ALTextDiff::Kind::Removed;
@@ -119,8 +135,7 @@ std::string ALUnifiedDiff::write(std::string_view left, std::string_view right, 
             {
                 const S32 at = (removed ? runs[i].left : runs[i].right) + n;
                 (removed ? out : in).push_back({ removed ? '-' : '+', removed ? at : runs[i].left, removed ? runs[i].right : at });
-                ignorable = ignorable && ALTextDiff::ignorable((removed ? l : r).lines[static_cast<size_t>(at)], by_lines.like,
-                                                               regionsOf(removed ? left_regions : right_regions, at));
+                ignorable = ignorable && ALTextDiff::ignorable((removed ? l : r).shown(at), by_lines.like, regionsOf(removed, at));
             }
         }
         const S32 first = static_cast<S32>(ops.size());
@@ -165,7 +180,9 @@ std::string ALUnifiedDiff::write(std::string_view left, std::string_view right, 
             const bool  of_left  = op.sign == '-';
             const Text& text     = of_left ? l : r;
             const S32   at       = of_left ? op.left : op.right;
-            diff += op.sign + text.lines[static_cast<size_t>(at)] + "\n";
+            diff += op.sign;
+            diff += text.shown(at);
+            diff += '\n';
             if (!text.broken && at == static_cast<S32>(text.lines.size()) - 1)
             {
                 diff += "\\ No newline at end of file\n";

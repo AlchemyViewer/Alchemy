@@ -108,51 +108,14 @@ void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff:
 {
     left_out.clear();
     right_out.clear();
-    const ALTextDiff::Likeness& like = options.like;
-    // Each side's words as compared: blanks, where they are let go of,
-    // none.
-    const ALDiffSame* same     = options.same.get();
-    const auto        compared = [&like, same](std::string_view line, const ALTextDiff::regions_t* regions) {
-        tokens_t all;
-        ALDiffSame::cut(line, regions, same, all);
-        // Comments, where they are let go of; then blanks at the end,
-        // where those are or a comment was.
-        const size_t had = all.size();
-        if (like.ignoreComments)
-        {
-            std::erase_if(all, [](const Token& token) { return token.region == ALTextDiff::Region::Comment; });
-        }
-        if (like.ignoreTrailing || all.size() != had)
-        {
-            while (!all.empty() && ALDiffTokens::isBlank(line, all.back()))
-            {
-                all.pop_back();
-            }
-        }
-        if (like.ignoreWhitespace)
-        {
-            std::erase_if(all, [line](const Token& token) { return ALDiffTokens::isBlank(line, token); });
-        }
-        return all;
-    };
-    const tokens_t lw = compared(left, left_regions);
-    const tokens_t rw = compared(right, right_regions);
+    // Each side's words as compared, and their ids.
     ALDiffIds        ids;
-    const auto       idOf = [&](std::string_view line, const Token& token) {
-        return ALDiffSame::idOf(ids, line.substr(static_cast<size_t>(token.begin), static_cast<size_t>(token.end - token.begin)), same, like.ignoreCase);
-    };
+    tokens_t         lw;
+    tokens_t         rw;
     std::vector<S32> a;
     std::vector<S32> b;
-    a.reserve(lw.size());
-    b.reserve(rw.size());
-    for (const Token& token : lw)
-    {
-        a.push_back(idOf(left, token));
-    }
-    for (const Token& token : rw)
-    {
-        b.push_back(idOf(right, token));
-    }
+    ALDiffSame::idsOf(left, left_regions, options.same.get(), options.like, false, ids, lw, a);
+    ALDiffSame::idsOf(right, right_regions, options.same.get(), options.like, false, ids, rw, b);
     // The runs as stretches the same or changed.
     std::vector<Op> ops;
     for (const ALTextDiff::Run& run : ALLineDiff::myers(a, b))

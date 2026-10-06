@@ -40,7 +40,9 @@ namespace ALLineDiff
     typedef ALTextDiff::Kind Kind;
 
     // How much walking a diff may do, in diagonals stepped along, before what
-    // is left is answered as all of it taken out and all of it put in.
+    // is left is answered as all of it taken out and all of it put in: the
+    // fewest changes asked for, or each stretch that Histogram or Patience
+    // find nothing better for, on its own.
     constexpr S64 MOST_WORK = 50000000;
 
     // A stretch added after the last, joined to it where it is of the same
@@ -66,6 +68,10 @@ namespace ALLineDiff
     // The fewest taken out and put in, and nothing else: Myers alone, with
     // ten times the walking.
     std::vector<Run> minimal(const std::vector<S32>& a, const std::vector<S32>& b);
+
+    // Of pairs in the order given, the most that rise in their second --
+    // each more than the one before it -- in that order (patience sorting).
+    std::vector<std::pair<S32, S32>> longestRising(const std::vector<std::pair<S32, S32>>& pairs);
 
     // Each change that could as well stand a line up or down put where it
     // reads as one thing, by the lines' text.
