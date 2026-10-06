@@ -69,21 +69,37 @@ public:
     // item's, or the one in its object. Pending where the object has not
     // said what it holds.
     virtual ALPreprocessor::Found configsOver(const std::string& from, const std::string& name, std::vector<Item>& out) = 0;
+
+    // A SLua require walked through the world (ALRequireNavigation): the
+    // folder an item is in -- its inventory folder, or its object's
+    // contents, which are one folder -- by an id of this world's, with the
+    // item's name; false for an item not known. The folder above one, No
+    // at the top: an object's contents are no folder's. And what a folder
+    // holds by a name: its items so named, scripts before notecards, and
+    // its folder so named; Pending where what it holds is not known yet --
+    // an object that has not said, an inventory folder not fetched.
+    virtual bool                  folderOf(const std::string& item, std::string& folder, std::string& name) = 0;
+    virtual ALPreprocessor::Found folderAbove(const std::string& folder, std::string& out) = 0;
+    virtual ALPreprocessor::Found named(const std::string& folder, const std::string& name, std::vector<Item>& items, std::string& subfolder) = 0;
 };
 
-// What an `#include` or a SLua `require` names, found as the preprocessor
-// finds it -- in the object holding the script, in the agent's inventory, or
-// in a folder on disk someone blessed, in the order the settings say -- with
-// the `.luaurc` chain that governs a SLua script, and each text read: from
-// the texts fetched, or the disk (ALDiskCache). Nothing is fetched here:
-// what is in the world and not in hand is Pending, and wanted.
+// What an `#include` names, found as the preprocessor finds it -- in the
+// object holding the script, in the agent's inventory, or in a folder on
+// disk someone blessed, in the order the settings say -- and what a SLua
+// `require` names, as the plugin's rules have it (LAD9): walked by Luau's
+// own navigator from the file asking, with no search (ALRequireNavigation).
+// With the `.luaurc` chain that governs a SLua script, and each text read:
+// from the texts fetched, or the disk (ALDiskCache). Nothing is fetched
+// here: what is in the world and not in hand is Pending, and wanted.
 //
-// A SLua `require("@name/rest")` goes through the `.luaurc` that governs the
-// asking file -- the notecard so named in its folder or the nearest folder
-// above, in inventory; the item so named in its object; the file so named in
-// its directory or the nearest above, on disk -- whose alias `name` stands
-// for a path from beside it, so that the name reads as `./path/rest` from
-// the configuration's own folder.
+// A require walks the places as one tree: folders on disk, inventory
+// folders, an object's contents as one folder -- the world's only where
+// world includes are on (LAD10); with them off a place in the world holds
+// nothing. Above a script in the world, or one in no place, the
+// `.luaurc` at the top of each of the scripter's include folders, in their
+// order, as the chain of configurations goes on. A `.luaurc` on disk
+// blesses where its aliases reach, for the run, as far as a configuration
+// may (ALDiskIncludes::blessFromConfig).
 class ALIncludeSearch
 {
 public:
@@ -198,6 +214,14 @@ public:
     static std::vector<std::string> foldersOf(const std::string& name);
 
 private:
+    // The places a SLua require is walked through, as this search sees
+    // them now (alincludesearch.cpp).
+    class Places;
+    // A SLua require: walked, and the first of what it stands for whose
+    // text is there, or on its way, taken.
+    ALPreprocessor::Found resolveRequire(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Asking& asking, const Where& where,
+                                         wanted_t* wanted, bool retry, std::vector<std::string>& alias_folders);
+
     // Something an include name could mean, in the order tried: in the
     // world, or a file on disk, read on the spot.
     struct Candidate
@@ -216,6 +240,9 @@ private:
     ALDiskCache::Blessed& blessedFor(const ALPreprocessor::Ask& ask, const Asking& asking, const Where& where,
                                      const std::vector<std::string>& alias_folders);
     ALDiskCache::Blessed& ownFolders(const Where& where);
+    // A file on disk a blessed folder admits, where it stands: what may be
+    // asked the text of from now on.
+    Candidate admitted(const std::string& real);
     // A candidate's text, from the texts fetched or the disk; Pending, and
     // wanted, where it is in the world and not in hand yet.
     ALPreprocessor::Found textOf(const Candidate& candidate, wanted_t* wanted, bool retry, std::string& text, std::string& assetId);

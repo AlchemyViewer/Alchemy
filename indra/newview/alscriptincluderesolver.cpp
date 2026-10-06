@@ -424,6 +424,156 @@ ALPreprocessor::Found ALScriptIncludeResolver::configsOver(const std::string& fr
     return out.empty() ? ALPreprocessor::Found::No : ALPreprocessor::Found::Yes;
 }
 
+// --- the world as folders, for a SLua require walked through it ---------------------------
+
+namespace
+{
+    // A folder of the world as a require walks it: an inventory folder,
+    // or an object's contents.
+    constexpr std::string_view INVENTORY_FOLDER = "folder:";
+    constexpr std::string_view OBJECT_CONTENTS  = "contents:";
+
+    bool idOf(const std::string& folder, std::string_view kind, LLUUID& out)
+    {
+        return folder.compare(0, kind.size(), kind) == 0 && out.set(folder.substr(kind.size()), false) && out.notNull();
+    }
+}
+
+bool ALScriptIncludeResolver::folderOf(const std::string& item, std::string& folder, std::string& name)
+{
+    LLUUID object, id;
+    if (!ALIncludeIdentity::itemOf(item, object, id))
+    {
+        return false;
+    }
+    if (object.notNull())
+    {
+        // Its object's contents, which are one folder; its name as the
+        // object said it, or as the object in view has it.
+        folder = std::string(OBJECT_CONTENTS) + object.asString();
+        if (const auto listed = mContents.find(object); listed != mContents.end())
+        {
+            for (const ALScriptContents::Item& held : listed->second)
+            {
+                if (held.id == id)
+                {
+                    name = held.name;
+                }
+            }
+        }
+        if (name.empty())
+        {
+            LLViewerObject* in_world = gObjectList.findObject(object);
+            if (LLInventoryItem* inventory = in_world ? in_world->getInventoryItem(id) : nullptr)
+            {
+                name = inventory->getName();
+            }
+        }
+        return true;
+    }
+    const LLViewerInventoryItem* own = gInventory.getItem(id);
+    if (!own || own->getParentUUID().isNull())
+    {
+        return false;
+    }
+    folder = std::string(INVENTORY_FOLDER) + own->getParentUUID().asString();
+    name   = own->getName();
+    return true;
+}
+
+ALPreprocessor::Found ALScriptIncludeResolver::folderAbove(const std::string& folder, std::string& out)
+{
+    LLUUID id;
+    if (!idOf(folder, INVENTORY_FOLDER, id))
+    {
+        // An object's contents are no folder's.
+        return ALPreprocessor::Found::No;
+    }
+    const LLViewerInventoryCategory* category = gInventory.getCategory(id);
+    if (!category || category->getParentUUID().isNull())
+    {
+        return ALPreprocessor::Found::No;
+    }
+    out = std::string(INVENTORY_FOLDER) + category->getParentUUID().asString();
+    return ALPreprocessor::Found::Yes;
+}
+
+ALPreprocessor::Found ALScriptIncludeResolver::named(const std::string& folder, const std::string& name, std::vector<Item>& items,
+                                                     std::string& subfolder)
+{
+    LLUUID id;
+    if (idOf(folder, OBJECT_CONTENTS, id))
+    {
+        // As the object said what it holds; not said yet, it may hold the
+        // name; asked and not answered, it holds nothing.
+        const auto listed = mContents.find(id);
+        if (listed == mContents.end())
+        {
+            return mUnanswered.contains(id) ? ALPreprocessor::Found::No : ALPreprocessor::Found::Pending;
+        }
+        LLViewerObject* in_world = gObjectList.findObject(id);
+        for (const ALScriptContents::Item& held : listed->second)
+        {
+            if (held.name != name)
+            {
+                continue;
+            }
+            Item one;
+            one.path = ALIncludeIdentity::ofItem(id, held.id);
+            one.name = held.name;
+            if (LLInventoryItem* inventory = in_world ? in_world->getInventoryItem(held.id) : nullptr)
+            {
+                one.assetId = inventory->getAssetUUID();
+            }
+            items.push_back(std::move(one));
+        }
+        return items.empty() ? ALPreprocessor::Found::No : ALPreprocessor::Found::Yes;
+    }
+    if (!idOf(folder, INVENTORY_FOLDER, id))
+    {
+        return ALPreprocessor::Found::No;
+    }
+    LLInventoryModel::cat_array_t*  cats  = nullptr;
+    LLInventoryModel::item_array_t* held  = nullptr;
+    gInventory.getDirectDescendentsOf(id, cats, held);
+    if (!cats || !held)
+    {
+        // Not fetched yet: asked for, and nothing in it until it comes,
+        // when the next check finds it.
+        if (LLViewerInventoryCategory* category = gInventory.getCategory(id))
+        {
+            category->fetch();
+        }
+        return ALPreprocessor::Found::No;
+    }
+    // Its scripts and notecards of the name, scripts first; and its folder
+    // of the name.
+    std::vector<const LLViewerInventoryItem*> matching;
+    for (const LLPointer<LLViewerInventoryItem>& item : *held)
+    {
+        if (item && item->getName() == name && (item->getType() == LLAssetType::AT_LSL_TEXT || item->getType() == LLAssetType::AT_NOTECARD))
+        {
+            matching.push_back(item.get());
+        }
+    }
+    std::stable_sort(matching.begin(), matching.end(), [](const LLViewerInventoryItem* a, const LLViewerInventoryItem* b) {
+        return a->getType() == LLAssetType::AT_LSL_TEXT && b->getType() != LLAssetType::AT_LSL_TEXT;
+    });
+    for (const LLViewerInventoryItem* item : matching)
+    {
+        items.push_back({ ALIncludeIdentity::ofItem(LLUUID::null, item->getUUID()), item->getName(), item->getAssetUUID() });
+    }
+    for (const LLPointer<LLViewerInventoryCategory>& category : *cats)
+    {
+        if (category && category->getName() == name)
+        {
+            subfolder = std::string(INVENTORY_FOLDER) + category->getUUID().asString();
+            break;
+        }
+    }
+    return items.empty() && subfolder.empty() ? ALPreprocessor::Found::No : ALPreprocessor::Found::Yes;
+}
+
 bool ALScriptIncludeResolver::inWorld(const Request& request, const std::string& name)
 {
     const std::string item_name = ALIncludeSearch::itemNameOf(name);

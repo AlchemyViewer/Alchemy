@@ -77,10 +77,6 @@ struct ALLuauConfig
     // up. One that does not parse is passed over. False where none did,
     // and the base or the defaults.
     static bool parseChain(const std::vector<std::string_view>& nearest_first, ALLuauConfig& out, const ALLuauConfig* base = nullptr);
-    // Which file of a chain, given nearest first, says what an alias --
-    // in lower case -- stands for: the nearest that does, with what it
-    // says, which is from beside that file. Nothing where none does.
-    static std::optional<size_t> aliasIn(const std::vector<std::string_view>& nearest_first, const std::string& alias, std::string& value);
 
     // Every lint by the name a `.luaurc` gives it, in Luau's order, and
     // the bit of the masks above that one is.

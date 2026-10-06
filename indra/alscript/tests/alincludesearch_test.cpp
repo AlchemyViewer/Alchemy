@@ -26,6 +26,7 @@
 #include "../preprocessor/alincludesearch.h"
 
 #include "../preprocessor/alincludeidentity.h"
+#include "../preprocessor/alrequirenavigation.h"
 #include "fsyspath.h"
 #include "llfile.h"
 
@@ -99,6 +100,70 @@ namespace
         {
             out = configs;
             return configsPending ? ALPreprocessor::Found::Pending : ALPreprocessor::Found::Yes;
+        }
+
+        // The inventory as folders, for a require walked through it: each
+        // folder by its id, with its parent, its items and its folders.
+        struct Folder
+        {
+            std::string                        parent;
+            std::vector<Item>                  items;
+            std::map<std::string, std::string> folders;
+            bool                               known = true;
+        };
+        std::map<std::string, Folder>      folders;
+        std::map<std::string, std::string> itemFolders;
+
+        bool folderOf(const std::string& item, std::string& folder, std::string& name) override
+        {
+            const auto in = itemFolders.find(item);
+            if (in == itemFolders.end())
+            {
+                return false;
+            }
+            folder = in->second;
+            for (const Item& held : folders[folder].items)
+            {
+                if (held.path == item)
+                {
+                    name = held.name;
+                }
+            }
+            return true;
+        }
+        ALPreprocessor::Found folderAbove(const std::string& folder, std::string& out) override
+        {
+            const auto found = folders.find(folder);
+            if (found == folders.end() || found->second.parent.empty())
+            {
+                return ALPreprocessor::Found::No;
+            }
+            out = found->second.parent;
+            return ALPreprocessor::Found::Yes;
+        }
+        ALPreprocessor::Found named(const std::string& folder, const std::string& name, std::vector<Item>& items, std::string& subfolder) override
+        {
+            const auto found = folders.find(folder);
+            if (found == folders.end())
+            {
+                return ALPreprocessor::Found::No;
+            }
+            if (!found->second.known)
+            {
+                return ALPreprocessor::Found::Pending;
+            }
+            for (const Item& held : found->second.items)
+            {
+                if (held.name == name)
+                {
+                    items.push_back(held);
+                }
+            }
+            if (const auto sub = found->second.folders.find(name); sub != found->second.folders.end())
+            {
+                subfolder = sub->second;
+            }
+            return items.empty() && subfolder.empty() ? ALPreprocessor::Found::No : ALPreprocessor::Found::Yes;
         }
     };
 }
@@ -328,7 +393,8 @@ namespace tut
     // disagree, it says whose rule LAD9 picks: the plugin's, Luau's, or
     // ours -- the nearest `.luaurc` wins, which the plugin reverses. The
     // tree is a scripter's two folders on disk, world includes off as they
-    // are by default (LAD10). Studio aliases (LA22) come with LA22.
+    // are by default (LAD10). Studio aliases (LA22) come with LA22. The
+    // search before LA15 is kept beside each, for what changed.
     struct RequireCase
     {
         // What it shows, and whose case it is.
@@ -337,8 +403,9 @@ namespace tut
         // object, which with world includes off reads nothing of the world.
         const char* from;
         const char* name;
-        // What it finds, under the tree, or nothing: now, and as LAD9 has it.
-        const char* now;
+        // What it finds, under the tree, or nothing: what the search found
+        // before the navigator, and what it finds now, as LAD9 has it.
+        const char* before;
         const char* chosen;
         // Whose rule LAD9 picks, where the references or we disagree: and
         // what Luau's navigator answers, where it differs from the choice.
@@ -349,7 +416,7 @@ namespace tut
     template<> template<>
     void alincludesearch_object::test<7>()
     {
-        set_test_name("the require parity suite: each case from Luau's tests, the plugin's and ours, as it resolves now, beside what LAD9 picks");
+        set_test_name("the require parity suite: each case from Luau's tests, the plugin's and ours, as LAD9 picks, beside what the search found before");
         Scratch s;
         // Luau's without_config, in lw/.
         s.write("proj/lw/dependency.luau", "return 'dependency'\n");
@@ -477,12 +544,118 @@ namespace tut
                 under = fsyspath(file).generic_string();
                 under = under.compare(0, root.size(), root) == 0 ? under.substr(root.size()) : under;
             }
-            ensure_equals(std::string(one.what) + ": now", under, std::string(one.now));
-            // A case where all agree is found as LAD9 has it already.
+            ensure_equals(std::string(one.what) + ": as LAD9 has it", under, std::string(one.chosen));
+            // A case where all agree was found so before.
             if (!*one.rule)
             {
-                ensure_equals(std::string(one.what) + ": as LAD9 has it", std::string(one.chosen), std::string(one.now));
+                ensure_equals(std::string(one.what) + ": as before", std::string(one.chosen), std::string(one.before));
             }
         }
+    }
+
+    template<> template<>
+    void alincludesearch_object::test<8>()
+    {
+        set_test_name("a require's path in the navigator's terms: no prefix is ./; @self from beside the file; @sl-* reserved; an alias may not climb");
+        const auto path = [](const std::string& name, const std::string& stem = "main") { return ALRequireNavigation::navigatorPath(name, stem); };
+        ensure_equals("no prefix", path("util").path, std::string("./util"));
+        ensure_equals("a folder in it", path("lib/util").path, std::string("./lib/util"));
+        ensure_equals("./ as it is", path("./util").path, std::string("./util"));
+        ensure_equals("../ as it is", path("../util").path, std::string("../util"));
+        ensure_equals("a separator of Windows's", path("lib\\util").path, std::string("./lib/util"));
+        ensure_equals("an alias as it is", path("@lib/util").path, std::string("@lib/util"));
+        ensure_equals("@self from a file: the folder of its name", path("@self/child").path, std::string("./main/child"));
+        ensure_equals("@self from a folder's init: beside it", path("@self/child", "init").path, std::string("./child"));
+        ensure_equals("@self alone", path("@self").path, std::string("./main"));
+        ensure_equals("@SELF in any case", path("@SELF/child", "init").path, std::string("./child"));
+        ensure("@sl-* reserved", !path("@sl-std/util").error.empty() && !path("@SL-std").error.empty());
+        ensure("an alias may not climb", !path("@lib/../secret").error.empty() && !path("@lib/a/../../b").error.empty());
+        ensure("@self may, as Luau's own", path("@self/../x").error.empty());
+        ensure("a name with .. in it is no climb", path("@lib/a..b").error.empty());
+    }
+
+    template<> template<>
+    void alincludesearch_object::test<9>()
+    {
+        set_test_name("a require walked through the world: an inventory folder's items and folders, its .luaurc notecard, an object's contents; Pending where the world has not said; nothing of it with world includes off but the scripter's folders' own .luaurc");
+        // The inventory: a project folder in a root, with a library folder,
+        // a module's folder with its init, and a configuration.
+        const auto add = [this](const std::string& folder, const std::string& name) {
+            const ALIncludeWorld::Item one{ ALIncludeIdentity::ofItem(LLUUID::null, LLUUID::generateNewID()), name, LLUUID::generateNewID() };
+            world.folders[folder].items.push_back(one);
+            world.itemFolders[one.path] = folder;
+            return one;
+        };
+        world.folders["root"].parent  = std::string();
+        world.folders["proj"].parent  = "root";
+        world.folders["lib"].parent   = "proj";
+        world.folders["mod"].parent   = "proj";
+        world.folders["proj"].folders = { { "lib", "lib" }, { "mod", "mod" } };
+        const ALIncludeWorld::Item main   = add("proj", "main");
+        const ALIncludeWorld::Item util   = add("proj", "util");
+        const ALIncludeWorld::Item shared = add("root", "shared");
+        const ALIncludeWorld::Item net    = add("lib", "net");
+        const ALIncludeWorld::Item init   = add("mod", "init");
+        const ALIncludeWorld::Item config = add("proj", ".luaurc");
+        for (const ALIncludeWorld::Item& one : { util, shared, net, init })
+        {
+            texts.put(one.path, one.assetId, "return '" + one.name + "'\n");
+        }
+        texts.put(config.path, config.assetId, "{\"aliases\": {\"lib\": \"./lib\", \"far\": \"/somewhere/on/disk\"}}");
+
+        Scratch           s;
+        const std::string top = s.write("inc/.luaurc", "{\"aliases\": {\"top\": \"./libs\"}}");
+        const std::string x   = s.write("inc/libs/x.luau", "return 'x'\n");
+        const ALIncludeSearch::Where on  = where(true, true, { s.at("inc") });
+        const ALIncludeSearch::Where off = where(false, true, { s.at("inc") });
+        const ALIncludeSearch::Asking own{ main.path, true };
+        const auto found = [&](const std::string& name, const ALIncludeSearch::Where& in, ALIncludeSearch::wanted_t* wanted = nullptr) {
+            ALPreprocessor::Include     include;
+            std::vector<std::string>    aliases;
+            const ALPreprocessor::Found said = search.resolve(ask(name, true, own.self), include, own, in, wanted, false, &aliases);
+            return said == ALPreprocessor::Found::Yes ? include.path : said == ALPreprocessor::Found::Pending ? std::string("pending") : std::string();
+        };
+        ensure_equals("beside it", found("./util", on), util.path);
+        ensure_equals("with no prefix", found("util", on), util.path);
+        ensure_equals("up a folder", found("../shared", on), shared.path);
+        ensure_equals("a folder's init", found("./mod", on), init.path);
+        ensure_equals("in a folder", found("./lib/net", on), net.path);
+        ensure_equals("through the folder's .luaurc", found("@lib/net", on), net.path);
+        ensure_equals("one there is not", found("./nothere", on), std::string());
+        ensure_equals("a world .luaurc names nothing on disk", found("@far/x", on), std::string());
+        ensure_equals("past the world's top, the scripter's folders' own .luaurc", found("@top/x", on), ALIncludeIdentity::ofFile(x));
+
+        // What the world has not said yet: Pending, and what is on its way
+        // wanted.
+        ALIncludeSearch::wanted_t wanted;
+        world.folders["lib"].known = false;
+        ensure_equals("a folder not known: Pending", found("./lib/net", on, &wanted), std::string("pending"));
+        world.folders["lib"].known = true;
+        ALScriptTextCache         fresh;
+        ALIncludeSearch           unread(fresh, world);
+        ALPreprocessor::Include   include;
+        std::vector<std::string>  aliases;
+        ensure("the .luaurc not in hand: Pending", unread.resolve(ask("@lib/net", true, own.self), include, own, on, &wanted, false, &aliases) ==
+                                                       ALPreprocessor::Found::Pending);
+        ensure("and wanted", wanted.contains(config.path));
+
+        // With world includes off, nothing of the world; the scripter's
+        // folders' own .luaurc still.
+        ensure_equals("off: not beside it", found("./util", off), std::string());
+        ensure_equals("off: no .luaurc of the world's", found("@lib/net", off), std::string());
+        ensure_equals("off: the scripter's folders' own", found("@top/x", off), ALIncludeIdentity::ofFile(x));
+
+        // An object's contents, one folder.
+        world.folders["contents"].parent = std::string();
+        const ALIncludeWorld::Item script = add("contents", "script");
+        const ALIncludeWorld::Item helper = add("contents", "helper");
+        texts.put(helper.path, helper.assetId, "return 'helper'\n");
+        const ALIncludeSearch::Asking in_object{ script.path, true };
+        ALPreprocessor::Include       got;
+        ensure("an object's: beside it", search.resolve(ask("./helper", true, script.path), got, in_object, on, nullptr, false, &aliases) ==
+                                             ALPreprocessor::Found::Yes &&
+                                             got.path == helper.path);
+        ensure("an object has no folder above", search.resolve(ask("../helper", true, script.path), got, in_object, on, nullptr, false, &aliases) ==
+                                                    ALPreprocessor::Found::No);
     }
 }

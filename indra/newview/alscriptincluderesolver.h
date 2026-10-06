@@ -97,6 +97,9 @@ public:
     std::vector<Item>     inObject(const std::string& asking, const std::string& item_name, bool& unknown) override;
     std::vector<Item>     inInventory(const std::string& item_name, const std::vector<std::string>& folders, const std::string& from) override;
     ALPreprocessor::Found configsOver(const std::string& from, const std::string& name, std::vector<Item>& out) override;
+    bool                  folderOf(const std::string& item, std::string& folder, std::string& name) override;
+    ALPreprocessor::Found folderAbove(const std::string& folder, std::string& out) override;
+    ALPreprocessor::Found named(const std::string& folder, const std::string& name, std::vector<Item>& items, std::string& subfolder) override;
 
 private:
     // Where a name is looked for, as the settings say now; who asks.

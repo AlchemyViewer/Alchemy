@@ -161,10 +161,6 @@ namespace tut
         ensure_equals("an alias the middle says over the root's", merged.aliases["lib"], std::string("./midlib"));
         ensure_equals("the root's own kept", merged.aliases["root"], std::string("./r"));
 
-        std::string value;
-        ensure("lib: the middle's, the nearest that says", ALLuauConfig::aliasIn(chain, "lib", value) == std::optional<size_t>(1) && value == "./midlib");
-        ensure("root: the root's", ALLuauConfig::aliasIn(chain, "root", value) == std::optional<size_t>(3) && value == "./r");
-        ensure("an alias none says", !ALLuauConfig::aliasIn(chain, "none", value));
 
         ALLuauConfig base;
         base.mode = "strict";

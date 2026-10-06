@@ -69,6 +69,7 @@ target_sources(
     preprocessor/alincludeidentity.cpp
     preprocessor/alincludesearch.cpp
     preprocessor/almodulelook.cpp
+    preprocessor/alrequirenavigation.cpp
     preprocessor/alpreprocessor.cpp
     preprocessor/alscriptenvelope.cpp
     preprocessor/alscriptsnapshot.cpp
@@ -139,6 +140,7 @@ target_sources(
         preprocessor/alincludeidentity.h
         preprocessor/alincludesearch.h
         preprocessor/almodulelook.h
+        preprocessor/alrequirenavigation.h
         preprocessor/alpreprocessor.h
         preprocessor/alscriptenvelope.h
         preprocessor/alscriptjoblane.h
