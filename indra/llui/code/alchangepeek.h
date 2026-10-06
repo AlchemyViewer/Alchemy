@@ -25,11 +25,13 @@
 #ifndef AL_ALCHANGEPEEK_H
 #define AL_ALCHANGEPEEK_H
 
+#include "alchangessincesaved.h"
 #include "altextdocument.h"
 #include "llpanel.h"
 
 #include <boost/signals2.hpp>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -55,17 +57,12 @@ class ALChangePeek : public LLPanel
 public:
     // A change of a text since it was saved: its lines now, from `now`, so
     // many; and as saved, from `saved`, so many.
-    struct Change
-    {
-        S32 now        = 0;
-        S32 nowCount   = 0;
-        S32 saved      = 0;
-        S32 savedCount = 0;
-
-        bool operator==(const Change& other) const = default;
-    };
+    typedef ALChangesSinceSaved::Change Change;
     // The changes of a text from a saved one, in order.
-    static std::vector<Change> changesOf(const std::vector<std::string>& saved, const std::vector<std::string>& now);
+    static std::vector<Change> changesOf(const std::vector<std::string>& saved, const std::vector<std::string>& now)
+    {
+        return ALChangesSinceSaved::between(saved, now);
+    }
     // The change after the caret's line of an editor's text, or before it:
     // the caret put at its first line, and a peek open there gone with it.
     // What vim's ]c and [c step through outside a comparison. False where
@@ -96,8 +93,8 @@ public:
     bool isOpen() const { return mShown >= 0; }
     // Which change is shown, counted from nought, of how many; -1 for none.
     S32  changeShown() const { return mShown; }
-    S32  changeCount() const { return static_cast<S32>(mChanges.size()); }
-    const Change& change() const { return mChanges[static_cast<size_t>(mShown)]; }
+    S32  changeCount() const { return mKnown ? static_cast<S32>(mKnown->changes.size()) : 0; }
+    const Change& change() const { return mKnown->changes[static_cast<size_t>(mShown)]; }
     // The line whose gap it stands in; and what its bar says.
     S32         gapLine() const { return mGapLine; }
     std::string said() const;
@@ -132,9 +129,9 @@ private:
     ALFlatButton*            mPrevious = nullptr;
     ALFlatButton*            mNext     = nullptr;
     ALFlatButton*            mClose    = nullptr;
-    std::vector<std::string> mSavedLines;
-    std::vector<std::string> mNowLines;
-    std::vector<Change>      mChanges;
+    // The changes, with the lines of the text as saved and as it was, it
+    // last showed one of (ALCodeEditor::changesSinceSaved).
+    std::shared_ptr<const ALChangesSinceSaved::Known> mKnown;
     S32                      mShown   = -1;
     // The line whose gap it opened, and the gap it had before; -1 for none.
     S32                      mGapLine = -1;

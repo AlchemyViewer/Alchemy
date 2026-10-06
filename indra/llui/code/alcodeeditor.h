@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alanchoredranges.h"
+#include "alchangessincesaved.h"
 #include "alcodecards.h"
 #include "albracketindex.h"
 #include "alcompletionmodel.h"
@@ -331,6 +332,10 @@ public:
     // Whether a line was changed since the text was last saved: the
     // gutter bars it, and a save clears them all.
     bool lineChanged(S32 line) const;
+    // The text's changes since it was saved, exactly, with the lines of
+    // both (ALChangesSinceSaved): worked out again only where the text or
+    // its history moved; none where nothing says what was saved.
+    std::shared_ptr<const ALChangesSinceSaved::Known> changesSinceSaved() { return mSinceSaved.of(document(), undoJournal()); }
     // A peek at the change since the text was saved that a line is in
     // (ALChangePeek): its lines as they were, in a gap under them, with
     // the change taken back and the steps to the others. What a press on
@@ -1039,6 +1044,7 @@ private:
     // The peek at a change, made the first time one is asked for; a child
     // let go of before the rest of the editor is.
     ALChangePeek*                      mPeek            = nullptr;
+    ALChangesSinceSaved                mSinceSaved;
     S32                                mGutterHoverLine = -1;
     ALAnchoredRanges<Decoration>       mDecorations;
     // How many decorations have been given since the last were given whole.

@@ -306,4 +306,31 @@ namespace tut
         const LLRect bar = peek.getChild<LLView>("close")->getRect();
         ensure("its bar at the top of what is in sight", bar.mTop == 30 - 2);
     }
+
+    template<> template<>
+    void alchangepeek_object::test<9>()
+    {
+        set_test_name("the changes since saved worked out once while nothing moves: stepped through, and a peek shown at each, asking nothing again; an edit, an undo, a save each work them out again");
+        ALCodeEditor& e     = make("a\nb\nc\nd\ne", "a\nB\nc\nx\nd");
+        const auto    first = e.changesSinceSaved();
+        ensure("known: three", first && first->changes.size() == 3 && first->version == e.document().version());
+        ensure("asked again, the same", e.changesSinceSaved() == first);
+        e.goTo(ALTextPos(0, 0));
+        ensure("stepped to the first", e.stepChange(true) && e.caret().line == 1);
+        ensure("a peek shown there", e.peekChange(1));
+        ensure("and on to the next", e.stepChange(true) && e.caret().line == 3 && e.changePeek()->changeShown() == 1);
+        ensure("nothing worked out again", e.changesSinceSaved() == first);
+
+        e.goTo(ALTextPos(0, 0));
+        e.insertText("y");
+        const auto edited = e.changesSinceSaved();
+        ensure("an edit: again, of the text as it is", edited && edited != first && edited->version == e.document().version() &&
+                                                           edited->now.front() == "ya");
+        ensure("undone: again, three", e.perform(ALEditorCommand::Undo) && e.changesSinceSaved() != edited && e.changesSinceSaved()->changes.size() == 3);
+        e.resetDirty();
+        ensure("saved: none", e.changesSinceSaved() && e.changesSinceSaved()->changes.empty());
+        // Changed by its document, which no journal is told of: again.
+        e.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "z");
+        ensure("the text as it is", e.changesSinceSaved()->now.front() == "za");
+    }
 }

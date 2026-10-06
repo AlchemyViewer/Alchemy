@@ -172,6 +172,7 @@ target_sources(
     base/alsurface.cpp
     code/alcodecards.cpp
     code/alchangepeek.cpp
+    code/alchangessincesaved.cpp
     code/alcodeeditor.cpp
     code/albracketindex.cpp
     code/alcompletionmodel.cpp
@@ -412,6 +413,7 @@ target_sources(
         base/alstringmatch.h
         code/alcodecards.h
         code/alchangepeek.h
+        code/alchangessincesaved.h
         code/alcodeeditor.h
         code/albracketindex.h
         code/alcompletionmodel.h

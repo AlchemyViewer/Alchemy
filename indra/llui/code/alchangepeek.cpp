@@ -34,7 +34,6 @@
 #include "alsurface.h"
 #include "allinepairs.h"
 #include "altextdiff.h"
-#include "altextmerge.h"
 
 #include "lllocalcliprect.h"
 #include "llrender2dutils.h"
@@ -46,18 +45,6 @@ namespace
     constexpr S32 ROW     = 20;
     constexpr S32 PAD     = 2;
     constexpr S32 SMALL_W = 22;
-}
-
-// static
-std::vector<ALChangePeek::Change> ALChangePeek::changesOf(const std::vector<std::string>& saved, const std::vector<std::string>& now)
-{
-    // What the text now changed of the saved one, as a merge reads it.
-    std::vector<Change> out;
-    for (const ALTextMerge::Change& c : ALTextMerge::changesOf(saved, now, ALTextDiff::Options()))
-    {
-        out.push_back(Change{ c.at, c.atEnd - c.at, c.base, c.baseEnd - c.base });
-    }
-    return out;
 }
 
 // static
@@ -85,14 +72,14 @@ S32 ALChangePeek::changeAt(const std::vector<Change>& changes, S32 line)
 // static
 bool ALChangePeek::stepFrom(ALCodeEditor& host, bool forward)
 {
-    const std::optional<std::string> saved = host.undoJournal().savedText();
-    if (!saved)
+    const std::shared_ptr<const ALChangesSinceSaved::Known> known = host.changesSinceSaved();
+    if (!known)
     {
         return false;
     }
     // The start of the next change after the caret's line, or of the last
     // before it: from within a change, back is to its own start.
-    const std::vector<Change> changes = changesOf(ALTextDiff::split(*saved), ALTextDiff::split(host.wholeText()));
+    const std::vector<Change>& changes = known->changes;
     const S32                 line    = host.caret().line;
     const Change*             to      = nullptr;
     for (const Change& c : changes)
@@ -186,16 +173,14 @@ ALChangePeek::~ALChangePeek() = default;
 
 bool ALChangePeek::showAt(S32 line)
 {
-    const std::optional<std::string> saved = mHost.undoJournal().savedText();
-    if (!saved)
+    std::shared_ptr<const ALChangesSinceSaved::Known> known = mHost.changesSinceSaved();
+    if (!known)
     {
         close();
         return false;
     }
-    mSavedLines = ALTextDiff::split(*saved);
-    mNowLines   = ALTextDiff::split(mHost.wholeText());
-    mChanges    = changesOf(mSavedLines, mNowLines);
-    const S32 at = changeAt(mChanges, line);
+    mKnown       = std::move(known);
+    const S32 at = changeAt(mKnown->changes, line);
     if (at < 0)
     {
         close();
@@ -231,11 +216,13 @@ bool ALChangePeek::takeBack()
         return false;
     }
     const Change                   c = change();
-    const std::vector<std::string> was(mSavedLines.begin() + c.saved, mSavedLines.begin() + c.saved + c.savedCount);
+    const std::vector<std::string> was(mKnown->saved.begin() + c.saved, mKnown->saved.begin() + c.saved + c.savedCount);
     ALTextRange                    range;
     std::string                    put;
     std::string                    made;
-    if (!ALDiffEdit::replaceLines(ALTextDiff::split(mHost.wholeText()), c.now, c.nowCount, was, range, put, made))
+    // Over the text as it is: the lines known, where it has not moved.
+    const bool same = mKnown->version == mHost.document().version();
+    if (!ALDiffEdit::replaceLines(same ? mKnown->now : ALTextDiff::split(mHost.wholeText()), c.now, c.nowCount, was, range, put, made))
     {
         return false;
     }
@@ -252,8 +239,7 @@ bool ALChangePeek::takeBack()
     // On to the change that was after it, now at this one's place.
     const S32 next = mShown;
     mShown         = -1;
-    mNowLines      = ALTextDiff::split(mHost.wholeText());
-    mChanges       = changesOf(mSavedLines, mNowLines);
+    mKnown         = mHost.changesSinceSaved();
     if (next < changeCount())
     {
         mShown = next;
@@ -300,7 +286,7 @@ void ALChangePeek::fill()
     std::string text;
     for (S32 n = 0; n < c.savedCount; ++n)
     {
-        text += (n ? "\n" : "") + mSavedLines[static_cast<size_t>(c.saved + n)];
+        text += (n ? "\n" : "") + mKnown->saved[static_cast<size_t>(c.saved + n)];
     }
     mSaved->setFont(mHost.getFont());
     mSaved->setGrammar(mHost.highlighter().grammar());
@@ -349,13 +335,13 @@ void ALChangePeek::markWords()
     const LLColor4 out_words = ALDiffColors::get(ALDiffColors::Name::RemovedWord).get();
     std::vector<ALCodeEditor::Decoration> was;
     std::vector<ALTextRange>              now;
-    for (const auto& [at_gone, at_made] : ALLinePairs::pair(mSavedLines, mNowLines, gone, made))
+    for (const auto& [at_gone, at_made] : ALLinePairs::pair(mKnown->saved, mKnown->now, gone, made))
     {
         const S32           saved_line = gone[static_cast<size_t>(at_gone)];
         const S32           now_line   = made[static_cast<size_t>(at_made)];
         ALTextDiff::spans_t out;
         ALTextDiff::spans_t in;
-        ALTextDiff::words(mSavedLines[static_cast<size_t>(saved_line)], mNowLines[static_cast<size_t>(now_line)], out, in);
+        ALTextDiff::words(mKnown->saved[static_cast<size_t>(saved_line)], mKnown->now[static_cast<size_t>(now_line)], out, in);
         for (const auto& [begin, end] : out)
         {
             ALCodeEditor::Decoration d;
