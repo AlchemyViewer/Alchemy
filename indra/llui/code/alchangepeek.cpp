@@ -27,17 +27,18 @@
 #include "alchangepeek.h"
 
 #include "alcodeeditor.h"
+#include "aldiffcolors.h"
 #include "aldiffedit.h"
 #include "alflatbutton.h"
 #include "alsaid.h"
 #include "alsurface.h"
 #include "allinepairs.h"
 #include "altextdiff.h"
+#include "altextmerge.h"
 
 #include "lllocalcliprect.h"
 #include "llrender2dutils.h"
 #include "lltextbox.h"
-#include "lluicolortable.h"
 #include "lluictrlfactory.h"
 
 namespace
@@ -50,21 +51,11 @@ namespace
 // static
 std::vector<ALChangePeek::Change> ALChangePeek::changesOf(const std::vector<std::string>& saved, const std::vector<std::string>& now)
 {
-    std::vector<Change>                out;
-    const std::vector<ALTextDiff::Run> runs = ALTextDiff::lines(saved, now);
-    for (size_t i = 0; i < runs.size();)
+    // What the text now changed of the saved one, as a merge reads it.
+    std::vector<Change> out;
+    for (const ALTextMerge::Change& c : ALTextMerge::changesOf(saved, now, ALTextDiff::Options()))
     {
-        if (runs[i].kind == ALTextDiff::Kind::Same)
-        {
-            ++i;
-            continue;
-        }
-        Change change{ runs[i].right, 0, runs[i].left, 0 };
-        for (; i < runs.size() && runs[i].kind != ALTextDiff::Kind::Same; ++i)
-        {
-            (runs[i].kind == ALTextDiff::Kind::Removed ? change.savedCount : change.nowCount) += runs[i].count;
-        }
-        out.push_back(change);
+        out.push_back(Change{ c.at, c.atEnd - c.at, c.base, c.baseEnd - c.base });
     }
     return out;
 }
@@ -316,7 +307,7 @@ void ALChangePeek::fill()
     mSaved->setBackgroundColor(mHost.backgroundColor());
     mSaved->setTextColor(mHost.textColor());
     mSaved->setText(text);
-    const LLColor4 removed = LLUIColorTable::instance().getColor("CodeDiffRemovedColor", LLColor4(0.9f, 0.3f, 0.3f, 0.18f));
+    const LLColor4 removed = ALDiffColors::get(ALDiffColors::Name::Removed).get();
     std::vector<ALTextView::LineAnnotation> lines(static_cast<size_t>(c.savedCount));
     for (S32 n = 0; n < c.savedCount; ++n)
     {
@@ -355,7 +346,7 @@ void ALChangePeek::markWords()
     {
         made.push_back(c.now + n);
     }
-    const LLColor4 out_words = LLUIColorTable::instance().getColor("CodeDiffRemovedWordColor", LLColor4(0.9f, 0.25f, 0.25f, 0.4f));
+    const LLColor4 out_words = ALDiffColors::get(ALDiffColors::Name::RemovedWord).get();
     std::vector<ALCodeEditor::Decoration> was;
     std::vector<ALTextRange>              now;
     for (const auto& [at_gone, at_made] : ALLinePairs::pair(mSavedLines, mNowLines, gone, made))

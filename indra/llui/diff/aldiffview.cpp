@@ -30,6 +30,7 @@
 
 #include "alcodeeditor.h"
 #include "aldiffbar.h"
+#include "aldiffcolors.h"
 #include "aldiffmodel.h"
 #include "altextdiff.h"
 #include "alunifieddiff.h"
@@ -502,17 +503,18 @@ void ALDiffView::fill()
 
 void ALDiffView::fillLayout(Layout layout)
 {
-    const LLColor4 out       = colorOf("CodeDiffRemovedColor", LLColor4(0.85f, 0.25f, 0.25f, 0.18f));
-    const LLColor4 in        = colorOf("CodeDiffAddedColor", LLColor4(0.25f, 0.75f, 0.35f, 0.18f));
-    const LLColor4 padding   = colorOf("CodeDiffPaddingColor", LLColor4(0.5f, 0.5f, 0.5f, 0.07f));
-    const LLColor4 out_words = colorOf("CodeDiffRemovedWordColor", LLColor4(0.9f, 0.25f, 0.25f, 0.4f));
-    const LLColor4 in_words  = colorOf("CodeDiffAddedWordColor", LLColor4(0.25f, 0.85f, 0.35f, 0.4f));
+    using ALDiffColors::Name;
+    const LLColor4 out       = ALDiffColors::get(Name::Removed).get();
+    const LLColor4 in        = ALDiffColors::get(Name::Added).get();
+    const LLColor4 padding   = ALDiffColors::get(Name::Padding).get();
+    const LLColor4 out_words = ALDiffColors::get(Name::RemovedWord).get();
+    const LLColor4 in_words  = ALDiffColors::get(Name::AddedWord).get();
     // The ruler's: each side's own change, and beside a gap, the other's.
-    const LLColor4 out_mark  = colorOf("CodeDiffRemovedMarkColor", LLColor4(0.9f, 0.3f, 0.3f, 0.85f));
-    const LLColor4 in_mark   = colorOf("CodeDiffAddedMarkColor", LLColor4(0.3f, 0.8f, 0.4f, 0.85f));
+    const LLColor4 out_mark  = ALDiffColors::get(Name::RemovedMark).get();
+    const LLColor4 in_mark   = ALDiffColors::get(Name::AddedMark).get();
     // A block moved, at either end: neither red nor green.
-    const LLColor4 moved      = colorOf("CodeDiffMovedColor", LLColor4(0.45f, 0.45f, 0.95f, 0.18f));
-    const LLColor4 moved_mark = colorOf("CodeDiffMovedMarkColor", LLColor4(0.5f, 0.5f, 1.f, 0.85f));
+    const LLColor4 moved      = ALDiffColors::get(Name::Moved).get();
+    const LLColor4 moved_mark = ALDiffColors::get(Name::MovedMark).get();
     for (ALCodeEditor* side : { mLeft, mRight, mInlined })
     {
         // What the editor is told of each line of the column, and of the
@@ -806,7 +808,7 @@ void ALDiffView::applyFolds()
 
 void ALDiffView::applyFolds(ALCodeEditor* side)
 {
-    const LLColor4 folded = colorOf("CodeDiffFoldColor", LLColor4(0.5f, 0.5f, 0.5f, 0.14f));
+    const LLColor4 folded = ALDiffColors::get(ALDiffColors::Name::Fold).get();
     const Column   column = columnOf(side);
     ALTextLayout&  layout = side->layout();
     for (S32 n = 0; n < foldCount(); ++n)
@@ -1327,9 +1329,9 @@ void ALDiffView::refreshColors()
     mColorsGeneration = LLUIColorTable::instance().generation();
     mBar->setColors(mRight->backgroundColor(), mRight->textColor());
     mCurrentColor  = colorOf("CodeDiffCurrentColor", mRight->cursorColor());
-    mDividerColor  = colorOf("CodeDiffDividerColor", LLColor4(0.5f, 0.5f, 0.5f, 0.5f));
-    mLinkedColor   = colorOf("CodeDiffLinkedColor", LLColor4(0.45f, 0.65f, 1.f, 1.f));
-    mConflictColor = colorOf("CodeDiffConflictColor", LLColor4(1.f, 0.6f, 0.1f, 1.f));
+    mDividerColor  = ALDiffColors::get(ALDiffColors::Name::Divider).get();
+    mLinkedColor   = ALDiffColors::get(ALDiffColors::Name::Linked).get();
+    mConflictColor = ALDiffColors::get(ALDiffColors::Name::Conflict).get();
 }
 
 void ALDiffView::draw()

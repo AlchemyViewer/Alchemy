@@ -27,6 +27,9 @@
 #include "alcodeeditor.h"
 
 #include "alchangepeek.h"
+#include "aldiffcolors.h"
+#include "aldiffedit.h"
+#include "allinebreaks.h"
 
 #include "alplace.h"
 #include "alsaid.h"
@@ -676,6 +679,16 @@ void ALCodeEditor::resetDirty()
 {
     ALTextView::resetDirty();
     std::fill(mChanged.begin(), mChanged.end(), 0);
+    closePeek();
+}
+
+void ALCodeEditor::closePeek()
+{
+    // What a peek shows is the change since the save before.
+    if (mPeek && mPeek->isOpen())
+    {
+        mPeek->close();
+    }
 }
 
 void ALCodeEditor::markUnsaved()
@@ -686,28 +699,15 @@ void ALCodeEditor::markUnsaved()
 
 void ALCodeEditor::barChangesSince(std::string_view saved)
 {
-    std::vector<std::string_view> was;
-    for (size_t at = 0;;)
-    {
-        const size_t nl = saved.find('\n', at);
-        was.push_back(saved.substr(at, nl == std::string_view::npos ? std::string_view::npos : nl - at));
-        if (nl == std::string_view::npos)
-        {
-            break;
-        }
-        at = nl + 1;
-    }
-    const size_t now  = static_cast<size_t>(document().lineCount());
-    size_t       head = 0;
-    while (head < now && head < was.size() && document().line(static_cast<S32>(head)) == was[head])
-    {
-        ++head;
-    }
-    size_t tail = 0;
-    while (tail < now - head && tail < was.size() - head && document().line(static_cast<S32>(now - 1 - tail)) == was[was.size() - 1 - tail])
-    {
-        ++tail;
-    }
+    // The saved text's lines read as the document reads its own, whatever
+    // ends them; what lies between where the two first differ and where
+    // they end alike barred.
+    const std::vector<std::string> was   = ALLineBreaks::split(saved);
+    const std::vector<std::string> lines = ALLineBreaks::split(wholeText());
+    const auto [first, last]             = ALDiffEdit::edgesOf(was, lines);
+    const size_t now                     = lines.size();
+    const size_t head                    = static_cast<size_t>(first);
+    const size_t tail                    = static_cast<size_t>(last);
     mChanged.assign(now, 0);
     std::fill(mChanged.begin() + static_cast<std::ptrdiff_t>(head), mChanged.end() - static_cast<std::ptrdiff_t>(tail), 1);
     if (head + tail == now && was.size() != now && now > 0)
@@ -728,6 +728,7 @@ void ALCodeEditor::markSavedAt(const ALTextUndo::SavePoint& point)
     {
         std::fill(mChanged.begin(), mChanged.end(), 0);
     }
+    closePeek();
 }
 
 LLColor4 ALCodeEditor::highlightColor() const
@@ -1731,7 +1732,7 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
         // The name's other places more lightly: they are only what is
         // written alike, lit without being asked for. A change's words as a
         // comparison marks words put in.
-        static const LLUIColor changed = LLUIColorTable::instance().getColor("CodeDiffAddedWordColor", LLColor4(0.25f, 0.85f, 0.35f, 0.4f));
+        static const LLUIColor changed = ALDiffColors::get(ALDiffColors::Name::AddedWord);
         const LLColor4 ink = index == static_cast<size_t>(Highlight::Occurrences) ? wash % 0.5f
                              : index == static_cast<size_t>(Highlight::Change)    ? changed.get() % alpha
                                                                                    : wash;
@@ -2913,8 +2914,8 @@ void ALCodeEditor::showFixPreview()
     // As a comparison shows it (ALDiffView): each line on the band its
     // kind is tinted, what goes as plain code faded, what comes coloured
     // as code.
-    const LLColor4 gone_band = LLUIColorTable::instance().getColor("CodeDiffRemovedColor", LLColor4(0.85f, 0.25f, 0.25f, 0.18f)).get();
-    const LLColor4 come_band = LLUIColorTable::instance().getColor("CodeDiffAddedColor", LLColor4(0.25f, 0.75f, 0.35f, 0.18f)).get();
+    const LLColor4 gone_band = ALDiffColors::get(ALDiffColors::Name::Removed).get();
+    const LLColor4 come_band = ALDiffColors::get(ALDiffColors::Name::Added).get();
     LLColor4       faded     = textColor();
     faded.mV[VALPHA] *= 0.7f;
     std::vector<ALTextView::Style> styles;

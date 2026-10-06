@@ -136,6 +136,7 @@ target_sources(
     fields/alcolorsheet.cpp
     base/aldeferredrebuild.cpp
     diff/aldiffbar.cpp
+    diff/aldiffcolors.cpp
     diff/aldiffedit.cpp
     diff/aldifflexer.cpp
     diff/aldiffmerge.cpp
@@ -367,6 +368,7 @@ target_sources(
         fields/alcolorsheet.h
         base/aldeferredrebuild.h
         diff/aldiffbar.h
+        diff/aldiffcolors.h
         diff/aldiffedit.h
         diff/aldiffids.h
         diff/aldifflexer.h

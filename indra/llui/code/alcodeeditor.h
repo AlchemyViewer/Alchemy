@@ -333,6 +333,9 @@ public:
     // a line's bar does. False where the line is in none.
     bool          peekChange(S32 line);
     ALChangePeek* changePeek() const { return mPeek; }
+    // A peek open closed: the text is saved, and what it shows was the
+    // change since the save before.
+    void          closePeek();
     void resetDirty() override;
     void markSavedAt(const ALTextUndo::SavePoint& point) override;
     // Nothing saved is known to measure against: every line barred.

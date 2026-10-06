@@ -27,6 +27,7 @@
 #include "alchangepeek.h"
 
 #include "alcodeeditor.h"
+#include "aldiffcolors.h"
 #include "alflatbutton.h"
 #include "alvimkeymap.h"
 #include "../llfocusmgr.h"
@@ -246,5 +247,28 @@ namespace tut
         ensure("the peek gone along", e.caret().line == 4 && e.changePeek()->isOpen() && e.changePeek()->changeShown() == 1);
         ensure("as the editor steps without vim", e.stepChange(false) && e.caret().line == 1 && e.changePeek()->changeShown() == 0);
         ensure("none before the first", !e.stepChange(false) && e.caret().line == 1);
+    }
+
+    template<> template<>
+    void alchangepeek_object::test<7>()
+    {
+        set_test_name("the bars against a saved text ended by CR LF or a lone CR: the lines that differ only; a save closes a peek; its lines tinted as a comparison's");
+        ALCodeEditor& e = make("a\nb\nc\nd", "a\nB\nc\nd");
+        e.barChangesSince("a\r\nb\r\nc\r\nd");
+        ensure("CR LF: the second line alone", !e.lineChanged(0) && e.lineChanged(1) && !e.lineChanged(2) && !e.lineChanged(3));
+        e.barChangesSince("a\rb\rc\rd");
+        ensure("a lone CR: the same", !e.lineChanged(0) && e.lineChanged(1) && !e.lineChanged(2) && !e.lineChanged(3));
+
+        ensure("peeked", e.peekChange(1) && e.changePeek()->isOpen());
+        ensure("tinted as a comparison tints a line taken out",
+               e.changePeek()->savedText()->lineAnnotation(0).tint == ALDiffColors::get(ALDiffColors::Name::Removed).get());
+        e.resetDirty();
+        ensure("saved: closed, the gap shut", !e.changePeek()->isOpen() && e.lineAnnotation(2).gap == 0);
+        e.selectAll();
+        e.insertText("a\nB!\nc\nd");
+        ensure("peeked again", e.peekChange(1) && e.changePeek()->isOpen());
+        ALTextUndo::SavePoint point = e.undoJournal().savePoint();
+        e.markSavedAt(point);
+        ensure("saved at a point: closed", !e.changePeek()->isOpen());
     }
 }
