@@ -1552,10 +1552,10 @@ namespace tut
         bool own        = false;
         for (const ALScriptProblem& problem : problems)
         {
-            in_modules += problem.file.rfind("disk:/lib/m", 0) == 0 && problem.line == 2 ? 1 : 0;
+            in_modules += problem.file.rfind("disk:/lib/m", 0) == 0 && problem.line == 2 && problem.source == ALScriptProblem::Source::Types ? 1 : 0;
             own |= problem.file.empty() && problem.line == 5 && problem.severity == ALScriptProblem::Severity::Error;
         }
-        ensure_equals("each module's own problem, in its lines: " + said(problems), in_modules, 4);
+        ensure_equals("each module's own type error, in its lines: " + said(problems), in_modules, 4);
         ensure("and the script's: " + said(problems), own);
 
         // The script typed in: only it, on its own.
@@ -1565,6 +1565,50 @@ namespace tut
         ensure("its own problem still: " + said(edited), std::any_of(edited.begin(), edited.end(), [](const ALScriptProblem& problem) {
                    return problem.file.empty() && problem.line == 5;
                }));
+        service.setDocument("");
+    }
+
+    template<> template<>
+    void alluauservice_object::test<46>()
+    {
+        set_test_name("a module checked with the script has its lints told too, Luau's and the studio's own, in its lines and with no fix, while the script's keep theirs; not again for an edit of the script alone");
+        ensure("definitions loaded: " + error, loaded);
+        service.setDocument("linted");
+        service.setConfig(ALLuauConfig());
+        ALLuauService::Modules modules;
+        modules.modules.push_back({ "disk:/lib/util.luau", "local unusedThing = 1\n"   // 0
+                                                           "local n = 1\n"             // 1
+                                                           "n = n + 1\n"               // 2
+                                                           "local M = {}\n"            // 3
+                                                           "M.n = n\n"                 // 4
+                                                           "return M\n" });            // 5
+        modules.reaches.push_back({ "", "util", "disk:/lib/util.luau" });
+        service.setModules(modules);
+        const std::string script = "local util = require(\"util\")\n"
+                                   "local x = util.n\n"
+                                   "x = x + 1\n"
+                                   "print(x)\n";
+        const ALScriptProblems problems = service.check(script);
+        const auto in = [&](const ALScriptProblems& found, const std::string& file, const std::string& code, S32 line) -> const ALScriptProblem* {
+            for (const ALScriptProblem& problem : found)
+            {
+                if (problem.file == file && problem.code == code && problem.line == line)
+                {
+                    return &problem;
+                }
+            }
+            return nullptr;
+        };
+        const ALScriptProblem* unused = in(problems, "disk:/lib/util.luau", "LocalUnused", 0);
+        ensure("Luau's lint of the module, in its lines: " + said(problems), unused != nullptr);
+        const ALScriptProblem* compound = in(problems, "disk:/lib/util.luau", "SlCompoundAssign", 2);
+        ensure("the studio's own of the module: " + said(problems), compound != nullptr);
+        ensure("neither with a fix, being another file's", unused->fixes.empty() && compound->fixes.empty());
+        const ALScriptProblem* own = in(problems, "", "SlCompoundAssign", 2);
+        ensure("the script's own, with its fix: " + said(problems), own && !own->fixes.empty());
+
+        const ALScriptProblems edited = service.check(script + "print(util)\n");
+        ensure("an edit of the script alone: not the module's again", !in(edited, "disk:/lib/util.luau", "LocalUnused", 0));
         service.setDocument("");
     }
 }

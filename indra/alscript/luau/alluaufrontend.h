@@ -35,6 +35,7 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -89,6 +90,10 @@ struct ALLuauFrontend
 
         const Luau::Config& getConfig(const Luau::ModuleName& name, const Luau::TypeCheckLimits&) const override;
     };
+
+    // What takeChecked takes, as the check's hook fills it.
+    mutable std::mutex               checkedMutex;
+    mutable std::vector<std::string> checkedNow;
 
     ScriptResolver                  files;
     ModeResolver                    configs;
@@ -205,6 +210,11 @@ struct ALLuauFrontend
     // for all of them one after another.
     Luau::CheckResult checkWithModules(const Luau::FrontendOptions& options);
     std::unique_ptr<ALLuauTaskPool> modulePool;
+
+    // The modules a check checked, as Luau checked each -- on whichever
+    // thread it was -- for what is told of them beyond their errors: their
+    // lints. Taken, which empties it.
+    std::vector<std::string> takeChecked();
 
     // The module a question reads, checked where it is not the text's
     // yet; none where the check was stopped. Under the new solver there is

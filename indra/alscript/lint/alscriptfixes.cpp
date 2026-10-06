@@ -1376,7 +1376,9 @@ namespace ALScriptFixes
     {
         for (ALScriptProblem& problem : problems)
         {
-            if (!passedOver.empty() && ALSourceMap::within(passedOver, problem.line, std::max(problem.line, problem.endLine)))
+            // Another file's -- a module's the script requires -- whose lines
+            // are not these.
+            if (!problem.file.empty() || (!passedOver.empty() && ALSourceMap::within(passedOver, problem.line, std::max(problem.line, problem.endLine))))
             {
                 continue;
             }

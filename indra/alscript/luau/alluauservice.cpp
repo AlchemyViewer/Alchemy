@@ -1195,10 +1195,12 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     front.sync(source);
     // What was found the first time, where the text has not changed since.
     Luau::CheckResult result;
+    front.takeChecked();
     if (front.stoppedIn(front.checkScript(&result)))
     {
         return ALScriptProblems();
     }
+    const std::vector<std::string> checked = front.takeChecked();
 
     ALScriptProblems problems;
     if (!result.timeoutHits.empty())
@@ -1323,9 +1325,11 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     // What selene's comments say of the lints, where the script was
     // written for selene too: allowed, gone; denied, an error.
     const SeleneFilters selene = seleneFiltersOf(source, module_source);
-    // A lint taken apart by its name, where the map knows its words.
-    auto lint = [&problems, &selene](const Luau::LintWarning& warning, ALScriptProblem::Severity severity) {
-        if (const std::optional<ALSeleneFilters::Action> said = selene.about(warning.code, warning.location))
+    // A lint taken apart by its name, where the map knows its words; in a
+    // module, said as the module's.
+    auto lint = [&problems](const SeleneFilters& filters, const Luau::LintWarning& warning, ALScriptProblem::Severity severity,
+                            const std::string& file) {
+        if (const std::optional<ALSeleneFilters::Action> said = filters.about(warning.code, warning.location))
         {
             if (*said == ALSeleneFilters::Action::Allow)
             {
@@ -1348,6 +1352,7 @@ ALScriptProblems ALLuauService::check(std::string_view source)
             }
         }
         problems.push_back(problemAt(warning.location, severity, ALScriptProblem::Source::Lint, name, warning.text));
+        problems.back().file = file;
         ALMessageMap::Match known;
         if (ALMessageMap::luauLint(name, warning.text, known))
         {
@@ -1357,11 +1362,11 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     };
     for (const Luau::LintWarning& warning : result.lintResult.errors)
     {
-        lint(warning, ALScriptProblem::Severity::Error);
+        lint(selene, warning, ALScriptProblem::Severity::Error, std::string());
     }
     for (const Luau::LintWarning& warning : result.lintResult.warnings)
     {
-        lint(warning, ALScriptProblem::Severity::Warning);
+        lint(selene, warning, ALScriptProblem::Severity::Warning, std::string());
     }
     // The studio's own, beside Luau's, as selene's comments say of them too.
     if (module_source)
@@ -1389,6 +1394,48 @@ ALScriptProblems ALLuauService::check(std::string_view source)
             problems.push_back(std::move(problem));
         }
     }
+    // Each module checked now, its lints too, as its type errors are told:
+    // Luau's and the studio's own, in its lines, as its own selene comments
+    // say of them. None offers a fix here, being another file's.
+    for (const std::string& name : checked)
+    {
+        const Luau::SourceModule* module_of = name != front.moduleName && name.rfind("module:", 0) == 0 ? front.frontend->getSourceModule(name)
+                                                                                                         : nullptr;
+        const Luau::ModulePtr     checked_module = module_of ? front.frontend->moduleResolver.getModule(name) : nullptr;
+        const auto                text           = front.files.texts.find(name);
+        if (!module_of || !checked_module || text == front.files.texts.end())
+        {
+            continue;
+        }
+        const std::string   file      = name.substr(7);
+        const SeleneFilters its       = seleneFiltersOf(text->second, module_of);
+        for (const Luau::LintWarning& warning : checked_module->lintResult.errors)
+        {
+            lint(its, warning, ALScriptProblem::Severity::Error, file);
+        }
+        for (const Luau::LintWarning& warning : checked_module->lintResult.warnings)
+        {
+            lint(its, warning, ALScriptProblem::Severity::Warning, file);
+        }
+        ALScriptProblems    own;
+        const Luau::Config& config = front.configs.getConfig(name, {});
+        ALScriptLintPass::check(text->second, *module_of, checked_module.get(), front.slLints, front.slFatalLints, config.lintErrors, own);
+        for (ALScriptProblem& problem : own)
+        {
+            const Luau::Location where(Luau::Position(problem.line, problem.column), Luau::Position(problem.endLine, problem.endColumn));
+            if (const std::optional<ALSeleneFilters::Action> said = its.aboutSl(ALScriptLintPass::bit(problem.code), where))
+            {
+                if (*said == ALSeleneFilters::Action::Allow)
+                {
+                    continue;
+                }
+                problem.severity = *said == ALSeleneFilters::Action::Deny ? ALScriptProblem::Severity::Error : ALScriptProblem::Severity::Warning;
+            }
+            problem.fixes.clear();
+            problem.file = file;
+            problems.push_back(std::move(problem));
+        }
+    }
     // A global it does not know changed to the nearest name that is in
     // scope there, where one is near: the script's own locals, its globals
     // and the definitions', up the scopes from the place.
@@ -1401,7 +1448,7 @@ ALScriptProblems ALLuauService::check(std::string_view source)
         {
             const std::string& key = problem.key;
             if ((key == "LuauUnknownGlobal" || key == "LuauUnknownGlobalAssign" || key == "LuauLintUnknownGlobal" || key == "LuauLintUnknownGlobalAssign") &&
-                problem.args.size() == 1 && !ALSourceMap::within(front.passedOver, problem.line, std::max(problem.line, problem.endLine)))
+                problem.args.size() == 1 && problem.file.empty() && !ALSourceMap::within(front.passedOver, problem.line, std::max(problem.line, problem.endLine)))
             {
                 std::vector<std::string> names;
                 const Luau::Position     at(static_cast<unsigned>(problem.line), static_cast<unsigned>(problem.column));

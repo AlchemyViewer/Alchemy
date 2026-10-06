@@ -105,7 +105,19 @@ Luau::FrontendOptions ALLuauFrontend::limited() const
         options.moduleTimeLimitSec = timeLimit;
     }
     options.cancellationToken = stop;
+    // Each module as Luau checks it, for its lints: noted, and nothing
+    // more, since it may be on a thread of the pool's.
+    options.customModuleCheck = [this](const Luau::SourceModule& source, const Luau::Module&) {
+        const std::lock_guard<std::mutex> lock(checkedMutex);
+        checkedNow.push_back(source.name);
+    };
     return options;
+}
+
+std::vector<std::string> ALLuauFrontend::takeChecked()
+{
+    const std::lock_guard<std::mutex> lock(checkedMutex);
+    return std::exchange(checkedNow, {});
 }
 
 Luau::FrontendOptions ALLuauFrontend::autocompleteOptions() const
@@ -113,6 +125,7 @@ Luau::FrontendOptions ALLuauFrontend::autocompleteOptions() const
     Luau::FrontendOptions options = limited();
     options.runLintChecks         = false;
     options.forAutocomplete       = true;
+    options.customModuleCheck     = nullptr;
     return options;
 }
 
