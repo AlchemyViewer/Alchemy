@@ -101,6 +101,15 @@ public:
     std::vector<Listed> filesUnder(const std::string& folder, const std::vector<std::string>& extensions, int depth, size_t entries,
                                    size_t files) const;
 
+    // The scripts of a language under each of `folders` -- SLua's .luau and
+    // .lua, LSL's .lsl and its includes' .lslh and .lsli -- each folder
+    // blessed for the look and listed as filesUnder lists it, `depth`
+    // folders down, each script once where it stands: no more than `most`
+    // in all. For a look across a scripter's scripts on disk, given only
+    // folders a script may read from: the scripter's own, what their
+    // configurations bless, the studio's aliases.
+    static std::vector<std::string> scriptsUnder(const std::vector<std::string>& folders, bool lua, int depth, size_t most);
+
     // An ordinary file of at most MAX_BYTES, read whole; false for
     // anything else, and for one that grew past the limit while it was
     // being read. Which files may be read at all is `admits`'s to say;

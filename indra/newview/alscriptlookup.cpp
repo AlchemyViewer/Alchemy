@@ -26,6 +26,8 @@
 
 #include "alscriptlookup.h"
 
+#include "aldiskincludes.h"
+#include "alincludeidentity.h"
 #include "alscriptlexicon.h"
 #include "alscriptnavigation.h"
 #include "alscriptstudioanalysis.h"
@@ -35,7 +37,10 @@
 #include "alscriptstudiotabs.h"
 #include "alscriptstudioviewer.h"
 #include "alscriptstudiowords.h"
+#include "fsyspath.h"
 #include "llinventorytype.h"
+
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
 #include <map>
@@ -201,11 +206,23 @@ void ALScriptLookup::start(Doc& doc, ALEditorCommand command, const ALScriptRefe
             // And every file on disk open here in the language, which no
             // object or folder lists: a module a script requires is one,
             // and so, often, are the scripts that require it.
+            boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> listed{ doc->id };
             for (const Doc* open : mServices.openDocs())
             {
                 if (open != doc && open->loaded && !open->notecard && !open->file.empty() && open->language.lua == doc->language.lua)
                 {
                     found.scripts.push_back({ ALScriptRef(), open->name, open->id });
+                    listed.insert(open->id);
+                }
+            }
+            // And those on disk under the folders a script reads from, open
+            // here or not: a script requiring the module may be any of them.
+            for (const std::string& file : mWindow.diskCandidates(*doc))
+            {
+                const std::string path = ALIncludeIdentity::ofFile(file);
+                if (listed.insert(path).second)
+                {
+                    found.scripts.push_back({ ALScriptRef(), fsyspath(fsyspath(file).filename()).string(), path, true });
                 }
             }
             doc->lookup->unlisted = found.unlisted;
@@ -295,6 +312,19 @@ void ALScriptLookup::begin(Doc& doc, U32 generation, const Candidate& candidate)
     }
     if (!candidate.path.empty())
     {
+        // A file under a folder a script reads from, read as it is on disk;
+        // one only open here, which has closed, passed over.
+        std::string file;
+        std::string text;
+        if (candidate.onDisk && ALIncludeIdentity::fileOf(candidate.path, file) && ALDiskIncludes::readOrdinary(file, text))
+        {
+            this->candidate(id, generation, candidate, LLUUID::null, std::make_shared<const std::string>(std::move(text)));
+            return;
+        }
+        if (candidate.onDisk)
+        {
+            doc.lookup->unread.push_back(candidate.name);
+        }
         --doc.lookup->pending;
         passed(doc);
         return;

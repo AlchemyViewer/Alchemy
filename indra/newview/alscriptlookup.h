@@ -104,6 +104,10 @@ public:
         ALScriptRef ref;
         std::string name;
         std::string path;
+        // A file on disk under a folder a script reads from, read from
+        // there where no tab has it open; one open here is read only as
+        // its tab has it.
+        bool        onDisk = false;
     };
     // All of them, and how many of the object's prims did not say what
     // they hold, whose scripts are not among them.
@@ -125,6 +129,11 @@ public:
         // holds -- a large linkset's folded ones among them; of an
         // inventory script's folder, for one, at once.
         virtual void candidates(const Doc& doc, std::function<void(Candidates)> told) = 0;
+        // The scripts of a tab's language on disk under the folders a script
+        // reads from -- the scripter's include folders, what their
+        // configurations bless, the studio's aliases -- each by its path:
+        // any of them may require a module there, or include it.
+        virtual std::vector<std::string> diskCandidates(const Doc& doc) { return {}; }
         // A script's text as the region has it, its author's source out of
         // any envelope, and its asset; nothing where it could not be read.
         virtual void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::optional<std::string>& source)> loaded) = 0;

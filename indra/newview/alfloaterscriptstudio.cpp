@@ -4585,6 +4585,31 @@ void ALFloaterScriptStudio::candidates(const Doc& doc, std::function<void(ALScri
     });
 }
 
+std::vector<std::string> ALFloaterScriptStudio::diskCandidates(const Doc& doc)
+{
+    // How far down each folder, and how many scripts in all, a lookup reads
+    // from disk: a scripter's include folder may be a large one.
+    constexpr S32    DISK_DEPTH   = 6;
+    constexpr size_t DISK_SCRIPTS = 300;
+    if (doc.notecard)
+    {
+        return {};
+    }
+    std::vector<std::string> folders;
+    for (const auto& [prefix, folder] : ALScriptPreprocessor::instance().moduleFolders(mChecking.preprocessRequest(doc, /*with_source*/ false)))
+    {
+        folders.push_back(folder);
+    }
+    if (doc.language.lua)
+    {
+        for (const ALScriptPreprocessor::StudioAlias& alias : ALScriptPreprocessor::studioAliases())
+        {
+            folders.push_back(alias.folder);
+        }
+    }
+    return ALDiskIncludes::scriptsUnder(folders, doc.language.lua, DISK_DEPTH, DISK_SCRIPTS);
+}
+
 void ALFloaterScriptStudio::loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::optional<std::string>& source)> loaded)
 {
     ALScriptWorkspace::instance().load(ref, [loaded = std::move(loaded)](const ALScriptLoaded& answer) {

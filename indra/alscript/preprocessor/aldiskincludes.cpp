@@ -31,6 +31,9 @@
 
 #include "fsyspath.h"
 #include "llsdjson.h"
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -187,6 +190,38 @@ std::optional<std::string> ALDiskIncludes::admits(const std::string& file) const
         }
     }
     return std::nullopt;
+}
+
+// static
+std::vector<std::string> ALDiskIncludes::scriptsUnder(const std::vector<std::string>& folders, bool lua, int depth, size_t most)
+{
+    // Looked at past what is found: a folder of other things holds more
+    // than its scripts.
+    constexpr size_t ENTRIES_PER_FOUND = 16;
+    static const std::vector<std::string> LUA{ ".luau", ".lua" };
+    static const std::vector<std::string> LSL{ ".lsl", ".lslh", ".lsli" };
+    ALDiskIncludes blessed;
+    for (const std::string& folder : folders)
+    {
+        blessed.bless(folder);
+    }
+    std::vector<std::string>                                                  out;
+    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> seen;
+    for (const std::string& folder : folders)
+    {
+        if (out.size() >= most)
+        {
+            break;
+        }
+        for (const Listed& listed : blessed.filesUnder(folder, lua ? LUA : LSL, depth, most * ENTRIES_PER_FOUND, most - out.size()))
+        {
+            if (seen.insert(listed.file).second)
+            {
+                out.push_back(listed.file);
+            }
+        }
+    }
+    return out;
 }
 
 std::vector<ALDiskIncludes::Listed> ALDiskIncludes::filesUnder(const std::string& folder, const std::vector<std::string>& extensions, int depth,

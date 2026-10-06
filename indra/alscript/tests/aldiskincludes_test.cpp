@@ -337,4 +337,39 @@ namespace tut
 #endif
         ensure("nor a name no folder has", blessed.atTop(".lslrc").empty());
     }
+
+    template<> template<>
+    void aldiskincludes_object::test<8>()
+    {
+        set_test_name("the scripts of a language under folders: each folder blessed for the look, each script once, no more than asked, nothing outside");
+        Scratch s;
+        s.write("lib/util.luau", "return {}\n");
+        s.write("lib/old.lua", "return {}\n");
+        s.write("lib/net/http.luau", "return {}\n");
+        s.write("lib/door.lsl", "default {}\n");
+        s.write("lib/door.lslh", "integer x;\n");
+        s.write("lib/notes.txt", "words\n");
+        s.write("tools/t.luau", "return {}\n");
+        s.write("elsewhere/secret.luau", "return {}\n");
+        const auto names = [&s](std::vector<std::string> found) {
+            std::sort(found.begin(), found.end());
+            std::string said;
+            for (const std::string& one : found)
+            {
+                said += (said.empty() ? "" : " ") + fsyspath(fs::relative(fsyspath(one), fsyspath(s.at("")))).generic_string();
+            }
+            return said;
+        };
+        ensure_equals("SLua's, both folders, through their folders",
+                      names(ALDiskIncludes::scriptsUnder({ s.at("lib"), s.at("tools") }, true, 4, 100)),
+                      std::string("lib/net/http.luau lib/old.lua lib/util.luau tools/t.luau"));
+        ensure_equals("LSL's and its includes'", names(ALDiskIncludes::scriptsUnder({ s.at("lib") }, false, 4, 100)),
+                      std::string("lib/door.lsl lib/door.lslh"));
+        ensure_equals("a folder given twice, or under another, each once",
+                      ALDiskIncludes::scriptsUnder({ s.at("lib"), s.at("lib/net"), s.at("lib") }, true, 4, 100).size(), size_t(3));
+        ensure_equals("no more than asked", ALDiskIncludes::scriptsUnder({ s.at("lib"), s.at("tools") }, true, 4, 2).size(), size_t(2));
+        ensure_equals("not deeper than asked", names(ALDiskIncludes::scriptsUnder({ s.at("lib") }, true, 0, 100)),
+                      std::string("lib/old.lua lib/util.luau"));
+        ensure("nothing of a folder not there", ALDiskIncludes::scriptsUnder({ s.at("nowhere") }, true, 4, 100).empty());
+    }
 }

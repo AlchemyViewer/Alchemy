@@ -821,6 +821,7 @@ private:
     // popover over the window, with a row saying what return will do as
     // it is typed.
     void candidates(const Doc& doc, std::function<void(ALScriptLookup::Candidates)> told) override;
+    std::vector<std::string> diskCandidates(const Doc& doc) override;
     void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::optional<std::string>& source)> loaded) override;
     void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> expanded) override;
     void showFound(Doc& doc, const ALScriptLookup::Found& found) override;
