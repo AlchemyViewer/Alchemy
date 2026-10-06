@@ -152,6 +152,21 @@ namespace
             return NavigateResult::Success;
         }
 
+        // An alias no configuration names: Script Studio's own, a folder
+        // on disk the scripter named.
+        NavigateResult toAliasFallback(const std::string& alias_in) override
+        {
+            std::string alias = alias_in;
+            std::transform(alias.begin(), alias.end(), alias.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            std::string folder;
+            if (!known(mPlaces.studioAlias(alias, folder)))
+            {
+                return NavigateResult::NotFound;
+            }
+            mAt = Position{ folder, std::nullopt };
+            return NavigateResult::Success;
+        }
+
         ConfigStatus getConfigStatus() const override
         {
             if (mAt.name)

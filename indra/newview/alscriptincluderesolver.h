@@ -108,6 +108,8 @@ private:
     // The include folders as the setting holds them, read once each time
     // the settings that decide the disk move; and how often they have.
     const std::vector<std::string>& ownIncludeFolders();
+    // The SLua aliases the studio names, read once likewise.
+    const std::vector<ALScriptPreprocessor::StudioAlias>& studioAliases();
     U32                             diskGeneration();
     // Every script and notecard of a name in the inventory.
     LLInventoryModel::item_array_t namedItems(const std::string& name);
@@ -117,6 +119,7 @@ private:
     ALIncludeSearch    mSearch;
     U32                                             mDiskGeneration = 1;
     std::optional<std::vector<std::string>>         mOwnFolders;
+    std::optional<std::vector<ALScriptPreprocessor::StudioAlias>> mStudioAliases;
     std::vector<boost::signals2::scoped_connection> mDiskSettings;
     // What each prim was last said to hold.
     boost::unordered_flat_map<LLUUID, std::vector<ALScriptContents::Item>> mContents;

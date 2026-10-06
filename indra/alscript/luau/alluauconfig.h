@@ -88,4 +88,11 @@ struct ALLuauConfig
     static bool aliasOf(std::string_view name, std::string& alias, std::string& rest);
     // Whether a path is absolute: from a root, on any platform.
     static bool absolute(std::string_view path);
+    // Whether a name may be one of Script Studio's own aliases: as Luau
+    // takes an alias's name, and neither `self`, which is Luau's, nor
+    // `sl-*`, which is Second Life's. And a folder's name made one: lower
+    // case, what Luau does not take put as `-`, and a number after it
+    // where `taken` has it in any case.
+    static bool        studioAliasName(std::string_view name);
+    static std::string studioAliasFor(std::string_view folder_name, const std::vector<std::string>& taken);
 };

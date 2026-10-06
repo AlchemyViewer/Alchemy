@@ -153,6 +153,17 @@ public:
     // setting holds them one to a line; and them put back.
     static std::vector<std::string> includeFolders();
     static void                     setIncludeFolders(const std::vector<std::string>& folders);
+    // The SLua aliases the studio names (LA22): each name as a require
+    // says it after the @ (ALLuauConfig::studioAliasName), and the folder
+    // on disk it stands for, in order, as the setting holds them one to a
+    // line; and them put back.
+    struct StudioAlias
+    {
+        std::string name;
+        std::string folder;
+    };
+    static std::vector<StudioAlias> studioAliases();
+    static void                     setStudioAliases(const std::vector<StudioAlias>& aliases);
     // The configuration fetched where it is in the world and not in hand,
     // and `fetched` called once it is; nothing where it is in hand, or
     // there is none.

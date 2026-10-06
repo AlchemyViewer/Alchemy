@@ -278,6 +278,46 @@ bool ALLuauConfig::parseChain(const std::vector<std::string_view>& nearest_first
 }
 
 // static
+bool ALLuauConfig::studioAliasName(std::string_view name)
+{
+    std::string lower(name);
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (lower.empty() || lower == "self" || lower.compare(0, 3, "sl-") == 0 || !Luau::isValidAlias(lower) || lower.front() == '@')
+    {
+        return false;
+    }
+    return true;
+}
+
+// static
+std::string ALLuauConfig::studioAliasFor(std::string_view folder_name, const std::vector<std::string>& taken)
+{
+    std::string name;
+    for (const char c : folder_name)
+    {
+        const bool kept = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.';
+        name += kept ? static_cast<char>(std::tolower(static_cast<unsigned char>(c))) : '-';
+    }
+    if (!studioAliasName(name))
+    {
+        name = "lib";
+    }
+    const auto is_taken = [&taken](const std::string& one) {
+        return std::any_of(taken.begin(), taken.end(), [&one](const std::string& other) {
+            return other.size() == one.size() && std::equal(other.begin(), other.end(), one.begin(), [](char a, char b) {
+                       return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+                   });
+        });
+    };
+    std::string out = name;
+    for (int count = 2; is_taken(out); ++count)
+    {
+        out = name + std::to_string(count);
+    }
+    return out;
+}
+
+// static
 bool ALLuauConfig::aliasOf(std::string_view name, std::string& alias, std::string& rest)
 {
     if (name.empty() || name.front() != '@')

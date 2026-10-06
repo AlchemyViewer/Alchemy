@@ -194,6 +194,7 @@ if(AL_BUILD_VIEWER)
     alscriptinventoryindex.cpp
     alscriptkeymap.cpp
     alscriptkeypresets.cpp
+    alpanelscriptaliases.cpp
     alpanelscriptkeymap.cpp
     alscriptlookup.cpp
     alscriptobjectcheck.cpp
@@ -1045,6 +1046,7 @@ if(AL_BUILD_VIEWER)
     alscriptjobqueue.h
     alscriptkeymap.h
     alscriptkeypresets.h
+    alpanelscriptaliases.h
     alpanelscriptkeymap.h
     alscriptlookup.h
     alscriptobjectcheck.h

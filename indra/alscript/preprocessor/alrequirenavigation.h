@@ -78,6 +78,9 @@ public:
     // scripter's include folder, which governs a script in the world, that
     // folder. Pending where its text is on its way.
     virtual Known config(const std::string& folder, std::string& text, bool& on_disk, std::string& base) = 0;
+    // The folder a studio alias stands for, where no configuration names
+    // the alias (LA22): Script Studio's own, by the name in lower case.
+    virtual Known studioAlias(const std::string& alias, std::string& folder) = 0;
     // An alias of the configuration of `config_folder`, which is on disk,
     // has reached a folder: blessed for the run where the configuration
     // may bless it (ALDiskIncludes::blessFromConfig).
@@ -88,7 +91,8 @@ public:
 // own navigator (Luau::Require::Navigator) over a source of places:
 // relative to the file asking, a folder's init included; aliases through
 // the nearest `.luaurc` that names them, an alias naming another followed,
-// a cycle an error; `@self` the module's own folder; no search.
+// a cycle an error, then Script Studio's own; `@self` the module's own
+// folder; no search.
 namespace ALRequireNavigation
 {
     // What a walk found: the files a require stands for, in the order

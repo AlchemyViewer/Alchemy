@@ -327,6 +327,23 @@ public:
         return found == ALPreprocessor::Found::Yes ? Known::Yes : found == ALPreprocessor::Found::Pending ? Known::Pending : Known::No;
     }
 
+    Known studioAlias(const std::string& alias, std::string& folder) override
+    {
+        if (!mWhere.disk)
+        {
+            return Known::No;
+        }
+        for (const auto& [name, path] : mWhere.aliases)
+        {
+            if (name == alias && isFolder(path))
+            {
+                folder = std::string(DISK_FOLDER) + path;
+                return Known::Yes;
+            }
+        }
+        return Known::No;
+    }
+
     void aliasReached(const std::string& config_folder, const std::string& folder) override
     {
         std::string config_dir, dir;
@@ -692,8 +709,13 @@ ALPreprocessor::Found ALIncludeSearch::resolveRequire(const ALPreprocessor::Ask&
         if (!file.file.empty())
         {
             // A file on disk only where a folder blessed admits it, the
-            // aliases' among them.
-            const std::optional<std::string> real = mDisk.admits(blessedFor(ask, asking, where, alias_folders), file.file);
+            // aliases' among them: a `.luaurc`'s, and the studio's own.
+            std::vector<std::string> blessing = alias_folders;
+            for (const auto& [name, folder] : where.aliases)
+            {
+                blessing.push_back(folder);
+            }
+            const std::optional<std::string> real = mDisk.admits(blessedFor(ask, asking, where, blessing), file.file);
             if (!real)
             {
                 continue;

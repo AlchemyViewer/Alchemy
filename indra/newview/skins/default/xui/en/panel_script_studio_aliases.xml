@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- Script Studio's SLua aliases, on the Build tab of its preferences:
+     each a name a require says after the @, and a folder on disk it
+     stands for, which naming it lets a require read. -->
+<panel
+ follows="left|top"
+ height="104"
+ layout="topleft"
+ name="aliases_panel"
+ width="370">
+    <panel.string name="NoAlias">No aliases. Use Add... to name a folder.</panel.string>
+    <panel.string name="NameTaken">'[NAME]' is already an alias.</panel.string>
+    <panel.string name="NameBad">An alias's name is letters, digits, - _ and . -- not self, and not starting sl-.</panel.string>
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="20"
+     name="aliases_label"
+     tool_tip="A SLua script reaches a library on disk through an alias: require(&quot;@name/module&quot;) reads module from the alias's folder, where no .luaurc names the alias. A script in an object reaches a library on disk only this way."
+     top="0"
+     width="350">
+        SLua aliases: require("@name/x") reads x from the folder
+    </text>
+    <pane_list
+     column_padding="0"
+     draw_heading="false"
+     follows="left|top"
+     height="54"
+     layout="topleft"
+     left="20"
+     multi_select="false"
+     name="aliases"
+     tool_tip="Each alias's name and its folder"
+     top_pad="4"
+     width="260">
+        <pane_list.columns name="alias" width="70" />
+        <pane_list.columns dynamic_width="true" name="folder" />
+    </pane_list>
+    <button
+     follows="left|top"
+     height="22"
+     label="Add..."
+     layout="topleft"
+     left_pad="6"
+     name="add_alias"
+     tool_tip="Name a folder as an alias, after the folder's own name"
+     top_delta="0"
+     width="70" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Remove"
+     layout="topleft"
+     left_delta="0"
+     name="remove_alias"
+     tool_tip="Stop naming the selected folder"
+     top_pad="4"
+     width="70" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="20"
+     name="name_label"
+     top="80"
+     width="44">
+        Name:
+    </text>
+    <line_editor
+     follows="left|top"
+     height="20"
+     layout="topleft"
+     left_pad="4"
+     max_length_bytes="64"
+     name="alias_name"
+     tool_tip="The selected alias's name: type another and press Return"
+     top_delta="-2"
+     width="120" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left_pad="6"
+     name="said"
+     top_delta="2"
+     width="170" />
+</panel>

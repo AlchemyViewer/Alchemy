@@ -658,4 +658,47 @@ namespace tut
         ensure("an object has no folder above", search.resolve(ask("../helper", true, script.path), got, in_object, on, nullptr, false, &aliases) ==
                                                     ALPreprocessor::Found::No);
     }
+
+    template<> template<>
+    void alincludesearch_object::test<10>()
+    {
+        set_test_name("studio aliases: a script in an object reaches a library on disk through one, world includes off; a project's own .luaurc wins; naming blesses only for a require");
+        Scratch           s;
+        const std::string util   = s.write("library/util.luau", "return 'util'\n");
+        const std::string helper = s.write("library/helper.lsl", "integer helper;\n");
+        s.write("project/.luaurc", "{\"aliases\": {\"shared\": \"./own_shared\"}}");
+        const std::string own    = s.write("project/own_shared/util.luau", "return 'own'\n");
+        const std::string script = s.write("project/main.luau", "return require('@shared/util')\n");
+        s.write("inc/empty.lsl", "\n");
+
+        ALIncludeSearch::Where disk = where(false, true, { s.at("inc") });
+        disk.aliases                = { { "lib", s.at("library") }, { "shared", s.at("library") } };
+        const ALIncludeSearch::Asking in_object = asking(true);
+        const auto found = [&](const std::string& name, const ALIncludeSearch::Asking& who, const ALIncludeSearch::Where& in) {
+            ALPreprocessor::Include  include;
+            std::vector<std::string> aliases;
+            return search.resolve(ask(name, true, who.self), include, who, in, nullptr, false, &aliases) == ALPreprocessor::Found::Yes ? include.path
+                                                                                                                                       : std::string();
+        };
+        ensure_equals("an object's script, through the studio's alias", found("@lib/util", in_object, disk), ALIncludeIdentity::ofFile(util));
+        ensure_equals("in any case", found("@LIB/util", in_object, disk), ALIncludeIdentity::ofFile(util));
+        ensure_equals("one nobody named", found("@other/util", in_object, disk), std::string());
+        ALIncludeSearch::Where unnamed = disk;
+        unnamed.aliases.clear();
+        ensure_equals("unnamed: not read, the folder blessed by nothing", found("@lib/util", in_object, unnamed), std::string());
+        ALIncludeSearch::Where off = disk;
+        off.disk                   = false;
+        ensure_equals("the disk off: nothing", found("@lib/util", in_object, off), std::string());
+
+        // A project's own `.luaurc` names the alias first.
+        const ALIncludeSearch::Asking from_disk{ ALIncludeIdentity::ofFile(script), true };
+        ensure_equals("the project's own alias", found("@shared/util", from_disk, disk), ALIncludeIdentity::ofFile(own));
+        ensure_equals("where it names none, the studio's", found("@shared/util", in_object, disk), ALIncludeIdentity::ofFile(util));
+
+        // Naming blesses the folder for a require, and adds nothing to an
+        // include's search.
+        ALPreprocessor::Include include;
+        ensure("an LSL include does not search an alias's folder",
+               search.resolve(ask("helper.lsl"), include, asking(), disk, nullptr, false) == ALPreprocessor::Found::No);
+    }
 }

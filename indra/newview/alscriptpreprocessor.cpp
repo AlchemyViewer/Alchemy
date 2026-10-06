@@ -272,6 +272,44 @@ void ALScriptPreprocessor::setIncludeFolders(const std::vector<std::string>& fol
 }
 
 // static
+std::vector<ALScriptPreprocessor::StudioAlias> ALScriptPreprocessor::studioAliases()
+{
+    // One to a line, `name=folder`; the first of a name kept.
+    std::vector<StudioAlias> aliases;
+    std::istringstream       lines(gSavedSettings.getString("ALScriptSLuaAliases"));
+    for (std::string line; std::getline(lines, line);)
+    {
+        const size_t equals = line.find('=');
+        if (equals == std::string::npos)
+        {
+            continue;
+        }
+        StudioAlias one{ line.substr(0, equals), line.substr(equals + 1) };
+        LLStringUtil::trim(one.name);
+        LLStringUtil::trim(one.folder);
+        const bool taken = std::any_of(aliases.begin(), aliases.end(), [&one](const StudioAlias& other) {
+            return LLStringUtil::compareInsensitive(other.name, one.name) == 0;
+        });
+        if (ALLuauConfig::studioAliasName(one.name) && !one.folder.empty() && !taken)
+        {
+            aliases.push_back(std::move(one));
+        }
+    }
+    return aliases;
+}
+
+// static
+void ALScriptPreprocessor::setStudioAliases(const std::vector<StudioAlias>& aliases)
+{
+    std::string joined;
+    for (const StudioAlias& alias : aliases)
+    {
+        joined += (joined.empty() ? "" : "\n") + alias.name + "=" + alias.folder;
+    }
+    gSavedSettings.setString("ALScriptSLuaAliases", joined);
+}
+
+// static
 std::string ALScriptPreprocessor::keyOf(const Request& request)
 {
     return request.path.empty() ? pathOf(request.ref) : request.path;

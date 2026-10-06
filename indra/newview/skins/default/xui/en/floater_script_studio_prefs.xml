@@ -882,7 +882,7 @@ end</floater.string>
              left="32"
              multi_select="false"
              name="include_folders"
-             tool_tip="Folders searched for includes, top first"
+             tool_tip="Folders an #include is searched for in, top first; a SLua script on disk in one may require what is beside it"
              top_pad="4"
              width="260">
                 <pane_list.columns dynamic_width="true" name="folder" />
@@ -907,6 +907,16 @@ end</floater.string>
              tool_tip="Stop searching the selected folder"
              top_pad="4"
              width="70" />
+            <panel
+             class="al_panel_script_aliases"
+             filename="panel_script_studio_aliases.xml"
+             follows="left|top"
+             height="104"
+             layout="topleft"
+             left="12"
+             name="aliases_panel"
+             top_pad="10"
+             width="370" />
             <text
              follows="left|top"
              height="16"

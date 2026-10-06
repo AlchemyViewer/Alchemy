@@ -101,13 +101,14 @@ U32 ALScriptIncludeResolver::diskGeneration()
     // switch and the folders.
     if (mDiskSettings.empty())
     {
-        for (const char* name : { "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder" })
+        for (const char* name : { "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptSLuaAliases" })
         {
             if (LLControlVariable* control = gSavedSettings.getControl(name))
             {
                 mDiskSettings.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) {
                     ++mDiskGeneration;
                     mOwnFolders.reset();
+                    mStudioAliases.reset();
                 }));
             }
         }
@@ -125,6 +126,16 @@ const std::vector<std::string>& ALScriptIncludeResolver::ownIncludeFolders()
     return *mOwnFolders;
 }
 
+const std::vector<ALScriptPreprocessor::StudioAlias>& ALScriptIncludeResolver::studioAliases()
+{
+    diskGeneration();
+    if (!mStudioAliases)
+    {
+        mStudioAliases = ALScriptPreprocessor::studioAliases();
+    }
+    return *mStudioAliases;
+}
+
 ALIncludeSearch::Where ALScriptIncludeResolver::where()
 {
     static LLCachedControl<std::string> order(gSavedSettings, "ALScriptPreprocIncludeOrder", "inventory object disk");
@@ -138,6 +149,12 @@ ALIncludeSearch::Where ALScriptIncludeResolver::where()
     where.world      = ALScriptPreprocessor::worldIncludes();
     where.disk       = disk;
     where.folders    = ownIncludeFolders();
+    for (const ALScriptPreprocessor::StudioAlias& alias : studioAliases())
+    {
+        std::string name = alias.name;
+        LLStringUtil::toLower(name);
+        where.aliases.emplace_back(std::move(name), alias.folder);
+    }
     where.generation = diskGeneration();
     where.now        = LLTimer::getTotalSeconds();
     return where;

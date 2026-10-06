@@ -288,10 +288,21 @@
             <key>Value</key>
             <string></string>
         </map>
+        <key>ALScriptSLuaAliases</key>
+        <map>
+            <key>Comment</key>
+            <string>SLua aliases Script Studio names, one to a line as name=folder: require("@name/x") reads x from the folder on disk, where no .luaurc names the alias. Naming a folder lets a require read it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string></string>
+        </map>
         <key>ALScriptPreprocDiskIncludes</key>
         <map>
             <key>Comment</key>
-            <string>The preprocessor resolves #include from a folder on disk as well as from inventory and the object.</string>
+            <string>The preprocessor reads files on disk: #include from the include folders, and a SLua require from the folders its .luaurc or the SLua aliases name. Off, nothing on disk.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -302,7 +313,7 @@
         <key>ALScriptPreprocWorldIncludes</key>
         <map>
             <key>Comment</key>
-            <string>The preprocessor resolves #include and require from the object holding the script and from the agent's inventory. Off, only folders on disk are looked in.</string>
+            <string>The preprocessor resolves #include and require from the object holding the script and from the agent's inventory: for SLua, a require relative to a script in the world, and a .luaurc notecard or item. Off, only folders on disk are looked in, and a script in the world reaches them through a SLua alias.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -324,7 +335,7 @@
         <key>ALScriptPreprocIncludeOrder</key>
         <map>
             <key>Comment</key>
-            <string>Where the preprocessor looks for an include, in order: any of inventory, object and disk.</string>
+            <string>Where the preprocessor looks for an LSL #include, or a SLua --#include, in order: any of inventory, object and disk. A SLua require does not search.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

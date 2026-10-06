@@ -70,6 +70,16 @@ namespace tut
         ensure("absolute on posix", ALLuauConfig::absolute("/opt/lua"));
         ensure("absolute on windows", ALLuauConfig::absolute("C:\\lua") && ALLuauConfig::absolute("c:/lua"));
         ensure("relative", !ALLuauConfig::absolute("./lib") && !ALLuauConfig::absolute("lib"));
+
+        // Script Studio's own aliases: what Luau takes, not self, not sl-*.
+        ensure("a studio alias's name", ALLuauConfig::studioAliasName("lib") && ALLuauConfig::studioAliasName("My_Lib-2.x"));
+        ensure("not self, in any case", !ALLuauConfig::studioAliasName("self") && !ALLuauConfig::studioAliasName("Self"));
+        ensure("not sl-*", !ALLuauConfig::studioAliasName("sl-std") && !ALLuauConfig::studioAliasName("SL-x"));
+        ensure("nothing Luau refuses", !ALLuauConfig::studioAliasName("") && !ALLuauConfig::studioAliasName("a/b") &&
+                                           !ALLuauConfig::studioAliasName("a b") && !ALLuauConfig::studioAliasName(".."));
+        ensure_equals("a folder's name made one", ALLuauConfig::studioAliasFor("My Library", {}), std::string("my-library"));
+        ensure_equals("a number where it is taken, in any case", ALLuauConfig::studioAliasFor("lib", { "LIB", "lib2" }), std::string("lib3"));
+        ensure_equals("one that cannot be: lib", ALLuauConfig::studioAliasFor("self", {}), std::string("lib"));
     }
     template<> template<>
     void alluauconfig_object::test<3>()
