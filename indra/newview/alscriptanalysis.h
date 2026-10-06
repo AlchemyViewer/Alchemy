@@ -137,7 +137,12 @@ public:
         // What a text declares, from its parse alone and with no types
         // (ALLuauService::shape, or LSL's outline): a comparison's texts,
         // which need be no tab's, and whose functions it pairs.
-        Shape
+        Shape,
+        // No question: what an SLua fragment is checked against made the
+        // text's (ALLuauService::warm), once the front tab's check has
+        // landed, so the next keystroke starts from the text as it settled.
+        // Asked by the thread itself, and answered to nobody.
+        Warm
     };
     struct Request
     {
@@ -179,7 +184,8 @@ public:
         };
         Weighing    weighing = Weighing::Text;
         // Whether it is about the tab in front: its questions go before
-        // anything else, then its check; then weighing; then the rest.
+        // anything else, then its check, then its warm job; then weighing;
+        // then the rest.
         bool        front = false;
         // The lines of the text nobody reads the names, hints and fixes of:
         // what an include put into an expansion (ALSourceMap::othersLines).
@@ -285,6 +291,12 @@ private:
         std::function<void()>       engineWork;
         std::function<void()>       engineDone;
     };
+    // Where a question waits: under its script and its kind -- and, for a
+    // weigh, which of its weighs. And how soon it goes, lower first: the
+    // front tab's questions, which someone is waiting on; its check; its
+    // warm job; weighing; everything else -- background tabs, lookups.
+    static std::string keyOf(const Request& request);
+    static U8          rankOf(const Request& request);
     // Takes the next job and runs it, on the worker: one is posted for
     // every question asked, and one that finds nothing waiting -- its
     // question replaced by a later one -- does nothing.

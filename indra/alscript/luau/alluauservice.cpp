@@ -1689,6 +1689,15 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     return problems;
 }
 
+void ALLuauService::warm(std::string_view source)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    if (mFrontend->solver == Luau::SolverMode::Old)
+    {
+        mFrontend->queried(source, /*completion*/ true);
+    }
+}
+
 // --- what could go here ---------------------------------------------------------
 
 std::vector<ALScriptCompletion> ALLuauService::complete(std::string_view source, S32 line, S32 column)

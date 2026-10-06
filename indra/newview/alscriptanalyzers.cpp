@@ -158,6 +158,9 @@ void ALLSLAnalyzer::answer(const Request& request, const std::string& text, cons
             // the tab is left be.
             result.outline = mService.outline(text, false);
             break;
+        case Kind::Warm:
+            // SLua's alone.
+            break;
     }
     result.parsed     = mService.parsed();
     result.understood = mService.understood();
@@ -270,6 +273,9 @@ void ALLuauAnalyzer::answer(const Request& request, const std::string& text, con
             break;
         case Kind::Weigh:
             weigh(request, text, result);
+            break;
+        case Kind::Warm:
+            mService.warm(text);
             break;
         case Kind::Shape:
             break;

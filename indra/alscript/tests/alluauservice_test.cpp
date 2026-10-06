@@ -1461,4 +1461,36 @@ namespace tut
         service.setModules({});
         service.setDocument("");
     }
+
+    template<> template<>
+    void alluauservice_object::test<44>()
+    {
+        set_test_name("warming after a check makes what a fragment is checked against the text's, so the next keystroke checks nothing whole");
+        ensure("definitions loaded: " + error, loaded);
+        service.setFragments(true);
+        service.setDocument("warmed");
+        const std::string base = "local count: number = 1\n";
+        const std::string typed = base + "local n: number = co\n";
+        // A check alone leaves the old solver no module to patch: the
+        // keystroke after checks the whole script.
+        service.check(base);
+        size_t checks = service.typeChecks();
+        service.complete(typed, 1, 18);
+        ensure_equals("unwarmed", service.typeChecks() - checks, size_t(newSolver ? 0 : 1));
+
+        service.check(base);
+        checks = service.typeChecks();
+        service.warm(base);
+        ensure_equals("the old solver's autocomplete module checked; the new solver's check is it", service.typeChecks() - checks,
+                      size_t(newSolver ? 0 : 1));
+        service.warm(base);
+        ensure_equals("and not again for the same text", service.typeChecks() - checks, size_t(newSolver ? 0 : 1));
+        checks             = service.typeChecks();
+        const size_t parts = service.fragmentsChecked();
+        ensure("answered", offers(service.complete(typed, 1, 18), "count"));
+        ensure_equals("over its statement", service.fragmentsChecked() - parts, size_t(1));
+        ensure_equals("nothing whole", service.typeChecks(), checks);
+        service.setFragments(false);
+        service.setDocument("");
+    }
 }

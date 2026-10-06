@@ -110,21 +110,10 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
     refused.column  = request.column;
     const auto answer = std::make_shared<callback_t>(std::move(callback));
     job.callback      = answer;
-    // Waiting under the script and the kind of question -- and, for a
-    // weigh, which of its weighs -- in place of what waited there.
-    std::string key = request.id;
-    key += '\x1f';
-    key += static_cast<char>('0' + static_cast<int>(request.kind));
-    if (request.kind == Kind::Weigh)
-    {
-        key += static_cast<char>('0' + static_cast<int>(request.weighing));
-    }
-    // By rank: the front tab's questions, which someone is waiting on, then
-    // its check; weighing; everything else -- background tabs, lookups.
-    const U8 rank = request.kind == Kind::Weigh    ? 2
-                    : !request.front                ? 3
-                    : request.kind == Kind::Check   ? 1
-                                                    : 0;
+    // Waiting under the script and the kind of question, in place of what
+    // waited there.
+    const std::string key     = keyOf(request);
+    const U8          rank    = rankOf(request);
     const std::string id      = request.id;
     const U32         version = request.version;
     job.request               = std::move(request);
@@ -144,6 +133,29 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
         }
         LLAppViewer::instance()->postToMainCoro([refused = std::move(refused), answer]() { (*answer)(refused); });
     }
+}
+
+// static
+std::string ALScriptAnalysis::keyOf(const Request& request)
+{
+    std::string key = request.id;
+    key += '\x1f';
+    key += static_cast<char>('0' + static_cast<int>(request.kind));
+    if (request.kind == Kind::Weigh)
+    {
+        key += static_cast<char>('0' + static_cast<int>(request.weighing));
+    }
+    return key;
+}
+
+// static
+U8 ALScriptAnalysis::rankOf(const Request& request)
+{
+    return request.kind == Kind::Weigh   ? 3
+           : !request.front              ? 4
+           : request.kind == Kind::Warm  ? 2
+           : request.kind == Kind::Check ? 1
+                                         : 0;
 }
 
 void ALScriptAnalysis::runEngine(std::function<void()> work, std::function<void()> done)
@@ -238,6 +250,26 @@ void ALScriptAnalysis::runNext()
         // Stopped, or asked again while it ran: what was asked since
         // answers in its place.
         return;
+    }
+    const Request& asked = job.request;
+    if (asked.kind == Kind::Warm)
+    {
+        return;
+    }
+    // The front tab's SLua check landed: what the next keystroke's fragment
+    // is checked against made the text's, before it asks. Under the old
+    // solver only, where that is autocomplete's module, which no check
+    // makes; under the new the check's module is it.
+    if (asked.kind == Kind::Check && asked.lua && asked.front && job.fragments && !job.newSolver)
+    {
+        Job warm          = job;
+        warm.callback     = nullptr;
+        warm.request.kind = Kind::Warm;
+        {
+            const std::lock_guard<std::mutex> lock(mQueueMutex);
+            mQueue.add(keyOf(warm.request), asked.id, asked.version, rankOf(warm.request), std::move(warm));
+        }
+        mThread->post([this]() { runNext(); });
     }
     const std::shared_ptr<callback_t> callback = job.callback;
     // The words in the viewer's language, on the main thread, where

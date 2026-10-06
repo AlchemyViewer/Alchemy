@@ -164,6 +164,13 @@ public:
     // and type errors, then the lints, each in the order it was found.
     ALScriptProblems check(std::string_view source);
 
+    // What a fragment is checked against, made the text's where it is not:
+    // autocomplete's module under the old solver, which a check does not
+    // make; under the new, the check's own module is it, and nothing is
+    // done. For the analysis thread to do once a check has landed, so that
+    // the next keystroke's fragment starts from the text as it settled.
+    void warm(std::string_view source);
+
     // What could go at a position of the script: the keywords, the
     // bindings in scope, the fields of what is being indexed; each with
     // whether it fits there and where a call's brackets go

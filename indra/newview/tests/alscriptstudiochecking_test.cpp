@@ -111,6 +111,7 @@ namespace
             case Kind::Actions:    return "actions";
             case Kind::Weigh:      return "weigh";
             case Kind::Shape:      return "shape";
+            case Kind::Warm:       return "warm";
         }
         return "?";
     }
