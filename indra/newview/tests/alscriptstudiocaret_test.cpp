@@ -519,4 +519,65 @@ namespace tut
         caret.answered(doc, result, ALTextPos(0, 8));
         ensure("an expansion of another text: none", studio.said.size() == 1 && services.statuses.back().find("NoDefinition") == 0);
     }
+
+    template<> template<>
+    void alscriptstudiocaret_object::test<10>()
+    {
+        set_test_name("a name's places in the modules the script requires, read apart: each back in its file, as the file reads where it is held, else as the module's text");
+        ALScriptStudioCaret& caret = make();
+        Doc&                 doc   = tab("a");
+        studio.expanded            = true;
+        doc.expanded.valid         = true;
+        doc.expanded.map.addFile("a", "object:a");
+        ALSourceMap::Segment segment;
+        segment.length = 60;
+        for (S32 line = 0; line < 2; ++line)
+        {
+            segment.outLine = segment.line = line;
+            doc.expanded.map.add(segment);
+        }
+        doc.expanded.map.finish();
+        // Two modules, each its own map over the same files.
+        const auto module_map = [&segment](const std::string& name, const std::string& path) {
+            ALSourceMap module;
+            module.addFile("a", "object:a");
+            module.addFile(name, path);
+            segment.file = 1;
+            for (S32 line = 0; line < 6; ++line)
+            {
+                segment.outLine = segment.line = line;
+                module.add(segment);
+            }
+            module.finish();
+            return module;
+        };
+        doc.expanded.moduleMaps.emplace_back("held", module_map("held.luau", "disk:/held.luau"));
+        doc.expanded.moduleMaps.emplace_back("other", module_map("other.luau", "disk:/other.luau"));
+        auto modules = std::make_shared<ALLuauService::Modules>();
+        modules->modules.push_back({ "other", "local util = require(\"held\")\nreturn util.count\n" });
+        doc.expanded.modules = modules;
+        studio.held          = "disk:/held.luau";
+
+        const U32 v          = ask(doc, ALEditorCommand::FindReferences);
+        doc.expanded.version = v;
+        ALScriptAnalysis::Result result     = references(v);
+        result.references.definition        = span(4, 8, 5);
+        result.references.definitionFile    = "held";
+        result.references.references        = { span(1, 26, 5) };
+        result.references.elsewhere         = { { "held", span(4, 8, 5) }, { "other", span(1, 12, 5) }, { "gone", span(0, 0, 5) } };
+        caret.answered(doc, result, ALTextPos(0, 8));
+        ensure_equals("declared in the held module", started(doc), "find in a declared disk:/held.luau@4 v" + std::to_string(v));
+        ensure_equals("the script's, each module's; none of a module not had", doc.lookup->places.size(), size_t(3));
+        const Doc::Place* held = placeIn(doc, "disk:/held.luau");
+        ensure("as the file reads", held && held->fileName == "held.luau" && held->text == "integer count; // held" && held->at == 6);
+        const Doc::Place* other = placeIn(doc, "disk:/other.luau");
+        ensure("as the module's text read, the name not placed", other && other->fileName == "other.luau" &&
+                                                                    other->text == "return util.count" && other->at == -1);
+        ensure("in the module's lines", other->span.line == 1 && other->span.column == 12);
+
+        doc.expanded.version = v + 1;
+        ask(doc, ALEditorCommand::FindReferences);
+        caret.answered(doc, result, ALTextPos(0, 8));
+        ensure_equals("an expansion of another text: the script's alone", doc.lookup->places.size(), size_t(1));
+    }
 }

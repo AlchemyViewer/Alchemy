@@ -96,11 +96,14 @@ public:
     typedef ALScriptStudioDoc            Doc;
     typedef ALScriptReferencesPane::Found Found;
 
-    // One of the object's other scripts a lookup may reach.
+    // One of the object's other scripts a lookup may reach; or a file on
+    // disk open in a tab, which no object or folder lists, by the path
+    // the preprocessor calls it -- its tab's id -- where it is no item.
     struct Candidate
     {
         ALScriptRef ref;
         std::string name;
+        std::string path;
     };
     // All of them, and how many of the object's prims did not say what
     // they hold, whose scripts are not among them.
@@ -210,12 +213,11 @@ private:
     // One of them done with, found in or passed over: the next begun, and
     // the lookup finished where it was the last.
     void passed(Doc& doc);
-    void candidate(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id,
-                   std::shared_ptr<const std::string> text);
-    void expanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
-                  const std::shared_ptr<const std::string>& source, const ALPreprocessor::Result& result);
-    void answered(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const ALSourceMap& map,
-                  const std::string& source, const std::shared_ptr<const std::string>& expanded, const ALScriptAnalysis::Result& result);
+    void candidate(const std::string& id, U32 generation, const Candidate& other, const LLUUID& asset_id, std::shared_ptr<const std::string> text);
+    void expanded(const std::string& id, U32 generation, const Candidate& other, const std::shared_ptr<const std::string>& source,
+                  const ALPreprocessor::Result& result);
+    void answered(const std::string& id, U32 generation, const Candidate& other, const ALSourceMap& map, const std::string& source,
+                  const std::shared_ptr<const std::string>& expanded, const ALScriptAnalysis::Result& result);
     void settled(Doc& doc);
     // What Return does with a name typed for a rename of `old_name`, found
     // at `count` places in `scripts` scripts, said.

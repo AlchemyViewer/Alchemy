@@ -833,4 +833,57 @@ namespace tut
         studio.changes(pb, { 2, 3 });
         ensure("changed since: said", studio.compared.size() == before && has(services.statuses.back(), "RenameChangesNotHere"));
     }
+
+    template<> template<>
+    void alscriptlookup_object::test<16>()
+    {
+        set_test_name("files on disk open here are looked through too, which no object lists: a module's field renamed in the script, the module and another script requiring it");
+        make();
+        const std::string LIB      = "disk:/s/lib.luau";
+        const std::string OTHER    = "disk:/s/b.luau";
+        const std::string LIB_TEXT = "local M = {}\nfunction M.twice(n) return n * 2 end\nreturn M\n";
+        const std::string B_LUA    = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
+        Doc& lib        = tab(LIB, ALScriptRef(), LIB_TEXT, "lib.luau");
+        lib.file        = "/s/lib.luau";
+        lib.language.lua = true;
+        Doc& other        = tab(OTHER, ALScriptRef(), B_LUA, "b.luau");
+        other.file        = "/s/b.luau";
+        other.language.lua = true;
+        Doc& lsl = tab("disk:/s/c.lsl", ALScriptRef(), "integer twice;\n", "c.lsl");
+        lsl.file = "/s/c.lsl";
+        Doc& doc          = tab("a", a, "local lib = require(\"./lib\")\nprint(lib.twice(2))\n", "A");
+        doc.language.lua  = true;
+        // Script A's own answer, its modules read apart: its place, and the
+        // module's declaration.
+        unit->start(doc, ALEditorCommand::Rename, refsOf("twice"), true, LIB, span(1, 11, 5),
+                    { place("", 1, 10), place(LIB, 1, 11, 5, "lib.luau") }, doc.editor->document().version());
+        ensure_equals("each open file of the language, as it stands in its tab", studio.expands.size(), size_t(2));
+        const ALScriptPreprocessor::Request& module = studio.expands[0].request;
+        ensure("the module, by its path, no item", module.path == LIB && module.ref.isNull() && module.name == "lib.luau" &&
+                                                       module.sourceText() == LIB_TEXT);
+        ensure("the other script", studio.expands[1].request.path == OTHER && studio.expands[1].request.sourceText() == B_LUA);
+
+        // The module read alone is the home itself; the other script has it
+        // ahead of its own lines.
+        studio.expands[0].expanded(expansion("lib.luau", LIB, LIB_TEXT));
+        studio.expands[1].expanded(expansion("b.luau", OTHER, B_LUA, "lib.luau", LIB, LIB_TEXT));
+        ensure_equals("both asked", studio.asks.size(), size_t(2));
+        ensure("the module at its declaration", studio.asks[0].request.line == 1 && studio.asks[0].request.column == 11 &&
+                                                    studio.asks[0].request.id == "lookup:a:" + LIB);
+        ensure("the other where the module's declaration went", studio.asks[1].request.line == 1 && studio.asks[1].request.column == 11);
+        studio.asks[0].answered(answer({ span(1, 11, 5) }));
+        studio.asks[1].answered(answer({ span(1, 11, 5), span(4, 10, 5) }));
+        ensure("asked for the new name", (bool)studio.chosen);
+        ensure_equals("each place once: the script's, the module's, the other's", doc.lookup->places.size(), size_t(3));
+        ensure("the other's, by its path", std::any_of(doc.lookup->places.begin(), doc.lookup->places.end(), [&](const Doc::Place& place) {
+                   return place.file == OTHER && place.fileName == "b.luau" && place.span.line == 1 && place.span.column == 10;
+               }));
+
+        studio.chosen("double");
+        ensure_equals("here", doc.editor->text(), std::string("local lib = require(\"./lib\")\nprint(lib.double(2))\n"));
+        ensure_equals("in the module", lib.editor->text(), std::string("local M = {}\nfunction M.double(n) return n * 2 end\nreturn M\n"));
+        ensure_equals("in the other script", other.editor->text(), std::string("local lib = require(\"./lib\")\nprint(lib.double(4))\n"));
+        ensure("each its own step", lib.editor->undoJournal().undoLabel() == "rename" && other.editor->undoJournal().undoLabel() == "rename");
+        ensure_equals("another language's file left alone", lsl.editor->text(), std::string("integer twice;\n"));
+    }
 }

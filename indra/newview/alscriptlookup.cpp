@@ -47,6 +47,21 @@ using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;
 
+namespace
+{
+    // What the preprocessor calls a tab's script: an item's path, or a
+    // file's on disk, which is the tab's id.
+    std::string pathOfScript(const ALScriptStudioDoc& doc)
+    {
+        return doc.file.empty() ? ALScriptPreprocessor::pathOf(doc.ref) : doc.id;
+    }
+    // And one of the lookup's other scripts.
+    std::string pathOfScript(const ALScriptLookup::Candidate& other)
+    {
+        return other.path.empty() ? ALScriptPreprocessor::pathOf(other.ref) : other.path;
+    }
+}
+
 ALScriptLookup::ALScriptLookup(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mWindow(window) {}
 
 // static
@@ -152,7 +167,7 @@ void ALScriptLookup::start(Doc& doc, ALEditorCommand command, const ALScriptRefe
     {
         if (each->loaded && each != &doc)
         {
-            lookup.versions[each->file.empty() ? ALScriptPreprocessor::pathOf(each->ref) : each->id] = each->editor->document().version();
+            lookup.versions[pathOfScript(*each)] = each->editor->document().version();
         }
     }
     for (Doc::Place& place : places)
@@ -182,6 +197,16 @@ void ALScriptLookup::start(Doc& doc, ALEditorCommand command, const ALScriptRefe
             if (!doc)
             {
                 return;
+            }
+            // And every file on disk open here in the language, which no
+            // object or folder lists: a module a script requires is one,
+            // and so, often, are the scripts that require it.
+            for (const Doc* open : mServices.openDocs())
+            {
+                if (open != doc && open->loaded && !open->notecard && !open->file.empty() && open->language.lua == doc->language.lua)
+                {
+                    found.scripts.push_back({ ALScriptRef(), open->name, open->id });
+                }
             }
             doc->lookup->unlisted = found.unlisted;
             doc->lookup->pending += static_cast<S32>(found.scripts.size());
@@ -258,28 +283,37 @@ void ALScriptLookup::begin(Doc& doc, U32 generation, const Candidate& candidate)
 {
     const ALScriptRef ref = candidate.ref;
     const std::string id  = doc.id;
-    // Read as it stands in an open tab, else as the region has it.
-    if (const Doc* other = mServices.findDoc(ref); other && other->loaded)
+    // Read as it stands in an open tab, else as the region has it; a file
+    // on disk only as it stands in its tab, which may have closed since.
+    const Doc* other = candidate.path.empty() ? mServices.findDoc(ref) : mServices.findDoc(candidate.path);
+    if (other && other->loaded)
     {
-        this->candidate(id, generation, ref, other->name, other->assetId, other->snapshot());
+        Candidate named = candidate;
+        named.name      = other->name;
+        this->candidate(id, generation, named, other->assetId, other->snapshot());
+        return;
+    }
+    if (!candidate.path.empty())
+    {
+        --doc.lookup->pending;
+        passed(doc);
         return;
     }
     const std::weak_ptr<bool> alive = mAlive;
-    const std::string         name  = candidate.name;
-    mWindow.loadSource(ref, [this, alive, id, generation, ref, name](const LLUUID& asset, const std::optional<std::string>& source) {
+    mWindow.loadSource(ref, [this, alive, id, generation, candidate](const LLUUID& asset, const std::optional<std::string>& source) {
         if (!alive.lock())
         {
             return;
         }
         if (source)
         {
-            this->candidate(id, generation, ref, name, asset, std::make_shared<const std::string>(*source));
+            this->candidate(id, generation, candidate, asset, std::make_shared<const std::string>(*source));
             return;
         }
         // Not read: passed over, and said so with what was found.
         if (Doc* doc = lookingIn(id, generation))
         {
-            doc->lookup->unread.push_back(name);
+            doc->lookup->unread.push_back(candidate.name);
             --doc->lookup->pending;
             passed(*doc);
         }
@@ -301,8 +335,8 @@ void ALScriptLookup::passed(Doc& doc)
     }
 }
 
-void ALScriptLookup::candidate(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
-                               const LLUUID& asset_id, std::shared_ptr<const std::string> text)
+void ALScriptLookup::candidate(const std::string& id, U32 generation, const Candidate& other, const LLUUID& asset_id,
+                               std::shared_ptr<const std::string> text)
 {
     Doc* found = lookingIn(id, generation);
     if (!found)
@@ -318,8 +352,9 @@ void ALScriptLookup::candidate(const std::string& id, U32 generation, const ALSc
     }
     // Expanded as the compiler would see it, its includes fetched.
     ALScriptPreprocessor::Request request;
-    request.ref           = ref;
-    request.name          = name;
+    request.ref           = other.ref;
+    request.path          = other.path;
+    request.name          = other.name;
     request.assetId       = asset_id;
     request.source        = text;
     request.lua           = doc.language.lua;
@@ -329,15 +364,15 @@ void ALScriptLookup::candidate(const std::string& id, U32 generation, const ALSc
     // -- with shrinknames on it renames every one.
     request.optimize      = false;
     const std::weak_ptr<bool> alive = mAlive;
-    mWindow.expand(request, [this, alive, id, generation, ref, name, text](const ALPreprocessor::Result& result) {
+    mWindow.expand(request, [this, alive, id, generation, other, text](const ALPreprocessor::Result& result) {
         if (alive.lock())
         {
-            expanded(id, generation, ref, name, text, result);
+            expanded(id, generation, other, text, result);
         }
     });
 }
 
-void ALScriptLookup::expanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
+void ALScriptLookup::expanded(const std::string& id, U32 generation, const Candidate& other,
                               const std::shared_ptr<const std::string>& source, const ALPreprocessor::Result& result)
 {
     Doc* found = lookingIn(id, generation);
@@ -346,8 +381,8 @@ void ALScriptLookup::expanded(const std::string& id, U32 generation, const ALScr
         return;
     }
     Doc&              doc  = *found;
-    const std::string self = ALScriptPreprocessor::pathOf(ref);
-    const std::string home = doc.lookup->homePath.empty() ? ALScriptPreprocessor::pathOf(doc.ref) : doc.lookup->homePath;
+    const std::string self = pathOfScript(other);
+    const std::string home = doc.lookup->homePath.empty() ? pathOfScript(doc) : doc.lookup->homePath;
     // The script declaring the name, in this expansion: the script
     // itself, or one of its includes; a script that has neither cannot
     // name it.
@@ -370,7 +405,7 @@ void ALScriptLookup::expanded(const std::string& id, U32 generation, const ALScr
     // Its own script to the analyzers, by who asked and what is looked
     // through: another tab's lookup through the same script does not
     // stand in for this one's, and this one's next lookup does.
-    request.id      = "lookup:" + id + ":" + ref.id();
+    request.id      = "lookup:" + id + ":" + (other.path.empty() ? other.ref.id() : other.path);
     request.version = generation;
     request.lua     = doc.language.lua;
     request.mono    = doc.language.compileTarget != "lsl2";
@@ -380,17 +415,17 @@ void ALScriptLookup::expanded(const std::string& id, U32 generation, const ALScr
     // The texts kept for the answer are the ones the questions hold.
     const std::weak_ptr<bool>                alive    = mAlive;
     const std::shared_ptr<const std::string> expanded_text = request.text;
-    mAnalysis.askAnalysis(std::move(request), [this, alive, id, generation, ref, name, source, map = result.map,
+    mAnalysis.askAnalysis(std::move(request), [this, alive, id, generation, other, source, map = result.map,
                                              expanded_text](const ALScriptAnalysis::Result& answer) {
         if (alive.lock())
         {
-            answered(id, generation, ref, name, map, *source, expanded_text, answer);
+            answered(id, generation, other, map, *source, expanded_text, answer);
         }
     });
 }
 
-void ALScriptLookup::answered(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
-                              const ALSourceMap& map, const std::string& source, const std::shared_ptr<const std::string>& expanded,
+void ALScriptLookup::answered(const std::string& id, U32 generation, const Candidate& other, const ALSourceMap& map,
+                              const std::string& source, const std::shared_ptr<const std::string>& expanded,
                               const ALScriptAnalysis::Result& result)
 {
     Doc* found = lookingIn(id, generation);
@@ -399,8 +434,9 @@ void ALScriptLookup::answered(const std::string& id, U32 generation, const ALScr
         return;
     }
     Doc&              doc  = *found;
-    const std::string self = ALScriptPreprocessor::pathOf(ref);
-    const std::string own  = ALScriptPreprocessor::pathOf(doc.ref);
+    const std::string self = pathOfScript(other);
+    const std::string own  = pathOfScript(doc);
+    const std::string name = other.name;
     --doc.lookup->pending;
     if (result.references.found)
     {
