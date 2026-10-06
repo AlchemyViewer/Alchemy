@@ -116,12 +116,17 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
     const U8          rank    = rankOf(request);
     const std::string id      = request.id;
     const U32         version = request.version;
+    // Another tab's SLua check gives way to the front tab's questions:
+    // stopped for one, and run again after it. LSL's are short, and the
+    // rest is the front tab's own, or weighing.
+    const bool        yields  = request.lua && request.kind == Kind::Check && !request.front;
     job.request               = std::move(request);
     {
         const std::lock_guard<std::mutex> lock(mQueueMutex);
-        if (mQueue.add(key, id, version, rank, std::move(job)))
+        if (mQueue.add(key, id, version, rank, std::move(job), yields))
         {
-            // What runs is answering something no longer wanted.
+            // What runs is answering something no longer wanted, or gives
+            // way to this.
             ALLuauService::cancel(mRunningStop);
         }
     }
@@ -229,23 +234,40 @@ void ALScriptAnalysis::runNext()
         LLAppViewer::instance()->postToMainCoro([done = job.engineDone]() { done(); });
         return;
     }
-    Result result = run(job, stop);
-    bool       unwanted = false;
+    Result result   = run(job, stop);
+    bool   unwanted = false;
+    bool   yielded  = false;
     {
         const std::lock_guard<std::mutex> lock(mQueueMutex);
         unwanted = mQueue.superseded();
+        yielded  = mQueue.yielded();
         mQueue.finished();
         if (mRunningStop == stop)
         {
             mRunningStop.reset();
         }
     }
+    bool stopped = false;
     if (stop && mWorker && mWorker->luau)
     {
-        unwanted = unwanted || mWorker->luau->stopped();
+        stopped = mWorker->luau->stopped();
         mWorker->luau->forgetStop();
     }
-    if (unwanted)
+    // Stopped as it gave way to the front tab, and wanted still: it waits
+    // again, behind what it gave way to, and answers after.
+    if (yielded && stopped && !unwanted)
+    {
+        const std::string id      = job.request.id;
+        const U32         version = job.request.version;
+        const U8          rank    = rankOf(job.request);
+        {
+            const std::lock_guard<std::mutex> lock(mQueueMutex);
+            mQueue.requeue(next->first, id, version, rank, std::move(next->second));
+        }
+        mThread->post([this]() { runNext(); });
+        return;
+    }
+    if (unwanted || stopped)
     {
         // Stopped, or asked again while it ran: what was asked since
         // answers in its place.

@@ -39,7 +39,9 @@
 // oldest asked first among equals. A job of a text older than one asked
 // about since, of the same script, is passed over as it is reached; and
 // the one running is told, as a newer question comes in, whether its
-// answer is wanted still.
+// answer is wanted still. A job that yields -- another tab's check -- is
+// stopped for a question of the lowest rank, someone waiting on it, and
+// waits again to run after.
 //
 // Not safe on two threads: its owner holds a lock around it.
 template <class Job>
@@ -49,14 +51,17 @@ public:
     // Kept under `key` -- the script and the kind of question -- in place
     // of whatever waited there, which is dropped. `id` is the script,
     // `version` its text's, and `rank` how soon it goes: lower first.
-    // True where it makes the running job's answer unwanted: its own key
-    // asked again, or a newer text of its script.
-    bool add(const std::string& key, const std::string& id, U32 version, U8 rank, Job job)
+    // `yields` where it may be stopped for a question of the lowest rank
+    // and run again after. True where the running job is to be stopped:
+    // its answer is unwanted -- its own key asked again, or a newer text of
+    // its script -- or this is of the lowest rank and it yields.
+    bool add(const std::string& key, const std::string& id, U32 version, U8 rank, Job job, bool yields = false)
     {
         Waiting& waiting = mWaiting[key];
         waiting.id       = id;
         waiting.version  = version;
         waiting.rank     = rank;
+        waiting.yields   = yields;
         waiting.serial   = ++mSerial;
         waiting.job      = std::move(job);
         if (mRunning && !mRunning->superseded && (mRunning->key == key || (mRunning->id == id && version > mRunning->version)))
@@ -64,7 +69,30 @@ public:
             mRunning->superseded = true;
             return true;
         }
+        if (mRunning && rank == 0 && mRunning->yields && !mRunning->yielded && !mRunning->superseded)
+        {
+            mRunning->yielded = true;
+            return true;
+        }
         return false;
+    }
+
+    // A job stopped as it yielded, back to wait under its key as it was
+    // asked: unless a newer one waits there already, which stands for it.
+    // Its rank keeps it behind what it yielded to.
+    void requeue(const std::string& key, const std::string& id, U32 version, U8 rank, Job job)
+    {
+        if (mWaiting.contains(key))
+        {
+            return;
+        }
+        Waiting& waiting = mWaiting[key];
+        waiting.id       = id;
+        waiting.version  = version;
+        waiting.rank     = rank;
+        waiting.yields   = true;
+        waiting.serial   = ++mSerial;
+        waiting.job      = std::move(job);
     }
 
     // What waits for a script let go of: nothing it asked is run.
@@ -100,7 +128,7 @@ public:
                 ++mPassedOver;
                 continue;
             }
-            mRunning = Running{ key, waiting.id, waiting.version, false };
+            mRunning = Running{ key, waiting.id, waiting.version, waiting.yields, false, false };
             return std::make_pair(std::move(key), std::move(waiting.job));
         }
         return std::nullopt;
@@ -109,6 +137,8 @@ public:
     // Whether the running job's answer is still wanted: nothing asked
     // since it was taken makes it pointless.
     bool superseded() const { return mRunning && mRunning->superseded; }
+    // Whether it was stopped as it yielded, to wait again (requeue).
+    bool yielded() const { return mRunning && mRunning->yielded; }
     // The running job done, answered or not.
     void finished() { mRunning.reset(); }
 
@@ -122,6 +152,7 @@ private:
         std::string id;
         U32         version = 0;
         U8          rank    = 0;
+        bool        yields  = false;
         U32         serial  = 0;
         Job         job{};
     };
@@ -130,7 +161,9 @@ private:
         std::string key;
         std::string id;
         U32         version    = 0;
+        bool        yields     = false;
         bool        superseded = false;
+        bool        yielded    = false;
     };
 
     // Whether a question asked after this one, of the same script, is of a

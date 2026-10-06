@@ -106,4 +106,36 @@ namespace tut
         ensure("a newer text of its script stops it", queue.add("x/check", "x", 2, 1, "x-check"));
         queue.finished();
     }
+
+    template<> template<>
+    void alscriptjobqueue_object::test<4>()
+    {
+        set_test_name("a job that yields is stopped by a question of the lowest rank, waits again behind it and runs after; one that does not yield runs on");
+        queue.add("back/check", "back", 1, 4, "back-check", true);
+        ensure("taken", queue.take().has_value());
+        ensure("a check of the front tab leaves it be", !queue.add("front/check", "front", 1, 1, "front-check"));
+        ensure("a question of the front tab stops it", queue.add("front/hover", "front", 1, 0, "front-hover"));
+        ensure("as it yields", queue.yielded());
+        ensure("its answer wanted still", !queue.superseded());
+        ensure("said once", !queue.add("front/signature", "front", 1, 0, "front-signature"));
+        queue.finished();
+        queue.requeue("back/check", "back", 1, 4, "back-check");
+        ensure_equals("it runs after what it yielded to", drained(), std::string("front-hover front-signature front-check back-check"));
+
+        // Asked again while it ran: the newer stands for it.
+        queue.add("back/check", "back", 1, 4, "back-check-1", true);
+        ensure("taken", queue.take().has_value());
+        ensure("stopped", queue.add("front/hover", "front", 2, 0, "front-hover-2"));
+        queue.add("back/check", "back", 2, 4, "back-check-2", true);
+        queue.finished();
+        queue.requeue("back/check", "back", 1, 4, "back-check-1");
+        ensure_equals("the newer alone", drained(), std::string("front-hover-2 back-check-2"));
+
+        // One that does not yield runs on.
+        queue.add("back/weigh", "back", 3, 3, "back-weigh");
+        ensure("taken", queue.take().has_value());
+        ensure("left be", !queue.add("front/hover", "front", 3, 0, "front-hover-3") && !queue.yielded());
+        queue.finished();
+        drained();
+    }
 }
