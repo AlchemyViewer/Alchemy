@@ -24,6 +24,7 @@ target_sources(
     core/alscriptlexicon.cpp
     core/alscriptmessages.cpp
     core/alscriptnameindex.cpp
+    core/alscriptoutlinepairs.cpp
     core/alscriptstack.cpp
     core/alscripttempfiles.cpp
     core/alscriptweight.cpp
@@ -82,6 +83,7 @@ target_sources(
         core/alscriptlexicon.h
         core/alscriptmessages.h
         core/alscriptnameindex.h
+        core/alscriptoutlinepairs.h
         core/alscriptproblem.h
         core/alscriptspan.h
         core/alscriptstack.h
@@ -249,6 +251,7 @@ if(AL_BUILD_TESTS)
   al_add_test(alsourcemap PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptjoblane PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptnameindex PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(alscriptoutlinepairs PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptsnapshot PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscripttextcache PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptstack PROJECT alscript LIBRARIES alscript llcommon)

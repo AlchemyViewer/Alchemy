@@ -28,6 +28,9 @@
 
 #include "../alrecovery.h"
 #include "../alscriptstudioorphans.h"
+#include "aldiffbar.h"
+#include "aldiffview.h"
+#include "alflatbutton.h"
 #include "alscriptstudio_fixture.h"
 #include "fsyspath.h"
 
@@ -49,6 +52,28 @@ namespace
         {
             did.push_back("compare " + doc.id + ": " + left + " | " + right + " (" + left_title + " | " + right_title + ")");
         }
+        void compareWithTab(Doc& doc, const std::string& theirs, const std::string& their_title, const std::string& own_title,
+                            const ALTextDiff::ranges_t&) override
+        {
+            // The tab's own text on the right, as the studio puts it; and
+            // where the test gives it somewhere, in a comparison of the
+            // view's own that follows the tab.
+            compare(doc, theirs, doc.editor->wholeText(), their_title, own_title);
+            if (host)
+            {
+                if (!doc.compareView)
+                {
+                    ALDiffView::Params p(LLUICtrlFactory::getDefaultParams<ALDiffView>());
+                    p.name          = "compare_" + doc.id;
+                    p.rect          = LLRect(0, 300, 600, 0);
+                    doc.compareView = LLUICtrlFactory::create<ALDiffView>(p);
+                    host->addChild(doc.compareView);
+                }
+                doc.compareView->setTexts(theirs, doc.editor->wholeText());
+                doc.compareTitles = Doc::CompareTitles{ their_title, own_title };
+            }
+        }
+        void retitleCompare(const Doc& doc) const override { retitled.push_back(doc.compareTitles ? doc.compareTitles->theirs : std::string()); }
         void pick(std::vector<ALQuickOpen::Candidate> given, const std::string&, const std::string& title,
                   std::function<void(const std::string& value)> chosen, std::function<void(const std::string& value)>) override
         {
@@ -58,6 +83,8 @@ namespace
         }
         void refreshNotice() override { ++notices; }
 
+        LLView*                                  host = nullptr;
+        mutable Names                            retitled;
         std::vector<ALQuickOpen::Candidate>      candidates;
         std::string                              picked;
         std::function<void(const std::string&)> choose;
@@ -258,5 +285,156 @@ namespace tut
         ensure_equals("the first says only its length", listed[2].detail, std::string("HistoryBytes(12)"));
         ensure_equals("by when", listed[2].label, ALRecoveryEntry::sayWhen(saves[2].when));
         ensure_equals("valued by place", listed[1].value, std::string("1"));
+    }
+
+    template<> template<>
+    void alscriptstudiohistory_object::test<6>()
+    {
+        set_test_name("a save compared has a slider over the item's saves, oldest first; stepped, the left is that save, its title and the offer back with it");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        studio.host = window.floater;
+        Doc& doc    = tab("door", "now\nsame");
+        saved(doc, "first\nsame", 300.0);
+        saved(doc, "second\nsame", 200.0);
+        saved(doc, "third\nsame", 100.0);
+        unit.show(doc);
+        // Listed newest first: the middle one.
+        studio.choose(studio.candidates[1].value);
+        ALDiffView& view = *doc.compareView;
+        ensure("the slider", view.bar()->getChild<LLView>("versions")->getVisible());
+        ensure_equals("at the middle of three, oldest first", view.bar()->versionShown(), 1);
+        ensure_equals("the second", view.leftText(), std::string("second\nsame"));
+
+        const S32 notices = studio.notices;
+        ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("newer"))->press();
+        ensure_equals("the newest on the left", view.leftText(), std::string("third\nsame"));
+        ensure("held to offer back", doc.historyShown && doc.historyShown->text == "third\nsame");
+        const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
+        LLStringUtil::format_map_t     when;
+        when["[NAME]"] = "door";
+        when["[WHEN]"] = ALRecoveryEntry::sayWhen(listed[0].when);
+        ensure_equals("titled by it", doc.compareTitles->theirs, said("HistorySavedAt", when));
+        ensure("said again", !studio.retitled.empty() && studio.retitled.back() == said("HistorySavedAt", when) && studio.notices == notices + 1);
+        ensure_equals("the right still the tab", view.rightText(), std::string("now\nsame"));
+
+        ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("older"))->press();
+        ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("older"))->press();
+        ensure("the oldest", view.leftText() == "first\nsame" && doc.historyShown->text == "first\nsame" && view.bar()->versionShown() == 0);
+    }
+
+    template<> template<>
+    void alscriptstudiohistory_object::test<7>()
+    {
+        set_test_name("a save chosen before its tab has loaded gets its slider once the comparison is shown; one save alone, none");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        studio.host  = window.floater;
+        Doc& loading = tab("lamp", "", false);
+        saved(loading, "one", 200.0);
+        saved(loading, "two", 100.0);
+        unit.show(loading);
+        studio.choose(studio.candidates[0].value);
+        ensure("waiting, with something to do once shown", loading.pendingCompare && loading.pendingCompare->shown);
+        // As the window does once the tab has loaded.
+        loading.loaded  = true;
+        loading.editor->setText("two");
+        const Doc::PendingCompare pending = *loading.pendingCompare;
+        loading.pendingCompare.reset();
+        studio.compareWithTab(loading, pending.text, pending.theirTitle, pending.ownTitle, pending.ranges);
+        pending.shown(loading);
+        ensure("the slider, at the newest", loading.compareView->bar()->getChild<LLView>("versions")->getVisible() &&
+                                                 loading.compareView->bar()->versionShown() == 1);
+
+        Doc& alone = tab("gate", "now");
+        saved(alone, "only", 100.0);
+        unit.show(alone);
+        studio.choose(studio.candidates[0].value);
+        ensure("one save: no slider", alone.compareView && !alone.compareView->bar()->getChild<LLView>("versions")->getVisible());
+    }
+
+    template<> template<>
+    void alscriptstudiohistory_object::test<8>()
+    {
+        set_test_name("a save stepped to that can no longer be read: said, the slider put back, the left as it was");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        studio.host = window.floater;
+        Doc& doc    = tab("door", "now");
+        saved(doc, "older", 200.0);
+        saved(doc, "newer", 100.0);
+        unit.show(doc);
+        studio.choose(studio.candidates[0].value);
+        ALDiffView& view = *doc.compareView;
+        ensure_equals("at the newest", view.bar()->versionShown(), 1);
+        // The older one gone from disk since it was listed.
+        const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
+        std::error_code                gone;
+        std::filesystem::remove(fsyspath(listed[1].path), gone);
+        ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("older"))->press();
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = "door";
+        args["[WHEN]"] = ALRecoveryEntry::sayWhen(listed[1].when);
+        ensure_equals("said", services().statuses.back(), said("HistoryUnreadable", args));
+        ensure("the slider put back", view.bar()->versionShown() == 1);
+        ensure("the left as it was", view.leftText() == "newer" && doc.historyShown->text == "newer");
+    }
+
+    template<> template<>
+    void alscriptstudiohistory_object::test<9>()
+    {
+        set_test_name("a save stepped to is read once and kept: stepped back to after its file is gone, still there");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        studio.host = window.floater;
+        Doc& doc    = tab("door", "now");
+        saved(doc, "first", 300.0);
+        saved(doc, "second", 200.0);
+        saved(doc, "third", 100.0);
+        unit.show(doc);
+        studio.choose(studio.candidates[1].value);
+        ALDiffView&  view  = *doc.compareView;
+        const auto   press = [&view](const char* name) { ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>(name))->press(); };
+        press("older");
+        ensure_equals("the oldest", view.leftText(), std::string("first"));
+        press("newer");
+        const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
+        std::error_code                gone;
+        std::filesystem::remove(fsyspath(listed[2].path), gone);
+        press("older");
+        ensure("the oldest again, as it was read", view.leftText() == "first" && view.bar()->versionShown() == 0 && doc.historyShown->text == "first");
+    }
+
+    template<> template<>
+    void alscriptstudiohistory_object::test<10>()
+    {
+        set_test_name("a save let go of as its comparison is left takes its slider with it: shown again, nothing steps a left that is no longer the save's");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        studio.host = window.floater;
+        Doc& doc    = tab("door", "now");
+        saved(doc, "first", 300.0);
+        saved(doc, "second", 200.0);
+        unit.show(doc);
+        studio.choose(studio.candidates[0].value);
+        ALDiffView& view = *doc.compareView;
+        ensure("the slider", view.bar()->getChild<LLView>("versions")->getVisible() && view.bar()->versionCount() == 2);
+        // As leaving the comparison does: Escape, or a keystroke typed into
+        // the source.
+        ALScriptStudioHistory::letGo(doc);
+        ensure("let go of", !doc.historyShown);
+        ensure("and its slider", view.bar()->versionCount() == 0 && !view.bar()->getChild<LLView>("versions")->getVisible());
+        ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("older"))->press();
+        ensure_equals("nothing stepped", view.leftText(), std::string("second"));
     }
 }

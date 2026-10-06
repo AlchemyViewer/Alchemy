@@ -99,6 +99,63 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALDiscordIntegration</key>
+        <map>
+            <key>Comment</key>
+            <string>Show what this account is doing in world on Discord (rich presence)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALDiscordLegacyChecked</key>
+        <map>
+            <key>Comment</key>
+            <string>Set once this account has taken over an older viewer's EnableDiscord being off</string>
+            <key>HideFromEditor</key>
+            <integer>1</integer>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALDiscordShareLocationRegion</key>
+        <map>
+            <key>Comment</key>
+            <string>Show the region and position on Discord, up to ALDiscordShareRegionMaxMaturity</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALDiscordShareRegionMaxMaturity</key>
+        <map>
+            <key>Comment</key>
+            <string>The most mature region whose name is shown on Discord: 13 General, 21 Moderate, 42 Adult</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>13</integer>
+        </map>
+        <key>ALDiscordShareName</key>
+        <map>
+            <key>Comment</key>
+            <string>Show the avatar's name on Discord</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyMouselookAlternativeFOV</key>
         <map>
             <key>Comment</key>

@@ -42,6 +42,16 @@
         "webrtc",
         "zlib"
       ]
+    },
+    {
+      "kind": "git",
+      "baseline": "103c8671192a6a84e5e36e8ab1aa5892ee6f12d3",
+      "reference": "main",
+      "repository": "https://github.com/AlchemyViewer/private-registry",
+      "packages": [
+        "discord-social-sdk",
+        "fmodstudio"
+      ]
     }
   ],
   "overlay-triplets": [

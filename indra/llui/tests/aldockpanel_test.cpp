@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../aldockpanel.h"
+#include "aldockpanel.h"
 
 #include "../llbutton.h"
 #include "../lllayoutstack.h"

@@ -345,8 +345,11 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
                                   : action == "take_saved"    ? "ActionTakeSaved"
                                   : action == "keep_saved"    ? "ActionKeepSaved"
                                   : action == "compare_saved" ? "ActionCompareSaved"
+                                  : action == "merge_saved"   ? "ActionMergeSaved"
                                   : action == "reload_world"  ? "ActionReloadWorld"
                                   : action == "compare_world" ? "ActionCompareWorld"
+                                  : action == "merge_world"   ? "ActionMergeWorld"
+                                  : action == "show_compare"  ? "ActionShowCompare"
                                   : action == "apply_fixes"   ? "ActionApplyFixes"
                                   : action == "make_strict"   ? "ActionMakeStrict"
                                                               : "ActionExport";

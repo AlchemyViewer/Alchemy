@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alchoicelist.h"
+#include "alchoicelist.h"
 
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"

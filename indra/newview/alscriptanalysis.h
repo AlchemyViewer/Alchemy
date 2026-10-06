@@ -133,7 +133,11 @@ public:
         Actions,
         // What the script weighs for each target asked for: its code, by
         // part and by line (ALScriptWeight).
-        Weigh
+        Weigh,
+        // What a text declares, from its parse alone and with no types
+        // (ALLuauService::shape, or LSL's outline): a comparison's texts,
+        // which need be no tab's, and whose functions it pairs.
+        Shape
     };
     struct Request
     {

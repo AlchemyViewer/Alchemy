@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../altextlayout.h"
+#include "altextlayout.h"
 
 #include "alfontshaping.h"
 #include "llfontfreetype.h"
@@ -267,7 +267,7 @@ namespace tut
         ready("a\nbbbb\nc\nd");
         const S32 row = layout.rowHeight();
         ensure("the widest line is the second", close_to(layout.contentWidth(), layout.line(1).width));
-        layout.setHidden(1, 2, true);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 1, 2, true);
         ensure("hidden", layout.hidden(1) && layout.hidden(2) && !layout.hidden(3));
         ensure("any", layout.anyHidden());
         ensure_equals("no height", layout.lineHeight(1), 0);
@@ -284,7 +284,7 @@ namespace tut
         doc.insert(ALTextPos(0, 0), "\n");
         ensure("slid down by the line the edit made", !layout.hidden(1) && layout.hidden(2) && layout.hidden(3) && !layout.hidden(4));
         ensure_equals("three rows now", layout.totalHeight(), 3 * row);
-        layout.setHidden(0, 4, false);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 0, 4, false);
         ensure("none hidden", !layout.anyHidden());
         ensure_equals("five rows", layout.totalHeight(), 5 * row);
     }
@@ -482,9 +482,9 @@ namespace tut
         ensure_equals("nothing laid out again", again, laid);
 
         const U32 before = layout.hiddenRevision();
-        layout.setHidden(1, 1, false);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 1, 1, false);
         ensure_equals("shown already: nothing moved", layout.hiddenRevision(), before);
-        layout.setHidden(1, 1, true);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 1, 1, true);
         ensure("hidden: moved", layout.hiddenRevision() != before);
         const U32 hidden = layout.hiddenRevision();
         doc.insert(ALTextPos(0, 0), "x\n");
@@ -499,7 +499,7 @@ namespace tut
         U32 was = layout.hiddenRevision();
         doc.replace(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 4)), "\nnew");
         ensure("none hidden, a line made: no change", layout.hiddenRevision() == was);
-        layout.setHidden(3, 4, true);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 3, 4, true);
         ensure("hidden", layout.hiddenRevision() != was && layout.hidden(3) && layout.hidden(4));
         was = layout.hiddenRevision();
         doc.replace(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)), "N");
@@ -686,9 +686,9 @@ namespace tut
         check("lines made");
         doc.remove(ALTextRange(ALTextPos(1, 0), ALTextPos(4, 0)));
         check("lines taken away");
-        layout.setHidden(6, 9, true);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 6, 9, true);
         check("hidden");
-        layout.setHidden(7, 7, false);
+        layout.setHidden(ALTextLayout::HiddenBy::Folds, 7, 7, false);
         check("one shown");
         layout.setWrapWidth(120);
         check("narrower");
@@ -750,5 +750,104 @@ namespace tut
         ensure_equals("nothing kept: nothing held", layout.trim(0, -1), 11);
         ensure_equals("none held", layout.linesHeld(), 0);
         ensure_equals("nothing more to let go of", layout.trim(0, -1), 0);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<19>()
+    {
+        set_test_name("hidden by whom: a line hidden while the folds or the host hide it, each showing only its own; edits slide both");
+        ready("0\n1\n2\n3\n4\n5\n6\n7\n8\n9");
+        typedef ALTextLayout::HiddenBy By;
+        const S32 row_h = layout.totalHeight() / 10;
+        layout.setHidden(By::Host, 2, 5, true);
+        layout.setHidden(By::Folds, 4, 7, true);
+        ensure("either hides it", layout.hidden(2) && layout.hidden(5) && layout.hidden(7) && !layout.hidden(8));
+        ensure("whose", layout.hiddenBy(4, By::Host) && layout.hiddenBy(4, By::Folds) && !layout.hiddenBy(2, By::Folds) && !layout.hiddenBy(7, By::Host));
+        ensure_equals("six lines take no height", layout.totalHeight(), 4 * row_h);
+        U32 was = layout.hiddenRevision();
+        layout.setHidden(By::Folds, 4, 7, false);
+        ensure("the folds shown: the host's still hidden", layout.hidden(4) && layout.hidden(5) && !layout.hidden(6) && !layout.hidden(7));
+        ensure("which moved what is hidden", layout.hiddenRevision() != was);
+        ensure_equals("four lines take none", layout.totalHeight(), 6 * row_h);
+        layout.setHidden(By::Folds, 3, 3, true);
+        was = layout.hiddenRevision();
+        layout.setHidden(By::Folds, 3, 3, true);
+        ensure("hiding a line hidden again moves nothing", layout.hiddenRevision() == was);
+        layout.setHidden(By::Host, 2, 5, false);
+        ensure("the host's shown: the fold's still hidden", !layout.hidden(2) && layout.hidden(3) && !layout.hidden(4));
+        doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "new\n");
+        ensure("slid by a line made above", !layout.hidden(3) && layout.hiddenBy(4, By::Folds));
+        layout.setHidden(By::Any, 0, 10, false);
+        ensure("all shown", !layout.anyHidden());
+    }
+    template<> template<>
+    void altextlayout_object::test<20>()
+    {
+        set_test_name("gaps: rows of nothing above a line in its height, its top its text's; hidden with it; one changed moves the tops below; below the text");
+        ready("0\n1\n2\n3\n4\n5");
+        const S32        row_h = layout.rowHeight();
+        std::vector<S32> gaps(7, 0);
+        gaps[3]       = 2;
+        gaps[6]       = 1;
+        S32 asked     = 0;
+        layout.setGapProvider([&](S32 line) {
+            ++asked;
+            return gaps[static_cast<size_t>(line)];
+        });
+        ensure_equals("in the height, and below the text", layout.totalHeight(), 9 * row_h);
+        ensure("the line's top its text's", layout.lineTop(3) == 5 * row_h && layout.gapTop(3) == 3 * row_h && layout.lineTop(4) == 6 * row_h);
+        ensure("past the last: the bottom of everything", layout.lineTop(6) == 9 * row_h && layout.gapTop(6) == 8 * row_h);
+        ensure("a y in the gap over the line below it", layout.lineAtY(3 * row_h) == 3 && layout.lineAtY(5 * row_h - 1) == 3 && layout.gapAtY(4 * row_h) == 3);
+        ensure("its text not in it", layout.gapAtY(5 * row_h) == -1 && layout.gapAtY(2 * row_h) == -1);
+        ensure("past the text, in the rows below it", layout.gapAtY(8 * row_h) == 6 && layout.gapAtY(9 * row_h) == -1 && layout.lineAtY(8 * row_h) == 5);
+
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 2, 3, true);
+        ensure("hidden, its gap with it", layout.gapRows(3) == 0 && layout.totalHeight() == 5 * row_h && layout.lineTop(4) == 2 * row_h);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 2, 3, false);
+        ensure("shown, its gap again", layout.gapRows(3) == 2 && layout.totalHeight() == 9 * row_h);
+
+        // One line's gap changed: its own height set, nothing summed again.
+        const U32 was = layout.heightsRevision();
+        gaps[1]       = 1;
+        asked         = 0;
+        layout.gapChanged(1);
+        ensure("the tops below moved", layout.lineTop(2) == 3 * row_h && layout.totalHeight() == 10 * row_h && layout.heightsRevision() != was);
+        ensure("asked of that line alone", asked <= 3);
+        gaps[6] = 0;
+        layout.gapChanged(6);
+        ensure_equals("the rows below the text let go", layout.totalHeight(), 9 * row_h);
+
+        // Made again where many changed.
+        gaps.assign(7, 0);
+        layout.gapsChanged();
+        ensure_equals("none", layout.totalHeight(), 6 * row_h);
+        layout.setGapProvider(nullptr);
+        ensure("none asked of nobody", layout.gapRows(3) == 0 && layout.gapAtY(0) == -1);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<21>()
+    {
+        set_test_name("the first line in sight after one, over a run of ten thousand hidden lines, gaps or none; the line count where none is");
+        std::string many = "first";
+        for (S32 n = 0; n < 10000; ++n)
+        {
+            many += "\nhidden";
+        }
+        many += "\nlast";
+        ready(many.c_str());
+        ensure("none hidden: the next", layout.visibleAfter(0) == 1 && layout.visibleAfter(-5) == 0);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 1, 10000, true);
+        ensure("over the run", layout.visibleAfter(0) == 10001);
+        ensure("from inside the run", layout.visibleAfter(1) == 10001 && layout.visibleAfter(9999) == 10001);
+        ensure("past the last: the count", layout.visibleAfter(10001) == 10002);
+        std::vector<S32> gaps(10003, 0);
+        gaps[10001] = 2;
+        layout.setGapProvider([&gaps](S32 line) { return gaps[static_cast<size_t>(line)]; });
+        ensure("a gap over the line after the run: still that line", layout.visibleAfter(0) == 10001);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 9000, 10001, true);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 1, 8999, false);
+        ensure("a run to the end: none after it", layout.visibleAfter(8999) == 10002 && layout.visibleAfter(5) == 6);
+        layout.setGapProvider(nullptr);
     }
 }

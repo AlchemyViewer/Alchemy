@@ -24,10 +24,10 @@
 
 #include "linden_common.h"
 
-#include "../alcolorfield.h"
-#include "../alcolorpicker.h"
+#include "alcolorfield.h"
+#include "alcolorpicker.h"
 
-#include "../alpopover.h"
+#include "alpopover.h"
 #include "../llfloater.h"
 #include "../lllineeditor.h"
 #include "../llscrollcontainer.h"

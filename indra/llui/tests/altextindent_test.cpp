@@ -24,9 +24,9 @@
 
 #include "linden_common.h"
 
-#include "../altextindent.h"
+#include "altextindent.h"
 
-#include "../alsyntaxgrammar.h"
+#include "alsyntaxgrammar.h"
 
 #include "../test/lltut.h"
 

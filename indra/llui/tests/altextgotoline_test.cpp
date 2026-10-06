@@ -24,11 +24,11 @@
 
 #include "linden_common.h"
 
-#include "../altextgotoline.h"
+#include "altextgotoline.h"
 
-#include "../alpopover.h"
-#include "../alquickask.h"
-#include "../altextview.h"
+#include "alpopover.h"
+#include "alquickask.h"
+#include "altextview.h"
 #include "../llfloater.h"
 #include "../lllineeditor.h"
 #include "../lluictrlfactory.h"

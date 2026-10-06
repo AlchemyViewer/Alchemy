@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alxuidiagnostics.h"
+#include "alxuidiagnostics.h"
 #include "../llfloater.h"
 #include "../lluictrlfactory.h"
 

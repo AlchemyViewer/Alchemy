@@ -399,6 +399,55 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="FindBarWrappedToTop">Reached the end; continued from the top</string>
 	<string name="FindBarWrappedToBottom">Reached the start; continued from the bottom</string>
 
+	<!-- The bar over a comparison (aldiffbar.cpp): which change the caret
+	     is in, the steps through them, and the ways of showing them. -->
+	<string name="DiffBarPrevious">Previous change</string>
+	<string name="DiffBarNext">Next change</string>
+	<string name="DiffBarFold">Fold away what is the same</string>
+	<string name="DiffBarIgnore">What to ignore</string>
+	<string name="DiffBarCopy">Copy this change, or the whole comparison as a unified diff</string>
+	<!-- A peek at a change from the code editor (alchangepeek.cpp): its bar. -->
+	<string name="PeekChanged">Changed since saved · [CURRENT] of [TOTAL]</string>
+	<string name="PeekAdded">Added since saved · [CURRENT] of [TOTAL]</string>
+	<string name="PeekRemoved">Taken out since saved · [CURRENT] of [TOTAL]</string>
+	<string name="PeekTakeBack">Take this change back</string>
+	<string name="PeekPrevious">Previous change</string>
+	<string name="PeekNext">Next change</string>
+	<string name="CodePeekChange">Peek at this change</string>
+	<string name="PeekClose">Close</string>
+	<string name="DiffBarInline">Show the changes inline, in one text</string>
+	<!-- The same button while the changes are inline: back to two sides. -->
+	<string name="DiffBarSideBySide">Show side by side</string>
+	<string name="DiffBarSwap">Swap the sides</string>
+	<string name="DiffBarDone">Back to the text</string>
+	<string name="DiffBarTakeBack">Take this change back</string>
+	<string name="DiffBarOf">Change [CURRENT] of [TOTAL]</string>
+	<string name="DiffBarChangesA">[COUNT] change</string>
+	<string name="DiffBarChangesB">[COUNT] changes</string>
+	<string name="DiffBarNone">No changes</string>
+	<!-- After the count, where a comparison by structure compared a change by lines. -->
+	<string name="DiffBarByLines">· by lines</string>
+	<!-- The count's tooltip while it says so: why. -->
+	<string name="DiffBarByLinesTip">A change too large to compare by structure was compared by lines</string>
+	<!-- After the count, while a merge is settled: the conflicts left. -->
+	<string name="DiffBarConflictsA">· [COUNT] conflict left</string>
+	<string name="DiffBarConflictsB">· [COUNT] conflicts left</string>
+	<string name="DiffBarConflictsNone">· no conflicts left</string>
+	<!-- Settling the conflict the caret is in, in a merge. -->
+	<string name="DiffBarTheirs">Theirs</string>
+	<string name="DiffBarTheirsTip">Settle this conflict with the other side's lines</string>
+	<string name="DiffBarMine">Mine</string>
+	<string name="DiffBarMineTip">Settle this conflict keeping your lines</string>
+	<string name="DiffBarBoth">Both</string>
+	<string name="DiffBarBothTip">Settle this conflict with your lines, then the other side's</string>
+	<!-- Stepping the left through its versions: a script's saves. -->
+	<string name="DiffBarOlder">An older version on the left</string>
+	<string name="DiffBarNewer">A newer version on the left</string>
+	<string name="DiffBarVersions">Which version is on the left, oldest to newest</string>
+	<!-- A comparison's row standing for lines the same folded away. -->
+	<string name="DiffFoldedLinesA">⋯ 1 line the same ⋯</string>
+	<string name="DiffFoldedLinesB">⋯ [COUNT] lines the same ⋯</string>
+
 	<!-- The row of tabs over an editor (altabstrip.cpp): the button that
 	     lists them all once they run past it. -->
 	<!-- Script Studio's editor colors, as the preferences list them (ALScriptTheme::labelOf). -->
@@ -1009,6 +1058,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaSharedReturned">returned by a function</string>
 	<string name="SluaSharedKept">passed to a function of the script's that keeps it</string>
 	<string name="SluaKeyText">LSL's keys held any text; SLua's uuid() stops the script on text that is no UUID, as it would here, where only a uuid will do.</string>
+	<string name="SluaVectorText">ll.DumpList2String writes a vector's or a rotation's parts as LSL did, with five places; SLua's tostring writes as few as each needs, &lt;1, 2, 3&gt;, which tovector reads back the same.</string>
 	<string name="SluaUuidText">uuid() stops the script on text that is no UUID, where LSL's keys held any text; touuid() answers nil instead.</string>
 	<string name="SluaDetectedTable">detected[n] is what LSL read with llDetected*(n - 1): SLua counts it from 1, and one past its end is an error, where LSL answered nothing.</string>
 	<string name="SluaMathDomain">math.sqrt, math.log and math.log10 answer nan or -inf out of their range, where LSL answered 0 or stopped with a math error.</string>
@@ -5325,4 +5375,8 @@ and report the problem.
     <string name="TooltipDistance">
         Distance: [OBJECT_DISTANCE]
     </string>
+
+    <!-- Discord rich presence -->
+    <string name="DiscordViaViewer">via [APP_NAME]</string>
+    <string name="DiscordHiddenRegion">Hidden Region</string>
 </strings>

@@ -537,6 +537,9 @@ namespace ALScriptKeymap
 #endif
             { "next_problem", KEY_F8, MASK_NONE },
             { "previous_problem", KEY_F8, MASK_SHIFT },
+            // Changes since the save, as Visual Studio Code steps them.
+            { "next_change", KEY_F5, MASK_ALT },
+            { "previous_change", KEY_F5, MASK_ALT | MASK_SHIFT },
             // What is left from LSL, as F8 walks every problem.
             { "next_migration", KEY_F8, MASK_ALT },
             { "previous_migration", KEY_F8, MASK_ALT | MASK_SHIFT },
@@ -599,7 +602,37 @@ namespace ALScriptKeymap
             after_k("inspector", '4'),
             after_k("expanded", 'P'),
             { "compare_saved", KEY_NONE, MASK_NONE },
+            { "compare_with", KEY_NONE, MASK_NONE },
+            // As Visual Studio Code's Show Next Change peeks, beside its
+            // Alt-F5 step.
+            { "peek_change", KEY_F3, MASK_ALT },
+            { "compare_preprocessed", KEY_NONE, MASK_NONE },
+            { "compare_hold_selection", KEY_NONE, MASK_NONE },
+            { "compare_selections", KEY_NONE, MASK_NONE },
             { "compare_inline", KEY_NONE, MASK_NONE },
+            // What the comparison's bar does by its buttons: a conflict
+            // settled with theirs, mine or both, the same folded away, the
+            // sides swapped, and the saves stepped through, each by the
+            // first letter of its word; the steps by < and >.
+            { "compare_settle_theirs", 'T', MASK_ALT },
+            { "compare_settle_mine", 'M', MASK_ALT },
+            { "compare_settle_both", 'B', MASK_ALT },
+            { "compare_fold", 'F', MASK_ALT },
+            { "compare_swap", 'S', MASK_ALT },
+            { "compare_older", ',', MASK_ALT },
+            { "compare_newer", '.', MASK_ALT },
+            { "compare_shown", KEY_NONE, MASK_NONE },
+            { "compare_take_back", KEY_NONE, MASK_NONE },
+            { "compare_copy_change", KEY_NONE, MASK_NONE },
+            { "compare_copy_diff", KEY_NONE, MASK_NONE },
+            { "compare_histogram", KEY_NONE, MASK_NONE },
+            { "compare_patience", KEY_NONE, MASK_NONE },
+            { "compare_minimal", KEY_NONE, MASK_NONE },
+            { "compare_structural", KEY_NONE, MASK_NONE },
+            { "compare_ignore_whitespace", KEY_NONE, MASK_NONE },
+            { "compare_ignore_trailing", KEY_NONE, MASK_NONE },
+            { "compare_ignore_blank_lines", KEY_NONE, MASK_NONE },
+            { "compare_ignore_comments", KEY_NONE, MASK_NONE },
             // The text's size: Control-= and Control-minus, Shift or not,
             // the keypad's too, as everywhere -- Command on a Mac -- and
             // Control-0 back to the size chosen. The '=' key is '=' from

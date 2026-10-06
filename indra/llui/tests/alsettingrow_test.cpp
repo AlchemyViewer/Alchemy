@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alsettingrow.h"
+#include "alsettingrow.h"
 
 #include "../llbutton.h"
 #include "../llfloater.h"

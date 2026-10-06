@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alxuidocuments.h"
+#include "alxuidocuments.h"
 
 #include "lldir.h"
 #include "llfile.h"

@@ -110,6 +110,7 @@ namespace
             case Kind::Inspect:    return "inspect";
             case Kind::Actions:    return "actions";
             case Kind::Weigh:      return "weigh";
+            case Kind::Shape:      return "shape";
         }
         return "?";
     }

@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alxuifindings.h"
+#include "alxuifindings.h"
 
 #include "../test/lltut.h"
 

@@ -649,10 +649,10 @@ namespace tut
             said += (said.empty() ? "" : " ") + model.placeOf(one) + "/" + one.name;
         }
         ensure_equals("scripts only, its name first, not itself", said,
-                      std::string("Door \xE2\x96\xB8 Door.1/open.lsl Lamp/open.lsl Lamp/blink.lsl"));
+                      "Door" + std::string(Model::PLACE_SEPARATOR) + "Door.1/open.lsl Lamp/open.lsl Lamp/blink.lsl");
         ensure_equals("a notecard's are notecards", model.comparableWith(notes).size(), 1U);
         ensure("a prim compares with nothing", model.comparableWith(prim).empty());
         ensure_equals("a root's place is its object", model.placeOf(here), std::string("Door"));
-        ensure_equals("a child's has its prim", model.placeOf(child), std::string("Door \xE2\x96\xB8 Door.1"));
+        ensure_equals("a child's has its prim", model.placeOf(child), "Door" + std::string(Model::PLACE_SEPARATOR) + "Door.1");
     }
 }

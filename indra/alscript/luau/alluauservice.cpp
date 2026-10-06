@@ -46,6 +46,7 @@
 #include "Luau/Linter.h"
 #include "Luau/Module.h"
 #include "Luau/ParseResult.h"
+#include "Luau/Parser.h"
 #include "Luau/Scope.h"
 #include "Luau/ToString.h"
 #include "Luau/Type.h"
@@ -2425,6 +2426,22 @@ std::vector<ALScriptOutlineEntry> ALLuauService::outline(std::string_view source
     }
     Outliner outliner(module.get());
     module_source->root->visit(&outliner);
+    return std::move(outliner.out);
+}
+
+std::vector<ALScriptOutlineEntry> ALLuauService::shape(std::string_view source)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    Luau::Allocator    allocator;
+    Luau::AstNameTable names(allocator);
+    Luau::ParseOptions options;
+    Luau::ParseResult  parsed = Luau::Parser::parse(source.data(), source.size(), names, allocator, options);
+    if (!parsed.root)
+    {
+        return {};
+    }
+    Outliner outliner(nullptr);
+    parsed.root->visit(&outliner);
     return std::move(outliner.out);
 }
 

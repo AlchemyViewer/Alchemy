@@ -24,11 +24,11 @@
 
 #include "linden_common.h"
 
-#include "../alquickopen.h"
+#include "alquickopen.h"
 
-#include "../alchoicelist.h"
+#include "alchoicelist.h"
 #include "llfontgl.h"
-#include "../alpopover.h"
+#include "alpopover.h"
 
 #include "../lllineeditor.h"
 #include "../llscrolllistctrl.h"

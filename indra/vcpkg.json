@@ -161,6 +161,12 @@
     }
   ],
   "features": {
+    "discord": {
+      "description": "Enable Discord rich presence through the Discord Social SDK",
+      "dependencies": [
+        "discord-social-sdk"
+      ]
+    },
     "dullahan-example": {
       "description": "Build with support for Dullahan OpenGL example application",
       "dependencies": [
@@ -187,6 +193,12 @@
       "description": "Build with support for the FAudio audio engine",
       "dependencies": [
         "faudio"
+      ]
+    },
+    "fmodstudio": {
+      "description": "Build with support for the FMOD Studio audio engine",
+      "dependencies": [
+        "fmodstudio"
       ]
     },
     "hunspell": {

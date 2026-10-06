@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alcolorpicker.h"
+#include "alcolorpicker.h"
 
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"

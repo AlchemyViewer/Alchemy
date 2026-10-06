@@ -459,6 +459,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="NoticeTakeCompiled">Use Preprocessed Code</floater.string>
     <floater.string name="NoticeCompare">Compare</floater.string>
     <floater.string name="NoticeCompareTip">Show both texts side by side, with changes marked; Escape closes the comparison</floater.string>
+    <floater.string name="NoticeMerge">Merge</floater.string>
+    <floater.string name="NoticeMergeTip">Put in what only the other version changed, then settle each conflict in the comparison; undo takes the merge back</floater.string>
     <floater.string name="CompareNow">This tab now</floater.string>
     <floater.string name="CompareUnsaved">[TITLE] (unsaved)</floater.string>
     <floater.string name="FixAllAfter">After [FIXES]</floater.string>
@@ -507,6 +509,31 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ExplorerComparePlaceholder">Type a name to find a script or notecard</floater.string>
     <floater.string name="ExplorerNothingToCompare">Nothing listed in the Explorer is like [NAME] to compare it with. Pin or select the other object first.</floater.string>
     <floater.string name="CompareSaved">As last saved</floater.string>
+    <floater.string name="CompareWithTitle">Compare [NAME] with</floater.string>
+    <floater.string name="PeekNoChange">The caret's line has not changed since the script was saved.</floater.string>
+    <floater.string name="NoChangeAfter">No change since the save after this line.</floater.string>
+    <floater.string name="NoChangeBefore">No change since the save before this line.</floater.string>
+    <floater.string name="ComparePreprocessed">Preprocessed, as a save sends it</floater.string>
+    <floater.string name="SelectionLine">[NAME], line [FIRST]</floater.string>
+    <floater.string name="SelectionLines">[NAME], lines [FIRST]–[LAST]</floater.string>
+    <floater.string name="SelectionHeld">Holding [TITLE] to compare. Select something else, here or in another tab, then choose View > Compare with Held Selection.</floater.string>
+    <floater.string name="CompareWithPlaceholder">Type to find a tab, a file, or a script in an object</floater.string>
+    <floater.string name="CompareWithSavedDetail">this tab's text when it was last saved</floater.string>
+    <floater.string name="CompareWithSavedThereDetail">what was saved over it from elsewhere</floater.string>
+    <floater.string name="CompareWithTab">open tab</floater.string>
+    <floater.string name="CompareWithTabUnsaved">open tab, unsaved</floater.string>
+    <floater.string name="CompareClipboard">Clipboard</floater.string>
+    <floater.string name="CompareWithLinesA">1 line</floater.string>
+    <floater.string name="CompareWithLinesB">[COUNT] lines</floater.string>
+    <floater.string name="CompareWithClipboardEmpty">The clipboard holds no text to compare with.</floater.string>
+    <floater.string name="CompareTabClosed">[NAME] is no longer open to compare with.</floater.string>
+    <floater.string name="CompareSavedThereGone">There is no longer a version saved elsewhere to compare with.</floater.string>
+    <floater.string name="CompareTabSnapshot">[NAME], as it was</floater.string>
+    <floater.string name="CompareWithFile">File on Disk...</floater.string>
+    <floater.string name="CompareWithFileDetail">choose a file to compare with</floater.string>
+    <floater.string name="CompareWithHistory">Local History...</floater.string>
+    <floater.string name="CompareWithSavesA">1 save kept</floater.string>
+    <floater.string name="CompareWithSavesB">[COUNT] saves kept</floater.string>
     <floater.string name="CompareNothingSaved">There is no saved text to compare with: you undid past the last save, then made a change.</floater.string>
     <floater.string name="CompareKept">Unsaved changes, [WHEN]</floater.string>
     <floater.string name="CompareCompiled">Preprocessed code, as saved</floater.string>
@@ -576,6 +603,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ActionKeepSavedTip">Keep your changes; saving [NAME] replaces the version saved elsewhere</floater.string>
     <floater.string name="ActionCompareSaved">Compare</floater.string>
     <floater.string name="ActionCompareSavedTip">Compare the version saved elsewhere with this tab</floater.string>
+    <floater.string name="ActionMergeSaved">Merge</floater.string>
+    <floater.string name="ActionMergeSavedTip">Put what only the version saved elsewhere changed into [NAME], then settle each conflict in the comparison</floater.string>
     <floater.string name="SavedElsewhereConflict">[NAME] was saved by [WHO] while this tab had unsaved changes.</floater.string>
     <floater.string name="SavedElsewhereKept">Kept your changes to [NAME]; saving replaces the version saved elsewhere.</floater.string>
     <floater.string name="SavedByBridge">VS Code</floater.string>
@@ -614,6 +643,19 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ActionReloadWorldTip">Reload the saved [NAME]; your unsaved changes are kept in File &gt; Recover Unsaved Changes</floater.string>
     <floater.string name="ActionCompareWorld">Compare</floater.string>
     <floater.string name="ActionCompareWorldTip">Compare the saved [NAME] with the text in this tab</floater.string>
+    <floater.string name="ActionMergeWorld">Merge</floater.string>
+    <floater.string name="ActionMergeWorldTip">Put what only the saved [NAME] changed into this tab, then settle each conflict in the comparison</floater.string>
+    <floater.string name="MergeConflictsA">Merged into [NAME] what only the other version changed. 1 conflict is left to settle in the comparison; save to keep the merge.</floater.string>
+    <floater.string name="MergeConflictsB">Merged into [NAME] what only the other version changed. [COUNT] conflicts are left to settle in the comparison; save to keep the merge.</floater.string>
+    <floater.string name="MergeTakenBack">The merge into [NAME] was undone; the other version stands again.</floater.string>
+    <floater.string name="CompareLoading">Loading [NAME] to compare...</floater.string>
+    <floater.string name="NoticeShowCompare">Show Comparison</floater.string>
+    <floater.string name="NoticeShowCompareTip">Show the merge's comparison, where each conflict is marked and settled</floater.string>
+    <floater.string name="ActionShowCompare">Show Comparison</floater.string>
+    <floater.string name="ActionShowCompareTip">Show the comparison of [NAME], where each conflict is marked and settled</floater.string>
+    <floater.string name="MergeClean">Merged into [NAME] what only the other version changed; nothing conflicts. Save to keep the merge.</floater.string>
+    <floater.string name="MergeNoBase">What [NAME] was before both changes is no longer known here, so the two are compared as they are: take back each change you want.</floater.string>
+    <floater.string name="MergeReadOnly">[NAME] cannot be changed here, so the two are compared as they are.</floater.string>
     <floater.string name="CompareWorld">Currently saved</floater.string>
     <floater.string name="ActionExport">Export to a file</floater.string>
     <floater.string name="ActionExportTip">Save a copy of [NAME] to a file on this computer</floater.string>
@@ -1149,6 +1191,14 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_problem" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_problem" />
             </menu_item_call>
+            <menu_item_call label="Next Change" layout="topleft" name="next_change">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_change" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_change" />
+            </menu_item_call>
+            <menu_item_call label="Previous Change" layout="topleft" name="previous_change">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_change" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_change" />
+            </menu_item_call>
             <menu_item_call label="Next Left From LSL" layout="topleft" name="next_migration">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_migration" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_migration" />
@@ -1266,11 +1316,131 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_saved" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_saved" />
             </menu_item_check>
+            <menu_item_check label="Peek at Change" layout="topleft" name="peek_change">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="peek_change" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="peek_change" />
+                <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="peek_change" />
+            </menu_item_check>
+            <menu_item_call label="Compare With..." layout="topleft" name="compare_with">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_with" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_with" />
+            </menu_item_call>
+            <menu_item_call label="Compare with Preprocessed" layout="topleft" name="compare_preprocessed">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_preprocessed" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_preprocessed" />
+            </menu_item_call>
+            <menu_item_call label="Select for Compare" layout="topleft" name="compare_hold_selection">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_hold_selection" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_hold_selection" />
+            </menu_item_call>
+            <menu_item_call label="Compare with Held Selection" layout="topleft" name="compare_selections">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_selections" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_selections" />
+            </menu_item_call>
+            <menu_item_check label="Show Comparison" layout="topleft" name="compare_shown">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_shown" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_shown" />
+                <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_shown" />
+            </menu_item_check>
+            <menu_item_call label="Take Change Back" layout="topleft" name="compare_take_back">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_take_back" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_take_back" />
+            </menu_item_call>
             <menu_item_check label="Compare Inline" layout="topleft" name="compare_inline">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_inline" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_inline" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_inline" />
             </menu_item_check>
+            <menu
+             label="Comparison"
+             layout="topleft"
+             mouse_opaque="false"
+             name="comparison_view_menu"
+             tear_off="false"
+             width="260">
+                <menu_item_call label="Settle with Theirs" layout="topleft" name="compare_settle_theirs">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_settle_theirs" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_settle_theirs" />
+                </menu_item_call>
+                <menu_item_call label="Settle with Mine" layout="topleft" name="compare_settle_mine">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_settle_mine" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_settle_mine" />
+                </menu_item_call>
+                <menu_item_call label="Settle with Both" layout="topleft" name="compare_settle_both">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_settle_both" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_settle_both" />
+                </menu_item_call>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Fold Unchanged Lines" layout="topleft" name="compare_fold">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_fold" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_fold" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_fold" />
+                </menu_item_check>
+                <menu_item_check label="Swap Sides" layout="topleft" name="compare_swap">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_swap" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_swap" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_swap" />
+                </menu_item_check>
+                <menu_item_call label="Older Save" layout="topleft" name="compare_older">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_older" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_older" />
+                </menu_item_call>
+                <menu_item_call label="Newer Save" layout="topleft" name="compare_newer">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_newer" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_newer" />
+                </menu_item_call>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Histogram" layout="topleft" name="compare_histogram">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_histogram" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_histogram" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_histogram" />
+                </menu_item_check>
+                <menu_item_check label="Patience" layout="topleft" name="compare_patience">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_patience" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_patience" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_patience" />
+                </menu_item_check>
+                <menu_item_check label="Fewest Changes" layout="topleft" name="compare_minimal">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_minimal" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_minimal" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_minimal" />
+                </menu_item_check>
+                <menu_item_check label="By Structure" layout="topleft" name="compare_structural">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_structural" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_structural" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_structural" />
+                </menu_item_check>
+                <menu_item_separator layout="topleft" />
+                <menu_item_call label="Copy This Change" layout="topleft" name="compare_copy_change">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_copy_change" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_copy_change" />
+                </menu_item_call>
+                <menu_item_call label="Copy as Unified Diff" layout="topleft" name="compare_copy_diff">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="compare_copy_diff" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="compare_copy_diff" />
+                </menu_item_call>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Ignore Whitespace" layout="topleft" name="compare_ignore_whitespace">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_ignore_whitespace" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_ignore_whitespace" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_ignore_whitespace" />
+                </menu_item_check>
+                <menu_item_check label="Ignore Whitespace at Line Ends" layout="topleft" name="compare_ignore_trailing">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_ignore_trailing" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_ignore_trailing" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_ignore_trailing" />
+                </menu_item_check>
+                <menu_item_check label="Ignore Blank Lines" layout="topleft" name="compare_ignore_blank_lines">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_ignore_blank_lines" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_ignore_blank_lines" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_ignore_blank_lines" />
+                </menu_item_check>
+                <menu_item_check label="Ignore Comments" layout="topleft" name="compare_ignore_comments">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_ignore_comments" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_ignore_comments" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_ignore_comments" />
+                </menu_item_check>
+            </menu>
             <menu_item_separator layout="topleft" />
             <menu_item_check label="Word Wrap" layout="topleft" name="word_wrap">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="word_wrap" />
@@ -1944,6 +2114,15 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                          height="22"
                          layout="topleft"
                          name="notice_third"
+                         right="-30"
+                         top="3"
+                         visible="false"
+                         width="86" />
+                        <button
+                         follows="right|top"
+                         height="22"
+                         layout="topleft"
+                         name="notice_fourth"
                          right="-30"
                          top="3"
                          visible="false"

@@ -24,9 +24,9 @@
 
 #include "linden_common.h"
 
-#include "../alxuischema.h"
+#include "alxuischema.h"
 
-#include "../alxuinotes.h"
+#include "alxuinotes.h"
 
 // Naming a widget's parameter block is what links the object that registers
 // it, so the tags below are in the schema this binary builds.

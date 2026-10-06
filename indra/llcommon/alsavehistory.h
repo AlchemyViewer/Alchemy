@@ -81,6 +81,10 @@ public:
     bool keep(ALSavedText saved);
     // A key's saves, newest first, as far as a listing reads them.
     std::vector<ALSavedText> list(const std::string& key) const;
+    // How many saves a key has, by the names of their files alone: none
+    // is opened, so one that cannot be read, which list() leaves out, is
+    // counted all the same.
+    size_t count(const std::string& key) const;
     // The text read in, for a save a listing read the start of; false
     // where its file is gone or cannot be read.
     bool load(ALSavedText& saved) const;

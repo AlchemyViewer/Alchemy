@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../allinetable.h"
+#include "allinetable.h"
 
 #include "../test/lltut.h"
 

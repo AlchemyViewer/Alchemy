@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../altextediting.h"
+#include "altextediting.h"
 
 #include "../test/lltut.h"
 

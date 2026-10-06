@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alfindbar.h"
+#include "alfindbar.h"
 
 #include "../lluictrlfactory.h"
 

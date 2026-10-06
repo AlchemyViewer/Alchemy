@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alfoldmodel.h"
+#include "alfoldmodel.h"
 
 #include "../test/lltut.h"
 

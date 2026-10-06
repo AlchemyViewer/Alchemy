@@ -398,11 +398,6 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
     mCommitCallbackRegistrar.add("Pref.DeleteTranscripts",      boost::bind(&LLFloaterPreference::onDeleteTranscripts, this));
     mCommitCallbackRegistrar.add("UpdateFilter", boost::bind(&LLFloaterPreference::onUpdateFilterTerm, this, false)); // <FS:ND/> Hook up for filtering
     mCommitCallbackRegistrar.add("Pref.CopySearchAsSLURL",      boost::bind(&LLFloaterPreference::onCopySearch, this));
-#ifdef LL_DISCORD
-    gSavedSettings.getControl("EnableDiscord")->getCommitSignal()->connect(boost::bind(&LLAppViewer::updateDiscordActivity));
-    gSavedSettings.getControl("ShowDiscordActivityDetails")->getCommitSignal()->connect(boost::bind(&LLAppViewer::updateDiscordActivity));
-    gSavedSettings.getControl("ShowDiscordActivityState")->getCommitSignal()->connect(boost::bind(&LLAppViewer::updateDiscordActivity));
-#endif
     mCommitCallbackRegistrar.add("Pref.AddSkin", boost::bind(&LLFloaterPreference::onAddSkin, this));
     mCommitCallbackRegistrar.add("Pref.RemoveSkin", boost::bind(&LLFloaterPreference::onRemoveSkin, this));
     mCommitCallbackRegistrar.add("Pref.ApplySkin", boost::bind(&LLFloaterPreference::onApplySkin, this));
@@ -586,8 +581,27 @@ bool LLFloaterPreference::postBuild()
     }
 
 #ifndef LL_DISCORD
+    LLTabContainer* privacy_tabs = getChild<LLTabContainer>("privacy_tab_container");
     LLPanel* panel = getChild<LLPanel>("privacy_preferences_discord");
-    getChild<LLTabContainer>("privacy_tab_container")->removeTabPanel(panel);
+    privacy_tabs->removeTabPanel(panel);
+
+    // General alone needs no tab row: hide it and give its room back to the page.
+    privacy_tabs->setTabsHidden(true);
+    LLPanel* general = getChild<LLPanel>("privacy_preferences_general");
+    LLRect general_rect = general->getRect();
+    general_rect.mTop = privacy_tabs->getRect().getHeight();
+    general->setShape(general_rect);
+#else
+    // The sharing options follow "Show my activity on Discord", which enables
+    // them as the panel is built; before login they are the account's
+    // settings with no account yet.
+    if (LLStartUp::getStartupState() < STATE_STARTED)
+    {
+        for (const char* name : { "show_name", "show_location", "discord_max_maturity" })
+        {
+            getChildView(name)->setEnabled(false);
+        }
+    }
 #endif
 
     return true;
@@ -2192,6 +2206,18 @@ void LLFloaterPreference::setPersonalInfo(const std::string& visibility)
     getChildView("conversation_log_combo")->setEnabled(true);
     getChild<LLUICtrl>("voice_call_friends_only_check")->setEnabled(true);
     getChild<LLUICtrl>("voice_call_friends_only_check")->setValue(gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly"));
+
+#ifdef LL_DISCORD
+    // The account's settings, so only once there is an account. The sharing
+    // options follow the first box by themselves from here; this catches them
+    // up when the window was built before login.
+    getChildView("enable_discord")->setEnabled(true);
+    const bool discord = gSavedPerAccountSettings.getBOOL("ALDiscordIntegration");
+    for (const char* name : { "show_name", "show_location", "discord_max_maturity" })
+    {
+        getChildView(name)->setEnabled(discord);
+    }
+#endif
 }
 
 

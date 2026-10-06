@@ -24,8 +24,8 @@
 
 #include "linden_common.h"
 
-#include "../alhistorylist.h"
-#include "../alpanelist.h"
+#include "alhistorylist.h"
+#include "alpanelist.h"
 
 #include "../llscrolllistcolumn.h"
 #include "../llscrolllistctrl.h"

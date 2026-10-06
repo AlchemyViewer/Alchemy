@@ -24,8 +24,8 @@
 
 #include "linden_common.h"
 
-#include "../albracketindex.h"
-#include "../alsyntaxhighlighter.h"
+#include "albracketindex.h"
+#include "alsyntaxhighlighter.h"
 
 #include "../test/lltut.h"
 

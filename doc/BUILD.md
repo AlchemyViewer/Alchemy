@@ -296,7 +296,7 @@ Ninja and Xcode presets are multi-config; Visual Studio presets always are. Ever
 Override any option at configure time with `-D<NAME>=<VALUE>`. For example:
 
 ```
-cmake -S indra --preset ninja-os -DAL_BUILD_TESTS=ON -DAL_USE_FMODSTUDIO=ON
+cmake -S indra --preset ninja-os -DAL_BUILD_TESTS=ON -DAL_USE_OPENAL=ON
 ```
 
 Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The most commonly used:
@@ -321,15 +321,33 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 |:--------------------|:--------|:---------------------------------------------------------------------|
 | `AL_USE_FAUDIO`     | ON      | FAudio audio engine                                                  |
 | `AL_USE_OPENAL`     | OFF     | OpenAL audio engine                                                  |
-| `AL_USE_FMODSTUDIO` | OFF     | FMOD Studio audio engine (proprietary; `AL_FMODSTUDIO_SDK_DIR` names the SDK, or the Windows installer's registry entry does) |
+| `AL_USE_FMODSTUDIO` | ON      | FMOD Studio audio engine, which takes precedence over the others (needs `AL_ENABLE_PROPRIETARY`, so off in `-os` builds, and access to the private registry) |
 
 ### Proprietary SDKs
 
 | Option           | Default | Description                                                                 |
 |:-----------------|:--------|:----------------------------------------------------------------------------|
 | `AL_ENABLE_PROPRIETARY` | OFF | Allow the non-free libraries below                                     |
-| `AL_USE_KDU`     | ON      | Kakadu JPEG2000 codec (needs `AL_ENABLE_PROPRIETARY`)                       |
-| `AL_USE_DISCORD` | OFF     | Discord presence through the Social SDK (needs `AL_ENABLE_PROPRIETARY`; `AL_DISCORD_SDK_DIR` names the SDK unpacked from the developer portal) |
+| `AL_USE_KDU`     | OFF     | Kakadu JPEG2000 codec (needs `AL_ENABLE_PROPRIETARY`)                       |
+| `AL_USE_DISCORD` | ON      | Discord rich presence through the Social SDK (needs `AL_ENABLE_PROPRIETARY` and access to the private registry; held off on Linux arm64, which the SDK is not built for) |
+
+Some proprietary ports come from AlchemyViewer's private vcpkg registry,
+`https://github.com/AlchemyViewer/private-registry`, which
+`indra/vcpkg-configuration.json` lists beside the public one. vcpkg fetches it
+with plain git, and only when an option above asks for one of its ports, so an
+open-source build never touches it. To use it, `git ls-remote` on that URL
+must succeed without a prompt, through Git Credential Manager or
+`gh auth setup-git`. With SSH keys only, send the organisation's HTTPS URLs
+over SSH, from inside the viewer checkout so the rewrite stays with it:
+
+```
+git config --local url."git@github.com:AlchemyViewer/".insteadOf "https://github.com/AlchemyViewer/"
+```
+
+With `--global` instead, it applies to every AlchemyViewer clone on the
+machine.
+
+The registry's README covers CI and adding ports.
 
 ### Profiling
 

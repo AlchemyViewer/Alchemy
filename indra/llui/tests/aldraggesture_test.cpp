@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../aldraggesture.h"
+#include "aldraggesture.h"
 
 #include "../test/lltut.h"
 

@@ -217,6 +217,9 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocaret.cpp
     alscriptstudiochecking.cpp
     alscriptstudiocommands.cpp
+    alscriptstudiocomparepairs.cpp
+    alscriptstudiocomparewith.cpp
+    alscriptstudioexpandedcompare.cpp
     alscriptstudiodoc.cpp
     alscriptstudiofileio.cpp
     alscriptstudioglue.cpp
@@ -224,7 +227,9 @@ if(AL_BUILD_VIEWER)
     alscriptstudioorphans.cpp
     alscriptstudioplaces.cpp
     alscriptstudiohistory.cpp
+    alscriptstudiomerging.cpp
     alscriptstudiorecovery.cpp
+    alscriptstudioselections.cpp
     alrecovery.cpp
     alrecoverykeeper.cpp
     alscriptstudiosaving.cpp
@@ -1063,6 +1068,9 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocaret.h
     alscriptstudiochecking.h
     alscriptstudiocommands.h
+    alscriptstudiocomparepairs.h
+    alscriptstudiocomparewith.h
+    alscriptstudioexpandedcompare.h
     alscriptstudiodoc.h
     alscriptstudiofileio.h
     alscriptstudioglue.h
@@ -1071,7 +1079,9 @@ if(AL_BUILD_VIEWER)
     alscriptstudiopane.h
     alscriptstudioplaces.h
     alscriptstudiohistory.h
+    alscriptstudiomerging.h
     alscriptstudiorecovery.h
+    alscriptstudioselections.h
     alrecovery.h
     alrecoverykeeper.h
     alscriptstudiosaving.h
@@ -1837,6 +1847,12 @@ if(AL_BUILD_VIEWER)
     roles_constants.h
   )
 
+  # Discord rich presence, over the SDK from the private registry.
+  if(AL_USE_DISCORD)
+    list(APPEND viewer_SOURCES aldiscordmanager.cpp)
+    list(APPEND viewer_HEADERS aldiscordmanager.h)
+  endif()
+
   # The version as one line, for the hosted build's metadata.
   file(
     WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
@@ -2596,6 +2612,58 @@ if(AL_BUILD_TESTS)
   # compared and put back over tabs of their own editors.
   al_add_test(
     alscriptstudiohistory
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A Script Studio window's Compare With over tabs of their own editors:
+  # what a tab is offered, and each kind of thing chosen set beside it.
+  al_add_test(
+    alscriptstudiocomparewith
+    UNIT
+    PROJECT ${test_project}
+    SOURCES alscriptstudiohistory.cpp
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A Script Studio window's comparison lined up by its texts' functions,
+  # over tabs of their own editors: each text's outline asked for as it is
+  # another, and the two paired.
+  al_add_test(
+    alscriptstudiocomparepairs
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A Script Studio window's source beside what a save sends of it, lined
+  # up by the preprocessor's map, over tabs of their own editors.
+  al_add_test(
+    alscriptstudioexpandedcompare
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A Script Studio window's merges over tabs of their own editors and
+  # comparisons: begun, settled, and compared where they cannot be.
+  al_add_test(
+    alscriptstudiomerging
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A Script Studio window's selections held and compared, over tabs of
+  # their own editors and comparisons.
+  al_add_test(
+    alscriptstudioselections
     UNIT
     PROJECT ${test_project}
     LIBRARIES al_studio_test_common llui alscript ${test_libs}

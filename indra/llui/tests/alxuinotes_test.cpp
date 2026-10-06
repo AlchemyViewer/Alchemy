@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alxuinotes.h"
+#include "alxuinotes.h"
 
 #include "../lluictrlfactory.h"
 

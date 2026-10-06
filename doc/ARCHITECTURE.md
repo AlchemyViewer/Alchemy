@@ -26,7 +26,7 @@
 - **llaudio** - Audio engine abstraction (OpenAL or FMOD Studio, Vorbis decoding)
 
 **UI layer:**
-- **llui** - UI widget framework: panels, floaters, buttons, text editors, lists, toolbars, notifications. Layout defined in XUI (XML) files. Includes spell-check via Hunspell
+- **llui** - UI widget framework: panels, floaters, buttons, text editors, lists, toolbars, notifications. Layout defined in XUI (XML) files. Includes spell-check via Hunspell. Linden Lab's widgets sit at its top as upstream has them; Alchemy's own are in folders, each on the include path: `base/` (view types, skin words, surfaces, matching), `text/` (`ALTextView` and its document, undo, editing, layout, search, ruler, find bar), `code/` (`ALCodeEditor`, completion, fixes, folds, the grammar and highlighter, the keymap), `diff/` (`ALTextDiff`, `ALDiffView`), `vim/`, `xui/` (XUI Studio's model), `fields/` (the property grid and its field editors), `studio/` (a studio window's panes, folds, docks, quick open) and `widgets/`
 
 **Application layer:**
 - **lllogin** - Login subsystem

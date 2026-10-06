@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alxuisourcemap.h"
+#include "alxuisourcemap.h"
 #include "../lldraghandle.h"
 #include "../llfloater.h"
 #include "../llpanel.h"

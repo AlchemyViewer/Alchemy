@@ -25,7 +25,7 @@
 
 #include "linden_common.h"
 
-#include "../almenuslot.h"
+#include "almenuslot.h"
 
 #include "../llmenugl.h"
 #include "../lluictrl.h"

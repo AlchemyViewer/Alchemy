@@ -25,7 +25,7 @@
 
 #include "linden_common.h"
 
-#include "../altextfind.h"
+#include "altextfind.h"
 
 #include "../test/lltut.h"
 

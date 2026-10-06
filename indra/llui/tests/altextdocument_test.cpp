@@ -24,9 +24,9 @@
 
 #include "linden_common.h"
 
-#include "../altextdocument.h"
+#include "altextdocument.h"
 
-#include "../altextchars.h"
+#include "altextchars.h"
 #include "llstring.h"
 
 #include "../test/lltut.h"
@@ -483,5 +483,66 @@ namespace tut
         ensure("not between them", !batch.replacedAround(ALTextPos(0, 4)) && !batch.replacedAround(ALTextPos(0, 5)));
         ensure("nor at an end", !batch.replacedAround(ALTextPos(0, 8)));
         ensure("between them, moved by the first", batch.placed(ALTextPos(0, 5)) == ALTextPos(0, 4));
+    }
+    template<> template<>
+    void altextdocument_object::test<21>()
+    {
+        set_test_name("a text's lines, whatever its endings, as a character at a time reads them: CRLF and a lone CR as LF, at the ends too, and a CR far on");
+        // Each character read in turn: what the lines are.
+        const auto reference = [](const std::string& text) {
+            std::vector<std::string> out(1);
+            for (size_t i = 0; i < text.size(); ++i)
+            {
+                if (text[i] == '\r' || text[i] == '\n')
+                {
+                    if (text[i] == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
+                    {
+                        ++i;
+                    }
+                    out.emplace_back();
+                }
+                else
+                {
+                    out.back().push_back(text[i]);
+                }
+            }
+            return out;
+        };
+        std::vector<std::string> texts = { "", "\r", "\n", "\r\n", "\n\r", "\r\r\n", "a\r", "a\r\n", "\ra", "a\rb\r\nc\nd\r\re",
+                                           std::string(500, 'x') + "\n" + std::string(30, 'y') + "\r" };
+        std::string many;
+        for (S32 n = 0; n < 2000; ++n)
+        {
+            many += "line " + std::to_string(n) + "\n";
+        }
+        texts.push_back(many + "a lone CR far on\rand after it");
+        // And texts of the three endings and letters, at random but the same
+        // each run.
+        U32 seed = 12345;
+        for (S32 t = 0; t < 300; ++t)
+        {
+            std::string text;
+            const S32   length = static_cast<S32>((seed = seed * 1103515245u + 12345u) >> 16) % 40;
+            for (S32 c = 0; c < length; ++c)
+            {
+                seed = seed * 1103515245u + 12345u;
+                text.push_back("ab\r\n"[(seed >> 16) % 4]);
+            }
+            texts.push_back(text);
+        }
+        for (const std::string& text : texts)
+        {
+            const ALTextDocument           doc(text);
+            const std::vector<std::string> want = reference(text);
+            std::vector<std::string>       got;
+            for (S32 l = 0; l < doc.lineCount(); ++l)
+            {
+                got.push_back(doc.line(l));
+            }
+            ensure("the lines of a text of " + std::to_string(text.size()) + " bytes", got == want);
+            ALTextDocument replaced("something else\nfirst");
+            replaced.setText(text);
+            ensure_equals("the same put in over another", replaced.text(), doc.text());
+        }
     }
 }

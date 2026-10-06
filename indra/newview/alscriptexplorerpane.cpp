@@ -899,10 +899,16 @@ void ALScriptExplorerPane::compare(const Choice& first, const Choice& second)
     mWindow->compareItems(open.ref(), open.name, title(open), other.ref(), title(other));
 }
 
-void ALScriptExplorerPane::compareWith(const Choice& row)
+std::vector<ALScriptExplorerPane::Choice> ALScriptExplorerPane::comparable(const Choice& row) const
 {
     std::vector<Choice> others = mModel.comparableWith(row);
     others.erase(std::remove_if(others.begin(), others.end(), [this](const Choice& one) { return !readable(one); }), others.end());
+    return others;
+}
+
+void ALScriptExplorerPane::compareWith(const Choice& row)
+{
+    const std::vector<Choice> others = comparable(row);
     if (others.empty())
     {
         LLStringUtil::format_map_t args;

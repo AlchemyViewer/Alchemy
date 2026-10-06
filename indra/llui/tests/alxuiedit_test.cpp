@@ -24,11 +24,11 @@
 
 #include "linden_common.h"
 
-#include "../alxuiedit.h"
+#include "alxuiedit.h"
 
-#include "../alxuiselection.h"
+#include "alxuiselection.h"
 
-#include "../alxuicatalog.h"
+#include "alxuicatalog.h"
 #include "../llpanel.h"
 #include "../lluictrlfactory.h"
 

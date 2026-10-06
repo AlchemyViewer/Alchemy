@@ -387,7 +387,7 @@ void ALScriptStudioSaving::save(Doc& doc)
         case ALScriptSaveFlow::Route::StoppedByWorld:
             // Saved elsewhere since this tab had it: saving would replace
             // that. The author says whether to, to reload, or to compare.
-            mServices.report(mServices.words("SaveWorldMoved", args), true, &doc, { "save_anyway", "reload_world", "compare_world" });
+            mServices.report(mServices.words("SaveWorldMoved", args), true, &doc, { "save_anyway", "reload_world", "merge_world", "compare_world" });
             stopped(doc);
             return;
         case ALScriptSaveFlow::Route::Notecard:
@@ -600,8 +600,9 @@ void ALScriptStudioSaving::savedElsewhere(const ALScriptSaved& saved)
                                  [&doc]() { return doc.editor->undoJournal().savedText(); }))
     {
         case ALScriptSaved::Heard::Same:
-            // What is here is what went up.
+            // What is here is what went up, a merge in it with it.
             doc.editor->resetDirty();
+            doc.merged.reset();
             mTabs.refreshToolbar();
             return;
         case ALScriptSaved::Heard::Keep:
@@ -619,7 +620,7 @@ void ALScriptStudioSaving::savedElsewhere(const ALScriptSaved& saved)
             args["[WHO]"]  = mServices.words(saved.sender.origin == ALScriptOrigin::Bridge   ? "SavedByBridge"
                                              : saved.sender.origin == ALScriptOrigin::Editor ? "SavedByEditor"
                                                                                                     : "SavedByQueue");
-            mServices.report(mServices.words("SavedElsewhereConflict", args), true, &doc, { "take_saved", "keep_saved", "compare_saved" });
+            mServices.report(mServices.words("SavedElsewhereConflict", args), true, &doc, { "take_saved", "keep_saved", "merge_saved", "compare_saved" });
             return;
         }
         case ALScriptSaved::Heard::Take:
@@ -639,6 +640,7 @@ void ALScriptStudioSaving::takeSaved(Doc& doc)
     // step back in the undo; the server holds it, so nothing to save.
     doc.carriedText = std::move(*doc.savedThere);
     doc.savedThere.reset();
+    doc.merged.reset();
     mWindow.takeCarried(doc);
     doc.editor->resetDirty();
     mTabs.refreshToolbar();
@@ -652,6 +654,7 @@ void ALScriptStudioSaving::keepSaved(Doc& doc)
     }
     // What was typed here kept; saving it replaces what was saved there.
     doc.savedThere.reset();
+    doc.merged.reset();
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
     mServices.setStatus(mServices.words("SavedElsewhereKept", args));
@@ -730,6 +733,12 @@ void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
     if (ours)
     {
         doc.editor->markSavedAt(doc.save.savePoint());
+        // A merge the text sent carried is kept for good: undoing it now
+        // is an edit like any.
+        if (doc.merged && doc.save.savePoint().serial >= doc.merged->serial)
+        {
+            doc.merged.reset();
+        }
         doc.targetChosen = false;
         // The experience it was sent with is the one it runs under now:
         // picked here, or asked of the region by the save itself where

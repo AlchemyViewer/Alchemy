@@ -673,6 +673,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALScriptStudioDiffAlgorithm</key>
+        <map>
+            <key>Comment</key>
+            <string>How Script Studio's comparisons, and a notecard's, choose the lines that stay: histogram, patience, minimal or structural.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>histogram</string>
+        </map>
         <key>ALScriptStudioCaretStyle</key>
         <map>
             <key>Comment</key>
@@ -1013,6 +1024,17 @@
             <string>String</string>
             <key>Value</key>
             <string></string>
+        </map>
+        <key>FMODResampleMethod</key>
+        <map>
+            <key>Comment</key>
+            <string>The resampler FMOD Studio uses for a sound whose sample rate is not the output's: 0 Linear, 1 Cubic, 2 Spline, the slowest and the best. Takes effect when audio next starts.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>2</integer>
         </map>
         <key>AudioFAudioInnerRadius</key>
         <map>

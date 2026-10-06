@@ -27,7 +27,7 @@
 
 #include "linden_common.h"
 
-#include "../altextdocument.h"
+#include "altextdocument.h"
 #include "../llaccordionctrl.h"
 #include "../lllayoutstack.h"
 #include "../llui.h"

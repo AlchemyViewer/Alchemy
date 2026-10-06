@@ -34,7 +34,12 @@
 #include "alscriptstudiocommands.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudiocomparepairs.h"
+#include "alscriptstudiocomparewith.h"
+#include "alscriptstudioexpandedcompare.h"
 #include "alscriptstudiohistory.h"
+#include "alscriptstudiomerging.h"
+#include "alscriptstudioselections.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudiosaving.h"
 #include "alscriptstudiotabs.h"
@@ -130,7 +135,10 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptReferencesPane::Window, public ALScriptOutlinePane::Window,
                                     public ALScriptCrumbsBar::Window, public ALScriptInspectorPane::Window,
                                     public ALScriptStudioCaret::Window, public ALScriptStudioChecking::Window,
-                                    public ALScriptObjectCheck::Window, public ALScriptRecompile::Window, public ALScriptStudioHistory::Window
+                                    public ALScriptObjectCheck::Window, public ALScriptRecompile::Window, public ALScriptStudioHistory::Window,
+                                    public ALScriptStudioCompareWith::Window, public ALScriptStudioMerging::Window,
+                                    public ALScriptStudioSelections::Window, public ALScriptStudioExpandedCompare::Window,
+                                    public ALScriptStudioComparePairs::Window
 {
     friend class LLFloaterReg;
 
@@ -196,6 +204,9 @@ public:
 
     // A word of the language, as the region defines it (ALScriptStudioWords).
     typedef ALScriptStudioWords::Vocab Vocab;
+    // How long a tab's changes stop before a comparison following it is
+    // made again, in seconds.
+    static constexpr F64 COMPARE_SETTLE = 0.3;
     // The least and the most a zoom takes the text to, in points
     // (ALScriptStudio::editorFont).
     static constexpr F32 MIN_TEXT_POINTS = 6.f;
@@ -343,6 +354,11 @@ private:
     // A notecard's editor takes the notecards' own wrap and line numbers,
     // counted from 0 where that is asked for.
     void                      applyEditorOptions(ALCodeEditor& editor, bool notecard = false);
+    // The keys every editor shares, vim's among them where it is on.
+    void                      applyEditorKeys(ALCodeEditor& editor);
+    // A comparison's sides in the editors' face and keys, but for what
+    // would part the sides: wrapping, folding.
+    void                      applyCompareOptions(ALDiffView& view);
     // The expanded text put in the document's other editor, which is shown
     // once there is one where the tab asked for it.
     void                      showExpanded(Doc& doc, const std::string& text) override;
@@ -834,13 +850,28 @@ private:
     void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
                  const std::string& right_title) override;
     // A comparison shown in the tab's editor's place, lined up at the
-    // anchors where there are any; what is typed in it goes to the source,
+    // ranges where there are any; what is typed in it goes to the source,
     // at the line the caret is on.
     void showCompare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title, const std::string& right_title,
-                     const std::vector<std::pair<S32, S32>>& anchors);
+                     const ALTextDiff::ranges_t& ranges);
     // A comparison whose right is the tab's text titled again, unsaved or
     // not as the tab now is.
-    void retitleCompare(const Doc& doc) const;
+    void retitleCompare(const Doc& doc) const override;
+    // Another text beside the tab's own, which the comparison follows as
+    // the tab changes: under the other's title and the tab's, "now" where
+    // none is given; lined up at the ranges where there are any -- the LSL
+    // a conversion was made from against the SLua it wrote, whose changes
+    // are no one's to take back.
+    void compareWithTab(Doc& doc, const std::string& theirs, const std::string& their_title, const std::string& own_title = std::string(),
+                        const ALTextDiff::ranges_t& ranges = {}) override;
+    // A comparison that follows its tab made again from the tab's text,
+    // where the tab has changed since.
+    void refreshCompare(Doc& doc);
+    // Every comparison inline or side by side, as the last was asked for.
+    void setCompareInline(bool inline_view);
+    // How every comparison chooses the lines that stay, kept in the
+    // settings for those to come.
+    void setCompareAlgorithm(ALTextDiff::Algorithm algorithm);
     void endCompare(Doc& doc) override;
     // A tab made to hold a kept text with nothing loaded under it: unsaved,
     // with whatever its script or file was.
@@ -951,6 +982,32 @@ private:
     void compareItems(const ALScriptRef& first, const std::string& name, const std::string& first_title, const ALScriptRef& second,
                       const std::string& second_title) override;
     void showHistory(const ALScriptRef& ref, const std::string& name) override;
+    // An item's text, once loaded, set beside a tab's under the two titles.
+    void compareWithLoaded(Doc& doc, const std::string& own_title, const ALScriptRef& other, const std::string& other_title);
+    // What Compare With asks of the window (ALScriptStudioCompareWith::Window).
+    void compareWithItem(Doc& doc, const ALScriptStudioCompareWith::Item& item, const std::string& title) override;
+    void offerHistory(Doc& doc) override { mHistory.show(doc); }
+    std::optional<std::string>                    clipboardText() const override;
+    std::vector<std::string>                      recentFiles() const override { return mFiles.recentFiles(); }
+    std::vector<ALScriptStudioCompareWith::Item> itemsLike(const Doc& doc) const override;
+    // What a merge asks of the window (ALScriptStudioMerging::Window).
+    void loadWorld(Doc& doc, std::function<void(Doc& doc, const std::string& text, const LLUUID& asset)> loaded) override;
+    // What comparing selections asks of the window (ALScriptStudioSelections::Window).
+    LLView* typeInSource(Doc& doc, const ALTextPos& at) override;
+    // What comparing the source with its expansion asks of the window
+    // (ALScriptStudioExpandedCompare::Window).
+    void compareRanged(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
+                       const std::string& right_title, const ALTextDiff::ranges_t& ranges) override
+    {
+        showCompare(doc, left, right, left_title, right_title, ranges);
+    }
+    void preprocess(Doc& doc) override { mSaving.preprocess(doc); }
+    // What lining a comparison up by its functions asks of the window
+    // (ALScriptStudioComparePairs::Window).
+    void askShape(ALScriptAnalysis::Request request, ALScriptAnalysis::callback_t answered) override
+    {
+        ALScriptAnalysis::instance().ask(std::move(request), std::move(answered));
+    }
     // What the Search tab asks of the window (ALScriptSearchPane::Window).
     void listObjects(const LLUUID& only, std::function<void(std::vector<ALScriptSearchPane::Window::Object>)> told) override;
     std::string                                     objectName(const LLUUID& root) const override;
@@ -1262,6 +1319,16 @@ private:
     ALScriptStudioRecovery             mRecovery{ *this, *this, *this };
     // What its items were saved as before, to compare and put back.
     ALScriptStudioHistory              mHistory{ *this, *this };
+    // Whatever a tab may be set beside, picked from one list.
+    ALScriptStudioCompareWith          mCompareWith{ *this, *this };
+    // A save that came up against another, settled conflict by conflict.
+    ALScriptStudioMerging              mMerging{ *this, *this };
+    // A selection held, to compare with another.
+    ALScriptStudioSelections           mSelections{ *this, *this };
+    // The source beside what a save sends of it.
+    ALScriptStudioExpandedCompare      mExpandedCompare{ *this, *this };
+    // A comparison lined up by its texts' functions.
+    ALScriptStudioComparePairs         mComparePairs{ *this, *this };
     // What the region said an object reserves, heard.
     boost::signals2::scoped_connection mRegionUsageConnection;
     // Saving and compiling the tabs.

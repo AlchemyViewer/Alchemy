@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../altextcarets.h"
+#include "altextcarets.h"
 
 #include "../test/lltut.h"
 

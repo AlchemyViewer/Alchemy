@@ -106,6 +106,10 @@ public:
     // The script's globals, functions and states, with each state's
     // events one deeper, in the order written.
     std::vector<ALScriptOutlineEntry> outline(std::string_view source);
+    // The same, `detailed` or from a parse alone: no declaration's words,
+    // no symbols worked out, and the tree kept for the other questions
+    // left as it is, so another text's shape costs this one nothing.
+    std::vector<ALScriptOutlineEntry> outline(std::string_view source, bool detailed);
     // Every name in the script by what its symbol is: a parameter, a
     // local, a global, a function, a state, an event, a label, a builtin
     // constant or function; and whether it is declared there. In order,

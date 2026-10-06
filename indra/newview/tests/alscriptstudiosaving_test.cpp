@@ -777,7 +777,7 @@ namespace tut
         type(dirty, "\n// mine");
         saving.savedElsewhere(saved(dirty, "default {}\n// theirs", ALScriptOrigin::Bridge));
         ensure_equals("asked whose to keep", lastSaid(), std::string("SavedElsewhereConflict"));
-        ensure("with the three answers", services.reports.back().actions == Names{ "take_saved", "keep_saved", "compare_saved" });
+        ensure("with the four answers", services.reports.back().actions == Names{ "take_saved", "keep_saved", "merge_saved", "compare_saved" });
         ensure("nothing taken yet", dirty.editor->wholeText() == "default {}\n// mine" && dirty.savedThere);
         saving.takeSaved(dirty);
         ensure("theirs taken, and nothing to save", dirty.editor->wholeText() == "default {}\n// theirs" && !dirty.editor->isDirty());
@@ -832,7 +832,7 @@ namespace tut
         type(doc, "x");
         saving.save(doc);
         ensure_equals("moved: said", lastSaid(), std::string("SaveWorldMoved"));
-        ensure("with what can be done", services.reports.back().actions == Names{ "save_anyway", "reload_world", "compare_world" });
+        ensure("with what can be done", services.reports.back().actions == Names{ "save_anyway", "reload_world", "merge_world", "compare_world" });
         ensure("and not sent", studio.sent.size() == 1 && !doc.save.underway());
         saving.saveAsked(doc);
         ensure_equals("asked again: sent over it", studio.sent.size(), size_t(2));
@@ -857,5 +857,35 @@ namespace tut
         ensure("typed, and theirs is new: asked", ALScriptSaved::heard("a", "b", true, last_was("c")) == Heard::Ask);
         ensure("typed, nothing known of the last save: asked", ALScriptSaved::heard("a", "b", true, last_was(std::nullopt)) == Heard::Ask);
         ensure_equals("asked where it was needed", asked, 3);
+    }
+
+    template<> template<>
+    void alscriptstudiosaving_object::test<17>()
+    {
+        set_test_name("a merge is kept for good once a save that carries it is saved; a save sent before it leaves it to be undone");
+        ALScriptStudioSaving& saving = make();
+        // As ALScriptStudioMerging keeps a merge just put in: the step it
+        // made, and what it set aside.
+        const auto merged = [](Doc& doc) {
+            Doc::Merged made;
+            made.serial     = doc.editor->savePoint().serial;
+            made.savedThere = std::string("theirs");
+            doc.merged      = std::move(made);
+        };
+
+        Doc& doc = tab("a", "default {}");
+        type(doc, "\n// merged");
+        merged(doc);
+        saving.save(doc);
+        saving.compiled(answer(doc));
+        ensure("saved with it: kept for good", !doc.merged);
+
+        Doc& early = tab("b", "default {}");
+        type(early, "\n// typed");
+        saving.save(early);
+        type(early, "\n// merged while it went");
+        merged(early);
+        saving.compiled(answer(early));
+        ensure("sent before it: still to be undone", early.merged && early.merged->savedThere == std::string("theirs"));
     }
 }

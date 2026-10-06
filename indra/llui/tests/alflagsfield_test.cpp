@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alflagsfield.h"
+#include "alflagsfield.h"
 
 #include "../llcheckboxctrl.h"
 #include "../lluictrlfactory.h"

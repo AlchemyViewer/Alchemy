@@ -24,10 +24,10 @@
 
 #include "linden_common.h"
 
-#include "../alkeycapture.h"
+#include "alkeycapture.h"
 
-#include "../alkeychord.h"
-#include "../alpopover.h"
+#include "alkeychord.h"
+#include "alpopover.h"
 #include "../llfloater.h"
 #include "../llfocusmgr.h"
 #include "../lltextbox.h"

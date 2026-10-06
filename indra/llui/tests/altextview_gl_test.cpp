@@ -28,9 +28,9 @@
 
 #include "../../llrender/tests/llheadlessgl_fixture.h"
 
-#include "../alcodeeditor.h"
-#include "../altextruler.h"
-#include "../altextview.h"
+#include "alcodeeditor.h"
+#include "altextruler.h"
+#include "altextview.h"
 #include "../llui.h"
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
@@ -89,6 +89,46 @@ namespace
             out[i] = rgba[i * 4];
         }
         return out;
+    }
+
+    // A view that is a white box: an atom's view, to see where it is drawn.
+    struct WhiteBox : public LLView
+    {
+        explicit WhiteBox(const LLView::Params& p) : LLView(p) {}
+        void draw() override { gl_rect_2d(getLocalRect(), LLColor4::white, true); }
+    };
+
+    // A view drawn where it is in a window, not at the window's corner:
+    // what is drawn past its edges lands where it can be seen.
+    std::vector<U8> drawnAt(LLView& view)
+    {
+        gl().clearFramebuffer();
+        glEnable(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+        LLUI::pushMatrix();
+        LLUI::translate(static_cast<F32>(view.getRect().mLeft), static_cast<F32>(view.getRect().mBottom));
+        view.draw();
+        LLUI::popMatrix();
+        gGL.flush();
+        glDisable(GL_BLEND);
+        glFinish();
+        return ll_test::readFramebufferRGBA(W, H);
+    }
+
+    // How many pixels of a stretch of the window, rows [bottom, top) and
+    // columns [left, right), anything was drawn in.
+    S32 drawnIn(const std::vector<U8>& rgba, S32 left, S32 right, S32 bottom, S32 top)
+    {
+        S32 found = 0;
+        for (S32 y = llmax(0, bottom); y < llmin(H, top); ++y)
+        {
+            for (S32 x = llmax(0, left); x < llmin(W, right); ++x)
+            {
+                const U8* px = &rgba[(static_cast<size_t>(y) * W + x) * 4];
+                found += (px[0] | px[1] | px[2]) != 0 ? 1 : 0;
+            }
+        }
+        return found;
     }
 }
 
@@ -606,5 +646,121 @@ namespace tut
                with_many == capture.size());
         gFocusMgr.setKeyboardFocus(nullptr);
         view->die();
+    }
+    // A gap: its tint across the text and nothing else in it, the line
+    // under it drawn as far down as the gap is tall, and the rows below
+    // the text drawn too.
+    template<> template<>
+    void altextview_gl_object::test<9>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "view";
+        p.rect         = LLRect(0, H, W, 0);
+        p.default_text = "MMMMMMMM\nMMMMMMMM\nMMMMMMMM";
+        // The skin's colours are not loaded here: the text's is given, on
+        // black.
+        p.text_color   = LLUIColor(LLColor4::white);
+        p.bg_visible   = false;
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        const auto frame = [&]() {
+            gl().clearFramebuffer();
+            glEnable(GL_BLEND);
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
+            view->draw();
+            gGL.flush();
+            glDisable(GL_BLEND);
+            glFinish();
+            return ll_test::readFramebufferRGBA(W, H);
+        };
+        // How many pixels in a band of the view's rows, from a row's top
+        // down so many rows, are lit in a channel over a floor.
+        const S32  row_h  = view->layout().rowHeight();
+        const LLRect text = view->textRect();
+        const auto lit    = [&](const std::vector<U8>& rgba, S32 from_row, S32 rows, S32 channel, U8 floor) {
+            S32 count = 0;
+            for (S32 y = text.mTop - (from_row + rows) * row_h; y < text.mTop - from_row * row_h; ++y)
+            {
+                for (S32 x = text.mLeft; x < text.mRight; ++x)
+                {
+                    count += rgba[(static_cast<size_t>(y) * W + x) * 4 + channel] > floor ? 1 : 0;
+                }
+            }
+            return count;
+        };
+        const std::vector<U8> before = frame();
+        ensure("the second line's ink in its row", lit(before, 1, 1, 0, 128) > 20);
+
+        std::vector<ALTextView::LineAnnotation> lines(4);
+        lines[1].gap     = 2;
+        lines[1].gapTint = LLColor4(0.f, 0.f, 1.f, 1.f);
+        lines[3].gap     = 1;
+        lines[3].gapTint = LLColor4(0.f, 1.f, 0.f, 1.f);
+        view->setLineAnnotations(lines);
+        const std::vector<U8> after = frame();
+        const S32             width = text.getWidth();
+        ensure("the gap tinted across the text", lit(after, 1, 2, 2, 200) >= width * (2 * row_h - 2));
+        ensure("and nothing written in it", lit(after, 1, 2, 0, 128) == 0);
+        ensure("the line under it as far down", lit(after, 3, 1, 0, 128) > 20 && lit(after, 3, 1, 0, 128) == lit(before, 1, 1, 0, 128));
+        ensure("the first line where it was", lit(after, 0, 1, 0, 128) == lit(before, 0, 1, 0, 128));
+        ensure("the rows below the text tinted", lit(after, 5, 1, 1, 200) >= width * (row_h - 2) && lit(after, 6, 1, 1, 200) == 0);
+        view->die();
+    }
+
+    // What goes by row is cut at the text's edge: a code editor scrolled
+    // half a row has its top row's number in the gutter cut there, not
+    // drawn above the editor; and an atom's view on that row cut too.
+    template<> template<>
+    void altextview_gl_object::test<10>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name              = "editor";
+        p.rect              = LLRect(0, H / 2, W, 20);
+        p.show_line_numbers = true;
+        p.text_color        = LLUIColor(LLColor4::white);
+        p.bg_visible        = false;
+        std::string text;
+        for (S32 n = 0; n < 40; ++n)
+        {
+            text += "MMMM " + std::to_string(n) + "\n";
+        }
+        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        editor->setFont(LLFontGL::getFontMonospace());
+        editor->setText(text);
+        const S32 row_h = editor->layout().rowHeight();
+        const S32 above = editor->getRect().mTop;
+        editor->setScrollY(row_h / 2);
+        const std::vector<U8> frame = drawnAt(*editor);
+        ensure("the gutter drawn", drawnIn(frame, 0, W, editor->getRect().mBottom, above) > 0);
+        ensure("nothing of it above the editor", drawnIn(frame, 0, W, above, H) == 0);
+
+        // An atom's view on the first line, which is half out of sight.
+        LLView::Params bp(LLUICtrlFactory::getDefaultParams<LLView>());
+        bp.name = "box";
+        bp.rect = LLRect(0, row_h, 40, 0);
+        ALTextView::Atom atom;
+        atom.at    = ALTextPos(0, 0);
+        atom.width = 40;
+        atom.view  = new WhiteBox(bp);
+        editor->setAtoms({ atom });
+        editor->setScrollY(row_h / 2);
+        editor->placeAtomViews();
+        const std::vector<U8> with_atom = drawnAt(*editor);
+        const LLRect          area      = editor->textRect();
+        const S32             x0        = editor->getRect().mLeft + area.mLeft;
+        ensure("the atom drawn, in what of its row is in sight", drawnIn(with_atom, x0, x0 + 40, editor->getRect().mBottom + area.mTop - row_h / 2, editor->getRect().mBottom + area.mTop) > 0);
+        // A clip takes in the row its top edge names, as a rect is drawn.
+        ensure("nothing of it above the text", drawnIn(with_atom, x0, x0 + 40, editor->getRect().mBottom + area.mTop + 1, H) == 0);
+        editor->die();
     }
 }

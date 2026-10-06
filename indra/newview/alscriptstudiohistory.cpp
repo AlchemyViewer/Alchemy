@@ -27,9 +27,11 @@
 #include "alscriptstudiohistory.h"
 
 #include "alcodeeditor.h"
+#include "aldiffview.h"
 #include "alrecovery.h"
 #include "alscriptstudioservices.h"
 
+#include <algorithm>
 #include <cstdlib>
 
 ALScriptStudioHistory::ALScriptStudioHistory(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
@@ -109,13 +111,19 @@ void ALScriptStudioHistory::show(Doc& doc)
         nullptr);
 }
 
+// static
+bool ALScriptStudioHistory::read(ALSavedText& saved)
+{
+    const std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
+    return saved.whole || (history && history->load(saved));
+}
+
 bool ALScriptStudioHistory::compare(Doc& doc, ALSavedText saved)
 {
-    std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
-    LLStringUtil::format_map_t     args;
+    LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
     args["[WHEN]"] = ALRecoveryEntry::sayWhen(saved.when);
-    if (!saved.whole && (!history || !history->load(saved)))
+    if (!read(saved))
     {
         mServices.setStatus(mServices.words("HistoryUnreadable", args), true);
         return false;
@@ -125,14 +133,124 @@ bool ALScriptStudioHistory::compare(Doc& doc, ALSavedText saved)
     doc.historyShown         = std::move(saved);
     if (doc.loaded)
     {
-        mWindow.compare(doc, text, doc.editor->wholeText(), theirs, mServices.words("CompareNow"));
+        mWindow.compareWithTab(doc, text, theirs, mServices.words("CompareNow"), {});
+        versions(doc);
     }
     else
     {
         // Set beside the tab's text once there is one, as the Explorer's
         // Compare is.
-        doc.pendingCompare = Doc::PendingCompare{ text, theirs, mServices.words("CompareNow") };
+        const std::weak_ptr<bool> alive = mAlive;
+        doc.pendingCompare              = Doc::PendingCompare{ text, theirs, mServices.words("CompareNow") };
+        doc.pendingCompare->shown       = [this, alive](Doc& shown) {
+            if (alive.lock())
+            {
+                versions(shown);
+            }
+        };
     }
     mWindow.refreshNotice();
     return true;
+}
+
+// static
+void ALScriptStudioHistory::offerVersions(ALDiffView& view, const std::string& key, const std::string& shown,
+                                          std::function<void(ALSavedText saved)> stepped, std::function<void(const ALSavedText& saved)> unreadable)
+{
+    const std::shared_ptr<ALSaveHistory> history = ALRecovery::history();
+    if (!history || key.empty())
+    {
+        return;
+    }
+    // Listed newest first; the slider has them oldest first.
+    struct Saves
+    {
+        std::vector<ALSavedText> saves;
+        S32                      current = 0;
+    };
+    auto listed = std::make_shared<Saves>();
+    listed->saves = history->list(key);
+    std::reverse(listed->saves.begin(), listed->saves.end());
+    const auto at = std::find_if(listed->saves.begin(), listed->saves.end(), [&shown](const ALSavedText& save) { return save.path == shown; });
+    if (at == listed->saves.end())
+    {
+        return;
+    }
+    listed->current = static_cast<S32>(at - listed->saves.begin());
+    // The view holds this, and is there whenever it is called.
+    ALDiffView* const shows = &view;
+    view.setVersions(static_cast<S32>(listed->saves.size()), listed->current, [listed, shows, stepped, unreadable](S32 version) {
+        if (version < 0 || version >= static_cast<S32>(listed->saves.size()))
+        {
+            return;
+        }
+        // Read once and kept in the list: a slider dragged back and forth
+        // passes the same saves again.
+        ALSavedText& save = listed->saves[static_cast<size_t>(version)];
+        if (!read(save))
+        {
+            unreadable(save);
+            shows->showVersion(listed->current);
+            return;
+        }
+        listed->current = version;
+        stepped(save);
+    });
+}
+
+// static
+void ALScriptStudioHistory::letGo(Doc& doc)
+{
+    doc.historyShown.reset();
+    if (doc.compareView)
+    {
+        doc.compareView->setVersions(0, 0, nullptr);
+    }
+}
+
+void ALScriptStudioHistory::versions(Doc& doc)
+{
+    if (!doc.compareView || !doc.historyShown)
+    {
+        return;
+    }
+    const std::weak_ptr<bool> alive = mAlive;
+    const std::string         id    = doc.id;
+    offerVersions(
+        *doc.compareView, keyOf(doc), doc.historyShown->path,
+        [this, alive, id](ALSavedText saved) {
+            if (alive.lock())
+            {
+                step(id, std::move(saved));
+            }
+        },
+        [this, alive, id](const ALSavedText& saved) {
+            const Doc* doc = alive.lock() ? mServices.findDoc(id) : nullptr;
+            if (doc)
+            {
+                LLStringUtil::format_map_t args;
+                args["[NAME]"] = doc->name;
+                args["[WHEN]"] = ALRecoveryEntry::sayWhen(saved.when);
+                mServices.setStatus(mServices.words("HistoryUnreadable", args), true);
+            }
+        });
+}
+
+void ALScriptStudioHistory::step(const std::string& id, ALSavedText saved)
+{
+    // Still the comparison of a save, following the tab.
+    Doc* doc = mServices.findDoc(id);
+    if (!doc || !doc->compareView || !doc->compareTitles || !doc->historyShown)
+    {
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"]             = doc->name;
+    args["[WHEN]"]             = ALRecoveryEntry::sayWhen(saved.when);
+    const std::string text     = saved.text;
+    doc->historyShown          = std::move(saved);
+    doc->compareTitles->theirs = mServices.words("HistorySavedAt", args);
+    doc->compareView->setLeftText(text);
+    mWindow.retitleCompare(*doc);
+    mWindow.refreshNotice();
 }

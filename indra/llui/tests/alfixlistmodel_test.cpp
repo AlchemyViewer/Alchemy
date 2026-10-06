@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alfixlistmodel.h"
+#include "alfixlistmodel.h"
 
 #include "../test/lltut.h"
 

@@ -1214,4 +1214,30 @@ namespace tut
                                                     "if j == -1 or n == -1 or m == nil or ll.GetInventoryType(\"x\") == -1 then print(f(3)) end\n");
         ensure("none: " + (none.empty() ? std::string() : none[0]), none.empty());
     }
+
+    template<> template<>
+    void alluauservice_object::test<38>()
+    {
+        set_test_name("a shape is the outline from a parse alone: the same symbols and spans, no types; a text broken in places as far as it parses; the service as it was");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script =
+            "local count = 1\n"
+            "local function half(n: number)\n"
+            "    local function quarter() return n / 4 end\n"
+            "    return n / 2\n"
+            "end\n"
+            "function LLEvents.touch_start(n: number) end\n";
+        const std::vector<ALScriptOutlineEntry> outline = service.outline(script);
+        const std::vector<ALScriptOutlineEntry> shape   = ALLuauService::shape(script);
+        ensure_equals("as many", shape.size(), outline.size());
+        for (size_t i = 0; i < shape.size(); ++i)
+        {
+            ensure("the same symbol, where it was", shape[i].name == outline[i].name && shape[i].kind == outline[i].kind && shape[i].span == outline[i].span &&
+                                                         shape[i].depth == outline[i].depth);
+            ensure("no type", shape[i].detail.empty());
+        }
+        ensure("the outline still typed", service.outline(script)[0].detail == "number");
+        const std::vector<ALScriptOutlineEntry> broken = ALLuauService::shape("local function a()\n  x = \nend\nlocal function b()\nend\n");
+        ensure("broken in a: both still there", broken.size() == 2 && broken[0].name == "a" && broken[1].name == "b" && broken[1].span.line == 3);
+    }
 }

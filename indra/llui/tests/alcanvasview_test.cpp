@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alcanvasview.h"
+#include "alcanvasview.h"
 
 #include "../llfloater.h"
 #include "../lllineeditor.h"

@@ -28,8 +28,8 @@
 
 #include "../../llrender/tests/llheadlessgl_fixture.h"
 
-#include "../alsurface.h"
-#include "../altabstrip.h"
+#include "alsurface.h"
+#include "altabstrip.h"
 #include "../llui.h"
 #include "../lluictrlfactory.h"
 

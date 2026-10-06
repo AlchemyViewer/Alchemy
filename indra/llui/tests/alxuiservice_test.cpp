@@ -24,10 +24,10 @@
 
 #include "linden_common.h"
 
-#include "../alxuiservice.h"
+#include "alxuiservice.h"
 
-#include "../alxuiedit.h"
-#include "../alxuiselection.h"
+#include "alxuiedit.h"
+#include "alxuiselection.h"
 #include "../llbutton.h"
 #include "../llfloater.h"
 #include "../lllineeditor.h"

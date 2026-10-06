@@ -27,6 +27,7 @@
 #include "../alscriptstudiodoc.h"
 
 #include "../alnotecardembedded.h"
+#include "aldiffview.h"
 
 #include "alscriptstudio_fixture.h"
 
@@ -294,5 +295,32 @@ namespace tut
         Doc script, after;
         script.carryItemsTo(after);
         ensure("a script's tab carries nothing", !after.carriedEmbedded);
+    }
+
+    template<> template<>
+    void alscriptstudiodoc_object::test<9>()
+    {
+        set_test_name("undo takes back the view in front's steps, but the tab's own while a comparison that follows the tab is in front");
+        al_studio_test::StudioWindow window;
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name = "editor";
+        p.rect = LLRect(0, 200, 400, 0);
+        Doc doc;
+        doc.editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        window.floater->addChild(doc.editor);
+        ALDiffView::Params dp(LLUICtrlFactory::getDefaultParams<ALDiffView>());
+        dp.name         = "compare";
+        dp.rect         = LLRect(0, 200, 400, 0);
+        doc.compareView = LLUICtrlFactory::create<ALDiffView>(dp);
+        window.floater->addChild(doc.compareView);
+        ensure("the source's", doc.undoText() == doc.editor);
+        doc.view = Doc::View::Compare;
+        ensure("a comparison of texts of no tab's: its side's, which has none", doc.undoText() == doc.compareView->shown());
+        doc.compareTitles = Doc::CompareTitles{ "Saved", "Now" };
+        ensure("one that follows the tab: the tab's", doc.undoText() == doc.editor);
     }
 }

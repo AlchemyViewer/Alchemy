@@ -24,12 +24,13 @@
 
 #include "linden_common.h"
 
-#include "../alcodeeditor.h"
+#include "alcodeeditor.h"
 
-#include "../alchoicelist.h"
-#include "../alchoicepopup.h"
-#include "../alfindbar.h"
-#include "../alsurface.h"
+#include "alchangepeek.h"
+#include "alchoicelist.h"
+#include "alchoicepopup.h"
+#include "alfindbar.h"
+#include "alsurface.h"
 #include "../llclipboard.h"
 
 #include "../llfocusmgr.h"
@@ -2745,5 +2746,56 @@ namespace tut
         ensure("both folded", e.isFolded(0) && e.isFolded(4));
         ensure("the main one at its fold's line", e.selection() == caretAt(0, 3));
         ensure("the other at its own", e.otherSelections().size() == 1 && e.otherSelections()[0] == caretAt(4, 3));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<76>()
+    {
+        set_test_name("a host's hidden lines and the folds' apart: unfolding leaves the host's; the caret landing in them asks the host, else shows the line");
+        ALCodeEditor& e = make("default\n{\n    state_entry()\n    {\n        a();\n        b();\n    }\n}");
+        typedef ALTextLayout::HiddenBy By;
+        e.layout().setHidden(By::Host, 4, 5, true);
+        e.foldAll();
+        ensure("folded too", e.layout().hiddenBy(3, By::Folds) || e.layout().hiddenBy(4, By::Folds));
+        e.unfoldAll();
+        ensure("unfolded: the host's still hidden", e.layout().hidden(4) && e.layout().hidden(5) && !e.layout().hiddenBy(4, By::Folds));
+        S32 asked = -1;
+        e.setLineRevealer([&](S32 line) {
+            asked = line;
+            e.layout().setHidden(By::Host, 4, 5, false);
+        });
+        e.goTo(ALTextPos(5, 0));
+        ensure("the host asked, and showed its run", asked == 5 && !e.layout().hidden(4) && !e.layout().hidden(5));
+        e.layout().setHidden(By::Host, 4, 5, true);
+        e.setLineRevealer(nullptr);
+        e.goTo(ALTextPos(4, 0));
+        ensure("nobody to ask: the line shown, the rest left", !e.layout().hidden(4) && e.layout().hidden(5));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<77>()
+    {
+        set_test_name("a changed line's bar is found by the mouse: taken on hover, and says what a press does, ahead of the gutter's own tips");
+        ALCodeEditor& e = make("one\ntwo\nthree");
+        e.resetDirty();
+        e.goTo(ALTextPos(1, 0));
+        e.insertText("2");
+        ensure("barred", e.lineChanged(1) && !e.lineChanged(0));
+        const LLRect text = e.textRect();
+        const auto   rowY = [&](S32 line) { return text.mTop - (e.layout().lineTop(line) - e.scrollY()) - e.layout().lineHeight(line) / 2; };
+        const S32    bar  = e.leftEdge() + 1;
+        ensure_equals("on the bar", e.changeBarAt(bar, rowY(1)), 1);
+        ensure_equals("a line not changed", e.changeBarAt(bar, rowY(0)), -1);
+        ensure_equals("past the bar", e.changeBarAt(e.leftEdge() + 5, rowY(1)), -1);
+        ensure("hovered: taken", e.handleHover(bar, rowY(1), MASK_NONE));
+        ensure("a tip, not a card", e.handleToolTip(bar, rowY(1), MASK_NONE) && !e.cardShown());
+        ensure("a press peeks", e.handleMouseDown(bar, rowY(1), MASK_NONE) && e.changePeek() && e.changePeek()->isOpen());
+        e.closePeek();
+
+        // No gutter: nothing to point at.
+        e.setShowLineNumbers(false);
+        e.setShowFoldMarkers(false);
+        ensure_equals("no gutter", e.gutterWidth(), 0);
+        ensure_equals("no bar", e.changeBarAt(e.leftEdge() + 1, rowY(1)), -1);
     }
 }

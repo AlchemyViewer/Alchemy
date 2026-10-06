@@ -63,6 +63,9 @@ namespace
 
         std::function<void(S32 screen_x, S32 screen_y)> pressedAt;
         std::function<bool(S32 screen_x, S32 screen_y)> draggedTo;
+        // The text it is in, whose colours it is drawn in: given as it is
+        // made, rather than looked for up its parents a frame at a time.
+        const ALTextView*                                text = nullptr;
 
         bool handleMouseDown(S32 x, S32 y, MASK mask) override
         {
@@ -108,7 +111,6 @@ namespace
         // while it has the keyboard.
         void draw() override
         {
-            const ALTextView* text  = ALViewType::as<ALTextView>(getParent());
             const LLColor4    paper = text ? text->backgroundColor() : LLColor4::white;
             const LLColor4    ink   = text ? text->textColor() : LLColor4::black;
             const F32         alpha = getDrawContext().mAlpha * (isInEnabledChain() ? 1.f : 0.5f);
@@ -391,6 +393,7 @@ ALTextView::Atom ALNotecardEmbedded::atomFor(const ALTextPos& at, size_t index)
     button->setClickedCallback([this, item](LLUICtrl*, const LLSD&) { open(item); });
     button->pressedAt = [this](S32 screen_x, S32 screen_y) { mWorld.pressedAt(screen_x, screen_y); };
     button->draggedTo = [this, item](S32 screen_x, S32 screen_y) { return dragOut(item, screen_x, screen_y); };
+    button->text      = &mView;
     ALTextView::Atom atom;
     atom.at      = at;
     atom.length  = 4;

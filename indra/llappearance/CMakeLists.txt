@@ -65,4 +65,11 @@ target_link_libraries(
     llcorehttp
     llcommon
 )
+# The texture layers draw with llui's helpers (llui.h), whose headers name
+# Alchemy's from llui's folders: those on the path, though nothing of llui
+# is linked here.
+target_include_directories(
+  llappearance
+  PRIVATE $<TARGET_PROPERTY:llui,INTERFACE_INCLUDE_DIRECTORIES>
+)
 target_precompile_headers(llappearance REUSE_FROM llprecompiled)

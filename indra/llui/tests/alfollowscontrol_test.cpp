@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alfollowscontrol.h"
+#include "alfollowscontrol.h"
 
 #include "../llpanel.h"
 #include "../lluictrlfactory.h"

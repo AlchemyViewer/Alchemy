@@ -207,4 +207,27 @@ namespace tut
         ensure("the half-written swept", !LLFile::isfile(dir + "2.llsd" + std::string(ALFileWrite::BESIDE)));
         ensure_equals("the save still there", texts(history, "item:a"), std::string("one"));
     }
+
+    template<> template<>
+    void alsavehistory_object::test<7>()
+    {
+        set_test_name("a key's saves counted by their files' names, each key its own; what is no save of the name not counted");
+        ALSaveHistory history(folder);
+        const F64     now = LLDate::now().secondsSinceEpoch();
+        ensure_equals("none for a key never saved", history.count("item:a"), 0U);
+        ensure_equals("none for no key", history.count(""), 0U);
+        history.keep(saved("item:a", "one", now - 60.0));
+        history.keep(saved("item:a", "two", now - 50.0));
+        history.keep(saved("item:b", "other", now - 40.0));
+        ensure_equals("as many as listed", history.count("item:a"), history.list("item:a").size());
+        ensure_equals("two", history.count("item:a"), 2U);
+        ensure_equals("the other key's", history.count("item:b"), 1U);
+        const std::string kept = history.list("item:a").front().path;
+        const std::string dir  = kept.substr(0, kept.find_last_of('/') + 1);
+        {
+            llofstream half(dir + "3.llsd" + std::string(ALFileWrite::BESIDE));
+            half << "{'key':'item:a'";
+        }
+        ensure_equals("what a write cut short is none", history.count("item:a"), 2U);
+    }
 }

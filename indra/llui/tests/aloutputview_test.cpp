@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../aloutputview.h"
+#include "aloutputview.h"
 
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"

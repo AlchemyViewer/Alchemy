@@ -35,6 +35,7 @@
 #include "alscriptlookup.h"
 #include "alscriptstudiocaret.h"
 #include "alscriptstudiochecking.h"
+#include "alscriptstudiocomparepairs.h"
 #include "alscriptstudioorphans.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudiorecovery.h"
@@ -119,6 +120,11 @@ ALCodeEditor* ALScriptStudioDoc::shownText() const
         case View::Expanded: return expandedEditor;
         default:             return editor;
     }
+}
+
+ALCodeEditor* ALScriptStudioDoc::undoText() const
+{
+    return shownView() == View::Compare && compareTitles ? editor : shownText();
 }
 
 bool ALScriptStudioDoc::hasKeyboard() const

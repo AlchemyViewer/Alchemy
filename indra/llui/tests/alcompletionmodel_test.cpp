@@ -24,7 +24,7 @@
 
 #include "linden_common.h"
 
-#include "../alcompletionmodel.h"
+#include "alcompletionmodel.h"
 
 #include "../test/lltut.h"
 

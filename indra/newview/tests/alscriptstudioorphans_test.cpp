@@ -469,12 +469,12 @@ namespace tut
         a.orphan->noticeDismissed = false;
         unit.noticeAction("retry");
         ensure("taken up, and let go of", studio.did.back() == "offer a: retry" && !a.offer);
-        a.offer = Doc::Offer{ "Saved elsewhere.", { "take_saved", "keep_saved", "compare_saved" } };
+        a.offer = Doc::Offer{ "Saved elsewhere.", { "take_saved", "keep_saved", "merge_saved", "compare_saved" } };
         ensure("a conflict with nothing to take: not said", Orphans::noticeFor(&a, words).text.empty());
         a.savedThere = std::string("theirs");
         notice       = Orphans::noticeFor(&a, words);
-        ensure("with it: said", notice.text == "Saved elsewhere." && notice.buttons[0].second == "NoticeTakeSaved" &&
-                                    notice.buttons[2].second == "NoticeCompare");
+        ensure("with it: said, all four", notice.text == "Saved elsewhere." && notice.buttons[0].second == "NoticeTakeSaved" &&
+                                              notice.buttons[2].second == "NoticeMerge" && notice.buttons[3].second == "NoticeCompare");
         unit.noticeAction("close");
         ensure("hidden: let go of, and nothing else", !a.offer && !a.orphan->noticeDismissed && studio.did.back() == "offer a: retry");
         a.offer           = Doc::Offer{ "Held.", { "save_anyway" } };
