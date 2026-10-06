@@ -162,7 +162,8 @@ public:
     // 1 - manual probe
     //
     // Set once, by whichever registration created the probe, and never derived again: it says
-    // what kind of probe this is, which is fixed the moment it exists.
+    // what kind of probe this is, which is fixed the moment it exists. The one exception is
+    // orphan(), which drops it to 0 so a probe on its way out sorts behind every live one.
     U32 mPriority = 0;
 
     // occlusion culling state
