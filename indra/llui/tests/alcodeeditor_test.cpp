@@ -2929,4 +2929,55 @@ namespace tut
         key(KEY_TAB);
         ensure_equals("the path in place to the line's end", e.text(), std::string("require(\"./main"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<81>()
+    {
+        set_test_name("in any other string the host names something for, the list opens at its quote, narrows on all the string holds, and puts what was named in place whole; elsewhere a string is prose");
+        ALCodeEditor&            e = make("");
+        std::vector<std::string> asked;
+        e.setStringProvider([&e, &asked](const ALTextPos& at, std::string_view typed, std::vector<ALCodeEditor::Completion>& out) {
+            asked.emplace_back(typed);
+            // The host's own rule: a sound's name, in llPlaySound's string.
+            if (e.document().line(at.line).find("llPlaySound(") == std::string::npos)
+            {
+                return;
+            }
+            for (const char* name : { "Door Open", "Door Close", "Say \"hi\"" })
+            {
+                ALCodeEditor::Completion c;
+                c.text = name;
+                for (const char ch : std::string_view(name))
+                {
+                    c.path += ch == '"' || ch == '\\' ? std::string("\\") + ch : std::string(1, ch);
+                }
+                c.kind = ALSyntaxKind::Constant;
+                out.push_back(c);
+            }
+        });
+        e.setAutoClose(true);
+        type("llPlaySound(\"");
+        ensure_equals("the quote closed for it", e.text(), std::string("llPlaySound(\"\")"));
+        ensure("open at the quote, asked of nothing yet", e.completionOpen() && e.completions().size() == 3 && asked.back().empty());
+        type("Door ");
+        ensure("narrowed on all it holds, its space too", e.completionOpen() && e.completions().size() == 2);
+        const size_t asks = asked.size();
+        type("C");
+        ensure("narrowed again, not asked again",
+               e.completions().size() == 1 && e.completions()[0].text == "Door Close" && asked.size() == asks);
+        key(KEY_TAB);
+        ensure_equals("the name in place, the quote kept", e.text(), std::string("llPlaySound(\"Door Close\")"));
+        ensure("and the list gone", !e.completionOpen());
+
+        e.setText("");
+        type("llPlaySound(\"Sa");
+        key(KEY_TAB);
+        ensure_equals("a name put in escaped", e.text(), std::string("llPlaySound(\"Say \\\"hi\\\"\")"));
+
+        e.setText("");
+        type("llSay(0, \"Do");
+        ensure("not where the host names nothing: prose", !e.completionOpen());
+        type("\"");
+        ensure("nor once the string is closed", !e.completionOpen());
+    }
 }

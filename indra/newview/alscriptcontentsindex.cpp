@@ -125,6 +125,7 @@ void ALScriptContentsIndex::heard(const Contents& contents)
     {
         prim.fetched = contents.fetched;
         prim.items   = contents.items;
+        prim.others  = contents.others;
         prim.serial  = contents.serial;
     }
     if (!contents.name.empty())

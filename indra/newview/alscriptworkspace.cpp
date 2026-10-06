@@ -200,6 +200,11 @@ private:
                 {
                     continue;
                 }
+                if (item->getType() != LLAssetType::AT_LSL_TEXT && item->getType() != LLAssetType::AT_NOTECARD)
+                {
+                    contents.others.push_back({ item->getName(), item->getType() });
+                    continue;
+                }
                 ALScriptContents::Item one;
                 one.id          = item->getUUID();
                 one.name        = item->getName();
@@ -211,13 +216,9 @@ private:
                     one.script = true;
                     one.lua    = item->getRuntime() == "luau" || item->getInventorySubType() == SST_LUA;
                 }
-                else if (item->getType() == LLAssetType::AT_NOTECARD)
-                {
-                    one.script = false;
-                }
                 else
                 {
-                    continue;
+                    one.script = false;
                 }
                 contents.items.push_back(std::move(one));
             }
@@ -225,6 +226,10 @@ private:
             // the order the simulator sends them in.
             std::stable_sort(contents.items.begin(), contents.items.end(),
                              [](const ALScriptContents::Item& a, const ALScriptContents::Item& b) {
+                                 return LLStringUtil::compareDict(a.name, b.name) < 0;
+                             });
+            std::stable_sort(contents.others.begin(), contents.others.end(),
+                             [](const ALScriptContents::Other& a, const ALScriptContents::Other& b) {
                                  return LLStringUtil::compareDict(a.name, b.name) < 0;
                              });
         }

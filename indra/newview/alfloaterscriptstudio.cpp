@@ -36,6 +36,7 @@
 #include "alflatbutton.h"
 #include "allinebreaks.h"
 #include "allsltoslua.h"
+#include "allsltraits.h"
 #include "alscriptlexicon.h"
 #include "alscriptstudioviewer.h"
 #include "alserialworker.h"
@@ -92,6 +93,7 @@
 #include "llexperiencecache.h"
 #include "llfloaterreg.h"
 #include "llinventoryfunctions.h"
+#include "llinventoryicon.h"
 #include "llinventorymodel.h"
 #include "llinventorymodelbackgroundfetch.h"
 #include "lllayoutstack.h"
@@ -307,6 +309,57 @@ namespace
             }
         }
         return text;
+    }
+
+    // The call a place is in an argument of: the function by its name
+    // before the call's bracket, with the library it is in --
+    // `llSetLinkAlpha`, `ll.MessageLinked` -- and which argument from
+    // nought. False where it is in none.
+    bool callAround(ALCodeEditor& editor, const ALTextPos& at, std::string& callee, S32& argument)
+    {
+        ALTextPos open;
+        if (!editor.bracketIndex().enclosing(at, '(', 1, open))
+        {
+            return false;
+        }
+        const std::string& line = editor.document().line(open.line);
+        S32                end  = std::min<S32>(open.column, static_cast<S32>(line.size()));
+        while (end > 0 && (line[end - 1] == ' ' || line[end - 1] == '\t'))
+        {
+            --end;
+        }
+        S32 start = end;
+        while (start > 0 && (ALScriptLexicon::isNameByte(line[start - 1]) || line[start - 1] == '.'))
+        {
+            --start;
+        }
+        if (start == end)
+        {
+            return false;
+        }
+        callee   = line.substr(start, end - start);
+        argument = editor.argumentAt(open, at);
+        return true;
+    }
+
+    // Whether an item of a type is of the kind an argument names.
+    bool itemOfKind(ALLSLTraits::Item kind, LLAssetType::EType type)
+    {
+        switch (kind)
+        {
+            case ALLSLTraits::Item::Any:       return true;
+            case ALLSLTraits::Item::Sound:     return type == LLAssetType::AT_SOUND;
+            case ALLSLTraits::Item::Texture:   return type == LLAssetType::AT_TEXTURE;
+            case ALLSLTraits::Item::Animation: return type == LLAssetType::AT_ANIMATION;
+            case ALLSLTraits::Item::Notecard:  return type == LLAssetType::AT_NOTECARD;
+            case ALLSLTraits::Item::Object:    return type == LLAssetType::AT_OBJECT;
+            case ALLSLTraits::Item::Material:  return type == LLAssetType::AT_MATERIAL;
+            case ALLSLTraits::Item::Settings:  return type == LLAssetType::AT_SETTINGS;
+            case ALLSLTraits::Item::Landmark:  return type == LLAssetType::AT_LANDMARK;
+            case ALLSLTraits::Item::Script:    return type == LLAssetType::AT_LSL_TEXT;
+            case ALLSLTraits::Item::None:      break;
+        }
+        return false;
     }
 }
 
@@ -2920,6 +2973,7 @@ void ALFloaterScriptStudio::speakFileLanguage(Doc& doc, const FileLanguage& lang
         editor.setCompletionProvider(nullptr);
         editor.setCompletionRequest(nullptr);
         editor.setPathProvider(nullptr);
+        editor.setStringProvider(nullptr);
         editor.setHoverProvider(nullptr);
         editor.setHoverRequest(nullptr);
         editor.setSignatureRequest(nullptr);
@@ -3063,6 +3117,11 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
             out.push_back(std::move(c));
         }
     });
+    // What a string could hold where the call wants an item of the
+    // object's by its name: the names of what the prim holds of that kind.
+    editor.setStringProvider([this, raw](const ALTextPos& at, std::string_view, std::vector<ALCodeEditor::Completion>& out) {
+        completeItems(*raw, at, out);
+    });
 }
 
 bool ALFloaterScriptStudio::openNotecardNamed(const Doc& doc, const std::string& name)
@@ -3187,26 +3246,9 @@ void ALFloaterScriptStudio::completeLinks(const Doc& doc, const ALTextPos& at, s
     {
         return;
     }
-    ALCodeEditor& editor = *doc.editor;
-    ALTextPos     open;
-    if (!editor.bracketIndex().enclosing(at, '(', 1, open))
-    {
-        return;
-    }
-    // The function the bracket is the call of: its name before it, with
-    // the library it is in -- `ll.MessageLinked`.
-    const std::string& line = editor.document().line(open.line);
-    S32                end  = std::min<S32>(open.column, static_cast<S32>(line.size()));
-    while (end > 0 && (line[end - 1] == ' ' || line[end - 1] == '\t'))
-    {
-        --end;
-    }
-    S32 start = end;
-    while (start > 0 && (ALScriptLexicon::isNameByte(line[start - 1]) || line[start - 1] == '.'))
-    {
-        --start;
-    }
-    if (start == end || !ALScriptStudioWords::linkArgument(doc.language.lua, line.substr(start, end - start), editor.argumentAt(open, at)))
+    std::string callee;
+    S32         argument = 0;
+    if (!callAround(*doc.editor, at, callee, argument) || !ALScriptStudioWords::linkArgument(doc.language.lua, callee, argument))
     {
         return;
     }
@@ -3253,6 +3295,88 @@ void ALFloaterScriptStudio::completeLinks(const Doc& doc, const ALTextPos& at, s
     }
 }
 
+
+void ALFloaterScriptStudio::completeItems(const Doc& doc, const ALTextPos& at, std::vector<ALCodeEditor::Completion>& out)
+{
+    // Where the call wants an item of the object's by its name -- the
+    // sound llPlaySound plays, the item ll.GiveInventory gives -- what the
+    // script's own prim holds of that kind, as the definitions say
+    // (ALLSLTraits::itemArg).
+    if (doc.ref.inInventory() || doc.notecard || !doc.editor)
+    {
+        return;
+    }
+    ALCodeEditor&     editor  = *doc.editor;
+    const ALTextRange literal = editor.stringAt(at);
+    if (literal.empty())
+    {
+        return;
+    }
+    // The string the whole of its argument, or its start: after the call's
+    // bracket or a comma, on its line or one of the few above.
+    char before = '\0';
+    for (S32 line = literal.begin.line; line >= 0 && line > literal.begin.line - 4 && !before; --line)
+    {
+        const std::string& text   = editor.document().line(line);
+        S32                column = line == literal.begin.line ? literal.begin.column : static_cast<S32>(text.size());
+        while (column > 0 && (text[column - 1] == ' ' || text[column - 1] == '\t' || text[column - 1] == '\r'))
+        {
+            --column;
+        }
+        before = column > 0 ? text[column - 1] : '\0';
+    }
+    std::string callee;
+    S32         argument = 0;
+    if ((before != '(' && before != ',') || !callAround(editor, literal.begin, callee, argument))
+    {
+        return;
+    }
+    const ALLSLTraits::Item kind = ALLSLTraits::itemArg(callee, argument);
+    if (kind == ALLSLTraits::Item::None)
+    {
+        return;
+    }
+    ALScriptContentsIndex&              index = ALScriptWorkspace::instance().contentsIndex();
+    const ALScriptContentsIndex::Prim* prim  = index.prim(doc.ref.object);
+    if (!prim || !prim->fetched)
+    {
+        // Asked for, for the next time the list opens.
+        index.ask(doc.ref.object);
+        return;
+    }
+    // Each put in whole, escaped as the string's quote wants it.
+    const char quote = editor.document().line(literal.begin.line)[literal.begin.column];
+    auto       offer = [&out, quote](const std::string& name, LLAssetType::EType type) {
+        ALCodeEditor::Completion one;
+        one.text = name;
+        for (const char c : name)
+        {
+            if (c == quote || c == '\\')
+            {
+                one.path += '\\';
+            }
+            one.path += c;
+        }
+        one.kind = ALSyntaxKind::String;
+        one.icon = LLInventoryIcon::getIcon(type);
+        out.push_back(std::move(one));
+    };
+    for (const ALScriptContents::Item& item : prim->items)
+    {
+        const LLAssetType::EType type = item.script ? LLAssetType::AT_LSL_TEXT : LLAssetType::AT_NOTECARD;
+        if (itemOfKind(kind, type))
+        {
+            offer(item.name, type);
+        }
+    }
+    for (const ALScriptContents::Other& other : prim->others)
+    {
+        if (itemOfKind(kind, other.type))
+        {
+            offer(other.name, other.type);
+        }
+    }
+}
 
 void ALFloaterScriptStudio::insertFromLibrary(const std::string& what)
 {

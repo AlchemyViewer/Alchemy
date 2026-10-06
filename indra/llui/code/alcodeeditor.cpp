@@ -234,6 +234,7 @@ void ALCodeEditor::clearHandlers()
     mCompletionRequest = nullptr;
     mPathProvider      = nullptr;
     mPathRequest       = nullptr;
+    mStringProvider    = nullptr;
     mHover             = nullptr;
     mHoverRequest      = nullptr;
     mSignatureRequest  = nullptr;
@@ -2565,8 +2566,9 @@ void ALCodeEditor::closeCompletion()
 {
     hideCompletionList();
     mCompletionModel.close();
-    mCompletionAsked = false;
-    mCompletionMoved = false;
+    mCompletionAsked  = false;
+    mCompletionMoved  = false;
+    mCompletionString = false;
 }
 
 S32 ALCodeEditor::chosenCompletion() const
@@ -2607,7 +2609,18 @@ void ALCodeEditor::refreshCompletion()
     char                             separator = '.';
     ALTextPos                        start;
     std::string                      asked;
-    if (path)
+    // What the list drew from before, which a list for a string does not
+    // narrow as words nor words as one.
+    const bool                       was_string = mCompletionString;
+    mCompletionString                           = !path && stringOffers(at, start, prefix);
+    if (mCompletionString)
+    {
+        // In a string the host names something for, all it holds before
+        // the caret, to be put in whole.
+        separator = '\0';
+        asked     = prefix;
+    }
+    else if (path)
     {
         // In a string that names a file, the name after its last slash --
         // the whole, where there is none -- with what comes before that as
@@ -2650,8 +2663,8 @@ void ALCodeEditor::refreshCompletion()
         return;
     }
     // What there is to choose from, asked for once while one identifier is
-    // typed, and narrowed as it grows.
-    if (!mCompletionModel.pooled(start, head, prefix))
+    // typed, and narrowed as it grows; a string's, as it was asked.
+    if (!mCompletionString && (was_string || !mCompletionModel.pooled(start, head, prefix)))
     {
         std::vector<Completion> answered;
         if (path)
@@ -2673,7 +2686,7 @@ void ALCodeEditor::refreshCompletion()
     }
     const bool                  fresh   = mCompletionModel.narrow(start, at, prefix);
     const completion_request_t& request = path ? mPathRequest : mCompletionRequest;
-    if (fresh && request)
+    if (fresh && request && !mCompletionString)
     {
         request(start, prefix);
     }
@@ -2691,6 +2704,30 @@ void ALCodeEditor::refreshCompletion()
         mCompletionMoved = false;
     }
     listCompletions(again);
+}
+
+bool ALCodeEditor::stringOffers(const ALTextPos& at, ALTextPos& start, std::string& typed)
+{
+    char                             opener = '\0';
+    const std::optional<ALTextRange> held   = mStringProvider ? quotedAt(at, &opener) : std::nullopt;
+    if (!held || (opener != '"' && opener != '\''))
+    {
+        return false;
+    }
+    start = held->begin;
+    typed = document().line(at.line).substr(start.column, at.column - start.column);
+    if (mCompletionString && mCompletionModel.pooled(start, std::string(), typed))
+    {
+        return true;
+    }
+    std::vector<Completion> answered;
+    mStringProvider(at, typed, answered);
+    if (answered.empty())
+    {
+        return false;
+    }
+    mCompletionModel.pool(start, at, typed, std::string(), '\0', std::move(answered), document(), /*with_words*/ false);
+    return true;
 }
 
 LLUIImagePtr ALCodeEditor::markIcon(Mark mark)
@@ -3209,7 +3246,23 @@ namespace
 std::optional<ALTextRange> ALCodeEditor::pathAt(const ALTextPos& pos)
 {
     const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar();
-    if (!grammar || pos.line < 0 || pos.line >= document().lineCount())
+    char                                         opener  = '\0';
+    const std::optional<ALTextRange>             held    = grammar ? quotedAt(pos, &opener) : std::nullopt;
+    if (!held || (opener != '"' && opener != '\'' && opener != '`' && opener != '<'))
+    {
+        return std::nullopt;
+    }
+    // A string the grammar says names a file, by what comes before it.
+    if (!grammar->pathString(std::string_view(document().line(held->begin.line)).substr(0, held->begin.column - 1)))
+    {
+        return std::nullopt;
+    }
+    return held;
+}
+
+std::optional<ALTextRange> ALCodeEditor::quotedAt(const ALTextPos& pos, char* opener)
+{
+    if (pos.line < 0 || pos.line >= document().lineCount())
     {
         return std::nullopt;
     }
@@ -3248,10 +3301,6 @@ std::optional<ALTextRange> ALCodeEditor::pathAt(const ALTextPos& pos)
     {
         return std::nullopt;
     }
-    if (!grammar->pathString(std::string_view(line).substr(0, begin)))
-    {
-        return std::nullopt;
-    }
     // Between the quotes; to the line's end where the string is not
     // closed.
     const char close = open == '<' ? '>' : open;
@@ -3259,6 +3308,10 @@ std::optional<ALTextRange> ALCodeEditor::pathAt(const ALTextPos& pos)
     if (pos.column <= begin || pos.column > held)
     {
         return std::nullopt;
+    }
+    if (opener)
+    {
+        *opener = open;
     }
     return ALTextRange(ALTextPos(pos.line, begin + 1), ALTextPos(pos.line, held));
 }
@@ -3588,12 +3641,13 @@ bool ALCodeEditor::acceptCompletion()
 
 void ALCodeEditor::complete(const Completion& chosen, const ALTextRange& range)
 {
-    // In a string that names a file: a whole path in place of what the
-    // string holds, its closing quote kept; else the name in place of the
-    // one typed. A folder is followed by a slash, and the list again.
+    // In a string that names a file, or one the host names something for:
+    // a whole path, or what it named, in place of what the string holds,
+    // its closing quote kept; else the name in place of the one typed. A
+    // folder is followed by a slash, and the list again.
     if ((!chosen.path.empty() || chosen.folder) && !hasOtherSelections())
     {
-        const std::optional<ALTextRange> held = pathAt(range.end);
+        const std::optional<ALTextRange> held = quotedAt(range.end);
         ALTextRange                      over = range;
         std::string                      put  = chosen.text;
         if (!chosen.path.empty() && held)
@@ -4741,6 +4795,19 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
     {
         openCompletion(true);
         return true;
+    }
+    // In any other string the host names something for -- an item's name,
+    // where the call wants one -- the same: the list at its opening quote,
+    // narrowed as it is typed.
+    if (ALTextPos start; mAutoComplete && !several && mStringProvider)
+    {
+        std::string typed;
+        if (stringOffers(caret(), start, typed))
+        {
+            mCompletionString = true;
+            openCompletion(true);
+            return true;
+        }
     }
     const bool identifier = uni_char < 0x80 && alIdentifierByte(static_cast<char>(uni_char));
     // In a comment or a string what is typed is prose: the list does not

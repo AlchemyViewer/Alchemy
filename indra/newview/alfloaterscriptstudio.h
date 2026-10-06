@@ -530,6 +530,9 @@ private:
     // Completion's link numbers: where the call being typed wants one, the
     // prims of the script's object by name, each putting in its number.
     void completeLinks(const Doc& doc, const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out);
+    // Completion in a string: where the call wants an item of the object's
+    // by its name, the names of what the script's prim holds of that kind.
+    void completeItems(const Doc& doc, const ALTextPos& at, std::vector<ALCodeEditor::Completion>& out);
     // What scripts say, from the workspace: listed in the Output tab, and
     // a run-time error in a script that is open marked on its line.
     void runtimeEvent(const ALScriptRuntimeEvent& event);

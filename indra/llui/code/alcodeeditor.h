@@ -478,6 +478,16 @@ public:
     // neither of these, a string is prose as any other.
     void setPathProvider(completion_provider_t provider) { mPathProvider = std::move(provider); }
     void setPathRequest(completion_request_t request) { mPathRequest = std::move(request); }
+    // The same in any other string quoted with `"` or `'`, where the host
+    // names something to stand for the whole of what it holds -- an item
+    // of the object's where a call wants one by its name: asked of what
+    // the string holds before the position, `Door o`, and answering each
+    // with the text the string is to hold, escaped for its quote
+    // (ALCompletion::path), with no words of the document's. The list
+    // opens on its own at the quote and as the string is typed, where
+    // anything is answered; where nothing is, a string is prose as any
+    // other, and what else completes in it still does.
+    void setStringProvider(completion_provider_t provider) { mStringProvider = std::move(provider); }
     // `words` false where whoever answered says the document's own words
     // are no use there (ALCompletionModel::supply).
     void supplyCompletions(const ALTextPos& at, std::vector<Completion> more, bool words = true);
@@ -569,6 +579,10 @@ public:
     // says names one, by what comes before its opening quote
     // (ALSyntaxGrammar::pathString). None anywhere else.
     std::optional<ALTextRange> pathAt(const ALTextPos& pos);
+    // The same of any string or path on its line, the grammar not asked:
+    // what it holds, and the byte that opens it -- a quote, or an include's
+    // `<`.
+    std::optional<ALTextRange> quotedAt(const ALTextPos& pos, char* opener = nullptr);
     // What to say about one: its size, which is what a scripter wants of
     // a string and what the type alone never says -- the bytes it comes
     // to, the characters where they are not the same number, and what it
@@ -869,6 +883,11 @@ private:
     // when it lists what could go at the caret with nothing typed.
     void openCompletion(bool asked = false);
     void refreshCompletion();
+    // Whether the host names anything for the string a position is in
+    // (setStringProvider): what it answered pooled for the list, or
+    // pooled already; and where what the string holds starts, and what it
+    // holds before the position.
+    bool stringOffers(const ALTextPos& at, ALTextPos& start, std::string& typed);
     // Whether Return takes the chosen completion (setAcceptOnEnter).
     bool returnAccepts() const;
     // The fix chosen, previewed beside the list.
@@ -1119,6 +1138,7 @@ private:
     completion_request_t    mCompletionRequest;
     completion_provider_t   mPathProvider;
     completion_request_t    mPathRequest;
+    completion_provider_t   mStringProvider;
     hover_provider_t        mHover;
     hover_request_t         mHoverRequest;
     signature_request_t     mSignatureRequest;
@@ -1148,6 +1168,9 @@ private:
     // from its best.
     bool                    mCompletionAsked = false;
     bool                    mCompletionMoved = false;
+    // Whether what the list draws from is what the host named for a
+    // string (stringOffers), rather than the words.
+    bool                    mCompletionString = false;
     // The stops of a snippet or a call being filled in (ALSnippetSession).
     ALSnippetSession         mSnippet;
     // Each placeholder's mirrors made what it holds, as one step of its

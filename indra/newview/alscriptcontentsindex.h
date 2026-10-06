@@ -83,6 +83,8 @@ public:
         // what it holds is not known.
         bool              fetched = false;
         std::vector<Item> items;
+        // The rest of what it holds, by name and type.
+        std::vector<ALScriptContents::Other> others;
         // What its answer said it is called; empty where none said.
         std::string       name;
         // The serial the answer was of; -1 where it did not say.
