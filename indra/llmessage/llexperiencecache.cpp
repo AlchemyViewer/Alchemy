@@ -927,7 +927,8 @@ void LLExperienceCacheImpl::mapKeys(const LLSD& legacyKeys)
 }
 
 // Return time to retry a request that generated an error, based on
-// error type and headers.  Return value is seconds-since-epoch.
+// error type and headers.  Return value is seconds from now, a delta:
+// processExperience adds the current time to it.
 F64 LLExperienceCacheImpl::getErrorRetryDeltaTime(S32 status, LLSD headers)
 {
 
