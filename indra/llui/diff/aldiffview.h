@@ -67,9 +67,14 @@ class LLTextBox;
 // its layout are of its own lines.
 //
 // F7 or Alt-Down goes to the next change and Shift-F7 or Alt-Up to the one
-// before; Escape tells whoever shows it, to put back what was there. What
-// is typed in it, which it cannot take, goes to whoever shows it, where it
-// says.
+// before; Escape tells whoever shows it, to put back what was there. The
+// bar's buttons have keys of their own, said on their tips, wherever the
+// keyboard is in it: Alt-F folds or opens what is the same, Alt-S swaps
+// the sides, Alt-T, Alt-M and Alt-B settle a conflict with theirs, mine or
+// both, and Alt-comma and Alt-period step the left to an older or a newer
+// version. Tab from a side goes to the bar's first button, Shift-Tab to its
+// last. What else is typed in it, which it cannot take, goes to whoever
+// shows it, where it says.
 class ALDiffView : public LLUICtrl
 {
 public:
@@ -116,6 +121,9 @@ public:
     // The version shown said again on the bar, as given before: where one
     // chosen could not be shown after all.
     void showVersion(S32 current);
+    // A version older (-1) or newer (1) chosen, as the bar's step chooses
+    // one, and told; false where there is none that way.
+    bool stepVersion(S32 delta);
     const std::string& leftText() const { return mModel.leftText(); }
     const std::string& rightText() const { return mModel.rightText(); }
     // What is compared, laid out: what a host or a test reads of it.
@@ -227,6 +235,10 @@ public:
     // The change, counted from nought, settled; false where it is in no
     // conflict, or an edit it needs was not made.
     bool settle(S32 change, ALTextMerge::Take take);
+    // The change the caret is in settled, as the bar's buttons settle it,
+    // the keyboard left on the side in front; and whether it can be.
+    bool settleAtCaret(ALTextMerge::Take take);
+    bool canSettleAtCaret() const;
 
     // A change's lines on the side in front -- inline, those taken out --
     // copied to the clipboard, each ended by a line break: what a side
@@ -325,6 +337,12 @@ private:
     // it is in as there are rows of it drawn before it. Past the last
     // row, the bottom of the text.
     S32           topOfRow(ALCodeEditor* side, S32 row) const;
+    // The rows of a side whose lines or gaps lie from one y to another down
+    // its text, at least, from the first to the one past the last; and
+    // those in sight, as it is scrolled: what is drawn over them, and what
+    // a point is looked for among.
+    std::pair<S32, S32> rowsBetween(ALCodeEditor* side, S32 from_y, S32 to_y) const;
+    std::pair<S32, S32> rowsInSight(ALCodeEditor* side) const;
     // The gap between the sides: wider where it holds the arrows that take
     // a change back, or bands between ranges.
     S32           gap() const;
@@ -427,10 +445,13 @@ private:
     bool                      mOffersCase = false;
     // What a folded row says, by how many lines it stands for: worked out
     // the first time a row of so many is drawn, not for every run each
-    // rebuild.
+    // rebuild; again as the colour table moves, with the skin.
     boost::unordered_flat_map<S32, std::string> mFoldSaid;
-    // The ranges drawn as bands, worked out as the comparison is filled.
+    // The ranges drawn as bands, worked out as the comparison is filled,
+    // in order of their top rows; and each one's top row with the furthest
+    // bottom row of those up to it.
     std::vector<S32>          mBands;
+    std::vector<std::pair<S32, S32>> mBandReach;
     // The sides' signals, let go of before the sides are: a side losing
     // the keyboard as it goes would tell a comparison already gone.
     std::vector<boost::signals2::scoped_connection> mConnections;

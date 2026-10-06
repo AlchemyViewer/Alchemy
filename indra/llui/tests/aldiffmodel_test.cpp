@@ -749,11 +749,11 @@ namespace tut
         ensure_equals("three changes", m.changeCount(), 3);
         ensure("the conflict's change found again", !m.changeConflicts(1) && m.changeConflicts(2) && m.conflictCount() == 1);
 
-        // Settled as both: the edit and the base, then the right made anew.
+        // Settled as both: the settling kept, then the right made anew.
         const std::optional<ALDiffMerge::Settling> settling = m.settle(2, ALTextMerge::Take::OursThenTheirs);
         ensure("an edit", settling && settling->edits);
         ensure_equals("ours then theirs", settling->made, lines(9, { { 0, "theirs 0" }, { 2, "mine 2" }, { 4, "mine 4" }, { 6, "mine 6" }, { 7, "theirs 6" }, { 8, "line 7" } }));
-        m.settled(settling->base);
+        m.settled(*settling);
         m.setRightText(settling->made);
         ensure_equals("none left", m.conflictCount(), 0);
         ensure("no change a conflict", !m.changeConflicts(0) && !m.changeConflicts(1) && !m.changeConflicts(2));
@@ -1472,5 +1472,48 @@ namespace tut
         // And back: the move returns to the first copy.
         both([&](ALDiffModel& m) { m.setRightText(joined(twice)); }, "the edit taken back");
         ensure_equals("one move again", kept.moveCount(), 1);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<35>()
+    {
+        set_test_name("blanks let go of or the way lines are chosen turned: a run opened stays open where it hides the same first line of the right, the rest folded; the right's line at a gap and a line's range found by halves");
+        // Two runs: lines 6 to 16, and 23 to 33.
+        m.setTexts(lines(40, { { 2, "two" }, { 20, "twenty" }, { 37, "thirty-seven" } }), lines(40, { { 2, "2" }, { 20, "20" }, { 37, "37" } }));
+        ensure_equals("two runs", m.foldCount(), 2);
+        m.setFoldOpen(1, true);
+        ALTextDiff::Likeness like;
+        like.ignoreWhitespace = true;
+        m.setLikeness(like);
+        ensure("blanks let go of: the second open still, the first folded", m.foldCount() == 2 && !m.foldOpen(0) && m.foldOpen(1));
+        m.setAlgorithm(ALTextDiff::Algorithm::Patience);
+        ensure("another way: the same", m.foldCount() == 2 && !m.foldOpen(0) && m.foldOpen(1));
+        m.setFoldOpen(0, true);
+        m.setFoldOpen(1, false);
+        m.setAlgorithm(ALTextDiff::Algorithm::Histogram);
+        ensure("and the other way about", m.foldOpen(0) && !m.foldOpen(1));
+
+        // A line the left has alone: the right's next, else its last.
+        m.setTexts("a\nb\nc\nd", "a\nd");
+        ensure("from a line the right has not: its next", m.rightAt(Column::Left, 1, 3) == std::make_pair(1, 0));
+        m.setTexts("a\nb\nc", "a");
+        ensure("past the right's last: its last", m.rightAt(Column::Left, 2, 1) == std::make_pair(0, 0));
+        ensure("inline too", m.rightAt(Column::Inline, 2, 1) == std::make_pair(0, 0));
+
+        // The narrowest range a line is in, of many and nested.
+        ALTextDiff::ranges_t ranges;
+        ranges.push_back(ALTextDiff::Range{ 0, 9, 0, 9 });
+        for (S32 n = 0; n < 10; ++n)
+        {
+            ranges.push_back(ALTextDiff::Range{ n, n, n, n });
+        }
+        ranges.push_back(ALTextDiff::Range{ 2, 4, 2, 4 });
+        ranges.push_back(ALTextDiff::Range{ 3, 3, 3, 5 });
+        m.setTexts(lines(12), lines(12), ranges);
+        ensure_equals("a line's own", m.rangeAt(Column::Left, 7), 8);
+        ensure_equals("of two as narrow, the wider on the other side", m.rangeAt(Column::Left, 3), 12);
+        ensure_equals("on the right, its own", m.rangeAt(Column::Right, 3), 4);
+        ensure_equals("a line wider on the right: its own still", m.rangeAt(Column::Right, 5), 6);
+        ensure_equals("past them all, none", m.rangeAt(Column::Left, 11), -1);
     }
 }

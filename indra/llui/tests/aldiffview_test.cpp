@@ -1452,4 +1452,180 @@ namespace tut
         d.left()->setScrollY(60);
         ensure_equals("the right followed the left up", d.right()->scrollY(), 60);
     }
+
+    template<> template<>
+    void aldiffview_object::test<39>()
+    {
+        set_test_name("the bar's buttons from the keyboard: Alt-F folds, Alt-S swaps, Alt-T, Alt-M and Alt-B settle, Alt-comma and Alt-period step the versions, each said on its tip; Tab to the bar, not to the source");
+        const std::string base   = lines(30);
+        const std::string theirs = lines(30, { { 0, "theirs 0" }, { 20, "theirs 20" } });
+        const std::string ours   = lines(30, { { 0, "theirs 0" }, { 2, "mine 2" }, { 20, "mine 20" } });
+        ALDiffView&       d      = make(theirs.c_str(), ours.c_str());
+        S32               typed  = 0;
+        d.setOnEdit([&](S32, S32) -> LLView* {
+            ++typed;
+            return nullptr;
+        });
+        LLKeyboard::setStringTranslatorFunc([](std::string_view name) { return std::string(name); });
+        const auto tip = [&d](const char* name) { return d.bar()->getChild<LLView>(name)->getToolTip(); };
+        const auto said = [](KEY key) { return LLKeyboard::stringFromAccelerator(MASK_ALT, key); };
+        ensure("each key said on its button's tip",
+               tip("fold").find(said('F')) != std::string::npos && tip("swap").find(said('S')) != std::string::npos &&
+                   tip("take_theirs").find(said('T')) != std::string::npos && tip("keep_mine").find(said('M')) != std::string::npos &&
+                   tip("keep_both").find(said('B')) != std::string::npos && tip("older").find(said(',')) != std::string::npos &&
+                   tip("newer").find(said('.')) != std::string::npos);
+
+        d.right()->setFocus(true);
+        d.right()->goTo(ALTextPos(2, 0));
+        ensure("folded at first", d.foldsSame() && d.foldedCount() > 0);
+        ensure("Alt-F from a side", d.right()->handleKey('F', MASK_ALT, false));
+        ensure("opened, and the button so", !d.foldsSame() && d.foldedCount() == 0 && !ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("fold"))->getToggleState());
+        d.right()->handleKey('F', MASK_ALT, false);
+        ensure("and folded again", d.foldsSame() && d.foldedCount() > 0);
+        ensure("Alt-S", d.right()->handleKey('S', MASK_ALT, false) && d.isSwapped());
+        d.right()->handleKey('S', MASK_ALT, false);
+        ensure("and back", !d.isSwapped());
+
+        // Settling, only in a merge.
+        ensure("Alt-T without a merge: not taken", !d.right()->handleKey('T', MASK_ALT, false));
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name               = "source";
+        p.rect               = LLRect(0, 100, 300, 0);
+        ALCodeEditor* source = LLUICtrlFactory::create<ALCodeEditor>(p);
+        d.setOnTakeBack([&](const ALTextRange& range, const std::string& text) { return source->replaceAll({ { range, text } }); });
+        const auto begin = [&]() {
+            d.setTexts(theirs, ours);
+            source->setText(ours);
+            d.setMergeBase(base);
+            d.right()->setFocus(true);
+            d.right()->goTo(ALTextPos(20, 0));
+        };
+        begin();
+        ensure("Alt-M", d.right()->handleKey('M', MASK_ALT, false) && d.conflictCount() == 0 && source->text() == ours);
+        begin();
+        ensure("Alt-T", d.right()->handleKey('T', MASK_ALT, false) && d.conflictCount() == 0 && source->text() == lines(30, { { 0, "theirs 0" }, { 2, "mine 2" }, { 20, "theirs 20" } }));
+        begin();
+        std::string both = ours;
+        both.replace(both.find("mine 20"), 7, "mine 20\ntheirs 20");
+        ensure("Alt-B", d.right()->handleKey('B', MASK_ALT, false) && d.conflictCount() == 0 && source->text() == both);
+        ensure("the keyboard left on the side", d.right()->hasFocus());
+
+        // The versions, only where there are some.
+        ensure("Alt-comma without versions: not taken", !d.right()->handleKey(',', MASK_ALT, false));
+        std::vector<S32> chosen;
+        d.setVersions(3, 1, [&](S32 version) { chosen.push_back(version); });
+        ensure("Alt-comma: older", d.right()->handleKey(',', MASK_ALT, false) && chosen == std::vector<S32>{ 0 } && d.bar()->versionShown() == 0);
+        ensure("no older than the oldest", d.right()->handleKey(',', MASK_ALT, false) && chosen.size() == 1);
+        ensure("Alt-period: newer", d.right()->handleKey('.', MASK_ALT, false) && chosen == std::vector<S32>({ 0, 1 }));
+        ensure("and the same from the view", d.stepVersion(1) && chosen.back() == 2 && !d.stepVersion(1));
+
+        // Tab from a side: to the bar, not typed into the source.
+        const std::string was = source->text();
+        ensure("Tab taken", d.right()->handleKey(KEY_TAB, MASK_NONE, false));
+        LLView* focus = dynamic_cast<LLView*>(gFocusMgr.getKeyboardFocus());
+        ensure("on a button of the bar", focus && focus->getParent() == d.bar() && ALViewType::as<ALFlatButton>(focus) != nullptr);
+        ensure("nothing typed", typed == 0 && source->text() == was);
+        d.left()->setFocus(true);
+        ensure("Shift-Tab taken", d.left()->handleKey(KEY_TAB, MASK_SHIFT, false));
+        ensure("on the last button: swap, with no done", gFocusMgr.getKeyboardFocus() == d.bar()->getChild<LLView>("swap"));
+        ensure("nothing typed still", typed == 0 && source->text() == was);
+        source->die();
+    }
+
+    template<> template<>
+    void aldiffview_object::test<40>()
+    {
+        set_test_name("a settling undone in the source and compared again: the conflict back; redone, settled again");
+        const std::string base   = lines(8);
+        const std::string theirs = lines(8, { { 0, "theirs 0" }, { 6, "theirs 6" } });
+        const std::string ours   = lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } });
+        ALDiffView&       d      = make(theirs.c_str(), ours.c_str());
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name               = "source";
+        p.rect               = LLRect(0, 100, 300, 0);
+        ALCodeEditor* source = LLUICtrlFactory::create<ALCodeEditor>(p);
+        d.setOnTakeBack([&](const ALTextRange& range, const std::string& text) { return source->replaceAll({ { range, text } }); });
+        for (const char* button : { "take_theirs", "keep_both" })
+        {
+            d.setTexts(theirs, ours);
+            source->setText(ours);
+            d.setMergeBase(base);
+            d.right()->setFocus(true);
+            d.right()->goTo(ALTextPos(6, 0));
+            press(d, button);
+            const std::string made = source->text();
+            ensure("settled", made != ours && d.conflictCount() == 0);
+            source->undo();
+            ensure_equals("undone in the source", source->text(), ours);
+            d.setRightText(source->text());
+            ensure_equals("the conflict back", d.conflictCount(), 1);
+            ensure("said on the bar", d.bar()->countSaid().find("1 conflict left") != std::string::npos);
+            d.right()->goTo(ALTextPos(6, 0));
+            ensure("and lit to settle again", enabled(d, "take_theirs") && d.canSettleAtCaret());
+            source->redo();
+            ensure_equals("redone in the source", source->text(), made);
+            d.setRightText(source->text());
+            ensure_equals("settled again", d.conflictCount(), 0);
+        }
+        source->die();
+    }
+
+    template<> template<>
+    void aldiffview_object::test<41>()
+    {
+        set_test_name("a narrow bar gives way: the count first, then the merge's words to letters, then the slider; nothing past its left edge. The inline toggle's tip says what it does now; the fallback's reason in the count's tip");
+        const std::string base   = lines(8);
+        const std::string theirs = lines(8, { { 6, "theirs 6" } });
+        const std::string ours   = lines(8, { { 6, "mine 6" } });
+        ALDiffView&       d      = make(theirs.c_str(), ours.c_str());
+        d.setOnEscape([]() {});
+        d.setOnTakeBack([](const ALTextRange&, const std::string&) { return true; });
+        d.setMergeBase(base);
+        d.setVersions(3, 1, [](S32) {});
+        LLView* count = d.bar()->getChild<LLView>("count");
+        const auto glyph = [&d](const char* name) { return ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>(name))->glyph(); };
+        const auto nothing_past_left = [&d]() {
+            for (LLView* child : *d.bar()->getChildList())
+            {
+                if (child->getVisible() && child->getRect().mLeft < 0)
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
+        d.reshape(1000, 300);
+        ensure("wide: all of it", count->getVisible() && glyph("take_theirs") == "Theirs" && d.bar()->getChild<LLView>("versions")->getVisible());
+        S32 lost_count = 0;
+        S32 lost_words = 0;
+        S32 lost_slider = 0;
+        for (S32 width = 1000; width >= 60; width -= 10)
+        {
+            d.reshape(width, 300);
+            ensure("nothing past the left edge", nothing_past_left());
+            lost_count  = !count->getVisible() && !lost_count ? width : lost_count;
+            lost_words  = glyph("take_theirs") == "T" && !lost_words ? width : lost_words;
+            lost_slider = !d.bar()->getChild<LLView>("versions")->getVisible() && !lost_slider ? width : lost_slider;
+        }
+        ensure("each let go in turn", lost_count > lost_words && lost_words > lost_slider && lost_slider > 0);
+        d.reshape(1000, 300);
+        ensure("and all back", count->getVisible() && glyph("take_theirs") == "Theirs" && d.bar()->getChild<LLView>("versions")->getVisible() &&
+                                   d.bar()->getChild<LLView>("take_theirs")->getVisible() && d.bar()->getChild<LLView>("done")->getVisible());
+
+        LLView* inline_button = d.bar()->getChild<LLView>("inline");
+        const std::string side_by_side = inline_button->getToolTip();
+        press(d, "inline");
+        ensure("inline: the tip says the way back", d.isInline() && inline_button->getToolTip() != side_by_side &&
+                                                        inline_button->getToolTip().find("side by side") != std::string::npos);
+        press(d, "inline");
+        ensure("and back", inline_button->getToolTip() == side_by_side);
+
+        ensure("no reason while it compares as asked", count->getToolTip().empty());
+        d.bar()->setFellBack(true);
+        const std::string said = d.bar()->countSaid();
+        ensure("by lines, briefly", said.size() >= 8 && said.substr(said.size() - 8) == "by lines");
+        ensure("the reason in the tip", !count->getToolTip().empty());
+        d.bar()->setFellBack(false);
+        ensure("let go", count->getToolTip().empty());
+    }
 }

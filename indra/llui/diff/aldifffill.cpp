@@ -28,6 +28,7 @@
 
 #include "alcodeeditor.h"
 #include "aldiffcolors.h"
+#include "aldiffedit.h"
 
 #include <algorithm>
 #include <string_view>
@@ -182,16 +183,8 @@ bool ALDiffFill::again(ALCodeEditor& side, const ALDiffModel& model, Column colu
     // is the line it was; and so is the line the stretch ends beside,
     // which the edit takes from its start, or, at the end of the text, the
     // one it begins beside, from its end.
-    S32 head = 0;
-    while (head < was && head < now && document.line(first + head) == lines[static_cast<size_t>(head)])
-    {
-        ++head;
-    }
-    S32 tail = 0;
-    while (tail < was - head && tail < now - head && document.line(first + was - 1 - tail) == lines[static_cast<size_t>(now - 1 - tail)])
-    {
-        ++tail;
-    }
+    const auto [head, tail] =
+        ALDiffEdit::edgesBy(was, now, [&](S32 w, S32 n) { return document.line(first + w) == lines[static_cast<size_t>(n)]; });
     S32 from = first;
     if (head + tail < std::max(was, now))
     {

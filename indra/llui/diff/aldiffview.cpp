@@ -115,11 +115,7 @@ ALDiffView::ALDiffView(const Params& p)
             mVersionChosen(version);
         }
     });
-    mBar->onSettle([this](ALTextMerge::Take take) {
-        ALCodeEditor* side = shown();
-        settle(changeAtCaret(), take);
-        side->setFocus(true);
-    });
+    mBar->onSettle([this](ALTextMerge::Take take) { settleAtCaret(take); });
     mBar->onDone([this]() {
         if (mEscape)
         {
@@ -154,7 +150,18 @@ ALDiffView::ALDiffView(const Params& p)
     fill();
 }
 
-ALDiffView::~ALDiffView() = default;
+ALDiffView::~ALDiffView()
+{
+    // What the sides were given that reaches this, let go of: they die
+    // after it, with the view they are children of.
+    for (ALCodeEditor* side : { mLeft, mRight, mInlined })
+    {
+        if (side)
+        {
+            side->clearHandlers();
+        }
+    }
+}
 
 ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::string& name)
 {
@@ -498,6 +505,8 @@ void ALDiffView::fill()
     // The bands, and the gap as wide as they need, or not.
     const S32 was = gap();
     mBands.clear();
+    mBandReach.clear();
+    std::vector<std::pair<S32, S32>> spans;
     for (S32 n = 0; n < static_cast<S32>(mModel.ranges().size()); ++n)
     {
         const auto [lf, le] = mModel.rangeRows(n, Column::Left);
@@ -505,8 +514,27 @@ void ALDiffView::fill()
         if (mModel.rangeBracketed(n) && !(lf == rf && le == lf + 1 && re == rf + 1))
         {
             mBands.push_back(n);
+            spans.emplace_back(llmin(lf, rf), llmax(le, re));
         }
     }
+    // In order of their top rows, each with the furthest bottom row of
+    // those up to it: what drawRanges finds those in sight by.
+    std::vector<size_t> order(mBands.size());
+    for (size_t i = 0; i < order.size(); ++i)
+    {
+        order[i] = i;
+    }
+    std::stable_sort(order.begin(), order.end(), [&spans](size_t a, size_t b) { return spans[a].first < spans[b].first; });
+    std::vector<S32> bands;
+    bands.reserve(order.size());
+    S32 reach = 0;
+    for (const size_t i : order)
+    {
+        bands.push_back(mBands[i]);
+        reach = llmax(reach, spans[i].second);
+        mBandReach.emplace_back(spans[i].first, reach);
+    }
+    mBands = std::move(bands);
     if (gap() != was)
     {
         arrange();
@@ -615,6 +643,29 @@ S32 ALDiffView::topOfRow(ALCodeEditor* side, S32 row) const
     return lines.lineTop(line) - mModel.gapRowsFrom(column, row) * lines.rowHeight();
 }
 
+std::pair<S32, S32> ALDiffView::rowsBetween(ALCodeEditor* side, S32 from_y, S32 to_y) const
+{
+    // From the rows of the gap above the line at the top, to those of the
+    // gap below the line at the bottom: a row or two more than is drawn,
+    // never fewer.
+    const Column  column = columnOf(side);
+    const S32     lines  = mModel.lineCount(column);
+    const S32     rows   = mModel.rowCount(layoutOf(side));
+    ALTextLayout& layout = side->layout();
+    if (lines == 0)
+    {
+        return { 0, rows };
+    }
+    const S32 first = layout.lineAtY(llmax(0, from_y));
+    const S32 last  = layout.lineAtY(llmax(0, to_y));
+    return { first > 0 ? mModel.rowOfLine(column, first - 1) + 1 : 0, last + 1 < lines ? mModel.rowOfLine(column, last + 1) + 1 : rows };
+}
+
+std::pair<S32, S32> ALDiffView::rowsInSight(ALCodeEditor* side) const
+{
+    return rowsBetween(side, side->scrollY(), side->scrollY() + textFrame(side).getHeight());
+}
+
 S32 ALDiffView::arrowAtPoint(S32 x, S32 y)
 {
     // In the gap, beside a change's first row.
@@ -628,9 +679,11 @@ S32 ALDiffView::arrowAtPoint(S32 x, S32 y)
     {
         return -1;
     }
-    const S32 doc_y = (text.mTop - y) + mRight->scrollY();
-    const S32 row_h = mRight->layout().rowHeight();
-    for (S32 n = 0; n < changeCount(); ++n)
+    // Only the changes that start on a row about the one under the point.
+    const S32  doc_y       = (text.mTop - y) + mRight->scrollY();
+    const S32  row_h       = mRight->layout().rowHeight();
+    const auto [from, end] = rowsBetween(mRight, doc_y, doc_y);
+    for (S32 n = mModel.changeFrom(Layout::Sides, from); n < changeCount() && mModel.changeFirst(Layout::Sides, n) < end; ++n)
     {
         const S32 top = topOfRow(mRight, mModel.changeFirst(Layout::Sides, n));
         if (doc_y >= top && doc_y < top + row_h)
@@ -660,7 +713,8 @@ void ALDiffView::drawArrows()
     // A change's first row partly out of sight cut at the sides' edge, not
     // drawn over the titles or the bar.
     LLLocalClipRect clip(LLRect(half, text.mTop, half + gap(), text.mBottom));
-    for (S32 n = 0; n < changeCount(); ++n)
+    const auto [from, end] = rowsInSight(mRight);
+    for (S32 n = mModel.changeFrom(Layout::Sides, from); n < changeCount() && mModel.changeFirst(Layout::Sides, n) < end; ++n)
     {
         const S32 row_t = rowY(mRight, mModel.changeFirst(Layout::Sides, n));
         if (height <= 0 || row_t - height > text.mTop || row_t < text.mBottom)
@@ -720,7 +774,10 @@ void ALDiffView::drawConflicts()
         }
         const LLRect    text = textFrame(side);
         LLLocalClipRect clip(text);
-        for (S32 change = 0; change < changeCount(); ++change)
+        // From the change the top row in sight is in, or the first after
+        // it, to the last that starts in sight.
+        const auto [sight_from, sight_end] = rowsInSight(side);
+        for (S32 change = llmax(0, mModel.changeFrom(layoutOf(side), sight_from) - 1); change < changeCount() && mModel.changeFirst(layoutOf(side), change) < sight_end; ++change)
         {
             const S32 first = mModel.changeFirst(layoutOf(side), change);
             const S32 end   = mModel.changeEnd(layoutOf(side), change);
@@ -962,7 +1019,8 @@ void ALDiffView::drawFoldRows()
         const LLColor4  ink    = side->textColor() % (0.6f * alpha);
         const S32       height = side->layout().rowHeight();
         const S32       stood  = side->hasFocus() ? mModel.foldOfGap(column, side->caretGap()) : -1;
-        for (S32 n = 0; n < foldCount(); ++n)
+        const auto [from, end] = rowsInSight(side);
+        for (S32 n = mModel.foldFrom(layoutOf(side), from); n < foldCount() && mModel.foldRow(layoutOf(side), n) < end; ++n)
         {
             if (mModel.foldOpen(n))
             {
@@ -1082,8 +1140,17 @@ void ALDiffView::drawRanges()
     const S32    top    = text.mTop;
     const S32    bottom = text.mBottom;
     LLLocalClipRect clip(LLRect(half, top, half + gap(), bottom));
-    for (const S32 n : mBands)
+    // Those whose rows reach the rows in sight on either side, by their
+    // top rows: from the first any of whose up to it reach past the top,
+    // to the last that starts above the bottom.
+    const auto [left_from, left_end]   = rowsInSight(mLeft);
+    const auto [right_from, right_end] = rowsInSight(mRight);
+    const S32  from = llmin(left_from, right_from);
+    const S32  end  = llmax(left_end, right_end);
+    const auto past = std::partition_point(mBandReach.begin(), mBandReach.end(), [from](const std::pair<S32, S32>& band) { return band.second <= from; });
+    for (size_t i = static_cast<size_t>(past - mBandReach.begin()); i < mBands.size() && mBandReach[i].first < end; ++i)
     {
+        const S32 n = mBands[i];
         // The one the caret is in, as its rows are, brighter.
         const bool     linked = n == mLinked;
         const LLColor4 band   = linked ? mLinkedColor % (0.2f * alpha) : mRight->textColor() % (0.08f * alpha);
@@ -1157,20 +1224,47 @@ bool ALDiffView::copyUnifiedDiff()
 
 bool ALDiffView::settle(S32 change, ALTextMerge::Take take)
 {
-    // The edit, where it needs one, made by whoever shows it; the base
-    // taken as theirs there either way, and the conflicts found again.
+    // The settling kept first, so that the right made anew -- here, or by
+    // whoever shows it as it makes the edit -- is merged once and found
+    // settled; the edit, where it needs one, made by whoever shows it, as
+    // one step to undo, which the merge sees by the text going back. A
+    // settling whose edit was not made settles nothing: the right is as it
+    // was before it.
     const std::optional<ALDiffMerge::Settling> settling = mModel.settle(change, take);
-    if (!settling || (settling->edits && (!mTakeBack || !mTakeBack(settling->range, settling->text))))
+    if (!settling || (settling->edits && !mTakeBack))
     {
         return false;
     }
-    mModel.settled(settling->base);
+    mModel.settled(*settling);
     if (settling->edits)
     {
+        if (!mTakeBack(settling->range, settling->text))
+        {
+            return false;
+        }
         setRightText(settling->made);
     }
     refreshBar();
     return true;
+}
+
+bool ALDiffView::settleAtCaret(ALTextMerge::Take take)
+{
+    // The keyboard back on the side in front, from the bar or wherever.
+    ALCodeEditor* side    = shown();
+    const bool    settled = settle(changeAtCaret(), take);
+    side->setFocus(true);
+    return settled;
+}
+
+bool ALDiffView::canSettleAtCaret() const
+{
+    return mTakeBack && mModel.changeConflicts(changeAtCaret());
+}
+
+bool ALDiffView::stepVersion(S32 delta)
+{
+    return mVersionChosen && mBar->stepVersion(delta);
 }
 
 S32 ALDiffView::changeAtCaret() const
@@ -1240,9 +1334,49 @@ bool ALDiffView::handleKeyHere(KEY key, MASK mask)
             return true;
         }
     }
+    // Tab from a side, which cannot take it, to the bar: its first button,
+    // or with Shift its last. A side that could take it would have.
+    if (key == KEY_TAB && (mask == MASK_NONE || mask == MASK_SHIFT) && !mBar->hasFocus() && mBar->focusButton(mask == MASK_NONE))
+    {
+        return true;
+    }
+    // The bar's buttons from the keyboard, wherever it is in the
+    // comparison, as their tips say: Alt with a letter, which a side that
+    // cannot be changed has no use for and the keymaps leave alone.
+    if (mask == MASK_ALT)
+    {
+        switch (key)
+        {
+            case 'T':
+            case 'M':
+            case 'B':
+                if (merging())
+                {
+                    settleAtCaret(key == 'T' ? ALTextMerge::Take::Theirs : key == 'M' ? ALTextMerge::Take::Ours : ALTextMerge::Take::OursThenTheirs);
+                    return true;
+                }
+                break;
+            case 'F':
+                setFoldSame(!foldsSame());
+                return true;
+            case 'S':
+                setSwapped(!isSwapped());
+                return true;
+            case ',':
+            case '.':
+                if (mVersionChosen)
+                {
+                    stepVersion(key == ',' ? -1 : 1);
+                    return true;
+                }
+                break;
+            default:
+                break;
+        }
+    }
     // A key the side in front would not take, being read only, that
-    // changes the text: a line broken or joined, a tab, a paste or a cut.
-    const bool edits = ((key == KEY_RETURN || key == KEY_BACKSPACE || key == KEY_DELETE || key == KEY_TAB) && (mask == MASK_NONE || mask == MASK_SHIFT)) ||
+    // changes the text: a line broken or joined, a paste or a cut.
+    const bool edits = ((key == KEY_RETURN || key == KEY_BACKSPACE || key == KEY_DELETE) && (mask == MASK_NONE || mask == MASK_SHIFT)) ||
                        ((key == 'V' || key == 'X') && mask == MASK_CONTROL);
     if (mEdit && edits)
     {
@@ -1331,6 +1465,9 @@ void ALDiffView::refreshColors()
         return;
     }
     mColorsGeneration = LLUIColorTable::instance().generation();
+    // What a folded row says taken again too: the skin and its strings
+    // move together.
+    mFoldSaid.clear();
     mBar->setColors(mRight->backgroundColor(), mRight->textColor());
     mCurrentColor  = colorOf("CodeDiffCurrentColor", mRight->cursorColor());
     mDividerColor  = ALDiffColors::get(ALDiffColors::Name::Divider).get();

@@ -404,7 +404,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="DiffBarPrevious">Previous change</string>
 	<string name="DiffBarNext">Next change</string>
 	<string name="DiffBarFold">Fold away what is the same</string>
-	<string name="DiffBarIgnore">What to ignore: whitespace, blank lines, comments, case</string>
+	<string name="DiffBarIgnore">What to ignore</string>
 	<string name="DiffBarCopy">Copy this change, or the whole comparison as a unified diff</string>
 	<!-- A peek at a change from the code editor (alchangepeek.cpp): its bar. -->
 	<string name="PeekChanged">Changed since saved · [CURRENT] of [TOTAL]</string>
@@ -413,8 +413,11 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PeekTakeBack">Take this change back</string>
 	<string name="PeekPrevious">Previous change</string>
 	<string name="PeekNext">Next change</string>
+	<string name="CodePeekChange">Peek at this change</string>
 	<string name="PeekClose">Close</string>
 	<string name="DiffBarInline">Show the changes inline, in one text</string>
+	<!-- The same button while the changes are inline: back to two sides. -->
+	<string name="DiffBarSideBySide">Show side by side</string>
 	<string name="DiffBarSwap">Swap the sides</string>
 	<string name="DiffBarDone">Back to the text</string>
 	<string name="DiffBarTakeBack">Take this change back</string>
@@ -423,7 +426,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="DiffBarChangesB">[COUNT] changes</string>
 	<string name="DiffBarNone">No changes</string>
 	<!-- After the count, where a comparison by structure compared a change by lines. -->
-	<string name="DiffBarByLines">· by lines where too large to compare by structure</string>
+	<string name="DiffBarByLines">· by lines</string>
+	<!-- The count's tooltip while it says so: why. -->
+	<string name="DiffBarByLinesTip">A change too large to compare by structure was compared by lines</string>
 	<!-- After the count, while a merge is settled: the conflicts left. -->
 	<string name="DiffBarConflictsA">· [COUNT] conflict left</string>
 	<string name="DiffBarConflictsB">· [COUNT] conflicts left</string>

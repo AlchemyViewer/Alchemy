@@ -37,6 +37,9 @@
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 
+#include <algorithm>
+#include <vector>
+
 static LLDefaultChildRegistry::Register<ALDiffBar> r("diff_bar");
 
 namespace
@@ -47,6 +50,24 @@ namespace
     constexpr S32 SMALL_W = 22;
     // The slider over the versions of the left.
     constexpr S32 SLIDER_W = 120;
+    // The least the count is kept for: "Change 10 of 12", about.
+    constexpr S32 COUNT_LEAST = 72;
+    // How far the bar gives way when it is narrow (layout): all of it, the
+    // count let go, the words as letters, the slider let go.
+    constexpr S32 SQUEEZE_MOST = 3;
+
+    // A word's first letter, which stands for it on a narrow bar.
+    std::string firstLetter(const std::string& word)
+    {
+        // Its first character's bytes: the lead byte says how many.
+        if (word.empty())
+        {
+            return word;
+        }
+        const U8     lead = static_cast<U8>(word[0]);
+        const size_t size = lead < 0xC0 ? 1 : lead < 0xE0 ? 2 : lead < 0xF0 ? 3 : 4;
+        return word.substr(0, size);
+    }
 }
 
 ALDiffBar::Params::Params()
@@ -76,7 +97,7 @@ ALDiffBar::ALDiffBar(const Params& p)
     // The ways of showing lit by the view, as it is once it has done what
     // was asked: a press only asks, and turns nothing itself.
     mFoldButton     = flat("fold", "\xE2\x8B\xAF", false, alSaid("DiffBarFold", "Fold away what is the same"));
-    mIgnoreButton   = flat("ignore", "\xE2\x90\xA3", false, alSaid("DiffBarIgnore", "What to ignore: whitespace, blank lines, comments, case"));
+    mIgnoreButton   = flat("ignore", "\xE2\x90\xA3", false, alSaid("DiffBarIgnore", "What to ignore"));
     mCopyButton     = flat("copy", "\xE2\x9D\x90", false, alSaid("DiffBarCopy", "Copy this change, or the whole comparison as a unified diff"));
     mInlineButton   = flat("inline", "\xE2\x96\xA4", false, alSaid("DiffBarInline", "Show the changes inline, in one text"));
     mSwapButton     = flat("swap", "\xE2\x87\x84", false, alSaid("DiffBarSwap", "Swap the sides"));
@@ -85,6 +106,10 @@ ALDiffBar::ALDiffBar(const Params& p)
     mPreviousButton->setKey(KEY_F7, MASK_SHIFT);
     mNextButton->setKey(KEY_F7, MASK_NONE);
     mDoneButton->setKey(KEY_ESCAPE, MASK_NONE);
+    // The view takes these keys wherever the keyboard is in it
+    // (ALDiffView::handleKeyHere); said on the buttons' tips.
+    mFoldButton->setKey('F', MASK_ALT);
+    mSwapButton->setKey('S', MASK_ALT);
     mPreviousButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mPrevious(); });
     mNextButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mNext(); });
     mFoldButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mFold(); });
@@ -95,11 +120,15 @@ ALDiffBar::ALDiffBar(const Params& p)
     mDoneButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mDone(); });
     mTakeBackButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mTakeBack(); });
     mTakeBackButton->setVisible(false);
-    mTheirsButton = flat("take_theirs", alSaid("DiffBarTheirs", "Theirs"), false,
-                         alSaid("DiffBarTheirsTip", "Settle this conflict with the other side's lines"));
-    mMineButton   = flat("keep_mine", alSaid("DiffBarMine", "Mine"), false, alSaid("DiffBarMineTip", "Settle this conflict keeping your lines"));
-    mBothButton   = flat("keep_both", alSaid("DiffBarBoth", "Both"), false,
-                         alSaid("DiffBarBothTip", "Settle this conflict with your lines, then the other side's"));
+    mWords[0]     = alSaid("DiffBarTheirs", "Theirs");
+    mWords[1]     = alSaid("DiffBarMine", "Mine");
+    mWords[2]     = alSaid("DiffBarBoth", "Both");
+    mTheirsButton = flat("take_theirs", mWords[0], false, alSaid("DiffBarTheirsTip", "Settle this conflict with the other side's lines"));
+    mMineButton   = flat("keep_mine", mWords[1], false, alSaid("DiffBarMineTip", "Settle this conflict keeping your lines"));
+    mBothButton   = flat("keep_both", mWords[2], false, alSaid("DiffBarBothTip", "Settle this conflict with your lines, then the other side's"));
+    mTheirsButton->setKey('T', MASK_ALT);
+    mMineButton->setKey('M', MASK_ALT);
+    mBothButton->setKey('B', MASK_ALT);
     mTheirsButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSettle(ALTextMerge::Take::Theirs); });
     mMineButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSettle(ALTextMerge::Take::Ours); });
     mBothButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSettle(ALTextMerge::Take::OursThenTheirs); });
@@ -111,6 +140,8 @@ ALDiffBar::ALDiffBar(const Params& p)
     mNewerButton = flat("newer", "\xE2\x96\xB8", false, alSaid("DiffBarNewer", "A newer version on the left"));
     mOlderButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { chooseVersion(mVersion - 1); });
     mNewerButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { chooseVersion(mVersion + 1); });
+    mOlderButton->setKey(',', MASK_ALT);
+    mNewerButton->setKey('.', MASK_ALT);
     LLSlider::Params sp;
     sp.name          = "versions";
     sp.rect          = LLRect(0, ROW, SLIDER_W, 0);
@@ -149,6 +180,8 @@ void ALDiffBar::setFellBack(bool fell_back)
     if (mFellBack != fell_back)
     {
         mFellBack = fell_back;
+        // Why, where it is said.
+        mCount->setToolTip(fell_back ? alSaid("DiffBarByLinesTip", "A change too large to compare by structure was compared by lines") : std::string());
         refreshSaid();
     }
 }
@@ -189,7 +222,7 @@ void ALDiffBar::refreshSaid()
     }
     if (mFellBack)
     {
-        said += " " + alSaid("DiffBarByLines", "\xC2\xB7 by lines where too large to compare by structure");
+        said += " " + alSaid("DiffBarByLines", "\xC2\xB7 by lines");
     }
     mCount->setText(said);
 }
@@ -272,7 +305,9 @@ void ALDiffBar::showCopyMenu()
 
 void ALDiffBar::setInline(bool inline_view)
 {
+    // What a press does, as it now is.
     mInlineButton->setToggleState(inline_view);
+    mInlineButton->setToolTip(inline_view ? alSaid("DiffBarSideBySide", "Show side by side") : alSaid("DiffBarInline", "Show the changes inline, in one text"));
 }
 
 void ALDiffBar::setSwapped(bool swapped)
@@ -282,15 +317,18 @@ void ALDiffBar::setSwapped(bool swapped)
 
 void ALDiffBar::setDoneShown(bool shown)
 {
-    mDoneButton->setVisible(shown);
-    layout();
+    if (mDoneShown != shown)
+    {
+        mDoneShown = shown;
+        layout();
+    }
 }
 
 void ALDiffBar::setTakeBackShown(bool shown)
 {
-    if (mTakeBackButton->getVisible() != shown)
+    if (mTakeBackShown != shown)
     {
-        mTakeBackButton->setVisible(shown);
+        mTakeBackShown = shown;
         layout();
     }
 }
@@ -302,12 +340,9 @@ void ALDiffBar::setTakeBackEnabled(bool enabled)
 
 void ALDiffBar::setMerging(bool merging)
 {
-    if (mTheirsButton->getVisible() != merging)
+    if (mMerging != merging)
     {
-        for (ALFlatButton* word : { mTheirsButton, mMineButton, mBothButton })
-        {
-            word->setVisible(merging);
-        }
+        mMerging = merging;
         layout();
     }
     if (!merging && mConflicts >= 0)
@@ -342,14 +377,44 @@ void ALDiffBar::setVersions(S32 count, S32 current)
         mOlderButton->setEnabled(mVersion > 0);
         mNewerButton->setEnabled(mVersion < count - 1);
     }
-    if (mVersions->getVisible() != shown)
+    if (shown != mVersionsShown)
     {
-        for (LLView* version : std::initializer_list<LLView*>{ mOlderButton, mNewerButton, mVersions })
-        {
-            version->setVisible(shown);
-        }
+        mVersionsShown = shown;
         layout();
     }
+}
+
+bool ALDiffBar::stepVersion(S32 delta)
+{
+    const S32 to = mVersion + delta;
+    if (mVersionCount < 2 || delta == 0 || to < 0 || to >= mVersionCount)
+    {
+        return false;
+    }
+    chooseVersion(to);
+    return true;
+}
+
+bool ALDiffBar::focusButton(bool first)
+{
+    // Left to right as they are placed.
+    std::vector<ALFlatButton*> shown;
+    for (ALFlatButton* button : { mPreviousButton, mNextButton, mFoldButton, mIgnoreButton, mCopyButton, mInlineButton, mSwapButton, mDoneButton,
+                                  mTakeBackButton, mTheirsButton, mMineButton, mBothButton, mOlderButton, mNewerButton })
+    {
+        if (button->getVisible() && button->getEnabled())
+        {
+            shown.push_back(button);
+        }
+    }
+    if (shown.empty())
+    {
+        return false;
+    }
+    const auto by_left = [](const ALFlatButton* a, const ALFlatButton* b) { return a->getRect().mLeft < b->getRect().mLeft; };
+    ALFlatButton* to   = first ? *std::min_element(shown.begin(), shown.end(), by_left) : *std::max_element(shown.begin(), shown.end(), by_left);
+    to->setFocus(true);
+    return true;
 }
 
 void ALDiffBar::chooseVersion(S32 version)
@@ -395,54 +460,89 @@ void ALDiffBar::draw()
 
 void ALDiffBar::layout()
 {
+    // As little given way as leaves the count its least, or once it is let
+    // go, as fits.
+    const S32 room    = getRect().getWidth() - 2 * PAD;
+    S32       squeeze = 0;
+    while (squeeze < SQUEEZE_MOST && placed(squeeze, false) + (squeeze == 0 ? COUNT_LEAST + GAP : 0) > room)
+    {
+        ++squeeze;
+    }
+    placed(squeeze, true);
+}
+
+S32 ALDiffBar::placed(S32 squeeze, bool apply)
+{
     // The buttons at the right, in ones, twos and threes -- the steps,
     // taking a change back, settling a conflict, the versions of the left,
     // the ways of showing, done -- and the count over what is left at the
-    // left. A word's button as wide as its word.
+    // left. A word's button as wide as its word, or squeezed, its letter.
     const S32 width = getRect().getWidth();
     const S32 top   = getRect().getHeight() - PAD;
     S32       right = width - PAD;
-    const auto place = [&](ALFlatButton* button) {
-        button->setShape(LLRect(right - SMALL_W, top, right, top - ROW));
-        right -= SMALL_W + 1;
-    };
-    if (mDoneButton->getVisible())
-    {
-        place(mDoneButton);
-        right -= GAP;
-    }
-    place(mSwapButton);
-    place(mInlineButton);
-    place(mIgnoreButton);
-    place(mFoldButton);
-    place(mCopyButton);
-    right -= GAP;
-    if (mTheirsButton->getVisible())
-    {
-        for (ALFlatButton* word : { mBothButton, mMineButton, mTheirsButton })
+    // Shown where it is wanted and, placed, fits: none past the left edge.
+    const auto place = [&](LLView* view, S32 wide, bool wanted) {
+        const bool shown = wanted && (!apply || right - wide >= PAD);
+        if (apply)
         {
-            const S32 wide = llmax(SMALL_W, LLFontGL::getFontSansSerifSmall()->getWidth(word->glyph()) + 2 * GAP);
-            word->setShape(LLRect(right - wide, top, right, top - ROW));
+            view->setVisible(shown);
+            if (shown)
+            {
+                view->setShape(LLRect(right - wide, top, right, top - ROW));
+            }
+        }
+        if (shown)
+        {
             right -= wide + 1;
         }
-        right -= GAP;
-    }
-    if (mTakeBackButton->getVisible())
-    {
-        place(mTakeBackButton);
-        right -= GAP;
-    }
-    place(mNextButton);
-    place(mPreviousButton);
-    if (mVersions->getVisible())
+        return shown;
+    };
+    if (place(mDoneButton, SMALL_W, mDoneShown))
     {
         right -= GAP;
-        place(mNewerButton);
-        mVersions->setShape(LLRect(right - SLIDER_W, top, right, top - ROW));
-        right -= SLIDER_W + 1;
-        place(mOlderButton);
     }
-    mCount->setShape(LLRect(PAD, top, llmax(PAD, right - GAP), top - ROW));
+    place(mSwapButton, SMALL_W, true);
+    place(mInlineButton, SMALL_W, true);
+    place(mIgnoreButton, SMALL_W, true);
+    place(mFoldButton, SMALL_W, true);
+    place(mCopyButton, SMALL_W, true);
+    right -= GAP;
+    const bool letters = squeeze >= 2;
+    bool       words   = false;
+    for (S32 n = 2; n >= 0; --n)
+    {
+        ALFlatButton*     word = n == 0 ? mTheirsButton : n == 1 ? mMineButton : mBothButton;
+        const std::string said = letters ? firstLetter(mWords[n]) : mWords[n];
+        if (apply)
+        {
+            word->setGlyph(said);
+        }
+        words = place(word, llmax(SMALL_W, LLFontGL::getFontSansSerifSmall()->getWidth(said) + 2 * GAP), mMerging) || words;
+    }
+    if (words)
+    {
+        right -= GAP;
+    }
+    if (place(mTakeBackButton, SMALL_W, mTakeBackShown))
+    {
+        right -= GAP;
+    }
+    place(mNextButton, SMALL_W, true);
+    place(mPreviousButton, SMALL_W, true);
+    if (mVersionsShown)
+    {
+        right -= GAP;
+    }
+    place(mNewerButton, SMALL_W, mVersionsShown);
+    place(mVersions, SLIDER_W, mVersionsShown && squeeze < 3);
+    place(mOlderButton, SMALL_W, mVersionsShown);
+    if (apply)
+    {
+        const bool counted = squeeze == 0 && right - GAP - PAD >= COUNT_LEAST;
+        mCount->setVisible(counted);
+        mCount->setShape(LLRect(PAD, top, llmax(PAD, right - GAP), top - ROW));
+    }
+    return width - PAD - right;
 }
 
 void ALDiffBar::reshape(S32 width, S32 height, bool called_from_parent)

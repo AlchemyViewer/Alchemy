@@ -260,8 +260,11 @@ public:
     S32                changeFirst(Layout layout, S32 change) const;
     S32                changeEnd(Layout layout, S32 change) const;
     const ChangeLines& changeLines(S32 change) const;
-    // The change a row is in; -1 for none.
+    // The change a row is in; -1 for none. And the first change whose
+    // first row is a row or after it, the count past them all: where a view
+    // drawing the rows in sight starts.
     S32                changeOfRow(Layout layout, S32 row) const;
+    S32                changeFrom(Layout layout, S32 row) const;
     // The change a line of a column is in, or, where the column has none
     // of a change's lines, the change whose gap it is under -- at the
     // text's end, the one below the last line; -1 for none.
@@ -295,9 +298,10 @@ public:
     // The conflicts a change is in settled (ALDiffMerge::settle); nothing
     // where it is in none.
     std::optional<ALDiffMerge::Settling> settle(S32 change, ALTextMerge::Take take) const;
-    // The base as a settling leaves it, and the conflicts found again: the
-    // right made anew after, where the settling edits it.
-    void                                 settled(ALDiffMerge::lines_t base);
+    // A settling kept (ALDiffMerge::settled) before the edit it makes, and
+    // the conflicts found again: the right made anew after, where it makes
+    // one, finds the merge again then.
+    void                                 settled(const ALDiffMerge::Settling& settling);
 
     // --- moves -------------------------------------------------------------------
 
@@ -369,6 +373,9 @@ public:
     // The fold whose own row a row is, or with `lines` whose lines it is
     // one of too; -1 for none.
     S32               foldOfRow(Layout layout, S32 row, bool lines) const;
+    // The first fold whose own row is a row or after it; the count past
+    // them all.
+    S32               foldFrom(Layout layout, S32 row) const;
     // The folded run whose own row is a column's gap above a line, or the
     // gap below the text; -1 for none.
     S32               foldOfGap(Column column, S32 line) const;
@@ -505,6 +512,15 @@ private:
     ALTextDiff::Options shownOptions() const;
     // Which ranges are bracketed, worked out as each layout is made.
     void              findBracketed();
+    // The ranges in order of their first lines on each side, worked out as
+    // each layout is made: what rangeAt finds a line's by halves.
+    void              orderRanges();
+    // The first line of the right each open run hides, in order -- carried
+    // where the right was made anew -- and the runs hiding those opened
+    // again after a rebuild: a run the same to the reader, though the runs
+    // are others.
+    std::vector<S32>  openedLines(const LineMap* map = nullptr) const;
+    void              reopen(const std::vector<S32>& opened);
     // Which changes are in a conflict of the merge, worked out as each
     // layout is made and each conflict settled.
     void              findConflicts();
@@ -517,6 +533,10 @@ private:
     // rebuilds, told of every edit.
     ALDiffMoves::Finder   mMoveFinder;
     std::vector<bool>     mBracketed;
+    // The ranges by their first lines of the text given as the left and as
+    // the right, and the furthest last line among those up to each.
+    std::vector<S32>      mRangeOrder[2];
+    std::vector<S32>      mRangeReach[2];
     ALTextDiff::Options   mOptions;
     bool                  mSwapped  = false;
     bool                  mFoldSame = true;

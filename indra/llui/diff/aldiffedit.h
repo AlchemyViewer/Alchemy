@@ -44,6 +44,24 @@ namespace ALDiffEdit
         S32 head = 0;
         S32 tail = 0;
     };
+    // Of so many lines and so many, told alike by their places in each:
+    // wherever the lines are kept.
+    template<typename Same>
+    Edges edgesBy(S32 was, S32 now, Same same)
+    {
+        const S32 most = std::min(was, now);
+        S32       head = 0;
+        while (head < most && same(head, head))
+        {
+            ++head;
+        }
+        S32 tail = 0;
+        while (tail < most - head && same(was - 1 - tail, now - 1 - tail))
+        {
+            ++tail;
+        }
+        return Edges{ head, tail };
+    }
     // Lines or views of them alike; one text with itself the same
     // throughout, read nowhere.
     template<typename Was, typename Now>
@@ -56,18 +74,8 @@ namespace ALDiffEdit
                 return Edges{ static_cast<S32>(was.size()), 0 };
             }
         }
-        const size_t most = std::min(was.size(), now.size());
-        size_t       head = 0;
-        while (head < most && was[head] == now[head])
-        {
-            ++head;
-        }
-        size_t tail = 0;
-        while (tail < most - head && was[was.size() - 1 - tail] == now[now.size() - 1 - tail])
-        {
-            ++tail;
-        }
-        return Edges{ static_cast<S32>(head), static_cast<S32>(tail) };
+        return edgesBy(static_cast<S32>(was.size()), static_cast<S32>(now.size()),
+                       [&](S32 w, S32 n) { return was[static_cast<size_t>(w)] == now[static_cast<size_t>(n)]; });
     }
 
     // `count` of a text's lines from `first`, counted from nought -- its

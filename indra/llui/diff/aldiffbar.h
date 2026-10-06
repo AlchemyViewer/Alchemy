@@ -52,6 +52,11 @@ class LLTextBox;
 // saves -- a slider over them, oldest to newest, and a step either way. In
 // the comparison's colours, as the find bar is in its view's.
 //
+// Narrower than all of it wants, it gives way in turn: the count first,
+// then the words that settle a conflict down to their first letters, then
+// the slider; and a button that still does not fit is not shown, rather
+// than put past the bar's left edge.
+//
 // It holds what it shows and nothing else: the view tells it the count
 // and the state of its toggles, and it says what was pressed.
 class ALDiffBar : public LLPanel
@@ -114,6 +119,12 @@ public:
     void        setVersions(S32 count, S32 current);
     S32         versionShown() const { return mVersion; }
     S32         versionCount() const { return mVersionCount; }
+    // A version older or newer chosen, as its step on the bar would: false
+    // where there is none that way.
+    bool        stepVersion(S32 delta);
+    // The keyboard given to its first button shown and enabled, or its
+    // last: where Tab from a side of the comparison goes.
+    bool        focusButton(bool first);
 
     // The colours of the comparison it is over: its glyphs and its count
     // in the sides' ink, its ground a shade off their paper.
@@ -152,6 +163,10 @@ private:
     // A version chosen: shown on the slider and the steps, and told.
     void          chooseVersion(S32 version);
     void          layout();
+    // The buttons placed from the right, so far given way (layout), each
+    // shown where it fits, and how wide they are all together; or only
+    // how wide, as it would be.
+    S32           placed(S32 squeeze, bool apply);
     // The menu of what to let go of (menu_diff_ignore.xml), under its
     // button; and of what to copy (menu_diff_copy.xml), under its.
     void          showIgnoreMenu();
@@ -164,6 +179,15 @@ private:
     bool          mFellBack = false;
     // The conflicts left, -1 where nothing is merged.
     S32           mConflicts = -1;
+    // What is shown, whether or not it fits: the buttons are shown as the
+    // layout finds room.
+    bool          mDoneShown     = true;
+    bool          mTakeBackShown = false;
+    bool          mMerging       = false;
+    bool          mVersionsShown = false;
+    // The words that settle a conflict, which a narrow bar shows as their
+    // first letters: theirs, mine, both.
+    std::string   mWords[3];
     Ignores       mIgnores;
     ALMenuSlot    mIgnoreMenu;
     Copies        mCopies;

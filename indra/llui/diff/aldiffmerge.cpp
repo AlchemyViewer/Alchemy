@@ -71,11 +71,13 @@ void ALDiffMerge::setOurs(lines_t ours)
     find();
 }
 
-void ALDiffMerge::settled(lines_t base)
+void ALDiffMerge::settled(const Settling& settling)
 {
-    mBase = std::move(base);
-    findTheirs();
-    find();
+    mSettled.insert(mSettled.end(), settling.settled.begin(), settling.settled.end());
+    if (!settling.edits)
+    {
+        find();
+    }
 }
 
 void ALDiffMerge::findTheirs()
@@ -86,27 +88,104 @@ void ALDiffMerge::findTheirs()
 void ALDiffMerge::find()
 {
     mHunks = ALTextMerge::merge(static_cast<S32>(mBase.size()), ALTextMerge::changesOf(mBase, mOurs, mOptions), mTheirChanges, mOurs, mTheirs, mOptions);
+    // A conflict settled is ours's own change, as the settling left it or
+    // as it was edited after.
+    mConflicts.clear();
+    for (size_t i = 0; i < mHunks.size(); ++i)
+    {
+        ALTextMerge::Hunk& hunk = mHunks[i];
+        if (hunk.kind == ALTextMerge::Kind::Conflict && !mSettled.empty() && settles(hunk))
+        {
+            hunk.kind = ALTextMerge::Kind::Ours;
+        }
+        if (hunk.kind == ALTextMerge::Kind::Conflict)
+        {
+            mConflicts.push_back(i);
+        }
+    }
+}
+
+bool ALDiffMerge::settles(const ALTextMerge::Hunk& hunk) const
+{
+    // Ours's lines of the hunk as they are now; a settling of the base's
+    // same lines that left them so settles it, and one they are as they
+    // were before -- undone -- does not. Beside a settling, or edited
+    // after, settled.
+    const auto ours = [&](const lines_t& lines) {
+        return static_cast<S32>(lines.size()) == hunk.oursCount &&
+               std::equal(lines.begin(), lines.end(), mOurs.begin() + hunk.ours);
+    };
+    bool beside = false;
+    bool undone = false;
+    for (const Settled& one : mSettled)
+    {
+        if (one.base > hunk.base + hunk.baseCount || hunk.base > one.base + one.baseCount)
+        {
+            continue;
+        }
+        const bool same = one.base == hunk.base && one.baseCount == hunk.baseCount;
+        if (same && ours(one.after))
+        {
+            return true;
+        }
+        beside = true;
+        undone = undone || (same && ours(one.before));
+    }
+    return beside && !undone;
+}
+
+template<typename F>
+void ALDiffMerge::eachConflictIn(S32 theirs_first, S32 theirs_count, S32 ours_first, S32 ours_count, F&& told) const
+{
+    // Each side's: from the first conflict that ends past the stretch's
+    // first line, on while they start before its end.
+    const auto by = [&](S32 first, S32 count, S32 ALTextMerge::Hunk::*at, S32 ALTextMerge::Hunk::*many) {
+        if (count <= 0)
+        {
+            return true;
+        }
+        auto it = std::partition_point(mConflicts.begin(), mConflicts.end(),
+                                       [&](size_t i) { return mHunks[i].*at + mHunks[i].*many <= first; });
+        for (; it != mConflicts.end() && mHunks[*it].*at < first + count; ++it)
+        {
+            if (share(first, count, mHunks[*it].*at, mHunks[*it].*many) && !told(*it))
+            {
+                return false;
+            }
+        }
+        return true;
+    };
+    if (by(theirs_first, theirs_count, &ALTextMerge::Hunk::theirs, &ALTextMerge::Hunk::theirsCount))
+    {
+        by(ours_first, ours_count, &ALTextMerge::Hunk::ours, &ALTextMerge::Hunk::oursCount);
+    }
 }
 
 S32 ALDiffMerge::conflictCount() const
 {
-    return static_cast<S32>(
-        std::count_if(mHunks.begin(), mHunks.end(), [](const ALTextMerge::Hunk& hunk) { return hunk.kind == ALTextMerge::Kind::Conflict; }));
+    return static_cast<S32>(mConflicts.size());
 }
 
 std::vector<size_t> ALDiffMerge::conflictsIn(S32 theirs_first, S32 theirs_count, S32 ours_first, S32 ours_count) const
 {
     std::vector<size_t> out;
-    for (size_t i = 0; i < mHunks.size(); ++i)
-    {
-        const ALTextMerge::Hunk& hunk = mHunks[i];
-        if (hunk.kind == ALTextMerge::Kind::Conflict &&
-            (share(theirs_first, theirs_count, hunk.theirs, hunk.theirsCount) || share(ours_first, ours_count, hunk.ours, hunk.oursCount)))
-        {
-            out.push_back(i);
-        }
-    }
+    eachConflictIn(theirs_first, theirs_count, ours_first, ours_count, [&out](size_t i) {
+        out.push_back(i);
+        return true;
+    });
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
     return out;
+}
+
+bool ALDiffMerge::inConflict(S32 theirs_first, S32 theirs_count, S32 ours_first, S32 ours_count) const
+{
+    bool any = false;
+    eachConflictIn(theirs_first, theirs_count, ours_first, ours_count, [&any](size_t) {
+        any = true;
+        return false;
+    });
+    return any;
 }
 
 std::optional<ALDiffMerge::Settling> ALDiffMerge::settle(const std::vector<size_t>& conflicts, ALTextMerge::Take take) const
@@ -130,34 +209,30 @@ std::optional<ALDiffMerge::Settling> ALDiffMerge::settle(const std::vector<size_
     };
 
     // Ours from the first conflict's lines to the last's, each as taken
-    // and the lines between as they are.
+    // and the lines between as they are; and each kept, as it was and as
+    // it will be.
     const S32 first = settling.front()->ours;
     const S32 end   = settling.back()->ours + settling.back()->oursCount;
     lines_t   made;
     S32       at = first;
+    Settling  out;
     for (const ALTextMerge::Hunk* hunk : settling)
     {
         from(mOurs, at, hunk->ours - at, made);
+        Settled& kept  = out.settled.emplace_back();
+        kept.base      = hunk->base;
+        kept.baseCount = hunk->baseCount;
+        from(mOurs, hunk->ours, hunk->oursCount, kept.before);
         if (take != ALTextMerge::Take::Theirs)
         {
-            from(mOurs, hunk->ours, hunk->oursCount, made);
+            from(mOurs, hunk->ours, hunk->oursCount, kept.after);
         }
         if (take != ALTextMerge::Take::Ours)
         {
-            from(mTheirs, hunk->theirs, hunk->theirsCount, made);
+            from(mTheirs, hunk->theirs, hunk->theirsCount, kept.after);
         }
+        made.insert(made.end(), kept.after.begin(), kept.after.end());
         at = hunk->ours + hunk->oursCount;
-    }
-
-    // The base taken as theirs at each, the last first so that the lines
-    // of those before stay where they are.
-    Settling out;
-    out.base = mBase;
-    for (auto it = settling.rbegin(); it != settling.rend(); ++it)
-    {
-        const ALTextMerge::Hunk& hunk = **it;
-        out.base.erase(out.base.begin() + hunk.base, out.base.begin() + hunk.base + hunk.baseCount);
-        out.base.insert(out.base.begin() + hunk.base, mTheirs.begin() + hunk.theirs, mTheirs.begin() + hunk.theirs + hunk.theirsCount);
     }
     if (!std::equal(made.begin(), made.end(), mOurs.begin() + first, mOurs.begin() + end))
     {

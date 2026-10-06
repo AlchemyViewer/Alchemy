@@ -94,7 +94,7 @@ namespace tut
         {
             const std::optional<ALDiffMerge::Settling> settling = merge->settle(inOurs(line, 1), take);
             ensure("settled", settling.has_value());
-            merge->settled(settling->base);
+            merge->settled(*settling);
             if (settling->edits)
             {
                 becomes(settling->made);
@@ -171,8 +171,9 @@ namespace tut
         begin(b, o, t);
         const std::optional<ALDiffMerge::Settling> kept = merge->settle(inOurs(1, 1), ALTextMerge::Take::Ours);
         ensure("ours: no edit", kept && !kept->edits);
-        ensure_equals("the base taken as theirs there", joined(kept->base), t);
-        merge->settled(kept->base);
+        ensure("kept as it was and as it will be, ours both",
+               kept->settled.size() == 1 && joined(kept->settled[0].before) == "two mine" && joined(kept->settled[0].after) == "two mine");
+        merge->settled(*kept);
         ensure_equals("settled", merge->conflictCount(), 0);
         becomes("one\ntwo mine, and more\nthree");
         ensure_equals("ours's own change, edited", merge->conflictCount(), 0);
@@ -197,7 +198,7 @@ namespace tut
         const std::optional<ALDiffMerge::Settling> settling = merge->settle(both, ALTextMerge::Take::Theirs);
         ensure("an edit", settling && settling->edits);
         ensure_equals("each theirs, the lines between kept", settling->made, t);
-        merge->settled(settling->base);
+        merge->settled(*settling);
         becomes(settling->made);
         ensure_equals("none left", merge->conflictCount(), 0);
         ensure("nothing to settle", !merge->settle({ 0 }, ALTextMerge::Take::Theirs));
@@ -269,5 +270,50 @@ namespace tut
         begin("x = 1; // one", "x = 2; // uno", "x = 2; // eins", commented);
         ensure_equals("alike but for comments: no conflict", merge->conflictCount(), 0);
         ensure("both took the one change", merge->hunks().size() == 1 && merge->hunks()[0].kind == ALTextMerge::Kind::Both);
+    }
+
+    template<> template<>
+    void aldiffmerge_object::test<8>()
+    {
+        set_test_name("a settling undone -- ours as it was before it -- is a conflict again, and redone settled again; the base is never changed");
+        const std::string b = "one\ntwo\nthree";
+        const std::string o = "one\ntwo mine\nthree";
+        const std::string t = "one\ntwo theirs\nthree";
+        for (const ALTextMerge::Take take : { ALTextMerge::Take::Theirs, ALTextMerge::Take::OursThenTheirs })
+        {
+            begin(b, o, t);
+            settle(1, take);
+            const std::string made = ours;
+            ensure("an edit", made != o);
+            ensure_equals("settled", merge->conflictCount(), 0);
+            ensure_equals("the base as it was", joined(merge->base()), b);
+            becomes(o);
+            ensure_equals("undone: a conflict again", merge->conflictCount(), 1);
+            ensure_equals("found by ours's line", inOurs(1, 1).size(), 1U);
+            becomes(made);
+            ensure_equals("redone: settled again", merge->conflictCount(), 0);
+            becomes(o);
+            ensure_equals("and undone again", merge->conflictCount(), 1);
+        }
+
+        // Two settled at once, undone together: both back.
+        const std::string b2 = "a\nb\nc\nd\ne";
+        const std::string o2 = "a mine\nb\nc\nd\ne mine";
+        const std::string t2 = "a theirs\nb\nc\nd\ne theirs";
+        begin(b2, o2, t2);
+        const std::optional<ALDiffMerge::Settling> settling = merge->settle(inOurs(0, 5), ALTextMerge::Take::OursThenTheirs);
+        ensure("both settled together", settling && settling->edits && settling->settled.size() == 2);
+        merge->settled(*settling);
+        becomes(settling->made);
+        ensure_equals("none left", merge->conflictCount(), 0);
+        becomes(o2);
+        ensure_equals("undone: both again", merge->conflictCount(), 2);
+        becomes(settling->made);
+        ensure_equals("redone: none", merge->conflictCount(), 0);
+        // One left as settled, the other put back by hand alone: that one a
+        // conflict again.
+        becomes("a mine\na theirs\nb\nc\nd\ne mine");
+        ensure_equals("one undone by hand", merge->conflictCount(), 1);
+        ensure_equals("the one", inOurs(5, 1).size(), 1U);
     }
 }

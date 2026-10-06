@@ -158,29 +158,11 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
     ALTextDiff::ranges_t ranges = carried(mRanges, false, static_cast<S32>(was.size()), map);
     mPairs                      = carried(mPairs, false, static_cast<S32>(was.size()), map);
     // The runs open, by the first line of the right each hides.
-    std::vector<S32>        opened;
-    const std::vector<S32>& rows = rightRows(Layout::Sides);
-    for (const Fold& fold : mFolds)
-    {
-        const S32 first = fold.first[index(Layout::Sides)];
-        if (fold.open && first < static_cast<S32>(rows.size()) && rows[static_cast<size_t>(first)] >= 0)
-        {
-            opened.push_back(map.line(rows[static_cast<size_t>(first)]));
-        }
-    }
-    mRightText = std::move(text);
-    mRanges    = std::move(ranges);
+    const std::vector<S32> opened = openedLines(&map);
+    mRightText                    = std::move(text);
+    mRanges                       = std::move(ranges);
     resplice(false, std::move(now), edges);
-    const std::vector<S32>& now_rows = rightRows(Layout::Sides);
-    for (Fold& fold : mFolds)
-    {
-        const S32 first = fold.first[index(Layout::Sides)];
-        const S32 line  = first < static_cast<S32>(now_rows.size()) ? now_rows[static_cast<size_t>(first)] : -1;
-        if (std::find(opened.begin(), opened.end(), line) != opened.end())
-        {
-            fold.open = true;
-        }
-    }
+    reopen(opened);
     return map;
 }
 
@@ -296,6 +278,45 @@ std::vector<std::pair<S32, size_t>> ALDiffModel::readFrom(size_t side, S32 from)
     return out;
 }
 
+std::vector<S32> ALDiffModel::openedLines(const LineMap* map) const
+{
+    std::vector<S32>        opened;
+    const std::vector<S32>& rows = rightRows(Layout::Sides);
+    for (const Fold& fold : mFolds)
+    {
+        const S32 first = fold.first[index(Layout::Sides)];
+        if (fold.open && first < static_cast<S32>(rows.size()) && rows[static_cast<size_t>(first)] >= 0)
+        {
+            const S32 line = rows[static_cast<size_t>(first)];
+            opened.push_back(map ? map->line(line) : line);
+        }
+    }
+    // In order already, as the folds are; a line taken back may not be.
+    if (!std::is_sorted(opened.begin(), opened.end()))
+    {
+        std::sort(opened.begin(), opened.end());
+    }
+    return opened;
+}
+
+void ALDiffModel::reopen(const std::vector<S32>& opened)
+{
+    if (opened.empty())
+    {
+        return;
+    }
+    const std::vector<S32>& rows = rightRows(Layout::Sides);
+    for (Fold& fold : mFolds)
+    {
+        const S32 first = fold.first[index(Layout::Sides)];
+        const S32 line  = first < static_cast<S32>(rows.size()) ? rows[static_cast<size_t>(first)] : -1;
+        if (line >= 0 && std::binary_search(opened.begin(), opened.end(), line))
+        {
+            fold.open = true;
+        }
+    }
+}
+
 void ALDiffModel::setSwapped(bool swapped)
 {
     if (mSwapped != swapped)
@@ -312,7 +333,11 @@ void ALDiffModel::setLikeness(const ALTextDiff::Likeness& like)
     {
         mMerge->setOptions(mOptions);
     }
+    // The runs are others now, but one hiding the same first line of the
+    // right as one the reader opened is the same to the reader: open.
+    const std::vector<S32> opened = openedLines();
     build();
+    reopen(opened);
 }
 
 void ALDiffModel::setSame(ALTextDiff::same_t same)
@@ -325,8 +350,10 @@ void ALDiffModel::setAlgorithm(ALTextDiff::Algorithm algorithm)
 {
     if (mOptions.algorithm != algorithm)
     {
-        mOptions.algorithm = algorithm;
+        mOptions.algorithm            = algorithm;
+        const std::vector<S32> opened = openedLines();
         build();
+        reopen(opened);
     }
 }
 
@@ -1052,6 +1079,7 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const std::vector<b
     }
     mFolds = std::move(folds);
     findBracketed();
+    orderRanges();
     findConflicts();
 }
 
@@ -1274,21 +1302,27 @@ std::pair<S32, S32> ALDiffModel::rightAt(Column column, S32 line, S32 at_column)
         const bool own = column == Column::Inline || column == rightColumn();
         return { rows[static_cast<size_t>(row)], own ? at_column : 0 };
     }
-    for (S32 n = row + 1; n < static_cast<S32>(rows.size()); ++n)
+    // The right's lines are on rows in order: the first whose row is after
+    // it, found by halves, else the one before that.
+    const Layout layout = layoutOf(column);
+    S32          after  = 0;
+    for (S32 end = static_cast<S32>(mRightLines.size()); after < end;)
     {
-        if (rows[static_cast<size_t>(n)] >= 0)
+        const S32 mid = after + (end - after) / 2;
+        if (rowOfRightLine(layout, mid) <= row)
         {
-            return { rows[static_cast<size_t>(n)], 0 };
+            after = mid + 1;
+        }
+        else
+        {
+            end = mid;
         }
     }
-    for (S32 n = row - 1; n >= 0; --n)
+    if (after < static_cast<S32>(mRightLines.size()))
     {
-        if (rows[static_cast<size_t>(n)] >= 0)
-        {
-            return { rows[static_cast<size_t>(n)], 0 };
-        }
+        return { after, 0 };
     }
-    return { 0, 0 };
+    return { llmax(0, after - 1), 0 };
 }
 
 // --- changes -----------------------------------------------------------------------
@@ -1306,6 +1340,13 @@ S32 ALDiffModel::changeEnd(Layout layout, S32 change) const
 const ALDiffModel::ChangeLines& ALDiffModel::changeLines(S32 change) const
 {
     return mChanges[static_cast<size_t>(change)].lines;
+}
+
+S32 ALDiffModel::changeFrom(Layout layout, S32 row) const
+{
+    const size_t at = index(layout);
+    return static_cast<S32>(std::lower_bound(mChanges.begin(), mChanges.end(), row, [at](const Change& change, S32 r) { return change.first[at] < r; }) -
+                            mChanges.begin());
 }
 
 S32 ALDiffModel::changeOfRow(Layout layout, S32 row) const
@@ -1404,7 +1445,7 @@ std::string ALDiffModel::changeText(S32 change, bool given_left) const
     std::string                     text;
     for (S32 n = 0; n < count; ++n)
     {
-        text += lines[static_cast<size_t>(first + n)] + "\n";
+        text.append(lines[static_cast<size_t>(first + n)]).push_back('\n');
     }
     return text;
 }
@@ -1429,7 +1470,7 @@ void ALDiffModel::findConflicts()
     for (size_t i = 0; mMerge && i < mChanges.size(); ++i)
     {
         const ChangeLines& c = mChanges[i].lines;
-        mConflicted[i]       = !mMerge->conflictsIn(c.leftFirst, c.leftCount, c.rightFirst, c.rightCount).empty();
+        mConflicted[i]       = mMerge->inConflict(c.leftFirst, c.leftCount, c.rightFirst, c.rightCount);
     }
 }
 
@@ -1453,11 +1494,11 @@ std::optional<ALDiffMerge::Settling> ALDiffModel::settle(S32 change, ALTextMerge
     return mMerge->settle(mMerge->conflictsIn(c.leftFirst, c.leftCount, c.rightFirst, c.rightCount), take);
 }
 
-void ALDiffModel::settled(ALDiffMerge::lines_t base)
+void ALDiffModel::settled(const ALDiffMerge::Settling& settling)
 {
     if (mMerge)
     {
-        mMerge->settled(std::move(base));
+        mMerge->settled(settling);
         findConflicts();
     }
 }
@@ -1530,6 +1571,34 @@ void ALDiffModel::findBracketed()
     }
 }
 
+void ALDiffModel::orderRanges()
+{
+    for (size_t side = 0; side < 2; ++side)
+    {
+        const auto first_of = [&](S32 n) { return side ? mRanges[static_cast<size_t>(n)].rightFirst : mRanges[static_cast<size_t>(n)].leftFirst; };
+        std::vector<S32>& order = mRangeOrder[side];
+        order.resize(mRanges.size());
+        for (size_t n = 0; n < order.size(); ++n)
+        {
+            order[n] = static_cast<S32>(n);
+        }
+        const auto by_first = [&](S32 a, S32 b) { return first_of(a) < first_of(b); };
+        if (!std::is_sorted(order.begin(), order.end(), by_first))
+        {
+            std::stable_sort(order.begin(), order.end(), by_first);
+        }
+        std::vector<S32>& reach = mRangeReach[side];
+        reach.resize(order.size());
+        S32 most = std::numeric_limits<S32>::min();
+        for (size_t i = 0; i < order.size(); ++i)
+        {
+            const ALTextDiff::Range& r = mRanges[static_cast<size_t>(order[i])];
+            most                       = llmax(most, side ? r.rightLast : r.leftLast);
+            reach[i]                   = most;
+        }
+    }
+}
+
 S32 ALDiffModel::rangeAt(Column column, S32 line) const
 {
     if (column == Column::Inline || line < 0)
@@ -1537,24 +1606,40 @@ S32 ALDiffModel::rangeAt(Column column, S32 line) const
         return -1;
     }
     // The left shows the text given as the left, but swapped.
-    const bool given = (column == Column::Left) != mSwapped;
-    S32        best  = -1;
-    S32        span  = 0;
-    S32        other = 0;
-    for (size_t n = 0; n < mRanges.size(); ++n)
+    const bool              given    = (column == Column::Left) != mSwapped;
+    const std::vector<S32>& order    = mRangeOrder[given ? 0 : 1];
+    const std::vector<S32>& reach    = mRangeReach[given ? 0 : 1];
+    if (order.size() != mRanges.size())
     {
-        const ALTextDiff::Range& r     = mRanges[n];
+        return -1;
+    }
+    const auto              first_of = [&](S32 n) { return given ? mRanges[static_cast<size_t>(n)].leftFirst : mRanges[static_cast<size_t>(n)].rightFirst; };
+    // Back from the last starting at or before the line, found by halves:
+    // until none before reaches it, or any before would be wider there than
+    // the narrowest found.
+    S32 i     = static_cast<S32>(std::upper_bound(order.begin(), order.end(), line, [&](S32 l, S32 n) { return l < first_of(n); }) - order.begin());
+    S32 best  = -1;
+    S32 span  = 0;
+    S32 other = 0;
+    while (--i >= 0 && reach[static_cast<size_t>(i)] >= line)
+    {
+        const S32                n     = order[static_cast<size_t>(i)];
+        const ALTextDiff::Range& r     = mRanges[static_cast<size_t>(n)];
         const S32                first = given ? r.leftFirst : r.rightFirst;
         const S32                last  = given ? r.leftLast : r.rightLast;
-        if (line < first || line > last)
+        if (best >= 0 && line - first > span)
+        {
+            break;
+        }
+        if (line > last)
         {
             continue;
         }
         const S32 mine   = last - first;
         const S32 theirs = given ? r.rightLast - r.rightFirst : r.leftLast - r.leftFirst;
-        if (best < 0 || mine < span || (mine == span && theirs > other))
+        if (best < 0 || mine < span || (mine == span && (theirs > other || (theirs == other && n < best))))
         {
-            best  = static_cast<S32>(n);
+            best  = n;
             span  = mine;
             other = theirs;
         }
@@ -1674,6 +1759,14 @@ S32 ALDiffModel::foldFirst(Layout layout, S32 fold) const
 S32 ALDiffModel::foldRow(Layout layout, S32 fold) const
 {
     return foldFirst(layout, fold) + foldLines(fold);
+}
+
+S32 ALDiffModel::foldFrom(Layout layout, S32 row) const
+{
+    // By their own rows, which are in order as their runs are.
+    const size_t at = index(layout);
+    return static_cast<S32>(
+        std::lower_bound(mFolds.begin(), mFolds.end(), row, [at](const Fold& fold, S32 r) { return fold.first[at] + fold.count < r; }) - mFolds.begin());
 }
 
 S32 ALDiffModel::foldOfRow(Layout layout, S32 row, bool lines) const
