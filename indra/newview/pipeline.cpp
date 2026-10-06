@@ -1251,7 +1251,13 @@ void LLPipeline::refreshCachedSettings()
     RenderGlowLumWeights = gSavedSettings.getVector3("RenderGlowLumWeights");
     RenderGlowWarmthWeights = gSavedSettings.getVector3("RenderGlowWarmthWeights");
     RenderGlowResolutionPow = gSavedSettings.getS32("RenderGlowResolutionPow");
-    RenderGlowIterations = gSavedSettings.getS32("RenderGlowIterations");
+    // Clamped where it is read rather than left to the slider: this is the
+    // number of full-screen blur passes drawn every frame, and a settings
+    // file or a shared Look can carry any number at all -- a million would
+    // hang the GPU, and be saved. The Lightbox's slider runs 1 to 8, which
+    // is the range the renderer lets through; the slider's maximum must
+    // stay at or under this one.
+    RenderGlowIterations = llclamp(gSavedSettings.getS32("RenderGlowIterations"), 1, 8);
     RenderGlowWidth = gSavedSettings.getF32("RenderGlowWidth");
     RenderGlowStrength = gSavedSettings.getF32("RenderGlowStrength");
     RenderGlowNoise = gSavedSettings.getBOOL("RenderGlowNoise");
