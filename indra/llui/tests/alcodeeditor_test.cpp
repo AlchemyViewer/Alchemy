@@ -3522,4 +3522,27 @@ namespace tut
         ALCodeEditor& e = make("f(\"a\\,b\", c);");
         ensure_equals("the comma a string's escape holds is not the call's", e.argumentAt(ALTextPos(0, 1), ALTextPos(0, 10)), 1);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<96>()
+    {
+        set_test_name("a line's note and heat go where an edit took the whole of it, and are not carried onto what was put in its place");
+        ALCodeEditor& e = make("a\nb\nc");
+        e.setLineNotes({ { 2, "28 bytes", "c: 28 bytes" } });
+        e.setLineHeat({ { 2, 1.f, "c's" } });
+        e.setText("x\ny");
+        ensure("no note on the new text", e.noteAt(0).empty() && e.noteAt(1).empty());
+        ensure("nor heat", e.heatAt(0) == 0.f && e.heatAt(1) == 0.f);
+
+        // Lines chosen to the end of the last, and typed over.
+        ALCodeEditor& f = make("a\nb\nc\nd\ne");
+        f.setLineNotes({ { 4, "e's", "" } });
+        f.document().replace(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 1)), "z");
+        ensure_equals("the lines gone", f.document().line(2), std::string("z"));
+        ensure("what was typed in their place has none", f.noteAt(2).empty());
+        // Typed in at a line's start, the line is all still there.
+        f.setLineNotes({ { 1, "b's", "" } });
+        f.document().replace(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)), "q");
+        ensure_equals("kept by the line typed in", f.noteAt(1), std::string("b's"));
+    }
 }

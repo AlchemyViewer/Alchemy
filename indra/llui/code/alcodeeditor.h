@@ -1135,7 +1135,7 @@ private:
     };
     ALLineTable<Aside>                 mAsides;
     bool                               mHeatShown = false;
-    void slideAsides(const std::vector<ALTextDocument::Edit::LineSpan>& spans);
+    void slideAsides(const ALTextDocument::Edit& edit);
     // What the layout is told about a line's inlays.
     void provideInlays(S32 line, std::vector<ALTextLayout::Inlay>& out) const;
     // The hint a line's glyph stands for, by the id provideInlays gave it,

@@ -306,7 +306,7 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     closeFixes();
     // The lines the edit touched are changed until the next save.
     mChanged.applySpans(spans, lines, 1, 0);
-    slideAsides(spans);
+    slideAsides(edit);
 
     // Decorations and highlights after the edit move along with the text;
     // the ones it cut into go.
@@ -1414,18 +1414,36 @@ S32 ALCodeEditor::noteAtLocal(S32 x, S32 y)
     return noteBoxOf(line, text).pointInRect(x, y) ? line : -1;
 }
 
-void ALCodeEditor::slideAsides(const std::vector<ALTextDocument::Edit::LineSpan>& spans)
+void ALCodeEditor::slideAsides(const ALTextDocument::Edit& edit)
 {
     if (mAsides.empty())
     {
         return;
     }
+    const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
     mAsides.resize(llmax(mAsides.size(), static_cast<size_t>(llmax(spans.back().last, 0) + 1)));
+    // Where a run's last stretch ended, in the text as it was and as it is:
+    // the edit's one stretch, or the last of a batch's on the run's lines.
+    typedef ALTextDocument::Edit::Part Part;
+    const auto last_ended = [&edit](const ALTextDocument::Edit::LineSpan& span) {
+        if (!edit.parts.empty())
+        {
+            const auto past = std::upper_bound(edit.parts.begin(), edit.parts.end(), span.last,
+                                               [](S32 line, const Part& part) { return line < part.before.begin.line; });
+            if (past != edit.parts.begin())
+            {
+                return std::make_pair((past - 1)->before.end, (past - 1)->after.end);
+            }
+        }
+        return std::make_pair(edit.range.normalised().end, edit.endAfter());
+    };
     // What is left of a line keeps its heat and its note: the line a run
     // begins inside -- typed in, or broken in two -- or, where it begins
-    // at a line's start, the line it ends in, pushed down by the lines
-    // made above it or pulled up over the lines taken; each where it is
-    // once the runs before it have moved it.
+    // at a line's start, the line it ends in, where the run left any of it
+    // -- pushed down by the lines made above it, pulled up over the lines
+    // taken, typed in at its start, its end kept; each where it is once the
+    // runs before it have moved it. A line the run took to its end is not
+    // left, and what was put in its place has none.
     std::vector<std::pair<S32, Aside>> keep;
     keep.reserve(spans.size());
     S32 shift = 0;
@@ -1439,7 +1457,15 @@ void ALCodeEditor::slideAsides(const std::vector<ALTextDocument::Edit::LineSpan>
         }
         else
         {
-            keep.emplace_back(first + shift + span.made - 1, mAsides[static_cast<size_t>(last)]);
+            // All of it, where the run ended at its start; else what came
+            // after where the run ended, if anything did.
+            const auto [was, now] = last_ended(span);
+            const bool left       = was.column == 0 || (now.line >= 0 && now.line < document().lineCount() &&
+                                                  static_cast<S32>(document().line(now.line).size()) > now.column);
+            if (left)
+            {
+                keep.emplace_back(first + shift + span.made - 1, mAsides[static_cast<size_t>(last)]);
+            }
         }
         shift = span.shiftAfter;
     }
