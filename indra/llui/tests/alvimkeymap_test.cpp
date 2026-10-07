@@ -5114,4 +5114,38 @@ namespace tut
         ensure_equals("VGJ: every line one", editor->document().lineCount(), 1);
         ensure_equals("all of them", editor->document().line(0).size(), size_t(200005));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<179>()
+    {
+        set_test_name("* keeps its word as \\<word\\>, so :s//, :g// and n after them take it whole; and what * and g* look for goes by ignorecase alone, their n too");
+        ALCodeEditor& e = make("foo food\n");
+        keys("*");
+        ex("%s//bar/g");
+        ensure_equals(":s// after * the word alone", flat(e.text()), std::string("bar food|"));
+
+        make("foo food\nfood\n");
+        keys("*");
+        ex("g//d");
+        ensure_equals(":g// after * the lines with the word whole", flat(editor->text()), std::string("food|"));
+
+        make("foo\nfood foo\n");
+        keys("*");
+        ex("s//X/");
+        ensure_equals(":s// on the line * went to", flat(editor->text()), std::string("foo|food X|"));
+
+        make("ab foo food\nfoo\n");
+        editor->setCaret(ALTextPos(0, 4));
+        keys("*");
+        ex("s//X/");
+        keys("nn");
+        ensure_equals("n after the :s// the word whole still", caretText(), std::string("0:3"));
+
+        make("Foo foo Foo foo\n");
+        ex("set ic scs");
+        keys("g*nn");
+        ensure_equals("g* and its n by ignorecase alone, the capital no matter", caretText(), std::string("0:12"));
+        keys("0*nn");
+        ensure_equals("and *", caretText(), std::string("0:12"));
+    }
 }

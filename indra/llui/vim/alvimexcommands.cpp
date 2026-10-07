@@ -1432,8 +1432,8 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
         mVim.say(ALVimKeymap::said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
         return false;
     }
-    mVim.mSearch.pattern   = pattern;
-    mVim.mSearch.wholeWord = false;
+    mVim.mSearch.pattern     = pattern;
+    mVim.mSearch.noSmartCase = false;
     if (!ranged)
     {
         // The whole text; the empty line after a final newline is no
@@ -1696,7 +1696,7 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
         flags = lastSubstituteFlags + flags.substr(1);
     }
     mVim.mSearch.pattern        = pattern;
-    mVim.mSearch.wholeWord      = false;
+    mVim.mSearch.noSmartCase    = false;
     lastReplacement      = with;
     lastSubstituteFlags  = flags;
     const bool every      = flags.find('g') != std::string::npos;

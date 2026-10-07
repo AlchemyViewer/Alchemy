@@ -64,14 +64,15 @@ public:
     ALTextPos   offsetFrom(const ALTextDocument& d, const ALTextRange& match, const Offset& offset) const;
     // Searching, with the last pattern kept for n and N, and its offset:
     // the caret to where it goes (target).
-    bool search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset = Offset(),
+    bool search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool no_smartcase, const Offset& offset = Offset(),
                 std::optional<ALTextPos> search_from = std::nullopt);
     // Where a search goes from the caret -- or from `search_from`, as * and
     // # look from the start of the word under the caret -- the count's
     // match on, round past the ends, the offset taken from it; its matches
     // lit and the match kept for n, the caret left where it is: an
     // operator's motion. Nothing where there is no match, which is said.
-    std::optional<ALTextPos> target(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset = Offset(),
+    // `no_smartcase`: its case as ignorecase alone says, as for * and #.
+    std::optional<ALTextPos> target(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool no_smartcase, const Offset& offset = Offset(),
                                     std::optional<ALTextPos> search_from = std::nullopt);
     // What is typed on the search line so far, lit and brought into sight;
     // and that let go of, the caret's place in sight again.
@@ -114,13 +115,15 @@ public:
     // it, round past the ends: what gn and gN take.
     std::optional<ALTextRange> matchNear(ALTextView& view, bool forward);
 
-    // The search, for n and N; :s sets it too, and * and # as a whole word.
-    // How case is matched is in the keymap's shared state: sensitive
-    // unless :set ignorecase says, as vim's own default is.
+    // The search, for n and N; :s and :g set it too, and * and # -- a whole
+    // word as \<word\>, as vim's are spelt -- whose case goes by
+    // ignorecase alone, smartcase let be, for their n and N as well, as
+    // vim's does. How case is matched is in the keymap's shared state:
+    // sensitive unless :set ignorecase says, as vim's own default is.
     std::string pattern;
     Offset      offset{};
-    bool        forward   = true;
-    bool        wholeWord = false;
+    bool        forward     = true;
+    bool        noSmartCase = false;
     // The last match a search went to, which n from where an offset left
     // the caret goes on from.
     ALTextRange lastMatch;

@@ -264,9 +264,9 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                     }
                     if (!pattern.empty())
                     {
-                        mVim.mSearch.pattern   = pattern;
-                        mVim.mSearch.wholeWord = false;
-                        mVim.mSearch.offset    = offset;
+                        mVim.mSearch.pattern     = pattern;
+                        mVim.mSearch.noSmartCase = false;
+                        mVim.mSearch.offset      = offset;
                     }
                     else if (has_offset)
                     {
@@ -283,7 +283,7 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                     {
                         // A count typed before the line is the match that
                         // many on: 3/foo goes to the third.
-                        mVim.mSearch.search(view, mVim.mSearch.pattern, mVim.mSearch.forward, countOr(mVim.mCount), mVim.mSearch.wholeWord, mVim.mSearch.offset);
+                        mVim.mSearch.search(view, mVim.mSearch.pattern, mVim.mSearch.forward, countOr(mVim.mCount), mVim.mSearch.noSmartCase, mVim.mSearch.offset);
                     }
                 }
                 if (mVim.mMode == ALVimKeymap::Mode::Normal)

@@ -35,11 +35,11 @@
 #include <algorithm>
 #include <cstdlib>
 
-bool ALVimSearch::search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset,
+bool ALVimSearch::search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool no_smartcase, const Offset& offset,
                          std::optional<ALTextPos> search_from)
 {
     const ALTextPos                start = mVim.cursor(view);
-    const std::optional<ALTextPos> to    = target(view, pattern, forward, count, whole_word, offset, search_from);
+    const std::optional<ALTextPos> to    = target(view, pattern, forward, count, no_smartcase, offset, search_from);
     if (!to)
     {
         return false;
@@ -52,16 +52,15 @@ bool ALVimSearch::search(ALTextView& view, const std::string& pattern, bool forw
     return true;
 }
 
-std::optional<ALTextPos> ALVimSearch::target(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset,
+std::optional<ALTextPos> ALVimSearch::target(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool no_smartcase, const Offset& offset,
                                              std::optional<ALTextPos> search_from)
 {
     const ALTextDocument& d = view.document();
     ALTextSearchOptions   options;
-    options.regex     = !whole_word;
-    options.wholeWord = whole_word;
-    // A whole word -- * and # -- is looked for as it is, its case as
-    // ignorecase alone says; a pattern in vim's spelling.
-    const Pattern pattern_in = whole_word ? Pattern{ pattern, !mVim.mShared->ignoreCase } : patternOf(pattern);
+    options.regex = true;
+    // A pattern in vim's spelling; what * and # look for in its case as
+    // ignorecase alone says.
+    const Pattern pattern_in = patternOf(pattern, no_smartcase ? std::optional<bool>(!mVim.mShared->ignoreCase) : std::nullopt);
     options.caseSensitive    = pattern_in.caseSensitive;
     const Found&                    found_now = found(view, pattern_in, options);
     const std::vector<ALTextRange>& matches   = found_now.matches;
@@ -183,9 +182,8 @@ std::optional<ALTextRange> ALVimSearch::matchNear(ALTextView& view, bool forward
         return std::nullopt;
     }
     ALTextSearchOptions options;
-    options.regex         = !wholeWord;
-    options.wholeWord     = wholeWord;
-    const Pattern parsed  = wholeWord ? Pattern{ pattern, !mVim.mShared->ignoreCase } : patternOf(pattern);
+    options.regex         = true;
+    const Pattern parsed  = patternOf(pattern, noSmartCase ? std::optional<bool>(!mVim.mShared->ignoreCase) : std::nullopt);
     options.caseSensitive = parsed.caseSensitive;
     const Found&                    found_now = found(view, parsed, options);
     const std::vector<ALTextRange>& matches   = found_now.matches;

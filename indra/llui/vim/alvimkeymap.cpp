@@ -3010,7 +3010,7 @@ bool ALVimKeymap::searchMotion(ALTextView& view, bool forward, std::optional<ALT
     }
     const ALTextPos                from   = cursor(view);
     const ALVimSearch::Offset      offset = mSearch.offset;
-    const std::optional<ALTextPos> to     = mSearch.target(view, mSearch.pattern, forward, count, mSearch.wholeWord, offset, search_from);
+    const std::optional<ALTextPos> to     = mSearch.target(view, mSearch.pattern, forward, count, mSearch.noSmartCase, offset, search_from);
     if (!to)
     {
         // Said already: the operator fails, and nothing is changed.
@@ -3079,9 +3079,12 @@ bool ALVimKeymap::starSearch(ALTextView& view, bool forward, bool whole)
         ++end;
     }
     const ALTextRange word(ALTextPos(from.line, begin), ALTextPos(from.line, end));
-    // A word is looked for whole, or anywhere for g* and g#; other
-    // characters anywhere, as themselves: a backslash before each that a
-    // pattern reads as more, as vim's * puts one. A word has none of them.
+    // A word is looked for whole, as \<word\>, or anywhere for g* and g#;
+    // other characters anywhere, as themselves: a backslash before each
+    // that a pattern reads as more, as vim's * puts one. A word has none
+    // of them. Kept so spelt as the last pattern, for what takes it up --
+    // n, :s//, :g// -- to look for the same, its case as ignorecase alone
+    // says.
     static constexpr std::string_view SPECIAL("/.*~[^$\\");
     std::string                       pattern;
     for (const char c : d.text(word))
@@ -3092,20 +3095,20 @@ bool ALVimKeymap::starSearch(ALTextView& view, bool forward, bool whole)
         }
         pattern += c;
     }
-    mSearch.pattern   = pattern;
-    mSearch.forward   = forward;
-    mSearch.wholeWord = whole && keyword;
-    mSearch.offset    = ALVimSearch::Offset();
-    // Into the search history as vim's * puts it there, a word looked for
-    // whole as \<word\>, for the search line to find again.
-    mCommandLine.remember('/', mSearch.wholeWord ? "\\<" + pattern + "\\>" : pattern);
+    mSearch.pattern     = whole && keyword ? "\\<" + pattern + "\\>" : pattern;
+    mSearch.forward     = forward;
+    mSearch.noSmartCase = true;
+    mSearch.offset      = ALVimSearch::Offset();
+    // Into the search history as vim's * puts it there, for the search
+    // line to find again.
+    mCommandLine.remember('/', mSearch.pattern);
     // Looked for from the word's start, as vim puts the caret there first:
     // # from inside a word goes to the one before it, not to its own start.
     if (mOperator)
     {
         return searchMotion(view, forward, word.begin);
     }
-    mSearch.search(view, mSearch.pattern, forward, countOr(mCount), mSearch.wholeWord, mSearch.offset, word.begin);
+    mSearch.search(view, mSearch.pattern, forward, countOr(mCount), mSearch.noSmartCase, mSearch.offset, word.begin);
     clearPending();
     return true;
 }
@@ -3883,7 +3886,7 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             }
             else
             {
-                mSearch.search(view, mSearch.pattern, ch == 'n' ? mSearch.forward : !mSearch.forward, count, mSearch.wholeWord, mSearch.offset);
+                mSearch.search(view, mSearch.pattern, ch == 'n' ? mSearch.forward : !mSearch.forward, count, mSearch.noSmartCase, mSearch.offset);
             }
             clearPending();
             return true;
