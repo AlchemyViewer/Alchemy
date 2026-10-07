@@ -550,12 +550,14 @@ private:
 
     // Visual mode: where it started and where its caret is -- on a
     // character, which the view's selection reaches past -- and the last
-    // visual selection for gv.
+    // visual selection for gv, with whether a block of it was taken to
+    // every line's end with $, as vim keeps its curswant.
     ALTextPos mVisualAnchor;
     ALTextPos mVisualCaret;
     Mode      mVisualLast = Mode::Normal;
     ALTextPos mVisualLastAnchor;
     ALTextPos mVisualLastCaret;
+    bool      mVisualLastToEnd = false;
     // The visual mode the search line was opened over, which entering the
     // line or letting it go goes back to, what is found moving the visual
     // caret as vim's search does; normal mode for one opened from any

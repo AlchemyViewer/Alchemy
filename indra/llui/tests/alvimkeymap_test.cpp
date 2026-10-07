@@ -3889,4 +3889,29 @@ namespace tut
         ensure_equals("the caret at its corner", caretText(), std::string("1:1"));
         ensure_equals("the block's text", vim->registerText('"'), std::string("fg"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<144>()
+    {
+        set_test_name("the last visual block keeps whether it was taken to every line's end with $, for {op}gv, gv and \\%V, whatever went to a line's end since");
+        ALCodeEditor& e = make("abcd\nefgh\n");
+        keys("l<C-v>jl<Esc>$dgv");
+        ensure_equals("a block without $, then $: dgv takes its columns alone", flat(e.text()), std::string("ad|eh|"));
+        e.setText("abcdefg\nabc\n");
+        e.setCaret(ALTextPos(0, 0));
+        keys("l<C-v>j$<Esc>0dgv");
+        ensure_equals("a block with $, then 0: dgv takes every line to its end", flat(e.text()), std::string("a|a|"));
+        e.setText("abcdefg\nabc\n");
+        e.setCaret(ALTextPos(0, 0));
+        keys("l<C-v>j$<Esc>0gvd");
+        ensure_equals("gv selects it to every line's end again", flat(e.text()), std::string("a|a|"));
+        e.setText("abcdefg\nabc\n");
+        e.setCaret(ALTextPos(0, 0));
+        keys("l<C-v>j$<Esc>0:%s/\\%V[a-z]/X/g<CR>");
+        ensure_equals("\\%V over a block with $: to every line's end", flat(e.text()), std::string("aXXXXXX|aXX|"));
+        e.setText("abcdefg\nabc\n");
+        e.setCaret(ALTextPos(0, 0));
+        keys("l<C-v>jl<Esc>$:%s/\\%V[a-z]/X/g<CR>");
+        ensure_equals("\\%V over a block without $, after $: its columns alone", flat(e.text()), std::string("aXXdefg|aXX|"));
+    }
 }

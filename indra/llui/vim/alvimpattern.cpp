@@ -603,7 +603,7 @@ void ALVimPattern::constrain(const ALTextDocument& d, const Places& places, std:
                     {
                         // In what the block holds of the line, which the
                         // bytes before its columns place.
-                        const ALTextRange piece = ALVimText::blockPiece(d, at.line, block_left, block_right, false, places.tabWidth);
+                        const ALTextRange piece = ALVimText::blockPiece(d, at.line, block_left, block_right, places.blockToEnd, places.tabWidth);
                         if (at < piece.begin || !(at < piece.end))
                         {
                             return false;

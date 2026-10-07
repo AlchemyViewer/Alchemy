@@ -127,7 +127,8 @@ ALVimPattern::Places ALVimSearch::placesOf(const ALTextView& view) const
         {
             // Its columns as the reader counts them, as the block itself
             // has them.
-            places.tabWidth = view.getTabWidth();
+            places.tabWidth   = view.getTabWidth();
+            places.blockToEnd = mVim.mVisualLastToEnd;
             ALVimText::blockColumns(d, d.clamp(mVim.mVisualLastAnchor), d.clamp(mVim.mVisualLastCaret), places.tabWidth, places.blockLeft, places.blockRight);
             places.visualRange = ALTextRange(d.lineStart(a.line), d.lineEnd(b.line));
         }
