@@ -128,7 +128,13 @@ namespace
             }
             change.stretches.clear();
         }
-        change.edit = edit;
+        // Its texts and its places, not the line spans its listeners had
+        // worked out, which a step put back works out afresh.
+        change.edit.range    = edit.range;
+        change.edit.removed  = edit.removed;
+        change.edit.inserted = edit.inserted;
+        change.edit.parts    = edit.parts;
+        change.edit.keepEnd(edit.endAfter());
         return change;
     }
 
