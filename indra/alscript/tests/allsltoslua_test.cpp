@@ -2417,4 +2417,65 @@ namespace tut
         ensure("no helper, nor a move: " + r.text, !has(r, "joinLists") && !has(r, "table.move("));
         checksClean(r);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<56>()
+    {
+        set_test_name("list forms through SLua's own where they do what LSL's did: an item replaced at a counter within the list, in "
+                      "place, its loop Luau's numeric for, the length kept; one put on the end; a part between two places written out; "
+                      "text and whole numbers joined; one thing's place found; llcompat's where not");
+        const ALLSLToSLua::Result r = convert("list gNames = [\"a\", \"b\"];\n"
+                                              "list gKept;\n"
+                                              "list gL = [1, 2, 3];\n"
+                                              "integer bump() { gL += [0]; return 1; }\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    list l = [1, 2, 3];\n"
+                                              "    integer i;\n"
+                                              "    for (i = 0; i < llGetListLength(l); ++i)\n"
+                                              "        l = llListReplaceList(l, [llList2Integer(l, i) * 2], i, i);\n"
+                                              "    list held = [1, 2];\n"
+                                              "    gKept = held;\n"
+                                              "    integer j;\n"
+                                              "    for (j = 0; j < llGetListLength(held); ++j)\n"
+                                              "        held = llListReplaceList(held, [j], j, j);\n"
+                                              "    integer k;\n"
+                                              "    for (k = 0; k < llGetListLength(gL); ++k)\n"
+                                              "        gL = llListReplaceList(gL, [bump()], k, k);\n"
+                                              "    l = llListReplaceList(l, [7], -1, -1);\n"
+                                              "    l = llListInsertList(l, [9], llGetListLength(l));\n"
+                                              "    list part = llList2List(l, 1, 2);\n"
+                                              "    list all = llList2List(l, 0, -1);\n"
+                                              "    list rest = llList2List(l, 2, -1);\n"
+                                              "    list wrapped = llList2List(l, 3, 1);\n"
+                                              "    llOwnerSay(llDumpList2String(l, \",\"));\n"
+                                              "    llOwnerSay(llDumpList2String(gNames + [n], \", \"));\n"
+                                              "    llOwnerSay(llDumpList2String(l + [1.5], \",\"));\n"
+                                              "    llOwnerSay((string)l);\n"
+                                              "    integer at = llListFindList(gNames, [\"b\"]);\n"
+                                              "    integer none = llListFindList(gNames, [NULL_KEY]);\n"
+                                              "    if (llListFindList(gNames, [NULL_KEY]) != -1) llOwnerSay(\"null\");\n"
+                                              "    integer parsed = llListFindList(llParseString2List(\"a,b\", [\",\"], []), [\"b\"]);\n"
+                                              "    llOwnerSay((string)(at + none + parsed) + llDumpList2String(part + all + rest + wrapped + held, \"\"));\n"
+                                              "} }\n");
+        ensure("replaced in place, in Luau's numeric for: " + r.text, has(r, "for i = 0, #l - 1 do\n        l[i + 1] = l[i + 1] * 2\n"));
+        ensure("a list held elsewhere, replaced as LSL's: " + r.text,
+               has(r, "for j = 0, #held - 1 do\n") && has(r, "        held = llcompat.ListReplaceList(held, {j}, j, j)\n"));
+        ensure("a global a call of the script's could change: " + r.text, has(r, "while k < #gL do") &&
+                                                                            has(r, "gL = llcompat.ListReplaceList(gL, {bump()}, k, k)"));
+        ensure("the last of a list that could be empty: " + r.text, has(r, "l = llcompat.ListReplaceList(l, {7}, -1, -1)"));
+        ensure("on the end: " + r.text, has(r, "table.insert(l, 9)"));
+        ensure("a part, and all of it: " + r.text, has(r, "local part = table.move(l, 2, 3, 1, {})") && has(r, "local all = table.clone(l)"));
+        ensure("to the end, and the part left out, as LSL's: " + r.text,
+               has(r, "local rest = llcompat.List2List(l, 2, -1)") && has(r, "local wrapped = llcompat.List2List(l, 3, 1)"));
+        ensure("whole numbers joined: " + r.text, has(r, "print(table.concat(l, \",\"))") && has(r, "print(table.concat(l))"));
+        ensure("and text: " + r.text, has(r, "print(table.concat(table.extend(table.clone(gNames), {n}), \", \"))"));
+        ensure("a float as LSL writes one: " + r.text, has(r, "print(ll.DumpList2String(table.extend(table.clone(l), {1.5}), \",\"))"));
+        ensure("found, its place: " + r.text, has(r, "local at = (table.find(gNames, \"b\") or 0) - 1"));
+        ensure("NULL_KEY as LSL's string, as its place and found: " + r.text,
+               has(r, "local none = (table.find(gNames, tostring(NULL_KEY)) or 0) - 1") &&
+                   has(r, "if table.find(gNames, tostring(NULL_KEY)) ~= nil then"));
+        ensure("in a library call's list: " + r.text, has(r, "local parsed = (table.find(ll.ParseString2List(\"a,b\", {\",\"}, {}) :: { any }, \"b\") or 0) - 1"));
+        ensure("no llcompat but those: " + r.text, count(r, "llcompat.") == 5);
+        checksClean(r);
+    }
 }

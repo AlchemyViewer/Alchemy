@@ -649,8 +649,13 @@ namespace
         bool steadyWhole(LSLExpression* e, int& v) const;
         // Whether an expression reads the same on every turn of a loop:
         // nothing it reads is set in the loop, and it calls only what the
-        // definitions call pure.
-        bool steadyIn(LSLExpression* e, LSLASTNode* loop) const;
+        // definitions call pure. Where kept is given, what the loop sets of
+        // it is known to change nothing the expression reads of it.
+        bool steadyIn(LSLExpression* e, LSLASTNode* loop, LSLSymbol* kept = nullptr) const;
+        // i < llGetListLength(l), where all the loop does to l is put one
+        // item in place of another at i: below the length, i is always one
+        // of its places, so the length is the same on every turn.
+        bool lengthKept(const Counting& c, LSLForStatement* f) const;
         // Before a function's or a handler's body is written: its for
         // loops that Luau's numeric for says exactly, and the variables
         // that only such loops use, whose declarations go.
@@ -713,6 +718,16 @@ namespace
         // to a list, a local list no other holds, or a call to a function of
         // the script's own that only ever returns one of those.
         bool fresh(LSLExpression* e) const;
+        // A list made where it is read: written out, or a library call's,
+        // but not another +'s. What a table function is given with it,
+        // Luau's old solver would hold to the type of its first item, so it
+        // is said to hold any value, as LSL's lists did.
+        bool        madeHere(LSLExpression* e) const;
+        std::string anyItems(LSLExpression* e, const Expr& written) const;
+        // The one item of a list written out, or null where it has more or
+        // fewer; and an item written as the list holds it.
+        LSLASTNode* soleItem(LSLExpression* e) const;
+        std::string itemText(LSLASTNode* item);
         // Why a read of a list hands the list itself on, or null where it
         // does not.
         Shared handedOn(LSLASTNode* read) const;
@@ -722,9 +737,11 @@ namespace
         // could change l.
         bool grow(LSLLValueExpression* target, const std::string& name, LSLOperator op, LSLExpression* rhs);
         // l = llDeleteSubList(l, 0, 0) or (l, -1, -1), l =
-        // llListInsertList(l, [x], 0), on a list no other holds, as
-        // table.remove and table.insert on it: at its front or its back,
-        // which no index can fall past.
+        // llListInsertList(l, [x], 0) or (l, [x], llGetListLength(l)), on a
+        // list no other holds, as table.remove and table.insert on it: at
+        // its front or its back, which no index can fall past. And l =
+        // llListReplaceList(l, [x], i, i) at a counter within the list, as
+        // l[i + 1] = x.
         bool editInPlace(LSLSymbol* var, const std::string& name, LSLExpression* rhs);
 
         // --- strings built in loops -------------------------------------------------
@@ -2567,6 +2584,50 @@ namespace
                 return item;
             }
         }
+        // One thing looked for in a list, its place: table.find's, counted
+        // from 0, or -1 where it is not there, as LSL's.
+        if (lsl == "llListFindList")
+        {
+            if (LSLASTNode* sought = soleItem(argumentAt(e, 1)))
+            {
+                called = "table.find";
+                return Expr{ "(table.find(" + anyItems(argumentAt(e, 0), arg(0)) + ", " + itemText(sought) + ") or 0) - 1", ADD };
+            }
+        }
+        // A part of a list between two places written out, from its start
+        // on: table.move's copy of it into a new list, which copies nothing
+        // past the list's end, as LSL's stops there; and all of it, a clone.
+        // Not a place counted from the end, which a short list could have
+        // its start past, nor a start after the end, which LSL reads as the
+        // part to leave out; nor an end past what a script's 64 KiB could
+        // hold, which the copy would count up to.
+        if (lsl == "llList2List")
+        {
+            int from = 0;
+            int to   = 0;
+            if (wholeNumber(argumentAt(e, 1), from) && wholeNumber(argumentAt(e, 2), to))
+            {
+                if (from == 0 && to == -1)
+                {
+                    called = "table.clone";
+                    return Expr{ "table.clone(" + arg(0).text + ")" };
+                }
+                if (from >= 0 && from <= to && to < 65536)
+                {
+                    called = "table.move";
+                    return Expr{ "table.move(" + arg(0).text + ", " + std::to_string(from + 1) + ", " + std::to_string(to + 1) + ", 1, {})" };
+                }
+            }
+        }
+        // A list of text and whole numbers joined: table.concat, which writes
+        // a whole number as LSL wrote an integer, where ll.DumpList2String
+        // writes it as a float, 5.000000, since SLua's numbers are all floats
+        // to it.
+        if (lsl == "llDumpList2String" && (itemTypes(argumentAt(e, 0)) & ~(ItemString | ItemInteger)) == 0)
+        {
+            called = "table.concat";
+            return Expr{ "table.concat(" + arg(0).text + ", " + coerced(argumentAt(e, 1), LST_STRING).text + ")" };
+        }
         if (lsl == "llPow")
         {
             // Luau's ^ binds tighter than a minus before it.
@@ -2688,15 +2749,14 @@ namespace
         {
             return std::nullopt;
         }
-        const std::string lsl   = call->getIdentifier()->getName();
-        LSLExpression*    among = argumentAt(call, 1);
+        const std::string lsl = call->getIdentifier()->getName();
         std::string       asked;
         // One thing looked for in a list: table.find, which answers as
         // ll.ListFindList does.
-        if (mOptions.idioms && lsl == "llListFindList" && among && among->getNodeSubType() == NODE_LIST_EXPRESSION && among->getChild(0) &&
-            !among->getChild(0)->getNext())
+        LSLASTNode* sought = mOptions.idioms && lsl == "llListFindList" ? soleItem(argumentAt(call, 1)) : nullptr;
+        if (sought)
         {
-            asked = "table.find(" + value(argumentAt(call, 0)).text + ", " + value(static_cast<LSLExpression*>(among->getChild(0))).text + ")";
+            asked = "table.find(" + anyItems(argumentAt(call, 0), value(argumentAt(call, 0))) + ", " + itemText(sought) + ")";
         }
         else
         {
@@ -3024,7 +3084,7 @@ namespace
                     const Expr     a     = value(lhs);
                     const Expr     b     = value(rhs);
                     LSLExpression* left  = unbracketed(lhs);
-                    std::string    first = "table.clone(" + a.text + ")";
+                    std::string    first = madeHere(lhs) ? anyItems(lhs, a) : "table.clone(" + a.text + ")";
                     if (lt != LST_LIST)
                     {
                         first = "{" + a.text + "} :: { any }";
@@ -3032,10 +3092,6 @@ namespace
                     else if (left->getNodeSubType() == NODE_BINARY_EXPRESSION && left->getOperation() == OP_PLUS)
                     {
                         first = a.text;
-                    }
-                    else if (left->getNodeSubType() != NODE_LVALUE_EXPRESSION && fresh(left))
-                    {
-                        first = bracketed(a, PRIMARY) + " :: { any }";
                     }
                     return { "table.extend(" + first + ", " + (rt == LST_LIST ? b.text : "{" + b.text + "}") + ")" };
                 }
@@ -3261,7 +3317,14 @@ namespace
                 switch (from)
                 {
                     case LST_FLOATINGPOINT: return { "string.format(\"%.6f\", " + v.text + ")" };
-                    case LST_LIST: return { "ll.DumpList2String(" + v.text + ", \"\")" };
+                    case LST_LIST:
+                        // Text and whole numbers joined as LSL wrote them
+                        // (Writer::idiom).
+                        if (mOptions.idioms && (itemTypes(child) & ~(ItemString | ItemInteger)) == 0)
+                        {
+                            return { "table.concat(" + v.text + ")" };
+                        }
+                        return { "ll.DumpList2String(" + v.text + ", \"\")" };
                     case LST_VECTOR:
                     case LST_QUATERNION:
                         // LSL writes each part with five places, as ll's
@@ -4271,11 +4334,43 @@ namespace
         // and where it starts are read once, as Luau reads them.
         bool setInBody = false;
         walk(f->getBody(), [&](LSLASTNode* node) { setInBody = setInBody || setBy(node) == c.var; });
-        if (setInBody || !steadyIn(c.limit, f))
+        if (setInBody || !(steadyIn(c.limit, f) || lengthKept(c, f)))
         {
             return std::nullopt;
         }
         return c;
+    }
+
+    bool Writer::lengthKept(const Counting& c, LSLForStatement* f) const
+    {
+        LSLExpression* limit = unwrapped(c.limit);
+        if (!limit || limit->getNodeSubType() != NODE_FUNCTION_EXPRESSION ||
+            std::string_view(static_cast<LSLFunctionExpression*>(limit)->getIdentifier()->getName()) != "llGetListLength")
+        {
+            return false;
+        }
+        LSLSymbol* list = wholeVariable(argumentAt(static_cast<LSLFunctionExpression*>(limit), 0));
+        if (!list)
+        {
+            return false;
+        }
+        // Each time the loop sets l: l = llListReplaceList(l, [x], i, i), x
+        // changing nothing of l's.
+        bool kept = true;
+        walk(f, [&](LSLASTNode* node) {
+            if (!kept || setBy(node) != list)
+            {
+                return;
+            }
+            LSLExpression* rhs = node->getNodeSubType() == NODE_BINARY_EXPRESSION && static_cast<LSLExpression*>(node)->getOperation() == OP_ASSIGN
+                                     ? unwrapped(static_cast<LSLBinaryExpression*>(node)->getRHS())
+                                     : nullptr;
+            auto*          call = rhs && rhs->getNodeSubType() == NODE_FUNCTION_EXPRESSION ? static_cast<LSLFunctionExpression*>(rhs) : nullptr;
+            kept = call && std::string_view(call->getIdentifier()->getName()) == "llListReplaceList" &&
+                   wholeVariable(argumentAt(call, 0)) == list && soleItem(argumentAt(call, 1)) && !mEffects.of(argumentAt(call, 1)).writes(list) &&
+                   wholeVariable(argumentAt(call, 2)) == c.var && wholeVariable(argumentAt(call, 3)) == c.var;
+        });
+        return kept && steadyIn(c.limit, f, list);
     }
 
     bool Writer::steadyWhole(LSLExpression* e, int& v) const
@@ -4304,7 +4399,7 @@ namespace
         return false;
     }
 
-    bool Writer::steadyIn(LSLExpression* e, LSLASTNode* loop) const
+    bool Writer::steadyIn(LSLExpression* e, LSLASTNode* loop, LSLSymbol* kept) const
     {
         // What the loop sets, and whether it calls anything of the script's
         // own, which could set a global.
@@ -4329,7 +4424,7 @@ namespace
                 {
                     LSLSymbol* var = static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol();
                     steady = steady && var && (var->getSubType() == SYM_BUILTIN ||
-                                               (!set.contains(var) && (var->getSubType() != SYM_GLOBAL || !calls)));
+                                               ((var == kept || !set.contains(var)) && (var->getSubType() != SYM_GLOBAL || !calls)));
                     break;
                 }
                 case NODE_FUNCTION_EXPRESSION:
@@ -5123,6 +5218,44 @@ namespace
         }
     }
 
+    bool Writer::madeHere(LSLExpression* e) const
+    {
+        LSLExpression* m = unwrapped(e);
+        return m && m->getNodeSubType() != NODE_LVALUE_EXPRESSION && !(m->getNodeSubType() == NODE_BINARY_EXPRESSION && m->getOperation() == OP_PLUS) &&
+               fresh(m);
+    }
+
+    std::string Writer::anyItems(LSLExpression* e, const Expr& written) const
+    {
+        return madeHere(e) ? bracketed(written, PRIMARY) + " :: { any }" : written.text;
+    }
+
+    LSLASTNode* Writer::soleItem(LSLExpression* e) const
+    {
+        e = unwrapped(e);
+        LSLASTNode* item = nullptr;
+        if (e && e->getNodeSubType() == NODE_LIST_EXPRESSION)
+        {
+            item = e->getChild(0);
+        }
+        else if (e && e->getNodeSubType() == NODE_CONSTANT_EXPRESSION && e->getChild(0)->getNodeSubType() == NODE_LIST_CONSTANT)
+        {
+            item = static_cast<LSLListConstant*>(e->getChild(0))->getValue();
+        }
+        return !isNull(item) && isNull(item->getNext()) ? item : nullptr;
+    }
+
+    std::string Writer::itemText(LSLASTNode* item)
+    {
+        // As LSL typed it: NULL_KEY in a list is LSL's string.
+        if (item->getNodeType() == NODE_CONSTANT)
+        {
+            return constant(static_cast<LSLConstant*>(item)).text;
+        }
+        auto* e = static_cast<LSLExpression*>(item);
+        return coerced(e, e->getIType()).text;
+    }
+
     Shared Writer::handedOn(LSLASTNode* read) const
     {
         // Up through brackets, and casts to what it already is.
@@ -5321,14 +5454,33 @@ namespace
             line(from == 0 ? "table.remove(" + name + ", 1)" : "table.remove(" + name + ")");
             return true;
         }
-        LSLExpression* added = unwrapped(argumentAt(call, 1));
-        if (lsl == "llListInsertList" && wholeNumber(argumentAt(call, 2), from) && from == 0 && added &&
-            added->getNodeSubType() == NODE_LIST_EXPRESSION && added->getChild(0) && !added->getChild(0)->getNext() &&
-            !mEffects.of(added).writes(var))
+        // One item, changing nothing of l's: put in at the front, or on the
+        // end, at the list's length; or in place of another, at a counter
+        // within the list (mWithin), which is always one of its places.
+        LSLExpression* added = argumentAt(call, 1);
+        LSLASTNode*    item  = soleItem(added);
+        if (!item || mEffects.of(added).writes(var))
         {
-            auto* item = static_cast<LSLExpression*>(added->getChild(0));
-            line("table.insert(" + name + ", 1, " + coerced(item, item->getIType()).text + ")");
+            return false;
+        }
+        LSLExpression* at     = unwrapped(argumentAt(call, 2));
+        const bool     length = at && at->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
+                            std::string_view(static_cast<LSLFunctionExpression*>(at)->getIdentifier()->getName()) == "llGetListLength" &&
+                            wholeVariable(argumentAt(static_cast<LSLFunctionExpression*>(at), 0)) == var;
+        if (lsl == "llListInsertList" && ((wholeNumber(at, from) && from == 0) || length))
+        {
+            line("table.insert(" + name + (length ? ", " : ", 1, ") + itemText(item) + ")");
             return true;
+        }
+        LSLSymbol* counter = wholeVariable(at);
+        const auto within  = counter ? mWithin.find(counter) : mWithin.end();
+        if (lsl == "llListReplaceList" && within != mWithin.end() && within->second == var && wholeVariable(argumentAt(call, 3)) == counter)
+        {
+            if (std::optional<std::string> place = llIndex(at))
+            {
+                line(name + "[" + *place + "] = " + itemText(item));
+                return true;
+            }
         }
         return false;
     }
