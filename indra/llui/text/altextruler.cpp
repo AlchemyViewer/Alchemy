@@ -337,8 +337,10 @@ void ALTextRuler::drawPreview(F32 alpha)
     const LLColor4  wash  = ALSurface::shade(bg, ink, 0.14f) % alpha;
     ALSurface::draw(box, bg, ink, alpha);
     LLLocalClipRect clip(LLRect(box.mLeft + 1, box.mTop - 1, box.mRight - 1, box.mBottom + 1));
-    // The numbers take the room the widest needs.
-    const std::string widest    = std::to_string(last + 1);
+    // The numbers the view shows, as its gutter counts them, in the room
+    // the widest needs.
+    const S32         base      = mView.lineNumberBase();
+    const std::string widest    = std::to_string(last + 1 + base);
     const S32         numbers   = static_cast<S32>(font->getWidth(widest)) + GUTTER;
     const S32         tab_width = mView.getTabWidth();
     S32               y         = box.mTop - PAD;
@@ -349,7 +351,7 @@ void ALTextRuler::drawPreview(F32 alpha)
             gl_rect_2d(LLRect(box.mLeft + 1, y, box.mRight - 1, y - row_h), wash, true);
         }
         const S32 baseline = y - row_h + static_cast<S32>(font->getDescenderHeight()) + 1;
-        font->renderUTF8(std::to_string(l + 1), 0, static_cast<F32>(box.mLeft + PAD + numbers - GUTTER), static_cast<F32>(baseline),
+        font->renderUTF8(std::to_string(l + 1 + base), 0, static_cast<F32>(box.mLeft + PAD + numbers - GUTTER), static_cast<F32>(baseline),
                          faint, LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
         // The line in its colours, token by token, tabs as spaces.
         const std::string&                text   = document.line(l);

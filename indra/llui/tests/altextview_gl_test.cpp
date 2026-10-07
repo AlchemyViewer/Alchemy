@@ -1050,4 +1050,72 @@ namespace tut
                changed_in(second, 0, second_from) == 0 && changed_in(second, second_to, W) == 0);
         view->die();
     }
+
+    // The preview of the lines under the mouse on the map numbers them as
+    // the view does, from its first line's number: a notecard's from 0, an
+    // expansion's from past its envelope.
+    template<> template<>
+    void altextview_gl_object::test<15>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::string text;
+        for (S32 i = 0; i < 200; ++i)
+        {
+            text += "word word word word\n";
+        }
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name               = "editor";
+        p.rect               = LLRect(0, H, W, 0);
+        p.default_text       = text;
+        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        editor->setFont(LLFontGL::getFontMonospace());
+        // No gutter, so that only the preview says a line's number; read
+        // only, so that no caret blinks between frames.
+        editor->setShowLineNumbers(false);
+        editor->setShowFoldMarkers(false);
+        editor->setReadOnly(true);
+        editor->setScrollMap(true);
+        editor->setScrollMapWidth(60);
+        editor->setBackgroundColor(LLColor4(0.1f, 0.1f, 0.12f, 1.f));
+        editor->setTextColor(LLColor4(0.9f, 0.9f, 0.9f, 1.f));
+        ALTextRuler* map = editor->findChild<ALTextRuler>("ruler");
+        ensure("a map", map != nullptr);
+        const auto drawn = [&]() {
+            gl().clearFramebuffer();
+            glEnable(GL_BLEND);
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
+            editor->draw();
+            gGL.flush();
+            glDisable(GL_BLEND);
+            glFinish();
+            return ll_test::readFramebufferRGBA(W, H);
+        };
+        // How many pixels left of the map, where the preview is, differ
+        // between two frames.
+        const auto changed = [&](const std::vector<U8>& a, const std::vector<U8>& b) {
+            S32 count = 0;
+            for (S32 y = 0; y < H; ++y)
+            {
+                for (S32 x = 0; x < W - 60; ++x)
+                {
+                    const size_t at = (static_cast<size_t>(y) * W + x) * 4;
+                    count += a[at] != b[at] || a[at + 1] != b[at + 1] || a[at + 2] != b[at + 2];
+                }
+            }
+            return count;
+        };
+        drawn();
+        map->handleHover(30, H / 2, MASK_NONE);
+        const std::vector<U8> from_one = drawn();
+        editor->setLineNumberBase(1000);
+        const std::vector<U8> from_base = drawn();
+        ensure("numbered past a thousand, the preview says so: " + std::to_string(changed(from_one, from_base)), changed(from_one, from_base) > 0);
+        editor->setLineNumberBase(0);
+        ensure("and from one again as before", changed(from_one, drawn()) == 0);
+        editor->die();
+    }
 }
