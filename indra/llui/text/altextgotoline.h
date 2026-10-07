@@ -64,6 +64,8 @@ namespace ALTextGoToLine
     void ask(const ask_t& ask, text_t text, S32 base, words_t words, went_t went = {});
 
     // "12" or "12:5", as a person types a place: the line and the column
-    // from one, zero where there is none or it is not a number.
-    void placeTyped(const std::string& text, S32& line, S32& column);
+    // from one, zero where there is none or it is not a number -- nor one
+    // where it is longer than a number holds. False where no line's number
+    // is typed at all.
+    bool placeTyped(const std::string& text, S32& line, S32& column);
 }

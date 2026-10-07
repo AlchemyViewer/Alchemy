@@ -213,4 +213,49 @@ namespace tut
         quick->setQuery("4");
         ensure_equals("past the last", word, std::string("GoToLineNone"));
     }
+
+    template<> template<>
+    void altextgotoline_object::test<5>()
+    {
+        set_test_name("what has no number in it goes nowhere, though the lines are counted from 0: nothing is not line 0");
+        ALTextView& v = make("zero\none\ntwo\n");
+        v.setCaret(ALTextPos(2, 1));
+        ask(-1);
+        for (const char* typed : { "x", ":", "-3" })
+        {
+            quick->setQuery(typed);
+            ensure_equals(std::string(typed) + ": said to be no line", word, std::string("GoToLineNone"));
+            ensure_equals(std::string(typed) + ": the caret where it was", v.caret(), ALTextPos(2, 1));
+        }
+        ensure_equals("said as typed", said["[LINE]"](), std::string("-3"));
+        choose();
+        ensure_equals("Return leaves it there", v.caret(), ALTextPos(2, 1));
+        ensure("and tells of no way back", went.empty());
+    }
+
+    template<> template<>
+    void altextgotoline_object::test<6>()
+    {
+        set_test_name("a number longer than a line's goes nowhere, not round to the line it is a multiple past, and is said as typed");
+        ALTextView& v = make("zero\none\ntwo\n");
+        v.setCaret(ALTextPos(2, 1));
+        ask();
+        quick->setQuery("4294967298");
+        ensure_equals("no such line", word, std::string("GoToLineNone"));
+        ensure_equals("the caret where it was", v.caret(), ALTextPos(2, 1));
+        ensure_equals("said as typed", said["[LINE]"](), std::string("4294967298"));
+        // A column too long to be one is none.
+        quick->setQuery("2:4294967298");
+        ensure_equals("the line, no column", word, std::string("GoToLineGo"));
+        ensure_equals("at its start", v.caret(), ALTextPos(1, 0));
+        popover()->escape();
+
+        // The most a number holds, counted from 0: past the last line, not
+        // round past the least.
+        ask(-1);
+        quick->setQuery("2147483647");
+        ensure_equals("no such line, from 0", word, std::string("GoToLineNone"));
+        ensure_equals("said as typed, from 0", said["[LINE]"](), std::string("2147483647"));
+        ensure_equals("the caret where it was, from 0", v.caret(), ALTextPos(2, 1));
+    }
 }

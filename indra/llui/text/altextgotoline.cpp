@@ -30,18 +30,37 @@
 #include "altextview.h"
 
 #include <cctype>
-#include <cstdlib>
+#include <charconv>
 #include <string_view>
+#include <system_error>
 
 namespace
 {
     // What is typed, as a line of the text counted from one, and a
-    // column: false where it is no line of it.
+    // column: false where it is no line of it, or no line's number at all.
     bool placeOf(const ALTextView& text, S32 base, const std::string& typed, S32& line, S32& column)
     {
-        ALTextGoToLine::placeTyped(typed, line, column);
-        line -= base;
-        return line >= 1 && line <= text.document().lineCount();
+        S32 shown = 0;
+        line      = 0;
+        if (!ALTextGoToLine::placeTyped(typed, shown, column))
+        {
+            return false;
+        }
+        // Counted wide enough that no base takes it past what a number
+        // holds.
+        const S64 counted = static_cast<S64>(shown) - base;
+        if (counted < 1 || counted > text.document().lineCount())
+        {
+            return false;
+        }
+        line = static_cast<S32>(counted);
+        return true;
+    }
+
+    // A run of digits as a number, where it is not too long for one.
+    bool numberOf(std::string_view digits, S32& out)
+    {
+        return std::from_chars(digits.data(), digits.data() + digits.size(), out).ec == std::errc();
     }
 
     ALTextPos posOf(const ALTextView& text, S32 line, S32 column)
@@ -112,15 +131,19 @@ void ALTextGoToLine::ask(const ask_t& ask, text_t text_of, S32 base, words_t wor
         }
         S32                        line, column;
         const bool                 there = placeOf(*text, base, typed, line, column);
+        std::string                trimmed = typed;
+        LLStringUtil::trim(trimmed);
+        // The line as typed: its number, or what was typed where that is
+        // no number a line has.
+        S32                        typed_line = 0, typed_column = 0;
+        const bool                 numbered = ALTextGoToLine::placeTyped(typed, typed_line, typed_column);
         LLStringUtil::format_map_t args;
         // In the numbers the text shows: the first line's too, which is
         // 0 where they count from 0.
         args["[FIRST]"] = std::to_string(1 + base);
         args["[COUNT]"] = std::to_string(text->document().lineCount() + base);
-        args["[LINE]"]  = std::to_string(line + base);
+        args["[LINE]"]  = numbered ? std::to_string(typed_line) : trimmed;
         args["[COL]"]   = std::to_string(column);
-        std::string trimmed = typed;
-        LLStringUtil::trim(trimmed);
         if (trimmed.empty())
         {
             quick->setHint(words("GoToLineHint", args));
@@ -139,7 +162,7 @@ void ALTextGoToLine::ask(const ask_t& ask, text_t text_of, S32 base, words_t wor
     quick->setQuery(std::string());
 }
 
-void ALTextGoToLine::placeTyped(const std::string& text, S32& line, S32& column)
+bool ALTextGoToLine::placeTyped(const std::string& text, S32& line, S32& column)
 {
     line = column = 0;
     std::string_view rest(text);
@@ -156,15 +179,15 @@ void ALTextGoToLine::placeTyped(const std::string& text, S32& line, S32& column)
     {
         ++digits;
     }
-    if (digits == 0)
+    if (digits == 0 || !numberOf(rest.substr(0, digits), line))
     {
-        return;
+        line = 0;
+        return false;
     }
-    line = static_cast<S32>(std::strtol(std::string(rest.substr(0, digits)).c_str(), nullptr, 10));
     rest.remove_prefix(digits);
     if (rest.empty() || (rest.front() != ':' && rest.front() != ','))
     {
-        return;
+        return true;
     }
     rest.remove_prefix(1);
     while (!rest.empty() && rest.front() == ' ')
@@ -176,8 +199,9 @@ void ALTextGoToLine::placeTyped(const std::string& text, S32& line, S32& column)
     {
         ++digits;
     }
-    if (digits > 0)
+    if (digits > 0 && !numberOf(rest.substr(0, digits), column))
     {
-        column = static_cast<S32>(std::strtol(std::string(rest.substr(0, digits)).c_str(), nullptr, 10));
+        column = 0;
     }
+    return true;
 }
