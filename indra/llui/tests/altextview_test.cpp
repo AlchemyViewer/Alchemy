@@ -3071,4 +3071,34 @@ namespace tut
         }
         ensure("none of it an edit", !v.isDirty());
     }
+
+    template<> template<>
+    void altextview_object::test<98>()
+    {
+        set_test_name("Next over matches that are empty -- ^ at each line's start -- goes on from the current one at the caret, round the end; one the caret was put on is found first");
+#if LL_DARWIN
+        constexpr MASK toggle = MASK_CONTROL | MASK_ALT;
+#else
+        constexpr MASK toggle = MASK_ALT;
+#endif
+        ALTextView& v = make("one\ntwo\nthree");
+        v.showFind(false);
+        ensure("patterns on", v.findBar()->handleKeyHere('R', toggle) && v.findBar()->options().regex);
+        v.findBar()->setQuery("^");
+        ensure_equals("one at each line's start", v.findMatches().size(), size_t(3));
+        ensure_equals("the one at the caret current", v.findCurrent(), 0);
+        ensure("found", v.findNext(true));
+        ensure("on to the second line's", v.caret() == ALTextPos(1, 0) && !v.hasSelection());
+        ensure("found", v.findNext(true));
+        ensure("on to the third's", v.caret() == ALTextPos(2, 0));
+        ensure("found", v.findNext(true));
+        ensure("round to the first", v.caret() == ALTextPos(0, 0) && v.findCurrent() == 0);
+        ensure("found back", v.findNext(false));
+        ensure("back round to the last", v.caret() == ALTextPos(2, 0));
+        v.setCaret(ALTextPos(1, 0));
+        ensure("found", v.findNext(true));
+        ensure("the one the caret was put on, first", v.caret() == ALTextPos(1, 0) && v.findCurrent() == 1);
+        ensure("found", v.findNext(true));
+        ensure("then on from it", v.caret() == ALTextPos(2, 0));
+    }
 }

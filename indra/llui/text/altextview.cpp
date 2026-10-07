@@ -4741,15 +4741,25 @@ bool ALTextView::findNext(bool forward)
     }
     const ALTextRange sel  = selection().normalised();
     const ALTextPos   from = hasSelection() ? (forward ? sel.end : sel.begin) : mCaret;
-    const S32         index = mFind.nearest(from, forward);
+    S32               index = mFind.nearest(from, forward);
     if (index < 0)
     {
         return false;
     }
+    // An empty match selects nothing, the caret left on it, where the next
+    // one on would be found from: on from the current one, when the caret
+    // is on that, is the one after it.
+    const ALTextRange& nearest = mFind.matches()[static_cast<size_t>(index)];
+    const bool         past    = forward && index == mFind.current() && !hasSelection() && nearest.empty() && nearest.begin == mCaret;
+    if (past)
+    {
+        index = (index + 1) % static_cast<S32>(mFind.count());
+    }
     const ALTextRange& match = mFind.matches()[static_cast<size_t>(index)];
-    // Round the text's end: on to one before where it started, or back to
-    // one at or after it.
-    const S32 wrapped = forward ? (match.begin < from ? 1 : 0) : (match.begin < from ? 0 : -1);
+    // Round the text's end: on to one before where it started, or to the
+    // one stepped past where it is the only one; or back to one at or
+    // after it.
+    const S32 wrapped = forward ? ((match.begin < from || (past && match.begin == from)) ? 1 : 0) : (match.begin < from ? 0 : -1);
     mFind.setCurrent(index);
     // The match alone, the other carets let go, from the bar's buttons as
     // from the keys.
