@@ -3195,4 +3195,20 @@ namespace tut
         keys("G.");
         ensure_equals(". opens two more", flat(e.text()), std::string("bar|bar|abc|foo|foo|foo|bar|bar|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<112>()
+    {
+        set_test_name("Ctrl-O's one command that inserts itself -- o, A, cw -- is the insert: one Escape leaves it for normal mode");
+        ALCodeEditor& e = make("abc\n");
+        keys("A<C-o>ox<Esc>");
+        ensure("normal mode after one Escape", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().find("-- (insert) --") == std::string::npos);
+        ensure_equals("the line opened and typed on", flat(e.text()), std::string("abc|x|"));
+        keys("i<C-o>A!<Esc>");
+        ensure("after A too", vim->mode() == ALVimKeymap::Mode::Normal);
+        ensure_equals("typed at the line's end", flat(e.text()), std::string("abc|x!|"));
+        keys("ggi<C-o>cwyz<Esc>");
+        ensure("and after cw", vim->mode() == ALVimKeymap::Mode::Normal);
+        ensure_equals("the word changed", flat(e.text()), std::string("yz|x!|"));
+    }
 }

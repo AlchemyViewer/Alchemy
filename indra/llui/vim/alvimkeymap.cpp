@@ -3951,6 +3951,9 @@ void ALVimKeymap::enterInsert(ALTextView& view, S32 count, bool grouped)
     mMode        = Mode::Insert;
     mInsertCount = llmax(1, count);
     mWantColumn  = -1;
+    // Ctrl-O's one command inserting itself -- o, A, cw -- is the insert
+    // it went back to: Escape ends it, as vim's does.
+    mOneCommand  = 0;
     mInsertStart = view.caret();
     mInsertMoved = false;
     mInsertOpened = false;
