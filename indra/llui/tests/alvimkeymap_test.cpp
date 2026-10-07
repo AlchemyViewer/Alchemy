@@ -2955,4 +2955,33 @@ namespace tut
         keys("2diw");
         ensure_equals("2diw is d2iw", e.document().line(4), std::string("two three"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<102>()
+    {
+        set_test_name("an exclusive motion an operator takes to a line's first column ends with the line before: d} keeps the blank line, y} from a line's start yanks lines");
+        ALCodeEditor& e = make("xa\nb\n\nc\n");
+        e.setCaret(ALTextPos(0, 1));
+        keys("d}");
+        ensure_equals("d} leaves the blank line it goes to", flat(e.text()), std::string("x||c|"));
+        keys("u");
+        e.setCaret(ALTextPos(0, 0));
+        keys("y}");
+        ensure_equals("y} from the line's start yanks the lines", vim->registerText('0'), std::string("xa\nb"));
+        keys("p");
+        ensure_equals("which are put as lines", flat(e.text()), std::string("xa|xa|b|b||c|"));
+
+        ALCodeEditor& marked = make("one\ntwo\nthree\n");
+        keys("jjma");
+        marked.setCaret(ALTextPos(0, 1));
+        keys("d`a");
+        ensure_equals("d`a to a mark in the first column takes up to the end of the line before", flat(marked.text()), std::string("o|three|"));
+
+        // $ is inclusive, though its end is past the last character: d2$
+        // onto an empty line takes the break before it.
+        ALCodeEditor& ended = make("ab\n\ncd\n");
+        ended.setCaret(ALTextPos(0, 1));
+        keys("d2$");
+        ensure_equals("d2$ onto an empty line joins it", flat(ended.text()), std::string("a|cd|"));
+    }
 }

@@ -1715,6 +1715,24 @@ bool ALVimKeymap::afterGr(ALTextView& view, llwchar pending, llwchar ch)
     return true;
 }
 
+namespace
+{
+    // An exclusive motion an operator takes to a line's first column, a
+    // line or more on, as vim has it (:help exclusive): the stretch ends
+    // at the end of the line before instead, and where nothing but blanks
+    // come before its start, it is those lines whole. d} leaves the blank
+    // line it goes to, and y} from a line's start yanks lines.
+    void adjustExclusiveEnd(const ALTextDocument& d, ALTextRange& range, bool& linewise)
+    {
+        if (linewise || range.end.column != 0 || range.end.line <= range.begin.line)
+        {
+            return;
+        }
+        range.end = d.lineEnd(range.end.line - 1);
+        linewise  = range.begin.column <= firstNonBlankColumn(d, range.begin.line);
+    }
+}
+
 bool ALVimKeymap::afterBracket(ALTextView& view, llwchar pending, llwchar ch)
 {
     const ALTextDocument& d       = view.document();
@@ -1773,6 +1791,7 @@ bool ALVimKeymap::afterBracket(ALTextView& view, llwchar pending, llwchar ch)
             {
                 Span span;
                 span.range = ALTextRange(cursor(view), to).normalised();
+                adjustExclusiveEnd(d, span.range, span.linewise);
                 applyOperator(view, operated, span, 1);
                 finishCommand(operated != 'y');
                 return true;
@@ -1792,6 +1811,7 @@ bool ALVimKeymap::afterBracket(ALTextView& view, llwchar pending, llwchar ch)
                 // left.
                 Span span;
                 span.range = ALTextRange(cursor(view), to).normalised();
+                adjustExclusiveEnd(d, span.range, span.linewise);
                 applyOperator(view, operated, span, 1);
                 finishCommand(operated != 'y');
                 return true;
@@ -1887,11 +1907,15 @@ bool ALVimKeymap::afterMotionKey(ALTextView& view, llwchar pending, llwchar ch)
         Span span;
         const ALTextPos from = cursor(view);
         span.range           = ALTextRange(from, m.to).normalised();
+        span.linewise        = m.linewise;
         if (m.inclusive)
         {
             span.range.end = d.nextCluster(span.range.end);
         }
-        span.linewise = m.linewise;
+        else
+        {
+            adjustExclusiveEnd(d, span.range, span.linewise);
+        }
         const llwchar op = mOperator;
         applyOperator(view, op, span, 1);
         finishCommand(op != 'y');
@@ -2006,11 +2030,18 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     Span            span;
     const ALTextPos from = cursor(view);
     span.range           = ALTextRange(from, m.to).normalised();
+    span.linewise        = m.linewise;
     if (m.inclusive)
     {
         span.range.end = d.nextCluster(span.range.end);
     }
-    span.linewise = m.linewise;
+    else if (m_ch != '$')
+    {
+        // $ ends past the last character rather than on it, but is vim's
+        // inclusive motion all the same: d2$ onto an empty line takes the
+        // break before it.
+        adjustExclusiveEnd(d, span.range, span.linewise);
+    }
     applyOperator(view, op, span, 1);
     finishCommand(op != 'y');
     return true;
