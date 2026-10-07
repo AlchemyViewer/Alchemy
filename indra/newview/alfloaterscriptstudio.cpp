@@ -888,7 +888,10 @@ void ALFloaterScriptStudio::listenToWorkspace()
     mRunningConnection = ALScriptWorkspace::instance().onRunningState([this](const ALScriptRunningState& state) { runningState(state); });
     mCompiledConnection =
         ALScriptWorkspace::instance().onCompiled([this](const ALScriptCompileResult& result) { mSaving.compiled(result); });
-    mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptSaved& saved) { mSaving.savedElsewhere(saved); });
+    mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptSaved& saved) {
+        mSaving.savedElsewhere(saved);
+        mMasters.saved(saved);
+    });
     // What the region said an object reserves: the Weights tab says it
     // again, with what came.
     mRegionUsageConnection = ALScriptWorkspace::instance().regionUsage().onHeard([this]() { mWeighing.stale(); });

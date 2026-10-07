@@ -437,6 +437,18 @@ void ALScriptStudioMasters::fileSaved(Doc& doc)
     ALScriptDiskMasters::instance().wrote(doc.file);
 }
 
+void ALScriptStudioMasters::saved(const ALScriptSaved& saved)
+{
+    // A tab here of a linked script kept as it was linked, for what was
+    // typed in it, is clean once that is saved. The links change with
+    // most such saves, which looks again; not with one of just what the
+    // file last sent, which moves nothing else.
+    if (mServices.findDoc(saved.ref) && ALScriptDiskMasters::instance().linkOf(saved.ref))
+    {
+        lookAgain();
+    }
+}
+
 void ALScriptStudioMasters::sayUnheard()
 {
     for (const ALScriptDiskMasters::Outcome& outcome : ALScriptDiskMasters::instance().takeUnheard())
@@ -570,10 +582,10 @@ void ALScriptStudioMasters::giveWay()
             doc->master->toldLinked.clear();
             continue;
         }
-        // Left as it is while it loads, or a save of it is on its way; once
-        // told of this link; and where the file could not be opened in its
-        // place, as a script asked for while linked is not.
-        if (!doc->loaded || doc->saveUnderway() || doc->master->toldLinked == link->master || !openable(*link))
+        // Left as it is while it loads, or a save of it is on its way; and
+        // where the file could not be opened in its place, as a script asked
+        // for while linked is not.
+        if (!doc->loaded || doc->saveUnderway() || !openable(*link))
         {
             continue;
         }
@@ -585,15 +597,32 @@ void ALScriptStudioMasters::giveWay()
             // What was typed here is in neither the world nor the file: kept,
             // and the author told, once, on the tab, with the link to let go
             // of for it to be saved from here again.
+            if (doc->master->toldLinked == link->master)
+            {
+                continue;
+            }
             doc->master->toldLinked = link->master;
             mServices.report(mServices.words("MasterLinkedUnsaved", args), true, doc, { "master_unlink" });
             continue;
         }
-        // Nothing typed here: the file's tab in its place, as a script
-        // asked for while linked opens.
+        // Nothing typed here -- never, or no longer, once what was kept was
+        // saved or reverted: the file's tab in its place, as a script asked
+        // for while linked opens. Saved from here, the world holds what the
+        // file does not: the file's tab offers to send the file over it, or
+        // to compare the two, as a change heard in the world does.
+        const ALScriptRef ref = doc->ref;
         mWindow.closeTab(*doc);
         mWindow.openMasterFile(link->master, link->lua);
-        mServices.report(mServices.words("MasterGaveWay", args), false, masterTab(link->master));
+        Doc*                     tab  = masterTab(link->master);
+        std::string              said = mServices.words("MasterGaveWay", args);
+        std::vector<std::string> offers;
+        if (tab && link->state == ALMasterLink::State::Differing)
+        {
+            tab->master->offerFor = ref;
+            said += " " + mServices.words("MasterLinkDiffers", args);
+            offers = { "master_send", "master_compare" };
+        }
+        mServices.report(said, false, tab, offers);
     }
 }
 

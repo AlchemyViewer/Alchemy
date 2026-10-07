@@ -137,6 +137,9 @@ public:
     void loaded(Doc& doc);
     // A file's tab saved to disk: what it masters sent.
     void fileSaved(Doc& doc);
+    // A script saved, from here or from anywhere: its tab here, where it
+    // is linked and was kept for what was typed in it, looked at again.
+    void saved(const ALScriptSaved& saved);
     // One of the offers about a tab, as its link in Output or its notice
     // does it.
     void offer(Doc& doc, const std::string& action);
@@ -158,10 +161,11 @@ private:
     // Whether a link's file may be opened in its script's place: not held,
     // and there.
     static bool openable(const ALMasterLink& link);
-    // The links changed, or an item's tab loaded: once whoever changed them
-    // is done, each item's tab here of a script now linked looked at -- one
-    // with nothing typed in it giving way to the file's, one with something
-    // kept and told so.
+    // The links changed, or an item's tab loaded or saved: once whoever
+    // changed them is done, each item's tab here of a script now linked
+    // looked at -- one with nothing typed in it giving way to the file's,
+    // one with something kept and told so, until that is saved or reverted
+    // and it gives way too.
     void lookAgain();
     void giveWay();
     // The tab of a master file, where one is open.
