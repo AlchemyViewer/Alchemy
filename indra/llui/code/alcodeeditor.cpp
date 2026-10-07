@@ -2828,18 +2828,12 @@ S32 ALCodeEditor::chosenCompletion() const
 void ALCodeEditor::vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out)
 {
     // Every word, matched as the document's own are -- a part of it, the
-    // letters of its parts -- rather than by its start alone.
-    std::vector<std::pair<std::string, std::string>> words;
-    if (highlighter().grammar())
-    {
-        highlighter().grammar()->collectWords(std::string_view(), words);
-    }
-    highlighter().words().collect(std::string_view(), words);
-    for (auto& [word, table] : words)
-    {
+    // letters of its parts -- rather than by its start alone; matched as
+    // it stands in its table, and only those that match copied.
+    const auto offer = [&out, prefix](const std::string& word, const std::string& table) {
         if (matchTier(word, prefix) < 0)
         {
-            continue;
+            return;
         }
         // A table is named for the kind of word it holds.
         Completion c;
@@ -2847,7 +2841,12 @@ void ALCodeEditor::vocabularyCompletions(std::string_view prefix, std::vector<Co
         c.kind   = alSyntaxKindFromName(table).value_or(ALSyntaxKind::Text);
         c.detail = alSyntaxKindName(c.kind);
         out.push_back(std::move(c));
+    };
+    if (const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar())
+    {
+        grammar->declaredWords().forEach(offer);
     }
+    highlighter().words().forEach(offer);
 }
 
 void ALCodeEditor::refreshCompletion()

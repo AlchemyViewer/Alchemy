@@ -160,9 +160,20 @@ public:
     void clear();
     bool has(std::string_view table, std::string_view word) const;
     bool empty() const { return mTables.empty(); }
-    // Every word beginning with the prefix, case aside, as the word and
-    // its table: what completion offers.
-    void collect(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const;
+    // Every word and its table, each handed to `visit` as it stands rather
+    // than copied: what completion narrows by its own match, keeping only
+    // the words that match.
+    template <typename Visit>
+    void forEach(Visit&& visit) const
+    {
+        for (const auto& [table, words] : mTables)
+        {
+            for (const std::string& word : words)
+            {
+                visit(word, table);
+            }
+        }
+    }
 
     // Every table a word is in, as a bit each, in one look: what a word
     // rule asks, instead of asking each of its tables in turn. A table's
@@ -269,9 +280,8 @@ public:
         std::vector<std::string> joined;
     };
     const FoldWords&   foldWords() const;
-    // The words the grammar itself declares that begin with the prefix,
-    // as the word and its table.
-    void collectWords(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const;
+    // The words the grammar itself declares, by table.
+    const ALSyntaxWords& declaredWords() const;
 
     ALSyntaxState initialState() const;
 
