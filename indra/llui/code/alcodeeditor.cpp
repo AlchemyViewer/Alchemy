@@ -52,6 +52,7 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <fmt/format.h>
 
 #include <functional>
 
@@ -4678,7 +4679,7 @@ void ALCodeEditor::drawSignature(const LLRect& text)
         measured.font          = font;
         // Which form of the function, of how many, where it has several:
         // Up and Down go through them.
-        const std::string counter = sig.overloads.size() > 1 ? llformat("%d/%d  ", sig.overload + 1, static_cast<S32>(sig.overloads.size())) : std::string();
+        const std::string counter = sig.overloads.size() > 1 ? fmt::format("{}/{}  ", sig.overload + 1, sig.overloads.size()) : std::string();
         measured.docs             = !sig.documentation.empty() || !counter.empty();
         measured.docLine          = counter + sig.documentation.substr(0, sig.documentation.find('\n'));
         measured.labelWidth       = font->getWidth(sig.label);
