@@ -26,6 +26,7 @@
 
 #include "altextdocument.h"
 
+#include <atomic>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -53,6 +54,10 @@ struct ALTextSearchOptions
     bool acrossLines   = false;
     // At most so many matches, the first in the text; none for no end.
     size_t limit       = 0;
+    // Looked at after each match and each line: once it is set, nothing
+    // more is looked for, and what was found so far is what is found. What
+    // a search on a worker that nobody waits for any more is stopped by.
+    const std::atomic<bool>* stop = nullptr;
 };
 
 // Finding in a document: every place a query stands, plain or as a

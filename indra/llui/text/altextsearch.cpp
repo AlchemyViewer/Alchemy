@@ -255,8 +255,11 @@ namespace
         }
         static const boost::u32regex NONE;
         const boost::u32regex&       re     = compiled ? *compiled : NONE;
-        // As many as were asked for, and no more looked for.
-        const auto full = [&out, &options]() { return options.limit > 0 && out.size() >= options.limit; };
+        // As many as were asked for, and no more looked for; nor any more
+        // once the search is stopped.
+        const auto full = [&out, &options]() {
+            return (options.limit > 0 && out.size() >= options.limit) || (options.stop && options.stop->load(std::memory_order_relaxed));
+        };
         const ALTextRange   within = scope ? scope->normalised() : ALTextRange(doc.start(), doc.end());
         const std::string_view needle = query;
         // Without regard to case, the ASCII bytes a plain match may begin

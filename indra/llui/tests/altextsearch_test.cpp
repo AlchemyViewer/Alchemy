@@ -457,4 +457,26 @@ namespace tut
         ensure_equals("kelvin from the Kelvin sign, and from k", said(ALTextSearch::matches(doc, "kelvin", options)), std::string("0:0-8 0:9-15"));
         ensure_equals("\xC4\xB0" "f, and if", said(ALTextSearch::matches(doc, "\xC4\xB0" "f", options)), std::string("1:0-3 1:4-6"));
     }
+
+    template<> template<>
+    void altextsearch_object::test<17>()
+    {
+        set_test_name("a search that is stopped looks no further than the match or the line it is at, plainly, by pattern and over the lines as one");
+        std::string text;
+        for (S32 i = 0; i < 1000; ++i)
+        {
+            text += "a\n";
+        }
+        const ALTextDocument doc(text);
+        std::atomic<bool>    stop{ true };
+        ALTextSearchOptions  options;
+        options.stop = &stop;
+        ensure("plainly", ALTextSearch::matches(doc, "a", options).size() <= 1);
+        options.regex = true;
+        ensure("by pattern", ALTextSearch::matches(doc, "a", options).size() <= 1);
+        options.acrossLines = true;
+        ensure("over the lines as one", ALTextSearch::matches(doc, "a", options).size() <= 1);
+        stop = false;
+        ensure_equals("not stopped, every one", ALTextSearch::matches(doc, "a", options).size(), size_t(1000));
+    }
 }

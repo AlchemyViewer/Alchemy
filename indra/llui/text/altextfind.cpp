@@ -27,10 +27,47 @@
 
 #include "altextfind.h"
 
+#include "alserialworker.h"
+#include "llsingleton.h"
+
+#include <atomic>
 #include <condition_variable>
+#include <exception>
+#include <functional>
 #include <mutex>
 #include <optional>
-#include <thread>
+
+namespace
+{
+    // The one thread every find's long searches take turns on: made with
+    // the first, closed as the viewer goes.
+    class ALTextFindThread final : public LLSingleton<ALTextFindThread>
+    {
+        LLSINGLETON_EMPTY_CTOR(ALTextFindThread);
+        void cleanupSingleton() override
+        {
+            if (mThread)
+            {
+                mThread->close();
+            }
+        }
+
+    public:
+        bool post(std::function<void()> job)
+        {
+            if (!mThread)
+            {
+                mThread = std::make_unique<ALSerialWorker>("TextFind");
+            }
+            return mThread->post(std::move(job));
+        }
+        // Closing, it passes over what waits for it.
+        bool closing() const { return mThread && mThread->closing(); }
+
+    private:
+        std::unique_ptr<ALSerialWorker> mThread;
+    };
+}
 
 struct ALTextFind::Working
 {
@@ -39,17 +76,44 @@ struct ALTextFind::Working
     bool                     finished = false;
     std::vector<ALTextRange> found;
     std::string              error;
+    // The text to look through, until the worker takes it: let go of at
+    // once where the search is, rather than when its turn comes.
+    std::string              text;
+    // Set where nobody takes what it finds: a search not begun is passed
+    // over, and one under way stops at its next match or line.
+    std::atomic<bool>        dropped{ false };
     // What it was asked, to ask it again where the text has moved on.
     U32                      version = 0;
     std::string              query;
     ALTextSearchOptions      options;
 };
 
+ALTextFind::~ALTextFind()
+{
+    letGo();
+}
+
+void ALTextFind::letGo()
+{
+    if (!mWorking)
+    {
+        return;
+    }
+    mWorking->dropped = true;
+    std::string text;
+    {
+        std::lock_guard<std::mutex> guard(mWorking->lock);
+        text.swap(mWorking->text);
+    }
+    mWorking.reset();
+}
+
 void ALTextFind::search(const ALTextDocument& doc, const std::string& query, const ALTextSearchOptions& options, bool in_selection,
                         const ALTextRange& selection)
 {
     ++mGeneration;
     mStale = false;
+    letGo();
     if (in_selection)
     {
         if (!mInSelection)
@@ -66,33 +130,60 @@ void ALTextFind::search(const ALTextDocument& doc, const std::string& query, con
     // text is otherwise every place it stands.
     ALTextSearchOptions capped = options;
     capped.limit               = LIMIT;
-    // A long text, or a pattern across lines, on a worker over a copy: the
-    // matches there were stand until its come.
+    // A long text, or a pattern across lines, on the worker over a copy of
+    // the text as the document keeps it whole: the matches there were
+    // stand until its come. Where the worker is closing, here.
     if (!query.empty() && (doc.byteCount() > ON_A_WORKER || (options.regex && options.acrossLines)))
     {
         auto working     = std::make_shared<Working>();
         working->version = doc.version();
         working->query   = query;
         working->options = options;
-        mWorking         = working;
+        working->text    = doc.wholeText();
         std::optional<ALTextRange> scope;
         if (mInSelection)
         {
             scope = mScope;
         }
-        std::thread([working, text = doc.text(), query, capped, scope]() {
-            const ALTextDocument     copy(text);
+        ALTextSearchOptions asked = capped;
+        asked.stop                = &working->dropped;
+        const bool posted         = ALTextFindThread::instance().post([working, query, asked, scope]() {
+            std::string text;
+            {
+                std::lock_guard<std::mutex> guard(working->lock);
+                text.swap(working->text);
+            }
+            if (working->dropped)
+            {
+                return;
+            }
             std::string              error;
-            std::vector<ALTextRange> found = ALTextSearch::matches(copy, query, capped, scope ? &*scope : nullptr, &error);
+            std::vector<ALTextRange> found;
+            // Out of memory for the copy, or anything the search throws:
+            // said as a pattern that does not compile is, rather than
+            // taking the viewer down.
+            try
+            {
+                const ALTextDocument copy(text);
+                found = ALTextSearch::matches(copy, query, asked, scope ? &*scope : nullptr, &error);
+            }
+            catch (const std::exception& fault)
+            {
+                found.clear();
+                error = fault.what();
+            }
             std::lock_guard<std::mutex> guard(working->lock);
             working->found    = std::move(found);
             working->error    = std::move(error);
             working->finished = true;
             working->done.notify_all();
-        }).detach();
-        return;
+        });
+        if (posted)
+        {
+            mWorking = std::move(working);
+            return;
+        }
     }
-    mWorking.reset();
     std::vector<ALTextRange> found = ALTextSearch::matches(doc, query, capped, mInSelection ? &mScope : nullptr, &mError);
     take(doc, std::move(found), mError, selection);
 }
@@ -121,7 +212,18 @@ bool ALTextFind::collect(const ALTextDocument& doc, const ALTextRange& selection
         return false;
     }
     std::shared_ptr<Working> working = mWorking;
+    // A worker closing passes over what waits for it, which then never
+    // comes: not waited for, but looked through here.
+    const bool                   closing = wait && (ALTextFindThread::wasDeleted() || ALTextFindThread::instance().closing());
     std::unique_lock<std::mutex> guard(working->lock);
+    if (closing && !working->finished)
+    {
+        const std::string         query   = working->query;
+        const ALTextSearchOptions options = working->options;
+        guard.unlock();
+        search(doc, query, options, mInSelection, selection);
+        return !mWorking || collect(doc, selection, true);
+    }
     if (wait)
     {
         working->done.wait(guard, [&working]() { return working->finished; });
@@ -157,8 +259,9 @@ bool ALTextFind::collect(const ALTextDocument& doc, const ALTextRange& selection
 void ALTextFind::clear()
 {
     ++mGeneration;
-    // A worker still looking is let go of; what it finds, nobody takes.
-    mWorking.reset();
+    // A worker still looking is let go of, and stops; what it finds,
+    // nobody takes.
+    letGo();
     mMatches.clear();
     mCurrent = -1;
     mStale   = false;
