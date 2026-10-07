@@ -34,6 +34,8 @@
 
 #include "../test/lltut.h"
 
+#include <memory>
+
 namespace
 {
     typedef ALScriptStudioDoc        Doc;

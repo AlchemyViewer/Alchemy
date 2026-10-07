@@ -474,8 +474,9 @@ namespace tut
         // A folder nobody blessed.
         s.write("outside/secret.luau", "return 'secret'\n");
 
-        const std::string                   ABSOLUTE   = s.at("proj/lw/dependency.luau");
-        const std::string                   UNBLESSED  = s.at("outside/secret.luau");
+        // Not ABSOLUTE, which Windows' headers define.
+        const std::string                   ABSOLUTE_PATH = s.at("proj/lw/dependency.luau");
+        const std::string                   UNBLESSED     = s.at("outside/secret.luau");
         const std::vector<RequireCase>      cases      = {
             // Where all three agree.
             { "Luau RequireSimpleRelativePath: ./ beside the file", "proj/lw/module.luau", "./dependency", "proj/lw/dependency.luau",
@@ -506,7 +507,7 @@ namespace tut
               "proj/lw/extension.luau", "plugin", "could not resolve child component \"extension.luau\"" },
             { "plugin: a folder's init named (Luau CannotRequireInitLuauDirectly)", "proj/lw/module.luau", "./nested/init",
               "proj/lw/nested/init.luau", "proj/lw/nested/init.luau", "plugin", "could not resolve child component \"init\"" },
-            { "plugin: an absolute path, in a blessed folder (Luau RequireAbsolutePath refuses)", "proj/lw/module.luau", ABSOLUTE.c_str(),
+            { "plugin: an absolute path, in a blessed folder (Luau RequireAbsolutePath refuses)", "proj/lw/module.luau", ABSOLUTE_PATH.c_str(),
               "proj/lw/dependency.luau", "proj/lw/dependency.luau", "plugin", "require path must start with a valid prefix: ./, ../, or @" },
             { "plugin (LAD2): ./ from a folder's init is beside the init", "proj/lw/dir/init.luau", "./x", "proj/lw/dir/x.luau",
               "proj/lw/dir/x.luau", "plugin", "proj/lw/x.luau" },

@@ -38,6 +38,7 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <sstream>
