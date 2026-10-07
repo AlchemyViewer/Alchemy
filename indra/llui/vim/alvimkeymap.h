@@ -177,6 +177,9 @@ public:
         ALVimRegisters           registers;
         std::vector<std::string> command;
         std::vector<std::string> search;
+        // Beside each search line, what ended it, as vim's history keeps:
+        // / or ? where it was typed, nothing where * or # put it there.
+        std::vector<char>        searchEnds;
         bool                     ignoreCase       = false;
         bool                     smartCase        = false;
         bool                     unnamedClipboard = false;

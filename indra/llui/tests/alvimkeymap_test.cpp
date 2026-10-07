@@ -5548,4 +5548,22 @@ namespace tut
         keys("n");
         ensure_equals("and n goes on with it", caretText(), std::string("0:0"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<195>()
+    {
+        set_test_name("a search line is the same as one in the history only where both ended alike: typed after /, after ?, or put there by * and #");
+        typedef std::vector<std::string> history_t;
+        make("foo foo\n");
+        keys("/\\<foo\\><CR>*");
+        ensure("a typed \\<foo\\> and *'s are two", vim->shared().search == history_t{ "\\<foo\\>", "\\<foo\\>" });
+
+        make("foo foo\n");
+        keys("/foo<CR>?foo<CR>");
+        ensure("and so are /foo and ?foo", vim->shared().search == history_t{ "foo", "foo" });
+
+        make("foo foo\n");
+        keys("/foo<CR>/foo<CR>");
+        ensure("where /foo twice is one", vim->shared().search == history_t{ "foo" });
+    }
 }

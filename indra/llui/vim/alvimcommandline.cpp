@@ -445,7 +445,7 @@ void ALVimCommandLine::complete(ALTextView& view, bool forward)
     mVim.bump();
 }
 
-void ALVimCommandLine::remember(llwchar kind, const std::string& line)
+void ALVimCommandLine::remember(llwchar kind, const std::string& line, bool typed)
 {
     const size_t MOST = 50;
     if (line.empty())
@@ -453,10 +453,37 @@ void ALVimCommandLine::remember(llwchar kind, const std::string& line)
         return;
     }
     std::vector<std::string>& history = historyOf(kind);
-    history.erase(std::remove(history.begin(), history.end(), line), history.end());
+    // What ended each search line, beside it; a line nobody said of ended
+    // with /.
+    std::vector<char>* ends = kind == ':' ? nullptr : &mVim.mShared->searchEnds;
+    const char         end  = typed ? static_cast<char>(kind) : '\0';
+    if (ends)
+    {
+        ends->resize(history.size(), '/');
+    }
+    for (size_t i = history.size(); i-- > 0;)
+    {
+        if (history[i] == line && (!ends || (*ends)[i] == end))
+        {
+            history.erase(history.begin() + static_cast<std::ptrdiff_t>(i));
+            if (ends)
+            {
+                ends->erase(ends->begin() + static_cast<std::ptrdiff_t>(i));
+            }
+        }
+    }
     history.push_back(line);
+    if (ends)
+    {
+        ends->push_back(end);
+    }
     if (history.size() > MOST)
     {
-        history.erase(history.begin(), history.begin() + static_cast<std::ptrdiff_t>(history.size() - MOST));
+        const std::ptrdiff_t over = static_cast<std::ptrdiff_t>(history.size() - MOST);
+        history.erase(history.begin(), history.begin() + over);
+        if (ends)
+        {
+            ends->erase(ends->begin(), ends->begin() + over);
+        }
     }
 }

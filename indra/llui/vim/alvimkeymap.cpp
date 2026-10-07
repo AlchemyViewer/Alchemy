@@ -3407,8 +3407,9 @@ bool ALVimKeymap::starSearch(ALTextView& view, bool forward, bool whole)
         pattern = "\\<" + pattern + "\\>";
     }
     // Into the search history as vim's * puts it there, for the search
-    // line to find again.
-    mCommandLine.remember('/', pattern);
+    // line to find again: as a line not typed, which a typed one the same
+    // is not.
+    mCommandLine.remember('/', pattern, false);
     mSearch.pattern     = forward ? pattern : ALVimSearch::backwardPattern(pattern);
     mSearch.forward     = forward;
     mSearch.noSmartCase = true;
