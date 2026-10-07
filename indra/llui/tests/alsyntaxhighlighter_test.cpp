@@ -455,4 +455,35 @@ namespace tut
         ensure("a span its line ends, but for a backslash, and an eol that says the same: " + error, grammar.load(good, error));
         ensure("and the little language: " + error, grammar.load(mini(), error));
     }
+
+    template<> template<>
+    void alsyntaxhighlighter_object::test<13>()
+    {
+        set_test_name("lexed again for a grammar or words that change nothing on a line, the line keeps its revision; one they change moves on, as every line of another document does; and with no grammar there are no tokens");
+        ALTextDocument      doc("foo\nbar");
+        ALTextDocument      other("foo\nbar");
+        ALSyntaxHighlighter highlighter;
+        const auto          grammar = loaded(mini());
+        highlighter.setGrammar(grammar);
+        highlighter.attach(&doc);
+        const U32 foo = highlighter.revision(0);
+        const U32 bar = highlighter.revision(1);
+
+        highlighter.setGrammar(grammar);
+        ensure_equals("the same grammar again: the first line as it was", highlighter.revision(0), foo);
+        ensure_equals("and the second", highlighter.revision(1), bar);
+
+        highlighter.ownWords().set("function", { "bar" });
+        highlighter.wordsChanged();
+        ensure_equals("a word taught that the first line does not hold: as it was", highlighter.revision(0), foo);
+        ensure_equals("the second's word a function now", said(doc.line(1), highlighter.tokens(1)), std::string("function:bar"));
+        ensure("and its revision moved on", highlighter.revision(1) != bar);
+
+        highlighter.attach(&other);
+        ensure("another document's lines move on, though they lex the same", highlighter.revision(0) != foo);
+        ensure_equals("and lex as they do", said(other.line(0), highlighter.tokens(0)), std::string("text:foo"));
+
+        highlighter.setGrammar(nullptr);
+        ensure("no grammar, no tokens", highlighter.tokens(0).empty() && highlighter.tokens(1).empty());
+    }
 }

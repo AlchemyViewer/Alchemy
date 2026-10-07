@@ -96,7 +96,13 @@ private:
         U32                        end      = 0;
         std::vector<ALSyntaxToken> tokens;
         U32                        revision = 0;
+        // Whether the tokens are as the line lexes now: from the state it
+        // starts in, by the grammar and the words there are.
         bool                       valid    = false;
+        // Whether the tokens are of the line's text, as it lexes now or
+        // not: what it lexes to next is held against them, and the
+        // revision moves only where the two differ.
+        bool                       lexed    = false;
     };
     struct StateHash
     {

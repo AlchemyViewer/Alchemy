@@ -95,23 +95,24 @@ void ALSyntaxHighlighter::attach(ALTextDocument* document)
     {
         mConnection = mDocument->onChanged([this](const ALTextDocument::Edit& edit) { onEdit(edit); });
     }
+    // Another text: no line's tokens are of its lines, whatever they come
+    // to, so every revision moves on.
+    for (Line& line : mLines)
+    {
+        line.lexed = false;
+    }
     reset();
 }
 
 void ALSyntaxHighlighter::reset()
 {
-    // Revisions survive a reset: a line that lexes to the same tokens
-    // afterwards keeps its number, and one that does not moves on.
-    std::vector<U32> revisions;
-    revisions.reserve(mLines.size());
-    for (const Line& line : mLines)
+    // Every line lexed again, its tokens and its revision kept until then:
+    // a line that lexes to the same tokens afterwards keeps its number,
+    // and one that does not moves on.
+    mLines.resize(mDocument ? static_cast<size_t>(mDocument->lineCount()) : 0);
+    for (Line& line : mLines)
     {
-        revisions.push_back(line.revision);
-    }
-    mLines.assign(mDocument ? mDocument->lineCount() : 0, Line());
-    for (size_t i = 0; i < mLines.size() && i < revisions.size(); ++i)
-    {
-        mLines[i].revision = revisions[i];
+        line.valid = false;
     }
     mFirstDirty = 0;
     mStates.clear();
@@ -241,7 +242,7 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
         mLexing = mStates[start];
         mGrammar->lexLine(mDocument->line(i), mLexing, fresh, *mWords);
         ++mLastLexed;
-        if (!entry.valid || fresh != entry.tokens)
+        if (!entry.lexed || fresh != entry.tokens)
         {
             entry.tokens.swap(fresh);
             ++entry.revision;
@@ -249,6 +250,7 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
         entry.start = start;
         entry.end   = intern(mLexing);
         entry.valid = true;
+        entry.lexed = true;
     }
     mFirstDirty = i;
 }
@@ -256,7 +258,9 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
 const std::vector<ALSyntaxToken>& ALSyntaxHighlighter::tokens(S32 line)
 {
     ensure(line);
-    if (line < 0 || line >= static_cast<S32>(mLines.size()))
+    // A line not lexed now -- there is no grammar, or no document -- has
+    // none, whatever it was lexed to before.
+    if (line < 0 || line >= static_cast<S32>(mLines.size()) || !mLines[line].valid)
     {
         return NO_TOKENS;
     }
