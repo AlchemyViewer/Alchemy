@@ -110,9 +110,16 @@ public:
     ALPaneList*          partsList() const { return mParts; }
     ALPaneList*          stringsList() const { return mStringsList; }
     // What keeping a shared start once asks of the window: the start, and
-    // the strings that share it, to be written so in the script shown.
+    // the strings that share it, to be written so in the script shown; and
+    // whether the script shown can be written to at all, asked as the
+    // button is drawn, which is off where it cannot.
     typedef std::function<void(const std::string& start, const std::vector<std::string>& strings)> keep_start_t;
-    void setKeepStart(keep_start_t keep) { mKeepStartCall = std::move(keep); }
+    typedef std::function<bool()>                                                                   can_keep_start_t;
+    void setKeepStart(keep_start_t keep, can_keep_start_t can = nullptr)
+    {
+        mKeepStartCall = std::move(keep);
+        mCanKeepStart  = std::move(can);
+    }
 
     void draw() override;
 
@@ -146,8 +153,9 @@ private:
         size_t      uses  = 0;
         S32         line  = -1;
         std::string file;
-        // How it moved since the text was last saved: a start's saving; or
-        // new, where it was weighed then and this was not in it.
+        // How it moved since the text was last saved: a start's by its
+        // saving, as less, as its bytes are said; or new, where it was
+        // weighed then and this was not in it.
         std::optional<S64>       change;
         bool                     fresh = false;
         // A start's strings.
@@ -181,6 +189,7 @@ private:
     ALPaneList*            mStringsList  = nullptr;
     LLButton*              mKeepStart    = nullptr;
     keep_start_t           mKeepStartCall;
+    can_keep_start_t       mCanKeepStart;
     Shown                  mShown;
     ALScriptWeight::Target mChosen = ALScriptWeight::Target::SLua;
     std::vector<Row>       mRows;

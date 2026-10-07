@@ -253,7 +253,8 @@ void ALScriptStudioChecking::expandedAnswer(const std::string& id, U32 version, 
         // each the checker's own; the bundle kept to weigh.
         doc.expanded.text   = std::make_shared<const std::string>(result.apart.script.text);
         doc.expanded.map    = result.apart.script.map;
-        doc.expanded.bundle = std::make_shared<const std::string>(result.text);
+        doc.expanded.bundle    = std::make_shared<const std::string>(result.text);
+        doc.expanded.bundleMap = result.map;
         for (const ALPreprocessor::Result::Piece& piece : result.apart.modules)
         {
             doc.expanded.moduleMaps.emplace_back(piece.key, piece.map);

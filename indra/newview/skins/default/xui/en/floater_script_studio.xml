@@ -2701,10 +2701,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                                     </pane_list>
                                 </layout_panel>
                                 <layout_panel
-                                 auto_resize="false"
+                                 auto_resize="true"
                                  height="144"
                                  layout="topleft"
-                                 min_dim="200"
+                                 min_dim="140"
                                  name="weights_strings_panel"
                                  user_resize="true"
                                  width="300">

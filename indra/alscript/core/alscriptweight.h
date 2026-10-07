@@ -129,13 +129,25 @@ struct ALScriptWeight
     // it, as a part's. Empty for LSO and Mono.
     struct String
     {
-        std::string text;
-        size_t      bytes = 0;
-        size_t      uses  = 0;
-        size_t      loads = 0;
-        bool        name  = false;
-        S32         line  = -1;
-        std::string file;
+        std::string      text;
+        size_t           bytes = 0;
+        size_t           uses  = 0;
+        size_t           loads = 0;
+        bool             name  = false;
+        S32              line  = -1;
+        std::string      file;
+        // How long a start every literal of it in the text weighed could
+        // give up to a local of its own (ALLuauSharedStart): its whole
+        // length where it is written whole, the first piece's where Luau
+        // joins constant strings into it; nought where the text writes it
+        // nowhere so, Luau making it as it compiles -- an interpolated
+        // string's pattern, strings joined on a local's constant value.
+        // SLua's alone.
+        size_t           startUpTo = 0;
+        // The functions that load it as a value, and those holding each of
+        // them, by their places in the bytecode, the script's own body
+        // aside: each would capture a start kept apart from it.
+        std::vector<U32> functions;
     };
     std::vector<String> strings;
 
@@ -143,6 +155,9 @@ struct ALScriptWeight
     // back on as each is loaded would weigh less: the start, the strings
     // sharing it by their places in `strings`, and the bytes it would save
     // (ALScriptWeigh::sharedStarts). Best first; a string in one at most.
+    // SLua's alone, which is what keeping one once rewrites; in the source's
+    // places (inSource), of the script's own strings alone, a module's
+    // being no literal of the script's text.
     struct SharedStart
     {
         std::string         start;
@@ -183,19 +198,28 @@ namespace ALScriptWeigh
     // CONCAT, each with its byte of line information. Once: the start's own
     // local, kept apart from folding -- `local start; start = "..."` -- since
     // Luau joins constant strings as it compiles, a local never assigned
-    // again among them.
-    constexpr size_t SHARED_START_PER_LOAD = 10;
-    constexpr size_t SHARED_START_ONCE     = 12;
+    // again among them. At each function loading one, and each holding such
+    // a function: the CAPTURE that hands it the local, which, assigned after
+    // it is declared, is captured by reference -- and a closure Luau shared
+    // before is made anew each time, a constant the less in the table, an
+    // allocation the more as it runs. And once where any function captures
+    // it: the script's body closing it over as it ends.
+    constexpr size_t SHARED_START_PER_LOAD     = 10;
+    constexpr size_t SHARED_START_ONCE         = 12;
+    constexpr size_t SHARED_START_PER_FUNCTION = 5;
+    constexpr size_t SHARED_START_CAPTURED     = 5;
     // What saves less is not worth saying.
     constexpr size_t SHARED_START_LEAST = 8;
     // The starts among a script's strings worth keeping once: of those
     // loaded only as values -- a field's name, a global's, a comparison's,
-    // a function's, are each one string whatever they share -- each start
-    // two of them share, cut where no character is, with every string
-    // having it; what keeping it once would save, the table's bytes before
-    // less after, less the joining at each load and the local once; the
-    // best first, and each string in the best start it has. No more than
-    // a few dozen.
+    // a function's, are each one string whatever they share -- and written
+    // out in the script's own text, at a line of it, each start two of them
+    // share, cut where no character is, with every string having it whose
+    // literals could each give it up (String::startUpTo); what keeping it
+    // once would save, the table's bytes before less after, less the
+    // joining at each load, the capture at each function and the local
+    // once; the best first, and each string in the best start it has. No
+    // more than a few dozen.
     std::vector<ALScriptWeight::SharedStart> sharedStarts(const std::vector<ALScriptWeight::String>& strings);
     // LSL compiled for LSO by Tailslide: the 16 KB image, a function, a
     // state and a handler at a time. Needs the builtins loaded (ALLSLService)
@@ -204,7 +228,9 @@ namespace ALScriptWeigh
 
     // LSL compiled for Luau's VM by the SLua fork's own compiler for it, as
     // the server compiles such an asset, and its bytecode read back as
-    // SLua's is. As lso() for the builtins and the lock: the compiler parses
+    // SLua's is -- but for shared starts, which would be SLua written into
+    // an LSL script, costed as SLua's code is and the server's asset is
+    // not. As lso() for the builtins and the lock: the compiler parses
     // with Tailslide's table, numbered as the runtime numbers its events.
     ALScriptWeight lslLuau(std::string_view source);
 

@@ -805,9 +805,17 @@ void ALFloaterScriptStudio::wirePanes()
         }
     });
     mProblemsPane = getChild<ALScriptProblemsPane>("problems_tab");
+    // Keeping a shared start once is an edit of the script shown: of an
+    // SLua script that can be written to, and no other.
+    mWeightsPane->setKeepStart([this](const std::string& start, const std::vector<std::string>& strings) { keepStartOnce(start, strings); },
+                               [this]() {
+                                   const size_t index = indexOf(mWeightsPane->shownId());
+                                   const Doc*   doc   = index != NONE ? mDocs[index].get() : nullptr;
+                                   return doc && doc->loaded && doc->modifiable && !doc->notecard && doc->language.lua && doc->editor &&
+                                          !doc->editor->isReadOnly();
+                               });
     // Return and a double-click go to the part or the string chosen; escape
     // back to the script.
-    mWeightsPane->setKeepStart([this](const std::string& start, const std::vector<std::string>& strings) { keepStartOnce(start, strings); });
     for (ALPaneList* list : { mWeightsParts, mWeightsStrings })
     {
         list->setCommitCallback([this, list](LLUICtrl*, const LLSD&) { onWeightChosen(list, false); });
@@ -4906,7 +4914,7 @@ void ALFloaterScriptStudio::keepStartOnce(const std::string& start, const std::v
         return;
     }
     Doc& doc = *mDocs[index];
-    if (!doc.loaded || !doc.modifiable || doc.notecard || !doc.language.lua || !doc.editor)
+    if (!doc.loaded || !doc.modifiable || doc.notecard || !doc.language.lua || !doc.editor || doc.editor->isReadOnly())
     {
         return;
     }

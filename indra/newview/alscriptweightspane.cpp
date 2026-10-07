@@ -134,7 +134,7 @@ bool ALScriptWeightsPane::postBuild()
     mStringsList->setComparison([this](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) { return compareStrings(column, a, b); });
     mKeepStart = getChild<LLButton>("weights_keep_start");
     mKeepStart->setCommitCallback([this](LLUICtrl*, const LLSD&) {
-        if (const StringRow* start = chosenStart(); start && mKeepStartCall)
+        if (const StringRow* start = chosenStart(); start && mKeepStartCall && (!mCanKeepStart || mCanKeepStart()))
         {
             // Copied: what the window does may refill the list.
             const std::string              text    = start->text;
@@ -205,6 +205,7 @@ void ALScriptWeightsPane::showNothing(const std::string& why)
     mTargets->deleteAllItems();
     mParts->deleteAllItems();
     mStringsList->deleteAllItems();
+    mStringsPanel->setVisible(false);
     mHead->setText(why);
     mHead->setToolTip(std::string());
 }
@@ -678,13 +679,15 @@ void ALScriptWeightsPane::fillStrings()
                 one.file = with.file;
             }
         }
+        // How it moved as its bytes are said, as less: a saving grown since
+        // is a change down, as a part grown lighter is.
         if (saved)
         {
             const auto before = saved_starts.find(shared.start);
             one.fresh         = before == saved_starts.end();
             if (!one.fresh)
             {
-                one.change = S64(shared.saved) - S64(before->second);
+                one.change = S64(before->second) - S64(shared.saved);
             }
         }
         // Its strings, named in its tip: the first few, and how many more.
@@ -773,8 +776,9 @@ const ALScriptWeightsPane::StringRow* ALScriptWeightsPane::chosenStart() const
 void ALScriptWeightsPane::draw()
 {
     // What can be kept once is what is chosen, which a click or a key may
-    // change at any time: asked as it is drawn.
-    mKeepStart->setEnabled(mKeepStartCall && chosenStart());
+    // change at any time, in a script that can be written to: asked as it
+    // is drawn.
+    mKeepStart->setEnabled(mKeepStartCall && chosenStart() && (!mCanKeepStart || mCanKeepStart()));
     LLPanel::draw();
 }
 
@@ -807,7 +811,9 @@ S32 ALScriptWeightsPane::compareStrings(S32 column, const LLScrollListItem* a, c
             said = order(S64(x.uses), S64(y.uses));
             break;
         case STRING_CHANGE:
-            said = order(x.fresh ? -x.bytes : x.change.value_or(0), y.fresh ? -y.bytes : y.change.value_or(0));
+            // One new since the save moved by all its bytes as they are
+            // said: a string by its own, a start by what it saves, as less.
+            said = order(x.fresh ? x.bytes : x.change.value_or(0), y.fresh ? y.bytes : y.change.value_or(0));
             break;
         case STRING_LINE:
             said = order(x.line < 0, y.line < 0);

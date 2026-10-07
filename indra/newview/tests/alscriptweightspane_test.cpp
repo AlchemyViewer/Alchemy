@@ -487,14 +487,15 @@ namespace tut
         ensure("a string of it says so: " + tip(1), tip(1).find("shares its start") != std::string::npos);
         ensure("one that is not, nothing: " + tip(4), tip(4).find("shares its start") == std::string::npos);
 
-        // Since the save: a string not there then, new; a start's saving
-        // by how it moved.
+        // Since the save: a string not there then, new; a start by how its
+        // saving moved, said as its bytes are, as less: saving more since,
+        // it is lighter.
         ALScriptWeight then = slua;
         then.strings.pop_back();
         then.sharedStarts[0].saved = 4;
         shown.saved                = { then };
         pane.show(shown);
-        ensure_equals("since the save", joined(column(strings, 3)), std::string("|+5||||new"));
+        ensure_equals("since the save", joined(column(strings, 3)), std::string("|-5||||new"));
 
         // Keeping the start once asks the window, with its strings.
         std::string              kept;
@@ -510,6 +511,17 @@ namespace tut
         strings->selectByValue(LLSD(1));
         floater->findChild<LLButton>("weights_keep_start", true)->onCommit();
         ensure("not for a string", kept.empty());
+        // Nor in a script that cannot be written to.
+        pane.setKeepStart([&](const std::string& start, const std::vector<std::string>&) { kept = start; }, []() { return false; });
+        strings->selectByValue(LLSD(0));
+        floater->findChild<LLButton>("weights_keep_start", true)->onCommit();
+        ensure("not where the script cannot be written to", kept.empty());
+
+        // Nothing to show hides the list with the rest.
+        pane.showNothing("Nothing open to weigh.");
+        ensure("hidden with nothing shown", !strings->getParent()->getVisible() && strings->getItemCount() == 0);
+        pane.show(shown);
+        ensure("shown again", strings->getParent()->getVisible());
 
         // LSO has no table: no list.
         pane.show(lsl());
