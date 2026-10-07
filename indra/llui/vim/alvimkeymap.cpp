@@ -1732,8 +1732,9 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
                 }
                 mVisualAnchor = d.clamp(mVisualLastAnchor);
                 mVisualCaret  = d.clamp(mVisualLastCaret);
-                // To every line's end as the block was taken, not as the
-                // caret last went.
+                // To the end as the area was taken -- a block's every line's,
+                // characters' last line's, for `.` -- not as the caret last
+                // went.
                 mWantColumn = mVisualLastToEnd ? S32_MAX : -1;
                 setMode(view, mVisualLast);
                 // A line's break taken as visual mode's operator takes it:
@@ -1760,8 +1761,8 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
             {
                 mVisualAnchor = mVisualLastAnchor;
                 mVisualCaret  = mVisualLastCaret;
-                // A block taken with $ to every line's end again, kept past
-                // this command as $ keeps it.
+                // An area taken with $ to the end again -- a block to every
+                // line's -- kept past this command as $ keeps it.
                 mWantColumn   = mVisualLastToEnd ? S32_MAX : -1;
                 mVerticalMove = mVerticalMove || mVisualLastToEnd;
                 setMode(view, mVisualLast);
@@ -5644,7 +5645,7 @@ void ALVimKeymap::setMode(ALTextView& view, Mode to, bool grouped)
         mVisualLast       = held;
         mVisualLastAnchor = mVisualAnchor;
         mVisualLastCaret  = mVisualCaret;
-        mVisualLastToEnd  = held == Mode::VisualBlock && mWantColumn == S32_MAX;
+        mVisualLastToEnd  = mWantColumn == S32_MAX;
     }
     if (held == Mode::VisualBlock && kept != Mode::VisualBlock)
     {

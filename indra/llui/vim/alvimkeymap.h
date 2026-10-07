@@ -593,8 +593,9 @@ private:
 
     // Visual mode: where it started and where its caret is -- on a
     // character, which the view's selection reaches past -- and the last
-    // visual selection for gv, with whether a block of it was taken to
-    // every line's end with $, as vim keeps its curswant.
+    // visual selection for gv, with whether it was taken with $ -- a block
+    // to every line's end, characters to the last line's -- as vim keeps its
+    // curswant for every mode.
     ALTextPos mVisualAnchor;
     ALTextPos mVisualCaret;
     Mode      mVisualLast = Mode::Normal;

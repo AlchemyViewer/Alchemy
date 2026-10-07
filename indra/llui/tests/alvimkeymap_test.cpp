@@ -5467,4 +5467,21 @@ namespace tut
         keys("Vjipy");
         ensure_equals("V ip taken on stops before it too", vim->registerText('"'), std::string("a\nb\nc"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<192>()
+    {
+        set_test_name("gv and {op}gv over characters taken with $ keep going to the end, for j and for .");
+        ALCodeEditor& e = make("ab\ncdefgh\nq\n");
+        keys("v$<Esc>gvd.");
+        ensure_equals("gv d, then . to the next line's end", flat(e.text()), std::string("q|"));
+
+        make("ab\ncdefgh\nq\n");
+        keys("v$<Esc>dgv.");
+        ensure_equals("d gv, then . to the next line's end", flat(editor->text()), std::string("q|"));
+
+        make("ab\ncdefgh\nq\n");
+        keys("v$<Esc>gvjd");
+        ensure_equals("gv, then j to the next line's end", flat(editor->text()), std::string("q|"));
+    }
 }
