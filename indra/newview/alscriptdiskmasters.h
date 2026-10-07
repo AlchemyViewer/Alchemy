@@ -222,6 +222,7 @@ private:
     boost::signals2::scoped_connection mIndexConnection;
     boost::signals2::scoped_connection mSavedConnection;
     boost::signals2::scoped_connection mEnabledConnection;
+    boost::signals2::scoped_connection mQuietConnection;
     outcome_signal_t                   mOutcome;
     changed_signal_t                   mChanged;
     // The sends under way and waiting, by the script's id, and the scripts

@@ -108,6 +108,20 @@ void ALScriptDiskMasters::start()
             mEnabledConnection = enabled->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) { rewatch(); });
         }
     }
+    if (!mQuietConnection.connected())
+    {
+        // A new quiet is the next burst's, without waiting on the links to
+        // change for the watch to be made again.
+        if (LLControlVariable* quiet = gSavedSettings.getControl("ALScriptMastersQuiet"))
+        {
+            mQuietConnection = quiet->getSignal()->connect([this](LLControlVariable*, const LLSD& value, const LLSD&) {
+                if (mWatch)
+                {
+                    mWatch->setQuiet(value.asReal());
+                }
+            });
+        }
+    }
     links();
     rewatch();
 }
