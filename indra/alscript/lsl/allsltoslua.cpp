@@ -870,8 +870,10 @@ namespace
         bool mCompatTime      = false;
         bool mGetAndResetTime = false;
         // Inside a handler of an event SLua hands what was detected, where
-        // the detected table is read.
+        // the detected table is read; and inside on_damage's, whose table
+        // alone can adjust the damage.
         bool mInDetected = false;
+        bool mOnDamage   = false;
         // The loops being written, innermost last: a for's steps, which a
         // jump to its end runs before `continue`.
         std::vector<LSLASTNode*> mLoops;
@@ -2389,7 +2391,13 @@ namespace
         };
         const auto found = METHODS.find(lsl);
         LSLExpression* index = argumentAt(e, 0);
-        if (found == METHODS.end() || !index)
+        // And llAdjustDamage, the damage set on what was detected, in
+        // on_damage: the one event whose table SLua lets adjust it, as LSL's
+        // call worked in it alone. Elsewhere LSL said an error on the debug
+        // channel and went on, where adjustDamage would stop the handler:
+        // llcompat's there.
+        const bool damage = lsl == "llAdjustDamage" && mOnDamage;
+        if ((found == METHODS.end() && !damage) || !index)
         {
             return std::nullopt;
         }
@@ -2397,6 +2405,10 @@ namespace
                                          "end is an error, where LSL answered nothing.");
         int v = 0;
         const std::string at = wholeNumber(index, v) ? std::to_string(v + 1) : bracketed(value(index), ADD + 1) + " + 1";
+        if (damage)
+        {
+            return Expr{ "detected[" + at + "]:adjustDamage(" + coerced(argumentAt(e, 1), LST_FLOATINGPOINT).text + ")" };
+        }
         return Expr{ "detected[" + at + "]:" + std::string(found->second) + "()", PRIMARY, found->second == "getGroup" };
     }
 
@@ -6204,8 +6216,10 @@ namespace
     {
         prepareBody(handler->getStatements());
         mInDetected = detectedEvent(handler->getIdentifier()->getName());
+        mOnDamage   = std::string_view(handler->getIdentifier()->getName()) == "on_damage";
         block(handler->getStatements());
         mInDetected = false;
+        mOnDamage   = false;
     }
 
     void Writer::singleState(LSLState* state)

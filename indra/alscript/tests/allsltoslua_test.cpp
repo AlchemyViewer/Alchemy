@@ -1965,4 +1965,30 @@ namespace tut
                has(close, "llcompat.Base64ToString(llcompat.StringToBase64(\"x\"))") && !has(close, "llbase64.decode(") &&
                    !has(close, "llbase64.encode(") && !noted(close, "SluaBase64Decode"));
     }
+
+    template<> template<>
+    void allsltoslua_object::test<67>()
+    {
+        set_test_name("llAdjustDamage in on_damage as the detected table's adjustDamage, as the llDetected* are; llcompat's elsewhere, where "
+                      "LSL's call only said an error and adjustDamage would stop the handler");
+        const ALLSLToSLua::Result r = convert("halve() { llAdjustDamage(0, 2.0); }\n"
+                                              "default {\n"
+                                              "    on_damage(integer n) {\n"
+                                              "        llAdjustDamage(0, 0.5);\n"
+                                              "        integer i;\n"
+                                              "        for (i = 1; i < n; ++i) llAdjustDamage(i, 5);\n"
+                                              "        if (n > 3) halve();\n"
+                                              "    }\n"
+                                              "    touch_start(integer n) { llAdjustDamage(0, 1.0); }\n"
+                                              "}\n");
+        ensure("on_damage's own: " + r.text, has(r, "detected[1]:adjustDamage(0.5)") && has(r, "detected[i + 1]:adjustDamage(5)") &&
+                                                 noted(r, "SluaDetectedTable"));
+        ensure("a function's, llcompat's: " + r.text, has(r, "llcompat.AdjustDamage(0, 2.0)"));
+        ensure("another event's, llcompat's: " + r.text, has(r, "llcompat.AdjustDamage(0, 1.0)"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result close =
+            ALLSLToSLua::convert("default { on_damage(integer n) { llAdjustDamage(0, 0.5); } }\n", ALLSLToSLua::Options::closeToLSL());
+        ensure("close to LSL, llcompat's: " + close.text, has(close, "llcompat.AdjustDamage(0, 0.5)") && !has(close, "adjustDamage("));
+    }
 }
