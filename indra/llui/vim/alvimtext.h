@@ -231,13 +231,19 @@ namespace ALVimText
     // register played can be one.
     enum Composite : llwchar
     {
-        // gg, ge, gE, gj, gk and g_: motions.
+        // gg, ge, gE, gj, gk, g_, g0, g^, gm, g$, gM and go: motions.
         GO_TOP = 0x110000,
         WORD_END_BACK,
         BIG_WORD_END_BACK,
         DISPLAY_DOWN,
         DISPLAY_UP,
         LAST_NON_BLANK,
+        DISPLAY_START,
+        DISPLAY_FIRST,
+        DISPLAY_MIDDLE,
+        DISPLAY_END,
+        LINE_MIDDLE,
+        GO_BYTE,
         // gr pending, and gc: an operator.
         PENDING_GR,
         COMMENT_OPERATOR,
@@ -262,6 +268,12 @@ namespace ALVimText
             case DISPLAY_DOWN:       return "gj";
             case DISPLAY_UP:         return "gk";
             case LAST_NON_BLANK:     return "g_";
+            case DISPLAY_START:      return "g0";
+            case DISPLAY_FIRST:      return "g^";
+            case DISPLAY_MIDDLE:     return "gm";
+            case DISPLAY_END:        return "g$";
+            case LINE_MIDDLE:        return "gM";
+            case GO_BYTE:            return "go";
             case PENDING_GR:         return "gr";
             case COMMENT_OPERATOR:   return "gc";
             case SURROUND_OPERATOR:

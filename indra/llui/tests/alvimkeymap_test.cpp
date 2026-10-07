@@ -4342,4 +4342,144 @@ namespace tut
         keys("*");
         ensure_equals("the word is foo, as vim's classes have it, not foo.bar", caretText(), std::string("0:8"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<157>()
+    {
+        set_test_name("g0 g^ gm g$ gM and go are motions, alone and after an operator: the screen line's first character, its first not blank, its middle and its last, the middle of the line's text, and a byte of the text");
+        ALCodeEditor& e = make("three four\n");
+        e.setCaret(ALTextPos(0, 3));
+        keys("dg0");
+        ensure_equals("dg0 back to the screen line's start, exclusive", flat(e.text()), std::string("ee four|"));
+        ensure("normal mode, nothing pending", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+        e.setText("three four\n");
+        e.setCaret(ALTextPos(0, 3));
+        keys("dg$");
+        ensure_equals("dg$ through its last character", flat(e.text()), std::string("thr|"));
+        e.setText("three four\n");
+        e.setCaret(ALTextPos(0, 3));
+        keys("dgm");
+        ensure_equals("dgm up to the last character, the view's middle being past it", flat(e.text()), std::string("thrr|"));
+        e.setText("three four\n");
+        e.setCaret(ALTextPos(0, 3));
+        keys("dgo");
+        ensure_equals("dgo back to the text's first byte", flat(e.text()), std::string("ee four|"));
+        e.setText("three four\n");
+        e.setCaret(ALTextPos(0, 3));
+        keys("dgM");
+        ensure_equals("dgM up to the middle of the line's text", flat(e.text()), std::string("thr four|"));
+        ensure_equals("what dgM took", vim->registerText('"'), std::string("ee"));
+
+        e.setText("three four\n");
+        e.setCaret(ALTextPos(0, 3));
+        keys("g$");
+        ensure_equals("g$ to the last character", caretText(), std::string("0:9"));
+        keys("g0");
+        ensure_equals("g0 to the first", caretText(), std::string("0:0"));
+        keys("gm");
+        ensure_equals("gm to the last, the view's middle being past it", caretText(), std::string("0:9"));
+        keys("gM");
+        ensure_equals("gM to the middle of the text", caretText(), std::string("0:5"));
+
+        e.setText("  three four\n");
+        e.setCaret(ALTextPos(0, 7));
+        keys("g^");
+        ensure_equals("g^ to the first not blank", caretText(), std::string("0:2"));
+        e.setCaret(ALTextPos(0, 7));
+        keys("dg^");
+        ensure_equals("dg^ back to it", flat(e.text()), std::string("   four|"));
+
+        e.setText("0123456789\n");
+        e.setCaret(ALTextPos(0, 0));
+        keys("20gM");
+        ensure_equals("20gM a fifth along", caretText(), std::string("0:2"));
+        keys("0101gM");
+        ensure_equals("past a hundred, the middle", caretText(), std::string("0:5"));
+        keys("02d10gM");
+        ensure_equals("2d10gM: the counts' product, a fifth along", flat(e.text()), std::string("23456789|"));
+
+        e.setText("abc\ndef\nghi");
+        e.setCaret(ALTextPos(2, 1));
+        keys("go");
+        ensure_equals("go to the first byte", caretText(), std::string("0:0"));
+        keys("``");
+        ensure_equals("a jump, `` going back", caretText(), std::string("2:1"));
+        keys("6go");
+        ensure_equals("6go, a line's break one byte", caretText(), std::string("1:1"));
+        keys("4go");
+        ensure_equals("a break's byte, the character before it", caretText(), std::string("0:2"));
+        keys("99go");
+        ensure_equals("past the end, the last character", caretText(), std::string("2:2"));
+        e.setCaret(ALTextPos(0, 1));
+        keys("d6go");
+        ensure_equals("d6go over the break", flat(e.text()), std::string("aef|ghi"));
+        e.setText("abc\ndef\nghi");
+        e.setCaret(ALTextPos(1, 2));
+        keys("2d3go");
+        ensure_equals("2d3go: the counts' product", flat(e.text()), std::string("abc|df|ghi"));
+
+        // A count of g$ is screen lines down; unwrapped, each line one, and
+        // the last line where they run out.
+        e.setText("one\ntwo two\nthree");
+        e.setCaret(ALTextPos(0, 1));
+        keys("2g$");
+        ensure_equals("2g$ to the next line's last", caretText(), std::string("1:6"));
+        e.setCaret(ALTextPos(0, 1));
+        keys("9g$");
+        ensure_equals("9g$ to the last line's", caretText(), std::string("2:4"));
+        e.setCaret(ALTextPos(0, 1));
+        keys("d2g$");
+        ensure_equals("d2g$ through the next line's last", flat(e.text()), std::string("o|three"));
+
+        e.setText("ab\n\ncd");
+        e.setCaret(ALTextPos(1, 0));
+        keys("dg$");
+        ensure_equals("dg$ on an empty line takes nothing, the break neither", flat(e.text()), std::string("ab||cd"));
+
+        // Unwrapped and wider than the view: what is in sight.
+        const std::string wide(150, 'x');
+        e.setText(wide + "\n");
+        e.setCaret(ALTextPos(0, 0));
+        const F32 width = static_cast<F32>(e.textRect().getWidth());
+        keys("g$");
+        ensure("g$ to the last character in sight", e.caret().column + 1 < static_cast<S32>(wide.size()) && e.layout().xOf(0, e.caret().column) <= width - 1.f &&
+                                                    e.layout().xOf(0, e.caret().column + 1) > width - 1.f);
+        e.setCaret(ALTextPos(0, 0));
+        keys("gm");
+        ensure("gm to the one half the view across", e.layout().xOf(0, e.caret().column) <= width / 2.f && e.layout().xOf(0, e.caret().column + 1) > width / 2.f);
+        keys("$");
+        const F32 left = e.scrollX();
+        keys("g0");
+        ensure("g0 to the first character in sight", left > 0.f && e.layout().xOf(0, e.caret().column) <= left && e.layout().xOf(0, e.caret().column + 1) > left);
+
+        // Wrapped, a screen line is a row of the line.
+        const std::string line = "aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll";
+        e.setText(line + "\n");
+        e.setWordWrap(true);
+        e.reshape(120, 200);
+        const std::vector<ALTextLayout::Row> rows = e.layout().line(0).rows;
+        ensure("the line wraps to three rows or more, of three characters or more", rows.size() >= 3 && rows[1].end - rows[1].begin >= 3);
+        e.setCaret(ALTextPos(0, rows[1].begin + 2));
+        keys("g0");
+        ensure("g0 to the row's first character", e.caret() == ALTextPos(0, rows[1].begin));
+        keys("g$");
+        ensure("g$ to its last", e.caret() == ALTextPos(0, rows[1].end - 1));
+        keys("gm");
+        ensure("gm on the row", e.layout().rowOf(0, e.caret().column) == 1);
+        e.setCaret(ALTextPos(0, rows[1].begin + 2));
+        keys("2g$");
+        ensure("2g$ to the end of the row below", e.caret() == ALTextPos(0, rows[2].end - 1));
+        e.setCaret(ALTextPos(0, rows[1].begin + 2));
+        keys("d99g$");
+        ensure_equals("d99g$ runs out of rows and fails, nothing taken", e.document().line(0), line);
+        e.setCaret(ALTextPos(0, rows[1].begin + 2));
+        keys("dg0");
+        const size_t row_begin = static_cast<size_t>(rows[1].begin);
+        const size_t row_end   = static_cast<size_t>(rows[1].end);
+        ensure_equals("dg0 from the row's start", e.document().line(0), line.substr(0, row_begin) + line.substr(row_begin + 2));
+        e.setText(line + "\n");
+        e.setCaret(ALTextPos(0, rows[1].begin + 1));
+        keys("dg$");
+        ensure_equals("dg$ through the row's last", e.document().line(0), line.substr(0, row_begin + 1) + line.substr(row_end));
+    }
 }

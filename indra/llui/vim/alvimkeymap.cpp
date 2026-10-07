@@ -1438,13 +1438,13 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
     const bool            editing = !view.isReadOnly();
     const S32             count   = countOr(mCount);
     // After an operator the g keys that are motions -- gg g_ ge gE gj gk
-    // g* g# gn gN -- go on to take it, gv to give it the last visual area,
-    // gr to wait for its character, and a g operator doubled, g~g~ gugu
-    // gUgU gcgc, is its lines as g~~ is. Any other key is no motion, and
-    // the operator fails as it does before any key that is none
-    // (operatorKey): nothing changed and nothing begun, the caret moved
-    // only where vim's gI and gi move it first, to the line's first column
-    // and to where inserting last stopped.
+    // g0 g^ gm g$ gM go g* g# gn gN -- go on to take it, gv to give it the
+    // last visual area, gr to wait for its character, and a g operator
+    // doubled, g~g~ gugu gUgU gcgc, is its lines as g~~ is. Any other key
+    // is no motion, and the operator fails as it does before any key that
+    // is none (operatorKey): nothing changed and nothing begun, the caret
+    // moved only where vim's gI and gi move it first, to the line's first
+    // column and to where inserting last stopped.
     if (mOperator)
     {
         switch (ch)
@@ -1455,6 +1455,12 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
             case 'E':
             case 'j':
             case 'k':
+            case '0':
+            case '^':
+            case 'm':
+            case '$':
+            case 'M':
+            case 'o':
             case '*':
             case '#':
             case 'n':
@@ -1776,6 +1782,19 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
             // A row of the display down or up, through a
             // wrapped line.
             return command(view, ch == 'j' ? DISPLAY_DOWN : DISPLAY_UP);
+        case '0':
+        case '^':
+        case 'm':
+        case '$':
+            // The screen line's first character, its first that is
+            // not blank, its middle and its last.
+            return command(view, ch == '0' ? DISPLAY_START : ch == '^' ? DISPLAY_FIRST : ch == 'm' ? DISPLAY_MIDDLE : DISPLAY_END);
+        case 'M':
+            // The middle of the line's text.
+            return command(view, LINE_MIDDLE);
+        case 'o':
+            // A byte of the text, by its count.
+            return command(view, GO_BYTE);
         default:
             clearPending();
             return true;
@@ -3270,8 +3289,8 @@ bool ALVimKeymap::motionKey(ALTextView& view, llwchar ch)
     if (m.ok)
     {
         const ALTextPos from = cursor(view);
-        const bool      jump = ch == 'G' || ch == GO_TOP || ch == '%' || ch == '(' || ch == ')' || ch == '{' || ch == '}' || ch == 'H' ||
-                          ch == 'M' || ch == 'L';
+        const bool      jump = ch == 'G' || ch == GO_TOP || ch == GO_BYTE || ch == '%' || ch == '(' || ch == ')' || ch == '{' || ch == '}' ||
+                          ch == 'H' || ch == 'M' || ch == 'L';
         if (jump && m.to != from)
         {
             noteJump(view, from);
@@ -3402,6 +3421,88 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             m.to    = d.clamp(ALTextPos(line, layout.columnAt(line, row, x, true)));
             m.moved = m.to != from;
+            return m;
+        }
+        case DISPLAY_START:
+        case DISPLAY_FIRST:
+        case DISPLAY_MIDDLE:
+        case DISPLAY_END:
+        {
+            // The screen line the caret is drawn on: its row of the layout,
+            // one of a wrapped line's or an unwrapped line whole, as much of
+            // it as is in sight across. g0 to its first character, g^ on
+            // from there over blanks, gm to the one half the view's width
+            // along, g$ to its last -- the count's rows down first, as gj
+            // goes them, where a wrapped text running out of rows fails it
+            // as vim's does. Never past a line's last character; exclusive,
+            // but g$, which takes its character with it.
+            ALTextLayout& layout  = view.layout();
+            const bool    wrapped = view.getWordWrap();
+            const F32     left    = wrapped ? 0.f : view.scrollX();
+            const F32     width   = static_cast<F32>(llmax(1, view.textRect().getWidth()));
+            S32           line    = from.line;
+            S32           row     = layout.rowOf(line, from.column);
+            for (S32 n = 1; ch == DISPLAY_END && n < count; ++n)
+            {
+                if (row + 1 < layout.rowCount(line))
+                {
+                    ++row;
+                }
+                else if (const S32 below = layout.visibleFrom(line + 1, 1); below >= 0)
+                {
+                    line = below;
+                    row  = 0;
+                }
+                else
+                {
+                    m.moved = !wrapped;
+                    break;
+                }
+            }
+            // A wrapped row's last character is the last it holds, a blank
+            // that hangs past the edge as well.
+            const F32 last_x = wrapped ? F32_MAX : left + width - 1.f;
+            const F32 x      = ch == DISPLAY_END ? last_x : ch == DISPLAY_MIDDLE ? left + width / 2.f : left;
+            m.to             = d.clamp(ALTextPos(line, layout.columnAt(line, row, x, false)));
+            if (atLineEnd(d, m.to))
+            {
+                m.to = lastCharOf(d, line);
+            }
+            if (ch == DISPLAY_FIRST)
+            {
+                while ((at(d, m.to) == ' ' || at(d, m.to) == '\t') && !atLineEnd(d, d.nextCluster(m.to)))
+                {
+                    m.to = d.nextCluster(m.to);
+                }
+            }
+            // An empty line has no character to take.
+            m.inclusive = ch == DISPLAY_END && !atLineEnd(d, m.to);
+            return m;
+        }
+        case LINE_MIDDLE:
+        {
+            // gM: half the line's text along, as the reader counts its
+            // columns, or the count's percent of it, a hundred at most; its
+            // last character where that is past it. Exclusive.
+            const S32 tab   = view.getTabWidth();
+            const S32 width = d.displayColumn(d.lineEnd(from.line), tab);
+            m.to            = d.posAtDisplayColumn(from.line, counted && count <= 100 ? width * count / 100 : width / 2, tab);
+            if (atLineEnd(d, m.to))
+            {
+                m.to = lastCharOf(d, from.line);
+            }
+            return m;
+        }
+        case GO_BYTE:
+        {
+            // go: the count's byte of the text, the first without one, each
+            // line's break a byte; on the character it is part of, the one
+            // before a break, and the last past the end. Exclusive.
+            m.to = d.clamp(d.posAt(static_cast<size_t>(llmax(0, count - 1))));
+            if (atLineEnd(d, m.to))
+            {
+                m.to = lastCharOf(d, m.to.line);
+            }
             return m;
         }
         case '0':
