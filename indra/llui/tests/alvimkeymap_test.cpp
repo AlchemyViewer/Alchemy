@@ -3041,4 +3041,50 @@ namespace tut
         keys(":%y<CR>");
         ensure_equals(":%y yanks the two lines", vim->registerText('0'), std::string("a\nb"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<106>()
+    {
+        set_test_name("a visual block is the columns the reader counts: what it cuts, lights, replaces, types onto and puts is whole characters, wherever the bytes before them put them");
+        make("\xc3\xa9\n");
+        keys("<C-v>d");
+        ensure_equals("a character of two bytes cut whole", editor->document().line(0), std::string());
+
+        make("a\xc3\xa9\nab\n");
+        keys("l<C-v>jd");
+        ensure_equals("the first line's column, whole", editor->document().line(0), std::string("a"));
+        ensure_equals("the second's", editor->document().line(1), std::string("a"));
+
+        make("\tab\nxxxxab\n");
+        editor->setTabWidth(4);
+        keys("l<C-v>jd");
+        ensure_equals("after a tab, the column it reaches", editor->document().line(0), std::string("\tb"));
+        ensure_equals("the same column under it", editor->document().line(1), std::string("xxxxb"));
+
+        make("\xc3\xa9" "a\nxa\n");
+        keys("l<C-v>jrx");
+        ensure_equals("r past a character of two bytes", editor->document().line(0), std::string("\xc3\xa9" "x"));
+        ensure_equals("and under it", editor->document().line(1), std::string("xx"));
+
+        make("\xc3\xa9" "a\nxa\n");
+        keys("l<C-v>jIZ<Esc>");
+        ensure_equals("I before the column, not inside the character", editor->document().line(0), std::string("\xc3\xa9" "Za"));
+        ensure_equals("and on the line under it", editor->document().line(1), std::string("xZa"));
+
+        make("\xc3\xa9x\n");
+        keys("<C-v>");
+        const std::vector<ALTextRange>& lit = editor->highlights(ALCodeEditor::Highlight::Block);
+        ensure("lit over the whole character", lit.size() == 1 && lit[0] == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)));
+        keys("<Esc>");
+
+        make("ab\ncd\n\xc3\xa9x\n\xc3\xa9y\n");
+        keys("<C-v>jy2jp");
+        ensure_equals("a block put past a character of two bytes", editor->document().line(2), std::string("\xc3\xa9" "ax"));
+        ensure_equals("and on the line under it", editor->document().line(3), std::string("\xc3\xa9" "cy"));
+
+        make("xxxxab\n\tab\nxxxxab\n");
+        editor->setTabWidth(4);
+        keys("4l<C-v>2j<Esc>:%s/\\%Va/Z/g<CR>");
+        ensure_equals("\\%V on a block: its column on a line a tab begins", flat(editor->text()), std::string("xxxxZb|\tZb|xxxxZb|"));
+    }
 }

@@ -30,6 +30,7 @@
 #include "alvimhost.h"
 #include "alvimexcommands.h"
 #include "alvimkeymap.h"
+#include "alvimtext.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -111,8 +112,10 @@ ALVimPattern::Places ALVimSearch::placesOf(const ALTextView& view) const
         places.visualRange = mVim.mVisualLast == ALVimKeymap::Mode::VisualLine ? ALTextRange(d.lineStart(a.line), d.lineEnd(b.line)) : ALTextRange(a, d.nextCluster(b));
         if (mVim.mVisualLast == ALVimKeymap::Mode::VisualBlock)
         {
-            places.blockLeft   = llmin(mVim.mVisualLastAnchor.column, mVim.mVisualLastCaret.column);
-            places.blockRight  = llmax(mVim.mVisualLastAnchor.column, mVim.mVisualLastCaret.column);
+            // Its columns as the reader counts them, as the block itself
+            // has them.
+            places.tabWidth = view.getTabWidth();
+            ALVimText::blockColumns(d, d.clamp(mVim.mVisualLastAnchor), d.clamp(mVim.mVisualLastCaret), places.tabWidth, places.blockLeft, places.blockRight);
             places.visualRange = ALTextRange(d.lineStart(a.line), d.lineEnd(b.line));
         }
     }

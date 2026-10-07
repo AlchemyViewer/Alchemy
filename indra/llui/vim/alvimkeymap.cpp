@@ -834,7 +834,7 @@ void ALVimKeymap::noteVisualOperation(const Span& span, S32 lines_hint)
     mVisualPending.valid   = true;
     mVisualPending.mode    = span.linewise ? Mode::VisualLine : span.block ? Mode::VisualBlock : Mode::Visual;
     mVisualPending.lines   = lines_hint >= 0 ? lines_hint : span.range.end.line - span.range.begin.line;
-    mVisualPending.columns = span.block ? span.range.end.column - span.range.begin.column
+    mVisualPending.columns = span.block ? span.right - span.left
                              : span.linewise ? 0
                                              : span.range.end.column - (span.range.end.line == span.range.begin.line ? span.range.begin.column : 0);
     // The operator is the key being handled: the last one typed.
@@ -1326,25 +1326,36 @@ bool ALVimKeymap::afterReplace(ALTextView& view, llwchar pending, llwchar ch)
     }
     if (visual)
     {
-        // Every character of the selection becomes this one.
-        const Span                                        span = visualSpan(view);
-        std::vector<std::pair<ALTextRange, std::string>> edits;
-        for (S32 line = span.range.begin.line; line <= span.range.end.line; ++line)
+        // Every character of the selection becomes this one: what a
+        // block holds of each line, or what each line has of the rest.
+        const Span               span = visualSpan(view);
+        std::vector<ALTextRange> pieces;
+        if (span.block)
         {
-            const S32 c0 = span.linewise ? 0 : (span.block || line == span.range.begin.line) ? span.range.begin.column : 0;
-            const S32 c1 = span.linewise ? d.lineLength(line)
-                           : span.block ? llmin(d.lineLength(line), span.range.end.column + 1)
-                           : line == span.range.end.line ? span.range.end.column : d.lineLength(line);
-            const S32 lo = llmin(c0, d.lineLength(line));
-            const S32 hi = llmin(llmax(lo, c1), d.lineLength(line));
-            if (hi > lo)
+            pieces = blockPieces(view, span);
+        }
+        else
+        {
+            for (S32 line = span.range.begin.line; line <= span.range.end.line; ++line)
+            {
+                const S32 c0 = span.linewise ? 0 : line == span.range.begin.line ? span.range.begin.column : 0;
+                const S32 c1 = span.linewise ? d.lineLength(line) : line == span.range.end.line ? span.range.end.column : d.lineLength(line);
+                const S32 lo = llmin(c0, d.lineLength(line));
+                const S32 hi = llmin(llmax(lo, c1), d.lineLength(line));
+                pieces.emplace_back(ALTextPos(line, lo), ALTextPos(line, hi));
+            }
+        }
+        std::vector<std::pair<ALTextRange, std::string>> edits;
+        for (const ALTextRange& piece : pieces)
+        {
+            if (!piece.empty())
             {
                 std::string with;
-                for (S32 c = lo; c < hi; ++c)
+                for (S32 c = piece.begin.column; c < piece.end.column; ++c)
                 {
                     with += utf8Of(ch);
                 }
-                edits.emplace_back(ALTextRange(ALTextPos(line, lo), ALTextPos(line, hi)), with);
+                edits.emplace_back(piece, with);
             }
         }
         const ALTextPos start = span.range.begin;
@@ -2144,15 +2155,13 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
             if (ch == 'I' || ch == 'A')
             {
                 // Typed onto every line of the block, once insert mode
-                // is left.
-                const bool block = span.block;
-                const S32  first = span.range.begin.line;
-                const S32  last  = span.range.end.line;
-                S32        column = ch == 'A' ? span.range.end.column : span.range.begin.column;
-                if (!block)
-                {
-                    column = ch == 'A' ? d.lineLength(first) : firstNonBlankColumn(d, first);
-                }
+                // is left, at its column as the reader counts them.
+                const bool      block  = span.block;
+                const S32       first  = span.range.begin.line;
+                const S32       last   = span.range.end.line;
+                const S32       column = ch == 'A' ? span.right : span.left;
+                const ALTextPos start  = block ? d.posAtDisplayColumn(first, column, view.getTabWidth())
+                                               : ALTextPos(first, ch == 'A' ? d.lineLength(first) : firstNonBlankColumn(d, first));
                 leaveVisual(view);
                 if (!editing)
                 {
@@ -2164,7 +2173,7 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                 mBlockLast   = last;
                 mBlockColumn = column;
                 mBlockAppend = ch == 'A';
-                view.setCaret(d.clamp(ALTextPos(first, column)));
+                view.setCaret(start);
                 enterInsert(view, 1);
                 return true;
             }
@@ -2493,7 +2502,9 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 to.line      = llmin(d.lineCount() - 1, from_here.line + mLastVisual.lines);
                 if (mLastVisual.mode == Mode::VisualBlock)
                 {
-                    to.column = from_here.column + mLastVisual.columns;
+                    // As many columns again as the reader counts them.
+                    const S32 tab = view.getTabWidth();
+                    to            = d.posAtDisplayColumn(to.line, d.displayColumn(from_here, tab) + mLastVisual.columns, tab);
                 }
                 else if (mLastVisual.mode == Mode::Visual)
                 {
@@ -3511,13 +3522,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
     std::vector<ALTextRange> pieces;
     if (span.block)
     {
-        const S32 c0 = llmin(span.range.begin.column, span.range.end.column);
-        const S32 c1 = llmax(span.range.begin.column, span.range.end.column) + 1;
-        for (S32 line = first; line <= last; ++line)
-        {
-            const S32 length = d.lineLength(line);
-            pieces.emplace_back(ALTextPos(line, llmin(c0, length)), ALTextPos(line, llmin(c1, length)));
-        }
+        pieces = blockPieces(view, span);
     }
     else if (span.linewise)
     {
@@ -3638,7 +3643,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                     mBlockInsert = true;
                     mBlockFirst  = first;
                     mBlockLast   = last;
-                    mBlockColumn = pieces.front().begin.column;
+                    mBlockColumn = span.left;
                     mBlockAppend = false;
                 }
                 enterInsert(view, 1, true);
@@ -3770,7 +3775,11 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
             }
             at_ = nl + 1;
         }
-        const S32 column = after && !atLineEnd(d, from) ? from.column + 1 : from.column;
+        // The column as the reader counts them, before the character
+        // under the caret or past it: the bytes before it differ from line
+        // to line.
+        const S32 tab    = view.getTabWidth();
+        const S32 column = after && !atLineEnd(d, from) ? d.displayColumn(d.nextCluster(from), tab) : d.displayColumn(from, tab);
         std::vector<std::pair<ALTextRange, std::string>> edits;
         std::string                                       tail;
         for (size_t i = 0; i < lines.size(); ++i)
@@ -3783,13 +3792,12 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
             }
             if (line < d.lineCount())
             {
-                const S32   length = d.lineLength(line);
-                std::string pad    = length < column ? std::string(column - length, ' ') : std::string();
-                edits.emplace_back(ALTextRange(ALTextPos(line, llmin(column, length)), ALTextPos(line, llmin(column, length))), pad + piece);
+                const ALTextPos where = d.posAtDisplayColumn(line, column, tab);
+                edits.emplace_back(ALTextRange(where, where), padTo(d, line, column, tab) + piece);
             }
             else
             {
-                tail += "\n" + std::string(column, ' ') + piece;
+                tail += "\n" + std::string(static_cast<size_t>(column), ' ') + piece;
             }
         }
         if (!tail.empty())
@@ -3797,7 +3805,7 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
             edits.emplace_back(ALTextRange(d.end(), d.end()), tail);
         }
         view.replaceAll(std::move(edits));
-        moveTo(view, ALTextPos(from.line, column));
+        moveTo(view, d.posAtDisplayColumn(from.line, column, tab));
         return;
     }
     std::string text;
@@ -3896,21 +3904,21 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
             view.insertText(again);
         }
     }
-    // And onto every other line of a block.
+    // And onto every other line of a block, at its column as the reader
+    // counts them; a line that stops short of it left alone, but for A,
+    // which puts it at the line's end.
     if (mBlockInsert && !mTyped.empty() && mTyped.find('\n') == std::string::npos)
     {
+        const S32                                        tab = view.getTabWidth();
         std::vector<std::pair<ALTextRange, std::string>> edits;
         for (S32 line = mBlockFirst + 1; line <= llmin(mBlockLast, d.lineCount() - 1); ++line)
         {
-            const S32 length = d.lineLength(line);
-            const S32 column = mBlockAppend ? llmin(mBlockColumn, length) : mBlockColumn;
-            if (!mBlockAppend && column > length)
+            if (!mBlockAppend && d.displayColumn(d.lineEnd(line), tab) < mBlockColumn)
             {
                 continue;
             }
-            const std::string pad = length < column ? std::string(column - length, ' ') : std::string();
-            const S32         at_ = llmin(column, length);
-            edits.emplace_back(ALTextRange(ALTextPos(line, at_), ALTextPos(line, at_)), pad + mTyped);
+            const ALTextPos where = d.posAtDisplayColumn(line, mBlockColumn, tab);
+            edits.emplace_back(ALTextRange(where, where), mTyped);
         }
         if (!edits.empty())
         {
@@ -4249,16 +4257,15 @@ void ALVimKeymap::surround(ALTextView& view, const Span& span, const std::string
     }
     else if (span.block)
     {
-        // A block: each of its lines' pieces surrounded.
-        for (S32 line = range.begin.line; line <= range.end.line; ++line)
+        // A block: what it holds of each of its lines surrounded, a line
+        // that stops short of it left alone.
+        for (const ALTextRange& piece : blockPieces(view, span))
         {
-            const S32 length = d.lineLength(line);
-            if (range.begin.column >= length)
+            if (!piece.empty())
             {
-                continue;
+                at_(piece.begin, open);
+                at_(piece.end, close);
             }
-            at_(ALTextPos(line, range.begin.column), open);
-            at_(ALTextPos(line, llmin(range.end.column + 1, length)), close);
         }
     }
     else if (range.begin == range.end)
@@ -4420,14 +4427,29 @@ ALVimKeymap::Span ALVimKeymap::visualSpan(const ALTextView& view) const
     }
     else if (mMode == Mode::VisualBlock)
     {
-        span.block = true;
-        span.range = ALTextRange(ALTextPos(a.line, llmin(mVisualAnchor.column, caret.column)), ALTextPos(b.line, llmax(mVisualAnchor.column, caret.column)));
+        const S32 tab = view.getTabWidth();
+        span.block    = true;
+        blockColumns(d, d.clamp(mVisualAnchor), caret, tab, span.left, span.right);
+        span.range = ALTextRange(blockPiece(d, a.line, span.left, span.right, tab).begin, blockPiece(d, b.line, span.left, span.right, tab).end);
     }
     else
     {
         span.range = ALTextRange(a, atLineEnd(d, b) ? b : d.nextCluster(b));
     }
     return span;
+}
+
+std::vector<ALTextRange> ALVimKeymap::blockPieces(const ALTextView& view, const Span& span) const
+{
+    const ALTextDocument&    d     = view.document();
+    const ALTextRange        lines = span.range.normalised();
+    std::vector<ALTextRange> pieces;
+    pieces.reserve(static_cast<size_t>(llmax(0, lines.end.line - lines.begin.line + 1)));
+    for (S32 line = lines.begin.line; line <= lines.end.line; ++line)
+    {
+        pieces.push_back(blockPiece(d, line, span.left, span.right, view.getTabWidth()));
+    }
+    return pieces;
 }
 
 void ALVimKeymap::showVisual(ALTextView& view)
@@ -4451,20 +4473,11 @@ void ALVimKeymap::showVisual(ALTextView& view)
     }
     else if (mMode == Mode::VisualBlock)
     {
-        // The rows between, each lit over the block's columns where the
-        // view can; the selection itself the corners.
-        const Span span = visualSpan(view);
+        // The rows between, each lit over what the block holds of it
+        // where the view can; the selection itself the corners.
         if (ALVimHost* host = view.vimHost())
         {
-            std::vector<ALTextRange> lit;
-            const S32                c0 = span.range.begin.column;
-            const S32                c1 = span.range.end.column + 1;
-            for (S32 line = span.range.begin.line; line <= span.range.end.line; ++line)
-            {
-                const S32 length = d.lineLength(line);
-                lit.emplace_back(ALTextPos(line, llmin(c0, length)), ALTextPos(line, llmin(c1, length)));
-            }
-            host->setLayer(ALVimHost::Layer::Block, std::move(lit));
+            host->setLayer(ALVimHost::Layer::Block, blockPieces(view, visualSpan(view)));
         }
         view.setCaret(caret);
     }

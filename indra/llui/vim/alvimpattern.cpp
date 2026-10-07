@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "alvimpattern.h"
+#include "alvimtext.h"
 
 #include "llstring.h"
 
@@ -598,9 +599,15 @@ void ALVimPattern::constrain(const ALTextDocument& d, const Places& places, std:
                     {
                         return false;
                     }
-                    if (block_left >= 0 && (at.column < block_left || at.column > block_right))
+                    if (block_left >= 0)
                     {
-                        return false;
+                        // In what the block holds of the line, which the
+                        // bytes before its columns place.
+                        const ALTextRange piece = ALVimText::blockPiece(d, at.line, block_left, block_right, places.tabWidth);
+                        if (at < piece.begin || !(at < piece.end))
+                        {
+                            return false;
+                        }
                     }
                     break;
                 case Where::Kind::Caret:

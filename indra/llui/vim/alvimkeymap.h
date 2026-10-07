@@ -246,12 +246,17 @@ private:
         // A motion that failed to move at all, which cancels an operator.
         bool      moved     = true;
     };
-    // A stretch an operator works on.
+    // A stretch an operator works on. A block's columns are the reader's
+    // (ALVimText::blockColumns), which the bytes of its lines need not
+    // agree on: the first and the last it covers; its range runs from what
+    // it holds of its first line to what it holds of its last.
     struct Span
     {
         ALTextRange range;
         bool        linewise = false;
         bool        block    = false;
+        S32         left     = 0;
+        S32         right    = 0;
     };
 
     // A key as typed: recorded where a macro is being, then through the
@@ -376,6 +381,9 @@ private:
     void leaveVisual(ALTextView& view);
     void showVisual(ALTextView& view);
     Span visualSpan(const ALTextView& view) const;
+    // What a block holds of each of its lines, the first to the last
+    // (ALVimText::blockPiece): what is cut, lit, replaced and put into.
+    std::vector<ALTextRange> blockPieces(const ALTextView& view, const Span& span) const;
 
     // Registers, the unnamed one on the clipboard.
     void     store(char name, std::string text, bool linewise, bool block, bool yanked);
@@ -395,8 +403,9 @@ private:
     // The number at or after the caret on its line, changed by so much;
     // false where there is none.
     bool addToNumber(ALTextView& view, S64 by);
-    // The last visual operation, for `.`: the extent it covered and the
-    // keys from the operator on.
+    // The last visual operation, for `.`: the extent it covered -- a
+    // block's columns as the reader counts them -- and the keys from the
+    // operator on.
     struct VisualExtent
     {
         bool valid   = false;
@@ -508,9 +517,9 @@ private:
     ALTextPos mVisualLastCaret;
 
     // Insert mode: how many times what is typed goes in, the characters
-    // typed so far, and a block's lines to put them on as well; what the
-    // last insert typed, for Control-A; and whether a Control-R waits
-    // for the register to put in.
+    // typed so far, and a block's lines to put them on as well, at its
+    // column as the reader counts them; what the last insert typed, for
+    // Control-A; and whether a Control-R waits for the register to put in.
     S32         mInsertCount = 1;
     std::string mTyped;
     std::string mLastTyped;

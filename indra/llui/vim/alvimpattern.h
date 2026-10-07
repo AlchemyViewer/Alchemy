@@ -92,7 +92,9 @@ struct ALVimPattern
     // What the places a pattern names are measured against: the caret, and
     // the last visual area where there was one -- whole lines for one by
     // lines, the character under either end included otherwise, and for a
-    // block the columns between its ends as well.
+    // block the columns between its ends as well, the first and the last
+    // it covers as the reader counts them with the tab width given
+    // (ALVimText::blockColumns).
     struct Places
     {
         ALTextPos   caret;
@@ -100,6 +102,7 @@ struct ALVimPattern
         ALTextRange visualRange;
         S32         blockLeft  = -1;
         S32         blockRight = -1;
+        S32         tabWidth   = 4;
     };
     // The matches in a document, or the stretch of it `scope` holds, that
     // stand where the pattern says; with where each whole match began,
