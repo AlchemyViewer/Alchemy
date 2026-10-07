@@ -136,25 +136,31 @@ void ALTextRuler::drawRuler(F32 alpha)
         mMarkLines.clear();
         mGapMarkLines.clear();
         LLColor4   unused;
-        // A text with neither -- a log -- not read through at all; one
-        // pass for both lists, the gap below the text the last of it.
+        // A text with neither -- a log -- not read through at all; where
+        // the host says something of the lines, one pass for both lists,
+        // the gap below the text the last of it; else the features' own
+        // list of the lines they mark, rather than every line of the text
+        // asked about.
         const bool annotated = mView.annotated();
         const S32  count     = document.lineCount();
-        const S32  end       = annotated ? count + 1 : features ? count : 0;
-        for (S32 line = 0; line < end; ++line)
+        if (annotated)
         {
-            if (line < count && markOf(line, unused))
+            for (S32 line = 0; line <= count; ++line)
             {
-                mMarkLines.push_back(line);
-            }
-            if (annotated)
-            {
+                if (line < count && markOf(line, unused))
+                {
+                    mMarkLines.push_back(line);
+                }
                 const ALTextView::LineAnnotation& said = mView.lineAnnotation(line);
                 if (said.gap > 0 && said.gapRulerTint.mV[VALPHA] > 0.f)
                 {
                     mGapMarkLines.push_back(line);
                 }
             }
+        }
+        else if (features)
+        {
+            features->markedLines(mMarkLines);
         }
         mMarksRevision       = marks_revision;
         mAnnotationsRevision = mView.annotationsRevision();

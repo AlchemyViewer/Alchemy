@@ -3798,6 +3798,20 @@ bool ALCodeEditor::mapMark(S32 line, LLColor4& color) const
     return true;
 }
 
+void ALCodeEditor::markedLines(std::vector<S32>& out) const
+{
+    // A pass over the marks themselves, a byte a line.
+    out.clear();
+    const S32 count = llmin(static_cast<S32>(mMarks.size()), document().lineCount());
+    for (S32 line = 0; line < count; ++line)
+    {
+        if (mMarks[static_cast<size_t>(line)] != Mark::None)
+        {
+            out.push_back(line);
+        }
+    }
+}
+
 bool ALCodeEditor::canSymbol(ALEditorCommand command) const
 {
     if (command == ALEditorCommand::GoToDefinition && mLinkRequest && !mLinkRequest(caret(), false).empty())

@@ -831,6 +831,7 @@ protected:
     S32  hostHiddenBeside(S32 line) const;
     bool mapMark(S32 line, LLColor4& color) const override;
     U32  marksRevision() const override { return mMarksRevision; }
+    void markedLines(std::vector<S32>& out) const override;
     bool closerOpenedAt(const ALTextPos& closer, ALTextPos& opener) override;
     // The features' commands, by what they are about: folding; the code's
     // structure, the functions a host knows of and a bracket's partner;
