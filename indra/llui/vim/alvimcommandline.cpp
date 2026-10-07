@@ -137,9 +137,12 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
             case KEY_ESCAPE:
                 line.clear();
                 cursor = 0;
-                mVim.mMode       = ALVimKeymap::Mode::Normal;
+                backFromLine();
                 mVim.mSearch.endIncremental(view);
-                mVim.moveTo(view, view.caret());
+                if (mVim.mMode == ALVimKeymap::Mode::Normal)
+                {
+                    mVim.moveTo(view, view.caret());
+                }
                 return true;
             case KEY_LEFT:
             case KEY_RIGHT:
@@ -179,7 +182,7 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                 historyAt = -1;
                 if (line.empty())
                 {
-                    mVim.mMode = ALVimKeymap::Mode::Normal;
+                    backFromLine();
                 }
                 else if (cursor > 0)
                 {
@@ -232,7 +235,7 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                 const llwchar     which   = kind;
                 line.clear();
                 cursor = 0;
-                mVim.mMode       = ALVimKeymap::Mode::Normal;
+                backFromLine();
                 historyAt  = -1;
                 remember(which, entered);
                 if (which == ':')
@@ -296,6 +299,14 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
     cursor += typed.size();
     historyAt = -1;
     return true;
+}
+
+void ALVimCommandLine::backFromLine()
+{
+    // A search typed over a visual selection goes back to it, for what it
+    // finds to move the visual caret; anything else to normal mode.
+    mVim.mMode         = kind == ':' ? ALVimKeymap::Mode::Normal : mVim.mSearchVisual;
+    mVim.mSearchVisual = ALVimKeymap::Mode::Normal;
 }
 
 void ALVimCommandLine::dropCompletion()

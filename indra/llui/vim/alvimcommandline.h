@@ -79,5 +79,9 @@ public:
     Completion completion;
 
 private:
+    // The keymap out of the line, back in the mode it was opened from:
+    // normal mode, or the visual mode a search was opened over.
+    void backFromLine();
+
     ALVimKeymap& mVim;
 };

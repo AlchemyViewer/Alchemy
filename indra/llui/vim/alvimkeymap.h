@@ -368,7 +368,8 @@ private:
     void   applyOperator(ALTextView& view, llwchar op, const Span& span, S32 count);
     void   moveTo(ALTextView& view, const ALTextPos& to);
     // Where the caret is for a motion or a command: the visual caret in
-    // a visual mode, else the view's.
+    // a visual mode, and on a search line opened over one; else the
+    // view's.
     ALTextPos cursor(const ALTextView& view) const;
     bool      isVisual() const { return mMode == Mode::Visual || mMode == Mode::VisualLine || mMode == Mode::VisualBlock; }
     void   finishCommand(bool changed);
@@ -518,6 +519,11 @@ private:
     Mode      mVisualLast = Mode::Normal;
     ALTextPos mVisualLastAnchor;
     ALTextPos mVisualLastCaret;
+    // The visual mode a search line was opened over, which entering the
+    // line or letting it go goes back to, what is found moving the visual
+    // caret as vim's search does; normal mode for one opened in normal
+    // mode.
+    Mode      mSearchVisual = Mode::Normal;
 
     // Insert mode: how many times what is typed goes in, the characters
     // typed so far, and a block's lines to put them on as well -- at its

@@ -851,7 +851,9 @@ void ALVimKeymap::noteVisualOperation(const Span& span, S32 lines_hint)
 
 ALTextPos ALVimKeymap::cursor(const ALTextView& view) const
 {
-    return isVisual() ? view.document().clamp(mVisualCaret) : view.caret();
+    // A search line opened over a selection searches from its caret too.
+    const bool visual = isVisual() || (mMode == Mode::Search && mSearchVisual != Mode::Normal);
+    return visual ? view.document().clamp(mVisualCaret) : view.caret();
 }
 
 void ALVimKeymap::moveTo(ALTextView& view, const ALTextPos& to)
@@ -1254,6 +1256,7 @@ bool ALVimKeymap::afterRecord(ALTextView& view, llwchar pending, llwchar ch)
             });
             return true;
         }
+        mSearchVisual = Mode::Normal;
         mMode     = ch == ':' ? Mode::Command : Mode::Search;
         mCommandLine.kind = ch;
         mCommandLine.historyPrefix.clear();
@@ -2671,6 +2674,9 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             return true;
         case '/':
         case '?':
+            // Over a visual selection, which stays: what is found extends
+            // it.
+            mSearchVisual = visual ? mMode : Mode::Normal;
             mMode      = Mode::Search;
             mCommandLine.kind  = ch;
             mCommandLine.historyAt = -1;
@@ -4601,6 +4607,7 @@ void ALVimKeymap::takeLine(ALTextView& view, llwchar kind, const std::string& te
 {
     clearPending();
     mCommandLine.completion = ALVimCommandLine::Completion();
+    mSearchVisual = Mode::Normal;
     mMode       = kind == ':' ? Mode::Command : Mode::Search;
     mCommandLine.kind   = kind;
     mCommandLine.line       = text;

@@ -3137,4 +3137,32 @@ namespace tut
         keys("$d");
         ensure_equals("a block taken with $ is every line to its end", flat(editor->text()), std::string("||"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<109>()
+    {
+        set_test_name("/ and ? over a visual selection move its caret, and it stays for the operator after; Escape and a backspace on the empty line go back to it");
+        ALCodeEditor& e = make("one foo two\nthree\n");
+        keys("v/foo<CR>");
+        ensure("still visual after the search", vim->mode() == ALVimKeymap::Mode::Visual);
+        keys("d");
+        ensure_equals("d from where it began through the match's first character", flat(e.text()), std::string("oo two|three|"));
+
+        make("one foo two\n");
+        keys("$v?foo<CR>d");
+        ensure_equals("? back over the selection", flat(editor->text()), std::string("one |"));
+
+        make("ab\ncd\nxy\n");
+        keys("<C-v>/y<CR>");
+        ensure("a block stays a block", vim->mode() == ALVimKeymap::Mode::VisualBlock);
+        keys("d");
+        ensure_equals("and takes its columns down to the match", flat(editor->text()), std::string("|||"));
+
+        make("one foo\n");
+        keys("v/fo<Esc>");
+        ensure("Escape back to visual", vim->mode() == ALVimKeymap::Mode::Visual);
+        keys("<Esc>V/<BS>");
+        ensure("a backspace on the empty line back to visual by lines", vim->mode() == ALVimKeymap::Mode::VisualLine);
+        keys("<Esc>");
+    }
 }
