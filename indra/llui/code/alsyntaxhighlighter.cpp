@@ -204,7 +204,6 @@ bool ALSyntaxHighlighter::lexSome(S32 most)
 
 void ALSyntaxHighlighter::lex(S32 line, S32 most)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     mLastLexed = 0;
     if (!mDocument || !mGrammar || mLines.empty())
     {
@@ -215,6 +214,9 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
     {
         return;
     }
+    // A zone only where there are lines to look at: most requests -- a row
+    // drawn, the map's revisions, the folds' -- find them lexed already.
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     compactStates();
     std::vector<ALSyntaxToken> fresh;
     // Each line starts in the state the one before ends in, by number: a
