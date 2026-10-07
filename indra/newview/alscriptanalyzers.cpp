@@ -266,7 +266,7 @@ void ALLuauAnalyzer::answer(const Request& request, const std::string& text, con
             result.signature = mService.signature(text, request.line, request.column);
             break;
         case Kind::References:
-            result.references = mService.references(text, request.line, request.column);
+            result.references = mService.references(text, request.line, request.column, request.module);
             break;
         case Kind::Actions:
             result.actions = mService.actions(text, request.line, request.column, request.endLine, request.endColumn);

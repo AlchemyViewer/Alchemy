@@ -30,12 +30,45 @@
 
 #include "../test/lltut.h"
 
+#include "Luau/Compiler.h"
+#include "lua.h"
+#include "lualib.h"
+
+#include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <map>
 #include <sstream>
 #include <thread>
+
+namespace
+{
+    // What a run puts ahead of a script that requires modules: each
+    // module's function by its number, in a table the `require` it sets
+    // runs them from, as Luau's require does.
+    const std::string REQUIRE_TAIL = "    }\n"
+                                     "    local loaded = {}\n"
+                                     "    function require(module)\n"
+                                     "        local held = loaded[module]\n"
+                                     "        if held == nil then\n"
+                                     "            held = dangerouslyexecuterequiredmodule(modules[module])\n"
+                                     "            loaded[module] = held\n"
+                                     "        end\n"
+                                     "        return held\n"
+                                     "    end\n"
+                                     "end\n";
+    std::string bundleOf(const std::vector<std::string>& modules, const std::string& script)
+    {
+        std::string out = "do\n    local modules = {\n";
+        for (size_t i = 0; i < modules.size(); ++i)
+        {
+            out += "        [" + std::to_string(i + 1) + "] = function()\n" + modules[i] + "        end,\n";
+        }
+        return out + REQUIRE_TAIL + script;
+    }
+}
 
 namespace tut
 {
@@ -521,13 +554,12 @@ namespace tut
         add("c", "return require(\"c\")\n");
         r = ALPreprocessor::run("local a = require(\"a\")\nlocal b = require('b')\nlocal x = require(name)\n", options(true));
         ensure_equals("problems", messages(r), std::string());
-        const std::string bundled = "local __modules = {}\n"
-                                    "__modules[\"b\"] = (function()\nreturn 42\nend)()\n"
-                                    "__modules[\"a\"] = (function()\nlocal b = __modules[\"b\"]\nreturn { b = b }\nend)()\n"
-                                    "local a = __modules[\"a\"]\nlocal b = __modules[\"b\"]\nlocal x = require(name)\n";
+        // Numbered as met: a, then what a requires.
+        const std::string bundled = bundleOf({ "local b = require(2)\nreturn { b = b }\n", "return 42\n" },
+                                             "local a = require(1)\nlocal b = require(2)\nlocal x = require(name)\n");
         ensure_equals("modules", r.text, bundled);
         ensure_equals("included", r.includes.size(), 2u);
-        ensure_equals("b mapped to its file", r.map.files()[r.map.toSource(2, 0).file].name, std::string("b"));
+        ensure_equals("b mapped to its file", r.map.files()[r.map.toSource(7, 0).file].name, std::string("b"));
         // The modules' own lines, which the studio shows nothing of: not
         // the table's, which are no one's, nor the script's.
         std::string others;
@@ -535,7 +567,7 @@ namespace tut
         {
             others += std::to_string(first) + "-" + std::to_string(last) + " ";
         }
-        ensure_equals("the modules' lines", others, std::string("2-2 5-6 "));
+        ensure_equals("the modules' lines", others, std::string("3-4 7-7 "));
         ensure("not apart unless asked", !r.apart.valid);
         // Apart, for the analyzers: the script with its requires as calls,
         // and each module as the run made it, each mapped to its file; the
@@ -915,14 +947,14 @@ namespace tut
     template<> template<>
     void alpreprocessor_object::test<22>()
     {
-        set_test_name("a name put in a string literal is escaped: a script's, and a module's path");
+        set_test_name("a name put in a string literal is escaped; a module's path is put nowhere in what a save sends");
         ALPreprocessor::Options opts = options();
         opts.fileName                = "Say \"hi\" \\ there";
         ALPreprocessor::Result r     = ALPreprocessor::run("llSay(0, __FILE__);\nllSay(0, __SHORTFILE__);\n", opts);
         ensure("the quote and the backslash escaped: " + r.text, r.text.find("\"Say \\\"hi\\\" \\\\ there\"") != std::string::npos);
 
-        // A module found on a Windows disk: its path is the key it is
-        // looked up under, which must read back as itself in Luau.
+        // A module found on a Windows disk: required by its number, and
+        // the folders it is in -- the scripter's own -- nowhere in the text.
         ALPreprocessor::Include module;
         module.text = "return { x = 1 }\n";
         module.name = "util.luau";
@@ -930,9 +962,8 @@ namespace tut
         files["./util"] = module;
         r = ALPreprocessor::run("local util = require(\"./util\")\n", options(true));
         ensure_equals("nothing wrong", messages(r), std::string());
-        const std::string key = "\"disk:C:\\\\Users\\\\me\\\\lib\\\\util.luau\"";
-        ensure("the table filled under the escaped key: " + r.text, r.text.find("__modules[" + key + "] = (function()") != std::string::npos);
-        ensure("and the call looks it up under the same: " + r.text, r.text.find("local util = __modules[" + key + "]") != std::string::npos);
+        ensure("required by its number: " + r.text, r.text.find("local util = require(1)") != std::string::npos);
+        ensure("no path: " + r.text, r.text.find("disk:") == std::string::npos && r.text.find("Users") == std::string::npos);
     }
 
     template<> template<>
@@ -1240,11 +1271,9 @@ namespace tut
                                                              options(true));
         ensure_equals("problems", messages(r), std::string());
         ensure_equals("only the concatenated call is a module's", r.text,
-                      std::string("local __modules = {}\n"
-                                  "__modules[\"x\"] = (function()\nreturn 1\nend)()\n"
-                                  "local a = t.require(\"x\")\n"
-                                  "local b = t : require(\"x\")\n"
-                                  "local c = t .. __modules[\"x\"]\n"));
+                      bundleOf({ "return 1\n" }, "local a = t.require(\"x\")\n"
+                                                  "local b = t : require(\"x\")\n"
+                                                  "local c = t .. require(1)\n"));
     }
 
     template<> template<>
@@ -1278,17 +1307,14 @@ namespace tut
         add("i", "return 9\n");
         const ALPreprocessor::Result r = ALPreprocessor::run(source, options(true));
         ensure_equals("problems", messages(r), std::string());
-        const auto count = [&r](const std::string& what) {
-            size_t n = 0;
-            for (size_t at = r.text.find(what); at != std::string::npos; at = r.text.find(what, at + 1))
-            {
-                ++n;
-            }
-            return n;
-        };
-        // Each module is filled once at the top, and looked up where it
-        // was called for.
-        ensure_equals("as many lookups as calls found", count("__modules[") - count("] = (function()"), found.size());
+        // Each module's function is put at the top once, and asked for by
+        // its number where it was called for.
+        size_t numbered = 0;
+        for (size_t at = r.text.find("require("); at != std::string::npos; at = r.text.find("require(", at + 1))
+        {
+            numbered += at + 8 < r.text.size() && std::isdigit(static_cast<unsigned char>(r.text[at + 8]));
+        }
+        ensure_equals("as many requires as calls found", numbered, found.size());
     }
 
     template<> template<>
@@ -1400,13 +1426,13 @@ namespace tut
         const ALPreprocessor::Result r =
             ALPreprocessor::run("-- @file vehicle/hovertext.luau\n--!strict\n--!nolint LocalUnused\nlocal m = require(\"m\")\n", options(true));
         ensure_equals("problems", messages(r), std::string());
-        ensure_equals("the header first, whole", r.text.substr(0, r.text.find("local __modules")),
+        ensure_equals("the header first, whole", r.text.substr(0, r.text.find("do\n    local modules")),
                       std::string("-- @file vehicle/hovertext.luau\n--!strict\n--!nolint LocalUnused\n"));
         ensure("each header line its own", r.map.toSource(1, 0).found() && r.map.toSource(1, 0).file == 0 && r.map.toSource(1, 0).line == 1);
-        ensure("the table's line maps nowhere", !r.map.toSource(3, 0).found());
-        ensure("nor its module's wrapping", !r.map.toSource(4, 0).found());
-        ensure("the module's own line maps to it", r.map.toSource(5, 0).found() && r.map.files()[r.map.toSource(5, 0).file].name == "m");
-        ensure("the script's code after it maps back", r.map.toSource(7, 0).file == 0 && r.map.toSource(7, 0).line == 3);
+        ensure("the table's lines and the require's map nowhere", !r.map.toSource(3, 0).found() && !r.map.toSource(9, 0).found());
+        ensure("nor its module's wrapping", !r.map.toSource(5, 0).found());
+        ensure("the module's own line maps to it", r.map.toSource(6, 0).found() && r.map.files()[r.map.toSource(6, 0).file].name == "m");
+        ensure("the script's code after it maps back", r.map.toSource(19, 0).file == 0 && r.map.toSource(19, 0).line == 3);
     }
 
     template<> template<>
@@ -1793,5 +1819,151 @@ namespace tut
                             r.problems[0].message == "could not find module './a': could not resolve child component \"a\"");
         ensure("in Luau's words", r.problems[1].key == "PreprocModuleNotFoundWhy" && r.problems[1].args == std::vector<std::string>({ "./b", "something odd" }));
         ensure("no reason: as before", r.problems[2].key == "PreprocModuleNotFound" && r.problems[2].args == std::vector<std::string>{ "./c" });
+    }
+
+    // How often each module ran, as a module says it through `counted`,
+    // a builtin of the VM, as SLua's are: a module's own globals are its
+    // own, and what it sets is not the script's.
+    std::map<std::string, int> gRuns;
+
+    template<> template<>
+    void alpreprocessor_object::test<48>()
+    {
+        set_test_name("SLua's require, run as a save sends it, is Luau's: a module run once, at its first require, every later one the same value -- but nil, run again; one never required not run; a module's globals its own");
+        add("count", "counted(\"count\")\nreturn {}\n");
+        add("lazy", "counted(\"lazy\")\nreturn {}\n");
+        add("never", "counted(\"never\")\nreturn {}\n");
+        add("nothing", "counted(\"nothing\")\nreturn nil\n");
+        add("own", "leaked = true\nlocal inner = require(\"count\")\nreturn { inner = inner, sees = leaked }\n");
+        const ALPreprocessor::Result r = ALPreprocessor::run("local a = require(\"count\")\n"
+                                                             "local b = require(\"count\")\n"
+                                                             "same = a == b\n"
+                                                             "local function later() return require(\"lazy\") end\n"
+                                                             "lazyBefore = runs(\"lazy\")\n"
+                                                             "later()\n"
+                                                             "later()\n"
+                                                             "local function unused() return require(\"never\") end\n"
+                                                             "require(\"nothing\")\n"
+                                                             "require(\"nothing\")\n"
+                                                             "local own = require(\"own\")\n"
+                                                             "shared = own.inner == a\n"
+                                                             "ownSees = own.sees\n",
+                                                             options(true));
+        ensure_equals("problems", messages(r), std::string());
+
+        // Run in SLua's VM, its globals read back.
+        gRuns.clear();
+        lua_State* L = luaL_newstate();
+        luaL_openlibs(L);
+        lua_pushcfunction(L, [](lua_State* S) {
+            ++gRuns[luaL_checkstring(S, 1)];
+            return 0;
+        }, "counted");
+        lua_setglobal(L, "counted");
+        lua_pushcfunction(L, [](lua_State* S) {
+            lua_pushinteger(S, gRuns[luaL_checkstring(S, 1)]);
+            return 1;
+        }, "runs");
+        lua_setglobal(L, "runs");
+        // The script's own, as the grid's are: SLua's builtin runs only a
+        // module of the scripter's making.
+        lua_setmemcat(L, LUA_FIRST_USER_MEMCAT);
+        const std::string bytecode = Luau::compile(r.text);
+        ensure("loads: " + r.text, luau_load(L, "=bundle", bytecode.data(), bytecode.size(), 0) == 0);
+        const int status = lua_pcall(L, 0, 0, 0);
+        ensure(std::string("runs: ") + (status != 0 && lua_isstring(L, -1) ? lua_tostring(L, -1) : "") + "\n" + r.text, status == 0);
+        const auto truth = [L](const char* name) {
+            lua_getglobal(L, name);
+            const bool value = lua_toboolean(L, -1);
+            lua_pop(L, 1);
+            return value;
+        };
+        const auto number = [L](const char* name) {
+            lua_getglobal(L, name);
+            const double value = lua_tonumber(L, -1);
+            lua_pop(L, 1);
+            return value;
+        };
+        ensure_equals("required three times, run once", gRuns["count"], 1);
+        ensure("and the same value each time", truth("same") && truth("shared"));
+        ensure_equals("not run before its first require", number("lazyBefore"), 0.0);
+        ensure_equals("then once, however often required", gRuns["lazy"], 1);
+        ensure_equals("never required, never run", gRuns["never"], 0);
+        ensure_equals("nil kept by nothing: run again, as Luau runs it", gRuns["nothing"], 2);
+        ensure("a module's global its own", truth("ownSees") && !truth("leaked"));
+        lua_close(L);
+    }
+
+    template<> template<>
+    void alpreprocessor_object::test<49>()
+    {
+        set_test_name("@line comments, where asked: a reader counting lines from each finds every line of the text where the map does, and where nothing moved there are none");
+        // Read as the plugin reads them: the line after a comment is the
+        // line it says of the file it names, and each line after the next.
+        const auto readsTrue = [](const ALPreprocessor::Result& r, const std::string& script, std::string& why) {
+            std::string        name = script;
+            S32                line = 1;
+            std::istringstream in(r.text);
+            std::string        text;
+            for (S32 out = 0; std::getline(in, text); ++out)
+            {
+                const size_t first = text.find_first_not_of(" \t");
+                if (first == std::string::npos)
+                {
+                    ++line;
+                    continue;
+                }
+                const std::string said = text.substr(first);
+                if (said.rfind("-- @line ", 0) == 0 || said.rfind("// @line ", 0) == 0)
+                {
+                    const size_t quote = said.find('"');
+                    line = std::atoi(said.c_str() + 9);
+                    name = said.substr(quote + 1, said.size() - quote - 2);
+                    continue;
+                }
+                const ALSourceMap::Loc at = r.map.toSource(out, S32(first));
+                if (at.found() && (r.map.files()[at.file].name != name || at.line + 1 != line))
+                {
+                    why = "output line " + std::to_string(out) + " is " + r.map.files()[at.file].name + ":" + std::to_string(at.line + 1) +
+                          ", read as " + name + ":" + std::to_string(line) + "\n" + r.text;
+                    return false;
+                }
+                ++line;
+            }
+            return true;
+        };
+        std::string why;
+
+        // SLua: each module's first line said, and the script's after them.
+        add("util", "local M = {}\n\nfunction M.f() return 1 end\nreturn M\n");
+        add("deep", "--#define K 2\nreturn { k = K }\n");
+        ALPreprocessor::Options lua = options(true);
+        lua.lineComments            = true;
+        const std::string script    = "--!strict\nlocal util = require(\"util\")\n\nlocal deep = require(\"deep\")\nprint(util.f(), deep.k)\n";
+        ALPreprocessor::Result r    = ALPreprocessor::run(script, lua);
+        ensure_equals("problems", messages(r), std::string());
+        ensure("the reader finds every line: " + why, readsTrue(r, "main.luau", why));
+        ensure("the header still first: " + r.text, r.text.rfind("--!strict\ndo\n", 0) == 0);
+        ensure("a module's first: " + r.text, r.text.find("        [1] = function()\n-- @line 1 \"util\"\nlocal M = {}\n") != std::string::npos);
+        ensure("one past a directive: " + r.text, r.text.find("-- @line 2 \"deep\"\nreturn { k = 2 }\n") != std::string::npos);
+        ensure("the script's after the modules: " + r.text, r.text.find("end\n-- @line 2 \"main.luau\"\nlocal util = require(1)\n") != std::string::npos);
+        ensure_equals("three, no more", std::count(r.text.begin(), r.text.end(), '@'), 3);
+        ensure("none mapped anywhere", !r.map.toSource(S32(std::count(r.text.begin(), r.text.begin() + r.text.find("-- @line 2 \"main"), '\n')), 0).found());
+        const ALPreprocessor::Result plain = ALPreprocessor::run(script, options(true));
+        ensure("off: none", plain.text.find("@line") == std::string::npos);
+
+        // LSL: an include's first line, the script's after it, a stretch a
+        // condition left out, a macro over lines.
+        add("inc.lsl", "integer x;\n\ninteger y;\n");
+        ALPreprocessor::Options lsl = options();
+        lsl.lineComments            = true;
+        r = ALPreprocessor::run("integer a;\n#include \"inc.lsl\"\n#if 0\ninteger gone;\n\n#endif\n#define TWICE(v) \\\n    ((v) * 2)\ninteger b = TWICE(3);\ndefault { state_entry() { } }\n", lsl);
+        ensure_equals("problems", messages(r), std::string());
+        ensure("the reader finds every line: " + why, readsTrue(r, "main.lsl", why));
+        ensure("in LSL's comment: " + r.text, r.text.find("// @line 1 \"inc.lsl\"\ninteger x;\n") != std::string::npos);
+
+        // Nothing moved: none at all.
+        r = ALPreprocessor::run("integer a;\n\ndefault { state_entry() { } }\n", lsl);
+        ensure("nothing to say: " + r.text, r.text.find("@line") == std::string::npos);
     }
 }

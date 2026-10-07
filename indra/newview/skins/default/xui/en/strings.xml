@@ -760,6 +760,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauKeyNotFound">Key '[1]' not found in [2]</string>
 	<string name="LuauKeyNotFoundDidYouMean">Key '[1]' not found in [2]; did you mean '[3]'?</string>
 	<string name="LuauCheckTimedOut">Type checking stopped after [1] seconds; what it found before then is shown</string>
+	<string name="LuauModuleNotOneValue">This module returns [1] values; a module must return exactly one to be required</string>
 
 	<!-- What a fix offered for a problem does (alscriptfixes.cpp) -->
 	<string name="ScriptFixInsert">Insert '[1]'</string>

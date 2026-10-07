@@ -655,6 +655,7 @@ namespace ALScriptKeymap
             { "preproc_enabled", KEY_NONE, MASK_NONE },
             { "preproc_disk", KEY_NONE, MASK_NONE },
             { "preproc_folder", KEY_NONE, MASK_NONE },
+            { "preproc_line_comments", KEY_NONE, MASK_NONE },
             { "preproc_switch", KEY_NONE, MASK_NONE },
             { "preproc_lazy", KEY_NONE, MASK_NONE },
             { "preproc_compress", KEY_NONE, MASK_NONE },

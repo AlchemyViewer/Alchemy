@@ -80,7 +80,7 @@ namespace
         "ALScriptStudioPreflight",   "ALScriptPreprocEnabled",     "ALScriptPreprocSwitch",
         "ALScriptPreprocLazyLists",  "ALScriptPreprocCompress",    "ALScriptPreprocOptimizer",
         "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings",
-        "ALScriptPreprocOptimizerInlining",     "ALScriptPreprocExtensions",
+        "ALScriptPreprocOptimizerInlining",     "ALScriptPreprocExtensions", "ALScriptPreprocLineComments",
         "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder", "ALScriptPreprocWorldIncludes",
         "ALScriptSLuaAliases",
         "ALScriptStudioTabWidth",    "ALScriptStudioInsertSpaces", "ALScriptStudioDetectIndentation", "ALScriptStudioReindentOnPaste",

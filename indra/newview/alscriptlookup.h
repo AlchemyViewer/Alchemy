@@ -225,8 +225,11 @@ private:
     void candidate(const std::string& id, U32 generation, const Candidate& other, const LLUUID& asset_id, std::shared_ptr<const std::string> text);
     void expanded(const std::string& id, U32 generation, const Candidate& other, const std::shared_ptr<const std::string>& source,
                   const ALPreprocessor::Result& result);
-    void answered(const std::string& id, U32 generation, const Candidate& other, const ALSourceMap& map, const std::string& source,
-                  const std::shared_ptr<const std::string>& expanded, const ALScriptAnalysis::Result& result);
+    // An answer read back through the expansion it was asked of: the
+    // script's places through its map, and where SLua was read `apart`,
+    // each module's through its own.
+    void answered(const std::string& id, U32 generation, const Candidate& other, const ALPreprocessor::Result& expansion, bool apart,
+                  const std::string& source, const std::shared_ptr<const std::string>& expanded, const ALScriptAnalysis::Result& result);
     void settled(Doc& doc);
     // What Return does with a name typed for a rename of `old_name`, found
     // at `count` places in `scripts` scripts, said.

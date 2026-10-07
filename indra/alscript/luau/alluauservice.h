@@ -187,8 +187,10 @@ public:
     // The name at a position -- a local, a global, a field of something,
     // a type -- with where it is declared and every place it stands: in
     // the script, and for a field or a type, in the modules it requires
-    // too (ALLuauNavigation).
-    ALScriptReferences references(std::string_view source, S32 line, S32 column);
+    // too (ALLuauNavigation). Or at a position in a module the script
+    // requires, by its key: what a lookup through another script asks at
+    // a module's declaration.
+    ALScriptReferences references(std::string_view source, S32 line, S32 column, const std::string& module = std::string());
     // The script's own shape: what it binds at the top and the functions
     // in it, each function's own one deeper.
     std::vector<ALScriptOutlineEntry> outline(std::string_view source);

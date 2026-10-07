@@ -194,6 +194,14 @@ public:
         // that a module nobody changed is not checked again with each
         // edit of the script. The text stays the bundle a save sends.
         bool apart = false;
+        // The plugin's `-- @line 12 "name"` (`// @line` in LSL) before each
+        // line of the text a reader counting lines from the last would not
+        // find where it is -- a module's first, the script's own after the
+        // modules, the first of an include and the first after it, one
+        // past lines a condition left out -- saying the line it is of the
+        // file of that name. A name, never a path. LSL's optimizer and
+        // compression keep no comments, these included.
+        bool lineComments = false;
     };
 
     struct Result

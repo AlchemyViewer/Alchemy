@@ -72,6 +72,10 @@ namespace
     // so the two line up when hover documentation arrives.
     const char* const DEFINITIONS_PACKAGE = "@sl-slua";
 
+    // What Luau's require says of a module that returns other than one
+    // value, as the run stops there: said where it is required.
+    const char* const MODULE_NOT_ONE_VALUE = "This module returns [1] values; a module must return exactly one to be required";
+
     using ALLuauTypes::functionOf;
     using ALLuauTypes::positionOf;
     using ALLuauTypes::spanOf;
@@ -1314,6 +1318,15 @@ ALScriptProblems ALLuauService::check(std::string_view source)
                 args = std::move(known.args);
             }
         }
+        else if (const Luau::IllegalRequire* illegal = Luau::get_if<Luau::IllegalRequire>(&error.data);
+                 illegal && illegal->reason.find("exactly 1 value") != std::string::npos)
+        {
+            // A module of no value, in the words a module of several is
+            // said in below, and without the identity it is checked by.
+            key     = "LuauModuleNotOneValue";
+            args    = { "0" };
+            message = ALScriptProblem::fill(MODULE_NOT_ONE_VALUE, args);
+        }
         else if (const Luau::UnknownProperty* unknown = Luau::get_if<Luau::UnknownProperty>(&error.data))
         {
             // Named by what was written -- `ll`, not the table's fields --
@@ -1362,6 +1375,46 @@ ALScriptProblems ALLuauService::check(std::string_view source)
         if (elsewhere)
         {
             problems.back().file = error.moduleName.substr(7);
+        }
+    }
+    // A module that returns more than one value, which Luau's require
+    // stops at as it runs and its type checker passes over -- it says only
+    // of one that returns none -- said at each require of it, the
+    // script's and those of each module checked now: the bundle a save
+    // sends does not count as it runs, which would cost every script that
+    // requires anything bytecode of its own.
+    const auto returnsMany = [&](const std::string& requiring, const std::string& file) {
+        const auto node = front.frontend->sourceNodes.find(requiring);
+        if (node == front.frontend->sourceNodes.end() || !node->second)
+        {
+            return;
+        }
+        for (const auto& [required, where] : node->second->requireLocations)
+        {
+            const Luau::ModulePtr of = front.frontend->moduleResolver.getModule(required);
+            if (!of || !of->returnType)
+            {
+                continue;
+            }
+            const Luau::TypePackId returned = Luau::follow(of->returnType);
+            if (!Luau::finite(returned) || Luau::size(returned) < 2)
+            {
+                continue;
+            }
+            const std::vector<std::string> args{ std::to_string(Luau::size(returned)) };
+            problems.push_back(problemAt(where, ALScriptProblem::Severity::Error, ALScriptProblem::Source::Types, std::string(),
+                                         ALScriptProblem::fill(MODULE_NOT_ONE_VALUE, args)));
+            problems.back().key  = "LuauModuleNotOneValue";
+            problems.back().args = args;
+            problems.back().file = file;
+        }
+    };
+    returnsMany(front.moduleName, std::string());
+    for (const std::string& name : checked)
+    {
+        if (name != front.moduleName && name.rfind("module:", 0) == 0)
+        {
+            returnsMany(name, name.substr(7));
         }
     }
     // What selene's comments say of the lints, where the script was
@@ -2052,10 +2105,10 @@ ALScriptSignature ALLuauService::signature(std::string_view source, S32 line, S3
 
 // --- where a name lives -------------------------------------------------------------
 
-ALScriptReferences ALLuauService::references(std::string_view source, S32 line, S32 column)
+ALScriptReferences ALLuauService::references(std::string_view source, S32 line, S32 column, const std::string& module)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    return mNavigation->references(source, positionOf(line, column));
+    return mNavigation->references(source, positionOf(line, column), module);
 }
 
 // --- what the script declares ------------------------------------------------------

@@ -357,7 +357,7 @@ if(AL_BUILD_TESTS)
   al_add_test(
     alpreprocessor
     PROJECT alscript
-    LIBRARIES alscript llcommon
+    LIBRARIES alscript llcommon ll::slua
     DEFINES ${definitions_defines} "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
   )
   # The preprocessor, the formatter, the optimizer and one analysis of each

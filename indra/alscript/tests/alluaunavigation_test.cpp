@@ -213,7 +213,7 @@ namespace tut
     template<> template<>
     void alluaunavigation_object::test<4>()
     {
-        set_test_name("two scripts requiring one module: each finds its own places and the module's; and a script read whole, its modules in it, finds them from the module's declaration");
+        set_test_name("two scripts requiring one module: each finds its own places and the module's; and asked at the module's declaration, as a lookup through another script asks, the script's places through the require");
         ensure("definitions loaded: " + error, loaded);
         open("a", true);
         const ALScriptReferences a = service.references(SCRIPT_A, 5, 12);
@@ -222,18 +222,19 @@ namespace tut
         ensure_equals("the other script's: its own and the module's", placesOf(b), std::string("1:11 ") + UTIL + "@3:11");
         ensure_equals("the same declaration", b.definitionFile + "@" + where(b.definition), a.definitionFile + "@" + where(a.definition));
 
-        // What the lookup across an object's scripts asks of each: the
-        // script expanded as a save sends it, its modules ahead of it in a
-        // table, asked at the module's declaration there.
-        std::string bundle = "local __modules = {}\n__modules[\"disk:/lib/util.luau\"] = (function()\n";
-        bundle += UTIL_TEXT;
-        bundle += "end)()\nlocal util = __modules[\"disk:/lib/util.luau\"]\nprint(util.twice(4))\n";
-        service.setDocument("bundle");
-        service.setConfig(ALLuauConfig());
-        service.setModules({});
-        const ALScriptReferences whole = service.references(bundle, 5, 12); // `twice` in `function M.twice`, two lines down
-        ensure("found in the bundle", whole.found && whole.name == "twice" && whole.definitionFile.empty());
-        ensure_equals("the module's declaration and the script's use", placesOf(whole), std::string("5:11 15:11"));
+        // What the lookup across scripts asks of each: the script read
+        // apart with its modules, as the checker reads it, asked at the
+        // module's declaration in the module's own lines.
+        open("lookup", false);
+        const ALScriptReferences from_module = service.references(SCRIPT_B, 3, 12, UTIL); // `twice` in `function M.twice`
+        ensure("found from the module", from_module.found && from_module.name == "twice" && from_module.definitionFile == UTIL);
+        ensure_equals("the script's use, through the require, and the module's declaration", placesOf(from_module),
+                      std::string("1:11 ") + UTIL + "@3:11");
+        // A module's local is its own alone.
+        const ALScriptReferences local = service.references(SCRIPT_B, 1, 6, UTIL); // `M` in `local M = {}`
+        ensure("found", local.found && local.name == "M");
+        ensure_equals("the module's places alone", placesOf(local),
+                      std::string(UTIL) + "@1:6 " + UTIL + "@3:9 " + UTIL + "@6:0 " + UTIL + "@7:9 " + UTIL + "@10:7");
         service.setDocument("");
     }
 

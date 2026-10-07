@@ -938,7 +938,8 @@ void ALFloaterScriptStudio::listenToSettings()
     for (const char* setting :
          { "ALScriptPreprocEnabled", "ALScriptPreprocSwitch", "ALScriptPreprocLazyLists", "ALScriptPreprocCompress", "ALScriptPreprocOptimizer",
            "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings", "ALScriptPreprocOptimizerInlining", "ALScriptPreprocExtensions",
-           "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder", "ALScriptPreprocDefines" })
+           "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder", "ALScriptPreprocDefines",
+           "ALScriptPreprocLineComments" })
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
         {
@@ -9470,7 +9471,7 @@ void ALFloaterScriptStudio::addBuildCommands()
            std::pair{ "preproc_lazy", "ALScriptPreprocLazyLists" }, std::pair{ "preproc_compress", "ALScriptPreprocCompress" },
            std::pair{ "preproc_extensions", "ALScriptPreprocExtensions" }, std::pair{ "preproc_optimize", "ALScriptPreprocOptimizer" },
            std::pair{ "preproc_shrink", "ALScriptPreprocOptimizerShrinkNames" }, std::pair{ "preproc_addstrings", "ALScriptPreprocOptimizerAddStrings" },
-           std::pair{ "preproc_inline", "ALScriptPreprocOptimizerInlining" } })
+           std::pair{ "preproc_inline", "ALScriptPreprocOptimizerInlining" }, std::pair{ "preproc_line_comments", "ALScriptPreprocLineComments" } })
     {
         mCommands.add(
             name, [setting]() { gSavedSettings.setBOOL(setting, !gSavedSettings.getBOOL(setting)); }, nullptr,

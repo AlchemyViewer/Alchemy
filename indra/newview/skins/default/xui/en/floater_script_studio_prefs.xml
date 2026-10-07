@@ -1046,6 +1046,17 @@ end</floater.string>
              top_pad="4"
              width="370" />
             <check_box
+             control_name="ALScriptPreprocLineComments"
+             follows="left|top"
+             height="20"
+             label="Mark where each line came from"
+             layout="topleft"
+             left="412"
+             name="preproc_line_comments"
+             tool_tip="Writes an @line comment wherever the preprocessed code moves to another file or skips lines, with the line and the file's name, as the VS Code plugin does. Never a folder path. Compressed or optimized LSL drops them"
+             top_pad="4"
+             width="370" />
+            <check_box
              control_name="ALScriptPreprocOptimizer"
              follows="left|top"
              height="20"

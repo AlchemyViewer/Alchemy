@@ -507,7 +507,7 @@ const Luau::FrontendModuleResolver& ALLuauNavigation::resolverOf(const Luau::Mod
     return complete.getModule(mFront.moduleName).get() == &module ? complete : mFront.frontend->moduleResolver;
 }
 
-ALScriptReferences ALLuauNavigation::references(std::string_view source, Luau::Position at)
+ALScriptReferences ALLuauNavigation::references(std::string_view source, Luau::Position at, const std::string& in_module)
 {
     ALLuauFrontend&           front         = mFront;
     const Luau::ModulePtr     module        = front.queried(source);
@@ -519,16 +519,34 @@ ALScriptReferences ALLuauNavigation::references(std::string_view source, Luau::P
     }
     const Luau::FrontendModuleResolver& resolver = resolverOf(*module);
     const Held                          home{ front.moduleName, module_source, module.get() };
-    const Target                        target = targetAt(resolver, home, at);
+    // Where it was asked: the script, or a module it requires.
+    Held asked = home;
+    if (!in_module.empty())
+    {
+        asked.name                       = "module:" + in_module;
+        asked.source                     = front.frontend->getSourceModule(asked.name);
+        const Luau::ModulePtr in_checked = resolver.getModule(asked.name);
+        asked.module                     = in_checked.get();
+        if (!asked.source || !asked.source->root || !asked.module)
+        {
+            return answer;
+        }
+    }
+    const Target target = targetAt(resolver, asked, at);
     if (target.kind == Target::Kind::None)
     {
         return answer;
     }
-    // Where it may stand: a local or a global in the script alone; a
-    // field of a table made somewhere, or a type, in every module the
-    // script requires too, as checked for the script.
+    // Where it may stand: a local or a global where it was asked alone; a
+    // field of a table made somewhere, or a type, in the script and every
+    // module it requires, as checked for the script. The script first,
+    // whatever was searched, its places the answer's own.
     std::vector<Held> searched{ home };
-    if (target.identity)
+    if (!target.identity && asked.name != home.name)
+    {
+        searched.push_back(asked);
+    }
+    else if (target.identity)
     {
         if (const auto required = front.requiredBy.find(front.moduleName); required != front.requiredBy.end())
         {
@@ -547,8 +565,12 @@ ALScriptReferences ALLuauNavigation::references(std::string_view source, Luau::P
     found.reserve(searched.size());
     for (const Held& in : searched)
     {
-        found.emplace_back(target, in, resolver, &in == &searched.front());
-        in.source->root->visit(&found.back());
+        found.emplace_back(target, in, resolver, in.name == asked.name);
+        // A local or a global of a module is not the script's.
+        if (target.identity || in.name == asked.name)
+        {
+            in.source->root->visit(&found.back());
+        }
         found.back().sort();
     }
 

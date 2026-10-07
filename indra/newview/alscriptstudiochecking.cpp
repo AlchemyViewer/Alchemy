@@ -254,20 +254,11 @@ void ALScriptStudioChecking::expandedAnswer(const std::string& id, U32 version, 
         doc.expanded.text   = std::make_shared<const std::string>(result.apart.script.text);
         doc.expanded.map    = result.apart.script.map;
         doc.expanded.bundle = std::make_shared<const std::string>(result.text);
-        auto modules        = std::make_shared<ALLuauService::Modules>();
         for (const ALPreprocessor::Result::Piece& piece : result.apart.modules)
         {
-            modules->modules.push_back({ piece.key, piece.text });
             doc.expanded.moduleMaps.emplace_back(piece.key, piece.map);
         }
-        for (const ALPreprocessor::Result::Resolved& resolved : result.resolved)
-        {
-            if (resolved.require)
-            {
-                modules->reaches.push_back({ resolved.from, resolved.name, resolved.path });
-            }
-        }
-        doc.expanded.modules = std::move(modules);
+        doc.expanded.modules = modulesOf(result);
     }
     else
     {

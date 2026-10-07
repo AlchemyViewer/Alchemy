@@ -248,6 +248,26 @@ public:
     // not use dropped. Fixes are kept only for the script's own.
     static void mapBack(std::vector<ALScriptProblem>& problems, const ALSourceMap& map,
                         const std::vector<std::pair<std::string, ALSourceMap>>& module_maps);
+    // The modules an expansion of SLua read apart reaches, each by its key
+    // and text, and which require reaches which: what the analyzers check
+    // the script with (ALLuauService::setModules). Here, so that what asks
+    // the analyzers of an expansion without checking needs nothing more.
+    static std::shared_ptr<const ALLuauService::Modules> modulesOf(const ALPreprocessor::Result& result)
+    {
+        auto modules = std::make_shared<ALLuauService::Modules>();
+        for (const ALPreprocessor::Result::Piece& piece : result.apart.modules)
+        {
+            modules->modules.push_back({ piece.key, piece.text });
+        }
+        for (const ALPreprocessor::Result::Resolved& resolved : result.resolved)
+        {
+            if (resolved.require)
+            {
+                modules->reaches.push_back({ resolved.from, resolved.name, resolved.path });
+            }
+        }
+        return modules;
+    }
 
 private:
     // What the analyzers said of a word, on the tip under the mouse.

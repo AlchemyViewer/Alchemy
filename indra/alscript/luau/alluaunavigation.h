@@ -61,8 +61,12 @@ public:
     explicit ALLuauNavigation(ALLuauFrontend& front);
 
     // The name at `at` of the script, where it is declared and every place
-    // it stands: the script's, and each module's by its key.
-    ALScriptReferences references(std::string_view source, Luau::Position at);
+    // it stands: the script's, and each module's by its key. Or at `at` of
+    // a module the script requires, by its key (ALLuauService::setModules):
+    // a field or a type found in the script and each module, as from the
+    // script; a local or a global in that module alone, a module's globals
+    // being its own.
+    ALScriptReferences references(std::string_view source, Luau::Position at, const std::string& module = std::string());
 
     // Where the field or the type at `at` of the script is declared, in a
     // module checked already for a question about it: in the script itself,

@@ -1653,4 +1653,50 @@ namespace tut
         ensure("no table, nothing kept", !ALLuauExports::checkedOf("disk:/lib/loose.luau", loose));
         service.setDocument("");
     }
+
+    template<> template<>
+    void alluauservice_object::test<48>()
+    {
+        set_test_name("a module that returns other than one value is said at the require that asks for it, as Luau's require would stop there: what the bundle need not check as it runs");
+        ensure("definitions loaded: " + error, loaded);
+        for (const char* mode : { "", "nonstrict", "strict" })
+        {
+            ALLuauConfig config;
+            config.mode = mode;
+            service.setDocument("uses");
+            service.setConfig(config);
+            ALLuauService::Modules modules;
+            modules.modules.push_back({ "disk:/lib/two.luau", "return 1, 2\n" });
+            modules.modules.push_back({ "disk:/lib/none.luau", "local x = 1\n" });
+            modules.modules.push_back({ "disk:/lib/one.luau", "return { x = 1 }\n" });
+            modules.modules.push_back({ "disk:/lib/mid.luau", "local t = require(\"two\")\nreturn { t = t }\n" });
+            modules.reaches.push_back({ "", "two", "disk:/lib/two.luau" });
+            modules.reaches.push_back({ "", "none", "disk:/lib/none.luau" });
+            modules.reaches.push_back({ "", "one", "disk:/lib/one.luau" });
+            modules.reaches.push_back({ "", "mid", "disk:/lib/mid.luau" });
+            modules.reaches.push_back({ "disk:/lib/mid.luau", "two", "disk:/lib/two.luau" });
+            service.setModules(modules);
+            const ALScriptProblems problems =
+                service.check("local two = require(\"two\")\nlocal none = require(\"none\")\nlocal one = require(\"one\")\nlocal mid = require(\"mid\")\nprint(two, none, one, mid)\n");
+            bool two = false, none = false, one = false, in_mid = false;
+            for (const ALScriptProblem& problem : problems)
+            {
+                // In the studio's words, with how many, and no module's path.
+                const bool said = problem.file.empty() && problem.severity == ALScriptProblem::Severity::Error &&
+                                  problem.key == "LuauModuleNotOneValue" && problem.message.find("disk:") == std::string::npos;
+                two |= said && problem.line == 0 && problem.args == std::vector<std::string>{ "2" };
+                none |= said && problem.line == 1 && problem.args == std::vector<std::string>{ "0" };
+                one |= problem.line == 2 && problem.severity == ALScriptProblem::Severity::Error;
+                in_mid |= problem.file == "disk:/lib/mid.luau" && problem.line == 0 && problem.key == "LuauModuleNotOneValue";
+            }
+            const std::string where = std::string(mode) + ": " + said(problems);
+            ensure("two values: said at its require, " + where, two);
+            ensure("no value: said at its require, " + where, none);
+            ensure("one: nothing, " + where, !one);
+            // Told as the module is checked, as all of a module's are: the
+            // first time, its text unchanged after.
+            ensure("a module's require of it: said in that module, " + where, in_mid || *mode);
+        }
+        service.setDocument("");
+    }
 }

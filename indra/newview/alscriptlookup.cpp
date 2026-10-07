@@ -31,6 +31,7 @@
 #include "alscriptlexicon.h"
 #include "alscriptnavigation.h"
 #include "alscriptstudioanalysis.h"
+#include "alscriptstudiochecking.h"
 #include "alscriptfixes.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
@@ -393,6 +394,8 @@ void ALScriptLookup::candidate(const std::string& id, U32 generation, const Cand
     // being looked for, and the optimizer may rename it or take it away
     // -- with shrinknames on it renames every one.
     request.optimize      = false;
+    // SLua read apart too, as the checker reads it (expanded).
+    request.apart         = doc.language.lua;
     const std::weak_ptr<bool> alive = mAlive;
     mWindow.expand(request, [this, alive, id, generation, other, text](const ALPreprocessor::Result& result) {
         if (alive.lock())
@@ -423,7 +426,29 @@ void ALScriptLookup::expanded(const std::string& id, U32 generation, const Candi
         passed(doc);
         return;
     }
-    const ALSourceMap::Loc at = result.map.toExpanded(file, doc.lookup->definition.line, doc.lookup->definition.column);
+    // SLua read apart, as the checker reads it: the script with its
+    // requires as calls, and each module its own, so that what a module
+    // returns reaches the script through the require -- in the bundle a
+    // save sends, a require hands it on by a number, which no type follows.
+    // Asked in the piece the declaration is in: the script's, or a
+    // module's, by its key.
+    const auto expansion = std::make_shared<const ALPreprocessor::Result>(result);
+    const bool apart     = doc.language.lua && result.apart.valid;
+    std::string        in_module;
+    ALSourceMap::Loc   at;
+    if (apart)
+    {
+        at = result.apart.script.map.toExpanded(file, doc.lookup->definition.line, doc.lookup->definition.column);
+        for (size_t i = 0; !at.found() && i < result.apart.modules.size(); ++i)
+        {
+            at = result.apart.modules[i].map.toExpanded(file, doc.lookup->definition.line, doc.lookup->definition.column);
+            in_module = at.found() ? result.apart.modules[i].key : std::string();
+        }
+    }
+    else
+    {
+        at = result.map.toExpanded(file, doc.lookup->definition.line, doc.lookup->definition.column);
+    }
     if (!at.found())
     {
         --doc.lookup->pending;
@@ -439,23 +464,28 @@ void ALScriptLookup::expanded(const std::string& id, U32 generation, const Candi
     request.version = generation;
     request.lua     = doc.language.lua;
     request.mono    = doc.language.compileTarget != "lsl2";
-    request.text    = std::make_shared<const std::string>(result.text);
+    request.text    = std::make_shared<const std::string>(apart ? result.apart.script.text : result.text);
     request.line    = at.line;
     request.column  = at.column;
+    if (apart)
+    {
+        request.modules = ALScriptStudioChecking::modulesOf(result);
+        request.module  = in_module;
+    }
     // The texts kept for the answer are the ones the questions hold.
-    const std::weak_ptr<bool>                alive    = mAlive;
+    const std::weak_ptr<bool>                alive         = mAlive;
     const std::shared_ptr<const std::string> expanded_text = request.text;
-    mAnalysis.askAnalysis(std::move(request), [this, alive, id, generation, other, source, map = result.map,
+    mAnalysis.askAnalysis(std::move(request), [this, alive, id, generation, other, source, expansion, apart,
                                              expanded_text](const ALScriptAnalysis::Result& answer) {
         if (alive.lock())
         {
-            answered(id, generation, other, map, *source, expanded_text, answer);
+            answered(id, generation, other, *expansion, apart, *source, expanded_text, answer);
         }
     });
 }
 
-void ALScriptLookup::answered(const std::string& id, U32 generation, const Candidate& other, const ALSourceMap& map,
-                              const std::string& source, const std::shared_ptr<const std::string>& expanded,
+void ALScriptLookup::answered(const std::string& id, U32 generation, const Candidate& other, const ALPreprocessor::Result& expansion,
+                              bool apart, const std::string& source, const std::shared_ptr<const std::string>& expanded,
                               const ALScriptAnalysis::Result& result)
 {
     Doc* found = lookingIn(id, generation);
@@ -473,21 +503,21 @@ void ALScriptLookup::answered(const std::string& id, U32 generation, const Candi
         // Each file's lines found once, however many places are in it.
         boost::unordered_flat_map<std::string, ALScriptPlaces::Lines, ll::string_hash, std::equal_to<>> files;
         const ALScriptPlaces::Lines                                                     own_lines(source);
-        const ALScriptPlaces::Lines                                                     expansion(expanded);
-        for (ALScriptSpan span : result.references.references)
-        {
+        // A place in the text asked about, or in a module read apart, back
+        // to where it was written; the maps all list the same files.
+        const auto add = [&](ALScriptSpan span, const ALSourceMap& map, const ALScriptPlaces::Lines& expansion_lines) {
             const ALScriptSpan raw  = span;
             const S32          file = mapSpan(map, span);
             if (file < 0)
             {
-                continue;
+                return;
             }
             // This script's own, read through the other's expansion of it
             // -- the region's copy, which is not what is typed here: its
             // own answer has them, in the text as it stands.
             if (file > 0 && map.files()[file].path == own)
             {
-                continue;
+                return;
             }
             Doc::Place place;
             place.span     = span;
@@ -509,10 +539,25 @@ void ALScriptLookup::answered(const std::string& id, U32 generation, const Candi
             }
             else
             {
-                placeText(place, expansion.line(raw.line));
+                placeText(place, expansion_lines.line(raw.line));
                 place.at = -1;
             }
             addPlace(*doc.lookup, std::move(place));
+        };
+        const ALScriptPlaces::Lines asked(expanded);
+        for (const ALScriptSpan& span : result.references.references)
+        {
+            add(span, apart ? expansion.apart.script.map : expansion.map, asked);
+        }
+        // Each module's places, read apart, by its own map.
+        for (const ALScriptReferences::Elsewhere& place : result.references.elsewhere)
+        {
+            const auto piece = std::find_if(expansion.apart.modules.begin(), expansion.apart.modules.end(),
+                                            [&place](const ALPreprocessor::Result::Piece& each) { return each.key == place.file; });
+            if (apart && piece != expansion.apart.modules.end())
+            {
+                add(place.span, piece->map, ALScriptPlaces::Lines(piece->text));
+            }
         }
         // Reached, and what it reads as kept for a rename's clash check.
         if (doc.lookup->scripts.insert(self).second)

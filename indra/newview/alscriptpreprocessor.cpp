@@ -208,13 +208,15 @@ ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request,
     static LLCachedControl<bool> addstrings(gSavedSettings, "ALScriptPreprocOptimizerAddStrings", false);
     static LLCachedControl<bool> inlining(gSavedSettings, "ALScriptPreprocOptimizerInlining", false);
     static LLCachedControl<bool> extensions(gSavedSettings, "ALScriptPreprocExtensions", false);
+    static LLCachedControl<bool> lineComments(gSavedSettings, "ALScriptPreprocLineComments", false);
     ALPreprocessor::Options      options;
-    options.lua        = request.lua;
-    options.apart      = request.lua && request.apart;
-    options.switches   = switches;
-    options.lazyLists  = lazy;
-    options.compress   = compress;
-    options.extensions = extensions;
+    options.lua          = request.lua;
+    options.apart        = request.lua && request.apart;
+    options.switches     = switches;
+    options.lazyLists    = lazy;
+    options.compress     = compress;
+    options.extensions   = extensions;
+    options.lineComments = lineComments;
     // The analyzers see the expanded text before the optimizer has been
     // at it, so that their positions stay the author's.
     options.optimize              = optimize && request.optimize && optimizer && !request.lua && ALLSLService::builtinsLoaded();

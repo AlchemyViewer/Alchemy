@@ -259,6 +259,42 @@ namespace
         result.map.finish();
         return result;
     }
+    // SLua read apart: the script with its require a call, and the module
+    // it reaches its own piece, each mapped line for line to its file.
+    ALPreprocessor::Result apartExpansion(const std::string& name, const std::string& path, const std::string& text, const std::string& required,
+                                          const std::string& mod_name, const std::string& mod_path, const std::string& mod_text)
+    {
+        ALPreprocessor::Result result;
+        result.map.addFile(name, path);
+        result.map.addFile(mod_name, mod_path);
+        const auto piece = [&](const std::string& key, S32 file, const std::string& source) {
+            ALPreprocessor::Result::Piece made;
+            made.key  = key;
+            made.text = source;
+            made.map.addFile(name, path);
+            made.map.addFile(mod_name, mod_path);
+            std::istringstream in(source);
+            std::string        line;
+            for (S32 l = 0; std::getline(in, line); ++l)
+            {
+                ALSourceMap::Segment segment;
+                segment.outLine = l;
+                segment.length  = static_cast<S32>(line.size());
+                segment.file    = file;
+                segment.line    = l;
+                made.map.add(segment);
+            }
+            made.map.finish();
+            return made;
+        };
+        result.apart.valid  = true;
+        result.apart.script = piece(std::string(), 0, text);
+        result.apart.modules.push_back(piece(mod_path, 1, mod_text));
+        result.resolved.push_back({ std::string(), required, true, mod_path });
+        result.text = "-- the bundle\n";
+        result.map.finish();
+        return result;
+    }
     ALScriptAnalysis::Result answer(std::vector<ALScriptSpan> spans)
     {
         ALScriptAnalysis::Result result;
@@ -944,5 +980,40 @@ namespace tut
         ensure("renamed there", other && other->editor->text() == "local lib = require(\"./lib\")\nprint(lib.double(4))\n");
         std::error_code ec;
         fs::remove_all(root, ec);
+    }
+
+    template<> template<>
+    void alscriptlookup_object::test<18>()
+    {
+        set_test_name("SLua read apart, as the checker reads it: another script asked at the module's declaration in the module, with its modules, and each place read back through its own piece");
+        make();
+        const std::string LIB      = "disk:/s/lib.luau";
+        const std::string OTHER    = "disk:/s/b.luau";
+        const std::string LIB_TEXT = "local M = {}\nfunction M.twice(n) return n * 2 end\nreturn M\n";
+        const std::string B_LUA    = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
+        Doc& other         = tab(OTHER, ALScriptRef(), B_LUA, "b.luau");
+        other.file         = "/s/b.luau";
+        other.language.lua = true;
+        Doc& doc           = tab("a", a, "local lib = require(\"./lib\")\nprint(lib.twice(2))\n", "A");
+        doc.language.lua   = true;
+        unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5),
+                    { place("", 1, 10), place(LIB, 1, 11, 5, "lib.luau") }, doc.editor->document().version());
+        ensure_equals("the other expanded", studio.expands.size(), size_t(1));
+        ensure("apart asked for", studio.expands[0].request.apart);
+        studio.expands[0].expanded(apartExpansion("b.luau", OTHER, B_LUA, "./lib", "lib.luau", LIB, LIB_TEXT));
+        ensure_equals("asked", studio.asks.size(), size_t(1));
+        const ALScriptAnalysis::Request& asked = studio.asks[0].request;
+        ensure("the script alone, its require a call", asked.text && *asked.text == B_LUA);
+        ensure("in the module, at its declaration in its own lines", asked.module == LIB && asked.line == 1 && asked.column == 11);
+        ensure("with its modules", asked.modules && asked.modules->modules.size() == 1 && asked.modules->modules[0].key == LIB &&
+                                       asked.modules->reaches.size() == 1 && asked.modules->reaches[0].name == "./lib");
+
+        ALScriptAnalysis::Result result = answer({ span(1, 10, 5) });
+        result.references.elsewhere.push_back({ LIB, span(1, 11, 5) });
+        studio.asks[0].answered(result);
+        ensure("the other's place, through its piece", std::any_of(doc.lookup->places.begin(), doc.lookup->places.end(), [&](const Doc::Place& place) {
+                   return place.file == OTHER && place.fileName == "b.luau" && place.span.line == 1 && place.span.column == 10;
+               }));
+        ensure_equals("each once: the script's, the module's, the other's", doc.lookup->places.size(), size_t(3));
     }
 }

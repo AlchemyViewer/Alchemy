@@ -161,6 +161,9 @@ public:
         // Where, for anything but a check.
         S32         line   = 0;
         S32         column = 0;
+        // References only, SLua: where (line, column) is in a module the
+        // script requires rather than in the script, by its key.
+        std::string module;
         // Actions only: where a stretch chosen from (line, column) ends,
         // or the same place for the caret alone.
         S32         endLine   = 0;
