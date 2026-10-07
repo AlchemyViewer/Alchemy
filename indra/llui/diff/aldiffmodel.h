@@ -314,11 +314,13 @@ public:
 
     // Blocks of lines taken out in one place and put in at another, the
     // same (ALDiffMoves): each line of one signed '>', not paired with
-    // another, and its move's.
+    // another, and its move's. None with a line in a change that is none,
+    // as lines are told the same, which is shown as lines the same.
     S32                    moveCount() const { return static_cast<S32>(mMoves.size()); }
     // The line at the other end of the move a line of a column is in --
     // side by side in the other column, inline in its own -- and that
-    // column; -1 for the line where it is in none.
+    // column; -1 for the line where it is in none, or that end is not
+    // shown.
     std::pair<Column, S32> moveOtherEnd(Column column, S32 line) const;
 
     // --- ranges ------------------------------------------------------------------

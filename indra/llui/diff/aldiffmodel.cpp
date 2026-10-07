@@ -596,22 +596,6 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const Relayout* aga
         with.same = mSwapped ? same.at(shown_right, shown_left) : same.at(shown_left, shown_right);
         return with;
     };
-    // The blocks moved, and which each line of either side is in.
-    if (!mKeepsLayout)
-    {
-        mMoveFinder.forget();
-    }
-    const ALDiffMoves::moves_t moves = mMoveFinder.find(mLeftLines, mRightLines, runs, options, mSwapped);
-    std::vector<S32>           left_move(left.size(), -1);
-    std::vector<S32>           right_move(right.size(), -1);
-    for (size_t n = 0; n < moves.size(); ++n)
-    {
-        for (S32 k = 0; k < moves[n].count; ++k)
-        {
-            left_move[static_cast<size_t>(moves[n].left + k)]   = static_cast<S32>(n);
-            right_move[static_cast<size_t>(moves[n].right + k)] = static_cast<S32>(n);
-        }
-    }
     // Which changes are none, as lines are told the same: each of their
     // lines blank, or a comment, where those are let go of. By each of
     // their runs.
@@ -656,6 +640,47 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const Relayout* aga
             {
                 ignored[i] = none;
             }
+        }
+    }
+    // The blocks moved, and which each line of either side is in: none
+    // with a line in a change that is none, whose lines are shown as the
+    // same, so that each block is signed and found at both its ends.
+    if (!mKeepsLayout)
+    {
+        mMoveFinder.forget();
+    }
+    ALDiffMoves::moves_t moves = mMoveFinder.find(mLeftLines, mRightLines, runs, options, mSwapped);
+    if (!moves.empty() && std::find(ignored.begin(), ignored.end(), true) != ignored.end())
+    {
+        std::vector<bool> left_none(left.size(), false);
+        std::vector<bool> right_none(right.size(), false);
+        for (size_t i = 0; i < runs.size(); ++i)
+        {
+            if (ignored[i])
+            {
+                const bool         out  = runs[i].kind == Kind::Removed;
+                std::vector<bool>& none = out ? left_none : right_none;
+                const S32          from = out ? runs[i].left : runs[i].right;
+                std::fill(none.begin() + from, none.begin() + from + runs[i].count, true);
+            }
+        }
+        const auto anyNone = [](const std::vector<bool>& none, S32 from, S32 count) {
+            return std::find(none.begin() + from, none.begin() + from + count, true) != none.begin() + from + count;
+        };
+        moves.erase(std::remove_if(moves.begin(), moves.end(),
+                                   [&](const ALDiffMoves::Move& move) {
+                                       return anyNone(left_none, move.left, move.count) || anyNone(right_none, move.right, move.count);
+                                   }),
+                    moves.end());
+    }
+    std::vector<S32> left_move(left.size(), -1);
+    std::vector<S32> right_move(right.size(), -1);
+    for (size_t n = 0; n < moves.size(); ++n)
+    {
+        for (S32 k = 0; k < moves[n].count; ++k)
+        {
+            left_move[static_cast<size_t>(moves[n].left + k)]   = static_cast<S32>(n);
+            right_move[static_cast<size_t>(moves[n].right + k)] = static_cast<S32>(n);
         }
     }
     // The last run that is a change: the runs the same after it are at
@@ -1580,12 +1605,14 @@ std::pair<ALDiffModel::Column, S32> ALDiffModel::moveOtherEnd(Column column, S32
     {
         return { column, -1 };
     }
-    // A line taken out stands for the line put in as far into the block.
+    // A line taken out stands for the line put in as far into the block;
+    // inline, where both ends are shown.
     const Move& move = mMoves[static_cast<size_t>(one.move)];
     if (column == Column::Inline)
     {
-        return one.kind == Kind::Removed ? std::make_pair(column, move.inlineRight + line - move.inlineLeft)
-                                         : std::make_pair(column, move.inlineLeft + line - move.inlineRight);
+        const S32 own   = one.kind == Kind::Removed ? move.inlineLeft : move.inlineRight;
+        const S32 other = one.kind == Kind::Removed ? move.inlineRight : move.inlineLeft;
+        return { column, own >= 0 && other >= 0 ? other + line - own : -1 };
     }
     return column == Column::Left ? std::make_pair(Column::Right, move.lines.right + line - move.lines.left)
                                   : std::make_pair(Column::Left, move.lines.left + line - move.lines.right);

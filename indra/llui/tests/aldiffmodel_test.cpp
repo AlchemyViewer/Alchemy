@@ -1841,4 +1841,48 @@ namespace tut
         ensure("unpaired: laid out again", m.setPairs({}));
         ensure("two runs again: the twenty open still, the thirty folded", m.foldCount() == 2 && m.foldOpen(0) && !m.foldOpen(1));
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<43>()
+    {
+        set_test_name("comments let go of: a block whose one end is a change of comments alone, shown as the same, is no block moved; its other end signed as its own, with no step to an end not shown");
+        // A line a comment where it starts //, the rest code.
+        auto said = std::make_shared<std::deque<std::vector<ALTextDiff::regions_t>>>();
+        m.setLexer([said](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            if (said->size() > 4)
+            {
+                said->pop_front();
+            }
+            std::vector<ALTextDiff::regions_t>& out = said->emplace_back();
+            for (const std::string& line : lines)
+            {
+                const ALTextDiff::Region region = line.rfind("//", 0) == 0 ? ALTextDiff::Region::Comment : ALTextDiff::Region::Code;
+                out.push_back({ ALTextDiff::Piece{ 0, static_cast<S32>(line.size()), region } });
+            }
+            return out;
+        });
+        ALTextDiff::Likeness like;
+        like.ignoreComments = true;
+        m.setLikeness(like);
+        // Two lines of comment taken from the top and put in at the end,
+        // after a line of code put in there.
+        const std::string comment  = "// a block of comment lines\n// moved down as one";
+        const std::string code     = lines(10);
+        const std::string at_top   = comment + "\n" + code + "\ntail";
+        const std::string at_end   = code + "\nput in\n" + comment + "\ntail";
+        const std::string ten_same(10, '\0');
+        m.setTexts(at_top, at_end);
+        ensure_equals("the comments taken out no change: the line put in alone", m.changeCount(), 1);
+        ensure_equals("no block moved", m.moveCount(), 0);
+        ensure("the comments put in signed as put in", signsOf(Column::Right) == ten_same + "+++" + std::string(1, '\0'));
+        ensure("no other end, side by side or inline", m.moveOtherEnd(Column::Right, 11).second == -1 && m.moveOtherEnd(Column::Inline, 12).second == -1);
+
+        // The other way: put in at the top, a change of comments alone, and
+        // taken out from beside code.
+        m.setTexts(at_end, at_top);
+        ensure_equals("the comments put in no change: the line taken out alone", m.changeCount(), 1);
+        ensure_equals("no block moved either", m.moveCount(), 0);
+        ensure("the comments taken out signed as taken out", signsOf(Column::Left) == ten_same + "---" + std::string(1, '\0'));
+        ensure("no other end, side by side or inline", m.moveOtherEnd(Column::Left, 12).second == -1 && m.moveOtherEnd(Column::Inline, 14).second == -1);
+    }
 }
