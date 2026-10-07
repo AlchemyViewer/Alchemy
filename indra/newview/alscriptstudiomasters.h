@@ -49,16 +49,21 @@ struct ALScriptStudioDoc::Mastered
     // Each look on disk for the file the script names, counted: what is
     // found is taken only from the last one asked for.
     U32         hintLook = 0;
+    // An item's tab kept as its script was linked, since what was typed in
+    // it is in neither the world nor the file: the file it was told of, so
+    // that it is told once.
+    std::string toldLinked;
 };
 
 // A Script Studio window's side of the scripts whose master is a file on
 // disk (ALScriptDiskMasters): linking a script's tab to a file, picked or
 // as the script names it -- the tab giving way to the file's, which is then
-// where it is changed -- and letting go of it; a linked script opened as
-// its file; the file's save sending what it masters; and what came of each
-// send said in Output, with what can be done about it on the file's tab,
-// and what the compiler said of it among that tab's problems. A link is
-// made only by a person's click: the hint is offered.
+// where it is changed -- and letting go of it; a linked script opened, and
+// edited outside, as its file, and its tab here giving way as it is linked
+// from elsewhere; the file's save sending what it masters; and what came of
+// each send said in Output, with what can be done about it on the file's
+// tab, and what the compiler said of it among that tab's problems. A link
+// is made only by a person's click: the hint is offered.
 class ALScriptStudioMasters
 {
 public:
@@ -86,6 +91,9 @@ public:
         // A tab with unsaved changes about to be linked to a file, asked what
         // becomes of them, the file named.
         virtual void askLinkUnsaved(const Doc& doc, const std::string& path, std::function<void(Unsaved answer)> answered) = 0;
+        // A file's tab opened, or brought forward, and given to the editor
+        // outside the viewer where it is on disk, as Edit Externally on it is.
+        virtual void editMasterFile(const std::string& path, bool lua) = 0;
         // Two texts compared in a tab's place, each with what it is.
         virtual void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
                              const std::string& right_title)                             = 0;
@@ -115,8 +123,14 @@ public:
     // A script asked for that is linked: its file opened in its place, said
     // so; false where it is not, or its file is gone.
     bool openMaster(const ALScriptRef& ref, const std::string& name);
+    // Edit Externally on an item's tab whose script is linked: its file
+    // given to the editor where it is on disk, in place of a copy of the
+    // script, and its tab opened; false where it is not linked, or its file
+    // is gone.
+    bool editMaster(const Doc& doc);
     // An item's tab loaded: the file its script names, where one is found
-    // under the blessed folders, offered once the disk's thread has looked.
+    // under the blessed folders, offered once the disk's thread has looked;
+    // or, its script linked while it loaded, looked at as below.
     void loaded(Doc& doc);
     // A file's tab saved to disk: what it masters sent.
     void fileSaved(Doc& doc);
@@ -138,6 +152,15 @@ private:
     // that named it, and may still be linked.
     void hintFound(const std::string& id, U32 look, const std::string& hint, bool lua, const std::optional<std::string>& found);
     void heard(const ALScriptDiskMasters::Outcome& outcome);
+    // Whether a link's file may be opened in its script's place: not held,
+    // and there.
+    static bool openable(const ALMasterLink& link);
+    // The links changed, or an item's tab loaded: once whoever changed them
+    // is done, each item's tab here of a script now linked looked at -- one
+    // with nothing typed in it giving way to the file's, one with something
+    // kept and told so.
+    void lookAgain();
+    void giveWay();
     // The tab of a master file, where one is open.
     Doc* masterTab(const std::string& master) const;
     // The world's text of a script beside its master's, in the master's tab.
@@ -147,6 +170,10 @@ private:
     ALScriptStudioAnalysis&            mAnalysis;
     Window&                            mWindow;
     boost::signals2::scoped_connection mOutcomeConnection;
-    // Held while this is, for what the disk's thread found to know it still is.
+    boost::signals2::scoped_connection mChangedConnection;
+    // A look at the tabs asked for, and not yet made.
+    bool                               mLookingAgain = false;
+    // Held while this is, for what the disk's thread found, and a look
+    // asked for, to know it still is.
     std::shared_ptr<bool>              mAlive = std::make_shared<bool>(true);
 };

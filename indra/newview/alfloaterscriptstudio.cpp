@@ -1493,6 +1493,20 @@ void ALFloaterScriptStudio::askLinkUnsaved(const Doc& doc, const std::string& pa
     });
 }
 
+void ALFloaterScriptStudio::editMasterFile(const std::string& path, bool lua)
+{
+    // Its tab, here or in the window that has it, given to the editor from
+    // there, as Edit Externally on it is.
+    openFile(path, lua, -1, -1, 0);
+    if (ALFloaterScriptStudio* holder = holderOf(ALScriptRef(), path))
+    {
+        if (const size_t index = holder->indexOf("disk:" + path); index != NONE)
+        {
+            holder->mExternal.edit(*holder->mDocs[index]);
+        }
+    }
+}
+
 bool ALFloaterScriptStudio::heldByBridge(const ALScriptRef& ref)
 {
     LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer();
@@ -8677,7 +8691,8 @@ void ALFloaterScriptStudio::addFileCommands()
     mCommands.add(
         "external_editor",
         [this]() {
-            if (Doc* doc = active())
+            // A linked script's file, where it is, in place of a copy.
+            if (Doc* doc = active(); doc && !mMasters.editMaster(*doc))
             {
                 mExternal.edit(*doc);
             }

@@ -787,6 +787,7 @@ private:
     void openMasterFile(const std::string& path, bool lua) override;
     void closeTab(Doc& doc) override;
     void askLinkUnsaved(const Doc& doc, const std::string& path, std::function<void(ALScriptStudioMasters::Unsaved answer)> answered) override;
+    void editMasterFile(const std::string& path, bool lua) override;
     bool heldByBridge(const ALScriptRef& ref) override;
     bool        weightNotes() const override { return mWeightNotes; }
     bool        weightHeat() const override { return mWeightHeat; }

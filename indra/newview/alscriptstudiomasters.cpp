@@ -93,6 +93,7 @@ ALScriptStudioMasters::ALScriptStudioMasters(ALScriptStudioServices& services, A
 : mServices(services), mAnalysis(analysis), mWindow(window)
 {
     mOutcomeConnection = ALScriptDiskMasters::instance().onOutcome([this](const ALScriptDiskMasters::Outcome& outcome) { heard(outcome); });
+    mChangedConnection = ALScriptDiskMasters::instance().onChanged([this]() { lookAgain(); });
 }
 
 // static
@@ -278,10 +279,16 @@ void ALScriptStudioMasters::sendFromFile(Doc& doc)
     }
 }
 
+// static
+bool ALScriptStudioMasters::openable(const ALMasterLink& link)
+{
+    return link.state != ALMasterLink::State::Suspended && ALFileStamp::of(link.master).exists;
+}
+
 bool ALScriptStudioMasters::openMaster(const ALScriptRef& ref, const std::string& name)
 {
     const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref);
-    if (!link || link->state == ALMasterLink::State::Suspended || !ALFileStamp::of(link->master).exists)
+    if (!link || !openable(*link))
     {
         return false;
     }
@@ -293,8 +300,33 @@ bool ALScriptStudioMasters::openMaster(const ALScriptRef& ref, const std::string
     return true;
 }
 
+bool ALScriptStudioMasters::editMaster(const Doc& doc)
+{
+    const std::optional<ALMasterLink> link =
+        doc.file.empty() && !doc.ref.isNull() ? ALScriptDiskMasters::instance().linkOf(doc.ref) : std::nullopt;
+    if (!link || !openable(*link))
+    {
+        return false;
+    }
+    // The script is changed through its file: the editor given that, where
+    // it is, rather than a copy of what the world holds.
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    args["[FILE]"] = fileNameOf(link->master);
+    mServices.report(mServices.words("MasterEditedOutside", args), false, &doc);
+    mWindow.editMasterFile(link->master, link->lua);
+    return true;
+}
+
 void ALScriptStudioMasters::loaded(Doc& doc)
 {
+    // Linked while it loaded: looked at with the rest, once the load is
+    // done with it.
+    if (doc.file.empty() && !doc.ref.isNull() && ALScriptDiskMasters::instance().linkOf(doc.ref))
+    {
+        lookAgain();
+        return;
+    }
     if (!canLink(&doc))
     {
         return;
@@ -459,6 +491,83 @@ void ALScriptStudioMasters::compareWithWorld(Doc& doc, const ALScriptRef& ref)
         mWindow.compare(*found, found->editor->wholeText(), theirs, mServices.words("CompareMasterFile", args),
                         mServices.words("CompareMasterWorld", args));
     });
+}
+
+void ALScriptStudioMasters::lookAgain()
+{
+    // Not deep in whoever changed the links -- a tab being linked, which
+    // closes itself after; a save heard; a load -- but once that is done,
+    // and once however often they changed meanwhile. With no main loop to
+    // wait for -- a test -- not at all.
+    if (mLookingAgain)
+    {
+        return;
+    }
+    const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop");
+    if (!main_loop)
+    {
+        return;
+    }
+    const std::weak_ptr<bool> alive = mAlive;
+    mLookingAgain                   = main_loop->post([this, alive]() {
+        if (alive.lock())
+        {
+            mLookingAgain = false;
+            giveWay();
+        }
+    });
+}
+
+void ALScriptStudioMasters::giveWay()
+{
+    // By their ids, since a tab giving way goes from among them.
+    std::vector<std::string> items;
+    for (const Doc* doc : mServices.openDocs())
+    {
+        if (doc->file.empty() && !doc->ref.isNull())
+        {
+            items.push_back(doc->id);
+        }
+    }
+    for (const std::string& id : items)
+    {
+        Doc* doc = mServices.findDoc(id);
+        if (!doc)
+        {
+            continue;
+        }
+        const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(doc->ref);
+        if (!link)
+        {
+            // Let go of, or never linked: told again, should it be linked.
+            doc->master->toldLinked.clear();
+            continue;
+        }
+        // Left as it is while it loads, or a save of it is on its way; once
+        // told of this link; and where the file could not be opened in its
+        // place, as a script asked for while linked is not.
+        if (!doc->loaded || doc->saveUnderway() || doc->master->toldLinked == link->master || !openable(*link))
+        {
+            continue;
+        }
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc->name;
+        args["[FILE]"] = fileNameOf(link->master);
+        if (doc->editor->isDirty())
+        {
+            // What was typed here is in neither the world nor the file: kept,
+            // and the author told, once, on the tab, with the link to let go
+            // of for it to be saved from here again.
+            doc->master->toldLinked = link->master;
+            mServices.report(mServices.words("MasterLinkedUnsaved", args), true, doc, { "master_unlink" });
+            continue;
+        }
+        // Nothing typed here: the file's tab in its place, as a script
+        // asked for while linked opens.
+        mWindow.closeTab(*doc);
+        mWindow.openMasterFile(link->master, link->lua);
+        mServices.report(mServices.words("MasterGaveWay", args), false, masterTab(link->master));
+    }
 }
 
 ALScriptStudioMasters::Doc* ALScriptStudioMasters::masterTab(const std::string& master) const
