@@ -27,9 +27,11 @@
 #include "aldiffmerge.h"
 
 #include "aldiffedit.h"
+#include "aldiffsplice.h"
 #include "allinebreaks.h"
 
 #include <algorithm>
+#include <cstddef>
 
 namespace
 {
@@ -70,14 +72,50 @@ std::string ALDiffMerge::start(std::string_view base, std::string_view ours, std
 
 void ALDiffMerge::setOptions(const ALTextDiff::Options& options)
 {
-    mOptions = ALTextDiff::linesOnly(options);
+    mOptions      = ALTextDiff::linesOnly(options);
+    mOurRunsKnown = false;
     findTheirs();
     find();
 }
 
 void ALDiffMerge::setOurs(lines_t ours)
 {
-    mOurs = std::move(ours);
+    mOurs         = std::move(ours);
+    mOurRunsKnown = false;
+    find();
+}
+
+void ALDiffMerge::setOurs(const lines_t& ours, const ALDiffEdit::Edges& edges)
+{
+    // The lines between the edges put in place of those there were, ours's
+    // others the lines it had; then its runs of the base spliced there, the
+    // base the same throughout, or all of them found again. A grammar's
+    // regions are not given: where lines are told the same by them the
+    // splice declines, and the whole is compared, as it reads them.
+    const S32 was = static_cast<S32>(mOurs.size());
+    const S32 now = static_cast<S32>(ours.size());
+    if (!mOurRunsKnown || edges.head < 0 || edges.tail < 0 || edges.head + edges.tail > std::min(was, now))
+    {
+        setOurs(lines_t(ours));
+        return;
+    }
+    const std::ptrdiff_t head = edges.head;
+    const std::ptrdiff_t gone = was - edges.head - edges.tail;
+    const std::ptrdiff_t put  = now - edges.head - edges.tail;
+    const std::ptrdiff_t both = std::min(gone, put);
+    std::copy(ours.begin() + head, ours.begin() + head + both, mOurs.begin() + head);
+    if (put > gone)
+    {
+        mOurs.insert(mOurs.begin() + head + gone, ours.begin() + head + both, ours.begin() + head + put);
+    }
+    else
+    {
+        mOurs.erase(mOurs.begin() + head + put, mOurs.begin() + head + gone);
+    }
+    const S32                base_lines = static_cast<S32>(mBase.size());
+    const ALDiffSplice::Side same{ mBase, base_lines, ALDiffEdit::Edges{ base_lines, 0 }, nullptr };
+    const ALDiffSplice::Side changed{ mOurs, was, edges, nullptr };
+    mOurRunsKnown = ALDiffSplice::splice(mOurRuns, same, changed, mOptions);
     find();
 }
 
@@ -97,7 +135,12 @@ void ALDiffMerge::findTheirs()
 
 void ALDiffMerge::find()
 {
-    mHunks = ALTextMerge::merge(static_cast<S32>(mBase.size()), ALTextMerge::changesOf(mBase, mOurs, mOptions), mTheirChanges, mOurs, mTheirs, mOptions);
+    if (!mOurRunsKnown)
+    {
+        mOurRuns      = ALTextDiff::lines(mBase, mOurs, mOptions);
+        mOurRunsKnown = true;
+    }
+    mHunks = ALTextMerge::merge(static_cast<S32>(mBase.size()), ALTextMerge::changesOf(mOurRuns), mTheirChanges, mOurs, mTheirs, mOptions);
     // A conflict settled is ours's own change, as the settling left it or
     // as it was edited after.
     mConflicts.clear();

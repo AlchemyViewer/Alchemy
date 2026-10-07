@@ -30,8 +30,12 @@
 
 ALTextMerge::changes_t ALTextMerge::changesOf(const std::vector<std::string>& base, const std::vector<std::string>& text, const ALTextDiff::Options& options)
 {
-    const std::vector<ALTextDiff::Run> runs = ALTextDiff::lines(base, text, options);
-    changes_t                          out;
+    return changesOf(ALTextDiff::lines(base, text, options));
+}
+
+ALTextMerge::changes_t ALTextMerge::changesOf(const std::vector<ALTextDiff::Run>& runs)
+{
+    changes_t out;
     for (size_t i = 0; i < runs.size();)
     {
         if (runs[i].kind == ALTextDiff::Kind::Same)

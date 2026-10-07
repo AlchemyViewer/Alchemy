@@ -25,6 +25,7 @@
 #ifndef AL_ALDIFFMERGE_H
 #define AL_ALDIFFMERGE_H
 
+#include "aldiffedit.h"
 #include "altextdiff.h"
 #include "altextdocument.h"
 #include "altextmerge.h"
@@ -69,6 +70,13 @@ public:
     // merge found again.
     void setOptions(const ALTextDiff::Options& options);
     void setOurs(lines_t ours);
+    // Ours made anew where it differs from ours as it was, between its
+    // edges (ALDiffEdit::edgesOf): only those lines taken in, and ours
+    // compared with the base again only about them (ALDiffSplice) where
+    // that is enough -- not where lines are told the same by a grammar's
+    // regions, which are read of whole texts -- before the merge is found
+    // again: a comparison's right as it is typed in.
+    void setOurs(const lines_t& ours, const ALDiffEdit::Edges& edges);
 
     const ALTextMerge::hunks_t& hunks() const { return mHunks; }
     const lines_t&              base() const { return mBase; }
@@ -106,8 +114,10 @@ public:
     void settled(const Settling& settling);
 
 private:
-    // The merge found again from ours; and theirs's changes of the base
-    // found again first, which only the base and the options change.
+    // The merge found again from ours, by its runs of the base, which are
+    // found again first where they are not known; and theirs's changes of
+    // the base found again first, which only the base and the options
+    // change.
     void find();
     void findTheirs();
     // Whether a conflict is one a settling kept settles: its lines of the
@@ -124,6 +134,10 @@ private:
     lines_t                mBase;
     lines_t                mTheirs;
     lines_t                mOurs;
+    // The runs between the base and ours, and whether they are of ours as
+    // it is and the options as they are.
+    std::vector<ALTextDiff::Run> mOurRuns;
+    bool                   mOurRunsKnown = false;
     // By lines alone, as told the same (ALTextDiff::linesOnly).
     ALTextDiff::Options    mOptions;
     ALTextMerge::changes_t mTheirChanges;

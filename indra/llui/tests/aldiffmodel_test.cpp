@@ -1706,7 +1706,7 @@ namespace tut
         ensure("ours: no edit", settling && !settling->edits);
         merged->clear();
         m.settled(*settling);
-        ensure("settled: found again by its own", has_base(*merged) && compared->empty());
+        ensure("settled: found again by its own, from ours's runs of the base as they were, so the base not read again", !merged->empty() && !has_base(*merged) && compared->empty());
         ensure_equals("none left", m.conflictCount(), 0);
 
         // Typed in: the comparison's asked for what it compares, never the

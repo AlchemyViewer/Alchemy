@@ -234,7 +234,9 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> between, co
     mRegions.reset();
     if (mMerge && !given_left)
     {
-        mMerge->setOurs(mRightLines);
+        // Ours, which was the right as it was: taken in and compared again
+        // only between the edges.
+        mMerge->setOurs(mRightLines, edges);
     }
     const ALTextDiff::Options options = shownOptions();
     Relayout                  again;
