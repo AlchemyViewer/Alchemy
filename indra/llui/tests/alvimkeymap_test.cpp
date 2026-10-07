@@ -4515,4 +4515,53 @@ namespace tut
         ensure_equals(". of d/foo up to the next foo", flat(editor->text()), std::string("foo b foo d bar e foo|"));
         ensure("foo moved last in the history, and there once", vim->shared().search == history_t{ "bar", "foo" });
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<159>()
+    {
+        set_test_name("a charwise selection that ends past a line's last character takes the line's break, and . counts it as a character; an operator over lines takes none");
+        ALCodeEditor& e = make("one\n\ntwo\n");
+        e.setCaret(ALTextPos(1, 0));
+        keys("vd");
+        ensure_equals("v d on an empty line takes the line", flat(e.text()), std::string("one|two|"));
+        ensure_equals("its break in the register", vim->registerText('"'), std::string("\n"));
+        ensure_equals("the caret where it began", caretText(), std::string("1:0"));
+
+        make("foo\n\nbar\n");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("viwd");
+        ensure_equals("viw d there too", flat(editor->text()), std::string("foo|bar|"));
+
+        make("abc\n\ndef\n");
+        editor->setCaret(ALTextPos(0, 1));
+        keys("vjd");
+        ensure_equals("v j onto an empty line: through its break", flat(editor->text()), std::string("adef|"));
+        ensure_equals("what it took", vim->registerText('"'), std::string("bc\n\n"));
+
+        make("abc\nq\nxyz\nr\n");
+        editor->setCaret(ALTextPos(0, 2));
+        keys("vly");
+        ensure_equals("l past the last character: y takes the break", vim->registerText('"'), std::string("c\n"));
+        keys("vld");
+        ensure_equals("and d joins the next line on", flat(editor->text()), std::string("abq|xyz|r|"));
+        keys("j0.");
+        ensure_equals(". as many again, the break counted as a character", flat(editor->text()), std::string("abq|z|r|"));
+        ensure_equals("what . took", vim->registerText('"'), std::string("xy"));
+
+        make("a\n\nb\nxyz\n");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("vdj0.");
+        ensure_equals(". after an empty line's break: one character", flat(editor->text()), std::string("a|b|yz|"));
+
+        make("abcdef\nab\nz\n");
+        keys("vlldj0.");
+        ensure_equals(". over a line shorter than it: past its last, its break too", flat(editor->text()), std::string("def|z|"));
+
+        make("abc\ndef\nghi\n");
+        editor->setCaret(ALTextPos(0, 2));
+        keys("vl~");
+        ensure_equals("~ over the break: the text recased, nothing joined", flat(editor->text()), std::string("abC|def|ghi|"));
+        keys("vlJ");
+        ensure_equals("J over lines takes no break: two lines joined, not three", flat(editor->text()), std::string("abC def|ghi|"));
+    }
 }

@@ -840,14 +840,24 @@ void ALVimKeymap::finishCommand(bool changed)
     mVisualPending.valid = false;
 }
 
-void ALVimKeymap::noteVisualOperation(const Span& span, S32 lines_hint)
+void ALVimKeymap::noteVisualOperation(const ALTextDocument& d, const Span& span, S32 lines_hint)
 {
     mVisualPending.valid   = true;
     mVisualPending.mode    = span.linewise ? Mode::VisualLine : span.block ? Mode::VisualBlock : Mode::Visual;
     mVisualPending.lines   = lines_hint >= 0 ? lines_hint : span.range.end.line - span.range.begin.line;
-    mVisualPending.columns = span.block ? span.right - span.left
-                             : span.linewise ? 0
-                                             : span.range.end.column - (span.range.end.line == span.range.begin.line ? span.range.begin.column : 0);
+    mVisualPending.columns = span.block ? span.right - span.left : 0;
+    if (mVisualPending.mode == Mode::Visual)
+    {
+        // Characters: from the selection's ends, whether or not the span
+        // took the break after the last; an end past a line's last
+        // character, on its break, one past the line's length.
+        const ALTextPos caret = d.clamp(mVisualCaret);
+        const ALTextPos a     = std::min(mVisualAnchor, caret);
+        const ALTextPos b     = std::max(mVisualAnchor, caret);
+        const S32       past  = atLineEnd(d, b) ? b.column + 1 : d.nextCluster(b).column;
+        mVisualPending.lines   = lines_hint >= 0 ? lines_hint : b.line - a.line;
+        mVisualPending.columns = past - (b.line == a.line ? a.column : 0);
+    }
     mVisualPending.toEnd   = span.block && span.toEnd;
     // The operator is the key being handled: the last one typed.
     mVisualPending.opAt = mCommandInputs.empty() ? 0 : mCommandInputs.size() - 1;
@@ -1500,7 +1510,7 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
             if (visual)
             {
                 const Span span = visualSpan(view);
-                noteVisualOperation(span);
+                noteVisualOperation(d, span);
                 applyOperator(view, COMMENT_OPERATOR, span, 1);
                 leaveVisual(view);
                 finishCommand(true);
@@ -1700,11 +1710,14 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
                 // caret last went.
                 mWantColumn = mVisualLastToEnd ? S32_MAX : -1;
                 setMode(view, mVisualLast);
-                const Span span = visualSpan(view);
+                // A line's break taken as visual mode's operator takes it:
+                // not by one over lines, nor by surround's.
+                const bool over_lines = op == '>' || op == '<' || op == '=' || op == COMMENT_OPERATOR || op == SURROUND_OPERATOR;
+                const Span span       = visualSpan(view, !over_lines);
                 setMode(view, Mode::Normal);
                 if (op != 'c')
                 {
-                    noteVisualOperation(span);
+                    noteVisualOperation(d, span);
                     mVisualPending.opAt = mCommandInputs.size();
                     if (op == COMMENT_OPERATOR)
                     {
@@ -1761,8 +1774,8 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
         case 'U':
             if (visual)
             {
-                const Span span = visualSpan(view);
-                noteVisualOperation(span);
+                const Span span = visualSpan(view, true);
+                noteVisualOperation(d, span);
                 applyOperator(view, ch, span, 1);
                 leaveVisual(view);
                 finishCommand(true);
@@ -2604,7 +2617,7 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                 // The selection surrounded, as surround.vim's visual S:
                 // kept for the character that says with what.
                 const Span span = visualSpan(view);
-                noteVisualOperation(span);
+                noteVisualOperation(d, span);
                 leaveVisual(view);
                 clearPending();
                 mSurroundSpan    = span;
@@ -2612,7 +2625,11 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                 mSurroundWaiting = true;
                 return true;
             }
-            Span span = visualSpan(view);
+            // A line's break taken by an operator over characters, not by
+            // one over lines (visualSpan).
+            const bool over_lines = ch == '>' || ch == '<' || ch == '=' || ch == 'J' || ch == 'I' || ch == 'A' || ch == 'D' || ch == 'X' || ch == 'Y' ||
+                                    ch == 'C' || ch == 'R';
+            Span span = visualSpan(view, !over_lines);
             if (ch == 'D' || ch == 'X' || ch == 'Y' || ch == 'C' || ch == 'S' || ch == 'R')
             {
                 // The lines whole, whatever was selected.
@@ -2767,7 +2784,7 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
             }
             const llwchar op = ch == 'x' ? 'd' : ch == 's' || ch == 'C' || ch == 'S' || ch == 'R' ? 'c' : ch == 'D' || ch == 'X' ? 'd' : ch == 'Y' ? 'y' : ch;
             const S32     n  = count;
-            noteVisualOperation(span);
+            noteVisualOperation(d, span);
             leaveVisual(view);
             applyOperator(view, op, span, n);
             finishCommand(op != 'y');
@@ -3134,11 +3151,20 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 }
                 else if (mLastVisual.mode == Mode::Visual)
                 {
+                    // As many characters again; where the line has fewer,
+                    // to past its last, which takes its break.
                     to.column = (mLastVisual.lines == 0 ? from_here.column : 0) + mLastVisual.columns;
-                    to        = d.prevCluster(d.clamp(to));
-                    if (to < from_here)
+                    if (to.column > d.lineLength(to.line))
                     {
-                        to = from_here;
+                        to = d.lineEnd(to.line);
+                    }
+                    else
+                    {
+                        to = d.prevCluster(d.clamp(to));
+                        if (to < from_here)
+                        {
+                            to = from_here;
+                        }
                     }
                 }
                 mVisualCaret = d.clamp(to);
@@ -5225,7 +5251,7 @@ void ALVimKeymap::leaveVisual(ALTextView& view)
     bump();
 }
 
-ALVimKeymap::Span ALVimKeymap::visualSpan(const ALTextView& view) const
+ALVimKeymap::Span ALVimKeymap::visualSpan(const ALTextView& view, bool line_break) const
 {
     const ALTextDocument& d     = view.document();
     const ALTextPos       caret = d.clamp(mVisualCaret);
@@ -5250,7 +5276,10 @@ ALVimKeymap::Span ALVimKeymap::visualSpan(const ALTextView& view) const
     }
     else
     {
-        span.range = ALTextRange(a, atLineEnd(d, b) ? b : d.nextCluster(b));
+        // The character at either end; past a line's last, its break, for
+        // an operator that takes one -- on to the next line's start, where
+        // there is a next line.
+        span.range = ALTextRange(a, line_break || !atLineEnd(d, b) ? d.nextCluster(b) : b);
     }
     span.visual = true;
     return span;

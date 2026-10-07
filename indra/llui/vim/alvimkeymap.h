@@ -440,7 +440,12 @@ private:
     void enterVisual(ALTextView& view, Mode which);
     void leaveVisual(ALTextView& view);
     void showVisual(ALTextView& view);
-    Span visualSpan(const ALTextView& view) const;
+    // The selection as an operator takes it. One of characters that ends
+    // past a line's last -- on an empty line, or after $ -- takes the line's
+    // break as well with `line_break`, as vim's d, c, y, p and the case
+    // operators take it; an operator over lines -- > < = J -- none, which
+    // would take the next line with it.
+    Span visualSpan(const ALTextView& view, bool line_break = false) const;
     // What a block holds of each of its lines, the first to the last
     // (ALVimText::blockPiece): what is cut, lit, replaced and put into.
     std::vector<ALTextRange> blockPieces(const ALTextView& view, const Span& span) const;
@@ -466,7 +471,9 @@ private:
     bool addToNumber(ALTextView& view, S64 by);
     // The last visual operation, for `.`: the extent it covered -- a
     // block's columns as the reader counts them, or every line's end for
-    // one taken with $ -- and the keys from the operator on.
+    // one taken with $; characters from the selection's two ends, one past
+    // a line's last counted a column more than the line has, as vim counts
+    // a line's break -- and the keys from the operator on.
     struct VisualExtent
     {
         bool valid   = false;
@@ -477,7 +484,7 @@ private:
         // Where in the command's inputs the operator was typed.
         size_t opAt = 0;
     };
-    void noteVisualOperation(const Span& span, S32 lines_hint = -1);
+    void noteVisualOperation(const ALTextDocument& d, const Span& span, S32 lines_hint = -1);
     // The file named under the caret, as gf reads one; empty for none.
     std::string fileUnderCursor(const ALTextView& view) const;
     // ]s and [s: the caret to the next misspelled word, or the one before,
