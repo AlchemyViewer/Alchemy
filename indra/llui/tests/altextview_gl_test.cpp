@@ -763,4 +763,291 @@ namespace tut
         ensure("nothing of it above the text", drawnIn(with_atom, x0, x0 + 40, editor->getRect().mBottom + area.mTop + 1, H) == 0);
         editor->die();
     }
+
+    // The ruler's marks cost what one does, however many lines have one: a
+    // comparison marks every line it changed, and a gap's mark with them.
+    template<> template<>
+    void altextview_gl_object::test<11>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::string text;
+        for (S32 i = 0; i < 200; ++i)
+        {
+            text += "word word word word\n";
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name           = "view";
+        p.rect           = LLRect(0, H, W, 0);
+        p.default_text   = text;
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        ALTextRuler* ruler = view->findChild<ALTextRuler>("ruler");
+        // A frame's draws, the ruler put in its place by a frame before it.
+        const auto draws = [&]() {
+            view->draw();
+            gGL.flush();
+            std::list<LLVertexBufferData> capture;
+            gGL.beginList(&capture);
+            view->draw();
+            gGL.flush();
+            gGL.endList();
+            glFinish();
+            return capture.size();
+        };
+        const LLColor4 changed(0.9f, 0.6f, 0.1f, 1.f);
+        // The same gap in both, so that only the marks differ.
+        std::vector<ALTextView::LineAnnotation> lines(200);
+        lines[100].gap     = 2;
+        lines[5].rulerTint = changed;
+        view->setLineAnnotations(lines);
+        const size_t one = draws();
+        ensure("the ruler beside the text", ruler && ruler->getVisible());
+        for (ALTextView::LineAnnotation& line : lines)
+        {
+            line.rulerTint = changed;
+        }
+        lines[100].gapRulerTint = changed;
+        view->setLineAnnotations(lines);
+        const size_t every = draws();
+        ensure("two hundred marks and a gap's cost what one does: " + std::to_string(every) + " against " + std::to_string(one), every == one);
+        view->die();
+    }
+
+    // A tint behind every line in sight and every gap costs what one does,
+    // as a line under a link and a style on every line costs what one of
+    // each does: a comparison's side tints most of its lines, and a log may
+    // underline a name on each.
+    template<> template<>
+    void altextview_gl_object::test<12>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::string text;
+        for (S32 i = 0; i < 12; ++i)
+        {
+            text += "integer value = f(x, [y, z]);\n";
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name           = "view";
+        p.rect           = LLRect(0, H, W, 0);
+        p.default_text   = text;
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        // A frame's draws, laid out by a frame before it.
+        const auto draws = [&]() {
+            view->draw();
+            gGL.flush();
+            std::list<LLVertexBufferData> capture;
+            gGL.beginList(&capture);
+            view->draw();
+            gGL.flush();
+            gGL.endList();
+            glFinish();
+            return capture.size();
+        };
+        const LLColor4 tint(0.2f, 0.6f, 0.2f, 0.5f);
+        // The same gaps in both, so that only the tints differ.
+        std::vector<ALTextView::LineAnnotation> lines(12);
+        lines[3].gap  = 1;
+        lines[8].gap  = 1;
+        lines[0].tint = tint;
+        view->setLineAnnotations(lines);
+        const size_t one_tint = draws();
+        for (ALTextView::LineAnnotation& line : lines)
+        {
+            line.tint = tint;
+        }
+        lines[3].gapTint = tint;
+        lines[8].gapTint = tint;
+        view->setLineAnnotations(lines);
+        const size_t every_tint = draws();
+        ensure("a tint on every line and gap costs what one does: " + std::to_string(every_tint) + " against " + std::to_string(one_tint),
+               every_tint == one_tint);
+        view->setLineAnnotations({});
+
+        // A style that underlines the first word, and a link always
+        // underlined on the name after it.
+        const auto underlined = [](S32 line, std::vector<ALTextView::Style>& styles, std::vector<ALTextView::Substitution>& links) {
+            ALTextView::Style style;
+            style.range = ALTextRange(ALTextPos(line, 0), ALTextPos(line, 7));
+            style.flags = LLFontGL::UNDERLINE;
+            styles.push_back(style);
+            ALTextView::Substitution link;
+            link.range     = ALTextRange(ALTextPos(line, 8), ALTextPos(line, 13));
+            link.link      = true;
+            link.underline = ALTextView::Substitution::Underline::Always;
+            links.push_back(link);
+        };
+        std::vector<ALTextView::Style>        styles;
+        std::vector<ALTextView::Substitution> links;
+        underlined(0, styles, links);
+        view->setStyles(styles);
+        view->setSubstitutions(links);
+        const size_t one_line = draws();
+        for (S32 line = 1; line < 12; ++line)
+        {
+            underlined(line, styles, links);
+        }
+        view->setStyles(styles);
+        view->setSubstitutions(links);
+        const size_t every_line = draws();
+        ensure("underlines on every line cost what one line's do: " + std::to_string(every_line) + " against " + std::to_string(one_line),
+               every_line == one_line);
+        view->die();
+    }
+
+    // The blocks the gutter draws its markers by are found again once the
+    // text is lexed to its end: an edit that changes how every line after
+    // it starts -- a string left open at the top -- has the lines in sight
+    // lexed in the frame after it, and of the rest a slice, not the whole.
+    template<> template<>
+    void altextview_gl_object::test<13>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::string text = "default\n{\n";
+        for (S32 i = 0; i < 3000; ++i)
+        {
+            text += "    integer x = 1;\n";
+        }
+        text += "}\n";
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name              = "editor";
+        p.rect              = LLRect(0, H, W, 0);
+        p.syntax            = "lsl";
+        p.show_fold_markers = true;
+        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        editor->setFont(LLFontGL::getFontMonospace());
+        editor->setText(text);
+        const S32  last  = editor->document().lineCount() - 1;
+        const auto frame = [&]() {
+            gl().clearFramebuffer();
+            editor->draw();
+            gGL.flush();
+            glFinish();
+        };
+        editor->highlighter().tokens(last);
+        frame();
+        ensure_equals("the block", editor->foldRegions().size(), size_t(1));
+
+        editor->document().insert(ALTextPos(0, 0), "\"");
+        frame();
+        editor->highlighter().tokens(last);
+        ensure("the frame after the edit left most of the text to lex: " + std::to_string(editor->highlighter().lastLexed()) + " of " +
+                   std::to_string(last + 1),
+               editor->highlighter().lastLexed() > last / 2);
+        frame();
+        ensure("lexed to its end: the block gone", editor->foldRegions().empty());
+        editor->die();
+    }
+
+    // What is being composed is underlined under its own text on each row
+    // its line wraps it over: on the first, from where it starts to the
+    // row's end; on the next, from the row's start to where it ends.
+    template<> template<>
+    void altextview_gl_object::test<14>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::string words;
+        for (S32 i = 0; i < 16; ++i)
+        {
+            words += "MMMM ";
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "view";
+        p.rect         = LLRect(0, H, W, 0);
+        p.default_text = words;
+        // The skin's colours are not loaded here: the text's is given, on
+        // black.
+        p.text_color   = LLUIColor(LLColor4::white);
+        p.bg_visible   = false;
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        view->setWordWrap(true);
+        const auto frame = [&]() {
+            gl().clearFramebuffer();
+            glEnable(GL_BLEND);
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
+            view->draw();
+            gGL.flush();
+            glDisable(GL_BLEND);
+            glFinish();
+            return ll_test::readFramebufferRGBA(W, H);
+        };
+        // Laid out by a frame, as it is drawn.
+        frame();
+        const std::vector<ALTextLayout::Row> rows = view->layout().line(0).rows;
+        ensure("the line wraps, three words or more to its first row", rows.size() >= 2 && rows[0].end > 15);
+        // From the third word of the first row to the end of the first word
+        // of the second.
+        const S32 begin = 10;
+        const S32 end   = rows[1].begin + 4;
+        ensure("it ends inside the second row", end < rows[1].end);
+        const std::vector<U8> plain = frame();
+        view->preeditor().markAsPreedit(begin, end - begin);
+        ensure("composing", view->hasPreedit());
+        const std::vector<U8> composed = frame();
+
+        // The columns of a row's band in which anything changed between the
+        // two frames, and how many of them lie in [from, to).
+        const LLRect text    = view->textRect();
+        const auto   columns = [&](size_t r) {
+            std::vector<bool> out(static_cast<size_t>(W), false);
+            const S32         top = text.mTop - (view->layout().lineTop(0) + rows[r].top - view->scrollY());
+            for (S32 y = llmax(0, top - rows[r].height); y < llmin(H, top); ++y)
+            {
+                for (S32 x = 0; x < W; ++x)
+                {
+                    const size_t i = (static_cast<size_t>(y) * W + x) * 4;
+                    if (plain[i] != composed[i] || plain[i + 1] != composed[i + 1] || plain[i + 2] != composed[i + 2])
+                    {
+                        out[static_cast<size_t>(x)] = true;
+                    }
+                }
+            }
+            return out;
+        };
+        const auto changed_in = [](const std::vector<bool>& cols, S32 from, S32 to) {
+            S32 found = 0;
+            for (S32 x = llmax(0, from); x < llmin(W, to); ++x)
+            {
+                found += cols[static_cast<size_t>(x)] ? 1 : 0;
+            }
+            return found;
+        };
+
+        const S32               first_from = text.mLeft + static_cast<S32>(view->layout().xOf(0, begin));
+        const S32               first_to   = text.mLeft + static_cast<S32>(rows[0].width);
+        const std::vector<bool> first      = columns(0);
+        ensure("nothing on the first row left of where it starts: " + std::to_string(changed_in(first, 0, first_from)),
+               changed_in(first, 0, first_from) == 0);
+        ensure("under its text to the first row's end: " + std::to_string(changed_in(first, first_from, first_to)) + " of " +
+                   std::to_string(first_to - first_from),
+               changed_in(first, first_from, first_to) * 4 >= (first_to - first_from) * 3);
+        ensure("nothing past the first row's end", changed_in(first, first_to, W) == 0);
+
+        const S32               second_from = text.mLeft + static_cast<S32>(view->layout().xOf(0, rows[1].begin));
+        const S32               second_to   = text.mLeft + static_cast<S32>(view->layout().xOf(0, end));
+        const std::vector<bool> second      = columns(1);
+        ensure("under its text on the second row: " + std::to_string(changed_in(second, second_from, second_to)) + " of " +
+                   std::to_string(second_to - second_from),
+               changed_in(second, second_from, second_to) * 4 >= (second_to - second_from) * 3);
+        ensure("nothing on the second row past where it ends",
+               changed_in(second, 0, second_from) == 0 && changed_in(second, second_to, W) == 0);
+        view->die();
+    }
 }

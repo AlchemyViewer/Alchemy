@@ -1628,4 +1628,57 @@ namespace tut
         d.bar()->setFellBack(false);
         ensure("let go", count->getToolTip().empty());
     }
+
+    template<> template<>
+    void aldiffview_object::test<42>()
+    {
+        set_test_name("a run opened, or every run opened, while the layout not shown was behind the model: so there too when it is shown, though filled again only where it was laid out again");
+        typedef ALDiffModel::Column Column;
+        const std::string left  = lines(100, { { 5, "five" }, { 50, "fifty" }, { 95, "ninety-five" } });
+        const auto        right = [](const char* last) { return aldiffview_data::lines(100, { { 5, "FIVE" }, { 50, "FIFTY" }, { 95, last } }); };
+        ALDiffView&       kept  = make(left.c_str(), right("NINETY-FIVE").c_str());
+        ALDiffView&       whole = makeWhole();
+        whole.setTexts(left, right("NINETY-FIVE"));
+        const auto both = [&](const std::function<void(ALDiffView&)>& done) {
+            done(kept);
+            done(whole);
+        };
+        const ALDiffModel& model = kept.model();
+        // Both layouts filled: inline, then side by side again. Two runs
+        // folded, lines 9 to 46 and 54 to 91 of each side.
+        both([](ALDiffView& d) {
+            d.setInline(true);
+            d.setInline(false);
+        });
+        ensure_equals("two runs folded", kept.foldedCount(), 2);
+
+        // Typed in far down: side by side filled again there, inline left
+        // as it was. The first run opened by the caret landing in it, the
+        // caret back by the edit, and inline shown.
+        both([&](ALDiffView& d) { d.setRightText(right("NINETY-FIVE!")); });
+        ensure("laid out again in part", !model.relaid().whole);
+        both([](ALDiffView& d) {
+            d.right()->goTo(ALTextPos(20, 0));
+            d.right()->goTo(ALTextPos(95, 0));
+        });
+        ensure("the first open, the second folded", model.foldOpen(0) && !model.foldOpen(1));
+        both([](ALDiffView& d) { d.setInline(true); });
+        const S32 first = model.foldFirstLine(Column::Inline, 0);
+        ensure("inline: its lines shown, its row gone", !hidden(kept.inlined(), first) && !hidden(kept.inlined(), first + model.foldLines(0) - 1) &&
+                                                         kept.inlined()->layout().gapRows(model.foldGapLine(Column::Inline, 0)) == 0);
+        ensure("the second still folded", hidden(kept.inlined(), model.foldFirstLine(Column::Inline, 1)));
+        sameShown(kept, whole, "a run opened side by side");
+
+        // Typed in again inline, side by side left as it was, every run
+        // opened as Alt-F does, and side by side shown.
+        both([&](ALDiffView& d) { d.setRightText(right("NINETY-FIVE?")); });
+        both([](ALDiffView& d) {
+            d.setFoldSame(false);
+            d.setInline(false);
+        });
+        ensure("side by side: every run open", kept.foldedCount() == 0 && !hidden(kept.left(), model.foldFirstLine(Column::Left, 1)) &&
+                                                   !hidden(kept.right(), model.foldFirstLine(Column::Right, 1)) &&
+                                                   kept.right()->layout().gapRows(model.foldGapLine(Column::Right, 1)) == 0);
+        sameShown(kept, whole, "every run opened inline");
+    }
 }

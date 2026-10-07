@@ -29,7 +29,9 @@
 #include "llsdserialize.h"
 #include "llstring.h"
 
+#include <algorithm>
 #include <sstream>
+#include <utility>
 
 namespace
 {
@@ -53,31 +55,160 @@ namespace
         return fits(range.begin) && fits(range.end) && !(range.end < range.begin);
     }
 
+    using Change = ALTextUndo::Step::Change;
+
+    // Where a place stands in a text that begins at another: its byte,
+    // walked to from a place at or before it whose byte is known -- `at`
+    // and `offset`, moved on to it -- so that a batch's stretches, in
+    // order, are found in one walk. False where the text has no such
+    // place.
+    bool walkTo(std::string_view text, ALTextPos& at, size_t& offset, const ALTextPos& to)
+    {
+        while (at.line < to.line)
+        {
+            const size_t brk = text.find('\n', offset);
+            if (brk == std::string_view::npos)
+            {
+                return false;
+            }
+            offset = brk + 1;
+            ++at.line;
+            at.column = 0;
+        }
+        if (at.line != to.line || to.column < at.column)
+        {
+            return false;
+        }
+        const size_t along    = static_cast<size_t>(to.column - at.column);
+        const size_t line_end = std::min(text.find('\n', offset), text.size());
+        if (offset + along > line_end)
+        {
+            return false;
+        }
+        offset += along;
+        at      = to;
+        return true;
+    }
+
+    // An edit as a step keeps it: a batch by its stretches, each one's text
+    // cut from the edit's, which run from the first stretch to the last;
+    // any other whole. A batch whose stretches do not stand within those
+    // texts where it says is kept whole, and so is one of a single stretch,
+    // which replaceMany would put back as a plain edit.
+    Change changeOf(const ALTextDocument::Edit& edit)
+    {
+        Change change;
+        if (edit.parts.size() > 1)
+        {
+            ALTextPos was_at = edit.range.begin;
+            ALTextPos is_at  = edit.range.begin;
+            size_t    was    = 0;
+            size_t    is     = 0;
+            change.stretches.reserve(edit.parts.size());
+            for (const ALTextDocument::Edit::Part& part : edit.parts)
+            {
+                if (!walkTo(edit.removed, was_at, was, part.before.begin) || !walkTo(edit.inserted, is_at, is, part.after.begin))
+                {
+                    break;
+                }
+                const size_t took_from = was;
+                const size_t put_from  = is;
+                if (!walkTo(edit.removed, was_at, was, part.before.end) || !walkTo(edit.inserted, is_at, is, part.after.end))
+                {
+                    break;
+                }
+                change.stretches.push_back({ edit.removed.substr(took_from, was - took_from), edit.inserted.substr(put_from, is - put_from) });
+            }
+            if (change.stretches.size() == edit.parts.size())
+            {
+                change.edit.range = edit.range;
+                change.edit.parts = edit.parts;
+                change.edit.keepEnd(edit.endAfter());
+                return change;
+            }
+            change.stretches.clear();
+        }
+        change.edit = edit;
+        return change;
+    }
+
+    // Whether the text a change takes away, forward or back, is what stands
+    // there: for a batch, each stretch's.
+    bool stands(const ALTextDocument& text, const Change& change, bool forward)
+    {
+        if (change.stretches.empty())
+        {
+            const ALTextRange range = forward ? change.edit.range : change.edit.rangeAfter();
+            return within(text, range) && text.text(range) == (forward ? change.edit.removed : change.edit.inserted);
+        }
+        for (size_t i = 0; i < change.stretches.size(); ++i)
+        {
+            const ALTextRange& range = forward ? change.edit.parts[i].before : change.edit.parts[i].after;
+            if (!within(text, range) || text.text(range) != (forward ? change.stretches[i].removed : change.stretches[i].inserted))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // A change made over a text, forward or back: a batch's stretches all
+    // at once, each where it stands in the text as it is, which tells
+    // whoever listens one edit with its parts, as it did when it was made.
+    void put(ALTextDocument& text, const Change& change, bool forward)
+    {
+        if (change.stretches.empty())
+        {
+            if (forward)
+            {
+                text.replace(change.edit.range, change.edit.inserted, change.edit.parts);
+                return;
+            }
+            const ALTextDocument::Edit back = change.edit.inverse();
+            text.replace(back.range, back.inserted, back.parts);
+            return;
+        }
+        std::vector<std::pair<ALTextRange, std::string>> pieces;
+        pieces.reserve(change.stretches.size());
+        for (size_t i = 0; i < change.stretches.size(); ++i)
+        {
+            const ALTextDocument::Edit::Part& part    = change.edit.parts[i];
+            const Change::Stretch&            stretch = change.stretches[i];
+            pieces.emplace_back(forward ? part.before : part.after, forward ? stretch.inserted : stretch.removed);
+        }
+        text.replaceMany(std::move(pieces));
+    }
+
     // One step's edits made over a text, forward or back, each checked
     // first: the text it takes away must be what stands there.
     template <typename Step>
     bool replay(ALTextDocument& text, const Step& step, bool forward)
     {
+        const auto made = [&text, forward](const Change& change) {
+            if (!stands(text, change, forward))
+            {
+                return false;
+            }
+            put(text, change, forward);
+            return true;
+        };
         if (forward)
         {
-            for (const ALTextDocument::Edit& edit : step.edits)
+            for (const Change& change : step.edits)
             {
-                if (!within(text, edit.range) || text.text(edit.range) != edit.removed)
+                if (!made(change))
                 {
                     return false;
                 }
-                text.replace(edit.range, edit.inserted);
             }
             return true;
         }
         for (auto it = step.edits.rbegin(); it != step.edits.rend(); ++it)
         {
-            const ALTextDocument::Edit back = it->inverse();
-            if (!within(text, back.range) || text.text(back.range) != back.removed)
+            if (!made(*it))
             {
                 return false;
             }
-            text.replace(back.range, back.inserted);
         }
         return true;
     }
@@ -98,6 +229,21 @@ namespace
     constexpr size_t EDIT_WRITTEN = 16;
     // And each other selection a step keeps, before or after.
     constexpr size_t RANGE_WRITTEN = 20;
+
+    // What a change weighs: a batch an edit a stretch, as it is written.
+    size_t weighed(const Change& change)
+    {
+        if (change.stretches.empty())
+        {
+            return EDIT_WRITTEN + change.edit.removed.size() + change.edit.inserted.size();
+        }
+        size_t bytes = 0;
+        for (const Change::Stretch& stretch : change.stretches)
+        {
+            bytes += EDIT_WRITTEN + stretch.removed.size() + stretch.inserted.size();
+        }
+        return bytes;
+    }
 
     LLSD rangesAsLLSD(const std::vector<ALTextRange>& ranges)
     {
@@ -224,7 +370,9 @@ std::string_view ALTextUndo::keyOf(Kind kind)
 
 bool ALTextUndo::carriesOn(const Step& last, const ALTextDocument::Edit& next)
 {
-    if (last.edits.empty())
+    // A batch kept by its stretches is no run's tail: keys typed at several
+    // carets are joined by the typing scope (beginTyping) instead.
+    if (last.edits.empty() || !last.edits.back().stretches.empty())
     {
         return false;
     }
@@ -232,7 +380,7 @@ bool ALTextUndo::carriesOn(const Step& last, const ALTextDocument::Edit& next)
     // are folded into one as they join, so a run of typing ends in an edit
     // of many characters. A step that is not a run has another key, which
     // is what keeps the next edit from joining it.
-    const ALTextDocument::Edit& tail = last.edits.back();
+    const ALTextDocument::Edit& tail = last.edits.back().edit;
     const Kind                  kind = kindOf(next);
     const Kind                  was  = tail.removed.empty() && !tail.inserted.empty() ? Kind::Typing
                                        : tail.inserted.empty() && !tail.removed.empty() ? Kind::Erasing
@@ -260,15 +408,16 @@ void ALTextUndo::join(Step& last, Step&& next)
     // Each edit folded into the one before it where it carries straight on
     // from it -- a run of typing kept as the one edit it amounts to, and
     // undone and redone as one -- and kept after it otherwise.
-    for (ALTextDocument::Edit& edit : next.edits)
+    for (Change& change : next.edits)
     {
-        // A fold joins the texts, which weigh what they did apart.
-        last.bytes += edit.removed.size() + edit.inserted.size();
-        if (last.edits.empty() || !fold(last.edits.back(), edit))
+        if (!last.edits.empty() && fold(last.edits.back().edit, change.edit))
         {
-            last.bytes += EDIT_WRITTEN;
-            last.edits.push_back(std::move(edit));
+            // A fold joins the texts, which weigh what they did apart.
+            last.bytes += change.edit.removed.size() + change.edit.inserted.size();
+            continue;
         }
+        last.bytes += weighed(change);
+        last.edits.push_back(std::move(change));
     }
     last.caretAfter  = next.caretAfter;
     last.anchorAfter = next.anchorAfter;
@@ -340,21 +489,25 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
     }
 
     Step step;
-    step.edits.push_back(edit);
+    step.edits.push_back(changeOf(edit));
     step.caretBefore  = before;
     step.anchorBefore = before_in.begin;
     step.caretAfter   = after;
     step.anchorAfter  = after;
     step.othersBefore = std::move(others_before);
     step.serial       = ++mNextSerial;
-    step.bytes        = STEP_WRITTEN + EDIT_WRITTEN + edit.removed.size() + edit.inserted.size() + RANGE_WRITTEN * step.othersBefore.size();
+    step.bytes        = STEP_WRITTEN + weighed(step.edits.front()) + RANGE_WRITTEN * step.othersBefore.size();
     step.typed        = mTypingDepth > 0 && !mSteps.inGroup();
 
     // The key a run is joined by: the kind of change, where it carries on
     // the last step; anything else ends the run first. A group is one step
     // however long it stays open, which the stack keeps; a run is one step
-    // while its changes come within the window.
-    std::string_view key = keyOf(kindOf(edit));
+    // while its changes come within the window, and while the step and the
+    // change weigh no more than the budget together: the newest step is
+    // kept whatever it weighs, so a run joined on past it would hold all it
+    // ever did, however long it went on.
+    const bool       past = !mSteps.undone().empty() && mSteps.undone().back().bytes + step.bytes > BUDGET;
+    std::string_view key  = keyOf(kindOf(edit));
     if (step.typed)
     {
         // A key typed: its first edit carries on a run of keys typed where
@@ -366,16 +519,16 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
         {
             mTypingNoted                    = true;
             const std::vector<Step>& undone = mSteps.undone();
-            const bool               on     = !undone.empty() && undone.back().typed && mTypingAt.begin == mTypingAt.end &&
+            const bool               on     = !past && !undone.empty() && undone.back().typed && mTypingAt.begin == mTypingAt.end &&
                                               (mTypingAt.end == undone.back().caretAfter ||
-                                               (!undone.back().edits.empty() && mTypingAt.end == undone.back().edits.back().endAfter()));
+                                               (!undone.back().edits.empty() && mTypingAt.end == undone.back().edits.back().edit.endAfter()));
             if (!on)
             {
                 mSteps.breakRun();
             }
         }
     }
-    else if (!mSteps.inGroup() && (mSteps.undone().empty() || !carriesOn(mSteps.undone().back(), edit)))
+    else if (!mSteps.inGroup() && (past || mSteps.undone().empty() || !carriesOn(mSteps.undone().back(), edit)))
     {
         mSteps.breakRun();
     }
@@ -490,8 +643,7 @@ std::optional<ALTextRange> ALTextUndo::undo(std::vector<ALTextRange>* others)
     mUndoneBytes -= step->bytes;
     for (auto it = step->edits.rbegin(); it != step->edits.rend(); ++it)
     {
-        const ALTextDocument::Edit back = it->inverse();
-        mDocument.replace(back.range, back.inserted, back.parts);
+        put(mDocument, *it, false);
     }
     const ALTextRange selection(step->anchorBefore, step->caretBefore);
     if (others)
@@ -513,9 +665,9 @@ std::optional<ALTextRange> ALTextUndo::redo(std::vector<ALTextRange>* others)
     mSettling = false;
     ++mRevision;
     mUndoneBytes += step->bytes;
-    for (const ALTextDocument::Edit& edit : step->edits)
+    for (const Change& change : step->edits)
     {
-        mDocument.replace(edit.range, edit.inserted, edit.parts);
+        put(mDocument, change, true);
     }
     const ALTextRange selection(step->anchorAfter, step->caretAfter);
     if (others)
@@ -548,7 +700,10 @@ void ALTextUndo::markSaved()
 namespace
 {
     // A step as it is written: its carets, its name, and its edits, each
-    // run folded into the one edit it amounts to.
+    // run folded into the one edit it amounts to. A batch is written as the
+    // plain edits it amounts to, one a stretch, made from its last stretch
+    // back so that each stands where it stood: no stretch before it has
+    // moved anything yet.
     LLSD stepAsLLSD(const ALTextUndo::Step& step)
     {
         LLSD out;
@@ -575,17 +730,35 @@ namespace
         }
         LLSD                                edits = LLSD::emptyArray();
         std::optional<ALTextDocument::Edit> pending;
-        for (const ALTextDocument::Edit& edit : step.edits)
-        {
+        const auto                          add = [&edits, &pending](const ALTextDocument::Edit& edit) {
             if (pending && fold(*pending, edit))
             {
-                continue;
+                return;
             }
             if (pending)
             {
                 edits.append(editAsLLSD(*pending));
             }
             pending = edit;
+        };
+        for (const Change& change : step.edits)
+        {
+            if (change.stretches.empty())
+            {
+                add(change.edit);
+                continue;
+            }
+            for (size_t i = change.stretches.size(); i-- > 0;)
+            {
+                ALTextDocument::Edit one;
+                one.range    = change.edit.parts[i].before;
+                one.removed  = change.stretches[i].removed;
+                one.inserted = change.stretches[i].inserted;
+                if (!one.nothing())
+                {
+                    add(one);
+                }
+            }
         }
         if (pending)
         {
@@ -725,13 +898,13 @@ std::optional<ALTextUndo::History> ALTextUndo::historyFrom(const LLSD& sd, std::
         step.bytes        = STEP_WRITTEN + RANGE_WRITTEN * (step.othersBefore.size() + step.othersAfter.size());
         for (LLSD::array_const_iterator it = one["edits"].beginArray(); it != one["edits"].endArray(); ++it)
         {
-            ALTextDocument::Edit edit;
-            if (!editFrom(*it, edit))
+            Change change;
+            if (!editFrom(*it, change.edit))
             {
                 return false;
             }
-            step.bytes += EDIT_WRITTEN + edit.removed.size() + edit.inserted.size();
-            step.edits.push_back(std::move(edit));
+            step.bytes += weighed(change);
+            step.edits.push_back(std::move(change));
         }
         into.push_back(std::move(step));
         return true;

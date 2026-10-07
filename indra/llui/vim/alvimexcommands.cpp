@@ -448,7 +448,7 @@ bool ALVimExCommands::confirmKey(ALTextView& view, const ALVimInput& input)
 void ALVimExCommands::endConfirming(ALTextView& view)
 {
     const ALTextDocument& d = view.document();
-    mVim.mMode                   = ALVimKeymap::Mode::Normal;
+    mVim.setMode(view, ALVimKeymap::Mode::Normal);
     if (confirming.lastLine >= 0)
     {
         const S32 line = llclamp(confirming.lastLine, 0, d.lineCount() - 1);
@@ -472,7 +472,7 @@ void ALVimExCommands::endConfirming(ALTextView& view)
     mVim.bump();
 }
 
-bool ALVimExCommands::lineAddress(ALTextView& view, const std::string& line, size_t& at_, S32& out) const
+bool ALVimExCommands::lineAddress(ALTextView& view, const std::string& line, size_t& at_, S32& out, bool* before_first) const
 {
     const ALTextDocument& d = view.document();
     if (at_ >= line.size())
@@ -483,6 +483,11 @@ bool ALVimExCommands::lineAddress(ALTextView& view, const std::string& line, siz
     {
         out = view.caret().line;
         ++at_;
+    }
+    else if (line[at_] == '+' || line[at_] == '-')
+    {
+        // An offset alone is from the caret's line: +1 is .+1.
+        out = view.caret().line;
     }
     else if (line[at_] == '$')
     {
@@ -539,6 +544,10 @@ bool ALVimExCommands::lineAddress(ALTextView& view, const std::string& line, siz
             any = true;
         }
         out += (plus ? 1 : -1) * (any ? n : 1);
+    }
+    if (before_first)
+    {
+        *before_first = out < 0;
     }
     out = llclamp(out, 0, d.lineCount() - 1);
     return true;
@@ -726,12 +735,21 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
     S32    first = view.caret().line;
     S32    last  = first;
     bool   ranged = false;
+    // Whether the range's last address is a line before the first -- :0 --
+    // which :put puts under, and so over the first line.
+    bool   before_first = false;
     size_t at_   = 0;
-    auto   lineNumber = [&](S32& out) { return lineAddress(view, line, at_, out); };
+    auto   lineNumber = [&](S32& out) { return lineAddress(view, line, at_, out, &before_first); };
     if (line[0] == '%')
     {
+        // 1,$: the empty line after a final line break is no line of the
+        // text's, as $ leaves it out.
         first  = 0;
         last   = d.lineCount() - 1;
+        if (last > 0 && d.lineLength(last) == 0)
+        {
+            --last;
+        }
         ranged = true;
         at_    = 1;
     }
@@ -750,6 +768,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         if (last < first)
         {
             std::swap(first, last);
+            before_first = false;
         }
     }
     std::string rest = line.substr(at_);
@@ -1072,23 +1091,41 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
     if (name == "pu" || name == "put" || name == "pu!" || name == "put!")
     {
         // A register's text as lines, whatever it was taken as: under the
-        // range's last line, or above its first with !.
-        const ALVimRegisters::Register reg = mVim.fetch(args.empty() ? mVim.mRegister : args[0]);
-        if (!editing || reg.text.empty())
+        // range's last line, or above it with !, as vim's [line] is the
+        // range's last; above the first line for :0put, under the line
+        // before it. Nothing is a register never set, or set to no text,
+        // as for p: an empty line is a line to put, and so is an empty
+        // last line of several. What _ gives back is no text, which as a
+        // line is an empty one.
+        if (!editing)
         {
             return;
         }
+        const char                     named = args.empty() ? mVim.mRegister : args[0];
+        const ALVimRegisters::Register reg   = mVim.fetch(named);
+        if (reg.text.empty() && !reg.linewise && named != '_')
+        {
+            mVim.say(ALVimKeymap::said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, named ? named : '"') } }), true);
+            return;
+        }
+        // Characters ending in a line break -- text copied from elsewhere,
+        // as often as not -- are the lines before it. Lines and a block's
+        // rows are kept with no break after the last: one there is before
+        // an empty last line.
         std::string text = reg.text;
-        if (!text.empty() && text.back() == '\n')
+        if (!reg.linewise && !reg.block && !text.empty() && text.back() == '\n')
         {
             text.pop_back();
         }
-        const bool above = name.back() == '!';
-        const S32  line  = above ? first : last;
+        const bool above = name.back() == '!' || before_first;
+        const S32  line  = before_first ? 0 : last;
         view.setCaret(above ? d.lineStart(line) : d.lineEnd(line));
         view.insertText(above ? text + "\n" : "\n" + text);
-        const S32 put_at = above ? line : line + 1;
-        mVim.moveTo(view, ALTextPos(put_at, firstNonBlankColumn(d, put_at)));
+        // The caret on the last line put, at its first non-blank, as vim
+        // leaves it.
+        const S32 put_at   = above ? line : line + 1;
+        const S32 put_last = put_at + static_cast<S32>(std::count(text.begin(), text.end(), '\n'));
+        mVim.moveTo(view, ALTextPos(put_last, firstNonBlankColumn(d, put_last)));
         return;
     }
     if (name == "ma" || name == "mark" || name == "k")
@@ -1484,6 +1521,11 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
         }
         ALAnchoredRanges<ALTextPos> marks;
         marks.assign(std::move(starts));
+        // A command with an address of its own -- .,+1d, .m0, 'a,.d, 3d --
+        // runs as it is written, from the line; one without is given the
+        // line's number.
+        const char lead      = command[0];
+        const bool addressed = lead == '.' || lead == '$' || lead == '\'' || lead == '%' || lead == '+' || lead == '-' || isDigit(lead);
         const auto slide = [](ALTextPos& mark, const ALTextDocument::Edit& edit) {
             const ALTextPos start(mark.line, 0);
             const ALTextPos next(mark.line + 1, 0);
@@ -1526,7 +1568,7 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
             // On the line, as vim puts the cursor there: `.` in the
             // command is the line.
             view.setCaret(ALTextPos(line, 0));
-            runCommand(view, std::to_string(line + 1 + view.lineNumberBase()) + command);
+            runCommand(view, addressed ? command : std::to_string(line + 1 + view.lineNumberBase()) + command);
             if (mVim.mMessageError)
             {
                 break;
@@ -1550,7 +1592,7 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
                   [](const std::pair<ALTextRange, std::string>& a, const std::pair<ALTextRange, std::string>& b) { return a.first.begin < b.first.begin; });
         view.undoJournal().endGroup();
         confirming.undoStep = view.undoJournal().groupStep();
-        mVim.mMode                = ALVimKeymap::Mode::Confirm;
+        mVim.setMode(view, ALVimKeymap::Mode::Confirm);
         askNext(view);
         return false;
     }
@@ -1723,7 +1765,7 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
         // asking ends, so nothing is done here.
         confirming       = Confirming();
         confirming.edits = std::move(edits);
-        mVim.mMode             = ALVimKeymap::Mode::Confirm;
+        mVim.setMode(view, ALVimKeymap::Mode::Confirm);
         askNext(view);
         return false;
     }

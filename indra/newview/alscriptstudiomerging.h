@@ -41,12 +41,13 @@ class ALScriptStudioServices;
 //
 // Where what both were is known -- the text the tab last loaded or saved,
 // which its undo still reaches -- every change only the other side made is
-// put into the tab as one step to undo, and the tab is compared with the
-// other side as a merge (ALDiffView::setMergeBase): what conflicts is
-// marked, and settled from the comparison's bar, each an edit of the tab;
-// then the tab is saved as any other. Where it is not known, or the tab
-// may not be changed, the two are compared as they are, and a change is
-// taken back from the other side as in any comparison.
+// put into the tab as one step to undo, lines told the same as the tab's
+// comparison tells them, and the tab is compared with the other side as a
+// merge (ALDiffView::setMergeBase): what conflicts is marked, and settled
+// from the comparison's bar, each an edit of the tab; then the tab is
+// saved as any other. Where it is not known, or the tab may not be
+// changed, the two are compared as they are, and a change is taken back
+// from the other side as in any comparison.
 class ALScriptStudioMerging
 {
 public:

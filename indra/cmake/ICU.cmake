@@ -82,17 +82,12 @@ foreach(component I18N UC DATA)
   endif()
 endforeach()
 
-# The C API is the whole of what we use, and saying so keeps ICU's C++ headers
-# -- which are not light -- out of every translation unit that wants a category
-# lookup. Nothing we need is C++-only: break iteration, collation, case mapping,
-# normalization and sort keys all have C entry points, and the RAII those
-# classes would bring is forty lines we already have.
-#
-# Not an ABI argument. ICU's C++ ABI is unstable between versions, but that
-# only matters across a dynamic boundary; we link a pinned ICU statically with
-# our own toolchain, so there is no boundary for it to matter across. Flipping
-# this to 1 is a one-line change if a C++-only API ever earns it.
-target_compile_definitions(ll::icu INTERFACE U_SHOW_CPLUSPLUS_API=0)
+# ICU's C++ API stays visible: Boost.Regex's Unicode support (boost::u32regex,
+# boost/regex/icu.hpp) is written against it, including unicode/coll.h and
+# using icu::Collator, icu::Locale and icu::UnicodeString. ICU's C++ ABI is
+# unstable between versions, but we link a pinned ICU statically with our own
+# toolchain, so there is no dynamic boundary for that to matter across.
+target_compile_definitions(ll::icu INTERFACE U_SHOW_CPLUSPLUS_API=1)
 
 # The ports are static (triplets/alchemy-base.cmake). Without this the headers
 # declare every entry point __declspec(dllimport) and the link looks for

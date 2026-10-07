@@ -1436,4 +1436,84 @@ namespace tut
         ensure_equals("found again", finder.find(left, right, runs, ALTextDiff::Options()).size(), size_t(1));
         ensure("keyed afresh: " + std::to_string(finder.lastKeyed()), finder.lastKeyed() >= 12);
     }
+
+    template<> template<>
+    void altextdiff_object::test<30>()
+    {
+        set_test_name("compared again where it changed, blanks let go of: the stretch told the same by the regions its texts were read in whole, the lexer asked for nothing less than a text; lined up at anchors too");
+        // Lines whole: a comment from a line starting /* to one holding */,
+        // a line with a quote in it a string, the rest code. Each text it
+        // was asked for, by how many lines it had.
+        auto                said  = std::make_shared<std::deque<std::vector<ALTextDiff::regions_t>>>();
+        auto                asked = std::make_shared<std::vector<size_t>>();
+        ALTextDiff::Options loose;
+        loose.like.ignoreWhitespace = true;
+        loose.lexer                 = [said, asked](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            asked->push_back(lines.size());
+            std::vector<ALTextDiff::regions_t>& out     = said->emplace_back();
+            bool                                comment = false;
+            for (const std::string& line : lines)
+            {
+                comment                         = comment || line.rfind("/*", 0) == 0;
+                const ALTextDiff::Region region = comment                                 ? ALTextDiff::Region::Comment
+                                                  : line.find('"') != std::string::npos ? ALTextDiff::Region::String
+                                                                                          : ALTextDiff::Region::Code;
+                out.push_back({ ALTextDiff::Piece{ 0, static_cast<S32>(line.size()), region } });
+                comment = comment && line.find("*/") == std::string::npos;
+            }
+            return out;
+        };
+        const auto whole_texts = [&asked](size_t count) {
+            return !asked->empty() && std::all_of(asked->begin(), asked->end(), [count](size_t n) { return n == count; });
+        };
+        // Whether a line of the left is in a run the same.
+        const auto told_same = [](const std::vector<ALTextDiff::Run>& runs, S32 line) {
+            return std::any_of(runs.begin(), runs.end(), [line](const ALTextDiff::Run& run) {
+                return run.kind == ALTextDiff::Kind::Same && line >= run.left && line < run.left + run.count;
+            });
+        };
+
+        // A line inside a block comment typed to differ only by its blanks:
+        // the comment's, let go of, though a string's would not be.
+        std::vector<std::string> left = numbered(60);
+        left[20]                      = "/* usage:";
+        left[21]                      = "say \"a  b\"";
+        left[25]                      = "*/";
+        std::vector<std::string> right = left;
+        right[21]                      = "say \"c\"";
+        std::vector<Run> runs          = ALTextDiff::lines(left, right, loose);
+        ensure("a change", !told_same(runs, 21));
+        std::vector<std::string> typed = right;
+        typed[21]                      = "say \"a b\"";
+        asked->clear();
+        ensure("spliced", ALDiffSplice::splice(runs, left, left, right, typed, loose));
+        ensure("a few lines compared", ALDiffSplice::lastCompared() <= 4);
+        ensure("the whole texts asked for, nothing less", whole_texts(60));
+        ensure("the line the same", told_same(runs, 21));
+        ensure("as the whole would find them", runs == ALTextDiff::lines(left, typed, loose));
+
+        // Lined up at anchors, every line unlike its other but the one
+        // typed: between the anchors either side of it, inside a comment
+        // opened above them both.
+        std::vector<std::string> l_lines = numbered(60, "left ");
+        std::vector<std::string> r_lines = numbered(60, "right ");
+        l_lines[12]                      = "/* usage: left";
+        r_lines[12]                      = "/* usage: right";
+        l_lines[25]                      = "say \"x  y\"";
+        r_lines[25]                      = "say \"z\"";
+        l_lines[38]                      = "left */";
+        r_lines[38]                      = "right */";
+        ALTextDiff::Options anchored = loose;
+        anchored.anchors             = { { 0, 0 }, { 10, 10 }, { 20, 20 }, { 30, 30 }, { 40, 40 }, { 50, 50 } };
+        runs                         = ALTextDiff::lines(l_lines, r_lines, anchored);
+        ensure("unlike", !told_same(runs, 25));
+        std::vector<std::string> r_typed = r_lines;
+        r_typed[25]                      = "say \"x   y\"";
+        asked->clear();
+        ensure("spliced between anchors", ALDiffSplice::splice(runs, l_lines, l_lines, r_lines, r_typed, anchored));
+        ensure_equals("the stretch between the two anchors compared", ALDiffSplice::lastCompared(), 20);
+        ensure("the whole texts asked for, nothing less: anchored", whole_texts(60));
+        ensure("the line the same: anchored", told_same(runs, 25));
+        ensure("as the whole would find them: anchored", runs == ALTextDiff::lines(l_lines, r_typed, anchored));
+    }
 }

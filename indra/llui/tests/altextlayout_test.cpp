@@ -92,8 +92,11 @@ namespace tut
             {
                 return row.begin;
             }
-            S32 cluster = row.begin;
-            F32 left    = 0.f;
+            // A row the line wraps after ends at the next row's start, which
+            // is not a place on it: on or past its last cluster is that one.
+            const bool wraps_after = row.glyphEnd < line.glyphs.size();
+            S32        cluster     = row.begin;
+            F32        left        = 0.f;
             for (size_t k = row.glyphBegin; k <= row.glyphEnd; ++k)
             {
                 const bool at_end     = (k == row.glyphEnd);
@@ -102,7 +105,7 @@ namespace tut
                 {
                     continue;
                 }
-                const S32 next_cluster = at_end ? row.end : line.glyphs[k].cluster;
+                const S32 next_cluster = at_end ? (wraps_after ? cluster : row.end) : line.glyphs[k].cluster;
                 const F32 right        = at_end ? row.width : line.glyphs[k].pen - row.xStart;
                 if (k != row.glyphBegin && x < right)
                 {
@@ -111,7 +114,7 @@ namespace tut
                 cluster = next_cluster;
                 left    = right;
             }
-            return row.end;
+            return wraps_after ? cluster : row.end;
         }
         static S32 walkedRow(const ALTextLayout::Line& line, S32 column)
         {
@@ -849,5 +852,38 @@ namespace tut
         layout.setHidden(ALTextLayout::HiddenBy::Host, 1, 8999, false);
         ensure("a run to the end: none after it", layout.visibleAfter(8999) == 10002 && layout.visibleAfter(5) == 6);
         layout.setGapProvider(nullptr);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<22>()
+    {
+        set_test_name("on or past the end of a row the line wraps after is a column on that row, so an x kept from row to row stops on a short row");
+        // Rows of 'aaaaaaaaaaaa ', 'bb ' -- the word after it does not fit
+        // beside it -- and 'cccccccccccccc'.
+        ready("aaaaaaaaaaaa bb cccccccccccccc");
+        layout.setWrapWidth(static_cast<S32>(layout.xOf(0, 14)) + 2);
+        const ALTextLayout::Line& line = layout.line(0);
+        ensure_equals("three rows", line.rows.size(), size_t(3));
+        ensure("the short one in the middle", line.rows[1].begin == 13 && line.rows[1].end == 16);
+        for (bool round : { false, true })
+        {
+            const std::string how = round ? ", rounded" : "";
+            ensure_equals("past the short row: before the space it hangs" + how, layout.columnAt(0, 1, line.rows[1].width + 20.f, round), 15);
+            ensure_equals("on the space it hangs" + how, layout.columnAt(0, 1, line.rows[1].width - 0.5f, round), 15);
+            ensure_equals("past the first row" + how, layout.columnAt(0, 0, line.rows[0].width + 20.f, round), 12);
+            ensure_equals("past the last row: the line's end" + how, layout.columnAt(0, 2, line.rows[2].width + 20.f, round), 30);
+        }
+        // Up from the line's end and down again, at the x the caret kept:
+        // each row in turn, none skipped and none stuck at.
+        const F32 kept = layout.xOf(0, 30);
+        const S32 up   = layout.columnAt(0, 1, kept, true);
+        S32       on   = -1;
+        layout.xOf(0, up, &on);
+        ensure_equals("up onto the short row, and drawn there", on, 1);
+        const S32 again = layout.columnAt(0, on - 1, kept, true);
+        ensure_equals("up again onto the first", layout.rowOf(0, again), 0);
+        const S32 down = layout.columnAt(0, layout.rowOf(0, again) + 1, kept, true);
+        ensure_equals("down onto the short row, not past it", layout.rowOf(0, down), 1);
+        ensure_equals("down again to the line's end", layout.columnAt(0, layout.rowOf(0, down) + 1, kept, true), 30);
     }
 }

@@ -15,7 +15,12 @@
     "boost-process",
     "boost-program-options",
     "boost-random",
-    "boost-regex",
+    {
+      "name": "boost-regex",
+      "features": [
+        "icu"
+      ]
+    },
     "boost-signals2",
     "boost-spirit",
     "boost-stacktrace",

@@ -37,9 +37,10 @@
 // What a find over a text found, kept in step with the text: each match,
 // in order, which of them is current, the stretch a find in a selection
 // keeps to, and what was wrong with a pattern. Looked through again a
-// moment after the text stops changing, not at every edit. Nothing here
-// draws or asks anything of a view: the view's find bar says what to look
-// for, and the view draws what was found.
+// moment after the text stops changing, not at every edit, and a while
+// after it first changed where it never stops. Nothing here draws or asks
+// anything of a view: the view's find bar says what to look for, and the
+// view draws what was found.
 //
 // A long text, or a pattern that reads across lines, is looked through on
 // a worker over a copy of it, so that a slow one holds nothing up: the
@@ -57,7 +58,8 @@ public:
                 const ALTextRange& selection);
     // A worker's matches, where they have come in: taken where the text is
     // as it was looked through, and true; looked for again where it is
-    // not. With `wait`, waited for.
+    // not, with what the worker was asked, unless a search is due (stale),
+    // which is left to whoever makes it. With `wait`, waited for.
     bool collect(const ALTextDocument& doc, const ALTextRange& selection, bool wait = false);
     bool searching() const { return mWorking != nullptr; }
     // Past this many bytes, a text is looked through on a worker.
@@ -69,7 +71,8 @@ public:
     // done within it.
     void edited(const ALTextDocument::Edit& edit);
     // To be looked through again once the text has stopped changing for a
-    // moment; and whether that moment has come.
+    // moment, or has gone on changing for longer than a find waits; and
+    // whether that moment has come.
     void stale();
     bool isStale() const { return mStale; }
     bool due() const;
@@ -105,6 +108,9 @@ private:
     S32                           mCurrent = -1;
     bool                          mStale   = false;
     LLFrameTimer                  mSettle;
+    // Since the find first went stale, however many changes have come
+    // since: what a text that never settles is looked through again by.
+    LLFrameTimer                  mStaleFor;
     bool                          mInSelection = false;
     ALTextRange                   mScope;
     std::string                   mError;

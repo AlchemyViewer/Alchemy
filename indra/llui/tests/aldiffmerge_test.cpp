@@ -316,4 +316,52 @@ namespace tut
         ensure_equals("one undone by hand", merge->conflictCount(), 1);
         ensure_equals("the one", inOurs(5, 1).size(), 1U);
     }
+
+    template<> template<>
+    void aldiffmerge_object::test<9>()
+    {
+        set_test_name("an edit that joins a conflict settled to one that is not: one conflict, still to settle; apart again, the one not settled; both settled and joined, none");
+        const std::string b = "a\nb\nc";
+        const std::string o = "A1\nb\nC1";
+        const std::string t = "A2\nb\nC2";
+        begin(b, o, t);
+        ensure_equals("two", merge->conflictCount(), 2);
+        settle(0, ALTextMerge::Take::Ours);
+        ensure_equals("the first settled", merge->conflictCount(), 1);
+        // The line between edited: one stretch both changed, which holds
+        // theirs's C2 that no settling was of.
+        becomes("A1\nB\nC1");
+        ensure_equals("joined: a conflict still", merge->conflictCount(), 1);
+        ensure_equals("found by the line not settled", inOurs(2, 1).size(), 1U);
+        becomes(o);
+        ensure_equals("apart again: the one not settled", merge->conflictCount(), 1);
+        ensure("the first settled still", inOurs(0, 1).empty() && inOurs(2, 1).size() == 1U);
+
+        begin(b, o, t);
+        settle(0, ALTextMerge::Take::Ours);
+        settle(2, ALTextMerge::Take::Ours);
+        ensure_equals("both settled", merge->conflictCount(), 0);
+        becomes("A1\nB\nC1");
+        ensure_equals("both settled, joined: none", merge->conflictCount(), 0);
+    }
+
+    template<> template<>
+    void aldiffmerge_object::test<10>()
+    {
+        set_test_name("a merge begun by lines told the same as a comparison tells them: theirs's change put in where, so told, ours did not change it; ours as it is wherever neither changed");
+        // Theirs re-indented lines 2 to 5 and changed line 3; ours changed
+        // line 5 and re-indented line 7.
+        const std::string b = "line 0\nline 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7";
+        const std::string t = "line 0\nline 1\n  line 2\n  three\n  line 4\n  line 5\nline 6\nline 7";
+        const std::string o = "line 0\nline 1\nline 2\nline 3\nline 4\nmine 5\nline 6\n    line 7";
+        ensure_equals("as they are: both changed lines 2 to 5, and ours kept there", ALDiffMerge::start(b, o, t), o);
+        ALTextDiff::Options loose;
+        loose.like.ignoreWhitespace = true;
+        const std::string begun = ALDiffMerge::start(b, o, t, loose);
+        ensure_equals("blanks let go of: theirs's line 3 put in, ours's indent kept", begun,
+                      std::string("line 0\nline 1\nline 2\n  three\nline 4\nmine 5\nline 6\n    line 7"));
+        // Merged so, no conflict, as a merge letting blanks go finds.
+        begin(b, begun, t, loose);
+        ensure_equals("none", merge->conflictCount(), 0);
+    }
 }

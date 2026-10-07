@@ -30,11 +30,30 @@
 #include "alvimhost.h"
 #include "alvimexcommands.h"
 #include "alvimkeymap.h"
+#include "alvimtext.h"
 
 #include <algorithm>
 #include <cstdlib>
 
-bool ALVimSearch::search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset)
+bool ALVimSearch::search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset,
+                         std::optional<ALTextPos> search_from)
+{
+    const ALTextPos                start = mVim.cursor(view);
+    const std::optional<ALTextPos> to    = target(view, pattern, forward, count, whole_word, offset, search_from);
+    if (!to)
+    {
+        return false;
+    }
+    if (!mVim.mOperator && *to != start)
+    {
+        mVim.noteJump(view, start);
+    }
+    mVim.moveTo(view, *to);
+    return true;
+}
+
+std::optional<ALTextPos> ALVimSearch::target(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset,
+                                             std::optional<ALTextPos> search_from)
 {
     const ALTextDocument& d = view.document();
     ALTextSearchOptions   options;
@@ -49,14 +68,14 @@ bool ALVimSearch::search(ALTextView& view, const std::string& pattern, bool forw
     if (!found_now.error.empty())
     {
         mVim.say(ALVimKeymap::said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", found_now.error } }), true);
-        return false;
+        return std::nullopt;
     }
     if (matches.empty())
     {
         mVim.say(ALVimKeymap::said("VimPatternNotFound", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", pattern } }), true);
-        return false;
+        return std::nullopt;
     }
-    const ALTextPos start = mVim.cursor(view);
+    const ALTextPos start = search_from ? *search_from : mVim.cursor(view);
     // From the last match where an offset left the caret by it: n after
     // /x/e goes on from that match, not from past its end.
     ALTextPos   from = offset.kind && !lastMatch.empty() && offsetFrom(d, lastMatch, offset) == start ? lastMatch.begin : start;
@@ -82,12 +101,7 @@ bool ALVimSearch::search(ALTextView& view, const std::string& pattern, bool forw
     {
         lightFound(*host);
     }
-    if (!mVim.mOperator && from != start)
-    {
-        mVim.noteJump(view, start);
-    }
-    mVim.moveTo(view, from);
-    return true;
+    return from;
 }
 
 ALVimSearch::Pattern ALVimSearch::patternOf(const std::string& vim, std::optional<bool> force_case) const
@@ -111,8 +125,11 @@ ALVimPattern::Places ALVimSearch::placesOf(const ALTextView& view) const
         places.visualRange = mVim.mVisualLast == ALVimKeymap::Mode::VisualLine ? ALTextRange(d.lineStart(a.line), d.lineEnd(b.line)) : ALTextRange(a, d.nextCluster(b));
         if (mVim.mVisualLast == ALVimKeymap::Mode::VisualBlock)
         {
-            places.blockLeft   = llmin(mVim.mVisualLastAnchor.column, mVim.mVisualLastCaret.column);
-            places.blockRight  = llmax(mVim.mVisualLastAnchor.column, mVim.mVisualLastCaret.column);
+            // Its columns as the reader counts them, as the block itself
+            // has them.
+            places.tabWidth   = view.getTabWidth();
+            places.blockToEnd = mVim.mVisualLastToEnd;
+            ALVimText::blockColumns(d, d.clamp(mVim.mVisualLastAnchor), d.clamp(mVim.mVisualLastCaret), places.tabWidth, places.blockLeft, places.blockRight);
             places.visualRange = ALTextRange(d.lineStart(a.line), d.lineEnd(b.line));
         }
     }

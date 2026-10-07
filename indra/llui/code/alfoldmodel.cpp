@@ -561,7 +561,11 @@ void ALFoldModel::edited(const ALTextDocument::Edit& edit, S32 lines)
         bool gone  = false;
         for (const ALTextDocument::Edit::LineSpan& span : spans)
         {
-            if (start > span.first && (start < span.last || (start == span.last && !span.lastKept)))
+            // From its first line's start, a run that does more than type
+            // there is over that line as well: it takes the line, unless
+            // all it did was put whole lines in above it.
+            const bool from_start = span.firstColumn == 0 && (span.last > span.first || span.made > 1);
+            if ((start > span.first || (start == span.first && from_start)) && (start < span.last || (start == span.last && !span.lastKept)))
             {
                 gone = true;
                 break;
@@ -578,6 +582,8 @@ void ALFoldModel::edited(const ALTextDocument::Edit& edit, S32 lines)
             kept.push_back(start + shift);
         }
     }
+    // Two the edit brought to one line are one fold.
+    kept.erase(std::unique(kept.begin(), kept.end()), kept.end());
     mFolded.swap(kept);
     mValid = false;
 }

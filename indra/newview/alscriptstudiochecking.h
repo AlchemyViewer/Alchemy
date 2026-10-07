@@ -191,7 +191,10 @@ public:
     // An LSL file on disk with no default state: an include's functions
     // and globals, which the parser takes for no script at all until a
     // state is put after them, and whose declarations are for others.
-    bool lslFragment(const Doc& doc) const;
+    // What it was of the text before while the text is still being lexed
+    // to its end, a slice each time it is asked; as the text stands `now`
+    // -- for a check, which sends it.
+    bool lslFragment(const Doc& doc, bool now = false) const;
     // A check due a moment after the last keystroke, or at once. A
     // notecard's is its own (checkNotecard), which the analyzers have no
     // part in.

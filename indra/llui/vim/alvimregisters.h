@@ -31,11 +31,13 @@
 // Vim's registers: what a yank or a delete keeps, and in which. A named
 // register, a to z, keeps what is put in it, and its capital adds to it. A
 // yank goes in 0 as well; a delete of a line or more in 1, the eight before
-// it moving along to 9; a smaller one in -; _ keeps nothing. The unnamed
-// register is the last put in any, and is the clipboard where
-// `clipboard=unnamed` says so -- a named one leaves the clipboard alone --
-// while + and * are the clipboard whatever it says. What a macro records is
-// its register's alone.
+// it moving along to 9, as does a smaller one over a search or a jump, which
+// vim keeps there however little it takes; a smaller one in -; _ keeps
+// nothing, and gives nothing back, the clipboard's no more than any
+// other's. The unnamed register is the last put in any, and is the
+// clipboard where `clipboard=unnamed` says so -- a named one leaves the
+// clipboard alone -- while + and * are the clipboard whatever it says. What
+// a macro records is its register's alone.
 class ALVimRegisters
 {
 public:
@@ -53,14 +55,20 @@ public:
     void setClipboard(copy_t copy, paste_t paste);
 
     // What a yank (`yanked`) or a delete took, kept in the register named,
-    // or where the kind of thing it was says with none (0). The clipboard
-    // is the unnamed register where `unnamed_clipboard` says so.
-    void store(char name, std::string text, bool linewise, bool block, bool yanked, bool unnamed_clipboard);
+    // or where the kind of thing it was says with none (0): a delete in 1
+    // where it is a line or more, or `register_one` says -- a delete over a
+    // search or a jump, which vim keeps there however little it takes --
+    // and in - where it is less. The clipboard is the unnamed register
+    // where `unnamed_clipboard` says so.
+    void store(char name, std::string text, bool linewise, bool block, bool yanked, bool unnamed_clipboard, bool register_one = false);
     // What a register gives back: a named or numbered one what it keeps;
     // "" what was last put in any, as is none named where the clipboard is
-    // not the unnamed register; else what the clipboard holds -- with how
-    // it was taken, where it is what the studio put there, and as
-    // characters otherwise.
+    // not the unnamed register; + and *, and none named where it is, what
+    // the clipboard holds -- with how it was taken, where it is what the
+    // studio put there, an empty line too though the clipboard says it
+    // holds nothing, and as characters otherwise. One never set holds no
+    // text and is no line; so is what _ gives back, and what any other
+    // name does.
     Register fetch(char name, bool unnamed_clipboard) const;
     // Keys a macro recorded, into its register as characters; its capital
     // adds to it. Neither the unnamed register nor the clipboard is

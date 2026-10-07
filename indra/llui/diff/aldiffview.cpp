@@ -315,7 +315,10 @@ void ALDiffView::compareBy(const std::shared_ptr<const ALSyntaxGrammar>& grammar
     }
     mLexedBy = code;
     // Without one, comments are let go of no longer (ALDiffModel::setLexer).
-    const auto lex = [this, &code]() { mModel.setLexer(code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t()); };
+    // A merge reads by a lexer of its own: the comparison's holds the texts
+    // it compares.
+    const auto lexer = [&code]() { return code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t(); };
+    const auto lex   = [this, &lexer]() { mModel.setLexer(lexer(), lexer()); };
     if (mModel.leftText().empty() && mModel.rightText().empty())
     {
         lex();
@@ -547,6 +550,7 @@ void ALDiffView::fillLayout(Layout layout)
     // Again only where the last rebuild laid out again, where the editors
     // are as the layout before it had them; else whole.
     std::optional<U32>& filled_at = mFilledAt[layout == Layout::Sides ? 0 : 1];
+    bool&               stale     = mFoldsStale[layout == Layout::Sides ? 0 : 1];
     const bool          again     = filled_at && *filled_at + 1 == mModel.layouts();
     for (ALCodeEditor* side : { mLeft, mRight, mInlined })
     {
@@ -562,8 +566,9 @@ void ALDiffView::fillLayout(Layout layout)
         }
         applyNotes(side);
         // Where it was filled again in part, the folds about the lines it
-        // was; the rest moved along with their lines.
-        if (partly)
+        // was; the rest moved along with their lines, as open as they were
+        // -- but where runs were opened or folded since, every one.
+        if (partly && !stale)
         {
             const ALDiffModel::Relaid& relaid = mModel.relaid();
             const size_t               c      = static_cast<size_t>(column);
@@ -575,6 +580,7 @@ void ALDiffView::fillLayout(Layout layout)
         }
     }
     filled_at = mModel.layouts();
+    stale     = false;
 }
 
 void ALDiffView::setNotes(std::vector<ALDiffModel::Note> notes)
@@ -822,6 +828,11 @@ void ALDiffView::applyFolds()
         if (filled(layoutOf(side)))
         {
             applyFolds(side);
+        }
+        else
+        {
+            // Every fold applied as it is filled.
+            mFoldsStale[layoutOf(side) == Layout::Sides ? 0 : 1] = true;
         }
     }
 }

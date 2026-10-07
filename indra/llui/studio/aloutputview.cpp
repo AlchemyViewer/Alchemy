@@ -791,7 +791,6 @@ void ALOutputView::refill()
     {
         placeSelection(document().clamp(*anchor_at), document().clamp(*caret_at));
     }
-    findChanged();
     if (follow)
     {
         followTail();

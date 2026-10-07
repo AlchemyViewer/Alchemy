@@ -89,6 +89,7 @@ public:
     // moves when they may have -- its tokens' -- so that a line is asked
     // again only then. None: blocks by indentation.
     void setSyntax(blocks_t blocks, revision_t revision);
+    bool hasSyntax() const { return static_cast<bool>(mBlocks); }
     // The line comment the text is written with, whose `#region` and
     // `#endregion` fold what is between them.
     void setLineComment(std::string token);
@@ -98,6 +99,10 @@ public:
     // wide as `tab_width` says.
     const std::vector<Region>& regions(const ALTextDocument& doc, S32 tab_width);
     void                       invalidate() { mValid = false; }
+    // The blocks as last found, not found again: what a view draws while
+    // the syntax they are found by is still being worked out down the
+    // text, which finding them now would work out all at once.
+    const std::vector<Region>& lastFound() const { return mRegions; }
     // The block that starts at a line; and the innermost one around it --
     // of those that hold it, the one that starts last.
     const Region* startingAt(const ALTextDocument& doc, S32 tab_width, S32 line);
@@ -137,13 +142,16 @@ public:
 
     // An edit of the text, over lines `first` through `last` of it as it
     // was, which the edit made into `made` lines. A fold that starts on
-    // the edit's first line stays: typing on a block's first line is not
-    // opening the block. One on its last line stays too where the edit
-    // ended at that line's start and left it a line of its own -- whole
-    // lines taken from above a folded block -- and moves with it; the rest
-    // inside go, and those after move along. The blocks are found again.
-    // A batch's runs of lines each so, one after another. `lines`, the
-    // text's lines after it, where known.
+    // the edit's first line stays where the edit began inside that line,
+    // or only typed at its start: typing on a block's first line is not
+    // opening the block. From the line's start, whole lines put in above
+    // it take it down with them, and anything more takes it. One on the
+    // edit's last line stays too where the edit ended at that line's
+    // start and left it a line of its own -- whole lines taken from above
+    // a folded block -- and moves with it; the rest inside go, and those
+    // after move along, two that land on one line becoming one. The
+    // blocks are found again. A batch's runs of lines each so, one after
+    // another. `lines`, the text's lines after it, where known.
     void edited(const ALTextDocument::Edit& edit, S32 lines = -1);
 
 private:

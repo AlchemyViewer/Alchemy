@@ -721,7 +721,7 @@ S32 ALCodeEditor::changeBarAt(S32 x, S32 y)
     {
         return -1;
     }
-    const S32 line = posAtLocal(text.mLeft, y, false).line;
+    const S32 line = posShownAt(x, y).line;
     return lineChanged(line) ? line : -1;
 }
 
@@ -878,13 +878,9 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     const LLColor4  fold    = foldColor() % alpha;
     const LLColor4  changed = changedColor() % alpha;
     const S32       caret_line = caret().line;
-    if (mShowFoldMarkers)
-    {
-        ensureRegions();
-    }
     // The block under the mouse in the fold column shows how far it
     // runs: a line down the column from its first row to its last.
-    const FoldRegion* shown = mShowFoldMarkers && mGutterHover && mGutterHoverLine >= 0 ? regionStartingAt(mGutterHoverLine) : nullptr;
+    const FoldRegion* shown = mShowFoldMarkers && mGutterHover && mGutterHoverLine >= 0 ? drawnRegionStartingAt(mGutterHoverLine) : nullptr;
     S32               guide_top = 0, guide_bottom = 0;
     // The numbers are placed as they come and drawn together after the
     // rest, one call for all of them rather than one for each.
@@ -1012,7 +1008,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         // A marker at a block's first line: pointing right at a folded
         // one, always; pointing down at an open one, while the mouse is
         // over the gutter, so that the gutter is quiet otherwise.
-        const bool marker = mShowFoldMarkers && regionStartingAt(line) && (isFolded(line) || mGutterHover);
+        const bool marker = mShowFoldMarkers && drawnRegionStartingAt(line) && (isFolded(line) || mGutterHover);
         if (!mShowLineNumbers && !marker && mShowFoldMarkers)
         {
             // Without the numbers there is no mark column: the host's sign
@@ -1370,7 +1366,8 @@ S32 ALCodeEditor::noteAtLocal(S32 x, S32 y)
     {
         return -1;
     }
-    const S32 line = posAtLocal(text.mLeft, y, false).line;
+    // On the band, a header, whose note is not drawn there with it.
+    const S32 line = posShownAt(x, y).line;
     return noteBoxOf(line, text).pointInRect(x, y) ? line : -1;
 }
 
@@ -1450,13 +1447,10 @@ std::vector<S32> ALCodeEditor::stickyLines(bool fresh)
     }
     // The first row on screen, and the blocks around its line that start
     // above it: their first lines, outermost first, the innermost few --
-    // kept for as long as the text, the top line and the folds are.
-    if (mStickyValid && !fresh)
-    {
-        return mSticky;
-    }
+    // kept for as long as the text, the top line and the folds are, and
+    // between frames for as long as the top line is.
     const S32 top_line = posAtLocal(textRect().mLeft, textRect().mTop - 1, false).line;
-    if (mStickyValid && mStickyVersion == document().version() && mStickyTop == top_line && mStickyFolded == mFolds.folded())
+    if (mStickyValid && mStickyTop == top_line && (!fresh || (mStickyVersion == document().version() && mStickyFolded == mFolds.folded())))
     {
         return mSticky;
     }
@@ -1491,6 +1485,26 @@ S32 ALCodeEditor::stickyRows()
 S32 ALCodeEditor::coveredAbove(S32 local_x)
 {
     return llmax(ALTextView::coveredAbove(local_x), stickyRows() * layout().rowHeight());
+}
+
+ALTextPos ALCodeEditor::posShownAt(S32 x, S32 y)
+{
+    const LLRect text  = textRect();
+    const S32    row_h = layout().rowHeight();
+    if (row_h > 0 && y <= text.mTop && (x >= text.mLeft || mShowLineNumbers))
+    {
+        // Each header's first row, at the left as the text is: as
+        // drawAfterRows draws them.
+        const std::vector<S32> pinned = stickyLines();
+        const S32              row    = (text.mTop - y) / row_h;
+        if (row < static_cast<S32>(pinned.size()))
+        {
+            const S32 line  = pinned[static_cast<size_t>(row)];
+            const F32 x_rel = static_cast<F32>(x - text.mLeft) + scrollX();
+            return document().clamp(ALTextPos(line, layout().columnAt(line, 0, x_rel, false)));
+        }
+    }
+    return posAtLocal(x, y, false);
 }
 
 void ALCodeEditor::drawAfterRows(const LLRect& text)
@@ -1546,6 +1560,12 @@ void ALCodeEditor::drawBeforeRows(const LLRect& text)
         LLLocalClipRect clip(text);
         gl_rect_2d(text.mLeft, top, text.mRight, top - layout().rowHeight(), currentLineColor() % alpha);
     }
+    // The blocks this frame draws by: the gutter's markers, and the box
+    // after a folded block's first line.
+    if (mShowFoldMarkers || !mFolds.folded().empty())
+    {
+        ensureRegions();
+    }
     drawGutter(text, alpha);
 }
 
@@ -1595,7 +1615,7 @@ LLRect ALCodeEditor::noteBoxOf(S32 line, const LLRect& text)
 // What a folded block's box says: how many lines are folded away.
 std::string ALCodeEditor::foldBoxText(S32 line)
 {
-    const FoldRegion* region = regionStartingAt(line);
+    const FoldRegion* region = drawnRegionStartingAt(line);
     const S32         hidden = region ? region->end - region->start : 0;
     return hidden > 0 ? "... " + std::to_string(hidden) : std::string("...");
 }
@@ -1959,7 +1979,23 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
 
 void ALCodeEditor::ensureRegions()
 {
-    folds().regions(document(), getTabWidth());
+    // Found again once every line is lexed, a slice more of the text lexed
+    // each frame until it is, and drawn as last found meanwhile: an edit
+    // that changes how every line after it starts -- a quote or a comment
+    // left open -- would have the whole text lexed in the frame after it
+    // to find them.
+    ALFoldModel& model = folds();
+    if (!model.hasSyntax() || highlighter().lexSome())
+    {
+        model.regions(document(), getTabWidth());
+    }
+}
+
+const ALCodeEditor::FoldRegion* ALCodeEditor::drawnRegionStartingAt(S32 line) const
+{
+    const std::vector<FoldRegion>& drawn = mFolds.lastFound();
+    const auto it = std::lower_bound(drawn.begin(), drawn.end(), line, [](const FoldRegion& region, S32 l) { return region.start < l; });
+    return (it != drawn.end() && it->start == line) ? &*it : nullptr;
 }
 
 const std::vector<ALCodeEditor::FoldRegion>& ALCodeEditor::foldRegions()
@@ -1994,35 +2030,69 @@ bool ALCodeEditor::isFolded(S32 line) const
 
 void ALCodeEditor::settleFolds()
 {
-    if (mFoldsDirty)
+    // Once every line is lexed, as the gutter's blocks are found
+    // (ensureRegions): until then what the folds hide stays as the edits
+    // moved it, and the next frame asks again.
+    if (mFoldsDirty && (!folds().hasSyntax() || highlighter().lexSome()))
     {
         applyFolds();
+        // The edits put the carets down while the layout showed every line
+        // they made, so none was on a hidden line then; one a folded block
+        // now holds -- a line broken at a folded header's end -- opens it,
+        // as a caret moved onto a hidden line does.
+        if (layout().anyHidden())
+        {
+            const std::vector<ALTextRange>& others = otherSelections();
+            std::vector<S32>                lines;
+            lines.reserve(others.size() + 1);
+            lines.push_back(caret().line);
+            for (const ALTextRange& other : others)
+            {
+                lines.push_back(other.end.line);
+            }
+            for (const S32 line : lines)
+            {
+                if (layout().hiddenBy(line, ALTextLayout::HiddenBy::Folds))
+                {
+                    revealLine(line);
+                }
+            }
+        }
     }
 }
 
 void ALCodeEditor::applyFolds()
 {
     mFoldsDirty = false;
-    // Only what changed: the lines no longer folded away shown, the lines
-    // folded away now hidden.
+    // The layout slides what it hides with an edit and shows every line an
+    // edit makes, so once what it hides has changed, the lines last hidden
+    // by folds are no guide to the lines it has folded: each line is set
+    // as the folds have it, where it is not so already. With no folds then
+    // or now, it has none folded.
     std::vector<std::pair<S32, S32>> hidden = folds().hidden(document(), getTabWidth());
-    if (hidden == mHiddenByFolds && !mHiddenByFolds.empty())
+    ALTextLayout&                    lines  = layout();
+    if (hidden == mHiddenByFolds && (hidden.empty() || lines.hiddenRevision() == mHiddenByFoldsAt))
     {
         return;
     }
-    const S32 last_line = document().lineCount() - 1;
-    for (const auto& [first, last] : mHiddenByFolds)
+    // In the order the folds start in; one inside another ends inside it.
+    const S32 count   = lines.lineCount();
+    size_t    next    = 0;
+    S32       through = -1;
+    for (S32 l = 0; l < count; ++l)
     {
-        if (first <= last_line)
+        for (; next < hidden.size() && hidden[next].first <= l; ++next)
         {
-            layout().setHidden(ALTextLayout::HiddenBy::Folds, first, llmin(last, last_line), false);
+            through = llmax(through, hidden[next].second);
+        }
+        const bool folded = l <= through;
+        if (lines.hiddenBy(l, ALTextLayout::HiddenBy::Folds) != folded)
+        {
+            lines.setHidden(ALTextLayout::HiddenBy::Folds, l, l, folded);
         }
     }
-    for (const auto& [first, last] : hidden)
-    {
-        layout().setHidden(ALTextLayout::HiddenBy::Folds, first, last, true);
-    }
     mHiddenByFolds.swap(hidden);
+    mHiddenByFoldsAt = lines.hiddenRevision();
 }
 
 ALFoldModel& ALCodeEditor::folds()
@@ -4112,7 +4182,7 @@ void ALCodeEditor::clearPlaceholders()
 
 bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
 {
-    const ALTextPos at = posAtLocal(x, y, false);
+    const ALTextPos at = posShownAt(x, y);
     // A problem under the mouse says what it is, and the word what it is
     // as well: what is wrong with a call is read against what it takes.
     ALTextRange                    about;
@@ -4335,7 +4405,7 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
         // The name in the head coloured as the text colours it where the
         // analyzer said what it is: a global, a parameter, a function of
         // the script's own, which the grammar alone does not know.
-        const ALTextRange word = mMouseX >= 0 ? identifierAt(posAtLocal(mMouseX, mMouseY, false)) : identifierAt(about.begin);
+        const ALTextRange word = mMouseX >= 0 ? identifierAt(posShownAt(mMouseX, mMouseY)) : identifierAt(about.begin);
         styleAsCode(*mCard, card.headLine, styles, document().text(word), word.empty() ? ALSyntaxKind::Text : semanticKindAt(word.begin));
     }
     const S32 lines = mCard->document().lineCount();
@@ -4393,9 +4463,17 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
         mCard->layout().line(line);
     }
     const S32 height = ALCodeCards::height(mCard->layout().totalHeight());
-    // Where: under the row of what it is about, at its start; above it
-    // where under would run off the bottom; within the text's width.
+    // Where: under the row of what it is about, at its start -- the band's
+    // row where its line is a header pinned over the top, which is where
+    // it is drawn; above it where under would run off the bottom; within
+    // the text's width.
     mCardAnchor = anchorOf(about);
+    const std::vector<S32> pinned = stickyLines();
+    if (const auto it = std::find(pinned.begin(), pinned.end(), about.begin.line); it != pinned.end())
+    {
+        mCardAnchor.mTop    = text.mTop - static_cast<S32>(it - pinned.begin()) * layout().rowHeight();
+        mCardAnchor.mBottom = mCardAnchor.mTop - layout().rowHeight();
+    }
     mCard->setShape(ALCodeCards::place(mCardAnchor, text, width, height));
     mCard->setVisible(true);
 }
@@ -4421,7 +4499,7 @@ void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text, std
     {
         return;
     }
-    const ALTextPos   under = posAtLocal(mMouseX, mMouseY, false);
+    const ALTextPos   under = posShownAt(mMouseX, mMouseY);
     const ALTextRange word  = identifierAt(under);
     if (word != mCards.asked())
     {
@@ -4626,7 +4704,11 @@ void ALCodeEditor::dropTyping()
 
 bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 {
+    // The card goes with a key, and comes again only once the mouse has
+    // moved: what a key leaves under a still mouse -- the next page, a
+    // line taken away -- is not what it rested on.
     hideCard();
+    mHoverTried = true;
     // A peek open steps by the keys a comparison steps by, ahead of the
     // misspellings they otherwise walk.
     if (key == KEY_F7 && (mask == MASK_NONE || mask == MASK_SHIFT) && mPeek && mPeek->isOpen())
@@ -4838,6 +4920,9 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 
 bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
 {
+    // A character as any key: the card goes until the mouse moves.
+    hideCard();
+    mHoverTried = true;
     const bool typing   = typingText();
     const bool was_open = completionOpen();
     // At several carets the signature and a snippet's stops, each about
@@ -5199,7 +5284,7 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     // listed as Control-. would list them.
     if (mShowLineNumbers && x >= leftEdge() && x < leftEdge() + MARK_INSET + MARK_SIZE + GUTTER_PAD / 2)
     {
-        const S32 line = posAtLocal(text.mLeft, y, false).line;
+        const S32 line = posShownAt(x, y).line;
         // On the caret's line the lightbulb, which is Control-.: the
         // refactors asked for with the fixes.
         if (fixableAt(line) && (line == caret().line ? quickFix() : openFixes(line)))
@@ -5209,7 +5294,7 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     }
     if (mShowFoldMarkers && x < gutter_right - heatWidth() && x >= gutter_right - heatWidth() - FOLD_COLUMN)
     {
-        const S32 line = posAtLocal(text.mLeft, y, false).line;
+        const S32 line = posShownAt(x, y).line;
         if (regionStartingAt(line))
         {
             if (isFolded(line))
@@ -5236,9 +5321,10 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     }
     if (x >= leftEdge() && x < gutter_right && text.mBottom <= y && y <= text.mTop)
     {
-        // A line number chooses its line, whole; with shift, from the
-        // selection's anchor to it.
-        const S32 line = posAtLocal(text.mLeft, y, false).line;
+        // A line number chooses its line, whole -- a pinned header's, its
+        // number pinned with it; with shift, from the selection's anchor
+        // to it.
+        const S32 line = posShownAt(x, y).line;
         const S32 last = document().lineCount() - 1;
         const ALTextPos from(line, 0);
         const ALTextPos to = line < last ? ALTextPos(line + 1, 0) : ALTextPos(line, static_cast<S32>(document().line(line).size()));
@@ -5311,7 +5397,7 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
     // the strip of heat at its edge, what the line came to.
     if (x >= leftEdge() && x < leftEdge() + gutterWidth() && text.mBottom <= y && y <= text.mTop)
     {
-        const S32 line = posAtLocal(text.mLeft, y, false).line;
+        const S32 line = posShownAt(x, y).line;
         if (mHeatShown && x >= leftEdge() + gutterWidth() - heatWidth())
         {
             if (line >= 0 && line < static_cast<S32>(mAsides.size()) && !mAsides[static_cast<size_t>(line)].heatTip.empty())
@@ -5321,6 +5407,13 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
             }
             return ALTextView::handleToolTip(x, y, mask);
         }
+        // The card once a rest, as on the text: what it said stands until
+        // the mouse moves, and one a key put away stays away as long.
+        if (mHoverTried)
+        {
+            return cardShown() || ALTextView::handleToolTip(x, y, mask);
+        }
+        mHoverTried = true;
         std::vector<CardProblem> problems;
         for (const Decoration* each : decorationsOn(line))
         {
@@ -5336,6 +5429,9 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
             return ALTextView::handleToolTip(x, y, mask);
         }
         showCard(ALTextRange(ALTextPos(line, 0), ALTextPos(line, 0)), std::string(), problems);
+        // About the line, from its mark: the card stays while the mouse is
+        // on the line's row in the gutter as well as beside it.
+        mCardAnchor.mLeft = llmin(mCardAnchor.mLeft, leftEdge());
         return true;
     }
     if (cardShown() && mCard->getRect().pointInRect(x, y))
@@ -5375,6 +5471,14 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
         // which draw watches for, rather than at the tooltip's own time.
         return true;
     }
+    // Asked for once a rest, here or by pump, rather than at every pass
+    // the mouse stays still for: the card it brought stands, or there is
+    // none, until the mouse moves; one a key put away stays away as long.
+    if (mHoverTried)
+    {
+        return cardShown() || ALTextView::handleToolTip(x, y, mask);
+    }
+    mHoverTried = true;
     return hoverCardAt(x, y) || ALTextView::handleToolTip(x, y, mask);
 }
 
@@ -5485,7 +5589,7 @@ bool ALCodeEditor::handleHover(S32 x, S32 y, MASK mask)
     }
     const S32 gutter_right = leftEdge() + gutterWidth();
     mGutterHover           = gutterWidth() > 0 && x >= leftEdge() && x < gutter_right && textRect().mBottom <= y && y <= textRect().mTop;
-    mGutterHoverLine       = mGutterHover ? posAtLocal(textRect().mLeft, y, false).line : -1;
+    mGutterHoverLine       = mGutterHover ? posShownAt(x, y).line : -1;
     const bool taken = ALTextView::handleHover(x, y, mask);
     // A changed line's bar is pressed for a peek at its change.
     if (changeBarAt(x, y) >= 0)

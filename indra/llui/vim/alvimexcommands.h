@@ -53,9 +53,12 @@ public:
     // engine's.
     std::string replacementOf(const std::string& with) const;
     // The position a range address names on the : line -- a number, .,
-    // $, 'x, '< '>, with an offset -- read from `at` on; false where
-    // the line has none there.
-    bool lineAddress(ALTextView& view, const std::string& line, size_t& at, S32& out) const;
+    // $, 'x, '< '>, with an offset, or an offset alone from the caret's
+    // line -- read from `at` on; false where the line has none there.
+    // `before_first`, where given, says whether it named a line before
+    // the first -- 0, where lines are numbered from one -- which is the
+    // first line for most commands, and the one :put puts under.
+    bool lineAddress(ALTextView& view, const std::string& line, size_t& at, S32& out, bool* before_first = nullptr) const;
 
     // The :s asking about each match: the edits left to make, in order,
     // and the one being asked about; the text put in, for the question.

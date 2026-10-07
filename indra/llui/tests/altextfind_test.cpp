@@ -117,4 +117,59 @@ namespace tut
         find.clear();
         ensure("put away with a worker out: let go of", !find.searching() && find.count() == 0);
     }
+
+    template<> template<>
+    void altextfind_object::test<4>()
+    {
+        set_test_name("a worker's matches of a text changed meanwhile, where a search is due with another query, are let go of rather than looked for again by the old one");
+        std::string text;
+        while (text.size() < ALTextFind::ON_A_WORKER + 1024)
+        {
+            text += "needle in a haystack of words\n";
+        }
+        ALTextDocument doc(text);
+        ALTextFind     find;
+        doc.onChanged([&find](const ALTextDocument::Edit& edit) { find.edited(edit); });
+        find.search(doc, "needle", ALTextSearchOptions(), false, ALTextRange());
+        ensure("on a worker", find.searching());
+        // The text changes while it looks, and the query after it, which a
+        // long text looks for once it settles.
+        doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "x");
+        find.stale();
+        find.collect(doc, ALTextRange(), true);
+        ensure("the search with the query as it is now still due", find.isStale());
+        ensure("and the old one not looked for again meanwhile", !find.searching());
+
+        // With nothing due, a changed text is looked through again as before.
+        find.search(doc, "haystack", ALTextSearchOptions(), false, ALTextRange());
+        doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "haystack ");
+        ensure("looked for again", find.collect(doc, ALTextRange(), true) && !find.isStale());
+        ensure("the one typed meanwhile among them", !find.matches().empty() && find.matches()[0] == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 8)));
+    }
+
+    template<> template<>
+    void altextfind_object::test<5>()
+    {
+        set_test_name("a text that changes too often to settle -- a log taking entries -- is looked through again all the same, once it has waited long enough");
+        ALTextFind find;
+        LLFrameTimer::updateFrameTime();
+        find.stale();
+        ensure("not at the change", !find.due());
+        // A change every 20 ms, well within the settle, for up to 2 s.
+        bool due = false;
+        for (S32 step = 0; step < 100 && !due; ++step)
+        {
+            ms_sleep(20);
+            LLFrameTimer::updateFrameTime();
+            find.stale();
+            due = find.due();
+        }
+        ensure("due though it never settled", due);
+
+        // Looked through, the wait starts again at the next change.
+        const ALTextDocument doc("x");
+        find.search(doc, "x", ALTextSearchOptions(), false, ALTextRange());
+        find.stale();
+        ensure("not due at the next change", !find.due());
+    }
 }

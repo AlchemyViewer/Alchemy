@@ -206,4 +206,41 @@ namespace tut
         }
         ensure_equals("each arm a block of its own, the last through the end", out, std::string("0-1 2-3 4-6"));
     }
+
+    template<> template<>
+    void alfoldmodel_object::test<5>()
+    {
+        set_test_name("whole lines taken from a folded block's first line take its fold, and leave the block after them as it was; lines put in above it at its start take it down with them");
+        const char* const text = "foo()\n{\n    x();\n}\nbar()\n{\n    y();\n}";
+        ALTextDocument    doc(text);
+        ensure_equals("two blocks", blocks(doc), std::string("0-3 4-7"));
+        model.fold(doc, 4, 0);
+        ALTextDocument::Edit edit = doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 0)), "");
+        model.edited(edit);
+        ensure_equals("the block after them now first", doc.line(0), std::string("bar()"));
+        ensure("the fold gone with its line, the block now there not folded for it", model.folded().empty());
+
+        // Both folded: the one after moves up, and is one fold still.
+        ALTextDocument both(text);
+        ALFoldModel    two;
+        two.fold(both, 4, 0);
+        two.fold(both, 4, 4);
+        edit = both.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 0)), "");
+        two.edited(edit);
+        ensure("the one after moved up, once", two.folded() == std::vector<S32>{ 0 });
+        ensure_equals("hiding its lines once", lines(two.hidden(both, 4)), std::string("1-3"));
+
+        // Return at its first line's start: the line goes down, and the fold
+        // with it.
+        ALTextDocument above(text);
+        ALFoldModel    down;
+        down.fold(above, 4, 0);
+        edit = above.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "\n");
+        down.edited(edit);
+        ensure("moved down with its line", down.folded() == std::vector<S32>{ 1 });
+        ensure_equals("hiding what it did", lines(down.hidden(above, 4)), std::string("2-4"));
+        edit = above.replace(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)), "q");
+        down.edited(edit);
+        ensure("typing at its start keeps it", down.folded() == std::vector<S32>{ 1 });
+    }
 }

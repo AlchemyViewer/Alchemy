@@ -128,7 +128,8 @@ public:
     bool               typingLine(std::string& line, S32& caret) const override;
     // A line put up on the : or / line, as the history window hands one
     // back: to be edited and entered, or run as it is, as vim's window
-    // runs the row Enter is pressed on.
+    // runs the row Enter is pressed on. An insert or an asking :s still
+    // going ends first, as Escape and q end them.
     void               takeLine(ALTextView& view, llwchar kind, const std::string& text, bool run = false);
     // What the mode last said: a pattern not found, lines yanked, a
     // command unknown; cleared by the next key.
@@ -246,12 +247,32 @@ private:
         // A motion that failed to move at all, which cancels an operator.
         bool      moved     = true;
     };
-    // A stretch an operator works on.
+    // A stretch an operator works on. A block's columns are the reader's
+    // (ALVimText::blockColumns), which the bytes of its lines need not
+    // agree on: the first and the last it covers, and whether it reaches
+    // every line's end, as one taken with $ does; its range runs from what
+    // it holds of its first line to what it holds of its last.
     struct Span
     {
         ALTextRange range;
         bool        linewise = false;
         bool        block    = false;
+        S32         left     = 0;
+        S32         right    = 0;
+        bool        toEnd    = false;
+        // Taken from a visual selection -- gn's match is one -- which a
+        // delete takes as it was selected, never as the lines it is over.
+        bool        visual   = false;
+        // Taken through the character its motion ends on, as vim's
+        // inclusive motions and iw and aw take it: an empty stretch so
+        // taken is an empty line's end -- C, c$ or ciw there -- which c
+        // keeps as an empty register, where one an exclusive motion made,
+        // s or c0 there, keeps nothing.
+        bool        inclusive = false;
+        // Over one of the motions whose delete vim keeps in register 1
+        // however little it takes: a search, n and N, * and #, %, { and },
+        // and ` to a mark.
+        bool        registerOne = false;
     };
 
     // A key as typed: recorded where a macro is being, then through the
@@ -312,8 +333,21 @@ private:
     // Insert mode's own Control keys; false where vim gives the key no
     // meaning there, and it is the view's.
     bool insertControl(ALTextView& view, const Input& input);
-    // Text put in as though it were typed, for `.` and a count.
+    // Text put in as though it were typed: part of what the insert typed,
+    // for `.` and a count, as the text has it.
     void typeIn(ALTextView& view, const std::string& text);
+    // What insert mode has typed: the text from where it began to the
+    // caret, as it stands now.
+    std::string typedText(const ALTextView& view) const;
+    // The caret about to be moved off what insert mode typed -- an arrow,
+    // Ctrl-O's command -- or, `gone`, moved off it already, by the mouse:
+    // what was typed so far is the last insert's, where it can still be
+    // read, and typing again is an insert of its own (restartInsert).
+    void typingLeft(const ALTextView& view, bool gone = false);
+    // Typing again once the caret was moved off what was typed: an insert
+    // from the caret, as vim's arrows make it -- what a count or a block
+    // types again, and what `.` repeats, are what is typed from here.
+    void restartInsert(ALTextView& view);
 
     // Normal mode's command, once the count, the register and any
     // operator have been read; false where the character is not one. In
@@ -326,6 +360,24 @@ private:
     std::optional<bool> visualKey(ALTextView& view, llwchar ch);
     std::optional<bool> normalKey(ALTextView& view, llwchar ch);
     bool                motionKey(ALTextView& view, llwchar ch);
+    // An operator over a search's motion -- / and ? entered after it, n
+    // and N, * and # -- from the caret to where the last search goes,
+    // `forward` or back, the counts' match on, looked for from
+    // `search_from` where one is given: exclusive and charwise, as vim's
+    // is; lines for an offset of lines, and inclusive for one from the
+    // match's end (:help search-offset). One that finds nothing fails the
+    // operator.
+    bool                searchMotion(ALTextView& view, bool forward, std::optional<ALTextPos> search_from = std::nullopt);
+    // * # g* g#: the word under the caret or the first after it on the
+    // line looked for, whole or -- `whole` false, g* and g# -- anywhere,
+    // forward or back, the count's match on; where no word follows, the
+    // other characters there, as they are. From the word's start, so that
+    // the word itself is passed over. The caret goes there, or an operator
+    // waiting takes the stretch to there (searchMotion), and n and N go on
+    // with it; and it goes into the search history, a whole word as
+    // \<word\>. Nothing but blanks from the caret to the line's end fails
+    // the command, the operator with it.
+    bool                starSearch(ALTextView& view, bool forward, bool whole);
     // A key that waits for the one after it -- a register's name, g's and
     // z's commands, r's character, a text object's kind -- and that one:
     // what the waiting key is picks a function from PENDING_KEYS, each
@@ -358,27 +410,58 @@ private:
     // character is no motion.
     Motion motion(ALTextView& view, llwchar ch, S32 count, llwchar arg);
     bool   textObject(ALTextView& view, llwchar kind, llwchar what, S32 count, Span& out);
+    // A text object over a visual selection of more than its caret's
+    // character -- of more than its line, for a paragraph -- which vim's take
+    // on rather than choose afresh: words on from the caret, or back where it
+    // is before the anchor; the brackets, the tag or the quotes around the
+    // selection, the next ones out where what they hold is no more than it
+    // holds; paragraphs on from the caret's line, or back. Nothing where the
+    // selection is no more, and the object is chosen afresh (textObject);
+    // false where there is nothing more to take.
+    std::optional<bool> visualObject(ALTextView& view, llwchar kind, llwchar what, S32 count);
     void   applyOperator(ALTextView& view, llwchar op, const Span& span, S32 count);
     void   moveTo(ALTextView& view, const ALTextPos& to);
     // Where the caret is for a motion or a command: the visual caret in
-    // a visual mode, else the view's.
+    // a visual mode, and on a search line opened over one; else the
+    // view's.
     ALTextPos cursor(const ALTextView& view) const;
     bool      isVisual() const { return mMode == Mode::Visual || mMode == Mode::VisualLine || mMode == Mode::VisualBlock; }
     void   finishCommand(bool changed);
     void   clearPending();
+    // The count typed before a register's name and the one typed after
+    // it, multiplied into the command's, as vim's are: once a key of the
+    // command's own comes, which is no digit of the count.
+    void   takeRegisterCount();
 
-    // Modes. Insert mode is one step to undo, in a group it opens; or in
-    // one the caller opened already, `grouped`, where what it put in first
-    // -- the line `o` opens, what `c` took out -- is part of the step.
+    // Modes. Every change of one, the parts' as well, is setMode's, which
+    // takes up and lets go of what each mode holds while it lasts on the
+    // way, whatever changed it: insert mode's step to undo, opened coming
+    // in -- or one the caller opened already, `grouped`, where what it put
+    // in first, the line `o` opens or what `c` took out, is part of the
+    // step -- and closed going out, Ctrl-O's wait over once it is in; a
+    // visual selection let go of, kept for gv and '< '>, a block's lit
+    // columns put out with it -- but not by a search line opened over it,
+    // which keeps it to go back to (mSearchVisual); and what the search
+    // line lit as it was typed, put out as it is left.
+    void setMode(ALTextView& view, Mode to, bool grouped = false);
     void enterInsert(ALTextView& view, S32 count, bool grouped = false);
     void leaveInsert(ALTextView& view);
     void enterVisual(ALTextView& view, Mode which);
     void leaveVisual(ALTextView& view);
     void showVisual(ALTextView& view);
-    Span visualSpan(const ALTextView& view) const;
+    // The selection as an operator takes it. One of characters that ends
+    // past a line's last -- on an empty line, or after $ -- takes the line's
+    // break as well with `line_break`, as vim's d, c, y, p and the case
+    // operators take it; an operator over lines -- > < = J -- none, which
+    // would take the next line with it.
+    Span visualSpan(const ALTextView& view, bool line_break = false) const;
+    // What a block holds of each of its lines, the first to the last
+    // (ALVimText::blockPiece): what is cut, lit, replaced and put into.
+    std::vector<ALTextRange> blockPieces(const ALTextView& view, const Span& span) const;
 
-    // Registers, the unnamed one on the clipboard.
-    void     store(char name, std::string text, bool linewise, bool block, bool yanked);
+    // Registers, the unnamed one on the clipboard; a delete in 1 whatever
+    // its size where `register_one` says (Span::registerOne).
+    void     store(char name, std::string text, bool linewise, bool block, bool yanked, bool register_one = false);
     Register fetch(char name) const;
     // gp and gP, `past`: the caret after what was put.
     void     put(ALTextView& view, char name, bool after, S32 count, bool past = false);
@@ -395,18 +478,23 @@ private:
     // The number at or after the caret on its line, changed by so much;
     // false where there is none.
     bool addToNumber(ALTextView& view, S64 by);
-    // The last visual operation, for `.`: the extent it covered and the
-    // keys from the operator on.
+    // The last visual operation, for `.`: the extent it covered -- a
+    // block's columns as the reader counts them, or every line's end for
+    // one taken with $; characters from the selection's two ends, one past
+    // a line's last counted a column more than the line has, as vim counts
+    // a line's break, or to the last line's end for one taken with $ --
+    // and the keys from the operator on.
     struct VisualExtent
     {
         bool valid   = false;
         Mode mode    = Mode::Normal;
         S32  lines   = 0;
         S32  columns = 0;
+        bool toEnd   = false;
         // Where in the command's inputs the operator was typed.
         size_t opAt = 0;
     };
-    void noteVisualOperation(const Span& span, S32 lines_hint = -1);
+    void noteVisualOperation(const ALTextDocument& d, const Span& span, S32 lines_hint = -1);
     // The file named under the caret, as gf reads one; empty for none.
     std::string fileUnderCursor(const ALTextView& view) const;
     // ]s and [s: the caret to the next misspelled word, or the one before,
@@ -444,11 +532,13 @@ private:
     U32   mGeneration = 1;
 
     // What normal mode has read so far: a count (0 for none), a register
-    // (0 for the unnamed), an operator waiting for its motion with its
-    // own count, and a character waiting for the one that completes it
-    // (f, t, r, m, `, ', ", g, z, Z, i, a) with the count that came before.
+    // (0 for the unnamed) with the count typed before its name, an
+    // operator waiting for its motion with its own count, and a character
+    // waiting for the one that completes it (f, t, r, m, `, ', ", g, z, Z,
+    // i, a) with the count that came before.
     S32     mCount        = 0;
     char    mRegister     = 0;
+    S32     mRegisterCount = 0;
     llwchar mOperator     = 0;
     S32     mOperatorCount = 0;
     llwchar mPending      = 0;
@@ -485,9 +575,9 @@ private:
     boost::signals2::scoped_connection mMarksSlide;
     // Everything held at a place in the text, moved with each edit made to
     // it, whoever makes it: the marks and the last visual area, the visual
-    // area being made, the last match gone to, the lines a block insert
-    // goes onto, and the :s edits still to be asked about -- those an edit
-    // cut through let go.
+    // area being made, the last match gone to, where insert mode began
+    // typing, the lines a block insert goes onto, and the :s edits still to
+    // be asked about -- those an edit cut through let go.
     void                      slideHeld(const ALTextDocument::Edit& edit);
     void                      followDocument(ALTextView& view);
 
@@ -500,19 +590,35 @@ private:
 
     // Visual mode: where it started and where its caret is -- on a
     // character, which the view's selection reaches past -- and the last
-    // visual selection for gv.
+    // visual selection for gv, with whether a block of it was taken to
+    // every line's end with $, as vim keeps its curswant.
     ALTextPos mVisualAnchor;
     ALTextPos mVisualCaret;
     Mode      mVisualLast = Mode::Normal;
     ALTextPos mVisualLastAnchor;
     ALTextPos mVisualLastCaret;
+    bool      mVisualLastToEnd = false;
+    // The visual mode the search line was opened over, which entering the
+    // line or letting it go goes back to, what is found moving the visual
+    // caret as vim's search does; normal mode for one opened from any
+    // other, and while no search line is being typed (setMode).
+    Mode      mSearchVisual = Mode::Normal;
 
-    // Insert mode: how many times what is typed goes in, the characters
-    // typed so far, and a block's lines to put them on as well; what the
-    // last insert typed, for Control-A; and whether a Control-R waits
-    // for the register to put in.
+    // Insert mode: how many times what is typed goes in, and whether on a
+    // line of its own each time, as o and O open one; where the typing
+    // began, moved with each edit, so that what was typed is read off the
+    // text -- what a backspace or Ctrl-W took back gone from it, the
+    // indent a Return made in it; whether the caret has been moved off it
+    // since, and from where, which the key meant to move it may not have;
+    // and a block's lines to put it on as well -- at its first column as
+    // the reader counts them, or for A past its last, or past each line's
+    // end where it was taken with $; what the last insert typed, for
+    // Control-A; and whether a Control-R waits for the register to put in.
     S32         mInsertCount = 1;
-    std::string mTyped;
+    bool        mInsertOpened = false;
+    ALTextPos   mInsertStart;
+    bool        mInsertMoved = false;
+    ALTextPos   mInsertLeftAt;
     std::string mLastTyped;
     bool        mInsertRegister = false;
     bool        mBlockInsert       = false;
@@ -520,6 +626,7 @@ private:
     S32         mBlockLast         = 0;
     S32         mBlockColumn       = 0;
     bool        mBlockAppend       = false;
+    bool        mBlockToEnd        = false;
 
     // The settings and histories shared with the other buffers' keymaps.
     std::shared_ptr<Shared>  mShared = std::make_shared<Shared>();

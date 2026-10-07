@@ -126,6 +126,44 @@ namespace ALVimText
         return end.column > 0 ? d.prevCluster(end) : end;
     }
 
+    // --- a visual block, by the columns a reader counts ---------------------------------
+
+    // A block's columns from its two corners, as displayColumn counts them:
+    // the first the one further left begins at, and the last the one further
+    // right covers -- a tab to its stop, a line's end one column -- so that
+    // the character at either corner is in it whole.
+    inline void blockColumns(const ALTextDocument& d, const ALTextPos& a, const ALTextPos& b, S32 tab_width, S32& left, S32& right)
+    {
+        const auto past = [&d, tab_width](const ALTextPos& p) {
+            return atLineEnd(d, p) ? d.displayColumn(p, tab_width) + 1 : d.displayColumn(d.nextCluster(p), tab_width);
+        };
+        left  = llmin(d.displayColumn(a, tab_width), d.displayColumn(b, tab_width));
+        right = llmax(past(a), past(b)) - 1;
+    }
+    // What a block holds of a line: from the character its first column
+    // falls in to past the one its last column falls in -- or to the
+    // line's end, for a block taken with $ -- wherever the bytes before
+    // them on the line put them, so that a character is taken whole or not
+    // at all; empty, at the line's end, on a line that stops short of the
+    // block.
+    inline ALTextRange blockPiece(const ALTextDocument& d, S32 line, S32 left, S32 right, bool to_end, S32 tab_width)
+    {
+        const ALTextPos begin = d.posAtDisplayColumn(line, left, tab_width);
+        if (to_end)
+        {
+            return ALTextRange(begin, d.lineEnd(line));
+        }
+        const ALTextPos last = d.posAtDisplayColumn(line, right, tab_width);
+        return ALTextRange(begin, atLineEnd(d, last) ? last : d.nextCluster(last));
+    }
+    // The blanks that take a line out to a column, as the reader counts
+    // them; none where it reaches that far already.
+    inline std::string padTo(const ALTextDocument& d, S32 line, S32 column, S32 tab_width)
+    {
+        const S32 width = d.displayColumn(d.lineEnd(line), tab_width);
+        return width < column ? std::string(static_cast<size_t>(column - width), ' ') : std::string();
+    }
+
     inline bool isBracket(char c) { return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}'; }
     inline char partnerOf(char c)
     {
@@ -193,13 +231,19 @@ namespace ALVimText
     // register played can be one.
     enum Composite : llwchar
     {
-        // gg, ge, gE, gj, gk and g_: motions.
+        // gg, ge, gE, gj, gk, g_, g0, g^, gm, g$, gM and go: motions.
         GO_TOP = 0x110000,
         WORD_END_BACK,
         BIG_WORD_END_BACK,
         DISPLAY_DOWN,
         DISPLAY_UP,
         LAST_NON_BLANK,
+        DISPLAY_START,
+        DISPLAY_FIRST,
+        DISPLAY_MIDDLE,
+        DISPLAY_END,
+        LINE_MIDDLE,
+        GO_BYTE,
         // gr pending, and gc: an operator.
         PENDING_GR,
         COMMENT_OPERATOR,
@@ -224,6 +268,12 @@ namespace ALVimText
             case DISPLAY_DOWN:       return "gj";
             case DISPLAY_UP:         return "gk";
             case LAST_NON_BLANK:     return "g_";
+            case DISPLAY_START:      return "g0";
+            case DISPLAY_FIRST:      return "g^";
+            case DISPLAY_MIDDLE:     return "gm";
+            case DISPLAY_END:        return "g$";
+            case LINE_MIDDLE:        return "gM";
+            case GO_BYTE:            return "go";
             case PENDING_GR:         return "gr";
             case COMMENT_OPERATOR:   return "gc";
             case SURROUND_OPERATOR:

@@ -2686,7 +2686,13 @@ if(AL_BUILD_TESTS)
 
   # The scripter's snippets: the shipped and their own, read, written and
   # kept whole on disk.
-  al_add_test(alscriptsnippets UNIT PROJECT ${test_project} LIBRARIES llui ${test_libs})
+  al_add_test(
+    alscriptsnippets
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
 
   # Script Studio's themes: their colours, the shipped ones legible, and
   # every skin's script colours read against what they are drawn on.

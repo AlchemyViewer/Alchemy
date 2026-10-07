@@ -42,7 +42,7 @@ void ALVimRegisters::setClipboard(copy_t copy, paste_t paste)
     mPaste = std::move(paste);
 }
 
-void ALVimRegisters::store(char name, std::string text, bool linewise, bool block, bool yanked, bool unnamed_clipboard)
+void ALVimRegisters::store(char name, std::string text, bool linewise, bool block, bool yanked, bool unnamed_clipboard, bool register_one)
 {
     Register reg;
     reg.text     = std::move(text);
@@ -87,24 +87,29 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
     {
         mRegisters['0'] = reg;
     }
-    else if (linewise || reg.text.find('\n') != std::string::npos)
-    {
-        // A delete of a line or more: the last nine kept, newest first,
-        // each moved down one rather than copied.
-        for (char n = '9'; n > '1'; --n)
-        {
-            const auto older = mRegisters.find(static_cast<char>(n - 1));
-            if (older != mRegisters.end())
-            {
-                mRegisters[n] = std::move(older->second);
-            }
-        }
-        mRegisters['1'] = reg;
-    }
     else
     {
-        // A smaller delete.
-        mRegisters['-'] = reg;
+        const bool lines = linewise || reg.text.find('\n') != std::string::npos;
+        if (lines || register_one)
+        {
+            // A delete of a line or more, or a smaller one `register_one`
+            // says is kept here: the last nine kept, newest first, each
+            // moved down one rather than copied.
+            for (char n = '9'; n > '1'; --n)
+            {
+                const auto older = mRegisters.find(static_cast<char>(n - 1));
+                if (older != mRegisters.end())
+                {
+                    mRegisters[n] = std::move(older->second);
+                }
+            }
+            mRegisters['1'] = reg;
+        }
+        if (!lines)
+        {
+            // A smaller delete.
+            mRegisters['-'] = reg;
+        }
     }
     // The unnamed register: the clipboard, which the world shares, where
     // the setting says so; the editor's own otherwise.
@@ -133,6 +138,13 @@ ALVimRegisters::Register ALVimRegisters::fetch(char name, bool unnamed_clipboard
     {
         return mUnnamed;
     }
+    // _ gives back nothing, and so does any name none of these keeps: the
+    // clipboard is + and *, and none named where it is the unnamed
+    // register, and nothing else.
+    if (name != 0 && name != '+' && name != '*')
+    {
+        return Register();
+    }
     // What the clipboard holds now: ours, with how it was taken, or
     // somebody else's, taken as characters.
     Register    reg;
@@ -145,6 +157,12 @@ ALVimRegisters::Register ALVimRegisters::fetch(char name, bool unnamed_clipboard
             reg.linewise = mUnnamed.linewise;
             reg.block    = mUnnamed.block;
         }
+    }
+    else if (mUnnamed.linewise && mUnnamed.text.empty())
+    {
+        // An empty line of ours leaves the clipboard empty, which may then
+        // say it holds nothing at all.
+        reg = mUnnamed;
     }
     return reg;
 }

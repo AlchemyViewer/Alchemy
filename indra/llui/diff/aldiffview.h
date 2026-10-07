@@ -356,9 +356,10 @@ private:
     void          drawArrows();
     // Each side's lines hidden and shown as the folds are, each folded
     // run's row a gap above the line after it, which the caret stops on,
-    // and a caret on a line hidden put beside the run: every side filled,
-    // or one; or of one, only the folds whose lines or row are among those
-    // from `from` to `to`.
+    // and a caret on a line hidden put beside the run: every side filled --
+    // a layout not filled has every fold applied as it next is -- or one;
+    // or of one, only the folds whose lines or row are among those from
+    // `from` to `to`.
     void          applyFolds();
     void          applyFolds(ALCodeEditor* side, S32 from = 0, S32 to = S32_MAX);
     void          openFold(S32 fold);
@@ -437,8 +438,12 @@ private:
     // The range the caret is in, -1 for none.
     S32                       mLinked = -1;
     // The model's layout each layout's editors were last filled from --
-    // side by side, and inline -- none before they are.
+    // side by side, and inline -- none before they are; and whether runs
+    // were opened or folded while they were not as the model is, which has
+    // every fold applied as they are filled, however little of them is
+    // filled again.
     std::optional<U32>        mFilledAt[2];
+    bool                      mFoldsStale[2] = { false, false };
     // The grammar words are cut by: none for prose.
     std::shared_ptr<const ALSyntaxGrammar> mLexedBy;
     // Whether letting case go is offered.

@@ -191,7 +191,7 @@ end</string>
       <key>detail</key>
       <string>A type alias</string>
       <key>body</key>
-      <string>type ${1:Name} = ${2:{}}</string>
+      <string>type ${1:Name} = ${2:{\}}</string>
     </map>
   </array>
 </llsd>

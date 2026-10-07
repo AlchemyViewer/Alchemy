@@ -28,13 +28,15 @@
 
 #include "altextchars.h"
 
-#include <boost/regex.hpp>
+#include <boost/regex/icu.hpp>
 
 #include <algorithm>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <string_view>
 
 namespace
 {
@@ -43,26 +45,127 @@ namespace
         return !(begin > 0 && alWordByte(line[begin - 1])) && !(end < static_cast<S32>(line.size()) && alWordByte(line[end]));
     }
 
-    // Past the character at a place, a whole one: what an empty match is
-    // stepped over by, so that the next match never begins inside one.
-    const char* pastCharacter(const char* at, const char* end)
+    // A text's characters over its bytes, as a pattern reads them: each
+    // well-formed sequence the codepoint it spells, and any other byte
+    // U+FFFD on its own, as the rest of the text reads them. A match found
+    // through them begins and ends where a character does, at the byte its
+    // base() is; a step stays within the bytes from `begin` to `end`, so
+    // that a walk forward lands on the end of what is searched. They are
+    // char32_t rather than ICU's UChar32, an int: a match's results hold a
+    // std::basic_string of them, and std::char_traits is only had for the
+    // character types.
+    class Characters
     {
-        const char* next = at + 1;
-        while (next < end && (static_cast<unsigned char>(*next) & 0xC0) == 0x80)
+    public:
+        typedef std::bidirectional_iterator_tag iterator_category;
+        typedef char32_t                        value_type;
+        typedef std::ptrdiff_t                  difference_type;
+        typedef const char32_t*                 pointer;
+        typedef char32_t                        reference;
+
+        Characters() = default;
+        Characters(const char* at, const char* begin, const char* end) : mAt(at), mBegin(begin), mEnd(end) {}
+
+        reference operator*() const
         {
-            ++next;
+            const unsigned char lead = static_cast<unsigned char>(*mAt);
+            return lead < 0x80 ? static_cast<char32_t>(lead) : decoded(mAt).cp;
         }
-        return next;
+        Characters& operator++()
+        {
+            mAt = static_cast<unsigned char>(*mAt) < 0x80 ? mAt + 1 : mBegin + decoded(mAt).next;
+            return *this;
+        }
+        Characters operator++(int)
+        {
+            Characters was(*this);
+            ++*this;
+            return was;
+        }
+        // To where the character before begins: the well-formed sequence
+        // that ends here, where one does, else the one byte before, as a
+        // walk forward reads them.
+        Characters& operator--()
+        {
+            const char* lead = mAt - 1;
+            if (static_cast<unsigned char>(*lead) >= 0x80)
+            {
+                while (lead > mBegin && mAt - lead < 4 && (static_cast<unsigned char>(*lead) & 0xC0) == 0x80)
+                {
+                    --lead;
+                }
+                if (mBegin + decoded(lead).next != mAt)
+                {
+                    lead = mAt - 1;
+                }
+            }
+            mAt = lead;
+            return *this;
+        }
+        Characters operator--(int)
+        {
+            Characters was(*this);
+            --*this;
+            return was;
+        }
+        bool        operator==(const Characters& other) const { return mAt == other.mAt; }
+        bool        operator!=(const Characters& other) const { return mAt != other.mAt; }
+        const char* base() const { return mAt; }
+
+    private:
+        LLCodepointAt decoded(const char* at) const
+        {
+            return utf8str_decode_at(std::string_view(mBegin, static_cast<size_t>(mEnd - mBegin)), static_cast<size_t>(at - mBegin));
+        }
+
+        const char* mAt    = nullptr;
+        const char* mBegin = nullptr;
+        const char* mEnd   = nullptr;
+    };
+
+    // Where the character the byte at `at` is in begins, as Characters
+    // reads a text: the byte itself, unless a well-formed sequence begun
+    // before it runs over it.
+    size_t characterStart(std::string_view text, size_t at)
+    {
+        size_t lead = at;
+        while (lead > 0 && lead < text.size() && at - lead < 3 && (static_cast<unsigned char>(text[lead]) & 0xC0) == 0x80)
+        {
+            --lead;
+        }
+        return lead < at && utf8str_decode_at(text, lead).next > at ? lead : at;
     }
 
-    bool compile(std::string_view query, const ALTextSearchOptions& options, boost::regex& re, std::string* error)
+    // The pattern's first match from `first`, a character at a time up to
+    // `last`, looking back as far as `base`; said in bytes, as Boost's own
+    // search of UTF-8 says it.
+    bool searchAt(const char* first, const char* last, const char* base, const boost::u32regex& re, boost::match_flag_type flags,
+                  boost::cmatch& found)
+    {
+        boost::match_results<Characters> by_character;
+        if (!boost::regex_search(Characters(first, base, last), Characters(last, base, last), by_character, re, flags, Characters(base, base, last)))
+        {
+            return false;
+        }
+        boost::BOOST_REGEX_DETAIL_NS::copy_results(found, by_character, re.get_named_subs());
+        return true;
+    }
+
+    bool compile(std::string_view query, const ALTextSearchOptions& options, boost::u32regex& re, std::string* error)
     {
         try
         {
-            re = boost::regex(std::string(query), boost::regex::perl | (options.caseSensitive ? 0 : boost::regex::icase));
+            // Read by character, as the text is: a letter past ASCII is one
+            // letter, and without regard to case it folds as Unicode says.
+            const char* begin = query.data();
+            const char* end   = begin + query.size();
+            re = boost::make_u32regex(Characters(begin, begin, end), Characters(end, begin, end),
+                                      boost::u32regex::perl | (options.caseSensitive ? 0 : boost::u32regex::icase));
             return true;
         }
-        catch (const boost::regex_error& fault)
+        // A pattern that does not read, or ICU's collators not to be had
+        // for the traits it is read with.
+        catch (const std::runtime_error& fault)
         {
             if (error)
             {
@@ -78,14 +181,14 @@ namespace
     // kept alone recompiled both every time. Behind a lock, since a search
     // over many scripts may run off the main thread; each handed out
     // shared, so that one being used outlives its place here.
-    std::shared_ptr<const boost::regex> compiledOnce(std::string_view query, const ALTextSearchOptions& options, std::string* error)
+    std::shared_ptr<const boost::u32regex> compiledOnce(std::string_view query, const ALTextSearchOptions& options, std::string* error)
     {
         struct Kept
         {
-            std::string                         query;
-            bool                                caseSensitive = false;
-            std::shared_ptr<const boost::regex> re;
-            std::string                         error;
+            std::string                            query;
+            bool                                   caseSensitive = false;
+            std::shared_ptr<const boost::u32regex> re;
+            std::string                            error;
         };
         constexpr size_t         KEPT = 4;
         static std::mutex        lock;
@@ -94,13 +197,13 @@ namespace
         auto found = std::find_if(kept.begin(), kept.end(), [&](const Kept& one) { return one.caseSensitive == options.caseSensitive && one.query == query; });
         if (found == kept.end())
         {
-            Kept         made;
-            boost::regex re;
+            Kept            made;
+            boost::u32regex re;
             made.query         = std::string(query);
             made.caseSensitive = options.caseSensitive;
             if (compile(query, options, re, &made.error))
             {
-                made.re = std::make_shared<const boost::regex>(std::move(re));
+                made.re = std::make_shared<const boost::u32regex>(std::move(re));
             }
             kept.insert(kept.begin(), std::move(made));
             if (kept.size() > KEPT)
@@ -144,13 +247,13 @@ namespace
         {
             return out;
         }
-        const std::shared_ptr<const boost::regex> compiled = options.regex ? compiledOnce(query, options, error) : nullptr;
+        const std::shared_ptr<const boost::u32regex> compiled = options.regex ? compiledOnce(query, options, error) : nullptr;
         if (options.regex && !compiled)
         {
             return out;
         }
-        static const boost::regex NONE;
-        const boost::regex&       re     = compiled ? *compiled : NONE;
+        static const boost::u32regex NONE;
+        const boost::u32regex&       re     = compiled ? *compiled : NONE;
         // As many as were asked for, and no more looked for.
         const auto full = [&out, &options]() { return options.limit > 0 && out.size() >= options.limit; };
         const ALTextRange   within = scope ? scope->normalised() : ALTextRange(doc.start(), doc.end());
@@ -160,6 +263,15 @@ namespace
         // offsets turned into places by `posOf`. The text is a line, or the
         // lines as one with breaks between them.
         auto searchIn = [&](const std::string& text, S32 from, S32 to, const std::function<ALTextPos(S32)>& posOf) {
+            // A stretch that begins inside a character begins after it, and
+            // one that ends inside a character ends before it, so that no
+            // match takes part of one.
+            const size_t first_whole = characterStart(text, static_cast<size_t>(from));
+            if (first_whole != static_cast<size_t>(from))
+            {
+                from = static_cast<S32>(utf8str_decode_at(text, first_whole).next);
+            }
+            to = static_cast<S32>(characterStart(text, static_cast<size_t>(to)));
             if (options.regex)
             {
                 // Searched to the text's own end, a match kept only where it
@@ -188,7 +300,7 @@ namespace
                     {
                         // From the text's start as the base, so that a look
                         // behind sees past where this search began.
-                        if (!boost::regex_search(start, end, found, re, flags, base) || found[0].first > limit)
+                        if (!searchAt(start, end, base, re, flags, found) || found[0].first > limit)
                         {
                             break;
                         }
@@ -243,7 +355,8 @@ namespace
                         {
                             break;
                         }
-                        start = pastCharacter(found[0].second, end);
+                        Characters past(found[0].second, base, end);
+                        start = (++past).base();
                     }
                     else
                     {
@@ -383,7 +496,7 @@ std::string ALTextSearch::replacement(const ALTextDocument& doc, const ALTextRan
     if (options.regex)
     {
         // The pattern as compiled for the matches, once for the lot.
-        const std::shared_ptr<const boost::regex> re = compiledOnce(query, options, nullptr);
+        const std::shared_ptr<const boost::u32regex> re = compiledOnce(query, options, nullptr);
         if (re)
         {
             // Matched again where it stands, with what is around it there
@@ -406,20 +519,15 @@ std::string ALTextSearch::replacement(const ALTextDocument& doc, const ALTextRan
             try
             {
                 boost::cmatch found;
-                bool matched = boost::regex_search(base + from, base + hay.size(), found, *re, flags, base) && found[0].second == base + to;
+                bool matched = searchAt(base + from, base + hay.size(), base, *re, flags, found) && found[0].second == base + to;
                 if (!matched)
                 {
-                    matched = boost::regex_search(base + from, base + to, found, *re, flags, base) && found[0].second == base + to;
+                    matched = searchAt(base + from, base + to, base, *re, flags, found) && found[0].second == base + to;
                 }
-                if (matched)
+                const char* own = text.data();
+                if (matched || searchAt(own, own + text.size(), own, *re, boost::match_default | boost::match_not_dot_newline, found))
                 {
                     out = found.format(std::string(with), boost::format_perl);
-                }
-                else if (boost::regex_search(text, *re, boost::match_default | boost::match_not_dot_newline))
-                {
-                    out = boost::regex_replace(text, *re, std::string(with),
-                                               boost::match_default | boost::match_not_dot_newline | boost::format_perl | boost::format_first_only |
-                                                   boost::format_no_copy);
                 }
             }
             catch (const std::runtime_error&)

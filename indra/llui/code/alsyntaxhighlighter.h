@@ -71,6 +71,16 @@ public:
     const std::vector<ALSyntaxToken>& tokens(S32 line);
     U32                               revision(S32 line);
 
+    // For whoever wants every line's tokens and asks every frame -- the
+    // blocks a gutter draws: the lines that want lexing lexed on from the
+    // first of them, no more than `most` of them, and whether every line
+    // is lexed now. An edit that changes how each line after it starts --
+    // a quote or a comment left open -- is lexed a slice a frame so, what
+    // was found of the text before it kept until this says it is done,
+    // rather than the whole text lexed in the frame after the edit.
+    static constexpr S32 SLICE = 256;
+    bool                 lexSome(S32 most = SLICE);
+
     // How many lines the last request had to lex, for a test that says an
     // edit re-lexes only what it must; and how many states are kept, for a
     // test that says they do not pile up.
@@ -96,6 +106,9 @@ private:
     void reset();
     void onEdit(const ALTextDocument::Edit& edit);
     void ensure(S32 line);
+    // The lines through `line` that want lexing lexed, from the first of
+    // them, no more than `most` of them; the rest from there next time.
+    void lex(S32 line, S32 most);
     // A state's number, kept once whoever starts or ends in it; and the
     // states kept cut back to those lines are in, past a number of them.
     U32  intern(ALSyntaxState state);

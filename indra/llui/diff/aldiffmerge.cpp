@@ -51,10 +51,20 @@ ALDiffMerge::ALDiffMerge(lines_t base, lines_t theirs, const ALTextDiff::Options
 // static
 std::string ALDiffMerge::start(std::string_view base, std::string_view ours, std::string_view theirs, const ALTextDiff::Options& options)
 {
-    const lines_t              b     = ALTextDiff::split(base);
-    const lines_t              o     = ALTextDiff::split(ours);
-    const lines_t              t     = ALTextDiff::split(theirs);
-    const ALTextMerge::hunks_t hunks = ALTextMerge::merge(b, o, t, ALTextDiff::linesOnly(options));
+    const lines_t        b     = ALTextDiff::split(base);
+    const lines_t        o     = ALTextDiff::split(ours);
+    const lines_t        t     = ALTextDiff::split(theirs);
+    ALTextMerge::hunks_t hunks = ALTextMerge::merge(b, o, t, ALTextDiff::linesOnly(options));
+    // Where neither changed, ours as it is: lines told the same may be
+    // written otherwise in ours than in the base -- re-indented, a comment
+    // reworded -- and keep it.
+    for (ALTextMerge::Hunk& hunk : hunks)
+    {
+        if (hunk.kind == ALTextMerge::Kind::Same)
+        {
+            hunk.kind = ALTextMerge::Kind::Ours;
+        }
+    }
     return ALLineBreaks::join(ALTextMerge::merged(b, o, t, hunks, [](S32) { return ALTextMerge::Take::Ours; }));
 }
 
@@ -110,16 +120,21 @@ bool ALDiffMerge::settles(const ALTextMerge::Hunk& hunk) const
     // Ours's lines of the hunk as they are now; a settling of the base's
     // same lines that left them so settles it, and one they are as they
     // were before -- undone -- does not. Beside a settling, or edited
-    // after, settled.
+    // after, settled; but not where it holds a change of theirs that no
+    // settling was of -- the conflict next to one settled, which an edit
+    // between the two made one with it.
     const auto ours = [&](const lines_t& lines) {
         return static_cast<S32>(lines.size()) == hunk.oursCount &&
                std::equal(lines.begin(), lines.end(), mOurs.begin() + hunk.ours);
     };
-    bool beside = false;
-    bool undone = false;
+    // A settling's lines of the base among a stretch's, or next to them.
+    const auto touches = [](const Settled& one, S32 from, S32 to) { return one.base <= to && from <= one.base + one.baseCount; };
+    const S32  end     = hunk.base + hunk.baseCount;
+    bool       beside  = false;
+    bool       undone  = false;
     for (const Settled& one : mSettled)
     {
-        if (one.base > hunk.base + hunk.baseCount || hunk.base > one.base + one.baseCount)
+        if (!touches(one, hunk.base, end))
         {
             continue;
         }
@@ -131,7 +146,23 @@ bool ALDiffMerge::settles(const ALTextMerge::Hunk& hunk) const
         beside = true;
         undone = undone || (same && ours(one.before));
     }
-    return beside && !undone;
+    if (!beside || undone)
+    {
+        return false;
+    }
+    // Theirs's changes in the hunk, in order by their lines of the base:
+    // each beside a settling.
+    auto it = std::partition_point(mTheirChanges.begin(), mTheirChanges.end(),
+                                   [&](const ALTextMerge::Change& change) { return change.base < hunk.base; });
+    for (; it != mTheirChanges.end() && it->baseEnd <= end; ++it)
+    {
+        const ALTextMerge::Change& change = *it;
+        if (std::none_of(mSettled.begin(), mSettled.end(), [&](const Settled& one) { return touches(one, change.base, change.baseEnd); }))
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 template<typename F>

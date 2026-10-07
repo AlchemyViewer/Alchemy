@@ -1436,4 +1436,42 @@ namespace tut
         named.clear();
         ensure("a plain one names nothing", checking.applyFix(doc, plain, version(doc)) && named.empty());
     }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<26>()
+    {
+        set_test_name("an include's file asked of again after an edit that changes how every line after it starts: what it was, while the text "
+                      "is lexed to its end a slice at a time, then what it is; a check sent of the text as it stands");
+        ALScriptStudioChecking& checking = make();
+        std::string             text;
+        for (S32 i = 0; i < 3000; ++i)
+        {
+            text += "integer helper" + std::to_string(i) + " = 1;\n";
+        }
+        Doc& doc = tab("disk:/lib.lsl", text);
+        doc.file = "/lib.lsl";
+        doc.editor->setSyntax("lsl");
+        ensure("a fragment", checking.lslFragment(doc));
+        ALSyntaxHighlighter& highlighter = doc.editor->highlighter();
+        const S32            last        = doc.editor->document().lineCount() - 1;
+
+        // A string opened at the top runs on to the end: every line after
+        // it starts in it.
+        doc.editor->document().insert(ALTextPos(0, 0), "\"");
+        ensure("asked again at once: a fragment", checking.lslFragment(doc));
+        highlighter.tokens(last);
+        ensure("the text not lexed to its end for it: " + std::to_string(highlighter.lastLexed()) + " of " + std::to_string(last + 1) + " left",
+               highlighter.lastLexed() > last / 2);
+        ensure("nor kept for the text as it stands", doc.check->fragment->first != version(doc));
+        ensure("lexed to its end: what it is, kept", checking.lslFragment(doc) && doc.check->fragment->first == version(doc));
+
+        // A state at the end of a text set whole: still lexed when the check
+        // is asked, which sends it as it stands, with no state put after it.
+        doc.editor->setText(text + "default\n{\n    state_entry() { }\n}\n");
+        checking.lslFragment(doc);
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        ensure_equals("asked once", studio.asks.size(), size_t(1));
+        ensure("of the script as it stands", *studio.asks[0].request.text == doc.editor->text());
+        ensure("and a script now", !checking.lslFragment(doc));
+    }
 }

@@ -49,7 +49,8 @@
 // settling left, or anything else it is edited to after, it is ours's own
 // change and no conflict; once ours holds again what it held before --
 // the edit undone, which a merge cannot see but by the text -- it is a
-// conflict again. Pure.
+// conflict again, as it is where an edit joins it to a conflict not
+// settled. Pure.
 class ALDiffMerge
 {
 public:
@@ -58,7 +59,9 @@ public:
     ALDiffMerge(lines_t base, lines_t theirs, const ALTextDiff::Options& options = ALTextDiff::Options());
 
     // Ours as a merge begins: every change only theirs made put in, and
-    // where both changed, ours.
+    // where both changed, ours; lines told the same as the options tell
+    // them -- those a comparison counts the merge's conflicts by -- and
+    // where neither changed, ours as it is.
     static std::string start(std::string_view base, std::string_view ours, std::string_view theirs,
                              const ALTextDiff::Options& options = ALTextDiff::Options());
 
@@ -109,7 +112,8 @@ private:
     void findTheirs();
     // Whether a conflict is one a settling kept settles: its lines of the
     // base those of one, or beside them, and ours there not as it was
-    // before -- undone.
+    // before -- undone -- and each change of theirs in it one a settling
+    // was of.
     bool settles(const ALTextMerge::Hunk& hunk) const;
     // Each conflict that shares a line of theirs or of ours with a stretch,
     // told of by its hunk -- one sharing both, twice -- until told to stop:

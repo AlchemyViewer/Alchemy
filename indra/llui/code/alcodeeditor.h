@@ -859,21 +859,34 @@ private:
     // inner; and the number of rows they take.
     // Worked out afresh as the view is drawn, which reads the lines above
     // the top anyway; asked for between -- a scroll to the caret, a click
-    // -- as last drawn, so that a batch's edit is not lexed for them.
+    // -- as last drawn while the top line is the one drawn, so that a
+    // batch's edit is not lexed for them, and worked out for the top line
+    // where the view has scrolled to another: what a scroll asks at each
+    // place it tries.
     std::vector<S32> stickyLines(bool fresh = false);
     S32              stickyRows();
     // What is drawn over the top of the text: the pinned headers too.
     S32              coveredAbove(S32 local_x) override;
+    // The position of the text drawn at a point of the view, which the
+    // gutter, the mouse and a note's tip go by: on the band of pinned
+    // headers -- over the text, and over the gutter where it shows its
+    // numbers -- the header drawn on that row, on its first row, rather
+    // than the line hidden under it; elsewhere posAtLocal's.
+    ALTextPos        posShownAt(S32 x, S32 y);
 
     void              ensureRegions();
     void              applyFolds();
     // The folds hidden again once, after an edit command or before a draw,
-    // rather than inside every edit.
+    // rather than inside every edit; a folded block that holds a caret then
+    // opened.
     void              settleFolds();
     void              editsDone() override { settleFolds(); }
     bool              mFoldsDirty = false;
     const FoldRegion* regionStartingAt(S32 line);
     const FoldRegion* regionAround(S32 line);
+    // The block that starts at a line, of those the frame draws by
+    // (ensureRegions), looked up without the blocks being found again.
+    const FoldRegion* drawnRegionStartingAt(S32 line) const;
     // The box drawn after a folded block's first line, in local
     // coordinates, or an empty rect.
     LLRect foldBoxOf(S32 line, const LLRect& text);
@@ -988,7 +1001,8 @@ private:
     bool     mHoverCards = true;
     F32      mHoverDelay = -1.f;
     // How long the mouse has rested, and whether the card was asked for
-    // since it last moved.
+    // since it last moved -- or put away by a key, which leaves it to come
+    // again only once the mouse moves.
     LLFrameTimer mMouseRest;
     bool         mHoverTried = false;
     // What the hover provider said of the word asked about, shown where
@@ -1139,8 +1153,10 @@ private:
     S32                     mStickyTop     = -1;
     std::vector<S32>        mStickyFolded;
     bool                    mStickyValid   = false;
-    // The lines last hidden by folds, which a change of them changes only.
+    // The lines last hidden by folds, and the layout's hidden revision
+    // then: while neither has moved, the layout hides what the folds do.
     std::vector<std::pair<S32, S32>> mHiddenByFolds;
+    U32                              mHiddenByFoldsAt = 0;
 
     completion_provider_t   mProvider;
     completion_request_t    mCompletionRequest;

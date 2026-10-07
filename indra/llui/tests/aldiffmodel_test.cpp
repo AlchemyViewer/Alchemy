@@ -26,11 +26,14 @@
 
 #include "aldiffmodel.h"
 
+#include "aldifflexer.h"
 #include "aldiffsame.h"
 #include "alstructuraldiff.h"
+#include "alsyntaxgrammar.h"
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <deque>
 #include <functional>
 #include <initializer_list>
@@ -38,6 +41,10 @@
 #include <memory>
 #include <string>
 #include <vector>
+
+#ifndef LLUI_TEST_APP_DIR
+#  define LLUI_TEST_APP_DIR ""
+#endif
 
 namespace tut
 {
@@ -1515,5 +1522,259 @@ namespace tut
         ensure_equals("on the right, its own", m.rangeAt(Column::Right, 3), 4);
         ensure_equals("a line wider on the right: its own still", m.rangeAt(Column::Right, 5), 6);
         ensure_equals("past them all, none", m.rangeAt(Column::Left, 11), -1);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<36>()
+    {
+        set_test_name("blanks let go of with a grammar: a line typed in inside a block comment compared again by the regions the texts were read in whole, as afresh; the lexer asked for nothing less than a text");
+        // Lines whole: a comment from a line starting /* to one holding */,
+        // a line with a quote in it a string, the rest code; each text it is
+        // asked for, by how many lines it has, where that is kept.
+        const auto lexer = [](std::shared_ptr<std::vector<size_t>> asked) {
+            auto said = std::make_shared<std::deque<std::vector<ALTextDiff::regions_t>>>();
+            return ALTextDiff::lexer_t([said, asked](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+                if (asked)
+                {
+                    asked->push_back(lines.size());
+                }
+                if (said->size() > 4)
+                {
+                    said->pop_front();
+                }
+                std::vector<ALTextDiff::regions_t>& out     = said->emplace_back();
+                bool                                comment = false;
+                for (const std::string& line : lines)
+                {
+                    comment                         = comment || line.rfind("/*", 0) == 0;
+                    const ALTextDiff::Region region = comment                                 ? ALTextDiff::Region::Comment
+                                                      : line.find('"') != std::string::npos ? ALTextDiff::Region::String
+                                                                                              : ALTextDiff::Region::Code;
+                    out.push_back({ ALTextDiff::Piece{ 0, static_cast<S32>(line.size()), region } });
+                    comment = comment && line.find("*/") == std::string::npos;
+                }
+                return out;
+            });
+        };
+        // A line inside a comment, typed to differ only by its blanks: the
+        // comment's, let go of, though a string's would not be; a change
+        // further down as it was.
+        const std::string left  = lines(60, { { 20, "/* usage:" }, { 21, "say \"a  b\"" }, { 25, "*/" }, { 50, "fifty" } });
+        const std::string right = lines(60, { { 20, "/* usage:" }, { 21, "say \"c\"" }, { 25, "*/" }, { 50, "FIFTY" } });
+        const std::string typed = lines(60, { { 20, "/* usage:" }, { 21, "say \"a b\"" }, { 25, "*/" }, { 50, "FIFTY" } });
+        ALTextDiff::Likeness like;
+        like.ignoreWhitespace = true;
+        auto asked            = std::make_shared<std::vector<size_t>>();
+        m.setLexer(lexer(asked));
+        m.setLikeness(like);
+        m.setTexts(left, right);
+        ensure_equals("two changes", m.changeCount(), 2);
+        asked->clear();
+        m.setRightText(typed);
+        ensure("the texts asked for whole, nothing less",
+               !asked->empty() && std::all_of(asked->begin(), asked->end(), [](size_t count) { return count == 60; }));
+        ensure_equals("the comment's blanks let go of: the change further down alone", m.changeCount(), 1);
+        ALDiffModel fresh;
+        fresh.setLexer(lexer(nullptr));
+        fresh.setLikeness(like);
+        fresh.setTexts(left, typed);
+        sameLayout(m, fresh, "typed inside the comment");
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<37>()
+    {
+        set_test_name("a merge read by the comparison's lexer, which holds two texts: the regions of the texts shown asked for again after it, an edit laid out again only around itself, as afresh");
+        // Two texts held, as ALDiffLexer holds them: one asked for again
+        // answered from where it is, another read in the place of the one
+        // asked for longer ago. Each line a stretch of code as long as it.
+        struct Held
+        {
+            std::vector<std::string>           lines[2];
+            std::vector<ALTextDiff::regions_t> regions[2];
+            U64                                used[2] = { 0, 0 };
+            U64                                clock   = 0;
+        };
+        const auto two_held = [] {
+            auto held = std::make_shared<Held>();
+            return ALTextDiff::lexer_t([held](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+                for (size_t n = 0; n < 2; ++n)
+                {
+                    if (held->used[n] > 0 && held->lines[n] == lines)
+                    {
+                        held->used[n] = ++held->clock;
+                        return held->regions[n];
+                    }
+                }
+                const size_t older = held->used[0] <= held->used[1] ? 0 : 1;
+                held->lines[older] = lines;
+                held->regions[older].clear();
+                for (const std::string& line : lines)
+                {
+                    held->regions[older].push_back({ ALTextDiff::Piece{ 0, static_cast<S32>(line.size()), ALTextDiff::Region::Code } });
+                }
+                held->used[older] = ++held->clock;
+                return held->regions[older];
+            });
+        };
+        // Theirs changed lines 0 and 6; ours 0 as theirs did, 2, 6, and 50
+        // far below -- not as long as theirs's line there -- and line 4 as
+        // typed. Swapped: the right shown on the left, and read first.
+        const std::string base   = lines(60);
+        const std::string theirs = lines(60, { { 0, "theirs 0" }, { 6, "theirs 6" } });
+        const auto        ours   = [](const char* four) {
+            return aldiffmodel_data::lines(60, { { 0, "theirs 0" }, { 2, "mine 2" }, { 4, four }, { 6, "mine 6" }, { 50, "mine fifty" } });
+        };
+        ALTextDiff::Likeness like;
+        like.ignoreWhitespace = true;
+        m.setLexer(two_held());
+        m.setLikeness(like);
+        m.setTexts(theirs, ours("line 4"));
+        m.setSwapped(true);
+        m.setMergeBase(base);
+        ensure_equals("one conflict", m.conflictCount(), 1);
+
+        // Typed in above the conflict: the lines below the edit read as
+        // they were, the right's own, and none of them otherwise.
+        m.setRightText(ours("line 4 typed"));
+        ensure("laid out again only around the edit", !m.relaid().whole && m.relaid().first[0] + m.relaid().now[0] < 20);
+
+        // The conflict settled as ours, which edits nothing; then the line
+        // typed in typed in again: likewise.
+        ensure("the conflict the third change", m.changeConflicts(2));
+        const std::optional<ALDiffMerge::Settling> settling = m.settle(2, ALTextMerge::Take::Ours);
+        ensure("ours: no edit", settling && !settling->edits);
+        m.settled(*settling);
+        ensure_equals("none left", m.conflictCount(), 0);
+        m.setRightText(ours("line 4 typed again"));
+        ensure("again only around the edit", !m.relaid().whole && m.relaid().first[0] + m.relaid().now[0] < 20);
+
+        ALDiffModel fresh;
+        fresh.setLexer(two_held());
+        fresh.setLikeness(like);
+        fresh.setTexts(theirs, ours("line 4 typed again"));
+        fresh.setSwapped(true);
+        sameLayout(m, fresh, "as afresh");
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<38>()
+    {
+        set_test_name("a merge read by a lexer of its own: the comparison's asked for none of the merge's texts as it is begun, settled, found again, and given again with a grammar");
+        // Each text a lexer is asked for, kept in turn; its regions none.
+        typedef std::vector<std::vector<std::string>> asked_t;
+        const auto asking = [](const std::shared_ptr<asked_t>& asked) {
+            auto held = std::make_shared<std::map<std::vector<std::string>, std::vector<ALTextDiff::regions_t>>>();
+            return ALTextDiff::lexer_t([asked, held](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+                asked->push_back(lines);
+                std::vector<ALTextDiff::regions_t>& out = (*held)[lines];
+                out.assign(lines.size(), {});
+                return out;
+            });
+        };
+        const auto compared = std::make_shared<asked_t>();
+        const auto merged   = std::make_shared<asked_t>();
+        const std::vector<std::string> base_lines = ALTextDiff::split(lines(8));
+        const auto has_base = [&base_lines](const asked_t& asked) { return std::find(asked.begin(), asked.end(), base_lines) != asked.end(); };
+
+        // As the merge with the model: theirs's line 0 taken, line 6 both's.
+        ALTextDiff::Likeness like;
+        like.ignoreWhitespace = true;
+        m.setLikeness(like);
+        m.setLexer(asking(compared), asking(merged));
+        m.setTexts(lines(8, { { 0, "theirs 0" }, { 6, "theirs 6" } }), lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } }));
+        m.setSwapped(true);
+        compared->clear();
+        m.setMergeBase(lines(8));
+        ensure_equals("one conflict", m.conflictCount(), 1);
+        ensure("begun: the merge read by its own", has_base(*merged));
+        ensure("the comparison's asked for nothing", compared->empty());
+
+        const std::optional<ALDiffMerge::Settling> settling = m.settle(1, ALTextMerge::Take::Ours);
+        ensure("ours: no edit", settling && !settling->edits);
+        merged->clear();
+        m.settled(*settling);
+        ensure("settled: found again by its own", has_base(*merged) && compared->empty());
+        ensure_equals("none left", m.conflictCount(), 0);
+
+        // Typed in: the comparison's asked for what it compares, never the
+        // base.
+        merged->clear();
+        m.setRightText(lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 4, "mine 4" }, { 6, "mine 6" } }));
+        ensure("typed in: found again by its own", has_base(*merged));
+        ensure("the comparison's never asked for the base", !compared->empty() && !has_base(*compared));
+        ensure_equals("settled still", m.conflictCount(), 0);
+
+        // Lexers given again, as a grammar is: the merge read by its new one.
+        const auto again = std::make_shared<asked_t>();
+        compared->clear();
+        m.setLexer(asking(compared), asking(again));
+        ensure("given again: found again by the new one", has_base(*again) && !has_base(*compared));
+        ensure_equals("settled still", m.conflictCount(), 0);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<39>()
+    {
+        set_test_name("a merge found again as the way the lines that stay are chosen is turned, as the comparison is");
+        // Theirs moved X from the end to the start; ours changed b. By
+        // histogram, a b a kept and X put in before them and taken out
+        // after, b apart from both; by patience, X kept and the three lines
+        // before it taken out, b among them.
+        m.setTexts("X\na\nb\na", "a\nB\na\nX");
+        m.setMergeBase("a\nb\na\nX");
+        ensure_equals("by histogram: none", m.conflictCount(), 0);
+        m.setAlgorithm(ALTextDiff::Algorithm::Patience);
+        ensure_equals("by patience: one", m.conflictCount(), 1);
+        m.setAlgorithm(ALTextDiff::Algorithm::Histogram);
+        ensure_equals("and back: none", m.conflictCount(), 0);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<40>()
+    {
+        set_test_name("blanks let go of with the LSL grammar: a block comment's opener broken and mended compares again the lines after it that read otherwise, a line the same changed and back, as afresh; an edit that reads none so, only around itself");
+        std::string                                  error;
+        const std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+        ensure("the LSL grammar", lsl != nullptr);
+        // A string differing only by its blanks, inside a block comment on
+        // both sides, where they are let go of; and a change further down.
+        const auto script = [](const char* opener, const char* said, const char* thirty, const char* fifty) {
+            return aldiffmodel_data::lines(60, { { 10, opener }, { 14, said }, { 16, "*/" }, { 30, thirty }, { 50, fifty } });
+        };
+        const std::string left   = script("/* note", "llSay(0, \"a b\");", "line 30", "fifty");
+        const std::string typed  = script("/* note", "llSay(0, \"a  b\");", "line 30 typed", "FIFTY");
+        const std::string broken = script("/ note", "llSay(0, \"a  b\");", "line 30 typed", "FIFTY");
+        ALTextDiff::Likeness like;
+        like.ignoreWhitespace = true;
+        m.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+        m.setLikeness(like);
+        m.setTexts(left, script("/* note", "llSay(0, \"a  b\");", "line 30", "FIFTY"));
+        ensure_equals("the string's blanks let go of inside the comment: the change further down alone", m.changeCount(), 1);
+
+        // Typed in below the comment, reading no line after it otherwise:
+        // compared again and laid out again only around itself.
+        m.setRightText(typed);
+        ensure_equals("typed in: a change of its own", m.changeCount(), 2);
+        ensure("typed in: only around it compared again", ALDiffSplice::lastCompared() > 0 && ALDiffSplice::lastCompared() <= 4);
+        ensure("typed in: laid out again in part", !m.relaid().whole);
+
+        // The comment's opener broken, and mended: the lines down to its
+        // close read otherwise, the string there its blanks' own and then
+        // let go of again; those lines compared again with the edit, and
+        // none further.
+        const auto as_afresh = [&](const std::string& right, S32 changes, const std::string& where) {
+            m.setRightText(right);
+            const S32 compared = ALDiffSplice::lastCompared();
+            ensure_equals(where + ": changes", m.changeCount(), changes);
+            ALDiffModel fresh;
+            fresh.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
+            fresh.setLikeness(like);
+            fresh.setTexts(left, right);
+            aldiffmodel_data::sameLayout(m, fresh, where);
+            ensure_equals(where + ": compared again down to the comment's close", compared, 14);
+        };
+        as_afresh(broken, 4, "the opener broken");
+        as_afresh(typed, 2, "mended");
     }
 }

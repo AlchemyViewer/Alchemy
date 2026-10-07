@@ -137,9 +137,14 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
             case KEY_ESCAPE:
                 line.clear();
                 cursor = 0;
-                mVim.mMode       = ALVimKeymap::Mode::Normal;
-                mVim.mSearch.endIncremental(view);
-                mVim.moveTo(view, view.caret());
+                backFromLine(view);
+                // What waited on the line goes with it: a count, and an
+                // operator the search was to be the motion of.
+                mVim.clearPending();
+                if (mVim.mMode == ALVimKeymap::Mode::Normal)
+                {
+                    mVim.moveTo(view, view.caret());
+                }
                 return true;
             case KEY_LEFT:
             case KEY_RIGHT:
@@ -179,7 +184,10 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                 historyAt = -1;
                 if (line.empty())
                 {
-                    mVim.mMode = ALVimKeymap::Mode::Normal;
+                    // Let go of as Escape lets it go, and what waited on
+                    // it with it.
+                    backFromLine(view);
+                    mVim.clearPending();
                 }
                 else if (cursor > 0)
                 {
@@ -232,7 +240,7 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                 const llwchar     which   = kind;
                 line.clear();
                 cursor = 0;
-                mVim.mMode       = ALVimKeymap::Mode::Normal;
+                backFromLine(view);
                 historyAt  = -1;
                 remember(which, entered);
                 if (which == ':')
@@ -250,7 +258,6 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                     const bool   has_offset = entered.size() > pattern.size();
                     if (has_offset && !ALVimSearch::parseOffset(offset_text, offset))
                     {
-                        mVim.mSearch.endIncremental(view);
                         mVim.say(ALVimKeymap::said("VimBadOffset", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", entered } }), true);
                         mVim.finishCommand(false);
                         return true;
@@ -266,10 +273,17 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
                         mVim.mSearch.offset = offset;
                     }
                     mVim.mSearch.forward = which == '/';
-                    mVim.mSearch.endIncremental(view);
+                    if (mVim.mOperator)
+                    {
+                        // The motion of the operator waiting on the line:
+                        // the operator over the stretch to where it goes.
+                        return mVim.searchMotion(view, mVim.mSearch.forward);
+                    }
                     if (!mVim.mSearch.pattern.empty())
                     {
-                        mVim.mSearch.search(view, mVim.mSearch.pattern, mVim.mSearch.forward, 1, mVim.mSearch.wholeWord, mVim.mSearch.offset);
+                        // A count typed before the line is the match that
+                        // many on: 3/foo goes to the third.
+                        mVim.mSearch.search(view, mVim.mSearch.pattern, mVim.mSearch.forward, countOr(mVim.mCount), mVim.mSearch.wholeWord, mVim.mSearch.offset);
                     }
                 }
                 if (mVim.mMode == ALVimKeymap::Mode::Normal)
@@ -296,6 +310,14 @@ bool ALVimCommandLine::commandLine(ALTextView& view, const ALVimInput& input)
     cursor += typed.size();
     historyAt = -1;
     return true;
+}
+
+void ALVimCommandLine::backFromLine(ALTextView& view)
+{
+    // A search typed over a visual selection goes back to it, for what it
+    // finds to move the visual caret; anything else to normal mode. What
+    // the line lit as it was typed goes out with it (setMode).
+    mVim.setMode(view, kind == ':' ? ALVimKeymap::Mode::Normal : mVim.mSearchVisual);
 }
 
 void ALVimCommandLine::dropCompletion()

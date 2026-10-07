@@ -30,6 +30,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -184,6 +185,15 @@ namespace ALTextDiff
 
     // The runs that make the left the right, compared as `options` says.
     std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options = Options());
+    // As lines(), each line's regions given rather than asked of the
+    // options' lexer, which is not asked: a stretch of two texts, its
+    // regions cut from those the whole texts were read in -- read on its
+    // own, a stretch is read from its grammar's first state, the lines
+    // inside a block comment as code. Regions of other than every line of
+    // both, none. Lines found as Histogram finds them where structure was
+    // asked for.
+    std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options,
+                           std::span<const regions_t> left_regions, std::span<const regions_t> right_regions);
     // As lines(), found the way `algorithm` says whatever the options say:
     // the lines a structural comparison reads its changes from.
     std::vector<Run> linesBy(Algorithm algorithm, const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options);

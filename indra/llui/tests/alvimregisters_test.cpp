@@ -125,4 +125,17 @@ namespace tut
         ensure("added, as characters", macro.text == "ddj" && !macro.linewise);
         ensure("neither the clipboard nor the unnamed register touched", copies == copied && registers.fetch('"', true).text == "before");
     }
+
+    template<> template<>
+    void alvimregisters_object::test<5>()
+    {
+        set_test_name("an empty line is kept as a line, and read back so through the clipboard it leaves empty; a register never set is no line");
+        const ALVimRegisters::Register unset = registers.fetch('a', false);
+        ensure("never set: no text, and no line", unset.text.empty() && !unset.linewise);
+        registers.store(0, "", true, false, true, true);
+        ensure("kept as a line", registers.fetch('0', true).linewise);
+        ensure_equals("the clipboard written, and empty", clipboard, std::string());
+        const ALVimRegisters::Register back = registers.fetch(0, true);
+        ensure("read back through the clipboard as the line it was", back.text.empty() && back.linewise);
+    }
 }

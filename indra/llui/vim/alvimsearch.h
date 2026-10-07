@@ -62,8 +62,17 @@ public:
     static void splitOffset(const std::string& line, llwchar kind, std::string& pattern, std::string& offset_text);
     static bool parseOffset(const std::string& text, Offset& out);
     ALTextPos   offsetFrom(const ALTextDocument& d, const ALTextRange& match, const Offset& offset) const;
-    // Searching, with the last pattern kept for n and N, and its offset.
-    bool search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset = Offset());
+    // Searching, with the last pattern kept for n and N, and its offset:
+    // the caret to where it goes (target).
+    bool search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset = Offset(),
+                std::optional<ALTextPos> search_from = std::nullopt);
+    // Where a search goes from the caret -- or from `search_from`, as * and
+    // # look from the start of the word under the caret -- the count's
+    // match on, round past the ends, the offset taken from it; its matches
+    // lit and the match kept for n, the caret left where it is: an
+    // operator's motion. Nothing where there is no match, which is said.
+    std::optional<ALTextPos> target(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const Offset& offset = Offset(),
+                                    std::optional<ALTextPos> search_from = std::nullopt);
     // What is typed on the search line so far, lit and brought into sight;
     // and that let go of, the caret's place in sight again.
     void incrementalSearch(ALTextView& view);

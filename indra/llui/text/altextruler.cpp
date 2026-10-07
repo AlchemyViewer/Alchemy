@@ -121,7 +121,6 @@ void ALTextRuler::drawRuler(F32 alpha)
     ALTextLayout&         layout   = mView.layout();
     const ALTextDocument& document = mView.document();
     const ALTextFeatures* features = mView.features();
-    gl_rect_2d(ruler, ink % (0.04f * alpha));
     const S32 total   = llmax(1, layout.totalHeight());
     const S32 track_h = llmax(1, ruler.getHeight());
     const auto yAt    = [&](S32 doc_y) { return ruler.mTop - static_cast<S32>(static_cast<F32>(doc_y) / static_cast<F32>(total) * static_cast<F32>(track_h)); };
@@ -162,13 +161,40 @@ void ALTextRuler::drawRuler(F32 alpha)
         mAnnotationsRevision = mView.annotationsRevision();
         mMarksValid          = true;
     }
+    // The matches by the pixel rows they fall on, found again only as
+    // they, the track or the text's height change, and drawn as runs:
+    // a letter found over a long text is tens of thousands of matches
+    // and a few hundred rows.
+    const std::vector<ALTextRange>& matches = mView.matchesFound();
+    if (!matches.empty() && (!mMatchRowsValid || mMatchRowsGeneration != mView.matchesGeneration() || mMatchRowsTop != ruler.mTop ||
+                             mMatchRowsHeight != track_h || mMatchRowsTotal != total))
+    {
+        mMatchRows.assign(static_cast<size_t>(track_h) + 2, 0);
+        for (const ALTextRange& match : matches)
+        {
+            const S32 row = llclamp(ruler.mTop - yOf(match.begin.line), 0, track_h);
+            mMatchRows[static_cast<size_t>(row)]     = 1;
+            mMatchRows[static_cast<size_t>(row) + 1] = 1;
+        }
+        mMatchRowsValid      = true;
+        mMatchRowsGeneration = mView.matchesGeneration();
+        mMatchRowsTop        = ruler.mTop;
+        mMatchRowsHeight     = track_h;
+        mMatchRowsTotal      = total;
+    }
+    // The track, every mark, the matches, the caret and the thumb in one
+    // batch, which is one draw, as the map's are: a mark drawn apiece is a
+    // draw apiece, and a comparison marks every line it changed.
+    gGL.getTextureSlot(0)->unbind();
+    gGL.begin(LLRender::TRIANGLES);
+    gl_rect_2d_in_batch(ruler.mLeft, ruler.mTop, ruler.mRight, ruler.mBottom, ink % (0.04f * alpha));
     LLColor4 mark;
     for (const S32 line : mMarkLines)
     {
         if (markOf(line, mark))
         {
             const S32 y = yOf(line);
-            gl_rect_2d(middle, y, ruler.mRight - 2, y - 2, mark % alpha);
+            gl_rect_2d_in_batch(middle, y, ruler.mRight - 2, y - 2, mark % alpha);
         }
     }
     // A gap's mark as tall as the gap is, where that is more than a mark.
@@ -177,32 +203,11 @@ void ALTextRuler::drawRuler(F32 alpha)
         if (layout.gapHeight(line) > 0)
         {
             const S32 y = yAt(layout.gapTop(line));
-            gl_rect_2d(middle, y, ruler.mRight - 2, llmin(y - 2, yOf(line)), mView.lineAnnotation(line).gapRulerTint % alpha);
+            gl_rect_2d_in_batch(middle, y, ruler.mRight - 2, llmin(y - 2, yOf(line)), mView.lineAnnotation(line).gapRulerTint % alpha);
         }
     }
-    // The matches by the pixel rows they fall on, found again only as
-    // they, the track or the text's height change, and drawn as runs:
-    // a letter found over a long text is tens of thousands of matches
-    // and a few hundred rows.
-    const std::vector<ALTextRange>& matches = mView.matchesFound();
     if (!matches.empty())
     {
-        if (!mMatchRowsValid || mMatchRowsGeneration != mView.matchesGeneration() || mMatchRowsTop != ruler.mTop || mMatchRowsHeight != track_h ||
-            mMatchRowsTotal != total)
-        {
-            mMatchRows.assign(static_cast<size_t>(track_h) + 2, 0);
-            for (const ALTextRange& match : matches)
-            {
-                const S32 row = llclamp(ruler.mTop - yOf(match.begin.line), 0, track_h);
-                mMatchRows[static_cast<size_t>(row)]     = 1;
-                mMatchRows[static_cast<size_t>(row) + 1] = 1;
-            }
-            mMatchRowsValid      = true;
-            mMatchRowsGeneration = mView.matchesGeneration();
-            mMatchRowsTop        = ruler.mTop;
-            mMatchRowsHeight     = track_h;
-            mMatchRowsTotal      = total;
-        }
         const LLColor4 found = mView.findMatchColor() % alpha;
         for (size_t row = 0; row < mMatchRows.size();)
         {
@@ -216,17 +221,19 @@ void ALTextRuler::drawRuler(F32 alpha)
             {
                 ++end;
             }
-            gl_rect_2d(ruler.mLeft + 2, ruler.mTop - static_cast<S32>(row), middle, ruler.mTop - static_cast<S32>(end), found);
+            gl_rect_2d_in_batch(ruler.mLeft + 2, ruler.mTop - static_cast<S32>(row), middle, ruler.mTop - static_cast<S32>(end), found);
             row = end;
         }
     }
     // The blip: where the caret is.
     const S32 caret_y = yOf(mView.caret().line);
-    gl_rect_2d(ruler.mLeft + 2, caret_y, ruler.mRight - 2, caret_y - 2, mView.cursorColor() % alpha);
+    gl_rect_2d_in_batch(ruler.mLeft + 2, caret_y, ruler.mRight - 2, caret_y - 2, mView.cursorColor() % alpha);
     if (shown > 0.f)
     {
-        gl_rect_2d(vThumb(ruler), ink % (0.35f * shown));
+        const LLRect thumb = vThumb(ruler);
+        gl_rect_2d_in_batch(thumb.mLeft, thumb.mTop, thumb.mRight, thumb.mBottom, ink % (0.35f * shown));
     }
+    gGL.end();
 }
 
 // --- the map ---------------------------------------------------------------------------

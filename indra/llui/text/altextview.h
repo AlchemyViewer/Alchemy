@@ -404,7 +404,8 @@ public:
     void typeText(std::string_view text);
     void deleteRange(const ALTextRange& range);
     // Several ranges of the text as it stands, each replaced by its
-    // string, as one step to undo: what a rename is. The ranges must not
+    // string, as one step to undo: what a rename is -- or, made while a
+    // key is typed, as part of what the key does. The ranges must not
     // overlap. The caret keeps its place in the text around it. False
     // where nothing changed.
     bool replaceAll(std::vector<std::pair<ALTextRange, std::string>> edits);
@@ -938,9 +939,6 @@ protected:
     // is brought into sight: whatever a subclass left for after its edits,
     // done once rather than at each.
     virtual void editsDone() {}
-    // The text changed other than by an edit command -- a log laid out
-    // again -- so that the find bar looks for its query again.
-    void         findChanged();
     virtual void drawBeforeRows(const LLRect& text) {}
     virtual void drawRowExtras(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha) {}
     // Over every row, still clipped to the text: what floats above the
@@ -1002,6 +1000,10 @@ protected:
     // notification to every listener, one edit for the journal, and the
     // caret put once, at `caret` in the text as it is after.
     ALTextDocument::Edit editMany(std::vector<std::pair<ALTextRange, std::string>> edits, const ALTextPos& caret);
+    // The same, the caret worked out from the edit as it was made: which
+    // stretches were kept, and where each went, known only then.
+    ALTextDocument::Edit editMany(std::vector<std::pair<ALTextRange, std::string>> edits,
+                                  const std::function<ALTextPos(const ALTextDocument::Edit&)>& caret);
     // What of a text fits in place of a stretch under maxBytes: all of
     // it, or as much as fits, cut at a character, the view full.
     std::string_view     fitting(const ALTextRange& over, std::string_view text);
@@ -1213,10 +1215,23 @@ private:
             findCounted();
         }
     }
-    void drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_top, F32 left, F32 alpha);
+    // A row's lines under its text -- what is being composed, and the links
+    // and the styles that underline -- added to the triangles being drawn,
+    // as gl_rect_2d_in_batch adds them, so that every row's are one draw.
+    void drawPreedit(S32 line, S32 row, S32 screen_top, F32 left, F32 alpha);
+    void drawUnderlines(S32 line, const ALTextLayout::Line& laid, S32 row, S32 screen_top, F32 left, F32 alpha);
     void colorRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha);
-    // The links, the atoms and the misspellings of a row, drawn over its glyphs.
+    // The atoms and the misspellings of a row, drawn over its glyphs.
     void drawLayers(S32 line, const ALTextLayout::Line& laid, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha);
+    // A rectangle in its colour, found as a frame is drawn and drawn with
+    // the others of its kind once they are all found: the tints behind the
+    // lines, and the carets. All of a list in one draw, and the list emptied.
+    struct Box
+    {
+        LLRect   rect;
+        LLColor4 color;
+    };
+    static void drawBoxes(std::vector<Box>& boxes);
     // Laying out is a cache fill, which a const query may cause.
     ALTextLayout& lay() const { return const_cast<ALTextLayout&>(mLayout); }
     // The layers through an edit: what is after it slides, what it cut
@@ -1241,9 +1256,13 @@ private:
     // back -- else as it is.
     ALTextPos snapped(const ALTextPos& pos, const ALTextPos& from) const;
     // The substitution or the atom under a local point, if the point is
-    // on its glyphs.
+    // on its glyphs on the row under it.
     const Substitution* linkAtLocal(S32 x, S32 y);
     const Atom*         atomAtLocal(S32 x, S32 y);
+    // An atom's box as the layout put it: the row its gap is on, and the
+    // gap's x's across that row, from its pen and its advance. False where
+    // its line has no gap for it.
+    bool                atomBox(const Atom& atom, S32& row, F32& x0, F32& x1);
     // The atom whose view has the keyboard, or -1; and the keyboard taken
     // back from a view about to lose its box.
     S32                 focusedAtom() const;
@@ -1311,6 +1330,9 @@ private:
 
     ALTextPos mCaret;
     ALTextPos mAnchor;
+    // Whether an edit has moved it along since it was last put: a move,
+    // which its next placing tells of wherever that puts it.
+    bool      mSelectionSlid = false;
     // The selections besides that one.
     ALTextCarets mCarets;
     // Each into the text, as the main one is put.
@@ -1413,13 +1435,10 @@ private:
     std::vector<LLColor4U>          mRunColours;
     std::vector<size_t>             mRunColourAt;
     std::vector<Squiggle>           mSquiggles;
-    // A frame's carets, drawn together once the rows are.
-    struct CaretBox
-    {
-        LLRect   rect;
-        LLColor4 color;
-    };
-    std::vector<CaretBox>           mCaretBoxes;
+    // A frame's tints, drawn together once the rows in sight are found,
+    // and its carets, once the rows are drawn.
+    std::vector<Box>                mTintBoxes;
+    std::vector<Box>                mCaretBoxes;
     // What the band under the text shows and where its pieces go, as the
     // keymap had it at its generation in this font: read and measured
     // again only when the keymap has moved on.

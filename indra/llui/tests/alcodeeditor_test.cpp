@@ -633,12 +633,15 @@ namespace tut
         ensure("shown again", e.cardShown());
         key(KEY_RIGHT);
         ensure("a key hides it", !e.cardShown());
-        // A problem's message comes the same way, from the gutter.
+        // A problem's message comes the same way, from the gutter, the
+        // mouse moved there.
         ALCodeEditor::Decoration d;
         d.range   = ALTextRange(ALTextPos(1, 0), ALTextPos(1, 6));
         d.message = "something is wrong here";
         e.setDecorations({ d });
-        e.handleToolTip(e.leftEdge() + 2, text.mTop - e.layout().rowHeight() - e.layout().rowHeight() / 2, MASK_NONE);
+        const S32 gutter_y = text.mTop - e.layout().rowHeight() - e.layout().rowHeight() / 2;
+        e.handleHover(e.leftEdge() + 2, gutter_y, MASK_NONE);
+        e.handleToolTip(e.leftEdge() + 2, gutter_y, MASK_NONE);
         ensure("the gutter's card", e.cardShown() && e.card()->text() == "something is wrong here");
     }
 
@@ -3107,5 +3110,320 @@ namespace tut
         }
         ensure("nothing named for the string", !named);
         e.closeCompletion();
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<83>()
+    {
+        set_test_name("a folded block's lines stay hidden through a rename inside it, and a fold taken with its header leaves none of them hidden");
+        ALCodeEditor& e = make("integer n;\nf()\n{\n    n = 1;\n    llSay(0, (string)n);\n}\ng()\n{\n    n = 2;\n}");
+        ensure("folds", e.foldAt(1));
+        ensure("its lines hidden", e.layout().hidden(2) && e.layout().hidden(5) && !e.layout().hidden(6));
+        e.setCaret(ALTextPos(6, 0));
+        // A name inside it replaced, as a rename or Replace All does: the
+        // layout shows the line it made, which the fold still holds.
+        ensure("replaced", e.replaceAll({ { ALTextRange(ALTextPos(3, 4), ALTextPos(3, 5)), "total" } }));
+        ensure_equals("the line", e.document().line(3), std::string("    total = 1;"));
+        ensure("still folded, the line replaced hidden with the rest", e.isFolded(1) && e.layout().hidden(2) && e.layout().hidden(3) && e.layout().hidden(5));
+        ensure_equals("six rows in sight", e.layout().totalHeight(), 6 * e.layout().rowHeight());
+
+        // The header taken with the line above it: the fold goes, and every
+        // line it hid, moved up a line, is in sight.
+        e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 3)));
+        key(KEY_DELETE);
+        ensure_equals("the header gone", e.document().line(1), std::string("{"));
+        ensure("nothing folded", !e.isFolded(0) && !e.isFolded(1));
+        ensure("nothing hidden", !e.layout().anyHidden() && !e.layout().hidden(1));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<84>()
+    {
+        set_test_name("a folded header taken with the whole lines below it does not fold the block that comes up in its place; Return at its start takes the fold down with it");
+        ALCodeEditor& e = make("foo()\n{\n    x();\n}\nbar()\n{\n    y();\n}");
+        ensure("folds", e.foldAt(0));
+        // From the header's start to the next line in sight, deleted.
+        e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 0)));
+        key(KEY_DELETE);
+        ensure_equals("the block gone", e.document().line(0), std::string("bar()"));
+        ensure("the one in its place not folded", !e.isFolded(0) && !e.layout().anyHidden());
+
+        ALCodeEditor& f = make("foo()\n{\n    x();\n}\nbar()");
+        ensure("folds", f.foldAt(0));
+        f.setCaret(ALTextPos(0, 0));
+        key(KEY_RETURN);
+        ensure_equals("a line put in above", f.document().line(1), std::string("foo()"));
+        ensure("the fold down with its header", f.isFolded(1) && !f.isFolded(0));
+        ensure("hiding its block there", !f.layout().hidden(1) && f.layout().hidden(2) && f.layout().hidden(4) && !f.layout().hidden(5));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<85>()
+    {
+        set_test_name("a line scrolled up to from where nothing is pinned comes out from under the headers pinned over it there");
+        std::string text = "default\n{\n    state_entry()\n    {\n";
+        for (int i = 0; i < 80; ++i)
+        {
+            text += "        llOwnerSay(\"line " + std::to_string(i) + "\");\n";
+        }
+        text += "    }\n}\n";
+        for (int i = 0; i < 100; ++i)
+        {
+            text += "// after " + std::to_string(i) + "\n";
+        }
+        ALCodeEditor& e = make(text.c_str());
+        e.setStickyHeaders(true);
+        const S32 row_h = e.layout().rowHeight();
+        // At the end, past every block, where nothing is pinned; then up
+        // into the handler, where its state and it are.
+        e.setCaret(ALTextPos(185, 0));
+        ensure("the view past the blocks", e.scrollY() > e.layout().lineTop(86));
+        e.setCaret(ALTextPos(40, 8));
+        const S32 below = e.layout().lineTop(40) - e.scrollY();
+        ensure("below the two pinned headers: " + std::to_string(below) + " of " + std::to_string(row_h), below >= 2 * row_h);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<86>()
+    {
+        set_test_name("a gutter mark's card stays while the mouse rests on its row there, and goes as it leaves the row");
+        ALCodeEditor& e = make("one\ntwo\nthree\n");
+        ALCodeEditor::Decoration d;
+        d.range   = ALTextRange(ALTextPos(1, 0), ALTextPos(1, 3));
+        d.message = "something is wrong here";
+        e.setDecorations({ d });
+        const LLRect text  = e.textRect();
+        const S32    row_h = e.layout().rowHeight();
+        // On the mark column, past the change bar.
+        const S32 x = e.leftEdge() + 8;
+        const S32 y = text.mTop - row_h - row_h / 2;
+        e.handleHover(x, y, MASK_NONE);
+        ensure("the gutter's card", e.handleToolTip(x, y, MASK_NONE) && e.cardShown() && e.card()->text() == "something is wrong here");
+        // The next frame, the mouse still.
+        e.handleHover(x, y, MASK_NONE);
+        ensure("kept, the mouse on the line's row in the gutter", e.cardShown());
+        e.handleHover(x, y - 2 * row_h, MASK_NONE);
+        ensure("gone from another row", !e.cardShown());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<87>()
+    {
+        set_test_name("a card a key put away stays away under a still mouse, a word a page brings under it brings none, and the mouse moving brings one again");
+        std::string text;
+        for (int i = 0; i < 60; ++i)
+        {
+            text += "llSay(0, \"line " + std::to_string(i) + "\");\n";
+        }
+        ALCodeEditor& e = make(text.c_str());
+        e.setHoverProvider([](const ALTextPos&, std::string_view word, std::string& out) {
+            if (word != "llSay")
+            {
+                return false;
+            }
+            out = "llSay(integer channel, string msg)";
+            return true;
+        });
+        const LLRect text_rect = e.textRect();
+        S32          row;
+        const S32    x = text_rect.mLeft + static_cast<S32>(e.layout().xOf(0, 2, &row)) + 1;
+        const S32    y = text_rect.mTop - e.layout().rowHeight() / 2;
+        e.handleHover(x, y, MASK_NONE);
+        ensure("a card", e.handleToolTip(x, y, MASK_NONE) && e.cardShown());
+        key(KEY_DOWN);
+        ensure("a key put it away", !e.cardShown());
+        // The frames after, the mouse still.
+        e.handleHover(x, y, MASK_NONE);
+        e.handleToolTip(x, y, MASK_NONE);
+        ensure("not back while the mouse is still", !e.cardShown());
+        key(KEY_PAGE_DOWN);
+        ensure("other lines under the mouse", e.scrollY() > 0);
+        e.handleHover(x, y, MASK_NONE);
+        e.handleToolTip(x, y, MASK_NONE);
+        ensure("none for the word scrolled under it", !e.cardShown());
+        // Moved: a card may come again.
+        e.handleHover(x + 1, y, MASK_NONE);
+        ensure("the mouse moved: a card again", e.handleToolTip(x + 1, y, MASK_NONE) && e.cardShown());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<88>()
+    {
+        set_test_name("the card is worked out once a rest, not again at every tooltip pass the mouse stays still for, on a word or on a mark");
+        ALCodeEditor& e = make("llSay(0, x);\nsecond line\n");
+        size_t hovered = 0;
+        e.setHoverProvider([&hovered](const ALTextPos&, std::string_view word, std::string& out) {
+            ++hovered;
+            out = "about " + std::string(word);
+            return true;
+        });
+        size_t fixed = 0;
+        e.setFixProvider([&fixed](S32, std::vector<ALCodeEditor::Fix>&) { ++fixed; });
+        e.setFixHandler([](const LLSD&) {});
+        ALCodeEditor::Decoration d;
+        d.range   = ALTextRange(ALTextPos(1, 0), ALTextPos(1, 6));
+        d.message = "something is wrong here";
+        e.setDecorations({ d });
+        const LLRect text  = e.textRect();
+        const S32    row_h = e.layout().rowHeight();
+        S32          row;
+        const S32    x = text.mLeft + static_cast<S32>(e.layout().xOf(0, 2, &row)) + 1;
+        const S32    y = text.mTop - row_h / 2;
+        // Frame after frame, the mouse still on the word.
+        for (int frame = 0; frame < 5; ++frame)
+        {
+            e.handleHover(x, y, MASK_NONE);
+            e.handleToolTip(x, y, MASK_NONE);
+        }
+        ensure("a card", e.cardShown());
+        ensure_equals("the word asked about once", hovered, size_t(1));
+        // And on the next line's mark, past the change bar.
+        const S32 gutter_x = e.leftEdge() + 8;
+        const S32 gutter_y = text.mTop - row_h - row_h / 2;
+        for (int frame = 0; frame < 5; ++frame)
+        {
+            e.handleHover(gutter_x, gutter_y, MASK_NONE);
+            e.handleToolTip(gutter_x, gutter_y, MASK_NONE);
+        }
+        ensure("the mark's card", e.cardShown() && e.card()->text().find("something is wrong here") != std::string::npos);
+        ensure_equals("its fixes asked for once", fixed, size_t(1));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<89>()
+    {
+        set_test_name("the gutter, the mouse and the notes on the band of pinned headers go by the header drawn there, not the line hidden under it");
+        std::string text = "default\n{\n    state_entry()\n    {\n";
+        for (int i = 0; i < 80; ++i)
+        {
+            text += "        llOwnerSay(\"line " + std::to_string(i) + "\");\n";
+        }
+        text += "    }\n}\n";
+        ALCodeEditor& e = make(text.c_str());
+        e.setStickyHeaders(true);
+        e.setHoverProvider([](const ALTextPos&, std::string_view word, std::string& out) {
+            if (word != "state_entry")
+            {
+                return false;
+            }
+            out = "the state_entry event";
+            return true;
+        });
+        ALCodeEditor::Decoration d;
+        d.range   = ALTextRange(ALTextPos(2, 0), ALTextPos(2, 1));
+        d.message = "a problem with the handler";
+        e.setDecorations({ d });
+        const LLRect text_rect = e.textRect();
+        const S32    row_h     = e.layout().rowHeight();
+        // Deep in the handler: "default" and "state_entry()" pinned over
+        // the top two rows, the handler's header on the second.
+        e.setCaret(ALTextPos(70, 8));
+        const S32 y      = text_rect.mTop - row_h - row_h / 2;
+        const S32 hidden = e.posAtLocal(text_rect.mLeft, y, false).line;
+        ensure("a line of the handler's under the band: " + std::to_string(hidden), hidden > 3);
+
+        // Its number pressed chooses the header's line.
+        const S32 number_x = e.leftEdge() + 18;
+        ensure("pressed", e.handleMouseDown(number_x, y, MASK_NONE));
+        e.handleMouseUp(number_x, y, MASK_NONE);
+        const ALTextRange chosen = e.selection().normalised();
+        ensure("the header's line chosen: " + std::to_string(chosen.begin.line), chosen.begin == ALTextPos(2, 0) && chosen.end == ALTextPos(3, 0));
+
+        // The mouse on its number: the header's problems, kept there.
+        e.setCaret(ALTextPos(70, 8));
+        e.handleHover(number_x, y, MASK_NONE);
+        e.handleToolTip(number_x, y, MASK_NONE);
+        ensure("the header's card from the gutter", e.cardShown() && e.card()->text().find("a problem with the handler") != std::string::npos);
+        e.handleHover(number_x, y, MASK_NONE);
+        ensure("kept on the band's row in the gutter", e.cardShown());
+
+        // The mouse on the header's name drawn there: the name's card.
+        S32       row;
+        const S32 name_x = text_rect.mLeft + static_cast<S32>(e.layout().xOf(2, 8, &row)) + 1;
+        e.handleHover(name_x, y, MASK_NONE);
+        e.handleToolTip(name_x, y, MASK_NONE);
+        ensure("the header's name", e.cardShown() && e.card()->text() == "the state_entry event");
+        e.handleHover(name_x, y, MASK_NONE);
+        ensure("kept on the band's row", e.cardShown());
+        e.hideCard();
+
+        // The note of the line hidden is not found over it; one in sight is.
+        const S32 seen   = hidden + 3;
+        const S32 seen_y = text_rect.mTop - (e.layout().lineTop(seen) - e.scrollY()) - row_h / 2;
+        e.setLineNotes({ { hidden, "n", "hidden" }, { seen, "n", "seen" } });
+        const auto note_on = [&](S32 at_y) {
+            S32 on = -1;
+            for (S32 nx = text_rect.mLeft; nx < text_rect.mRight && on < 0; ++nx)
+            {
+                on = e.noteAtLocal(nx, at_y);
+            }
+            return on;
+        };
+        ensure_equals("the note in sight", note_on(seen_y), seen);
+        ensure_equals("none on the band", note_on(y), -1);
+
+        // The fold column there folds the header's block.
+        const S32 fold_x = e.leftEdge() + e.gutterWidth() - 6;
+        e.handleMouseDown(fold_x, y, MASK_NONE);
+        e.handleMouseUp(fold_x, y, MASK_NONE);
+        ensure("the header's block folded", e.isFolded(2) && !e.isFolded(hidden));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<90>()
+    {
+        set_test_name("a folded script edited so that every line after the edit starts otherwise: the folds settled once it is lexed to its end, a "
+                      "slice a frame, not the whole of it lexed in the frame of the edit");
+        std::string text = "default\n{\n    state_entry()\n    {\n        integer x = 1;\n    }\n";
+        for (S32 i = 0; i < 3000; ++i)
+        {
+            text += "    integer y = 2;\n";
+        }
+        text += "}\n";
+        ALCodeEditor& e = make("");
+        e.setText(text);
+        const S32 last = e.document().lineCount() - 1;
+        e.setCaret(ALTextPos(0, 0));
+        ensure("folds", e.foldAt(2));
+        ensure("its lines hidden", e.layout().hidden(3) && e.layout().hidden(5) && !e.layout().hidden(6));
+
+        // A string opened at the top runs on to the end: every line after
+        // it starts in it, and the block is gone.
+        e.document().insert(ALTextPos(0, 0), "\"");
+        e.pump();
+        e.highlighter().tokens(last);
+        ensure("the frame after the edit left most of the text to lex: " + std::to_string(e.highlighter().lastLexed()) + " of " +
+                   std::to_string(last + 1),
+               e.highlighter().lastLexed() > last / 2);
+        ensure("the fold as the edit left it meanwhile", e.isFolded(2) && e.layout().hidden(3));
+        e.pump();
+        ensure("lexed to its end, the next frame lets go of the fold whose block went", !e.isFolded(2) && !e.layout().anyHidden());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<91>()
+    {
+        set_test_name("Return at the end of a folded header opens the block the line it makes goes into, the caret on that line in sight");
+        ALCodeEditor& e = make("foo() {\n    x();\n}\nbar()");
+        ensure("folds", e.foldAt(0));
+        ensure("its lines hidden", e.layout().hidden(1) && e.layout().hidden(2) && !e.layout().hidden(3));
+        e.setCaret(e.document().lineEnd(0));
+        key(KEY_RETURN);
+        ensure_equals("the header as it was", e.document().line(0), std::string("foo() {"));
+        ensure_equals("the caret on the line made", e.caret().line, 1);
+        ensure("the block opened", !e.isFolded(0));
+        ensure("the caret's line in sight, and the rest of the block", !e.layout().hidden(1) && !e.layout().anyHidden());
+
+        // The brace under the header: the line made between them is the
+        // block's too, the header found past it.
+        ALCodeEditor& f = make("f()\n{\n    x();\n}\ng()");
+        ensure("folds", f.foldAt(0));
+        ensure("its lines hidden", f.layout().hidden(1) && f.layout().hidden(3) && !f.layout().hidden(4));
+        f.setCaret(f.document().lineEnd(0));
+        key(KEY_RETURN);
+        ensure_equals("the brace a line down", f.document().line(2), std::string("{"));
+        ensure_equals("the caret on the line made", f.caret().line, 1);
+        ensure("the block opened", !f.isFolded(0));
+        ensure("the caret's line in sight, and the rest of the block", !f.layout().hidden(1) && !f.layout().anyHidden());
     }
 }

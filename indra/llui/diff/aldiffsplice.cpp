@@ -31,13 +31,24 @@
 
 #include <algorithm>
 #include <limits>
+#include <span>
 
 namespace
 {
     typedef ALTextDiff::Run  Run;
     typedef ALTextDiff::Kind Kind;
+    // A text's lines' regions, a line each; none where lines are not told
+    // the same by them.
+    typedef std::span<const ALTextDiff::regions_t> text_regions_t;
 
     S32 sLastCompared = 0;
+
+    // The regions of a stretch of a text, from `from` to `to`, cut from
+    // those of the whole of it; none where it has none.
+    text_regions_t regionsOf(text_regions_t regions, S32 from, S32 to)
+    {
+        return regions.empty() ? regions : regions.subspan(static_cast<size_t>(from), static_cast<size_t>(to - from));
+    }
 
     // A place in both texts: so many lines of the left and of the right.
     struct Place
@@ -85,8 +96,9 @@ namespace
     // just after a change is parted from it by a run the same of none,
     // which is looked at again at both ends. False where the stretch is
     // more than MOST_SHARE, or the runs do not pass through its anchors.
+    // Its lines told the same by the texts' regions, where they are.
     bool spliceAnchored(std::vector<Run>& runs, const std::vector<std::string>& left, const std::vector<std::string>& right, Place was, Place from,
-                        Place to, const ALTextDiff::Options& options, S32& compared)
+                        Place to, const ALTextDiff::Options& options, text_regions_t left_regions, text_regions_t right_regions, S32& compared)
     {
         const S32                   ln   = static_cast<S32>(left.size());
         const S32                   rn   = static_cast<S32>(right.size());
@@ -158,7 +170,8 @@ namespace
             keep(cut);
         }
         bool first = true;
-        for (Run run : ALTextDiff::lines(some_left, some_right, some))
+        for (Run run : ALTextDiff::lines(some_left, some_right, some, regionsOf(left_regions, start.left, end.left),
+                                         regionsOf(right_regions, start.right, end.right)))
         {
             run.left += start.left;
             run.right += start.right;
@@ -207,9 +220,14 @@ S32 ALDiffSplice::lastCompared()
 bool ALDiffSplice::splice(std::vector<Run>& runs, const std::vector<std::string>& left_was, const std::vector<std::string>& left,
                           const std::vector<std::string>& right_was, const std::vector<std::string>& right, const ALTextDiff::Options& options)
 {
-    // A side passed as itself is not read.
-    return splice(runs, Side{ left, static_cast<S32>(left_was.size()), ALDiffEdit::edgesOf(left_was, left) },
-                  Side{ right, static_cast<S32>(right_was.size()), ALDiffEdit::edgesOf(right_was, right) }, options);
+    // A side passed as itself is not read. Each side's regions, where lines
+    // are told the same by them, read whole by the lexer in turn, as a
+    // comparison of the two reads them.
+    const bool                                regioned      = options.like.byRegions() && !options.like.ignoreComments && options.lexer;
+    const std::vector<ALTextDiff::regions_t>* left_regions  = regioned ? &options.lexer(left) : nullptr;
+    const std::vector<ALTextDiff::regions_t>* right_regions = regioned ? &options.lexer(right) : nullptr;
+    return splice(runs, Side{ left, static_cast<S32>(left_was.size()), ALDiffEdit::edgesOf(left_was, left), left_regions },
+                  Side{ right, static_cast<S32>(right_was.size()), ALDiffEdit::edgesOf(right_was, right), right_regions }, options);
 }
 
 bool ALDiffSplice::splice(std::vector<Run>& runs, const Side& left_side, const Side& right_side, const ALTextDiff::Options& options)
@@ -231,6 +249,20 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const Side& left_side, const S
     if (left_same && right_same)
     {
         return true;
+    }
+    // Where lines are told the same by their regions, those the whole texts
+    // were read in, which a stretch's are cut from; the whole again where
+    // they are not given.
+    text_regions_t left_regions;
+    text_regions_t right_regions;
+    if (options.like.byRegions() && options.lexer)
+    {
+        if (!left_side.regions || !right_side.regions || left_side.regions->size() != left.size() || right_side.regions->size() != right.size())
+        {
+            return false;
+        }
+        left_regions  = *left_side.regions;
+        right_regions = *right_side.regions;
     }
     // The changed stretch of each side as it was; a side the same holds no
     // place back.
@@ -288,7 +320,8 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const Side& left_side, const S
         S32 between = 0;
         if (options.anchors.empty() ||
             !spliceAnchored(runs, left, right, Place{ ln_was, rn_was }, Place{ l_from, r_from },
-                            Place{ left_same ? -FAR_OFF : static_cast<S32>(left.size()) - lt, right_same ? -FAR_OFF : static_cast<S32>(right.size()) - rt }, options, between))
+                            Place{ left_same ? -FAR_OFF : static_cast<S32>(left.size()) - lt, right_same ? -FAR_OFF : static_cast<S32>(right.size()) - rt }, options,
+                            left_regions, right_regions, between))
         {
             return false;
         }
@@ -342,7 +375,7 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const Side& left_side, const S
             keep(cut);
         }
     }
-    for (Run run : ALTextDiff::lines(some_left, some_right, some))
+    for (Run run : ALTextDiff::lines(some_left, some_right, some, regionsOf(left_regions, start.left, l_end), regionsOf(right_regions, start.right, r_end)))
     {
         run.left += start.left;
         run.right += start.right;

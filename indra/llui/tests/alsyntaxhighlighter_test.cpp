@@ -381,4 +381,45 @@ namespace tut
         a.setWords(nullptr);
         ensure_equals("none set, none", said(doc.line(0), a.tokens(0)), std::string("text:foo bar"));
     }
+    template<> template<>
+    void alsyntaxhighlighter_object::test<11>()
+    {
+        set_test_name("lexed a slice at a time: no more lines lexed than asked, the lines that lex as they did passed for nothing, and the tokens what lexing afresh gives");
+        ALTextDocument doc;
+        std::string    text;
+        for (S32 i = 0; i < 1000; ++i)
+        {
+            text += "a 1\n";
+        }
+        doc.setText(text);
+        const S32           last = doc.lineCount() - 1;
+        ALSyntaxHighlighter highlighter;
+        ensure("nothing to lex without a grammar", highlighter.lexSome(1));
+        highlighter.setGrammar(loaded(mini()));
+        highlighter.attach(&doc);
+        highlighter.tokens(last);
+        ensure("lexed to its end, nothing more to lex", highlighter.lexSome(1) && highlighter.lastLexed() == 0);
+
+        // A comment opened at the top: every line after it starts in it.
+        doc.insert(ALTextPos(0, 0), "/* ");
+        ensure("a slice: not the end", !highlighter.lexSome(100));
+        ensure_equals("as many as asked", highlighter.lastLexed(), 100);
+        ensure("and again", !highlighter.lexSome(100) && highlighter.lastLexed() == 100);
+        ensure_equals("a line asked for lexed on from where the slices stopped", said(doc.line(500), highlighter.tokens(500)), std::string("comment:a 1"));
+        ensure_equals("from there", highlighter.lastLexed(), 301);
+        ensure("the rest", highlighter.lexSome(1000) && highlighter.lastLexed() == last - 500);
+
+        // A line typed in: lexed, and the lines after it, which start as
+        // they did, passed for nothing.
+        doc.insert(ALTextPos(10, 0), "b");
+        ensure("one line lexed, and none after it wants lexing", highlighter.lexSome(1) && highlighter.lastLexed() == 1);
+
+        ALSyntaxHighlighter fresh;
+        fresh.setGrammar(loaded(mini()));
+        fresh.attach(&doc);
+        for (S32 line = 0; line < doc.lineCount(); ++line)
+        {
+            ensure("line " + std::to_string(line) + " as lexed afresh", highlighter.tokens(line) == fresh.tokens(line));
+        }
+    }
 }
