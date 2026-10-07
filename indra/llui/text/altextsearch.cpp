@@ -123,6 +123,19 @@ namespace
         const char* mEnd   = nullptr;
     };
 
+    // Where the character the byte at `at` is in begins, as Characters
+    // reads a text: the byte itself, unless a well-formed sequence begun
+    // before it runs over it.
+    size_t characterStart(std::string_view text, size_t at)
+    {
+        size_t lead = at;
+        while (lead > 0 && lead < text.size() && at - lead < 3 && (static_cast<unsigned char>(text[lead]) & 0xC0) == 0x80)
+        {
+            --lead;
+        }
+        return lead < at && utf8str_decode_at(text, lead).next > at ? lead : at;
+    }
+
     // The pattern's first match from `first`, a character at a time up to
     // `last`, looking back as far as `base`; said in bytes, as Boost's own
     // search of UTF-8 says it.
@@ -250,6 +263,15 @@ namespace
         // offsets turned into places by `posOf`. The text is a line, or the
         // lines as one with breaks between them.
         auto searchIn = [&](const std::string& text, S32 from, S32 to, const std::function<ALTextPos(S32)>& posOf) {
+            // A stretch that begins inside a character begins after it, and
+            // one that ends inside a character ends before it, so that no
+            // match takes part of one.
+            const size_t first_whole = characterStart(text, static_cast<size_t>(from));
+            if (first_whole != static_cast<size_t>(from))
+            {
+                from = static_cast<S32>(utf8str_decode_at(text, first_whole).next);
+            }
+            to = static_cast<S32>(characterStart(text, static_cast<size_t>(to)));
             if (options.regex)
             {
                 // Searched to the text's own end, a match kept only where it

@@ -396,4 +396,27 @@ namespace tut
         ensure_equals("each byte one", said(ALTextSearch::matches(doc, ".", options, nullptr, &error)), std::string("0:0-1 0:1-2 0:2-3 0:3-4"));
         ensure("and nothing to say", error.empty());
     }
+
+    template<> template<>
+    void altextsearch_object::test<14>()
+    {
+        set_test_name("a stretch that begins inside a character is searched from the character after it, by pattern, line by line or whole");
+        ALTextDocument doc;
+        doc.setText("caf\xc3\xa9 x\n");
+        ALTextSearchOptions options;
+        options.regex = true;
+        const ALTextRange inside(ALTextPos(0, 4), ALTextPos(0, 7));
+        ensure_equals("line by line: nothing of the \xc3\xa9 it began in", said(ALTextSearch::matches(doc, ".", options, &inside)), std::string("0:5-6 0:6-7"));
+        auto edits = ALTextSearch::replacements(doc, ".", options, "_", &inside);
+        doc.replaceMany(std::move(edits));
+        ensure_equals("replaced, the \xc3\xa9 whole", doc.text(), std::string("caf\xc3\xa9__\n"));
+        options.acrossLines = true;
+        doc.setText("caf\xc3\xa9 x\n");
+        ensure_equals("the lines as one text, the same", said(ALTextSearch::matches(doc, ".", options, &inside)), std::string("0:5-6 0:6-7"));
+        options.acrossLines = false;
+        // One that ends inside a character keeps no match of it, as before.
+        doc.setText("x \xc3\xa9\n");
+        const ALTextRange ending(ALTextPos(0, 0), ALTextPos(0, 3));
+        ensure_equals("ending inside one: what is before it", said(ALTextSearch::matches(doc, ".", options, &ending)), std::string("0:0-1 0:1-2"));
+    }
 }
