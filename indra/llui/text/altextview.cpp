@@ -244,21 +244,34 @@ namespace
         LLPointer<LLImageRaw> raw    = new LLImageRaw(static_cast<U16>(width), static_cast<U16>(height), 4);
         U8*                   data   = raw->getData();
         const F32             step   = 2.f * F_PI / static_cast<F32>(SQUIGGLE_WAVE);
+        // The wave sampled once, finely enough that the fade is smooth, over
+        // a wave and as far either side of it as the line and its fade
+        // reach: no texel is covered by the wave further from it than that,
+        // so that is all of the wave any texel looks along -- a few hundred
+        // samples each, not the sines of two whole waves.
+        constexpr F32    REACH   = SQUIGGLE_HALF + SQUIGGLE_FEATHER;
+        constexpr F32    SAMPLE  = 0.01f;
+        const S32        samples = static_cast<S32>(ceilf((static_cast<F32>(SQUIGGLE_WAVE) + 2.f * REACH) / SAMPLE)) + 1;
+        std::vector<F32> wave(static_cast<size_t>(samples));
+        for (S32 i = 0; i < samples; ++i)
+        {
+            wave[static_cast<size_t>(i)] = SQUIGGLE_AMPLITUDE * sinf((static_cast<F32>(i) * SAMPLE - REACH) * step);
+        }
         for (S32 row = 0; row < height; ++row)
         {
             for (S32 column = 0; column < width; ++column)
             {
                 // The texel's middle, in points from the wave's start and
-                // its middle, and how near the wave comes to it: looked
-                // for along a wave either side, finely enough that the
-                // fade is smooth.
-                const F32 x    = (static_cast<F32>(column) + 0.5f) / static_cast<F32>(scale);
-                const F32 y    = (static_cast<F32>(row) + 0.5f) / static_cast<F32>(scale) - 0.5f * static_cast<F32>(SQUIGGLE_HEIGHT);
+                // its middle, and how near the wave within reach comes to it.
+                const F32 x       = (static_cast<F32>(column) + 0.5f) / static_cast<F32>(scale);
+                const F32 y       = (static_cast<F32>(row) + 0.5f) / static_cast<F32>(scale) - 0.5f * static_cast<F32>(SQUIGGLE_HEIGHT);
+                const S32 from    = llmax(0, static_cast<S32>(floorf(x / SAMPLE)));
+                const S32 to      = llmin(samples - 1, static_cast<S32>(ceilf((x + 2.f * REACH) / SAMPLE)));
                 F32       nearest = F32_MAX;
-                for (F32 along = x - static_cast<F32>(SQUIGGLE_WAVE); along <= x + static_cast<F32>(SQUIGGLE_WAVE); along += 0.01f)
+                for (S32 i = from; i <= to; ++i)
                 {
-                    const F32 dx = x - along;
-                    const F32 dy = y - SQUIGGLE_AMPLITUDE * sinf(along * step);
+                    const F32 dx = x - (static_cast<F32>(i) * SAMPLE - REACH);
+                    const F32 dy = y - wave[static_cast<size_t>(i)];
                     nearest      = llmin(nearest, dx * dx + dy * dy);
                 }
                 const F32 cover = llclamp((SQUIGGLE_HALF + SQUIGGLE_FEATHER - sqrtf(nearest)) / SQUIGGLE_FEATHER, 0.f, 1.f);
@@ -5078,8 +5091,14 @@ void ALTextView::drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, cons
 
 void ALTextView::drawSquiggles(const Squiggle* squiggles, size_t count)
 {
+    // The texture made the first time there is a squiggle to draw, not the
+    // first time a view draws its rows.
+    if (count == 0)
+    {
+        return;
+    }
     LLImageGL* wave = squiggleTexture();
-    if (count == 0 || !wave || !wave->getHasGLTexture())
+    if (!wave || !wave->getHasGLTexture())
     {
         return;
     }
