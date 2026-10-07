@@ -269,6 +269,9 @@ public:
     // is none: found through the heights, not by stepping over a run of
     // hidden lines one by one -- a comparison folds tens of thousands.
     S32 visibleAfter(S32 index);
+    // The last line not hidden before this one, -1 where there is none:
+    // found through the heights as well.
+    S32 visibleBefore(S32 index);
     // Moves on whenever which lines are hidden may have changed -- a line
     // hidden or shown, lines made or taken away -- for whoever keeps a list
     // of the lines in sight.

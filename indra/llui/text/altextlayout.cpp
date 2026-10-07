@@ -396,6 +396,24 @@ S32 ALTextLayout::visibleAfter(S32 index)
     return llmin(static_cast<S32>(mHeights.reach(mHeights.before(static_cast<size_t>(next)))), count);
 }
 
+S32 ALTextLayout::visibleBefore(S32 index)
+{
+    const S32 prev = llmin(index, lineCount()) - 1;
+    if (prev < 0 || !hidden(prev))
+    {
+        return llmax(prev, -1);
+    }
+    ensureHeights();
+    if (rowHeight() <= 0)
+    {
+        return visibleFrom(prev, -1);
+    }
+    // And the line the last pixel above the hidden run falls in is the
+    // last in sight before it; with nothing above the run, there is none.
+    const S32 above = mHeights.before(static_cast<size_t>(prev));
+    return above > 0 ? static_cast<S32>(mHeights.reach(above - 1)) : -1;
+}
+
 F32 ALTextLayout::spaceAdvance()
 {
     if (mSpaceAdvance < 0.f)
@@ -1065,17 +1083,19 @@ S32 ALTextLayout::lineAtY(S32 y)
     // The last line whose top is at or above y. Hidden lines share a top
     // with the line after them, so the last of a run is the one in sight
     // -- unless the run reaches the end, where the nearest in sight is
-    // above it.
+    // above it: found through the heights, not by stepping back over the
+    // run, which a comparison folding all after its last change has in
+    // sight whenever what it shows fits the view.
     const S32 line = llclamp(static_cast<S32>(mHeights.reach(y)), 0, lineCount() - 1);
     if (mHidden[line])
     {
-        const S32 above = visibleFrom(line, -1);
+        const S32 above = visibleBefore(line + 1);
         if (above >= 0)
         {
             return above;
         }
-        const S32 below = visibleFrom(line, 1);
-        if (below >= 0)
+        const S32 below = visibleAfter(line);
+        if (below < lineCount())
         {
             return below;
         }

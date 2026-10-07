@@ -942,4 +942,36 @@ namespace tut
         layout.invalidateLine(4);
         check("that line laid out again");
     }
+
+    template<> template<>
+    void altextlayout_object::test<25>()
+    {
+        set_test_name("the line at a y past a run hidden to the end is the last in sight, and the last in sight before a line is found over a run, gaps or none");
+        std::string many = "first\nsecond";
+        for (S32 n = 0; n < 5000; ++n)
+        {
+            many += "\nhidden";
+        }
+        ready(many.c_str());
+        const S32 row  = layout.rowHeight();
+        const S32 last = layout.lineCount() - 1;
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 2, last, true);
+        ensure_equals("past everything in sight: the last line in sight", layout.lineAtY(10 * row), 1);
+        ensure_equals("on it, itself", layout.lineAtY(row), 1);
+        ensure_equals("before the run, from past it", layout.visibleBefore(last + 1), 1);
+        ensure_equals("from inside it", layout.visibleBefore(2500), 1);
+        ensure_equals("before a line in sight, the one above it", layout.visibleBefore(1), 0);
+        ensure_equals("none before the first", layout.visibleBefore(0), -1);
+        std::vector<S32> gaps(static_cast<size_t>(last + 2), 0);
+        gaps[1] = 2;
+        layout.setGapProvider([&gaps](S32 line) { return gaps[static_cast<size_t>(line)]; });
+        ensure_equals("a gap over the last in sight: still it", layout.visibleBefore(last + 1), 1);
+        ensure_equals("and past everything, it", layout.lineAtY(20 * row), 1);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 1, 1, true);
+        ensure_equals("the run from the second line: the first", layout.visibleBefore(last + 1), 0);
+        ensure_equals("past everything, the first", layout.lineAtY(20 * row), 0);
+        layout.setHidden(ALTextLayout::HiddenBy::Host, 0, 0, true);
+        ensure_equals("everything hidden: none", layout.visibleBefore(last + 1), -1);
+        layout.setGapProvider(nullptr);
+    }
 }

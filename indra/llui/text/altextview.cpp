@@ -1225,7 +1225,9 @@ bool ALTextView::stepRow(S32& line, S32& row, S32 direction)
             --row;
             return true;
         }
-        const S32 above = mLayout.visibleFrom(line - 1, -1);
+        // Over the lines folded away through the heights, not one by one:
+        // a fold may hide thousands.
+        const S32 above = mLayout.visibleBefore(line);
         if (above < 0)
         {
             return false;
@@ -1239,8 +1241,8 @@ bool ALTextView::stepRow(S32& line, S32& row, S32 direction)
         ++row;
         return true;
     }
-    const S32 below = mLayout.visibleFrom(line + 1, 1);
-    if (below < 0)
+    const S32 below = mLayout.visibleAfter(line);
+    if (below >= mLayout.lineCount())
     {
         return false;
     }
