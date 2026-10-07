@@ -726,7 +726,12 @@ ALScriptLinkScripts::Linked ALScriptLinkScripts::link(bool send_differing)
             continue;
         }
         links.push_back(linkOf(row));
-        const bool send = send_differing && row.world == World::Differs;
+        // Sent where it differs, but not where its file does not expand
+        // cleanly: the studio's own send does not put that up, and a save
+        // of the file does.
+        const bool differs = send_differing && row.world == World::Differs;
+        const bool send    = differs && !row.missed;
+        linked.unexpanded += differs && !send ? 1 : 0;
         if (send)
         {
             sends.push_back(row.ref);

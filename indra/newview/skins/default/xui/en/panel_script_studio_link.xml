@@ -43,7 +43,7 @@
      layout="topleft"
      left="4"
      name="link_send_differing"
-     tool_tip="Once linked, send each file that is not what its script holds in-world, keeping what the script had in History"
+     tool_tip="Once linked, send each file found to differ from what its script holds in-world, keeping what the script held in History first. A file whose script could not be compared is not sent, nor one that does not expand cleanly: saving it sends it."
      top_pad="5"
      width="170" />
     <button

@@ -708,6 +708,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="LinkTipUnknown">Whether it is what the script holds in-world can't be told: its text in-world could not be read.</floater.string>
     <floater.string name="LinkTipUnknownWhy">Whether it is what the script holds in-world can't be told: [WHY].</floater.string>
     <floater.string name="LinkTipNotOwned">Not your object, so it is not ticked: tick it to link it.</floater.string>
+    <floater.string name="LinkTipMissed">[FILE] does not expand cleanly -- an include not found, say -- so it is not sent from here; saving the file sends it all the same.</floater.string>
     <floater.string name="LinkChooseTitle">The file for [NAME]</floater.string>
     <floater.string name="LinkChoosePlaceholder">Type to find a file</floater.string>
     <floater.string name="LinkChoosePick">Another file...</floater.string>
@@ -717,6 +718,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="LinkedScriptsB">Linked [COUNT] scripts to their files: [LIST].</floater.string>
     <floater.string name="LinkedSendingA">Sending the 1 that differs.</floater.string>
     <floater.string name="LinkedSendingB">Sending the [COUNT] that differ.</floater.string>
+    <floater.string name="LinkedUnexpandedA">1 that differs was not sent, as its file does not expand cleanly: saving the file sends it.</floater.string>
+    <floater.string name="LinkedUnexpandedB">[COUNT] that differ were not sent, as their files do not expand cleanly: saving each file sends it.</floater.string>
     <floater.string name="ExplorerSendingFromFilesA">Sending 1 script from its file.</floater.string>
     <floater.string name="ExplorerSendingFromFilesB">Sending [COUNT] scripts from their files.</floater.string>
     <floater.string name="ExplorerSendUnsavedA">1 was not sent: its file has unsaved changes in a tab.</floater.string>

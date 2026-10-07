@@ -179,6 +179,10 @@ std::string ALScriptLinkPane::tipOf(const Row& row) const
         args["[WHY]"] = row.worldWhy;
         said.push_back(mServices->words(row.worldWhy.empty() ? "LinkTipUnknown" : "LinkTipUnknownWhy", args));
     }
+    if (row.answered && row.missed)
+    {
+        said.push_back(mServices->words("LinkTipMissed", args));
+    }
     if (!row.owned)
     {
         said.push_back(mServices->words("LinkTipNotOwned", args));
@@ -399,6 +403,10 @@ void ALScriptLinkPane::linkTicked()
     if (sent > 0)
     {
         said = mServices->sentences(said, mServices->counted("LinkedSending", sent));
+    }
+    if (linked.unexpanded > 0)
+    {
+        said = mServices->sentences(said, mServices->counted("LinkedUnexpanded", linked.unexpanded));
     }
     mServices->report(said);
     fill();

@@ -220,11 +220,15 @@ public:
             bool        sent = false;
         };
         std::vector<One> ones;
+        // Those that differ left unsent, their files not expanding cleanly.
+        S32 unexpanded = 0;
     };
     // The rows ticked linked (linkOf); then, where `send_differing`, those
     // that differ sent from their files as the studio's own send, which a
-    // change in the world since holds. What was proposed let go of, and
-    // what was made told.
+    // change in the world since holds -- and which, the first through a
+    // link, keeps what the world held in History first. Not one whose file
+    // does not expand cleanly, which such a send would not put up. What was
+    // proposed let go of, and what was made told.
     Linked link(bool send_differing);
 
     // Whether a file is called what an item is, in any case, a script's
