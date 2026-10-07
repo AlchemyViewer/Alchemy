@@ -1264,6 +1264,10 @@ private:
     void   drawBars(F32 alpha);
     void drawRows(const LLRect& text);
     void placeFindBar();
+    // The find bar, where it is shown, in the view's colours as they stand
+    // -- a theme chosen while it is open, the keyboard come or gone, the
+    // text made read-only -- coloured only where they changed.
+    void colorFindBar();
     // The bar's query looked for through the text again: at once, or once
     // edits stop coming for a moment, the matches sliding with the text
     // until then; and at once where they are about to be used.
@@ -1487,8 +1491,17 @@ private:
     LLHandle<LLContextMenu> mUrlMenuHandle;
 
     ALFindBar*               mFindBar = nullptr;
-    // The colour table's generation the find bar was last coloured at.
-    U32                      mFindBarColors = 0;
+    // What the find bar was last coloured in -- the view's ground and ink,
+    // and the colour table's generation, which the bar's own shades of
+    // them come from -- and none until it is.
+    struct FindBarColors
+    {
+        bool     set        = false;
+        U32      generation = 0;
+        LLColor4 paper;
+        LLColor4 ink;
+    };
+    FindBarColors            mFindBarColors;
     // What the bar's query found, kept in step with the text.
     ALTextFind               mFind;
     LLUIColor                mFindMatchColor;

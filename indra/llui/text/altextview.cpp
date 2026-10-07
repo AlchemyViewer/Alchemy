@@ -4607,7 +4607,27 @@ void ALTextView::placeFindBar()
     const S32    height = mFindBar->wantedHeight();
     const S32    right  = text.mRight - 6;
     mFindBar->setShape(LLRect(right - width, local.mTop - 4, right, local.mTop - 4 - height));
-    mFindBar->setColors(backgroundColor(), textColor());
+}
+
+void ALTextView::colorFindBar()
+{
+    if (!findShown())
+    {
+        return;
+    }
+    const LLColor4& paper      = backgroundColor();
+    const LLColor4& ink        = textColor();
+    const U32       generation = LLUIColorTable::instance().generation();
+    FindBarColors&  colored    = mFindBarColors;
+    if (colored.set && colored.generation == generation && colored.paper == paper && colored.ink == ink)
+    {
+        return;
+    }
+    colored.set        = true;
+    colored.generation = generation;
+    colored.paper      = paper;
+    colored.ink        = ink;
+    mFindBar->setColors(paper, ink);
 }
 
 void ALTextView::queryChanged()
@@ -5544,13 +5564,7 @@ void ALTextView::pump()
             dragSelectTo(mDragX, mDragY);
         }
     }
-    // The find bar in the view's colours as they are now: a theme chosen
-    // while it is open recolours it, as it does the text.
-    if (mFindBar && mFindBar->getVisible() && mFindBarColors != LLUIColorTable::instance().generation())
-    {
-        mFindBarColors = LLUIColorTable::instance().generation();
-        mFindBar->setColors(backgroundColor(), textColor());
-    }
+    colorFindBar();
     // The find bar's query looked for through the text again once edits
     // have stopped coming for a moment, not at every keystroke; and a
     // worker's matches taken as they come in.
