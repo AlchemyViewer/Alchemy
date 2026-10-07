@@ -3718,19 +3718,19 @@ bool ALTextView::canPerform(ALEditorCommand command) const
     }
 }
 
-S32 ALTextView::screenTopOf(const LLRect& text, S32 line, S32 row)
+S32 ALTextView::screenTopOf(const LLRect& text, S32 line, S32 row) const
 {
-    return text.mTop - (mLayout.lineTop(line) + mLayout.rowTop(line, row) - mScrollY);
+    return text.mTop - (lay().lineTop(line) + lay().rowTop(line, row) - mScrollY);
 }
 
-LLRect ALTextView::anchorOf(const ALTextPos& at)
+LLRect ALTextView::anchorOf(const ALTextPos& at) const
 {
     const LLRect text = textRect();
     S32          row;
-    const F32    x    = mLayout.xOf(at.line, at.column, &row);
+    const F32    x    = lay().xOf(at.line, at.column, &row);
     const S32    top  = screenTopOf(text, at.line, row);
     const S32    left = static_cast<S32>(static_cast<F32>(text.mLeft) - mScrollX + x);
-    return LLRect(left, top, left, top - mLayout.rowHeightOf(at.line, row));
+    return LLRect(left, top, left, top - lay().rowHeightOf(at.line, row));
 }
 
 LLRect ALTextView::anchorOf(const ALTextRange& range)
@@ -4411,9 +4411,10 @@ bool ALTextView::getPreeditLocation(S32 query_offset, LLCoordGL* coord, LLRect* 
     {
         return false;
     }
-    S32       row;
-    const F32 qx  = lay().xOf(query.line, query.column, &row);
-    const S32 top = text.mTop - (lay().lineTop(query.line) + lay().rowTop(query.line, row) + (lay().rowHeightOf(query.line, row) - row_h) - mScrollY);
+    // The row's text band: a row a box made taller holds its text at its
+    // bottom, a font's line high.
+    const LLRect at  = anchorOf(query);
+    const S32    top = at.mBottom + row_h;
     if (top > text.mTop || top - row_h < text.mBottom)
     {
         return false;
@@ -4422,7 +4423,7 @@ bool ALTextView::getPreeditLocation(S32 query_offset, LLCoordGL* coord, LLRect* 
     if (coord)
     {
         S32 sx, sy;
-        localPointToScreen(static_cast<S32>(left + qx), top - row_h / 2, &sx, &sy);
+        localPointToScreen(at.mLeft, top - row_h / 2, &sx, &sy);
         LLUI::getInstance()->screenPointToGL(sx, sy, &coord->mX, &coord->mY);
     }
     if (bounds)
@@ -5792,11 +5793,9 @@ bool ALTextView::handleKeyHere(KEY key, MASK mask)
         scrollToCaret();
         const LLRect text  = textRect();
         const S32    row_h = llmax(1, mLayout.rowHeight());
-        S32          row   = 0;
-        const F32    cx    = lay().xOf(mCaret.line, mCaret.column, &row);
-        const S32    top   = text.mTop - (lay().lineTop(mCaret.line) + lay().rowTop(mCaret.line, row) - mScrollY);
-        const S32    x     = llclamp(text.mLeft + static_cast<S32>(cx - mScrollX), text.mLeft, text.mRight - 1);
-        const S32    y     = llclamp(top - row_h, text.mBottom, text.mTop - 1);
+        const LLRect at    = anchorOf(mCaret);
+        const S32    x     = llclamp(at.mLeft, text.mLeft, text.mRight - 1);
+        const S32    y     = llclamp(at.mTop - row_h, text.mBottom, text.mTop - 1);
         refreshSuggestions();
         showContextMenu(x, y);
         return true;

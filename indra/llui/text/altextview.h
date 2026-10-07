@@ -896,7 +896,7 @@ public:
     // nothing. For a stretch, its span on the row it begins on, or the
     // whole of that row where it shows nothing there. What a list, a card
     // or a tip is put beside.
-    LLRect anchorOf(const ALTextPos& at);
+    LLRect anchorOf(const ALTextPos& at) const;
     LLRect anchorOf(const ALTextRange& range);
     // A drag of the mouse under way -- from its press, or a shift-press
     // from the anchor -- and the characters under its two ends: what a
@@ -987,7 +987,7 @@ protected:
     // a box made taller than the font's line holds its text at its
     // bottom -- and every row on screen in turn, for a subclass drawing
     // beside them.
-    S32  screenTopOf(const LLRect& text, S32 line, S32 row);
+    S32  screenTopOf(const LLRect& text, S32 line, S32 row) const;
     void forEachVisibleRow(const LLRect& text, const std::function<void(S32 line, S32 row, S32 screen_top)>& visit);
     // Every gap on screen: the line it is above (one past the last for
     // the gap below the text), its top on the screen and its height.
