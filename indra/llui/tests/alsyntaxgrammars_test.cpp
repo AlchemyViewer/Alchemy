@@ -470,4 +470,24 @@ namespace tut
         ensure_equals("not a fraction's, which Luau calls malformed", lexed("slua", "x = 1.5i", state, words),
                       std::string("text:x |operator:=|text: |number:1.5|text:i"));
     }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<20>()
+    {
+        set_test_name("a comment right after an operator opens: the operator takes none of it, in LSL or SLua, and operators side by side are still one");
+        ALSyntaxWords words;
+        ALSyntaxState state;
+        ensure_equals("LSL, a block comment", lexed("lsl", "x = y +/* note */ 1;", state, words),
+                      std::string("text:x |operator:=|text: y |operator:+|comment:/* note */|text: |number:1|punctuation:;"));
+        ensure("closed on its line", state.frames.size() == 1);
+        ensure_equals("a line comment", lexed("lsl", "x =// the x", state, words), std::string("text:x |operator:=|comment:// the x"));
+        ensure_equals("operators together", lexed("lsl", "x += y != z", state, words),
+                      std::string("text:x |operator:+=|text: y |operator:!=|text: z"));
+        ALSyntaxState slua;
+        ensure_equals("SLua, a long comment", lexed("slua", "local n = 1 +--[[ off ]] 2", slua, words),
+                      std::string("control:local|text: n |operator:=|text: |number:1|text: |operator:+|comment:--[[ off ]]|text: |number:2"));
+        ensure_equals("a line comment", lexed("slua", "n = n *-- twice", slua, words), std::string("text:n |operator:=|text: n |operator:*|comment:-- twice"));
+        ensure_equals("operators together", lexed("slua", "n //= 2 ~= 3", slua, words),
+                      std::string("text:n |operator://=|text: |number:2|text: |operator:~=|text: |number:3"));
+    }
 }

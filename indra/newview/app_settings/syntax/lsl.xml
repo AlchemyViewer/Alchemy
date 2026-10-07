@@ -235,9 +235,14 @@
             </map>
           </array>
         </map>
+        <!-- One character at a time, which run together as one operator
+             all the same: a run taken whole would take the / of a comment
+             right after it, as in +/* ... */. -->
         <map>
           <key>chars</key>
           <string>+\-*/%=!&lt;&gt;&amp;|^~</string>
+          <key>max</key>
+          <integer>1</integer>
           <key>kind</key>
           <string>operator</string>
         </map>
