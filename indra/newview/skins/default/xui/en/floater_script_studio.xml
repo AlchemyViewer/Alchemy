@@ -662,7 +662,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="MasterDiffering">[NAME] was changed in-world by [WHO]: it no longer holds [FILE].</floater.string>
     <floater.string name="MasterSuspended">[NAME]'s link to [FILE] is held: [WHY].</floater.string>
     <floater.string name="MasterOrphaned">[NAME] is gone from where it was; its link to [FILE] is kept a while, should it come back.</floater.string>
-    <floater.string name="MasterPending">[FILE] was not sent to [NAME]: [WHY]. Send it once it is in reach.</floater.string>
+    <floater.string name="MasterPending">[FILE] was not sent to [NAME]: [WHY]. It waits to be sent by hand.</floater.string>
     <floater.string name="MasterRelinked">[NAME] is linked to [FILE] again.</floater.string>
     <floater.string name="MasterNotWritten">[FILE] could not be written, so [NAME] is not linked to it; what was typed is still here.</floater.string>
     <floater.string name="MasterGaveWay">[NAME] is linked to [FILE] now: its tab gave way to the file's, where it is changed from here on.</floater.string>
