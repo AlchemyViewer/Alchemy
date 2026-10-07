@@ -1474,4 +1474,36 @@ namespace tut
         ensure("of the script as it stands", *studio.asks[0].request.text == doc.editor->text());
         ensure("and a script now", !checking.lslFragment(doc));
     }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<27>()
+    {
+        set_test_name("a fix that moves a require onto a SLua alias of the studio's own is held to the text's limit as its edit is, without a composition standing in the text");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        std::vector<std::string> named;
+        viewer.slots.nameStudioAlias = [&named](const std::string& name, const std::string& folder) {
+            named.push_back(name + "=" + folder);
+            return true;
+        };
+        // Three bytes composed at the end of the text, which the edit is
+        // not made to; room for two more without them.
+        ALCodeEditor& editor = *doc.editor;
+        editor.setCaret(editor.document().end());
+        editor.preeditor().updatePreedit("xyz", LLPreeditor::segment_lengths_t{ 3 }, LLPreeditor::standouts_t{ false }, 3);
+        ensure("composing", editor.hasPreedit());
+        editor.setMaxBytes(SCRIPT.size() + 2);
+
+        ALScriptFix longer = fix("Name /inc as the SLua alias @inc, and require it as '@inc/util'", 0, 8, 13, "counter_", false);
+        longer.key         = "ScriptFixRequireAlias";
+        longer.args        = { "@inc/util", "inc", "/inc" };
+        ensure("three more: past the limit, not made", !checking.applyFix(doc, longer, version(doc)));
+        ensure("nor named", named.empty());
+        ALScriptFix moved   = longer;
+        moved.edits[0].text = "counter";
+        ensure("two more: made", checking.applyFix(doc, moved, version(doc)));
+        ensure("the folder named", named == std::vector<std::string>{ "inc=/inc" });
+        ensure_equals("and the text, the composition gone", editor.text(), "integer counter" + SCRIPT.substr(13));
+        editor.setMaxBytes(0);
+    }
 }

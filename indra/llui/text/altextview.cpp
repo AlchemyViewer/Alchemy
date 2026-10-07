@@ -2565,20 +2565,42 @@ std::string_view ALTextView::fitting(const ALTextRange& over, std::string_view t
     return text.substr(0, room);
 }
 
-bool ALTextView::fits(const std::vector<std::pair<ALTextRange, std::string>>& edits)
+bool ALTextView::wouldFit(const std::vector<std::pair<ALTextRange, std::string>>& edits) const
 {
     if (mMaxBytes == 0)
     {
         return true;
     }
+    // In bytes of the text without a composition standing in it, which is
+    // the text the edit is made to: a place inside one at its start, as
+    // withoutComposition puts it, and one past it back by what it added --
+    // what it wrote over put back.
+    const size_t composed    = hasPreedit() ? static_cast<size_t>(mPreeditLength) : 0;
+    const size_t overwritten = hasPreedit() ? mPreeditOverwritten.size() : 0;
+    const auto   offset      = [this, composed, overwritten](const ALTextPos& pos) -> size_t {
+        if (!hasPreedit() || pos <= mPreeditBegin)
+        {
+            return mDocument.offsetOf(pos);
+        }
+        if (pos.line == mPreeditBegin.line && pos.column < mPreeditBegin.column + mPreeditLength)
+        {
+            return mDocument.offsetOf(mPreeditBegin);
+        }
+        return mDocument.offsetOf(pos) - composed + overwritten;
+    };
     size_t taken = 0, put = 0;
     for (const auto& [over, text] : edits)
     {
         const ALTextRange range = over.normalised();
-        taken += mDocument.offsetOf(range.end) - mDocument.offsetOf(range.begin);
+        taken += offset(range.end) - offset(range.begin);
         put += text.size();
     }
-    if (put <= taken || mDocument.byteCount() - taken + put <= mMaxBytes)
+    return put <= taken || mDocument.byteCount() - composed + overwritten - taken + put <= mMaxBytes;
+}
+
+bool ALTextView::fits(const std::vector<std::pair<ALTextRange, std::string>>& edits)
+{
+    if (wouldFit(edits))
     {
         return true;
     }

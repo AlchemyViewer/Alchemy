@@ -50,26 +50,12 @@ namespace
 
     // Whether edits made at once over a view's text take, as
     // ALTextView::replaceAll makes them: the view not read only, something
-    // to take out or put in, and the text kept under the view's limit.
+    // to take out or put in, and the text kept under the view's limit as
+    // the view measures it.
     bool takes(const ALCodeEditor& view, const std::vector<std::pair<ALTextRange, std::string>>& edits)
     {
-        if (view.isReadOnly())
-        {
-            return false;
-        }
-        const ALTextDocument& text  = view.document();
-        size_t                taken = 0;
-        size_t                put   = 0;
-        for (const auto& [range, with] : edits)
-        {
-            taken += text.text(range).size();
-            put += with.size();
-        }
-        if (taken == 0 && put == 0)
-        {
-            return false;
-        }
-        return view.maxBytes() == 0 || put <= taken || text.byteCount() - taken + put <= view.maxBytes();
+        const bool any = std::any_of(edits.begin(), edits.end(), [](const auto& edit) { return !edit.first.empty() || !edit.second.empty(); });
+        return !view.isReadOnly() && any && view.wouldFit(edits);
     }
     // What makes an include's functions and globals a script to the
     // parser: a state after them. Put after the text, so that every place

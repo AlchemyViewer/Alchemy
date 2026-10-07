@@ -255,6 +255,11 @@ public:
     // held to it: a text put in whole, an undo and a redo are not.
     void            setMaxBytes(size_t bytes) { mMaxBytes = bytes; }
     size_t          maxBytes() const { return mMaxBytes; }
+    // Whether stretches replaced at once would keep the text under
+    // maxBytes, measured as replaceAll measures them -- in the text without
+    // a composition standing in it -- for whoever must know before making
+    // them. Asked, it says nothing.
+    bool            wouldFit(const std::vector<std::pair<ALTextRange, std::string>>& edits) const;
     // How the text is indented -- by tabs or by spaces, and how wide a
     // tab or a level is -- and where that was said: the defaults the view
     // was given; the text itself, as it was put in whole, where the view
@@ -1007,8 +1012,8 @@ protected:
     // What of a text fits in place of a stretch under maxBytes: all of
     // it, or as much as fits, cut at a character, the view full.
     std::string_view     fitting(const ALTextRange& over, std::string_view text);
-    // Whether stretches replaced at once keep under maxBytes; the view
-    // full where they would not.
+    // Whether stretches replaced at once keep under maxBytes (wouldFit);
+    // the view full where they would not.
     bool                 fits(const std::vector<std::pair<ALTextRange, std::string>>& edits);
     // A beep, and whoever listens told: a change was cut short or not made.
     void                 full();
