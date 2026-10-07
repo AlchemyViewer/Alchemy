@@ -655,7 +655,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="MasterHintUnsaved">Save or revert [NAME] before linking it to [FILE], the file it names: what was typed here is in neither the script nor the file.</floater.string>
     <floater.string name="MasterSent">Saved [NAME] from [FILE].</floater.string>
     <floater.string name="MasterNotCompiled">[NAME] went up from [FILE], and did not compile.</floater.string>
-    <floater.string name="MasterKeptTheirs">It had been changed in-world since; what it held is in History.</floater.string>
+    <floater.string name="MasterKeptTheirs">What it held in-world, which was not the file, is in History.</floater.string>
     <floater.string name="MasterSendFailed">[FILE] was not sent to [NAME]: [WHY].</floater.string>
     <floater.string name="MasterSkipped">[NAME] already holds [FILE].</floater.string>
     <floater.string name="MasterHeld">[NAME] was changed in-world since [FILE] was last sent to it, so it was not sent.</floater.string>
