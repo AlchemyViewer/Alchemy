@@ -105,6 +105,26 @@ namespace
         }
         return ALUploadHeader::hashOfPlain(target, text);
     }
+
+    // The files on disk an expansion read, the master's includes and
+    // theirs, as a link keeps them (`disk:<path>`): whose change sends it
+    // again.
+    std::vector<std::string> usesOf(const ALScriptPrepared& prepared)
+    {
+        std::vector<std::string> uses;
+        if (prepared.map)
+        {
+            const std::vector<ALSourceMap::File>& files = prepared.map->files();
+            for (size_t i = 1; i < files.size(); ++i)
+            {
+                if (files[i].path.rfind("disk:", 0) == 0)
+                {
+                    uses.push_back(ALScriptModules::identity(files[i].path));
+                }
+            }
+        }
+        return uses;
+    }
 }
 
 // static
@@ -114,11 +134,12 @@ void ALScriptMasterUpload::start(const ALMasterLink& link, ALMasterPlan::Send ki
 }
 
 // static
-void ALScriptMasterUpload::probe(const ALMasterLink& link, probed_t done, bool world)
+void ALScriptMasterUpload::probe(const ALMasterLink& link, probed_t done, bool world, bool refetch)
 {
     std::shared_ptr<ALScriptMasterUpload> probing = std::make_shared<ALScriptMasterUpload>(link, ALMasterPlan::Send::Derived);
     probing->mProbed                              = std::move(done);
     probing->mProbeWorld                          = world;
+    probing->mRefetch                             = refetch;
     probing->read();
 }
 
@@ -183,7 +204,11 @@ void ALScriptMasterUpload::find()
         return;
     }
     // An object keeps its copy of what it holds until it is selected or
-    // asked, and hears nothing of a co-owner's save: the region asked.
+    // asked, and hears nothing of a co-owner's save: the region asked. A
+    // probe told not to ask again -- of contents just fetched, for a whole
+    // object's scripts -- takes the copy the object holds, where it holds
+    // one it has not heard has changed: what is asked of the region then is
+    // only what is not there.
     if (!gObjectList.findObject(mRef.object))
     {
         mUpdated.state = ALMasterLink::State::Pending;
@@ -197,7 +222,7 @@ void ALScriptMasterUpload::find()
         [self](const ALScriptContents& contents) {
             self->found(contents.fetched ? ALScriptDiskMasters::itemOf(self->mRef) : nullptr);
         },
-        true);
+        /*from_region*/ mRefetch);
 }
 
 void ALScriptMasterUpload::found(LLInventoryItem* item)
@@ -331,6 +356,9 @@ void ALScriptMasterUpload::decide()
         found.worldSame    = mWorldSame;
         found.worldMoved   = mWorldMoved;
         found.preprocessed = mPrepared.errors;
+        found.stamp        = mStamp.time;
+        found.uses         = usesOf(mPrepared);
+        found.missed       = !mPrepared.errors.empty();
         mProbed(found);
         return;
     }
@@ -458,19 +486,8 @@ void ALScriptMasterUpload::uploaded(const ALScriptCompileResult& result)
     mUpdated.state  = ALMasterLink::State::Active;
     // An include it could not find may be any file saved from here on.
     mUpdated.missed = !mPrepared.errors.empty();
-    mUpdated.uses.clear();
-    if (mPrepared.map)
-    {
-        const std::vector<ALSourceMap::File>& files = mPrepared.map->files();
-        for (size_t i = 1; i < files.size(); ++i)
-        {
-            if (files[i].path.rfind("disk:", 0) == 0)
-            {
-                mUpdated.uses.push_back(ALScriptModules::identity(files[i].path));
-            }
-        }
-    }
-    mChanged = true;
+    mUpdated.uses   = usesOf(mPrepared);
+    mChanged        = true;
     end(Outcome::What::Sent, std::string(), result);
 }
 

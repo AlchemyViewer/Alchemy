@@ -65,7 +65,11 @@ public:
     // it would go up, and, where `world`, the world's text read and hashed
     // beside it, whether or not it moved. Nothing is said, and the link is
     // left as it is -- it need not be one yet: a file proposed for an item
-    // is probed through a link made up for it.
+    // is probed through a link made up for it. An object's contents are
+    // asked of the region again, as a send asks them, unless not `refetch`:
+    // then the copy the object holds is taken, where it has one, for
+    // contents just fetched -- every script of an object probed, say,
+    // which would otherwise ask the region again for each.
     struct Probe
     {
         ALScriptRef ref;
@@ -85,9 +89,16 @@ public:
         bool        worldMoved = false;
         // What the preprocessor found.
         std::vector<ALScriptDiagnostic> preprocessed;
+        // What a link made from it keeps, as a send's would: the master's
+        // stamp as this read found it (ALFileStamp::time); the files on disk
+        // the expansion read, as `disk:<path>` identities; and whether the
+        // expansion had a problem -- an include not found, say.
+        S64                      stamp = 0;
+        std::vector<std::string> uses;
+        bool                     missed = false;
     };
     typedef std::function<void(const Probe&)> probed_t;
-    static void probe(const ALMasterLink& link, probed_t done, bool world = true);
+    static void probe(const ALMasterLink& link, probed_t done, bool world = true, bool refetch = true);
 
     ALScriptMasterUpload(const ALMasterLink& link, ALMasterPlan::Send kind);
 
@@ -134,7 +145,9 @@ private:
     // A notecard that carries items in the world.
     bool               mWorldCarries = false;
     // Told what was found, where this is a probe and sends nothing; and
-    // whether it reads the world's text.
+    // whether it reads the world's text. Whether an object's contents are
+    // asked of the region again: a send's always are.
     probed_t           mProbed;
     bool               mProbeWorld = true;
+    bool               mRefetch    = true;
 };
