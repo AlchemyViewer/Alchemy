@@ -5098,12 +5098,10 @@ void ALTextView::squiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, const LL
     }
 }
 
-void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, const LLRect& text, S32 row_top, F32 left, F32 alpha)
+void ALTextView::drawUnderlines(S32 line, const ALTextLayout::Line& laid, S32 r, S32 screen_top, F32 left, F32 alpha)
 {
-    const ALTextLayout::Row& row        = laid.rows[static_cast<size_t>(r)];
-    const S32                row_h      = row.textHeight;
-    // The text's band at the bottom of the row; a box has the whole.
-    const S32                screen_top = row_top - row.textTop();
+    const ALTextLayout::Row& row = laid.rows[static_cast<size_t>(r)];
+    const S32                y   = screen_top - row.ascent - 2;
     // The links underlined: the one the mouse is on, and the ones that
     // always are.
     if (!mSubstitutions.empty())
@@ -5120,8 +5118,7 @@ void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, con
             F32 x0, x1;
             if (spanOnRow(line, r, it->range, x0, x1))
             {
-                const S32 y = screen_top - row.ascent - 2;
-                gl_rect_2d(static_cast<S32>(left + x0), y + 1, static_cast<S32>(left + x1), y, mLinkColor.get() % alpha);
+                gl_rect_2d_in_batch(static_cast<S32>(left + x0), y + 1, static_cast<S32>(left + x1), y, mLinkColor.get() % alpha);
             }
         }
     }
@@ -5136,10 +5133,16 @@ void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, con
         F32 x0, x1;
         if (spanOnRow(line, r, style.range, x0, x1))
         {
-            const S32 y = screen_top - row.ascent - 2;
-            gl_rect_2d(static_cast<S32>(left + x0), y + 1, static_cast<S32>(left + x1), y, (style.color ? *style.color : textColor()) % alpha);
+            gl_rect_2d_in_batch(static_cast<S32>(left + x0), y + 1, static_cast<S32>(left + x1), y, (style.color ? *style.color : textColor()) % alpha);
         }
     }
+}
+
+void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, const LLRect& text, S32 row_top, F32 left, F32 alpha)
+{
+    const ALTextLayout::Row& row        = laid.rows[static_cast<size_t>(r)];
+    // The text's band at the bottom of the row; a box has the whole.
+    const S32                screen_top = row_top - row.textTop();
     // The atoms on the row, each in its box: an image drawn there, or a
     // view put there.
     if (!mAtoms.empty())
@@ -5213,7 +5216,7 @@ void ALTextView::drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_
         const F32 x1        = mLayout.xOf(line, hi);
         const S32 thickness = llmax(1, static_cast<S32>(i < mPreeditStandouts.size() && mPreeditStandouts[i] ? standout_thickness : marker_thickness));
         const S32 y         = screen_top - row_h + 1;
-        gl_rect_2d(static_cast<S32>(left + x0), y + thickness, static_cast<S32>(left + x1), y, ink);
+        gl_rect_2d_in_batch(static_cast<S32>(left + x0), y + thickness, static_cast<S32>(left + x1), y, ink);
     }
 }
 
@@ -5354,6 +5357,21 @@ void ALTextView::drawRows(const LLRect& text)
     }
     mFont->renderGlyphRuns(mGlyphRuns.data(), mGlyphRuns.size());
 
+    // The lines under the text, every row's in one batch and under the
+    // rest of what is over it.
+    gGL.getTextureSlot(0)->unbind();
+    gGL.begin(LLRender::TRIANGLES);
+    for (const RowSeen& seen : mRowsSeen)
+    {
+        const ALTextLayout::Line& laid = mLayout.line(seen.line);
+        if (hasPreedit() && seen.line == mPreeditBegin.line)
+        {
+            drawPreedit(seen.line, laid.rows[static_cast<size_t>(seen.row)], seen.screenTop, left, alpha);
+        }
+        drawUnderlines(seen.line, laid, seen.row, seen.screenTop, left, alpha);
+    }
+    gGL.end();
+
     // Over the text; the squiggles, which share a texture, after the rest
     // of it and together.
     mQueueSquiggles = true;
@@ -5365,11 +5383,6 @@ void ALTextView::drawRows(const LLRect& text)
         const ALTextLayout::Row&  row            = laid.rows[r];
         const S32                 row_screen_top = seen.rowScreenTop;
         const S32                 screen_top     = seen.screenTop;
-        if (hasPreedit() && line == mPreeditBegin.line)
-        {
-            drawPreedit(line, row, screen_top, left, alpha);
-        }
-
         drawLayers(line, laid, static_cast<S32>(r), text, row_screen_top, left, alpha);
         drawRowExtras(line, static_cast<S32>(r), text, screen_top, left, alpha);
 
@@ -5435,20 +5448,27 @@ void ALTextView::drawRows(const LLRect& text)
         mCaretBoxes.push_back({ LLRect(x, top, x + CARET_WIDTH, top - mLayout.rowHeight()), mCursorColor.get() % alpha });
     }
     // The carets together, over every row's layers.
-    if (!mCaretBoxes.empty())
-    {
-        gGL.getTextureSlot(0)->unbind();
-        gGL.begin(LLRender::TRIANGLES);
-        for (const CaretBox& box : mCaretBoxes)
-        {
-            gl_rect_2d_in_batch(box.rect.mLeft, box.rect.mTop, box.rect.mRight, box.rect.mBottom, box.color);
-        }
-        gGL.end();
-        mCaretBoxes.clear();
-    }
+    drawBoxes(mCaretBoxes);
     mQueueSquiggles = false;
     drawSquiggles(mSquiggles.data(), mSquiggles.size());
     mSquiggles.clear();
+}
+
+// static
+void ALTextView::drawBoxes(std::vector<Box>& boxes)
+{
+    if (boxes.empty())
+    {
+        return;
+    }
+    gGL.getTextureSlot(0)->unbind();
+    gGL.begin(LLRender::TRIANGLES);
+    for (const Box& box : boxes)
+    {
+        gl_rect_2d_in_batch(box.rect.mLeft, box.rect.mTop, box.rect.mRight, box.rect.mBottom, box.color);
+    }
+    gGL.end();
+    boxes.clear();
 }
 
 void ALTextView::dragSelectTo(S32 x, S32 y)
@@ -5556,7 +5576,9 @@ void ALTextView::draw()
     }
     const LLRect text = textRect();
     // A tint behind each line that has one, and each gap, under
-    // everything else.
+    // everything else: all found, then drawn as one batch. Finding the
+    // rows in sight lays them out, and a line laid out may make a glyph,
+    // which binds the font's texture where a batch has none.
     if (annotated())
     {
         // The first and last rows in sight may be partly out of it.
@@ -5566,16 +5588,17 @@ void ALTextView::draw()
             const LLColor4& tint = lineAnnotation(line).tint;
             if (tint.mV[VALPHA] > 0.f)
             {
-                gl_rect_2d(text.mLeft, screen_top, text.mRight, screen_top - row_h, tint % alpha);
+                mTintBoxes.push_back({ LLRect(text.mLeft, screen_top, text.mRight, screen_top - row_h), tint % alpha });
             }
         });
         forEachVisibleGap(text, [&](S32 line, S32 screen_top, S32 height) {
             const LLColor4& tint = lineAnnotation(line).gapTint;
             if (tint.mV[VALPHA] > 0.f)
             {
-                gl_rect_2d(text.mLeft, screen_top, text.mRight, screen_top - height, tint % alpha);
+                mTintBoxes.push_back({ LLRect(text.mLeft, screen_top, text.mRight, screen_top - height), tint % alpha });
             }
         });
+        drawBoxes(mTintBoxes);
     }
     drawBeforeRows(text);
     placeAtomViews();

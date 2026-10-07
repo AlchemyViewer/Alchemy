@@ -1213,10 +1213,23 @@ private:
             findCounted();
         }
     }
+    // A row's lines under its text -- what is being composed, and the links
+    // and the styles that underline -- added to the triangles being drawn,
+    // as gl_rect_2d_in_batch adds them, so that every row's are one draw.
     void drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_top, F32 left, F32 alpha);
+    void drawUnderlines(S32 line, const ALTextLayout::Line& laid, S32 row, S32 screen_top, F32 left, F32 alpha);
     void colorRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha);
-    // The links, the atoms and the misspellings of a row, drawn over its glyphs.
+    // The atoms and the misspellings of a row, drawn over its glyphs.
     void drawLayers(S32 line, const ALTextLayout::Line& laid, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha);
+    // A rectangle in its colour, found as a frame is drawn and drawn with
+    // the others of its kind once they are all found: the tints behind the
+    // lines, and the carets. All of a list in one draw, and the list emptied.
+    struct Box
+    {
+        LLRect   rect;
+        LLColor4 color;
+    };
+    static void drawBoxes(std::vector<Box>& boxes);
     // Laying out is a cache fill, which a const query may cause.
     ALTextLayout& lay() const { return const_cast<ALTextLayout&>(mLayout); }
     // The layers through an edit: what is after it slides, what it cut
@@ -1413,13 +1426,10 @@ private:
     std::vector<LLColor4U>          mRunColours;
     std::vector<size_t>             mRunColourAt;
     std::vector<Squiggle>           mSquiggles;
-    // A frame's carets, drawn together once the rows are.
-    struct CaretBox
-    {
-        LLRect   rect;
-        LLColor4 color;
-    };
-    std::vector<CaretBox>           mCaretBoxes;
+    // A frame's tints, drawn together once the rows in sight are found,
+    // and its carets, once the rows are drawn.
+    std::vector<Box>                mTintBoxes;
+    std::vector<Box>                mCaretBoxes;
     // What the band under the text shows and where its pieces go, as the
     // keymap had it at its generation in this font: read and measured
     // again only when the keymap has moved on.
