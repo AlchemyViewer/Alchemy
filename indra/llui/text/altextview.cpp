@@ -2236,8 +2236,8 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
                         }
                     }
                 }
-                slid = slid || span.made != span.last - span.first + 1;
-                moved += span.made - (span.last - span.first + 1);
+                slid  = slid || span.made != span.last - span.first + 1;
+                moved = span.shiftAfter;
             }
         }
         mAnnotations.applySpans(edit.lineSpans(), mDocument.lineCount(), LineAnnotation(), LineAnnotation());

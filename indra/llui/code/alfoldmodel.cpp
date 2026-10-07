@@ -559,7 +559,7 @@ void ALFoldModel::edited(const ALTextDocument::Edit& edit, S32 lines)
             }
             if (start > span.last || (start == span.last && span.lastKept))
             {
-                shift += span.made - (span.last - span.first + 1);
+                shift = span.shiftAfter;
                 continue;
             }
             break;

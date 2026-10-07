@@ -1412,7 +1412,7 @@ void ALCodeEditor::slideAsides(const std::vector<ALTextDocument::Edit::LineSpan>
         {
             keep.emplace_back(first + shift + span.made - 1, mAsides[static_cast<size_t>(last)]);
         }
-        shift += span.made - (last - first + 1);
+        shift = span.shiftAfter;
     }
     mAsides.applySpans(spans, llmax(document().lineCount(), 0), Aside(), Aside());
     for (const auto& [row, aside] : keep)
