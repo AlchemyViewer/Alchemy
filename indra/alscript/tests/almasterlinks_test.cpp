@@ -75,6 +75,17 @@ namespace tut
             }
             return out;
         }
+
+        // The files watched, in order, a master's marked with a star.
+        static std::string watched(const std::vector<ALMasterLinks::Watched>& list)
+        {
+            std::string out;
+            for (const ALMasterLinks::Watched& one : list)
+            {
+                out += (out.empty() ? "" : " ") + one.path + (one.master ? "*" : "");
+            }
+            return out;
+        }
     };
 
     typedef test_group<almasterlinks_data> almasterlinks_group;
@@ -404,5 +415,158 @@ namespace tut
         ensure_equals("the rest found by their master", links.mastering("/s/master1.lsl").size(), size_t(LINKS / MASTERS));
         ensure("none removed found", links.mastering("/s/master0.lsl").empty());
         ensure("each found by its item", links.of(almasterlinks_data::key(1 + 4999 / 100), almasterlinks_data::key(104999)) != nullptr);
+    }
+
+    template<> template<>
+    void almasterlinks_object::test<8>()
+    {
+        set_test_name("whether the last expansion missed something comes back through the LLSD, and is written only where set");
+        ALMasterLinks links;
+        ALMasterLink  missing = almasterlinks_data::link(1, 10, "/s/door.lsl");
+        missing.missed        = true;
+        links.put(missing);
+        links.put(almasterlinks_data::link(1, 11, "/s/lamp.lsl"));
+
+        const LLSD llsd = links.toLLSD();
+        ensure_equals("still version 1", llsd["version"].asInteger(), 1);
+        ensure("written where set", llsd["links"][0]["missed"].asBoolean());
+        ensure("and not where not", !llsd["links"][1].has("missed"));
+
+        std::ostringstream out;
+        LLSDSerialize::toNotation(llsd, out);
+        std::istringstream in(out.str());
+        LLSD               back;
+        ensure("as notation", LLSDSerialize::fromNotation(back, in, static_cast<llssize>(out.str().size())) > 0);
+        const ALMasterLinks read = ALMasterLinks::fromLLSD(back);
+        ensure("read back set", read.of(almasterlinks_data::key(1), almasterlinks_data::key(10))->missed);
+        ensure("and not", !read.of(almasterlinks_data::key(1), almasterlinks_data::key(11))->missed);
+
+        // As an older version wrote it, with no such field, and as it might
+        // be written otherwise.
+        LLSD older;
+        LLSD record;
+        record["item"]   = almasterlinks_data::key(12);
+        record["master"] = "/s/old.lsl";
+        older["links"].append(record);
+        record["item"]   = almasterlinks_data::key(13);
+        record["missed"] = 1;
+        older["links"].append(record);
+        record["item"]   = almasterlinks_data::key(14);
+        record["missed"] = LLSD::emptyMap();
+        older["links"].append(record);
+        const ALMasterLinks old = ALMasterLinks::fromLLSD(older);
+        ensure_equals("all read", old.size(), size_t(3));
+        ensure("none said is none missed", !old.of(LLUUID::null, almasterlinks_data::key(12))->missed);
+        ensure("a number is read as one", old.of(LLUUID::null, almasterlinks_data::key(13))->missed);
+        ensure("what is no value is none", !old.of(LLUUID::null, almasterlinks_data::key(14))->missed);
+    }
+
+    template<> template<>
+    void almasterlinks_object::test<9>()
+    {
+        set_test_name("an include's change may send its users and every link that missed something, each once, none suspended or orphaned");
+        ALMasterLinks links;
+        const auto    with = [&links](int item, const std::vector<std::string>& uses, bool missed, ALMasterLink::State state) {
+            ALMasterLink one = almasterlinks_data::link(1, item, "/s/master" + std::to_string(item) + ".lsl");
+            one.uses         = uses;
+            one.missed       = missed;
+            one.state        = state;
+            links.put(one);
+        };
+        using State = ALMasterLink::State;
+        with(10, { "disk:/s/lib/util.lsl" }, false, State::Active);
+        with(11, { "disk:/s/lib/net.lsl" }, true, State::Active);
+        with(12, { "disk:/s/lib/util.lsl" }, false, State::Suspended);
+        with(13, { "disk:/s/lib/util.lsl" }, true, State::Orphaned);
+        with(14, { "disk:/s/lib/util.lsl" }, true, State::Pending);
+        with(15, { "disk:/s/lib/net.lsl" }, false, State::Active);
+        with(16, { "disk:/s/lib/util.lsl" }, false, State::Differing);
+        with(17, {}, true, State::Suspended);
+
+        ensure_equals("its users and those that missed, in the order put",
+                      almasterlinks_data::items(links.affectedBy("disk:/s/lib/util.lsl")), std::string("10 11 14 16"));
+        ensure_equals("by its path alone the same", almasterlinks_data::items(links.affectedBy("/s/lib/util.lsl")),
+                      std::string("10 11 14 16"));
+        ensure_equals("a file nobody read: those that missed", almasterlinks_data::items(links.affectedBy("/s/lib/new.lsl")),
+                      std::string("11 14"));
+        ensure_equals("one both a user and missing is one", almasterlinks_data::items(links.affectedBy("/s/lib/net.lsl")),
+                      std::string("11 14 15"));
+
+        // Expanded again, and nothing missed now.
+        links.find(almasterlinks_data::key(1), almasterlinks_data::key(14))->missed = false;
+        ensure_equals("no longer", almasterlinks_data::items(links.affectedBy("/s/lib/new.lsl")), std::string("11"));
+        ensure("nothing at all with nothing linked", ALMasterLinks().affectedBy("/s/lib/util.lsl").empty());
+    }
+
+    template<> template<>
+    void almasterlinks_object::test<10>()
+    {
+        set_test_name("the files to watch: live and suspended links' masters, live ones' disk includes, each once, a master as a master");
+        ALMasterLinks links;
+        const auto    with = [&links](int item, const std::string& master, const std::vector<std::string>& uses, ALMasterLink::State state) {
+            ALMasterLink one = almasterlinks_data::link(1, item, master);
+            one.uses         = uses;
+            one.state        = state;
+            links.put(one);
+        };
+        using State = ALMasterLink::State;
+        const std::string in_world = "object:" + almasterlinks_data::key(1).asString() + ":" + almasterlinks_data::key(99).asString();
+        with(10, "/s/a.lsl", { "disk:/s/lib/u.lsl", in_world, "disk:/s/lib/v.lsl", "disk:/s/lib/u.lsl" }, State::Active);
+        with(11, "/s/b.lsl", { "disk:/s/lib/u.lsl", "inventory:" + almasterlinks_data::key(98).asString() }, State::Differing);
+        // An include here that a link later masters.
+        with(12, "/s/c.lsl", { "disk:/s/c2.lsl" }, State::Pending);
+        with(13, "/s/c2.lsl", {}, State::Active);
+        // A master gone: its file watched, to hear it come back; not what
+        // it last read.
+        with(14, "/s/e.lsl", { "disk:/s/lib/w.lsl" }, State::Suspended);
+        with(15, "/s/f.lsl", { "disk:/s/lib/x.lsl" }, State::Orphaned);
+        // A master of two links, and a master another link reads.
+        with(16, "C:\\S\\G.lsl", { "disk:/s/a.lsl" }, State::Active);
+        with(17, "c:/s/g.lsl", {}, State::Active);
+
+        ensure_equals("each once, in the order met", almasterlinks_data::watched(links.watched()),
+                      std::string("/s/a.lsl* /s/lib/u.lsl /s/lib/v.lsl /s/b.lsl* /s/c.lsl* /s/c2.lsl* /s/e.lsl* C:\\S\\G.lsl*"));
+        ensure("nothing with nothing linked", ALMasterLinks().watched().empty());
+
+        // Orphaned, the file it masters is watched no longer.
+        links.find(almasterlinks_data::key(1), almasterlinks_data::key(14))->state = State::Orphaned;
+        links.find(almasterlinks_data::key(1), almasterlinks_data::key(13))->state = State::Orphaned;
+        ensure_equals("an include again where it no longer masters", almasterlinks_data::watched(links.watched()),
+                      std::string("/s/a.lsl* /s/lib/u.lsl /s/lib/v.lsl /s/b.lsl* /s/c.lsl* /s/c2.lsl C:\\S\\G.lsl*"));
+    }
+
+    template<> template<>
+    void almasterlinks_object::test<11>()
+    {
+        set_test_name("the orphaned links of an item's name, those of the object's name first, then the latest");
+        ALMasterLinks links;
+        const auto    orphan = [&links](int item, const std::string& item_name, const std::string& object_name, F64 since) {
+            ALMasterLink one  = almasterlinks_data::link(1, item, "/s/" + std::to_string(item) + ".lsl");
+            one.itemName      = item_name;
+            one.objectName    = object_name;
+            one.state         = ALMasterLink::State::Orphaned;
+            one.orphanedSince = LLDate(since);
+            links.put(one);
+        };
+        orphan(10, "door", "Gate", 1000.0);
+        orphan(11, "door", "Door", 500.0);
+        orphan(12, "door", "Door", 2000.0);
+        orphan(13, "door", "Shed", 3000.0);
+        orphan(14, "lamp", "Door", 4000.0);
+        orphan(15, "Door", "Door", 5000.0);
+        // The same name, but not orphaned.
+        ALMasterLink live = almasterlinks_data::link(2, 16, "/s/live.lsl");
+        live.itemName     = "door";
+        live.objectName   = "Door";
+        links.put(live);
+        orphan(17, "door", "Shed", 3000.0);
+
+        ensure_equals("the object's first, then the latest, as put among equals",
+                      almasterlinks_data::items(links.orphansNamed("door", "Door")), std::string("12 11 13 17 10"));
+        ensure_equals("an object of no such name: the latest first",
+                      almasterlinks_data::items(links.orphansNamed("door", "Window")), std::string("13 17 12 10 11"));
+        ensure_equals("names compared as written", almasterlinks_data::items(links.orphansNamed("Door", "door")), std::string("15"));
+        ensure("an item of no such name has none", links.orphansNamed("window", "Door").empty());
+        ensure("nor an item with no name", links.orphansNamed("", "Door").empty());
     }
 }

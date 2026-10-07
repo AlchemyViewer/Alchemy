@@ -28,6 +28,8 @@
 
 #include "alincludeidentity.h"
 
+#include <boost/unordered/unordered_flat_set.hpp>
+
 #include <algorithm>
 #include <charconv>
 
@@ -179,6 +181,95 @@ std::vector<const ALMasterLink*> ALMasterLinks::usersOf(const std::string& inclu
     return linksAt(mByUse, identity ? useKeyOf(include) : ALIncludeIdentity::ofFile(keyOf(include)));
 }
 
+std::vector<const ALMasterLink*> ALMasterLinks::affectedBy(const std::string& include) const
+{
+    const std::vector<const ALMasterLink*>               users = usersOf(include);
+    const boost::unordered_flat_set<const ALMasterLink*> user(users.begin(), users.end());
+    std::vector<const ALMasterLink*>                     out;
+    for (const ALMasterLink& link : mLinks)
+    {
+        if (link.state != ALMasterLink::State::Suspended && link.state != ALMasterLink::State::Orphaned &&
+            (link.missed || user.contains(&link)))
+        {
+            out.push_back(&link);
+        }
+    }
+    return out;
+}
+
+std::vector<const ALMasterLink*> ALMasterLinks::orphansNamed(const std::string& item_name, const std::string& object_name) const
+{
+    std::vector<const ALMasterLink*> out;
+    if (item_name.empty())
+    {
+        return out;
+    }
+    for (const ALMasterLink& link : mLinks)
+    {
+        if (link.state == ALMasterLink::State::Orphaned && link.itemName == item_name)
+        {
+            out.push_back(&link);
+        }
+    }
+    // Of the same object first, then the latest; as put among equals.
+    std::stable_sort(out.begin(), out.end(), [&object_name](const ALMasterLink* a, const ALMasterLink* b) {
+        const bool a_same = a->objectName == object_name;
+        const bool b_same = b->objectName == object_name;
+        if (a_same != b_same)
+        {
+            return a_same;
+        }
+        return a->orphanedSince.secondsSinceEpoch() > b->orphanedSince.secondsSinceEpoch();
+    });
+    return out;
+}
+
+std::vector<ALMasterLinks::Watched> ALMasterLinks::watched() const
+{
+    std::vector<Watched>                                                             out;
+    boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> at;
+    const auto add = [&out, &at](const std::string& path, bool master) {
+        if (path.empty())
+        {
+            return;
+        }
+        const auto [found, fresh] = at.try_emplace(keyOf(path), out.size());
+        if (fresh)
+        {
+            out.push_back(Watched{ path, master });
+        }
+        else if (master)
+        {
+            // An include of one link, the master of another: a master.
+            out[found->second].master = true;
+        }
+    };
+    for (const ALMasterLink& link : mLinks)
+    {
+        const bool live = link.state == ALMasterLink::State::Active || link.state == ALMasterLink::State::Differing ||
+                          link.state == ALMasterLink::State::Pending;
+        if (live || link.state == ALMasterLink::State::Suspended)
+        {
+            add(link.master, true);
+        }
+        if (!live)
+        {
+            continue;
+        }
+        for (const std::string& use : link.uses)
+        {
+            // Only a file on disk is watched; an include in the world is
+            // heard as it is saved.
+            std::string file;
+            if (ALIncludeIdentity::fileOf(use, file))
+            {
+                add(file, false);
+            }
+        }
+    }
+    return out;
+}
+
 std::vector<const ALMasterLink*> ALMasterLinks::linksAt(const ByPath& index, const std::string& key) const
 {
     if (mPathsStale)
@@ -301,6 +392,11 @@ LLSD ALMasterLinks::toLLSD() const
         record["hash"]        = link.hash;
         record["stamp"]       = std::to_string(link.stamp);
         record["uses"]        = uses;
+        // Only where set, so that a record says no more than it must.
+        if (link.missed)
+        {
+            record["missed"] = true;
+        }
         record["object_name"] = link.objectName;
         record["item_name"]   = link.itemName;
         record["region_name"] = link.regionName;
@@ -369,6 +465,7 @@ ALMasterLinks ALMasterLinks::fromLLSD(const LLSD& llsd)
                 }
             }
         }
+        link.missed        = record["missed"].asBoolean();
         link.objectName    = record["object_name"].asString();
         link.itemName      = record["item_name"].asString();
         link.regionName    = record["region_name"].asString();

@@ -94,6 +94,9 @@ struct ALMasterLink
     // (`disk:<path>`, ALIncludeIdentity::ofFile), its nested includes
     // among them: whose change sends the script again.
     std::vector<std::string> uses;
+    // Whether the last expansion had a problem -- an include not found, say:
+    // a file saved since may be the one it wanted.
+    bool                     missed = false;
     // What the object, the item and the region were called, for showing
     // the link and for finding the item again after a copy or a take.
     std::string objectName;
@@ -131,6 +134,29 @@ public:
     // (keyOf).
     std::vector<const ALMasterLink*> mastering(const std::string& master) const;
     std::vector<const ALMasterLink*> usersOf(const std::string& include) const;
+    // The links a change to an include may send again: its users, and every
+    // link whose last expansion missed something, which the include may be.
+    // Each once, in the order put, and none suspended or orphaned, whose
+    // master is not there to send.
+    std::vector<const ALMasterLink*> affectedBy(const std::string& include) const;
+    // The orphaned links of an item of this name, for a copy rezzed of what
+    // was taken to be linked again: those of an object of the name given
+    // first, then the latest orphaned first. An item with no name has none.
+    std::vector<const ALMasterLink*> orphansNamed(const std::string& item_name, const std::string& object_name) const;
+
+    // A file whose save sends something: a master, or an include of one.
+    struct Watched
+    {
+        std::string path;
+        bool        master = false;
+    };
+    // The files to watch: the master of every link that is live or
+    // suspended -- a suspended link's, so that its file coming back is
+    // heard -- and the files on disk the last expansions of the live ones
+    // read. Each once, compared as paths are (keyOf); a file that is both a
+    // master and an include is a master. In the order put, each link's
+    // master before its uses.
+    std::vector<Watched> watched() const;
 
     // A link put in, or put over the one the item already had.
     ALMasterLink& put(ALMasterLink link);
