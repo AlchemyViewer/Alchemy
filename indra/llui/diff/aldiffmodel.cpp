@@ -218,9 +218,14 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, cons
     again.head                           = edges.head;
     again.tail                           = edges.tail;
     again.lines                          = was;
+    // The texts' regions as they now are, read whole as the rebuild reads
+    // them after: what the lines compared again are told the same by, where
+    // they are so.
+    const auto [left_regions, right_regions] = shownRegions();
     const std::vector<std::string>& other = given_left ? mRightLines : mLeftLines;
-    const ALDiffSplice::Side        changed{ side, was, edges };
-    const ALDiffSplice::Side        same{ other, static_cast<S32>(other.size()), ALDiffEdit::Edges{ static_cast<S32>(other.size()), 0 } };
+    const ALDiffSplice::Side        changed{ side, was, edges, shown_left ? left_regions : right_regions };
+    const ALDiffSplice::Side        same{ other, static_cast<S32>(other.size()), ALDiffEdit::Edges{ static_cast<S32>(other.size()), 0 },
+                                   shown_left ? right_regions : left_regions };
     const bool spliced = shown_left ? ALDiffSplice::splice(mRuns, changed, same, options) : ALDiffSplice::splice(mRuns, same, changed, options);
     if (!spliced)
     {

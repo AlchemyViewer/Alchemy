@@ -31,6 +31,7 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <deque>
 #include <functional>
 #include <initializer_list>
@@ -1515,5 +1516,62 @@ namespace tut
         ensure_equals("on the right, its own", m.rangeAt(Column::Right, 3), 4);
         ensure_equals("a line wider on the right: its own still", m.rangeAt(Column::Right, 5), 6);
         ensure_equals("past them all, none", m.rangeAt(Column::Left, 11), -1);
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<36>()
+    {
+        set_test_name("blanks let go of with a grammar: a line typed in inside a block comment compared again by the regions the texts were read in whole, as afresh; the lexer asked for nothing less than a text");
+        // Lines whole: a comment from a line starting /* to one holding */,
+        // a line with a quote in it a string, the rest code; each text it is
+        // asked for, by how many lines it has, where that is kept.
+        const auto lexer = [](std::shared_ptr<std::vector<size_t>> asked) {
+            auto said = std::make_shared<std::deque<std::vector<ALTextDiff::regions_t>>>();
+            return ALTextDiff::lexer_t([said, asked](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+                if (asked)
+                {
+                    asked->push_back(lines.size());
+                }
+                if (said->size() > 4)
+                {
+                    said->pop_front();
+                }
+                std::vector<ALTextDiff::regions_t>& out     = said->emplace_back();
+                bool                                comment = false;
+                for (const std::string& line : lines)
+                {
+                    comment                         = comment || line.rfind("/*", 0) == 0;
+                    const ALTextDiff::Region region = comment                                 ? ALTextDiff::Region::Comment
+                                                      : line.find('"') != std::string::npos ? ALTextDiff::Region::String
+                                                                                              : ALTextDiff::Region::Code;
+                    out.push_back({ ALTextDiff::Piece{ 0, static_cast<S32>(line.size()), region } });
+                    comment = comment && line.find("*/") == std::string::npos;
+                }
+                return out;
+            });
+        };
+        // A line inside a comment, typed to differ only by its blanks: the
+        // comment's, let go of, though a string's would not be; a change
+        // further down as it was.
+        const std::string left  = lines(60, { { 20, "/* usage:" }, { 21, "say \"a  b\"" }, { 25, "*/" }, { 50, "fifty" } });
+        const std::string right = lines(60, { { 20, "/* usage:" }, { 21, "say \"c\"" }, { 25, "*/" }, { 50, "FIFTY" } });
+        const std::string typed = lines(60, { { 20, "/* usage:" }, { 21, "say \"a b\"" }, { 25, "*/" }, { 50, "FIFTY" } });
+        ALTextDiff::Likeness like;
+        like.ignoreWhitespace = true;
+        auto asked            = std::make_shared<std::vector<size_t>>();
+        m.setLexer(lexer(asked));
+        m.setLikeness(like);
+        m.setTexts(left, right);
+        ensure_equals("two changes", m.changeCount(), 2);
+        asked->clear();
+        m.setRightText(typed);
+        ensure("the texts asked for whole, nothing less",
+               !asked->empty() && std::all_of(asked->begin(), asked->end(), [](size_t count) { return count == 60; }));
+        ensure_equals("the comment's blanks let go of: the change further down alone", m.changeCount(), 1);
+        ALDiffModel fresh;
+        fresh.setLexer(lexer(nullptr));
+        fresh.setLikeness(like);
+        fresh.setTexts(left, typed);
+        sameLayout(m, fresh, "typed inside the comment");
     }
 }
