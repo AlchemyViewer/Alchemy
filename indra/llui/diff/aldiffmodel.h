@@ -133,8 +133,9 @@ public:
     // right each hides. Where each of its lines went.
     LineMap setRightText(std::string_view right);
     // The left made another -- another version of it -- and compared again
-    // as the right made anew is: what stood for what, what was said of the
-    // left and a merge with it, which were the other's, let go of.
+    // as the right made anew is, the runs as open as they were: what stood
+    // for what, what was said of the left and a merge with it, which were
+    // the other's, let go of.
     void    setLeftText(std::string_view left);
     // Stretches of the texts as given that stand for each other by what
     // they are -- a function, an event or a state of the same name on each

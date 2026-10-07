@@ -1777,4 +1777,29 @@ namespace tut
         as_afresh(broken, 4, "the opener broken");
         as_afresh(typed, 2, "mended");
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<41>()
+    {
+        set_test_name("the left of another version: a run opened stays open where it hides the same first line of the right, compared afresh or again in part, ranges let go of or none");
+        // Two runs: the right's lines 6 to 16, and 24 to 33.
+        const std::string right = lines(40, { { 2, "2" }, { 20, "20" }, { 37, "37" } });
+        m.setTexts(lines(40, { { 2, "two" }, { 20, "twenty" }, { 37, "thirty-seven" } }), right);
+        ensure_equals("two runs", m.foldCount(), 2);
+        m.setFoldOpen(1, true);
+        // Changed near both ends: more than half of each to compare again,
+        // so all of it.
+        m.setLeftText(lines(40, { { 2, "TWO" }, { 20, "twenty" }, { 37, "THIRTY-SEVEN" } }));
+        ensure("compared afresh: the second open still, the first folded", m.foldCount() == 2 && !m.foldOpen(0) && m.foldOpen(1));
+        // Changed between the runs: compared again there alone.
+        m.setLeftText(lines(40, { { 2, "TWO" }, { 20, "TWENTY" }, { 37, "THIRTY-SEVEN" } }));
+        ensure("compared again in part: the same", m.foldCount() == 2 && !m.foldOpen(0) && m.foldOpen(1));
+
+        // Ranges, which the left of another version lets go of.
+        m.setTexts(lines(40, { { 2, "two" }, { 20, "twenty" }, { 37, "thirty-seven" } }), right, { { 0, 0, 0, 0 } });
+        ensure_equals("two runs, lined up by the range", m.foldCount(), 2);
+        m.setFoldOpen(0, true);
+        m.setLeftText(lines(40, { { 2, "two" }, { 20, "twenty!" }, { 37, "thirty-seven" } }));
+        ensure("ranges let go of: the first open still, the second folded", m.ranges().empty() && m.foldCount() == 2 && m.foldOpen(0) && !m.foldOpen(1));
+    }
 }

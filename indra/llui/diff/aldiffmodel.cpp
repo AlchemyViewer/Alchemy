@@ -176,6 +176,9 @@ void ALDiffModel::setLeftText(std::string_view left)
     std::vector<std::string> lines = linesAgain(mLeftLines, mLeftText, text, edges);
     mLeftText                      = std::move(text);
     mPairs = carried(mPairs, true, static_cast<S32>(mLeftLines.size()), ALDiffSplice::lineMap(mLeftLines, lines, edges));
+    // The runs open, by the first line of the right each hides: the right
+    // is as it was.
+    const std::vector<S32> opened = openedLines();
     if (!mRanges.empty())
     {
         // Nor what stood for what: lined up otherwise, compared afresh.
@@ -183,9 +186,12 @@ void ALDiffModel::setLeftText(std::string_view left)
         mMoveFinder.edited(true, edges.head, static_cast<S32>(mLeftLines.size()) - edges.tail, static_cast<S32>(lines.size()) - edges.tail);
         mLeftLines = std::move(lines);
         build();
-        return;
     }
-    resplice(true, std::move(lines), edges);
+    else
+    {
+        resplice(true, std::move(lines), edges);
+    }
+    reopen(opened);
 }
 
 void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, const ALDiffEdit::Edges& edges)
