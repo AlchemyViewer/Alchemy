@@ -3196,17 +3196,22 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             const std::string needle = utf8Of(want);
             const std::string& line  = d.line(from.line);
             S32                col   = from.column;
+            // A t or T typed to the character beside the caret stops where it
+            // is, so an operator takes the character under it. Said again by
+            // ; or , it goes past that character instead, as vim's does
+            // without ; in 'cpoptions', and then only for a count of one.
+            const bool past_beside = till && (ch == ';' || ch == ',') && count == 1;
             for (S32 n = 0; n < count; ++n)
             {
                 size_t found;
                 if (forward)
                 {
-                    const S32 start = col + 1 + ((till && n == 0) ? 1 : 0);
+                    const S32 start = col + 1 + ((past_beside && n == 0) ? 1 : 0);
                     found           = start < static_cast<S32>(line.size()) ? line.find(needle, start) : std::string::npos;
                 }
                 else
                 {
-                    const S32 start = col - 1 - ((till && n == 0) ? 1 : 0);
+                    const S32 start = col - 1 - ((past_beside && n == 0) ? 1 : 0);
                     found           = start >= 0 ? line.rfind(needle, start) : std::string::npos;
                 }
                 if (found == std::string::npos)

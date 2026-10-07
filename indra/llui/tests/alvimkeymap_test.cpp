@@ -3554,4 +3554,26 @@ namespace tut
         keys("x");
         ensure_equals("one character again", flat(e.text()), std::string("cdef|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<135>()
+    {
+        set_test_name("t and T to a character beside the caret stay where they are, so an operator takes the character under it; ; after them goes past it");
+        ALCodeEditor& e = make("f(x)(y)\n(x)\na)b)c\n");
+        e.setCaret(ALTextPos(0, 2));
+        keys("dt)");
+        ensure_equals("dt) beside a ): the x alone, not on to the next )", e.document().line(0), std::string("f()(y)"));
+        e.setCaret(ALTextPos(1, 1));
+        keys("ct)Z<Esc>");
+        ensure_equals("ct) beside the line's only ): the x changed", e.document().line(1), std::string("(Z)"));
+        e.setCaret(ALTextPos(2, 0));
+        keys("t)");
+        ensure_equals("t) beside a ): the caret stays", caretText(), std::string("2:0"));
+        keys(";");
+        ensure_equals("; after it goes on to before the next", caretText(), std::string("2:2"));
+        keys("$T)");
+        ensure_equals("T) beside a ): the caret stays", caretText(), std::string("2:4"));
+        keys(";");
+        ensure_equals("; after it goes back to after the one before", caretText(), std::string("2:2"));
+    }
 }
