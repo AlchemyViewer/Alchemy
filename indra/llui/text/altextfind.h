@@ -57,7 +57,8 @@ public:
                 const ALTextRange& selection);
     // A worker's matches, where they have come in: taken where the text is
     // as it was looked through, and true; looked for again where it is
-    // not. With `wait`, waited for.
+    // not, with what the worker was asked, unless a search is due (stale),
+    // which is left to whoever makes it. With `wait`, waited for.
     bool collect(const ALTextDocument& doc, const ALTextRange& selection, bool wait = false);
     bool searching() const { return mWorking != nullptr; }
     // Past this many bytes, a text is looked through on a worker.

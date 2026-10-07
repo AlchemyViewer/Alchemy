@@ -133,7 +133,13 @@ bool ALTextFind::collect(const ALTextDocument& doc, const ALTextRange& selection
     mWorking.reset();
     if (working->version != doc.version())
     {
-        // Of a text since changed: looked for again, as it is now.
+        // Of a text since changed. Where a search is due -- the query
+        // changed meanwhile -- that one is left to be made, with what is
+        // asked for then; else looked for again, as the text is now.
+        if (mStale)
+        {
+            return false;
+        }
         const std::string         query   = working->query;
         const ALTextSearchOptions options = working->options;
         guard.unlock();
