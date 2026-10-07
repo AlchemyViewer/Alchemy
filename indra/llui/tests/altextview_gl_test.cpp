@@ -1118,4 +1118,77 @@ namespace tut
         ensure("and from one again as before", changed(from_one, drawn()) == 0);
         editor->die();
     }
+
+    // A gap put between the lines moves the map's rows below it down, each
+    // line drawn with its own runs of text: the map is the one a view with
+    // that gap from the start draws, though the text, and so the lines in
+    // sight, are as they were. A text with no grammar, whose lines' tokens
+    // never change.
+    template<> template<>
+    void altextview_gl_object::test<16>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        // Lines of many lengths, so that one drawn with another's runs is
+        // seen to be.
+        std::string text;
+        for (S32 i = 0; i < 200; ++i)
+        {
+            text += std::string(static_cast<size_t>(i % 9 + 1) * 4, 'x') + "\n";
+        }
+        std::vector<ALTextView::LineAnnotation> gapped(200);
+        gapped[1].gap = 2;
+        const auto make = [&]() {
+            ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+            p.name           = "view";
+            p.rect           = LLRect(0, H, W, 0);
+            p.default_text   = text;
+            ALTextView* made = LLUICtrlFactory::create<ALTextView>(p);
+            made->setFont(LLFontGL::getFontMonospace());
+            made->setScrollMap(true);
+            made->setScrollMapWidth(60);
+            made->setBackgroundColor(LLColor4(0.1f, 0.1f, 0.12f, 1.f));
+            made->setTextColor(LLColor4(0.9f, 0.9f, 0.9f, 1.f));
+            return made;
+        };
+        // The map's columns of a frame of a view, drawn twice so that its
+        // layout has settled.
+        const auto map_of = [&](ALTextView* view) {
+            std::vector<U8> map;
+            for (S32 pass = 0; pass < 2; ++pass)
+            {
+                gl().clearFramebuffer();
+                glEnable(GL_BLEND);
+                gGL.setSceneBlendType(LLRender::BT_ALPHA);
+                view->draw();
+                gGL.flush();
+                glDisable(GL_BLEND);
+                glFinish();
+                const std::vector<U8> rgba = ll_test::readFramebufferRGBA(W, H);
+                map.clear();
+                for (S32 y = 0; y < H; ++y)
+                {
+                    for (S32 x = W - 60; x < W; ++x)
+                    {
+                        const size_t at = (static_cast<size_t>(y) * W + x) * 4;
+                        map.insert(map.end(), rgba.begin() + static_cast<std::ptrdiff_t>(at), rgba.begin() + static_cast<std::ptrdiff_t>(at + 3));
+                    }
+                }
+            }
+            return map;
+        };
+        ALTextView* drawn_first = make();
+        const std::vector<U8> before = map_of(drawn_first);
+        drawn_first->setLineAnnotations(gapped);
+        const std::vector<U8> after = map_of(drawn_first);
+        ensure("the gap moved the map", after != before);
+        ALTextView* gapped_first = make();
+        gapped_first->setLineAnnotations(gapped);
+        ensure("as a view with the gap from the start draws it", after == map_of(gapped_first));
+        drawn_first->die();
+        gapped_first->die();
+    }
 }

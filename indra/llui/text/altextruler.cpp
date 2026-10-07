@@ -493,7 +493,8 @@ void ALTextRuler::drawMap(F32 alpha)
     const S32 columns = llmax(0, (inner_right - inner_left) / MAP_CHAR_W);
     MapRuns&  runs    = mMapRuns;
     bool      fresh   = runs.version == mView.document().version() && runs.grammar == highlighter.grammar().get() && runs.tabWidth == tab_width &&
-                 runs.columns == columns && runs.first == first && runs.last == last && runs.hidden == layout.hiddenRevision();
+                 runs.columns == columns && runs.first == first && runs.last == last && runs.hidden == layout.hiddenRevision() &&
+                 runs.gaps == mMapLinesGaps;
     // A gap's row has no text, and no runs.
     const auto revisionOf = [&](S32 o) { return mMapGaps[static_cast<size_t>(o)] ? 0 : highlighter.revision(mMapLines[o]); };
     for (S32 o = first; fresh && o <= last; ++o)
@@ -509,6 +510,7 @@ void ALTextRuler::drawMap(F32 alpha)
         runs.first    = first;
         runs.last     = last;
         runs.hidden   = layout.hiddenRevision();
+        runs.gaps     = mMapLinesGaps;
         runs.starts.clear();
         runs.revisions.clear();
         runs.runs.clear();

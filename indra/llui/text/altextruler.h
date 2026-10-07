@@ -127,8 +127,9 @@ private:
     U32               mMapLinesGaps        = 0;
     // The map's runs of text for the lines in sight, by column, as last
     // read: kept while the text, its grammar and each line's tokens, the
-    // tab width, the map's width and the lines in sight hold, so that an
-    // idle frame does not read every line again.
+    // tab width, the map's width, the lines in sight and the rows they are
+    // on -- which the hidden lines and the gaps between them say -- hold,
+    // so that an idle frame does not read every line again.
     struct MapRuns
     {
         U32                 version  = 0;
@@ -138,6 +139,7 @@ private:
         S32                 first    = -1;
         S32                 last     = -1;
         U32                 hidden   = 0;
+        U32                 gaps     = 0;
         // For each line in sight, where its runs start, and its tokens'
         // revision; the runs of the last end where the list does.
         std::vector<size_t> starts;
