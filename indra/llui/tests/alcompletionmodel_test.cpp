@@ -222,4 +222,19 @@ namespace tut
         model.narrow(ALTextPos(0, 6), ALTextPos(0, 8), "nu", std::string(), {}, text);
         ensure("another identifier has them again", joined(model.list()).find("number_of") != std::string::npos);
     }
+
+    template<> template<>
+    void alcompletionmodel_object::test<9>()
+    {
+        set_test_name("the stretch the one chosen replaces runs from where what is narrowed starts, though what it is matched by is shorter: a string's "
+                      "text as its escapes read");
+        // `Say \"` typed in a string, matched as `Say "`.
+        const ALTextDocument text("llPlaySound(\"Say \\\"\n");
+        const ALTextPos      start(0, 13);
+        model.pool(start, ALTextPos(0, 19), "Say \"", std::string(), '\0', { word("Say \"hi\"", ALSyntaxKind::String), word("Door", ALSyntaxKind::String) },
+                   text, /*with_words*/ false);
+        model.narrow(start, ALTextPos(0, 19), "Say \"");
+        ensure_equals("matched as it reads", joined(model.list()), std::string("Say \"hi\""));
+        ensure("all the string holds up to the caret replaced", model.range() == ALTextRange(start, ALTextPos(0, 19)));
+    }
 }

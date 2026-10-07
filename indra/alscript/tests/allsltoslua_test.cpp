@@ -1830,4 +1830,47 @@ namespace tut
         const ALLSLToSLua::Result entry = convert("default {\n    state_entry() { // set up\n        llOwnerSay(\"hi\");\n    }\n}\n");
         ensure("state_entry's, kept: " + entry.text, has(entry, "-- set up\n") && entry.text.find("-- set up") < entry.text.find("ll.OwnerSay"));
     }
+
+    template<> template<>
+    void allsltoslua_object::test<53>()
+    {
+        set_test_name("a comment after the brace of a block not written goes over what stands for it, not at the end of what holds it: a boolean's "
+                      "if and else, a lone state's state_exit; an if with -- in a string in its check still on one line");
+        const ALLSLToSLua::Result r = convert("integer gMany;\n"
+                                              "default {\n"
+                                              "    touch_start(integer n) {\n"
+                                              "        if (n > 1) { // many\n"
+                                              "            gMany = TRUE;\n"
+                                              "        } else { // one\n"
+                                              "            gMany = FALSE;\n"
+                                              "        }\n"
+                                              "        if (gMany) llOwnerSay(\"many\");\n"
+                                              "    }\n"
+                                              "}\n");
+        const size_t many = r.text.find("    -- many\n");
+        const size_t one  = r.text.find("    -- one\n");
+        const size_t set  = r.text.find("    gMany = n > 1\n");
+        ensure("both over the line that stands for the if: " + r.text, set != std::string::npos && many < one && one < set);
+        ensure("once each: " + r.text, count(r, "-- many") == 1 && count(r, "-- one") == 1);
+        checksClean(r);
+
+        const ALLSLToSLua::Result exit = convert("default {\n"
+                                                 "    state_entry() {\n"
+                                                 "        llOwnerSay(\"in\");\n"
+                                                 "    }\n"
+                                                 "    state_exit() { // say goodbye\n"
+                                                 "        llOwnerSay(\"out\");\n"
+                                                 "    }\n"
+                                                 "}\n");
+        const size_t left = exit.text.find("-- state_exit, left out");
+        ensure("state_exit's, over the line said in its place: " + exit.text,
+               left != std::string::npos && exit.text.find("-- say goodbye\n") < left && count(exit, "-- say goodbye") == 1);
+
+        const ALLSLToSLua::Result dashes = convert("default {\n"
+                                                   "    listen(integer c, string name, key id, string s) {\n"
+                                                   "        if (s == \" -- x\") llOwnerSay(\"y\");\n"
+                                                   "    }\n"
+                                                   "}\n");
+        ensure("a string's dashes no comment: " + dashes.text, has(dashes, " == \" -- x\" then print(\"y\") end\n"));
+    }
 }

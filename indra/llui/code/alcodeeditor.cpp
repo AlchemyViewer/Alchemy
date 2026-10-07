@@ -116,6 +116,36 @@ namespace
         if (table == "deprecated") return ALSyntaxKind::Deprecated;
         return ALSyntaxKind::Text;
     }
+
+    // What a string's text reads as, for the names a host offers for it to
+    // be matched against: a quote or a backslash escaped is itself -- the
+    // escapes a host writes its names with -- and an escape only begun at
+    // the end is nothing yet. Any other is left as written, which no name
+    // holds.
+    std::string unescaped(std::string_view written)
+    {
+        std::string reads;
+        reads.reserve(written.size());
+        for (size_t i = 0; i < written.size(); ++i)
+        {
+            if (written[i] == '\\')
+            {
+                if (i + 1 == written.size())
+                {
+                    break;
+                }
+                const char next = written[i + 1];
+                if (next == '\\' || next == '"' || next == '\'')
+                {
+                    reads += next;
+                    ++i;
+                    continue;
+                }
+            }
+            reads += written[i];
+        }
+        return reads;
+    }
 }
 
 ALCodeEditor::Params::Params()
@@ -2569,6 +2599,7 @@ void ALCodeEditor::closeCompletion()
     mCompletionAsked  = false;
     mCompletionMoved  = false;
     mCompletionString = false;
+    mCompletionPath   = false;
 }
 
 S32 ALCodeEditor::chosenCompletion() const
@@ -2603,7 +2634,11 @@ void ALCodeEditor::vocabularyCompletions(std::string_view prefix, std::vector<Co
 void ALCodeEditor::refreshCompletion()
 {
     const ALTextPos                  at   = caret();
-    const std::optional<ALTextRange> path = mPathProvider || mPathRequest ? pathAt(at) : std::nullopt;
+    // A path's list and a string's at one caret only: at several, what is
+    // chosen goes in at each as a name does (completionAt), not as a path or
+    // as what a string holds, and a string there is prose as any other.
+    const bool                       one  = !hasOtherSelections();
+    const std::optional<ALTextRange> path = one && (mPathProvider || mPathRequest) ? pathAt(at) : std::nullopt;
     std::string                      prefix;
     std::string                      head;
     char                             separator = '.';
@@ -2612,7 +2647,17 @@ void ALCodeEditor::refreshCompletion()
     // What the list drew from before, which a list for a string does not
     // narrow as words nor words as one.
     const bool                       was_string = mCompletionString;
-    mCompletionString                           = !path && stringOffers(at, start, prefix);
+    const bool                       was_path   = mCompletionPath;
+    mCompletionString                           = one && !path && stringOffers(at, start, prefix);
+    mCompletionPath                             = path.has_value();
+    // A list shown for a string or a path the caret has left -- its opening
+    // quote taken back, its closing one typed -- goes with it, rather than
+    // become one of every word for nothing typed.
+    if ((was_string || was_path) && !mCompletionString && !mCompletionPath && completionOpen())
+    {
+        closeCompletion();
+        return;
+    }
     if (mCompletionString)
     {
         // In a string the host names something for, all it holds before
@@ -2688,7 +2733,8 @@ void ALCodeEditor::refreshCompletion()
     const completion_request_t& request = path ? mPathRequest : mCompletionRequest;
     if (fresh && request && !mCompletionString)
     {
-        request(start, prefix);
+        // A path's of the whole typed so far, as its provider is asked.
+        request(start, path ? asked : prefix);
     }
     if (mCompletionModel.list().empty())
     {
@@ -2731,7 +2777,9 @@ bool ALCodeEditor::stringOffers(const ALTextPos& at, ALTextPos& start, std::stri
         return false;
     }
     start = held->begin;
-    typed = document().line(at.line).substr(start.column, at.column - start.column);
+    // As it reads, which the names are matched against: `Say "` of
+    // `Say \"`, for the name `Say "hi"`.
+    typed = unescaped(std::string_view(document().line(at.line)).substr(start.column, at.column - start.column));
     if (mCompletionString && mCompletionModel.pooled(start, std::string(), typed))
     {
         return true;
@@ -3228,6 +3276,46 @@ namespace
         return kind == ALSyntaxKind::String || kind == ALSyntaxKind::Escape;
     }
 
+    // A string's or a path's: an include's name is a path, a require's a
+    // string.
+    bool isQuotedKind(ALSyntaxKind kind)
+    {
+        return isStringKind(kind) || kind == ALSyntaxKind::Path;
+    }
+
+    // The run of tokens one after another of the kinds `wanted` takes that
+    // a column is in -- or at the end of as well, `at_end` -- as the columns
+    // of its line it begins and ends at. False where it is in none.
+    bool tokenRunAt(const std::vector<ALSyntaxToken>& tokens, S32 column, bool at_end, bool (*wanted)(ALSyntaxKind), S32& begin, S32& end)
+    {
+        size_t at = tokens.size();
+        for (size_t t = 0; t < tokens.size(); ++t)
+        {
+            if (wanted(tokens[t].kind) && tokens[t].begin <= column && (column < tokens[t].end || (at_end && column == tokens[t].end)))
+            {
+                at = t;
+                break;
+            }
+        }
+        if (at == tokens.size())
+        {
+            return false;
+        }
+        size_t first = at;
+        size_t last  = at;
+        while (first > 0 && wanted(tokens[first - 1].kind) && tokens[first - 1].end == tokens[first].begin)
+        {
+            --first;
+        }
+        while (last + 1 < tokens.size() && wanted(tokens[last + 1].kind) && tokens[last + 1].begin == tokens[last].end)
+        {
+            ++last;
+        }
+        begin = tokens[first].begin;
+        end   = tokens[last].end;
+        return true;
+    }
+
     // What an escape stands for, in bytes: the forms both languages
     // share, Luau's numeric and codepoint ones, and whatever it is
     // written as where we do not know it -- better a number that is the
@@ -3276,51 +3364,38 @@ std::optional<ALTextRange> ALCodeEditor::pathAt(const ALTextPos& pos)
     return held;
 }
 
-std::optional<ALTextRange> ALCodeEditor::quotedAt(const ALTextPos& pos, char* opener)
+std::optional<ALTextRange> ALCodeEditor::quotedAt(const ALTextPos& pos, char* opener, bool* closed)
 {
     if (pos.line < 0 || pos.line >= document().lineCount())
     {
         return std::nullopt;
     }
     // The run of string and path tokens the position is in, or at the end
-    // of: an include's name is a path, a require's a string.
-    const auto quoted = [](ALSyntaxKind kind) { return isStringKind(kind) || kind == ALSyntaxKind::Path; };
-    const std::vector<ALSyntaxToken>& tokens = highlighter().tokens(pos.line);
-    size_t                            at     = tokens.size();
-    for (size_t t = 0; t < tokens.size(); ++t)
-    {
-        if (quoted(tokens[t].kind) && tokens[t].begin <= pos.column && pos.column <= tokens[t].end)
-        {
-            at = t;
-            break;
-        }
-    }
-    if (at == tokens.size())
+    // of.
+    S32 begin = 0;
+    S32 end   = 0;
+    if (!tokenRunAt(highlighter().tokens(pos.line), pos.column, /*at_end*/ true, isQuotedKind, begin, end))
     {
         return std::nullopt;
     }
-    size_t first = at;
-    size_t last  = at;
-    while (first > 0 && quoted(tokens[first - 1].kind) && tokens[first - 1].end == tokens[first].begin)
-    {
-        --first;
-    }
-    while (last + 1 < tokens.size() && quoted(tokens[last + 1].kind) && tokens[last + 1].begin == tokens[last].end)
-    {
-        ++last;
-    }
-    const std::string& line  = document().line(pos.line);
-    const S32          begin = tokens[first].begin;
-    const S32          end   = std::min(tokens[last].end, static_cast<S32>(line.size()));
-    const char         open  = begin < end ? line[begin] : '\0';
+    const std::string& line = document().line(pos.line);
+    end                     = std::min(end, static_cast<S32>(line.size()));
+    const char         open = begin < end ? line[begin] : '\0';
     if (open != '"' && open != '\'' && open != '`' && open != '<')
     {
         return std::nullopt;
     }
     // Between the quotes; to the line's end where the string is not
-    // closed.
-    const char close = open == '<' ? '>' : open;
-    const S32  held  = end - 1 > begin && line[end - 1] == close ? end - 1 : end;
+    // closed -- its last byte no quote, or a quote a backslash escapes,
+    // `"Say \"` typed so far.
+    const char close   = open == '<' ? '>' : open;
+    S32        escapes = 0;
+    while (end - 2 - escapes > begin && line[end - 2 - escapes] == '\\')
+    {
+        ++escapes;
+    }
+    const bool shut = end - 1 > begin && line[end - 1] == close && escapes % 2 == 0;
+    const S32  held = shut ? end - 1 : end;
     if (pos.column <= begin || pos.column > held)
     {
         return std::nullopt;
@@ -3328,6 +3403,10 @@ std::optional<ALTextRange> ALCodeEditor::quotedAt(const ALTextPos& pos, char* op
     if (opener)
     {
         *opener = open;
+    }
+    if (closed)
+    {
+        *closed = shut;
     }
     return ALTextRange(ALTextPos(pos.line, begin + 1), ALTextPos(pos.line, held));
 }
@@ -3382,32 +3461,7 @@ ALTextRange ALCodeEditor::stringAt(const ALTextPos& at) const
 
     auto runOn = [&me](S32 line, S32 column, S32& begin, S32& end) {
         // The run of string tokens around a column, or nothing.
-        const std::vector<ALSyntaxToken>& tokens = me.highlighter().tokens(line);
-        size_t                            at_t   = tokens.size();
-        for (size_t t = 0; t < tokens.size(); ++t)
-        {
-            if (tokens[t].begin <= column && column < tokens[t].end && isStringKind(tokens[t].kind))
-            {
-                at_t = t;
-                break;
-            }
-        }
-        if (at_t == tokens.size())
-        {
-            return false;
-        }
-        size_t first = at_t, last = at_t;
-        while (first > 0 && isStringKind(tokens[first - 1].kind) && tokens[first - 1].end == tokens[first].begin)
-        {
-            --first;
-        }
-        while (last + 1 < tokens.size() && isStringKind(tokens[last + 1].kind) && tokens[last + 1].begin == tokens[last].end)
-        {
-            ++last;
-        }
-        begin = tokens[first].begin;
-        end   = tokens[last].end;
-        return true;
+        return tokenRunAt(me.highlighter().tokens(line), column, /*at_end*/ false, isStringKind, begin, end);
     };
 
     S32 begin = 0, end = 0;
@@ -3659,16 +3713,22 @@ void ALCodeEditor::complete(const Completion& chosen, const ALTextRange& range)
 {
     // In a string that names a file, or one the host names something for:
     // a whole path, or what it named, in place of what the string holds,
-    // its closing quote kept; else the name in place of the one typed. A
-    // folder is followed by a slash, and the list again.
+    // its closing quote kept; else the name in place of the one typed. In
+    // one not closed, which runs on to the line's end, only what it holds
+    // up to the caret, and the quote closed after it: what follows the
+    // caret is the script's. A folder is followed by a slash, and the list
+    // again, inside the quote.
     if ((!chosen.path.empty() || chosen.folder) && !hasOtherSelections())
     {
-        const std::optional<ALTextRange> held = quotedAt(range.end);
-        ALTextRange                      over = range;
-        std::string                      put  = chosen.text;
+        char                             opener = '\0';
+        bool                             closed = true;
+        const std::optional<ALTextRange> held   = quotedAt(range.end, &opener, &closed);
+        const bool                       closes = held && !closed;
+        ALTextRange                      over   = range;
+        std::string                      put    = chosen.text;
         if (!chosen.path.empty() && held)
         {
-            over = *held;
+            over = closed ? *held : ALTextRange(held->begin, range.end);
             put  = chosen.path;
         }
         if (chosen.folder && (put.empty() || put.back() != '/'))
@@ -3676,7 +3736,11 @@ void ALCodeEditor::complete(const Completion& chosen, const ALTextRange& range)
             put += '/';
         }
         setSelection(over);
-        insertText(put);
+        insertText(closes ? put + (opener == '<' ? '>' : opener) : put);
+        if (closes && chosen.folder)
+        {
+            setCaret(ALTextPos(caret().line, caret().column - 1));
+        }
         setFocus(true);
         if (chosen.folder)
         {
@@ -4806,10 +4870,18 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
     // In a string that names a file -- a require's, an include's -- what
     // is typed completes as a path, where anyone answers there: the list
     // at its opening quote and after each slash, narrowed as a name is
-    // typed. Its closing quote leaves the string, and the list with it.
+    // typed. Its closing quote leaves the string, and the list with it. A
+    // list open on it already was narrowed as the text changed.
     if (mAutoComplete && !several && (mPathProvider || mPathRequest) && pathAt(caret()))
     {
-        openCompletion(true);
+        if (was_open && mCompletionPath)
+        {
+            mCompletionAsked = true;
+        }
+        else
+        {
+            openCompletion(true);
+        }
         return true;
     }
     // In any other string the host names something for -- an item's name,
@@ -4820,8 +4892,15 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
         std::string typed;
         if (stringOffers(caret(), start, typed))
         {
-            mCompletionString = true;
-            openCompletion(true);
+            if (was_open && mCompletionString)
+            {
+                mCompletionAsked = true;
+            }
+            else
+            {
+                mCompletionString = true;
+                openCompletion(true);
+            }
             return true;
         }
     }

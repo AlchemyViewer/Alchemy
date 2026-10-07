@@ -373,9 +373,11 @@ bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std:
         }
     }
     rank(mList, prefix);
+    // From where it starts, not as long as the prefix: a string's text is
+    // matched as its escapes read, shorter than it is written.
     if (!mList.empty())
     {
-        mRange = ALTextRange(ALTextPos(at.line, at.column - static_cast<S32>(prefix.size())), at);
+        mRange = ALTextRange(start, at);
     }
     return fresh;
 }

@@ -158,7 +158,9 @@ public:
     bool relisted(const std::string& asked);
 
     const std::vector<ALCompletion>& list() const { return mList; }
-    // The identifier the list narrows, which the one chosen replaces.
+    // The identifier the list narrows, which the one chosen replaces: from
+    // where it starts to where it is typed up to, however long the prefix
+    // it is matched by.
     const ALTextRange& range() const { return mRange; }
     // Where the identifier asked about starts, or -1s for none.
     const ALTextPos&   asked() const { return mAsked; }

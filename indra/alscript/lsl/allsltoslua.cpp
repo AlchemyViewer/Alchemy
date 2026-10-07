@@ -461,8 +461,18 @@ namespace
         // after the line that opens the block in SLua -- `if ... then`,
         // `else`, `do`, a function's -- as the LSL had them after its brace,
         // a long one running on over the lines after. Called as that line
-        // is written; what no line took is written at the top of the block.
-        void trail(LSLASTNode* body);
+        // is written; what no line took is written at the top of the block
+        // (commentsOpening), or over what stands for a block not written.
+        // Whether one put after the line is a line's comment, which takes
+        // the rest of the line with it.
+        bool trail(LSLASTNode* body);
+        void commentsOpening(LSLASTNode* body);
+        // What commentsAfter and trail put after a line: the comments of
+        // `given` not yet written, each after a space, written by that, and
+        // whether any is a line's comment; and that put in at `end` in the
+        // text, a line's break.
+        std::string trailing(const std::vector<size_t>& given, bool* takes_line = nullptr);
+        void        putTrailing(size_t end, const std::string& after);
 
         // Declarations on lines one after another that the LSL lined up --
         // each one line, given a value, and their = at one column, or the
@@ -590,7 +600,8 @@ namespace
         void block(LSLASTNode* s);
         // An if written from `at` in the text, `lines` lines down, its
         // stretches from `spans`, put on one line where it is one statement
-        // and nothing said over it: if c then s end.
+        // and nothing said over it: if c then s end. Not called where a
+        // line's comment trails its first line (trail).
         void onOneLine(size_t at, S32 lines, size_t spans);
         // An expression standing as a statement: an assignment, a step, a
         // call.
@@ -1482,16 +1493,7 @@ namespace
         {
             return;
         }
-        std::string after;
-        for (size_t k : found->second)
-        {
-            Comment& c = mComments[k];
-            if (!c.written)
-            {
-                c.written = true;
-                after += " " + c.text;
-            }
-        }
+        const std::string after = trailing(found->second);
         if (after.empty())
         {
             return;
@@ -1507,12 +1509,7 @@ namespace
             const size_t first = mText.find_first_not_of(' ', at);
             if (first < end && mText.compare(first, 2, "--") != 0)
             {
-                mText.insert(end, after);
-                // Counted past it: as many lines, further on.
-                if (end < mCounted)
-                {
-                    mCounted += after.size();
-                }
+                putTrailing(end, after);
                 mTrailed[node] = after.size();
                 return;
             }
@@ -1521,27 +1518,71 @@ namespace
         mText += indent() + after.substr(1) + "\n";
     }
 
-    void Writer::trail(LSLASTNode* body)
+    bool Writer::trail(LSLASTNode* body)
     {
         const auto found = mCommentsOpening.find(body);
         if (found == mCommentsOpening.end() || mText.empty() || mText.back() != '\n')
         {
-            return;
+            return false;
         }
-        std::string after;
-        for (size_t k : found->second)
+        // At the end of the line just written, its break kept.
+        bool              takes_line = false;
+        const std::string after      = trailing(found->second, &takes_line);
+        putTrailing(mText.size() - 1, after);
+        return takes_line;
+    }
+
+    void Writer::commentsOpening(LSLASTNode* body)
+    {
+        if (const auto opening = mCommentsOpening.find(body); opening != mCommentsOpening.end())
         {
-            Comment& c = mComments[k];
-            if (!c.written)
+            for (size_t k : opening->second)
             {
-                c.written = true;
-                after += " " + c.text;
+                writeComment(mComments[k]);
             }
         }
-        // At the end of the line just written, its break kept; the lines a
-        // long comment runs on over counted as written before it.
-        const size_t end = mText.size() - 1;
+    }
+
+    std::string Writer::trailing(const std::vector<size_t>& given, bool* takes_line)
+    {
+        std::string after;
+        for (size_t k : given)
+        {
+            Comment& c = mComments[k];
+            if (c.written)
+            {
+                continue;
+            }
+            c.written = true;
+            after += " " + c.text;
+            // A line's comment, which takes the rest of its line: not a long
+            // one, `--[[ ]]` or `--[==[ ]==]`, which closes where it is.
+            size_t level = 2;
+            if (level < c.text.size() && c.text[level] == '[')
+            {
+                ++level;
+                while (level < c.text.size() && c.text[level] == '=')
+                {
+                    ++level;
+                }
+                if (level < c.text.size() && c.text[level] == '[')
+                {
+                    continue;
+                }
+            }
+            if (takes_line)
+            {
+                *takes_line = true;
+            }
+        }
+        return after;
+    }
+
+    void Writer::putTrailing(size_t end, const std::string& after)
+    {
         mText.insert(end, after);
+        // Counted past it: as many more, further on, and the lines a long
+        // comment runs on over counted as written before it.
         if (end < mCounted)
         {
             mCounted += after.size();
@@ -3338,13 +3379,7 @@ namespace
         if (s->getNodeSubType() == NODE_COMPOUND_STATEMENT)
         {
             // What was after its brace that no line opening it took.
-            if (const auto opening = mCommentsOpening.find(s); opening != mCommentsOpening.end())
-            {
-                for (size_t k : opening->second)
-                {
-                    writeComment(mComments[k]);
-                }
-            }
+            commentsOpening(s);
             for (LSLASTNode* child = s->getChild(0); child; child = child->getNext())
             {
                 statement(child, !child->getNext());
@@ -3560,29 +3595,7 @@ namespace
             }
         }
         const std::string_view body = row(head + 1);
-        // Not where a line's comment trails the if's line, which would take
-        // the rest of the line with it; a long comment closes where it is.
-        const std::string_view if_row  = row(head);
-        const size_t           dashes  = if_row.find(" --");
-        bool                   trailed = false;
-        if (dashes != std::string_view::npos)
-        {
-            size_t level = dashes + 3;
-            if (level < if_row.size() && if_row[level] == '[')
-            {
-                ++level;
-                while (level < if_row.size() && if_row[level] == '=')
-                {
-                    ++level;
-                }
-                trailed = !(level < if_row.size() && if_row[level] == '[');
-            }
-            else
-            {
-                trailed = true;
-            }
-        }
-        if (if_row.substr(0, 3) != "if " || trailed || body.empty() || body.substr(0, 2) == "--" || row(head + 2) != "end")
+        if (row(head).substr(0, 3) != "if " || body.empty() || body.substr(0, 2) == "--" || row(head + 2) != "end")
         {
             return;
         }
@@ -3679,17 +3692,23 @@ namespace
                 bool           when_true = true;
                 if (booleanChoice(i, chosen, when_true))
                 {
+                    // What was after either branch's brace, over the line
+                    // that stands for both.
+                    commentsOpening(i->getTrueBranch());
+                    commentsOpening(i->getFalseBranch());
                     const Expr check = condition(i->getCheckExpr());
                     line(nameOf(chosen) + " = " + (when_true ? check.text : "not " + bracketed(check, UNARY)));
                     return;
                 }
-                // On one line where the LSL wrote it on one, with no else.
+                // On one line where the LSL wrote it on one, with no else,
+                // and no line's comment after its first line, which would
+                // take the rest of the line with it.
                 const bool   one_line = s->getLoc()->first_line == s->getLoc()->last_line && isNull(i->getFalseBranch());
                 const S32    lines_at = one_line ? linesWritten() : 0;
                 const size_t text_at  = mText.size();
                 const size_t spans    = mSpans.size();
                 line("if " + condition(i->getCheckExpr()).text + " then");
-                trail(i->getTrueBranch());
+                const bool   trailed  = trail(i->getTrueBranch());
                 for (;;)
                 {
                     ++mDepth;
@@ -3716,7 +3735,7 @@ namespace
                     break;
                 }
                 line("end");
-                if (one_line)
+                if (one_line && !trailed)
                 {
                     onOneLine(text_at, lines_at, spans);
                 }
@@ -6071,7 +6090,9 @@ namespace
             if (event == "state_exit")
             {
                 // Not an event SLua has, and one that never came: said, over
-                // a line of its own, and left out.
+                // a line of its own, and left out; what was after its brace
+                // over that line, which stands for the handler's.
+                commentsOpening(handler->getStatements());
                 note(handler, "SluaStateExit", "state_exit runs as a script leaves a state, and this one has no other: it never ran.");
                 line("-- state_exit, left out");
                 line("");

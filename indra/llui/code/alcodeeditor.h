@@ -475,18 +475,21 @@ public:
     // its last slash -- each one's whole path and whether it is a folder
     // (ALCompletion::path, folder) -- with no words of the document's.
     // Neither the provider of names nor its request is asked there; with
-    // neither of these, a string is prose as any other.
+    // neither of these, or at several carets, a string is prose as any
+    // other.
     void setPathProvider(completion_provider_t provider) { mPathProvider = std::move(provider); }
     void setPathRequest(completion_request_t request) { mPathRequest = std::move(request); }
     // The same in any other string quoted with `"` or `'`, where the host
     // names something to stand for the whole of what it holds -- an item
     // of the object's where a call wants one by its name: asked of what
-    // the string holds before the position, `Door o`, and answering each
-    // with the text the string is to hold, escaped for its quote
-    // (ALCompletion::path), with no words of the document's. The list
-    // opens on its own at the quote and as the string is typed, where
-    // anything is answered; where nothing is, a string is prose as any
-    // other, and what else completes in it still does.
+    // the string holds before the position, as its escapes read it --
+    // `Door o`, `Say "` of `Say \"` -- and answering each with the text
+    // the string is to hold, escaped for its quote (ALCompletion::path),
+    // with no words of the document's; each matched by its name as it
+    // reads. The list opens on its own at the quote and as the string is
+    // typed, where anything is answered; where nothing is, a string is
+    // prose as any other, and what else completes in it still does. Not
+    // at several carets, where a string is prose too.
     void setStringProvider(completion_provider_t provider) { mStringProvider = std::move(provider); }
     // What the host names in strings may have changed -- an object's
     // contents heard: where the caret is in a string and no list is open,
@@ -585,9 +588,9 @@ public:
     // (ALSyntaxGrammar::pathString). None anywhere else.
     std::optional<ALTextRange> pathAt(const ALTextPos& pos);
     // The same of any string or path on its line, the grammar not asked:
-    // what it holds, and the byte that opens it -- a quote, or an include's
-    // `<`.
-    std::optional<ALTextRange> quotedAt(const ALTextPos& pos, char* opener = nullptr);
+    // what it holds, the byte that opens it -- a quote, or an include's
+    // `<` -- and whether it is closed on its line.
+    std::optional<ALTextRange> quotedAt(const ALTextPos& pos, char* opener = nullptr, bool* closed = nullptr);
     // What to say about one: its size, which is what a scripter wants of
     // a string and what the type alone never says -- the bytes it comes
     // to, the characters where they are not the same number, and what it
@@ -1174,8 +1177,11 @@ private:
     bool                    mCompletionAsked = false;
     bool                    mCompletionMoved = false;
     // Whether what the list draws from is what the host named for a
-    // string (stringOffers), rather than the words.
+    // string (stringOffers), or the names in a path's folder (pathAt),
+    // rather than the words: a list for either goes as the caret leaves
+    // the string.
     bool                    mCompletionString = false;
+    bool                    mCompletionPath   = false;
     // The stops of a snippet or a call being filled in (ALSnippetSession).
     ALSnippetSession         mSnippet;
     // Each placeholder's mirrors made what it holds, as one step of its

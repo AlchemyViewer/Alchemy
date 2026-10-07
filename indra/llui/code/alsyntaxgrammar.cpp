@@ -368,6 +368,10 @@ struct ALSyntaxGrammar::Impl
     bool compileRegex(const std::string& pattern, ALRegex& out, std::string& error) const;
     bool compileOpeners(const LLSD& opens, std::vector<Opener>& out, std::string& error);
     static bool anyOpens(const std::vector<Opener>& openers, std::string_view before);
+    // A list of patterns the file names under `key`, each compiled; and
+    // whether any of them is found in a text: completes_in's, path_strings'.
+    static bool compileFound(const LLSD& description, const char* key, std::vector<ALRegex>& out, std::string& error);
+    static bool anyFound(const std::vector<ALRegex>& patterns, std::string_view text);
     size_t tryRule(const Rule& rule, std::string_view line, size_t pos, const std::string& payload, const ALSyntaxWords& words,
                    const ALRegex* end_regex, ALSyntaxKind& kind, std::string& capture) const;
     // What rules may begin where a byte is, and which spans' ends are
@@ -489,6 +493,36 @@ bool ALSyntaxGrammar::Impl::anyOpens(const std::vector<Opener>& openers, std::st
             }, 0);
         }
         if (opener.regex.search(before, nullptr, from))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// static
+bool ALSyntaxGrammar::Impl::compileFound(const LLSD& description, const char* key, std::vector<ALRegex>& out, std::string& error)
+{
+    const LLSD& list = description[key];
+    for (LLSD::array_const_iterator it = list.beginArray(); it != list.endArray(); ++it)
+    {
+        ALRegex where(it->asString());
+        if (!where.ok())
+        {
+            error = std::string(key) + ": " + where.error();
+            return false;
+        }
+        out.push_back(std::move(where));
+    }
+    return true;
+}
+
+// static
+bool ALSyntaxGrammar::Impl::anyFound(const std::vector<ALRegex>& patterns, std::string_view text)
+{
+    for (const ALRegex& where : patterns)
+    {
+        if (where.search(text))
         {
             return true;
         }
@@ -1006,27 +1040,10 @@ bool ALSyntaxGrammar::load(const LLSD& description, std::string& error)
     {
         impl->memberSeparators = description["member_separators"].asString();
     }
-    const LLSD& completes_in = description["completes_in"];
-    for (LLSD::array_const_iterator it = completes_in.beginArray(); it != completes_in.endArray(); ++it)
+    if (!Impl::compileFound(description, "completes_in", impl->completesIn, error) ||
+        !Impl::compileFound(description, "path_strings", impl->pathStrings, error))
     {
-        ALRegex where(it->asString());
-        if (!where.ok())
-        {
-            error = "completes_in: " + where.error();
-            return false;
-        }
-        impl->completesIn.push_back(std::move(where));
-    }
-    const LLSD& path_strings = description["path_strings"];
-    for (LLSD::array_const_iterator it = path_strings.beginArray(); it != path_strings.endArray(); ++it)
-    {
-        ALRegex where(it->asString());
-        if (!where.ok())
-        {
-            error = "path_strings: " + where.error();
-            return false;
-        }
-        impl->pathStrings.push_back(std::move(where));
+        return false;
     }
     impl->prose       = description["prose"].asBoolean();
     const LLSD& pairs = description["pairs"];
@@ -1248,26 +1265,12 @@ const std::string& ALSyntaxGrammar::memberSeparators() const
 
 bool ALSyntaxGrammar::completesIn(std::string_view before) const
 {
-    for (const ALRegex& where : mImpl->completesIn)
-    {
-        if (where.search(before))
-        {
-            return true;
-        }
-    }
-    return false;
+    return Impl::anyFound(mImpl->completesIn, before);
 }
 
 bool ALSyntaxGrammar::pathString(std::string_view before) const
 {
-    for (const ALRegex& where : mImpl->pathStrings)
-    {
-        if (where.search(before))
-        {
-            return true;
-        }
-    }
-    return false;
+    return Impl::anyFound(mImpl->pathStrings, before);
 }
 
 const std::vector<std::pair<char, char>>& ALSyntaxGrammar::pairs() const
