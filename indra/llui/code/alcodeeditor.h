@@ -617,11 +617,11 @@ public:
     void                            dropTyping();
 
     // Every place of a text changed at once, each a selection of its own.
-    // Select Next Occurrence takes the name at the caret, then adds the
-    // next place after the main selection, going round, which becomes the
-    // main one; Change All selects every place at once, the main one kept
-    // main and the others it had let go. A name taken so matches whole
-    // names only.
+    // Select Next Occurrence takes the name at the caret -- in prose, the
+    // word -- then adds the next place after the main selection, going
+    // round, which becomes the main one; Change All selects every place at
+    // once, the main one kept main and the others it had let go. A name
+    // taken so matches whole names only, and a word whole words.
     bool                            selectNextOccurrence();
     bool                            changeAllOccurrences();
     // The names of a signature's parameters, and where their list opens
@@ -1219,6 +1219,11 @@ private:
     // there are; at most `most` of them.
     std::vector<ALTextRange> placesOf(const std::string& wanted, bool whole, const ALTextPos& from, size_t most,
                                       const std::vector<ALTextRange>& taken) const;
+    // Whether a name taken at the caret is one as code spells it -- the
+    // grammar is code -- or a word, as prose and a text with no grammar
+    // have it; and the one there is at the caret, or at its end.
+    bool                     namesAsCode() const;
+    ALTextRange              occurrenceAtCaret() const;
     // The name Select Next Occurrence took at the caret, whose places are
     // whole names only: the main selection while it is one of them.
     ALTextRange              mOccurrenceName;

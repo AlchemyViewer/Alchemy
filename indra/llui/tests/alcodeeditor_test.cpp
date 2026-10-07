@@ -3472,4 +3472,39 @@ namespace tut
         ensure("as a namespace", found->kind == ALSyntaxKind::Namespace);
         ensure_equals("and said to be one", found->detail, std::string("namespace"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<94>()
+    {
+        set_test_name("in prose the occurrences of the word at the caret are taken, whole words as Whole Word finds them; in code whole names, "
+                      "or every place a selection reads, none over another");
+        // Größe, then Gr alone, at the start of Grün, and alone again.
+        const std::string grosse = "Gr\xC3\xB6\xC3\x9F" "e";
+        ALCodeEditor&     e      = make((grosse + " Gr Gr\xC3\xBC" "n Gr").c_str(), "text");
+        e.setCaret(ALTextPos(0, 1));
+        ensure("a word taken", e.selectNextOccurrence());
+        ensure_equals("the whole of it", e.selectedText(), grosse);
+        e.setCaret(ALTextPos(0, 9));
+        ensure("a word standing alone", e.selectNextOccurrence() && e.selection().normalised() == ALTextRange(ALTextPos(0, 8), ALTextPos(0, 10)));
+        ensure("its next place", e.selectNextOccurrence());
+        ensure("the next whole word, not the start of another",
+               e.selection().normalised() == ALTextRange(ALTextPos(0, 17), ALTextPos(0, 19)) && e.otherSelections().size() == 1);
+        e.goTo(ALTextPos(0, 9));
+        ensure("every place", e.changeAllOccurrences());
+        ensure("the one other whole word only", e.otherSelections().size() == 1 && e.otherSelections().front().normalised() ==
+                                                                                     ALTextRange(ALTextPos(0, 17), ALTextPos(0, 19)));
+
+        ALCodeEditor& c = make("integer aa = aaaa + aa;");
+        c.setCaret(ALTextPos(0, 9));
+        ensure("in code, every place", c.changeAllOccurrences());
+        ensure("of the whole name", c.otherSelections().size() == 1 && c.otherSelections().front().normalised() ==
+                                                                          ALTextRange(ALTextPos(0, 20), ALTextPos(0, 22)));
+        c.setSelection(ALTextRange(ALTextPos(0, 8), ALTextPos(0, 10)));
+        ensure("chosen by hand, every place it reads", c.changeAllOccurrences());
+        const std::vector<ALTextRange>& places = c.otherSelections();
+        ensure_equals("in and out of names, none over another", places.size(), size_t(3));
+        ensure("where they are", places[0].normalised() == ALTextRange(ALTextPos(0, 13), ALTextPos(0, 15)) &&
+                                   places[1].normalised() == ALTextRange(ALTextPos(0, 15), ALTextPos(0, 17)) &&
+                                   places[2].normalised() == ALTextRange(ALTextPos(0, 20), ALTextPos(0, 22)));
+    }
 }

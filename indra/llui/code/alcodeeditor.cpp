@@ -4047,6 +4047,27 @@ void ALCodeEditor::syncMirrors(S32 index)
     afterEdit();
 }
 
+bool ALCodeEditor::namesAsCode() const
+{
+    const ALSyntaxGrammar* grammar = highlighter().grammar().get();
+    return grammar && !grammar->prose();
+}
+
+ALTextRange ALCodeEditor::occurrenceAtCaret() const
+{
+    if (namesAsCode())
+    {
+        return identifierAtCaret();
+    }
+    // The word the caret is in, or at the end of.
+    ALTextRange word = document().wordAt(caret());
+    if (word.empty() && caret().column > 0)
+    {
+        word = document().wordAt(document().prevCluster(caret()));
+    }
+    return word;
+}
+
 std::vector<ALTextRange> ALCodeEditor::placesOf(const std::string& wanted, bool whole, const ALTextPos& from, size_t most,
                                                 const std::vector<ALTextRange>& taken_in) const
 {
@@ -4071,6 +4092,9 @@ std::vector<ALTextRange> ALCodeEditor::placesOf(const std::string& wanted, bool 
         const auto past = std::upper_bound(held.begin(), held.end(), range.begin, [](const ALTextPos& at, const ALTextRange& r) { return at < r.end; });
         return past != held.end() && range.overlaps(*past);
     };
+    // Whole as a name is in code; as a word, the find bar's Whole Word, in
+    // prose.
+    bool (*const joins)(char) = namesAsCode() ? &alIdentifierByte : &alWordByte;
     // Each line once, from `from` round to it again.
     for (S32 step = 0; step <= count && out.size() < most; ++step)
     {
@@ -4082,7 +4106,7 @@ std::vector<ALTextRange> ALCodeEditor::placesOf(const std::string& wanted, bool 
              at = text.find(wanted, at + 1))
         {
             const size_t end = at + wanted.size();
-            if (whole && !standsWhole(text, at, end, alIdentifierByte))
+            if (whole && !standsWhole(text, at, end, joins))
             {
                 continue;
             }
@@ -4104,7 +4128,7 @@ bool ALCodeEditor::selectNextOccurrence()
     if (taken.empty())
     {
         // The name at the caret, to go on from.
-        ALTextRange name = identifierAtCaret();
+        ALTextRange name = occurrenceAtCaret();
         if (name.empty())
         {
             name = document().wordAt(caret());
@@ -4114,13 +4138,14 @@ bool ALCodeEditor::selectNextOccurrence()
             return false;
         }
         // And at every other caret, its own.
+        const bool               code = namesAsCode();
         size_t                   main = 0;
         std::vector<ALTextRange> all  = selectionsInOrder(&main);
         for (ALTextRange& one : all)
         {
             if (one.empty())
             {
-                const ALTextRange word = identifierAt(one.end);
+                const ALTextRange word = code ? identifierAt(one.end) : ALTextRange();
                 one                    = word.empty() ? document().wordAt(one.end) : word;
             }
         }
@@ -4156,7 +4181,7 @@ bool ALCodeEditor::changeAllOccurrences()
     bool        whole = taken == mOccurrenceName;
     if (taken.empty())
     {
-        taken = identifierAtCaret();
+        taken = occurrenceAtCaret();
         whole = true;
     }
     if (taken.empty() || taken.begin.line != taken.end.line || isReadOnly())
