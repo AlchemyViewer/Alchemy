@@ -26,6 +26,8 @@
 
 #include "alluautaskpool.h"
 
+#include "alscriptstack.h"
+
 #include <algorithm>
 
 ALLuauTaskPool::ALLuauTaskPool(unsigned threads)
@@ -85,6 +87,9 @@ void ALLuauTaskPool::work()
             task = std::move(mTasks.front());
             mTasks.pop_front();
         }
-        task();
+        // A module's check and lint recurse on how it nests, as the
+        // script's own do on the lane, so on as deep a stack: this thread's
+        // is the platform's, half a megabyte on macOS.
+        alScriptOnLargeStack(task);
     }
 }

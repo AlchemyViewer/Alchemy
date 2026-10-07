@@ -190,10 +190,10 @@ Luau::CheckResult ALLuauFrontend::checkWithModules(const Luau::FrontendOptions& 
     // Autocomplete's module is the old solver's alone.
     const bool autocomplete = options.forAutocomplete && solver == Luau::SolverMode::Old;
     // Several modules the script requires, to be checked now: else as
-    // Luau's own check, which is the same on one thread.
-    const size_t modules = static_cast<size_t>(std::count_if(files.texts.begin(), files.texts.end(), [](const auto& text) {
-        return text.first.rfind("module:", 0) == 0;
-    }));
+    // Luau's own check, which is the same on one thread. Its own, not
+    // every kept script's.
+    const auto   required = requiredBy.find(moduleName);
+    const size_t modules  = required == requiredBy.end() ? 0 : required->second.size();
     if (modules < 2 || !frontend->isDirty(moduleName, autocomplete))
     {
         return frontend->check(moduleName, options);

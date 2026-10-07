@@ -955,7 +955,10 @@ void ALIncludeSearch::searchedBefore(const ALPreprocessor::Ask& ask, const Askin
         std::error_code             ec;
         const std::filesystem::path real     = std::filesystem::weakly_canonical(fsyspath(folder), ec);
         const std::filesystem::path relative = fsyspath(was.file).lexically_relative(ec ? fsyspath(folder) : real);
-        std::string                 path     = relative.generic_string();
+        // As UTF-8, as fsyspath gives it: generic_string() is the code
+        // page's on Windows, and throws on a name it cannot hold.
+        std::string path = fsyspath(relative).string();
+        std::replace(path.begin(), path.end(), '\\', '/');
         if (path.empty() || path == "." || path.compare(0, 2, "..") == 0)
         {
             return names;
