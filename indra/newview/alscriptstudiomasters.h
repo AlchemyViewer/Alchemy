@@ -30,6 +30,8 @@
 #include <boost/signals2.hpp>
 
 #include <functional>
+#include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -44,6 +46,9 @@ struct ALScriptStudioDoc::Mastered
 {
     std::string hinted;
     ALScriptRef offerFor;
+    // Each look on disk for the file the script names, counted: what is
+    // found is taken only from the last one asked for.
+    U32         hintLook = 0;
 };
 
 // A Script Studio window's side of the scripts whose master is a file on
@@ -111,7 +116,7 @@ public:
     // so; false where it is not, or its file is gone.
     bool openMaster(const ALScriptRef& ref, const std::string& name);
     // An item's tab loaded: the file its script names, where one is found
-    // under the blessed folders, offered.
+    // under the blessed folders, offered once the disk's thread has looked.
     void loaded(Doc& doc);
     // A file's tab saved to disk: what it masters sent.
     void fileSaved(Doc& doc);
@@ -128,6 +133,10 @@ private:
     // `written`: what was typed in the tab has just been written to the
     // file, so the file is not what the world holds.
     void linkTo(Doc& doc, const std::string& path, ALMasterLink::Made made, bool written = false);
+    // The file a script names, as the disk's thread found it, back to its
+    // tab found again by its id: offered where the tab is still the script
+    // that named it, and may still be linked.
+    void hintFound(const std::string& id, U32 look, const std::string& hint, bool lua, const std::optional<std::string>& found);
     void heard(const ALScriptDiskMasters::Outcome& outcome);
     // The tab of a master file, where one is open.
     Doc* masterTab(const std::string& master) const;
@@ -138,4 +147,6 @@ private:
     ALScriptStudioAnalysis&            mAnalysis;
     Window&                            mWindow;
     boost::signals2::scoped_connection mOutcomeConnection;
+    // Held while this is, for what the disk's thread found to know it still is.
+    std::shared_ptr<bool>              mAlive = std::make_shared<bool>(true);
 };

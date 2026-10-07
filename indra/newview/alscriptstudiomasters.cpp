@@ -33,8 +33,11 @@
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudioservices.h"
 #include "alscriptworkspace.h"
+#include "alserialworker.h"
 #include "alwatchedfile.h"
 #include "lldir.h"
+#include "llsingleton.h"
+#include "workqueue.h"
 
 namespace
 {
@@ -55,6 +58,35 @@ namespace
             default: return "SavedByQueue";
         }
     }
+
+    // The thread every window's masters ask the disk on, whether the file a
+    // script names is there: made with the first such look, closed as the
+    // viewer goes. Owned by no window, so that one closing never waits on
+    // a slow drive: what a look finds for a window gone finds nobody.
+    class ALScriptMastersDisk final : public LLSingleton<ALScriptMastersDisk>
+    {
+        LLSINGLETON_EMPTY_CTOR(ALScriptMastersDisk);
+        void cleanupSingleton() override
+        {
+            if (mThread)
+            {
+                mThread->close();
+            }
+        }
+
+    public:
+        bool post(std::function<void()> job)
+        {
+            if (!mThread)
+            {
+                mThread = std::make_unique<ALSerialWorker>("ScriptMastersDisk");
+            }
+            return mThread->post(std::move(job));
+        }
+
+    private:
+        std::unique_ptr<ALSerialWorker> mThread;
+    };
 }
 
 ALScriptStudioMasters::ALScriptStudioMasters(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window)
@@ -270,26 +302,63 @@ void ALScriptStudioMasters::loaded(Doc& doc)
     // A file the script names as its own, offered where a hint may reach
     // it: under the folders its includes may be read from, and nowhere
     // else, whatever the script says.
-    const bool                       lua  = doc.language.lua;
-    const std::string                head = doc.envelope ? doc.envelope->header : std::string();
-    const std::optional<std::string> hint = ALMasterMatch::hintOf(doc.editor->wholeText(), head, lua);
-    if (!hint)
+    const bool                       lua   = doc.language.lua;
+    const std::string                head  = doc.envelope ? doc.envelope->header : std::string();
+    const std::optional<std::string> named = ALMasterMatch::hintOf(doc.editor->wholeText(), head, lua);
+    if (!named)
     {
         return;
     }
-    std::string                      why;
-    const std::optional<std::string> found =
-        ALMasterMatch::resolve(*hint, ALScriptDiskMasters::blessedFor(std::string(), lua), ALScriptDiskMasters::aliasesFor(std::string(), lua),
-                               lua, why);
-    if (!found)
+    // Which folders those are is said here, where the settings and the
+    // configurations are read; whether the file is in one is asked of the
+    // disk on its own thread, since a drive may be slow, or a share far
+    // away. Nothing of the tab goes there: what is found comes back to the
+    // tab found again by its id.
+    ALDiskIncludes                                   blessed   = ALScriptDiskMasters::blessedFor(std::string(), lua);
+    std::vector<std::pair<std::string, std::string>> aliases   = ALScriptDiskMasters::aliasesFor(std::string(), lua);
+    const U32                                        look      = ++doc.master->hintLook;
+    const std::string                                id        = doc.id;
+    const LL::WorkQueue::ptr_t                       main_loop = LL::WorkQueue::getInstance("mainloop");
+    if (!main_loop)
+    {
+        // No main loop to hand it back to -- a test -- so looked for here.
+        std::string why;
+        hintFound(id, look, *named, lua, ALMasterMatch::resolve(*named, blessed, aliases, lua, why));
+        return;
+    }
+    const std::weak_ptr<bool> alive = mAlive;
+    ALScriptMastersDisk::instance().post(
+        [this, alive, main_loop, id, look, hint = *named, lua, blessed = std::move(blessed), aliases = std::move(aliases)]() {
+            std::string                      why;
+            const std::optional<std::string> found = ALMasterMatch::resolve(hint, blessed, aliases, lua, why);
+            main_loop->post([this, alive, id, look, hint, lua, found]() {
+                if (alive.lock())
+                {
+                    hintFound(id, look, hint, lua, found);
+                }
+            });
+        });
+}
+
+void ALScriptStudioMasters::hintFound(const std::string& id, U32 look, const std::string& hint, bool lua, const std::optional<std::string>& found)
+{
+    Doc* doc = mServices.findDoc(id);
+    if (!found || !doc || doc->master->hintLook != look || doc->language.lua != lua || !canLink(doc))
     {
         return;
     }
-    doc.master->hinted = *found;
+    // Still the script that named it: what was typed while the disk was
+    // asked may have taken the hint out, or named another file.
+    const std::string head = doc->envelope ? doc->envelope->header : std::string();
+    if (ALMasterMatch::hintOf(doc->editor->wholeText(), head, lua) != hint)
+    {
+        return;
+    }
+    doc->master->hinted = *found;
     LLStringUtil::format_map_t args;
-    args["[NAME]"] = doc.name;
+    args["[NAME]"] = doc->name;
     args["[FILE]"] = *found;
-    mServices.report(mServices.words("MasterHinted", args), false, &doc, { "master_link_hint" });
+    mServices.report(mServices.words("MasterHinted", args), false, doc, { "master_link_hint" });
 }
 
 void ALScriptStudioMasters::fileSaved(Doc& doc)
