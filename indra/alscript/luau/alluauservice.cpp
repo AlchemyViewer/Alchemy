@@ -62,6 +62,7 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
+#include <algorithm>
 #include <limits>
 #include <mutex>
 #include <set>
@@ -75,34 +76,48 @@ namespace
 
     // The constants the grid's VM sets that the definitions leave out. The
     // VM makes a global of every constant in builtins.txt but TRUE and
-    // FALSE, which SLua says as true and false; lsl-definitions writes into
-    // secondlife.d.luau none of those it marks private, which is these, all
-    // numbers. A script may use them, and the converter writes them as LSL
-    // has them, so they are declared beside the definitions -- each only
-    // where the definitions do not declare it already, so that a region's
-    // definitions that come to declare one are believed over this list.
-    const char* const UNDOCUMENTED_CONSTANTS[] = {
-        "GCNP_GET_WALKABILITY",             "LEGACY_MASS_FACTOR",
-        "NAVIGATE_TO_GOAL_REACHED_DIST",    "PARCEL_FLAG_LINDEN_HOMES",
-        "PRIM_MATERIAL_DENSITY",            "PRIM_MATERIAL_FRICTION",
-        "PRIM_MATERIAL_GRAVITY_MULTIPLIER", "PRIM_MATERIAL_RESTITUTION",
-        "PSYS_SRC_OBJ_REL_MASK",            "REZ_TORQUE",
-        "SKY_ABSORPTION_CONFIG",            "SKY_DENSITY_PROFILE_COUNTS",
-        "SKY_MIE_CONFIG",                   "SKY_RAYLEIGH_CONFIG",
-    };
+    // FALSE, which SLua says as true and false (luaSL_set_constant_globals,
+    // over the table setUpProcess loads); lsl-definitions writes into
+    // secondlife.d.luau none of those it marks private, such as
+    // PRIM_MATERIAL_DENSITY and REZ_TORQUE. A script may use them, and the
+    // converter writes them as LSL has them, so they are declared beside the
+    // definitions, by the type the VM gives each -- and each only where the
+    // definitions do not declare it already, so that a region's definitions
+    // that come to declare one are believed over the table.
+    const char* undocumentedType(Luau::SLConstantType type)
+    {
+        switch (type)
+        {
+            case Luau::SLConstantType::Integer:
+            case Luau::SLConstantType::Float: return "number";
+            case Luau::SLConstantType::String: return "string";
+            case Luau::SLConstantType::Key: return "uuid";
+            case Luau::SLConstantType::Vector: return "vector";
+            case Luau::SLConstantType::Quaternion: return "quaternion";
+            default: return nullptr;
+        }
+    }
 
     // Those the definitions just loaded into these globals do not declare,
-    // declared there under a package of their own; false where they did
-    // not load, which only a mistake in the text above could cause.
+    // declared there under a package of their own, by name so that the
+    // text is the same each time; false where they did not load, which only
+    // a type the definitions lack could cause.
     bool declareUndocumented(Luau::Frontend& frontend, Luau::GlobalTypes& globals, bool for_autocomplete)
     {
-        std::string declared;
-        for (const char* name : UNDOCUMENTED_CONSTANTS)
+        std::vector<std::pair<std::string_view, const char*>> missing;
+        for (const auto& [name, constant] : Luau::luauSL_constants())
         {
-            if (!Luau::tryGetGlobalBinding(globals, name))
+            const char* type = undocumentedType(constant.type);
+            if (type && !Luau::tryGetGlobalBinding(globals, name))
             {
-                declared += llformat("declare %s: number\n", name);
+                missing.emplace_back(name, type);
             }
+        }
+        std::sort(missing.begin(), missing.end());
+        std::string declared;
+        for (const auto& [name, type] : missing)
+        {
+            declared += "declare " + std::string(name) + ": " + type + "\n";
         }
         return declared.empty() ||
                frontend.loadDefinitionFile(globals, globals.globalScope, declared, ALLuauFrontend::UNDOCUMENTED_PACKAGE,
