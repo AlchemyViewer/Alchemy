@@ -5213,4 +5213,56 @@ namespace tut
         ensure_equals("in a range with no name after it", vim->commandLine(), std::string("10,2center0"));
         keys("<Esc><Esc>");
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<184>()
+    {
+        set_test_name("the : commands are taken by any of their names vim takes, from the least to the whole: :joi :dele :norma :lef :rig :mo :cop :gl :vg :su :ya :pu :und :mar :setlo");
+        ALCodeEditor& e = make("a b\nc\n");
+        ex("joi");
+        ensure_equals(":joi joins", flat(e.text()), std::string("a b c|"));
+        make("a\nb\nc\n");
+        ex("dele");
+        ensure_equals(":dele deletes", flat(editor->text()), std::string("b|c|"));
+        make("abc\n");
+        ex("norma x");
+        ensure_equals(":norma plays the keys", flat(editor->text()), std::string("bc|"));
+        make("  a\n");
+        ex("lef");
+        ensure_equals(":lef to the left", flat(editor->text()), std::string("a|"));
+        make("a\n");
+        ex("rig 5");
+        ensure_equals(":rig to the right", flat(editor->text()), std::string("    a|"));
+        make("a\nb\nc\n");
+        ex("3mo 0");
+        ensure_equals(":mo moves", flat(editor->text()), std::string("c|a|b|"));
+        make("a\nb\nc\n");
+        ex("3cop 0");
+        ensure_equals(":cop copies", flat(editor->text()), std::string("c|a|b|c|"));
+        make("a\nxb\nc\n");
+        ex("gl/x/d");
+        ensure_equals(":gl", flat(editor->text()), std::string("a|c|"));
+        make("a\nxb\nc\n");
+        ex("vg/x/d");
+        ensure_equals(":vg", flat(editor->text()), std::string("xb|"));
+        make("aa\n");
+        ex("su/a/b/");
+        ensure_equals(":su", flat(editor->text()), std::string("ba|"));
+        make("a\nb\n");
+        ex("ya");
+        ex("pu");
+        ensure_equals(":ya then :pu", flat(editor->text()), std::string("a|a|b|"));
+        make("a\n");
+        keys("x");
+        ex("und");
+        ensure_equals(":und undoes", flat(editor->text()), std::string("a|"));
+        ensure("none of them unknown: " + vim->message(), !vim->messageIsError());
+        make("a\nb\n");
+        keys("gg");
+        ex("2mar a");
+        keys("'a");
+        ensure_equals(":mar sets a mark", caretText(), std::string("1:0"));
+        ex("setlo ic");
+        ensure(":setlo sets", vim->shared().ignoreCase);
+    }
 }

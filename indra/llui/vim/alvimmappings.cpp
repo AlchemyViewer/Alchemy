@@ -27,6 +27,7 @@
 #include "alvimmappings.h"
 
 #include "alsaid.h"
+#include "alvimtext.h"
 #include "llstring.h"
 
 #include <algorithm>
@@ -118,12 +119,6 @@ namespace
         { "cmapc", "cmapclear", ALVimMappings::COMMAND_LINE, Kind::Clear },
         { "smapc", "smapclear", 0, Kind::Clear },
     };
-
-    // `name` is `whole` cut no shorter than `least`.
-    bool abbreviates(std::string_view name, std::string_view least, std::string_view whole)
-    {
-        return name.size() >= least.size() && name.size() <= whole.size() && whole.compare(0, name.size(), name) == 0;
-    }
 
     std::string lowered(std::string text)
     {
@@ -404,7 +399,7 @@ bool ALVimMappings::command(const std::string& name_in, const std::string& args_
     const Family* family   = nullptr;
     for (const Family& each : FAMILY)
     {
-        if (abbreviates(name, each.least, each.whole))
+        if (ALVimText::abbreviates(name, each.least, each.whole))
         {
             family = &each;
             break;

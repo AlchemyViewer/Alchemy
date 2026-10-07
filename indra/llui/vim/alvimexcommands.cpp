@@ -708,7 +708,7 @@ void ALVimExCommands::source(ALVimKeymap::Shared& shared, std::string_view text,
                 }
             }
         }
-        else if (name != "noh" && name != "nohlsearch")
+        else if (!abbreviates(name, "noh", "nohlsearch"))
         {
             error = ALVimKeymap::said("VimNotACommand", "E492: Not an editor command: [LINE]", { { "[LINE]", line } });
         }
@@ -808,19 +808,26 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         args.erase(0, 1);
     }
     LLStringUtil::trim(args);
+    // The keymap's own commands by any of their names vim takes, from the
+    // least to the whole (ALVimText::abbreviates); those that take a bang
+    // with one.
+    const bool        bang = name.back() == '!';
+    const std::string bare = bang ? name.substr(0, name.size() - 1) : name;
+    const auto        is   = [&bare](std::string_view least, std::string_view whole) { return abbreviates(bare, least, whole); };
 
-    if (name == "s" || name == "substitute" || name == "&" || name == "~")
+    const bool substituting = !bang && is("s", "substitute");
+    if (substituting || name == "&" || name == "~")
     {
         // :& and :&& do the last one again; :~ likewise, on the last
         // pattern searched for, which here is the same one.
-        if (!substitute(view, first, last, name == "s" || name == "substitute" ? args : "&" + args))
+        if (!substitute(view, first, last, substituting ? args : "&" + args))
         {
             return;
         }
         mVim.finishCommand(true);
         return;
     }
-    if (name == "d" || name == "delete")
+    if (!bang && is("d", "delete"))
     {
         ALVimKeymap::Span span;
         span.linewise = true;
@@ -829,7 +836,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         mVim.finishCommand(true);
         return;
     }
-    if (name == "y" || name == "yank")
+    if (!bang && is("y", "yank"))
     {
         ALVimKeymap::Span span;
         span.linewise = true;
@@ -862,7 +869,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         mVim.finishCommand(true);
         return;
     }
-    if (name == "m" || name == "move" || name == "t" || name == "co" || name == "copy")
+    if (!bang && (is("m", "move") || bare == "t" || is("co", "copy")))
     {
         // The lines below the line the address names moved there, or
         // copied there; to the top for one before the first, as :0put
@@ -907,7 +914,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         mVim.finishCommand(change.has_value());
         return;
     }
-    if (name == "sor" || name == "sort" || name == "sor!" || name == "sort!")
+    if (is("sor", "sort"))
     {
         // The lines of the range -- the whole text without one -- in
         // order: by their text, or by the first number in each with n;
@@ -928,7 +935,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         {
             --last;
         }
-        const bool reverse  = name.back() == '!';
+        const bool reverse  = bang;
         const bool numeric  = args.find('n') != std::string::npos;
         const bool ignore   = args.find('i') != std::string::npos;
         const bool unique   = args.find('u') != std::string::npos;
@@ -1006,15 +1013,15 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         mVim.finishCommand(true);
         return;
     }
-    if (name == "g" || name == "global" || name == "v" || name == "vglobal" || name == "g!" || name == "global!")
+    if (is("g", "global") || (!bang && is("v", "vglobal")))
     {
-        if (global(view, first, last, ranged, args, name[0] == 'v' || name.back() == '!'))
+        if (global(view, first, last, ranged, args, name[0] == 'v' || bang))
         {
             mVim.finishCommand(true);
         }
         return;
     }
-    if (name == "normal" || name == "norm" || name == "normal!" || name == "norm!")
+    if (is("norm", "normal"))
     {
         // The keys as if typed in normal mode, on each line of the range
         // in turn, from the line's first character; whatever mode they
@@ -1034,7 +1041,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
             }
             view.setCaret(ALTextPos(line, 0));
             mVim.moveTo(view, view.caret());
-            if (!mVim.play(view, inputs, name.back() != '!') && mVim.mMessageError)
+            if (!mVim.play(view, inputs, !bang) && mVim.mMessageError)
             {
                 break;
             }
@@ -1048,7 +1055,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         view.undoJournal().endGroup();
         return;
     }
-    if (name == "j" || name == "join" || name == "j!" || name == "join!")
+    if (is("j", "join"))
     {
         // The range's lines, the last and one more where it is one line;
         // or, with a count, that many from the range's last.
@@ -1061,7 +1068,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         }
         if (editing)
         {
-            if (const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(d, from, until, name.back() == '!'))
+            if (const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(d, from, until, bang))
             {
                 view.apply(*join);
                 mVim.moveTo(view, join->caret);
@@ -1069,7 +1076,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         }
         return;
     }
-    if (name == "retab" || name == "ret" || name == "retab!" || name == "ret!")
+    if (is("ret", "retab"))
     {
         // Every line's leading blanks, or the range's, as the tabs are set:
         // spaces where they are, else tabs; a width given sets it, the
@@ -1085,13 +1092,13 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         }
         return;
     }
-    if (name == "u" || name == "undo" || name == "red" || name == "redo")
+    if (!bang && (is("u", "undo") || is("red", "redo")))
     {
         view.perform(name[0] == 'u' ? ALEditorCommand::Undo : ALEditorCommand::Redo);
         mVim.moveTo(view, view.caret());
         return;
     }
-    if (name == "pu" || name == "put" || name == "pu!" || name == "put!")
+    if (is("pu", "put"))
     {
         // A register's text as lines, whatever it was taken as: under the
         // range's last line, or above it with !, as vim's [line] is the
@@ -1121,7 +1128,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         {
             text.pop_back();
         }
-        const bool above = name.back() == '!' || before_first;
+        const bool above = bang || before_first;
         const S32  line  = before_first ? 0 : last;
         view.setCaret(above ? d.lineStart(line) : d.lineEnd(line));
         view.insertText(above ? text + "\n" : "\n" + text);
@@ -1132,7 +1139,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         mVim.moveTo(view, ALTextPos(put_last, firstNonBlankColumn(d, put_last)));
         return;
     }
-    if (name == "ma" || name == "mark" || name == "k")
+    if (!bang && (is("ma", "mark") || bare == "k"))
     {
         // A mark at the range's last line, as m would set it there.
         if (args.size() == 1 && ((args[0] >= 'a' && args[0] <= 'z') || args[0] == '\'' || args[0] == '`'))
@@ -1145,7 +1152,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         }
         return;
     }
-    if (name == "le" || name == "left" || name == "ri" || name == "right" || name == "ce" || name == "center")
+    if (!bang && (is("le", "left") || is("ri", "right") || is("ce", "center")))
     {
         // The range's lines to the left with an indent, or to the right or
         // centred within a width: eighty, where none is given.
@@ -1174,7 +1181,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         }
         return;
     }
-    if (name == "reg" || name == "registers" || name == "di" || name == "display")
+    if (!bang && (is("reg", "registers") || is("di", "display")))
     {
         listRegisters(view, args);
         return;
@@ -1206,7 +1213,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         list(view, text);
         return;
     }
-    if (name == "noh" || name == "nohlsearch")
+    if (!bang && is("noh", "nohlsearch"))
     {
         if (ALVimHost* host = view.vimHost())
         {
@@ -1317,12 +1324,13 @@ bool ALVimExCommands::globalBatches(const std::string& command)
     {
         ++name_end;
     }
+    // By the names runCommand takes them by.
     const std::string name = command.substr(0, name_end);
-    if (name == "s" || name == "substitute")
+    if (abbreviates(name, "s", "substitute"))
     {
         return true;
     }
-    if (name == "d" || name == "delete")
+    if (abbreviates(name, "d", "delete"))
     {
         return command.find_first_not_of(" \t", name_end) == std::string::npos;
     }

@@ -32,12 +32,15 @@
 
 #include <cctype>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // What the vim keymap and the classes it is made of (ALVimSearch and the
 // rest) read the text by, a character at a time, and the small rules they
 // share: a word's classes, a line's blanks, brackets by the text alone, a
-// count's bounds, the keys two typed make. Inside, not for anyone else.
+// count's bounds, the keys two typed make, a : command's name as vim reads
+// it. Inside, not for anyone else -- but a host's : commands, whose names
+// are read by the same rule.
 namespace ALVimText
 {
     // --- the text, a character at a time ------------------------------------------------
@@ -373,10 +376,17 @@ namespace ALVimText
     }
     // A letter of a : command's name.
     inline bool isNameChar(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+    // Whether a : command's name is `whole` as vim reads its names: any of
+    // it from the least it may be shortened to, `least`, to the whole --
+    // d, de, del ... delete.
+    inline bool abbreviates(std::string_view name, std::string_view least, std::string_view whole)
+    {
+        return name.size() >= least.size() && name.size() <= whole.size() && whole.compare(0, name.size(), name) == 0;
+    }
     // :set, and its local and global forms, which are one here.
     inline bool isSetCommand(const std::string& name)
     {
-        return name == "set" || name == "se" || name == "setl" || name == "setlocal" || name == "setg" || name == "setglobal";
+        return abbreviates(name, "se", "set") || abbreviates(name, "setl", "setlocal") || abbreviates(name, "setg", "setglobal");
     }
     // An operator's count and its motion's together -- 3d2w is six words --
     // held to the same most, which their product would otherwise pass far

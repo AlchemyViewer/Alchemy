@@ -32,6 +32,7 @@
 #include "alscriptstudiosaves.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiotabs.h"
+#include "alvimtext.h"
 #include "fsyspath.h"
 
 #include <algorithm>
@@ -48,13 +49,9 @@ namespace
                                               "open_file", "fold_all", "unfold_all", "go_to_line", "quick_fix", "fix_all", "weights",
                                               "back",      "forward",  "reference", "go_to_symbol" };
 
-    // Whether a command's name is one of vim's, as vim reads its names: any
-    // of it from the least it may be shortened to, `least`, to the whole.
-    bool abbreviates(const std::string& name, const char* least, const char* whole)
-    {
-        const size_t shortest = strlen(least);
-        return name.size() >= shortest && name.size() <= strlen(whole) && std::string_view(whole).substr(0, name.size()) == name;
-    }
+    // Whether a command's name is one of vim's, as vim reads its names: the
+    // keymap's own rule.
+    using ALVimText::abbreviates;
 
     // The vim every studio window shares, made with the first and kept for
     // the session: a register yanked into in one window is put from in
