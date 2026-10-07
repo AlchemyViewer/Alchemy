@@ -105,8 +105,9 @@ public:
 
     // An edit heard: the stop being typed over becomes what was typed, the
     // others move with the text, and one the edit cut into goes, with its
-    // mirrors; the mirror being brought up is what the edit put in. With no
-    // stop left, or none being typed over, it is over.
+    // mirrors; the mirror being brought up is what the edit put in, and a
+    // stop it is inside of, or is, grows with it. With no stop left, or
+    // none being typed over, it is over.
     void slide(const ALTextDocument::Edit& edit);
     // Whether a line is one the session is still being filled in on: from
     // the first stop's line to where the call or the snippet ends.

@@ -127,4 +127,42 @@ namespace tut
         const ALSnippetSession::Expansion same = ALSnippetSession::expand("    lead\n    x", ALTextPos(0, 0), "");
         ensure_equals("no unit: as written", same.text, std::string("    lead\n    x"));
     }
+
+    template<> template<>
+    void alsnippetsession_object::test<6>()
+    {
+        set_test_name("a mirror that is a later stop, or inside one, made again as the batch the editor makes: the stop holds what went in, and is still there to go to");
+        // Every stale mirror of a stop made again at once, as the editor does
+        // on leaving it.
+        const auto sync = [this](ALTextDocument& doc, S32 stop) {
+            std::string                                      wanted;
+            std::vector<std::pair<ALTextRange, std::string>> edits;
+            for (const S32 k : session.staleMirrors(stop, doc, wanted))
+            {
+                edits.emplace_back(session.mirrors()[static_cast<size_t>(k)].range, wanted);
+            }
+            session.syncingAll();
+            session.slide(doc.replaceMany(std::move(edits)));
+            session.syncing(-1);
+        };
+
+        const ALSnippetSession::Expansion whole = ALSnippetSession::expand("local ${1:name} = require(\"${2:$1}\")", ALTextPos(0, 0), "");
+        ALTextDocument                    doc(whole.text);
+        ensure("the second stop the first's mirror", whole.stops.size() == 2 && whole.mirrors.size() == 1 && whole.stops[1] == whole.mirrors[0].range);
+        session.start(whole.stops, whole.landing.begin, whole.mirrors);
+        session.slide(doc.replace(session.stops()[0], "json"));
+        sync(doc, 0);
+        ensure_equals("brought up", doc.text(), std::string("local json = require(\"json\")"));
+        ensure("both stops kept", session.stops().size() == 2 && session.at() == 0);
+        ensure_equals("the second over what its mirror holds now", doc.text(session.stops()[1]), std::string("json"));
+
+        const ALSnippetSession::Expansion around = ALSnippetSession::expand("${1:x} ${2:the $1 thing}", ALTextPos(0, 0), "");
+        ALTextDocument                    text(around.text);
+        session.start(around.stops, around.landing.begin, around.mirrors);
+        session.slide(text.replace(session.stops()[0], "abc"));
+        sync(text, 0);
+        ensure_equals("brought up inside", text.text(), std::string("abc the abc thing"));
+        ensure("the stop around it kept", session.stops().size() == 2);
+        ensure_equals("grown with it", text.text(session.stops()[1]), std::string("the abc thing"));
+    }
 }

@@ -401,6 +401,18 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
                                            [](const ALTextDocument::Edit::Part& p, const ALTextPos& at) { return p.before.begin < at; });
         return part != edit.parts.end() && part->before == range ? std::optional<ALTextRange>(part->after) : std::nullopt;
     };
+    // Whether every stretch the edit replaced that reaches into a range lies
+    // whole inside it: a stop a mirror being made again is inside of, or is,
+    // which holds what goes in its place.
+    const auto holds = [&edit, &removed](const ALTextRange& range) {
+        const ALTextRange r      = range.normalised();
+        const auto        inside = [&r](const ALTextRange& stretch) {
+            return !(r.begin < stretch.end && stretch.begin < r.end) || (r.begin <= stretch.begin && stretch.end <= r.end);
+        };
+        return edit.parts.empty() ? inside(removed)
+                                  : std::all_of(edit.parts.begin(), edit.parts.end(),
+                                                [&inside](const ALTextDocument::Edit::Part& part) { return inside(part.before); });
+    };
     for (S32 k = 0; k < static_cast<S32>(mMirrors.size());)
     {
         Mirror&                          mirror = mMirrors[static_cast<size_t>(k)];
@@ -440,6 +452,13 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
         }
         else if (edit.slide(r))
         {
+            ++i;
+        }
+        else if (mSyncing == SYNCING_ALL && holds(r))
+        {
+            // A mirror inside it made again, or the whole of it: it grows
+            // and shrinks with what went in, rather than going.
+            r = edit.stretched(r);
             ++i;
         }
         else
