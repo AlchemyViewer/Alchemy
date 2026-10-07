@@ -490,4 +490,20 @@ namespace tut
         ensure_equals("operators together", lexed("slua", "n //= 2 ~= 3", slua, words),
                       std::string("text:n |operator://=|text: |number:2|text: |operator:~=|text: |number:3"));
     }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<15>()
+    {
+        set_test_name("SLua: a concatenation is two dots before a number as anywhere, and a number may still begin with its point");
+        ALSyntaxWords words;
+        words.set("function", { "print" });
+        ALSyntaxState state;
+        ensure_equals("a concatenation, then a number", lexed("slua", "print(\"n=\"..5)", state, words),
+                      std::string("function:print|punctuation:(|string:\"n=\"|punctuation:..|number:5|punctuation:)"));
+        ensure_equals("a concatenation of a fraction", lexed("slua", "s = s.. .5", state, words),
+                      std::string("text:s |operator:=|text: s|punctuation:..|text: |number:.5"));
+        ensure_equals("a number that begins with its point", lexed("slua", "x = .5 + 1.", state, words),
+                      std::string("text:x |operator:=|text: |number:.5|text: |operator:+|text: |number:1."));
+        ensure_equals("the varargs", lexed("slua", "f(...)", state, words), std::string("text:f|punctuation:(...)"));
+    }
 }
