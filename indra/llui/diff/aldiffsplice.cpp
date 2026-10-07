@@ -428,18 +428,22 @@ ALDiffSplice::LineMap ALDiffSplice::lineMap(const std::vector<std::string>& was,
 
 ALDiffSplice::LineMap ALDiffSplice::lineMap(const std::vector<std::string>& was, const std::vector<std::string>& now, const ALDiffEdit::Edges& edges)
 {
+    return lineMapBetween(was, std::vector<std::string>(now.begin() + edges.head, now.end() - edges.tail), edges);
+}
+
+ALDiffSplice::LineMap ALDiffSplice::lineMapBetween(const std::vector<std::string>& was, const std::vector<std::string>& between, const ALDiffEdit::Edges& edges)
+{
     // Only the lines between the edges kept, each where it went.
     LineMap map;
     const auto [head, tail] = edges;
     map.head                = head;
     map.tail                = tail;
     map.wasLines            = static_cast<S32>(was.size());
-    map.nowLines            = static_cast<S32>(now.size());
+    map.nowLines            = head + tail + static_cast<S32>(between.size());
     map.to.assign(static_cast<size_t>(map.wasLines - head - tail), map.nowLines);
     map.same.assign(map.to.size(), false);
     const std::vector<std::string> some_was(was.begin() + head, was.end() - tail);
-    const std::vector<std::string> some_now(now.begin() + head, now.end() - tail);
-    for (const Run& run : ALTextDiff::lines(some_was, some_now))
+    for (const Run& run : ALTextDiff::lines(some_was, between))
     {
         for (S32 n = 0; n < run.count && run.kind != Kind::Added; ++n)
         {

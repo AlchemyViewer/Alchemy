@@ -40,15 +40,13 @@
 
 namespace
 {
-    // The lines of a text, with LF, that was a text and these lines of it:
-    // where the two first differ and how far they end alike, by their bytes,
-    // and so the lines wholly before and wholly after, by the breaks there
-    // -- those taken from the lines as they were rather than made again,
-    // only the lines between cut from the text. What lies between of the
-    // lines as they were is left where it was. A line the same beside the
-    // bytes that differ may be counted among those between, which only
+    // Of a text, with LF, that was another: where the two first differ and
+    // how far they end alike, by their bytes, and so the lines wholly before
+    // and wholly after, by the breaks there, which are the lines as they
+    // were; and the lines between, cut from the text. A line the same beside
+    // the bytes that differ may be counted among those between, which only
     // reads it again.
-    std::vector<std::string> linesAgain(std::vector<std::string>& was, std::string_view was_text, std::string_view text, ALDiffEdit::Edges& edges)
+    std::vector<std::string> linesBetween(std::string_view was_text, std::string_view text, ALDiffEdit::Edges& edges)
     {
         const size_t most   = std::min(was_text.size(), text.size());
         const size_t before = static_cast<size_t>(std::mismatch(text.begin(), text.begin() + static_cast<std::ptrdiff_t>(most), was_text.begin()).first - text.begin());
@@ -61,15 +59,34 @@ namespace
         // break of the lines after.
         const size_t from = edges.head > 0 ? text.rfind('\n', before - 1) + 1 : 0;
         const size_t to   = edges.tail > 0 ? text.size() - after + ending.find('\n') : text.size();
-        std::vector<std::string> now;
-        now.reserve(was.size() + 8);
-        std::move(was.begin(), was.begin() + edges.head, std::back_inserter(now));
+        std::vector<std::string> between;
         for (const std::string_view line : ALLineBreaks::views(text.substr(from, to - from)))
         {
-            now.emplace_back(line);
+            between.emplace_back(line);
         }
-        std::move(was.end() - edges.tail, was.end(), std::back_inserter(now));
-        return now;
+        return between;
+    }
+
+    // A side's lines made those of its text now: the lines between its
+    // edges put in the place of those that were there, those before and
+    // after them left where they are. Whole throughout, as it was until
+    // then and as it is after, so that nothing reading it reads a line
+    // taken away.
+    void putBetween(std::vector<std::string>& side, std::vector<std::string> between, const ALDiffEdit::Edges& edges)
+    {
+        const std::ptrdiff_t head = edges.head;
+        const std::ptrdiff_t was  = static_cast<std::ptrdiff_t>(side.size()) - edges.head - edges.tail;
+        const std::ptrdiff_t now  = static_cast<std::ptrdiff_t>(between.size());
+        const std::ptrdiff_t both = std::min(was, now);
+        std::move(between.begin(), between.begin() + both, side.begin() + head);
+        if (now > was)
+        {
+            side.insert(side.begin() + head + was, std::make_move_iterator(between.begin() + both), std::make_move_iterator(between.end()));
+        }
+        else
+        {
+            side.erase(side.begin() + head + now, side.begin() + head + was);
+        }
     }
 
     size_t hashOf(const ALTextDiff::regions_t& regions)
@@ -144,13 +161,13 @@ ALTextDiff::ranges_t ALDiffModel::carried(const ALTextDiff::ranges_t& ranges, bo
 ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
 {
     // Each line of the right as it was, where it now is: the lines the
-    // two share at either end taken from the right as it was, of which what
-    // lies between is still there to compare.
-    std::string                     text = ALLineBreaks::withLineFeeds(right);
+    // two share at either end those of the right as it was, which is whole
+    // until the lines between are put in.
+    std::string                     text    = ALLineBreaks::withLineFeeds(right);
     ALDiffEdit::Edges               edges;
-    std::vector<std::string>        now  = linesAgain(mRightLines, mRightText, text, edges);
-    const std::vector<std::string>& was  = mRightLines;
-    const LineMap                   map  = ALDiffSplice::lineMap(was, now, edges);
+    std::vector<std::string>        between = linesBetween(mRightText, text, edges);
+    const std::vector<std::string>& was     = mRightLines;
+    const LineMap                   map     = ALDiffSplice::lineMapBetween(was, between, edges);
     // A range goes with its lines, changed or not: an edit of the SLua a
     // statement became still stands for the statement. Two come to one
     // line where one was taken out; lines() keeps those it can. So does a
@@ -161,7 +178,7 @@ ALDiffModel::LineMap ALDiffModel::setRightText(std::string_view right)
     const std::vector<S32> opened = openedLines(&map);
     mRightText                    = std::move(text);
     mRanges                       = std::move(ranges);
-    resplice(false, std::move(now), edges);
+    resplice(false, std::move(between), edges);
     reopen(opened);
     return map;
 }
@@ -171,11 +188,11 @@ void ALDiffModel::setLeftText(std::string_view left)
     // What was said of the left, and a merge with it, were the other's.
     mNotes.clear();
     mMerge.reset();
-    std::string              text = ALLineBreaks::withLineFeeds(left);
+    std::string              text    = ALLineBreaks::withLineFeeds(left);
     ALDiffEdit::Edges        edges;
-    std::vector<std::string> lines = linesAgain(mLeftLines, mLeftText, text, edges);
-    mLeftText                      = std::move(text);
-    mPairs = carried(mPairs, true, static_cast<S32>(mLeftLines.size()), ALDiffSplice::lineMap(mLeftLines, lines, edges));
+    std::vector<std::string> between = linesBetween(mLeftText, text, edges);
+    mLeftText                        = std::move(text);
+    mPairs = carried(mPairs, true, static_cast<S32>(mLeftLines.size()), ALDiffSplice::lineMapBetween(mLeftLines, between, edges));
     // The runs open, by the first line of the right each hides: the right
     // is as it was.
     const std::vector<S32> opened = openedLines();
@@ -183,24 +200,25 @@ void ALDiffModel::setLeftText(std::string_view left)
     {
         // Nor what stood for what: lined up otherwise, compared afresh.
         mRanges.clear();
-        mMoveFinder.edited(true, edges.head, static_cast<S32>(mLeftLines.size()) - edges.tail, static_cast<S32>(lines.size()) - edges.tail);
-        mLeftLines = std::move(lines);
+        mMoveFinder.edited(true, edges.head, static_cast<S32>(mLeftLines.size()) - edges.tail, edges.head + static_cast<S32>(between.size()));
+        putBetween(mLeftLines, std::move(between), edges);
         build();
     }
     else
     {
-        resplice(true, std::move(lines), edges);
+        resplice(true, std::move(between), edges);
     }
     reopen(opened);
 }
 
-void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, const ALDiffEdit::Edges& edges)
+void ALDiffModel::resplice(bool given_left, std::vector<std::string> between, const ALDiffEdit::Edges& edges)
 {
     // Compared again where it changed (ALDiffSplice), else all of it: the
     // side changed by where it differs, the other the same throughout.
     std::vector<std::string>& side       = given_left ? mLeftLines : mRightLines;
     const S32                 was        = static_cast<S32>(side.size());
-    const S32                 moved      = static_cast<S32>(lines.size()) - was;
+    const S32                 lines      = edges.head + edges.tail + static_cast<S32>(between.size());
+    const S32                 moved      = lines - was;
     const bool                shown_left = given_left != mSwapped;
     const size_t              shown      = shown_left ? 0 : 1;
     // Where a grammar says how lines read, the regions the lines of the
@@ -211,8 +229,8 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> lines, cons
     const bool                           had        = regioned && (shown ? shownRegions().second : shownRegions().first);
     const std::vector<std::pair<S32, size_t>> read_before = had ? readFrom(shown, was - edges.tail, by_regions) : std::vector<std::pair<S32, size_t>>();
     // The moves' ids of the lines edited let go of, those after moved along.
-    mMoveFinder.edited(given_left, edges.head, was - edges.tail, static_cast<S32>(lines.size()) - edges.tail);
-    side = std::move(lines);
+    mMoveFinder.edited(given_left, edges.head, was - edges.tail, lines - edges.tail);
+    putBetween(side, std::move(between), edges);
     mRegions.reset();
     if (mMerge && !given_left)
     {

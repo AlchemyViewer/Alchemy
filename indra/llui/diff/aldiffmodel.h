@@ -498,11 +498,13 @@ private:
     void              build();
     void              rebuild();
     void              layout(const ALTextDiff::Options& options, const Relayout* again = nullptr);
-    // A side's lines made anew, its text already so: compared again only
-    // where it changed (ALDiffSplice) where that is enough, and laid out
-    // again only there -- there taking in the lines after it that now read
-    // otherwise by its grammar, as far as the last of them.
-    void              resplice(bool given_left, std::vector<std::string> lines, const ALDiffEdit::Edges& edges);
+    // A side's lines made anew, its text already so, by the lines between
+    // its edges, those before and after being the lines it has: compared
+    // again only where it changed (ALDiffSplice) where that is enough, and
+    // laid out again only there -- there taking in the lines after it that
+    // now read otherwise by its grammar, as far as the last of them. What
+    // is read of the side as it was is read before the lines are put in.
+    void              resplice(bool given_left, std::vector<std::string> between, const ALDiffEdit::Edges& edges);
     // The rows' lines of the right's text: side by side the column showing
     // it, inline the right's as shown, or swapped the left's.
     const std::vector<S32>& rightRows(Layout layout) const { return layout == Layout::Sides ? of(rightColumn()).lineOf : mInlineRows[mSwapped ? 0 : 1]; }
