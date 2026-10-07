@@ -243,4 +243,37 @@ namespace tut
         down.edited(edit);
         ensure("typing at its start keeps it", down.folded() == std::vector<S32>{ 1 });
     }
+
+    template<> template<>
+    void alfoldmodel_object::test<6>()
+    {
+        set_test_name("by syntax, open at a line: a bracket alone on its line under a header that opens a block of its own starts its own, once each, as the blocks have it");
+        const ALTextDocument doc("llSetLinkPrimitiveParamsFast(LINK_THIS,\n[\n    PRIM_COLOR, ALL_SIDES\n]);\n");
+        ALFoldModel          folds;
+        folds.setSyntax(
+            [&doc](S32 line, std::vector<ALFoldModel::Block>& out) {
+                const std::string& text = doc.line(line);
+                for (S32 i = 0; i < static_cast<S32>(text.size()); ++i)
+                {
+                    const char c = text[static_cast<size_t>(i)];
+                    if (c == '(' || c == '[')
+                    {
+                        out.push_back({ i, ALFoldModel::Event::Open });
+                    }
+                    else if (c == ')' || c == ']')
+                    {
+                        out.push_back({ i, ALFoldModel::Event::Close });
+                    }
+                }
+            },
+            [](S32) { return 1u; });
+        std::string out;
+        for (const ALFoldModel::Region& region : folds.regions(doc, 4))
+        {
+            out += (out.empty() ? "" : " ") + std::to_string(region.start) + "-" + std::to_string(region.end);
+        }
+        ensure_equals("the call's block from its line, the list's from its own", out, std::string("0-3 1-3"));
+        ensure("both open inside them, each once", folds.openAt(doc, 4, 2, 8) == std::vector<S32>({ 0, 1 }));
+        ensure("the innermost alone the list's", folds.openAt(doc, 4, 2, 1) == std::vector<S32>({ 1 }));
+    }
 }

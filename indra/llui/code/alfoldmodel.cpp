@@ -313,14 +313,11 @@ std::vector<S32> ALFoldModel::openAt(const ALTextDocument& doc, S32 tab_width, S
         mLines.clear();
         mValid = false;
     }
-    // Back from the line, innermost first: what opens with nothing after
-    // it closing it is open there.
-    S32 closes = 0;
-    for (S32 l = llmin(line, doc.lineCount()) - 1; l >= 0 && l >= line - reach && out.size() < most; --l)
-    {
-        const Line& entry = lineAt(doc, l);
-        bool        opens = false;
-        bool        first = false;
+    // Whether a line opens what nothing after it closes, walked back to with
+    // `closes` closers after it still to be matched, which it matches; and
+    // whether the outermost it leaves open opened the line.
+    const auto opensOn = [](const Line& entry, S32& closes, bool& first) {
+        bool opens = false;
         for (auto it = entry.blocks.rbegin(); it != entry.blocks.rend(); ++it)
         {
             if (it->event != Event::Close)
@@ -340,11 +337,22 @@ std::vector<S32> ALFoldModel::openAt(const ALTextDocument& doc, S32 tab_width, S
                 ++closes;
             }
         }
-        if (!opens)
+        return opens;
+    };
+    // Back from the line, innermost first: what opens with nothing after
+    // it closing it is open there.
+    S32 closes = 0;
+    for (S32 l = llmin(line, doc.lineCount()) - 1; l >= 0 && l >= line - reach && out.size() < most; --l)
+    {
+        bool first = false;
+        if (!opensOn(lineAt(doc, l), closes, first))
         {
             continue;
         }
-        // Opened on a line of its own: its header's line.
+        // Opened on a line of its own: its header's line, where that opens
+        // nothing of its own, as the blocks have it (bySyntax); else its
+        // own, the header's block the next one out. Only blank lines are
+        // between them, which close nothing.
         S32 start = l;
         if (first)
         {
@@ -353,7 +361,12 @@ std::vector<S32> ALFoldModel::openAt(const ALTextDocument& doc, S32 tab_width, S
             {
                 --header;
             }
-            start = header >= 0 ? header : l;
+            S32  after_header = closes;
+            bool header_first = false;
+            if (header >= 0 && !opensOn(lineAt(doc, header), after_header, header_first))
+            {
+                start = header;
+            }
         }
         out.insert(out.begin(), start);
     }
