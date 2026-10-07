@@ -3399,4 +3399,31 @@ namespace tut
         e.pump();
         ensure("lexed to its end, the next frame lets go of the fold whose block went", !e.isFolded(2) && !e.layout().anyHidden());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<91>()
+    {
+        set_test_name("Return at the end of a folded header opens the block the line it makes goes into, the caret on that line in sight");
+        ALCodeEditor& e = make("foo() {\n    x();\n}\nbar()");
+        ensure("folds", e.foldAt(0));
+        ensure("its lines hidden", e.layout().hidden(1) && e.layout().hidden(2) && !e.layout().hidden(3));
+        e.setCaret(e.document().lineEnd(0));
+        key(KEY_RETURN);
+        ensure_equals("the header as it was", e.document().line(0), std::string("foo() {"));
+        ensure_equals("the caret on the line made", e.caret().line, 1);
+        ensure("the block opened", !e.isFolded(0));
+        ensure("the caret's line in sight, and the rest of the block", !e.layout().hidden(1) && !e.layout().anyHidden());
+
+        // The brace under the header: the line made between them is the
+        // block's too, the header found past it.
+        ALCodeEditor& f = make("f()\n{\n    x();\n}\ng()");
+        ensure("folds", f.foldAt(0));
+        ensure("its lines hidden", f.layout().hidden(1) && f.layout().hidden(3) && !f.layout().hidden(4));
+        f.setCaret(f.document().lineEnd(0));
+        key(KEY_RETURN);
+        ensure_equals("the brace a line down", f.document().line(2), std::string("{"));
+        ensure_equals("the caret on the line made", f.caret().line, 1);
+        ensure("the block opened", !f.isFolded(0));
+        ensure("the caret's line in sight, and the rest of the block", !f.layout().hidden(1) && !f.layout().anyHidden());
+    }
 }

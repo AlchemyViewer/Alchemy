@@ -877,7 +877,8 @@ private:
     void              ensureRegions();
     void              applyFolds();
     // The folds hidden again once, after an edit command or before a draw,
-    // rather than inside every edit.
+    // rather than inside every edit; a folded block that holds a caret then
+    // opened.
     void              settleFolds();
     void              editsDone() override { settleFolds(); }
     bool              mFoldsDirty = false;

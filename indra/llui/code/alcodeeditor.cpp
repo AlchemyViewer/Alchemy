@@ -2036,6 +2036,28 @@ void ALCodeEditor::settleFolds()
     if (mFoldsDirty && (!folds().hasSyntax() || highlighter().lexSome()))
     {
         applyFolds();
+        // The edits put the carets down while the layout showed every line
+        // they made, so none was on a hidden line then; one a folded block
+        // now holds -- a line broken at a folded header's end -- opens it,
+        // as a caret moved onto a hidden line does.
+        if (layout().anyHidden())
+        {
+            const std::vector<ALTextRange>& others = otherSelections();
+            std::vector<S32>                lines;
+            lines.reserve(others.size() + 1);
+            lines.push_back(caret().line);
+            for (const ALTextRange& other : others)
+            {
+                lines.push_back(other.end.line);
+            }
+            for (const S32 line : lines)
+            {
+                if (layout().hiddenBy(line, ALTextLayout::HiddenBy::Folds))
+                {
+                    revealLine(line);
+                }
+            }
+        }
     }
 }
 
