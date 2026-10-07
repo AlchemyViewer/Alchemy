@@ -38,6 +38,7 @@
 #include "Luau/BytecodeUtils.h"
 #include "Luau/Compiler.h"
 #include "Luau/LSLCompiler.h"
+#include "luacode.h"
 #include "Luau/ParseResult.h"
 #include "Luau/Parser.h"
 
@@ -598,14 +599,17 @@ namespace ALScriptWeigh
     ALScriptWeight slua(std::string_view source)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-        // Compiled as the grid compiles it, with SLua's flags.
+        // Compiled as the grid compiles it, with SLua's flags, and LSL's
+        // constants folded where they are read: a constant is a value in
+        // the bytecode, not a global looked up.
         ALLuauService::setUpProcess();
         ALScriptWeight weight;
         weight.target = ALScriptWeight::Target::SLua;
         weight.limit  = ALScriptWeight::limitOf(weight.target);
         Luau::CompileOptions options;
-        options.optimizationLevel = SLUA_OPTIMIZATION_LEVEL;
-        options.debugLevel        = SLUA_DEBUG_LEVEL;
+        options.optimizationLevel       = SLUA_OPTIMIZATION_LEVEL;
+        options.debugLevel              = SLUA_DEBUG_LEVEL;
+        options.libraryMemberConstantCb = &luauSL_lookup_constant_cb;
         std::string asset;
         try
         {

@@ -45,6 +45,7 @@
 
 #include "Luau/AstQuery.h"
 #include "Luau/BuiltinDefinitions.h"
+#include "Luau/LSLBuiltins.h"
 #include "Luau/Cancellation.h"
 #include "Luau/Error.h"
 #include "Luau/Frontend.h"
@@ -910,6 +911,9 @@ void ALLuauService::setUpProcess()
         // integer type and library among them, which the grid's
         // definitions name.
         Luau::setRequiredSLuaFlags();
+        // The LSL constants the grid's compiler folds, as its own harness
+        // loads them: SLua's embedded builtins, of the same commit.
+        luauSL_init_global_builtins(nullptr);
         // A type in a message is a glance, not a listing: `ll` has
         // hundreds of fields, and an error naming it must not print them
         // all.
