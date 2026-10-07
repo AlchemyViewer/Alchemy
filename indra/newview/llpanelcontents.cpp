@@ -116,6 +116,7 @@ LLPanelContents::LLPanelContents()
 
 LLPanelContents::~LLPanelContents()
 {
+    mSimulatorFeaturesConnection.disconnect();
     // Children all cleaned up by default view destructor.
 }
 
@@ -135,6 +136,7 @@ void LLPanelContents::getState(LLViewerObject *objectp )
 {
     if( !objectp )
     {
+        mSimulatorFeaturesConnection.disconnect();
         mLastScriptObjectID.setNull();
         getChildView("button new script")->setEnabled(false);
         getChildView("button new notecard")->setEnabled(false);
@@ -204,11 +206,20 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     // default a freshly selected object's new script to the region's language.
     LLViewerRegion* region = objectp->getRegion();
     bool lua_enabled = isLuaEnabledForObjectRegion(objectp);
+    // A region's features can come after its object is selected: asked
+    // again once they have, or the choice would stay LSL with SLua off.
+    mSimulatorFeaturesConnection.disconnect();
+    if (region && !region->simulatorFeaturesReceived())
+    {
+        mSimulatorFeaturesConnection = region->setSimulatorFeaturesReceivedCallback(
+            boost::bind(&LLPanelContents::onSimulatorFeaturesReceived, this, _1));
+    }
     LLComboBox* new_script = getChild<LLComboBox>("button new script");
     new_script->setEnabledByValue("lua", lua_enabled);
     if (mLastScriptObjectID != objectp->getID() || mLastLuaRegion != lua_enabled)
     {
-        new_script->setValue(lua_enabled ? "lua" : "lsl");
+        mNewScriptIsLua = lua_enabled;
+        new_script->setValue(mNewScriptIsLua ? "lua" : "lsl");
     }
     mLastScriptObjectID = objectp->getID();
     mLastLuaRegion = lua_enabled;
@@ -244,6 +255,11 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     {
         mPublishButton->setToggleState(false);
     }
+}
+
+void LLPanelContents::onSimulatorFeaturesReceived(const LLUUID&)
+{
+    refresh();
 }
 
 void LLPanelContents::onFilterEdit()
@@ -352,15 +368,18 @@ void LLPanelContents::onNewScriptFlyoutCommit(LLUICtrl* ctrl)
     }
 // [/RLVa:KB]
 
-    U8 script_language = isLuaEnabledForObjectRegion(object) ? SST_LUA : SST_LSL;
+    // The button itself says nothing, the list deselected as it is
+    // clicked: it makes what was last picked, or the region's language.
     if (value == "lua")
     {
-        script_language = SST_LUA;
+        mNewScriptIsLua = true;
     }
     else if (value == "lsl")
     {
-        script_language = SST_LSL;
+        mNewScriptIsLua = false;
     }
+    ctrl->setValue(mNewScriptIsLua ? "lua" : "lsl");
+    const U8 script_language = mNewScriptIsLua ? SST_LUA : SST_LSL;
 
     // template_id is an inventory item UUID of a script in the user's
     // inventory pulled from per account settings. The sim should fallback

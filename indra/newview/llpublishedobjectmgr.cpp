@@ -67,44 +67,52 @@ namespace
         return std::string(s);
     }
 
-    std::string get_prim_name(LLViewerObject* obj)
+    // What the prim is called, where the viewer has been told: its own
+    // name, or what its selection heard. Empty where neither has come.
+    std::string known_prim_name(LLViewerObject* obj)
     {
         std::string name = nv_string(obj, "Name");
-        if (!name.empty())
+        if (!name.empty() || !obj)
         {
             return name;
         }
 
+        LLSelectNode* node = LLSelectMgr::instance().getSelection()->findNode(obj);
+        return node ? node->mName : std::string();
+    }
+
+    // What a prim is called until its name comes, which for a child is
+    // only with an ObjectProperties reply, and those go to a selection.
+    // Said by its place in the linkset, so a placeholder is never kept:
+    // the places move as the linkset changes.
+    std::string placeholder_prim_name(S32 link_number)
+    {
+        return (link_number > 1) ? llformat("Link #%d", link_number) : std::string("Object");
+    }
+
+    std::string get_prim_name(LLViewerObject* obj, S32 link_number = 1)
+    {
         if (!obj)
         {
             return std::string();
         }
+        const std::string name = known_prim_name(obj);
+        return name.empty() ? placeholder_prim_name(link_number) : name;
+    }
 
-        LLSelectNode* node = LLSelectMgr::instance().getSelection()->findNode(obj);
-        if (node && !node->mName.empty())
-        {
-            return node->mName;
-        }
-
-        // Never emit an empty prim/object name to downstream tooling.
-        return obj->getID().asString();
+    // A prim as kept: its name where one came, its placeholder where not.
+    std::string kept_prim_name(const LLPublishedObjectMgr::PublishedPrimInfo& prim_info)
+    {
+        return prim_info.mPrimName.empty() ? placeholder_prim_name(prim_info.mLinkNumber) : prim_info.mPrimName;
     }
 
     void add_object_permissions(LLSD& object_data, LLViewerObject* object)
     {
-        LLPermissions* permissions =
-            LLSelectMgr::getInstance()->findObjectPermissions(object);
-        if (!permissions)
+        LLSD permissions = LLPublishedObjectMgr::getObjectPermissionsLLSD(object);
+        if (permissions.isDefined())
         {
-            return;
+            object_data["permissions"] = permissions;
         }
-
-        LLSD permission_entry;
-        permission_entry["owner"] =
-            static_cast<S32>(permissions->getMaskOwner());
-        permission_entry["next_owner"] =
-            static_cast<S32>(permissions->getMaskNextOwner());
-        object_data["permissions"] = permission_entry;
     }
 }
 
@@ -384,6 +392,59 @@ LLSD LLPublishedObjectMgr::buildPrimInventoryLLSD(LLViewerObject* object) const
     return items;
 }
 
+LLSD LLPublishedObjectMgr::makePermissionsLLSD(U32 owner_mask, U32 next_owner_mask)
+{
+    LLSD permissions;
+    permissions["owner"]      = static_cast<S32>(owner_mask);
+    permissions["next_owner"] = static_cast<S32>(next_owner_mask);
+    return permissions;
+}
+
+LLSD LLPublishedObjectMgr::getObjectPermissionsLLSD(LLViewerObject* object)
+{
+    if (!object)
+    {
+        return LLSD();
+    }
+
+    LLPermissions* permissions =
+        LLSelectMgr::getInstance()->findObjectPermissions(object);
+    if (permissions)
+    {
+        return makePermissionsLLSD(permissions->getMaskOwner(), permissions->getMaskNextOwner());
+    }
+
+    // Unselected prims carry no LLPermissions, but object flags still hold this agent's rights.
+    // next_owner is unavailable from flags and is omitted until ObjectProperties arrives.
+    U32 owner_mask = 0;
+    if (object->permModify())   { owner_mask |= PERM_MODIFY; }
+    if (object->permCopy())     { owner_mask |= PERM_COPY; }
+    if (object->permTransfer()) { owner_mask |= PERM_TRANSFER; }
+    if (object->permMove())     { owner_mask |= PERM_MOVE; }
+
+    LLSD permission_entry;
+    permission_entry["owner"] = static_cast<S32>(owner_mask);
+    return permission_entry;
+}
+
+bool LLPublishedObjectMgr::computeCanSaveBack(LLViewerObject* root, LLUUID& source_task_id)
+{
+    source_task_id.setNull();
+    if (!root || root->isAttachment())
+    {
+        return false;
+    }
+
+    LLSelectNode* node = LLSelectMgr::instance().getSelection()->findNode(root);
+    if (!node || !node->mValid || node->mFromTaskID.isNull())
+    {
+        return false;
+    }
+
+    source_task_id = node->mFromTaskID;
+    return true;
+}
+
 LLSD LLPublishedObjectMgr::buildPublishedObjectLLSD(LLViewerObject* root) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
@@ -410,12 +471,13 @@ LLSD LLPublishedObjectMgr::buildPublishedObjectLLSD(LLViewerObject* root) const
     {
         LLSD link;
         link["link_id"]          = child->getID();
-        link["link_number"]      = link_number++;
-        link["link_name"]        = get_prim_name(child);
+        link["link_number"]      = link_number;
+        link["link_name"]        = get_prim_name(child, link_number);
         link["link_description"] = nv_string(child, "Desc");
         add_object_permissions(link, child);
         link["inventory"]        = buildPrimInventoryLLSD(child);
         linked_objects.append(link);
+        ++link_number;
     }
     if (linked_objects.size() > 0)
     {
@@ -468,7 +530,7 @@ LLSD LLPublishedObjectMgr::buildObjectListLLSD() const
             LLSD link;
             link["link_id"]     = prim_info.mPrimID;
             link["link_number"] = prim_info.mLinkNumber;
-            link["link_name"]   = prim_info.mPrimName;
+            link["link_name"]   = kept_prim_name(prim_info);
             link["link_description"] = prim_info.mPrimDescription;
             add_object_permissions(link, child);
             link["inventory"]   = buildPrimInventoryLLSD(child);
@@ -507,10 +569,10 @@ bool LLPublishedObjectMgr::buildLinksetUpdateLLSD(
         entry["link_number"] = prim_info.mLinkNumber;
 
         LLViewerObject* prim = gObjectList.findObject(prim_info.mPrimID);
-        std::string link_name = prim ? get_prim_name(prim) : std::string();
+        std::string link_name = prim ? known_prim_name(prim) : std::string();
         if (link_name.empty())
         {
-            link_name = prim_info.mPrimName;
+            link_name = kept_prim_name(prim_info);
         }
         std::string link_desc = prim ? nv_string(prim, "Desc") : std::string();
         if (link_desc.empty())
@@ -552,7 +614,7 @@ bool LLPublishedObjectMgr::reconcileLinksetChildAdded(
 
     PublishedPrimInfo prim_info;
     prim_info.mPrimID          = child_id;
-    prim_info.mPrimName        = get_prim_name(child);
+    prim_info.mPrimName        = known_prim_name(child);
     prim_info.mPrimDescription = nv_string(child, "Desc");
     prim_info.mLinkNumber      = static_cast<S32>(info->mPrims.size()) + 1;
     prim_info.mInventorySerial = -1;
@@ -674,7 +736,10 @@ LLPublishedObjectMgr::reconcileInventoryChanged(
         {
             if (p.mPrimID == prim_id)
             {
-                p.mPrimName        = get_prim_name(prim);
+                if (std::string name = known_prim_name(prim); !name.empty())
+                {
+                    p.mPrimName = name;
+                }
                 p.mPrimDescription = nv_string(prim, "Desc");
                 p.mInventorySerial = 0;
                 break;
@@ -741,25 +806,37 @@ bool LLPublishedObjectMgr::applyPropertyChange(
 
     if (prim_id == root_id)
     {
-        bool has_name = !name.empty();
-        bool name_changed = has_name && (pub_info->mObjectName != name);
-        bool desc_changed = (pub_info->mObjectDescription != desc);
-        if (!name_changed && !desc_changed)
-        {
-            return false;
-        }
+        bool changed = false;
 
-        if (name_changed)
+        if (!name.empty() && pub_info->mObjectName != name)
         {
             pub_info->mObjectName = name;
             update["object_name"] = name;
+            changed = true;
         }
-        if (desc_changed)
+        if (pub_info->mObjectDescription != desc)
         {
             pub_info->mObjectDescription = desc;
             update["object_description"] = desc;
+            changed = true;
         }
-        return true;
+
+        // Properties arrive after publish, so this field is backfilled here.
+        LLViewerObject* root = gObjectList.findObject(root_id);
+        if (root)
+        {
+            LLUUID source_task_id;
+            const bool can_save_back = computeCanSaveBack(root, source_task_id);
+            if (can_save_back != pub_info->mCanSaveBackToContents)
+            {
+                pub_info->mCanSaveBackToContents = can_save_back;
+                pub_info->mSourceTaskID = source_task_id;
+                update["can_save_back"] = can_save_back;
+                changed = true;
+            }
+        }
+
+        return changed;
     }
 
     auto prim_it = std::find_if(pub_info->mPrims.begin(), pub_info->mPrims.end(),
@@ -787,6 +864,61 @@ bool LLPublishedObjectMgr::applyPropertyChange(
         prim_it->mPrimDescription = desc;
         modified_entry["link_description"] = desc;
     }
+    LLSD modified_arr = LLSD::emptyArray();
+    modified_arr.append(modified_entry);
+    update["changes"]["linked_objects"]["modified"] = modified_arr;
+    return true;
+}
+
+bool LLPublishedObjectMgr::applyPermissionsChange(
+    const LLUUID& root_id,
+    const LLUUID& prim_id,
+    const LLUUID& owner_id,
+    U32 owner_mask,
+    U32 next_owner_mask,
+    LLSD& update)
+{
+    PublishedObjectInfo* pub_info = getPublished(root_id);
+    if (!pub_info)
+    {
+        return false;
+    }
+
+    const LLSD permissions = makePermissionsLLSD(owner_mask, next_owner_mask);
+
+    update = LLSD();
+    update["object_id"] = root_id;
+
+    if (prim_id == root_id)
+    {
+        bool changed = false;
+        if (!llsd_equals(permissions, pub_info->mPermissions))
+        {
+            pub_info->mPermissions = permissions;
+            update["permissions"] = permissions;
+            changed = true;
+        }
+        if (owner_id.notNull() && pub_info->mOwnerID != owner_id)
+        {
+            pub_info->mOwnerID = owner_id;
+            update["owner_id"] = owner_id;
+            changed = true;
+        }
+        return changed;
+    }
+
+    auto prim_it = std::find_if(pub_info->mPrims.begin(), pub_info->mPrims.end(),
+        [&](const PublishedPrimInfo& p) { return p.mPrimID == prim_id; });
+    if (prim_it == pub_info->mPrims.end() || llsd_equals(permissions, prim_it->mPermissions))
+    {
+        return false;
+    }
+
+    prim_it->mPermissions = permissions;
+
+    LLSD modified_entry;
+    modified_entry["link_id"]     = prim_id;
+    modified_entry["permissions"] = permissions;
     LLSD modified_arr = LLSD::emptyArray();
     modified_arr.append(modified_entry);
     update["changes"]["linked_objects"]["modified"] = modified_arr;
@@ -1049,24 +1181,14 @@ void LLPublishedObjectMgr::buildAndSendPublish(const LLUUID& object_id)
     info.mOwnerID           = root->mOwnerID;
     info.mObjectName        = pub["object_name"].asString();
     info.mObjectDescription = pub["object_description"].asString();
+    info.mPermissions       = getObjectPermissionsLLSD(root);
     if (root->getRegion())
     {
         info.mRegionName = root->getRegion()->getName();
     }
-    LLSelectNode* root_select_node = LLSelectMgr::instance().getSelection()->findNode(root);
-    if (root_select_node
-        && root_select_node->mValid
-        && !root_select_node->mFromTaskID.isNull()
-        && !root->isAttachment())
-    {
-        info.mCanSaveBackToContents = true;
-        info.mSourceTaskID = root_select_node->mFromTaskID;
-    }
-    else
-    {
-        info.mCanSaveBackToContents = false;
-        info.mSourceTaskID.setNull();
-    }
+    LLUUID source_task_id;
+    info.mCanSaveBackToContents = computeCanSaveBack(root, source_task_id);
+    info.mSourceTaskID          = source_task_id;
 
     // Each prim's inventory as the publish sends it, for what changes later
     // to be told from what does not.
@@ -1085,9 +1207,10 @@ void LLPublishedObjectMgr::buildAndSendPublish(const LLUUID& object_id)
     {
         LLPublishedObjectMgr::PublishedPrimInfo prim_info;
         prim_info.mPrimID          = prim->getID();
-        prim_info.mPrimName        = LLScriptEditorWSServer::getPrimName(prim);  // Use helper with selection fallback
+        prim_info.mPrimName        = known_prim_name(prim);
         prim_info.mLinkNumber      = link_num++;
         prim_info.mInventorySerial = static_cast<S16>(prim->getInventorySerial());
+        prim_info.mPermissions     = getObjectPermissionsLLSD(prim);
         if (const auto sent = sent_inventories.find(prim_info.mPrimID); sent != sent_inventories.end())
         {
             prim_info.mSentInventory = sent->second;
@@ -1117,7 +1240,7 @@ void LLPublishedObjectMgr::buildAndSendPublish(const LLUUID& object_id)
                 });
             if (prim_it != published_info.mPrims.end())
             {
-                linked_objects[i]["link_name"] = prim_it->mPrimName;
+                linked_objects[i]["link_name"] = kept_prim_name(*prim_it);
                 linked_objects[i]["link_description"] = prim_it->mPrimDescription;
             }
         }
@@ -1132,12 +1255,9 @@ void LLPublishedObjectMgr::buildAndSendPublish(const LLUUID& object_id)
         << " (" << pub["object_name"].asString() << ") with "
         << (prims.size() - 1) << " linked prim(s)" << LL_ENDL;
 
-    // Re-request object properties now that the object is published so
-    // onObjectPropertyChanged can emit object.update for root and linked prims.
-    for (LLViewerObject* prim : prims)
-    {
-        LLSelectMgr::instance().requestObjectPropertiesFamily(prim);
-    }
+    // Re-request now that the object is published so onObjectPropertyChanged can emit
+    // object.update. The sim answers per linkset, so only the root needs asking.
+    LLSelectMgr::instance().requestObjectPropertiesFamily(root);
 }
 
 void LLPublishedObjectMgr::onLinksetChildAdded(const LLUUID& root_id, LLViewerObject* child)
@@ -1293,5 +1413,22 @@ void LLPublishedObjectMgr::onObjectPropertyChanged(
         prim->dirtyInventory();
         setInventoryRequestStart(prim_id, LLTimer::getTotalSeconds().value());
         prim->requestInventory();
+    }
+}
+
+void LLPublishedObjectMgr::onObjectPermissionsReceived(
+    const LLUUID& prim_id, const LLUUID& owner_id, U32 owner_mask, U32 next_owner_mask)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    LLViewerObject* prim = gObjectList.findObject(prim_id);
+    if (!prim)
+    {
+        return;
+    }
+
+    LLSD update;
+    if (applyPermissionsChange(prim->getRootEdit()->getID(), prim_id, owner_id, owner_mask, next_owner_mask, update))
+    {
+        mServer->notifyAll("object.update", update);
     }
 }

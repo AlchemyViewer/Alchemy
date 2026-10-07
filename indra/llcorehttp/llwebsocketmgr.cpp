@@ -932,6 +932,7 @@ bool LLWebsocketMgr::WSServer::start()
     // Start the server thread
     mServerThread = std::thread([this]() {
         set_thread_fp_mode();
+        LL_PROFILER_SET_THREAD_NAME(mServerName.c_str());
         LL_INFOS("WebSocket") << "WebSocket server thread starting for: " << mServerName << LL_ENDL;
         mImpl->run();
         LL_INFOS("WebSocket") << "WebSocket server thread exiting for: " << mServerName << LL_ENDL;

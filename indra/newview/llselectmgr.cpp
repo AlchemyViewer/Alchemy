@@ -6445,6 +6445,7 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
         if (ws_server)
         {
             ws_server->onObjectPropertyChanged(id, name, desc, inv_serial);
+            ws_server->onObjectPermissionsReceived(id, owner_id, owner_mask, next_owner_mask);
         }
     }
 
@@ -6545,6 +6546,7 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
     if (auto ws_server = LLScriptEditorWSServer::getServer())
     {
         ws_server->onObjectPropertyChanged(id, name, desc);
+        ws_server->onObjectPermissionsReceived(id, owner_id, owner_mask, next_owner_mask);
     }
 }
 
