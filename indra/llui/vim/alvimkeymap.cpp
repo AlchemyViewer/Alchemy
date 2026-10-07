@@ -2003,12 +2003,6 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     Span            span;
     const ALTextPos from = cursor(view);
     span.range           = ALTextRange(from, m.to).normalised();
-    // A word motion under an operator stops at the line's end rather
-    // than reaching the next line's first word.
-    if ((ch == 'w' || ch == 'W') && span.range.end.line > from.line && !m.linewise)
-    {
-        span.range.end = d.lineEnd(from.line);
-    }
     if (m.inclusive)
     {
         span.range.end = d.nextCluster(span.range.end);
@@ -2790,7 +2784,14 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             const bool big = ch == 'W';
             for (S32 n = 0; n < count; ++n)
             {
-                const S32 cls = classOf(at(d, m.to), big);
+                // Under an operator the last word moved over ends at its
+                // line's end, as vim's does: dw on a line's last word leaves
+                // the line break, where d2w from there goes on to take the
+                // next line's first word. A step that starts at a line's
+                // end -- an empty line's -- takes the break.
+                const bool      last  = mOperator != 0 && n + 1 == count;
+                const ALTextPos start = m.to;
+                const S32       cls   = classOf(at(d, m.to), big);
                 if (cls != 0)
                 {
                     while (!atLineEnd(d, m.to) && classOf(at(d, m.to), big) == cls)
@@ -2804,12 +2805,12 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                 {
                     if (atLineEnd(d, m.to))
                     {
-                        if (m.to.line + 1 >= d.lineCount())
+                        if (m.to.line + 1 >= d.lineCount() || (last && m.to != start))
                         {
                             break;
                         }
                         m.to = ALTextPos(m.to.line + 1, 0);
-                        if (d.lineLength(m.to.line) == 0)
+                        if (last || d.lineLength(m.to.line) == 0)
                         {
                             break;
                         }

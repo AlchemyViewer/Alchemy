@@ -2919,4 +2919,19 @@ namespace tut
         keys("c2wX<Esc>");
         ensure_equals("c2w from there: the word it ends and the next", e.document().line(2), std::string("aX ef"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<100>()
+    {
+        set_test_name("an operator's words go on across a line's end where the count does: only the last word stops at its line's end");
+        ALCodeEditor& e = make("one\ntwo three\nx\nab cd\nef gh\n");
+        keys("d2w");
+        ensure_equals("d2w takes the line's word, the break and the next line's first word", flat(e.text()), std::string("three|x|ab cd|ef gh|"));
+        e.setCaret(ALTextPos(2, 3));
+        keys("c2wX<Esc>");
+        ensure_equals("c2w changes through the next line's first word", flat(e.text()), std::string("three|x|ab X gh|"));
+        e.setCaret(ALTextPos(0, 0));
+        keys("y3w");
+        ensure_equals("y3w yanks three words across two line breaks", vim->registerText('0'), std::string("three\nx\nab "));
+    }
 }
