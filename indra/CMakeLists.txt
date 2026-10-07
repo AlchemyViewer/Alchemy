@@ -21,15 +21,9 @@ set(AL_CHANNEL "Alchemy Test" CACHE STRING "Viewer Channel Name")
 set(AL_GRID agni CACHE STRING "Target Grid")
 
 # The Velopack update client in the viewer, and the velopack target that
-# packs the installer and the update feed; see cmake/ViewerPackage.cmake.
-# Windows and macOS ship through it; Linux does not.
-cmake_dependent_option(
-  AL_USE_VELOPACK
-  "Build the Velopack update client and the velopack packaging target"
-  OFF
-  "WIN32 OR APPLE"
-  OFF
-)
+# packs the installer, or on Linux the AppImage, and the update feed; see
+# cmake/ViewerPackage.cmake.
+option(AL_USE_VELOPACK "Build the Velopack update client and the velopack packaging target" OFF)
 
 # Build executable options
 option(AL_BUILD_VIEWER "Build the viewer project" ON)

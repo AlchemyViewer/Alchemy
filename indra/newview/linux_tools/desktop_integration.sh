@@ -15,13 +15,21 @@
 # when the system already has an entry or AL_NO_DESKTOP_INTEGRATION is set.
 #
 # The tree carries the entry and icons under share/, as a package installs
-# them under /usr/share; the copy made here runs this tree's launcher.
+# them under /usr/share; the copy made here runs this tree's launcher. Run
+# from an AppImage, whose tree is mounted somewhere new each time, it runs
+# the AppImage instead, which Velopack updates in place.
 
 set -euo pipefail
 
 script=$(readlink -f -- "${BASH_SOURCE[0]}")
 prefix=$(dirname -- "$(dirname -- "$script")")
 launcher="$prefix/alchemy"
+# What the entry runs and is recorded as pointing at.
+origin="$prefix"
+if [[ -n ${APPIMAGE:-} && -f $APPIMAGE && -n ${APPDIR:-} && $prefix == "$APPDIR"/* ]]; then
+    launcher=$APPIMAGE
+    origin=$APPIMAGE
+fi
 
 shopt -s nullglob
 entries=("$prefix"/share/applications/*.desktop)
@@ -94,8 +102,8 @@ update_caches()
 do_install()
 {
     local data=$1 scope=$2
-    if [[ $prefix == *$'\n'* ]]; then
-        echo "Cannot add a tree whose path holds a newline: $prefix" >&2
+    if [[ $origin == *$'\n'* ]]; then
+        echo "Cannot add a viewer whose path holds a newline: $origin" >&2
         exit 1
     fi
 
@@ -115,7 +123,7 @@ do_install()
                 printf '%s\n' "$line"
             fi
         done <"$template"
-        printf 'X-Alchemy-Install=%s\n' "${prefix//\\/\\\\}"
+        printf 'X-Alchemy-Install=%s\n' "${origin//\\/\\\\}"
     } >"$tmp"
     chmod 644 -- "$tmp"
     mv -f -- "$tmp" "$entry"
@@ -158,7 +166,7 @@ do_refresh()
         # One the user wrote, or one pointing here already, stays as it is.
         local installed
         installed=$(entry_install "$entry")
-        if [[ -z $installed || $installed == "$prefix" ]]; then
+        if [[ -z $installed || $installed == "$origin" ]]; then
             return 0
         fi
     else

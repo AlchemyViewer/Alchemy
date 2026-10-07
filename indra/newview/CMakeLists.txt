@@ -1903,8 +1903,8 @@ if(AL_BUILD_VIEWER)
   endif()
 
   if(LINUX)
-    list(APPEND viewer_SOURCES llappviewersdl.cpp)
-    list(APPEND viewer_HEADERS llappviewersdl.h)
+    list(APPEND viewer_SOURCES llappviewersdl.cpp llvelopack.cpp)
+    list(APPEND viewer_HEADERS llappviewersdl.h llvelopack.h)
   endif()
 
   # The crash reporter's body, where its SDK is.

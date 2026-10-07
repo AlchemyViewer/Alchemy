@@ -756,7 +756,7 @@ void clear_nsis_links(const std::string& nsis_folder_path)
     }
 
     // 3. Taskbar links, which are user-specific and located at:
-    // %AppData%\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\
+    // %AppData%\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar
     // Note that it can be a link to velopack already or to a different NSIS viewer.
     // Name might also be different based on method of creation.
     if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_APPDATA, NULL, 0, path)))
@@ -1095,7 +1095,17 @@ static void on_log_message(void* user_data, const char* level, const char* messa
     LL_INFOS("Velopack") << "[" << level << "] " << message << LL_ENDL;
 }
 
-#endif // LL_WINDOWS / LL_DARWIN
+#elif LL_LINUX
+
+// Linux has no install hooks: the AppImage is the installation, and its
+// launcher adds it to the desktop (linux_tools/desktop_integration.sh).
+
+static void on_log_message(void* user_data, const char* level, const char* message)
+{
+    LL_INFOS("Velopack") << "[" << level << "] " << message << LL_ENDL;
+}
+
+#endif // LL_WINDOWS / LL_DARWIN / LL_LINUX
 
 //
 // Common progress callback
@@ -1248,6 +1258,10 @@ static void ensure_update_manager(bool allow_downgrade)
 
     // Windows: Velopack auto-detection works because the viewer is installed
     // by Velopack's Setup.exe which creates the proper install structure.
+    // Linux: it works from the AppImage, whose usr/bin holds the updater and
+    // the manifest and whose path is $APPIMAGE. A tree from the archive or a
+    // system package is not Velopack's, and finds no update manager: the
+    // package manager updates it.
     if (!vpkc_new_update_manager_with_source(sUpdateSource, &options, nullptr, &sUpdateManager))
     {
         char err[512];

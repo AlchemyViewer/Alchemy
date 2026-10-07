@@ -58,9 +58,10 @@
 #include "llwin32headers.h"     // GetCommandLineW
 #include "llappviewerwin32.h"   // LLAppViewerWin32, create_app_mutex, NVAPI session helpers
 #include <shlwapi.h>            // PathGetArgsW
+#endif
+
 #if LL_VELOPACK
 #include "llvelopack.h"
-#endif
 #endif
 
 #if LL_DARWIN
@@ -349,9 +350,10 @@ finally:
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
-#if LL_WINDOWS && LL_VELOPACK
+#if (LL_WINDOWS || LL_LINUX) && LL_VELOPACK
     // Velopack MUST be initialized first - it may handle install/uninstall
-    // commands and exit the process before we do anything else.
+    // commands and exit the process before we do anything else. On Linux it
+    // has no hooks to run, and finds the AppImage it updates, if any.
     if (!velopack_initialize())
     {
         // Velopack handled the invocation (install/uninstall hook); exit

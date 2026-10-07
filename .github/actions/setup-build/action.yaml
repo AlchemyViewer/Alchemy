@@ -135,8 +135,8 @@ runs:
       shell: bash
       run: ./vcpkg/bootstrap-vcpkg.sh
 
-    # Corrosion builds velopack_libc where Velopack ships, Windows and macOS,
-    # from the crates indra/rust/Cargo.lock names. They come from the cache:
+    # Corrosion builds velopack_libc, which every platform ships, from the
+    # crates indra/rust/Cargo.lock names. They come from the cache:
     # only what cargo downloads, the index and the .crate archives, as it
     # unpacks the sources itself and the unpacked tree would be most of what
     # a restore costs on Windows. On a miss they are fetched and saved at
@@ -144,7 +144,6 @@ runs:
     # cargo, and would save an empty registry under the key.
     - name: Restore the Rust crates
       id: crates
-      if: runner.os != 'Linux'
       uses: actions/cache/restore@v6
       with:
         path: |
@@ -153,12 +152,12 @@ runs:
         key: cargo-${{ runner.os }}-${{ hashFiles('indra/rust/Cargo.lock') }}
 
     - name: Fetch the Rust crates
-      if: runner.os != 'Linux' && steps.crates.outputs.cache-hit != 'true'
+      if: steps.crates.outputs.cache-hit != 'true'
       shell: bash
       run: cargo fetch --locked --manifest-path indra/rust/Cargo.toml
 
     - name: Save the Rust crates
-      if: runner.os != 'Linux' && steps.crates.outputs.cache-hit != 'true'
+      if: steps.crates.outputs.cache-hit != 'true'
       uses: actions/cache/save@v6
       with:
         path: |

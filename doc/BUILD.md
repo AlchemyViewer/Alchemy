@@ -19,8 +19,8 @@ Every platform needs a C++ toolchain plus:
 
 - **CMake** 4.0+
 - **Git**
-- **Rust** — only for the Velopack update client (`-DAL_USE_VELOPACK=ON`, Windows and macOS), whose C API the build compiles from `indra/rust`
-- **.NET SDK** — only for Velopack installers
+- **Rust** — only for the Velopack update client (`-DAL_USE_VELOPACK=ON`), whose C API the build compiles from `indra/rust`
+- **.NET SDK** — only for Velopack installers; on Linux the AppImage also needs `mksquashfs` (`squashfs-tools`)
 - **Python** 3 — only for the tests that spawn a Python peer (see [Running tests](#running-tests))
 
 Install commands are platform-specific; see below.
@@ -477,7 +477,9 @@ cpack --config build-<OS>-<preset>/CPackSourceConfig.cmake
 
 (or the `package_source` target under Ninja). Uncommitted changes are not in it, and cpack says so.
 
-The Windows installer and the update packages for Windows and macOS come from [Velopack](https://velopack.io): configure with `-DAL_USE_VELOPACK=ON`, run `dotnet tool restore` once so the `vpk` tool is available, and build the `velopack` target. It installs into `newview/velopack/<Config>/app` and writes the update feed, and on Windows the installer, to `newview/velopack/<Config>/Releases`. Each platform and architecture has its own Velopack channel, named for its runtime, since an installed viewer updates from its channel's feed: `win-x64`, `win-arm64`, `osx-arm64` and `osx-x64`. The channel also names the feed, `releases.<channel>.json`, and the files vpk writes. On macOS vpk adds its updater to the bundle and seals it again, with `AL_SIGNING_IDENTITY` or ad-hoc, and notarizes it when `AL_NOTARY_PROFILE` names a profile stored with `xcrun notarytool store-credentials`.
+The Windows installer, the Linux AppImage and the update packages for every platform come from [Velopack](https://velopack.io): configure with `-DAL_USE_VELOPACK=ON`, run `dotnet tool restore` once so the `vpk` tool is available, and build the `velopack` target. It installs into `newview/velopack/<Config>/app` (on Linux, into the `usr/bin` of `newview/velopack/<Config>/<App>.AppDir`) and writes the update feed, and on Windows the installer and on Linux the AppImage, to `newview/velopack/<Config>/Releases`. Each platform and architecture has its own Velopack channel, named for its runtime, since an installed viewer updates from its channel's feed: `win-x64`, `win-arm64`, `osx-arm64`, `osx-x64`, `linux-x64` and `linux-arm64`. The channel also names the feed, `releases.<channel>.json`, and the files vpk writes. On macOS vpk adds its updater to the bundle and seals it again, with `AL_SIGNING_IDENTITY` or ad-hoc, and notarizes it when `AL_NOTARY_PROFILE` names a profile stored with `xcrun notarytool store-credentials`.
+
+On Linux the AppImage holds the installed tree as it is, at the AppDir's `usr/bin`, where the update client looks for the updater and manifest vpk adds; `cmake/ViewerAppDir.cmake` lays out the rest around it, the `AppRun` that runs the launcher and the tree's desktop entry and icons. Run from the AppImage, the launcher points the desktop entry at the AppImage file rather than at its mount, and the update client replaces that file in place. A tree from the archive or a system package has no Velopack installation, finds no update manager, and is updated by its package manager. The hosted build's `package-linux` job makes the AppImage and feed from the build's archive.
 
 The third-party attribution is generated, not kept by hand: `cmake/Attribution.cmake` reads every installed port's `vcpkg.spdx.json` and `copyright` and writes `app_settings/packages-info.txt` (what the About floater's Licences tab shows) and `licenses.txt` (every licence text). What vcpkg cannot know — the pieces under `indra/externals/`, the SDKs from outside vcpkg, and a holder or licence a port's files do not state — is in `cmake/attribution.json`, as is the list of installed ports that ship nothing and are skipped: build tools, empty ports that stand for a system library, and what is built only for those. A newly added port whose `vcpkg.json` declares no `license` stops the build with its name; fix the port, add an override to the table, or, if the viewer ships none of it, skip it with the reason (and the platform, when the port is empty only on some).
 
