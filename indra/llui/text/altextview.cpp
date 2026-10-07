@@ -4129,20 +4129,10 @@ void ALTextView::paste()
     }
     if (hasOtherSelections())
     {
-        // Its lines, as the text will have them.
-        LLStringUtil::replaceString(text, "\r\n", "\n");
-        LLStringUtil::replaceChar(text, '\r', '\n');
-        std::vector<std::string> lines;
-        for (size_t from = 0;;)
-        {
-            const size_t end = text.find('\n', from);
-            lines.push_back(text.substr(from, end == std::string::npos ? std::string::npos : end - from));
-            if (end == std::string::npos)
-            {
-                break;
-            }
-            from = end + 1;
-        }
+        // Its lines, as the text will have them; and the whole with its
+        // line endings as the text's, for where it goes in whole.
+        text                           = ALLineBreaks::withLineFeeds(text);
+        std::vector<std::string> lines = ALLineBreaks::split(text);
         // One line to each selection where there is a line for each -- a
         // break after the last not counted -- and the whole to each
         // otherwise.
