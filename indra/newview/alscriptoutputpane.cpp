@@ -356,6 +356,7 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
                                   : action == "master_send"         ? "ActionMasterSend"
                                   : action == "master_compare"      ? "ActionMasterCompare"
                                   : action == "master_compare_file" ? "ActionMasterCompareFile"
+                                  : action == "master_give_way"     ? "ActionMasterGiveWay"
                                   : action == "master_open_file"    ? "ActionMasterOpenFile"
                                   : action == "master_unlink"       ? "ActionMasterUnlink"
                                   : action == "master_find"         ? "ActionMasterFind"

@@ -228,6 +228,7 @@ namespace
             loads.push_back(ref);
             toLoad = std::move(loaded);
         }
+        void refreshNotice() override { ++notices; }
 
         // An editor as the studio makes one, kept by the window.
         ALCodeEditor* editor(const std::string& name, const std::string& text)
@@ -247,7 +248,8 @@ namespace
         LLView&                                             parent;
         std::optional<std::string>                          picked;
         std::optional<Unsaved>                              answer;
-        S32                                                 picks = 0;
+        S32                                                 picks   = 0;
+        S32                                                 notices = 0;
         S32                                                 made  = 0;
         std::vector<std::string>                            opened, closed, asked, edited;
         std::vector<Compared>                               compared;
@@ -267,9 +269,14 @@ namespace tut
         std::unique_ptr<ALScriptStudioMasters> unit;
         NoWorld                                world;
         std::string                            folder;
+        std::vector<boost::signals2::connection> wired;
 
         ~alscriptstudiomasters_data()
         {
+            for (boost::signals2::connection& one : wired)
+            {
+                one.disconnect();
+            }
             unit.reset();
             services.docs.clear();
             // The links let go of with the test, for the next to start from
@@ -332,6 +339,19 @@ namespace tut
             doc.objectName             = "Door";
             doc.editor                 = studio->editor("editor_" + name, text);
             return doc;
+        }
+        // A tab's edits, undos and redos told to the masters, as the
+        // window's own tabs' are; found again by its id, since it may give
+        // way.
+        void wire(const Doc& doc)
+        {
+            const std::string id = doc.id;
+            wired.push_back(doc.editor->onTextChanged([this, id]() {
+                if (Doc* found = services.findDoc(id))
+                {
+                    unit->textChanged(*found);
+                }
+            }));
         }
         // Something typed at the end of a tab's text.
         static void type(Doc& doc, const std::string& text)
@@ -732,5 +752,89 @@ namespace tut
         lamp.editor->resetDirty();
         unit->offer(lamp, "master_link_hint");
         ensure("saved: linked, its tab giving way", ALScriptDiskMasters::instance().linkOf(lamp_ref) && !services.findDoc(lamp_ref));
+    }
+
+    template<> template<>
+    void alscriptstudiomasters_object::test<10>()
+    {
+        set_test_name("a tab kept for what was typed, made clean by an undo, is kept and offered to switch to its file, and told again when typed in; Switch to File gives way, as a revert or a save of it does");
+        make();
+        Doc& door = itemTab("door", "default {}\n");
+        wire(door);
+        type(door, "// mine\n");
+        write(in("door.lsl"), "default {}\n");
+        const ALScriptRef door_ref = door.ref;
+        linkFromElsewhere(door, in("door.lsl"));
+        settle();
+        ensure("kept and told", services.findDoc(door_ref) == &door && says(said().text, "MasterLinkedUnsaved") && said().doc == "door");
+        const size_t said_before = services.reports.size();
+        const S32    notices     = studio->notices;
+
+        door.editor->undo();
+        ensure("clean again by the undo", !door.editor->isDirty());
+        ensure("not closed under the author", services.findDoc(door_ref) == &door && studio->closed.empty());
+        ensure("its notice: nothing unsaved left, Switch to File offered with the rest",
+               door.offer && says(door.offer->text, "MasterLinkedClean") &&
+                   door.offer->actions == Names{ "master_give_way", "master_compare_file", "master_open_file", "master_unlink" } &&
+                   studio->notices == notices + 1);
+        ensure("over the tab alone, not in Output", services.reports.size() == said_before);
+
+        // The links changing meanwhile: kept still.
+        Doc& bell = itemTab("bell", "default {}\n");
+        write(in("bell.lsl"), "default {}\n");
+        linkFromElsewhere(bell, in("bell.lsl"));
+        settle();
+        ensure("kept as the links change", services.findDoc(door_ref) == &door && !services.findDoc("bell"));
+
+        door.editor->redo();
+        ensure("typed in again by the redo: the notice back to what was typed",
+               door.editor->isDirty() && door.offer && says(door.offer->text, "MasterLinkedUnsaved") &&
+                   door.offer->actions == Names{ "master_compare_file", "master_open_file", "master_unlink" });
+        door.editor->undo();
+        ensure("and clean again", door.offer && says(door.offer->text, "MasterLinkedClean"));
+
+        // Switch to File taken once typed in again: kept, and told so.
+        type(door, "x");
+        door.offer.reset();
+        unit->offer(door, "master_give_way");
+        ensure("typed in since it was offered: kept, told so", services.findDoc(door_ref) == &door && door.offer &&
+                                                                  says(door.offer->text, "MasterLinkedUnsaved"));
+        door.editor->undo();
+        ensure("clean again", door.offer && says(door.offer->text, "MasterLinkedClean"));
+        unit->offer(door, "master_give_way");
+        ensure("Switch to File: the file's tab in its place, said there",
+               !services.findDoc(door_ref) && studio->closed.back() == "door" && says(said().text, "MasterGaveWay") &&
+                   said().doc == "disk:" + in("door.lsl"));
+
+        // Reverted once clean: gives way, as a revert does.
+        Doc& lamp = itemTab("lamp", "default {}\n");
+        wire(lamp);
+        type(lamp, "// mine\n");
+        write(in("lamp.lsl"), "default {}\n");
+        const ALScriptRef lamp_ref = lamp.ref;
+        linkFromElsewhere(lamp, in("lamp.lsl"));
+        settle();
+        lamp.editor->undo();
+        ensure("kept once clean", services.findDoc(lamp_ref) == &lamp && says(lamp.offer->text, "MasterLinkedClean"));
+        lamp.editor->setText("default {}\n");
+        unit->loaded(lamp);
+        settle();
+        ensure("reverted: gave way", !services.findDoc(lamp_ref) && says(said().text, "MasterGaveWay"));
+
+        // Saved once clean: gives way, as a save does.
+        Doc& gate = itemTab("gate", "default {}\n");
+        wire(gate);
+        type(gate, "// mine\n");
+        write(in("gate.lsl"), "default {}\n");
+        const ALScriptRef gate_ref = gate.ref;
+        linkFromElsewhere(gate, in("gate.lsl"));
+        settle();
+        gate.editor->undo();
+        ensure("kept once clean", services.findDoc(gate_ref) == &gate);
+        ALScriptSaved saved;
+        saved.ref = gate_ref;
+        unit->saved(saved);
+        settle();
+        ensure("saved: gave way", !services.findDoc(gate_ref) && says(said().text, "MasterGaveWay"));
     }
 }

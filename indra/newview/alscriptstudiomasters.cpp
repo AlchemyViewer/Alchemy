@@ -449,8 +449,11 @@ void ALScriptStudioMasters::saved(const ALScriptSaved& saved)
     // typed in it, is clean once that is saved. The links change with
     // most such saves, which looks again; not with one of just what the
     // file last sent, which moves nothing else.
-    if (mServices.findDoc(saved.ref) && ALScriptDiskMasters::instance().linkOf(saved.ref))
+    Doc* doc = mServices.findDoc(saved.ref);
+    if (doc && ALScriptDiskMasters::instance().linkOf(saved.ref))
     {
+        // Saved, whatever an undo had made of it: given way as a save's is.
+        doc->master->toldClean = false;
         lookAgain();
     }
 }
@@ -499,6 +502,23 @@ void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
     else if (action == "master_compare_file" && doc.file.empty() && !ref.isNull())
     {
         compareWithFile(doc, ref);
+    }
+    else if (action == "master_give_way" && doc.file.empty() && !ref.isNull())
+    {
+        // As a clean tab gives way as its script is linked; typed in again
+        // since it was offered, told so again, and kept.
+        const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref);
+        if (!link || !openable(*link))
+        {
+            return;
+        }
+        if (doc.editor->isDirty())
+        {
+            doc.master->toldClean = false;
+            tellKept(doc, *link);
+            return;
+        }
+        giveWayTo(doc, *link);
     }
     else if (action == "master_open_file" && doc.file.empty() && !ref.isNull())
     {
@@ -640,6 +660,7 @@ void ALScriptStudioMasters::giveWay()
         {
             // Let go of, or never linked: told again, should it be linked.
             doc->master->toldLinked.clear();
+            doc->master->toldClean = false;
             continue;
         }
         // Left as it is while it loads, or a save of it is on its way; and
@@ -663,29 +684,94 @@ void ALScriptStudioMasters::giveWay()
                 continue;
             }
             doc->master->toldLinked = link->master;
+            doc->master->toldClean  = false;
             mServices.report(mServices.words("MasterLinkedUnsaved", args), true, doc,
                              { "master_compare_file", "master_open_file", "master_unlink" });
             continue;
         }
+        // Made clean again by an undo while kept: kept still, its notice
+        // offering it to give way, rather than closed under the author.
+        if (doc->master->toldClean && doc->master->toldLinked == link->master)
+        {
+            continue;
+        }
         // Nothing typed here -- never, or no longer, once what was kept was
         // saved or reverted: the file's tab in its place, as a script asked
-        // for while linked opens. Saved from here, the world holds what the
-        // file does not: the file's tab offers to send the file over it, or
-        // to compare the two, as a change heard in the world does.
-        const ALScriptRef ref = doc->ref;
-        mWindow.closeTab(*doc);
-        mWindow.openMasterFile(link->master, link->lua);
-        Doc*                     tab  = masterTab(link->master);
-        std::string              said = mServices.words("MasterGaveWay", args);
-        std::vector<std::string> offers;
-        if (tab && link->state == ALMasterLink::State::Differing)
-        {
-            tab->master->offerFor = ref;
-            said += " " + mServices.words("MasterLinkDiffers", args);
-            offers = { "master_send", "master_compare" };
-        }
-        mServices.report(said, false, tab, offers);
+        // for while linked opens.
+        giveWayTo(*doc, *link);
     }
+}
+
+void ALScriptStudioMasters::giveWayTo(Doc& doc, const ALMasterLink& link)
+{
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    args["[FILE]"] = fileNameOf(link.master);
+    // Saved from here, the world holds what the file does not: the file's
+    // tab offers to send the file over it, or to compare the two, as a
+    // change heard in the world does.
+    const ALScriptRef ref = doc.ref;
+    mWindow.closeTab(doc);
+    mWindow.openMasterFile(link.master, link.lua);
+    Doc*                     tab  = masterTab(link.master);
+    std::string              said = mServices.words("MasterGaveWay", args);
+    std::vector<std::string> offers;
+    if (tab && link.state == ALMasterLink::State::Differing)
+    {
+        tab->master->offerFor = ref;
+        said += " " + mServices.words("MasterLinkDiffers", args);
+        offers = { "master_send", "master_compare" };
+    }
+    mServices.report(said, false, tab, offers);
+}
+
+void ALScriptStudioMasters::textChanged(Doc& doc)
+{
+    // Every edit of every tab comes here: only one kept as its script was
+    // linked goes further.
+    if (doc.master->toldLinked.empty() || !doc.file.empty())
+    {
+        return;
+    }
+    // Clean again by an undo or a redo, back to the text as saved, a step
+    // either way from it. A text put in whole -- a revert, a load -- is
+    // clean with no step either way: it is looked at again as it loads,
+    // and gives way then, as a save does.
+    const ALTextUndo& journal = doc.editor->undoJournal();
+    const bool        clean   = !doc.editor->isDirty();
+    const bool        whole   = !journal.canUndo() && !journal.canRedo();
+    const bool        undone  = clean && !whole;
+    if (undone == doc.master->toldClean)
+    {
+        return;
+    }
+    doc.master->toldClean = undone;
+    if (clean && whole)
+    {
+        return;
+    }
+    const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(doc.ref);
+    if (link && link->master == doc.master->toldLinked)
+    {
+        tellKept(doc, *link);
+    }
+}
+
+void ALScriptStudioMasters::tellKept(Doc& doc, const ALMasterLink& link)
+{
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    args["[FILE]"] = fileNameOf(link.master);
+    if (doc.master->toldClean)
+    {
+        doc.offer = Doc::Offer{ mServices.words("MasterLinkedClean", args),
+                                { "master_give_way", "master_compare_file", "master_open_file", "master_unlink" } };
+    }
+    else
+    {
+        doc.offer = Doc::Offer{ mServices.words("MasterLinkedUnsaved", args), { "master_compare_file", "master_open_file", "master_unlink" } };
+    }
+    mWindow.refreshNotice();
 }
 
 ALScriptStudioMasters::Doc* ALScriptStudioMasters::masterTab(const std::string& master) const

@@ -89,6 +89,7 @@ namespace
                                 : action == "master_link_hint"                           ? "NoticeMasterLink"
                                 : action == "master_send"                                ? "NoticeMasterSend"
                                 : action == "master_compare"                             ? "NoticeCompare"
+                                : action == "master_give_way"                            ? "NoticeMasterGiveWay"
                                 : action == "master_compare_file"                        ? "NoticeMasterCompareFile"
                                 : action == "master_open_file"                           ? "NoticeMasterOpenFile"
                                 : action == "master_unlink"                              ? "NoticeMasterUnlink"

@@ -53,6 +53,10 @@ struct ALScriptStudioDoc::Mastered
     // it is in neither the world nor the file: the file it was told of, so
     // that it is told once.
     std::string toldLinked;
+    // A tab so kept made clean again by an undo or a redo, which its notice
+    // then says, offering it to give way: it is not closed under the
+    // author's hands, as a save or a revert closes it.
+    bool        toldClean = false;
 };
 
 // A Script Studio window's side of the scripts whose master is a file on
@@ -103,6 +107,9 @@ public:
         // A script's text as the world holds it, fetched if need be, as the
         // workspace answers a load of it.
         virtual void loadWorldText(const ALScriptRef& ref, std::function<void(const ALScriptLoaded& loaded)> loaded) = 0;
+        // The notice over the tab in front shown again, a tab's offer having
+        // changed without a word in Output.
+        virtual void refreshNotice() = 0;
 
     protected:
         ~Window() = default;
@@ -143,6 +150,10 @@ public:
     // A script saved, from here or from anywhere: its tab here, where it
     // is linked and was kept for what was typed in it, looked at again.
     void saved(const ALScriptSaved& saved);
+    // A tab's text changed, as its editor says on every edit, undo and
+    // redo: one kept for what was typed in it, clean again or no longer,
+    // told so on its notice.
+    void textChanged(Doc& doc);
     // One of the offers about a tab, as its link in Output or its notice
     // does it.
     void offer(Doc& doc, const std::string& action);
@@ -171,6 +182,14 @@ private:
     // and it gives way too.
     void lookAgain();
     void giveWay();
+    // An item's tab closed for its file's, opened in its place, and said so
+    // there, with what the world holds that the file does not.
+    void giveWayTo(Doc& doc, const ALMasterLink& link);
+    // The notice over a tab kept for what was typed in it, as it stands:
+    // nothing unsaved left, and the tab offered to give way; or what was
+    // typed not in the file. Over the tab alone: an undo and a redo may
+    // each say it again, which Output would fill with.
+    void tellKept(Doc& doc, const ALMasterLink& link);
     // The tab of a master file, where one is open.
     Doc* masterTab(const std::string& master) const;
     // The world's text of a script beside its master's, in the master's tab;

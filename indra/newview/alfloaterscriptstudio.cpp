@@ -2320,6 +2320,9 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
         {
             refreshNotice();
         }
+        // A tab kept as its script was linked, made clean again by an undo,
+        // or typed in again.
+        mMasters.textChanged(*raw);
     });
     // Typing stopped short, a notecard being full: said why. The editor
     // goes with the tab, and the connection with it.
