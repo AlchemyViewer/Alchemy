@@ -404,7 +404,8 @@ public:
     void typeText(std::string_view text);
     void deleteRange(const ALTextRange& range);
     // Several ranges of the text as it stands, each replaced by its
-    // string, as one step to undo: what a rename is. The ranges must not
+    // string, as one step to undo: what a rename is -- or, made while a
+    // key is typed, as part of what the key does. The ranges must not
     // overlap. The caret keeps its place in the text around it. False
     // where nothing changed.
     bool replaceAll(std::vector<std::pair<ALTextRange, std::string>> edits);

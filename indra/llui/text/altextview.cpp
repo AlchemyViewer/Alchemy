@@ -2699,10 +2699,20 @@ bool ALTextView::replaceAll(std::vector<std::pair<ALTextRange, std::string>> edi
     // the ones before it left it (caretThrough).
     const ALTextPos was = mCaret;
 
-    // As one edit, which every listener hears once.
-    mUndo.beginGroup();
+    // As one edit, which every listener hears once, and one step to undo;
+    // but one made for a key typed -- a line brought out as its closer is
+    // typed -- is part of what the key does, one with its typing
+    // (ALTextUndo::beginTyping), as the same made at every caret is.
+    const bool own_step = !mUndo.typing();
+    if (own_step)
+    {
+        mUndo.beginGroup();
+    }
     const bool any = !editMany(std::move(edits), [&was](const ALTextDocument::Edit& done) { return caretThrough(done, was); }).nothing();
-    mUndo.endGroup();
+    if (own_step)
+    {
+        mUndo.endGroup();
+    }
     if (!any)
     {
         return false;

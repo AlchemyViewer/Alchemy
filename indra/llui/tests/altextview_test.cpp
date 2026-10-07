@@ -2996,4 +2996,44 @@ namespace tut
         ensure("the caret past it", v.caret() == ALTextPos(0, 4) && !v.hasOtherSelections());
         ensure_equals("and told once", moved, 1);
     }
+
+    template<> template<>
+    void altextview_object::test<95>()
+    {
+        set_test_name("a closer typed that brings its line out, and Return after a closing word it brings out, are one step with the typing, at one caret as at several");
+        ALTextView& v = make("default\n{\n    x;\n    ");
+        v.setSyntax("lsl");
+        v.setCaret(v.document().end());
+        type("}");
+        ensure_equals("brought out as it was typed", v.document().line(3), std::string("}"));
+        ensure("the caret after it", v.caret() == ALTextPos(3, 1));
+        type(";");
+        ensure_equals("typed on after it", v.document().line(3), std::string("};"));
+        v.undo();
+        ensure_equals("one step back: the closer, its line brought out and what followed it", v.text(), std::string("default\n{\n    x;\n    "));
+        ensure("where it was typed, and nothing before it", v.caret() == ALTextPos(3, 4) && !v.canPerform(ALEditorCommand::Undo));
+
+        // The same at two carets, each on such a line: one step as well.
+        v.setText("default\n{\n    x;\n    \n}\nstate s\n{\n    y;\n    ");
+        v.setSyntax("lsl");
+        v.setSelections(ALTextRange(ALTextPos(8, 4), ALTextPos(8, 4)), { ALTextRange(ALTextPos(3, 4), ALTextPos(3, 4)) });
+        type("}");
+        ensure_equals("the first brought out", v.document().line(3), std::string("}"));
+        ensure_equals("the second brought out", v.document().line(8), std::string("}"));
+        type(";");
+        ensure_equals("typed on after each", v.document().line(3) + v.document().line(8), std::string("};};"));
+        v.undo();
+        ensure_equals("one step back at both", v.text(), std::string("default\n{\n    x;\n    \n}\nstate s\n{\n    y;\n    "));
+        ensure("nothing before it", !v.canPerform(ALEditorCommand::Undo));
+
+        // A word that closes a block, there before Return was pressed.
+        v.setText("if x then\n    y()\n    end");
+        v.setSyntax("slua");
+        v.setCaret(v.document().end());
+        key(KEY_RETURN);
+        ensure_equals("brought out, then the line broken", v.text(), std::string("if x then\n    y()\nend\n"));
+        v.undo();
+        ensure_equals("one step back", v.text(), std::string("if x then\n    y()\n    end"));
+        ensure("where Return was pressed, and nothing before it", v.caret() == ALTextPos(2, 7) && !v.canPerform(ALEditorCommand::Undo));
+    }
 }

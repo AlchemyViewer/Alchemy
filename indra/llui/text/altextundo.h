@@ -151,6 +151,8 @@ public:
     // and so no run of its own kind -- is a run of erasing keys instead.
     void beginTyping(const ALTextRange& selection, bool erasing = false);
     void endTyping();
+    // Whether a key's scope is open: what is recorded now is the key's.
+    bool typing() const { return mTypingDepth > 0; }
 
     // Everything recorded until endGroup() is one step.
     void beginGroup();
