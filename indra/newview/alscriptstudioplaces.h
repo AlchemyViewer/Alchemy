@@ -30,6 +30,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // What the studio's window and its units share of places in scripts: a
@@ -51,7 +52,9 @@ namespace ALScriptPlaces
     // A text's lines, found once, for the many places a name has in one
     // text -- an include, an expansion -- rather than each read by walking
     // the text from its top: a text open in a tab, read where it stands for
-    // as long as the lines are asked, or a copy held apart.
+    // as long as the lines are asked, or a copy held apart, split as a tab's
+    // document splits it (ALLineBreaks), so that a place's line is the same
+    // line whether its file is open or not.
     class Lines
     {
     public:
@@ -65,13 +68,10 @@ namespace ALScriptPlaces
         std::string line(S32 line) const;
 
     private:
-        void index();
-
         const ALTextDocument*              mOpen = nullptr;
         std::shared_ptr<const std::string> mHeld;
-        const std::string*                 mText = nullptr;
-        // Where each of the text's lines starts.
-        std::vector<size_t>                mStarts;
+        // The lines of the text held or read in place, into it.
+        std::vector<std::string_view>      mLines;
     };
     bool        isIdentifier(const std::string& text);
     // The symbols of an outline a place is in, the outermost first: which
