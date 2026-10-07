@@ -181,7 +181,7 @@ void ALScriptDiskMasters::link(std::vector<ALMasterLink> made)
     for (ALMasterLink& one : made)
     {
         one.master = canonical(one.master);
-        if (ALScriptMasterAdopt::knowsNothing(one))
+        if (ALMasterIndex::knowsNothing(one))
         {
             unknown.push_back(one);
         }

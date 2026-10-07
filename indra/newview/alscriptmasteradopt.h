@@ -45,12 +45,7 @@
 class ALScriptMasterAdopt
 {
 public:
-    // Whether a link knows nothing of what a send through it would know:
-    // nothing went up through it, and nothing of its file's expansion is
-    // known.
-    static bool knowsNothing(const ALMasterLink& link);
-
-    // Links just made that know nothing, probed after those waiting
+    // Links just made that know nothing (ALMasterIndex::knowsNothing), probed after those waiting
     // already; what each probe finds goes to ALScriptDiskMasters::adopted.
     void adopt(const std::vector<ALMasterLink>& made);
 

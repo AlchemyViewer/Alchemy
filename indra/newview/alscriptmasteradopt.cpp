@@ -37,12 +37,6 @@ namespace
     constexpr size_t PROBES = 4;
 }
 
-// static
-bool ALScriptMasterAdopt::knowsNothing(const ALMasterLink& link)
-{
-    return link.hash.empty() && link.uses.empty() && !link.missed;
-}
-
 void ALScriptMasterAdopt::adopt(const std::vector<ALMasterLink>& made)
 {
     for (const ALMasterLink& link : made)
