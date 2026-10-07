@@ -4108,6 +4108,15 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             // An empty line has no character to take.
             m.inclusive = ch == DISPLAY_END && !atLineEnd(d, m.to);
+            // A count's g$ over wrapped rows wants every line's end from here
+            // on for j and k, as $ does and vim's curswant has it, whether or
+            // not it ran out of rows; one row's wants its own column, as does
+            // one an operator took.
+            if (ch == DISPLAY_END && wrapped && count > 1 && !mOperator)
+            {
+                mWantColumn   = S32_MAX;
+                mVerticalMove = true;
+            }
             return m;
         }
         case LINE_MIDDLE:

@@ -5055,4 +5055,20 @@ namespace tut
         ensure_equals("d99g$ runs out of rows and fails, nothing taken", w.document().line(0), line);
         ensure_equals("the caret at the end of the last row all the same", caretText(), "0:" + std::to_string(line.size() - 1));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<176>()
+    {
+        set_test_name("g$ with a count over wrapped rows wants every line's end after it, as $ does, so j goes to the next line's end; one row's g$ its own column");
+        ALCodeEditor& e = make("abc\ndefgh\nghijklmn");
+        e.setWordWrap(true);
+        keys("2g$");
+        ensure_equals("2g$: the next row's last character", caretText(), std::string("1:4"));
+        keys("j");
+        ensure_equals("then j: the next line's end", caretText(), std::string("2:7"));
+
+        e.setCaret(ALTextPos(0, 0));
+        keys("g$j");
+        ensure_equals("g$ then j: the column g$ went to", caretText(), std::string("1:2"));
+    }
 }
