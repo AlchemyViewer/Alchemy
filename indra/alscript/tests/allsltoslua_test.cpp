@@ -1938,4 +1938,31 @@ namespace tut
                has(close, "llcompat.GetTime()") && has(close, "llcompat.ResetTime()") && !has(close, "ll.GetTime") && !has(close, "timeBase"));
         checksClean(close);
     }
+
+    template<> template<>
+    void allsltoslua_object::test<66>()
+    {
+        set_test_name("Base64 through llbase64: encode as it is, the same bytes as LSL's; decode noted once, as it keeps a NUL and what is "
+                      "not UTF-8; close to LSL, llcompat's");
+        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
+                                              "    key k = llDetectedKey(0);\n"
+                                              "    string s = llStringToBase64(\"hello\");\n"
+                                              "    string t = llStringToBase64(k);\n"
+                                              "    string d = llBase64ToString(s);\n"
+                                              "    string e = llBase64ToString(t + \"=\");\n"
+                                              "    llOwnerSay(s + t + d + e);\n"
+                                              "} }\n");
+        ensure("encode: " + r.text, has(r, "local s = llbase64.encode(\"hello\")") && has(r, "local t = llbase64.encode(tostring(k))"));
+        ensure("decode: " + r.text, has(r, "local d = llbase64.decode(s)") && has(r, "local e = llbase64.decode(t .. \"=\")"));
+        ensure("decode noted once: " + r.text, noted(r, "SluaBase64Decode") && count(r, "-- LSL: llbase64.decode keeps every byte") == 1);
+        ensure("nothing of llcompat's: " + r.text, !has(r, "llcompat.") && !noted(r, "SluaDeprecatedFor", "StringToBase64") &&
+                                                     !noted(r, "SluaDeprecatedFor", "Base64ToString"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result close =
+            ALLSLToSLua::convert("default { state_entry() { llOwnerSay(llBase64ToString(llStringToBase64(\"x\"))); } }\n", ALLSLToSLua::Options::closeToLSL());
+        ensure("close to LSL: " + close.text,
+               has(close, "llcompat.Base64ToString(llcompat.StringToBase64(\"x\"))") && !has(close, "llbase64.decode(") &&
+                   !has(close, "llbase64.encode(") && !noted(close, "SluaBase64Decode"));
+    }
 }

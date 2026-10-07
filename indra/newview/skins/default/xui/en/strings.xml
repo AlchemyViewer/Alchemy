@@ -1088,6 +1088,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaUuidText">uuid() stops the script on text that is no UUID, where LSL's keys held any text; touuid() answers nil instead.</string>
 	<string name="SluaDetectedTable">detected[n] is what LSL read with llDetected*(n - 1): SLua counts it from 1, and one past its end is an error, where LSL answered nothing.</string>
 	<string name="SluaMathDomain">math.sqrt, math.log and math.log10 answer nan or -inf out of their range, where LSL answered 0 or stopped with a math error.</string>
+	<string name="SluaBase64Decode">llbase64.decode keeps every byte it decodes, a NUL and what is not UTF-8 among them, where LSL's llBase64ToString cut the string at a NUL and made what was not UTF-8 '?'.</string>
 	<string name="SluaAbsent">SLua has no [1], in ll or in llcompat: it is left out.</string>
 	<string name="SluaUse">SLua would use [1] for [2].</string>
 	<string name="SluaCompatOnlyTimer">SLua's ll has no SetTimerEvent; llcompat's is LSL's. SLua's own timers are LLTimers:every(seconds, callback) and LLTimers:once, several at a time.</string>

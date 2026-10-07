@@ -2486,6 +2486,22 @@ namespace
             called = "print";
             return Expr{ "print(" + coerced(argumentAt(e, 0), LST_STRING).text + ")" };
         }
+        // Base64 of the string's bytes, its UTF-8, as LSL's was: both are
+        // APR's, padded and on one line.
+        if (lsl == "llStringToBase64")
+        {
+            called = "llbase64.encode";
+            return Expr{ "llbase64.encode(" + coerced(argumentAt(e, 0), LST_STRING).text + ")" };
+        }
+        // The bytes decoded, every one: LSL's string could hold neither a
+        // NUL nor what is not UTF-8.
+        if (lsl == "llBase64ToString")
+        {
+            noteOnce(e, "SluaBase64Decode", "llbase64.decode keeps every byte it decodes, a NUL and what is not UTF-8 among them, where "
+                                            "LSL's llBase64ToString cut the string at a NUL and made what was not UTF-8 '?'.");
+            called = "llbase64.decode";
+            return Expr{ "llbase64.decode(" + coerced(argumentAt(e, 0), LST_STRING).text + ")" };
+        }
         // Half up, as LSL rounds, where math.round rounds a half away from
         // nought.
         if (lsl == "llRound")
