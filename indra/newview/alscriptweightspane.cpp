@@ -75,19 +75,7 @@ namespace
     // is long, never cut inside a character.
     std::string shownText(std::string_view text)
     {
-        constexpr size_t SHOWN = 48;
-        size_t           cut   = std::min(text.size(), SHOWN);
-        while (cut > 0 && cut < text.size() && (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80)
-        {
-            --cut;
-        }
-        std::string out = "\"";
-        for (size_t i = 0; i < cut; ++i)
-        {
-            const char c = text[i];
-            out += c == '\n' ? std::string("\\n") : c == '\t' ? std::string("\\t") : c == '\r' ? std::string("\\r") : std::string(1, c);
-        }
-        return out + (cut < text.size() ? "\xE2\x80\xA6\"" : "\"");
+        return ALScriptWeigh::quoted(text, 48);
     }
 
     // What a part is across two weighings of the same script: which part
