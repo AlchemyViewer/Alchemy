@@ -502,8 +502,12 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
     // The key a run is joined by: the kind of change, where it carries on
     // the last step; anything else ends the run first. A group is one step
     // however long it stays open, which the stack keeps; a run is one step
-    // while its changes come within the window.
-    std::string_view key = keyOf(kindOf(edit));
+    // while its changes come within the window, and while the step and the
+    // change weigh no more than the budget together: the newest step is
+    // kept whatever it weighs, so a run joined on past it would hold all it
+    // ever did, however long it went on.
+    const bool       past = !mSteps.undone().empty() && mSteps.undone().back().bytes + step.bytes > BUDGET;
+    std::string_view key  = keyOf(kindOf(edit));
     if (step.typed)
     {
         // A key typed: its first edit carries on a run of keys typed where
@@ -515,7 +519,7 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
         {
             mTypingNoted                    = true;
             const std::vector<Step>& undone = mSteps.undone();
-            const bool               on     = !undone.empty() && undone.back().typed && mTypingAt.begin == mTypingAt.end &&
+            const bool               on     = !past && !undone.empty() && undone.back().typed && mTypingAt.begin == mTypingAt.end &&
                                               (mTypingAt.end == undone.back().caretAfter ||
                                                (!undone.back().edits.empty() && mTypingAt.end == undone.back().edits.back().edit.endAfter()));
             if (!on)
@@ -524,7 +528,7 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
             }
         }
     }
-    else if (!mSteps.inGroup() && (mSteps.undone().empty() || !carriesOn(mSteps.undone().back(), edit)))
+    else if (!mSteps.inGroup() && (past || mSteps.undone().empty() || !carriesOn(mSteps.undone().back(), edit)))
     {
         mSteps.breakRun();
     }

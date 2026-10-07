@@ -101,7 +101,8 @@ public:
         mutable std::string               written;
     };
     // What the steps back may weigh together, and the history written
-    // out: the oldest go first past it, the newest always kept.
+    // out: the oldest go first past it, the newest always kept. A run that
+    // would pass it goes on in a step of its own.
     static constexpr size_t BUDGET = 1024 * 1024;
     // A history read and checked against a text, to be put back over it
     // (restore): read and checked once, whoever puts it back.

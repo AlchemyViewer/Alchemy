@@ -937,4 +937,26 @@ namespace tut
         restored.undo();
         ensure_equals("and stepped back from the history", copy.text(), std::string("alpha\nbeta\ngamma\ndelta"));
     }
+
+    template<> template<>
+    void altextundo_object::test<26>()
+    {
+        set_test_name("a run goes on in its step only while the step stays within the budget: the key that would pass it begins a step of its own, and the history is written within it");
+        // Ten keys typed one after the other, each putting in 300 KB: three
+        // to a step.
+        const std::string put(300 * 1024, 'k');
+        ALTextPos         at(0, 0);
+        for (S32 i = 0; i < 10; ++i)
+        {
+            undo.beginTyping(ALTextRange(at, at));
+            at = type(at, put.c_str());
+            undo.endTyping();
+        }
+        ensure_equals("all typed", doc.text().size(), 10 * put.size());
+        ensure("the history written within the budget", undo.asNotation().size() <= ALTextUndo::BUDGET);
+        undo.undo();
+        ensure_equals("the last key a step of its own", doc.text().size(), 9 * put.size());
+        undo.redo();
+        ensure_equals("and put back", doc.text().size(), 10 * put.size());
+    }
 }
