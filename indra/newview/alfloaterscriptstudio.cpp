@@ -302,20 +302,6 @@ namespace
         return item ? item->getAssetUUID() : LLUUID::null;
     }
 
-    // A message as one row reads it.
-    std::string oneLine(std::string text)
-    {
-        for (char& c : text)
-        {
-            if (c == '\n' || c == '\r' || c == '\t')
-            {
-                c = ' ';
-            }
-        }
-        return text;
-    }
-
-
     // Whether an item of a type is of the kind an argument names.
     bool itemOfKind(ALLSLTraits::Item kind, LLAssetType::EType type)
     {
@@ -7783,7 +7769,7 @@ ALScriptStudioDoc::RuntimeProblem ALFloaterScriptStudio::runtimeProblemOf(const 
     Doc::RuntimeProblem problem;
     problem.line    = event.line;
     problem.column  = event.column;
-    problem.message = event.error.empty() ? oneLine(event.message) : event.error;
+    problem.message = event.error.empty() ? ALLineBreaks::oneLine(event.message) : event.error;
     return problem;
 }
 
