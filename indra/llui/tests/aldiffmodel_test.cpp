@@ -1574,4 +1574,136 @@ namespace tut
         fresh.setTexts(left, typed);
         sameLayout(m, fresh, "typed inside the comment");
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<37>()
+    {
+        set_test_name("a merge read by the comparison's lexer, which holds two texts: the regions of the texts shown asked for again after it, an edit laid out again only around itself, as afresh");
+        // Two texts held, as ALDiffLexer holds them: one asked for again
+        // answered from where it is, another read in the place of the one
+        // asked for longer ago. Each line a stretch of code as long as it.
+        struct Held
+        {
+            std::vector<std::string>           lines[2];
+            std::vector<ALTextDiff::regions_t> regions[2];
+            U64                                used[2] = { 0, 0 };
+            U64                                clock   = 0;
+        };
+        const auto two_held = [] {
+            auto held = std::make_shared<Held>();
+            return ALTextDiff::lexer_t([held](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+                for (size_t n = 0; n < 2; ++n)
+                {
+                    if (held->used[n] > 0 && held->lines[n] == lines)
+                    {
+                        held->used[n] = ++held->clock;
+                        return held->regions[n];
+                    }
+                }
+                const size_t older = held->used[0] <= held->used[1] ? 0 : 1;
+                held->lines[older] = lines;
+                held->regions[older].clear();
+                for (const std::string& line : lines)
+                {
+                    held->regions[older].push_back({ ALTextDiff::Piece{ 0, static_cast<S32>(line.size()), ALTextDiff::Region::Code } });
+                }
+                held->used[older] = ++held->clock;
+                return held->regions[older];
+            });
+        };
+        // Theirs changed lines 0 and 6; ours 0 as theirs did, 2, 6, and 50
+        // far below -- not as long as theirs's line there -- and line 4 as
+        // typed. Swapped: the right shown on the left, and read first.
+        const std::string base   = lines(60);
+        const std::string theirs = lines(60, { { 0, "theirs 0" }, { 6, "theirs 6" } });
+        const auto        ours   = [](const char* four) {
+            return aldiffmodel_data::lines(60, { { 0, "theirs 0" }, { 2, "mine 2" }, { 4, four }, { 6, "mine 6" }, { 50, "mine fifty" } });
+        };
+        ALTextDiff::Likeness like;
+        like.ignoreWhitespace = true;
+        m.setLexer(two_held());
+        m.setLikeness(like);
+        m.setTexts(theirs, ours("line 4"));
+        m.setSwapped(true);
+        m.setMergeBase(base);
+        ensure_equals("one conflict", m.conflictCount(), 1);
+
+        // Typed in above the conflict: the lines below the edit read as
+        // they were, the right's own, and none of them otherwise.
+        m.setRightText(ours("line 4 typed"));
+        ensure("laid out again only around the edit", !m.relaid().whole && m.relaid().first[0] + m.relaid().now[0] < 20);
+
+        // The conflict settled as ours, which edits nothing; then the line
+        // typed in typed in again: likewise.
+        ensure("the conflict the third change", m.changeConflicts(2));
+        const std::optional<ALDiffMerge::Settling> settling = m.settle(2, ALTextMerge::Take::Ours);
+        ensure("ours: no edit", settling && !settling->edits);
+        m.settled(*settling);
+        ensure_equals("none left", m.conflictCount(), 0);
+        m.setRightText(ours("line 4 typed again"));
+        ensure("again only around the edit", !m.relaid().whole && m.relaid().first[0] + m.relaid().now[0] < 20);
+
+        ALDiffModel fresh;
+        fresh.setLexer(two_held());
+        fresh.setLikeness(like);
+        fresh.setTexts(theirs, ours("line 4 typed again"));
+        fresh.setSwapped(true);
+        sameLayout(m, fresh, "as afresh");
+    }
+
+    template<> template<>
+    void aldiffmodel_object::test<38>()
+    {
+        set_test_name("a merge read by a lexer of its own: the comparison's asked for none of the merge's texts as it is begun, settled, found again, and given again with a grammar");
+        // Each text a lexer is asked for, kept in turn; its regions none.
+        typedef std::vector<std::vector<std::string>> asked_t;
+        const auto asking = [](const std::shared_ptr<asked_t>& asked) {
+            auto held = std::make_shared<std::map<std::vector<std::string>, std::vector<ALTextDiff::regions_t>>>();
+            return ALTextDiff::lexer_t([asked, held](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+                asked->push_back(lines);
+                std::vector<ALTextDiff::regions_t>& out = (*held)[lines];
+                out.assign(lines.size(), {});
+                return out;
+            });
+        };
+        const auto compared = std::make_shared<asked_t>();
+        const auto merged   = std::make_shared<asked_t>();
+        const std::vector<std::string> base_lines = ALTextDiff::split(lines(8));
+        const auto has_base = [&base_lines](const asked_t& asked) { return std::find(asked.begin(), asked.end(), base_lines) != asked.end(); };
+
+        // As the merge with the model: theirs's line 0 taken, line 6 both's.
+        ALTextDiff::Likeness like;
+        like.ignoreWhitespace = true;
+        m.setLikeness(like);
+        m.setLexer(asking(compared), asking(merged));
+        m.setTexts(lines(8, { { 0, "theirs 0" }, { 6, "theirs 6" } }), lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } }));
+        m.setSwapped(true);
+        compared->clear();
+        m.setMergeBase(lines(8));
+        ensure_equals("one conflict", m.conflictCount(), 1);
+        ensure("begun: the merge read by its own", has_base(*merged));
+        ensure("the comparison's asked for nothing", compared->empty());
+
+        const std::optional<ALDiffMerge::Settling> settling = m.settle(1, ALTextMerge::Take::Ours);
+        ensure("ours: no edit", settling && !settling->edits);
+        merged->clear();
+        m.settled(*settling);
+        ensure("settled: found again by its own", has_base(*merged) && compared->empty());
+        ensure_equals("none left", m.conflictCount(), 0);
+
+        // Typed in: the comparison's asked for what it compares, never the
+        // base.
+        merged->clear();
+        m.setRightText(lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 4, "mine 4" }, { 6, "mine 6" } }));
+        ensure("typed in: found again by its own", has_base(*merged));
+        ensure("the comparison's never asked for the base", !compared->empty() && !has_base(*compared));
+        ensure_equals("settled still", m.conflictCount(), 0);
+
+        // Lexers given again, as a grammar is: the merge read by its new one.
+        const auto again = std::make_shared<asked_t>();
+        compared->clear();
+        m.setLexer(asking(compared), asking(again));
+        ensure("given again: found again by the new one", has_base(*again) && !has_base(*compared));
+        ensure_equals("settled still", m.conflictCount(), 0);
+    }
 }

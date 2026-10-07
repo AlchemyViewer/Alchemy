@@ -336,7 +336,7 @@ void ALDiffModel::setLikeness(const ALTextDiff::Likeness& like)
     mOptions.like = like;
     if (mMerge)
     {
-        mMerge->setOptions(mOptions);
+        mMerge->setOptions(mergeOptions());
     }
     // The runs are others now, but one hiding the same first line of the
     // right as one the reader opened is the same to the reader: open.
@@ -362,9 +362,10 @@ void ALDiffModel::setAlgorithm(ALTextDiff::Algorithm algorithm)
     }
 }
 
-void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer)
+void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging)
 {
     mOptions.lexer = std::move(lexer);
+    mMergeLexer    = std::move(merging);
     if (!mOptions.lexer && mOptions.like.ignoreComments)
     {
         // Lines told the same otherwise now: as setLikeness.
@@ -372,6 +373,11 @@ void ALDiffModel::setLexer(ALTextDiff::lexer_t lexer)
         like.ignoreComments       = false;
         setLikeness(like);
         return;
+    }
+    // The merge read by the grammar now given.
+    if (mMerge)
+    {
+        mMerge->setOptions(mergeOptions());
     }
     build(foldsOpen());
 }
@@ -437,7 +443,10 @@ ALTextDiff::Options ALDiffModel::shownOptions() const
 
 std::pair<ALDiffModel::line_regions_t, ALDiffModel::line_regions_t> ALDiffModel::shownRegions() const
 {
-    if (mRegions)
+    // Kept while they are as long as the texts shown: a lexer asked for
+    // another text reads it in the place of one it held, and what is kept
+    // of that one is then another's.
+    if (mRegions && (!mRegions->first || (mRegions->first->size() == shownLeft().size() && mRegions->second->size() == shownRight().size())))
     {
         return *mRegions;
     }
@@ -1463,10 +1472,30 @@ void ALDiffModel::setMergeBase(std::optional<std::string_view> base)
     if (base)
     {
         // Theirs the left as given, ours the right.
-        mMerge.emplace(ALTextDiff::split(*base), mLeftLines, mOptions);
+        mMerge.emplace(ALTextDiff::split(*base), mLeftLines, mergeOptions());
         mMerge->setOurs(mRightLines);
+        mergeRead();
     }
     findConflicts();
+}
+
+void ALDiffModel::mergeRead()
+{
+    if (!mMergeLexer)
+    {
+        mRegions.reset();
+        shownRegions();
+    }
+}
+
+ALTextDiff::Options ALDiffModel::mergeOptions() const
+{
+    ALTextDiff::Options options = mOptions;
+    if (options.lexer && mMergeLexer)
+    {
+        options.lexer = mMergeLexer;
+    }
+    return options;
 }
 
 void ALDiffModel::findConflicts()
@@ -1504,6 +1533,11 @@ void ALDiffModel::settled(const ALDiffMerge::Settling& settling)
     if (mMerge)
     {
         mMerge->settled(settling);
+        // Found again where it makes no edit: as it is begun.
+        if (!settling.edits)
+        {
+            mergeRead();
+        }
         findConflicts();
     }
 }

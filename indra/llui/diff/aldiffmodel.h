@@ -187,8 +187,11 @@ public:
     // How lines are cut into words -- a grammar's tokens, or none for their
     // bytes alone -- and so which lines of a change pair and what is
     // marked in them. Without one nothing says where a comment is: none
-    // let go of.
-    void    setLexer(ALTextDiff::lexer_t lexer);
+    // let go of. And the merge's, a lexer of its own over the same grammar
+    // (mergeOptions): a lexer holds the last two texts it read, which are
+    // the comparison's, and a merge reads three. Without it, the merge
+    // reads by the comparison's.
+    void    setLexer(ALTextDiff::lexer_t lexer, ALTextDiff::lexer_t merging = ALTextDiff::lexer_t());
 
     // The texts as given, their line endings LF as an editor reads them.
     const std::string&           leftText() const { return mLeftText; }
@@ -292,6 +295,9 @@ public:
     // the texts, which let it go; nothing for none.
     void                                 setMergeBase(std::optional<std::string_view> base);
     bool                                 merging() const { return mMerge.has_value(); }
+    // How a merge is found, and begun (ALDiffMerge::start): as the texts
+    // are compared, read by the merge's own lexer where it was given one.
+    ALTextDiff::Options                  mergeOptions() const;
     // How many conflicts there are, and whether a change is in one.
     S32                                  conflictCount() const;
     bool                                 changeConflicts(S32 change) const;
@@ -524,6 +530,12 @@ private:
     // Which changes are in a conflict of the merge, worked out as each
     // layout is made and each conflict settled.
     void              findConflicts();
+    // After a merge is found by the comparison's lexer, where it has none
+    // of its own, which may hold the merge's texts now in the place of
+    // those shown: the regions of those shown read again, while their
+    // lines are whole -- an edit takes the lines it keeps out of the side
+    // as it was before it reads that side's regions.
+    void              mergeRead();
 
     std::string           mLeftText;
     std::string           mRightText;
@@ -538,6 +550,8 @@ private:
     std::vector<S32>      mRangeOrder[2];
     std::vector<S32>      mRangeReach[2];
     ALTextDiff::Options   mOptions;
+    // The lexer a merge reads by, where it has one of its own.
+    ALTextDiff::lexer_t   mMergeLexer;
     bool                  mSwapped  = false;
     bool                  mFoldSame = true;
     ColumnData            mColumns[3];
@@ -577,7 +591,8 @@ private:
     std::vector<bool>     mConflicted;
     std::vector<Move>     mMoves;
     std::vector<Fold>     mFolds;
-    // The regions asked for this rebuild, let go of as the next begins.
+    // The regions asked for this rebuild, let go of as the next begins, and
+    // read again as a merge reading by the same lexer is found.
     mutable std::optional<std::pair<line_regions_t, line_regions_t>> mRegions;
 };
 

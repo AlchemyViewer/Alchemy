@@ -315,7 +315,10 @@ void ALDiffView::compareBy(const std::shared_ptr<const ALSyntaxGrammar>& grammar
     }
     mLexedBy = code;
     // Without one, comments are let go of no longer (ALDiffModel::setLexer).
-    const auto lex = [this, &code]() { mModel.setLexer(code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t()); };
+    // A merge reads by a lexer of its own: the comparison's holds the texts
+    // it compares.
+    const auto lexer = [&code]() { return code ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(code)) : ALTextDiff::lexer_t(); };
+    const auto lex   = [this, &lexer]() { mModel.setLexer(lexer(), lexer()); };
     if (mModel.leftText().empty() && mModel.rightText().empty())
     {
         lex();
