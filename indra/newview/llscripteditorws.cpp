@@ -600,10 +600,12 @@ size_t LLScriptEditorWSServer::unauthenticatedConnectionCount() const
 
 bool LLScriptEditorWSServer::update()
 {
-    // A server nobody is connected to stops after a while, so that a
+    // A server nobody is connected to may stop after a while, so that a
     // port is not held for a client that has gone; it starts again the
-    // next time an editor asks for it. Zero keeps it up for the session.
-    static LLCachedControl<S32> idle_timeout(gSavedSettings, "ExternalWebsocketSyncIdleTimeout", 600);
+    // next time an editor asks for it. Zero, as it is unless set, keeps it
+    // up for the session: an editor started later finds nothing to connect
+    // to once it has stopped.
+    static LLCachedControl<S32> idle_timeout(gSavedSettings, "ExternalWebsocketSyncIdleTimeout", 0);
     const F64                   since = mIdleSince.load();
     if (since > 0.0 && idle_timeout > 0 && LLTimer::getTotalSeconds().value() - since >= static_cast<F64>(idle_timeout) && getConnectionCount() == 0)
     {
