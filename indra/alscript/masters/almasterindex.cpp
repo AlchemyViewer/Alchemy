@@ -150,7 +150,8 @@ void ALMasterIndex::read()
     // Orphans kept a while, for a script taken and rezzed again.
     if (mLinks.prune(LLDate::now()) > 0)
     {
-        changed(Tell::No);
+        // Pruned again at the next read, should this be lost.
+        changed(Write::Soon, Tell::No);
     }
 }
 
@@ -220,7 +221,7 @@ void ALMasterIndex::link(std::vector<ALMasterLink> made)
     {
         mLinks.put(std::move(one));
     }
-    changed(Tell::Now);
+    changed(Write::Now, Tell::Now);
 }
 
 bool ALMasterIndex::unlink(const LLUUID& object, const LLUUID& item)
@@ -229,7 +230,7 @@ bool ALMasterIndex::unlink(const LLUUID& object, const LLUUID& item)
     {
         return false;
     }
-    changed(Tell::Now);
+    changed(Write::Now, Tell::Now);
     return true;
 }
 
@@ -246,7 +247,7 @@ size_t ALMasterIndex::markPending(const std::vector<Item>& items)
     }
     if (marked > 0)
     {
-        changed(Tell::Now);
+        changed(Write::Now, Tell::Now);
     }
     return marked;
 }
@@ -264,26 +265,32 @@ ALMasterIndex::Heard ALMasterIndex::heardSaved(const LLUUID& object, const LLUUI
     if (!link->hash.empty() && world == link->hash)
     {
         link->base = asset;
-        changed(Tell::No);
+        changed(Write::Soon, Tell::No);
         return Heard::Same;
     }
     link->state = ALMasterLink::State::Differing;
-    changed(Tell::Now);
+    changed(Write::Now, Tell::Now);
     return Heard::Differing;
 }
 
 bool ALMasterIndex::finished(const LLUUID& object, const LLUUID& item, const ALMasterLink& updated)
 {
-    if (!mLinks.of(object, item))
+    const ALMasterLink* was = mLinks.of(object, item);
+    if (!was)
     {
         return false;
     }
-    if (updated.object != object || updated.item != item)
+    // Moved to another item, or come to stand otherwise, is what could not
+    // be found again: written at once. What the send learned is written a
+    // moment later, with the sends ending beside it.
+    const bool moved  = updated.object != object || updated.item != item;
+    const bool prompt = moved || updated.state != was->state || ALMasterLinks::keyOf(updated.master) != ALMasterLinks::keyOf(was->master);
+    if (moved)
     {
         mLinks.remove(object, item);
     }
     mLinks.put(updated);
-    changed(Tell::Now);
+    changed(prompt ? Write::Now : Write::Soon, Tell::Now);
     return true;
 }
 
@@ -313,11 +320,11 @@ bool ALMasterIndex::adopted(const LLUUID& object, const LLUUID& item, const std:
         link->hash  = hash;
         link->stamp = stamp;
     }
-    changed(Tell::Soon);
+    changed(Write::Soon, Tell::Soon);
     return true;
 }
 
-void ALMasterIndex::changed(Tell tell)
+void ALMasterIndex::changed(Write write, Tell tell)
 {
     const F64 now = mClock.now();
     if (!mDirty)
@@ -326,7 +333,17 @@ void ALMasterIndex::changed(Tell tell)
         mDirtySince = now;
     }
     mDirtyLast = now;
-    writeSoon();
+    if (write == Write::Now)
+    {
+        // With whatever waited to be written a moment from now: a write
+        // already coming finds nothing to write.
+        handOver();
+        post();
+    }
+    else
+    {
+        writeSoon();
+    }
     switch (tell)
     {
         case Tell::Now: mChanged(); break;

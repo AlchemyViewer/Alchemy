@@ -467,4 +467,77 @@ namespace tut
         // What waits for a time gone by finds nobody.
         pass(10.0);
     }
+
+    template<> template<>
+    void almasterindex_object::test<11>()
+    {
+        set_test_name("what a person did, or what could not be found again, is written at once; what a send learned a moment later");
+        ALMasterIndex& made = open();
+        // Each read as a crash would leave the file: what was handed over
+        // written, nothing more, and no time passed.
+        const auto on_disk = [this, &made](int item) {
+            made.awaitWrites();
+            const ALMasterLinks       disk = almasterindex_data::onDisk(file);
+            const ALMasterLink* const one  = disk.of(almasterindex_data::key(1), almasterindex_data::key(item));
+            return one ? std::optional<ALMasterLink>(*one) : std::nullopt;
+        };
+
+        made.link({ almasterindex_data::link(1, 1, "/s/a.lsl"), almasterindex_data::link(1, 2, "/s/b.lsl") });
+        ensure("a link: handed over at once", !made.dirty());
+        ensure("on disk", on_disk(1).has_value());
+
+        // A send's bookkeeping waits, and a crash now loses it.
+        ALMasterLink sent = *made.linkOf(almasterindex_data::key(1), almasterindex_data::key(1));
+        sent.hash         = "h1";
+        sent.base         = almasterindex_data::key(10);
+        sent.uses         = { "disk:/s/util.lsl" };
+        made.finished(almasterindex_data::key(1), almasterindex_data::key(1), sent);
+        ensure("a send's bookkeeping waits", made.dirty());
+        ensure("not on disk yet", on_disk(1)->hash.empty());
+
+        // Something a person did takes it with it.
+        made.markPending({ { almasterindex_data::key(1), almasterindex_data::key(2) } });
+        ensure("pending: at once", !made.dirty());
+        ensure("pending on disk", on_disk(2)->state == ALMasterLink::State::Pending);
+        ensure_equals("and what waited with it", on_disk(1)->hash, std::string("h1"));
+
+        // A send that changes how a link stands: at once.
+        sent       = *made.linkOf(almasterindex_data::key(1), almasterindex_data::key(1));
+        sent.state = ALMasterLink::State::Suspended;
+        made.finished(almasterindex_data::key(1), almasterindex_data::key(1), sent);
+        ensure("suspended: at once", !made.dirty());
+        ensure("suspended on disk", on_disk(1)->state == ALMasterLink::State::Suspended);
+        sent.state = ALMasterLink::State::Active;
+        made.finished(almasterindex_data::key(1), almasterindex_data::key(1), sent);
+        ensure("active again: at once", !made.dirty() && on_disk(1)->state == ALMasterLink::State::Active);
+
+        // A send saved as another item: at once, or the link is lost with it.
+        ALMasterLink moved = sent;
+        moved.item         = almasterindex_data::key(3);
+        made.finished(almasterindex_data::key(1), almasterindex_data::key(1), moved);
+        ensure("moved: at once", !made.dirty());
+        ensure("under the new item on disk", on_disk(3).has_value() && !on_disk(1).has_value());
+
+        // A save heard from elsewhere: differing at once, the same later.
+        sent      = *made.linkOf(almasterindex_data::key(1), almasterindex_data::key(3));
+        sent.hash = ALUploadHeader::hashOfPlain("mono", "default {}");
+        made.finished(almasterindex_data::key(1), almasterindex_data::key(3), sent);
+        made.flush();
+        made.heardSaved(almasterindex_data::key(1), almasterindex_data::key(3), almasterindex_data::key(11), "default {}");
+        ensure("the same: later", made.dirty());
+        made.heardSaved(almasterindex_data::key(1), almasterindex_data::key(3), almasterindex_data::key(12), "default { touch_start(integer n) {} }");
+        ensure("differing: at once", !made.dirty() && on_disk(3)->state == ALMasterLink::State::Differing);
+
+        // A probe's answer, and a link let go of.
+        made.link(almasterindex_data::link(1, 4, "/s/d.lsl"));
+        made.adopted(almasterindex_data::key(1), almasterindex_data::key(4), "/s/d.lsl", { "disk:/s/util.lsl" }, false, std::string(), 0);
+        ensure("a probe's answer: later", made.dirty());
+        ensure("not on disk yet", on_disk(4)->uses.empty());
+        made.unlink(almasterindex_data::key(1), almasterindex_data::key(2));
+        ensure("let go of: at once", !made.dirty() && !on_disk(2).has_value());
+        ensure_equals("the probe's answer with it", on_disk(4)->uses.size(), size_t(1));
+        // Nothing left for the time to write.
+        pass(10.0);
+        ensure("nothing waiting", !made.dirty());
+    }
 }

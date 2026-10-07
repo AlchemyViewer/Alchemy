@@ -145,8 +145,8 @@ public:
     // The links a file's save may send again: those whose last expansion
     // read it, or missed an include (ALMasterLinks::affectedBy).
     std::vector<ALMasterLink> affectedBy(const std::string& include);
-    // A link made, or one replaced; and one let go of. Written out a moment
-    // from now, with whatever else changes by then.
+    // A link made, or one replaced; and one let go of. Handed to the index's
+    // writer at once (ALMasterIndex).
     void link(ALMasterLink link);
     void unlink(const ALScriptRef& ref);
     // Links made together, as Link Scripts to Files makes them: each as one

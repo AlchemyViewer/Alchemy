@@ -50,13 +50,36 @@ class ALSerialWorker;
 // mending, is not lost to a session that merely looked. Links orphaned
 // long ago are let go of as it is read (ALMasterLinks::prune).
 //
-// Written a moment after the last change rather than at each: a checkout's
-// sends, or an include's dozens, end one after another, and each moves its
-// link on. The links are put into words on the thread that changed them
-// and written, forced out to the disk, on a thread of the index's own, one
-// write after another, the newest only where several wait. Whatever waits
-// is written on the asking thread as the index goes, the thread's own write
-// finished first, so that nothing changed is lost with it.
+// Written on a thread of the index's own, forced out to the disk, one write
+// after another, the newest only where several wait; the links are put into
+// words on the thread that changed them. Whatever waits is written on that
+// thread as the index goes, the writer's own write finished first, so that
+// nothing changed is lost with it.
+//
+// What a person did, or what could not be found again, is handed to the
+// writer at once: a link made or let go of, links marked pending, a link's
+// state changed -- differing, suspended, orphaned, pending, active again --
+// and a link moved to the item a send saved as. What a send learns -- the
+// base it left, its hash, the master's stamp, the files its expansion read
+// and whether it missed one, the item's name and target -- and what a probe
+// finds, are written a moment after the last such change rather than at
+// each: a checkout's sends, or an include's dozens, end one after another,
+// and each moves its link on.
+//
+// A crash in that moment loses only what a send or a probe learned, and it
+// is learned again. The next send through the link finds the world moved
+// from the base the file has, and reads what the world holds: where that is
+// what would go up -- the master unchanged since -- a send of the studio's
+// own is skipped and the base moved, and a save of the master goes up again
+// as any save does, no change in the world said. Where the master changed
+// since, the lost send's own text reads as a change made in the world: a
+// save of the master still goes up, keeping that text in History first and
+// saying the world changed, and a send of the studio's own is held until
+// the scripter sends it. Nothing is lost, but that is said once wrongly. A
+// link nothing went up through reads the world at its first send whatever
+// its base, so a lost first send comes to the same. The files read, and
+// whether one was missed, are learned again at the link's next send: until
+// then an include's save may not send it again.
 //
 // Kept on one thread, as ALMasterLinks is. Paths come in as the links keep
 // them, their links on disk followed: a master as ALMasterLink::master
@@ -182,15 +205,21 @@ private:
     struct Writer;
 
     void read();
-    // A change to the links: the index to be written a moment from now,
-    // and whoever listens told at once, or a moment from now, or not at all.
+    // A change to the links: the index handed to the writer at once, or
+    // written a moment from now with what else changes by then; and whoever
+    // listens told at once, or a moment from now, or not at all.
+    enum class Write : U8
+    {
+        Now,
+        Soon
+    };
     enum class Tell : U8
     {
         Now,
         Soon,
         No
     };
-    void changed(Tell tell);
+    void changed(Write write, Tell tell);
     void writeSoon();
     void writeDue();
     // What changed put into words, and handed to the writer; and the writer
