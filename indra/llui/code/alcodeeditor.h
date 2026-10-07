@@ -1204,6 +1204,10 @@ private:
     // Each placeholder's mirrors made what it holds, as one step of its
     // own.
     void                     syncMirrors(S32 index);
+    // A snippet's body read to go in at a place (ALSnippetSession::expand):
+    // indented as the line it goes into, its own levels in that line's
+    // blank, or as tabs are typed here.
+    ALSnippetSession::Expansion expandSnippet(std::string_view body, const ALTextPos& at) const;
     // The selections folding has hidden, the main one among them, each a
     // caret at the end of the fold's line.
     void                     caretsOutOfFolds();

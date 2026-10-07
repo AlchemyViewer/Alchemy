@@ -3914,10 +3914,7 @@ ALTextEditing::Change ALCodeEditor::completionAt(const Completion& chosen, const
     {
         // Indented as the line it goes into, as insertSnippet has it; the
         // caret on its first stop.
-        const std::string&                line     = document().line(over.begin.line);
-        const std::string                 indent   = line.substr(0, std::min(line.size(), line.find_first_not_of(" \t")));
-        const ALSnippetSession::Expansion expanded = ALSnippetSession::expand(chosen.snippet, over.begin, indent,
-                                                                              ALTextIndent::indentUnit(indent, { getTabWidth(), getSoftTabs() }));
+        const ALSnippetSession::Expansion expanded = expandSnippet(chosen.snippet, over.begin);
         const ALTextRange                 land     = expanded.stops.empty() ? expanded.landing : expanded.stops.front();
         one.replacements.push_back({ over, expanded.text });
         one.selects = true;
@@ -3970,9 +3967,7 @@ void ALCodeEditor::insertSnippet(std::string_view body)
     // the body after the first follows.
     const ALTextRange           selection = this->selection();
     const ALTextPos             at        = std::min(selection.begin, selection.end);
-    const std::string&          line      = document().line(at.line);
-    const std::string           indent    = line.substr(0, std::min(line.size(), line.find_first_not_of(" \t")));
-    ALSnippetSession::Expansion expanded  = ALSnippetSession::expand(body, at, indent, ALTextIndent::indentUnit(indent, { getTabWidth(), getSoftTabs() }));
+    ALSnippetSession::Expansion expanded  = expandSnippet(body, at);
     insertText(expanded.text);
     const ALTextRange landing = expanded.landing;
     if (expanded.stops.empty())
@@ -3985,6 +3980,12 @@ void ALCodeEditor::insertSnippet(std::string_view body)
     mSnippet.start(std::move(expanded.stops), landing.begin, std::move(expanded.mirrors),
                    landing.begin.line == landing.end.line ? landing.end.column - landing.begin.column : 0);
     setSelection(mSnippet.stops()[0]);
+}
+
+ALSnippetSession::Expansion ALCodeEditor::expandSnippet(std::string_view body, const ALTextPos& at) const
+{
+    const std::string indent = ALTextIndent::leadingBlanks(document(), at.line);
+    return ALSnippetSession::expand(body, at, indent, ALTextIndent::indentUnit(indent, { getTabWidth(), getSoftTabs() }));
 }
 
 void ALCodeEditor::syncMirrors(S32 index)
