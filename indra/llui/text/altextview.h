@@ -957,6 +957,11 @@ protected:
     // A row's glyph colours, after the kinds have coloured them, for a
     // subclass with colours of its own for some glyphs.
     virtual void tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors) {}
+    // Each kind's colour as a glyph is drawn in it at an alpha: made again
+    // only when the alpha or the colour table changes, since a frame's
+    // glyphs ask for a few kinds thousands of times.
+    typedef std::array<LLColor4U, static_cast<size_t>(ALSyntaxKind::COUNT)> kind_inks_t;
+    const kind_inks_t& kindInks(F32 alpha);
     // A line's row drawn at a place, coloured as it is in the text: what
     // a header pinned at the top is drawn with.
     void drawRowAt(S32 line, S32 row, F32 left, S32 screen_top, F32 alpha);
@@ -1430,6 +1435,15 @@ private:
     bool             mScrollMapLeft    = false;
 
     std::vector<LLColor4U> mColorScratch;
+    // What kindInks made, at the alpha and the colour table's generation it
+    // made them at.
+    struct KindInks
+    {
+        F32         alpha  = -1.f;
+        U32         colors = 0;
+        kind_inks_t inks;
+    };
+    KindInks               mKindInks;
     // A frame's rows in sight, and their glyphs as one call's runs with the
     // colours they are drawn in: kept from frame to frame rather than made
     // for each.

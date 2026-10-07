@@ -4926,6 +4926,23 @@ const LLColor4& ALTextView::colorForKind(ALSyntaxKind kind) const
     return mKindColors[static_cast<size_t>(kind)].get();
 }
 
+const ALTextView::kind_inks_t& ALTextView::kindInks(F32 alpha)
+{
+    // The kinds' colours are the colour table's, or set once as the view
+    // was made: the table's generation says when any of them changed.
+    const U32 colors = LLUIColorTable::instance().generation();
+    if (mKindInks.alpha != alpha || mKindInks.colors != colors)
+    {
+        mKindInks.alpha  = alpha;
+        mKindInks.colors = colors;
+        for (size_t kind = 0; kind < mKindInks.inks.size(); ++kind)
+        {
+            mKindInks.inks[kind] = LLColor4U(mKindColors[kind].get() % alpha);
+        }
+    }
+    return mKindInks.inks;
+}
+
 // static
 std::string ALTextView::kindColorName(std::string_view prefix, ALSyntaxKind kind)
 {
@@ -4987,7 +5004,8 @@ void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALText
 {
     const size_t count = row.glyphEnd - row.glyphBegin;
     mColorScratch.resize(count);
-    const LLColor4                    base   = textColor() % alpha;
+    const LLColor4U                   base   = LLColor4U(textColor() % alpha);
+    const kind_inks_t&                inks   = kindInks(alpha);
     const std::vector<ALSyntaxToken>& tokens = mHighlighter.tokens(line);
     // From the first token that reaches the row, where the glyphs go
     // forward through the line: a long line wraps into many rows.
@@ -5002,11 +5020,11 @@ void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALText
         }
         if (t < tokens.size() && tokens[t].begin <= cluster && tokens[t].kind != ALSyntaxKind::Text)
         {
-            mColorScratch[k] = LLColor4U(colorForKind(tokens[t].kind) % alpha);
+            mColorScratch[k] = inks[static_cast<size_t>(tokens[t].kind)];
         }
         else
         {
-            mColorScratch[k] = LLColor4U(base);
+            mColorScratch[k] = base;
         }
     }
     // A style's colour over the grammar's.

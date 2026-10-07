@@ -1112,6 +1112,7 @@ void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
             // alongside; else from the line's first, and the grammar asked
             // afresh for each glyph.
             const std::vector<ALSyntaxToken>& grammar = highlighter().tokens(line);
+            const kind_inks_t&                inks    = kindInks(alpha);
             size_t                            g_at    = 0;
             if (laid.ordered)
             {
@@ -1157,7 +1158,7 @@ void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
                 {
                     continue;
                 }
-                colors[k] = LLColor4U(colorForKind(token->kind) % alpha);
+                colors[k] = inks[static_cast<size_t>(token->kind)];
             }
         }
     }
@@ -1196,7 +1197,10 @@ void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
     {
         return;
     }
-    size_t next = laid.ordered ? static_cast<size_t>(std::lower_bound(at.begin(), at.end(), std::make_pair(row.begin, S32_MIN)) - at.begin()) : 0;
+    // The three depths' colours made once for the row, not at each bracket.
+    const LLColor4U depth_inks[3] = { LLColor4U(mBracketColors[0].get() % alpha), LLColor4U(mBracketColors[1].get() % alpha),
+                                      LLColor4U(mBracketColors[2].get() % alpha) };
+    size_t          next          = laid.ordered ? static_cast<size_t>(std::lower_bound(at.begin(), at.end(), std::make_pair(row.begin, S32_MIN)) - at.begin()) : 0;
     for (size_t k = 0; k < colors.size(); ++k)
     {
         const S32 cluster = laid.glyphs[row.glyphBegin + k].cluster;
@@ -1206,7 +1210,7 @@ void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
         }
         if (next < at.size() && at[next].first == cluster)
         {
-            colors[k] = LLColor4U(mBracketColors[static_cast<size_t>(at[next].second % 3)].get() % alpha);
+            colors[k] = depth_inks[static_cast<size_t>(at[next].second % 3)];
         }
     }
 }
