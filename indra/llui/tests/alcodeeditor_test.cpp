@@ -3288,4 +3288,84 @@ namespace tut
         ensure("the mark's card", e.cardShown() && e.card()->text().find("something is wrong here") != std::string::npos);
         ensure_equals("its fixes asked for once", fixed, size_t(1));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<89>()
+    {
+        set_test_name("the gutter, the mouse and the notes on the band of pinned headers go by the header drawn there, not the line hidden under it");
+        std::string text = "default\n{\n    state_entry()\n    {\n";
+        for (int i = 0; i < 80; ++i)
+        {
+            text += "        llOwnerSay(\"line " + std::to_string(i) + "\");\n";
+        }
+        text += "    }\n}\n";
+        ALCodeEditor& e = make(text.c_str());
+        e.setStickyHeaders(true);
+        e.setHoverProvider([](const ALTextPos&, std::string_view word, std::string& out) {
+            if (word != "state_entry")
+            {
+                return false;
+            }
+            out = "the state_entry event";
+            return true;
+        });
+        ALCodeEditor::Decoration d;
+        d.range   = ALTextRange(ALTextPos(2, 0), ALTextPos(2, 1));
+        d.message = "a problem with the handler";
+        e.setDecorations({ d });
+        const LLRect text_rect = e.textRect();
+        const S32    row_h     = e.layout().rowHeight();
+        // Deep in the handler: "default" and "state_entry()" pinned over
+        // the top two rows, the handler's header on the second.
+        e.setCaret(ALTextPos(70, 8));
+        const S32 y      = text_rect.mTop - row_h - row_h / 2;
+        const S32 hidden = e.posAtLocal(text_rect.mLeft, y, false).line;
+        ensure("a line of the handler's under the band: " + std::to_string(hidden), hidden > 3);
+
+        // Its number pressed chooses the header's line.
+        const S32 number_x = e.leftEdge() + 18;
+        ensure("pressed", e.handleMouseDown(number_x, y, MASK_NONE));
+        e.handleMouseUp(number_x, y, MASK_NONE);
+        const ALTextRange chosen = e.selection().normalised();
+        ensure("the header's line chosen: " + std::to_string(chosen.begin.line), chosen.begin == ALTextPos(2, 0) && chosen.end == ALTextPos(3, 0));
+
+        // The mouse on its number: the header's problems, kept there.
+        e.setCaret(ALTextPos(70, 8));
+        e.handleHover(number_x, y, MASK_NONE);
+        e.handleToolTip(number_x, y, MASK_NONE);
+        ensure("the header's card from the gutter", e.cardShown() && e.card()->text().find("a problem with the handler") != std::string::npos);
+        e.handleHover(number_x, y, MASK_NONE);
+        ensure("kept on the band's row in the gutter", e.cardShown());
+
+        // The mouse on the header's name drawn there: the name's card.
+        S32       row;
+        const S32 name_x = text_rect.mLeft + static_cast<S32>(e.layout().xOf(2, 8, &row)) + 1;
+        e.handleHover(name_x, y, MASK_NONE);
+        e.handleToolTip(name_x, y, MASK_NONE);
+        ensure("the header's name", e.cardShown() && e.card()->text() == "the state_entry event");
+        e.handleHover(name_x, y, MASK_NONE);
+        ensure("kept on the band's row", e.cardShown());
+        e.hideCard();
+
+        // The note of the line hidden is not found over it; one in sight is.
+        const S32 seen   = hidden + 3;
+        const S32 seen_y = text_rect.mTop - (e.layout().lineTop(seen) - e.scrollY()) - row_h / 2;
+        e.setLineNotes({ { hidden, "n", "hidden" }, { seen, "n", "seen" } });
+        const auto note_on = [&](S32 at_y) {
+            S32 on = -1;
+            for (S32 nx = text_rect.mLeft; nx < text_rect.mRight && on < 0; ++nx)
+            {
+                on = e.noteAtLocal(nx, at_y);
+            }
+            return on;
+        };
+        ensure_equals("the note in sight", note_on(seen_y), seen);
+        ensure_equals("none on the band", note_on(y), -1);
+
+        // The fold column there folds the header's block.
+        const S32 fold_x = e.leftEdge() + e.gutterWidth() - 6;
+        e.handleMouseDown(fold_x, y, MASK_NONE);
+        e.handleMouseUp(fold_x, y, MASK_NONE);
+        ensure("the header's block folded", e.isFolded(2) && !e.isFolded(hidden));
+    }
 }

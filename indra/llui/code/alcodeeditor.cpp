@@ -721,7 +721,7 @@ S32 ALCodeEditor::changeBarAt(S32 x, S32 y)
     {
         return -1;
     }
-    const S32 line = posAtLocal(text.mLeft, y, false).line;
+    const S32 line = posShownAt(x, y).line;
     return lineChanged(line) ? line : -1;
 }
 
@@ -1370,7 +1370,8 @@ S32 ALCodeEditor::noteAtLocal(S32 x, S32 y)
     {
         return -1;
     }
-    const S32 line = posAtLocal(text.mLeft, y, false).line;
+    // On the band, a header, whose note is not drawn there with it.
+    const S32 line = posShownAt(x, y).line;
     return noteBoxOf(line, text).pointInRect(x, y) ? line : -1;
 }
 
@@ -1488,6 +1489,26 @@ S32 ALCodeEditor::stickyRows()
 S32 ALCodeEditor::coveredAbove(S32 local_x)
 {
     return llmax(ALTextView::coveredAbove(local_x), stickyRows() * layout().rowHeight());
+}
+
+ALTextPos ALCodeEditor::posShownAt(S32 x, S32 y)
+{
+    const LLRect text  = textRect();
+    const S32    row_h = layout().rowHeight();
+    if (row_h > 0 && y <= text.mTop && (x >= text.mLeft || mShowLineNumbers))
+    {
+        // Each header's first row, at the left as the text is: as
+        // drawAfterRows draws them.
+        const std::vector<S32> pinned = stickyLines();
+        const S32              row    = (text.mTop - y) / row_h;
+        if (row < static_cast<S32>(pinned.size()))
+        {
+            const S32 line  = pinned[static_cast<size_t>(row)];
+            const F32 x_rel = static_cast<F32>(x - text.mLeft) + scrollX();
+            return document().clamp(ALTextPos(line, layout().columnAt(line, 0, x_rel, false)));
+        }
+    }
+    return posAtLocal(x, y, false);
 }
 
 void ALCodeEditor::drawAfterRows(const LLRect& text)
@@ -4118,7 +4139,7 @@ void ALCodeEditor::clearPlaceholders()
 
 bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
 {
-    const ALTextPos at = posAtLocal(x, y, false);
+    const ALTextPos at = posShownAt(x, y);
     // A problem under the mouse says what it is, and the word what it is
     // as well: what is wrong with a call is read against what it takes.
     ALTextRange                    about;
@@ -4341,7 +4362,7 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
         // The name in the head coloured as the text colours it where the
         // analyzer said what it is: a global, a parameter, a function of
         // the script's own, which the grammar alone does not know.
-        const ALTextRange word = mMouseX >= 0 ? identifierAt(posAtLocal(mMouseX, mMouseY, false)) : identifierAt(about.begin);
+        const ALTextRange word = mMouseX >= 0 ? identifierAt(posShownAt(mMouseX, mMouseY)) : identifierAt(about.begin);
         styleAsCode(*mCard, card.headLine, styles, document().text(word), word.empty() ? ALSyntaxKind::Text : semanticKindAt(word.begin));
     }
     const S32 lines = mCard->document().lineCount();
@@ -4399,9 +4420,17 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
         mCard->layout().line(line);
     }
     const S32 height = ALCodeCards::height(mCard->layout().totalHeight());
-    // Where: under the row of what it is about, at its start; above it
-    // where under would run off the bottom; within the text's width.
+    // Where: under the row of what it is about, at its start -- the band's
+    // row where its line is a header pinned over the top, which is where
+    // it is drawn; above it where under would run off the bottom; within
+    // the text's width.
     mCardAnchor = anchorOf(about);
+    const std::vector<S32> pinned = stickyLines();
+    if (const auto it = std::find(pinned.begin(), pinned.end(), about.begin.line); it != pinned.end())
+    {
+        mCardAnchor.mTop    = text.mTop - static_cast<S32>(it - pinned.begin()) * layout().rowHeight();
+        mCardAnchor.mBottom = mCardAnchor.mTop - layout().rowHeight();
+    }
     mCard->setShape(ALCodeCards::place(mCardAnchor, text, width, height));
     mCard->setVisible(true);
 }
@@ -4427,7 +4456,7 @@ void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text, std
     {
         return;
     }
-    const ALTextPos   under = posAtLocal(mMouseX, mMouseY, false);
+    const ALTextPos   under = posShownAt(mMouseX, mMouseY);
     const ALTextRange word  = identifierAt(under);
     if (word != mCards.asked())
     {
@@ -5212,7 +5241,7 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     // listed as Control-. would list them.
     if (mShowLineNumbers && x >= leftEdge() && x < leftEdge() + MARK_INSET + MARK_SIZE + GUTTER_PAD / 2)
     {
-        const S32 line = posAtLocal(text.mLeft, y, false).line;
+        const S32 line = posShownAt(x, y).line;
         // On the caret's line the lightbulb, which is Control-.: the
         // refactors asked for with the fixes.
         if (fixableAt(line) && (line == caret().line ? quickFix() : openFixes(line)))
@@ -5222,7 +5251,7 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     }
     if (mShowFoldMarkers && x < gutter_right - heatWidth() && x >= gutter_right - heatWidth() - FOLD_COLUMN)
     {
-        const S32 line = posAtLocal(text.mLeft, y, false).line;
+        const S32 line = posShownAt(x, y).line;
         if (regionStartingAt(line))
         {
             if (isFolded(line))
@@ -5249,9 +5278,10 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     }
     if (x >= leftEdge() && x < gutter_right && text.mBottom <= y && y <= text.mTop)
     {
-        // A line number chooses its line, whole; with shift, from the
-        // selection's anchor to it.
-        const S32 line = posAtLocal(text.mLeft, y, false).line;
+        // A line number chooses its line, whole -- a pinned header's, its
+        // number pinned with it; with shift, from the selection's anchor
+        // to it.
+        const S32 line = posShownAt(x, y).line;
         const S32 last = document().lineCount() - 1;
         const ALTextPos from(line, 0);
         const ALTextPos to = line < last ? ALTextPos(line + 1, 0) : ALTextPos(line, static_cast<S32>(document().line(line).size()));
@@ -5324,7 +5354,7 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
     // the strip of heat at its edge, what the line came to.
     if (x >= leftEdge() && x < leftEdge() + gutterWidth() && text.mBottom <= y && y <= text.mTop)
     {
-        const S32 line = posAtLocal(text.mLeft, y, false).line;
+        const S32 line = posShownAt(x, y).line;
         if (mHeatShown && x >= leftEdge() + gutterWidth() - heatWidth())
         {
             if (line >= 0 && line < static_cast<S32>(mAsides.size()) && !mAsides[static_cast<size_t>(line)].heatTip.empty())
@@ -5516,7 +5546,7 @@ bool ALCodeEditor::handleHover(S32 x, S32 y, MASK mask)
     }
     const S32 gutter_right = leftEdge() + gutterWidth();
     mGutterHover           = gutterWidth() > 0 && x >= leftEdge() && x < gutter_right && textRect().mBottom <= y && y <= textRect().mTop;
-    mGutterHoverLine       = mGutterHover ? posAtLocal(textRect().mLeft, y, false).line : -1;
+    mGutterHoverLine       = mGutterHover ? posShownAt(x, y).line : -1;
     const bool taken = ALTextView::handleHover(x, y, mask);
     // A changed line's bar is pressed for a peek at its change.
     if (changeBarAt(x, y) >= 0)

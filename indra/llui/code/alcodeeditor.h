@@ -867,6 +867,12 @@ private:
     S32              stickyRows();
     // What is drawn over the top of the text: the pinned headers too.
     S32              coveredAbove(S32 local_x) override;
+    // The position of the text drawn at a point of the view, which the
+    // gutter, the mouse and a note's tip go by: on the band of pinned
+    // headers -- over the text, and over the gutter where it shows its
+    // numbers -- the header drawn on that row, on its first row, rather
+    // than the line hidden under it; elsewhere posAtLocal's.
+    ALTextPos        posShownAt(S32 x, S32 y);
 
     void              ensureRegions();
     void              applyFolds();
