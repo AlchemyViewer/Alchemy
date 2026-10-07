@@ -149,6 +149,10 @@ public:
     // from now, with whatever else changes by then.
     void link(ALMasterLink link);
     void unlink(const ALScriptRef& ref);
+    // Links made together, as Link Scripts to Files makes them: each as one
+    // is, and the index, the watch and whoever listens changed once for them
+    // all, rather than once for each. The one above is a batch of one.
+    void link(std::vector<ALMasterLink> made);
     // Scripts not sent when they might have been, waiting to be sent by
     // hand; how many of them are linked still, and so marked.
     size_t markPending(const std::vector<ALScriptRef>& refs);

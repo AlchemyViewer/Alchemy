@@ -87,7 +87,21 @@ std::vector<ALMasterLink> ALScriptDiskMasters::mastering(const std::string& mast
 
 void ALScriptDiskMasters::link(ALMasterLink link)
 {
-    mLinks.put(std::move(link));
+    std::vector<ALMasterLink> made;
+    made.push_back(std::move(link));
+    this->link(std::move(made));
+}
+
+void ALScriptDiskMasters::link(std::vector<ALMasterLink> made)
+{
+    if (made.empty())
+    {
+        return;
+    }
+    for (ALMasterLink& one : made)
+    {
+        mLinks.put(std::move(one));
+    }
     mChanged();
 }
 

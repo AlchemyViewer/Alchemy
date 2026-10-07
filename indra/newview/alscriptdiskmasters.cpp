@@ -374,12 +374,24 @@ std::vector<ALMasterLink> ALScriptDiskMasters::linksIn(const LLUUID& object)
 
 void ALScriptDiskMasters::link(ALMasterLink link)
 {
-    if (ALMasterLinks* all = links())
+    std::vector<ALMasterLink> made;
+    made.push_back(std::move(link));
+    this->link(std::move(made));
+}
+
+void ALScriptDiskMasters::link(std::vector<ALMasterLink> made)
+{
+    ALMasterLinks* all = links();
+    if (!all || made.empty())
     {
-        link.master = canonical(link.master);
-        all->put(std::move(link));
-        changed();
+        return;
     }
+    for (ALMasterLink& one : made)
+    {
+        one.master = canonical(one.master);
+        all->put(std::move(one));
+    }
+    changed();
 }
 
 void ALScriptDiskMasters::unlink(const ALScriptRef& ref)

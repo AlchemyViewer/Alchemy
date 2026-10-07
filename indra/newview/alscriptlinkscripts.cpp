@@ -701,9 +701,11 @@ void ALScriptLinkScripts::link(bool send_differing, std::function<void(const Lin
         {
             return;
         }
-        ALScriptDiskMasters& masters = ALScriptDiskMasters::instance();
-        Linked               linked;
-        size_t               at = 0;
+        ALScriptDiskMasters&      masters = ALScriptDiskMasters::instance();
+        Linked                    linked;
+        std::vector<ALMasterLink> links;
+        std::vector<ALScriptRef>  sends;
+        size_t                    at = 0;
         for (const Row& row : chosen)
         {
             S64 stamp = 0;
@@ -712,13 +714,21 @@ void ALScriptLinkScripts::link(bool send_differing, std::function<void(const Lin
                 const ALFileStamp& was = stamps[at++];
                 stamp                  = was.exists ? was.time : 0;
             }
-            masters.link(linkOf(row, stamp));
+            links.push_back(linkOf(row, stamp));
             const bool send = send_differing && row.world == World::Differs;
             if (send)
             {
-                masters.send(row.ref, ALMasterPlan::Send::Derived);
+                sends.push_back(row.ref);
             }
             linked.ones.push_back({ row.name, row.place, row.file, send });
+        }
+        // Linked all at once: the index written, the files watched and the
+        // tabs and the Explorer told once for them all. Then those that
+        // differ sent, each through its link.
+        masters.link(std::move(links));
+        for (const ALScriptRef& ref : sends)
+        {
+            masters.send(ref, ALMasterPlan::Send::Derived);
         }
         cancel();
         done(linked);
