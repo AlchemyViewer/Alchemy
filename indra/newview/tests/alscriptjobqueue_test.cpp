@@ -118,8 +118,8 @@ namespace tut
         ensure("as it yields", queue.yielded());
         ensure("its answer wanted still", !queue.superseded());
         ensure("said once", !queue.add("front/signature", "front", 1, 0, "front-signature"));
+        queue.requeue("back-check");
         queue.finished();
-        queue.requeue("back/check", "back", 1, 4, "back-check");
         ensure_equals("it runs after what it yielded to", drained(), std::string("front-hover front-signature front-check back-check"));
 
         // Asked again while it ran: the newer stands for it.
@@ -127,8 +127,8 @@ namespace tut
         ensure("taken", queue.take().has_value());
         ensure("stopped", queue.add("front/hover", "front", 2, 0, "front-hover-2"));
         queue.add("back/check", "back", 2, 4, "back-check-2", true);
+        queue.requeue("back-check-1");
         queue.finished();
-        queue.requeue("back/check", "back", 1, 4, "back-check-1");
         ensure_equals("the newer alone", drained(), std::string("front-hover-2 back-check-2"));
 
         // One that does not yield runs on.
@@ -137,5 +137,40 @@ namespace tut
         ensure("left be", !queue.add("front/hover", "front", 3, 0, "front-hover-3") && !queue.yielded());
         queue.finished();
         drained();
+    }
+
+    template<> template<>
+    void alscriptjobqueue_object::test<5>()
+    {
+        set_test_name("a job that yielded waits again in the turn it was asked at, and runs through the next time; one let go of as it runs is unwanted and waits no more");
+        queue.add("back/check", "back", 1, 4, "back-check", true);
+        ensure("taken", queue.take().has_value());
+        queue.add("other/check", "other", 1, 4, "other-check", true);
+        ensure("stopped by a question of the front tab", queue.add("front/hover", "front", 1, 0, "front-hover") && queue.yielded());
+        queue.requeue("back-check");
+        queue.finished();
+        auto next = queue.take();
+        ensure("the question first", next && next->second == "front-hover");
+        queue.finished();
+        next = queue.take();
+        ensure("then it, ahead of what was asked after it", next && next->second == "back-check");
+        ensure("not stopped again", !queue.add("front/hover", "front", 1, 0, "front-hover-again") && !queue.yielded());
+        ensure("its answer wanted", !queue.superseded());
+        queue.finished();
+        ensure_equals("the rest after", drained(), std::string("front-hover-again other-check"));
+
+        // Let go of while it runs: unwanted, said once, and not put back
+        // though it was stopped as it yielded.
+        queue.add("gone/check", "gone", 1, 4, "gone-check", true);
+        ensure("taken", queue.take().has_value());
+        queue.add("gone/hover", "gone", 1, 0, "gone-hover");
+        ensure("yielded", queue.yielded());
+        ensure("let go of: to be stopped", queue.forget("gone"));
+        ensure("unwanted", queue.superseded());
+        ensure("said once", !queue.forget("gone"));
+        queue.requeue("gone-check");
+        queue.finished();
+        ensure_equals("nothing of it waits", queue.waiting(), size_t(0));
+        ensure("another script's running job left be", !queue.forget("other"));
     }
 }

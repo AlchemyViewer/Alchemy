@@ -136,10 +136,9 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
     // waited there; on SLua's lane or LSL's, weighing included.
     const std::string key  = ALScriptAnalysisLane::keyOf(request);
     const U8          rank = ALScriptAnalysisLane::rankOf(request);
-    // Another tab's SLua check gives way to the front tab's questions:
-    // stopped for one, and run again after it. LSL's are short, and the
-    // rest is the front tab's own, or weighing.
-    const bool            yields = request.lua && request.kind == Kind::Check && !request.front;
+    // Another tab's SLua work gives way to the front tab's questions:
+    // stopped for one, and run again after it.
+    const bool            yields = ALScriptAnalysisLane::yieldsOf(request);
     ALScriptAnalysisLane& lane   = request.lua ? *mLuau : *mTailslide;
     job.request                  = std::move(request);
     if (!lane.post(key, rank, yields, std::move(job)))

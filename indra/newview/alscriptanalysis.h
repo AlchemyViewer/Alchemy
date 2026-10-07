@@ -248,7 +248,8 @@ public:
     // passed over: whoever asked has asked again.
     void ask(Request request, callback_t callback);
 
-    // A script let go of: nothing it has waiting is run.
+    // A script let go of: nothing it has waiting is run, and what runs for
+    // it is stopped.
     void forget(const std::string& id);
 
     // Tailslide's work that is no question -- the optimizer's run over what

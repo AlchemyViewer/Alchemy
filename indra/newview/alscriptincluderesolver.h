@@ -92,6 +92,10 @@ public:
     }
     bool listed(const LLUUID& prim) const { return mContents.contains(prim); }
     bool unanswered(const LLUUID& prim) const { return mUnanswered.contains(prim); }
+    // An inventory folder a run waited for (folderIn), its fetch back or
+    // given up on: one still not in is read for what the model holds of it
+    // from now on, rather than holding up the runs after.
+    void folderWaited(const LLUUID& folder);
 
     // ALIncludeWorld
     std::vector<Item>     inObject(const std::string& asking, const std::string& item_name, bool& unknown) override;
@@ -118,6 +122,13 @@ private:
     U32                             diskGeneration();
     // Every script and notecard of a name in the inventory.
     LLInventoryModel::item_array_t namedItems(const std::string& name);
+    // Whether an inventory folder's contents may be read, for a require
+    // walking it, asking for them where they are not fetched yet: Pending
+    // then where a run resolving waits for what it wants, which notes it
+    // for that run to want; else Yes, for what the model holds -- all of
+    // them, where they are in -- as where a run waited and they never came.
+    // No where there is no such folder.
+    ALPreprocessor::Found          folderIn(const LLUUID& id);
 
     // The texts fetched: the preprocessor's.
     ALScriptTextCache& mTexts;
@@ -133,4 +144,11 @@ private:
     // a run over a script in one says why, until a save asks again and it
     // answers.
     boost::unordered_flat_set<LLUUID> mUnanswered;
+    // Whether a resolve is under way for a run that waits for what it
+    // wants; the inventory folders it found not fetched yet, which its run
+    // is to want; and those a run waited for that never came, read for
+    // what the model holds.
+    bool                              mCollecting = false;
+    std::vector<LLUUID>               mFoldersWanted;
+    boost::unordered_flat_set<LLUUID> mFoldersWaited;
 };

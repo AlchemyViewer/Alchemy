@@ -95,7 +95,7 @@ public:
     virtual void fetchNearby(const ALScriptPreprocessor::Request& request, std::function<void()> fetched) {}
     // A SLua alias of the studio's own named for a folder on disk, and the
     // disk read (ALScriptPreprocessor::studioAliases): as a fix that moves a
-    // require onto one does first. False where the name is another
-    // folder's already.
+    // require onto one does once its edit is sure to take, before it is
+    // made. False where the name is another folder's already.
     virtual bool nameStudioAlias(const std::string& name, const std::string& folder) { return false; }
 };

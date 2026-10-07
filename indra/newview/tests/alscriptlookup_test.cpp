@@ -31,6 +31,7 @@
 #include "../alscriptlookup.h"
 #include "alincludeidentity.h"
 #include "llfile.h"
+#include "workqueue.h"
 
 #include "../alscriptstudiowords.h"
 #include "alscriptstudio_fixture.h"
@@ -42,6 +43,7 @@
 #include <chrono>
 #include <filesystem>
 #include <sstream>
+#include <thread>
 
 // A script's id, and what the preprocessor calls a script and a file, as
 // the studio's tests' stubs of the viewer's spell them
@@ -936,17 +938,22 @@ namespace tut
     {
         set_test_name("scripts on disk under the folders a script reads from are looked through, open or not: one not open read as it is on disk, and opened to be renamed");
         make();
-        // A folder of the scripter's, as the window lists it.
+        // A folder of the scripter's, as the window lists it, where it
+        // stands: what the walk names each file by.
         namespace fs = std::filesystem;
-        const fs::path root = fs::temp_directory_path() / ("alscriptlookup_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-        fs::create_directories(root);
+        const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        fs::create_directories(made);
+        const fs::path    root     = fs::canonical(made);
         const std::string LIB_TEXT = "local M = {}\nfunction M.twice(n) return n * 2 end\nreturn M\n";
         const std::string B_LUA    = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
+        const std::string C_LUA    = "print(\"nothing of it\")\n";
         const std::string lib_file = (root / "lib.luau").string();
         const std::string b_file   = (root / "b.luau").string();
         llofstream(lib_file, std::ios::binary) << LIB_TEXT;
         llofstream(b_file, std::ios::binary) << B_LUA;
-        studio.disk = { lib_file, b_file };
+        // One that does not name it, passed over as it is read.
+        llofstream((root / "c.luau").string(), std::ios::binary) << C_LUA;
+        studio.disk = { root.string() };
         const std::string LIB = ALIncludeIdentity::ofFile(lib_file);
         const std::string B   = ALIncludeIdentity::ofFile(b_file);
         Doc& lib         = tab(LIB, ALScriptRef(), LIB_TEXT, "lib.luau");
@@ -956,7 +963,7 @@ namespace tut
         doc.language.lua = true;
         unit->start(doc, ALEditorCommand::Rename, refsOf("twice"), true, LIB, span(1, 11, 5),
                     { place("", 1, 10), place(LIB, 1, 11, 5, "lib.luau") }, doc.editor->document().version());
-        ensure_equals("the module open here once, and the other read from disk", studio.expands.size(), size_t(2));
+        ensure_equals("the module open here once, the other read from disk, and the one not naming it passed over", studio.expands.size(), size_t(2));
         ensure("the module, as its tab has it", studio.expands[0].request.path == LIB && studio.expands[0].request.sourceText() == LIB_TEXT);
         ensure("the other, as it is on disk", studio.expands[1].request.path == B && studio.expands[1].request.name == "b.luau" &&
                                                   studio.expands[1].request.sourceText() == B_LUA);
@@ -1016,5 +1023,104 @@ namespace tut
                    return place.file == OTHER && place.fileName == "b.luau" && place.span.line == 1 && place.span.column == 10;
                }));
         ensure_equals("each once: the script's, the module's, the other's", doc.lookup->places.size(), size_t(3));
+    }
+
+    template<> template<>
+    void alscriptlookup_object::test<19>()
+    {
+        set_test_name("a file open here by another way to its path is the one file: looked through once, as its tab has it, and found to be where the name is declared");
+        make();
+        namespace fs = std::filesystem;
+        const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        fs::create_directories(made / "sub");
+        const fs::path    root     = fs::canonical(made);
+        const std::string LIB_TEXT = "local M = {}\nfunction M.twice(n) return n * 2 end\nreturn M\n";
+        const std::string B_LUA    = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
+        llofstream((root / "lib.luau").string(), std::ios::binary) << LIB_TEXT;
+        llofstream((root / "b.luau").string(), std::ios::binary) << B_LUA;
+        studio.disk = { root.string() };
+        // The module where it stands, as the analyzers name it; and its tab,
+        // opened by a way round to it.
+        const std::string LIB      = ALIncludeIdentity::ofFile((root / "lib.luau").string());
+        const std::string lib_file = (root / "sub" / ".." / "lib.luau").string();
+        const std::string LIB_TAB  = ALIncludeIdentity::ofFile(lib_file);
+        const std::string TYPED    = LIB_TEXT + "-- as typed\n";
+        Doc& lib         = tab(LIB_TAB, ALScriptRef(), TYPED, "lib.luau");
+        lib.file         = lib_file;
+        lib.language.lua = true;
+        Doc& doc         = tab("a", a, "local lib = require(\"./lib\")\nprint(lib.twice(2))\n", "A");
+        doc.language.lua = true;
+        unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5),
+                    { place("", 1, 10), place(LIB, 1, 11, 5, "lib.luau") }, doc.editor->document().version());
+        ensure_equals("the module once, and the other", studio.expands.size(), size_t(2));
+        ensure("the module as its tab has it", studio.expands[0].request.path == LIB_TAB && studio.expands[0].request.sourceText() == TYPED);
+        ensure("the other from disk", studio.expands[1].request.sourceText() == B_LUA);
+        studio.expands[0].expanded(expansion("lib.luau", LIB_TAB, TYPED));
+        ensure_equals("the home itself, asked at its declaration", studio.asks.size(), size_t(1));
+        ensure("there", studio.asks[0].request.line == 1 && studio.asks[0].request.column == 11);
+        std::error_code ec;
+        fs::remove_all(root, ec);
+    }
+
+    template<> template<>
+    void alscriptlookup_object::test<20>()
+    {
+        set_test_name("with a main loop to hand them back to, the folders on disk are walked and read off the main thread, the lookup held open for them; nothing comes of a walk once the lookups are gone");
+        make();
+        namespace fs = std::filesystem;
+        const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        fs::create_directories(made);
+        const fs::path    root  = fs::canonical(made);
+        const std::string B_LUA = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
+        llofstream((root / "b.luau").string(), std::ios::binary) << B_LUA;
+        studio.disk = { root.string() };
+        // The main loop's queue, as the viewer's is: kept, since a walk
+        // let go of may hand back to it after the test.
+        static LL::WorkQueue main_loop("mainloop", 1024);
+        const auto pumped = [](const std::function<bool()>& until, std::chrono::milliseconds within) {
+            const auto deadline = std::chrono::steady_clock::now() + within;
+            while (std::chrono::steady_clock::now() < deadline)
+            {
+                main_loop.runPending();
+                if (until())
+                {
+                    return true;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+            return false;
+        };
+        Doc& doc         = tab("a", a, "local lib = require(\"./lib\")\nprint(lib.twice(2))\n", "A");
+        doc.language.lua = true;
+        const std::string LIB = "disk:/s/lib.luau";
+        unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
+                    doc.editor->document().version());
+        ensure("nothing read here", studio.expands.empty());
+        ensure("held open for the walk", doc.lookup->pending == 1 && studio.shows == 0);
+        ensure("what it read handed back", pumped([&] { return !studio.expands.empty(); }, std::chrono::seconds(5)));
+        ensure("the one naming it, as it is on disk", studio.expands.size() == 1 && studio.expands[0].request.sourceText() == B_LUA);
+        studio.expands[0].expanded(expansion("b.luau", studio.expands[0].request.path, B_LUA));
+        ensure_equals("shown once it is done with", studio.shows, 1);
+
+        // Begun again while its walk is under way: the walk let go of, and
+        // only the new lookup's read looked through.
+        unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
+                    doc.editor->document().version());
+        unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
+                    doc.editor->document().version());
+        ensure("the new one's handed back", pumped([&] { return studio.expands.size() > 1; }, std::chrono::seconds(5)));
+        pumped([] { return false; }, std::chrono::milliseconds(300));
+        ensure_equals("and nothing of the old one's", studio.expands.size(), size_t(2));
+        studio.expands[1].expanded(expansion("b.luau", studio.expands[1].request.path, B_LUA));
+        ensure_equals("shown once", studio.shows, 2);
+
+        // Begun again, and the lookups gone before what it read is back.
+        unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
+                    doc.editor->document().version());
+        unit.reset();
+        pumped([] { return false; }, std::chrono::milliseconds(300));
+        ensure_equals("nothing comes of it", studio.expands.size(), size_t(2));
+        std::error_code ec;
+        fs::remove_all(root, ec);
     }
 }

@@ -56,6 +56,17 @@ U8 ALScriptAnalysisLane::rankOf(const Request& request)
                                          : 0;
 }
 
+// static
+bool ALScriptAnalysisLane::yieldsOf(const Request& request)
+{
+    // Another tab's SLua work gives way to the front tab's questions: its
+    // check, and a lookup's question of another script, which is a whole
+    // check of that script and its modules. LSL's are short; the front
+    // tab's own are what is waited on; and a weigh is Luau's compiler
+    // alone, which nothing stops part way.
+    return request.lua && !request.front && request.kind != ALScriptAnalysis::Kind::Weigh;
+}
+
 ALScriptAnalysisLane::ALScriptAnalysisLane(std::string name, std::function<std::unique_ptr<ALScriptAnalyzer>()> make, Main main)
 :   mMake(std::move(make))
 ,   mMain(std::move(main))
@@ -98,7 +109,11 @@ bool ALScriptAnalysisLane::post(const std::string& key, U8 rank, bool yields, Jo
 void ALScriptAnalysisLane::forget(const std::string& id)
 {
     const std::lock_guard<std::mutex> lock(mQueueMutex);
-    mQueue.forget(id);
+    if (mQueue.forget(id))
+    {
+        // What runs for it answers nobody now, nor waits again.
+        ALLuauService::cancel(mRunningStop);
+    }
 }
 
 void ALScriptAnalysisLane::close()
@@ -152,36 +167,35 @@ void ALScriptAnalysisLane::runNext()
         mMain.run(job.engineDone);
         return;
     }
-    Result result   = run(job, stop);
-    bool   unwanted = false;
-    bool   yielded  = false;
+    Result result  = run(job, stop);
+    bool   stopped = false;
+    if (mAnalyzer)
+    {
+        stopped = mAnalyzer->stopped();
+        mAnalyzer->forgetStop();
+    }
+    bool unwanted = false;
+    bool again    = false;
     {
         const std::lock_guard<std::mutex> lock(mQueueMutex);
         unwanted = mQueue.superseded();
-        yielded  = mQueue.yielded();
+        // Stopped as it gave way to the front tab, and wanted still: it waits
+        // again, behind what it gave way to, and answers after -- put back
+        // before it is finished with, under the same lock, so that a newer
+        // one asked meanwhile stands for it.
+        again = mQueue.yielded() && stopped && !unwanted;
+        if (again)
+        {
+            mQueue.requeue(std::move(next->second));
+        }
         mQueue.finished();
         if (mRunningStop == stop)
         {
             mRunningStop.reset();
         }
     }
-    bool stopped = false;
-    if (mAnalyzer)
+    if (again)
     {
-        stopped = mAnalyzer->stopped();
-        mAnalyzer->forgetStop();
-    }
-    // Stopped as it gave way to the front tab, and wanted still: it waits
-    // again, behind what it gave way to, and answers after.
-    if (yielded && stopped && !unwanted)
-    {
-        const std::string id      = job.request.id;
-        const U32         version = job.request.version;
-        const U8          rank    = rankOf(job.request);
-        {
-            const std::lock_guard<std::mutex> lock(mQueueMutex);
-            mQueue.requeue(next->first, id, version, rank, std::move(next->second));
-        }
         mThread->post([this]() { runNext(); });
         return;
     }

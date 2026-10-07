@@ -223,8 +223,8 @@ public:
     // it was made over, whose places it is in.
     bool applyFix(Doc& doc, const ALScriptFix& fix, U32 version);
     // A SLua alias of the studio's own named for a folder, as a fix that
-    // moves a require onto one does first; false, said, where the name is
-    // another folder's.
+    // moves a require onto one does once its edit is sure to take, before
+    // it is made; false, said, where the name is another folder's.
     bool nameStudioAlias(const std::string& name, const std::string& folder);
     // The preferred fix of every problem picked, made as one step, once
     // asked; and made, the asking done. True where anything was made.

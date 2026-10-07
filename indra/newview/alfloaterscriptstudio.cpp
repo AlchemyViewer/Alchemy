@@ -4597,11 +4597,11 @@ void ALFloaterScriptStudio::candidates(const Doc& doc, std::function<void(ALScri
 
 std::vector<std::string> ALFloaterScriptStudio::diskCandidates(const Doc& doc)
 {
-    // How far down each folder, and how many scripts in all, a lookup reads
-    // from disk: a scripter's include folder may be a large one.
-    constexpr S32    DISK_DEPTH   = 6;
-    constexpr size_t DISK_SCRIPTS = 300;
-    if (doc.notecard)
+    // The folders alone: the lookup walks them, off the main thread. None
+    // while the disk is off, as the preprocessor reads none -- the studio's
+    // aliases on disk no more than the scripter's own folders.
+    static LLCachedControl<bool> disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
+    if (doc.notecard || !disk)
     {
         return {};
     }
@@ -4620,7 +4620,7 @@ std::vector<std::string> ALFloaterScriptStudio::diskCandidates(const Doc& doc)
             }
         }
     }
-    return ALDiskIncludes::scriptsUnder(folders, doc.language.lua, DISK_DEPTH, DISK_SCRIPTS);
+    return folders;
 }
 
 void ALFloaterScriptStudio::loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::optional<std::string>& source)> loaded)

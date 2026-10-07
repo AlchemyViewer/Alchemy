@@ -39,9 +39,10 @@
 // oldest asked first among equals. A job of a text older than one asked
 // about since, of the same script, is passed over as it is reached; and
 // the one running is told, as a newer question comes in, whether its
-// answer is wanted still. A job that yields -- another tab's check -- is
-// stopped for a question of the lowest rank, someone waiting on it, and
-// waits again to run after.
+// answer is wanted still. A job that yields -- another tab's check, a
+// lookup's question of another script -- is stopped for a question of the
+// lowest rank, someone waiting on it, and waits again to run after; once,
+// so that it is answered at all.
 //
 // Not safe on two threads: its owner holds a lock around it.
 template <class Job>
@@ -77,31 +78,44 @@ public:
         return false;
     }
 
-    // A job stopped as it yielded, back to wait under its key as it was
-    // asked: unless a newer one waits there already, which stands for it.
-    // Its rank keeps it behind what it yielded to.
-    void requeue(const std::string& key, const std::string& id, U32 version, U8 rank, Job job)
+    // The running job, stopped as it yielded, back to wait under its key
+    // as it was asked, before it is finished: unless a newer one waits
+    // there already, which stands for it, or its answer is unwanted. Its
+    // rank keeps it behind what it yielded to, and its turn among its
+    // equals is the one it was asked at. It does not yield again: stopped
+    // for every question of the front tab -- a hover as the mouse rests,
+    // the inspector as the caret moves -- and started over each time, a
+    // check of another tab might never be answered.
+    void requeue(Job job)
     {
-        if (mWaiting.contains(key))
+        if (!mRunning || mRunning->superseded || mWaiting.contains(mRunning->key))
         {
             return;
         }
-        Waiting& waiting = mWaiting[key];
-        waiting.id       = id;
-        waiting.version  = version;
-        waiting.rank     = rank;
-        waiting.yields   = true;
-        waiting.serial   = ++mSerial;
+        Waiting& waiting = mWaiting[mRunning->key];
+        waiting.id       = mRunning->id;
+        waiting.version  = mRunning->version;
+        waiting.rank     = mRunning->rank;
+        waiting.yields   = false;
+        waiting.serial   = mRunning->serial;
         waiting.job      = std::move(job);
     }
 
-    // What waits for a script let go of: nothing it asked is run.
-    void forget(const std::string& id)
+    // What waits for a script let go of: nothing it asked is run, and the
+    // answer of the one running for it is unwanted. True where that one is
+    // to be stopped.
+    bool forget(const std::string& id)
     {
         for (auto it = mWaiting.begin(); it != mWaiting.end();)
         {
             it = it->second.id == id ? mWaiting.erase(it) : std::next(it);
         }
+        if (mRunning && mRunning->id == id && !mRunning->superseded)
+        {
+            mRunning->superseded = true;
+            return true;
+        }
+        return false;
     }
 
     // The next to run, taken off and marked running: the lowest rank, the
@@ -128,7 +142,7 @@ public:
                 ++mPassedOver;
                 continue;
             }
-            mRunning = Running{ key, waiting.id, waiting.version, waiting.yields, false, false };
+            mRunning = Running{ key, waiting.id, waiting.version, waiting.rank, waiting.serial, waiting.yields, false, false };
             return std::make_pair(std::move(key), std::move(waiting.job));
         }
         return std::nullopt;
@@ -139,7 +153,7 @@ public:
     bool superseded() const { return mRunning && mRunning->superseded; }
     // Whether it was stopped as it yielded, to wait again (requeue).
     bool yielded() const { return mRunning && mRunning->yielded; }
-    // The running job done, answered or not.
+    // The running job done, answered or not. A requeue comes before it.
     void finished() { mRunning.reset(); }
 
     size_t waiting() const { return mWaiting.size(); }
@@ -156,11 +170,14 @@ private:
         U32         serial  = 0;
         Job         job{};
     };
+    // As it waited, for a requeue to put it back as it was asked.
     struct Running
     {
         std::string key;
         std::string id;
         U32         version    = 0;
+        U8          rank       = 0;
+        U32         serial     = 0;
         bool        yields     = false;
         bool        superseded = false;
         bool        yielded    = false;

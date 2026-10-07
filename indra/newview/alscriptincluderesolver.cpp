@@ -171,7 +171,30 @@ ALIncludeSearch::Asking ALScriptIncludeResolver::askingOf(const Request& request
 ALPreprocessor::Found ALScriptIncludeResolver::resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Request& request,
                                                     wanted_t* wanted, bool retry, std::vector<std::string>* alias_folders)
 {
-    return mSearch.resolve(ask, out, askingOf(request), where(), wanted, retry, alias_folders);
+    // An inventory folder a require walked into before it was fetched is
+    // wanted too, as a text is, where the run asking waits for what it
+    // wants (folderIn): fetched before it expands, and looked in again.
+    mFoldersWanted.clear();
+    mCollecting                       = wanted != nullptr;
+    const ALPreprocessor::Found found = mSearch.resolve(ask, out, askingOf(request), where(), wanted, retry, alias_folders);
+    mCollecting                       = false;
+    if (wanted)
+    {
+        for (const LLUUID& folder : mFoldersWanted)
+        {
+            wanted->insert(ALScriptPreprocessor::inventoryAliasFolder(folder));
+        }
+    }
+    return found;
+}
+
+void ALScriptIncludeResolver::folderWaited(const LLUUID& folder)
+{
+    const LLViewerInventoryCategory* category = gInventory.getCategory(folder);
+    if (category && category->getVersion() == LLViewerInventoryCategory::VERSION_UNKNOWN)
+    {
+        mFoldersWaited.insert(folder);
+    }
 }
 
 ALPreprocessor::Found ALScriptIncludeResolver::configsFor(const std::string& from, const Request& request, wanted_t* wanted, bool retry,
@@ -445,15 +468,47 @@ ALPreprocessor::Found ALScriptIncludeResolver::configsOver(const std::string& fr
 
 namespace
 {
-    // A folder of the world as a require walks it: an inventory folder,
-    // or an object's contents.
-    constexpr std::string_view INVENTORY_FOLDER = "folder:";
-    constexpr std::string_view OBJECT_CONTENTS  = "contents:";
+    // A folder of the world as a require walks it: an object's contents;
+    // or an inventory folder, named as a studio alias names one
+    // (ALScriptPreprocessor::inventoryAliasFolder).
+    constexpr std::string_view OBJECT_CONTENTS = "contents:";
 
-    bool idOf(const std::string& folder, std::string_view kind, LLUUID& out)
+    bool contentsOf(const std::string& folder, LLUUID& out)
     {
-        return folder.compare(0, kind.size(), kind) == 0 && out.set(folder.substr(kind.size()), false) && out.notNull();
+        return folder.compare(0, OBJECT_CONTENTS.size(), OBJECT_CONTENTS) == 0 && out.set(folder.substr(OBJECT_CONTENTS.size()), false) &&
+               out.notNull();
     }
+}
+
+ALPreprocessor::Found ALScriptIncludeResolver::folderIn(const LLUUID& id)
+{
+    LLViewerInventoryCategory* category = gInventory.getCategory(id);
+    if (!category)
+    {
+        return ALPreprocessor::Found::No;
+    }
+    if (category->getVersion() != LLViewerInventoryCategory::VERSION_UNKNOWN)
+    {
+        return ALPreprocessor::Found::Yes;
+    }
+    // Not fetched yet -- the model keeps a list for every folder it knows,
+    // fetched or not, empty or holding only what came on its own, so only
+    // the version says so: asked for, and pending until it comes, where a
+    // run waits for it as for a text (resolve). Where nobody waits -- a
+    // path being typed, a fix asking whether a name is found -- and where a
+    // run waited already and it never came, rather than holding up every
+    // run after: read for what the model holds of it so far, and in full
+    // once it does come.
+    category->fetch();
+    if (!mCollecting || mFoldersWaited.contains(id))
+    {
+        return ALPreprocessor::Found::Yes;
+    }
+    if (std::find(mFoldersWanted.begin(), mFoldersWanted.end(), id) == mFoldersWanted.end())
+    {
+        mFoldersWanted.push_back(id);
+    }
+    return ALPreprocessor::Found::Pending;
 }
 
 bool ALScriptIncludeResolver::folderOf(const std::string& item, std::string& folder, std::string& name)
@@ -493,7 +548,7 @@ bool ALScriptIncludeResolver::folderOf(const std::string& item, std::string& fol
     {
         return false;
     }
-    folder = std::string(INVENTORY_FOLDER) + own->getParentUUID().asString();
+    folder = ALScriptPreprocessor::inventoryAliasFolder(own->getParentUUID());
     name   = own->getName();
     return true;
 }
@@ -501,7 +556,7 @@ bool ALScriptIncludeResolver::folderOf(const std::string& item, std::string& fol
 ALPreprocessor::Found ALScriptIncludeResolver::folderAbove(const std::string& folder, std::string& out)
 {
     LLUUID id;
-    if (!idOf(folder, INVENTORY_FOLDER, id))
+    if (!ALScriptPreprocessor::inventoryAliasFolder(folder, id))
     {
         // An object's contents are no folder's.
         return ALPreprocessor::Found::No;
@@ -511,7 +566,7 @@ ALPreprocessor::Found ALScriptIncludeResolver::folderAbove(const std::string& fo
     {
         return ALPreprocessor::Found::No;
     }
-    out = std::string(INVENTORY_FOLDER) + category->getParentUUID().asString();
+    out = ALScriptPreprocessor::inventoryAliasFolder(category->getParentUUID());
     return ALPreprocessor::Found::Yes;
 }
 
@@ -519,7 +574,7 @@ ALPreprocessor::Found ALScriptIncludeResolver::named(const std::string& folder, 
                                                      std::string& subfolder)
 {
     LLUUID id;
-    if (idOf(folder, OBJECT_CONTENTS, id))
+    if (contentsOf(folder, id))
     {
         // As the object said what it holds; not said yet, it may hold the
         // name; asked and not answered, it holds nothing.
@@ -546,21 +601,19 @@ ALPreprocessor::Found ALScriptIncludeResolver::named(const std::string& folder, 
         }
         return items.empty() ? ALPreprocessor::Found::No : ALPreprocessor::Found::Yes;
     }
-    if (!idOf(folder, INVENTORY_FOLDER, id))
+    if (!ALScriptPreprocessor::inventoryAliasFolder(folder, id))
     {
         return ALPreprocessor::Found::No;
+    }
+    if (const ALPreprocessor::Found in = folderIn(id); in != ALPreprocessor::Found::Yes)
+    {
+        return in;
     }
     LLInventoryModel::cat_array_t*  cats  = nullptr;
     LLInventoryModel::item_array_t* held  = nullptr;
     gInventory.getDirectDescendentsOf(id, cats, held);
     if (!cats || !held)
     {
-        // Not fetched yet: asked for, and nothing in it until it comes,
-        // when the next check finds it.
-        if (LLViewerInventoryCategory* category = gInventory.getCategory(id))
-        {
-            category->fetch();
-        }
         return ALPreprocessor::Found::No;
     }
     // Its scripts and notecards of the name, scripts first; and its folder
@@ -584,7 +637,7 @@ ALPreprocessor::Found ALScriptIncludeResolver::named(const std::string& folder, 
     {
         if (category && category->getName() == name)
         {
-            subfolder = std::string(INVENTORY_FOLDER) + category->getUUID().asString();
+            subfolder = ALScriptPreprocessor::inventoryAliasFolder(category->getUUID());
             break;
         }
     }
@@ -594,7 +647,7 @@ ALPreprocessor::Found ALScriptIncludeResolver::named(const std::string& folder, 
 ALPreprocessor::Found ALScriptIncludeResolver::contents(const std::string& folder, std::vector<Item>& items, std::vector<std::string>& folders)
 {
     LLUUID id;
-    if (idOf(folder, OBJECT_CONTENTS, id))
+    if (contentsOf(folder, id))
     {
         const auto listed = mContents.find(id);
         if (listed == mContents.end())
@@ -607,9 +660,13 @@ ALPreprocessor::Found ALScriptIncludeResolver::contents(const std::string& folde
         }
         return ALPreprocessor::Found::Yes;
     }
-    if (!idOf(folder, INVENTORY_FOLDER, id))
+    if (!ALScriptPreprocessor::inventoryAliasFolder(folder, id))
     {
         return ALPreprocessor::Found::No;
+    }
+    if (const ALPreprocessor::Found in = folderIn(id); in != ALPreprocessor::Found::Yes)
+    {
+        return in;
     }
     LLInventoryModel::cat_array_t*  cats = nullptr;
     LLInventoryModel::item_array_t* held = nullptr;

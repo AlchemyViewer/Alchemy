@@ -87,6 +87,10 @@ public:
     // warm job; weighing; everything else -- background tabs, lookups.
     static std::string keyOf(const Request& request);
     static U8          rankOf(const Request& request);
+    // Whether it gives way to the front tab's questions, stopped for one
+    // and run again after (ALScriptJobQueue::add): another tab's SLua work
+    // but a weigh.
+    static bool        yieldsOf(const Request& request);
 
     ALScriptAnalysisLane(std::string name, std::function<std::unique_ptr<ALScriptAnalyzer>()> make, Main main);
     ~ALScriptAnalysisLane();
@@ -99,7 +103,8 @@ public:
     // it gives way to this. False, and nothing waits, once the lane is
     // closed.
     bool post(const std::string& key, U8 rank, bool yields, Job job);
-    // A script let go of: nothing it has waiting is run.
+    // A script let go of: nothing it has waiting is run, and what runs for
+    // it is stopped.
     void forget(const std::string& id);
     // Closed, the running job stopped and what waits passed over; and
     // kept closed.

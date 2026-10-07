@@ -47,6 +47,30 @@ namespace
 {
     // How long after the last keystroke the analyzers are asked.
     const F64 ANALYSIS_DELAY = 0.35;
+
+    // Whether edits made at once over a view's text take, as
+    // ALTextView::replaceAll makes them: the view not read only, something
+    // to take out or put in, and the text kept under the view's limit.
+    bool takes(const ALCodeEditor& view, const std::vector<std::pair<ALTextRange, std::string>>& edits)
+    {
+        if (view.isReadOnly())
+        {
+            return false;
+        }
+        const ALTextDocument& text  = view.document();
+        size_t                taken = 0;
+        size_t                put   = 0;
+        for (const auto& [range, with] : edits)
+        {
+            taken += text.text(range).size();
+            put += with.size();
+        }
+        if (taken == 0 && put == 0)
+        {
+            return false;
+        }
+        return view.maxBytes() == 0 || put <= taken || text.byteCount() - taken + put <= view.maxBytes();
+    }
     // What makes an include's functions and globals a script to the
     // parser: a state after them. Put after the text, so that every place
     // in it is where it was; what is said of it is dropped.
@@ -1503,8 +1527,12 @@ bool ALScriptStudioChecking::applyFix(Doc& doc, const ALScriptFix& fix, U32 vers
         edits.emplace_back(range, edit.text);
     }
     // A require moved onto a SLua alias of the studio's own: the folder
-    // named first, as the fix said it would be, and the disk read.
-    if (fix.key == "ScriptFixRequireAlias" && fix.args.size() == 3 && !nameStudioAlias(fix.args[1], fix.args[2]))
+    // named, as the fix said it would be, and the disk read -- once the
+    // edit is sure to take, so that nothing is named, nor the disk turned
+    // on, for an edit that is not made; and before it is made, so that a
+    // name another folder has taken since the check refuses the fix with
+    // nothing changed, and nothing left to undo or to redo.
+    if (fix.key == "ScriptFixRequireAlias" && fix.args.size() == 3 && (!takes(source, edits) || !nameStudioAlias(fix.args[1], fix.args[2])))
     {
         return false;
     }
