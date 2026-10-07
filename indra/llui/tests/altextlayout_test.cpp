@@ -886,4 +886,32 @@ namespace tut
         ensure_equals("down onto the short row, not past it", layout.rowOf(0, down), 1);
         ensure_equals("down again to the line's end", layout.columnAt(0, layout.rowOf(0, down) + 1, kept, true), 30);
     }
+
+    template<> template<>
+    void altextlayout_object::test<23>()
+    {
+        set_test_name("a line let go of and then changed counts for the widest by the text it has, not by what it measured before");
+        std::string text;
+        for (S32 i = 0; i < 20; ++i)
+        {
+            text += i == 12 ? "a line far longer than every other line of the text\n" : "line\n";
+        }
+        ready(text.c_str());
+        for (S32 l = 0; l < layout.lineCount(); ++l)
+        {
+            layout.line(l);
+        }
+        const F32 long_width = layout.line(12).width;
+        const F32 space      = layout.columnWidth();
+        ensure("the long line the widest", close_to(layout.contentWidth(), long_width));
+        // Let go of, far from what is in sight, then changed there: a
+        // short line made long, as Replace All makes one.
+        layout.trim(0, 3);
+        doc.replace(ALTextRange(ALTextPos(8, 0), ALTextPos(8, 4)), std::string(400, 'x'));
+        ensure("the line made long counts as long: " + std::to_string(layout.contentWidth()), layout.contentWidth() >= 399.f * space);
+        // And the long lines made short.
+        doc.replace(ALTextRange(ALTextPos(12, 0), ALTextPos(12, doc.lineLength(12))), "x");
+        doc.replace(ALTextRange(ALTextPos(8, 0), ALTextPos(8, 400)), "y");
+        ensure("the long lines made short count as short: " + std::to_string(layout.contentWidth()), layout.contentWidth() < long_width * 0.5f);
+    }
 }

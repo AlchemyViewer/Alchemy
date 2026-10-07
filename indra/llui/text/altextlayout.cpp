@@ -241,12 +241,14 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
     {
         // As many lines as before: each the edit touched is laid out again
         // when next asked for, and keeps its height until then, so that
-        // the lines below keep their tops.
+        // the lines below keep their tops -- but not its width, which was
+        // the width of the text it had, let go of or not.
         for (const ALTextDocument::Edit::LineSpan& span : spans)
         {
             for (S32 l = llmax(span.first, 0); l <= span.last && l < lineCount(); ++l)
             {
-                mLines[l].valid = false;
+                mLines[l].valid   = false;
+                mLines[l].trimmed = false;
             }
         }
     }
