@@ -31,6 +31,7 @@
 #include "alserialworker.h"
 #include "alluauconfig.h"
 #include "alscriptenvelope.h"
+#include "alscriptmasteradopt.h"
 #include "alscriptmasterfanout.h"
 #include "alscriptmastertoasts.h"
 #include "alscriptmasterupload.h"
@@ -66,6 +67,9 @@ namespace
     // seconds.
     constexpr F64         SAVE_QUIET  = 1.0;
     constexpr F64         SAVE_LATEST = 5.0;
+    // How long changes made one after another are gathered before the
+    // watch and the listeners hear of them.
+    constexpr F32         CHANGE_SOON = 0.25f;
 
     // A path as the links keep it: the file's own, links followed.
     std::string canonical(const std::string& path)
@@ -133,7 +137,8 @@ struct ALScriptDiskMasters::Writer
 };
 
 ALScriptDiskMasters::ALScriptDiskMasters()
-: mFanOut(std::make_unique<ALScriptMasterFanOut>()), mToasts(std::make_unique<ALScriptMasterToasts>()), mWriter(std::make_shared<Writer>())
+: mFanOut(std::make_unique<ALScriptMasterFanOut>()), mAdopt(std::make_unique<ALScriptMasterAdopt>()), mToasts(std::make_unique<ALScriptMasterToasts>()),
+  mWriter(std::make_shared<Writer>())
 {
     mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptSaved& saved) { heardSaved(saved); });
 }
@@ -284,6 +289,27 @@ void ALScriptDiskMasters::changed()
     mChanged();
 }
 
+void ALScriptDiskMasters::changedSoon()
+{
+    save();
+    if (mChangeComing)
+    {
+        return;
+    }
+    mChangeComing                   = true;
+    const std::weak_ptr<bool> alive = mAlive;
+    doAfterInterval(
+        [this, alive]() {
+            if (alive.lock())
+            {
+                mChangeComing = false;
+                rewatch();
+                mChanged();
+            }
+        },
+        CHANGE_SOON);
+}
+
 void ALScriptDiskMasters::start()
 {
     if (!mEnabledConnection.connected())
@@ -386,12 +412,48 @@ void ALScriptDiskMasters::link(std::vector<ALMasterLink> made)
     {
         return;
     }
+    std::vector<ALMasterLink> unknown;
     for (ALMasterLink& one : made)
     {
         one.master = canonical(one.master);
+        if (ALScriptMasterAdopt::knowsNothing(one))
+        {
+            unknown.push_back(one);
+        }
         all->put(std::move(one));
     }
     changed();
+    // Last: a probe may answer as it is asked, and finds the links made.
+    if (!unknown.empty())
+    {
+        mAdopt->adopt(unknown);
+    }
+}
+
+void ALScriptDiskMasters::adopted(const ALScriptRef& ref, const std::string& master, const std::vector<std::string>& uses, bool missed,
+                                  const std::string& hash, S64 stamp)
+{
+    ALMasterLinks* all  = links();
+    ALMasterLink*  link = all ? all->find(ref.object, ref.item) : nullptr;
+    // Linked still, to that file, and knowing nothing still: a send that
+    // ended meanwhile, or a link made again, knows better.
+    if (!link || ALMasterLinks::keyOf(link->master) != ALMasterLinks::keyOf(master) || !ALScriptMasterAdopt::knowsNothing(*link))
+    {
+        return;
+    }
+    if (uses.empty() && !missed && hash.empty())
+    {
+        // Nothing learned: nothing changed.
+        return;
+    }
+    link->uses   = uses;
+    link->missed = missed;
+    if (!hash.empty())
+    {
+        link->hash  = hash;
+        link->stamp = stamp;
+    }
+    changedSoon();
 }
 
 void ALScriptDiskMasters::unlink(const ALScriptRef& ref)

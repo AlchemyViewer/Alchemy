@@ -26,6 +26,7 @@
 
 #include "../alscriptstudiomasters.h"
 #include "../alnotecardembedded.h"
+#include "../alscriptmasteradopt.h"
 #include "../alscriptmasterfanout.h"
 #include "../alscriptmastertoasts.h"
 #include "../alscriptmasterwatch.h"

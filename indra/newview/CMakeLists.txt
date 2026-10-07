@@ -201,6 +201,7 @@ if(AL_BUILD_VIEWER)
     alscriptlinkpane.cpp
     alscriptlinkscripts.cpp
     alscriptlookup.cpp
+    alscriptmasteradopt.cpp
     alscriptmasterfanout.cpp
     alscriptmastertoasts.cpp
     alscriptmasterupload.cpp
@@ -1097,6 +1098,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudioplaces.h
     alscriptstudiohistory.h
     alscriptstudiomerging.h
+    alscriptmasteradopt.h
     alscriptmasterfanout.h
     alscriptmastertoasts.h
     alscriptmasterupload.h

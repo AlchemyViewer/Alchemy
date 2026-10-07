@@ -39,6 +39,7 @@
 #include <string>
 #include <vector>
 
+class ALScriptMasterAdopt;
 class ALScriptMasterFanOut;
 class ALScriptMasterToasts;
 class ALScriptMasterWatch;
@@ -151,8 +152,18 @@ public:
     void unlink(const ALScriptRef& ref);
     // Links made together, as Link Scripts to Files makes them: each as one
     // is, and the index, the watch and whoever listens changed once for them
-    // all, rather than once for each. The one above is a batch of one.
+    // all, rather than once for each. The one above is a batch of one. A
+    // link that knows nothing of what a send through it would know is
+    // probed for it (ALScriptMasterAdopt).
     void link(std::vector<ALMasterLink> made);
+    // What a probe of a link just made found: the files its expansion read,
+    // and whether it missed one; and, where the world holds what the file
+    // makes already, that as what went up last, its hash and the file's
+    // stamp -- an empty hash where it does not. Kept only where the item is
+    // linked still to that file, and nothing went up through it since,
+    // which would know better; nothing said.
+    void adopted(const ALScriptRef& ref, const std::string& master, const std::vector<std::string>& uses, bool missed, const std::string& hash,
+                 S64 stamp);
     // Scripts not sent when they might have been, waiting to be sent by
     // hand; how many of them are linked still, and so marked.
     size_t markPending(const std::vector<ALScriptRef>& refs);
@@ -204,6 +215,9 @@ private:
     void           handOver();
     void           saveNow();
     void           changed();
+    // The same a moment from now, once for changes made one after another:
+    // what the probes of links just made find.
+    void           changedSoon();
     // What is watched, as the links stand now.
     void           rewatch();
     // A save of a linked script heard from elsewhere.
@@ -229,6 +243,7 @@ private:
     boost::unordered_flat_map<std::string, ALScriptRef, ll::string_hash, std::equal_to<>> mQueued;
     std::unique_ptr<ALScriptMasterWatch>                                      mWatch;
     std::unique_ptr<ALScriptMasterFanOut>                                     mFanOut;
+    std::unique_ptr<ALScriptMasterAdopt>                                      mAdopt;
     std::unique_ptr<ALScriptMasterToasts>                                     mToasts;
     std::vector<Outcome>                                                      mUnheard;
     // What the writer's thread is handed, and the thread, made with the
@@ -241,6 +256,8 @@ private:
     F64                                                                       mDirtySince = 0.0;
     F64                                                                       mDirtyLast  = 0.0;
     bool                                                                      mSaveComing = false;
+    // Whether changedSoon's change is coming.
+    bool                                                                      mChangeComing = false;
     // Held while this is, for a timer to know it still is.
     std::shared_ptr<bool>                                                     mAlive = std::make_shared<bool>(true);
 };
