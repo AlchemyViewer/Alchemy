@@ -242,16 +242,12 @@ namespace tut
     template<> template<>
     void altextdocument_object::test<12>()
     {
-        set_test_name("a log: text arrives at the end and the oldest lines go");
+        set_test_name("a log: text arrives at the end");
         ALTextDocument doc;
         doc.append("one\ntwo");
         doc.append("\nthree");
         ensure_equals("three lines", doc.lineCount(), 3);
-        ALTextDocument::Edit gone = doc.removeFirstLines(2);
-        ensure_equals("one left", doc.text(), std::string("three"));
-        ensure_equals("what went", gone.removed, std::string("one\ntwo\n"));
-        ensure("everything can go", doc.removeFirstLines(5).removed == "three" && doc.empty());
-        ensure("nothing to go", doc.removeFirstLines(0).nothing());
+        ensure_equals("in the order it came", doc.text(), std::string("one\ntwo\nthree"));
     }
 
     template<> template<>

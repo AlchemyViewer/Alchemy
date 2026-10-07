@@ -275,7 +275,7 @@ namespace tut
         ensure_equals("six lines", doc.lineCount(), 6);
         ensure_equals("the new line", said(doc.line(1), highlighter.tokens(1)), std::string("number:1"));
         ensure_equals("the last still there", said(doc.line(5), highlighter.tokens(5)), std::string("text:g"));
-        doc.removeFirstLines(2);
+        doc.remove(ALTextRange(doc.start(), ALTextPos(2, 0)));
         ensure_equals("the first now", said(doc.line(0), highlighter.tokens(0)), std::string("text:b  c"));
         ensure_equals("the last still there", said(doc.line(3), highlighter.tokens(3)), std::string("text:g"));
     }

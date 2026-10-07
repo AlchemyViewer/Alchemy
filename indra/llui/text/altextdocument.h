@@ -249,10 +249,8 @@ public:
     Edit insert(const ALTextPos& at, std::string_view text) { return replace(ALTextRange(at, at), text); }
     Edit remove(const ALTextRange& range) { return replace(range, std::string_view()); }
 
-    // A log or a chat history: text arriving at the end, and the oldest
-    // lines let go of from the front.
+    // A log or a chat history: text arriving at the end.
     Edit append(std::string_view text);
-    Edit removeFirstLines(S32 count);
 
     boost::signals2::connection onChanged(const changed_signal_t::slot_type& slot) { return mChanged.connect(slot); }
 

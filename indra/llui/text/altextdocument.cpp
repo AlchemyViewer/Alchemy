@@ -528,19 +528,6 @@ ALTextDocument::Edit ALTextDocument::append(std::string_view text)
     return replace(ALTextRange(at, at), text);
 }
 
-ALTextDocument::Edit ALTextDocument::removeFirstLines(S32 count)
-{
-    if (count <= 0)
-    {
-        return Edit();
-    }
-    if (count >= lineCount())
-    {
-        return replace(ALTextRange(start(), end()), std::string_view());
-    }
-    return replace(ALTextRange(start(), ALTextPos(count, 0)), std::string_view());
-}
-
 // --- positions ---------------------------------------------------------------
 
 ALTextPos ALTextDocument::end() const

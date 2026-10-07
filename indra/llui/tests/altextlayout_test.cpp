@@ -258,7 +258,7 @@ namespace tut
         ensure_equals("four lines", layout.lineCount(), 4);
         ensure_equals("the new line lays out", layout.line(1).glyphs.size(), size_t(3));
         ensure_equals("tops follow", layout.lineTop(3), 3 * layout.rowHeight());
-        doc.removeFirstLines(3);
+        doc.remove(ALTextRange(doc.start(), ALTextPos(3, 0)));
         ensure_equals("one left", layout.lineCount(), 1);
         ensure_equals("which is the last", layout.line(0).glyphs.size(), size_t(5));
     }
