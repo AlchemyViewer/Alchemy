@@ -6,10 +6,11 @@
   matches one of: match (a literal; whole_word to refuse it inside a word),
   chars (a class, with min and max; unicode for everything beyond ASCII),
   word (an identifier, looked up in `tables`, each a table and the kind a
-  word found there is; `qualified` looks `head.word` up first, for tables
-  that name `ll.Say`), span (an opening with an end, an escape, and
-  multiline; one that is not ends with its line, but for a line that ends
-  in its unless_after, as an eol's), span_regex with end_regex (where \1
+  word found there is; `qualified` looks a word after `head.` up as
+  `head.word` and by no other name, for tables that name `ll.Say`), span
+  (an opening with an end, an escape, and multiline; one that is not ends
+  with its line, but for a line that ends in its unless_after, as an
+  eol's), span_regex with end_regex (where \1
   stands for the opening's first capture), regex (anchored where it is
   tried; not_after_chars, a class the character before it may not be in,
   and consume, the group that is the token, the rest of the match only

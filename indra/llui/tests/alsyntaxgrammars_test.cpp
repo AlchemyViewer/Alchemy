@@ -131,7 +131,7 @@ namespace tut
     {
         set_test_name("SLua");
         ALSyntaxWords words;
-        words.set("function", { "Say" });
+        words.set("function", { "ll.Say" });
         words.set("type", { "number" });
         ALSyntaxState state;
         ensure_equals("comment", lexed("slua", "-- comment", state, words), std::string("comment:-- comment"));
@@ -558,5 +558,22 @@ namespace tut
         ensure_equals("so the next line is code", lexed("slua", "local x = 1", slua, words), std::string("control:local|text: x |operator:=|text: |number:1"));
         ensure_equals("a macro's string left open", lexed("slua", "--#define X \"abc", slua, words), std::string("preprocessor:--#define X |string:\"abc"));
         ensure("ends with its line", slua.frames.size() == 1);
+    }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<18>()
+    {
+        set_test_name("SLua: a member is looked up by its head's name for it and no other: one named as a global is not that global, as its hover says");
+        ALSyntaxWords words;
+        words.set("function", { "type", "next", "print", "ll.Say" });
+        ALSyntaxState state;
+        ensure_equals("a field called type", lexed("slua", "if item.type == x then", state, words),
+                      std::string("control:if|text: item|punctuation:.|text:type |operator:==|text: x |control:then"));
+        ensure_equals("one called next", lexed("slua", "node = node.next", state, words), std::string("text:node |operator:=|text: node|punctuation:.|text:next"));
+        ensure_equals("the global itself", lexed("slua", "next(t)", state, words), std::string("function:next|punctuation:(|text:t|punctuation:)"));
+        ensure_equals("after a concatenation, the global still", lexed("slua", "s = s..type(x)", state, words),
+                      std::string("text:s |operator:=|text: s|punctuation:..|function:type|punctuation:(|text:x|punctuation:)"));
+        ensure_equals("a member its head names", lexed("slua", "ll.Say(0)", state, words),
+                      std::string("text:ll|punctuation:.|function:Say|punctuation:(|number:0|punctuation:)"));
     }
 }

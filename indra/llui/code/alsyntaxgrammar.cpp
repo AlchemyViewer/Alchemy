@@ -241,8 +241,8 @@ struct ALSyntaxGrammar::Impl
         Then         then      = Then::Stay;
         U16          target    = 0;
         bool         wholeWord = false;
-        // Word: a word right after `head.` is looked up as `head.word`
-        // first, which is how SLua's tables name `ll.Say`.
+        // Word: a word right after `head.` is looked up as `head.word`,
+        // which is how SLua's tables name `ll.Say`, and by no other name.
         bool         qualified = false;
         // Literal and SpanEscape: the text; Span: the opening; SpanEnd: the
         // end, a regex where endRegex says so, with \1 standing for the
@@ -891,7 +891,9 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
                 ++end;
             }
             const std::string_view word = line.substr(pos, end - pos);
-            // `head.word`, where the rule qualifies and there is a head.
+            // `head.word`, where the rule qualifies and there is a head: a
+            // member, which is found by that name or not at all, and is no
+            // global of its own name -- `item.type` is no `type`.
             if (rule.qualified && pos >= 2 && line[pos - 1] == '.')
             {
                 size_t head = pos - 1;
@@ -925,6 +927,7 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
                             }
                         }
                     }
+                    return end;
                 }
             }
             // Every table the word is in, in one look at the grammar's words
