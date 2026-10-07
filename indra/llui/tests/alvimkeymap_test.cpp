@@ -3087,4 +3087,26 @@ namespace tut
         keys("4l<C-v>2j<Esc>:%s/\\%Va/Z/g<CR>");
         ensure_equals("\\%V on a block: its column on a line a tab begins", flat(editor->text()), std::string("xxxxZb|\tZb|xxxxZb|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<107>()
+    {
+        set_test_name("visual p: lines replaced by a register's lines and no blank one more, lines put into part of a line on lines of their own, and what a block holds of each line replaced");
+        ALCodeEditor& e = make("a\nb\nc\n");
+        keys("yyjVp");
+        ensure_equals("V p: the line replaced, and nothing more", flat(e.text()), std::string("a|a|c|"));
+        ensure_equals("the caret on the line put", caretText(), std::string("1:0"));
+
+        make("abcd\nX\n");
+        keys("jyygglvlp");
+        ensure_equals("v p of a line: on a line of its own, the line broken round it", flat(editor->text()), std::string("a|X|d|X|"));
+
+        make("abcd\nefgh\nX\n");
+        keys("2jylggl<C-v>jlp");
+        ensure_equals("a block's columns each replaced by a register of one line, the rest of the lines kept", flat(editor->text()), std::string("aXd|eXh|X|"));
+
+        make("ab\ncd\nxyz\nxyz\n");
+        keys("<C-v>jy2jl<C-v>jp");
+        ensure_equals("a block register put in place of a block", flat(editor->text()), std::string("ab|cd|xaz|xcz|"));
+    }
 }

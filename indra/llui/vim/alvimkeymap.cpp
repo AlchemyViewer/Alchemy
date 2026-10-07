@@ -2128,7 +2128,14 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
             if (ch == 'p' || ch == 'P')
             {
                 // The selection replaced by the register, which keeps
-                // what was there for a further put.
+                // what was there for a further put. Lines are replaced by
+                // its text, its lines taking theirs; lines put into less
+                // than a line go on lines of their own, the line broken
+                // round them. What a block holds of each line is replaced
+                // by a register of one line, as vim's blockwise put has
+                // it; by anything else it is taken out, and the register
+                // put at the block's corner -- lines under the block for
+                // p, over it for P.
                 const Register put_this = fetch(mRegister);
                 leaveVisual(view);
                 if (!editing)
@@ -2137,18 +2144,54 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                     return true;
                 }
                 view.undoJournal().beginGroup();
-                view.deleteRange(span.range);
-                view.setCaret(span.range.begin);
-                if (put_this.linewise)
+                if (span.block)
                 {
-                    view.insertText(put_this.text + "\n");
+                    const std::vector<ALTextRange> pieces   = blockPieces(view, span);
+                    const bool                     one_line = !put_this.linewise && !put_this.block && put_this.text.find('\n') == std::string::npos;
+                    std::vector<std::pair<ALTextRange, std::string>> edits;
+                    for (const ALTextRange& piece : pieces)
+                    {
+                        // A line short of the block padded out to it.
+                        std::string with = one_line ? (piece.empty() ? padTo(d, piece.begin.line, span.left, view.getTabWidth()) : std::string()) + put_this.text
+                                                    : std::string();
+                        if (!piece.empty() || !with.empty())
+                        {
+                            edits.emplace_back(piece, std::move(with));
+                        }
+                    }
+                    if (!edits.empty())
+                    {
+                        view.replaceAll(std::move(edits));
+                    }
+                    const ALTextPos corner = d.clamp(pieces.front().begin);
+                    if (one_line)
+                    {
+                        moveTo(view, corner);
+                    }
+                    else
+                    {
+                        const bool below = put_this.linewise && ch == 'p';
+                        view.setCaret(below ? d.lineStart(pieces.back().begin.line) : corner);
+                        put(view, mRegister, below, 1);
+                    }
                 }
                 else
                 {
-                    view.insertText(put_this.text);
+                    const bool split = put_this.linewise && !span.linewise;
+                    view.deleteRange(span.range);
+                    view.setCaret(span.range.begin);
+                    view.insertText(split ? "\n" + put_this.text + "\n" : put_this.text);
+                    if (put_this.linewise)
+                    {
+                        const S32 line = span.range.begin.line + (split ? 1 : 0);
+                        moveTo(view, ALTextPos(line, firstNonBlankColumn(d, line)));
+                    }
+                    else
+                    {
+                        moveTo(view, put_this.text.empty() ? view.caret() : d.prevCluster(view.caret()));
+                    }
                 }
                 view.undoJournal().endGroup();
-                moveTo(view, put_this.text.empty() ? view.caret() : d.prevCluster(view.caret()));
                 finishCommand(true);
                 return true;
             }
