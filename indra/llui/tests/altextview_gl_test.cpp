@@ -763,4 +763,57 @@ namespace tut
         ensure("nothing of it above the text", drawnIn(with_atom, x0, x0 + 40, editor->getRect().mBottom + area.mTop + 1, H) == 0);
         editor->die();
     }
+
+    // The ruler's marks cost what one does, however many lines have one: a
+    // comparison marks every line it changed, and a gap's mark with them.
+    template<> template<>
+    void altextview_gl_object::test<11>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::string text;
+        for (S32 i = 0; i < 200; ++i)
+        {
+            text += "word word word word\n";
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name           = "view";
+        p.rect           = LLRect(0, H, W, 0);
+        p.default_text   = text;
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        ALTextRuler* ruler = view->findChild<ALTextRuler>("ruler");
+        // A frame's draws, the ruler put in its place by a frame before it.
+        const auto draws = [&]() {
+            view->draw();
+            gGL.flush();
+            std::list<LLVertexBufferData> capture;
+            gGL.beginList(&capture);
+            view->draw();
+            gGL.flush();
+            gGL.endList();
+            glFinish();
+            return capture.size();
+        };
+        const LLColor4 changed(0.9f, 0.6f, 0.1f, 1.f);
+        // The same gap in both, so that only the marks differ.
+        std::vector<ALTextView::LineAnnotation> lines(200);
+        lines[100].gap     = 2;
+        lines[5].rulerTint = changed;
+        view->setLineAnnotations(lines);
+        const size_t one = draws();
+        ensure("the ruler beside the text", ruler && ruler->getVisible());
+        for (ALTextView::LineAnnotation& line : lines)
+        {
+            line.rulerTint = changed;
+        }
+        lines[100].gapRulerTint = changed;
+        view->setLineAnnotations(lines);
+        const size_t every = draws();
+        ensure("two hundred marks and a gap's cost what one does: " + std::to_string(every) + " against " + std::to_string(one), every == one);
+        view->die();
+    }
 }
