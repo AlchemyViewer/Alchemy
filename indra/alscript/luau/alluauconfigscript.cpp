@@ -52,6 +52,9 @@ namespace
         // Off once the run is over: reading what it returned raises no
         // error, there being nothing to catch one.
         bool                                  capped = true;
+        // On once the deadline has stopped it: what it came to is then the
+        // time it had, not its text's.
+        bool                                  late = false;
     };
 
     void* allocate(void* ud, void* ptr, size_t osize, size_t nsize)
@@ -80,13 +83,38 @@ namespace
     // Not at the collector's steps, which it is not raised from.
     void interrupt(lua_State* L, int gc)
     {
-        if (gc < 0 && std::chrono::steady_clock::now() > static_cast<Limits*>(lua_callbacks(L)->userdata)->deadline)
+        Limits& limits = *static_cast<Limits*>(lua_callbacks(L)->userdata);
+        if (gc < 0 && std::chrono::steady_clock::now() > limits.deadline)
         {
+            limits.late = true;
             luaL_errorL(L, "configuration execution timed out");
         }
     }
 
-    // Luau's libraries as luaL_openlibs opens them, but Eris.
+    // table.move, held to MOST_MOVED elements. Luau's own copies in a loop
+    // in C that no interrupt reaches, and a move of nils into a table that
+    // holds none stores nothing: `table.move({}, 1, 2^31 - 2, 2)` would
+    // turn two billion times on the thread that asked, past the deadline
+    // and under the memory. Luau's, an upvalue, does the moving. The rest
+    // of the libraries' loops in C are held by what they hold, or check the
+    // interrupt as they go.
+    int boundedMove(lua_State* L)
+    {
+        const int first = luaL_checkinteger(L, 2);
+        const int last  = luaL_checkinteger(L, 3);
+        if (last >= first && static_cast<S64>(last) - first >= ALLuauConfigScript::MOST_MOVED)
+        {
+            luaL_errorL(L, "table.move may not move more than %d elements in a configuration", ALLuauConfigScript::MOST_MOVED);
+        }
+        lua_pushvalue(L, lua_upvalueindex(1));
+        lua_insert(L, 1);
+        lua_call(L, lua_gettop(L) - 1, 1);
+        return 1;
+    }
+
+    // Luau's libraries as luaL_openlibs opens them, but Eris; and its
+    // table.move held to so many elements, before the sandbox makes the
+    // libraries read-only.
     void openLibraries(lua_State* L)
     {
         static const luaL_Reg LIBRARIES[] = {
@@ -113,6 +141,11 @@ namespace
             lua_pushstring(L, library.name);
             lua_call(L, 1, 0);
         }
+        lua_rawgetfield(L, LUA_GLOBALSINDEX, LUA_TABLIBNAME);
+        lua_rawgetfield(L, -1, "move");
+        lua_pushcclosure(L, boundedMove, "move", 1);
+        lua_rawsetfield(L, -2, "move");
+        lua_pop(L, 1);
     }
 
     // A string as a `.luaurc` holds it: as it is, Luau's reading of one
@@ -135,16 +168,18 @@ namespace
 
     constexpr const char* UNSAYABLE = "configuration strings may not hold a quote or a control character, nor end in a backslash";
 
-    // The value at the top of the stack written as JSON, and popped: a
-    // string, a number, a boolean; a table, as an array where its keys are
-    // 1 to n -- `as_array` says which an empty one is -- else an object,
-    // its keys strings. What Luau's own reading of the table takes; what
-    // the `.luaurc` it becomes says of each value is Luau's to judge. Read
-    // raw, so that no metamethod runs.
-    bool write(lua_State* L, std::string& out, std::string& error, bool as_array, int depth)
+    // The value at the top of the stack, the one `key` names, written as
+    // JSON, and popped: a string, a boolean; a table, as an array where its
+    // keys are 1 to n -- `as_array` says which an empty one is -- else an
+    // object, its keys strings. What Luau's own reading of the table takes,
+    // but a number: a `.luaurc` holds none, and Luau's reading of one would
+    // stop at it with "expected value", saying nothing of the key. What the
+    // `.luaurc` it becomes says of each value is Luau's to judge. Read raw,
+    // so that no metamethod runs.
+    bool write(lua_State* L, std::string& out, std::string& error, const std::string& key, bool as_array, int depth)
     {
         const int  top  = lua_gettop(L);
-        const auto fail = [&](const char* why) {
+        const auto fail = [&](const std::string& why) {
             error = why;
             lua_settop(L, top - 1);
             return false;
@@ -162,8 +197,7 @@ namespace
                 break;
             }
             case LUA_TNUMBER:
-                out += llformat("%.17g", lua_tonumber(L, top));
-                break;
+                return fail("configuration value for key \"" + key + "\" must be a string or a boolean, not a number");
             case LUA_TBOOLEAN:
                 out += lua_toboolean(L, top) ? "true" : "false";
                 break;
@@ -229,7 +263,7 @@ namespace
                         lua_pushlstring(L, named[i].data(), named[i].size());
                     }
                     lua_rawget(L, top);
-                    if (!write(L, out, error, false, depth + 1))
+                    if (!write(L, out, error, array ? key + "[" + std::to_string(i + 1) + "]" : named[i], false, depth + 1))
                     {
                         lua_settop(L, top - 1);
                         return false;
@@ -239,7 +273,7 @@ namespace
                 break;
             }
             default:
-                return fail("configuration values must be strings, numbers, booleans, or nested tables");
+                return fail("configuration values must be strings, booleans, or nested tables");
         }
         lua_settop(L, top - 1);
         return true;
@@ -279,7 +313,7 @@ namespace
             first = false;
             quoted(json, named);
             json += ": ";
-            if (!write(L, json, error, /*as_array*/ std::string_view(key) == "globals", 0))
+            if (!write(L, json, error, key, /*as_array*/ std::string_view(key) == "globals", 0))
             {
                 return false;
             }
@@ -288,9 +322,9 @@ namespace
         return true;
     }
 
-    bool run(const std::string& source, std::string& json, std::string& error)
+    // `limits` the caller's, to tell after whether the deadline stopped it.
+    bool run(const std::string& source, std::string& json, std::string& error, Limits& limits)
     {
-        Limits limits;
         limits.deadline = std::chrono::steady_clock::now() +
                           std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<F64>(ALLuauConfigScript::MOST_SECONDS));
         std::unique_ptr<lua_State, void (*)(lua_State*)> state(lua_newstate(allocate, &limits), lua_close);
@@ -338,16 +372,23 @@ namespace
         return luaurcOf(L, json, error);
     }
 
-    // What each text came to, the latest asked first.
+    // What each text came to, the latest asked first; and until when, where
+    // the deadline stopped it. That is what the time it had came to more
+    // than its text: a thread held up elsewhere would otherwise see a good
+    // configuration refused until the text changed. Kept a while all the
+    // same, not run again at every ask, so that one that never ends costs
+    // its time only so often.
     struct Ran
     {
-        std::string source;
-        bool        ok = false;
-        std::string said;
+        std::string                           source;
+        bool                                  ok = false;
+        std::string                           said;
+        std::chrono::steady_clock::time_point until = std::chrono::steady_clock::time_point::max();
     };
-    constexpr size_t RAN_KEPT = 32;
-    std::mutex       sRanMutex;
-    std::vector<Ran> sRan;
+    constexpr size_t               RAN_KEPT  = 32;
+    constexpr std::chrono::seconds LATE_KEPT = std::chrono::seconds(10);
+    std::mutex                     sRanMutex;
+    std::vector<Ran>               sRan;
 }
 
 // static
@@ -356,17 +397,32 @@ bool ALLuauConfigScript::asLuaurc(const std::string& source, std::string& json, 
     {
         const std::lock_guard<std::mutex> lock(sRanMutex);
         const auto found = std::find_if(sRan.begin(), sRan.end(), [&source](const Ran& ran) { return ran.source == source; });
-        if (found != sRan.end())
+        if (found != sRan.end() && std::chrono::steady_clock::now() < found->until)
         {
             std::rotate(sRan.begin(), found, found + 1);
-            (sRan.front().ok ? json : error) = sRan.front().said;
-            return sRan.front().ok;
+            const Ran& ran = sRan.front();
+            json           = ran.ok ? ran.said : std::string();
+            error          = ran.ok ? std::string() : ran.said;
+            return ran.ok;
+        }
+        if (found != sRan.end())
+        {
+            // Stopped at its deadline, a while ago: run again.
+            sRan.erase(found);
         }
     }
-    Ran ran;
+    Limits limits;
+    Ran    ran;
     ran.source = source;
-    ran.ok     = run(source, json, error);
-    ran.said   = ran.ok ? json : error;
+    ran.ok     = run(source, json, error, limits);
+    // Only what this run said: no JSON it had begun before it failed, no
+    // error the caller had from before.
+    (ran.ok ? error : json).clear();
+    ran.said = ran.ok ? json : error;
+    if (limits.late)
+    {
+        ran.until = std::chrono::steady_clock::now() + LATE_KEPT;
+    }
     const std::lock_guard<std::mutex> lock(sRanMutex);
     sRan.insert(sRan.begin(), std::move(ran));
     if (sRan.size() > RAN_KEPT)

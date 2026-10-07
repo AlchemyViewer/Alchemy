@@ -57,10 +57,10 @@ target_sources(
     lsl/optimizer/allslsignatures.cpp
     lsl/optimizer/allslsimplifier.cpp
     luau/alluaucompletion.cpp
-    luau/alluaufragment.cpp
     luau/alluauconfig.cpp
     luau/alluauconfigscript.cpp
     luau/alluauexports.cpp
+    luau/alluaufragment.cpp
     luau/alluaufrontend.cpp
     luau/alluaunavigation.cpp
     luau/alluauservice.cpp
@@ -72,8 +72,8 @@ target_sources(
     preprocessor/alincludeidentity.cpp
     preprocessor/alincludesearch.cpp
     preprocessor/almodulelook.cpp
-    preprocessor/alrequirenavigation.cpp
     preprocessor/alpreprocessor.cpp
+    preprocessor/alrequirenavigation.cpp
     preprocessor/alscriptenvelope.cpp
     preprocessor/alscriptsnapshot.cpp
     preprocessor/alscripttextcache.cpp
@@ -132,10 +132,10 @@ target_sources(
         lsl/optimizer/allslsignatures.h
         lsl/optimizer/allslsimplifier.h
         luau/alluaucompletion.h
-        luau/alluaufragment.h
         luau/alluauconfig.h
         luau/alluauconfigscript.h
         luau/alluauexports.h
+        luau/alluaufragment.h
         luau/alluaufrontend.h
         luau/alluaunavigation.h
         luau/alluauservice.h
@@ -147,8 +147,8 @@ target_sources(
         preprocessor/alincludeidentity.h
         preprocessor/alincludesearch.h
         preprocessor/almodulelook.h
-        preprocessor/alrequirenavigation.h
         preprocessor/alpreprocessor.h
+        preprocessor/alrequirenavigation.h
         preprocessor/alscriptenvelope.h
         preprocessor/alscriptjoblane.h
         preprocessor/alscriptsnapshot.h

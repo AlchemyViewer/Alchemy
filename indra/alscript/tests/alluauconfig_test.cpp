@@ -269,7 +269,8 @@ namespace tut
     template<> template<>
     void alluauconfig_object::test<9>()
     {
-        set_test_name("a .config.luau that fails says why: not compiling, an error, a yield, the wrong return, a value no configuration holds, too long, too much memory; and it cannot reach Eris");
+        set_test_name("a .config.luau that fails says why: not compiling, an error, a yield, the wrong return, a value no configuration holds, too long, too much memory, "
+                      "too much moved at once; and it cannot reach Eris");
         std::string json, error;
         ensure("does not compile", !ALLuauConfigScript::asLuaurc("return {", json, error) && !error.empty());
         ensure("an error, in its words", !ALLuauConfigScript::asLuaurc("error('no config here')", json, error) && error.find("no config here") != std::string::npos);
@@ -280,7 +281,15 @@ namespace tut
         ensure_equals("luau not a table", (ALLuauConfigScript::asLuaurc("return { luau = 3 }", json, error), error),
                       std::string("configuration value for key \"luau\" must be a table"));
         ensure("a function where a value goes", !ALLuauConfigScript::asLuaurc("return { luau = { aliases = { x = print } } }", json, error) &&
-                                                    error.find("must be strings, numbers, booleans") != std::string::npos);
+                                                    error.find("must be strings, booleans") != std::string::npos);
+        // A .luaurc holds no numbers, and Luau's reading of one would stop
+        // at it saying nothing of where: refused here, by its key.
+        ensure_equals("a number, by its key", (ALLuauConfigScript::asLuaurc("return { luau = { lint = { LocalUnused = 0 } } }", json, error), error),
+                      std::string("configuration value for key \"LocalUnused\" must be a string or a boolean, not a number"));
+        ensure("in an array, by its place", !ALLuauConfigScript::asLuaurc("return { luau = { globals = { 'a', 2 } } }", json, error) &&
+                                                error.find("\"globals[2]\"") != std::string::npos);
+        ensure("at the top", !ALLuauConfigScript::asLuaurc("return { luau = { linterrors = 1 } }", json, error) &&
+                                 error.find("\"linterrors\"") != std::string::npos);
         ensure("an array with a hole", !ALLuauConfigScript::asLuaurc("return { luau = { globals = { [1] = 'a', [3] = 'b' } } }", json, error) &&
                                            error.find("invalid numeric key") != std::string::npos);
         ensure("a table in itself, nesting forever", !ALLuauConfigScript::asLuaurc("local t = {} t.t = t return { luau = { aliases = t } }", json, error) &&
@@ -294,8 +303,18 @@ namespace tut
                       std::string("configuration execution timed out"));
         const F64 took = std::chrono::duration<F64>(std::chrono::steady_clock::now() - started).count();
         ensure(llformat("stopped at its time, not long after: %.2f s", took), took >= ALLuauConfigScript::MOST_SECONDS && took < ALLuauConfigScript::MOST_SECONDS + 2.0);
-        ensure("asked again, kept: no second wait", (ALLuauConfigScript::asLuaurc("while true do end", json, error),
-                                                      std::chrono::duration<F64>(std::chrono::steady_clock::now() - started).count() < took + 0.1));
+        ensure("asked again at once, kept for a while: no second wait", (ALLuauConfigScript::asLuaurc("while true do end", json, error),
+                                                                         std::chrono::duration<F64>(std::chrono::steady_clock::now() - started).count() < took + 0.1));
+        // table.move's copy is a loop in C the deadline does not reach, and
+        // nils moved into a table that holds none take no memory: held to so
+        // many elements, at once.
+        const auto moving = std::chrono::steady_clock::now();
+        ensure("two billion nils moved, refused at once: " + error,
+               !ALLuauConfigScript::asLuaurc("table.move({}, 1, 2147483646, 2) return {}", json, error) && error.find("table.move") != std::string::npos &&
+                   std::chrono::duration<F64>(std::chrono::steady_clock::now() - moving).count() < ALLuauConfigScript::MOST_SECONDS);
+        ensure("a move within it, as Luau's: " + error,
+               ALLuauConfigScript::asLuaurc("return { luau = { globals = table.move({ 'a', 'b' }, 1, 2, 2, { 'z' }) } }", json, error) &&
+                   json == "{\"globals\": [\"z\", \"a\", \"b\"]}");
         ensure("memory past the most, refused",
                !ALLuauConfigScript::asLuaurc("local t = {} for i = 1, 1e7 do t[i] = string.rep('x', 1000) .. i end return t", json, error) &&
                    error.find("memory") != std::string::npos);
@@ -310,5 +329,26 @@ namespace tut
                ALLuauConfigScript::asLuaurc("return { luau = { globals = { string.upper('a'), tostring(math.max(1, 2)), table.concat({ 'x', 'y' }), buffer and 'b' or 'none' } } }",
                                             json, error) &&
                    json == "{\"globals\": [\"A\", \"2\", \"xy\", \"b\"]}");
+    }
+
+    template<> template<>
+    void alluauconfig_object::test<10>()
+    {
+        set_test_name("a .config.luau's run says only what it came to: no JSON with a failure, begun or not, no error with a success, run or kept");
+        const char* const failing = "return { luau = { languagemode = 'strict', lint = { LocalUnused = 0 } } }";
+        std::string       json = "from before", error;
+        ensure("a failure part way through the writing", !ALLuauConfigScript::asLuaurc(failing, json, error) && !error.empty());
+        ensure_equals("leaves no JSON", json, std::string());
+        json = "from before";
+        ensure("asked again, kept", !ALLuauConfigScript::asLuaurc(failing, json, error) && !error.empty());
+        ensure_equals("and no JSON still", json, std::string());
+
+        const char* const working = "return { luau = { languagemode = 'strict' } }";
+        error = "from before";
+        ensure("a success: " + json, ALLuauConfigScript::asLuaurc(working, json, error) && json == "{\"languageMode\": \"strict\"}");
+        ensure_equals("leaves no error", error, std::string());
+        error = "from before";
+        ensure("asked again, kept", ALLuauConfigScript::asLuaurc(working, json, error) && json == "{\"languageMode\": \"strict\"}");
+        ensure_equals("and no error still", error, std::string());
     }
 }
