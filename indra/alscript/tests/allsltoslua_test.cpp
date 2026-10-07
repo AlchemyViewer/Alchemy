@@ -36,6 +36,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <set>
 #include <sstream>
 
@@ -2506,5 +2507,255 @@ namespace tut
         ensure("its index in characters, ll's: " + r.text, has(r, "local at = (ll.SubStringIndex(s, \"x\") or 0) - 1"));
         ensure("found by string.find alone: " + r.text, count(r, "SubStringIndex") == 1);
         checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<77>()
+    {
+        set_test_name("a particle rule list written out as the ParticleParams table ll.ParticleSystem takes: each rule by the key the "
+                      "definitions give it, its value as the list had it, the flags' masks each true, a key to a line where the list had "
+                      "more than one");
+        const ALLSLToSLua::Result r = convert("integer gFlags = 3;\n"
+                                              "default { touch_start(integer n) {\n"
+                                              "    llParticleSystem([\n"
+                                              "        PSYS_PART_FLAGS, PSYS_PART_EMISSIVE_MASK | PSYS_PART_INTERP_COLOR_MASK,\n"
+                                              "        PSYS_PART_START_COLOR, <1, 0, 0>, PSYS_PART_START_ALPHA, 1,\n"
+                                              "        PSYS_SRC_PATTERN, PSYS_SRC_PATTERN_EXPLODE,\n"
+                                              "        PSYS_SRC_TEXTURE, NULL_KEY, PSYS_SRC_TARGET_KEY, llGetOwner()\n"
+                                              "    ]);\n"
+                                              "    llLinkParticleSystem(LINK_SET, [PSYS_PART_FLAGS, gFlags, PSYS_SRC_BURST_RATE, 0.1]);\n"
+                                              "    llLinkParticleSystem(2, [PSYS_PART_FLAGS, PSYS_PART_BOUNCE_MASK]);\n"
+                                              "    llParticleSystem([]);\n"
+                                              "} }\n");
+        ensure("a key to a line: " + r.text, has(r, "    ll.ParticleSystem({\n"
+                                                    "        emissive = true,\n"
+                                                    "        color_interp = true,\n"
+                                                    "        color_begin = vector(1, 0, 0),\n"
+                                                    "        alpha_begin = 1,\n"
+                                                    "        pattern = PSYS_SRC_PATTERN_EXPLODE,\n"
+                                                    "        texture = tostring(NULL_KEY),\n"
+                                                    "        target_key = ll.GetOwner(),\n"
+                                                    "    })\n"));
+        ensure("on one line as written; flags not of masks as they are: " + r.text,
+               has(r, "ll.LinkParticleSystem(LINK_SET, { flags = gFlags, burst_rate = 0.1 })") && has(r, "ll.LinkParticleSystem(2, { bounce = true })"));
+        ensure("no rules, as they were: " + r.text, has(r, "ll.ParticleSystem({})"));
+        const auto same = [&r](const std::string& lsl, const std::string& slua) {
+            return std::find(r.same.begin(), r.same.end(), std::make_pair(lsl, slua)) != r.same.end();
+        };
+        ensure("each constant the same word as its key", same("PSYS_PART_START_COLOR", "color_begin") && same("PSYS_PART_EMISSIVE_MASK", "emissive") &&
+                                                             same("PSYS_SRC_BURST_RATE", "burst_rate"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<78>()
+    {
+        set_test_name("a media rule list as MediaParams: TRUE and FALSE, 1 and 0, as booleans, a whitelist's text as its pieces where "
+                      "the serializer joins them back the same; a list where it would not, or a truth is no 1 or 0 written out");
+        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
+                                              "    integer on = llGetLinkNumber();\n"
+                                              "    llSetPrimMediaParams(0, [PRIM_MEDIA_AUTO_PLAY, TRUE, PRIM_MEDIA_AUTO_LOOP, 0, PRIM_MEDIA_CURRENT_URL, \"http://a.com\",\n"
+                                              "        PRIM_MEDIA_WIDTH_PIXELS, 512, PRIM_MEDIA_WHITELIST_ENABLE, 1, PRIM_MEDIA_WHITELIST, \"a.com,*.b.com,\"]);\n"
+                                              "    if (llSetLinkMedia(LINK_THIS, 1, [PRIM_MEDIA_HOME_URL, \"http://h\"]) == STATUS_OK) llOwnerSay(\"ok\");\n"
+                                              "    llSetPrimMediaParams(1, [PRIM_MEDIA_WHITELIST, \",a.com\"]);\n"
+                                              "    llSetPrimMediaParams(2, [PRIM_MEDIA_WHITELIST, \"a\\\\,b\"]);\n"
+                                              "    llSetPrimMediaParams(3, [PRIM_MEDIA_WHITELIST, \"\"]);\n"
+                                              "    llSetPrimMediaParams(4, [PRIM_MEDIA_AUTO_PLAY, on]);\n"
+                                              "    llSetPrimMediaParams(5, [PRIM_MEDIA_AUTO_ZOOM, 2]);\n"
+                                              "} }\n");
+        ensure("a table: " + r.text, has(r, "    ll.SetPrimMediaParams(0, {\n"
+                                            "        auto_play = true,\n"
+                                            "        auto_loop = false,\n"
+                                            "        current_url = \"http://a.com\",\n"
+                                            "        width = 512,\n"
+                                            "        whitelist_enable = true,\n"
+                                            "        whitelist = { \"a.com\", \"*.b.com\", \"\" },\n"
+                                            "    })\n"));
+        ensure("what it answers read: " + r.text, has(r, "if ll.SetLinkMedia(LINK_THIS, 1, { home_url = \"http://h\" }) == STATUS_OK then"));
+        // The join leaves a first piece of none out, escapes a \, and sends
+        // no rule at all for no text.
+        ensure("a whitelist the join would change, a list: " + r.text,
+               has(r, "ll.SetPrimMediaParams(1, {PRIM_MEDIA_WHITELIST, \",a.com\"})") && has(r, "ll.SetPrimMediaParams(2, {PRIM_MEDIA_WHITELIST, \"a") &&
+                   has(r, "ll.SetPrimMediaParams(3, {PRIM_MEDIA_WHITELIST, \"\"})"));
+        ensure("a truth not written out as one, a list: " + r.text,
+               has(r, "ll.SetPrimMediaParams(4, {PRIM_MEDIA_AUTO_PLAY, on})") && has(r, "ll.SetPrimMediaParams(5, {PRIM_MEDIA_AUTO_ZOOM, 2})"));
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<79>()
+    {
+        set_test_name("an HTTP rule list as HttpRequestParams: headers of names each once by name, said where the serializer's order "
+                      "by name is not the order written; the accepts in order; a list for a name twice, a name not written out, or a "
+                      "value moved past one that changes something");
+        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
+                                              "    string token = llGetObjectDesc();\n"
+                                              "    llHTTPRequest(\"https://x\", [HTTP_METHOD, \"POST\", HTTP_MIMETYPE, \"application/json\", HTTP_VERIFY_CERT, FALSE,\n"
+                                              "        HTTP_CUSTOM_HEADER, \"X-B\", token, HTTP_BODY_MAXLENGTH, 16384, HTTP_CUSTOM_HEADER, \"X-A\", \"two\",\n"
+                                              "        HTTP_ACCEPT, \"application/json\", HTTP_ACCEPT, \"text/plain\"], \"{}\");\n"
+                                              "} }\n");
+        ensure("a table: " + r.text, has(r, "    ll.HTTPRequest(\"https://x\", {\n"
+                                            "        method = \"POST\",\n"
+                                            "        mimetype = \"application/json\",\n"
+                                            "        verify_cert = false,\n"
+                                            "        custom_header = { [\"X-B\"] = token, [\"X-A\"] = \"two\" },\n"
+                                            "        max_body_length = 16384,\n"
+                                            "        accept = { \"application/json\", \"text/plain\" },\n"
+                                            "    }, \"{}\")\n"));
+        ensure("the headers' order said: " + r.text, noted(r, "SluaHeaderOrder") && has(r, "-- LSL: SLua passes ll.HTTPRequest a custom_header table's headers sorted by name"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result sorted = convert("default { touch_start(integer n) {\n"
+                                                   "    key id = llHTTPRequest(\"https://y\", [HTTP_CUSTOM_HEADER, \"A\", \"1\", HTTP_CUSTOM_HEADER, \"B\", \"2\"], \"\");\n"
+                                                   "    llOwnerSay((string)id);\n"
+                                                   "} }\n");
+        ensure("in order by name, nothing said: " + sorted.text,
+               has(sorted, "local id = ll.HTTPRequest(\"https://y\", { custom_header = { [\"A\"] = \"1\", [\"B\"] = \"2\" } }, \"\")") &&
+                   !noted(sorted, "SluaHeaderOrder"));
+        checksClean(sorted);
+
+        const ALLSLToSLua::Result lists = convert("integer gCount;\n"
+                                                  "string counted() { ++gCount; return (string)gCount; }\n"
+                                                  "default { touch_start(integer n) {\n"
+                                                  "    string token = llGetObjectDesc();\n"
+                                                  "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, \"A\", \"1\", HTTP_CUSTOM_HEADER, \"A\", \"2\"], \"\");\n"
+                                                  "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, token, \"1\"], \"\");\n"
+                                                  "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_METHOD, \"GET\", HTTP_CUSTOM_HEADER, \"B\", counted()], \"\");\n"
+                                                  "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_CUSTOM_HEADER, \"B\", counted()], \"\");\n"
+                                                  "} }\n");
+        ensure("a name twice, a list: " + lists.text, has(lists, "ll.HTTPRequest(\"https://z\", {HTTP_CUSTOM_HEADER, \"A\", \"1\", HTTP_CUSTOM_HEADER, \"A\", \"2\"}, \"\")"));
+        ensure("a name not written out, a list: " + lists.text, has(lists, "ll.HTTPRequest(\"https://z\", {HTTP_CUSTOM_HEADER, token, \"1\"}, \"\")"));
+        ensure("moved past another, a list: " + lists.text, has(lists, "{HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_METHOD, \"GET\", HTTP_CUSTOM_HEADER, \"B\", counted()}"));
+        ensure("one after another, run in their order: " + lists.text, has(lists, "{ custom_header = { [\"A\"] = counted(), [\"B\"] = counted() } }"));
+        checksClean(lists);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<80>()
+    {
+        set_test_name("a rule list the table could not say just so stays a list: not written out, a key twice, a rule of another table "
+                      "or a number, a value of another shape, a rule with no value; flags that are not an | of masks each once, as they "
+                      "are; none at all without SLua's idioms");
+        const char* const script = "list gRules = [PSYS_PART_MAX_AGE, 2.0];\n"
+                                   "default { touch_start(integer n) {\n"
+                                   "    llParticleSystem(gRules);\n"
+                                   "    llParticleSystem([PSYS_PART_MAX_AGE, 2.0, PSYS_PART_MAX_AGE, 3.0]);\n"
+                                   "    llParticleSystem([PRIM_MEDIA_AUTO_PLAY, TRUE]);\n"
+                                   "    llParticleSystem([7, 2.0]);\n"
+                                   "    llParticleSystem([PSYS_PART_START_ALPHA, <1, 0, 0>]);\n"
+                                   "    llParticleSystem([PSYS_PART_MAX_AGE]);\n"
+                                   "    llLinkParticleSystem(1, [PSYS_PART_FLAGS, PSYS_PART_WIND_MASK + PSYS_PART_BOUNCE_MASK]);\n"
+                                   "    llLinkParticleSystem(2, [PSYS_PART_FLAGS, PSYS_PART_WIND_MASK | PSYS_PART_WIND_MASK]);\n"
+                                   "    llLinkParticleSystem(3, [PSYS_PART_FLAGS, PSYS_PART_WIND_MASK | (PSYS_PART_BOUNCE_MASK | PSYS_PART_RIBBON_MASK)]);\n"
+                                   "} }\n";
+        const ALLSLToSLua::Result r = convert(script);
+        ensure("not written out: " + r.text, has(r, "ll.ParticleSystem(gRules)"));
+        ensure("a key twice: " + r.text, has(r, "ll.ParticleSystem({PSYS_PART_MAX_AGE, 2.0, PSYS_PART_MAX_AGE, 3.0})"));
+        ensure("another table's rule: " + r.text, has(r, "ll.ParticleSystem({PRIM_MEDIA_AUTO_PLAY, 1})"));
+        ensure("a number for a rule: " + r.text, has(r, "ll.ParticleSystem({7, 2.0})"));
+        ensure("a value of another shape: " + r.text, has(r, "ll.ParticleSystem({PSYS_PART_START_ALPHA, vector(1, 0, 0)})"));
+        ensure("no value: " + r.text, has(r, "ll.ParticleSystem({PSYS_PART_MAX_AGE})"));
+        ensure("flags as they are: " + r.text, has(r, "ll.LinkParticleSystem(1, { flags = PSYS_PART_WIND_MASK + PSYS_PART_BOUNCE_MASK })") &&
+                                                   has(r, "ll.LinkParticleSystem(2, { flags = bit32.bor(PSYS_PART_WIND_MASK, PSYS_PART_WIND_MASK) })"));
+        ensure("masks bracketed, each true: " + r.text, has(r, "ll.LinkParticleSystem(3, { wind = true, bounce = true, ribbon = true })"));
+        ALLSLToSLua::Options plain;
+        plain.idioms                    = false;
+        const ALLSLToSLua::Result lists = ALLSLToSLua::convert(script, plain);
+        ensure("no idioms, no tables: " + lists.text, has(lists, "ll.LinkParticleSystem(3, {PSYS_PART_FLAGS, ") && !has(lists, "wind = true"));
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<81>()
+    {
+        set_test_name("every rule of the three tables at once: each key one the definitions' type has, every key the type has written, "
+                      "and strict under the grid's solver");
+        const ALLSLToSLua::Result r = convert(
+            "default { touch_start(integer n) {\n"
+            "    key k = llGetOwner();\n"
+            "    llParticleSystem([PSYS_PART_FLAGS, PSYS_PART_INTERP_COLOR_MASK | PSYS_PART_INTERP_SCALE_MASK | PSYS_PART_BOUNCE_MASK |\n"
+            "        PSYS_PART_WIND_MASK | PSYS_PART_FOLLOW_SRC_MASK | PSYS_PART_FOLLOW_VELOCITY_MASK | PSYS_PART_TARGET_POS_MASK |\n"
+            "        PSYS_PART_TARGET_LINEAR_MASK | PSYS_PART_EMISSIVE_MASK | PSYS_PART_RIBBON_MASK,\n"
+            "        PSYS_PART_START_COLOR, <1, 1, 1>, PSYS_PART_START_ALPHA, 1.0, PSYS_PART_END_COLOR, <0, 0, 0>, PSYS_PART_END_ALPHA, 0.0,\n"
+            "        PSYS_PART_START_SCALE, <0.1, 0.1, 0>, PSYS_PART_END_SCALE, <1, 1, 0>, PSYS_PART_MAX_AGE, 2.0, PSYS_SRC_ACCEL, <0, 0, -1>,\n"
+            "        PSYS_SRC_PATTERN, PSYS_SRC_PATTERN_ANGLE_CONE, PSYS_SRC_INNERANGLE, 0.1, PSYS_SRC_OUTERANGLE, 0.2, PSYS_SRC_TEXTURE, \"\",\n"
+            "        PSYS_SRC_BURST_RATE, 0.1, PSYS_SRC_BURST_PART_COUNT, 5, PSYS_SRC_BURST_RADIUS, 1.0, PSYS_SRC_BURST_SPEED_MIN, 0.5,\n"
+            "        PSYS_SRC_BURST_SPEED_MAX, 1.5, PSYS_SRC_MAX_AGE, 0.0, PSYS_SRC_TARGET_KEY, k, PSYS_SRC_OMEGA, <0, 0, 1>,\n"
+            "        PSYS_SRC_ANGLE_BEGIN, 0.0, PSYS_SRC_ANGLE_END, 3.14, PSYS_PART_BLEND_FUNC_SOURCE, PSYS_PART_BF_SOURCE_ALPHA,\n"
+            "        PSYS_PART_BLEND_FUNC_DEST, PSYS_PART_BF_ONE, PSYS_PART_START_GLOW, 0.1, PSYS_PART_END_GLOW, 0.0]);\n"
+            "    llLinkParticleSystem(2, [PSYS_PART_FLAGS,\n"
+            "        n]);\n"
+            "    llSetLinkMedia(LINK_THIS, 0, [PRIM_MEDIA_ALT_IMAGE_ENABLE, TRUE, PRIM_MEDIA_CONTROLS, PRIM_MEDIA_CONTROLS_MINI,\n"
+            "        PRIM_MEDIA_CURRENT_URL, \"http://a\", PRIM_MEDIA_HOME_URL, \"http://b\", PRIM_MEDIA_AUTO_LOOP, TRUE, PRIM_MEDIA_AUTO_PLAY, TRUE,\n"
+            "        PRIM_MEDIA_AUTO_SCALE, FALSE, PRIM_MEDIA_AUTO_ZOOM, FALSE, PRIM_MEDIA_FIRST_CLICK_INTERACT, TRUE,\n"
+            "        PRIM_MEDIA_WIDTH_PIXELS, 640, PRIM_MEDIA_HEIGHT_PIXELS, 480, PRIM_MEDIA_WHITELIST_ENABLE, TRUE,\n"
+            "        PRIM_MEDIA_WHITELIST, \"a.com,b.com\", PRIM_MEDIA_PERMS_INTERACT, PRIM_MEDIA_PERM_ANYONE, PRIM_MEDIA_PERMS_CONTROL, PRIM_MEDIA_PERM_OWNER]);\n"
+            "    llHTTPRequest(\"https://x\", [HTTP_METHOD, \"PUT\", HTTP_MIMETYPE, \"text/plain\", HTTP_BODY_MAXLENGTH, 4096, HTTP_VERIFY_CERT, TRUE,\n"
+            "        HTTP_VERBOSE_THROTTLE, FALSE, HTTP_CUSTOM_HEADER, \"X-A\", \"1\", HTTP_PRAGMA_NO_CACHE, TRUE, HTTP_USER_AGENT, \"me\",\n"
+            "        HTTP_ACCEPT, \"text/plain\", HTTP_EXTENDED_ERROR, TRUE], \"\");\n"
+            "} }\n");
+        // The keys each table was written with, a line each.
+        std::map<std::string, std::set<std::string>> written;
+        {
+            std::istringstream in(r.text);
+            std::string        text;
+            std::string        type;
+            while (std::getline(in, text))
+            {
+                type = text.find("ParticleSystem(") != std::string::npos      ? "ParticleParams"
+                       : text.find("ll.SetLinkMedia(") != std::string::npos   ? "MediaParams"
+                       : text.find("ll.HTTPRequest(") != std::string::npos    ? "HttpRequestParams"
+                                                                              : type;
+                const size_t equals = text.find(" = ");
+                if (text.rfind("        ", 0) == 0 && equals != std::string::npos)
+                {
+                    written[type].insert(text.substr(8, equals - 8));
+                }
+            }
+        }
+        // And the keys each of the definitions' types has.
+        llifstream        in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
+        std::stringstream defs;
+        defs << in.rdbuf();
+        for (const char* type : { "ParticleParams", "MediaParams", "HttpRequestParams" })
+        {
+            const std::string text  = defs.str();
+            const size_t      begin = text.find(std::string("export type ") + type + " = {");
+            ensure(std::string("the definitions have ") + type, begin != std::string::npos);
+            const std::string block = text.substr(begin, text.find("\n}", begin) - begin);
+            std::set<std::string> fields;
+            std::istringstream    lines(block);
+            std::string           line;
+            std::getline(lines, line);
+            while (std::getline(lines, line))
+            {
+                const size_t colon = line.find(':');
+                if (line.rfind("  ", 0) == 0 && colon != std::string::npos)
+                {
+                    fields.insert(line.substr(2, colon - 2));
+                }
+            }
+            std::string missing;
+            for (const std::string& key : fields)
+            {
+                missing += written[type].contains(key) ? "" : " " + key;
+            }
+            std::string unknown;
+            for (const std::string& key : written[type])
+            {
+                unknown += fields.contains(key) ? "" : " " + key;
+            }
+            ensure(std::string(type) + " has every key written:" + unknown + "\n" + r.text, unknown.empty());
+            ensure(std::string(type) + " written with every key it has:" + missing + "\n" + r.text, missing.empty());
+        }
+        checksClean(r);
+        if (!newSolver)
+        {
+            std::string said;
+            for (const ALScriptProblem& p : service.check("--!strict\n" + r.text))
+            {
+                said += p.severity == ALScriptProblem::Severity::Error ? p.message + "\n" : std::string();
+            }
+            ensure("strict:\n" + said + "---\n" + r.text, said.empty());
+        }
     }
 }

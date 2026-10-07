@@ -572,10 +572,15 @@ namespace
         // The arguments, each as its parameter's type -- but those SLua takes
         // either text or a uuid for (`text`, a bit for each by its place),
         // as they are.
-        std::string args(LSLASTNode* list, LSLParamList* params, U16 text = 0);
+        // One may be given written already: its place, and its text.
+        std::string args(LSLASTNode* list, LSLParamList* params, U16 text = 0, int put = -1, const std::string& put_text = {});
         // What SLua has in a library call's stead, where it means the same;
         // nothing where it has nothing.
         std::optional<Expr> idiom(LSLFunctionExpression* e, const std::string& lsl, std::string& called);
+        // A rule list written out for the particle, media and HTTP calls, as
+        // the table SLua's ll takes in its stead, where the table does just
+        // what the list did; nothing elsewhere.
+        std::optional<Expr> ruleTable(LSLFunctionExpression* e, const std::string& lsl, std::string& called);
         // What was detected, from the handler's own table.
         std::optional<Expr> detected(LSLFunctionExpression* e, const std::string& lsl);
         // LSL's script time where the script resets it: read from the
@@ -2218,7 +2223,7 @@ namespace
         return out;
     }
 
-    std::string Writer::args(LSLASTNode* list, LSLParamList* params, U16 text)
+    std::string Writer::args(LSLASTNode* list, LSLParamList* params, U16 text, int put, const std::string& put_text)
     {
         std::string out;
         LSLASTNode* param = params ? params->getChild(0) : nullptr;
@@ -2233,7 +2238,7 @@ namespace
                 to = slType(given);
             }
             // A parameter the script only reads as a truth is given one.
-            out += (out.empty() ? "" : ", ") + (boolean(taken) ? truthOf(given) : coerced(given, to).text);
+            out += (out.empty() ? "" : ", ") + (at == put ? put_text : boolean(taken) ? truthOf(given) : coerced(given, to).text);
             param = param ? param->getNext() : nullptr;
         }
         return out;
@@ -2574,6 +2579,372 @@ namespace
         return std::nullopt;
     }
 
+    // --- rule lists as tables -----------------------------------------------------------
+
+    // What a rule's value is to the key SLua's table names it by: as the
+    // definitions' ParticleParams, MediaParams and HttpRequestParams type
+    // it, and as the grid's serializer makes LSL's list of it again.
+    enum class Takes : U8
+    {
+        Number,  // an integer or a float, as it is
+        Vector,  // a vector, as it is
+        Text,    // a string, as it is
+        Asset,   // a string or a key, as it is
+        Truth,   // a boolean, which it makes 1 or 0
+        Flags,   // a number, and a boolean of each of its masks, ORed in
+        Csv,     // a {string}, which it joins with commas, escaping \ and ,
+        Headers, // a {[string]: string}, a rule of each, sorted by name
+        Each     // a {string}, a rule of each, in order
+    };
+
+    struct TableRule
+    {
+        const char* constant;
+        const char* key;
+        Takes       takes;
+    };
+
+    // Each constant a member of the table's enum in the definitions' YAML,
+    // under its pretty-name, or its name without the prefix and the filler
+    // words (part, src; http), as they build the type.
+    const TableRule PARTICLE_RULES[] = {
+        { "PSYS_PART_FLAGS", "flags", Takes::Flags },
+        { "PSYS_PART_START_COLOR", "color_begin", Takes::Vector },
+        { "PSYS_PART_START_ALPHA", "alpha_begin", Takes::Number },
+        { "PSYS_PART_END_COLOR", "color_end", Takes::Vector },
+        { "PSYS_PART_END_ALPHA", "alpha_end", Takes::Number },
+        { "PSYS_PART_START_SCALE", "scale_begin", Takes::Vector },
+        { "PSYS_PART_END_SCALE", "scale_end", Takes::Vector },
+        { "PSYS_PART_MAX_AGE", "part_max_age", Takes::Number },
+        { "PSYS_SRC_ACCEL", "accel", Takes::Vector },
+        { "PSYS_SRC_PATTERN", "pattern", Takes::Number },
+        { "PSYS_SRC_INNERANGLE", "angle_inner", Takes::Number },
+        { "PSYS_SRC_OUTERANGLE", "angle_outer", Takes::Number },
+        { "PSYS_SRC_TEXTURE", "texture", Takes::Asset },
+        { "PSYS_SRC_BURST_RATE", "burst_rate", Takes::Number },
+        { "PSYS_SRC_BURST_PART_COUNT", "burst_count", Takes::Number },
+        { "PSYS_SRC_BURST_RADIUS", "burst_radius", Takes::Number },
+        { "PSYS_SRC_BURST_SPEED_MIN", "burst_speed_min", Takes::Number },
+        { "PSYS_SRC_BURST_SPEED_MAX", "burst_speed_max", Takes::Number },
+        { "PSYS_SRC_MAX_AGE", "src_max_age", Takes::Number },
+        { "PSYS_SRC_TARGET_KEY", "target_key", Takes::Asset },
+        { "PSYS_SRC_OMEGA", "omega", Takes::Vector },
+        { "PSYS_SRC_ANGLE_BEGIN", "angle_begin", Takes::Number },
+        { "PSYS_SRC_ANGLE_END", "angle_end", Takes::Number },
+        { "PSYS_PART_BLEND_FUNC_SOURCE", "blend_func_source", Takes::Number },
+        { "PSYS_PART_BLEND_FUNC_DEST", "blend_func_dest", Takes::Number },
+        { "PSYS_PART_START_GLOW", "glow_begin", Takes::Number },
+        { "PSYS_PART_END_GLOW", "glow_end", Takes::Number },
+    };
+    // PSYS_PART_FLAGS' masks, the flag enum's members, each a boolean of
+    // its own, its name without the prefix and _MASK.
+    const std::pair<const char*, const char*> PARTICLE_FLAGS[] = {
+        { "PSYS_PART_INTERP_COLOR_MASK", "color_interp" }, { "PSYS_PART_INTERP_SCALE_MASK", "scale_interp" },
+        { "PSYS_PART_BOUNCE_MASK", "bounce" },             { "PSYS_PART_WIND_MASK", "wind" },
+        { "PSYS_PART_FOLLOW_SRC_MASK", "follow" },         { "PSYS_PART_FOLLOW_VELOCITY_MASK", "follow_velocity" },
+        { "PSYS_PART_TARGET_POS_MASK", "target_pos" },     { "PSYS_PART_TARGET_LINEAR_MASK", "target_linear" },
+        { "PSYS_PART_EMISSIVE_MASK", "emissive" },         { "PSYS_PART_RIBBON_MASK", "ribbon" },
+    };
+    const TableRule MEDIA_RULES[] = {
+        { "PRIM_MEDIA_ALT_IMAGE_ENABLE", "alt_image_enable", Takes::Truth },
+        { "PRIM_MEDIA_CONTROLS", "controls", Takes::Number },
+        { "PRIM_MEDIA_CURRENT_URL", "current_url", Takes::Text },
+        { "PRIM_MEDIA_HOME_URL", "home_url", Takes::Text },
+        { "PRIM_MEDIA_AUTO_LOOP", "auto_loop", Takes::Truth },
+        { "PRIM_MEDIA_AUTO_PLAY", "auto_play", Takes::Truth },
+        { "PRIM_MEDIA_AUTO_SCALE", "auto_scale", Takes::Truth },
+        { "PRIM_MEDIA_AUTO_ZOOM", "auto_zoom", Takes::Truth },
+        { "PRIM_MEDIA_FIRST_CLICK_INTERACT", "first_click_interact", Takes::Truth },
+        { "PRIM_MEDIA_WIDTH_PIXELS", "width", Takes::Number },
+        { "PRIM_MEDIA_HEIGHT_PIXELS", "height", Takes::Number },
+        { "PRIM_MEDIA_WHITELIST_ENABLE", "whitelist_enable", Takes::Truth },
+        { "PRIM_MEDIA_WHITELIST", "whitelist", Takes::Csv },
+        { "PRIM_MEDIA_PERMS_INTERACT", "perms_interact", Takes::Number },
+        { "PRIM_MEDIA_PERMS_CONTROL", "perms_control", Takes::Number },
+    };
+    const TableRule HTTP_RULES[] = {
+        { "HTTP_METHOD", "method", Takes::Text },
+        { "HTTP_MIMETYPE", "mimetype", Takes::Text },
+        { "HTTP_BODY_MAXLENGTH", "max_body_length", Takes::Number },
+        { "HTTP_VERIFY_CERT", "verify_cert", Takes::Truth },
+        { "HTTP_VERBOSE_THROTTLE", "verbose_throttle", Takes::Truth },
+        { "HTTP_CUSTOM_HEADER", "custom_header", Takes::Headers },
+        { "HTTP_PRAGMA_NO_CACHE", "pragma_no_cache", Takes::Truth },
+        { "HTTP_USER_AGENT", "user_agent", Takes::Text },
+        { "HTTP_ACCEPT", "accept", Takes::Each },
+        { "HTTP_EXTENDED_ERROR", "extended_error", Takes::Truth },
+    };
+
+    // The name of the LSL constant an expression is, as it is.
+    const char* constantName(LSLExpression* e)
+    {
+        e = unbracketed(e);
+        if (!e || e->getNodeSubType() != NODE_LVALUE_EXPRESSION)
+        {
+            return nullptr;
+        }
+        auto*      read   = static_cast<LSLLValueExpression*>(e);
+        LSLSymbol* symbol = read->getIdentifier()->getSymbol();
+        return symbol && symbol->getSubType() == SYM_BUILTIN && isNull(read->getMember()) ? read->getIdentifier()->getName() : nullptr;
+    }
+
+    // Text written out, as it is.
+    std::optional<std::string_view> textWritten(LSLExpression* e)
+    {
+        e = unbracketed(e);
+        if (e && e->getNodeSubType() == NODE_CONSTANT_EXPRESSION && e->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
+        {
+            return std::string_view(static_cast<LSLStringConstant*>(e->getChild(0))->getValue());
+        }
+        return std::nullopt;
+    }
+
+    // TRUE or FALSE, or 1 or 0, written out: which.
+    std::optional<bool> truthWritten(LSLExpression* e)
+    {
+        int               n    = -1;
+        const char* const name = constantName(e);
+        if (wholeNumber(e, n) && (n == 0 || n == 1))
+        {
+            return n == 1;
+        }
+        if (name && (std::string_view(name) == "TRUE" || std::string_view(name) == "FALSE"))
+        {
+            return std::string_view(name) == "TRUE";
+        }
+        return std::nullopt;
+    }
+
+    // An | of PSYS_PART_FLAGS' masks, each once: each mask and its key, in
+    // the order written.
+    bool flagKeys(LSLExpression* e, std::vector<std::pair<const char*, const char*>>& keys)
+    {
+        e = unbracketed(e);
+        if (e && e->getNodeSubType() == NODE_BINARY_EXPRESSION && e->getOperation() == OP_BIT_OR)
+        {
+            auto* both = static_cast<LSLBinaryExpression*>(e);
+            return flagKeys(both->getLHS(), keys) && flagKeys(both->getRHS(), keys);
+        }
+        const char* const name = constantName(e);
+        for (const auto& flag : PARTICLE_FLAGS)
+        {
+            if (name && std::string_view(name) == flag.first)
+            {
+                const bool again = std::find(keys.begin(), keys.end(), flag) != keys.end();
+                keys.push_back(flag);
+                return !again;
+            }
+        }
+        return false;
+    }
+
+    // A whitelist's text as the {string} the serializer joins back into the
+    // same text: its pieces between commas. Only where the join gives it
+    // back as it was: text with no \ to escape, and neither none nor a
+    // first piece of none, which the join leaves out.
+    std::optional<std::vector<std::string_view>> whitelistPieces(std::string_view text)
+    {
+        if (text.empty() || text.front() == ',' || text.find('\\') != std::string_view::npos)
+        {
+            return std::nullopt;
+        }
+        std::vector<std::string_view> pieces;
+        for (size_t from = 0;;)
+        {
+            const size_t comma = text.find(',', from);
+            pieces.push_back(text.substr(from, comma == std::string_view::npos ? std::string_view::npos : comma - from));
+            if (comma == std::string_view::npos)
+            {
+                return pieces;
+            }
+            from = comma + 1;
+        }
+    }
+
+    std::optional<Expr> Writer::ruleTable(LSLFunctionExpression* e, const std::string& lsl, std::string& called)
+    {
+        // Each call, the argument its rules are, and the table's rules.
+        struct Call
+        {
+            const char*      lsl;
+            int              at;
+            const TableRule* rules;
+            size_t           count;
+        };
+        static const Call CALLS[] = {
+            { "llParticleSystem", 0, PARTICLE_RULES, std::size(PARTICLE_RULES) },
+            { "llLinkParticleSystem", 1, PARTICLE_RULES, std::size(PARTICLE_RULES) },
+            { "llSetPrimMediaParams", 1, MEDIA_RULES, std::size(MEDIA_RULES) },
+            { "llSetLinkMedia", 2, MEDIA_RULES, std::size(MEDIA_RULES) },
+            { "llHTTPRequest", 1, HTTP_RULES, std::size(HTTP_RULES) },
+        };
+        const auto call = std::find_if(std::begin(CALLS), std::end(CALLS), [&](const Call& c) { return lsl == c.lsl; });
+        LSLExpression* list = call != std::end(CALLS) ? unbracketed(argumentAt(e, call->at)) : nullptr;
+        if (!list || list->getNodeSubType() != NODE_LIST_EXPRESSION)
+        {
+            return std::nullopt;
+        }
+        std::vector<LSLExpression*> items;
+        for (LSLASTNode* item = list->getChild(0); item; item = item->getNext())
+        {
+            items.push_back(static_cast<LSLExpression*>(item));
+        }
+        // Each rule a constant the table has a key for, with what that key
+        // takes after it, and each key once -- but a header of each name,
+        // and the accepts, which gather. Anything else stays a list.
+        struct Rule
+        {
+            const TableRule* rule;
+            size_t           at;
+        };
+        std::vector<Rule>             rules;
+        std::vector<std::string_view> keys;
+        std::vector<std::string_view> headers;
+        bool                          moved = false;
+        for (size_t i = 0; i < items.size();)
+        {
+            const char* const name = constantName(items[i]);
+            const TableRule*  rule = nullptr;
+            for (size_t r = 0; name && r < call->count; ++r)
+            {
+                rule = std::string_view(name) == call->rules[r].constant ? &call->rules[r] : rule;
+            }
+            const size_t taken = rule && rule->takes == Takes::Headers ? 2 : 1;
+            if (!rule || i + taken >= items.size())
+            {
+                return std::nullopt;
+            }
+            LSLExpression* v    = items[i + 1];
+            const LSLIType type = v->getIType();
+            bool           fits = false;
+            switch (rule->takes)
+            {
+                case Takes::Number: fits = type == LST_INTEGER || type == LST_FLOATINGPOINT; break;
+                case Takes::Vector: fits = type == LST_VECTOR; break;
+                case Takes::Text: fits = type == LST_STRING; break;
+                case Takes::Asset: fits = type == LST_STRING || type == LST_KEY; break;
+                case Takes::Truth: fits = truthWritten(v).has_value(); break;
+                case Takes::Flags: fits = type == LST_INTEGER; break;
+                case Takes::Csv: fits = textWritten(v) && whitelistPieces(*textWritten(v)); break;
+                case Takes::Headers:
+                {
+                    // A name written out, each once.
+                    const std::optional<std::string_view> header = textWritten(v);
+                    fits = header && std::find(headers.begin(), headers.end(), *header) == headers.end() &&
+                           items[i + 2]->getIType() == LST_STRING;
+                    if (fits)
+                    {
+                        headers.push_back(*header);
+                    }
+                    break;
+                }
+                case Takes::Each: fits = type == LST_STRING; break;
+            }
+            const bool gathers = rule->takes == Takes::Headers || rule->takes == Takes::Each;
+            const bool again   = std::find(keys.begin(), keys.end(), rule->key) != keys.end();
+            if (!fits || (again && !gathers))
+            {
+                return std::nullopt;
+            }
+            moved |= again && rules.back().rule != rule;
+            keys.push_back(rule->key);
+            rules.push_back({ rule, i });
+            i += 1 + taken;
+        }
+        // A header or an accept after the first of its kind goes up into
+        // the first one's table, run before what stood between: only where
+        // nothing in the list changes anything, so that the order cannot
+        // show.
+        const auto still = [](LSLExpression* item) { return ALLSLTraits::changesNothing(item); };
+        if (rules.empty() || (moved && !std::all_of(items.begin(), items.end(), still)))
+        {
+            return std::nullopt;
+        }
+        // Each key in the order written, a gathering one where it first is,
+        // each value as the list would have had it.
+        struct Gathered
+        {
+            const char* key;
+            size_t      at;
+            std::string all;
+        };
+        std::vector<std::string> fields;
+        std::vector<Gathered>    gathered;
+        for (const Rule& each : rules)
+        {
+            const TableRule* rule = each.rule;
+            LSLExpression*   v    = items[each.at + 1];
+            std::string      text;
+            switch (rule->takes)
+            {
+                case Takes::Truth: text = *truthWritten(v) ? "true" : "false"; break;
+                case Takes::Flags:
+                {
+                    std::vector<std::pair<const char*, const char*>> flags;
+                    if (flagKeys(v, flags))
+                    {
+                        for (const auto& [mask, key] : flags)
+                        {
+                            sameAs(mask, key);
+                            fields.push_back(std::string(key) + " = true");
+                        }
+                        continue;
+                    }
+                    text = coerced(v, LST_INTEGER).text;
+                    break;
+                }
+                case Takes::Csv:
+                    for (std::string_view piece : *whitelistPieces(*textWritten(v)))
+                    {
+                        text += (text.empty() ? "{ " : ", ") + luaString(piece);
+                    }
+                    text += " }";
+                    break;
+                case Takes::Headers:
+                case Takes::Each:
+                {
+                    const std::string one   = rule->takes == Takes::Headers
+                                                  ? "[" + luaString(*textWritten(v)) + "] = " + coerced(items[each.at + 2], LST_STRING).text
+                                                  : coerced(v, LST_STRING).text;
+                    const auto        found = std::find_if(gathered.begin(), gathered.end(), [&](const Gathered& g) { return g.key == rule->key; });
+                    if (found != gathered.end())
+                    {
+                        found->all += ", " + one;
+                        continue;
+                    }
+                    gathered.push_back({ rule->key, fields.size(), one });
+                    break;
+                }
+                default: text = coerced(v, v->getIType()).text; break;
+            }
+            sameAs(rule->constant, rule->key);
+            fields.push_back(std::string(rule->key) + " = " + text);
+        }
+        for (const Gathered& g : gathered)
+        {
+            fields[g.at] += "{ " + g.all + " }";
+        }
+        // The serializer sends headers sorted by name: said where that is
+        // not the order they were written in.
+        if (!std::is_sorted(headers.begin(), headers.end()))
+        {
+            note(e, "SluaHeaderOrder",
+                 "SLua passes ll.HTTPRequest a custom_header table's headers sorted by name, where LSL's list passed them in the order "
+                 "written; nothing else differs.");
+        }
+        // A key to a line where the LSL's list had more than one.
+        const bool  lines = list->getLoc()->first_line != list->getLoc()->last_line;
+        std::string table = lines ? "{\n" : "{ ";
+        for (size_t i = 0; i < fields.size(); ++i)
+        {
+            table += lines ? indent() + "    " + fields[i] + ",\n" : (i ? ", " : "") + fields[i];
+        }
+        table += lines ? indent() + "}" : " }";
+        called = "ll." + lsl.substr(2);
+        LSLParamList* params = e->getIdentifier()->getSymbol()->getFunctionDecl();
+        return Expr{ called + "(" + args(e->getArguments(), params, 0, call->at, table) + ")" };
+    }
+
     std::optional<Expr> Writer::idiom(LSLFunctionExpression* e, const std::string& lsl, std::string& called)
     {
         const auto arg = [&](int at) { return value(argumentAt(e, at)); };
@@ -2583,6 +2954,10 @@ namespace
             {
                 return item;
             }
+        }
+        if (std::optional<Expr> table = ruleTable(e, lsl, called))
+        {
+            return table;
         }
         // One thing looked for in a list, its place: table.find's, counted
         // from 0, or -1 where it is not there, as LSL's.

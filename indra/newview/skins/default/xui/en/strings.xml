@@ -1123,6 +1123,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaHexSign">SLua reads [1] as [2], where LSL wrapped it to [3]: bit32 takes either the same, so it stays as written where only bit32 reads it, and is [3] where it is read as a number.</string>
 	<string name="SluaIntegerPast32Bits">LSL reads [1] as -1: past 0xFFFFFFFF, the most its 32 bits hold, a number stops there.</string>
 	<string name="SluaListCompare">LSL compares lists by their lengths alone, and != answers the difference of them.</string>
+	<string name="SluaHeaderOrder">SLua passes ll.HTTPRequest a custom_header table's headers sorted by name, where LSL's list passed them in the order written; nothing else differs.</string>
 	<string name="SluaShortCircuit">[1] leaves its right side unrun once the left decides it; LSL ran both sides, the right one first.</string>
 	<string name="SluaUuid">SLua's uuid holds a key; LSL's key could hold any text.</string>
 	<string name="SluaAssignInExpression">SLua's assignments are statements: this one is made by a function called where it stood.</string>

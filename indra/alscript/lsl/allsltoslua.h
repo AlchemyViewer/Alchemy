@@ -78,7 +78,8 @@ public:
         // from a clock of its own.
         bool sluaCalls = true;
         // What SLua has in a call's stead where it means the same: math,
-        // vector and quaternion's functions, ^, print, os.time, table.find.
+        // vector and quaternion's functions, ^, print, os.time, table.find,
+        // and the tables ll's particle, media and HTTP calls take for rules.
         bool idioms = true;
         // Luau types on locals, parameters and what functions return, from
         // LSL's types.
