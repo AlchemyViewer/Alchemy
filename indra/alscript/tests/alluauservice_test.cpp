@@ -103,8 +103,8 @@ namespace tut
     };
 
     typedef test_group<alluauservice_data, 100> alluauservice_group;
-    typedef alluauservice_group::object    alluauservice_object;
-    alluauservice_group                    alluauservice_instance("alluauservice");
+    typedef alluauservice_group::object         alluauservice_object;
+    alluauservice_group                         alluauservice_instance("alluauservice");
 
     template<> template<>
     void alluauservice_object::test<1>()
