@@ -1501,6 +1501,15 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
             pos = len;
             continue;
         }
+        if (!sPlainLexing && current.all.empty())
+        {
+            // A state no rule of which begins anywhere -- a line comment,
+            // plain text -- holds the rest of the line, all at once rather
+            // than a character at a time.
+            emit(pos, len, current.defaultKind);
+            pos = len;
+            continue;
+        }
         const Rule*             hit        = nullptr;
         size_t                  end        = std::string_view::npos;
         ALSyntaxKind            kind       = current.defaultKind;
