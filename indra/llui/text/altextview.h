@@ -941,6 +941,10 @@ protected:
     // and a see-through child that only holds others is over the text only
     // where one of those is.
     LLView*      overlayAt(S32 x, S32 y);
+    // Whether a point is on the bars, which take a press to scroll by: the
+    // ruler or the map down the side, or the bar along the bottom where
+    // it shows.
+    bool         barsAt(S32 x, S32 y);
     // An edit command done -- typed, replaced, undone -- before the caret
     // is brought into sight: whatever a subclass left for after its edits,
     // done once rather than at each.

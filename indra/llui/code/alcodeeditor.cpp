@@ -5365,6 +5365,16 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     {
         return LLUICtrl::handleMouseDown(x, y, mask);
     }
+    // The ruler, the map and the bottom bar scroll the text, and leave
+    // what the typing has up -- a call's stops, the closers put in, the
+    // list -- as the wheel does; the card and the fixes, about what the
+    // scroll takes away, go.
+    if (barsAt(x, y))
+    {
+        hideCard();
+        closeFixes();
+        return ALTextView::handleMouseDown(x, y, mask);
+    }
     hideCard();
     closeCompletion();
     closeFixes();

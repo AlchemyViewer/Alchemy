@@ -31,6 +31,7 @@
 #include "alchoicepopup.h"
 #include "alfindbar.h"
 #include "alsurface.h"
+#include "altextruler.h"
 #include "../llclipboard.h"
 
 #include "../llfocusmgr.h"
@@ -3561,5 +3562,30 @@ namespace tut
         ensure_equals("the mirrors made what it holds", e.document().line(0), std::string("for (idx = 0; idx < n; ++idx)"));
         ensure("the caret still at the line's end: " + std::to_string(e.caret().column), e.caret() == ALTextPos(0, 29));
         ensure("the stops let go", e.placeholders().empty());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<98>()
+    {
+        set_test_name("a press on the ruler scrolls the text and leaves a call's stops to Tab through");
+        std::string text;
+        for (int i = 0; i < 80; ++i)
+        {
+            text += "llOwnerSay(\"line " + std::to_string(i) + "\");\n";
+        }
+        ALCodeEditor& e = make("");
+        e.setText(text);
+        e.setCaret(ALTextPos(0, 0));
+        e.insertSnippet("f(${1:a}, ${2:b})");
+        ensure_equals("the stops", e.placeholders().size(), size_t(2));
+        ALTextRuler* ruler = e.findChild<ALTextRuler>("ruler");
+        ensure("a ruler down the side", ruler && ruler->getVisible());
+        const LLRect bar = ruler->getRect();
+        ensure("the press taken", e.handleMouseDown(bar.mLeft + bar.getWidth() / 2, bar.mBottom + 4, MASK_NONE));
+        gFocusMgr.setMouseCapture(nullptr);
+        ensure("the text scrolled", e.scrollY() > 0);
+        ensure_equals("the stops still there", e.placeholders().size(), size_t(2));
+        key(KEY_TAB);
+        ensure_equals("Tab goes on to the next", e.selectedText(), std::string("b"));
     }
 }

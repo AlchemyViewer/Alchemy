@@ -680,6 +680,16 @@ bool ALTextView::rulerAt(S32 x, S32 y)
     return mRuler->getVisible() && mRuler->getRect().pointInRect(x, y) && !overlayAt(x, y);
 }
 
+bool ALTextView::barsAt(S32 x, S32 y)
+{
+    if (rulerAt(x, y))
+    {
+        return true;
+    }
+    const LLRect bar = hBarRect();
+    return bar.notEmpty() && bar.pointInRect(x, y) && barAlpha() > 0.f;
+}
+
 LLRect ALTextView::textRect() const
 {
     LLRect rect = bodyRect();
