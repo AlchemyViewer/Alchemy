@@ -3101,4 +3101,28 @@ namespace tut
         ensure("found", v.findNext(true));
         ensure("then on from it", v.caret() == ALTextPos(2, 0));
     }
+
+    template<> template<>
+    void altextview_object::test<99>()
+    {
+        set_test_name("a view that takes no focus -- a card over an editor -- selects a word double-clicked in it and leaves the keyboard where it was");
+        ALTextView& editor = make("the editor");
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "card";
+        p.rect         = LLRect(0, 100, 400, 0);
+        p.default_text = "hello world";
+        p.takes_focus  = false;
+        ALTextView* card = LLUICtrlFactory::create<ALTextView>(p);
+        card->setFont(LLFontGL::getFontMonospace());
+        const LLRect text = card->textRect();
+        const S32    x    = text.mLeft + static_cast<S32>(card->layout().xOf(0, 8)) + 1;
+        const S32    y    = text.mTop - card->layout().lineTop(0) - card->layout().rowHeight() / 2;
+        card->handleMouseDown(x, y, MASK_NONE);
+        card->handleMouseUp(x, y, MASK_NONE);
+        ensure("a click leaves the keyboard with the editor", editor.hasFocus() && !card->hasFocus());
+        ensure("double", card->handleDoubleClick(x, y, MASK_NONE));
+        ensure_equals("the word", card->selectedText(), std::string("world"));
+        ensure("and so does a double click", editor.hasFocus() && !card->hasFocus());
+        card->die();
+    }
 }

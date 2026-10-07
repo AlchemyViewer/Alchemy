@@ -6213,7 +6213,10 @@ bool ALTextView::handleDoubleClick(S32 x, S32 y, MASK mask)
         // Quick, but somewhere else: a click, and the start of a drag.
         return handleMouseDown(x, y, mask);
     }
-    setFocus(true);
+    if (mTakesFocus)
+    {
+        setFocus(true);
+    }
     const ALTextRange word = mDocument.wordAt(posAtLocal(x, y, false));
     placeSelection(word.begin, word.end);
     mDesiredX       = -1.f;
