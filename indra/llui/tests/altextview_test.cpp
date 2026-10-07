@@ -2969,4 +2969,31 @@ namespace tut
         ensure_equals("the line it was on", v.document().line(7), std::string("abqyz"));
         ensure("the caret past the q, two lines down", v.caret() == ALTextPos(7, 3));
     }
+
+    template<> template<>
+    void altextview_object::test<94>()
+    {
+        set_test_name("an edit a host makes to the document itself slides the main selection with the text, as it slides the others; a key typed still tells whoever follows the caret");
+        ALTextView& v = make("zero\none\ntwo\nthree");
+        v.setSelections(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 3)), { ALTextRange(ALTextPos(3, 1), ALTextPos(3, 1)) });
+        // The first line let go of, as a log lets go of its oldest.
+        v.document().remove(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
+        ensure("the main selection a line up, on the same text", v.selection() == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 3)));
+        ensure_equals("which is", v.selectedText(), std::string("two"));
+        ensure("the other a line up with it, after it still",
+               v.otherSelections().size() == 1 && v.otherSelections()[0] == ALTextRange(ALTextPos(2, 1), ALTextPos(2, 1)));
+        // Text put in right at the end of a selection is not part of it.
+        v.document().insert(ALTextPos(1, 3), "!");
+        ensure_equals("still the same text", v.selectedText(), std::string("two"));
+
+        // One caret: the key's edit slides it past what it typed, which is
+        // a move all the same.
+        v.setSelections(ALTextRange(ALTextPos(0, 3), ALTextPos(0, 3)), {});
+        S32 moved = 0;
+        boost::signals2::scoped_connection heard = v.onCaretMoved([&moved]() { ++moved; });
+        type("x");
+        ensure_equals("typed", v.document().line(0), std::string("onex"));
+        ensure("the caret past it", v.caret() == ALTextPos(0, 4) && !v.hasOtherSelections());
+        ensure_equals("and told once", moved, 1);
+    }
 }

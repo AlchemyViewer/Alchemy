@@ -472,7 +472,9 @@ void ALTextView::setText(std::string_view text)
     // Through the virtual, so that what a subclass keeps about changes
     // since the last save -- the gutter's bars -- starts clean too.
     resetDirty();
+    // At the start of a new text, which is no move to tell of.
     mCaret = mAnchor = mDocument.start();
+    mSelectionSlid    = false;
     mCaretGap         = -1;
     mDesiredX         = -1.f;
     mScrollY          = 0;
@@ -507,10 +509,9 @@ void ALTextView::replaceText(const ALTextRange& range_in, std::string_view text)
     mChanges.clear();
     mChangeAt = 0;
     resetDirty();
-    // The main caret, which whoever edits puts, moved along with the text.
-    mCaret    = mDocument.clamp(done.placed(mCaret));
-    mAnchor   = mDocument.clamp(done.placed(mAnchor));
-    // Out of any gap it stood in, which the host says again or not.
+    // The selection moved along with the text as the edit was made
+    // (onDocumentEdit); out of any gap it stood in, which the host says
+    // again or not.
     mCaretGap = -1;
     syncScrollbar();
     mChanged();
@@ -976,6 +977,10 @@ void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret,
 {
     const ALTextRange was      = selection();
     const S32         was_gap  = mCaretGap;
+    // An edit that moved it since is a move too, though it is put where the
+    // edit left it.
+    const bool        slid     = mSelectionSlid;
+    mSelectionSlid             = false;
     mCaretGap                  = -1;
     mAnchor                    = mDocument.clamp(anchor);
     mCaret                = snapped(mDocument.clamp(caret), was.end);
@@ -1020,7 +1025,8 @@ void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret,
         }
     }
     mBlink.reset();
-    if (selection() != was)
+    const bool moved = slid || selection() != was;
+    if (moved)
     {
         // Offered once a frame, not at every step: a selection of the
         // whole text moved a line at a time is otherwise copied whole at
@@ -1033,7 +1039,7 @@ void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret,
     // Into a gap, or out of one onto the line under it, is a move, though
     // the place in the text is the one it had.
     mCaretGap = gap;
-    if (selection() != was || mCaretGap != was_gap)
+    if (moved || mCaretGap != was_gap)
     {
         mCaretMoved();
     }
@@ -2270,9 +2276,21 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
         }
     }
     // What the find bar found slides with the text, and so do the carets
-    // besides the main one, which whoever made the edit puts.
+    // besides the main one.
     mFind.edited(edit);
     mCarets.apply(edit);
+    // And the main one as they do, for an edit a host makes to the document
+    // itself; an edit made through the view puts it after. Moved, it is out
+    // of any gap it stood in.
+    const ALTextRange held  = selection();
+    const ALTextRange after = ALTextCarets::slid(held, edit);
+    mAnchor                 = mDocument.clamp(after.begin);
+    mCaret                  = mDocument.clamp(after.end);
+    if (selection() != held)
+    {
+        mCaretGap      = -1;
+        mSelectionSlid = true;
+    }
 
     // The layers: what is after the edit slides with the text, what it
     // cut through goes.

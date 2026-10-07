@@ -1332,6 +1332,9 @@ private:
 
     ALTextPos mCaret;
     ALTextPos mAnchor;
+    // Whether an edit has moved it along since it was last put: a move,
+    // which its next placing tells of wherever that puts it.
+    bool      mSelectionSlid = false;
     // The selections besides that one.
     ALTextCarets mCarets;
     // Each into the text, as the main one is put.
