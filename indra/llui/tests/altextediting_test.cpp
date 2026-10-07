@@ -297,4 +297,17 @@ namespace tut
         ensure_equals("a caret inside the token where it began", placed, std::string("0:1-0:1 2:0-2:0 "));
         ensure("nothing where no line says anything", toggleComment(ALTextDocument("\n  \n"), { at(0, 0), at(1, 1) }, "//").empty());
     }
+
+    template<> template<>
+    void altextediting_object::test<11>()
+    {
+        set_test_name("lines joined as vim's J joins them: no space after a line that ends in a blank, nor onto nothing yet");
+        const std::string    text = "a  \nb\n\nc\t\n  d\n\n\ne";
+        const ALTextDocument doc(text);
+        ensure_equals("a line's trailing blanks stand for the space", applied(text, *joinLines(doc, 0, 1, false)), std::string("a  b\n\nc\t\n  d\n\n\ne"));
+        ensure_equals("a tab as well", applied(text, *joinLines(doc, 3, 4, false)), std::string("a  \nb\n\nc\td\n\n\ne"));
+        ensure_equals("nothing joined onto yet takes no space", applied(text, *joinLines(doc, 5, 7, false)), std::string("a  \nb\n\nc\t\n  d\ne"));
+        ensure_equals("an empty line between joins what comes after it with a space", applied(text, *joinLines(doc, 1, 3, false)),
+                      std::string("a  \nb c\t\n  d\n\n\ne"));
+    }
 }

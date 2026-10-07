@@ -284,6 +284,17 @@ std::optional<Change> joinLines(const ALTextDocument& doc, S32 first, S32 last, 
     {
         return std::nullopt;
     }
+    // What each line gives the joined line: the first all of itself, the
+    // rest what follows their leading blanks. The first that gives any.
+    const auto given = [&doc, first](S32 line) {
+        const std::string& text = doc.line(line);
+        return std::string_view(text).substr(line == first ? 0 : alLeadingBlankBytes(text));
+    };
+    S32 filled = first;
+    while (filled <= last && given(filled).empty())
+    {
+        ++filled;
+    }
     // From the bottom up, so each join's place is the text's as it was.
     Change change;
     for (S32 line = last - 1; line >= first; --line)
@@ -293,12 +304,13 @@ std::optional<Change> joinLines(const ALTextDocument& doc, S32 first, S32 last, 
             change.replacements.push_back({ ALTextRange(doc.lineEnd(line), doc.lineStart(line + 1)), std::string() });
             continue;
         }
-        const std::string& next  = doc.line(line + 1);
-        const size_t       text  = next.find_first_not_of(" \t");
-        const bool         blank = text == std::string::npos || next[text] == ')';
-        const S32          at    = text == std::string::npos ? static_cast<S32>(next.size()) : static_cast<S32>(text);
-        const std::string  space = blank ? std::string() : std::string(" ");
-        change.replacements.push_back({ ALTextRange(doc.lineEnd(line), ALTextPos(line + 1, at)), space });
+        // A space where the next line gives anything but a `)`, after
+        // something the lines before it gave that does not end in a blank.
+        const std::string&     next  = doc.line(line + 1);
+        const size_t           text  = alLeadingBlankBytes(next);
+        const std::string_view here  = given(line);
+        const bool             space = text < next.size() && next[text] != ')' && filled <= line && (here.empty() || !alBlankByte(here.back()));
+        change.replacements.push_back({ ALTextRange(doc.lineEnd(line), ALTextPos(line + 1, static_cast<S32>(text))), space ? std::string(" ") : std::string() });
     }
     change.caret = doc.lineEnd(first);
     return change;

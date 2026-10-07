@@ -86,7 +86,8 @@ namespace ALTextEditing
     std::optional<Change> toggleComment(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, const std::string& token);
     // Lines first through last joined into one, as vim's J does: each break
     // and the next line's leading blanks gone, one space in their place --
-    // none before a `)`, nor where the next line is blank; or, with
+    // none before a `)`, nor where the next line is blank, nor after a line
+    // that ends in a blank or where nothing is joined yet; or, with
     // `keep_blanks`, the break alone, as its gJ. The caret where the first
     // join is. Nothing where last is not past first.
     std::optional<Change> joinLines(const ALTextDocument& doc, S32 first, S32 last, bool keep_blanks);
