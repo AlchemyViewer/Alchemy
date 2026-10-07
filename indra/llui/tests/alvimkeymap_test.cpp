@@ -4096,4 +4096,19 @@ namespace tut
         keys("\"ayl2\"a3p.");
         ensure_equals("2\"a3p then .: six more", flat(editor->text()), std::string("aaaaaaaaaaaaab|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<151>()
+    {
+        set_test_name(":put! over a range puts above its last line, as :put puts under it");
+        ALCodeEditor& e = make("1\n2\n3\n4\n");
+        keys("\"xyy");
+        ex("1,3put! x");
+        ensure_equals(":1,3put! x: above the third line", flat(e.text()), std::string("1|2|1|3|4|"));
+        ensure_equals("the caret on the line put", caretText(), std::string("2:0"));
+        e.setText("1\n2\n3\n4\n");
+        e.setCaret(ALTextPos(0, 0));
+        ex("2,3put x");
+        ensure_equals(":2,3put x: under the third line", flat(e.text()), std::string("1|2|3|1|4|"));
+    }
 }

@@ -1091,11 +1091,12 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
     if (name == "pu" || name == "put" || name == "pu!" || name == "put!")
     {
         // A register's text as lines, whatever it was taken as: under the
-        // range's last line, or above its first with !; above the first
-        // line for :0put, under the line before it. Nothing is a
-        // register never set, or set to no text, as for p: an empty line is
-        // a line to put, and so is an empty last line of several. What _
-        // gives back is no text, which as a line is an empty one.
+        // range's last line, or above it with !, as vim's [line] is the
+        // range's last; above the first line for :0put, under the line
+        // before it. Nothing is a register never set, or set to no text,
+        // as for p: an empty line is a line to put, and so is an empty
+        // last line of several. What _ gives back is no text, which as a
+        // line is an empty one.
         if (!editing)
         {
             return;
@@ -1117,7 +1118,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
             text.pop_back();
         }
         const bool above = name.back() == '!' || before_first;
-        const S32  line  = before_first ? 0 : above ? first : last;
+        const S32  line  = before_first ? 0 : last;
         view.setCaret(above ? d.lineStart(line) : d.lineEnd(line));
         view.insertText(above ? text + "\n" : "\n" + text);
         // The caret on the last line put, at its first non-blank, as vim
