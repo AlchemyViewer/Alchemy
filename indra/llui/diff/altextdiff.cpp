@@ -266,10 +266,29 @@ namespace
         {
             const S32 to_left  = i < kept.size() ? kept[i].first : n;
             const S32 to_right = i < kept.size() ? kept[i].second : m;
-            // The stretch before the pair, on its own.
-            for (const Run& run : stretch(a, b, left, right, l, to_left, r, to_right, algorithm))
+            // The stretch before the pair, on its own: one of no lines on a
+            // side, or of a line each, as it is without looking -- a
+            // conversion's anchors leave mostly those between them.
+            if (l == to_left || r == to_right)
             {
-                push(run);
+                push(Run{ Kind::Removed, l, r, to_left - l });
+                push(Run{ Kind::Added, to_left, r, to_right - r });
+            }
+            else if (to_left - l == 1 && to_right - r == 1 && a[static_cast<size_t>(l)] == b[static_cast<size_t>(r)])
+            {
+                push(Run{ Kind::Same, l, r, 1 });
+            }
+            else if (to_left - l == 1 && to_right - r == 1)
+            {
+                push(Run{ Kind::Removed, l, r, 1 });
+                push(Run{ Kind::Added, to_left, r, 1 });
+            }
+            else
+            {
+                for (const Run& run : stretch(a, b, left, right, l, to_left, r, to_right, algorithm))
+                {
+                    push(run);
+                }
             }
             if (i == kept.size())
             {
