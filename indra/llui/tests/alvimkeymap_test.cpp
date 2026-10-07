@@ -3723,4 +3723,29 @@ namespace tut
         keys("diw");
         ensure_equals("diw there takes what yiw yanked", flat(editor->text()), std::string("foo ba"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<140>()
+    {
+        set_test_name("a count before / or ? is the match that many on, round past the ends, its offset taken from that one; over a visual selection too");
+        ALCodeEditor& e = make("a foo b foo c foo d foo\n");
+        keys("3/foo<CR>");
+        ensure_equals("3/foo the third match on", caretText(), std::string("0:14"));
+        keys("$3?foo<CR>");
+        ensure_equals("3?foo the third back", caretText(), std::string("0:8"));
+        keys("02/foo/e<CR>");
+        ensure_equals("2/foo/e the second match's last character", caretText(), std::string("0:10"));
+        keys("06/foo<CR>");
+        ensure_equals("6/foo round past the end to the second", caretText(), std::string("0:8"));
+        keys("03n");
+        ensure_equals("3n the third on, as before", caretText(), std::string("0:14"));
+        ensure_equals("nothing changed", flat(e.text()), std::string("a foo b foo c foo d foo|"));
+
+        make("x\nfoo\ny\nfoo\nz\nfoo\nw\n");
+        keys("2/foo/+1<CR>");
+        ensure_equals("2/foo/+1 the line after the second", caretText(), std::string("4:0"));
+        keys("ggv2/foo<CR>d");
+        ensure_equals("v2/foo takes the selection to the second", flat(editor->text()), std::string("oo|z|foo|w|"));
+        ensure_equals("and d took it", vim->registerText('"'), std::string("x\nfoo\ny\nf"));
+    }
 }
