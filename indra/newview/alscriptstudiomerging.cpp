@@ -126,11 +126,10 @@ void ALScriptStudioMerging::textChanged(Doc& doc)
 // static
 bool ALScriptStudioMerging::canSettle(const Doc& doc)
 {
-    // As the bar lights its buttons: a merge, someone to make the edit, and
-    // the caret in a conflict.
+    // As the bar lights its buttons: someone to make the edit, and the
+    // caret in a conflict of a merge.
     const ALDiffView* view = doc.compareView;
-    return view && doc.shownView() == Doc::View::Compare && view->merging() && view->canTakeBack() &&
-           view->model().changeConflicts(view->changeAtCaret());
+    return view && doc.shownView() == Doc::View::Compare && view->canSettleAtCaret();
 }
 
 // static

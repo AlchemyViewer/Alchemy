@@ -1486,7 +1486,7 @@ void ALDiffView::refreshBar()
     mBar->setTakeBackEnabled(mTakeBack && change >= 0);
     if (mModel.merging())
     {
-        mBar->setConflicts(mModel.conflictCount(), mTakeBack && mModel.changeConflicts(change));
+        mBar->setConflicts(mModel.conflictCount(), canSettleAtCaret());
     }
     mBar->setSteps(mModel.changeStep(column, line, false) >= 0, mModel.changeStep(column, line, true) >= 0);
 }
