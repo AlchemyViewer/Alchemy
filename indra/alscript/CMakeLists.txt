@@ -79,6 +79,7 @@ target_sources(
     preprocessor/alscriptsnapshot.cpp
     preprocessor/alscripttextcache.cpp
     preprocessor/alsourcemap.cpp
+    preprocessor/aluploadheader.cpp
 )
 
 target_sources(
@@ -156,6 +157,7 @@ target_sources(
         preprocessor/alscriptsnapshot.h
         preprocessor/alscripttextcache.h
         preprocessor/alsourcemap.h
+        preprocessor/aluploadheader.h
 )
 
 target_include_directories(
@@ -306,6 +308,7 @@ if(AL_BUILD_TESTS)
   al_add_test(alscripttextcache PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptstack PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptenvelope PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(aluploadheader PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almessagemap PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alluauconfig PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptformatter PROJECT alscript LIBRARIES alscript llcommon)
