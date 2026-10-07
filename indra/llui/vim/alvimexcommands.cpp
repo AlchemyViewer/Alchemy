@@ -472,7 +472,7 @@ void ALVimExCommands::endConfirming(ALTextView& view)
     mVim.bump();
 }
 
-bool ALVimExCommands::lineAddress(ALTextView& view, const std::string& line, size_t& at_, S32& out) const
+bool ALVimExCommands::lineAddress(ALTextView& view, const std::string& line, size_t& at_, S32& out, bool* before_first) const
 {
     const ALTextDocument& d = view.document();
     if (at_ >= line.size())
@@ -544,6 +544,10 @@ bool ALVimExCommands::lineAddress(ALTextView& view, const std::string& line, siz
             any = true;
         }
         out += (plus ? 1 : -1) * (any ? n : 1);
+    }
+    if (before_first)
+    {
+        *before_first = out < 0;
     }
     out = llclamp(out, 0, d.lineCount() - 1);
     return true;
@@ -731,8 +735,11 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
     S32    first = view.caret().line;
     S32    last  = first;
     bool   ranged = false;
+    // Whether the range's last address is a line before the first -- :0 --
+    // which :put puts under, and so over the first line.
+    bool   before_first = false;
     size_t at_   = 0;
-    auto   lineNumber = [&](S32& out) { return lineAddress(view, line, at_, out); };
+    auto   lineNumber = [&](S32& out) { return lineAddress(view, line, at_, out, &before_first); };
     if (line[0] == '%')
     {
         // 1,$: the empty line after a final line break is no line of the
@@ -761,6 +768,7 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         if (last < first)
         {
             std::swap(first, last);
+            before_first = false;
         }
     }
     std::string rest = line.substr(at_);
@@ -1083,7 +1091,8 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
     if (name == "pu" || name == "put" || name == "pu!" || name == "put!")
     {
         // A register's text as lines, whatever it was taken as: under the
-        // range's last line, or above its first with !. Nothing is a
+        // range's last line, or above its first with !; above the first
+        // line for :0put, under the line before it. Nothing is a
         // register never set, or set to no text, as for p: an empty line is
         // a line to put, and so is an empty last line of several. What _
         // gives back is no text, which as a line is an empty one.
@@ -1107,8 +1116,8 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         {
             text.pop_back();
         }
-        const bool above = name.back() == '!';
-        const S32  line  = above ? first : last;
+        const bool above = name.back() == '!' || before_first;
+        const S32  line  = before_first ? 0 : above ? first : last;
         view.setCaret(above ? d.lineStart(line) : d.lineEnd(line));
         view.insertText(above ? text + "\n" : "\n" + text);
         // The caret on the last line put, at its first non-blank, as vim

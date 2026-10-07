@@ -4011,4 +4011,43 @@ namespace tut
         ensure_equals("$put: under the last line", flat(editor->text()), std::string("1|2|3|4|5|1|2|"));
         ensure_equals("the caret on the last of them", caretText(), std::string("6:0"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<148>()
+    {
+        set_test_name(":0put puts above the first line, under the line before it, as :.-1put does from the first line; under lines counted from 0, :0put is under the line shown as 0");
+        ALCodeEditor& e = make("a\nb\n");
+        keys("j\"xyy");
+        ex("0put x");
+        ensure_equals(":0put x: above the first line", flat(e.text()), std::string("b|a|b|"));
+        ensure_equals("the caret on the line put", caretText(), std::string("0:0"));
+
+        make("a\n\nb\n");
+        keys("jyy");
+        ex("0put");
+        ensure_equals(":0put of an empty line: above the first", flat(editor->text()), std::string("|a||b|"));
+        ensure_equals("the caret on it", caretText(), std::string("0:0"));
+
+        make("a\nb\n");
+        keys("j\"xyygg");
+        ex("0put! x");
+        ensure_equals(":0put! x: above the first line as well", flat(editor->text()), std::string("b|a|b|"));
+
+        make("a\nb\n");
+        keys("j\"xyygg");
+        ex(".-1put x");
+        ensure_equals(":.-1put x from the first line: above it", flat(editor->text()), std::string("b|a|b|"));
+
+        make("a\nb\n");
+        keys("j\"xyy");
+        ex("0,1put x");
+        ensure_equals(":0,1put x: under the range's last line", flat(editor->text()), std::string("a|b|b|"));
+        ensure_equals("the caret on the line put", caretText(), std::string("1:0"));
+
+        ALCodeEditor& zero = make("a\nb\n");
+        zero.setLineNumberBase(-1);
+        keys("j\"xyy");
+        ex("0put x");
+        ensure_equals("lines counted from 0: :0put x under the first, the line shown as 0", flat(zero.text()), std::string("a|b|b|"));
+    }
 }
