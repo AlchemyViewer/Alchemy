@@ -24,45 +24,73 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alscriptstudiomasters.h"
+#include "alscriptstudiodiskmasters.h"
 
 #include "alscriptdiskmasters.h"
 
-namespace
-{
-    // The viewer's: each ask passed on to ALScriptDiskMasters, the one the
-    // account in hand has, as it is asked. Holds nothing of its own, so
-    // that one serves every window.
-    class ALScriptStudioDiskMasters final : public ALScriptStudioMasters::DiskMasters
-    {
-    public:
-        std::optional<ALMasterLink> linkOf(const ALScriptRef& ref) override { return ALScriptDiskMasters::instance().linkOf(ref); }
-        std::vector<ALMasterLink>   mastering(const std::string& master) override { return ALScriptDiskMasters::instance().mastering(master); }
-        bool                        masters(const std::string& master) override { return ALScriptDiskMasters::instance().masters(master); }
-        void link(ALMasterLink link) override { ALScriptDiskMasters::instance().link(std::move(link)); }
-        void unlink(const ALScriptRef& ref) override { ALScriptDiskMasters::instance().unlink(ref); }
-        void send(const ALScriptRef& ref, ALMasterPlan::Send kind) override { ALScriptDiskMasters::instance().send(ref, kind); }
-        void wrote(const std::string& path) override { ALScriptDiskMasters::instance().wrote(path); }
-        boost::signals2::connection onOutcome(std::function<void(const Outcome& outcome)> heard) override
-        {
-            return ALScriptDiskMasters::instance().onOutcome(std::move(heard));
-        }
-        boost::signals2::connection onChanged(std::function<void()> changed) override
-        {
-            return ALScriptDiskMasters::instance().onChanged(std::move(changed));
-        }
-        std::vector<Outcome> takeUnheard() override { return ALScriptDiskMasters::instance().takeUnheard(); }
-        ALDiskIncludes       blessedFor(const std::string& master, bool lua) override { return ALScriptDiskMasters::blessedFor(master, lua); }
-        std::vector<std::pair<std::string, std::string>> aliasesFor(const std::string& master, bool lua) override
-        {
-            return ALScriptDiskMasters::aliasesFor(master, lua);
-        }
-    };
-}
-
 // static
-ALScriptStudioMasters::DiskMasters& ALScriptStudioMasters::viewer()
+ALScriptStudioDiskMasters& ALScriptStudioDiskMasters::get()
 {
     static ALScriptStudioDiskMasters disk;
     return disk;
+}
+
+std::optional<ALMasterLink> ALScriptStudioDiskMasters::linkOf(const ALScriptRef& ref)
+{
+    return ALScriptDiskMasters::instance().linkOf(ref);
+}
+
+std::vector<ALMasterLink> ALScriptStudioDiskMasters::mastering(const std::string& master)
+{
+    return ALScriptDiskMasters::instance().mastering(master);
+}
+
+bool ALScriptStudioDiskMasters::masters(const std::string& master)
+{
+    return ALScriptDiskMasters::instance().masters(master);
+}
+
+void ALScriptStudioDiskMasters::link(ALMasterLink link)
+{
+    ALScriptDiskMasters::instance().link(std::move(link));
+}
+
+void ALScriptStudioDiskMasters::unlink(const ALScriptRef& ref)
+{
+    ALScriptDiskMasters::instance().unlink(ref);
+}
+
+void ALScriptStudioDiskMasters::send(const ALScriptRef& ref, ALMasterPlan::Send kind)
+{
+    ALScriptDiskMasters::instance().send(ref, kind);
+}
+
+void ALScriptStudioDiskMasters::wrote(const std::string& path)
+{
+    ALScriptDiskMasters::instance().wrote(path);
+}
+
+boost::signals2::connection ALScriptStudioDiskMasters::onOutcome(std::function<void(const Outcome& outcome)> heard)
+{
+    return ALScriptDiskMasters::instance().onOutcome(std::move(heard));
+}
+
+boost::signals2::connection ALScriptStudioDiskMasters::onChanged(std::function<void()> changed)
+{
+    return ALScriptDiskMasters::instance().onChanged(std::move(changed));
+}
+
+std::vector<ALScriptStudioDiskMasters::Outcome> ALScriptStudioDiskMasters::takeUnheard()
+{
+    return ALScriptDiskMasters::instance().takeUnheard();
+}
+
+ALDiskIncludes ALScriptStudioDiskMasters::blessedFor(const std::string& master, bool lua)
+{
+    return ALScriptDiskMasters::blessedFor(master, lua);
+}
+
+std::vector<std::pair<std::string, std::string>> ALScriptStudioDiskMasters::aliasesFor(const std::string& master, bool lua)
+{
+    return ALScriptDiskMasters::aliasesFor(master, lua);
 }

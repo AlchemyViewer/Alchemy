@@ -1104,6 +1104,7 @@ if(AL_BUILD_VIEWER)
     alscriptmastertoasts.h
     alscriptmasterupload.h
     alscriptmasterwatch.h
+    alscriptstudiodiskmasters.h
     alscriptstudiomasters.h
     alscriptstudiorecovery.h
     alscriptstudioselections.h

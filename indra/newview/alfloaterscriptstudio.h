@@ -39,6 +39,7 @@
 #include "alscriptstudiocomparewith.h"
 #include "alscriptstudioexpandedcompare.h"
 #include "alscriptstudiohistory.h"
+#include "alscriptstudiodiskmasters.h"
 #include "alscriptstudiomasters.h"
 #include "alscriptstudiomerging.h"
 #include "alscriptstudioselections.h"
@@ -1387,7 +1388,7 @@ private:
     // Recompiles from the Explorer.
     ALScriptRecompile                  mRecompile{ *this, *this };
     // Its scripts whose master is a file on disk.
-    ALScriptStudioMasters              mMasters{ *this, *this, *this, ALScriptStudioMasters::viewer() };
+    ALScriptStudioMasters              mMasters{ *this, *this, *this, ALScriptStudioDiskMasters::get() };
     std::string                        mCheckingWhere;
     S32                                mCheckedErrors   = 0;
     S32                                mCheckedWarnings = 0;

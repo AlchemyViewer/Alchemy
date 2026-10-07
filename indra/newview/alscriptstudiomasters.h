@@ -116,8 +116,8 @@ public:
     };
 
     // What the masters ask of the account's scripts mastered on disk, the
-    // links and the sends: ALScriptDiskMasters in the viewer (viewer()), and
-    // a test's own in a test.
+    // links and the sends: ALScriptDiskMasters in the viewer, through
+    // ALScriptStudioDiskMasters, and a test's own in a test.
     class DiskMasters
     {
     public:
@@ -150,9 +150,6 @@ public:
     protected:
         ~DiskMasters() = default;
     };
-    // The viewer's (alscriptstudiodiskmasters.cpp).
-    static DiskMasters& viewer();
-
     ALScriptStudioMasters(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window, DiskMasters& disk);
 
     // Whether a tab may be linked to a file: an item's script or notecard,
