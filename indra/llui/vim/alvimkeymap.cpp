@@ -2431,6 +2431,8 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 view.setCaret(ALTextPos(line, static_cast<S32>(indent.size())));
             }
             enterInsert(view, count, true);
+            // A count opens as many lines.
+            mInsertOpened = true;
             return true;
         }
         case 'x':
@@ -3951,6 +3953,7 @@ void ALVimKeymap::enterInsert(ALTextView& view, S32 count, bool grouped)
     mWantColumn  = -1;
     mInsertStart = view.caret();
     mInsertMoved = false;
+    mInsertOpened = false;
     mInsertRegister = false;
     mCount       = 0;
     mRegister    = 0;
@@ -3977,10 +3980,15 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
         mLastTyped = typed;
     }
     // Again as many times as the count said: made once and put in as one
-    // edit, not an edit a time.
-    if (mInsertCount > 1 && !typed.empty())
+    // edit, not an edit a time. A line o or O opened is opened again for
+    // each, at the indent it was given, as vim types a line break before
+    // each -- with nothing typed on it too.
+    const bool opened = mInsertOpened && !moved;
+    if (mInsertCount > 1 && (!typed.empty() || opened))
     {
-        const size_t size = typed.size() * static_cast<size_t>(mInsertCount - 1);
+        const ALTextPos   start = d.clamp(mInsertStart);
+        const std::string each  = opened ? "\n" + d.text(ALTextRange(d.lineStart(start.line), start)) + typed : typed;
+        const size_t      size  = each.size() * static_cast<size_t>(mInsertCount - 1);
         if (size > MAX_COUNT_TEXT)
         {
             tooMuch(size);
@@ -3991,7 +3999,7 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
             again.reserve(size);
             for (S32 n = 1; n < mInsertCount; ++n)
             {
-                again += typed;
+                again += each;
             }
             view.insertText(again);
         }
@@ -4076,8 +4084,10 @@ void ALVimKeymap::restartInsert(ALTextView& view)
 {
     mInsertMoved = false;
     mInsertStart = view.caret();
-    // A block's other lines no longer line up with what is typed.
-    mBlockInsert = false;
+    // Typed on where the caret went, not on a line of its own; a block's
+    // other lines no longer line up with it.
+    mInsertOpened = false;
+    mBlockInsert  = false;
     // What `.` repeats is an i, and the key being fed.
     if (!mReplaying && !mCommandInputs.empty())
     {

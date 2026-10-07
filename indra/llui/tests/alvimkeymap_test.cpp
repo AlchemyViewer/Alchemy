@@ -3182,4 +3182,17 @@ namespace tut
         keys(".");
         ensure_equals(". types again what followed the arrow alone", editor->document().line(0), std::string("foXXo"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<111>()
+    {
+        set_test_name("a count before o and O opens as many lines, each with what was typed, and . does it again");
+        ALCodeEditor& e = make("abc\n");
+        keys("3ofoo<Esc>");
+        ensure_equals("three lines below", flat(e.text()), std::string("abc|foo|foo|foo|"));
+        keys("gg2Obar<Esc>");
+        ensure_equals("two above", flat(e.text()), std::string("bar|bar|abc|foo|foo|foo|"));
+        keys("G.");
+        ensure_equals(". opens two more", flat(e.text()), std::string("bar|bar|abc|foo|foo|foo|bar|bar|"));
+    }
 }

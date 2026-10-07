@@ -538,7 +538,8 @@ private:
     // mode.
     Mode      mSearchVisual = Mode::Normal;
 
-    // Insert mode: how many times what is typed goes in; where the typing
+    // Insert mode: how many times what is typed goes in, and whether on a
+    // line of its own each time, as o and O open one; where the typing
     // began, moved with each edit, so that what was typed is read off the
     // text -- what a backspace or Ctrl-W took back gone from it, the
     // indent a Return made in it; whether the caret has been moved off it
@@ -548,6 +549,7 @@ private:
     // end where it was taken with $; what the last insert typed, for
     // Control-A; and whether a Control-R waits for the register to put in.
     S32         mInsertCount = 1;
+    bool        mInsertOpened = false;
     ALTextPos   mInsertStart;
     bool        mInsertMoved = false;
     ALTextPos   mInsertLeftAt;
