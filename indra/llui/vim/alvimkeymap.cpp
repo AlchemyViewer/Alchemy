@@ -1722,7 +1722,8 @@ bool ALVimKeymap::afterBracket(ALTextView& view, llwchar pending, llwchar ch)
     // ]d [d the problems, ]s [s the misspellings, [z ]z the fold
     // the caret is in, ]c [c the changes of a comparison.
     const bool    forward  = pending == ']';
-    const S32     given    = mCount;
+    // An operator's count with the motion's: 2d]) is d2]).
+    const S32     given    = mOperatorCount > 0 ? countTimes(mOperatorCount, countOr(mCount)) : mCount;
     const llwchar operated = mOperator;
     clearPending();
     if (ch == 'd')
@@ -1844,7 +1845,8 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
 {
     const ALTextDocument& d       = view.document();
     const bool            visual  = mMode != Mode::Normal;
-    const S32             count   = countOr(mCount);
+    // The operator's count and the object's together: 2daw is d2aw.
+    const S32             count   = countTimes(countOr(mOperatorCount), countOr(mCount));
     // A text object, for the operator or the visual selection.
     Span span;
     if (textObject(view, pending, ch, count, span))
@@ -1870,7 +1872,8 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
 bool ALVimKeymap::afterMotionKey(ALTextView& view, llwchar pending, llwchar ch)
 {
     const ALTextDocument& d       = view.document();
-    const S32             count   = countOr(mCount);
+    // The operator's count and the motion's together: 2df. is d2f.
+    const S32             count   = countTimes(countOr(mOperatorCount), countOr(mCount));
     // f, F, t, T, ` and ': motions with an argument.
     Motion m = motion(view, pending, count, ch);
     mFailed  = mFailed || (m.ok && !m.moved);
@@ -2640,6 +2643,9 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
 {
     const ALTextDocument& d = view.document();
     const ALTextPos       from = cursor(view);
+    // A count typed, before an operator or after it: G and gg go to its
+    // line and | to its column, where without one G is the last line.
+    const bool            counted = mCount > 0 || mOperatorCount > 0;
     Motion                m;
     m.ok = true;
     m.to = from;
@@ -2678,11 +2684,11 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             else if (ch == GO_TOP)
             {
-                line = llclamp(mCount > 0 || count > 1 ? count - 1 - view.lineNumberBase() : 0, 0, d.lineCount() - 1);
+                line = llclamp(counted ? count - 1 - view.lineNumberBase() : 0, 0, d.lineCount() - 1);
             }
             else
             {
-                line = llclamp(mCount > 0 ? count - 1 - view.lineNumberBase() : d.lineCount() - 1, 0, d.lineCount() - 1);
+                line = llclamp(counted ? count - 1 - view.lineNumberBase() : d.lineCount() - 1, 0, d.lineCount() - 1);
             }
             m.linewise = true;
             m.moved    = line != from.line || ch == GO_TOP || ch == 'G';
@@ -2776,7 +2782,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             return m;
         }
         case '|':
-            m.to = d.clamp(ALTextPos(from.line, mCount > 0 ? count - 1 : 0));
+            m.to = d.clamp(ALTextPos(from.line, counted ? count - 1 : 0));
             return m;
         case 'w':
         case 'W':

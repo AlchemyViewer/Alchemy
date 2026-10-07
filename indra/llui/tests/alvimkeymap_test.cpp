@@ -219,7 +219,7 @@ namespace tut
 
     // More than TUT's fifty a group holds by default, which runs the first
     // fifty and says nothing of the rest: keep this above the highest test.
-    typedef test_group<alvimkeymap_data, 100> alvimkeymap_group;
+    typedef test_group<alvimkeymap_data, 110> alvimkeymap_group;
     typedef alvimkeymap_group::object    alvimkeymap_object;
     alvimkeymap_group                    alvimkeymap_group_instance("alvimkeymap");
 
@@ -2933,5 +2933,26 @@ namespace tut
         e.setCaret(ALTextPos(0, 0));
         keys("y3w");
         ensure_equals("y3w yanks three words across two line breaks", vim->registerText('0'), std::string("three\nx\nab "));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<101>()
+    {
+        set_test_name("a count before the operator counts for f t F T, G, |, ]) and the text objects as one after it does");
+        ALCodeEditor& e = make("a.b.c.d\n1\n2\n3\n4\n5\nabcdef\nf(a, g(b), c)\none two three\n");
+        keys("2df.");
+        ensure_equals("2df. is d2f.", e.document().line(0), std::string("c.d"));
+        e.setCaret(ALTextPos(4, 0));
+        keys("2dG");
+        ensure_equals("2dG takes up to the second line, not to the last", flat(e.text()), std::string("c.d|5|abcdef|f(a, g(b), c)|one two three|"));
+        e.setCaret(ALTextPos(2, 4));
+        keys("3d|");
+        ensure_equals("3d| takes back to the third column", e.document().line(2), std::string("abef"));
+        e.setCaret(ALTextPos(3, 7));
+        keys("2d])");
+        ensure_equals("2d]) takes to the second close out", e.document().line(3), std::string("f(a, g()"));
+        e.setCaret(ALTextPos(4, 0));
+        keys("2diw");
+        ensure_equals("2diw is d2iw", e.document().line(4), std::string("two three"));
     }
 }
