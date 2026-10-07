@@ -652,6 +652,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="MasterSendingB">Sending [NAME] to its [COUNT] scripts.</floater.string>
     <floater.string name="MasterOpened">[NAME] is linked to [FILE]: its file opened in its place.</floater.string>
     <floater.string name="MasterHinted">[NAME] names [FILE] as its file.</floater.string>
+    <floater.string name="MasterHintUnsaved">Save or revert [NAME] before linking it to [FILE], the file it names: what was typed here is in neither the script nor the file.</floater.string>
     <floater.string name="MasterSent">Saved [NAME] from [FILE].</floater.string>
     <floater.string name="MasterNotCompiled">[NAME] went up from [FILE], and did not compile.</floater.string>
     <floater.string name="MasterKeptTheirs">It had been changed in-world since; what it held is in History.</floater.string>

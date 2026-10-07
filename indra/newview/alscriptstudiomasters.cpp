@@ -469,10 +469,23 @@ void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
     const ALScriptRef ref = doc.file.empty() ? doc.ref : doc.master->offerFor;
     if (action == "master_link_hint")
     {
-        if (!doc.master->hinted.empty() && canLink(&doc))
+        if (doc.master->hinted.empty() || !canLink(&doc))
         {
-            linkTo(doc, doc.master->hinted, ALMasterLink::Made::Hint);
+            return;
         }
+        // What was typed since the offer is in neither the world nor the
+        // file, and the tab giving way would set it aside unasked. Nothing
+        // a script names is written to, so it is not put in the file
+        // either, as a file picked may be: saved or reverted first.
+        if (doc.editor->isDirty())
+        {
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = doc.name;
+            args["[FILE]"] = fileNameOf(doc.master->hinted);
+            mServices.report(mServices.words("MasterHintUnsaved", args), true, &doc, { "master_link_hint" });
+            return;
+        }
+        linkTo(doc, doc.master->hinted, ALMasterLink::Made::Hint);
     }
     else if (action == "master_send" && !ref.isNull())
     {
