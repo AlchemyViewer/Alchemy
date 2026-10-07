@@ -2500,6 +2500,12 @@ ALTextDocument::Edit ALTextView::edit(const ALTextRange& range_in, std::string_v
 
 ALTextDocument::Edit ALTextView::editMany(std::vector<std::pair<ALTextRange, std::string>> edits, const ALTextPos& caret)
 {
+    return editMany(std::move(edits), [&caret](const ALTextDocument::Edit&) { return caret; });
+}
+
+ALTextDocument::Edit ALTextView::editMany(std::vector<std::pair<ALTextRange, std::string>> edits,
+                                          const std::function<ALTextPos(const ALTextDocument::Edit&)>& caret)
+{
     if (hasPreedit())
     {
         for (auto& one : edits)
@@ -2519,7 +2525,7 @@ ALTextDocument::Edit ALTextView::editMany(std::vector<std::pair<ALTextRange, std
     {
         return done;
     }
-    const ALTextPos after = mDocument.clamp(caret);
+    const ALTextPos after = mDocument.clamp(caret(done));
     mUndo.record(done, before, after, LLTimer::getUptimeSeconds(), std::move(others));
     placeCaret(after, false);
     return done;
@@ -2615,6 +2621,46 @@ void ALTextView::insertText(std::string_view text)
     }
 }
 
+namespace
+{
+    // Where a caret goes through stretches replaced at once: moved along by
+    // those before it, as far as each of them grew or shrank and by the
+    // lines each made or took, text put in right at it pushing it; inside
+    // one, at its place in what replaced it where both lie within a line,
+    // else past what replaced it.
+    ALTextPos caretThrough(const ALTextDocument::Edit& edit, const ALTextPos& caret)
+    {
+        // The stretch it may be inside, as it was and as it is after.
+        ALTextRange before;
+        ALTextRange after;
+        if (edit.parts.empty())
+        {
+            before = edit.range.normalised();
+            after  = edit.rangeAfter();
+        }
+        else
+        {
+            // The first that ends past it.
+            const auto in = std::upper_bound(edit.parts.begin(), edit.parts.end(), caret,
+                                             [](const ALTextPos& p, const ALTextDocument::Edit::Part& part) { return p < part.before.end; });
+            if (in != edit.parts.end())
+            {
+                before = in->before;
+                after  = in->after;
+            }
+        }
+        if (!(before.begin < caret && caret < before.end))
+        {
+            return edit.placed(caret);
+        }
+        if (before.begin.line == before.end.line && after.begin.line == after.end.line)
+        {
+            return ALTextPos(after.begin.line, after.begin.column + llmin(caret.column - before.begin.column, after.end.column - after.begin.column));
+        }
+        return after.end;
+    }
+}
+
 bool ALTextView::replaceAll(std::vector<std::pair<ALTextRange, std::string>> edits)
 {
     if (mReadOnly || edits.empty())
@@ -2630,64 +2676,19 @@ bool ALTextView::replaceAll(std::vector<std::pair<ALTextRange, std::string>> edi
         // Measured without it above; taken out now, before the caret is.
         resetPreedit();
     }
-    // In the text's order: by where each begins, then where it ends, and
-    // two alike in the order given -- so that, made from the last, what is
-    // put in at a place stands before a stretch replaced from there, and
-    // two put in at one place stand in the order given; as ALScriptFixes
-    // applies a fix, and the fix preview shows it.
-    std::stable_sort(edits.begin(), edits.end(),
-                     [](const auto& a, const auto& b) { return a.first.begin < b.first.begin || (a.first.begin == b.first.begin && a.first.end < b.first.end); });
-
-    // Where the caret ends up: past every replacement before it on its
-    // line, its column moves by what each grew or shrank; inside one, it
-    // keeps its place in what replaced it, or the end of it. A
-    // replacement across lines above it moves its line.
-    const ALTextPos was   = mCaret;
-    ALTextPos       caret = was;
-    for (const auto& [range, text] : edits)
-    {
-        const S32 lines_in = static_cast<S32>(std::count(text.begin(), text.end(), '\n'));
-        const S32 lines_was = range.end.line - range.begin.line;
-        ALTextPos end_after;
-        if (lines_in == 0)
-        {
-            end_after = ALTextPos(range.begin.line, range.begin.column + static_cast<S32>(text.size()));
-        }
-        else
-        {
-            end_after = ALTextPos(range.begin.line + lines_in, static_cast<S32>(text.size() - text.rfind('\n') - 1));
-        }
-        if (range.end <= was)
-        {
-            if (range.end.line == was.line)
-            {
-                caret.column += end_after.column - range.end.column;
-            }
-            caret.line += lines_in - lines_was;
-        }
-        else if (range.begin < was)
-        {
-            if (lines_in == 0 && lines_was == 0)
-            {
-                caret.column = range.begin.column + llmin(was.column - range.begin.column, static_cast<S32>(text.size()));
-            }
-            else
-            {
-                caret = end_after;
-            }
-            break;
-        }
-    }
+    // The caret keeps its place in the text around it, worked out from the
+    // edit once it is made: the stretches in the text's order, each where
+    // the ones before it left it (caretThrough).
+    const ALTextPos was = mCaret;
 
     // As one edit, which every listener hears once.
     mUndo.beginGroup();
-    const bool any = !editMany(std::move(edits), caret).nothing();
+    const bool any = !editMany(std::move(edits), [&was](const ALTextDocument::Edit& done) { return caretThrough(done, was); }).nothing();
     mUndo.endGroup();
     if (!any)
     {
         return false;
     }
-    placeCaret(mDocument.clamp(caret), false);
     afterEdit();
     return true;
 }

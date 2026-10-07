@@ -1002,6 +1002,10 @@ protected:
     // notification to every listener, one edit for the journal, and the
     // caret put once, at `caret` in the text as it is after.
     ALTextDocument::Edit editMany(std::vector<std::pair<ALTextRange, std::string>> edits, const ALTextPos& caret);
+    // The same, the caret worked out from the edit as it was made: which
+    // stretches were kept, and where each went, known only then.
+    ALTextDocument::Edit editMany(std::vector<std::pair<ALTextRange, std::string>> edits,
+                                  const std::function<ALTextPos(const ALTextDocument::Edit&)>& caret);
     // What of a text fits in place of a stretch under maxBytes: all of
     // it, or as much as fits, cut at a character, the view full.
     std::string_view     fitting(const ALTextRange& over, std::string_view text);

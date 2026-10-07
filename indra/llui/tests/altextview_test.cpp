@@ -2938,4 +2938,35 @@ namespace tut
         ensure_equals("from where the layout put its box", button->getRect().mLeft, before);
         ensure("as wide as its box", llabs(button->getRect().getWidth() - picture.width) <= 1);
     }
+
+    template<> template<>
+    void altextview_object::test<93>()
+    {
+        set_test_name("a replace-all with the caret inside a later stretch, or past one that broke its line, keeps it where it was in the text, each earlier stretch counted; and a redo puts it there");
+        // A rename with the caret in the second of two on its line.
+        ALTextView& v = make("integer ab = ab;");
+        v.setCaret(ALTextPos(0, 14));
+        ensure("renamed", v.replaceAll({ { ALTextRange(ALTextPos(0, 8), ALTextPos(0, 10)), "total" }, { ALTextRange(ALTextPos(0, 13), ALTextPos(0, 15)), "total" } }));
+        ensure_equals("the text", v.text(), std::string("integer total = total;"));
+        ensure("the caret where it was in the name, past the first grown", v.caret() == ALTextPos(0, 17));
+        v.undo();
+        ensure("undone, where it was", v.caret() == ALTextPos(0, 14));
+        v.redo();
+        ensure("redone, where the rename left it", v.caret() == ALTextPos(0, 17));
+
+        // A stretch before it grown, and then its line broken before it.
+        v.setText("ab cd ef");
+        v.setCaret(ALTextPos(0, 6));
+        ensure("replaced", v.replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)), "XXX" }, { ALTextRange(ALTextPos(0, 3), ALTextPos(0, 4)), "\n" } }));
+        ensure_equals("the text", v.text(), std::string("XXXb \nd ef"));
+        ensure("the caret still before ef, on the line made", v.caret() == ALTextPos(1, 2));
+
+        // Lines put in above it, then the stretch it is inside replaced
+        // across lines: past what replaced it, on the line it moved to.
+        v.setText("l0\nl1\nl2\nl3\nl4\nabcdef\nxyz");
+        v.setCaret(ALTextPos(5, 4));
+        ensure("replaced", v.replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "\n\n" }, { ALTextRange(ALTextPos(5, 2), ALTextPos(6, 1)), "q" } }));
+        ensure_equals("the line it was on", v.document().line(7), std::string("abqyz"));
+        ensure("the caret past the q, two lines down", v.caret() == ALTextPos(7, 3));
+    }
 }
