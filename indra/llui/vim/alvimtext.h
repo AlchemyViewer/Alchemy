@@ -141,14 +141,19 @@ namespace ALVimText
         right = llmax(past(a), past(b)) - 1;
     }
     // What a block holds of a line: from the character its first column
-    // falls in to past the one its last column falls in, wherever the bytes
-    // before them on the line put them, so that a character is taken whole
-    // or not at all; empty, at the line's end, on a line that stops short
-    // of the block.
-    inline ALTextRange blockPiece(const ALTextDocument& d, S32 line, S32 left, S32 right, S32 tab_width)
+    // falls in to past the one its last column falls in -- or to the
+    // line's end, for a block taken with $ -- wherever the bytes before
+    // them on the line put them, so that a character is taken whole or not
+    // at all; empty, at the line's end, on a line that stops short of the
+    // block.
+    inline ALTextRange blockPiece(const ALTextDocument& d, S32 line, S32 left, S32 right, bool to_end, S32 tab_width)
     {
         const ALTextPos begin = d.posAtDisplayColumn(line, left, tab_width);
-        const ALTextPos last  = d.posAtDisplayColumn(line, right, tab_width);
+        if (to_end)
+        {
+            return ALTextRange(begin, d.lineEnd(line));
+        }
+        const ALTextPos last = d.posAtDisplayColumn(line, right, tab_width);
         return ALTextRange(begin, atLineEnd(d, last) ? last : d.nextCluster(last));
     }
     // The blanks that take a line out to a column, as the reader counts

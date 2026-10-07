@@ -3109,4 +3109,32 @@ namespace tut
         keys("<C-v>jy2jl<C-v>jp");
         ensure_equals("a block register put in place of a block", flat(editor->text()), std::string("ab|cd|xaz|xcz|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<108>()
+    {
+        set_test_name("visual block A types past the block's last column on every line, a short line padded out to it, and past every line's end for a block taken with $");
+        ALCodeEditor& e = make("abcd\nefgh\n");
+        keys("l<C-v>jlAX<Esc>");
+        ensure_equals("past the block, not before its last column", flat(e.text()), std::string("abcXd|efgXh|"));
+
+        make("ab\nlonger\n");
+        keys("l<C-v>jllA;<Esc>");
+        ensure_equals("a line short of the block padded out to its edge", flat(editor->text()), std::string("ab  ;|long;er|"));
+
+        make("ab\nlonger\n");
+        keys("<C-v>j$A;<Esc>");
+        ensure_equals("with $, past each line's end", flat(editor->text()), std::string("ab;|longer;|"));
+
+        make("longer\nab\n");
+        keys("<C-v>j$");
+        const std::vector<ALTextRange>& lit = editor->highlights(ALCodeEditor::Highlight::Block);
+        ensure("with $, lit to every line's end", lit.size() == 2 && lit[0] == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 6)));
+        keys("h");
+        ensure("and no longer once the caret moves along the line",
+               editor->highlights(ALCodeEditor::Highlight::Block).size() == 2 &&
+                   editor->highlights(ALCodeEditor::Highlight::Block)[0] == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)));
+        keys("$d");
+        ensure_equals("a block taken with $ is every line to its end", flat(editor->text()), std::string("||"));
+    }
 }

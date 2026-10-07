@@ -636,7 +636,14 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
     // it, and so does a key nobody took, whose character is to come.
     if (taken && (mMode == Mode::Normal || isVisual()) && !mVerticalMove && mCount == 0 && !mOperator && !mPending)
     {
-        mWantColumn = -1;
+        // A block taken to every line's end with $ no longer reaches
+        // them, and is lit again as it is.
+        const bool to_end = mWantColumn == S32_MAX;
+        mWantColumn       = -1;
+        if (to_end && mMode == Mode::VisualBlock)
+        {
+            showVisual(view);
+        }
     }
     // Ctrl-O's one command done -- nothing pending, back in normal mode --
     // inserting again where it left off; not by the Ctrl-O itself.
@@ -837,6 +844,7 @@ void ALVimKeymap::noteVisualOperation(const Span& span, S32 lines_hint)
     mVisualPending.columns = span.block ? span.right - span.left
                              : span.linewise ? 0
                                              : span.range.end.column - (span.range.end.line == span.range.begin.line ? span.range.begin.column : 0);
+    mVisualPending.toEnd   = span.block && span.toEnd;
     // The operator is the key being handled: the last one typed.
     mVisualPending.opAt = mCommandInputs.empty() ? 0 : mCommandInputs.size() - 1;
 }
@@ -2198,13 +2206,20 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
             if (ch == 'I' || ch == 'A')
             {
                 // Typed onto every line of the block, once insert mode
-                // is left, at its column as the reader counts them.
-                const bool      block  = span.block;
-                const S32       first  = span.range.begin.line;
-                const S32       last   = span.range.end.line;
-                const S32       column = ch == 'A' ? span.right : span.left;
-                const ALTextPos start  = block ? d.posAtDisplayColumn(first, column, view.getTabWidth())
-                                               : ALTextPos(first, ch == 'A' ? d.lineLength(first) : firstNonBlankColumn(d, first));
+                // is left, at its columns as the reader counts them: I
+                // before what it holds of each line, A past it -- past
+                // the line's end for a block taken with $, else at the
+                // block's right edge, a line short of it padded out with
+                // blanks, as vim's A has it.
+                const bool        block  = span.block;
+                const S32         first  = span.range.begin.line;
+                const S32         last   = span.range.end.line;
+                const S32         tab    = view.getTabWidth();
+                const S32         column = ch == 'A' ? span.right : span.left;
+                const ALTextRange piece  = blockPiece(d, first, span.left, span.right, span.toEnd, tab);
+                const ALTextPos   start  = block ? (ch == 'A' ? piece.end : piece.begin)
+                                                 : ALTextPos(first, ch == 'A' ? d.lineLength(first) : firstNonBlankColumn(d, first));
+                const std::string pad    = block && ch == 'A' && !span.toEnd ? padTo(d, first, span.right + 1, tab) : std::string();
                 leaveVisual(view);
                 if (!editing)
                 {
@@ -2216,8 +2231,16 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                 mBlockLast   = last;
                 mBlockColumn = column;
                 mBlockAppend = ch == 'A';
+                mBlockToEnd  = span.toEnd;
+                // The blanks are part of the insert, one step to undo
+                // with what is typed.
+                view.undoJournal().beginGroup();
                 view.setCaret(start);
-                enterInsert(view, 1);
+                if (!pad.empty())
+                {
+                    view.insertText(pad);
+                }
+                enterInsert(view, 1, true);
                 return true;
             }
             const llwchar op = ch == 'x' ? 'd' : ch == 's' || ch == 'C' || ch == 'S' || ch == 'R' ? 'c' : ch == 'D' || ch == 'X' ? 'd' : ch == 'Y' ? 'y' : ch;
@@ -2540,6 +2563,9 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 // As much again from the caret, selected as it was, then
                 // the operator and what followed it.
                 const ALTextPos from_here = view.caret();
+                // A block taken with $ to every line's end again, and no
+                // other, whatever went to a line's end last.
+                mWantColumn = mLastVisual.toEnd ? S32_MAX : -1;
                 enterVisual(view, mLastVisual.mode);
                 ALTextPos to = from_here;
                 to.line      = llmin(d.lineCount() - 1, from_here.line + mLastVisual.lines);
@@ -3948,15 +3974,23 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
         }
     }
     // And onto every other line of a block, at its column as the reader
-    // counts them; a line that stops short of it left alone, but for A,
-    // which puts it at the line's end.
+    // counts them: I's before it, a line that stops short of it left
+    // alone; A's past what the block holds of the line, a line short of
+    // it padded out to its edge, or past the line's end for a block taken
+    // with $.
     if (mBlockInsert && !mTyped.empty() && mTyped.find('\n') == std::string::npos)
     {
         const S32                                        tab = view.getTabWidth();
         std::vector<std::pair<ALTextRange, std::string>> edits;
         for (S32 line = mBlockFirst + 1; line <= llmin(mBlockLast, d.lineCount() - 1); ++line)
         {
-            if (!mBlockAppend && d.displayColumn(d.lineEnd(line), tab) < mBlockColumn)
+            if (mBlockAppend)
+            {
+                const ALTextPos where = blockPiece(d, line, mBlockColumn, mBlockColumn, mBlockToEnd, tab).end;
+                edits.emplace_back(ALTextRange(where, where), (mBlockToEnd ? std::string() : padTo(d, line, mBlockColumn + 1, tab)) + mTyped);
+                continue;
+            }
+            if (d.displayColumn(d.lineEnd(line), tab) < mBlockColumn)
             {
                 continue;
             }
@@ -4470,10 +4504,14 @@ ALVimKeymap::Span ALVimKeymap::visualSpan(const ALTextView& view) const
     }
     else if (mMode == Mode::VisualBlock)
     {
+        // To every line's end where the caret went there with $, and has
+        // gone up and down since, as vim's curswant has it.
         const S32 tab = view.getTabWidth();
         span.block    = true;
+        span.toEnd    = mWantColumn == S32_MAX;
         blockColumns(d, d.clamp(mVisualAnchor), caret, tab, span.left, span.right);
-        span.range = ALTextRange(blockPiece(d, a.line, span.left, span.right, tab).begin, blockPiece(d, b.line, span.left, span.right, tab).end);
+        span.range = ALTextRange(blockPiece(d, a.line, span.left, span.right, span.toEnd, tab).begin,
+                                 blockPiece(d, b.line, span.left, span.right, span.toEnd, tab).end);
     }
     else
     {
@@ -4490,7 +4528,7 @@ std::vector<ALTextRange> ALVimKeymap::blockPieces(const ALTextView& view, const 
     pieces.reserve(static_cast<size_t>(llmax(0, lines.end.line - lines.begin.line + 1)));
     for (S32 line = lines.begin.line; line <= lines.end.line; ++line)
     {
-        pieces.push_back(blockPiece(d, line, span.left, span.right, view.getTabWidth()));
+        pieces.push_back(blockPiece(d, line, span.left, span.right, span.toEnd, view.getTabWidth()));
     }
     return pieces;
 }

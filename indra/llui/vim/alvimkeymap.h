@@ -248,7 +248,8 @@ private:
     };
     // A stretch an operator works on. A block's columns are the reader's
     // (ALVimText::blockColumns), which the bytes of its lines need not
-    // agree on: the first and the last it covers; its range runs from what
+    // agree on: the first and the last it covers, and whether it reaches
+    // every line's end, as one taken with $ does; its range runs from what
     // it holds of its first line to what it holds of its last.
     struct Span
     {
@@ -257,6 +258,7 @@ private:
         bool        block    = false;
         S32         left     = 0;
         S32         right    = 0;
+        bool        toEnd    = false;
     };
 
     // A key as typed: recorded where a macro is being, then through the
@@ -404,14 +406,15 @@ private:
     // false where there is none.
     bool addToNumber(ALTextView& view, S64 by);
     // The last visual operation, for `.`: the extent it covered -- a
-    // block's columns as the reader counts them -- and the keys from the
-    // operator on.
+    // block's columns as the reader counts them, or every line's end for
+    // one taken with $ -- and the keys from the operator on.
     struct VisualExtent
     {
         bool valid   = false;
         Mode mode    = Mode::Normal;
         S32  lines   = 0;
         S32  columns = 0;
+        bool toEnd   = false;
         // Where in the command's inputs the operator was typed.
         size_t opAt = 0;
     };
@@ -517,9 +520,11 @@ private:
     ALTextPos mVisualLastCaret;
 
     // Insert mode: how many times what is typed goes in, the characters
-    // typed so far, and a block's lines to put them on as well, at its
-    // column as the reader counts them; what the last insert typed, for
-    // Control-A; and whether a Control-R waits for the register to put in.
+    // typed so far, and a block's lines to put them on as well -- at its
+    // first column as the reader counts them, or for A past its last, or
+    // past each line's end where it was taken with $; what the last insert
+    // typed, for Control-A; and whether a Control-R waits for the register
+    // to put in.
     S32         mInsertCount = 1;
     std::string mTyped;
     std::string mLastTyped;
@@ -529,6 +534,7 @@ private:
     S32         mBlockLast         = 0;
     S32         mBlockColumn       = 0;
     bool        mBlockAppend       = false;
+    bool        mBlockToEnd        = false;
 
     // The settings and histories shared with the other buffers' keymaps.
     std::shared_ptr<Shared>  mShared = std::make_shared<Shared>();
