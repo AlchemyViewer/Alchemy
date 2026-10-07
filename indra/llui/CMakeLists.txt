@@ -520,7 +520,7 @@ target_link_libraries(
     llxml
     llmath
     llcommon
-  PRIVATE ll::fastfloat
+  PRIVATE ll::fastfloat ll::icu
 )
 
 if(AL_USE_NSSPELLCHECKER)
