@@ -410,6 +410,15 @@ private:
     // character is no motion.
     Motion motion(ALTextView& view, llwchar ch, S32 count, llwchar arg);
     bool   textObject(ALTextView& view, llwchar kind, llwchar what, S32 count, Span& out);
+    // A text object over a visual selection of more than its caret's
+    // character -- of more than its line, for a paragraph -- which vim's take
+    // on rather than choose afresh: words on from the caret, or back where it
+    // is before the anchor; the brackets, the tag or the quotes around the
+    // selection, the next ones out where what they hold is no more than it
+    // holds; paragraphs on from the caret's line, or back. Nothing where the
+    // selection is no more, and the object is chosen afresh (textObject);
+    // false where there is nothing more to take.
+    std::optional<bool> visualObject(ALTextView& view, llwchar kind, llwchar what, S32 count);
     void   applyOperator(ALTextView& view, llwchar op, const Span& span, S32 count);
     void   moveTo(ALTextView& view, const ALTextPos& to);
     // Where the caret is for a motion or a command: the visual caret in

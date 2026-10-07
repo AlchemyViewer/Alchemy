@@ -219,7 +219,7 @@ namespace tut
 
     // More than TUT's fifty a group holds by default, which runs the first
     // fifty and says nothing of the rest: keep this above the highest test.
-    typedef test_group<alvimkeymap_data, 160> alvimkeymap_group;
+    typedef test_group<alvimkeymap_data, 170> alvimkeymap_group;
     typedef alvimkeymap_group::object    alvimkeymap_object;
     alvimkeymap_group                    alvimkeymap_group_instance("alvimkeymap");
 
@@ -4595,5 +4595,72 @@ namespace tut
         editor->setCaret(ALTextPos(0, 5));
         keys("<C-v>j$d");
         ensure_equals("a block taken with $ onto a shorter line: from past that line's end", flat(editor->text()), std::string("lo|ab|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<161>()
+    {
+        set_test_name("a text object over a visual selection of more than one character takes it on: words from the caret, forward or back; brackets, tags and quotes out to the next; paragraphs on from the caret's line");
+        const char* words = "one two three four\nfive six\n";
+        // Each a selection made from a place, then yanked: what it covers.
+        const auto selects = [&](const char* text, S32 line, S32 column, const char* typed) {
+            make(text);
+            editor->setCaret(ALTextPos(line, column));
+            keys(typed);
+            keys("y");
+            return vim->registerText('"');
+        };
+        ensure_equals("viw iw: on by the blank after", selects(words, 0, 4, "viwiw"), std::string("two "));
+        ensure_equals("viw iw iw: and the next word", selects(words, 0, 4, "viwiwiw"), std::string("two three"));
+        ensure_equals("vaw aw: a word and its blank more", selects(words, 0, 4, "vawaw"), std::string("two three "));
+        ensure_equals("vh iw: back from a caret before the anchor, over the blank", selects(words, 0, 5, "vhiw"), std::string(" tw"));
+        ensure_equals("vh iw iw: and the word before", selects(words, 0, 5, "vhiwiw"), std::string("one tw"));
+        ensure_equals("vh aw aw: back by words and their blanks", selects(words, 0, 9, "vhawaw"), std::string("one two th"));
+        ensure_equals("vj iw: from the caret on the next line", selects(words, 0, 4, "vjiw"), std::string("two three four\nfive six"));
+        ensure_equals("vk aw: back from the caret on the line above", selects(words, 1, 5, "vkaw"), std::string(" two three four\nfive s"));
+        ensure_equals("viw iw at a line's last word: the next line's first", selects(words, 0, 14, "viwiw"), std::string("four\nfive"));
+        ensure_equals("vh iw iw from a line's start: back over the break", selects(words, 1, 1, "vhiwiw"), std::string(" four\nfi"));
+        ensure_equals("vh iw at the text's start: nothing to take, the selection as it was", selects(words, 0, 1, "vhiw"), std::string("on"));
+        make(words);
+        editor->setCaret(ALTextPos(0, 4));
+        keys("Vjiw");
+        ensure("V j iw: lines become characters", vim->mode() == ALVimKeymap::Mode::Visual);
+        keys("y");
+        ensure_equals("from the caret on", vim->registerText('"'), std::string("two three four\nfive six"));
+
+        const char* brackets = "f(a (b c) d) (e)\n";
+        ensure_equals("vi( i(: inside the block around", selects(brackets, 0, 5, "vi(i("), std::string("a (b c) d"));
+        ensure_equals("va( a(: the block around", selects(brackets, 0, 5, "va(a("), std::string("(a (b c) d)"));
+        ensure_equals("vl i(: inside, more than was selected", selects(brackets, 0, 5, "vli("), std::string("b c"));
+        ensure_equals("vl from a ( i(: inside the block around it", selects(brackets, 0, 4, "vli("), std::string("a (b c) d"));
+        ensure_equals("vi( a(: the block whole", selects(brackets, 0, 5, "vi(a("), std::string("(b c)"));
+        ensure_equals("vi( i( i(: no block further out, the selection as it was", selects(brackets, 0, 5, "vi(i(i("), std::string("a (b c) d"));
+        ensure_equals("i( over an empty block: nothing", selects("x () y\n", 0, 1, "vlli("), std::string(" ()"));
+
+        const char* tags = "<a><b>x y</b> z</a>\n";
+        ensure_equals("vit it: the tags as well", selects(tags, 0, 7, "vitit"), std::string("<b>x y</b>"));
+        ensure_equals("vit it it: inside the tag around", selects(tags, 0, 7, "vititit"), std::string("<b>x y</b> z"));
+        ensure_equals("vat at: the tag around", selects(tags, 0, 7, "vatat"), std::string("<a><b>x y</b> z</a>"));
+        ensure_equals("vl it: inside, more than was selected", selects(tags, 0, 6, "vlit"), std::string("x y"));
+        ensure_equals("it over a selection past the tag's close: the tag around", selects(tags, 0, 8, "vllllllit"), std::string("<b>x y</b> z"));
+
+        const char* quotes = "x \"ab cd\" y \"ef\" z\n";
+        ensure_equals("vi\" i\": the quotes too", selects(quotes, 0, 4, "vi\"i\""), std::string("\"ab cd\""));
+        ensure_equals("vi\" i\" i\": on to the next quoted text", selects(quotes, 0, 4, "vi\"i\"i\""), std::string("\"ab cd\" y \"ef"));
+        ensure_equals("va\" a\": on to the next, its blank after", selects(quotes, 0, 4, "va\"a\""), std::string("\"ab cd\" y \"ef\" "));
+        ensure_equals("vl i\": inside the quotes", selects(quotes, 0, 4, "vli\""), std::string("ab cd"));
+        ensure_equals("vh i\": the same, the caret before the anchor", selects(quotes, 0, 5, "vhi\""), std::string("ab cd"));
+        ensure_equals("i\" over a selection past a closing quote: to the next quoted text", selects(quotes, 0, 4, "vllllllllli\""), std::string("b cd\" y \"ef"));
+        ensure_equals("i\" over two lines: nothing", selects("\"a\" b\n\"c\" d\n", 0, 4, "vji\""), std::string("b\n\"c\" d"));
+
+        const char* paragraphs = "a\nb\n\nc\n\n\nd\ne\n";
+        ensure_equals("vip ip: the blank line after", selects(paragraphs, 0, 0, "vipip"), std::string("a\nb\n"));
+        ensure_equals("vip ip ip: and the paragraph after", selects(paragraphs, 0, 0, "vipipip"), std::string("a\nb\n\nc"));
+        ensure_equals("vap ap: a paragraph and its blank lines more", selects(paragraphs, 0, 0, "vapap"), std::string("a\nb\n\nc\n\n"));
+        ensure_equals("V ip on a paragraph's first line: on from it, past a paragraph of one", selects(paragraphs, 3, 0, "Vip"), std::string("c\n\n"));
+        ensure_equals("vj ip: by characters, to the blank line's start", selects(paragraphs, 0, 0, "vjip"), std::string("a\nb\n\n"));
+        ensure_equals("vk ip: back over the blank lines", selects(paragraphs, 7, 0, "vkip"), std::string("\n\nd\ne"));
+        ensure_equals("Vj ap: on by the blank lines and the paragraph after", selects("a\nx\n\nb\nc\n\nd\n", 0, 0, "Vjap"), std::string("a\nx\n\nb\nc"));
+        ensure_equals("a count past the text's end: as far as it goes", selects("a\nb\n\nc\n", 0, 0, "vj5ip"), std::string("a\nb\n\nc\n"));
     }
 }

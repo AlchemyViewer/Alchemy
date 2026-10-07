@@ -1916,13 +1916,28 @@ namespace
     // line alone -- or, on the last line, goes back to the last character of
     // the line before, which puts `end` before `start`. None where the text
     // runs out first.
+    //
+    // A visual selection of more than one character is taken on instead, as
+    // vim's current_word() takes one on, from its caret, `from`: forward by
+    // the count's objects as those after a count's first go; or -- the caret
+    // before the anchor -- back, iw over a word to its start or over blanks
+    // to the first of them, aw over blanks and the word before them or over
+    // a word and the blanks before it. `start` is then `from`, and `end`
+    // where the caret goes.
     struct WordObject
     {
         ALTextPos start;
         ALTextPos end;
         bool      inclusive = true;
     };
-    std::optional<WordObject> wordObject(const ALTextDocument& d, const ALTextPos& from, bool around, bool big, S32 count)
+    enum class WordsFrom
+    {
+        Under,
+        Forward,
+        Back
+    };
+    std::optional<WordObject> wordObject(const ALTextDocument& d, const ALTextPos& from, bool around, bool big, S32 count,
+                                         WordsFrom words_from = WordsFrom::Under)
     {
         ALTextPos  p   = from;
         const auto cls = [&d, &p, big] { return classOf(at(d, p), big); };
@@ -2021,44 +2036,172 @@ namespace
             p = d.prevCluster(p);
             return true;
         };
-
-        // Back to the start of the word or the blanks under the caret.
-        const S32 under = cls();
-        while (p.column > 0 && classOf(at(d, d.prevCluster(p)), big) == under)
-        {
-            p = d.prevCluster(p);
-        }
-        ALTextPos start         = p;
-        bool      inclusive     = true;
-        bool      include_white = false;
-        // The first of the count: iw's word, or aw's blanks and the word
-        // after them, to the word's last character; else past the word and
-        // its blanks, or iw's blanks, to the character before what comes
-        // next -- the last of the line before, from a line's start.
-        if ((under == 0) == around)
-        {
-            if (!end_word())
-            {
-                return std::nullopt;
-            }
-        }
-        else
-        {
-            fwd_word();
+        // A character back, as vim's dec() steps: 0 along the line, 1 onto
+        // the end of the line before; -1 at the start of the text, where it
+        // stays.
+        const auto dec = [&d, &p]() -> S32 {
             if (p.column > 0)
             {
                 p = d.prevCluster(p);
+                return 0;
             }
-            else if (p.line > 0)
+            if (p.line <= 0)
             {
-                p = lastCharOf(d, p.line - 1);
+                return -1;
             }
-            include_white = around;
+            p = d.lineEnd(p.line - 1);
+            return 1;
+        };
+        // Back, and back past the end of a line that is not empty, as decl().
+        const auto decl = [&p, &dec]() -> S32 {
+            const S32 r = dec();
+            return r == 1 && p.column > 0 ? dec() : r;
+        };
+        // bck_word() for one word, a caret at a word's start already staying
+        // there: back over blanks, stopping on an empty line, and to the start
+        // of the word before them. False at the start of the text.
+        const auto bck_word = [&]() -> bool {
+            const S32 run = cls();
+            if (dec() == -1)
+            {
+                return false;
+            }
+            if (run == cls() || run == 0)
+            {
+                while (cls() == 0)
+                {
+                    if (p.column == 0 && d.lineLength(p.line) == 0)
+                    {
+                        return true;
+                    }
+                    if (dec() == -1)
+                    {
+                        return true;
+                    }
+                }
+                const S32 word = cls();
+                while (cls() == word)
+                {
+                    if (dec() == -1)
+                    {
+                        return true;
+                    }
+                }
+            }
+            inc();
+            return true;
+        };
+        // bckend_word() for one word, stopping at a line's start: back out of
+        // the run the caret is in and over the blanks before it, stopping on
+        // an empty line, onto the last character of the word before -- no
+        // further than the end of the line before. False at the text's start.
+        const auto bckend_word = [&]() -> bool {
+            const S32 run = cls();
+            S32       r   = dec();
+            if (r != 0)
+            {
+                return r == 1;
+            }
+            if (run != 0)
+            {
+                while (cls() == run)
+                {
+                    r = dec();
+                    if (r != 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+            while (cls() == 0)
+            {
+                if (p.column == 0 && d.lineLength(p.line) == 0)
+                {
+                    break;
+                }
+                r = dec();
+                if (r != 0)
+                {
+                    return true;
+                }
+            }
+            return true;
+        };
+
+        if (words_from == WordsFrom::Back)
+        {
+            // Back from the character before the caret, the count of them:
+            // iw's word to its start, or its blanks to the first of them; aw's
+            // blanks and the word before, or its word and the blanks before.
+            for (S32 n = 0; n < count; ++n)
+            {
+                if (decl() == -1)
+                {
+                    return std::nullopt;
+                }
+                if (around != (cls() != 0))
+                {
+                    if (!bck_word())
+                    {
+                        return std::nullopt;
+                    }
+                }
+                else
+                {
+                    if (!bckend_word())
+                    {
+                        return std::nullopt;
+                    }
+                    incl();
+                }
+            }
+            return WordObject{ from, p, true };
+        }
+
+        ALTextPos start         = p;
+        bool      inclusive     = true;
+        bool      include_white = false;
+        S32       n             = 0;
+        if (words_from == WordsFrom::Under)
+        {
+            // Back to the start of the word or the blanks under the caret.
+            const S32 under = cls();
+            while (p.column > 0 && classOf(at(d, d.prevCluster(p)), big) == under)
+            {
+                p = d.prevCluster(p);
+            }
+            start = p;
+            // The first of the count: iw's word, or aw's blanks and the word
+            // after them, to the word's last character; else past the word
+            // and its blanks, or iw's blanks, to the character before what
+            // comes next -- the last of the line before, from a line's start.
+            if ((under == 0) == around)
+            {
+                if (!end_word())
+                {
+                    return std::nullopt;
+                }
+            }
+            else
+            {
+                fwd_word();
+                if (p.column > 0)
+                {
+                    p = d.prevCluster(p);
+                }
+                else if (p.line > 0)
+                {
+                    p = lastCharOf(d, p.line - 1);
+                }
+                include_white = around;
+            }
+            n = 1;
         }
         // The rest, each from the character after where the last ended, the
-        // same two ways; one that stops at a line's start, from an empty
-        // line, ends there and not on a character.
-        for (S32 n = 1; n < count; ++n)
+        // same two ways -- every one of them, for a selection taken on; one
+        // that stops at a line's start, from an empty line, ends there and
+        // not on a character.
+        for (; n < count; ++n)
         {
             inclusive = true;
             if (incl() == -1)
@@ -2101,6 +2244,347 @@ namespace
             }
         }
         return WordObject{ start, p, inclusive };
+    }
+
+    // The opening bracket a bracket object names: ( ) b, [ ], { } B or < >.
+    char objectOpener(llwchar what)
+    {
+        switch (what)
+        {
+            case '(':
+            case ')':
+            case 'b':
+                return '(';
+            case '[':
+            case ']':
+                return '[';
+            case '{':
+            case '}':
+            case 'B':
+                return '{';
+            case '<':
+            case '>':
+                return '<';
+            default:
+                return '\0';
+        }
+    }
+
+    // The opener of a kind left open around a place, then as many more out
+    // as counted, or as many as there are: through the view's bracket index
+    // where there is one, as % goes, else -- an angle bracket -- by the text
+    // alone, nesting counted. An opener at the place itself is the first
+    // where `here` says, as it is under the caret; a visual selection's
+    // start looks for the one before it, as vim's does. False where there is
+    // none.
+    bool openerAround(const ALTextDocument& d, ALBracketIndex* index, char opener, const ALTextPos& from, bool here, S32 count, ALTextPos& open)
+    {
+        open = from;
+        if (index)
+        {
+            ALTextPos paired;
+            if (!(here && at(d, from) == opener && index->match(from, paired, ALBracketIndex::ANYWHERE)) &&
+                !index->enclosing(from, opener, 1, open, ALBracketIndex::ANYWHERE))
+            {
+                return false;
+            }
+            for (S32 n = 1; n < count; ++n)
+            {
+                ALTextPos outer;
+                if (!index->enclosing(open, opener, 1, outer, ALBracketIndex::ANYWHERE))
+                {
+                    break;
+                }
+                open = outer;
+            }
+            return true;
+        }
+        const char closer = partnerOf(opener);
+        S32        depth  = 0;
+        bool       found  = here && at(d, open) == opener;
+        while (!found)
+        {
+            if (!stepBack(d, open))
+            {
+                return false;
+            }
+            const char c = at(d, open);
+            if (c == closer)
+            {
+                ++depth;
+            }
+            else if (c == opener)
+            {
+                if (depth == 0)
+                {
+                    found = true;
+                }
+                else
+                {
+                    --depth;
+                }
+            }
+        }
+        for (S32 n = 1; n < count; ++n)
+        {
+            ALTextPos outer = open;
+            depth           = 0;
+            bool more       = false;
+            while (stepBack(d, outer))
+            {
+                const char c = at(d, outer);
+                if (c == closer)
+                {
+                    ++depth;
+                }
+                else if (c == opener)
+                {
+                    if (depth == 0)
+                    {
+                        more = true;
+                        break;
+                    }
+                    --depth;
+                }
+            }
+            if (!more)
+            {
+                break;
+            }
+            open = outer;
+        }
+        return true;
+    }
+
+    // A tag and the one that closes it, as offsets into the text: where
+    // each begins, and where each ends past its >.
+    struct TagPair
+    {
+        size_t openBegin, openEnd, closeBegin, closeEnd;
+    };
+    // Every tag in a text paired with its closing one by nesting, so that an
+    // inner tag of the same name is not taken for the closing of the outer.
+    // Self-closing tags, comments and declarations are no tags.
+    std::vector<TagPair> tagPairs(const std::string& text)
+    {
+        std::vector<TagPair>                        pairs;
+        std::vector<std::pair<std::string, size_t>> open;
+        auto nameAt = [&](size_t at, size_t& end) {
+            end = at;
+            while (end < text.size() && (isWordByte(text[end]) || text[end] == '-' || text[end] == ':' || text[end] == '.'))
+            {
+                ++end;
+            }
+            return text.substr(at, end - at);
+        };
+        for (size_t lt = text.find('<'); lt != std::string::npos; lt = text.find('<', lt + 1))
+        {
+            if (text.compare(lt, 4, "<!--") == 0)
+            {
+                const size_t close = text.find("-->", lt + 4);
+                lt                 = close == std::string::npos ? text.size() : close + 2;
+                continue;
+            }
+            const size_t gt = text.find('>', lt + 1);
+            if (gt == std::string::npos)
+            {
+                break;
+            }
+            if (lt + 1 < text.size() && text[lt + 1] == '/')
+            {
+                size_t            name_end;
+                const std::string name = nameAt(lt + 2, name_end);
+                // The nearest open tag of the name closes; the ones
+                // opened after it were left unclosed.
+                for (size_t i = open.size(); i-- > 0;)
+                {
+                    if (open[i].first == name)
+                    {
+                        const size_t open_begin = open[i].second;
+                        pairs.push_back(TagPair{ open_begin, text.find('>', open_begin) + 1, lt, gt + 1 });
+                        open.resize(i);
+                        break;
+                    }
+                }
+            }
+            else if (lt + 1 < text.size() && (std::isalpha(static_cast<unsigned char>(text[lt + 1])) || text[lt + 1] == '_'))
+            {
+                size_t            name_end;
+                const std::string name = nameAt(lt + 1, name_end);
+                if (!name.empty() && text[gt - 1] != '/')
+                {
+                    open.emplace_back(name, lt);
+                }
+            }
+            lt = gt;
+        }
+        return pairs;
+    }
+
+    // vim's find_next_quote(): the first quote at or after a column, the
+    // character after a backslash passed over where `escaped`; -1 for none.
+    S32 nextQuote(const std::string& line, S32 col, char quote, bool escaped)
+    {
+        const S32 size = static_cast<S32>(line.size());
+        for (; col < size; ++col)
+        {
+            if (escaped && line[col] == '\\')
+            {
+                if (++col >= size)
+                {
+                    return -1;
+                }
+                continue;
+            }
+            if (line[col] == quote)
+            {
+                return col;
+            }
+        }
+        return -1;
+    }
+    // vim's find_prev_quote(): the last quote before a column that no odd
+    // run of backslashes escapes, where `escaped`; else where the looking
+    // stopped, the line's start, which the caller tells from a quote.
+    S32 prevQuote(const std::string& line, S32 col, char quote, bool escaped)
+    {
+        while (col > 0)
+        {
+            --col;
+            S32 n = 0;
+            while (escaped && col - n > 0 && line[col - n - 1] == '\\')
+            {
+                ++n;
+            }
+            if (n % 2 != 0)
+            {
+                col -= n;
+            }
+            else if (line[col] == quote)
+            {
+                break;
+            }
+        }
+        return col;
+    }
+    // vim's current_quote() over a visual selection of more than one
+    // character on one line, `anchor` and `caret` its columns: taken on to
+    // the quoted text it is in or comes before -- after the caret, or before
+    // it where the caret is before the anchor -- from the quote under the
+    // caret to the next quoted text; inside the quotes, or for `around` with
+    // them and the blanks after, or else those before. A selection of just
+    // what a pair holds takes the quotes as well, and so does a count of two
+    // or more. Where the anchor and the caret go; none where there is no
+    // such text.
+    std::optional<std::pair<S32, S32>> quoteOn(const std::string& line, S32 anchor, S32 caret, char quote, bool around, S32 count)
+    {
+        const S32  size    = static_cast<S32>(line.size());
+        const auto ch      = [&line, size](S32 col) { return col >= 0 && col < size ? line[col] : '\0'; };
+        const auto blank   = [&ch](S32 col) { return ch(col) == ' ' || ch(col) == '\t'; };
+        const bool forward = anchor < caret;
+        const S32  low     = forward ? anchor : caret;
+        const S32  high    = forward ? caret : anchor;
+        const bool inside  = low > 0 && ch(low - 1) == quote && ch(high) != '\0' && ch(high + 1) == quote;
+        bool       quoted  = false;
+        for (S32 i = low; i <= high && ch(i) != '\0' && !quoted; ++i)
+        {
+            quoted = ch(i) == quote;
+        }
+        S32 col_start = caret;
+        S32 col_end   = caret;
+        if (ch(caret) == quote)
+        {
+            if (forward)
+            {
+                // Taken to be the closing quote: the text the next pair holds,
+                // or, with no more pairs, what this one opens.
+                col_start = nextQuote(line, caret + 1, quote, false);
+                if (col_start < 0)
+                {
+                    return std::nullopt;
+                }
+                col_end = nextQuote(line, col_start + 1, quote, true);
+                if (col_end < 0)
+                {
+                    col_end   = col_start;
+                    col_start = caret;
+                }
+            }
+            else
+            {
+                col_end = prevQuote(line, caret, quote, false);
+                if (ch(col_end) != quote)
+                {
+                    return std::nullopt;
+                }
+                col_start = prevQuote(line, col_end, quote, true);
+                if (ch(col_start) != quote)
+                {
+                    col_start = col_end;
+                    col_end   = caret;
+                }
+            }
+        }
+        else
+        {
+            // The pair, counted from the line's start, around the first
+            // quote the caret faces.
+            const S32 first = forward ? nextQuote(line, caret, quote, false) : prevQuote(line, caret, quote, false);
+            col_start       = 0;
+            while (true)
+            {
+                col_start = nextQuote(line, col_start, quote, false);
+                if (col_start < 0 || col_start > first)
+                {
+                    return std::nullopt;
+                }
+                col_end = nextQuote(line, col_start + 1, quote, true);
+                if (col_end < 0)
+                {
+                    return std::nullopt;
+                }
+                if (col_start <= first && first <= col_end)
+                {
+                    break;
+                }
+                col_start = col_end + 1;
+            }
+        }
+        if (around)
+        {
+            if (blank(col_end + 1))
+            {
+                while (blank(col_end + 1))
+                {
+                    ++col_end;
+                }
+            }
+            else
+            {
+                while (col_start > 0 && blank(col_start - 1))
+                {
+                    --col_start;
+                }
+            }
+        }
+        if (!around && count < 2 && !inside)
+        {
+            ++col_start;
+        }
+        // The last character: the closing quote or the blank after it, or the
+        // one before the quote.
+        const S32 last = around || count > 1 || inside ? col_end : col_end - 1;
+        if (forward)
+        {
+            // The anchor to the start, where the selection held no quote and
+            // was just what a pair holds, or began at none.
+            const bool restart = !quoted && (inside || (ch(anchor) != quote && (anchor == 0 || ch(anchor - 1) != quote)));
+            return std::make_pair(restart ? col_start : anchor, last);
+        }
+        // The anchor to the end, where the selection was just what a pair
+        // holds, or held no quote and ended at none.
+        const bool reend = inside || (!quoted && ch(anchor) != quote && (ch(anchor) == '\0' || ch(anchor + 1) != quote));
+        return std::make_pair(reend ? last : anchor, col_start);
     }
 }
 
@@ -2238,6 +2722,13 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
     const bool            visual  = mMode != Mode::Normal;
     // The operator's count and the object's together: 2daw is d2aw.
     const S32             count   = countTimes(countOr(mOperatorCount), countOr(mCount));
+    // A visual selection that is more than its caret's character taken on
+    // by the object rather than replaced by it (visualObject).
+    if (visual && visualObject(view, pending, ch, count))
+    {
+        clearPending();
+        return true;
+    }
     if (visual && (ch == 'w' || ch == 'W'))
     {
         // A word object selected as vim's selects one: the anchor at its
@@ -3937,89 +4428,13 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         case '<':
         case '>':
         {
-            const char opener = (what == '(' || what == ')' || what == 'b') ? '(' : (what == '[' || what == ']') ? '[' : (what == '{' || what == '}' || what == 'B') ? '{' : '<';
-            const char closer = partnerOf(opener);
-            ALTextPos  open   = from;
-            if (opener != '<')
+            // The opener under the caret where it is code, else the one left
+            // open before it, and as many more out as counted (openerAround).
+            const char opener = objectOpener(what);
+            ALTextPos  open;
+            if (!openerAround(d, opener != '<' ? &bracketsOf(view) : nullptr, opener, from, true, count, open))
             {
-                // Through the view's bracket index, as % goes: the opener
-                // under the caret where it is code, else the one left open
-                // before it; then as many more out as counted, or as many
-                // as there are.
-                ALBracketIndex& index = bracketsOf(view);
-                ALTextPos       paired;
-                if (!(at(d, from) == opener && index.match(from, paired, ALBracketIndex::ANYWHERE)) &&
-                    !index.enclosing(from, opener, 1, open, ALBracketIndex::ANYWHERE))
-                {
-                    return false;
-                }
-                for (S32 n = 1; n < count; ++n)
-                {
-                    ALTextPos outer;
-                    if (!index.enclosing(open, opener, 1, outer, ALBracketIndex::ANYWHERE))
-                    {
-                        break;
-                    }
-                    open = outer;
-                }
-            }
-            else
-            {
-                // Back to the opener that holds the caret, counting nesting:
-                // an angle bracket by the text alone.
-                S32       depth = 0;
-                bool      found = at(d, open) == opener;
-                while (!found)
-                {
-                    if (!stepBack(d, open))
-                    {
-                        return false;
-                    }
-                    const char c = at(d, open);
-                    if (c == closer)
-                    {
-                        ++depth;
-                    }
-                    else if (c == opener)
-                    {
-                        if (depth == 0)
-                        {
-                            found = true;
-                        }
-                        else
-                        {
-                            --depth;
-                        }
-                    }
-                }
-                for (S32 n = 1; n < count; ++n)
-                {
-                    ALTextPos outer = open;
-                    depth           = 0;
-                    bool more       = false;
-                    while (stepBack(d, outer))
-                    {
-                        const char c = at(d, outer);
-                        if (c == closer)
-                        {
-                            ++depth;
-                        }
-                        else if (c == opener)
-                        {
-                            if (depth == 0)
-                            {
-                                more = true;
-                                break;
-                            }
-                            --depth;
-                        }
-                    }
-                    if (!more)
-                    {
-                        break;
-                    }
-                    open = outer;
-                }
+                return false;
             }
             ALTextPos close;
             if (!matchBracketIn(view, open, close))
@@ -4038,87 +4453,30 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         }
         case 't':
         {
-            // The tag around the caret, the count of them out: every tag
-            // in the text paired with its closing one by nesting, so that
-            // an inner tag of the same name is not taken for the closing
-            // of the outer; the innermost pair around the caret is the
-            // first, its parent the second. Self-closing tags, comments
-            // and declarations are no tags.
-            const std::string& text = d.wholeText();
-            const size_t       here = d.offsetOf(from);
-            struct Tag
-            {
-                size_t openBegin, openEnd, closeBegin, closeEnd;
-            };
-            std::vector<Tag>                             pairs;
-            std::vector<std::pair<std::string, size_t>> open;
-            auto nameAt = [&](size_t at, size_t& end) {
-                end = at;
-                while (end < text.size() && (isWordByte(text[end]) || text[end] == '-' || text[end] == ':' || text[end] == '.'))
-                {
-                    ++end;
-                }
-                return text.substr(at, end - at);
-            };
-            for (size_t lt = text.find('<'); lt != std::string::npos; lt = text.find('<', lt + 1))
-            {
-                if (text.compare(lt, 4, "<!--") == 0)
-                {
-                    const size_t close = text.find("-->", lt + 4);
-                    lt                 = close == std::string::npos ? text.size() : close + 2;
-                    continue;
-                }
-                const size_t gt = text.find('>', lt + 1);
-                if (gt == std::string::npos)
-                {
-                    break;
-                }
-                if (lt + 1 < text.size() && text[lt + 1] == '/')
-                {
-                    size_t            name_end;
-                    const std::string name = nameAt(lt + 2, name_end);
-                    // The nearest open tag of the name closes; the ones
-                    // opened after it were left unclosed.
-                    for (size_t i = open.size(); i-- > 0;)
-                    {
-                        if (open[i].first == name)
-                        {
-                            const size_t open_begin = open[i].second;
-                            pairs.push_back(Tag{ open_begin, text.find('>', open_begin) + 1, lt, gt + 1 });
-                            open.resize(i);
-                            break;
-                        }
-                    }
-                }
-                else if (lt + 1 < text.size() && (std::isalpha(static_cast<unsigned char>(text[lt + 1])) || text[lt + 1] == '_'))
-                {
-                    size_t            name_end;
-                    const std::string name = nameAt(lt + 1, name_end);
-                    if (!name.empty() && text[gt - 1] != '/')
-                    {
-                        open.emplace_back(name, lt);
-                    }
-                }
-                lt = gt;
-            }
+            // The tag around the caret, the count of them out, of every tag
+            // in the text paired with its closing one (tagPairs): the
+            // innermost pair around the caret is the first, its parent the
+            // second.
+            const size_t               here  = d.offsetOf(from);
+            const std::vector<TagPair> pairs = tagPairs(d.wholeText());
             // The pairs around the caret, innermost first: the inner of
             // two nested pairs starts later.
-            std::vector<const Tag*> around_caret;
-            for (const Tag& tag : pairs)
+            std::vector<const TagPair*> around_caret;
+            for (const TagPair& tag : pairs)
             {
                 if (tag.openBegin <= here && here < tag.closeEnd)
                 {
                     around_caret.push_back(&tag);
                 }
             }
-            std::sort(around_caret.begin(), around_caret.end(), [](const Tag* a, const Tag* b) { return a->openBegin > b->openBegin; });
+            std::sort(around_caret.begin(), around_caret.end(), [](const TagPair* a, const TagPair* b) { return a->openBegin > b->openBegin; });
             const size_t level = static_cast<size_t>(llmax(1, count)) - 1;
             if (level >= around_caret.size())
             {
                 return false;
             }
-            const Tag& tag = *around_caret[level];
-            out.range      = around ? ALTextRange(d.posAt(tag.openBegin), d.posAt(tag.closeEnd)) : ALTextRange(d.posAt(tag.openEnd), d.posAt(tag.closeBegin));
+            const TagPair& tag = *around_caret[level];
+            out.range          = around ? ALTextRange(d.posAt(tag.openBegin), d.posAt(tag.closeEnd)) : ALTextRange(d.posAt(tag.openEnd), d.posAt(tag.closeBegin));
             return true;
         }
         case 'p':
@@ -4197,6 +4555,224 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         default:
             return false;
     }
+}
+
+std::optional<bool> ALVimKeymap::visualObject(ALTextView& view, llwchar kind, llwchar what, S32 count)
+{
+    const ALTextDocument& d      = view.document();
+    const ALTextPos       anchor = d.clamp(mVisualAnchor);
+    const ALTextPos       caret  = d.clamp(mVisualCaret);
+    const ALTextPos       low    = std::min(anchor, caret);
+    const ALTextPos       high   = std::max(anchor, caret);
+    const bool            around = kind == 'a';
+    switch (what)
+    {
+        case 'w':
+        case 'W':
+        {
+            if (anchor == caret)
+            {
+                return std::nullopt;
+            }
+            // The caret on by the count's words, or back by them where it is
+            // before the anchor (wordObject); lines become characters.
+            const std::optional<WordObject> word =
+                wordObject(d, caret, around, what == 'W', count, caret < anchor ? WordsFrom::Back : WordsFrom::Forward);
+            if (!word)
+            {
+                return false;
+            }
+            mVisualCaret = word->end;
+            if (mMode == Mode::VisualLine)
+            {
+                setMode(view, Mode::Visual);
+            }
+            break;
+        }
+        case '"':
+        case '\'':
+        case '`':
+        {
+            if (anchor == caret)
+            {
+                return std::nullopt;
+            }
+            // On one line alone (quoteOn); lines become characters.
+            const std::optional<std::pair<S32, S32>> taken =
+                anchor.line == caret.line ? quoteOn(d.line(caret.line), anchor.column, caret.column, static_cast<char>(what), around, count) : std::nullopt;
+            if (!taken)
+            {
+                return false;
+            }
+            mVisualAnchor = ALTextPos(caret.line, taken->first);
+            mVisualCaret  = ALTextPos(caret.line, taken->second);
+            if (mMode == Mode::VisualLine)
+            {
+                setMode(view, Mode::Visual);
+            }
+            break;
+        }
+        case '(':
+        case ')':
+        case 'b':
+        case '[':
+        case ']':
+        case '{':
+        case '}':
+        case 'B':
+        case '<':
+        case '>':
+        {
+            if (anchor == caret)
+            {
+                return std::nullopt;
+            }
+            // The block around the selection's start, the count of them out,
+            // looked for from before it (openerAround).
+            const char      opener = objectOpener(what);
+            ALBracketIndex* index  = opener != '<' ? &bracketsOf(view) : nullptr;
+            ALTextPos       open;
+            ALTextPos       close;
+            if (!openerAround(d, index, opener, low, false, count, open) || !matchBracketIn(view, open, close))
+            {
+                return false;
+            }
+            ALTextPos first = open;
+            ALTextPos last  = close;
+            // Inside it, which must hold something; where it holds no more
+            // than the selection does, inside the block around that one.
+            while (!around)
+            {
+                first = d.nextCluster(open);
+                last  = d.prevCluster(close);
+                if (first == close)
+                {
+                    return false;
+                }
+                if (first < low || high < last || first == last)
+                {
+                    break;
+                }
+                // From the character before the selection, a line's end
+                // passed over.
+                ALTextPos before = low;
+                stepBack(d, before);
+                if (atLineEnd(d, before) && before.column > 0)
+                {
+                    stepBack(d, before);
+                }
+                const ALTextPos inner = open;
+                if (!openerAround(d, index, opener, before, false, 1, open) || !(open < inner) || !matchBracketIn(view, open, close))
+                {
+                    return false;
+                }
+            }
+            mVisualAnchor = first;
+            mVisualCaret  = last;
+            setMode(view, Mode::Visual);
+            break;
+        }
+        case 't':
+        {
+            if (anchor == caret)
+            {
+                return std::nullopt;
+            }
+            // The tags open before the selection's start and not closed
+            // before it, innermost first (tagPairs): the count's, or the
+            // first out from it that does not close before the selection's
+            // end.
+            const size_t               lo    = d.offsetOf(low);
+            const size_t               hi    = d.offsetOf(high);
+            const std::vector<TagPair> pairs = tagPairs(d.wholeText());
+            std::vector<const TagPair*> open_before;
+            for (const TagPair& tag : pairs)
+            {
+                if (tag.openBegin < lo && tag.closeBegin >= lo)
+                {
+                    open_before.push_back(&tag);
+                }
+            }
+            std::sort(open_before.begin(), open_before.end(), [](const TagPair* a, const TagPair* b) { return a->openBegin > b->openBegin; });
+            size_t level = static_cast<size_t>(llmax(1, count)) - 1;
+            while (level < open_before.size() && open_before[level]->closeBegin < hi)
+            {
+                ++level;
+            }
+            if (level >= open_before.size())
+            {
+                return false;
+            }
+            // Through the closing tag's >; or what the tags hold, and where
+            // the selection held just that already, the tags as well.
+            const TagPair& tag   = *open_before[level];
+            size_t         first = tag.openBegin;
+            size_t         last  = tag.closeEnd - 1;
+            if (!around && !(tag.openEnd == lo && tag.closeBegin == hi + 1))
+            {
+                first = tag.openEnd;
+                last  = tag.closeBegin - 1;
+            }
+            // Nothing between the tags: the character after the first.
+            mVisualAnchor = d.posAt(first);
+            mVisualCaret  = last < first ? mVisualAnchor : d.posAt(last);
+            setMode(view, Mode::Visual);
+            break;
+        }
+        case 'p':
+        {
+            // A selection of one line is a paragraph afresh -- but by lines
+            // where the caret is on the first of its paragraph or blank
+            // lines, which vim takes on from there.
+            S32 line = caret.line;
+            if (anchor.line == caret.line && (mMode != Mode::VisualLine || (line > 0 && lineBlank(d, line - 1) == lineBlank(d, line))))
+            {
+                return std::nullopt;
+            }
+            // On from the caret's line, or back where it is above the
+            // anchor's, by the count's paragraphs or runs of blank lines --
+            // ap's with the run after each -- the mode as it was. As far as
+            // the text goes, where it ends first, and false.
+            const S32 step = caret.line < anchor.line ? -1 : 1;
+            const S32 edge = step < 0 ? 0 : d.lineCount() - 1;
+            bool      ok   = true;
+            for (S32 n = 0; n < count; ++n)
+            {
+                if (line == edge)
+                {
+                    ok = false;
+                    break;
+                }
+                S32 was = -1;
+                for (S32 t = 0; t < 2; ++t)
+                {
+                    line += step;
+                    const S32 blank = lineBlank(d, line) ? 1 : 0;
+                    if (blank == was)
+                    {
+                        line -= step;
+                        break;
+                    }
+                    while (line != edge && (lineBlank(d, line + step) ? 1 : 0) == blank)
+                    {
+                        line += step;
+                    }
+                    if (!around || line == edge)
+                    {
+                        break;
+                    }
+                    was = blank;
+                }
+            }
+            mVisualCaret = ALTextPos(line, 0);
+            showVisual(view);
+            return ok;
+        }
+        default:
+            return std::nullopt;
+    }
+    showVisual(view);
+    return true;
 }
 
 // --- operators ---------------------------------------------------------------------------
