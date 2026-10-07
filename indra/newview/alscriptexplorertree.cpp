@@ -33,6 +33,7 @@
 #include "llfolderviewitem.h"
 #include "llfolderviewmodel.h"
 #include "lltextbox.h"
+#include "lltooltip.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 
@@ -64,6 +65,7 @@ public:
         mName   = row.name;
         mLabel  = look.label;
         mSuffix = look.suffix;
+        mTip    = look.tip;
         mKnown  = row.known;
         if (look.icon != mIconName)
         {
@@ -83,6 +85,7 @@ public:
     bool               folder() const { return mFolder; }
     bool               known() const { return mKnown; }
     const std::string& suffix() const { return mSuffix; }
+    const std::string& tip() const { return mTip; }
     S32                mOrder = 0;
     // How the rows last said it was, open or folded: the folder is opened
     // or folded again only where that changed, leaving what a person did
@@ -161,6 +164,7 @@ private:
     std::string           mName;
     std::string           mLabel;
     std::string           mSuffix;
+    std::string           mTip;
     std::string           mIconName;
     LLPointer<LLUIImage>  mIcon;
     std::string           mOverlayName;
@@ -324,6 +328,22 @@ bool ALScriptExplorerTree::handleRightMouseDown(S32 x, S32 y, MASK mask)
     {
         mHooks.menu(x, y);
     }
+    return true;
+}
+
+bool ALScriptExplorerTree::handleToolTip(S32 x, S32 y, MASK mask)
+{
+    // Asked before the rows are: each row's own widget would say its name.
+    const LLFolderViewItem* hit  = mFolderView ? itemAt(x, y) : nullptr;
+    const Node*             node = hit ? static_cast<const Node*>(hit->getViewModelItem()) : nullptr;
+    if (!node || node->tip().empty())
+    {
+        return LLPanel::handleToolTip(x, y, mask);
+    }
+    LLRect sticky;
+    hit->localRectToScreen(LLRect(0, hit->getRect().getHeight(), hit->getRect().getWidth(), hit->getRect().getHeight() - hit->getItemHeight()),
+                           &sticky);
+    LLToolTipMgr::instance().show(LLToolTip::Params().message(node->tip()).sticky_rect(sticky).delay_time(getTooltipTimeout()));
     return true;
 }
 

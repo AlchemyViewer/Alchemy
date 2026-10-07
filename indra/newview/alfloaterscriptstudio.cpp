@@ -49,6 +49,7 @@
 #include "alnotecarditems.h"
 #include "alrecovery.h"
 #include "alscriptinventoryindex.h"
+#include "alscriptlinkbadges.h"
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptregionusage.h"
@@ -888,6 +889,9 @@ void ALFloaterScriptStudio::listenToWorkspace()
     // What the region said an object reserves: the Weights tab says it
     // again, with what came.
     mRegionUsageConnection = ALScriptWorkspace::instance().regionUsage().onHeard([this]() { mWeighing.stale(); });
+    // A file's tab says how many scripts it is the master of, which links
+    // made and let go of change.
+    mLinkBadgesConnection = ALScriptLinkBadges::instance().onChanged([this]() { fillTabs(); });
     // New definitions from the region: the analyzers reload, the words
     // are rebuilt, and every script is checked again.
     mDefinitionsConnection = LLSyntaxDefCache::instance().addSyntaxIDCallback([this]() {
@@ -3634,6 +3638,13 @@ ALTabStrip::Tab ALFloaterScriptStudio::tabOf(const Doc& doc, const TabFacts& fac
     {
         tab.toolTip += "\n" + mTabTips.readOnly;
     }
+    // A file that is the master of scripts in the world says so after its
+    // name, quietly, and how many in its tip.
+    if (facts.masters > 0)
+    {
+        tab.detail = counted("TabMastersDetail", facts.masters);
+        tab.toolTip += "\n" + counted("TabMastersTip", facts.masters);
+    }
     return tab;
 }
 
@@ -3646,6 +3657,7 @@ ALFloaterScriptStudio::TabFacts ALFloaterScriptStudio::tabFactsOf(const Doc& doc
     facts.preview  = doc.preview;
     facts.readOnly = doc.loaded && !doc.modifiable;
     facts.image    = ALScriptStudioWords::imageNameOf(doc);
+    facts.masters  = doc.file.empty() ? 0 : ALScriptLinkBadges::instance().masteredBy(doc.file);
     problemCounts(doc, facts.errors, facts.warnings);
     return facts;
 }

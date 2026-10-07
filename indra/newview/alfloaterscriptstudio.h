@@ -1067,10 +1067,12 @@ private:
         S32         errors = 0;
         S32         warnings = 0;
         const char* image  = nullptr;
+        // How many scripts in the world a file's tab is the master of.
+        S32         masters = 0;
         friend bool operator==(const TabFacts& a, const TabFacts& b)
         {
             return a.id == b.id && a.name == b.name && a.dirty == b.dirty && a.preview == b.preview && a.readOnly == b.readOnly && a.errors == b.errors &&
-                   a.warnings == b.warnings && a.image == b.image;
+                   a.warnings == b.warnings && a.image == b.image && a.masters == b.masters;
         }
         friend bool operator!=(const TabFacts& a, const TabFacts& b) { return !(a == b); }
     };
@@ -1422,4 +1424,7 @@ private:
     std::vector<boost::signals2::scoped_connection> mSettingConnections;
     boost::signals2::scoped_connection mRuntimeConnection;
     boost::signals2::scoped_connection mRunningConnection;
+    // A file's links made or let go of: its tab says how many scripts it
+    // is the master of.
+    boost::signals2::scoped_connection mLinkBadgesConnection;
 };

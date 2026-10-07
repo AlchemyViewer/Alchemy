@@ -196,6 +196,10 @@ private:
     // Start, stop, reset or restart over the rows, asked about first where
     // it reaches more than one script.
     void run(const std::string& action, const std::vector<Choice>& rows);
+    // Every linked script among the rows, and of their prims, sent from
+    // its file as the studio's own send, which a change in the world since
+    // holds.
+    void sendFromFiles(const std::vector<Choice>& rows);
 
     // What is chosen of what a prim holds, dragged out with the viewer's
     // drag tool -- to the inventory, as the build floater's contents are --
@@ -252,4 +256,5 @@ private:
     boost::signals2::scoped_connection mHeardConnection;
     boost::signals2::scoped_connection mRegionUsageConnection;
     boost::signals2::scoped_connection mPresenceConnection;
+    boost::signals2::scoped_connection mBadgesConnection;
 };
