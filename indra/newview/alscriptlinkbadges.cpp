@@ -188,12 +188,19 @@ void ALScriptLinkBadges::look()
     {
         mWorker = std::make_unique<ALSerialWorker>("ScriptLinkBadges");
     }
-    mLooking                        = true;
-    const std::weak_ptr<bool> alive = mAlive;
-    const bool                posted = mWorker->post([this, alive, main_loop, masters = std::move(masters)]() {
+    mLooking                         = true;
+    const std::weak_ptr<bool> alive  = mAlive;
+    const ALSerialWorker*     worker = mWorker.get();
+    const bool                posted = mWorker->post([this, alive, main_loop, worker, masters = std::move(masters)]() {
+        // Given up as the viewer quits, which waits on this: a master on a
+        // share out of reach may take a while over each look.
         Stamps stamps;
         for (const std::string& master : masters)
         {
+            if (worker->closing())
+            {
+                return;
+            }
             stamps[master] = ALFileStamp::of(master);
         }
         main_loop->post([this, alive, stamps = std::move(stamps)]() mutable {

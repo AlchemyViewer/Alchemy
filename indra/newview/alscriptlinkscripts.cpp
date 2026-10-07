@@ -469,6 +469,11 @@ std::vector<ALScriptLinkScripts::Found> ALScriptLinkScripts::match(const std::ve
         std::vector<ALMasterLink::Made> made;
         for (const auto& [master, how] : ask.records)
         {
+            // Each a look at the disk, which may be a share out of reach.
+            if (stopped && stopped())
+            {
+                break;
+            }
             const std::string key = ALMasterLinks::keyOf(master);
             const bool        seen = std::any_of(records.begin(), records.end(), [&key](const std::string& one) { return ALMasterLinks::keyOf(one) == key; });
             if (!seen && ALDiskIncludes::extensionOf(master, extensions) > 0 && ALFileStamp::of(master).exists)
@@ -774,8 +779,18 @@ void ALScriptLinkScripts::link(bool send_differing, std::function<void(const Lin
         return;
     }
     const auto shared = std::make_shared<decltype(finish)>(std::move(finish));
-    const bool posted = ALScriptLinkDisk::instance().post([main_loop, shared, stamp_all, same = std::move(same)](const ALSerialWorker&) {
-        std::vector<ALFileStamp> stamps = stamp_all(same);
+    const bool posted = ALScriptLinkDisk::instance().post([main_loop, shared, same = std::move(same)](const ALSerialWorker& thread) {
+        // Given up as the viewer quits, which waits on this.
+        std::vector<ALFileStamp> stamps;
+        stamps.reserve(same.size());
+        for (const std::string& file : same)
+        {
+            if (thread.closing())
+            {
+                return;
+            }
+            stamps.push_back(ALFileStamp::of(file));
+        }
         main_loop->post([shared, stamps = std::move(stamps)]() { (*shared)(stamps); });
     });
     if (!posted)
