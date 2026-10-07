@@ -5020,4 +5020,39 @@ namespace tut
         keys("$2\"aj");
         ensure_equals("$ then 2\"aj", caretText(), std::string("2:9"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<175>()
+    {
+        set_test_name("gj, gk and g$ that run out of rows before the count's go as far as there are and fail, an operator's with them, the caret left where they got to");
+        ALCodeEditor& e = make("abc\ndef\nghi");
+        ex("normal 9gjx");
+        ensure_equals("9gj fails: the x after it not run", flat(e.text()), std::string("abc|def|ghi"));
+        ensure_equals("the caret on the last line all the same", caretText(), std::string("2:0"));
+        ex("normal 9gkx");
+        ensure_equals("9gk fails likewise", flat(e.text()), std::string("abc|def|ghi"));
+        ensure_equals("the caret on the first line", caretText(), std::string("0:0"));
+
+        e.setCaret(ALTextPos(0, 1));
+        keys("d9gj");
+        ensure_equals("d9gj: nothing taken", flat(e.text()), std::string("abc|def|ghi"));
+        ensure_equals("the caret where gj got to", caretText(), std::string("2:1"));
+        ensure("normal mode, nothing pending", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+        keys("d9gk");
+        ensure_equals("d9gk: nothing taken", flat(e.text()), std::string("abc|def|ghi"));
+        ensure_equals("the caret where gk got to", caretText(), std::string("0:1"));
+        keys("d2gj");
+        ensure_equals("d2gj within the rows there are: from the caret to there", flat(e.text()), std::string("ahi"));
+
+        const std::string line = "aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll";
+        ALCodeEditor&     w    = make(line.c_str());
+        w.setWordWrap(true);
+        w.reshape(120, 200);
+        const std::vector<ALTextLayout::Row> rows = w.layout().line(0).rows;
+        ensure("the line wraps to three rows or more", rows.size() >= 3);
+        w.setCaret(ALTextPos(0, rows[1].begin + 2));
+        keys("d99g$");
+        ensure_equals("d99g$ runs out of rows and fails, nothing taken", w.document().line(0), line);
+        ensure_equals("the caret at the end of the last row all the same", caretText(), "0:" + std::to_string(line.size() - 1));
+    }
 }

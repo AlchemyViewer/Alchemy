@@ -2956,7 +2956,13 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     {
         // A key that is no motion, or one that could not move: the
         // operator fails, and the key is taken all the same -- never left
-        // for the view to type into the text.
+        // for the view to type into the text. gj, gk or g$ out of rows went
+        // partway before it failed, and leaves the caret where it got to,
+        // as vim's does; any other is where it began.
+        if (m.ok && (m_ch == DISPLAY_DOWN || m_ch == DISPLAY_UP || m_ch == DISPLAY_END) && m.to != here)
+        {
+            moveTo(view, m.to);
+        }
         mFailed = true;
         clearPending();
         return true;
@@ -4001,12 +4007,15 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
         case DISPLAY_UP:
         {
             // A row of the display at a time, by the layout's rows, at
-            // the x the caret is drawn at.
-            ALTextLayout& layout = view.layout();
-            S32           row    = 0;
-            const F32     x      = layout.xOf(from.line, from.column, &row);
-            S32           line   = from.line;
-            for (S32 n = 0; n < count; ++n)
+            // the x the caret is drawn at. Out of rows before the count's:
+            // as far as there are, and a failure all the same, as vim's
+            // gj and gk are, an operator's with them.
+            ALTextLayout& layout  = view.layout();
+            S32           row     = 0;
+            const F32     x       = layout.xOf(from.line, from.column, &row);
+            S32           line    = from.line;
+            bool          ran_out = false;
+            for (S32 n = 0; n < count && !ran_out; ++n)
             {
                 if (ch == DISPLAY_DOWN)
                 {
@@ -4021,7 +4030,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                     }
                     else
                     {
-                        break;
+                        ran_out = true;
                     }
                 }
                 else
@@ -4037,12 +4046,12 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                     }
                     else
                     {
-                        break;
+                        ran_out = true;
                     }
                 }
             }
             m.to    = d.clamp(ALTextPos(line, layout.columnAt(line, row, x, true)));
-            m.moved = m.to != from;
+            m.moved = m.to != from && !ran_out;
             return m;
         }
         case DISPLAY_START:
