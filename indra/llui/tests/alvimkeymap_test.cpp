@@ -3914,4 +3914,53 @@ namespace tut
         keys("l<C-v>jl<Esc>$:%s/\\%V[a-z]/X/g<CR>");
         ensure_equals("\\%V over a block without $, after $: its columns alone", flat(e.text()), std::string("aXXdefg|aXX|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<145>()
+    {
+        set_test_name("visual p puts what it replaced in the unnamed register, and in - or 1, whichever register it put, so a further p puts that; visual P leaves the registers as they were");
+        ALCodeEditor& e = make("one two three four\n");
+        keys("3wyiwbviwp");
+        ensure_equals("viwp: the word replaced", flat(e.text()), std::string("one two four four|"));
+        ensure_equals("the caret on the last character put", caretText(), std::string("0:11"));
+        ensure_equals("what it replaced in the unnamed register", vim->registerText('"'), std::string("three"));
+        ensure_equals("and in -, as a small delete's", vim->registerText('-'), std::string("three"));
+        ensure_equals("the yank kept in 0", vim->registerText('0'), std::string("four"));
+        keys("0viwp");
+        ensure_equals("a further p puts what the last replaced", flat(e.text()), std::string("three two four four|"));
+        ensure_equals("and keeps what this one replaced", vim->registerText('"'), std::string("one"));
+
+        make("one two three four\n");
+        keys("3wyiwbviwP");
+        ensure_equals("viwP: the word replaced", flat(editor->text()), std::string("one two four four|"));
+        ensure_equals("the unnamed register as it was", vim->registerText('"'), std::string("four"));
+        ensure_equals("and - too", vim->registerText('-'), std::string());
+        keys("0viwP");
+        ensure_equals("a further P puts the same again", flat(editor->text()), std::string("four two four four|"));
+        ensure_equals("the caret on its last character", caretText(), std::string("0:3"));
+
+        make("one two three four\n");
+        keys("\"xyiw3wyiwbviw\"xp");
+        ensure_equals("viw\"xp: the named register put", flat(editor->text()), std::string("one two one four|"));
+        ensure_equals("what it replaced in the unnamed register all the same", vim->registerText('"'), std::string("three"));
+        ensure_equals("the named one as it was", vim->registerText('x'), std::string("one"));
+        keys("0viw\"_p");
+        ensure_equals("viw\"_p: nothing put", flat(editor->text()), std::string(" two one four|"));
+        ensure_equals("and what it took out in the unnamed register, as vim's has it", vim->registerText('"'), std::string("one"));
+
+        make("a\nb\nc\n");
+        keys("yyjVp");
+        ensure_equals("V p: the line replaced", flat(editor->text()), std::string("a|a|c|"));
+        ensure_equals("the line it replaced in the unnamed register", vim->registerText('"'), std::string("b"));
+        ensure_equals("and in 1, as a delete of a line's", vim->registerText('1'), std::string("b"));
+        keys("p");
+        ensure_equals("p puts it, a line", flat(editor->text()), std::string("a|a|b|c|"));
+        ensure_equals("the caret on it", caretText(), std::string("2:0"));
+
+        make("abcd\nefgh\nX\n");
+        keys("2jylggl<C-v>jlp");
+        ensure_equals("a block's columns replaced", flat(editor->text()), std::string("aXd|eXh|X|"));
+        ensure_equals("what the block held in the unnamed register, a line each", vim->registerText('"'), std::string("bc\nfg"));
+        ensure_equals("and in 1", vim->registerText('1'), std::string("bc\nfg"));
+    }
 }

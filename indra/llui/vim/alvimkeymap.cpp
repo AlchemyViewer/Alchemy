@@ -2528,16 +2528,36 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
             }
             if (ch == 'p' || ch == 'P')
             {
-                // The selection replaced by the register, which keeps
-                // what was there for a further put. Lines are replaced by
-                // its text, its lines taking theirs; lines put into less
-                // than a line go on lines of their own, the line broken
-                // round them. What a block holds of each line is replaced
-                // by a register of one line, as vim's blockwise put has
-                // it; by anything else it is taken out, and the register
-                // put at the block's corner -- lines under the block for
-                // p, over it for P.
-                const Register put_this = fetch(mRegister);
+                // The selection replaced by the register. Lines are
+                // replaced by its text, its lines taking theirs; lines put
+                // into less than a line go on lines of their own, the line
+                // broken round them. What a block holds of each line is
+                // replaced by a register of one line, as vim's blockwise
+                // put has it; by anything else it is taken out, and the
+                // register put at the block's corner -- lines under the
+                // block for p, over it for P. What p replaced goes where a
+                // delete puts what it takes -- the unnamed register, and 1
+                // or - -- once the register is put, whichever was named,
+                // so a further p puts that; P leaves every register as it
+                // was, for a further P to put the same again.
+                const Register                 put_this = fetch(mRegister);
+                const std::vector<ALTextRange> pieces   = span.block ? blockPieces(view, span) : std::vector<ALTextRange>();
+                std::string                    taken;
+                if (span.block)
+                {
+                    for (size_t i = 0; i < pieces.size(); ++i)
+                    {
+                        if (i > 0)
+                        {
+                            taken += '\n';
+                        }
+                        taken += d.text(pieces[i]);
+                    }
+                }
+                else
+                {
+                    taken = d.text(span.range);
+                }
                 leaveVisual(view);
                 if (!editing)
                 {
@@ -2547,8 +2567,7 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                 view.undoJournal().beginGroup();
                 if (span.block)
                 {
-                    const std::vector<ALTextRange> pieces   = blockPieces(view, span);
-                    const bool                     one_line = !put_this.linewise && !put_this.block && put_this.text.find('\n') == std::string::npos;
+                    const bool one_line = !put_this.linewise && !put_this.block && put_this.text.find('\n') == std::string::npos;
                     std::vector<std::pair<ALTextRange, std::string>> edits;
                     for (const ALTextRange& piece : pieces)
                     {
@@ -2593,6 +2612,10 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                     }
                 }
                 view.undoJournal().endGroup();
+                if (ch == 'p' && (span.linewise || span.block || !span.range.empty()))
+                {
+                    store(0, std::move(taken), span.linewise, span.block, false);
+                }
                 finishCommand(true);
                 return true;
             }
