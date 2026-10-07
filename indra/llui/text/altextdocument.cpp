@@ -434,22 +434,27 @@ ALTextDocument::Edit ALTextDocument::replaceMany(std::vector<std::pair<ALTextRan
     {
         return replace(kept.front().first, kept.front().second);
     }
-    // The text from the first to the last as it will be: what lies between
-    // them as it is, and each put in, its line endings as LF; and where
-    // each is, as it was and as it will be.
+    // The text from the first to the last as it was, and as it will be:
+    // what lies between them cut from what was, and each put in, its line
+    // endings as LF; and where each is, as it was and as it will be.
     const ALTextRange       span(kept.front().first.begin, kept.back().first.end);
+    std::string             removed = this->text(span);
     std::string             out;
     std::vector<Edit::Part> parts;
+    out.reserve(removed.size());
     parts.reserve(kept.size());
     ALTextPos  at   = span.begin;
     ALTextPos  made = span.begin;
+    size_t     from = 0;
     const auto append = [&out, &made](std::string_view piece) {
         out.append(piece);
         made = alTextEnd(made, piece);
     };
     for (auto& [range, piece] : kept)
     {
-        append(this->text(ALTextRange(at, range.begin)));
+        const size_t between = byteCount(ALTextRange(at, range.begin));
+        append(std::string_view(removed).substr(from, between));
+        from += between + byteCount(range);
         if (piece.find('\r') != std::string::npos)
         {
             piece = ALLineBreaks::withLineFeeds(piece);
@@ -462,7 +467,40 @@ ALTextDocument::Edit ALTextDocument::replaceMany(std::vector<std::pair<ALTextRan
         parts.push_back(part);
         at = range.end;
     }
-    return replace(span, out, std::move(parts));
+    if (removed == out)
+    {
+        Edit none;
+        none.range = ALTextRange(span.begin, span.begin);
+        return none;
+    }
+    Edit edit;
+    edit.range    = span;
+    edit.removed  = std::move(removed);
+    edit.inserted = std::move(out);
+    edit.keepEnd(made);
+    edit.parts = std::move(parts);
+    // Each stretch made where it stands, the last first so that those
+    // before it stand where they did, and the lines between them left as
+    // they are -- where each makes as many lines as it replaces, as keys
+    // typed at several carets do. One that makes more or fewer would move
+    // the lines below it once for every stretch: the lines from the first
+    // to the last are made again at once instead.
+    const bool same_lines = std::all_of(edit.parts.begin(), edit.parts.end(), [](const Edit::Part& part) {
+        return part.before.end.line - part.before.begin.line == part.after.end.line - part.after.begin.line;
+    });
+    if (same_lines)
+    {
+        for (auto it = kept.rbegin(); it != kept.rend(); ++it)
+        {
+            spliceLines(it->first, it->second);
+        }
+    }
+    else
+    {
+        spliceLines(span, edit.inserted);
+    }
+    announce(edit);
+    return edit;
 }
 
 ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view text, std::vector<Edit::Part> parts)
@@ -485,10 +523,15 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
 
     edit.keepEnd();
     edit.parts = std::move(parts);
+    spliceLines(range, edit.inserted);
+    announce(edit);
+    return edit;
+}
 
-    const size_t           first = static_cast<size_t>(range.begin.line);
-    const size_t           last  = static_cast<size_t>(range.end.line);
-    const std::string_view put   = edit.inserted;
+void ALTextDocument::spliceLines(const ALTextRange& range, std::string_view put)
+{
+    const size_t first = static_cast<size_t>(range.begin.line);
+    const size_t last  = static_cast<size_t>(range.end.line);
     if (first == last && put.find('\n') == std::string_view::npos)
     {
         // Within a line, and none broken: the line changed where it is.
@@ -531,7 +574,10 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
         made.back().append(after);
         mLines.replace(first, last - first + 1, std::make_move_iterator(made.begin()), std::make_move_iterator(made.end()));
     }
+}
 
+void ALTextDocument::announce(const Edit& edit)
+{
     mBytes = mBytes - edit.removed.size() + edit.inserted.size();
     ++mVersion;
     // The whole text kept, if it was, is made again when next asked
@@ -539,7 +585,6 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
     // asks again.
     mWholeValid = false;
     mChanged(edit);
-    return edit;
 }
 
 ALTextDocument::Edit ALTextDocument::append(std::string_view text)

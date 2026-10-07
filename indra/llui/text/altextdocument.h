@@ -306,6 +306,12 @@ private:
     // Into the text, byte for byte, with no regard for graphemes.
     ALTextPos   clampBytes(ALTextPos pos) const;
     ALTextRange clampBytes(const ALTextRange& range) const;
+    // The lines a range is in made again with what goes in its place, its
+    // line endings LF already: the lines alone, nobody told.
+    void        spliceLines(const ALTextRange& range, std::string_view put);
+    // An edit made: the byte count, the version and the whole text kept
+    // moved on with it, and whoever listens told.
+    void        announce(const Edit& edit);
 
     ALLineTable<std::string> mLines;
     size_t                   mBytes   = 0;
