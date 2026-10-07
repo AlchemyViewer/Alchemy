@@ -65,12 +65,12 @@ namespace
 
 const ALGradeHistory::Step& ALGradeHistory::stepAt(size_t index) const
 {
-    const std::vector<Step>& back = mSteps.undone();
+    const auto& back = mSteps.undone();
     if (index < back.size())
     {
         return back[index];
     }
-    const std::vector<Step>& forward = mSteps.redone();
+    const auto& forward = mSteps.redone();
     return forward[forward.size() - 1 - (index - back.size())];
 }
 
