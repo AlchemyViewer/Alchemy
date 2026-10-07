@@ -213,11 +213,23 @@ void ALScriptMasterUpload::find()
     // object's scripts -- takes the copy the object holds, where it holds
     // one it has not heard has changed: what is asked of the region then is
     // only what is not there.
-    if (!gObjectList.findObject(mRef.object))
+    LLViewerObject* object = gObjectList.findObject(mRef.object);
+    if (!object)
     {
         mUpdated.state = ALMasterLink::State::Pending;
         mChanged       = true;
         end(Outcome::What::Pending, LLTrans::getString("ScriptMasterOutOfReach"));
+        return;
+    }
+    // What RLVa keeps from being seen or changed -- the object's contents,
+    // as it keeps the build floater's -- is listed as holding nothing, and
+    // would look gone: whether the item is there is not known, and nothing
+    // is sent into it. The send waits to be made by hand, the link kept.
+    if (!ALScriptWorkspace::rlvRefusal(object, LLAssetType::AT_NONE, ALScriptRlvUse::Change).empty())
+    {
+        mUpdated.state = ALMasterLink::State::Pending;
+        mChanged       = true;
+        end(Outcome::What::Pending, LLTrans::getString("ScriptMasterRlvHeld"));
         return;
     }
     std::shared_ptr<ALScriptMasterUpload> self = shared_from_this();
