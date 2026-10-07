@@ -31,6 +31,7 @@
 #include "llstl.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -235,6 +236,11 @@ ALSnippetSession::Expansion ALSnippetSession::expand(std::string_view body, cons
     std::string&                                text = out.text;
     std::vector<Place>                          places;
     boost::unordered_flat_map<S32, std::string> held;
+    // The numbers given a default so far; and each one's first default
+    // where a place of it before that had none -- `$1 = ${1:value}` --
+    // which the body is read again to show there too.
+    boost::unordered_flat_set<S32>              defaulted;
+    boost::unordered_flat_map<S32, std::string> backfill;
     std::optional<ALTextRange>                  end;
     ALTextPos                                   pos = at;
     auto                                        put = [&](char ch) {
@@ -315,7 +321,8 @@ ALSnippetSession::Expansion ALSnippetSession::expand(std::string_view body, cons
             const S32       number = atoi(std::string(body.substr(digits, past - digits)).c_str());
             const ALTextPos from   = pos;
             const size_t    began  = text.size();
-            if (braced && body[past] == ':')
+            const bool      given  = braced && body[past] == ':';
+            if (given)
             {
                 read(past + 1, close);
             }
@@ -344,12 +351,27 @@ ALSnippetSession::Expansion ALSnippetSession::expand(std::string_view body, cons
             else
             {
                 places.push_back(Place{ number, ALTextRange(from, pos) });
-                held.emplace(number, text.substr(began));
+                const bool first_place = held.emplace(number, text.substr(began)).second;
+                if (given && defaulted.insert(number).second && !first_place)
+                {
+                    backfill.emplace(number, text.substr(began));
+                }
             }
             i = braced ? close + 1 : past;
         }
     };
     read(0, body.size());
+    if (!backfill.empty())
+    {
+        // Read again, each place before its number's first default showing
+        // that, as a mirror after it would.
+        text.clear();
+        places.clear();
+        end.reset();
+        pos  = at;
+        held = backfill;
+        read(0, body.size());
+    }
     // Each number's first place the stop, the rest its mirrors; the stops
     // in the order of their numbers.
     std::stable_sort(places.begin(), places.end(), [](const Place& a, const Place& b) { return a.number < b.number; });

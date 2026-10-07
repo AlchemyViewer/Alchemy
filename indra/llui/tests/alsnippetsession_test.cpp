@@ -165,4 +165,23 @@ namespace tut
         ensure("the stop around it kept", session.stops().size() == 2);
         ensure_equals("grown with it", text.text(session.stops()[1]), std::string("the abc thing"));
     }
+
+    template<> template<>
+    void alsnippetsession_object::test<7>()
+    {
+        set_test_name("a number's first place written bare, its default given after: every place shows the default, and leaving the stop takes nothing from its mirror");
+        const ALSnippetSession::Expansion x = ALSnippetSession::expand("$1 = ${1:value};", ALTextPos(0, 0), "");
+        ensure_equals("the default where it is first", x.text, std::string("value = value;"));
+        ensure("the stop the first place, holding it", x.stops.size() == 1 && x.stops[0] == range(0, 0, 5));
+        ensure("its mirror the second", x.mirrors.size() == 1 && x.mirrors[0].of == 0 && x.mirrors[0].range == range(0, 8, 13));
+        const ALTextDocument doc(x.text);
+        session.start(x.stops, x.landing.begin, x.mirrors);
+        std::string wanted;
+        ensure("nothing to bring up as the stop is left", session.staleMirrors(0, doc, wanted).empty() && wanted == "value");
+
+        const ALSnippetSession::Expansion braced = ALSnippetSession::expand("${1} + $1 + ${1:n}", ALTextPos(0, 0), "");
+        ensure_equals("braced without one, and a mirror between, the same", braced.text, std::string("n + n + n"));
+        const ALSnippetSession::Expansion empty = ALSnippetSession::expand("${1:} + ${1:n}", ALTextPos(0, 0), "");
+        ensure_equals("a first given an empty default keeps it", empty.text, std::string(" + n"));
+    }
 }

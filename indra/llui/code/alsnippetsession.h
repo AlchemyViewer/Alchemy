@@ -53,7 +53,9 @@ public:
     // placeholders, in order of their numbers -- one inside another's text
     // as well, `${1:a ${2:b}}` -- and `$0`, or `${0:text}`, where the caret
     // lands past the last. A number that comes again is a mirror of the
-    // first, written as it holds. `$$` or `\$` a dollar, `\}` a brace.
+    // first, written as it holds; a first written with no default holds
+    // the first one its number is given after it, `$1 = ${1:value}` as
+    // `value = value`. `$$` or `\$` a dollar, `\}` a brace.
     struct Expansion
     {
         // The text as it will stand.
