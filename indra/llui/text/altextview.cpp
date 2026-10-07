@@ -188,6 +188,20 @@ namespace
     S32       atomId(size_t index) { return ATOM_ID_BASE + static_cast<S32>(index); }
     bool      isAtomId(S32 id) { return id >= ATOM_ID_BASE; }
 
+    // Of things in the order they begin, none over another -- matches,
+    // selections, misspellings, styles -- those that may touch the places
+    // from `from` to `to`, a row's: from the first that ends at or past
+    // `from`, while they begin at or before `to`. Each found by a search,
+    // not by asking every one on the line of every row it wraps into; and
+    // each still asked whether it does touch the row.
+    template <typename It, typename RangeOf>
+    std::pair<It, It> touching(It first, It last, const ALTextPos& from, const ALTextPos& to, RangeOf range_of)
+    {
+        first = std::partition_point(first, last, [&](const auto& item) { return range_of(item).end < from; });
+        last  = std::partition_point(first, last, [&](const auto& item) { return !(to < range_of(item).begin); });
+        return { first, last };
+    }
+
     // How long the word at the caret is left unmarked after it was typed.
     const F32 SPELL_SETTLE_SECONDS = 1.5f;
     // A squiggle: a wave a pixel high either way and six pixels long,
@@ -4966,25 +4980,47 @@ void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALText
             mColorScratch[k] = base;
         }
     }
-    // A style's colour over the grammar's.
-    for (auto it = firstStyleOn(line); it != mStyles.end() && it->range.begin.line <= line; ++it)
-    {
-        const Style& style = *it;
-        if (!style.color)
+    // The row's glyphs whose clusters are from one column to another in an
+    // ink: found by a search where the glyphs go forward through the line,
+    // so that many stretches on a long row cost each its own glyphs, else
+    // every glyph asked.
+    const auto paint = [&](S32 from, S32 to, const LLColor4U& ink) {
+        size_t k = 0;
+        if (laid.ordered)
         {
-            continue;
+            const auto first = laid.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphBegin);
+            const auto end   = laid.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphEnd);
+            k = static_cast<size_t>(std::partition_point(first, end, [from](const ALTextLayout::Glyph& g) { return g.cluster < from; }) - first);
         }
-        const LLColor4U ink(*style.color % alpha);
-        const S32       from = style.range.begin.line == line ? style.range.begin.column : 0;
-        const S32       to   = style.range.end.line == line ? style.range.end.column : S32_MAX;
-        for (size_t k = 0; k < count; ++k)
+        for (; k < count; ++k)
         {
             const S32 cluster = laid.glyphs[row.glyphBegin + k].cluster;
             if (cluster >= from && cluster < to)
             {
                 mColorScratch[k] = ink;
             }
+            else if (laid.ordered && cluster >= to)
+            {
+                break;
+            }
         }
+    };
+    // A style's colour over the grammar's: of the styles on the line, those
+    // that may touch the row, where its glyphs go forward.
+    std::pair<std::vector<Style>::const_iterator, std::vector<Style>::const_iterator> styled(firstStyleOn(line), mStyles.items().end());
+    if (laid.ordered)
+    {
+        styled = touching(styled.first, styled.second, ALTextPos(line, row.begin), ALTextPos(line, row.end), [](const Style& s) { return s.range; });
+    }
+    for (auto it = styled.first; it != styled.second && it->range.begin.line <= line; ++it)
+    {
+        const Style& style = *it;
+        if (!style.color)
+        {
+            continue;
+        }
+        paint(style.range.begin.line == line ? style.range.begin.column : 0, style.range.end.line == line ? style.range.end.column : S32_MAX,
+              LLColor4U(*style.color % alpha));
     }
     // A link in its own colour, over whatever the grammar made of it.
     if (!mSubstitutions.empty())
@@ -4994,17 +5030,9 @@ void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALText
                                               [](const Substitution& s, const ALTextPos& p) { return s.range.end <= p; });
         for (; it != mSubstitutions.end() && it->range.begin.line == line && it->range.begin.column < row.end; ++it)
         {
-            if (!it->link)
+            if (it->link)
             {
-                continue;
-            }
-            for (size_t k = 0; k < count; ++k)
-            {
-                const S32 cluster = laid.glyphs[row.glyphBegin + k].cluster;
-                if (cluster >= it->range.begin.column && cluster < it->range.end.column)
-                {
-                    mColorScratch[k] = link;
-                }
+                paint(it->range.begin.column, it->range.end.column, link);
             }
         }
     }
@@ -5108,8 +5136,12 @@ void ALTextView::drawUnderlines(S32 line, const ALTextLayout::Line& laid, S32 r,
             }
         }
     }
-    // The styles that underline, in the style's colour or the text's.
-    for (auto it = firstStyleOn(line); it != mStyles.end() && it->range.begin.line <= line; ++it)
+    // The styles that underline, in the style's colour or the text's: those
+    // that may touch the row, and on past the line's end on its last.
+    const ALTextPos from(line, row.begin);
+    const ALTextPos to(line, static_cast<size_t>(r) + 1 == laid.rows.size() ? S32_MAX : row.end);
+    const auto      styled = touching(mStyles.begin(), mStyles.end(), from, to, [](const Style& s) { return s.range; });
+    for (auto it = styled.first; it != styled.second; ++it)
     {
         const Style& style = *it;
         if (!(style.flags & LLFontGL::UNDERLINE))
@@ -5165,9 +5197,18 @@ void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, con
     // left alone for a moment.
     if (getSpellCheck())
     {
-        const bool settling = keyboardOnText() && mSpellTimer.getElapsedTimeF32() < SPELL_SETTLE_SECONDS;
-        for (const auto& [begin, end] : misspellings(line))
+        // Those that may touch the row, and on past the line's end on its
+        // last.
+        const bool      settling = keyboardOnText() && mSpellTimer.getElapsedTimeF32() < SPELL_SETTLE_SECONDS;
+        const ALTextPos from(line, row.begin);
+        const ALTextPos to(line, static_cast<size_t>(r) + 1 == laid.rows.size() ? S32_MAX : row.end);
+        const auto&     words = misspellings(line);
+        const auto      found = touching(words.begin(), words.end(), from, to, [line](const std::pair<S32, S32>& w) {
+            return ALTextRange(ALTextPos(line, w.first), ALTextPos(line, w.second));
+        });
+        for (auto it = found.first; it != found.second; ++it)
         {
+            const auto& [begin, end] = *it;
             if (settling && mCaret.line == line && begin <= mCaret.column && mCaret.column <= end)
             {
                 continue;
@@ -5242,8 +5283,14 @@ void ALTextView::drawRows(const LLRect& text)
     gGL.begin(LLRender::TRIANGLES);
     for (const RowSeen& seen : mRowsSeen)
     {
-        const S32                line = seen.line;
-        const ALTextLayout::Row& row  = mLayout.line(line).rows[static_cast<size_t>(seen.row)];
+        const S32                 line = seen.line;
+        const ALTextLayout::Line& laid = mLayout.line(line);
+        const ALTextLayout::Row&  row  = laid.rows[static_cast<size_t>(seen.row)];
+        // The places on the row, and on past the line's end on its last:
+        // what of the selections and the matches on a long wrapped line
+        // may touch it.
+        const ALTextPos from(line, row.begin);
+        const ALTextPos to(line, static_cast<size_t>(seen.row) + 1 == laid.rows.size() ? S32_MAX : row.end);
         // A selection's band on the row: its span there, as a match's is,
         // past the line's end where it goes on to the next.
         const auto band = [&](const ALTextRange& range) {
@@ -5255,21 +5302,20 @@ void ALTextView::drawRows(const LLRect& text)
             }
         };
         band(sel);
-        for (auto [it, end] = mCarets.onLine(line); it != end; ++it)
+        const auto on_line = mCarets.onLine(line);
+        const auto carets  = touching(on_line.first, on_line.second, from, to, [](const ALTextRange& s) { return s.normalised(); });
+        for (auto it = carets.first; it != carets.second; ++it)
         {
             band(it->normalised());
         }
-        if (!matches.empty())
+        const auto found = touching(matches.begin(), matches.end(), from, to, [](const ALTextRange& m) { return m.normalised(); });
+        for (auto it = found.first; it != found.second; ++it)
         {
-            auto first = std::lower_bound(matches.begin(), matches.end(), line, [](const ALTextRange& m, S32 l) { return m.end.line < l; });
-            for (auto it = first; it != matches.end() && it->begin.line <= line; ++it)
+            F32 x0, x1;
+            if (spanOnRow(line, seen.row, *it, x0, x1))
             {
-                F32 x0, x1;
-                if (spanOnRow(line, seen.row, *it, x0, x1))
-                {
-                    gl_rect_2d_in_batch(static_cast<S32>(left + x0), seen.rowScreenTop, static_cast<S32>(left + x1), seen.rowScreenTop - row.height,
-                                        mFindMatchColor.get() % alpha);
-                }
+                gl_rect_2d_in_batch(static_cast<S32>(left + x0), seen.rowScreenTop, static_cast<S32>(left + x1), seen.rowScreenTop - row.height,
+                                    mFindMatchColor.get() % alpha);
             }
         }
     }
@@ -5379,7 +5425,18 @@ void ALTextView::drawRows(const LLRect& text)
             {
                 caret(mCaret);
             }
-            for (auto [it, end] = mCarets.onLine(line); it != end; ++it)
+            // Those besides it whose caret may be on the row: found by a
+            // search where the line's clusters, and so its rows' columns,
+            // are in order, rather than asked of at every row, else all
+            // asked.
+            auto carets = mCarets.onLine(line);
+            if (laid.ordered)
+            {
+                const ALTextPos from(line, r == 0 ? 0 : row.begin);
+                const ALTextPos to(line, r + 1 == laid.rows.size() ? S32_MAX : row.end);
+                carets = touching(carets.first, carets.second, from, to, [](const ALTextRange& s) { return ALTextRange(s.end, s.end); });
+            }
+            for (auto it = carets.first; it != carets.second; ++it)
             {
                 caret(it->end);
             }
