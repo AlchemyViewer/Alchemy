@@ -1338,7 +1338,11 @@ void LLWindowSDL::maybeStopFlashIcon()
     if (mFlashing && mFlashTimer.hasExpired())
     {
         mFlashing = false;
-        if (mWindow)
+        // SDL's Wayland backend ignores the operation and sends every flash
+        // as an xdg-activation request, so a cancel there would ask for
+        // attention a second time. The compositor drops the request itself
+        // once the window is focused.
+        if (mWindow && mServerProtocol != Wayland)
             SDL_FlashWindow( mWindow, SDL_FLASH_CANCEL );
     }
 }
@@ -1814,12 +1818,7 @@ void LLWindowSDL::gatherInput()
 
     // This is a good time to stop flashing the icon if our mFlashTimer has
     // expired.
-    if (mFlashing && mFlashTimer.hasExpired())
-    {
-        if (mWindow)
-            SDL_FlashWindow(mWindow, SDL_FLASH_CANCEL);
-        mFlashing = false;
-    }
+    maybeStopFlashIcon();
 }
 
 SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
