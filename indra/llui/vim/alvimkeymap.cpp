@@ -2938,7 +2938,12 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
         m.to        = here;
         m.inclusive = true;
     }
-    if (!m.ok || !m.moved)
+    // h and l, and the word motions w W e E, that cannot move -- l or cw
+    // on an empty line, h at a line's start, w on the last line's end --
+    // leave the operator the empty stretch where they stay, as vim's do: c
+    // inserts there, y yanks nothing, d takes nothing, and none fails.
+    const bool stays = m.ok && (m_ch == 'h' || m_ch == 'l' || m_ch == ' ' || m_ch == 'w' || m_ch == 'W' || m_ch == 'e' || m_ch == 'E');
+    if (!m.ok || (!m.moved && !stays))
     {
         // A key that is no motion, or one that could not move: the
         // operator fails, and the key is taken all the same -- never left

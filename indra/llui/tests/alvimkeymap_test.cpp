@@ -4733,4 +4733,36 @@ namespace tut
         keys("u0f<%");
         ensure_equals("% from an angle bracket goes on to the round one after it", caretText(), std::string("0:1"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<165>()
+    {
+        set_test_name("an operator over h, l or a word motion that cannot move takes the empty stretch where it stays: c inserts there, y yanks nothing, d takes nothing, and none fails");
+        ALCodeEditor& e = make("ab\n\nc\n");
+        keys("yljclX<Esc>");
+        ensure_equals("cl on an empty line inserts there", flat(e.text()), std::string("ab|X|c|"));
+        ensure_equals("and keeps nothing", vim->registerText('"'), std::string("a"));
+
+        make("abc\n");
+        keys("chX<Esc>");
+        ensure_equals("ch at a line's start inserts there", flat(editor->text()), std::string("Xabc|"));
+
+        make("a\n");
+        keys("jcwX<Esc>");
+        ensure_equals("cw on the last line, empty", flat(editor->text()), std::string("a|X"));
+
+        make("a\n");
+        keys("yljceX<Esc>");
+        ensure_equals("ce there too", flat(editor->text()), std::string("a|X"));
+        ensure_equals("keeping the empty end it took, as C does", vim->registerText('"'), std::string());
+
+        make("abc\n");
+        keys("lyl0yh");
+        ensure_equals("yh at a line's start yanks nothing", vim->registerText('0'), std::string());
+
+        make("ab\n\nc\n");
+        editor->setCaret(ALTextPos(1, 0));
+        ex("normal dliQ");
+        ensure_equals("dl on an empty line takes nothing and does not fail: the keys after it run", flat(editor->text()), std::string("ab|Q|c|"));
+    }
 }
