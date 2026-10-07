@@ -59,6 +59,14 @@ void ALScriptMasterUpload::start(const ALMasterLink& link, ALMasterPlan::Send ki
     std::make_shared<ALScriptMasterUpload>(link, kind)->read();
 }
 
+// static
+void ALScriptMasterUpload::probe(const ALMasterLink& link, probed_t done)
+{
+    std::shared_ptr<ALScriptMasterUpload> probing = std::make_shared<ALScriptMasterUpload>(link, ALMasterPlan::Send::Derived);
+    probing->mProbed                              = std::move(done);
+    probing->read();
+}
+
 ALScriptMasterUpload::ALScriptMasterUpload(const ALMasterLink& link, ALMasterPlan::Send kind)
 : mLink(link), mUpdated(link), mKind(kind), mRef(link.object, link.item)
 {
@@ -166,7 +174,9 @@ void ALScriptMasterUpload::worldHas(const LLUUID& asset)
     // Moved in the world since the last send from the master: what it holds
     // read, to tell a real change from the same text gone up another way.
     mWorldMoved = asset.notNull() && mLink.base.notNull() && asset != mLink.base;
-    if (!mWorldMoved)
+    // A probe reads it whatever the base: what the world holds is what it
+    // is asked.
+    if (!mWorldMoved && !(mProbed && asset.notNull()))
     {
         decide();
         return;
@@ -180,6 +190,7 @@ void ALScriptMasterUpload::worldText(const ALScriptLoaded& loaded)
     if (loaded.error.empty())
     {
         mWorldText = loaded.text;
+        mWorldRead = true;
         mWorldSame = hashOfText(mWorldText, mTarget) == mOurs;
     }
     decide();
@@ -189,6 +200,20 @@ void ALScriptMasterUpload::decide()
 {
     static LLCachedControl<bool> skip_unchanged(gSavedSettings, "ALScriptMastersSkipUnchanged", true);
     const bool unchanged = !mLink.hash.empty() && mOurs == mLink.hash;
+    if (mProbed)
+    {
+        Probe found;
+        found.ref          = mRef;
+        found.itemName     = mName;
+        found.ours         = mOurs;
+        found.unchanged    = unchanged;
+        found.worldRead    = mWorldRead;
+        found.worldSame    = mWorldSame;
+        found.worldMoved   = mWorldMoved;
+        found.preprocessed = mPrepared.errors;
+        mProbed(found);
+        return;
+    }
     switch (ALMasterPlan::decide(mKind, mWorldMoved, mWorldSame, unchanged, skip_unchanged))
     {
         case ALMasterPlan::Do::Skip:
@@ -280,6 +305,17 @@ void ALScriptMasterUpload::uploaded(const ALScriptCompileResult& result)
 
 void ALScriptMasterUpload::end(Outcome::What what, const std::string& why, std::optional<ALScriptCompileResult> result)
 {
+    if (mProbed)
+    {
+        // A probe goes no further than finding why it could not go up.
+        Probe found;
+        found.ref      = mRef;
+        found.what     = what;
+        found.why      = why;
+        found.itemName = mName.empty() ? mLink.itemName : mName;
+        mProbed(found);
+        return;
+    }
     Outcome outcome;
     outcome.what         = what;
     outcome.ref          = mRef;

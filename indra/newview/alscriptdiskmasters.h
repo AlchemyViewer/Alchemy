@@ -103,6 +103,10 @@ public:
     std::optional<ALMasterLink> linkOf(const ALScriptRef& ref);
     std::vector<ALMasterLink>   mastering(const std::string& master);
     bool                        masters(const std::string& master) { return !mastering(master).empty(); }
+    // Every link, and those of the items in one object -- a null one the
+    // agent's own inventory -- in the order they were made.
+    std::vector<ALMasterLink> all();
+    std::vector<ALMasterLink> linksIn(const LLUUID& object);
     // A link made, or one replaced; and one let go of. Written out at once.
     void link(ALMasterLink link);
     void unlink(const ALScriptRef& ref);

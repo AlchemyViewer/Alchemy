@@ -27,9 +27,11 @@
 #include "alscriptdiskmasters.h"
 #include "alwatchedfile.h"
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 class LLInventoryItem;
 
@@ -55,6 +57,34 @@ public:
     typedef ALScriptDiskMasters::Outcome Outcome;
 
     static void start(const ALMasterLink& link, ALMasterPlan::Send kind);
+
+    // What a send would find, nothing sent: the master read and expanded as
+    // it would go up, and the world's text read and hashed beside it,
+    // whether or not it moved. Nothing is said, and the link is left as it
+    // is -- it need not be one yet: a file proposed for an item is probed
+    // through a link made up for it.
+    struct Probe
+    {
+        ALScriptRef ref;
+        // Where a send could not have gone up -- the master gone or not to
+        // be read, the item gone, out of reach or of the other language --
+        // what it would have come to, and why; Sent where it could.
+        Outcome::What what = Outcome::What::Sent;
+        std::string   why;
+        std::string   itemName;
+        // What would go up, hashed as the link keeps it; whether that is
+        // what went up last; whether the world's text was read, and holds
+        // it already; whether the world moved since the link's base.
+        std::string ours;
+        bool        unchanged  = false;
+        bool        worldRead  = false;
+        bool        worldSame  = false;
+        bool        worldMoved = false;
+        // What the preprocessor found.
+        std::vector<ALScriptDiagnostic> preprocessed;
+    };
+    typedef std::function<void(const Probe&)> probed_t;
+    static void probe(const ALMasterLink& link, probed_t done);
 
     ALScriptMasterUpload(const ALMasterLink& link, ALMasterPlan::Send kind);
 
@@ -85,4 +115,7 @@ private:
     bool               mWorldSame  = false;
     std::string        mWorldText;
     bool               mKeptTheirs = false;
+    bool               mWorldRead  = false;
+    // Told what was found, where this is a probe and sends nothing.
+    probed_t           mProbed;
 };

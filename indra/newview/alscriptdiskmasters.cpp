@@ -154,6 +154,28 @@ std::vector<ALMasterLink> ALScriptDiskMasters::mastering(const std::string& mast
     return out;
 }
 
+std::vector<ALMasterLink> ALScriptDiskMasters::all()
+{
+    ALMasterLinks* links_now = links();
+    return links_now ? links_now->all() : std::vector<ALMasterLink>();
+}
+
+std::vector<ALMasterLink> ALScriptDiskMasters::linksIn(const LLUUID& object)
+{
+    std::vector<ALMasterLink> out;
+    if (ALMasterLinks* links_now = links())
+    {
+        for (const ALMasterLink& one : links_now->all())
+        {
+            if (one.object == object)
+            {
+                out.push_back(one);
+            }
+        }
+    }
+    return out;
+}
+
 void ALScriptDiskMasters::link(ALMasterLink link)
 {
     if (ALMasterLinks* all = links())
