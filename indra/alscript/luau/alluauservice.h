@@ -39,6 +39,11 @@ namespace Luau
     struct FrontendCancellationToken;
 }
 
+class ALLuauCompletion;
+class ALLuauFragment;
+struct ALLuauFrontend;
+class ALLuauNavigation;
+
 // The SLua analyzer: Luau's front end from Second Life's fork, given the
 // grid's definitions and asked about one script at a time: what is wrong
 // with it, what could go at a position, what is at one, what a call there
@@ -90,6 +95,14 @@ public:
     static void cancel(const Stop& stop);
     void        setStop(Stop stop);
     bool        stopped() const;
+
+    // Whether a completion or signature help asked of a text changed since
+    // its last check is answered over the part that changed, checked alone
+    // against that check (ALLuauFragment), rather than after the whole
+    // script is checked again. Off until told; the whole script is still
+    // checked where there is no check to patch, or the fragment declines.
+    void setFragments(bool use);
+    bool fragments() const;
 
     // The documentation, as secondlife.docs.json has it: a map from a
     // symbol such as "@sl-slua/global/ll.Say" to its text and link.
@@ -152,17 +165,32 @@ public:
     // and type errors, then the lints, each in the order it was found.
     ALScriptProblems check(std::string_view source);
 
+    // What a fragment is checked against, made the text's where it is not:
+    // autocomplete's module under the old solver, which a check does not
+    // make; under the new, the check's own module is it, and nothing is
+    // done. For the analysis thread to do once a check has landed, so that
+    // the next keystroke's fragment starts from the text as it settled.
+    void warm(std::string_view source);
+
     // What could go at a position of the script: the keywords, the
-    // bindings in scope, the fields of what is being indexed.
+    // bindings in scope, the fields of what is being indexed; each with
+    // whether it fits there and where a call's brackets go
+    // (ALLuauCompletion). In no order: the editor ranks them. Over a
+    // fragment where setFragments says so, as is signature help.
     std::vector<ALScriptCompletion> complete(std::string_view source, S32 line, S32 column);
     // What is at a position: its name and type, its documentation, and
-    // where in the script it was bound.
+    // where it was bound: in the script, or for a field or a type, in a
+    // module it requires.
     ALScriptHover hover(std::string_view source, S32 line, S32 column);
     // The call a position is inside, if any.
     ALScriptSignature signature(std::string_view source, S32 line, S32 column);
-    // The name at a position -- a local, a global, a field of something
-    // -- with where the script binds it and every place it stands.
-    ALScriptReferences references(std::string_view source, S32 line, S32 column);
+    // The name at a position -- a local, a global, a field of something,
+    // a type -- with where it is declared and every place it stands: in
+    // the script, and for a field or a type, in the modules it requires
+    // too (ALLuauNavigation). Or at a position in a module the script
+    // requires, by its key: what a lookup through another script asks at
+    // a module's declaration.
+    ALScriptReferences references(std::string_view source, S32 line, S32 column, const std::string& module = std::string());
     // The script's own shape: what it binds at the top and the functions
     // in it, each function's own one deeper.
     std::vector<ALScriptOutlineEntry> outline(std::string_view source);
@@ -195,12 +223,22 @@ public:
     // script is strict, or under the new solver -- in whatever order they
     // come. For the test that says so.
     size_t typeChecks() const;
+    // How many questions were answered over a fragment instead, for the
+    // test that says a question asked as the script is typed checks
+    // nothing whole.
+    size_t fragmentsChecked() const;
     // How many modules the front end has checked, the script's and those it
     // requires alike, since it was built: for the test that says a module
     // unchanged is not checked again.
     size_t modulesChecked() const;
 
 private:
-    struct Impl;
-    std::unique_ptr<Impl> mImpl;
+    // What is kept between questions (alluaufrontend.h), whose Luau
+    // headers stay out of this one; the fragment the questions asked as a
+    // script is typed are answered over; and what answers over them in
+    // classes of their own: completion, and where names are bound and used.
+    std::unique_ptr<ALLuauFrontend>   mFrontend;
+    std::unique_ptr<ALLuauFragment>   mFragment;
+    std::unique_ptr<ALLuauCompletion> mCompletion;
+    std::unique_ptr<ALLuauNavigation> mNavigation;
 };

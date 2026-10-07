@@ -111,6 +111,7 @@ namespace
             case Kind::Actions:    return "actions";
             case Kind::Weigh:      return "weigh";
             case Kind::Shape:      return "shape";
+            case Kind::Warm:       return "warm";
         }
         return "?";
     }
@@ -1386,5 +1387,53 @@ namespace tut
         ensure_equals("put right", doc.editor->document().line(1), std::string("if #t ~= 0 then print(1) end"));
         ensure("Apply again: nothing waiting, and said", !checking.applyPreviewed(doc) && services.statuses.back() == "FixAllNotPreviewed" &&
                                                             services.statusFailures.back());
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<25>()
+    {
+        set_test_name("a fix that moves a require onto a SLua alias of the studio's own names the folder once its edit is sure to take, and is refused with nothing changed where the name is another folder's");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        std::vector<std::string> named;
+        bool                     free = true;
+        viewer.slots.nameStudioAlias = [&named, &free](const std::string& name, const std::string& folder) {
+            named.push_back(name + "=" + folder);
+            return free;
+        };
+        ALScriptFix moved = fix("Name /inc as the SLua alias @inc, and require it as '@inc/util'", 0, 8, 13, "total", false);
+        moved.key         = "ScriptFixRequireAlias";
+        moved.args        = { "@inc/util", "inc", "/inc" };
+        ensure("made", checking.applyFix(doc, moved, version(doc)));
+        ensure("the folder named", named == std::vector<std::string>{ "inc=/inc" });
+        ensure_equals("and the text", doc.editor->document().line(0), std::string("integer total;"));
+        ALScriptFix taken = fix("Name /lib as the SLua alias @inc, and require it as '@inc/util'", 0, 8, 13, "other", false);
+        taken.key         = "ScriptFixRequireAlias";
+        taken.args        = { "@inc/util", "inc", "/lib" };
+        // An edit that would not take names nothing: in a text that may not
+        // change, or that it would take past its limit.
+        named.clear();
+        doc.editor->setReadOnly(true);
+        ensure("not made", !checking.applyFix(doc, taken, version(doc)));
+        ensure("and nothing named", named.empty());
+        doc.editor->setReadOnly(false);
+        ALScriptFix longer   = taken;
+        longer.edits[0].text = "a_name_longer_than_the_text_has_room_for";
+        doc.editor->setMaxBytes(doc.editor->document().byteCount());
+        ensure("past the limit: not made", !checking.applyFix(doc, longer, version(doc)));
+        ensure("nor named", named.empty());
+        doc.editor->setMaxBytes(0);
+        free             = false;
+        const U32 was_at = version(doc);
+        ensure("the name another folder's: refused", !checking.applyFix(doc, taken, version(doc)));
+        ensure("asked", named == std::vector<std::string>{ "inc=/lib" });
+        ensure("said", services.statuses.back().find("AliasTaken [NAME]=inc") == 0 && services.statusFailures.back());
+        ensure("nothing changed", version(doc) == was_at && doc.editor->document().line(0) == "integer total;");
+        ensure("nothing to redo", !doc.editor->undoJournal().canRedo());
+        ALScriptFix plain = fix("Require it as './util'", 0, 8, 13, "sum", false);
+        plain.key         = "ScriptFixRequireAs";
+        plain.args        = { "./util" };
+        named.clear();
+        ensure("a plain one names nothing", checking.applyFix(doc, plain, version(doc)) && named.empty());
     }
 }

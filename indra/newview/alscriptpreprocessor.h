@@ -33,6 +33,7 @@
 #include "alscripttextcache.h"
 #include "alluauconfig.h"
 #include "alpreprocessor.h"
+#include "alrequirenavigation.h"
 #include "alscripttypes.h"
 #include "llinventorymodel.h"
 #include "llsingleton.h"
@@ -151,8 +152,27 @@ public:
     bool configOf(const Request& request, ALLuauConfig& out, const ALLuauConfig* base = nullptr);
     // The folders an include is looked for in on disk, in order, as the
     // setting holds them one to a line; and them put back.
+    // What could follow a path typed in a string that names a file -- a
+    // require's, by its rules, or an include's, by its search -- as the
+    // places stand now (ALIncludeSearch::suggest).
+    std::vector<ALRequireNavigation::Suggestion> suggestPaths(const Request& request, const std::string& typed, bool require);
     static std::vector<std::string> includeFolders();
     static void                     setIncludeFolders(const std::vector<std::string>& folders);
+    // The SLua aliases the studio names (LA22): each name as a require
+    // says it after the @ (ALLuauConfig::studioAliasName), and the folder
+    // on disk it stands for -- or an inventory folder, `folder:<id>`, read
+    // only while world includes are on -- in order, as the setting holds
+    // them one to a line; and them put back.
+    struct StudioAlias
+    {
+        std::string name;
+        std::string folder;
+    };
+    // An inventory folder as a studio alias's folder names it, and back.
+    static std::string inventoryAliasFolder(const LLUUID& folder);
+    static bool        inventoryAliasFolder(const std::string& folder, LLUUID& out);
+    static std::vector<StudioAlias> studioAliases();
+    static void                     setStudioAliases(const std::vector<StudioAlias>& aliases);
     // The configuration fetched where it is in the world and not in hand,
     // and `fetched` called once it is; nothing where it is in hand, or
     // there is none.
@@ -222,6 +242,11 @@ private:
     // `check` is an expansion for the analyzers, which gives way to a run.
     void                    start(const Request& request, callback_t callback, bool fresh, bool check = false);
     void                    attemptJob(const std::shared_ptr<Job>& job);
+    // Whether a check is stood in for by a later check of the same script,
+    // started since and not answered yet: its answers handed on to that
+    // one, which answers them with its own result, as the worker's lane
+    // hands on one still waiting there.
+    bool                    handedOn(const std::shared_ptr<Job>& job);
     // What the worker made of a job, back on the main thread: another
     // round where the run asked for an include nobody had looked up
     // yet, else the optimizer and then the answer.
@@ -244,7 +269,9 @@ private:
     // What waits for the worker, on the worker's side.
     std::shared_ptr<ALScriptJobLane<Job>> mLane = std::make_shared<ALScriptJobLane<Job>>();
     // An include by its identity, loaded into the cache -- or noted as
-    // failed -- and `done` called either way.
+    // failed -- and `done` called either way. Or an inventory folder a
+    // require walks into, by the name an alias gives one, waited for
+    // until its contents are in or it has had long enough.
     void                    fetch(const std::string& path, std::function<void()> done);
 
     // The texts fetched, and what failed to come; and what an include or
@@ -257,6 +284,10 @@ private:
     // every script between one keystroke and the next -- is expanded in
     // one round rather than one round for each level of include.
     boost::unordered_flat_map<std::string, std::vector<ALPreprocessor::Ask>, ll::string_hash, std::equal_to<>> mAsked;
+    // The newest check of each script, by its identity (handedOn).
+    boost::unordered_flat_map<std::string, std::weak_ptr<Job>, ll::string_hash, std::equal_to<>> mNewestCheck;
+    // What waits on each inventory folder being fetched (fetch).
+    boost::unordered_flat_map<LLUUID, std::vector<std::function<void()>>> mFoldersWaiting;
     // Where a run happens: one thread, so that two scripts saved at
     // once are expanded one after another rather than fighting over the
     // builtins. Closed at cleanup, or as the viewer starts to quit, and

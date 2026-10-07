@@ -28,12 +28,17 @@
 
 #include "alpanelist.h"
 #include "alrecoverystore.h"
+#include "llbutton.h"
 #include "llfloater.h"
 #include "llpanel.h"
 #include "llscrolllistitem.h"
 #include "lltextbox.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
+
 #include <map>
+#include <numeric>
 #include <tuple>
 
 namespace
@@ -55,6 +60,35 @@ namespace
         PART_CHANGE,
         PART_LINE
     };
+    enum StringColumn : S32
+    {
+        STRING_TEXT,
+        STRING_BYTES,
+        STRING_USES,
+        STRING_CHANGE,
+        STRING_LINE
+    };
+    // How many of a shared start's strings its tip names.
+    constexpr size_t STRINGS_NAMED = 6;
+
+    // A string as a row shows it: quoted, on one line, its start where it
+    // is long, never cut inside a character.
+    std::string shownText(std::string_view text)
+    {
+        constexpr size_t SHOWN = 48;
+        size_t           cut   = std::min(text.size(), SHOWN);
+        while (cut > 0 && cut < text.size() && (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80)
+        {
+            --cut;
+        }
+        std::string out = "\"";
+        for (size_t i = 0; i < cut; ++i)
+        {
+            const char c = text[i];
+            out += c == '\n' ? std::string("\\n") : c == '\t' ? std::string("\\t") : c == '\r' ? std::string("\\r") : std::string(1, c);
+        }
+        return out + (cut < text.size() ? "\xE2\x80\xA6\"" : "\"");
+    }
 
     // What a part is across two weighings of the same script: which part
     // it is, not where it is, which an edit above it moves -- and, among
@@ -93,8 +127,21 @@ bool ALScriptWeightsPane::postBuild()
         mStrings = window;
     }
     mHead    = getChild<LLTextBox>("weights_head");
-    mTargets = getChild<ALPaneList>("weights_targets");
-    mParts   = getChild<ALPaneList>("weights_parts");
+    mTargets      = getChild<ALPaneList>("weights_targets");
+    mParts        = getChild<ALPaneList>("weights_parts");
+    mStringsPanel = getChild<LLView>("weights_strings_panel");
+    mStringsList  = getChild<ALPaneList>("weights_strings");
+    mStringsList->setComparison([this](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) { return compareStrings(column, a, b); });
+    mKeepStart = getChild<LLButton>("weights_keep_start");
+    mKeepStart->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        if (const StringRow* start = chosenStart(); start && mKeepStartCall && (!mCanKeepStart || mCanKeepStart()))
+        {
+            // Copied: what the window does may refill the list.
+            const std::string              text    = start->text;
+            const std::vector<std::string> strings = start->strings;
+            mKeepStartCall(text, strings);
+        }
+    });
     // A target chosen shows its parts; the script's own until then.
     mTargets->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         if (LLScrollListItem* item = mTargets->getFirstSelected())
@@ -154,8 +201,11 @@ void ALScriptWeightsPane::showNothing(const std::string& why)
 {
     mShown = Shown();
     mRows.clear();
+    mStringRows.clear();
     mTargets->deleteAllItems();
     mParts->deleteAllItems();
+    mStringsList->deleteAllItems();
+    mStringsPanel->setVisible(false);
     mHead->setText(why);
     mHead->setToolTip(std::string());
 }
@@ -275,6 +325,7 @@ void ALScriptWeightsPane::fillParts()
     mParts->deleteAllItems();
     mRows.clear();
     const ALScriptWeight* weight = chosen();
+    fillStrings();
     if (!weight)
     {
         mHead->setText(std::string());
@@ -470,41 +521,311 @@ std::string ALScriptWeightsPane::kindName(ALScriptWeight::Part::Kind kind) const
 
 std::string ALScriptWeightsPane::where(const ALScriptWeight::Part& part) const
 {
-    if (part.line < 0)
+    return whereAt(part.file, part.line);
+}
+
+std::string ALScriptWeightsPane::whereAt(const std::string& file, S32 line) const
+{
+    if (line < 0)
     {
         return std::string();
     }
-    if (part.file.empty())
+    if (file.empty())
     {
-        return std::to_string(part.line + 1);
+        return std::to_string(line + 1);
     }
-    const auto named = mShown.fileNames.find(part.file);
-    return llformat("%s:%d", named != mShown.fileNames.end() ? named->second.c_str() : part.file.c_str(), part.line + 1);
+    const auto named = mShown.fileNames.find(file);
+    return llformat("%s:%d", named != mShown.fileNames.end() ? named->second.c_str() : file.c_str(), line + 1);
 }
 
-std::optional<ALScriptWeightsPane::Place> ALScriptWeightsPane::chosenPlace() const
+std::optional<ALScriptWeightsPane::Place> ALScriptWeightsPane::chosenPlace(const ALPaneList* list) const
 {
-    const LLScrollListItem* item = mParts->getFirstSelected();
+    const LLScrollListItem* item = list ? list->getFirstSelected() : nullptr;
     if (!item)
     {
         return std::nullopt;
     }
-    const S32 index = item->getValue().asInteger();
-    if (index < 0 || static_cast<size_t>(index) >= mRows.size() || mRows[static_cast<size_t>(index)].part.line < 0)
+    const size_t index = static_cast<size_t>(std::max(0, item->getValue().asInteger()));
+    Place        place;
+    if (list == mStringsList && index < mStringRows.size())
+    {
+        place.file = mStringRows[index].file;
+        place.line = mStringRows[index].line;
+    }
+    else if (list == mParts && index < mRows.size())
+    {
+        place.file   = mRows[index].part.file;
+        place.line   = mRows[index].part.line;
+        place.column = std::max(0, mRows[index].part.column);
+    }
+    else
     {
         return std::nullopt;
     }
-    const ALScriptWeight::Part& part = mRows[static_cast<size_t>(index)].part;
-    Place                       place;
-    place.file   = part.file;
-    place.line   = part.line;
-    place.column = std::max(0, part.column);
-    if (!part.file.empty())
+    if (place.line < 0)
     {
-        const auto named = mShown.fileNames.find(part.file);
-        place.fileName   = named != mShown.fileNames.end() ? named->second : part.file;
+        return std::nullopt;
+    }
+    if (!place.file.empty())
+    {
+        const auto named = mShown.fileNames.find(place.file);
+        place.fileName   = named != mShown.fileNames.end() ? named->second : place.file;
     }
     return place;
+}
+
+void ALScriptWeightsPane::fillStrings()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    const S32 scrolled = mStringsList->getScrollPos();
+    // What was chosen, by what it is, since the rows are made afresh.
+    std::optional<std::pair<bool, std::string>> held;
+    if (const LLScrollListItem* item = mStringsList->getFirstSelected())
+    {
+        const size_t was = static_cast<size_t>(std::max(0, item->getValue().asInteger()));
+        if (was < mStringRows.size())
+        {
+            held = std::make_pair(mStringRows[was].start, mStringRows[was].text);
+        }
+    }
+    mStringsList->deleteAllItems();
+    mStringRows.clear();
+    // A Luau target's table of strings; no other target has one.
+    const ALScriptWeight* weight = chosen();
+    const bool            luau   = weight && weight->compiled &&
+                          (weight->target == ALScriptWeight::Target::SLua || weight->target == ALScriptWeight::Target::LSLLuau);
+    mStringsPanel->setVisible(luau);
+    if (!luau)
+    {
+        return;
+    }
+    // What was weighed as the text was last saved, by text.
+    const ALScriptWeight*                                                                    saved = savedFor(weight->target);
+    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>                 saved_strings;
+    boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>>         saved_starts;
+    if (saved)
+    {
+        for (const ALScriptWeight::String& one : saved->strings)
+        {
+            saved_strings.insert(one.text);
+        }
+        for (const ALScriptWeight::SharedStart& one : saved->sharedStarts)
+        {
+            saved_starts.emplace(one.start, one.saved);
+        }
+    }
+    // Which start each string shares, by its place in the weight's.
+    boost::unordered_flat_map<size_t, size_t> start_of;
+    for (size_t i = 0; i < weight->sharedStarts.size(); ++i)
+    {
+        for (const size_t s : weight->sharedStarts[i].strings)
+        {
+            start_of.emplace(s, i);
+        }
+    }
+    S32        select = -1;
+    const auto add    = [&](StringRow one, const std::string& uses, const std::string& tip, bool italic) {
+        const S32 index = static_cast<S32>(mStringRows.size());
+        if (held && held->first == one.start && held->second == one.text)
+        {
+            select = index;
+        }
+        LLSD row;
+        row["value"]                            = index;
+        row["columns"][STRING_TEXT]["column"]   = "string";
+        row["columns"][STRING_TEXT]["value"]    = one.name;
+        row["columns"][STRING_BYTES]["column"]  = "bytes";
+        row["columns"][STRING_BYTES]["value"]   = one.start ? mStrings->getString("WeightsSaves", { { "[BYTES]", std::to_string(-one.bytes) } })
+                                                            : std::to_string(one.bytes);
+        row["columns"][STRING_USES]["column"]   = "uses";
+        row["columns"][STRING_USES]["value"]    = uses;
+        row["columns"][STRING_CHANGE]["column"] = "change";
+        row["columns"][STRING_CHANGE]["value"]  = changeText(one.change, one.fresh);
+        row["columns"][STRING_LINE]["column"]   = "line";
+        row["columns"][STRING_LINE]["value"]    = whereAt(one.file, one.line);
+        for (S32 c = STRING_TEXT; c <= STRING_LINE; ++c)
+        {
+            row["columns"][c]["tool_tip"] = tip;
+            if (italic)
+            {
+                row["columns"][c]["font"]["style"] = "ITALIC";
+            }
+        }
+        mStringRows.push_back(std::move(one));
+        mStringsList->addElement(row);
+    };
+    // The starts several strings share first, best first: each at the
+    // first of its strings, the script's own before an include's.
+    for (size_t i = 0; i < weight->sharedStarts.size(); ++i)
+    {
+        const ALScriptWeight::SharedStart& shared = weight->sharedStarts[i];
+        StringRow                          one;
+        one.start = true;
+        one.index = i;
+        one.text  = shared.start;
+        one.bytes = -static_cast<S64>(shared.saved);
+        for (const size_t s : shared.strings)
+        {
+            if (s >= weight->strings.size())
+            {
+                continue;
+            }
+            const ALScriptWeight::String& with = weight->strings[s];
+            one.uses += with.loads;
+            const bool earlier = with.line >= 0 && (one.line < 0 || std::make_pair(!with.file.empty(), with.line) < std::make_pair(!one.file.empty(), one.line));
+            if (earlier)
+            {
+                one.line = with.line;
+                one.file = with.file;
+            }
+        }
+        // How it moved as its bytes are said, as less: a saving grown since
+        // is a change down, as a part grown lighter is.
+        if (saved)
+        {
+            const auto before = saved_starts.find(shared.start);
+            one.fresh         = before == saved_starts.end();
+            if (!one.fresh)
+            {
+                one.change = S64(before->second) - S64(shared.saved);
+            }
+        }
+        // Its strings, named in its tip: the first few, and how many more.
+        std::string named;
+        for (const size_t s : shared.strings)
+        {
+            if (s >= weight->strings.size())
+            {
+                continue;
+            }
+            one.strings.push_back(weight->strings[s].text);
+            if (one.strings.size() <= STRINGS_NAMED)
+            {
+                named = named.empty() ? shownText(weight->strings[s].text)
+                                      : mStrings->getString("JoinList", { { "[FIRST]", named }, { "[SECOND]", shownText(weight->strings[s].text) } });
+            }
+        }
+        if (one.strings.size() > STRINGS_NAMED)
+        {
+            named = mStrings->getString("WeightsSharedStartMore",
+                                        { { "[STRINGS]", named }, { "[COUNT]", std::to_string(one.strings.size() - STRINGS_NAMED) } });
+        }
+        LLStringUtil::format_map_t args;
+        args["[START]"]  = shownText(shared.start);
+        args["[COUNT]"]  = std::to_string(shared.strings.size());
+        args["[LENGTH]"] = std::to_string(shared.start.size());
+        args["[SAVED]"]  = std::to_string(shared.saved);
+        one.name         = mStrings->getString("WeightsSharedStart", args);
+        const std::string uses = std::to_string(one.uses);
+        const std::string tip  = mStrings->getString("JoinSentences", { { "[FIRST]", mStrings->getString("WeightsSharedStartTip", args) },
+                                                                        { "[SECOND]", mStrings->getString("WeightsSharedStartStrings", { { "[STRINGS]", named } }) } });
+        add(std::move(one), uses, tip, true);
+    }
+    // Then each string, the heaviest first.
+    std::vector<size_t> order(weight->strings.size());
+    std::iota(order.begin(), order.end(), size_t(0));
+    std::stable_sort(order.begin(), order.end(), [weight](size_t a, size_t b) { return weight->strings[a].bytes > weight->strings[b].bytes; });
+    for (const size_t s : order)
+    {
+        const ALScriptWeight::String& string = weight->strings[s];
+        StringRow                     one;
+        one.index = s;
+        one.text  = string.text;
+        one.name  = shownText(string.text);
+        one.bytes = static_cast<S64>(string.bytes);
+        one.uses  = string.uses;
+        one.line  = string.line;
+        one.file  = string.file;
+        one.fresh = saved && !saved_strings.contains(string.text);
+        LLStringUtil::format_map_t args;
+        args["[BYTES]"] = std::to_string(string.bytes);
+        args["[USES]"]  = std::to_string(string.uses);
+        args["[LOADS]"] = std::to_string(string.loads);
+        std::string tip = mStrings->getString(string.name && string.uses == 0 ? "WeightsStringNameTip" : "WeightsStringTip", args);
+        // Where it shares a start, which.
+        if (const auto shares = start_of.find(s); shares != start_of.end())
+        {
+            const ALScriptWeight::SharedStart& shared = weight->sharedStarts[shares->second];
+            tip = mStrings->getString("JoinSentences",
+                                      { { "[FIRST]", tip },
+                                        { "[SECOND]", mStrings->getString("WeightsStringShares", { { "[START]", shownText(shared.start) },
+                                                                                                   { "[COUNT]", std::to_string(shared.strings.size() - 1) } }) } });
+        }
+        add(std::move(one), string.name && string.uses == 0 ? mStrings->getString("WeightsStringName") : std::to_string(string.uses), tip, false);
+    }
+    mStringsList->updateSort();
+    if (select >= 0)
+    {
+        mStringsList->selectByValue(LLSD(select));
+    }
+    mStringsList->setScrollPos(scrolled);
+}
+
+const ALScriptWeightsPane::StringRow* ALScriptWeightsPane::chosenStart() const
+{
+    const ALScriptWeight*   weight = chosen();
+    const LLScrollListItem* item   = mStringsList->getFirstSelected();
+    if (!weight || weight->target != ALScriptWeight::Target::SLua || !item)
+    {
+        return nullptr;
+    }
+    const size_t index = static_cast<size_t>(std::max(0, item->getValue().asInteger()));
+    return index < mStringRows.size() && mStringRows[index].start ? &mStringRows[index] : nullptr;
+}
+
+void ALScriptWeightsPane::draw()
+{
+    // What can be kept once is what is chosen, which a click or a key may
+    // change at any time, in a script that can be written to: asked as it
+    // is drawn.
+    mKeepStart->setEnabled(mKeepStartCall && chosenStart() && (!mCanKeepStart || mCanKeepStart()));
+    LLPanel::draw();
+}
+
+S32 ALScriptWeightsPane::compareStrings(S32 column, const LLScrollListItem* a, const LLScrollListItem* b) const
+{
+    const size_t i = static_cast<size_t>(a->getValue().asInteger());
+    const size_t j = static_cast<size_t>(b->getValue().asInteger());
+    if (i >= mStringRows.size() || j >= mStringRows.size())
+    {
+        return 0;
+    }
+    const StringRow& x     = mStringRows[i];
+    const StringRow& y     = mStringRows[j];
+    const auto       order = [](S64 p, S64 q) { return p < q ? -1 : p > q ? 1 : 0; };
+    // The shared starts together, whichever column.
+    S32 said = order(!x.start, !y.start);
+    if (said != 0)
+    {
+        return said;
+    }
+    switch (column)
+    {
+        case STRING_TEXT:
+            said = LLStringUtil::compareDict(x.text, y.text);
+            break;
+        case STRING_BYTES:
+            said = order(x.bytes, y.bytes);
+            break;
+        case STRING_USES:
+            said = order(S64(x.uses), S64(y.uses));
+            break;
+        case STRING_CHANGE:
+            // One new since the save moved by all its bytes as they are
+            // said: a string by its own, a start by what it saves, as less.
+            said = order(x.fresh ? x.bytes : x.change.value_or(0), y.fresh ? y.bytes : y.change.value_or(0));
+            break;
+        case STRING_LINE:
+            said = order(x.line < 0, y.line < 0);
+            if (said == 0)
+            {
+                said = x.file != y.file ? LLStringUtil::compareDict(x.file, y.file) : order(x.line, y.line);
+            }
+            break;
+        default:
+            break;
+    }
+    return said != 0 ? said : order(S64(i), S64(j));
 }
 
 S32 ALScriptWeightsPane::compare(S32 column, const LLScrollListItem* a, const LLScrollListItem* b) const

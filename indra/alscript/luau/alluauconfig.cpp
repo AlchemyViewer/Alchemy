@@ -278,23 +278,51 @@ bool ALLuauConfig::parseChain(const std::vector<std::string_view>& nearest_first
 }
 
 // static
-std::optional<size_t> ALLuauConfig::aliasIn(const std::vector<std::string_view>& nearest_first, const std::string& alias, std::string& value)
+bool ALLuauConfig::reservedAlias(std::string_view name)
 {
-    for (size_t i = 0; i < nearest_first.size(); ++i)
+    std::string lower(name);
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lower == "self" || lower.compare(0, 3, "sl-") == 0;
+}
+
+// static
+bool ALLuauConfig::studioAliasName(std::string_view name)
+{
+    std::string lower(name);
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (lower.empty() || reservedAlias(lower) || !Luau::isValidAlias(lower) || lower.front() == '@')
     {
-        ALLuauConfig one;
-        std::string  error;
-        if (!parse(nearest_first[i], one, error))
-        {
-            continue;
-        }
-        if (const auto found = one.aliases.find(alias); found != one.aliases.end())
-        {
-            value = found->second;
-            return i;
-        }
+        return false;
     }
-    return std::nullopt;
+    return true;
+}
+
+// static
+std::string ALLuauConfig::studioAliasFor(std::string_view folder_name, const std::vector<std::string>& taken)
+{
+    std::string name;
+    for (const char c : folder_name)
+    {
+        const bool kept = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.';
+        name += kept ? static_cast<char>(std::tolower(static_cast<unsigned char>(c))) : '-';
+    }
+    if (!studioAliasName(name))
+    {
+        name = "lib";
+    }
+    const auto is_taken = [&taken](const std::string& one) {
+        return std::any_of(taken.begin(), taken.end(), [&one](const std::string& other) {
+            return other.size() == one.size() && std::equal(other.begin(), other.end(), one.begin(), [](char a, char b) {
+                       return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+                   });
+        });
+    };
+    std::string out = name;
+    for (int count = 2; is_taken(out); ++count)
+    {
+        out = name + std::to_string(count);
+    }
+    return out;
 }
 
 // static

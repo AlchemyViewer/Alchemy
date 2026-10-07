@@ -2798,4 +2798,314 @@ namespace tut
         ensure_equals("no gutter", e.gutterWidth(), 0);
         ensure_equals("no bar", e.changeBarAt(e.leftEdge() + 1, rowY(1)), -1);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<78>()
+    {
+        set_test_name("a completion's brackets go where whoever answered says: none, after an empty pair, or between them; else as its kind reads");
+        ALCodeEditor&          e        = make("", "lsl");
+        ALCompletion::Brackets brackets = ALCompletion::Brackets::Guess;
+        e.setCompletionProvider([&brackets](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+            ALCodeEditor::Completion c;
+            c.text     = "handler";
+            c.detail   = "handler(integer n)";
+            c.kind     = ALSyntaxKind::Function;
+            c.brackets = brackets;
+            if (ALCodeEditor::matchTier(c.text, prefix) >= 0)
+            {
+                out.push_back(c);
+            }
+        });
+        std::vector<ALTextPos> asks;
+        e.setSignatureRequest([&](const ALTextPos& caret) { asks.push_back(caret); });
+        const auto take = [&](ALCompletion::Brackets said) {
+            brackets = said;
+            e.setText("");
+            asks.clear();
+            type("hand");
+            ensure("offered", e.completionOpen());
+            key(KEY_TAB);
+            return e.text();
+        };
+        ensure_equals("guessed: a function is called, its parameter to fill", take(ALCompletion::Brackets::Guess), std::string("handler(n)"));
+        ensure_equals("none: passed as it is", take(ALCompletion::Brackets::None), std::string("handler"));
+        ensure("and no signature asked", asks.empty());
+        ensure_equals("after: an empty pair", take(ALCompletion::Brackets::After), std::string("handler()"));
+        ensure("the caret after it, and no signature asked", e.caret() == ALTextPos(0, 9) && asks.empty());
+        ensure_equals("inside: its parameter to fill", take(ALCompletion::Brackets::Inside), std::string("handler(n)"));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<79>()
+    {
+        set_test_name("a comment the grammar says completes, as SLua's --! does, opens the list on its own; any other comment does not");
+        ALCodeEditor& e = make("", "slua");
+        e.setCompletionProvider([](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+            for (const char* word : { "strict", "nonstrict" })
+            {
+                if (ALCodeEditor::matchTier(word, prefix) >= 0)
+                {
+                    ALCodeEditor::Completion c;
+                    c.text = word;
+                    c.kind = ALSyntaxKind::Keyword;
+                    out.push_back(c);
+                }
+            }
+        });
+        type("--!st");
+        ensure("open after --!", e.completionOpen() && e.completions()[0].text == "strict");
+        key(KEY_TAB);
+        ensure_equals("taken", e.text(), std::string("--!strict"));
+        e.setText("");
+        type("-- st");
+        ensure("not in a comment that says nothing of how the script is checked", !e.completionOpen());
+        e.setText("");
+        type("x = 1 --!st");
+        ensure("nor after code on its line", !e.completionOpen());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<80>()
+    {
+        set_test_name("in a string that names a file the list opens at its quote and after each slash, narrows on the name typed, and puts a path or a folder in place");
+        ALCodeEditor&            e = make("", "slua");
+        std::vector<std::string> asked;
+        e.setPathProvider([&asked](const ALTextPos&, std::string_view path, std::vector<ALCodeEditor::Completion>& out) {
+            asked.emplace_back(path);
+            const auto add = [&out](const char* text, const char* whole, bool folder) {
+                ALCodeEditor::Completion c;
+                c.text   = text;
+                c.path   = whole;
+                c.folder = folder;
+                c.kind   = ALSyntaxKind::Namespace;
+                out.push_back(c);
+            };
+            if (path.rfind("lib/", 0) == 0)
+            {
+                add("util", "./lib/util", false);
+                add("net", "", true);
+            }
+            else
+            {
+                add("lib", "", true);
+                add("main", "./main", false);
+                add("quoted", "./a\\\"b", false);
+            }
+        });
+        std::vector<std::string> requested;
+        e.setPathRequest([&requested](const ALTextPos&, std::string_view path) { requested.emplace_back(path); });
+        e.setAutoClose(true);
+        type("require(\"");
+        ensure_equals("the quote closed for it", e.text(), std::string("require(\"\")"));
+        ensure("open at the quote, asked of nothing yet", e.completionOpen() && e.completions().size() == 3 && asked.back().empty());
+        type("li");
+        ensure("narrowed to the folder", e.completions().size() == 1 && e.completions()[0].text == "lib");
+        key(KEY_TAB);
+        ensure_equals("the folder, and a slash after it", e.text(), std::string("require(\"lib/\")"));
+        ensure("the list again, for what is in it", e.completionOpen() && asked.back() == "lib/");
+        ensure("the request too of the whole path typed, not of the name after its slash", !requested.empty() && requested.back() == "lib/");
+        type("ut");
+        ensure_equals("narrowed in the folder", e.completions()[0].text, std::string("util"));
+        key(KEY_TAB);
+        ensure_equals("the whole path in place, the quote kept", e.text(), std::string("require(\"./lib/util\")"));
+        ensure("and the list gone", !e.completionOpen());
+
+        e.setText("");
+        type("require(\"qu");
+        key(KEY_TAB);
+        ensure_equals("a path given escaped stays escaped", e.text(), std::string("require(\"./a\\\"b\")"));
+
+        e.setText("");
+        type("print(\"li");
+        ensure("not in a string that names nothing", !e.completionOpen());
+
+        e.setText("");
+        type("--#include \"m");
+        ensure("an include's name too", e.completionOpen() && e.completions()[0].text == "main");
+        key(KEY_ESCAPE);
+
+        // The opening quote taken back: the list goes with the string,
+        // rather than become one of every word.
+        e.setText("");
+        type("require(\"");
+        ensure("open at the quote", e.completionOpen());
+        key(KEY_BACKSPACE);
+        ensure_equals("the pair taken", e.text(), std::string("require()"));
+        ensure("and the list with it", !e.completionOpen());
+
+        // Not closed: the path runs to the line's end, and what was typed of
+        // it is put in place, the quote closed after it.
+        e.setAutoClose(false);
+        e.setText("");
+        type("require(\"ma");
+        ensure("open in a string not closed", e.completionOpen() && e.completions()[0].text == "main");
+        key(KEY_TAB);
+        ensure_equals("the path in place, closed", e.text(), std::string("require(\"./main\""));
+        ensure("past its quote", e.caret() == ALTextPos(0, 16));
+        // What follows the caret there is the script's, not the string's.
+        e.setText("local m = require(, 1)");
+        e.setCaret(ALTextPos(0, 18));
+        type("\"ma");
+        ensure("open before what follows", e.completionOpen() && e.completions()[0].text == "main");
+        key(KEY_TAB);
+        ensure_equals("what follows kept", e.text(), std::string("local m = require(\"./main\", 1)"));
+        // A folder put in so: the quote closed after its slash, the caret
+        // inside it for the list again.
+        e.setText("");
+        type("require(\"li");
+        key(KEY_TAB);
+        ensure_equals("the folder, closed", e.text(), std::string("require(\"lib/\""));
+        ensure("inside the quote, the list open again", e.caret() == ALTextPos(0, 13) && e.completionOpen() && asked.back() == "lib/");
+        // Its closing quote typed: the list goes, and nobody is asked for
+        // the words past it.
+        e.setText("");
+        type("require(\"ma");
+        size_t words_asked = 0;
+        e.setCompletionRequest([&words_asked](const ALTextPos&, std::string_view) { ++words_asked; });
+        type("\"");
+        ensure("closed with the string, the words not asked for", !e.completionOpen() && words_asked == 0);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<81>()
+    {
+        set_test_name("in any other string the host names something for, the list opens at its quote, narrows on all the string holds, and puts what was named in place whole; elsewhere a string is prose");
+        ALCodeEditor&            e = make("");
+        std::vector<std::string> asked;
+        e.setStringProvider([&e, &asked](const ALTextPos& at, std::string_view typed, std::vector<ALCodeEditor::Completion>& out) {
+            asked.emplace_back(typed);
+            // The host's own rule: a sound's name, in llPlaySound's string.
+            if (e.document().line(at.line).find("llPlaySound(") == std::string::npos)
+            {
+                return;
+            }
+            for (const char* name : { "Door Open", "Door Close", "Say \"hi\"" })
+            {
+                ALCodeEditor::Completion c;
+                c.text = name;
+                for (const char ch : std::string_view(name))
+                {
+                    c.path += ch == '"' || ch == '\\' ? std::string("\\") + ch : std::string(1, ch);
+                }
+                c.kind = ALSyntaxKind::Constant;
+                out.push_back(c);
+            }
+        });
+        e.setAutoClose(true);
+        type("llPlaySound(\"");
+        ensure_equals("the quote closed for it", e.text(), std::string("llPlaySound(\"\")"));
+        ensure("open at the quote, asked of nothing yet", e.completionOpen() && e.completions().size() == 3 && asked.back().empty());
+        type("Door ");
+        ensure("narrowed on all it holds, its space too", e.completionOpen() && e.completions().size() == 2);
+        const size_t asks = asked.size();
+        type("C");
+        ensure("narrowed again, not asked again",
+               e.completions().size() == 1 && e.completions()[0].text == "Door Close" && asked.size() == asks);
+        key(KEY_TAB);
+        ensure_equals("the name in place, the quote kept", e.text(), std::string("llPlaySound(\"Door Close\")"));
+        ensure("and the list gone", !e.completionOpen());
+
+        e.setText("");
+        type("llPlaySound(\"Sa");
+        key(KEY_TAB);
+        ensure_equals("a name put in escaped", e.text(), std::string("llPlaySound(\"Say \\\"hi\\\"\")"));
+
+        // A name of several words found by any of them.
+        e.setText("");
+        type("llPlaySound(\"clo");
+        ensure("by a later word", e.completionOpen() && e.completions().size() == 1 && e.completions()[0].text == "Door Close");
+        key(KEY_ESCAPE);
+
+        e.setText("");
+        type("llSay(0, \"Do");
+        ensure("not where the host names nothing: prose", !e.completionOpen());
+        type("\"");
+        ensure("nor once the string is closed", !e.completionOpen());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<82>()
+    {
+        set_test_name("a name for a string not closed goes in for what was typed up to the caret, the quote closed after it; the list goes as the caret "
+                      "leaves the string; a name matched as the string's escapes read; at several carets nothing named for a string");
+        ALCodeEditor& e = make("");
+        e.setStringProvider([&e](const ALTextPos& at, std::string_view, std::vector<ALCodeEditor::Completion>& out) {
+            if (e.document().line(at.line).find("llPlaySound(") == std::string::npos)
+            {
+                return;
+            }
+            for (const char* name : { "Door Open", "Door Close", "Say \"hi\"" })
+            {
+                ALCodeEditor::Completion c;
+                c.text = name;
+                for (const char ch : std::string_view(name))
+                {
+                    c.path += ch == '"' || ch == '\\' ? std::string("\\") + ch : std::string(1, ch);
+                }
+                c.kind = ALSyntaxKind::Constant;
+                out.push_back(c);
+            }
+        });
+        size_t words_asked = 0;
+        e.setCompletionRequest([&words_asked](const ALTextPos&, std::string_view) { ++words_asked; });
+
+        // Not closed, the call's other arguments after the caret: they stay.
+        e.setAutoClose(false);
+        e.setText("llPlaySound(, 1.0);");
+        e.setCaret(ALTextPos(0, 12));
+        type("\"Do");
+        ensure("open before what follows", e.completionOpen() && e.completions().size() == 2);
+        key(KEY_TAB);
+        ensure_equals("the name in place of what was typed, closed, what follows kept", e.text(), std::string("llPlaySound(\"Door Close\", 1.0);"));
+        ensure("past its quote", e.caret() == ALTextPos(0, 24));
+        // A quote typed before a word is not closed for it: the word stays,
+        // after the name.
+        e.setAutoClose(true);
+        e.setText("llPlaySound(snd, 1.0);");
+        e.setCaret(ALTextPos(0, 12));
+        type("\"");
+        ensure("open at the quote", e.completionOpen() && e.completions().size() == 3);
+        key(KEY_TAB);
+        ensure_equals("nothing after the caret taken", e.text(), std::string("llPlaySound(\"Door Close\"snd, 1.0);"));
+
+        // The opening quote taken back, or the closing one typed: the list
+        // goes with the string, rather than become one of every word.
+        e.setText("");
+        type("llPlaySound(\"");
+        ensure("open at the quote", e.completionOpen());
+        size_t before = words_asked;
+        key(KEY_BACKSPACE);
+        ensure_equals("the pair taken", e.text(), std::string("llPlaySound()"));
+        ensure("and the list with it, the words not asked for", !e.completionOpen() && words_asked == before);
+        e.setAutoClose(false);
+        e.setText("");
+        type("llPlaySound(\"Do");
+        ensure("open in the string", e.completionOpen());
+        before = words_asked;
+        type("\"");
+        ensure("closed with the string, the words not asked for", !e.completionOpen() && words_asked == before);
+
+        // Matched as the string's escapes read: `Say \"` is `Say "`, and an
+        // escape only begun is nothing yet.
+        e.setText("");
+        type("llPlaySound(\"Say \\");
+        ensure("an escape begun", e.completionOpen() && e.completions().size() == 1 && e.completions()[0].text == "Say \"hi\"");
+        type("\"");
+        ensure("and ended", e.completionOpen() && e.completions().size() == 1 && e.completions()[0].text == "Say \"hi\"");
+        key(KEY_TAB);
+        ensure_equals("put in escaped, and closed", e.text(), std::string("llPlaySound(\"Say \\\"hi\\\"\""));
+
+        // At several carets nothing is named for a string, which would go in
+        // at each as a name rather than as the string holds it.
+        e.setText("llPlaySound(\"\");\nllPlaySound(\"\");");
+        e.setSelections(ALTextRange(ALTextPos(0, 13), ALTextPos(0, 13)), { ALTextRange(ALTextPos(1, 13), ALTextPos(1, 13)) });
+        key(' ', MASK_CONTROL);
+        bool named = false;
+        for (const ALCodeEditor::Completion& c : e.completions())
+        {
+            named = named || !c.path.empty();
+        }
+        ensure("nothing named for the string", !named);
+        e.closeCompletion();
+    }
 }

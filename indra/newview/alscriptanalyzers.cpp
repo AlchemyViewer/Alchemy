@@ -158,6 +158,9 @@ void ALLSLAnalyzer::answer(const Request& request, const std::string& text, cons
             // the tab is left be.
             result.outline = mService.outline(text, false);
             break;
+        case Kind::Warm:
+            // SLua's alone.
+            break;
     }
     result.parsed     = mService.parsed();
     result.understood = mService.understood();
@@ -234,6 +237,7 @@ void ALLuauAnalyzer::answer(const Request& request, const std::string& text, con
     static const ALLuauService::Modules NONE;
     mService.setModules(request.modules ? *request.modules : NONE);
     mService.setTimeLimit(setup.seconds);
+    mService.setFragments(setup.fragments);
     mService.setStop(setup.stop);
     switch (request.kind)
     {
@@ -262,13 +266,16 @@ void ALLuauAnalyzer::answer(const Request& request, const std::string& text, con
             result.signature = mService.signature(text, request.line, request.column);
             break;
         case Kind::References:
-            result.references = mService.references(text, request.line, request.column);
+            result.references = mService.references(text, request.line, request.column, request.module);
             break;
         case Kind::Actions:
             result.actions = mService.actions(text, request.line, request.column, request.endLine, request.endColumn);
             break;
         case Kind::Weigh:
             weigh(request, text, result);
+            break;
+        case Kind::Warm:
+            mService.warm(text);
             break;
         case Kind::Shape:
             break;

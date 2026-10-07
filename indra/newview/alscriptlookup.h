@@ -33,7 +33,9 @@
 #include "llstl.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -59,6 +61,10 @@ struct ALScriptStudioDoc::Lookup
     std::string                    name;
     bool                           hasDefinition = false;
     std::string                    homePath;
+    // This script and the home, where they are files on disk, by where
+    // they stand once every link is followed; else as they are named.
+    std::string                    sameOwn;
+    std::string                    sameHome;
     ALScriptSpan                   definition;
     bool                           renamable = false;
     U32                            version   = 0;
@@ -96,11 +102,20 @@ public:
     typedef ALScriptStudioDoc            Doc;
     typedef ALScriptReferencesPane::Found Found;
 
-    // One of the object's other scripts a lookup may reach.
+    // One of the object's other scripts a lookup may reach; or a file on
+    // disk open in a tab, which no object or folder lists, by the path
+    // the preprocessor calls it -- its tab's id -- where it is no item.
     struct Candidate
     {
         ALScriptRef ref;
         std::string name;
+        std::string path;
+        // A file on disk under a folder a script reads from, read from
+        // there where no tab has it open; one open here is read only as
+        // its tab has it.
+        bool        onDisk = false;
+        // Such a file's text, as the walk of the folders read it.
+        std::shared_ptr<const std::string> text;
     };
     // All of them, and how many of the object's prims did not say what
     // they hold, whose scripts are not among them.
@@ -122,6 +137,13 @@ public:
         // holds -- a large linkset's folded ones among them; of an
         // inventory script's folder, for one, at once.
         virtual void candidates(const Doc& doc, std::function<void(Candidates)> told) = 0;
+        // Where a tab's lookup finds scripts on disk: the folders a script
+        // of its language reads from -- the scripter's include folders,
+        // what their configurations bless, the studio's aliases -- each by
+        // its path, and none while disk includes are off. The lookup walks
+        // them for the scripts of the language, off the main thread, since
+        // any of them may require a module there, or include it.
+        virtual std::vector<std::string> diskCandidates(const Doc& doc) { return {}; }
         // A script's text as the region has it, its author's source out of
         // any envelope, and its asset; nothing where it could not be read.
         virtual void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::optional<std::string>& source)> loaded) = 0;
@@ -152,7 +174,11 @@ public:
     };
 
     ALScriptLookup(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, Window& window);
+    ~ALScriptLookup();
 
+    // What the preprocessor calls a tab's script, and its source map names
+    // it by: an item's path, or a file's on disk, which is the tab's id.
+    static std::string pathOf(const Doc& doc);
     // A place added, once: by its file and where it starts.
     static void addPlace(Doc::Lookup& lookup, Doc::Place place);
     // The script's own first, then each other script's, by name, then in
@@ -204,17 +230,42 @@ private:
         S32                    running = 0;
         bool                   feeding = false;
     };
+    // The files on disk a lookup reaches, each by where it stands.
+    typedef boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> Listed;
+    // What a walk of the folders on disk found: the scripts that mention
+    // the name, each by where it stands, read; and the names of those that
+    // could not be read.
+    struct DiskRead
+    {
+        std::vector<std::pair<std::string, std::shared_ptr<const std::string>>> mention;
+        std::vector<std::string>                                                unread;
+    };
+    // The folders on disk walked for a tab's lookup, and the scripts of
+    // `lua`'s language under them read -- but those `listed`, which are
+    // read as their tabs have them -- off the main thread where there is a
+    // main loop to hand them back to; held for by the lookup until then.
+    void walkDisk(const std::string& id, U32 generation, std::vector<std::string> folders, bool lua, const std::string& name, Listed listed);
+    // The walk itself, on whichever thread: given up part way, between its
+    // entries, once `stopped` says so.
+    static DiskRead readDisk(const std::vector<std::string>& folders, bool lua, const std::string& name, const Listed& listed,
+                             const std::function<bool()>& stopped);
+    // What it found, back on the main thread: each script that mentions
+    // the name begun as the lookup's others are, and the walk's hold let go;
+    // and the walk, `walk` its stop, no longer under way.
+    void walked(const std::string& id, U32 generation, DiskRead read, const std::shared_ptr<std::atomic<bool>>& walk);
     // As many of a tab's other scripts begun as may be on their way.
     void feed(const std::string& id);
     void begin(Doc& doc, U32 generation, const Candidate& candidate);
     // One of them done with, found in or passed over: the next begun, and
     // the lookup finished where it was the last.
     void passed(Doc& doc);
-    void candidate(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id,
-                   std::shared_ptr<const std::string> text);
-    void expanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
-                  const std::shared_ptr<const std::string>& source, const ALPreprocessor::Result& result);
-    void answered(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const ALSourceMap& map,
+    void candidate(const std::string& id, U32 generation, const Candidate& other, const LLUUID& asset_id, std::shared_ptr<const std::string> text);
+    void expanded(const std::string& id, U32 generation, const Candidate& other, const std::shared_ptr<const std::string>& source,
+                  const ALPreprocessor::Result& result);
+    // An answer read back through the expansion it was asked of: the
+    // script's places through its map, and where SLua was read `apart`,
+    // each module's through its own.
+    void answered(const std::string& id, U32 generation, const Candidate& other, const ALPreprocessor::Result& expansion, bool apart,
                   const std::string& source, const std::shared_ptr<const std::string>& expanded, const ALScriptAnalysis::Result& result);
     void settled(Doc& doc);
     // What Return does with a name typed for a rename of `old_name`, found
@@ -246,4 +297,8 @@ private:
     boost::unordered_flat_map<std::string, Lane, ll::string_hash, std::equal_to<>> mLanes;
     // Held while this is, for an answer to know it still is.
     std::shared_ptr<bool>   mAlive = std::make_shared<bool>(true);
+    // Each tab's lookup's walk of the folders on disk under way, by the tab:
+    // what tells it to give up, raised as the tab's lookup is begun again,
+    // and as this goes.
+    boost::unordered_flat_map<std::string, std::shared_ptr<std::atomic<bool>>, ll::string_hash, std::equal_to<>> mWalks;
 };

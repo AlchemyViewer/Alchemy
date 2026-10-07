@@ -288,10 +288,21 @@
             <key>Value</key>
             <string></string>
         </map>
+        <key>ALScriptSLuaAliases</key>
+        <map>
+            <key>Comment</key>
+            <string>SLua aliases Script Studio names, one to a line as name=folder: require("@name/x") reads x from the folder on disk, where no .luaurc names the alias. Naming a folder lets a require read it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string></string>
+        </map>
         <key>ALScriptPreprocDiskIncludes</key>
         <map>
             <key>Comment</key>
-            <string>The preprocessor resolves #include from a folder on disk as well as from inventory and the object.</string>
+            <string>The preprocessor reads files on disk: #include from the include folders, and a SLua require from the folders its .luaurc or the SLua aliases name. Off, nothing on disk.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -302,7 +313,7 @@
         <key>ALScriptPreprocWorldIncludes</key>
         <map>
             <key>Comment</key>
-            <string>The preprocessor resolves #include and require from the object holding the script and from the agent's inventory. Off, only folders on disk are looked in.</string>
+            <string>The preprocessor resolves #include and require from the object holding the script and from the agent's inventory: for SLua, a require relative to a script in the world, and a .luaurc notecard or item. Off, only folders on disk are looked in, and a script in the world reaches them through a SLua alias.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -324,7 +335,7 @@
         <key>ALScriptPreprocIncludeOrder</key>
         <map>
             <key>Comment</key>
-            <string>Where the preprocessor looks for an include, in order: any of inventory, object and disk.</string>
+            <string>Where the preprocessor looks for an LSL #include, or a SLua --#include, in order: any of inventory, object and disk. A SLua require does not search.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -336,6 +347,17 @@
         <map>
             <key>Comment</key>
             <string>The preprocessor rewrites list[i] reads and writes as llList2Type and lazy_list_set calls (LSL).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocLineComments</key>
+        <map>
+            <key>Comment</key>
+            <string>The preprocessor writes an @line comment wherever its text moves to another file or skips lines, saying the line and the file's name, as Linden Lab's VS Code plugin does.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -541,6 +563,17 @@
             <key>Value</key>
             <real>5.0</real>
         </map>
+        <key>ALScriptFragmentCompletion</key>
+        <map>
+            <key>Comment</key>
+            <string>As an SLua script is typed, answer a completion or signature help over the statement being typed, checked alone against the script's last check, rather than checking the whole script again first. Off, every keystroke that changed the script checks all of it before answering.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptStudioAutoComplete</key>
         <map>
             <key>Comment</key>
@@ -621,7 +654,7 @@
         <key>ALScriptConvertHandlerFields</key>
         <map>
             <key>Comment</key>
-            <string>Convert to SLua assigns handlers to LLEvents' fields (LLEvents.touch_start = function ...) rather than putting them on with LLEvents:on. SLua puts an assigned handler on as LLEvents:on does, beside any others.</string>
+            <string>Convert to SLua assigns handlers to LLEvents' fields (function LLEvents.touch_start(...)) rather than putting them on with LLEvents:on. SLua puts an assigned handler on as LLEvents:on does, beside any others.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -632,7 +665,7 @@
         <key>ALScriptConvertTypes</key>
         <map>
             <key>Comment</key>
-            <string>Convert to SLua writes Luau types on locals, parameters and what functions return, from LSL's types.</string>
+            <string>Convert to SLua writes Luau types on locals, parameters and what functions return, from LSL's types; and the SLua handlers the editor completes have their parameters typed as the definitions type them.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

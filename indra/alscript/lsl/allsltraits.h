@@ -92,6 +92,27 @@ public:
     // Whether text is a UUID as LSL writes one: 8-4-4-4-12 hexadecimal.
     static bool isUuid(std::string_view text);
 
+    // The kind of item among the object's contents an argument names,
+    // where the definitions say it names one (inventory-kind): a sound to
+    // play, a notecard to read, an item of whatever kind to give.
+    enum class Item : U8
+    {
+        None,
+        Any,
+        Sound,
+        Texture,
+        Animation,
+        Notecard,
+        Object,
+        Material,
+        Settings,
+        Landmark,
+        Script,
+    };
+    // Of a function's argument by its place from nought, the function by
+    // its LSL name or SLua's (`ll.PlaySound`, `llcompat.PlaySound`).
+    static Item itemArg(std::string_view function, int index);
+
     // What an expression can be dropped, or read at another time, without
     // losing anything: no assignment, no call but to a function the
     // definitions call pure, no print. A null node is nothing.

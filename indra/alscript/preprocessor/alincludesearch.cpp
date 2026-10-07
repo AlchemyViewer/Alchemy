@@ -26,11 +26,18 @@
 #include "alincludesearch.h"
 
 #include "alincludeidentity.h"
+#include "almessagemap.h"
+#include "alluauconfigscript.h"
+#include "alrequirenavigation.h"
+#include "fsyspath.h"
 #include "llstl.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
+#include <filesystem>
+#include <tuple>
 
 namespace
 {
@@ -63,6 +70,617 @@ namespace
         return ends || starts ? dir + name : dir + SEPARATOR + name;
     }
 }
+
+namespace
+{
+    constexpr std::string_view DISK_FOLDER = "disk:";
+    constexpr std::string_view ABOVE       = "above:";
+    const std::string          CONFIG_NAME(".luaurc");
+
+    // A name with an extension of its own, as the plugin reads one: a dot
+    // past its first letter.
+    bool hasExtension(const std::string& name)
+    {
+        const size_t dot = name.rfind('.');
+        return dot != std::string::npos && dot > 0;
+    }
+
+    // A file's name as a module: a script's extension taken off, in any
+    // case.
+    std::string stemOf(const std::string& name)
+    {
+        return name.substr(0, name.size() - ALDiskIncludes::extensionOf(name, ALDiskIncludes::scriptExtensions(true)));
+    }
+
+    // What a folder holds, each once, by name: a module and a folder of
+    // one name both, as `@self` lays a module out.
+    void sortChildren(std::vector<ALRequirePlaces::Child>& out)
+    {
+        const auto key = [](const ALRequirePlaces::Child& one) { return std::tie(one.name, one.folder); };
+        std::sort(out.begin(), out.end(), [&key](const ALRequirePlaces::Child& a, const ALRequirePlaces::Child& b) { return key(a) < key(b); });
+        out.erase(std::unique(out.begin(), out.end(), [&key](const ALRequirePlaces::Child& a, const ALRequirePlaces::Child& b) { return key(a) == key(b); }),
+                  out.end());
+    }
+
+    // What a folder on disk holds, as a path names it: each file with one of
+    // `extensions` -- by its module name, the extension taken off, where
+    // `modules` -- and each folder but a hidden one; no more than a few
+    // hundred looked at.
+    constexpr size_t LISTED_MOST = 500;
+    void listFolder(const std::string& dir, const std::vector<std::string>& extensions, bool modules, std::vector<ALRequirePlaces::Child>& out)
+    {
+        std::error_code ec;
+        size_t          looked = 0;
+        for (std::filesystem::directory_iterator it(fsyspath(dir), ec), end; !ec && it != end && looked < LISTED_MOST; it.increment(ec), ++looked)
+        {
+            const std::string name = fsyspath(it->path().filename()).string();
+            if (name.empty() || name.front() == '.')
+            {
+                continue;
+            }
+            std::error_code kind;
+            if (it->is_directory(kind))
+            {
+                out.push_back({ name, true });
+                continue;
+            }
+            if (const size_t extension = ALDiskIncludes::extensionOf(name, extensions))
+            {
+                out.push_back({ modules ? name.substr(0, name.size() - extension) : name, false });
+            }
+        }
+        sortChildren(out);
+    }
+
+    bool isFolder(const std::string& path)
+    {
+        std::error_code ec;
+        return std::filesystem::is_directory(fsyspath(path), ec);
+    }
+    bool isFile(const std::string& path)
+    {
+        std::error_code ec;
+        return std::filesystem::is_regular_file(fsyspath(path), ec);
+    }
+}
+
+// The places a SLua require is walked through, as the search sees them now:
+// folders on disk, `disk:` and the path; with world includes on, the
+// world's folders, by its own ids (ALIncludeWorld); above a script in the
+// world, or one in no place -- the empty id -- `above:` and the number of
+// each of the scripter's include folders with a `.luaurc` at its top, in
+// their order. What is read on disk is only ever a `.luaurc`; a module's
+// file is read once the walk is done, where the folders blessed admit it.
+class ALIncludeSearch::Places final : public ALRequirePlaces
+{
+public:
+    Places(ALIncludeSearch& search, const Where& where, wanted_t* wanted, bool retry, std::vector<std::string>& alias_folders)
+    :   mSearch(search),
+        mWhere(where),
+        mWanted(wanted),
+        mRetry(retry),
+        mAliasFolders(alias_folders)
+    {
+    }
+
+    bool placeOf(const std::string& path, std::string& folder, std::string& name) override
+    {
+        std::string file;
+        if (ALIncludeIdentity::fileOf(path, file))
+        {
+            if (!mWhere.disk)
+            {
+                return false;
+            }
+            const std::filesystem::path at = fsyspath(file);
+            folder = std::string(DISK_FOLDER) + fsyspath(at.parent_path()).string();
+            name   = stemOf(fsyspath(at.filename()).string());
+            return true;
+        }
+        std::string item_name;
+        if (mWhere.world && ALIncludeIdentity::inWorld(path) && mSearch.mWorld.folderOf(path, folder, item_name))
+        {
+            name = stemOf(item_name);
+            return true;
+        }
+        return false;
+    }
+
+    bool placeOfAbsolute(const std::string& path_in, const std::string& config_folder, std::string& folder, std::string& name) override
+    {
+        if (!mWhere.disk)
+        {
+            return false;
+        }
+        // Only as written under a folder a require reads, or under the
+        // configuration's own, which may bless what is under it: nothing on
+        // the disk is asked of a path a script or a configuration wrote
+        // before then -- not another machine's share, which asking would
+        // send who asks, nor a device, nor where anything merely is.
+        std::vector<std::string> may = readable();
+        std::string              config_dir;
+        if (diskDir(config_folder, config_dir))
+        {
+            // The configuration's folder as written, and as it stands --
+            // through a link, a junction, a short name -- which is asked of
+            // the disk already: its configuration is being read.
+            std::error_code             ec;
+            const std::filesystem::path real = std::filesystem::weakly_canonical(fsyspath(config_dir), ec);
+            may.push_back(config_dir);
+            if (!ec)
+            {
+                may.push_back(fsyspath(real).string());
+            }
+        }
+        if (!ALDiskIncludes::lexicallyUnder(path_in, may))
+        {
+            return false;
+        }
+        std::filesystem::path at = fsyspath(path_in);
+        if (!at.has_filename())
+        {
+            at = at.parent_path();
+        }
+        folder = std::string(DISK_FOLDER) + fsyspath(at.parent_path()).string();
+        name   = fsyspath(at.filename()).string();
+        return true;
+    }
+
+    Known parentOf(const std::string& folder, std::string& out) override
+    {
+        if (folder.empty())
+        {
+            return above(0, out);
+        }
+        if (folder.compare(0, ABOVE.size(), ABOVE) == 0)
+        {
+            return above(std::strtoul(folder.c_str() + ABOVE.size(), nullptr, 10) + 1, out);
+        }
+        std::string dir;
+        if (diskDir(folder, dir))
+        {
+            const std::filesystem::path at = fsyspath(dir);
+            if (!at.has_parent_path() || at.parent_path() == at)
+            {
+                return Known::No;
+            }
+            out = std::string(DISK_FOLDER) + fsyspath(at.parent_path()).string();
+            return Known::Yes;
+        }
+        if (!mWhere.world)
+        {
+            return Known::No;
+        }
+        // The top of the world: the scripter's include folders above it.
+        switch (mSearch.mWorld.folderAbove(folder, out))
+        {
+            case ALPreprocessor::Found::Yes:
+                return Known::Yes;
+            case ALPreprocessor::Found::Pending:
+                return Known::Pending;
+            default:
+                return above(0, out);
+        }
+    }
+
+    // Each of these asked of the disk, or the world, once a walk: a walk
+    // asks the same of a folder again and again on its way, and again at
+    // its end.
+    Known subfolder(const std::string& folder, const std::string& name, std::string& out) override
+    {
+        if (!onePart(folder, name))
+        {
+            return Known::No;
+        }
+        auto [at, fresh] = mSubfolders.try_emplace(folder + '\x01' + name);
+        if (fresh)
+        {
+            at->second.first = subfolderOf(folder, name, at->second.second);
+        }
+        out = at->second.second;
+        return at->second.first;
+    }
+
+    Known files(const std::string& folder, const std::string& name, std::vector<File>& out) override
+    {
+        if (!onePart(folder, name))
+        {
+            return Known::No;
+        }
+        auto [at, fresh] = mFiles.try_emplace(folder + '\x01' + name);
+        if (fresh)
+        {
+            at->second.first = filesOf(folder, name, at->second.second);
+        }
+        out.insert(out.end(), at->second.second.begin(), at->second.second.end());
+        return at->second.first;
+    }
+
+    Known config(const std::string& folder, ALRequirePlaces::Config& out) override
+    {
+        // Read, and what it says parsed, once a walk: the navigator asks it
+        // as often as it climbs past it for an alias.
+        auto [at, fresh] = mConfigs.try_emplace(folder);
+        if (fresh)
+        {
+            ALRequirePlaces::Config& read = at->second.second;
+            at->second.first              = configOf(folder, read);
+            if (at->second.first == Known::Yes && !read.ambiguous && read.error.empty())
+            {
+                ALLuauConfig said;
+                if (ALLuauConfig::parse(read.text, said, read.error))
+                {
+                    read.aliases = std::move(said.aliases);
+                }
+            }
+        }
+        out = at->second.second;
+        return at->second.first;
+    }
+
+    Known studioAlias(const std::string& alias, std::string& folder) override
+    {
+        for (const auto& [name, path] : mWhere.aliases)
+        {
+            if (name != alias)
+            {
+                continue;
+            }
+            // A folder on disk, while the disk is read; or a folder of the
+            // world by the world's own id -- an inventory folder -- walked
+            // as the world is, while the world is let in.
+            if (ALLuauConfig::absolute(path))
+            {
+                if (!mWhere.disk || !isFolder(path))
+                {
+                    return Known::No;
+                }
+                folder = std::string(DISK_FOLDER) + path;
+                return Known::Yes;
+            }
+            if (!mWhere.world)
+            {
+                return Known::No;
+            }
+            folder = path;
+            return Known::Yes;
+        }
+        return Known::No;
+    }
+
+    std::vector<std::string> studioAliasNames() override
+    {
+        std::vector<std::string> out;
+        for (const auto& [name, path] : mWhere.aliases)
+        {
+            if (ALLuauConfig::absolute(path) ? mWhere.disk : mWhere.world)
+            {
+                out.push_back(name);
+            }
+        }
+        return out;
+    }
+
+    Known children(const std::string& folder, std::vector<Child>& out) override
+    {
+        std::string dir;
+        if (diskDir(folder, dir))
+        {
+            listFolder(dir, ALDiskIncludes::scriptExtensions(true), true, out);
+            return Known::Yes;
+        }
+        if (!inWorld(folder))
+        {
+            return Known::No;
+        }
+        std::vector<ALIncludeWorld::Item> items;
+        std::vector<std::string>          folders;
+        const ALPreprocessor::Found       found = mSearch.mWorld.contents(folder, items, folders);
+        for (const ALIncludeWorld::Item& item : items)
+        {
+            out.push_back({ stemOf(item.name), false });
+        }
+        for (const std::string& name : folders)
+        {
+            out.push_back({ name, true });
+        }
+        return found == ALPreprocessor::Found::Pending ? Known::Pending : Known::Yes;
+    }
+
+    void aliasReached(const std::string& config_folder, const std::string& folder, const std::string& name) override
+    {
+        std::string config_dir, dir;
+        if (!mWhere.disk || !diskDir(config_folder, config_dir))
+        {
+            return;
+        }
+        // The folder it stands for; for a module, its files, each alone --
+        // nothing beside them -- and the folder of its name, its init's.
+        std::vector<std::string> reached;
+        if (name.empty())
+        {
+            if (diskDir(folder, dir))
+            {
+                reached.push_back(dir);
+            }
+        }
+        else
+        {
+            std::vector<File> modules;
+            std::string       sub;
+            files(folder, name, modules);
+            for (const File& file : modules)
+            {
+                if (!file.file.empty())
+                {
+                    reached.push_back(file.file);
+                }
+            }
+            if (subfolder(folder, name, sub) == Known::Yes && diskDir(sub, dir))
+            {
+                reached.push_back(dir);
+            }
+        }
+        ALDiskIncludes own = mSearch.ownFolders(mWhere).includes;
+        for (const std::string& one : reached)
+        {
+            if (std::find(mAliasFolders.begin(), mAliasFolders.end(), one) != mAliasFolders.end())
+            {
+                continue;
+            }
+            if (own.blessFromConfig(one, config_dir))
+            {
+                mAliasFolders.push_back(one);
+            }
+            else if (mRefused.empty())
+            {
+                mRefused = "the configuration in '" + config_dir + "' names '" + one + "', which is outside it and outside the include folders";
+            }
+        }
+    }
+
+    // Why what an alias of a configuration on disk reached was not blessed,
+    // the first such the walk met: outside the configuration's folder and
+    // the scripter's own.
+    const std::string& refused() const { return mRefused; }
+
+private:
+    // A name a folder may hold, as one part of a path: not empty, nor `.`
+    // or `..`, nor with a separator in it; nor, on disk, with a `:`, which
+    // would name another drive's folder, or a stream of a file.
+    bool onePart(const std::string& folder, const std::string& name) const
+    {
+        std::string dir;
+        return !name.empty() && name != "." && name != ".." &&
+               name.find_first_of(diskDir(folder, dir) ? "/\\:" : "/\\") == std::string::npos;
+    }
+
+    Known subfolderOf(const std::string& folder, const std::string& name, std::string& out)
+    {
+        std::string dir;
+        if (diskDir(folder, dir))
+        {
+            const std::string path = fsyspath(fsyspath(dir) / fsyspath(name)).string();
+            if (!isFolder(path))
+            {
+                return Known::No;
+            }
+            out = std::string(DISK_FOLDER) + path;
+            return Known::Yes;
+        }
+        if (!inWorld(folder))
+        {
+            return Known::No;
+        }
+        std::vector<ALIncludeWorld::Item> items;
+        const ALPreprocessor::Found       found = mSearch.mWorld.named(folder, name, items, out);
+        if (found == ALPreprocessor::Found::Pending)
+        {
+            return Known::Pending;
+        }
+        return out.empty() ? Known::No : Known::Yes;
+    }
+
+    Known filesOf(const std::string& folder, const std::string& name, std::vector<File>& out)
+    {
+        // As written where it has an extension; else with a script's, the
+        // modern one first.
+        std::vector<std::string> names{ name };
+        if (!hasExtension(name))
+        {
+            names = { name + ".luau", name + ".lua" };
+        }
+        std::string dir;
+        if (diskDir(folder, dir))
+        {
+            for (const std::string& one : names)
+            {
+                const std::string path = fsyspath(fsyspath(dir) / fsyspath(one)).string();
+                if (isFile(path))
+                {
+                    out.push_back({ ALIncludeIdentity::ofFile(path), one, LLUUID::null, path });
+                }
+            }
+            return out.empty() ? Known::No : Known::Yes;
+        }
+        if (!inWorld(folder))
+        {
+            return Known::No;
+        }
+        // An item is named as it is, which is usually with no extension at
+        // all: that first, then one with a script's.
+        if (!hasExtension(name))
+        {
+            names.insert(names.begin(), name);
+        }
+        bool pending = false;
+        for (const std::string& one : names)
+        {
+            std::vector<ALIncludeWorld::Item> items;
+            std::string                       sub;
+            pending = mSearch.mWorld.named(folder, one, items, sub) == ALPreprocessor::Found::Pending || pending;
+            for (const ALIncludeWorld::Item& item : items)
+            {
+                out.push_back({ item.path, item.name, item.assetId, std::string() });
+            }
+        }
+        return pending ? Known::Pending : out.empty() ? Known::No : Known::Yes;
+    }
+
+    Known configOf(const std::string& folder, ALRequirePlaces::Config& out)
+    {
+        std::string dir;
+        if (diskDir(folder, dir))
+        {
+            out.onDisk = true;
+            out.base   = folder;
+            return mSearch.readConfig(diskConfig(dir), out) ? Known::Yes : Known::No;
+        }
+        if (folder.compare(0, ABOVE.size(), ABOVE) == 0)
+        {
+            const size_t                                    index = std::strtoul(folder.c_str() + ABOVE.size(), nullptr, 10);
+            const std::vector<ALIncludeSearch::DiskConfig>& tops  = atTop();
+            if (index >= tops.size())
+            {
+                return Known::No;
+            }
+            out.onDisk = true;
+            out.base   = std::string(DISK_FOLDER) + tops[index].dir;
+            return mSearch.readConfig(tops[index], out) ? Known::Yes : Known::No;
+        }
+        if (!inWorld(folder))
+        {
+            return Known::No;
+        }
+        // In the world a `.luaurc` alone: a `.config.luau` is run only from
+        // the disk.
+        std::vector<ALIncludeWorld::Item> items;
+        std::string                       sub;
+        if (mSearch.mWorld.named(folder, CONFIG_NAME, items, sub) == ALPreprocessor::Found::Pending)
+        {
+            return Known::Pending;
+        }
+        if (items.empty())
+        {
+            return Known::No;
+        }
+        out.onDisk = false;
+        out.base   = folder;
+        out.file   = items.front().name;
+        std::string                 asset;
+        const ALPreprocessor::Found found =
+            mSearch.textOf({ items.front().path, CONFIG_NAME, items.front().assetId, std::string() }, mWanted, mRetry, out.text, asset);
+        return found == ALPreprocessor::Found::Yes ? Known::Yes : found == ALPreprocessor::Found::Pending ? Known::Pending : Known::No;
+    }
+
+    // A folder on disk's configuration, from the disk cache's look up the
+    // folders above it (ALDiskCache::upwards), which a walk's own climb
+    // shares with the chain over the file asking -- and every folder's above
+    // it kept from that one look for the walk, which climbs through them.
+    ALIncludeSearch::DiskConfig diskConfig(const std::string& dir)
+    {
+        if (const auto known = mDiskConfigs.find(dir); known != mDiskConfigs.end())
+        {
+            return known->second;
+        }
+        // A copy of the first: asking the second may move what the cache
+        // keeps.
+        const std::vector<std::string>  luaurcs = mSearch.mDisk.upwards(dir, CONFIG_NAME, mWhere.generation, mWhere.now);
+        const std::vector<std::string>& luaus   = mSearch.mDisk.upwards(dir, ALLuauConfigScript::NAME, mWhere.generation, mWhere.now);
+        const auto                      has     = [](const std::vector<std::string>& found, const std::string& file) {
+            return std::find(found.begin(), found.end(), file) != found.end() ? file : std::string();
+        };
+        ALIncludeSearch::DiskConfig own;
+        std::filesystem::path       folder = fsyspath(dir);
+        for (bool first = true; !folder.empty(); first = false)
+        {
+            ALIncludeSearch::DiskConfig one;
+            one.dir    = first ? dir : fsyspath(folder).string();
+            one.luaurc = has(luaurcs, fsyspath(folder / fsyspath(CONFIG_NAME)).string());
+            one.luau   = has(luaus, fsyspath(folder / fsyspath(ALLuauConfigScript::NAME)).string());
+            if (first)
+            {
+                own = one;
+            }
+            mDiskConfigs.emplace(one.dir, std::move(one));
+            const std::filesystem::path above = folder.parent_path();
+            if (above == folder)
+            {
+                break;
+            }
+            folder = above;
+        }
+        return own;
+    }
+
+    // The folders a require reads on disk, as written and as they stand:
+    // the scripter's, the studio's aliases', and what the run's aliases
+    // have blessed.
+    std::vector<std::string> readable()
+    {
+        std::vector<std::string>        out = mWhere.folders;
+        const std::vector<std::string>& own = mSearch.ownFolders(mWhere).includes.folders();
+        out.insert(out.end(), own.begin(), own.end());
+        for (const auto& [name, path] : mWhere.aliases)
+        {
+            if (ALLuauConfig::absolute(path))
+            {
+                out.push_back(path);
+            }
+        }
+        out.insert(out.end(), mAliasFolders.begin(), mAliasFolders.end());
+        return out;
+    }
+
+    // A folder on disk's path, where it is one -- and the disk is read.
+    bool diskDir(const std::string& folder, std::string& dir) const
+    {
+        if (!mWhere.disk || folder.compare(0, DISK_FOLDER.size(), DISK_FOLDER) != 0)
+        {
+            return false;
+        }
+        dir = folder.substr(DISK_FOLDER.size());
+        return !dir.empty();
+    }
+    // Whether a folder is the world's, and the world is let in.
+    bool inWorld(const std::string& folder) const
+    {
+        return mWhere.world && !folder.empty() && folder.compare(0, ABOVE.size(), ABOVE) != 0 &&
+               folder.compare(0, DISK_FOLDER.size(), DISK_FOLDER) != 0;
+    }
+    Known above(size_t index, std::string& out)
+    {
+        if (index >= atTop().size())
+        {
+            return Known::No;
+        }
+        out = std::string(ABOVE) + std::to_string(index);
+        return Known::Yes;
+    }
+    const std::vector<ALIncludeSearch::DiskConfig>& atTop()
+    {
+        if (!mTops)
+        {
+            mTops = mSearch.configsAtTop(mWhere);
+        }
+        return *mTops;
+    }
+
+    ALIncludeSearch&                        mSearch;
+    const Where&                            mWhere;
+    wanted_t*                               mWanted;
+    bool                                    mRetry;
+    std::vector<std::string>&               mAliasFolders;
+    std::optional<std::vector<ALIncludeSearch::DiskConfig>> mTops;
+    std::string                             mRefused;
+    // What the walk has asked, each once: by folder, and by a name in one.
+    template<typename T>
+    using asked_t = boost::unordered_flat_map<std::string, std::pair<Known, T>, ll::string_hash, std::equal_to<>>;
+    asked_t<std::string>                                                                                   mSubfolders;
+    asked_t<std::vector<File>>                                                                             mFiles;
+    asked_t<ALRequirePlaces::Config>                                                                       mConfigs;
+    boost::unordered_flat_map<std::string, ALIncludeSearch::DiskConfig, ll::string_hash, std::equal_to<>> mDiskConfigs;
+};
 
 ALIncludeSearch::ALIncludeSearch(ALScriptTextCache& texts, ALIncludeWorld& world) : mTexts(texts), mWorld(world) {}
 
@@ -205,8 +823,13 @@ std::vector<ALIncludeSearch::Candidate> ALIncludeSearch::candidatesFor(const ALP
             if (ALLuauConfig::absolute(ask.name))
             {
                 // A path from a root, which an alias may stand for: the
-                // file itself, where a blessed folder holds it.
-                dirs.assign(1, std::string());
+                // file itself, where a blessed folder holds it -- as it is
+                // written first, so that nothing on the disk is asked of a
+                // path out of them: not another machine's share, nor a
+                // device (ALDiskIncludes::lexicallyUnder).
+                std::vector<std::string> may = where.folders;
+                may.insert(may.end(), blessed.includes.folders().begin(), blessed.includes.folders().end());
+                dirs.assign(ALDiskIncludes::lexicallyUnder(ask.name, may) ? 1 : 0, std::string());
             }
             for (const std::string& dir : dirs)
             {
@@ -218,20 +841,7 @@ std::vector<ALIncludeSearch::Candidate> ALIncludeSearch::candidatesFor(const ALP
                     {
                         continue;
                     }
-                    Candidate c;
-                    const size_t slash = real->find_last_of("/\\");
-                    c.name             = slash == std::string::npos ? *real : real->substr(slash + 1);
-                    c.path             = ALIncludeIdentity::ofFile(*real);
-                    c.file             = *real;
-                    // Past a few thousand, the oldest admissions let go of
-                    // all at once: each is made again by the next run over
-                    // what names it.
-                    if (mAdmitted.size() >= ADMITTED_KEPT && !mAdmitted.contains(c.path))
-                    {
-                        mAdmitted.clear();
-                    }
-                    mAdmitted.insert(c.path);
-                    out.push_back(std::move(c));
+                    out.push_back(admitted(*real));
                 }
             }
         }
@@ -271,12 +881,13 @@ ALPreprocessor::Found ALIncludeSearch::textOf(const Candidate& c, wanted_t* want
 ALPreprocessor::Found ALIncludeSearch::configsFor(const std::string& from, const Asking& asking, const Where& where, wanted_t* wanted, bool retry,
                                                   std::vector<Config>& out)
 {
-    static const std::string CONFIG_NAME(".luaurc");
     out.clear();
-    std::vector<Candidate> chain;
-    std::string            file;
+    std::vector<Candidate>  chain;
+    std::vector<DiskConfig> disk;
+    std::string             file;
     // A configuration in the world only where the world is let in: an
-    // object is not asked what it holds otherwise, and would never say.
+    // object is not asked what it holds otherwise, and would never say. A
+    // `.luaurc` alone there: a `.config.luau` is run only from the disk.
     const bool in_world = ALIncludeIdentity::inWorld(from);
     if (in_world && where.world)
     {
@@ -293,10 +904,7 @@ ALPreprocessor::Found ALIncludeSearch::configsFor(const std::string& from, const
     else if (!in_world && ALIncludeIdentity::fileOf(from, file))
     {
         // Up the directories from the file's own, every one to the root.
-        for (const std::string& config : mDisk.upwards(dirOf(file), CONFIG_NAME, where.generation, where.now))
-        {
-            chain.push_back({ ALIncludeIdentity::ofFile(config), CONFIG_NAME, LLUUID::null, config });
-        }
+        disk = configsUp(dirOf(file), where);
     }
     if (in_world)
     {
@@ -304,10 +912,7 @@ ALPreprocessor::Found ALIncludeSearch::configsFor(const std::string& from, const
         // scripter's include folders, while the disk is read: a script in
         // the world has no folders on disk to look up through, and its
         // scripter's modules are read from those.
-        for (const std::string& top : mDisk.atTop(ownFolders(where), CONFIG_NAME))
-        {
-            chain.push_back({ ALIncludeIdentity::ofFile(top), CONFIG_NAME, LLUUID::null, top });
-        }
+        disk = configsAtTop(where);
     }
     // Every text asked for at once: Pending while any is on its way.
     bool pending = false;
@@ -330,7 +935,91 @@ ALPreprocessor::Found ALIncludeSearch::configsFor(const std::string& from, const
     {
         return ALPreprocessor::Found::Pending;
     }
+    // On disk, a folder with both is passed over, as Luau's analysis
+    // passes it over; and a `.config.luau` that did not run, as a
+    // `.luaurc` that does not parse is.
+    for (const DiskConfig& one : disk)
+    {
+        ALRequirePlaces::Config read;
+        if (readConfig(one, read) && !read.ambiguous && !read.text.empty())
+        {
+            out.push_back({ ALIncludeIdentity::ofFile(one.luaurc.empty() ? one.luau : one.luaurc), std::move(read.text) });
+        }
+    }
     return out.empty() ? ALPreprocessor::Found::No : ALPreprocessor::Found::Yes;
+}
+
+std::vector<ALIncludeSearch::DiskConfig> ALIncludeSearch::configsUp(const std::string& dir, const Where& where)
+{
+    // Each name's from the cache, a folder's two together, the nearest --
+    // the longest of the folders above one -- first. A copy of the first:
+    // asking the second may move what the cache keeps.
+    const std::vector<std::string> luaurcs = mDisk.upwards(dir, CONFIG_NAME, where.generation, where.now);
+    const std::vector<std::string>& luaus  = mDisk.upwards(dir, ALLuauConfigScript::NAME, where.generation, where.now);
+    std::vector<DiskConfig>         out;
+    const auto                      in = [&out](const std::string& folder) -> DiskConfig& {
+        for (DiskConfig& one : out)
+        {
+            if (one.dir == folder)
+            {
+                return one;
+            }
+        }
+        out.push_back({ folder, std::string(), std::string() });
+        return out.back();
+    };
+    for (const std::string& file : luaurcs)
+    {
+        in(dirOf(file)).luaurc = file;
+    }
+    for (const std::string& file : luaus)
+    {
+        in(dirOf(file)).luau = file;
+    }
+    std::stable_sort(out.begin(), out.end(), [](const DiskConfig& a, const DiskConfig& b) { return a.dir.size() > b.dir.size(); });
+    return out;
+}
+
+std::vector<ALIncludeSearch::DiskConfig> ALIncludeSearch::configsAtTop(const Where& where)
+{
+    ALDiskCache::Blessed&   own = ownFolders(where);
+    std::vector<DiskConfig> out;
+    for (const std::string& folder : own.includes.folders())
+    {
+        DiskConfig one;
+        one.luaurc = mDisk.admits(own, fsyspath(fsyspath(folder) / fsyspath(CONFIG_NAME)).string()).value_or(std::string());
+        one.luau   = mDisk.admits(own, fsyspath(fsyspath(folder) / fsyspath(ALLuauConfigScript::NAME)).string()).value_or(std::string());
+        if (!one.luaurc.empty() || !one.luau.empty())
+        {
+            one.dir = dirOf(one.luaurc.empty() ? one.luau : one.luaurc);
+            out.push_back(std::move(one));
+        }
+    }
+    return out;
+}
+
+bool ALIncludeSearch::readConfig(const DiskConfig& config, ALRequirePlaces::Config& out)
+{
+    out.file = config.luaurc.empty() ? config.luau : config.luaurc;
+    if (!config.luaurc.empty() && !config.luau.empty())
+    {
+        out.ambiguous = true;
+        return true;
+    }
+    if (!config.luaurc.empty())
+    {
+        return mDisk.read(config.luaurc, out.text);
+    }
+    std::string source;
+    if (config.luau.empty() || !mDisk.read(config.luau, source))
+    {
+        return false;
+    }
+    if (!ALLuauConfigScript::asLuaurc(source, out.text, out.error))
+    {
+        out.text.clear();
+    }
+    return true;
 }
 
 ALPreprocessor::Found ALIncludeSearch::resolve(const ALPreprocessor::Ask& ask_in, ALPreprocessor::Include& out, const Asking& asking,
@@ -343,61 +1032,13 @@ ALPreprocessor::Found ALIncludeSearch::resolve(const ALPreprocessor::Ask& ask_in
         // it is.
         ask.from = asking.self;
     }
-    std::string alias, rest;
-    if (asking.lua && ask.require && ALLuauConfig::aliasOf(ask.name, alias, rest))
+    if (asking.lua && ask.require)
     {
-        // Through the nearest `.luaurc` over the asking file that says
-        // what the alias is, as Luau reads a chain of them: the alias's
-        // path from beside that configuration, so the name is asked for
-        // from there.
-        std::vector<Config>         configs;
-        const ALPreprocessor::Found config = configsFor(ask.from, asking, where, wanted, retry, configs);
-        if (config != ALPreprocessor::Found::Yes)
-        {
-            return config;
-        }
-        std::vector<std::string_view> texts;
-        for (const Config& one : configs)
-        {
-            texts.push_back(one.text);
-        }
-        std::string                 value;
-        const std::optional<size_t> saying = ALLuauConfig::aliasIn(texts, alias, value);
-        if (!saying)
-        {
-            return ALPreprocessor::Found::No;
-        }
-        const std::string config_path = configs[*saying].path;
-        if (!ALLuauConfig::absolute(value) && value.compare(0, 2, "./") != 0 && value.compare(0, 3, "../") != 0)
-        {
-            value = "./" + value;
-        }
-        while (!value.empty() && (value.back() == '/' || value.back() == '\\'))
-        {
-            value.pop_back();
-        }
-        ask.name = rest.empty() ? value : value + "/" + rest;
-        ask.from = config_path;
-        // A `.luaurc` on disk blesses where its aliases point, for this
-        // run; one in the world blesses nothing, and its alias is only
-        // ever a name to look for in the world. Only while the disk is
-        // read, and only where a configuration may reach
-        // (ALDiskIncludes::mayFromConfig).
-        std::string config_file;
-        if (alias_folders && where.disk && ALIncludeIdentity::fileOf(config_path, config_file))
-        {
-            const std::string folder = ALLuauConfig::absolute(value) ? value : joined(dirOf(config_file), value);
-            if (std::find(alias_folders->begin(), alias_folders->end(), folder) == alias_folders->end())
-            {
-                ALDiskIncludes own = ownFolders(where).includes;
-                if (own.blessFromConfig(folder, dirOf(config_file)))
-                {
-                    alias_folders->push_back(folder);
-                }
-            }
-        }
+        // A SLua require: walked as the plugin's rules have it (LAD9), with
+        // what an alias of a `.luaurc` on disk reaches blessed for the run.
+        std::vector<std::string> own_folders;
+        return resolveRequire(ask, out, asking, where, wanted, retry, alias_folders ? *alias_folders : own_folders);
     }
-
     bool                         unknown    = false;
     const std::vector<Candidate> candidates = candidatesFor(ask, asking, where, alias_folders ? *alias_folders : std::vector<std::string>(), unknown);
     for (const Candidate& c : candidates)
@@ -415,6 +1056,302 @@ ALPreprocessor::Found ALIncludeSearch::resolve(const ALPreprocessor::Ask& ask_in
     }
     // Not found anywhere listed; the object may still hold it.
     return unknown ? ALPreprocessor::Found::Pending : ALPreprocessor::Found::No;
+}
+
+ALPreprocessor::Found ALIncludeSearch::resolveRequire(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Asking& asking,
+                                                      const Where& where, wanted_t* wanted, bool retry, std::vector<std::string>& alias_folders)
+{
+    Places                            places(*this, where, wanted, retry, alias_folders);
+    const ALRequireNavigation::Walked walked = ALRequireNavigation::walk(places, ask.from, ask.name);
+    if (walked.found == ALRequirePlaces::Known::Pending)
+    {
+        return ALPreprocessor::Found::Pending;
+    }
+    // A file on disk the walk reached that no folder lets a require read.
+    std::string shut_out;
+    for (const ALRequirePlaces::File& file : walked.files)
+    {
+        Candidate c{ file.path, file.name, file.assetId, std::string() };
+        if (!file.file.empty())
+        {
+            const std::optional<std::string> real = requireAdmits(ask, asking, where, alias_folders, file.file);
+            if (!real)
+            {
+                shut_out = shut_out.empty() ? file.file : shut_out;
+                continue;
+            }
+            c = admitted(*real);
+        }
+        const ALPreprocessor::Found found = textOf(c, wanted, retry, out.text, out.assetId);
+        if (found == ALPreprocessor::Found::No)
+        {
+            continue;
+        }
+        out.name = c.name;
+        out.path = c.path;
+        if (walked.passedOver)
+        {
+            // By its path from the folder both are in, as the file taken is
+            // by its name: on disk and in the world alike.
+            out.passedOver = stemOf(file.name) + "/" + walked.passedOver->name;
+        }
+        return found;
+    }
+    out.why = walked.error;
+    if (out.why.empty() && !shut_out.empty())
+    {
+        // Walked to, and not let in: where an alias that would have let it
+        // in reached past what its configuration may bless, that; else
+        // that nothing lets it in.
+        out.why = !places.refused().empty() ? places.refused()
+                                            : "'" + shut_out + "' is there, but no include folder or alias lets a require read it";
+    }
+    searchedBefore(ask, asking, where, alias_folders, out);
+    return ALPreprocessor::Found::No;
+}
+
+std::optional<std::string> ALIncludeSearch::requireAdmits(const ALPreprocessor::Ask& ask, const Asking& asking, const Where& where,
+                                                          const std::vector<std::string>& alias_folders, const std::string& file)
+{
+    std::vector<std::string> blessing = alias_folders;
+    for (const auto& [name, folder] : where.aliases)
+    {
+        if (ALLuauConfig::absolute(folder))
+        {
+            blessing.push_back(folder);
+        }
+    }
+    return mDisk.admits(blessedFor(ask, asking, where, blessing), file);
+}
+
+void ALIncludeSearch::searchedBefore(const ALPreprocessor::Ask& ask, const Asking& asking, const Where& where,
+                                     std::vector<std::string>& alias_folders, ALPreprocessor::Include& out)
+{
+    // Only a name the search took: not an alias's, nor a path from a root.
+    if (ask.name.empty() || ask.name.front() == '@' || ALLuauConfig::absolute(ask.name))
+    {
+        return;
+    }
+    bool                         unknown = false;
+    const std::vector<Candidate> found   = candidatesFor(ask, asking, where, alias_folders, unknown);
+    if (found.empty())
+    {
+        return;
+    }
+    const Candidate& was = found.front();
+    out.searched         = was.file.empty() ? was.name : was.file;
+    if (was.file.empty())
+    {
+        // In the world: said, and nothing offered to write instead.
+        return;
+    }
+    // A name under a folder, as a require writes it: its path from there,
+    // `/` between the parts, a script's extension taken off and a folder's
+    // init as the folder -- and as written, extension and all, should that
+    // be the one that walks to it.
+    const auto under = [&was](const std::string& folder) {
+        std::vector<std::string>    names;
+        std::error_code             ec;
+        const std::filesystem::path real     = std::filesystem::weakly_canonical(fsyspath(folder), ec);
+        const std::filesystem::path relative = fsyspath(was.file).lexically_relative(ec ? fsyspath(folder) : real);
+        // As UTF-8, as fsyspath gives it: generic_string() is the code
+        // page's on Windows, and throws on a name it cannot hold.
+        std::string path = fsyspath(relative).string();
+        std::replace(path.begin(), path.end(), '\\', '/');
+        if (path.empty() || path == "." || path.compare(0, 2, "..") == 0)
+        {
+            return names;
+        }
+        std::string module = stemOf(path);
+        if (module == "init")
+        {
+            return names;
+        }
+        if (module.size() > 5 && module.compare(module.size() - 5, 5, "/init") == 0)
+        {
+            module.erase(module.size() - 5);
+        }
+        names.push_back(module);
+        names.push_back(path);
+        return names;
+    };
+    // Whether a require so written walks to the very file the search found.
+    const auto walks = [&](const std::string& name, const Where& in) {
+        std::vector<std::string>          blessed = alias_folders;
+        Places                            places(*this, in, nullptr, false, blessed);
+        const ALRequireNavigation::Walked walked = ALRequireNavigation::walk(places, ask.from, name);
+        for (const ALRequirePlaces::File& file : walked.files)
+        {
+            const std::optional<std::string> real = file.file.empty() ? std::nullopt : requireAdmits(ask, asking, in, blessed, file.file);
+            if (real && *real == was.file)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    const auto offer = [&out](const std::string& require, const std::string& alias = std::string(), const std::string& folder = std::string()) {
+        if (std::none_of(out.moves.begin(), out.moves.end(), [&require](const ALPreprocessor::Include::Move& move) { return move.require == require; }))
+        {
+            out.moves.push_back({ require, alias, folder });
+        }
+    };
+    // From beside the file asking.
+    std::string from_file;
+    if (ALIncludeIdentity::fileOf(ask.from, from_file))
+    {
+        for (const std::string& name : under(fsyspath(fsyspath(from_file).parent_path()).string()))
+        {
+            if (walks("./" + name, where))
+            {
+                offer("./" + name);
+                break;
+            }
+        }
+    }
+    // Through an alias that reaches it already: a `.luaurc`'s, or the
+    // studio's own.
+    std::vector<std::pair<std::string, std::string>> aliases;
+    for (const auto& [prefix, folder] : moduleFolders(asking, where))
+    {
+        if (!prefix.empty())
+        {
+            aliases.emplace_back(prefix.substr(1, prefix.size() - 2), folder);
+        }
+    }
+    for (const auto& [alias, folder] : where.aliases)
+    {
+        if (ALLuauConfig::absolute(folder))
+        {
+            aliases.emplace_back(alias, folder);
+        }
+    }
+    for (const auto& [alias, folder] : aliases)
+    {
+        for (const std::string& name : under(folder))
+        {
+            if (walks("@" + alias + "/" + name, where))
+            {
+                offer("@" + alias + "/" + name);
+                break;
+            }
+        }
+    }
+    if (!out.moves.empty())
+    {
+        return;
+    }
+    // Otherwise the include folder that holds it, named a studio alias
+    // after itself: by a name no alias has already, the studio's or one of
+    // a configuration in reach of the file, which a require would go
+    // through first.
+    std::vector<std::string> taken;
+    for (const auto& [alias, folder] : where.aliases)
+    {
+        taken.push_back(alias);
+    }
+    {
+        std::vector<std::string> blessed = alias_folders;
+        Places                   places(*this, where, nullptr, false, blessed);
+        for (const std::string& alias : ALRequireNavigation::aliasesFrom(places, ask.from))
+        {
+            taken.push_back(alias);
+        }
+    }
+    for (const std::string& folder : where.folders)
+    {
+        const std::vector<std::string> names = under(folder);
+        if (names.empty())
+        {
+            continue;
+        }
+        std::filesystem::path at = fsyspath(folder);
+        if (!at.has_filename())
+        {
+            at = at.parent_path();
+        }
+        const std::string alias = ALLuauConfig::studioAliasFor(fsyspath(at.filename()).string(), taken);
+        Where             named = where;
+        named.aliases.emplace_back(alias, folder);
+        for (const std::string& name : names)
+        {
+            if (walks("@" + alias + "/" + name, named))
+            {
+                offer("@" + alias + "/" + name, alias, folder);
+                return;
+            }
+        }
+    }
+}
+
+std::vector<ALRequireNavigation::Suggestion> ALIncludeSearch::suggest(const std::string& from, const std::string& typed, bool require,
+                                                                     const Asking& asking, const Where& where)
+{
+    if (require && asking.lua)
+    {
+        std::vector<std::string> alias_folders;
+        Places                   places(*this, where, nullptr, false, alias_folders);
+        return ALRequireNavigation::suggest(places, from.empty() ? asking.self : from, typed);
+    }
+    // An include: the names under the folders its search looks in, the
+    // file's own first, each with its extension, and the folders.
+    std::vector<ALRequireNavigation::Suggestion> out;
+    if (!where.disk)
+    {
+        return out;
+    }
+    const size_t      slash = typed.find_last_of("/\\");
+    const std::string head  = slash == std::string::npos ? std::string() : typed.substr(0, slash + 1);
+    std::vector<std::string> dirs;
+    std::string              file;
+    if (ALIncludeIdentity::fileOf(from.empty() ? asking.self : from, file))
+    {
+        dirs.push_back(fsyspath(fsyspath(file).parent_path()).string());
+    }
+    for (const std::string& folder : ownFolders(where).includes.folders())
+    {
+        if (std::find(dirs.begin(), dirs.end(), folder) == dirs.end())
+        {
+            dirs.push_back(folder);
+        }
+    }
+    // A script of the language by any of its names on disk -- for LSL, its
+    // includes' `.lslh` and `.lsli` too -- as the search reads them. Only
+    // under the folders it looks in, as typed: a path typed from a root
+    // stands in for the folder before it, and `..` climbs, and neither
+    // takes the listing anywhere else -- another machine's share least.
+    std::vector<ALRequirePlaces::Child> found;
+    for (const std::string& dir : dirs)
+    {
+        const std::string at = head.empty() ? dir : fsyspath(fsyspath(dir) / fsyspath(head)).string();
+        if (ALDiskIncludes::lexicallyUnder(at, dirs))
+        {
+            listFolder(at, ALDiskIncludes::scriptExtensions(asking.lua), false, found);
+        }
+    }
+    sortChildren(found);
+    for (const ALRequirePlaces::Child& child : found)
+    {
+        out.push_back({ child.name, head + child.name, child.folder });
+    }
+    return out;
+}
+
+ALIncludeSearch::Candidate ALIncludeSearch::admitted(const std::string& real)
+{
+    Candidate    c;
+    const size_t slash = real.find_last_of("/\\");
+    c.name             = slash == std::string::npos ? real : real.substr(slash + 1);
+    c.path             = ALIncludeIdentity::ofFile(real);
+    c.file             = real;
+    // Past a few thousand, the oldest admissions let go of all at once:
+    // each is made again by the next run over what names it.
+    if (mAdmitted.size() >= ADMITTED_KEPT && !mAdmitted.contains(c.path))
+    {
+        mAdmitted.clear();
+    }
+    mAdmitted.insert(c.path);
+    return c;
 }
 
 ALPreprocessor::Found ALIncludeSearch::lookUp(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Asking& asking, const Where& where)
@@ -556,7 +1493,9 @@ std::vector<std::pair<std::string, std::string>> ALIncludeSearch::moduleFolders(
         const bool on_disk = ALIncludeIdentity::fileOf(config.path, config_file);
         for (const auto& [alias, path] : parsed.aliases)
         {
-            if (!said.insert(alias).second || !on_disk)
+            // None a configuration may not name, which a require through it
+            // never reaches (ALLuauConfig::reservedAlias).
+            if (ALLuauConfig::reservedAlias(alias) || !said.insert(alias).second || !on_disk)
             {
                 continue;
             }
@@ -597,6 +1536,17 @@ bool ALIncludeSearch::configOf(const Asking& asking, const Where& where, ALLuauC
     return ALLuauConfig::parseChain(texts, out, base);
 }
 
+namespace
+{
+    // A module found nowhere, however it was said: as it was, why Luau's
+    // navigator found nothing, or with a reason of no known shape.
+    bool moduleMissing(const ALScriptProblem& problem)
+    {
+        return !problem.args.empty() &&
+               (problem.key == "PreprocModuleNotFound" || problem.key == "PreprocModuleNotFoundWhy" || ALMessageMap::requireReason(problem.key));
+    }
+}
+
 // static
 void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& facts)
 {
@@ -606,7 +1556,7 @@ void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& 
     if (facts.objectUnanswered)
     {
         const bool missing = std::any_of(problems.begin(), problems.end(), [](const ALScriptProblem& p) {
-            return p.key == "PreprocIncludeNotFound" || p.key == "PreprocModuleNotFound";
+            return p.key == "PreprocIncludeNotFound" || moduleMissing(p);
         });
         if (missing)
         {
@@ -626,11 +1576,12 @@ void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& 
     {
         for (ALScriptProblem& problem : problems)
         {
-            const bool include = problem.key == "PreprocIncludeNotFound";
-            if ((!include && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1 || !facts.inWorld || !facts.inWorld(problem.args[0]))
+            const bool include = problem.key == "PreprocIncludeNotFound" && problem.args.size() == 1;
+            if ((!include && !moduleMissing(problem)) || !facts.inWorld || !facts.inWorld(problem.args[0]))
             {
                 continue;
             }
+            problem.args.resize(1);
             problem.key     = include ? "PreprocIncludeInWorld" : "PreprocModuleInWorld";
             problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': one so named is in the object or the inventory, but "
                                                               "includes from there are off. Includes come from folders on disk: turn on Build > "
@@ -651,8 +1602,8 @@ void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& 
     std::string file;
     for (ALScriptProblem& problem : problems)
     {
-        const bool include = problem.key == "PreprocIncludeNotFound";
-        if ((!include && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1)
+        const bool include = problem.key == "PreprocIncludeNotFound" && problem.args.size() == 1;
+        if (!include && !moduleMissing(problem))
         {
             continue;
         }
@@ -661,6 +1612,7 @@ void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& 
         {
             continue;
         }
+        problem.args.resize(1);
         problem.key     = include ? "PreprocIncludeNotOnDisk" : "PreprocModuleNotOnDisk";
         problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': the disk was not looked in. Includes come from "
                                                           "folders on disk: turn on Build > Include from Disk, and add the folder with Build > "
@@ -680,7 +1632,9 @@ ALIncludeSearch::LeftOut ALIncludeSearch::leftOut(const ALScriptProblems& proble
     {
         const bool in_world = problem.key == "PreprocIncludeInWorld" || problem.key == "PreprocModuleInWorld";
         const bool off_disk = problem.key == "PreprocIncludeNotOnDisk" || problem.key == "PreprocModuleNotOnDisk";
-        if ((!in_world && !off_disk && problem.key != "PreprocIncludeNotFound" && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1)
+        const bool missing  = (problem.key == "PreprocIncludeNotFound" && problem.args.size() == 1) || moduleMissing(problem) ||
+                             problem.key == "PreprocModuleSearched";
+        if ((!in_world && !off_disk && !missing) || problem.args.empty())
         {
             continue;
         }

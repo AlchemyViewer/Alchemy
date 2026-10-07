@@ -92,11 +92,23 @@ public:
     }
     bool listed(const LLUUID& prim) const { return mContents.contains(prim); }
     bool unanswered(const LLUUID& prim) const { return mUnanswered.contains(prim); }
+    // An inventory folder a run waited for (folderIn), its fetch back or
+    // given up on: one still not in is read for what the model holds of it
+    // from now on, rather than holding up the runs after.
+    void folderWaited(const LLUUID& folder);
 
     // ALIncludeWorld
     std::vector<Item>     inObject(const std::string& asking, const std::string& item_name, bool& unknown) override;
     std::vector<Item>     inInventory(const std::string& item_name, const std::vector<std::string>& folders, const std::string& from) override;
     ALPreprocessor::Found configsOver(const std::string& from, const std::string& name, std::vector<Item>& out) override;
+    bool                  folderOf(const std::string& item, std::string& folder, std::string& name) override;
+    ALPreprocessor::Found folderAbove(const std::string& folder, std::string& out) override;
+    ALPreprocessor::Found named(const std::string& folder, const std::string& name, std::vector<Item>& items, std::string& subfolder) override;
+    ALPreprocessor::Found contents(const std::string& folder, std::vector<Item>& items, std::vector<std::string>& folders) override;
+    // What could follow a path typed in a string that names a file
+    // (ALIncludeSearch::suggest), for a script the preprocessor is asked
+    // about.
+    std::vector<ALRequireNavigation::Suggestion> suggest(const Request& request, const std::string& typed, bool require);
 
 private:
     // Where a name is looked for, as the settings say now; who asks.
@@ -105,15 +117,25 @@ private:
     // The include folders as the setting holds them, read once each time
     // the settings that decide the disk move; and how often they have.
     const std::vector<std::string>& ownIncludeFolders();
+    // The SLua aliases the studio names, read once likewise.
+    const std::vector<ALScriptPreprocessor::StudioAlias>& studioAliases();
     U32                             diskGeneration();
     // Every script and notecard of a name in the inventory.
     LLInventoryModel::item_array_t namedItems(const std::string& name);
+    // Whether an inventory folder's contents may be read, for a require
+    // walking it, asking for them where they are not fetched yet: Pending
+    // then where a run resolving waits for what it wants, which notes it
+    // for that run to want; else Yes, for what the model holds -- all of
+    // them, where they are in -- as where a run waited and they never came.
+    // No where there is no such folder.
+    ALPreprocessor::Found          folderIn(const LLUUID& id);
 
     // The texts fetched: the preprocessor's.
     ALScriptTextCache& mTexts;
     ALIncludeSearch    mSearch;
     U32                                             mDiskGeneration = 1;
     std::optional<std::vector<std::string>>         mOwnFolders;
+    std::optional<std::vector<ALScriptPreprocessor::StudioAlias>> mStudioAliases;
     std::vector<boost::signals2::scoped_connection> mDiskSettings;
     // What each prim was last said to hold.
     boost::unordered_flat_map<LLUUID, std::vector<ALScriptContents::Item>> mContents;
@@ -122,4 +144,11 @@ private:
     // a run over a script in one says why, until a save asks again and it
     // answers.
     boost::unordered_flat_set<LLUUID> mUnanswered;
+    // Whether a resolve is under way for a run that waits for what it
+    // wants; the inventory folders it found not fetched yet, which its run
+    // is to want; and those a run waited for that never came, read for
+    // what the model holds.
+    bool                              mCollecting = false;
+    std::vector<LLUUID>               mFoldersWanted;
+    boost::unordered_flat_set<LLUUID> mFoldersWaited;
 };

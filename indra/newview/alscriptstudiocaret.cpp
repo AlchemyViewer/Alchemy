@@ -40,6 +40,7 @@
 #include <optional>
 
 using ALScriptPlaces::lineOf;
+using ALScriptPlaces::mapModuleSpan;
 using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;
@@ -94,7 +95,13 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
     ALScriptSpan       definition    = refs.definition;
     std::string        homePath;
     std::string        homeName;
-    if (hasDefinition && map)
+    if (hasDefinition && !refs.definitionFile.empty())
+    {
+        // In a module the script requires, which the analyzers read apart:
+        // through the module's own map, to the file it came of.
+        hasDefinition = map && mapModuleSpan(doc.expanded.moduleMaps, refs.definitionFile, definition, homePath, homeName);
+    }
+    else if (hasDefinition && map)
     {
         const S32 file = mapSpan(*map, definition);
         if (file < 0)
@@ -154,6 +161,49 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
                 expansion.emplace(doc.expanded.text);
             }
             placeText(place, expansion->line(raw.line));
+            place.at = -1;
+        }
+        places.push_back(std::move(place));
+    }
+    // Each place in a module the script requires, which the analyzers read
+    // apart: back to the file it came of through the module's own map,
+    // its line as the file has it where it is had, else as the module's
+    // text read.
+    static const std::vector<ALLuauService::Module> NO_MODULES;
+    std::optional<ALScriptPlaces::Lines>            module_text;
+    std::string                                     module_key;
+    for (const ALScriptReferences::Elsewhere& away : refs.elsewhere)
+    {
+        Doc::Place place;
+        place.span = away.span;
+        if (!map || !mapModuleSpan(doc.expanded.moduleMaps, away.file, place.span, place.file, place.fileName))
+        {
+            continue;
+        }
+        auto lines = files.find(place.file);
+        if (lines == files.end())
+        {
+            lines = files.emplace(place.file, mAnalysis.sourceLines(place.file)).first;
+        }
+        if (lines->second.has(place.span.line))
+        {
+            placeText(place, lines->second.line(place.span.line));
+        }
+        else
+        {
+            if (module_key != away.file)
+            {
+                module_key = away.file;
+                module_text.reset();
+                for (const ALLuauService::Module& module : doc.expanded.modules ? doc.expanded.modules->modules : NO_MODULES)
+                {
+                    if (module.key == away.file)
+                    {
+                        module_text.emplace(module.text);
+                    }
+                }
+            }
+            placeText(place, module_text ? module_text->line(away.span.line) : std::string());
             place.at = -1;
         }
         places.push_back(std::move(place));

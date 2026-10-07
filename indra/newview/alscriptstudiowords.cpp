@@ -387,6 +387,104 @@ bool ALScriptStudioWords::linkArgument(bool lua, std::string_view function, S32 
 }
 
 // static
+bool ALScriptStudioWords::callAt(ALCodeEditor& editor, const ALTextPos& at, std::string& callee, S32& argument)
+{
+    ALTextPos open;
+    if (!editor.bracketIndex().enclosing(at, '(', 1, open))
+    {
+        return false;
+    }
+    const std::string& line = editor.document().line(open.line);
+    S32                end  = std::min<S32>(open.column, static_cast<S32>(line.size()));
+    while (end > 0 && (line[end - 1] == ' ' || line[end - 1] == '\t'))
+    {
+        --end;
+    }
+    S32 start = end;
+    while (start > 0 && (ALScriptLexicon::isNameByte(line[start - 1]) || line[start - 1] == '.'))
+    {
+        --start;
+    }
+    if (start == end)
+    {
+        return false;
+    }
+    callee   = line.substr(start, end - start);
+    argument = editor.argumentAt(open, at);
+    return true;
+}
+
+// static
+ALLSLTraits::Item ALScriptStudioWords::itemStringAt(ALCodeEditor& editor, const ALTextPos& at, bool lua, char& quote)
+{
+    // How far above its string a call's bracket is looked for.
+    constexpr S32 BRACKET_LINES = 200;
+    // The string at the place or ending at it, closed or not: its quote.
+    char                             opener = '\0';
+    const std::optional<ALTextRange> held   = editor.quotedAt(at, &opener);
+    if (!held || (opener != '"' && opener != '\''))
+    {
+        return ALLSLTraits::Item::None;
+    }
+    quote = opener;
+    const ALTextRange literal(ALTextPos(held->begin.line, held->begin.column - 1), held->end);
+    // What comes before the string, past blanks, lines and comments.
+    char      before = '\0';
+    ALTextPos before_at(-1, -1);
+    for (S32 line = literal.begin.line; line >= 0 && line > literal.begin.line - BRACKET_LINES && !before; --line)
+    {
+        const std::string&                text   = editor.document().line(line);
+        const std::vector<ALSyntaxToken>& tokens = editor.highlighter().tokens(line);
+        S32                               column = line == literal.begin.line ? literal.begin.column : static_cast<S32>(text.size());
+        while (column > 0 && !before)
+        {
+            const char c = text[column - 1];
+            if (c == ' ' || c == '\t' || c == '\r')
+            {
+                --column;
+                continue;
+            }
+            const auto comment = std::find_if(tokens.begin(), tokens.end(), [column](const ALSyntaxToken& t) {
+                return t.begin < column && column <= t.end && (t.kind == ALSyntaxKind::Comment || t.kind == ALSyntaxKind::DocComment);
+            });
+            if (comment != tokens.end())
+            {
+                column = comment->begin;
+                continue;
+            }
+            before    = c;
+            before_at = ALTextPos(line, column - 1);
+        }
+    }
+    std::string callee;
+    S32         argument = 0;
+    if (before == '(' || before == ',')
+    {
+        if (!callAt(editor, literal.begin, callee, argument))
+        {
+            return ALLSLTraits::Item::None;
+        }
+    }
+    else if (lua && ALScriptLexicon::isNameByte(before))
+    {
+        // SLua's call of a string alone, with no brackets, right after the
+        // function's name: its one argument.
+        const std::string& text  = editor.document().line(before_at.line);
+        S32                start = before_at.column + 1;
+        while (start > 0 && (ALScriptLexicon::isNameByte(text[start - 1]) || text[start - 1] == '.'))
+        {
+            --start;
+        }
+        callee = text.substr(start, before_at.column + 1 - start);
+    }
+    else
+    {
+        return ALLSLTraits::Item::None;
+    }
+    return ALLSLTraits::itemArg(callee, argument);
+}
+
+// static
 bool ALScriptStudioWords::inStateBody(ALCodeEditor& editor, const ALTextPos& at)
 {
     // Straight inside a state is one bracket deep, in a block opened after
@@ -432,7 +530,7 @@ bool ALScriptStudioWords::inStateBody(ALCodeEditor& editor, const ALTextPos& at)
 }
 
 // static
-ALCodeEditor::Completion ALScriptStudioWords::completionFor(const Vocab& word, bool lua)
+ALCodeEditor::Completion ALScriptStudioWords::completionFor(const Vocab& word, bool lua, bool typed)
 {
     ALCodeEditor::Completion c;
     c.text          = word.text;
@@ -443,15 +541,19 @@ ALCodeEditor::Completion ALScriptStudioWords::completionFor(const Vocab& word, b
     if (word.kind == ALSyntaxKind::Event)
     {
         // A handler to fill in: LSL's with its typed parameters as the
-        // detail reads them, SLua's as a function set on LLEvents.
+        // detail reads them; SLua's as a function of LLEvents', as SLua's
+        // own scripts write one, each parameter typed where asked as the
+        // detail types it -- `type name` there, `name: type` here.
         if (lua)
         {
+            // Split as the editor splits a signature's for its stops: a
+            // type's own brackets and commas kept, a variadic `...`.
             std::string params;
-            for (const std::string& name : ALCodeEditor::parameterNames(word.detail, word.text))
+            for (const ALSnippetSession::Parameter& one : ALSnippetSession::parameters(word.detail, word.text))
             {
-                params += (params.empty() ? "" : ", ") + name;
+                params += (params.empty() ? "" : ", ") + (typed && !one.type.empty() ? one.name + ": " + one.type : one.name);
             }
-            c.snippet = "LLEvents." + word.text + " = function(" + params + ")\n    $0\nend";
+            c.snippet = "function LLEvents." + word.text + "(" + params + ")\n    $0\nend";
         }
         else
         {
@@ -643,9 +745,35 @@ bool ALScriptStudioWords::hoverText(bool lua, const ALTextDocument& text, const 
 // static
 void ALScriptStudioWords::complete(bool lua, ALCodeEditor& editor, const ALTextPos& at, std::string_view prefix,
                                    const std::vector<Snippet>& snippets, const std::string& snippet_word,
-                                   std::vector<ALCodeEditor::Completion>& out)
+                                   std::vector<ALCodeEditor::Completion>& out, bool typed)
 {
     auto begins = [&prefix](const std::string& text) { return ALCodeEditor::matchTier(text, prefix) >= 0; };
+    // After an SLua `--!`, the comments that say how a script is checked,
+    // and nothing else.
+    if (lua)
+    {
+        const std::string& line   = editor.document().line(at.line);
+        const size_t       word   = static_cast<size_t>(std::max(0, at.column - static_cast<S32>(prefix.size())));
+        std::string_view   before = std::string_view(line).substr(0, std::min(word, line.size()));
+        while (!before.empty() && (before.front() == ' ' || before.front() == '\t'))
+        {
+            before.remove_prefix(1);
+        }
+        if (before == "--!")
+        {
+            for (std::string_view hot : ALScriptLexicon::LUAU_HOT_COMMENTS)
+            {
+                if (begins(std::string(hot)))
+                {
+                    ALCodeEditor::Completion c;
+                    c.text = std::string(hot);
+                    c.kind = ALSyntaxKind::Keyword;
+                    out.push_back(std::move(c));
+                }
+            }
+            return;
+        }
+    }
     // An LSL event's handler goes straight inside a state and nowhere
     // else, so a handler is offered only there; asked once, and only
     // if one matches.
@@ -667,7 +795,7 @@ void ALScriptStudioWords::complete(bool lua, ALCodeEditor& editor, const ALTextP
                 continue;
             }
         }
-        out.push_back(completionFor(each, lua));
+        out.push_back(completionFor(each, lua, typed));
     }
     // A snippet by its prefix, where a bare word is being typed
     // rather than a member.

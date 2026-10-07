@@ -31,6 +31,7 @@
 #include "../test/lltut.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -111,7 +112,7 @@ namespace tut
 
         blessed.bless(s.at("nowhere"));
         blessed.bless(lib);
-        ensure_equals("what is not a folder blesses nothing", blessed.folders().size(), size_t(1));
+        ensure_equals("what is not a folder blesses no folder", blessed.folders().size(), size_t(1));
         blessed.bless(s.at("lib/../lib"));
         ensure_equals("and one folder is blessed once however it is named", blessed.folders().size(), size_t(1));
     }
@@ -336,5 +337,96 @@ namespace tut
         ensure("not through a link out", blessed.atTop(".luaurc") == files{ third, second });
 #endif
         ensure("nor a name no folder has", blessed.atTop(".lslrc").empty());
+    }
+
+    template<> template<>
+    void aldiskincludes_object::test<8>()
+    {
+        set_test_name("the scripts of a language under folders: each folder blessed for the look, each script once, no more than asked, nothing outside");
+        Scratch s;
+        s.write("lib/util.luau", "return {}\n");
+        s.write("lib/old.lua", "return {}\n");
+        s.write("lib/net/http.luau", "return {}\n");
+        s.write("lib/door.lsl", "default {}\n");
+        s.write("lib/door.lslh", "integer x;\n");
+        s.write("lib/notes.txt", "words\n");
+        s.write("tools/t.luau", "return {}\n");
+        s.write("elsewhere/secret.luau", "return {}\n");
+        const auto names = [&s](std::vector<std::string> found) {
+            std::sort(found.begin(), found.end());
+            std::string said;
+            for (const std::string& one : found)
+            {
+                said += (said.empty() ? "" : " ") + fsyspath(fs::relative(fsyspath(one), fsyspath(s.at("")))).generic_string();
+            }
+            return said;
+        };
+        ensure_equals("SLua's, both folders, through their folders",
+                      names(ALDiskIncludes::scriptsUnder({ s.at("lib"), s.at("tools") }, true, 4, 100)),
+                      std::string("lib/net/http.luau lib/old.lua lib/util.luau tools/t.luau"));
+        ensure_equals("LSL's and its includes'", names(ALDiskIncludes::scriptsUnder({ s.at("lib") }, false, 4, 100)),
+                      std::string("lib/door.lsl lib/door.lslh"));
+        ensure_equals("a folder given twice, or under another, each once",
+                      ALDiskIncludes::scriptsUnder({ s.at("lib"), s.at("lib/net"), s.at("lib") }, true, 4, 100).size(), size_t(3));
+        ensure_equals("no more than asked", ALDiskIncludes::scriptsUnder({ s.at("lib"), s.at("tools") }, true, 4, 2).size(), size_t(2));
+        ensure_equals("not deeper than asked", names(ALDiskIncludes::scriptsUnder({ s.at("lib") }, true, 0, 100)),
+                      std::string("lib/old.lua lib/util.luau"));
+        ensure("nothing of a folder not there", ALDiskIncludes::scriptsUnder({ s.at("nowhere") }, true, 4, 100).empty());
+    }
+
+    template<> template<>
+    void aldiskincludes_object::test<9>()
+    {
+        set_test_name("a script's extensions, in any case; a file blessed alone, nothing beside it; a path as written under a folder or not, nothing on the disk asked");
+        typedef std::vector<std::string> names;
+        const names&                     lua = ALDiskIncludes::scriptExtensions(true);
+        ensure("SLua's, the modern first", lua == names{ ".luau", ".lua" });
+        ensure("LSL's and its includes'", ALDiskIncludes::scriptExtensions(false) == names{ ".lsl", ".lslh", ".lsli" });
+        ensure_equals("in any case", ALDiskIncludes::extensionOf("Util.LUAU", lua), size_t(5));
+        ensure_equals("the old one", ALDiskIncludes::extensionOf("old.Lua", lua), size_t(4));
+        ensure_equals("an include's", ALDiskIncludes::extensionOf("defs.LSLH", ALDiskIncludes::scriptExtensions(false)), size_t(5));
+        ensure_equals("past a name of its own", ALDiskIncludes::extensionOf(".luau", lua), size_t(0));
+        ensure_equals("none", ALDiskIncludes::extensionOf("notes.txt", lua), size_t(0));
+        ensure("a require of one in any case is that file", ALDiskIncludes::namesFor("Util.LUAU", true, true) ==
+                                                              names{ "Util.LUAU", "Util.LUAU.luau", "Util.LUAU.lua" });
+
+        Scratch           s;
+        const std::string shout  = s.write("lib/Shout.LUAU", "return {}\n");
+        const std::string module = s.write("vendor/json.luau", "return {}\n");
+        const std::string beside = s.write("vendor/other.luau", "return {}\n");
+        ALDiskIncludes    blessed;
+        blessed.bless(s.at("lib"));
+        const std::vector<ALDiskIncludes::Listed> listed = blessed.filesUnder(s.at("lib"), lua, 1, 100, 100);
+        ensure("listed in any case", listed.size() == 1 && listed[0].file == shout);
+        blessed.bless(module);
+        ensure_equals("a file blessed alone", blessed.admits(module).value_or(""), module);
+        ensure("nothing beside it", !blessed.admits(beside));
+        ensure_equals("and no folder", blessed.folders().size(), size_t(1));
+
+        const std::vector<std::string> folders{ s.at("lib") };
+        std::string                    upper = s.at("lib/net/x.luau");
+        std::transform(upper.begin(), upper.end(), upper.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+        ensure("under, as written", ALDiskIncludes::lexicallyUnder(s.at("lib/net/x.luau"), folders));
+        ensure("in any case", ALDiskIncludes::lexicallyUnder(upper, folders));
+        ensure("whatever is there", ALDiskIncludes::lexicallyUnder(s.at("lib/missing/x.luau"), folders));
+        ensure("not climbing out", !ALDiskIncludes::lexicallyUnder(s.at("lib/../vendor/json.luau"), folders));
+        ensure("not a folder whose name it only begins with", !ALDiskIncludes::lexicallyUnder(s.at("lib2/x.luau"), folders));
+        ensure("not another machine's share", !ALDiskIncludes::lexicallyUnder("//alincludes.invalid/share/x", folders) &&
+                                                  !ALDiskIncludes::lexicallyUnder("\\\\alincludes.invalid\\share\\x", folders));
+        ensure("nor a device's path to one under it", !ALDiskIncludes::lexicallyUnder("\\\\?\\" + s.at("lib/x.luau"), folders));
+        ensure("nor under nothing", !ALDiskIncludes::lexicallyUnder(s.at("lib/x.luau"), {}) &&
+                                        !ALDiskIncludes::lexicallyUnder(std::string(), folders));
+        // What a configuration lists of another machine's share: not
+        // blessed, and not asked after.
+        ensure("a configuration's share", !blessed.mayFromConfig("//alincludes.invalid/share", s.at("lib")) &&
+                                              !blessed.blessFromConfig("\\\\alincludes.invalid\\share", s.at("lib")));
+        // Nor by the NT namespace's names, which Windows passes on as they
+        // are: a share's, and even a blessed folder's own.
+        ensure("the NT namespace's share", !blessed.mayFromConfig("\\??\\UNC\\alincludes.invalid\\share", s.at("lib")) &&
+                                               !blessed.blessFromConfig("/?\?/UNC/alincludes.invalid/share", s.at("lib")));
+        fs::create_directories(s.under("lib/net"));
+        ensure("its name for a folder under the configuration's", !blessed.mayFromConfig("\\??\\" + s.at("lib/net"), s.at("lib")) &&
+                                                                        !ALDiskIncludes::lexicallyUnder("\\??\\" + s.at("lib/net"), folders));
+        ensure("which, as itself, it may name", blessed.mayFromConfig(s.at("lib/net"), s.at("lib")));
     }
 }

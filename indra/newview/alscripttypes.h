@@ -293,7 +293,7 @@ struct ALScriptTransferResult
     std::string              error;
 };
 
-// The scripts and notecards a prim holds.
+// What a prim holds: its scripts and notecards, and the rest by name.
 struct ALScriptContents
 {
     // A script or a notecard in a prim's contents.
@@ -311,12 +311,21 @@ struct ALScriptContents
         std::string description;
     };
 
-    LLUUID            prim;
-    std::string       name;
+    // Anything else it holds, as a script names it: a sound to play, an
+    // object to rez, a texture to put on a face.
+    struct Other
+    {
+        std::string        name;
+        LLAssetType::EType type = LLAssetType::AT_NONE;
+    };
+
+    LLUUID             prim;
+    std::string        name;
     // False where the prim is not known here, or nothing came back;
     // listed as holding nothing where RLVa keeps its contents unseen.
-    bool              fetched = false;
-    std::vector<Item> items;
+    bool               fetched = false;
+    std::vector<Item>  items;
+    std::vector<Other> others;
     // The serial of the contents this is, which moves as they change
     // (LLViewerObject::getInventorySerial); -1 where it is not known.
     S32               serial = -1;

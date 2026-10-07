@@ -222,6 +222,10 @@ public:
     // once; refused where the text has moved on since `version`, the one
     // it was made over, whose places it is in.
     bool applyFix(Doc& doc, const ALScriptFix& fix, U32 version);
+    // A SLua alias of the studio's own named for a folder, as a fix that
+    // moves a require onto one does once its edit is sure to take, before
+    // it is made; false, said, where the name is another folder's.
+    bool nameStudioAlias(const std::string& name, const std::string& folder);
     // The preferred fix of every problem picked, made as one step, once
     // asked; and made, the asking done. True where anything was made.
     void askFixAll(Doc& doc, const FixPick& pick);
@@ -244,6 +248,26 @@ public:
     // not use dropped. Fixes are kept only for the script's own.
     static void mapBack(std::vector<ALScriptProblem>& problems, const ALSourceMap& map,
                         const std::vector<std::pair<std::string, ALSourceMap>>& module_maps);
+    // The modules an expansion of SLua read apart reaches, each by its key
+    // and text, and which require reaches which: what the analyzers check
+    // the script with (ALLuauService::setModules). Here, so that what asks
+    // the analyzers of an expansion without checking needs nothing more.
+    static std::shared_ptr<const ALLuauService::Modules> modulesOf(const ALPreprocessor::Result& result)
+    {
+        auto modules = std::make_shared<ALLuauService::Modules>();
+        for (const ALPreprocessor::Result::Piece& piece : result.apart.modules)
+        {
+            modules->modules.push_back({ piece.key, piece.text });
+        }
+        for (const ALPreprocessor::Result::Resolved& resolved : result.resolved)
+        {
+            if (resolved.require)
+            {
+                modules->reaches.push_back({ resolved.from, resolved.name, resolved.path });
+            }
+        }
+        return modules;
+    }
 
 private:
     // What the analyzers said of a word, on the tip under the mouse.

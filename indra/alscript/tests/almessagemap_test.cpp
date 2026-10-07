@@ -177,4 +177,35 @@ namespace tut
         ensure_equals("a mark with no word stays", ALScriptProblem::fill("[1] and [3]", { "a" }), std::string("a and [3]"));
         ensure_equals("each mark as often as it is used", ALScriptProblem::fill("[1][1]", { "x" }), std::string("xx"));
     }
+
+    template<> template<>
+    void almessagemap_object::test<8>()
+    {
+        set_test_name("why a SLua require found nothing, keyed: Luau's navigator's words and the studio's own, the module's name left for [1]");
+        ALMessageMap::Match m;
+        ensure("a child", ALMessageMap::luauRequire("could not resolve child component \"util\"", m) && m.key == "PreprocRequireNoChild" &&
+                              m.args == std::vector<std::string>({ "", "util" }));
+        ensure("ambiguous, the fuller shape", ALMessageMap::luauRequire("could not resolve child component \"util\" (ambiguous)", m) &&
+                                                  m.key == "PreprocRequireNoChildAmbiguous");
+        ensure("an alias", ALMessageMap::luauRequire("@lib is not a valid alias", m) && m.key == "PreprocRequireNotAlias" && m.args[1] == "lib");
+        ensure("a cycle", ALMessageMap::luauRequire("detected alias cycle (@a -> @b -> @a)", m) && m.key == "PreprocRequireAliasCycle" &&
+                              m.args[1] == "@a -> @b -> @a");
+        ensure("the studio's own", ALMessageMap::luauRequire("the alias '@sl-std' is reserved: aliases starting @sl- are Second Life's", m) &&
+                                       m.key == "PreprocRequireReserved" && m.args[1] == "sl-std");
+        ensure("a folder with both configurations", ALMessageMap::luauRequire("could not resolve alias \"lib\" (ambiguous configuration file)", m) &&
+                                                        m.key == "PreprocRequireConfigAmbiguous" && m.args[1] == "lib");
+        ensure("a file nothing lets in", ALMessageMap::luauRequire("'C:/lib/x.luau' is there, but no include folder or alias lets a require read it", m) &&
+                                             m.key == "PreprocRequireNotAdmitted" && m.args[1] == "C:/lib/x.luau");
+        ensure("an alias past its configuration's folder",
+               ALMessageMap::luauRequire("the configuration in 'C:/lib' names 'D:/out', which is outside it and outside the include folders", m) &&
+                   m.key == "PreprocRequireAliasRefused" && m.args == std::vector<std::string>({ "", "C:/lib", "D:/out" }));
+        ensure("a configuration that could not be read",
+               ALMessageMap::luauRequire("the configuration 'C:/lib/.luaurc' could not be read: expected value", m) &&
+                   m.key == "PreprocRequireConfigBroken" && m.args == std::vector<std::string>({ "", "C:/lib/.luaurc", "expected value" }));
+        ensure("a world alias naming the disk",
+               ALMessageMap::luauRequire("the alias stands for '/x', a path on disk, which a configuration in the world may not name", m) &&
+                   m.key == "PreprocRequireAliasNamesDisk" && m.args[1] == "/x");
+        ensure("a reason of no known shape", !ALMessageMap::luauRequire("something else went wrong", m));
+        ensure("its keys known as such", ALMessageMap::requireReason("PreprocRequireNoChild") && !ALMessageMap::requireReason("PreprocRequireTooDeep"));
+    }
 }

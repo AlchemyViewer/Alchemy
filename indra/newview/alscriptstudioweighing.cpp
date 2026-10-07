@@ -88,11 +88,13 @@ void ALScriptStudioWeighing::weighed(Doc& doc, const ALScriptAnalysis::Result& r
         return;
     }
     // In the source's places, through the expansion the question was
-    // asked over -- which answered() has made sure is the one there is.
+    // asked over -- which answered() has made sure is the one there is;
+    // the bundle's, where it was the bundle that was weighed.
     doc.weighing->all.clear();
+    const ALSourceMap& map = doc.expanded.bundle ? doc.expanded.bundleMap : doc.expanded.map;
     for (const ALScriptWeight& weight : result.weights)
     {
-        doc.weighing->all.push_back(mAnalysis.preprocessed(doc) && doc.expanded.valid ? weight.inSource(doc.expanded.map) : weight);
+        doc.weighing->all.push_back(mAnalysis.preprocessed(doc) && doc.expanded.valid ? weight.inSource(map) : weight);
     }
     doc.weighing->allVersion = result.version;
     keepSaved(doc);

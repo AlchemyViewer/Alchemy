@@ -43,6 +43,14 @@
 
   member_separators: what comes between a name and a member of it, after
   which completion opens; a dot where a grammar does not say.
+
+  completes_in: where what is typed completes as code does though a
+  comment or a string holds it, each a regex matched against a line's text
+  up to the caret.
+
+  path_strings: the strings that name a file, each a regex matched against
+  a line's text up to the string's opening quote; what is typed in one
+  completes as a path.
 -->
 <llsd>
   <map>
@@ -61,6 +69,16 @@
     <string>--</string>
     <key>member_separators</key>
     <string>.:</string>
+    <key>completes_in</key>
+    <array>
+      <!-- The comments that say how a script is checked. -->
+      <string>^\s*--!\w*$</string>
+    </array>
+    <key>path_strings</key>
+    <array>
+      <string>\brequire\s*\(\s*$</string>
+      <string>--#include\s*$</string>
+    </array>
     <key>extensions</key>
     <array>
       <string>luau</string>

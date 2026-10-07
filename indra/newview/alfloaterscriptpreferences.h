@@ -28,6 +28,7 @@
 #include "alscripttheme.h"
 #include "llfloater.h"
 
+#include <initializer_list>
 #include <map>
 #include <string>
 #include <vector>
@@ -70,6 +71,13 @@ public:
     // for the snippet notecard followed.
     bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept,
                            std::string& tooltip_msg) override;
+    // Settings just changed outside the window, while it may be open, by
+    // something whose other change stays whatever the window does -- a
+    // fix that named an alias and rewrote a require to use it: what
+    // Cancel goes back to takes them as they now are, as it takes a lint
+    // set from a problem's menu, so that Cancel cannot take the alias
+    // from under the require.
+    static void keepChanged(std::initializer_list<const char*> settings);
 
 private:
     // Everything changes as it is changed, so that the editors show it;

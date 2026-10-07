@@ -47,6 +47,30 @@ namespace
 {
     // How long after the last keystroke the analyzers are asked.
     const F64 ANALYSIS_DELAY = 0.35;
+
+    // Whether edits made at once over a view's text take, as
+    // ALTextView::replaceAll makes them: the view not read only, something
+    // to take out or put in, and the text kept under the view's limit.
+    bool takes(const ALCodeEditor& view, const std::vector<std::pair<ALTextRange, std::string>>& edits)
+    {
+        if (view.isReadOnly())
+        {
+            return false;
+        }
+        const ALTextDocument& text  = view.document();
+        size_t                taken = 0;
+        size_t                put   = 0;
+        for (const auto& [range, with] : edits)
+        {
+            taken += text.text(range).size();
+            put += with.size();
+        }
+        if (taken == 0 && put == 0)
+        {
+            return false;
+        }
+        return view.maxBytes() == 0 || put <= taken || text.byteCount() - taken + put <= view.maxBytes();
+    }
     // What makes an include's functions and globals a script to the
     // parser: a state after them. Put after the text, so that every place
     // in it is where it was; what is said of it is dropped.
@@ -68,6 +92,17 @@ namespace
             case ALScriptSymbolKind::Label:     return ALSyntaxKind::Label;
             case ALScriptSymbolKind::Module:    return ALSyntaxKind::Namespace;
             default:                            return ALSyntaxKind::Text;
+        }
+    }
+
+    ALCompletion::Brackets bracketsOf(ALScriptCompletion::Brackets brackets)
+    {
+        switch (brackets)
+        {
+            case ALScriptCompletion::Brackets::None:   return ALCompletion::Brackets::None;
+            case ALScriptCompletion::Brackets::After:  return ALCompletion::Brackets::After;
+            case ALScriptCompletion::Brackets::Inside: return ALCompletion::Brackets::Inside;
+            default:                                   return ALCompletion::Brackets::Guess;
         }
     }
 
@@ -105,6 +140,7 @@ namespace
 
 using ALScriptPlaces::Declared;
 using ALScriptPlaces::declaredOf;
+using ALScriptPlaces::mapModuleSpan;
 using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::rangeOf;
 
@@ -241,21 +277,13 @@ void ALScriptStudioChecking::expandedAnswer(const std::string& id, U32 version, 
         // each the checker's own; the bundle kept to weigh.
         doc.expanded.text   = std::make_shared<const std::string>(result.apart.script.text);
         doc.expanded.map    = result.apart.script.map;
-        doc.expanded.bundle = std::make_shared<const std::string>(result.text);
-        auto modules        = std::make_shared<ALLuauService::Modules>();
+        doc.expanded.bundle    = std::make_shared<const std::string>(result.text);
+        doc.expanded.bundleMap = result.map;
         for (const ALPreprocessor::Result::Piece& piece : result.apart.modules)
         {
-            modules->modules.push_back({ piece.key, piece.text });
             doc.expanded.moduleMaps.emplace_back(piece.key, piece.map);
         }
-        for (const ALPreprocessor::Result::Resolved& resolved : result.resolved)
-        {
-            if (resolved.require)
-            {
-                modules->reaches.push_back({ resolved.from, resolved.name, resolved.path });
-            }
-        }
-        doc.expanded.modules = std::move(modules);
+        doc.expanded.modules = modulesOf(result);
     }
     else
     {
@@ -496,6 +524,10 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
         {
             std::vector<ALCodeEditor::Completion> more;
             more.reserve(result.completions.size());
+            // The document's own words beside the answer, but where the
+            // analyzer says the place wants none of them: a type, a string,
+            // a comment that says how the script is checked.
+            bool words = true;
             for (const ALScriptCompletion& c : result.completions)
             {
                 ALCodeEditor::Completion completion;
@@ -504,9 +536,14 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
                 completion.kind          = syntaxKindOf(c.kind);
                 completion.deprecated    = c.deprecated;
                 completion.documentation = ALCompletion::shared(c.documentation);
+                completion.snippet       = c.snippet;
+                completion.fits          = c.fits;
+                completion.brackets      = bracketsOf(c.brackets);
                 more.push_back(std::move(completion));
+                words = words && c.context != ALScriptCompletion::Context::Type && c.context != ALScriptCompletion::Context::String &&
+                        c.context != ALScriptCompletion::Context::HotComment;
             }
-            doc.editor->supplyCompletions(at, std::move(more));
+            doc.editor->supplyCompletions(at, std::move(more), words);
             break;
         }
         case ALScriptAnalysis::Kind::Hover:
@@ -542,6 +579,9 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
             break;
         case ALScriptAnalysis::Kind::Shape:
             // A comparison's, which it answers itself.
+            break;
+        case ALScriptAnalysis::Kind::Warm:
+            // Answered to nobody.
             break;
     }
 }
@@ -1035,21 +1075,16 @@ void ALScriptStudioChecking::mapBack(std::vector<ALScriptProblem>& problems, con
         if (!problem.file.empty())
         {
             problem.fixes.clear();
-            const auto own = std::find_if(module_maps.begin(), module_maps.end(),
-                                          [&problem](const auto& module) { return module.first == problem.file; });
-            if (own == module_maps.end())
-            {
-                continue;
-            }
             ALScriptSpan span;
             span.line      = problem.line;
             span.column    = problem.column;
             span.endLine   = problem.endLine;
             span.endColumn = problem.endColumn;
-            const S32 file = mapSpan(own->second, span);
-            if (file >= 0)
+            std::string path;
+            std::string name;
+            if (mapModuleSpan(module_maps, problem.file, span, path, name))
             {
-                problem.file      = own->second.files()[file].path;
+                problem.file      = path;
                 problem.line      = span.line;
                 problem.column    = span.column;
                 problem.endLine   = span.endLine;
@@ -1491,6 +1526,16 @@ bool ALScriptStudioChecking::applyFix(Doc& doc, const ALScriptFix& fix, U32 vers
         }
         edits.emplace_back(range, edit.text);
     }
+    // A require moved onto a SLua alias of the studio's own: the folder
+    // named, as the fix said it would be, and the disk read -- once the
+    // edit is sure to take, so that nothing is named, nor the disk turned
+    // on, for an edit that is not made; and before it is made, so that a
+    // name another folder has taken since the check refuses the fix with
+    // nothing changed, and nothing left to undo or to redo.
+    if (fix.key == "ScriptFixRequireAlias" && fix.args.size() == 3 && (!takes(source, edits) || !nameStudioAlias(fix.args[1], fix.args[2])))
+    {
+        return false;
+    }
     if (!source.replaceAll(std::move(edits)))
     {
         return false;
@@ -1499,6 +1544,19 @@ bool ALScriptStudioChecking::applyFix(Doc& doc, const ALScriptFix& fix, U32 vers
     mServices.setStatus(fix.title);
     schedule(doc, true);
     return true;
+}
+
+bool ALScriptStudioChecking::nameStudioAlias(const std::string& name, const std::string& folder)
+{
+    if (ALScriptStudioViewer::get().nameStudioAlias(name, folder))
+    {
+        return true;
+    }
+    // Named for another folder since the check: offered again after it.
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = name;
+    mServices.setStatus(mServices.words("AliasTaken", args), true);
+    return false;
 }
 
 void ALScriptStudioChecking::askFixAll(Doc& doc, const FixPick& pick)

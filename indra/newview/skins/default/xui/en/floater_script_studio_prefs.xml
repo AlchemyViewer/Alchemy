@@ -160,7 +160,7 @@ local function half(n: number): number
     return n / 2
 end
 
-LLEvents.touch_start = function(detected)
+function LLEvents.touch_start(detected)
     ll.Say(PUBLIC_CHANNEL, `Hello {name}`)
     for i = 1, #detected do
         count += 1
@@ -453,7 +453,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="auto_complete"
-             tool_tip="The completion list opens as you type; off, only when you press Control-Space"
+             tool_tip="The completion list opens as you type; off, only when you press Control-Space. An SLua handler completes with Luau types while LSL to SLua's Luau types option is on"
              top_pad="6"
              width="370" />
             <text
@@ -491,6 +491,17 @@ end</floater.string>
              name="accept_on_enter"
              tool_tip="Off, Return starts a new line and closes the list; only Tab accepts a completion"
              top_pad="6"
+             width="350" />
+            <check_box
+             control_name="ALScriptFragmentCompletion"
+             follows="left|top"
+             height="20"
+             label="Complete SLua from the statement being typed"
+             layout="topleft"
+             left="32"
+             name="fragment_completion"
+             tool_tip="Completion and signature help check only the statement being typed against the script's last check, and answer at once. Off, each keystroke that changed the script checks all of it before answering"
+             top_pad="4"
              width="350" />
             <text
              follows="left|top"
@@ -882,7 +893,7 @@ end</floater.string>
              left="32"
              multi_select="false"
              name="include_folders"
-             tool_tip="Folders searched for includes, top first"
+             tool_tip="Folders an #include is searched for in, top first; a SLua script on disk in one may require what is beside it"
              top_pad="4"
              width="260">
                 <pane_list.columns dynamic_width="true" name="folder" />
@@ -907,6 +918,16 @@ end</floater.string>
              tool_tip="Stop searching the selected folder"
              top_pad="4"
              width="70" />
+            <panel
+             class="al_panel_script_aliases"
+             filename="panel_script_studio_aliases.xml"
+             follows="left|top"
+             height="130"
+             layout="topleft"
+             left="12"
+             name="aliases_panel"
+             top_pad="10"
+             width="370" />
             <text
              follows="left|top"
              height="16"
@@ -1022,6 +1043,17 @@ end</floater.string>
              left="412"
              name="preproc_compress"
              tool_tip="Removes comments and extra spaces from the preprocessed code, for a smaller asset"
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptPreprocLineComments"
+             follows="left|top"
+             height="20"
+             label="Mark where each line came from"
+             layout="topleft"
+             left="412"
+             name="preproc_line_comments"
+             tool_tip="Writes an @line comment wherever the preprocessed code moves to another file or skips lines, with the line and the file's name, as the VS Code plugin does. Never a folder path. Compressed or optimized LSL drops them"
              top_pad="4"
              width="370" />
             <check_box
@@ -1645,7 +1677,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="convert_fields"
-             tool_tip="LLEvents.touch_start = function(detected) ... end. SLua puts an assigned handler on as LLEvents:on does, beside any others, but only LLEvents:handlers finds it again for LLEvents:off. Off: LLEvents:on."
+             tool_tip="function LLEvents.touch_start(detected) ... end, as SLua's own scripts write one. SLua puts an assigned handler on as LLEvents:on does, beside any others, but only LLEvents:handlers finds it again for LLEvents:off. Off: LLEvents:on."
              top_pad="4"
              width="700" />
             <check_box
@@ -1656,7 +1688,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="convert_types"
-             tool_tip="local count: number = 0, and function names(who: string): string, from LSL's types."
+             tool_tip="local count: number = 0, and function names(who: string): string, from LSL's types. Handlers the editor completes typed the same way: function LLEvents.on_rez(start_param: number)."
              top_pad="4"
              width="700" />
             <check_box

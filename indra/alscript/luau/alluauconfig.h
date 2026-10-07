@@ -77,10 +77,6 @@ struct ALLuauConfig
     // up. One that does not parse is passed over. False where none did,
     // and the base or the defaults.
     static bool parseChain(const std::vector<std::string_view>& nearest_first, ALLuauConfig& out, const ALLuauConfig* base = nullptr);
-    // Which file of a chain, given nearest first, says what an alias --
-    // in lower case -- stands for: the nearest that does, with what it
-    // says, which is from beside that file. Nothing where none does.
-    static std::optional<size_t> aliasIn(const std::vector<std::string_view>& nearest_first, const std::string& alias, std::string& value);
 
     // Every lint by the name a `.luaurc` gives it, in Luau's order, and
     // the bit of the masks above that one is.
@@ -92,4 +88,14 @@ struct ALLuauConfig
     static bool aliasOf(std::string_view name, std::string& alias, std::string& rest);
     // Whether a path is absolute: from a root, on any platform.
     static bool absolute(std::string_view path);
+    // Whether an alias's name is kept from anybody's naming, in any case:
+    // `self`, which is Luau's, and `sl-*`, which is Second Life's. Neither a
+    // configuration's nor the studio's, nor offered after an @.
+    static bool reservedAlias(std::string_view name);
+    // Whether a name may be one of Script Studio's own aliases: as Luau
+    // takes an alias's name, and not reserved. And a folder's name made
+    // one: lower case, what Luau does not take put as `-`, and a number
+    // after it where `taken` has it in any case.
+    static bool        studioAliasName(std::string_view name);
+    static std::string studioAliasFor(std::string_view folder_name, const std::vector<std::string>& taken);
 };

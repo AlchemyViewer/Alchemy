@@ -25,8 +25,10 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // The disk is the one place a script's text can reach past the world, and a
@@ -50,14 +52,16 @@ public:
     static constexpr std::uintmax_t MAX_BYTES = 4u * 1024u * 1024u;
 
     // A folder blessed, where it is one: kept as it stands once its links
-    // are followed. Anything else -- no such folder, a file -- is passed
-    // over.
+    // are followed. An ordinary file is blessed alone, nothing beside it --
+    // what an alias of a configuration names as a module -- and is no
+    // folder. Anything else -- no such folder, a device -- is passed over.
     void bless(const std::string& folder);
     bool blessed() const { return !mFolders.empty(); }
     // Whether a configuration on disk in `config_folder` may bless
     // `folder`: one under the folder the configuration is in, or under
     // one already blessed -- the scripter's own, blessed first. Links
-    // followed, both.
+    // followed, both; another machine's share, or a device, asked nothing
+    // of unless it is under one of those as written (lexicallyUnder).
     bool mayFromConfig(const std::string& folder, const std::string& config_folder) const;
     // Blessed where mayFromConfig says so; false, and said once in the
     // log, where not.
@@ -66,9 +70,24 @@ public:
     const std::vector<std::string>& folders() const { return mFolders; }
 
     // Where a file stands, once its links are followed, where it may be
-    // read: an ordinary file of at most MAX_BYTES under a blessed folder.
-    // Nothing for anything else.
+    // read: an ordinary file of at most MAX_BYTES under a blessed folder,
+    // or blessed itself. Nothing for anything else.
     std::optional<std::string> admits(const std::string& file) const;
+
+    // Whether a path from a root is under one of `folders` as both are
+    // written, part by part and in any case, nothing on the disk asked: what
+    // a path a script wrote must be before the disk is asked anything of
+    // it. A path on another machine's share -- which asking would send it
+    // who asks -- or a device's is under none but a folder of the same.
+    // Only that: where a file may be read is still `admits`'s to say.
+    static bool lexicallyUnder(const std::string& path, const std::vector<std::string>& folders);
+
+    // What a script of each language is named with on disk, the modern
+    // first: SLua's `.luau` and `.lua`; LSL's `.lsl`, and its includes'
+    // `.lslh` and `.lsli`. And how long the one of `extensions` a name ends
+    // with is, in any case, past a name of its own; nought for none.
+    static const std::vector<std::string>& scriptExtensions(bool lua);
+    static size_t                          extensionOf(std::string_view name, const std::vector<std::string>& extensions);
 
     // The files a name may stand for in a folder, in the order they are
     // looked for: the name as written, then with its language's
@@ -92,14 +111,28 @@ public:
     // hidden folder, nor a link to a folder, nor anything more than
     // `depth` folders down; no more than `entries` looked at, nor `files`
     // found -- a scripter's include folder may be a home folder. Nothing
-    // for a folder that is not blessed.
+    // for a folder that is not blessed. Given up part way, with what was
+    // found so far, once `stopped` says so: asked before each entry, for a
+    // look on a thread that is to end -- a slow drive may take a while over
+    // every one.
     struct Listed
     {
         std::string file;
         std::string relative;
     };
     std::vector<Listed> filesUnder(const std::string& folder, const std::vector<std::string>& extensions, int depth, size_t entries,
-                                   size_t files) const;
+                                   size_t files, const std::function<bool()>& stopped = {}) const;
+
+    // The scripts of a language under each of `folders` -- SLua's .luau and
+    // .lua, LSL's .lsl and its includes' .lslh and .lsli -- each folder
+    // blessed for the look and listed as filesUnder lists it, `depth`
+    // folders down, each script once where it stands: no more than `most`
+    // in all. For a look across a scripter's scripts on disk, given only
+    // folders a script may read from: the scripter's own, what their
+    // configurations bless, the studio's aliases. Given up part way once
+    // `stopped` says so, as filesUnder is.
+    static std::vector<std::string> scriptsUnder(const std::vector<std::string>& folders, bool lua, int depth, size_t most,
+                                                 const std::function<bool()>& stopped = {});
 
     // An ordinary file of at most MAX_BYTES, read whole; false for
     // anything else, and for one that grew past the limit while it was
@@ -118,4 +151,5 @@ public:
 
 private:
     std::vector<std::string> mFolders;
+    std::vector<std::string> mFiles;
 };

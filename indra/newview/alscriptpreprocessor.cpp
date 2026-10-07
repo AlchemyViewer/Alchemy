@@ -42,6 +42,7 @@
 #include "alscriptstack.h"
 #include "alscriptworkspace.h"
 #include "llagent.h"
+#include "llcallbacklist.h"
 #include "lldir.h"
 #include "llsdjson.h"
 #include "llinventoryfunctions.h"
@@ -72,6 +73,11 @@ namespace
     constexpr size_t MAX_REMEMBERED = 128;
     // How many scripts' asks are remembered at once.
     constexpr size_t MAX_SCRIPTS_REMEMBERED = 256;
+    // How long a run waits for an inventory folder a require walks into to
+    // be fetched, as long as the inventory waits before it asks for one
+    // again; and how often it looks.
+    constexpr F64 FOLDER_WAIT = 10.0;
+    constexpr F32 FOLDER_POLL = 0.25f;
 
 } // namespace
 
@@ -101,6 +107,9 @@ struct ALScriptPreprocessor::Job
     // A check's: raised once a later check of the same script is asked
     // for, which takes its answers; the run then stops where it stands.
     std::shared_ptr<std::atomic<bool>> superseded;
+    // Answered: an older check may hand its answers on to it no longer
+    // (handedOn).
+    bool                               finished = false;
 
     bool stale() const { return superseded && superseded->load(std::memory_order_relaxed); }
 };
@@ -121,6 +130,11 @@ std::vector<std::string> ALScriptPreprocessor::heldPaths() const
 ALPreprocessor::Found ALScriptPreprocessor::lookUp(const Request& request, const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out)
 {
     return mResolver->lookUp(request, ask, out);
+}
+
+std::vector<ALRequireNavigation::Suggestion> ALScriptPreprocessor::suggestPaths(const Request& request, const std::string& typed, bool require)
+{
+    return mResolver->suggest(request, typed, require);
 }
 
 std::vector<ALPreprocessor::Include> ALScriptPreprocessor::includedBy(const Request& request)
@@ -203,13 +217,15 @@ ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request,
     static LLCachedControl<bool> addstrings(gSavedSettings, "ALScriptPreprocOptimizerAddStrings", false);
     static LLCachedControl<bool> inlining(gSavedSettings, "ALScriptPreprocOptimizerInlining", false);
     static LLCachedControl<bool> extensions(gSavedSettings, "ALScriptPreprocExtensions", false);
+    static LLCachedControl<bool> lineComments(gSavedSettings, "ALScriptPreprocLineComments", false);
     ALPreprocessor::Options      options;
-    options.lua        = request.lua;
-    options.apart      = request.lua && request.apart;
-    options.switches   = switches;
-    options.lazyLists  = lazy;
-    options.compress   = compress;
-    options.extensions = extensions;
+    options.lua          = request.lua;
+    options.apart        = request.lua && request.apart;
+    options.switches     = switches;
+    options.lazyLists    = lazy;
+    options.compress     = compress;
+    options.extensions   = extensions;
+    options.lineComments = lineComments;
     // The analyzers see the expanded text before the optimizer has been
     // at it, so that their positions stay the author's.
     options.optimize              = optimize && request.optimize && optimizer && !request.lua && ALLSLService::builtinsLoaded();
@@ -269,6 +285,58 @@ void ALScriptPreprocessor::setIncludeFolders(const std::vector<std::string>& fol
         joined += (joined.empty() ? "" : "\n") + folder;
     }
     gSavedSettings.setString("ALScriptPreprocDiskIncludeFolder", joined);
+}
+
+// static
+std::string ALScriptPreprocessor::inventoryAliasFolder(const LLUUID& folder)
+{
+    // As the include resolver knows an inventory folder a require walks.
+    return "folder:" + folder.asString();
+}
+
+// static
+bool ALScriptPreprocessor::inventoryAliasFolder(const std::string& folder, LLUUID& out)
+{
+    constexpr std::string_view KIND = "folder:";
+    return folder.compare(0, KIND.size(), KIND) == 0 && out.set(folder.substr(KIND.size()), false) && out.notNull();
+}
+
+// static
+std::vector<ALScriptPreprocessor::StudioAlias> ALScriptPreprocessor::studioAliases()
+{
+    // One to a line, `name=folder`; the first of a name kept.
+    std::vector<StudioAlias> aliases;
+    std::istringstream       lines(gSavedSettings.getString("ALScriptSLuaAliases"));
+    for (std::string line; std::getline(lines, line);)
+    {
+        const size_t equals = line.find('=');
+        if (equals == std::string::npos)
+        {
+            continue;
+        }
+        StudioAlias one{ line.substr(0, equals), line.substr(equals + 1) };
+        LLStringUtil::trim(one.name);
+        LLStringUtil::trim(one.folder);
+        const bool taken = std::any_of(aliases.begin(), aliases.end(), [&one](const StudioAlias& other) {
+            return LLStringUtil::compareInsensitive(other.name, one.name) == 0;
+        });
+        if (ALLuauConfig::studioAliasName(one.name) && !one.folder.empty() && !taken)
+        {
+            aliases.push_back(std::move(one));
+        }
+    }
+    return aliases;
+}
+
+// static
+void ALScriptPreprocessor::setStudioAliases(const std::vector<StudioAlias>& aliases)
+{
+    std::string joined;
+    for (const StudioAlias& alias : aliases)
+    {
+        joined += (joined.empty() ? "" : "\n") + alias.name + "=" + alias.folder;
+    }
+    gSavedSettings.setString("ALScriptSLuaAliases", joined);
 }
 
 // static
@@ -341,6 +409,15 @@ void ALScriptPreprocessor::start(const Request& request, callback_t callback, bo
     if (check)
     {
         job->superseded = std::make_shared<std::atomic<bool>>(false);
+        // The newest check of its script: one older, still gathering what
+        // it wants, answers through this one (handedOn). For as many
+        // scripts as are remembered asking (mAsked).
+        const std::string key = keyOf(request);
+        if (mNewestCheck.size() >= MAX_SCRIPTS_REMEMBERED && !mNewestCheck.contains(key))
+        {
+            mNewestCheck.clear();
+        }
+        mNewestCheck[key] = job;
     }
     // What this script's own includes failed at before may come now;
     // another script's failures are its own, and clearing them would
@@ -389,8 +466,40 @@ void ALScriptPreprocessor::start(const Request& request, callback_t callback, bo
 }
 
 
+bool ALScriptPreprocessor::handedOn(const std::shared_ptr<Job>& job)
+{
+    if (!job->check)
+    {
+        return false;
+    }
+    const auto                 newest = mNewestCheck.find(keyOf(job->request));
+    const std::shared_ptr<Job> later  = newest != mNewestCheck.end() ? newest->second.lock() : nullptr;
+    if (!later || later == job || later->finished)
+    {
+        return false;
+    }
+    // As the worker's lane hands a check's answers on (toWorker): the main
+    // thread's alone, which the worker never touches.
+    if (job->callback)
+    {
+        later->alsoAnswer.push_back(std::move(job->callback));
+        job->callback = nullptr;
+    }
+    std::move(job->alsoAnswer.begin(), job->alsoAnswer.end(), std::back_inserter(later->alsoAnswer));
+    job->alsoAnswer.clear();
+    return true;
+}
+
 void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
 {
+    // A check a later one of the same script has started since -- while
+    // this one waited on the region or on what it fetched -- stands in for:
+    // nothing more is made of this one, not so much as its includes looked
+    // up again.
+    if (handedOn(job))
+    {
+        return;
+    }
     // Everything the viewer has to say about this script, gathered here
     // on the main thread: the settings, the agent, and each include
     // looked up in the inventory, the object's contents or the disk.
@@ -549,6 +658,7 @@ void ALScriptPreprocessor::cleanupSingleton()
 
 void ALScriptPreprocessor::finish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result)
 {
+    job->finished = true;
     if (!job->callback && job->alsoAnswer.empty())
     {
         return;
@@ -615,6 +725,54 @@ void ALScriptPreprocessor::optimizeAndFinish(const std::shared_ptr<Job>& job, AL
 
 void ALScriptPreprocessor::fetch(const std::string& path, std::function<void()> done)
 {
+    LLUUID folder;
+    if (inventoryAliasFolder(path, folder))
+    {
+        // An inventory folder a require walked into before it was fetched,
+        // which the resolver asked for: waited for until its contents are
+        // in, or until it has had long enough -- one that never comes holds
+        // a run up no longer than that, and is read for what the model
+        // holds of it after (ALScriptIncludeResolver::folderWaited). One
+        // look a folder, however many runs wait on it: a check is asked for
+        // at every pause in typing.
+        std::vector<std::function<void()>>& waiting = mFoldersWaiting[folder];
+        waiting.push_back(std::move(done));
+        if (waiting.size() > 1)
+        {
+            return;
+        }
+        const F64 until = LLTimer::getTotalSeconds() + FOLDER_WAIT;
+        doPeriodically(
+            [folder, until]() {
+                const LLViewerInventoryCategory* category = gInventory.getCategory(folder);
+                if (category && category->getVersion() == LLViewerInventoryCategory::VERSION_UNKNOWN && LLTimer::getTotalSeconds() < until)
+                {
+                    return false;
+                }
+                if (!ALScriptPreprocessor::instanceExists())
+                {
+                    return true;
+                }
+                ALScriptPreprocessor& self = ALScriptPreprocessor::instance();
+                self.mResolver->folderWaited(folder);
+                // Taken first: a run made again may come to wait on it again.
+                std::vector<std::function<void()>> waited;
+                if (const auto found = self.mFoldersWaiting.find(folder); found != self.mFoldersWaiting.end())
+                {
+                    waited = std::move(found->second);
+                    self.mFoldersWaiting.erase(found);
+                }
+                // Each made again, but one a later check of its script stands
+                // in for, which hands its answers on (attemptJob).
+                for (const std::function<void()>& then : waited)
+                {
+                    then();
+                }
+                return true;
+            },
+            FOLDER_POLL);
+        return;
+    }
     ALScriptRef ref;
     if (!refOf(path, ref))
     {

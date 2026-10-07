@@ -648,6 +648,27 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocIncludeTooDeep">#include nested too deeply at '[1]'</string>
 	<string name="PreprocMacroRedefined">macro '[1]' redefined</string>
 	<string name="PreprocModuleNotFound">could not find module '[1]'</string>
+	<string name="PreprocModuleBesideInit">'[1]' is both [2] and the folder's init [3]; the file is taken</string>
+	<string name="PreprocRequireUnread">'[1]' is never read, but [2] still goes with the script, since a require runs it: about [3] bytes of bytecode</string>
+	<string name="PreprocModuleNotFoundWhy">could not find module '[1]': [2]</string>
+	<string name="PreprocRequireNoChildAmbiguous">could not find module '[1]': '[2]' is ambiguous there</string>
+	<string name="PreprocRequireNoChild">could not find module '[1]': there is no '[2]'</string>
+	<string name="PreprocRequireNotAlias">could not find module '[1]': no .luaurc, and no SLua alias of Script Studio's, names @[2]</string>
+	<string name="PreprocRequireAliasCycle">could not find module '[1]': its aliases name each other in a circle ([2])</string>
+	<string name="PreprocRequireConfigAmbiguous">could not find module '[1]': a folder on the way to @[2] has both a .luaurc and a .config.luau, which Luau reads as neither</string>
+	<string name="PreprocRequireAliasUnresolved">could not find module '[1]': the alias "[2]" could not be read</string>
+	<string name="PreprocRequireNoParentOf">could not find module '[1]': there is no folder above '[2]'</string>
+	<string name="PreprocRequireNoParent">could not find module '[1]': there is no folder above this script</string>
+	<string name="PreprocRequireBadPrefix">could not find module '[1]': a require path starts with ./, ../ or @</string>
+	<string name="PreprocRequireReserved">could not find module '[1]': the alias @[2] is reserved, as every alias starting @sl- is Second Life's</string>
+	<string name="PreprocRequireClimbs">could not find module '[1]': a require through an alias may not climb out of its folder, as '[2]' does</string>
+	<string name="PreprocRequireAliasTarget">could not find module '[1]': its alias stands for '[2]', which is not there</string>
+	<string name="PreprocRequireNoModule">could not find module '[1]': there is no module at '[2]'</string>
+	<string name="PreprocRequireAliasNamesDisk">could not find module '[1]': its alias stands for '[2]', a path on disk, which a .luaurc in the world may not name</string>
+	<string name="PreprocRequireNotAdmitted">could not find module '[1]': '[2]' is there, but no include folder or alias lets a require read it. Add its folder with Build &gt; Add Include Folder...</string>
+	<string name="PreprocRequireAliasRefused">could not find module '[1]': the configuration in '[2]' names '[3]', which is outside its folder and outside the include folders</string>
+	<string name="PreprocRequireConfigBroken">could not find module '[1]': the configuration '[2]' on the way could not be read: [3]</string>
+	<string name="PreprocModuleSearched">could not find module '[1]': a require no longer searches the include folders, where it found [2]</string>
 	<string name="PreprocNoVariableBefore">no variable before '[1]'</string>
 	<string name="PreprocNotAnInteger">'[1]' is not an integer constant</string>
 	<string name="PreprocOutsideLoop">[1] outside a loop</string>
@@ -744,12 +765,14 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauKeyNotFound">Key '[1]' not found in [2]</string>
 	<string name="LuauKeyNotFoundDidYouMean">Key '[1]' not found in [2]; did you mean '[3]'?</string>
 	<string name="LuauCheckTimedOut">Type checking stopped after [1] seconds; what it found before then is shown</string>
+	<string name="LuauModuleNotOneValue">This module returns [1] values; a module must return exactly one to be required</string>
 
 	<!-- What a fix offered for a problem does (alscriptfixes.cpp) -->
 	<string name="ScriptFixInsert">Insert '[1]'</string>
 	<string name="ScriptFixChange">Change '[1]' to '[2]'</string>
 	<string name="ScriptFixUseInstead">Use '[2]' instead of '[1]'</string>
 	<string name="ScriptFixUnused">Rename to '_[1]'</string>
+	<string name="ScriptFixRemoveRequire">Remove the require of [1]</string>
 	<string name="ScriptFixSuppress">Suppress '[1]' on this line</string>
 	<string name="ScriptFixCast">Cast to [1]</string>
 	<string name="ScriptFixCompare">Compare with '=='</string>
@@ -772,6 +795,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixRemoveNoEffect">Remove what does nothing</string>
 	<string name="ScriptFixRequire">Require '[1]'</string>
 	<string name="ScriptFixRequireField">Take '[1]' from '[2]'</string>
+	<string name="ScriptFixRequireAs">Require it as '[1]'</string>
+	<string name="ScriptFixRequireAlias">Name [3] as the SLua alias @[2], and require it as '[1]'</string>
 	<string name="ScriptFixInclude">Include '[1]'</string>
 	<string name="ScriptFixCompoundAssign">Write it [1] [2]= ...</string>
 	<string name="ScriptFixHoistCall">Work out [1] once, before the loop</string>

@@ -24,9 +24,15 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
+
+namespace Luau
+{
+    class AstStatBlock;
+}
 
 // What a module exports, as its text says it: the names of the table it
 // returns. Read by Luau's parser alone, with nothing checked -- a module
@@ -48,4 +54,20 @@
 namespace ALLuauExports
 {
     std::vector<std::string> of(std::string_view source);
+    // The same of a module already parsed, whole: what the analysis has
+    // of a module it checked, which it does not parse again for this.
+    std::vector<std::string> of(const Luau::AstStatBlock& root);
+
+    // Whether a field's name is one a script could write after a dot:
+    // a name, and not one of Luau's keywords -- `util.end` does not parse.
+    bool isName(std::string_view name);
+
+    // What a module the analysis checked was found to export -- the names
+    // of the table its type says it returns, whatever built it, as a parse
+    // alone cannot see: one returned from a function, fields set in a loop
+    // over names given outright -- kept by the module's key and the text it
+    // was checked from, for a look at the same text to take in place of
+    // `of`. The latest few hundred kept; any thread's.
+    void                                    checked(const std::string& key, std::string_view text, std::vector<std::string> names);
+    std::optional<std::vector<std::string>> checkedOf(const std::string& key, std::string_view text);
 }

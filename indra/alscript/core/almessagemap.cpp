@@ -266,6 +266,31 @@ namespace
         { "LuauFailsAtRuntime", "the argument '[1]' is used in a way that will error at runtime" },
     };
 
+    // Why a SLua require found nothing: Luau's navigator's words
+    // (Require/src/RequireNavigator.cpp), then the studio's own
+    // (ALRequireNavigation). Each key's text in a skin is the whole
+    // problem, the module's name [1]; here the reason alone, its words from
+    // [2]. The fuller shape before the one it begins with.
+    const ErrorRow REQUIRE_ROWS[] = {
+        { "PreprocRequireNoChildAmbiguous", "could not resolve child component \"[2]\" (ambiguous)" },
+        { "PreprocRequireNoChild", "could not resolve child component \"[2]\"" },
+        { "PreprocRequireNotAlias", "@[2] is not a valid alias" },
+        { "PreprocRequireAliasCycle", "detected alias cycle ([2])" },
+        { "PreprocRequireConfigAmbiguous", "could not resolve alias \"[2]\" (ambiguous configuration file)" },
+        { "PreprocRequireAliasUnresolved", "could not resolve alias \"[2]\"" },
+        { "PreprocRequireNoParentOf", "could not get parent of component \"[2]\"" },
+        { "PreprocRequireNoParent", "could not get parent of requiring context" },
+        { "PreprocRequireBadPrefix", "require path must start with a valid prefix: ./, ../, or @" },
+        { "PreprocRequireReserved", "the alias '@[2]' is reserved: aliases starting @sl- are Second Life's" },
+        { "PreprocRequireClimbs", "a require through an alias may not climb out of its folder: '[2]'" },
+        { "PreprocRequireAliasNamesDisk", "the alias stands for '[2]', a path on disk, which a configuration in the world may not name" },
+        { "PreprocRequireAliasTarget", "the alias stands for '[2]', which is not there" },
+        { "PreprocRequireNoModule", "could not find a module at '[2]'" },
+        { "PreprocRequireNotAdmitted", "'[2]' is there, but no include folder or alias lets a require read it" },
+        { "PreprocRequireAliasRefused", "the configuration in '[2]' names '[3]', which is outside it and outside the include folders" },
+        { "PreprocRequireConfigBroken", "the configuration '[2]' could not be read: [3]" },
+    };
+
     // A template cut at its marks: the literal stretches, and the number
     // of the mark after each but the last.
     struct Cut
@@ -434,6 +459,27 @@ bool ALMessageMap::luauLint(std::string_view name, std::string_view message, Mat
         }
     }
     return false;
+}
+
+// static
+bool ALMessageMap::luauRequire(std::string_view message, Match& out)
+{
+    static const std::vector<Cut> CUTS = cutAll(REQUIRE_ROWS);
+    for (size_t i = 0; i < CUTS.size(); ++i)
+    {
+        if (matchCut(CUTS[i], message, out.args))
+        {
+            out.key = REQUIRE_ROWS[i].key;
+            return true;
+        }
+    }
+    return false;
+}
+
+// static
+bool ALMessageMap::requireReason(std::string_view key)
+{
+    return std::any_of(std::begin(REQUIRE_ROWS), std::end(REQUIRE_ROWS), [key](const ErrorRow& row) { return key == row.key; });
 }
 
 // static

@@ -26,7 +26,6 @@
 
 #include "alluauconfig.h"
 #include "alluauservice.h"
-#include "alscriptjobqueue.h"
 #include "alscriptproblem.h"
 #include "alscriptsymbol.h"
 #include "alscriptweight.h"
@@ -40,14 +39,14 @@
 #include <mutex>
 #include <string>
 
-class ALSerialWorker;
+class ALScriptAnalysisLane;
 namespace Luau
 {
     struct FrontendCancellationToken;
 }
 
-// The LSL and SLua analyzers, each owned by one worker thread and asked
-// about one script at a time:
+// The LSL and SLua analyzers, each owned by a thread of its own
+// (ALScriptAnalysisLane) and asked about one script at a time:
 // what is wrong with it and what it declares, what could go at a
 // position, what is at one, what a call there takes, and where a name is
 // bound and used. A request carries the document's version, the
@@ -137,7 +136,12 @@ public:
         // What a text declares, from its parse alone and with no types
         // (ALLuauService::shape, or LSL's outline): a comparison's texts,
         // which need be no tab's, and whose functions it pairs.
-        Shape
+        Shape,
+        // No question: what an SLua fragment is checked against made the
+        // text's (ALLuauService::warm), once the front tab's check has
+        // landed, so the next keystroke starts from the text as it settled.
+        // Asked by the thread itself, and answered to nobody.
+        Warm
     };
     struct Request
     {
@@ -157,6 +161,9 @@ public:
         // Where, for anything but a check.
         S32         line   = 0;
         S32         column = 0;
+        // References only, SLua: where (line, column) is in a module the
+        // script requires rather than in the script, by its key.
+        std::string module;
         // Actions only: where a stretch chosen from (line, column) ends,
         // or the same place for the caret alone.
         S32         endLine   = 0;
@@ -179,7 +186,8 @@ public:
         };
         Weighing    weighing = Weighing::Text;
         // Whether it is about the tab in front: its questions go before
-        // anything else, then its check; then weighing; then the rest.
+        // anything else, then its check, then its warm job; then weighing;
+        // then the rest.
         bool        front = false;
         // The lines of the text nobody reads the names, hints and fixes of:
         // what an include put into an expansion (ALSourceMap::othersLines).
@@ -240,7 +248,8 @@ public:
     // passed over: whoever asked has asked again.
     void ask(Request request, callback_t callback);
 
-    // A script let go of: nothing it has waiting is run.
+    // A script let go of: nothing it has waiting is run, and what runs for
+    // it is stopped.
     void forget(const std::string& id);
 
     // Tailslide's work that is no question -- the optimizer's run over what
@@ -259,44 +268,15 @@ private:
     void cleanupSingleton() override;
     void ensureStarted();
 
-    struct Worker;
-    // The one thread the services run on. Closed at cleanup, or as the
-    // viewer starts to quit, and kept closed: an ask after is answered
-    // with nothing rather than starting another.
-    std::unique_ptr<ALSerialWorker>                     mThread;
-    // Touched only from the worker's own tasks, which one thread runs one
-    // after another.
-    std::unique_ptr<Worker>                             mWorker;
-    U32                                                 mDefinitionsGeneration = 1;
-    // One job waiting: the question, who is answered, and what the main
-    // thread read for it -- the definitions' paths, the settings.
-    struct Job
-    {
-        Request                     request;
-        std::shared_ptr<callback_t> callback;
-        std::string                 luauPath;
-        std::string                 docsPath;
-        std::string                 lslPath;
-        U32                         generation = 0;
-        bool                        newSolver  = false;
-        F32                         seconds    = 0.f;
-        // Tailslide's work that is no question (runEngine), where it is one.
-        std::function<void()>       engineWork;
-        std::function<void()>       engineDone;
-    };
-    // Takes the next job and runs it, on the worker: one is posted for
-    // every question asked, and one that finds nothing waiting -- its
-    // question replaced by a later one -- does nothing.
-    void runNext();
-    Result run(const Job& job, const std::shared_ptr<Luau::FrontendCancellationToken>& stop);
-
-    // What waits, written on the main thread and taken on the worker, and
-    // the stop of the SLua job running, if any: a question that makes its
-    // answer pointless stops it, and so does the viewer closing. Both
-    // under the lock.
-    std::mutex                                       mQueueMutex;
-    ALScriptJobQueue<Job>                            mQueue;
-    std::shared_ptr<Luau::FrontendCancellationToken> mRunningStop;
+    // Each engine's own thread and queue (LAD8): SLua's on Luau's -- its
+    // checks, questions and weighs, Luau's compiler alone -- and LSL's on
+    // Tailslide's, LSL on Luau weighed there too, and the engine's work
+    // that is no question. Neither waits on the other. Made with the
+    // first question, closed at cleanup or as the viewer starts to quit,
+    // and kept closed: a question after is answered with nothing.
+    std::unique_ptr<ALScriptAnalysisLane> mLuau;
+    std::unique_ptr<ALScriptAnalysisLane> mTailslide;
+    U32                                   mDefinitionsGeneration = 1;
     // Numbers the engine's work, each its own key.
-    U32                                              mEngineSerial = 0;
+    U32                                   mEngineSerial = 0;
 };

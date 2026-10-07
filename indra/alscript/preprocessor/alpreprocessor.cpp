@@ -27,6 +27,8 @@
 
 #include "alpreprocessor.h"
 
+#include "almessagemap.h"
+
 #include "alscriptfixes.h"
 #include "alscriptlexicon.h"
 #include "alscriptweight.h"
@@ -38,6 +40,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <ctime>
 #include <deque>
 #include <limits>
@@ -4433,8 +4436,18 @@ namespace
     // ---- the plugin's require, for SLua ----------------------------------------------
 
     // Every `require("name")` resolved to a module, each module processed
-    // once with its own requires resolved first, and the call replaced by
-    // a lookup in a table the modules fill at the top of the text.
+    // once with its own requires resolved first and numbered as the plugin
+    // numbers them, in the order they are first met, and the call replaced
+    // by `require(2)`: a global `require` the top of the text sets, which
+    // runs the module as Luau's require does -- once, at its first require,
+    // every later one handed the same value -- through SLua's
+    // `dangerouslyexecuterequiredmodule`, which gives it globals of its own
+    // and does not let it yield, as Luau's does not. The plugin's shape, so
+    // that a script bundles alike in either; a number, so that no file's
+    // identity -- a disk path among them -- is written into what a save
+    // sends.
+    void assemble(const Tokens& tokens, ALPreprocessor::Result& result, bool lua);
+
     class Requires
     {
     public:
@@ -4445,6 +4458,7 @@ namespace
 
         void gather(Tokens& tokens, const std::string& from)
         {
+            const boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> named = namesIn(tokens);
             Tokens out;
             size_t i = 0;
             while (i < tokens.size())
@@ -4459,13 +4473,25 @@ namespace
                         (tokens[b].text.front() == '"' || tokens[b].text.front() == '\''))
                     {
                         const std::string name = tokens[b].text.substr(1, tokens[b].text.size() - 2);
-                        std::string       key;
-                        if (resolve(name, from, t, key))
+                        size_t            number = 0;
+                        if (resolve(name, from, t, tokens[b], number))
                         {
-                            out.push_back(synth(Kind::Ident, "__modules", t));
-                            out.push_back(synth(Kind::Punct, "[", t));
-                            out.push_back(synth(Kind::String, literalOf(key), t));
-                            out.push_back(synth(Kind::Punct, "]", t));
+                            // Whether what it gives is read: a require all
+                            // of whose are not is said with its weight.
+                            const std::string& key  = mModules[number - 1].first;
+                            const std::string  kept = unread(out, tokens, c, named);
+                            if (kept.empty())
+                            {
+                                mRead.insert(key);
+                            }
+                            else
+                            {
+                                mUnread[key].push_back({ t, kept });
+                            }
+                            out.push_back(synth(Kind::Ident, "require", t));
+                            out.push_back(synth(Kind::Punct, "(", t));
+                            out.push_back(synth(Kind::Number, std::to_string(number), t));
+                            out.push_back(synth(Kind::Punct, ")", t));
                             i = c + 1;
                             continue;
                         }
@@ -4477,8 +4503,36 @@ namespace
             tokens.swap(out);
         }
 
-        // The table and its modules, ahead of the script; nothing where
-        // nothing was required.
+        // Luau's require as Luau runs it: a module run once, at its first
+        // require, and every later one handed the same value -- but one that
+        // returned nil, which Luau runs again. Luau stops a module that
+        // returns other than one value; the studio's checker says so at the
+        // require as it is written (LuauModuleNotOneValue), and nothing
+        // checks it as it runs: the
+        // check came to some 150 bytes of bytecode, half again what the rest
+        // is, which every script that requires anything would carry. Inside
+        // a `do`, not a function called at once as the plugin's is, which is
+        // a function less; and the modules in the table's constructor,
+        // before its local is one: SLua's builtin will not run a function
+        // that holds any local of the text's, and none of the text's locals
+        // is a name a module could mean. Each `[n] =` is the bytes a list's
+        // entry is, and says which module it is.
+        static constexpr std::string_view REQUIRE_HEAD = "do\n"
+                                                         "    local modules = {\n";
+        static constexpr std::string_view REQUIRE_TAIL = "    }\n"
+                                                         "    local loaded = {}\n"
+                                                         "    function require(module)\n"
+                                                         "        local held = loaded[module]\n"
+                                                         "        if held == nil then\n"
+                                                         "            held = dangerouslyexecuterequiredmodule(modules[module])\n"
+                                                         "            loaded[module] = held\n"
+                                                         "        end\n"
+                                                         "        return held\n"
+                                                         "    end\n"
+                                                         "end\n";
+
+        // The modules and the `require` that runs them, ahead of the
+        // script; nothing where nothing was required.
         Tokens prologue() const
         {
             Tokens out;
@@ -4491,45 +4545,215 @@ namespace
             Token site;
             site.verbatim = false;
             site.file     = -1;
+            const auto text = [&](std::string_view luau) {
+                for (const Token& t : Lexer(true, site.file).run(luau))
+                {
+                    out.push_back(synth(t.kind, t.text, site));
+                }
+            };
             const auto word = [&](Kind kind, const std::string& text) { out.push_back(synth(kind, text, site)); };
-            word(Kind::Ident, "local");
-            word(Kind::Space, " ");
-            word(Kind::Ident, "__modules");
-            word(Kind::Space, " ");
-            word(Kind::Punct, "=");
-            word(Kind::Space, " ");
-            word(Kind::Punct, "{");
-            word(Kind::Punct, "}");
-            word(Kind::Newline, "\n");
-            for (const auto& module : mModules)
+            text(REQUIRE_HEAD);
+            for (size_t number = 1; number <= mModules.size(); ++number)
             {
-                word(Kind::Ident, "__modules");
+                word(Kind::Space, "        ");
                 word(Kind::Punct, "[");
-                word(Kind::String, literalOf(module.first));
+                word(Kind::Number, std::to_string(number));
                 word(Kind::Punct, "]");
                 word(Kind::Space, " ");
                 word(Kind::Punct, "=");
                 word(Kind::Space, " ");
-                word(Kind::Punct, "(");
                 word(Kind::Ident, "function");
                 word(Kind::Punct, "(");
                 word(Kind::Punct, ")");
                 word(Kind::Newline, "\n");
-                append(out, module.second);
+                append(out, mModules[number - 1].second);
                 if (out.back().kind != Kind::Newline)
                 {
                     word(Kind::Newline, "\n");
                 }
+                word(Kind::Space, "        ");
                 word(Kind::Ident, "end");
-                word(Kind::Punct, ")");
-                word(Kind::Punct, "(");
-                word(Kind::Punct, ")");
+                word(Kind::Punct, ",");
                 word(Kind::Newline, "\n");
+            }
+            text(REQUIRE_TAIL);
+            return out;
+        }
+
+        // Each module required only where nothing reads what it gives, said
+        // at each such require with what it weighs: it goes with the script
+        // all the same, since a require runs it, and that may be why it is
+        // there. Where something reads it anywhere, taking these out would
+        // save nothing, and nothing is said.
+        void noteUnread()
+        {
+            static const size_t EMPTY = ALScriptWeigh::slua("").total;
+            // In the order the modules were met, the same each run.
+            for (const auto& [key, body] : mModules)
+            {
+                const auto unread = mUnread.find(key);
+                const auto made   = mMade.find(key);
+                if (unread == mUnread.end() || mRead.count(key) || made == mMade.end())
+                {
+                    continue;
+                }
+                const std::vector<Unread>& sites = unread->second;
+                const ALScriptWeight weight = ALScriptWeigh::slua(made->second.text);
+                if (!weight.compiled)
+                {
+                    continue;
+                }
+                const std::string bytes = std::to_string(weight.total > EMPTY ? weight.total - EMPTY : weight.total);
+                for (const Unread& site : sites)
+                {
+                    mEngine.problem(ALScriptProblem::Severity::Note, "PreprocRequireUnread",
+                                    "'[1]' is never read, but [2] still goes with the script, since a require runs it: about [3] bytes of bytecode",
+                                    { site.name, made->second.name, bytes }, site.at);
+                }
+            }
+        }
+
+    private:
+        // Each name the tokens hold, and how often: an identifier, or a
+        // word in an interpolated string, which may be a name read there.
+        static boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> namesIn(const Tokens& tokens)
+        {
+            boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> out;
+            for (const Token& t : tokens)
+            {
+                if (t.kind == Kind::Ident)
+                {
+                    ++out[t.text];
+                }
+                else if (t.kind == Kind::String && !t.text.empty() && t.text.front() == '`')
+                {
+                    size_t at = 0;
+                    while (at < t.text.size())
+                    {
+                        if (std::isalpha(static_cast<unsigned char>(t.text[at])) || t.text[at] == '_')
+                        {
+                            const size_t begin = at;
+                            while (at < t.text.size() && (std::isalnum(static_cast<unsigned char>(t.text[at])) || t.text[at] == '_'))
+                            {
+                                ++at;
+                            }
+                            ++out[t.text.substr(begin, at - begin)];
+                        }
+                        else
+                        {
+                            ++at;
+                        }
+                    }
+                }
             }
             return out;
         }
 
-    private:
+        // The name a require's value is given where nothing reads it --
+        // `local name = require("x")`, the require the whole of its value,
+        // the name in the file nowhere else -- or nothing. A name begun
+        // with `_` says it is meant: nothing.
+        static std::string unread(const Tokens& before, const Tokens& tokens, size_t closed,
+                                  const boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>>& named)
+        {
+            // Back past the `=` to the name, and `local` before it.
+            std::array<const Token*, 3> back{};
+            size_t                      found = 0;
+            for (auto it = before.rbegin(); it != before.rend() && found < back.size(); ++it)
+            {
+                if (!it->blank())
+                {
+                    back[found++] = &*it;
+                }
+            }
+            if (found < back.size() || !back[0]->is(Kind::Punct, "=") || back[1]->kind != Kind::Ident || !back[2]->is(Kind::Ident, "local"))
+            {
+                return std::string();
+            }
+            const std::string& name = back[1]->text;
+            // Nothing after the call that goes on with it.
+            const size_t next = skipBlank(tokens, closed + 1);
+            const bool   ends = next >= tokens.size() || tokens[next].is(Kind::Punct, ";") ||
+                              (tokens[next].kind == Kind::Ident && tokens[next].text != "and" && tokens[next].text != "or");
+            const auto   uses = named.find(name);
+            if (!ends || name.empty() || name.front() == '_' || uses == named.end() || uses->second != 1)
+            {
+                return std::string();
+            }
+            return name;
+        }
+
+        // A module found nowhere, said with why where that is known: keyed
+        // where the reason is one the map knows, so that a skin may say it
+        // in its own words, else in Luau's.
+        void notFound(const std::string& name, const std::string& why, const Token& at)
+        {
+            if (why.empty())
+            {
+                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocModuleNotFound", "could not find module '[1]'", { name }, at);
+                return;
+            }
+            ALMessageMap::Match known;
+            if (!ALMessageMap::luauRequire(why, known))
+            {
+                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocModuleNotFoundWhy", "could not find module '[1]': [2]", { name, why }, at);
+                return;
+            }
+            std::vector<std::string> args = std::move(known.args);
+            if (args.empty())
+            {
+                args.emplace_back();
+            }
+            args[0] = name;
+            mEngine.problem(ALScriptProblem::Severity::Error, "could not find module '" + name + "': " + why, at);
+            mResult.problems.back().key  = known.key;
+            mResult.problems.back().args = std::move(args);
+        }
+
+        // What a require found by the search before may be written as now,
+        // each as a fix to the problem just said: the string put in the
+        // name's place, the studio alias it needs named first. Only for a
+        // require the script itself says as written: one in a module is
+        // the module's to change.
+        void moveFixes(const std::vector<ALPreprocessor::Include::Move>& moves, const Token& said)
+        {
+            if (said.file != 0 || !said.verbatim || said.text.size() < 2)
+            {
+                return;
+            }
+            const char quote = said.text.front();
+            for (const ALPreprocessor::Include::Move& move : moves)
+            {
+                std::string written(1, quote);
+                for (const char c : move.require)
+                {
+                    if (c == quote || c == '\\')
+                    {
+                        written += '\\';
+                    }
+                    written += c;
+                }
+                written += quote;
+                ALScriptFix fix;
+                if (move.alias.empty())
+                {
+                    fix.key   = "ScriptFixRequireAs";
+                    fix.args  = { move.require };
+                    fix.title = ALScriptProblem::fill("Require it as '[1]'", fix.args);
+                }
+                else
+                {
+                    fix.key   = "ScriptFixRequireAlias";
+                    fix.args  = { move.require, move.alias, move.folder };
+                    fix.title = ALScriptProblem::fill("Name [3] as the SLua alias @[2], and require it as '[1]'", fix.args);
+                }
+                fix.edits.emplace_back(said.line, said.column, said.line, said.column + S32(said.text.size()), written);
+                // A studio alias is a setting: named only where asked.
+                fix.preferred = move.alias.empty() && moves.front().require == move.require;
+                mResult.problems.back().fixes.push_back(std::move(fix));
+            }
+        }
+
         // Whether the word last put out, past blanks, is a `.` or a `:`:
         // `t.require("x")` and `t:require("x")` are a table's, not the
         // global that finds a module.
@@ -4545,7 +4769,7 @@ namespace
             return false;
         }
 
-        bool resolve(const std::string& name, const std::string& from, const Token& at, std::string& key)
+        bool resolve(const std::string& name, const std::string& from, const Token& at, const Token& said, size_t& number)
         {
             ALPreprocessor::Ask ask;
             ask.name    = name;
@@ -4563,18 +4787,36 @@ namespace
             }
             if (answer == ALPreprocessor::Found::No)
             {
-                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocModuleNotFound", "could not find module '[1]'", { name }, at);
+                if (found.searched.empty())
+                {
+                    notFound(name, found.why, at);
+                    return false;
+                }
+                // Found by the search before a require followed the
+                // plugin's rules: said, with what to write instead.
+                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocModuleSearched",
+                                "could not find module '[1]': a require no longer searches the include folders, where it found [2]", { name, found.searched },
+                                at);
+                moveFixes(found.moves, said);
                 return false;
             }
-            key = found.path.empty() ? name : found.path;
+            const std::string key = found.path.empty() ? name : found.path;
             mResult.resolved.push_back({ from, name, true, key });
-            if (mDone.count(key))
+            if (!found.passedOver.empty())
             {
-                return true;
+                // A file and a folder's init both: the file, as the plugin
+                // takes it, said with the one not taken.
+                const std::string taken = found.name.empty() ? key : found.name;
+                mEngine.problem(ALScriptProblem::Severity::Warning, "PreprocModuleBesideInit",
+                                "'[1]' is both [2] and the folder's init [3]; the file is taken", { name, taken, found.passedOver }, at);
             }
-            if (mInProgress.count(key))
+            if (const auto known = mNumbers.find(key); known != mNumbers.end())
             {
-                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocRequiresItself", "'[1]' requires itself", { name }, at);
+                number = known->second;
+                if (mInProgress.count(key))
+                {
+                    mEngine.problem(ALScriptProblem::Severity::Error, "PreprocRequiresItself", "'[1]' requires itself", { name }, at);
+                }
                 return true;
             }
             if (S32(mInProgress.size()) >= mOptions.includeDepth)
@@ -4587,8 +4829,18 @@ namespace
                 mResult.includes.push_back(key);
             }
             mInProgress.insert(key);
+            // Numbered as met, before what it requires is.
+            number = mModules.size() + 1;
+            mNumbers.emplace(key, number);
+            mModules.emplace_back(key, Tokens());
             Tokens body;
             mEngine.module(found, body);
+            // Its text as made, to weigh where nothing reads it.
+            {
+                ALPreprocessor::Result made;
+                assemble(body, made, true);
+                mMade[key] = Made{ std::move(made.text), found.name.empty() ? name : found.name };
+            }
             // Kept as the run made it, its requires still calls, where the
             // analyzers want each module apart.
             if (mOptions.apart)
@@ -4597,8 +4849,7 @@ namespace
             }
             gather(body, key);
             mInProgress.erase(key);
-            mDone.insert(key);
-            mModules.emplace_back(key, std::move(body));
+            mModules[number - 1].second = std::move(body);
             return true;
         }
 
@@ -4607,11 +4858,28 @@ namespace
         ALPreprocessor::Result&                    mResult;
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> mPendingNames;
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> mInProgress;
-        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> mDone;
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> mListed;
-        std::vector<std::pair<std::string, Tokens>> mModules;
+        // Each module's number, and by it, its identity and text.
+        boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> mNumbers;
+        std::vector<std::pair<std::string, Tokens>>                                      mModules;
+        // Each module's text as the run made it, and its name.
+        struct Made
+        {
+            std::string text;
+            std::string name;
+        };
+        boost::unordered_flat_map<std::string, Made, ll::string_hash, std::equal_to<>> mMade;
+        // The modules something reads, and each require of another whose
+        // value nothing reads, by the module: where, and the name it is given.
+        struct Unread
+        {
+            Token       at;
+            std::string name;
+        };
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>                mRead;
+        boost::unordered_flat_map<std::string, std::vector<Unread>, ll::string_hash, std::equal_to<>> mUnread;
         // Each module as the run made it, before its requires became
-        // lookups in the table (Options::apart).
+        // numbers (Options::apart).
         std::vector<std::pair<std::string, Tokens>> mApart;
 
     public:
@@ -4686,6 +4954,59 @@ namespace
             return true;
         }
         return punctJoins(lua, a.text, b.text);
+    }
+
+    // The plugin's `@line` comments (Options::lineComments): before each
+    // line whose first token is not where a reader counting lines from the
+    // last comment would put it, one saying where it is. A line that
+    // begins inside a long comment or string, or with what no file made,
+    // is not one a comment can go before, and what comes of no file leaves
+    // the reader nowhere, so that the next line of a file is said.
+    Tokens withLineComments(const Tokens& in, const ALSourceMap& map, bool lua)
+    {
+        Tokens out;
+        out.reserve(in.size() + 64);
+        S32    file  = 0;
+        S32    line  = 0;
+        bool   open  = true;
+        size_t start = 0;
+        for (const Token& t : in)
+        {
+            if (open && t.kind != Kind::Space && t.kind != Kind::Newline)
+            {
+                open = false;
+                if (t.file < 0)
+                {
+                    file = -1;
+                }
+                else if (t.file != file || t.line != line)
+                {
+                    const std::string& name = t.file < S32(map.files().size()) ? map.files()[t.file].name : std::string();
+                    Token              site;
+                    site.verbatim = false;
+                    site.file     = -1;
+                    // Ahead of the line's indent, all there is of it yet.
+                    Tokens indent(std::make_move_iterator(out.begin() + start), std::make_move_iterator(out.end()));
+                    out.resize(start);
+                    out.push_back(synth(Kind::Comment, std::string(lua ? "--" : "//") + " @line " + std::to_string(t.line + 1) + " " + literalOf(name), site));
+                    out.push_back(synth(Kind::Newline, "\n", site));
+                    append(out, std::move(indent));
+                    file = t.file;
+                    line = t.line;
+                }
+            }
+            out.push_back(t);
+            for (const char c : t.text)
+            {
+                line += c == '\n';
+            }
+            if (t.kind == Kind::Newline)
+            {
+                open  = true;
+                start = out.size();
+            }
+        }
+        return out;
     }
 
     void assemble(const Tokens& tokens, ALPreprocessor::Result& result, bool lua)
@@ -4930,6 +5251,7 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
             as_made = tokens;
         }
         gathered.gather(tokens, std::string());
+        gathered.noteUnread();
         if (options.apart && !gathered.apart().empty())
         {
             // Each piece assembled over the same files as the whole.
@@ -5007,6 +5329,10 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
             result.usedSwitches = true;
             tokens              = Switches(engine).run(tokens);
         }
+    }
+    if (options.lineComments)
+    {
+        tokens = withLineComments(tokens, result.map, options.lua);
     }
     assemble(tokens, result, options.lua);
     if (result.overran)

@@ -62,7 +62,12 @@ namespace
         LLSD keywords;
         keywords["functions"]["ll.Say"]   = LLSD().with("return", "()").with("arguments", LLSD().with(0, argument("channel", "number")));
         keywords["functions"]["math.pi"]  = LLSD().with("return", "number");
-        keywords["events"]["touch_start"] = LLSD().with("arguments", LLSD().with(0, argument("num_detected", "number")));
+        keywords["events"]["touch_start"] = LLSD().with("arguments", LLSD().with(0, argument("detected", "{DetectedEvent}")));
+        keywords["events"]["listen"] = LLSD().with("arguments", LLSD()
+                                                                    .with(0, argument("channel", "number"))
+                                                                    .with(1, argument("name", "string"))
+                                                                    .with(2, argument("id", "uuid"))
+                                                                    .with(3, argument("msg", "string")));
         return keywords;
     }
 }
@@ -193,7 +198,13 @@ namespace tut
         const ALCodeEditor::Completion lsl = Words::completionFor(*Words::word(false, "touch_start"), false);
         ensure_equals("LSL's handler", lsl.snippet, std::string("touch_start(integer num_detected)\n{\n    $0\n}"));
         const ALCodeEditor::Completion slua = Words::completionFor(*Words::word(true, "touch_start"), true);
-        ensure_equals("SLua's, set on LLEvents", slua.snippet, std::string("LLEvents.touch_start = function(num_detected)\n    $0\nend"));
+        ensure_equals("SLua's, a function of LLEvents'", slua.snippet, std::string("function LLEvents.touch_start(detected)\n    $0\nend"));
+        ensure_equals("typed where asked, as the definitions type it", Words::completionFor(*Words::word(true, "touch_start"), true, true).snippet,
+                      std::string("function LLEvents.touch_start(detected: {DetectedEvent})\n    $0\nend"));
+        ensure_equals("each parameter typed", Words::completionFor(*Words::word(true, "listen"), true, true).snippet,
+                      std::string("function LLEvents.listen(channel: number, name: string, id: uuid, msg: string)\n    $0\nend"));
+        ensure_equals("each untyped", Words::completionFor(*Words::word(true, "listen"), true).snippet,
+                      std::string("function LLEvents.listen(channel, name, id, msg)\n    $0\nend"));
         const ALCodeEditor::Completion say = Words::completionFor(*Words::word(false, "llSay"), false);
         ensure("a function as itself", say.snippet.empty() && say.text == "llSay" && say.documentation && *say.documentation == "Says msg on channel.\nMore.");
 
@@ -423,5 +434,67 @@ namespace tut
         ensure("no include", asked.lookUp(ALScriptPreprocessor::Request(), ALPreprocessor::Ask(), found) == ALPreprocessor::Found::No);
         viewer.slots.lslHelpUrl = nullptr;
         ensure_equals("the wiki as nothing says it", asked.lslHelpUrl(), std::string("[LSL_STRING]"));
+    }
+
+    // The call a string is an argument of, and what kind of item of the
+    // object's it names there: however many lines and comments come between
+    // the string and the bracket or comma before it; SLua's call of a string
+    // alone; nothing for a string that is not an argument's start, nor one
+    // of an argument that names no item.
+    template<> template<>
+    void alscriptstudiowords_object::test<15>()
+    {
+        using Item = ALLSLTraits::Item;
+        const auto kind = [this](const std::string& text, bool lua, char* quote = nullptr) {
+            ALCodeEditor& e = editor(text, lua);
+            // At the end: in the string, not closed.
+            const S32 last = e.document().lineCount() - 1;
+            char      said = '\0';
+            const Item found = Words::itemStringAt(e, ALTextPos(last, static_cast<S32>(e.document().line(last).size())), lua, said);
+            if (quote)
+            {
+                *quote = said;
+            }
+            return found;
+        };
+        char quote = '\0';
+        ensure("on its line", kind("llPlaySound(\"do", false, &quote) == Item::Sound && quote == '"');
+        ensure("a second argument", kind("llGiveInventory(llGetOwner(), \"x", false) == Item::Any);
+        ensure("lines and comments between",
+               kind("llGiveInventory(llGetOwner(),\n    // what to give\n    /* by name */\n    \"x", false) == Item::Any);
+        ensure("many lines between", kind("llRezObject(\n\n\n\n\n\n\"obj", false) == Item::Object);
+        ensure("SLua's, by its own name", kind("ll.StartAnimation('wa", true, &quote) == Item::Animation && quote == '\'');
+        ensure("SLua's with no brackets", kind("ll.PlaySound \"do", true) == Item::Sound);
+        ensure("and none in LSL, which has no such call", kind("llPlaySound \"do", false) == Item::None);
+        ensure("not an argument naming an item", kind("llSay(0, \"x", false) == Item::None);
+        ensure("not a string that only ends an argument", kind("llPlaySound(prefix + \"x", false) == Item::None);
+        ensure("not after a keyword", kind("return \"x", true) == Item::None);
+        ensure("not in a comment", kind("// llPlaySound(\"x", false) == Item::None);
+
+        std::string callee;
+        S32         argument = -1;
+        ALCodeEditor& e = editor("llSetLinkAlpha(2, ", false);
+        ensure("the call around a place", Words::callAt(e, ALTextPos(0, 18), callee, argument) && callee == "llSetLinkAlpha" && argument == 1);
+    }
+
+    template<> template<>
+    void alscriptstudiowords_object::test<16>()
+    {
+        set_test_name("an SLua handler's parameters split as a signature's are: a type's own commas, colons and arrow its own, a variadic `...` however written");
+        slua["events"]["mapped"] = LLSD().with("arguments", LLSD().with(0, argument("pairs", "Map<K, V>")).with(1, argument("n", "number")));
+        slua["events"]["called"] =
+            LLSD().with("arguments", LLSD().with(0, argument("back", "(number) -> ()")).with(1, argument("data", "{[string]: any}")));
+        slua["events"]["varied"] = LLSD().with("arguments", LLSD().with(0, argument("first", "number")).with(1, argument("...", "any")));
+        slua["events"]["bare"]   = LLSD().with("arguments", LLSD().with(0, argument("...any", "")));
+        Words::forget();
+        const auto handler = [](const char* name, bool typed) { return Words::completionFor(*Words::word(true, name), true, typed).snippet; };
+        ensure_equals("a generic's comma", handler("mapped", true), std::string("function LLEvents.mapped(pairs: Map<K, V>, n: number)\n    $0\nend"));
+        ensure_equals("and untyped", handler("mapped", false), std::string("function LLEvents.mapped(pairs, n)\n    $0\nend"));
+        ensure_equals("a function type's arrow, a table type's colon", handler("called", true),
+                      std::string("function LLEvents.called(back: (number) -> (), data: {[string]: any})\n    $0\nend"));
+        ensure_equals("a variadic typed", handler("varied", true), std::string("function LLEvents.varied(first: number, ...: any)\n    $0\nend"));
+        ensure_equals("and not", handler("varied", false), std::string("function LLEvents.varied(first, ...)\n    $0\nend"));
+        ensure_equals("one written ...any", handler("bare", true), std::string("function LLEvents.bare(...: any)\n    $0\nend"));
+        ensure_equals("and untyped", handler("bare", false), std::string("function LLEvents.bare(...)\n    $0\nend"));
     }
 }

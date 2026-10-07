@@ -26,6 +26,7 @@
 #include "aldiskcache.h"
 #include "alluauconfig.h"
 #include "alpreprocessor.h"
+#include "alrequirenavigation.h"
 #include "alscripttextcache.h"
 #include "llstl.h"
 #include "lluuid.h"
@@ -36,6 +37,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+namespace tut { struct alincludesearch_data; }
 
 // What finding an include asks of the world a script is in, which only the
 // viewer can answer -- its inventory, what an object holds -- and a test
@@ -69,21 +72,40 @@ public:
     // item's, or the one in its object. Pending where the object has not
     // said what it holds.
     virtual ALPreprocessor::Found configsOver(const std::string& from, const std::string& name, std::vector<Item>& out) = 0;
+
+    // A SLua require walked through the world (ALRequireNavigation): the
+    // folder an item is in -- its inventory folder, or its object's
+    // contents, which are one folder -- by an id of this world's, with the
+    // item's name; false for an item not known. The folder above one, No
+    // at the top: an object's contents are no folder's. And what a folder
+    // holds by a name: its items so named, scripts before notecards, and
+    // its folder so named; Pending where what it holds is not known yet --
+    // an object that has not said, an inventory folder not fetched.
+    virtual bool                  folderOf(const std::string& item, std::string& folder, std::string& name) = 0;
+    virtual ALPreprocessor::Found folderAbove(const std::string& folder, std::string& out) = 0;
+    virtual ALPreprocessor::Found named(const std::string& folder, const std::string& name, std::vector<Item>& items, std::string& subfolder) = 0;
+    // What a folder holds, for what a path typed may go on with: its
+    // scripts and notecards, and its folders' names.
+    virtual ALPreprocessor::Found contents(const std::string& folder, std::vector<Item>& items, std::vector<std::string>& folders) = 0;
 };
 
-// What an `#include` or a SLua `require` names, found as the preprocessor
-// finds it -- in the object holding the script, in the agent's inventory, or
-// in a folder on disk someone blessed, in the order the settings say -- with
-// the `.luaurc` chain that governs a SLua script, and each text read: from
-// the texts fetched, or the disk (ALDiskCache). Nothing is fetched here:
-// what is in the world and not in hand is Pending, and wanted.
+// What an `#include` names, found as the preprocessor finds it -- in the
+// object holding the script, in the agent's inventory, or in a folder on
+// disk someone blessed, in the order the settings say -- and what a SLua
+// `require` names, as the plugin's rules have it (LAD9): walked by Luau's
+// own navigator from the file asking, with no search (ALRequireNavigation).
+// With the `.luaurc` chain that governs a SLua script, and each text read:
+// from the texts fetched, or the disk (ALDiskCache). Nothing is fetched
+// here: what is in the world and not in hand is Pending, and wanted.
 //
-// A SLua `require("@name/rest")` goes through the `.luaurc` that governs the
-// asking file -- the notecard so named in its folder or the nearest folder
-// above, in inventory; the item so named in its object; the file so named in
-// its directory or the nearest above, on disk -- whose alias `name` stands
-// for a path from beside it, so that the name reads as `./path/rest` from
-// the configuration's own folder.
+// A require walks the places as one tree: folders on disk, inventory
+// folders, an object's contents as one folder -- the world's only where
+// world includes are on (LAD10); with them off a place in the world holds
+// nothing. Above a script in the world, or one in no place, the
+// `.luaurc` at the top of each of the scripter's include folders, in their
+// order, as the chain of configurations goes on. A `.luaurc` on disk
+// blesses where its aliases reach, for the run, as far as a configuration
+// may (ALDiskIncludes::blessFromConfig).
 class ALIncludeSearch
 {
 public:
@@ -99,6 +121,13 @@ public:
         bool                     world = false;
         bool                     disk  = false;
         std::vector<std::string> folders;
+        // SLua's studio aliases (LA22): each name, in lower case, and the
+        // folder on disk it stands for, which naming it blesses for a
+        // require -- not for an include's search -- or a folder of the
+        // world by the world's own id, an inventory folder, read only
+        // while the world is let in. A require goes to them after the
+        // `.luaurc` chain, so that a project's own wins.
+        std::vector<std::pair<std::string, std::string>> aliases;
         // What the disk's settings have been through, and the time: what
         // the disk said is kept a moment (ALDiskCache).
         U32                      generation = 0;
@@ -111,7 +140,8 @@ public:
         bool        lua = false;
     };
     typedef boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> wanted_t;
-    // A `.luaurc` of a chain, by its identity, and its text.
+    // A configuration of a chain, by its identity, and its text as a
+    // `.luaurc` reads: a `.config.luau`'s is what it returned.
     struct Config
     {
         std::string path;
@@ -128,7 +158,8 @@ public:
     // gathers it -- and with none where the object has not said what it
     // holds; No where nothing is so named. `retry` asks again for what
     // failed before. `alias_folders` gathers the folders the aliases of a
-    // `.luaurc` on disk bless, for the rest of a run.
+    // `.luaurc` on disk bless -- or a module's files, each alone -- for the
+    // rest of a run.
     ALPreprocessor::Found resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Asking& asking, const Where& where,
                                   wanted_t* wanted, bool retry, std::vector<std::string>* alias_folders = nullptr);
     // The `.luaurc` files over a file, nearest first, as Luau reads a chain
@@ -139,6 +170,15 @@ public:
     // its way.
     ALPreprocessor::Found configsFor(const std::string& from, const Asking& asking, const Where& where, wanted_t* wanted, bool retry,
                                      std::vector<Config>& out);
+    // What could follow a path typed so far in a string that names a file
+    // in `from` -- the script asking where empty: for a SLua require, as
+    // Luau's own suggester walks it by the require's rules
+    // (ALRequireNavigation::suggest); for an include, the names under the
+    // folders its search looks in on disk, the file's own first, each named
+    // with its extension, and the folders. What the world holds is offered
+    // only while world includes are on.
+    std::vector<ALRequireNavigation::Suggestion> suggest(const std::string& from, const std::string& typed, bool require, const Asking& asking,
+                                                         const Where& where);
     // resolve() with nothing fetched, and the aliases' folders blessed for
     // the asking.
     ALPreprocessor::Found lookUp(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Asking& asking, const Where& where);
@@ -198,6 +238,30 @@ public:
     static std::vector<std::string> foldersOf(const std::string& name);
 
 private:
+    // The require parity suite asks the search before LAD9 itself, as a
+    // require found nowhere does (searchedBefore).
+    friend struct ::tut::alincludesearch_data;
+
+    // The places a SLua require is walked through, as this search sees
+    // them now (alincludesearch.cpp).
+    class Places;
+    // A SLua require: walked, and the first of what it stands for whose
+    // text is there, or on its way, taken.
+    ALPreprocessor::Found resolveRequire(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Asking& asking, const Where& where,
+                                         wanted_t* wanted, bool retry, std::vector<std::string>& alias_folders);
+    // A file on disk a require walked to, where it stands, where a folder
+    // blessed for a require admits it: the scripter's, an alias's of a
+    // `.luaurc`, a studio alias's.
+    std::optional<std::string> requireAdmits(const ALPreprocessor::Ask& ask, const Asking& asking, const Where& where,
+                                             const std::vector<std::string>& alias_folders, const std::string& file);
+    // A require found nowhere: where the search before LAD9 found it, and
+    // the forms a require may say it by now that find that very file --
+    // relative to the file asking, through an alias that reaches it
+    // already, or otherwise through a studio alias of the include folder
+    // that holds it (Include::moves). For one release.
+    void searchedBefore(const ALPreprocessor::Ask& ask, const Asking& asking, const Where& where, std::vector<std::string>& alias_folders,
+                        ALPreprocessor::Include& out);
+
     // Something an include name could mean, in the order tried: in the
     // world, or a file on disk, read on the spot.
     struct Candidate
@@ -216,6 +280,28 @@ private:
     ALDiskCache::Blessed& blessedFor(const ALPreprocessor::Ask& ask, const Asking& asking, const Where& where,
                                      const std::vector<std::string>& alias_folders);
     ALDiskCache::Blessed& ownFolders(const Where& where);
+    // A folder on disk's configuration: its `.luaurc` and its
+    // `.config.luau`, where each is, either empty; both is ambiguous.
+    struct DiskConfig
+    {
+        std::string dir;
+        std::string luaurc;
+        std::string luau;
+    };
+    // Each folder's from one up to the root that has either, nearest
+    // first; and at the top of each of the scripter's include folders that
+    // has either, in their order. A walk's own climb reads a folder's from
+    // the same look up the folders (Places).
+    std::vector<DiskConfig> configsUp(const std::string& dir, const Where& where);
+    std::vector<DiskConfig> configsAtTop(const Where& where);
+    // One read as a `.luaurc` reads, and named by its file: its `.luaurc`,
+    // or its `.config.luau` run (ALLuauConfigScript) -- no text, and why,
+    // where that fails -- or ambiguous, with both. False where it has
+    // neither, or the file cannot be read.
+    bool readConfig(const DiskConfig& config, ALRequirePlaces::Config& out);
+    // A file on disk a blessed folder admits, where it stands: what may be
+    // asked the text of from now on.
+    Candidate admitted(const std::string& real);
     // A candidate's text, from the texts fetched or the disk; Pending, and
     // wanted, where it is in the world and not in hand yet.
     ALPreprocessor::Found textOf(const Candidate& candidate, wanted_t* wanted, bool retry, std::string& text, std::string& assetId);

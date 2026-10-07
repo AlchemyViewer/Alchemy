@@ -56,10 +56,21 @@ size_t ALSnippetSession::parameterListAt(std::string_view detail, std::string_vi
 std::vector<std::string> ALSnippetSession::parameterNames(std::string_view detail, std::string_view name)
 {
     std::vector<std::string> names;
-    const size_t             open = parameterListAt(detail, name);
+    for (Parameter& one : parameters(detail, name))
+    {
+        names.push_back(std::move(one.name));
+    }
+    return names;
+}
+
+// static
+std::vector<ALSnippetSession::Parameter> ALSnippetSession::parameters(std::string_view detail, std::string_view name)
+{
+    std::vector<Parameter> out;
+    const size_t           open = parameterListAt(detail, name);
     if (open == std::string::npos)
     {
-        return names;
+        return out;
     }
     // To the bracket that closes it, minding the ones inside.
     size_t close = open + 1;
@@ -79,65 +90,101 @@ std::vector<std::string> ALSnippetSession::parameterNames(std::string_view detai
     }
     if (close >= detail.size())
     {
-        return names;
+        return out;
     }
+    // How deep in a type's own brackets a character leaves it: `<>` are
+    // brackets, but the `>` of a function type's `->` closes nothing.
+    const auto step = [](std::string_view text, size_t at) -> S32 {
+        switch (text[at])
+        {
+            case '(':
+            case '[':
+            case '{':
+            case '<':
+                return 1;
+            case ')':
+            case ']':
+            case '}':
+                return -1;
+            case '>':
+                return at > 0 && text[at - 1] == '-' ? 0 : -1;
+            default:
+                return 0;
+        }
+    };
+    const auto trimmed = [](std::string_view text) {
+        const size_t a = text.find_first_not_of(" \t");
+        return a == std::string_view::npos ? std::string_view() : text.substr(a, text.find_last_not_of(" \t") - a + 1);
+    };
     const std::string_view inside = detail.substr(open + 1, close - open - 1);
-    size_t                 at     = 0;
-    S32                    depth  = 0;
-    std::string            piece;
-    auto take = [&]() {
-        // "integer channel", "channel: number", "...any" or "channel".
-        size_t a = piece.find_first_not_of(' ');
-        size_t z = piece.find_last_not_of(' ');
-        if (a == std::string::npos)
+    auto take = [&](std::string_view piece) {
+        // "integer channel", "channel: number", "...any" or "channel": by
+        // the first colon outside the type's brackets, else the last blank.
+        piece = trimmed(piece);
+        if (piece.empty())
         {
             return;
         }
-        std::string one = piece.substr(a, z - a + 1);
-        if (const size_t colon = one.find(':'); colon != std::string::npos)
+        size_t colon = std::string_view::npos;
+        size_t blank = std::string_view::npos;
+        S32    depth = 0;
+        for (size_t at = 0; at < piece.size(); ++at)
         {
-            one = one.substr(0, colon);
+            depth += step(piece, at);
+            if (depth == 0 && piece[at] == ':' && colon == std::string_view::npos)
+            {
+                colon = at;
+            }
+            else if (depth == 0 && (piece[at] == ' ' || piece[at] == '\t'))
+            {
+                blank = at;
+            }
         }
-        else if (const size_t space = one.rfind(' '); space != std::string::npos)
+        Parameter one;
+        if (colon != std::string_view::npos)
         {
-            one = one.substr(space + 1);
+            one.name = std::string(trimmed(piece.substr(0, colon)));
+            one.type = std::string(trimmed(piece.substr(colon + 1)));
         }
-        while (!one.empty() && one.back() == '?')
+        else if (blank != std::string_view::npos)
         {
-            one.pop_back();
-        }
-        if (one.rfind("...", 0) == 0)
-        {
-            one = "...";
-        }
-        if (!one.empty())
-        {
-            names.push_back(one);
-        }
-    };
-    for (; at < inside.size(); ++at)
-    {
-        const char c = inside[at];
-        if (c == '(' || c == '<' || c == '{' || c == '[')
-        {
-            ++depth;
-        }
-        else if (c == ')' || c == '>' || c == '}' || c == ']')
-        {
-            --depth;
-        }
-        if (c == ',' && depth == 0)
-        {
-            take();
-            piece.clear();
+            one.name = std::string(piece.substr(blank + 1));
+            one.type = std::string(trimmed(piece.substr(0, blank)));
         }
         else
         {
-            piece.push_back(c);
+            one.name = std::string(piece);
+        }
+        while (!one.name.empty() && one.name.back() == '?')
+        {
+            one.name.pop_back();
+        }
+        if (one.name.rfind("...", 0) == 0)
+        {
+            if (one.type.empty())
+            {
+                one.type = one.name.substr(3);
+            }
+            one.name = "...";
+        }
+        if (!one.name.empty())
+        {
+            out.push_back(std::move(one));
+        }
+    };
+    size_t from  = 0;
+    S32    depth = 0;
+    for (size_t at = 0; at < inside.size(); ++at)
+    {
+        depth += step(inside, at);
+        if (inside[at] == ',' && depth == 0)
+        {
+            take(inside.substr(from, at - from));
+            from = at + 1;
         }
     }
-    take();
-    return names;
+    take(inside.substr(from));
+    return out;
 }
 
 // static

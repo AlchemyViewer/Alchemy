@@ -27,11 +27,15 @@
 #include "../core/alscriptweight.h"
 
 #include "../lsl/allslservice.h"
+#include "../luau/alluauservice.h"
+#include "../luau/alluausharedstart.h"
 #include "../preprocessor/alsourcemap.h"
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <numeric>
+#include <sstream>
 
 namespace tut
 {
@@ -112,6 +116,42 @@ namespace tut
             for (const ALScriptWeight::Part& part : weight.parts)
             {
                 out += " " + part.within + (part.within.empty() ? "" : ".") + part.name + "=" + std::to_string(part.bytes);
+            }
+            return out;
+        }
+
+        // A shared start's edits made from the end back, as an editor's
+        // replaceAll does.
+        static std::string applied(const std::string& script, const ALLuauSharedStart::Rewrite& rewrite)
+        {
+            std::vector<std::string> lines;
+            for (size_t from = 0; from <= script.size();)
+            {
+                const size_t cut = std::min(script.find('\n', from), script.size());
+                lines.push_back(script.substr(from, cut - from));
+                from = cut + 1;
+            }
+            for (auto edit = rewrite.edits.rbegin(); edit != rewrite.edits.rend(); ++edit)
+            {
+                ensure("one line each", edit->line == edit->endLine);
+                std::string& line = lines[static_cast<size_t>(edit->line)];
+                line.replace(static_cast<size_t>(edit->column), static_cast<size_t>(edit->endColumn - edit->column), edit->text);
+            }
+            std::string after;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                after += lines[i] + (i + 1 < lines.size() ? "\n" : "");
+            }
+            return after;
+        }
+
+        // The texts of a shared start's strings.
+        static std::vector<std::string> textsOf(const ALScriptWeight& weight, const ALScriptWeight::SharedStart& shared)
+        {
+            std::vector<std::string> out;
+            for (const size_t i : shared.strings)
+            {
+                out.push_back(weight.strings[i].text);
             }
             return out;
         }
@@ -635,5 +675,400 @@ namespace tut
         ensure("a short one on its own line:" + lined(weight), at(weight, 12) > 4 + std::string("touched").size());
         const size_t lines = within(weight, 0, 100);
         ensure("most of the whole on some line: " + std::to_string(lines) + " of " + std::to_string(weight.total), lines * 3 > weight.total * 2);
+    }
+
+    // Each string the table keeps: what it takes up, how many instructions
+    // name it and how many load it as a value, the first line naming it,
+    // and a function's name as such. They come to the table, its count
+    // before them.
+    template<> template<>
+    void alscriptweight_object::test<13>()
+    {
+        const std::string script = "local function greet(name: string)\n"           // 0
+                                   "    ll.OwnerSay(\"hello \" .. name)\n"             // 1
+                                   "end\n"                                            // 2
+                                   "local t = {}\n"                                   // 3
+                                   "t.colour = \"red\"\n"                             // 4
+                                   "if t.colour == \"blue\" then greet(\"x\") end\n"  // 5
+                                   "greet(\"hello again\")\n"                         // 6
+                                   "greet(\"hello again\")\n";                        // 7
+        const ALScriptWeight w = ALScriptWeigh::slua(script);
+        ensure("compiled: " + w.error, w.compiled);
+        const auto of = [&w](const std::string& text) -> const ALScriptWeight::String* {
+            for (const ALScriptWeight::String& one : w.strings)
+            {
+                if (one.text == text)
+                {
+                    return &one;
+                }
+            }
+            return nullptr;
+        };
+        const ALScriptWeight::String* again = of("hello again");
+        ensure("a value loaded twice", again && again->uses == 2 && again->loads == 2 && again->line == 6 && again->bytes == 12);
+        const ALScriptWeight::String* colour = of("colour");
+        ensure("a field's name: named, never loaded", colour && colour->uses >= 2 && colour->loads == 0 && colour->line == 4);
+        const ALScriptWeight::String* blue = of("blue");
+        ensure("a comparison's: named, never loaded", blue && blue->uses == 1 && blue->loads == 0);
+        const ALScriptWeight::String* say = of("OwnerSay");
+        ensure("an import's path", say && say->uses >= 1 && say->loads == 0 && say->line == 1);
+        const ALScriptWeight::String* greet = of("greet");
+        ensure("a function's name, at the line it starts on", greet && greet->name && greet->uses == 0 && greet->line == 0);
+        size_t bytes = 0;
+        for (const ALScriptWeight::String& one : w.strings)
+        {
+            bytes += one.bytes;
+        }
+        const ALScriptWeight::Part* table = named(w, "strings");
+        ensure("they come to the table, with its count", table && table->bytes == bytes + 1);
+
+        // LSL compiled for Luau's VM: its strings, at the lines the lined
+        // compile says.
+        ensure("the builtins: " + error, lslLoaded);
+        const ALScriptWeight lsl = ALScriptWeigh::lslLuau(byLine());
+        bool found = false;
+        for (const ALScriptWeight::String& one : lsl.strings)
+        {
+            found = found || (one.text == "a sentence of some length, said to the owner on every start" && one.line == 15);
+        }
+        ensure("LSL on Luau's, placed", lsl.compiled && found);
+    }
+
+    // Strings that start alike: where keeping the start once and joining it
+    // back on would weigh less, what it would save -- the table's bytes
+    // before less after, less the join at each load and the local once.
+    // Only strings loaded as values; a short start saves nothing.
+    template<> template<>
+    void alscriptweight_object::test<14>()
+    {
+        const std::string start = "You have touched the object of the day: ";
+        const std::vector<std::string> rests = { "alpha", "bravo", "charlie", "delta" };
+        std::string script = "local t = {}\n";
+        for (const std::string& rest : rests)
+        {
+            script += "ll.OwnerSay(\"" + start + rest + "\")\n";
+        }
+        // Sharing a start with them, but a field's name too: never two.
+        script += "t[\"" + start + "zulu\"] = 1\nt.x = t[\"" + start + "zulu\"]\n";
+        // Two sharing a start too short to be worth it.
+        script += "ll.OwnerSay(\"short one\")\nll.OwnerSay(\"short two\")\n";
+        const ALScriptWeight w = ALScriptWeigh::slua(script);
+        ensure("compiled: " + w.error, w.compiled);
+        ensure_equals("one start worth keeping", w.sharedStarts.size(), size_t(1));
+        const ALScriptWeight::SharedStart& shared = w.sharedStarts.front();
+        ensure_equals("the start the four share", shared.start, start);
+        ensure_equals("the four, not the field's", shared.strings.size(), rests.size());
+        size_t before = 0;
+        size_t after  = 1 + start.size();
+        for (const std::string& rest : rests)
+        {
+            before += 1 + start.size() + rest.size();
+            after += 1 + rest.size();
+        }
+        const size_t cost = after + rests.size() * ALScriptWeigh::SHARED_START_PER_LOAD + ALScriptWeigh::SHARED_START_ONCE;
+        ensure_equals("what it saves", shared.saved, before - cost);
+        for (const size_t i : shared.strings)
+        {
+            ensure("each one of them", w.strings[i].text.rfind(start, 0) == 0 && w.strings[i].text != start + "zulu");
+        }
+
+        // The costs against the compiler's own: the four written whole, and
+        // written with the start kept apart and joined back on, weigh about
+        // what was said apart.
+        std::string whole;
+        std::string apart = "local start\nstart = \"" + start + "\"\n";
+        for (const std::string& rest : rests)
+        {
+            whole += "ll.OwnerSay(\"" + start + rest + "\")\n";
+            apart += "ll.OwnerSay(start .. \"" + rest + "\")\n";
+        }
+        const ALScriptWeight as_whole = ALScriptWeigh::slua(whole);
+        const ALScriptWeight as_apart = ALScriptWeigh::slua(apart);
+        ensure("both compiled", as_whole.compiled && as_apart.compiled && as_whole.sharedStarts.size() == 1);
+        const S64 really = S64(as_whole.total) - S64(as_apart.total);
+        ensure(llformat("saves about what was said: %lld against %zu", (long long)really, as_whole.sharedStarts[0].saved),
+               std::abs(really - S64(as_whole.sharedStarts[0].saved)) <= 8);
+
+        // Nothing where only two share a start: two loads cost more than
+        // one start saves, until the start is long.
+        ensure("two with a middling start: nothing",
+               ALScriptWeigh::slua("ll.OwnerSay(\"twenty bytes of start, then one\")\nll.OwnerSay(\"twenty bytes of start, then two\")\n").sharedStarts.empty());
+        ensure("two with a long one: worth it",
+               ALScriptWeigh::slua("ll.OwnerSay(\"a start long enough to be worth keeping once, then one\")\n"
+                                   "ll.OwnerSay(\"a start long enough to be worth keeping once, then two\")\n")
+                       .sharedStarts.size() == 1);
+        // Never inside a character.
+        const ALScriptWeight cut = ALScriptWeigh::slua("ll.OwnerSay(\"a start long enough to be worth keeping once \xC3\xA9t\xC3\xA9\")\n"
+                                                       "ll.OwnerSay(\"a start long enough to be worth keeping once \xC3\xA8re\")\n");
+        ensure("cut before the character", cut.sharedStarts.size() == 1 && cut.sharedStarts[0].start == "a start long enough to be worth keeping once ");
+    }
+
+    // A shared start kept once in the script itself: each literal of its
+    // strings the start's local and the rest joined on, the local declared
+    // at the top, past the --! comments, apart from its value; in brackets
+    // where `..` would bind otherwise; constant strings joined with the
+    // pieces after the first bracketed with its rest, which Luau then
+    // still folds into one; a require's path, a table's key, a length Luau
+    // works out as it compiles and a string not of them left alone. What it
+    // weighs after is what was said apart, with nothing left to keep once;
+    // and it checks, strict as well.
+    template<> template<>
+    void alscriptweight_object::test<15>()
+    {
+        const std::string start = "You have touched the object of the day: ";
+        const std::string script = "--!strict\n"                                                           // 0
+                                   "local util = require(\"" + start + "x\")\n"                           // 1
+                                   "ll.OwnerSay(\"" + start + "alpha\")\n"                                   // 2
+                                   "ll.OwnerSay(\"" + start + "bravo\" .. \"!\")\n"                          // 3
+                                   "local said = { [\"" + start + "key\"] = \"" + start + "charlie\" }\n"    // 4
+                                   "print(#\"" + start + "delta\")\n"                                         // 5
+                                   "print \"" + start + "delta\"\n"                                           // 6
+                                   "ll.OwnerSay(\"other\")\n";                                                // 7
+        const ALScriptWeight before = ALScriptWeigh::slua(script);
+        ensure("weighed: " + before.error, before.compiled);
+        ensure_equals("one start", before.sharedStarts.size(), size_t(1));
+        const std::vector<std::string> strings = textsOf(before, before.sharedStarts[0]);
+        ensure("not the require's path, which is no string to keep once",
+               std::find(strings.begin(), strings.end(), start + "x") == strings.end());
+        ALLuauSharedStart::Rewrite rewrite;
+        std::string                error;
+        const bool                 done = ALLuauSharedStart::rewrite(script, before.sharedStarts[0].start, strings, rewrite, error);
+        ensure("rewritten: " + error, done);
+        ensure_equals("its name", rewrite.name, std::string("sharedStart"));
+        const std::string after = applied(script, rewrite);
+        const auto has = [&after](const std::string& text) { return after.find(text) != std::string::npos; };
+        ensure("the local past the --! comment: " + after, after.rfind("--!strict\nlocal sharedStart\nsharedStart = \"" + start + "\"\n\n", 0) == 0);
+        ensure("a call's: " + after, has("ll.OwnerSay(sharedStart .. \"alpha\")"));
+        ensure("constant strings joined, still folded: " + after, has("ll.OwnerSay(sharedStart .. (\"bravo\" .. \"!\"))"));
+        ensure("a table's value, not its key: " + after, has("[\"" + start + "key\"] = sharedStart .. \"charlie\""));
+        ensure("a length Luau works out, left: " + after, has("print(#\"" + start + "delta\")"));
+        ensure("and a call with no brackets: " + after, has("print (sharedStart .. \"delta\")"));
+        ensure("a require's path left: " + after, has("require(\"" + start + "x\")"));
+        ensure("another string left: " + after, has("ll.OwnerSay(\"other\")"));
+
+        // What it weighs now, and that it checks.
+        const ALScriptWeight weighed = ALScriptWeigh::slua(after);
+        ensure("weighed after: " + weighed.error, weighed.compiled);
+        // Nothing left to keep once: the start is the local's one value,
+        // kept once already, and the require's path no literal to keep.
+        ensure_equals("nothing offered again", weighed.sharedStarts.size(), size_t(0));
+        ensure(llformat("lighter: %zu then %zu", before.total, weighed.total), weighed.total < before.total);
+        ALLuauService     service;
+        llifstream        in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
+        std::stringstream definitions;
+        definitions << in.rdbuf();
+        ensure("definitions: " + error, service.loadDefinitions(definitions.str(), error));
+        std::string said;
+        for (const ALScriptProblem& p : service.check(after))
+        {
+            said += p.severity == ALScriptProblem::Severity::Error && p.message.find("require") == std::string::npos ? p.message + "\n" : std::string();
+        }
+        ensure("checks, strict:\n" + said + "---\n" + after, said.empty());
+
+        ensure("nothing to make of a script without them",
+               !ALLuauSharedStart::rewrite("print(\"x\")\n", start, strings, rewrite, error) && !error.empty());
+        const bool taken = ALLuauSharedStart::rewrite("local sharedStart = 1\nprint(\"" + start + "alpha\")\n", start, { start + "alpha" }, rewrite, error);
+        ensure("rewritten with a name taken: " + error, taken);
+        ensure_equals("a name it has taken, another", rewrite.name, std::string("sharedStart2"));
+        ensure_equals("quoted as SLua reads it", ALLuauSharedStart::quoted("a\"b\\c\n\x01" "2"), std::string("\"a\\\"b\\\\c\\n\\0012\""));
+    }
+
+    // Strings loaded in closures: each function that loads one, and each
+    // holding such a function, would capture the start's local, and the
+    // script's body close it over as it ends, which the saving counts.
+    // What it says is about what the compiler makes: a closure shared
+    // before frees its constant made anew, a byte or two each.
+    template<> template<>
+    void alscriptweight_object::test<16>()
+    {
+        const std::string              start  = "You have touched the object of the day: ";
+        const std::vector<std::string> rests  = { "alpha", "bravo", "charlie" };
+        const std::vector<std::string> events = { "touch_start", "touch_end", "collision_start" };
+        std::string                    whole;
+        std::string                    apart  = "local start\nstart = \"" + start + "\"\n";
+        for (size_t i = 0; i < rests.size(); ++i)
+        {
+            whole += "LLEvents:on(\"" + events[i] + "\", function()\n    ll.OwnerSay(\"" + start + rests[i] + "\")\nend)\n";
+            apart += "LLEvents:on(\"" + events[i] + "\", function()\n    ll.OwnerSay(start .. \"" + rests[i] + "\")\nend)\n";
+        }
+        const ALScriptWeight as_whole = ALScriptWeigh::slua(whole);
+        const ALScriptWeight as_apart = ALScriptWeigh::slua(apart);
+        ensure("both compiled: " + as_whole.error + as_apart.error, as_whole.compiled && as_apart.compiled);
+        ensure_equals("one start", as_whole.sharedStarts.size(), size_t(1));
+        const ALScriptWeight::SharedStart& shared = as_whole.sharedStarts.front();
+        ensure_equals("the start the three share", shared.start, start);
+        for (const size_t i : shared.strings)
+        {
+            ensure_equals("each loaded in a function of its own", as_whole.strings[i].functions.size(), size_t(1));
+        }
+        size_t before = 0;
+        size_t after  = 1 + start.size();
+        for (const std::string& rest : rests)
+        {
+            before += 1 + start.size() + rest.size();
+            after += 1 + rest.size();
+        }
+        const size_t cost = after + rests.size() * (ALScriptWeigh::SHARED_START_PER_LOAD + ALScriptWeigh::SHARED_START_PER_FUNCTION) +
+                            ALScriptWeigh::SHARED_START_ONCE + ALScriptWeigh::SHARED_START_CAPTURED;
+        ensure_equals("what it saves, a capture for each closure", shared.saved, before - cost);
+        const S64 really = S64(as_whole.total) - S64(as_apart.total);
+        ensure(llformat("saves about what was said: %lld against %zu", (long long)really, shared.saved),
+               std::abs(really - S64(shared.saved)) <= S64(8 + 2 * rests.size()));
+    }
+
+    // Where the start's local goes: before the first of the script that is
+    // not a comment, since Luau reads a `--!` comment as the script's own
+    // only before that -- past an ordinary comment before them, a blank
+    // line, `--!` comments apart -- at the start of its line, or after a
+    // comment on it. What would not parse is refused, as is a start not
+    // every string of which is written out; and a byte of no character is
+    // quoted in hex.
+    template<> template<>
+    void alscriptweight_object::test<17>()
+    {
+        const std::string              start   = "You have touched the object of the day: ";
+        const std::vector<std::string> strings = { start + "alpha", start + "bravo" };
+        const std::string              said    = "ll.OwnerSay(\"" + start + "alpha\")\nll.OwnerSay(\"" + start + "bravo\")\n";
+        const std::string              local   = "local sharedStart\nsharedStart = \"" + start + "\"\n\n";
+        const auto kept = [&](const std::string& script) {
+            ALLuauSharedStart::Rewrite rewrite;
+            std::string                why;
+            const bool                 done = ALLuauSharedStart::rewrite(script, start, strings, rewrite, why);
+            ensure("rewritten: " + why + "\n" + script, done);
+            return alscriptweight_data::applied(script, rewrite);
+        };
+        const auto heads = [&](const std::string& head, const std::string& text) { return text.rfind(head + local, 0) == 0; };
+        std::string after = kept("-- Door script\n--!strict\n" + said);
+        ensure("past an ordinary comment and the --! one: " + after, heads("-- Door script\n--!strict\n", after));
+        ensure("and the strings kept: " + after, after.find("ll.OwnerSay(sharedStart .. \"alpha\")") != std::string::npos);
+        after = kept("\n--!strict\n" + said);
+        ensure("past a blank first line: " + after, heads("\n--!strict\n", after));
+        after = kept("--!strict\n\n--!optimize 2\n" + said);
+        ensure("past --! comments apart: " + after, heads("--!strict\n\n--!optimize 2\n", after));
+        after = kept("--!strict\n    " + said);
+        ensure("at the start of an indented line: " + after, heads("--!strict\n", after) && after.find(local + "    ll.OwnerSay") != std::string::npos);
+        after = kept("--[[ The door ]] " + said);
+        ensure("after a comment on the same line: " + after, heads("--[[ The door ]] ", after));
+
+        ALLuauSharedStart::Rewrite rewrite;
+        std::string                error;
+        ensure("a call's string on a line of its own would be ambiguous bracketed",
+               !ALLuauSharedStart::rewrite("ll.OwnerSay\n\"" + start + "alpha\"\nll.OwnerSay(\"" + start + "bravo\")\n", start, strings, rewrite, error) &&
+                   error.find("does not parse") != std::string::npos);
+        ensure("nothing made of it", rewrite.edits.empty());
+        ensure("a string not written out: " + error,
+               !ALLuauSharedStart::rewrite("ll.OwnerSay(\"" + start + "alpha\")\n", start, strings, rewrite, error) &&
+                   error.find("not every one") != std::string::npos);
+        ensure("none written out, a local joined on: " + error,
+               !ALLuauSharedStart::rewrite("local greeting = \"" + start + "\"\nll.OwnerSay(greeting .. \"alpha\")\nll.OwnerSay(greeting .. \"bravo\")\n",
+                                           start, strings, rewrite, error) &&
+                   error.find("none of these strings") != std::string::npos);
+
+        ensure_equals("a byte of no character in hex, a whole one as it is", ALLuauSharedStart::quoted("\xFF" "a\xC3\xA9\xC3"),
+                      std::string("\"\\xFFa\xC3\xA9\\xC3\""));
+        ensure_equals("an overlong form is no character", ALLuauSharedStart::quoted("\xC0\x80"), std::string("\"\\xC0\\x80\""));
+        ensure_equals("four bytes, whole", ALLuauSharedStart::quoted("\xF0\x9F\x98\x80"), std::string("\"\xF0\x9F\x98\x80\""));
+    }
+
+    // What is not offered: strings Luau makes as it compiles -- an
+    // interpolated string's pattern, strings joined on a local's constant
+    // value -- one the script's types name as a singleton, which `string`
+    // is not, the start kept once already, and a module's strings in the
+    // source's places. What is: strings a `..` that is not folded goes on
+    // to, each a literal of its own, kept once in place.
+    template<> template<>
+    void alscriptweight_object::test<18>()
+    {
+        const std::string start = "You have touched the object of the day: ";
+        ensure("an interpolated string's pattern",
+               ALScriptWeigh::slua("local function said(name: string)\n"
+                                   "    ll.OwnerSay(`" + start + "{name}, first`)\n"
+                                   "    ll.OwnerSay(`" + start + "{name}, second`)\n"
+                                   "    ll.OwnerSay(`" + start + "{name}, third`)\n"
+                                   "end\n"
+                                   "said(\"x\")\n")
+                   .sharedStarts.empty());
+        ensure("strings joined on a local's constant value",
+               ALScriptWeigh::slua("local greeting = \"" + start + "\"\n"
+                                   "ll.OwnerSay(greeting .. \"alpha\")\n"
+                                   "ll.OwnerSay(greeting .. \"bravo\")\n"
+                                   "ll.OwnerSay(greeting .. \"charlie\")\n")
+                   .sharedStarts.empty());
+        const auto feelings = [&start](const std::string& type) {
+            return "type Mood = " + type + "\nlocal function feel(mood: Mood) end\n"
+                   "feel(\"" + start + "happy\")\nfeel(\"" + start + "sad\")\nfeel(\"" + start + "bored\")\n";
+        };
+        ensure_equals("given for a string", ALScriptWeigh::slua(feelings("string")).sharedStarts.size(), size_t(1));
+        ensure("given for a singleton",
+               ALScriptWeigh::slua(feelings("\"" + start + "happy\" | \"" + start + "sad\" | \"" + start + "bored\"")).sharedStarts.empty());
+
+        // Kept once, with an interpolated string sharing the start beside
+        // them: neither it nor the start's local is offered again.
+        const std::string kept_script = "local function said(name: string)\n"
+                                        "    ll.OwnerSay(`" + start + "{name}`)\n"
+                                        "end\n"
+                                        "ll.OwnerSay(\"" + start + "alpha\")\n"
+                                        "ll.OwnerSay(\"" + start + "bravo\")\n"
+                                        "ll.OwnerSay(\"" + start + "charlie\")\n"
+                                        "said(\"x\")\n";
+        const ALScriptWeight kept = ALScriptWeigh::slua(kept_script);
+        ensure("weighed: " + kept.error, kept.compiled && kept.sharedStarts.size() == 1);
+        ensure_equals("the three written out, not the pattern", kept.sharedStarts[0].strings.size(), size_t(3));
+        ALLuauSharedStart::Rewrite rewrite;
+        std::string                error;
+        bool                       done = ALLuauSharedStart::rewrite(kept_script, start, textsOf(kept, kept.sharedStarts[0]), rewrite, error);
+        ensure("rewritten: " + error, done);
+        const ALScriptWeight again = ALScriptWeigh::slua(applied(kept_script, rewrite));
+        ensure("weighed again: " + again.error, again.compiled);
+        ensure_equals("nothing offered again", again.sharedStarts.size(), size_t(0));
+
+        // Joined on to a name, each piece is loaded on its own.
+        const std::string joined = "local function touched(name: string)\n"
+                                   "    ll.OwnerSay(name .. \"" + start + "alpha\" .. \"!\")\n"
+                                   "    ll.OwnerSay(name .. \"" + start + "bravo\" .. \"!\")\n"
+                                   "    ll.OwnerSay(name .. \"" + start + "charlie\" .. \"!\")\n"
+                                   "end\n"
+                                   "touched(\"x\")\n";
+        const ALScriptWeight pieces = ALScriptWeigh::slua(joined);
+        ensure("weighed: " + pieces.error, pieces.compiled && pieces.sharedStarts.size() == 1 && pieces.sharedStarts[0].start == start);
+        done = ALLuauSharedStart::rewrite(joined, start, textsOf(pieces, pieces.sharedStarts[0]), rewrite, error);
+        ensure("rewritten: " + error, done);
+        const std::string pieces_after = applied(joined, rewrite);
+        ensure("each piece kept in place: " + pieces_after, pieces_after.find("ll.OwnerSay(name .. sharedStart .. \"alpha\" .. \"!\")") != std::string::npos);
+        const ALScriptWeight lighter = ALScriptWeigh::slua(pieces_after);
+        ensure(llformat("lighter: %zu then %zu", pieces.total, lighter.total), lighter.compiled && lighter.total < pieces.total);
+
+        // A module's strings, in the source's places, are not the script's
+        // to keep once: the first three lines are a module's.
+        const std::vector<std::string> lines = { "local m = {}",
+                                                 "function m.a() ll.OwnerSay(\"" + start + "alpha\") end",
+                                                 "function m.b() ll.OwnerSay(\"" + start + "bravo\") end",
+                                                 "ll.OwnerSay(\"" + start + "charlie\")",
+                                                 "m.a() m.b()" };
+        std::string bundle;
+        for (const std::string& line : lines)
+        {
+            bundle += line + "\n";
+        }
+        const auto mapped = [&lines](S32 module_lines) {
+            ALSourceMap map;
+            map.addFile("script", "script");
+            map.addFile("mod", "inventory:/mod");
+            for (S32 out = 0; out < S32(lines.size()); ++out)
+            {
+                ALSourceMap::Segment segment;
+                segment.outLine = out;
+                segment.length  = S32(lines[out].size());
+                segment.file    = out < module_lines ? 1 : 0;
+                segment.line    = out < module_lines ? out : out - module_lines;
+                map.add(segment);
+            }
+            map.finish();
+            return map;
+        };
+        const ALScriptWeight bundled = ALScriptWeigh::slua(bundle);
+        ensure("weighed: " + bundled.error, bundled.compiled && bundled.sharedStarts.size() == 1);
+        ensure_equals("all the script's: kept", bundled.inSource(mapped(0)).sharedStarts.size(), size_t(1));
+        ensure_equals("two a module's: nothing", bundled.inSource(mapped(3)).sharedStarts.size(), size_t(0));
     }
 }

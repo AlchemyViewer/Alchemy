@@ -99,6 +99,7 @@ namespace al_studio_test
                                                                const std::vector<std::string>&, std::function<void()>)>
                                                                                               modules;
             std::function<void(const ALScriptPreprocessor::Request&, std::function<void()>)> fetchNearby;
+            std::function<bool(const std::string&, const std::string&)>                      nameStudioAlias;
         };
         Slots slots;
 
@@ -153,6 +154,10 @@ namespace al_studio_test
             {
                 slots.fetchNearby(request, std::move(fetched));
             }
+        }
+        bool nameStudioAlias(const std::string& name, const std::string& folder) override
+        {
+            return slots.nameStudioAlias ? slots.nameStudioAlias(name, folder) : ALScriptStudioViewer::nameStudioAlias(name, folder);
         }
     };
 

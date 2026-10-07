@@ -138,9 +138,14 @@ ALScriptModules::Look ALScriptModules::lookFor(const ALScriptPreprocessor::Reque
     {
         ALLuauConfig config;
         preprocessor.configOf(request, config);
+        // Not the names Second Life and Luau keep, which no require
+        // reaches through a configuration.
         for (const auto& [alias, folder] : config.aliases)
         {
-            look.aliases.push_back(alias);
+            if (!ALLuauConfig::reservedAlias(alias))
+            {
+                look.aliases.push_back(alias);
+            }
         }
     }
     return look;

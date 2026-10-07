@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../alscriptweightspane.h"
+#include "llbutton.h"
 
 #include "alpanelist.h"
 #include "alrecoverystore.h"
@@ -38,6 +39,7 @@
 #include "../test/lltut.h"
 
 #include <algorithm>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -184,14 +186,14 @@ namespace tut
         ALPaneList* parts   = list("weights_parts");
 
         parts->selectByValue(LLSD(2));
-        std::optional<ALScriptWeightsPane::Place> place = pane.chosenPlace();
+        std::optional<ALScriptWeightsPane::Place> place = pane.chosenPlace(parts);
         ensure("the include's function has a place", place.has_value());
         ensure_equals("in the include", place->file, std::string("disk:/lib.lsl"));
         ensure_equals("by its name", place->fileName, std::string("lib.lsl"));
         ensure_equals("at its line", place->line, 0);
         ensure_equals("and column", place->column, 4);
         parts->selectByValue(LLSD(0));
-        ensure("the registers are nowhere", !pane.chosenPlace());
+        ensure("the registers are nowhere", !pane.chosenPlace(parts));
 
         targets->selectByValue(LLSD(S32(ALScriptWeight::Target::Mono)));
         targets->onCommit();
@@ -266,7 +268,7 @@ namespace tut
         pane.showNothing("Nothing open to weigh.");
         ensure_equals("no targets", list("weights_targets")->getItemCount(), 0);
         ensure_equals("no parts", list("weights_parts")->getItemCount(), 0);
-        ensure("nothing chosen", !pane.chosenPlace());
+        ensure("nothing chosen", !pane.chosenPlace(pane.partsList()));
         ensure_equals("why", floater->findChild<LLTextBox>("weights_head", true)->getText(), std::string("Nothing open to weigh."));
         ensure("and whose it is forgotten", pane.shownId().empty());
     }
@@ -406,5 +408,123 @@ namespace tut
         pane.show(lsl());
         const std::string lso = floater->findChild<LLTextBox>("weights_head", true)->getText();
         ensure("not for LSO: " + lso, lso.find("records no lines") == std::string::npos);
+    }
+
+    // A Luau target's strings beside its parts: the starts several share
+    // first, in italics, with what they would save; then each string, the
+    // heaviest first, its uses, and a function's name said as one; each
+    // chosen says where it is first named. No other target has a table.
+    template<> template<>
+    void alscriptweightspane_object::test<9>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALScriptWeightsPane&       pane = weights();
+        ALScriptWeightsPane::Shown shown;
+        shown.id   = "script-2";
+        shown.name = "Greeter";
+        ALScriptWeight slua;
+        slua.target   = ALScriptWeight::Target::SLua;
+        slua.compiled = true;
+        slua.limit    = 131072;
+        slua.total    = 900;
+        slua.parts    = { part(ALScriptWeight::Part::Kind::Constant, "strings", 120) };
+        const auto string = [](const char* text, size_t bytes, size_t uses, size_t loads, S32 line, bool name = false) {
+            ALScriptWeight::String one;
+            one.text  = text;
+            one.bytes = bytes;
+            one.uses  = uses;
+            one.loads = loads;
+            one.line  = line;
+            one.name  = name;
+            return one;
+        };
+        slua.strings = { string("greet", 6, 0, 0, 0, true), string("You have touched me, alpha", 27, 1, 1, 4), string("You have touched me, bravo", 27, 2, 2, 2),
+                         string("x\ny", 4, 1, 1, 6) };
+        ALScriptWeight::SharedStart shared;
+        shared.start   = "You have touched me, ";
+        shared.strings = { 1, 2 };
+        shared.saved   = 9;
+        slua.sharedStarts = { shared };
+        shown.weights     = { slua };
+        pane.show(shown);
+
+        ALPaneList* strings = list("weights_strings");
+        ensure("the list there", strings && strings->getParent()->getVisible());
+        ensure_equals("a start, then each string", strings->getItemCount(), 5);
+        const std::vector<std::string> texts = column(strings, 0);
+        ensure("the start first: " + texts[0], texts[0].find("Shared start") == 0 && texts[0].find("\"You have touched me, \"") != std::string::npos &&
+                                                   texts[0].find("2 strings") != std::string::npos);
+        ensure_equals("what it saves, as less", column(strings, 1)[0], std::string("-9"));
+        ensure_equals("its strings' loads", column(strings, 2)[0], std::string("3"));
+        ensure_equals("at the first of them", column(strings, 4)[0], std::string("3"));
+        ensure_equals("then the heaviest first, a break shown as one", joined(texts).substr(joined({ texts[0] }).size()),
+                      std::string("|\"You have touched me, alpha\"|\"You have touched me, bravo\"|\"greet\"|\"x\\ny\""));
+        ensure_equals("each one's uses, a function's name said as one", joined(column(strings, 2)), std::string("|3|1|2|name|1"));
+
+        strings->selectByValue(LLSD(2));
+        std::optional<ALScriptWeightsPane::Place> place = pane.chosenPlace(strings);
+        ensure("a string chosen: where it is first named", place && place->file.empty() && place->line == 2);
+        strings->selectByValue(LLSD(0));
+        place = pane.chosenPlace(strings);
+        ensure("the start chosen: the first of its strings", place && place->line == 2);
+        ensure("not the parts' choice", !pane.chosenPlace(list("weights_parts")));
+
+        // Kept chosen through a refill, by what it is.
+        strings->selectByValue(LLSD(1));
+        pane.show(shown);
+        ensure("still chosen", strings->getFirstSelected() && strings->getFirstSelected()->getValue().asInteger() == 1);
+
+        // A start's tip names its strings; each of them says it shares one.
+        const auto tip = [&](S32 row) {
+            const LLScrollListItem* item = strings->getAllData()[static_cast<size_t>(row)];
+            return item->getColumn(0)->getToolTip();
+        };
+        ensure("the start's strings named: " + tip(0), tip(0).find("\"You have touched me, alpha\"") != std::string::npos &&
+                                                          tip(0).find("\"You have touched me, bravo\"") != std::string::npos);
+        ensure("a string of it says so: " + tip(1), tip(1).find("shares its start") != std::string::npos);
+        ensure("one that is not, nothing: " + tip(4), tip(4).find("shares its start") == std::string::npos);
+
+        // Since the save: a string not there then, new; a start by how its
+        // saving moved, said as its bytes are, as less: saving more since,
+        // it is lighter.
+        ALScriptWeight then = slua;
+        then.strings.pop_back();
+        then.sharedStarts[0].saved = 4;
+        shown.saved                = { then };
+        pane.show(shown);
+        ensure_equals("since the save", joined(column(strings, 3)), std::string("|-5||||new"));
+
+        // Keeping the start once asks the window, with its strings.
+        std::string              kept;
+        std::vector<std::string> of;
+        pane.setKeepStart([&](const std::string& start, const std::vector<std::string>& texts) {
+            kept = start;
+            of   = texts;
+        });
+        strings->selectByValue(LLSD(0));
+        floater->findChild<LLButton>("weights_keep_start", true)->onCommit();
+        ensure("asked with the start and its strings", kept == "You have touched me, " && of.size() == 2 && of[1] == "You have touched me, bravo");
+        kept.clear();
+        strings->selectByValue(LLSD(1));
+        floater->findChild<LLButton>("weights_keep_start", true)->onCommit();
+        ensure("not for a string", kept.empty());
+        // Nor in a script that cannot be written to.
+        pane.setKeepStart([&](const std::string& start, const std::vector<std::string>&) { kept = start; }, []() { return false; });
+        strings->selectByValue(LLSD(0));
+        floater->findChild<LLButton>("weights_keep_start", true)->onCommit();
+        ensure("not where the script cannot be written to", kept.empty());
+
+        // Nothing to show hides the list with the rest.
+        pane.showNothing("Nothing open to weigh.");
+        ensure("hidden with nothing shown", !strings->getParent()->getVisible() && strings->getItemCount() == 0);
+        pane.show(shown);
+        ensure("shown again", strings->getParent()->getVisible());
+
+        // LSO has no table: no list.
+        pane.show(lsl());
+        ensure("hidden for LSO", !strings->getParent()->getVisible() && strings->getItemCount() == 0);
     }
 }

@@ -63,6 +63,7 @@
 #include <functional>
 #include <sstream>
 #include <string>
+#include <vector>
 
 // Only an optimised build measures, and only it has a use for these: an
 // unoptimised one would say they are unused.
@@ -246,6 +247,48 @@ namespace
         std::printf("  %-52s", name);
         cell(lsl);
         cell(slua);
+        std::printf("\n");
+    }
+
+    // A script being typed in: a line put into the big script's main, in
+    // two forms one character apart, and the caret in each `back` bytes
+    // before the line's end. Each run is over the other form, as a
+    // scripter typing the character and deleting it has them, so every
+    // question is about a text not checked yet.
+    struct Typing
+    {
+        std::string texts[2];
+        S32         line = 0;
+        S32         columns[2]{};
+        size_t      next = 0;
+
+        Typing(const std::string& script, const std::string& one, const std::string& two, S32 back = 0)
+        {
+            const size_t at = script.rfind("    print(name");
+            line            = static_cast<S32>(std::count(script.begin(), script.begin() + at, '\n'));
+            texts[0]        = script.substr(0, at) + one + "\n" + script.substr(at);
+            texts[1]        = script.substr(0, at) + two + "\n" + script.substr(at);
+            columns[0]      = static_cast<S32>(one.size()) - back;
+            columns[1]      = static_cast<S32>(two.size()) - back;
+        }
+
+        // The other form; column() is then the caret in it.
+        const std::string& text()
+        {
+            next ^= 1;
+            return texts[next];
+        }
+        S32 column() const { return columns[next]; }
+    };
+
+    // A row of SLua alone over the scripts of each size.
+    void sizes(const char* name, const std::vector<double>& ms)
+    {
+        std::printf("  %-52s", name);
+        for (double one : ms)
+        {
+            cell(one);
+        }
         std::printf("\n");
     }
 
@@ -463,6 +506,120 @@ int main(int, char**)
     // What running a job on a stack as deep as a script needs costs,
     // before the job itself: nothing to do on it.
     row("a job on the large stack, doing nothing", ms_per_run([] { alScriptOnLargeStack([] { g_sink = g_sink + 1; }); }), NONE);
+
+    // What typing asks of SLua, under each of Luau's solvers and over
+    // scripts of three sizes: an edit of one character, then the question
+    // typing asks there -- a completion as a name is typed, signature help
+    // in a call, a hover after either. These are what the studio waits on
+    // at a keystroke, where the check job waits out its settle.
+    for (const bool new_solver : { false, true })
+    {
+        ALLuauService typing;
+        typing.setNewSolver(new_solver, error);
+        typing.loadDefinitions(readWhole(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau"), error);
+        std::vector<double> complete, again, signature, hover, expanded, fragment_complete, fragment_signature, fragment_expanded;
+        int                 found = 0, fragment_found = 0;
+        size_t              fragment_checks = 0;
+        for (const int lines : { 1000, 5000, 20000 })
+        {
+            const std::string script = ll_test::bigSLua(lines);
+            Typing            word(script, "    local x = helper1", "    local x = helper12");
+            Typing            call(script, "    helper1()", "    helper12()", 1);
+            if (lines == 1000)
+            {
+                const std::vector<ALScriptCompletion> offered = typing.complete(word.texts[1], word.line, word.columns[1]);
+                found += std::any_of(offered.begin(), offered.end(), [](const ALScriptCompletion& one) { return one.text == "helper12"; });
+                found += typing.signature(call.texts[1], call.line, call.columns[1]).found;
+                found += typing.hover(word.texts[1], word.line, word.columns[1] - 2).found;
+            }
+            complete.push_back(ms_per_run([&] {
+                const std::string& text = word.text();
+                g_sink                  = g_sink + typing.complete(text, word.line, word.column()).size();
+            }));
+            // The same asked again of the text it was asked of: what the
+            // answer costs, with nothing to check.
+            again.push_back(ms_per_run([&] { g_sink = g_sink + typing.complete(word.texts[1], word.line, word.columns[1]).size(); }));
+            signature.push_back(ms_per_run([&] {
+                const std::string& text = call.text();
+                g_sink                  = g_sink + typing.signature(text, call.line, call.column()).parameters.size();
+            }));
+            hover.push_back(ms_per_run([&] {
+                const std::string& text = word.text();
+                g_sink                  = g_sink + typing.hover(text, word.line, word.column() - 2).label.size();
+            }));
+            // A script the preprocessor expands, as one with a directive is:
+            // each question waits for the expansion of its text, then is
+            // asked of what it made.
+            {
+                ALPreprocessor::Options options;
+                options.lua = true;
+                Typing directed("--#define LIMIT 100\n" + script, "    local x = helper1", "    local x = helper12");
+                S32    made_lines[2]{};
+                for (int form = 0; form < 2; ++form)
+                {
+                    const std::string made = ALPreprocessor::run(directed.texts[form], options).text;
+                    const size_t      at   = made.find("    local x = helper1");
+                    made_lines[form]       = static_cast<S32>(std::count(made.begin(), made.begin() + at, '\n'));
+                }
+                expanded.push_back(ms_per_run([&] {
+                    const std::string&           text = directed.text();
+                    const ALPreprocessor::Result made = ALPreprocessor::run(text, options);
+                    g_sink = g_sink + typing.complete(made.text, made_lines[directed.next], directed.column()).size();
+                }));
+                // The same over a fragment, against the expansion of the
+                // script as it was before the line was typed.
+                const std::string before = ALPreprocessor::run("--#define LIMIT 100\n" + script, options).text;
+                typing.check(before);
+                typing.complete(before, 0, 0);
+                typing.setFragments(true);
+                fragment_expanded.push_back(ms_per_run([&] {
+                    const std::string&           text = directed.text();
+                    const ALPreprocessor::Result made = ALPreprocessor::run(text, options);
+                    g_sink = g_sink + typing.complete(made.text, made_lines[directed.next], directed.column()).size();
+                }));
+                typing.setFragments(false);
+            }
+            // Over a fragment (ALLuauFragment): the statement typed checked
+            // alone against the script's last check, the script as it was
+            // before the line was typed.
+            typing.check(script);
+            typing.complete(script, 0, 0);
+            typing.setFragments(true);
+            const size_t checks_before = typing.typeChecks();
+            if (lines == 1000)
+            {
+                const std::vector<ALScriptCompletion> offered = typing.complete(word.texts[1], word.line, word.columns[1]);
+                fragment_found += std::any_of(offered.begin(), offered.end(), [](const ALScriptCompletion& one) { return one.text == "helper12"; });
+                fragment_found += typing.signature(call.texts[1], call.line, call.columns[1]).found;
+            }
+            fragment_complete.push_back(ms_per_run([&] {
+                const std::string& text = word.text();
+                g_sink                  = g_sink + typing.complete(text, word.line, word.column()).size();
+            }));
+            fragment_checks += typing.typeChecks() - checks_before;
+            // Where the fragment finds no function to call -- here the new
+            // solver's at 20,000 lines, whose own check leaves the helpers'
+            // types blocked -- signature help asks the whole script.
+            fragment_signature.push_back(ms_per_run([&] {
+                const std::string& text = call.text();
+                g_sink                  = g_sink + typing.signature(text, call.line, call.column()).parameters.size();
+            }));
+            typing.setFragments(false);
+        }
+        std::printf("\nSLua typing, the %s solver: an edit of one character, then the question\n\n", new_solver ? "new" : "old");
+        std::printf("  %-52s %10s %10s %10s\n", "lines", "1,000", "5,000", "20,000");
+        std::printf("  %-52s %10d\n", "the questions below answer (3 is right)", found);
+        sizes("complete after an edit", complete);
+        sizes("  asked again of the same text", again);
+        sizes("signature help in a call after an edit", signature);
+        sizes("hover after an edit", hover);
+        sizes("complete after an edit of a script expanded", expanded);
+        std::printf("  %-52s %10d\n", "over a fragment, the questions answer (2 is right)", fragment_found);
+        std::printf("  %-52s %10zu\n", "  whole checks among the completions (0 is right)", fragment_checks);
+        sizes("complete after an edit, over a fragment", fragment_complete);
+        sizes("signature help after an edit, over a fragment", fragment_signature);
+        sizes("complete after an edit expanded, over a fragment", fragment_expanded);
+    }
 
     // What the main thread does for a check before the preprocessor's
     // thread has anything to do: the includes found on disk and read.

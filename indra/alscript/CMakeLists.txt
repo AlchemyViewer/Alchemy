@@ -56,15 +56,24 @@ target_sources(
     lsl/optimizer/allslshapes.cpp
     lsl/optimizer/allslsignatures.cpp
     lsl/optimizer/allslsimplifier.cpp
+    luau/alluaucompletion.cpp
     luau/alluauconfig.cpp
+    luau/alluauconfigscript.cpp
     luau/alluauexports.cpp
+    luau/alluaufragment.cpp
+    luau/alluaufrontend.cpp
+    luau/alluaunavigation.cpp
     luau/alluauservice.cpp
+    luau/alluausharedstart.cpp
+    luau/alluautaskpool.cpp
+    luau/alluautypes.cpp
     preprocessor/aldiskcache.cpp
     preprocessor/aldiskincludes.cpp
     preprocessor/alincludeidentity.cpp
     preprocessor/alincludesearch.cpp
     preprocessor/almodulelook.cpp
     preprocessor/alpreprocessor.cpp
+    preprocessor/alrequirenavigation.cpp
     preprocessor/alscriptenvelope.cpp
     preprocessor/alscriptsnapshot.cpp
     preprocessor/alscripttextcache.cpp
@@ -98,6 +107,7 @@ target_sources(
         lsl/allsleffects.h
         lsl/allsleventtext.inc
         lsl/allslexports.h
+        lsl/allslitemargs.inc
         lsl/allslservice.h
         lsl/allsltoslua.h
         lsl/allsltraits.h
@@ -121,15 +131,24 @@ target_sources(
         lsl/optimizer/allslshapes.h
         lsl/optimizer/allslsignatures.h
         lsl/optimizer/allslsimplifier.h
+        luau/alluaucompletion.h
         luau/alluauconfig.h
+        luau/alluauconfigscript.h
         luau/alluauexports.h
+        luau/alluaufragment.h
+        luau/alluaufrontend.h
+        luau/alluaunavigation.h
         luau/alluauservice.h
+        luau/alluausharedstart.h
+        luau/alluautaskpool.h
+        luau/alluautypes.h
         preprocessor/aldiskcache.h
         preprocessor/aldiskincludes.h
         preprocessor/alincludeidentity.h
         preprocessor/alincludesearch.h
         preprocessor/almodulelook.h
         preprocessor/alpreprocessor.h
+        preprocessor/alrequirenavigation.h
         preprocessor/alscriptenvelope.h
         preprocessor/alscriptjoblane.h
         preprocessor/alscriptsnapshot.h
@@ -198,6 +217,26 @@ if(AL_BUILD_TESTS)
     LIBRARIES alscript llcommon
     DEFINES ${definitions_defines} ${templates_define}
   )
+  # Completion and signature help over a fragment, against the whole
+  # script, at the places a scripter asks, over every SLua script to hand;
+  # the places found by Luau's own lexer.
+  al_add_test(
+    alluaufragment
+    PROJECT alscript
+    LIBRARIES alscript llcommon ll::slua
+    DEFINES
+      ${definitions_defines}
+      ${templates_define}
+      "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
+  )
+  # Where a name is declared and used, across a script and the modules it
+  # requires.
+  al_add_test(
+    alluaunavigation
+    PROJECT alscript
+    LIBRARIES alscript llcommon
+    DEFINES ${definitions_defines}
+  )
   al_add_test(
     allslservice
     PROJECT alscript
@@ -221,7 +260,15 @@ if(AL_BUILD_TESTS)
   # The SLua checks, and LSL written again as SLua, again with Luau's new
   # type solver, which a scripter may choose (ALScriptLuauSolver): the same
   # tests, told by the environment.
-  foreach(test alluauservice alscriptfixes alscriptlintpass allsltoslua)
+  foreach(
+    test
+    alluauservice
+    alluaufragment
+    alluaunavigation
+    alscriptfixes
+    alscriptlintpass
+    allsltoslua
+  )
     add_test(
       NAME INTEGRATION_TEST_RUNNER_${test}_newsolver
       COMMAND $<TARGET_FILE:INTEGRATION_TEST_${test}>
@@ -310,7 +357,7 @@ if(AL_BUILD_TESTS)
   al_add_test(
     alpreprocessor
     PROJECT alscript
-    LIBRARIES alscript llcommon
+    LIBRARIES alscript llcommon ll::slua
     DEFINES ${definitions_defines} "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
   )
   # The preprocessor, the formatter, the optimizer and one analysis of each

@@ -363,6 +363,9 @@ struct ALScriptStudioDoc
         std::shared_ptr<const ALLuauService::Modules>  modules;
         std::vector<std::pair<std::string, ALSourceMap>> moduleMaps;
         std::shared_ptr<const std::string>              bundle;
+        // The bundle's own way back to the source, the modules first in it:
+        // what its weights are placed through, not the script's alone.
+        ALSourceMap                                     bundleMap;
         ALScriptProblems problems;
         // What the code came to on the script's target before the
         // optimizer and after, where it ran and was weighed.

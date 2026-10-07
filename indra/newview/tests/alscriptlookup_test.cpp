@@ -29,6 +29,9 @@
 #include <boost/unordered_map.hpp>
 
 #include "../alscriptlookup.h"
+#include "alincludeidentity.h"
+#include "llfile.h"
+#include "workqueue.h"
 
 #include "../alscriptstudiowords.h"
 #include "alscriptstudio_fixture.h"
@@ -36,7 +39,11 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
+#include <chrono>
+#include <filesystem>
 #include <sstream>
+#include <thread>
 
 // A script's id, and what the preprocessor calls a script and a file, as
 // the studio's tests' stubs of the viewer's spell them
@@ -158,6 +165,7 @@ namespace
             return whenFileOpened ? whenFileOpened(path) : nullptr;
         }
         void activate(Doc& doc) override { activated.push_back(doc.id); }
+        std::vector<std::string> diskCandidates(const Doc& doc) override { return disk; }
 
         std::vector<ALScriptLookup::Candidate>             others;
         // How many prims did not say what they hold; the candidates held
@@ -183,6 +191,8 @@ namespace
         std::function<void(const std::string&, const std::vector<size_t>&)> changes;
         Names                                              compared;
         std::function<Doc*(const std::string&)>            whenFileOpened;
+        // The scripts on disk under the folders a script reads from.
+        std::vector<std::string>                           disk;
     };
 
     ALScriptSpan span(S32 line, S32 column, S32 length)
@@ -249,6 +259,42 @@ namespace
             copy(inc, inc_text);
         }
         copy(0, text);
+        result.map.finish();
+        return result;
+    }
+    // SLua read apart: the script with its require a call, and the module
+    // it reaches its own piece, each mapped line for line to its file.
+    ALPreprocessor::Result apartExpansion(const std::string& name, const std::string& path, const std::string& text, const std::string& required,
+                                          const std::string& mod_name, const std::string& mod_path, const std::string& mod_text)
+    {
+        ALPreprocessor::Result result;
+        result.map.addFile(name, path);
+        result.map.addFile(mod_name, mod_path);
+        const auto piece = [&](const std::string& key, S32 file, const std::string& source) {
+            ALPreprocessor::Result::Piece made;
+            made.key  = key;
+            made.text = source;
+            made.map.addFile(name, path);
+            made.map.addFile(mod_name, mod_path);
+            std::istringstream in(source);
+            std::string        line;
+            for (S32 l = 0; std::getline(in, line); ++l)
+            {
+                ALSourceMap::Segment segment;
+                segment.outLine = l;
+                segment.length  = static_cast<S32>(line.size());
+                segment.file    = file;
+                segment.line    = l;
+                made.map.add(segment);
+            }
+            made.map.finish();
+            return made;
+        };
+        result.apart.valid  = true;
+        result.apart.script = piece(std::string(), 0, text);
+        result.apart.modules.push_back(piece(mod_path, 1, mod_text));
+        result.resolved.push_back({ std::string(), required, true, mod_path });
+        result.text = "-- the bundle\n";
         result.map.finish();
         return result;
     }
@@ -832,5 +878,249 @@ namespace tut
         open.editor->insertText("// ");
         studio.changes(pb, { 2, 3 });
         ensure("changed since: said", studio.compared.size() == before && has(services.statuses.back(), "RenameChangesNotHere"));
+    }
+
+    template<> template<>
+    void alscriptlookup_object::test<16>()
+    {
+        set_test_name("files on disk open here are looked through too, which no object lists: a module's field renamed in the script, the module and another script requiring it");
+        make();
+        const std::string LIB      = "disk:/s/lib.luau";
+        const std::string OTHER    = "disk:/s/b.luau";
+        const std::string LIB_TEXT = "local M = {}\nfunction M.twice(n) return n * 2 end\nreturn M\n";
+        const std::string B_LUA    = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
+        Doc& lib        = tab(LIB, ALScriptRef(), LIB_TEXT, "lib.luau");
+        lib.file        = "/s/lib.luau";
+        lib.language.lua = true;
+        Doc& other        = tab(OTHER, ALScriptRef(), B_LUA, "b.luau");
+        other.file        = "/s/b.luau";
+        other.language.lua = true;
+        Doc& lsl = tab("disk:/s/c.lsl", ALScriptRef(), "integer twice;\n", "c.lsl");
+        lsl.file = "/s/c.lsl";
+        Doc& doc          = tab("a", a, "local lib = require(\"./lib\")\nprint(lib.twice(2))\n", "A");
+        doc.language.lua  = true;
+        // Script A's own answer, its modules read apart: its place, and the
+        // module's declaration.
+        unit->start(doc, ALEditorCommand::Rename, refsOf("twice"), true, LIB, span(1, 11, 5),
+                    { place("", 1, 10), place(LIB, 1, 11, 5, "lib.luau") }, doc.editor->document().version());
+        ensure_equals("each open file of the language, as it stands in its tab", studio.expands.size(), size_t(2));
+        const ALScriptPreprocessor::Request& module = studio.expands[0].request;
+        ensure("the module, by its path, no item", module.path == LIB && module.ref.isNull() && module.name == "lib.luau" &&
+                                                       module.sourceText() == LIB_TEXT);
+        ensure("the other script", studio.expands[1].request.path == OTHER && studio.expands[1].request.sourceText() == B_LUA);
+
+        // The module read alone is the home itself; the other script has it
+        // ahead of its own lines.
+        studio.expands[0].expanded(expansion("lib.luau", LIB, LIB_TEXT));
+        studio.expands[1].expanded(expansion("b.luau", OTHER, B_LUA, "lib.luau", LIB, LIB_TEXT));
+        ensure_equals("both asked", studio.asks.size(), size_t(2));
+        ensure("the module at its declaration", studio.asks[0].request.line == 1 && studio.asks[0].request.column == 11 &&
+                                                    studio.asks[0].request.id == "lookup:a:" + LIB);
+        ensure("the other where the module's declaration went", studio.asks[1].request.line == 1 && studio.asks[1].request.column == 11);
+        studio.asks[0].answered(answer({ span(1, 11, 5) }));
+        studio.asks[1].answered(answer({ span(1, 11, 5), span(4, 10, 5) }));
+        ensure("asked for the new name", (bool)studio.chosen);
+        ensure_equals("each place once: the script's, the module's, the other's", doc.lookup->places.size(), size_t(3));
+        ensure("the other's, by its path", std::any_of(doc.lookup->places.begin(), doc.lookup->places.end(), [&](const Doc::Place& place) {
+                   return place.file == OTHER && place.fileName == "b.luau" && place.span.line == 1 && place.span.column == 10;
+               }));
+
+        studio.chosen("double");
+        ensure_equals("here", doc.editor->text(), std::string("local lib = require(\"./lib\")\nprint(lib.double(2))\n"));
+        ensure_equals("in the module", lib.editor->text(), std::string("local M = {}\nfunction M.double(n) return n * 2 end\nreturn M\n"));
+        ensure_equals("in the other script", other.editor->text(), std::string("local lib = require(\"./lib\")\nprint(lib.double(4))\n"));
+        ensure("each its own step", lib.editor->undoJournal().undoLabel() == "rename" && other.editor->undoJournal().undoLabel() == "rename");
+        ensure_equals("another language's file left alone", lsl.editor->text(), std::string("integer twice;\n"));
+    }
+
+    template<> template<>
+    void alscriptlookup_object::test<17>()
+    {
+        set_test_name("scripts on disk under the folders a script reads from are looked through, open or not: one not open read as it is on disk, and opened to be renamed");
+        make();
+        // A folder of the scripter's, as the window lists it, where it
+        // stands: what the walk names each file by.
+        namespace fs = std::filesystem;
+        const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        fs::create_directories(made);
+        const fs::path    root     = fs::canonical(made);
+        const std::string LIB_TEXT = "local M = {}\nfunction M.twice(n) return n * 2 end\nreturn M\n";
+        const std::string B_LUA    = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
+        const std::string C_LUA    = "print(\"nothing of it\")\n";
+        const std::string lib_file = (root / "lib.luau").string();
+        const std::string b_file   = (root / "b.luau").string();
+        llofstream(lib_file, std::ios::binary) << LIB_TEXT;
+        llofstream(b_file, std::ios::binary) << B_LUA;
+        // One that does not name it, passed over as it is read.
+        llofstream((root / "c.luau").string(), std::ios::binary) << C_LUA;
+        studio.disk = { root.string() };
+        const std::string LIB = ALIncludeIdentity::ofFile(lib_file);
+        const std::string B   = ALIncludeIdentity::ofFile(b_file);
+        Doc& lib         = tab(LIB, ALScriptRef(), LIB_TEXT, "lib.luau");
+        lib.file         = lib_file;
+        lib.language.lua = true;
+        Doc& doc         = tab("a", a, "local lib = require(\"./lib\")\nprint(lib.twice(2))\n", "A");
+        doc.language.lua = true;
+        unit->start(doc, ALEditorCommand::Rename, refsOf("twice"), true, LIB, span(1, 11, 5),
+                    { place("", 1, 10), place(LIB, 1, 11, 5, "lib.luau") }, doc.editor->document().version());
+        ensure_equals("the module open here once, the other read from disk, and the one not naming it passed over", studio.expands.size(), size_t(2));
+        ensure("the module, as its tab has it", studio.expands[0].request.path == LIB && studio.expands[0].request.sourceText() == LIB_TEXT);
+        ensure("the other, as it is on disk", studio.expands[1].request.path == B && studio.expands[1].request.name == "b.luau" &&
+                                                  studio.expands[1].request.sourceText() == B_LUA);
+        studio.expands[0].expanded(expansion("lib.luau", LIB, LIB_TEXT));
+        studio.expands[1].expanded(expansion("b.luau", B, B_LUA, "lib.luau", LIB, LIB_TEXT));
+        studio.asks[0].answered(answer({ span(1, 11, 5) }));
+        studio.asks[1].answered(answer({ span(1, 11, 5), span(4, 10, 5) }));
+        ensure("the other's place, by its path", std::any_of(doc.lookup->places.begin(), doc.lookup->places.end(), [&](const Doc::Place& place) {
+                   return place.file == B && place.span.line == 1 && place.span.column == 10;
+               }));
+
+        // Renamed: opened, as a file not open is, with the change made.
+        studio.whenFileOpened = [&](const std::string& path) {
+            Doc& opened         = tab(ALIncludeIdentity::ofFile(path), ALScriptRef(), B_LUA, "b.luau");
+            opened.file         = path;
+            opened.language.lua = true;
+            return &opened;
+        };
+        studio.chosen("double");
+        ensure("opened to be renamed", studio.filesOpened == Names{ b_file });
+        const Doc* other = services.findDoc(B);
+        ensure("renamed there", other && other->editor->text() == "local lib = require(\"./lib\")\nprint(lib.double(4))\n");
+        std::error_code ec;
+        fs::remove_all(root, ec);
+    }
+
+    template<> template<>
+    void alscriptlookup_object::test<18>()
+    {
+        set_test_name("SLua read apart, as the checker reads it: another script asked at the module's declaration in the module, with its modules, and each place read back through its own piece");
+        make();
+        const std::string LIB      = "disk:/s/lib.luau";
+        const std::string OTHER    = "disk:/s/b.luau";
+        const std::string LIB_TEXT = "local M = {}\nfunction M.twice(n) return n * 2 end\nreturn M\n";
+        const std::string B_LUA    = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
+        Doc& other         = tab(OTHER, ALScriptRef(), B_LUA, "b.luau");
+        other.file         = "/s/b.luau";
+        other.language.lua = true;
+        Doc& doc           = tab("a", a, "local lib = require(\"./lib\")\nprint(lib.twice(2))\n", "A");
+        doc.language.lua   = true;
+        unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5),
+                    { place("", 1, 10), place(LIB, 1, 11, 5, "lib.luau") }, doc.editor->document().version());
+        ensure_equals("the other expanded", studio.expands.size(), size_t(1));
+        ensure("apart asked for", studio.expands[0].request.apart);
+        studio.expands[0].expanded(apartExpansion("b.luau", OTHER, B_LUA, "./lib", "lib.luau", LIB, LIB_TEXT));
+        ensure_equals("asked", studio.asks.size(), size_t(1));
+        const ALScriptAnalysis::Request& asked = studio.asks[0].request;
+        ensure("the script alone, its require a call", asked.text && *asked.text == B_LUA);
+        ensure("in the module, at its declaration in its own lines", asked.module == LIB && asked.line == 1 && asked.column == 11);
+        ensure("with its modules", asked.modules && asked.modules->modules.size() == 1 && asked.modules->modules[0].key == LIB &&
+                                       asked.modules->reaches.size() == 1 && asked.modules->reaches[0].name == "./lib");
+
+        ALScriptAnalysis::Result result = answer({ span(1, 10, 5) });
+        result.references.elsewhere.push_back({ LIB, span(1, 11, 5) });
+        studio.asks[0].answered(result);
+        ensure("the other's place, through its piece", std::any_of(doc.lookup->places.begin(), doc.lookup->places.end(), [&](const Doc::Place& place) {
+                   return place.file == OTHER && place.fileName == "b.luau" && place.span.line == 1 && place.span.column == 10;
+               }));
+        ensure_equals("each once: the script's, the module's, the other's", doc.lookup->places.size(), size_t(3));
+    }
+
+    template<> template<>
+    void alscriptlookup_object::test<19>()
+    {
+        set_test_name("a file open here by another way to its path is the one file: looked through once, as its tab has it, and found to be where the name is declared");
+        make();
+        namespace fs = std::filesystem;
+        const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        fs::create_directories(made / "sub");
+        const fs::path    root     = fs::canonical(made);
+        const std::string LIB_TEXT = "local M = {}\nfunction M.twice(n) return n * 2 end\nreturn M\n";
+        const std::string B_LUA    = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
+        llofstream((root / "lib.luau").string(), std::ios::binary) << LIB_TEXT;
+        llofstream((root / "b.luau").string(), std::ios::binary) << B_LUA;
+        studio.disk = { root.string() };
+        // The module where it stands, as the analyzers name it; and its tab,
+        // opened by a way round to it.
+        const std::string LIB      = ALIncludeIdentity::ofFile((root / "lib.luau").string());
+        const std::string lib_file = (root / "sub" / ".." / "lib.luau").string();
+        const std::string LIB_TAB  = ALIncludeIdentity::ofFile(lib_file);
+        const std::string TYPED    = LIB_TEXT + "-- as typed\n";
+        Doc& lib         = tab(LIB_TAB, ALScriptRef(), TYPED, "lib.luau");
+        lib.file         = lib_file;
+        lib.language.lua = true;
+        Doc& doc         = tab("a", a, "local lib = require(\"./lib\")\nprint(lib.twice(2))\n", "A");
+        doc.language.lua = true;
+        unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5),
+                    { place("", 1, 10), place(LIB, 1, 11, 5, "lib.luau") }, doc.editor->document().version());
+        ensure_equals("the module once, and the other", studio.expands.size(), size_t(2));
+        ensure("the module as its tab has it", studio.expands[0].request.path == LIB_TAB && studio.expands[0].request.sourceText() == TYPED);
+        ensure("the other from disk", studio.expands[1].request.sourceText() == B_LUA);
+        studio.expands[0].expanded(expansion("lib.luau", LIB_TAB, TYPED));
+        ensure_equals("the home itself, asked at its declaration", studio.asks.size(), size_t(1));
+        ensure("there", studio.asks[0].request.line == 1 && studio.asks[0].request.column == 11);
+        std::error_code ec;
+        fs::remove_all(root, ec);
+    }
+
+    template<> template<>
+    void alscriptlookup_object::test<20>()
+    {
+        set_test_name("with a main loop to hand them back to, the folders on disk are walked and read off the main thread, the lookup held open for them; nothing comes of a walk once the lookups are gone");
+        make();
+        namespace fs = std::filesystem;
+        const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        fs::create_directories(made);
+        const fs::path    root  = fs::canonical(made);
+        const std::string B_LUA = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
+        llofstream((root / "b.luau").string(), std::ios::binary) << B_LUA;
+        studio.disk = { root.string() };
+        // The main loop's queue, as the viewer's is: kept, since a walk
+        // let go of may hand back to it after the test.
+        static LL::WorkQueue main_loop("mainloop", 1024);
+        const auto pumped = [](const std::function<bool()>& until, std::chrono::milliseconds within) {
+            const auto deadline = std::chrono::steady_clock::now() + within;
+            while (std::chrono::steady_clock::now() < deadline)
+            {
+                main_loop.runPending();
+                if (until())
+                {
+                    return true;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+            return false;
+        };
+        Doc& doc         = tab("a", a, "local lib = require(\"./lib\")\nprint(lib.twice(2))\n", "A");
+        doc.language.lua = true;
+        const std::string LIB = "disk:/s/lib.luau";
+        unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
+                    doc.editor->document().version());
+        ensure("nothing read here", studio.expands.empty());
+        ensure("held open for the walk", doc.lookup->pending == 1 && studio.shows == 0);
+        ensure("what it read handed back", pumped([&] { return !studio.expands.empty(); }, std::chrono::seconds(5)));
+        ensure("the one naming it, as it is on disk", studio.expands.size() == 1 && studio.expands[0].request.sourceText() == B_LUA);
+        studio.expands[0].expanded(expansion("b.luau", studio.expands[0].request.path, B_LUA));
+        ensure_equals("shown once it is done with", studio.shows, 1);
+
+        // Begun again while its walk is under way: the walk let go of, and
+        // only the new lookup's read looked through.
+        unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
+                    doc.editor->document().version());
+        unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
+                    doc.editor->document().version());
+        ensure("the new one's handed back", pumped([&] { return studio.expands.size() > 1; }, std::chrono::seconds(5)));
+        pumped([] { return false; }, std::chrono::milliseconds(300));
+        ensure_equals("and nothing of the old one's", studio.expands.size(), size_t(2));
+        studio.expands[1].expanded(expansion("b.luau", studio.expands[1].request.path, B_LUA));
+        ensure_equals("shown once", studio.shows, 2);
+
+        // Begun again, and the lookups gone before what it read is back.
+        unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
+                    doc.editor->document().version());
+        unit.reset();
+        pumped([] { return false; }, std::chrono::milliseconds(300));
+        ensure_equals("nothing comes of it", studio.expands.size(), size_t(2));
+        std::error_code ec;
+        fs::remove_all(root, ec);
     }
 }

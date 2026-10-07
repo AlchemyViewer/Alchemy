@@ -193,6 +193,7 @@ void ALCompletionModel::rank(std::vector<ALCompletion>& list, std::string_view p
     struct Sorted
     {
         S32 tier;
+        S32 fit;
         S32 rank;
     };
     // Ranked by index, and only as far as the cap sorted: a pool of a
@@ -202,12 +203,16 @@ void ALCompletionModel::rank(std::vector<ALCompletion>& list, std::string_view p
     for (size_t i = 0; i < list.size(); ++i)
     {
         const S32 tier = prefix.empty() ? 0 : matchTier(list[i].text, prefix);
-        sorted.push_back({ { tier < 0 ? 9 : tier, kindRank(list[i]) }, i });
+        sorted.push_back({ { tier < 0 ? 9 : tier, list[i].fits ? 0 : 1, kindRank(list[i]) }, i });
     }
     const auto before = [&list](const auto& a, const auto& b) {
         if (a.first.tier != b.first.tier)
         {
             return a.first.tier < b.first.tier;
+        }
+        if (a.first.fit != b.first.fit)
+        {
+            return a.first.fit < b.first.fit;
         }
         if (a.first.rank != b.first.rank)
         {
@@ -238,7 +243,7 @@ bool ALCompletionModel::pooled(const ALTextPos& start, const std::string& head, 
 }
 
 void ALCompletionModel::pool(const ALTextPos& start, const ALTextPos& at, std::string_view prefix, const std::string& head, char separator,
-                             std::vector<ALCompletion> answered, const ALTextDocument& text)
+                             std::vector<ALCompletion> answered, const ALTextDocument& text, bool with_words)
 {
     mPoolStart  = start;
     mPoolHead   = head;
@@ -249,7 +254,7 @@ void ALCompletionModel::pool(const ALTextPos& start, const ALTextPos& at, std::s
     // After `ll.` the members of `ll` are wanted: the head was put before
     // the prefix for whoever answers by whole names, and is taken off what
     // they answer.
-    if (!head.empty())
+    if (!head.empty() && separator != '\0')
     {
         const std::string dotted = head + separator;
         for (ALCompletion& c : mPool)
@@ -266,7 +271,7 @@ void ALCompletionModel::pool(const ALTextPos& start, const ALTextPos& at, std::s
     {
         mPoolTargets.push_back(ALFuzzyMatch::prepare(c.text));
     }
-    if (!head.empty())
+    if (!head.empty() || !with_words)
     {
         return;
     }
@@ -297,6 +302,7 @@ bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std:
     {
         mAsked = start;
         mSupplied.clear();
+        mWords = true;
     }
     // The pool narrowed to what is typed now.
     mList.clear();
@@ -335,15 +341,28 @@ bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std:
             {
                 have.documentation = c.documentation;
             }
+            // What only the later answer knows: whether it fits there, and
+            // where its brackets go.
+            have.fits = have.fits || c.fits;
+            if (have.brackets == ALCompletion::Brackets::Guess)
+            {
+                have.brackets = c.brackets;
+            }
+            if (have.path.empty())
+            {
+                have.path = c.path;
+            }
+            have.folder = have.folder || c.folder;
             continue;
         }
         listed.emplace(c.text, mList.size());
         mList.push_back(c);
     }
     // Then the document's own, but those named already and those no
-    // longer than what is typed.
-    for (const ALFuzzyMatch::Target& word : mPoolWords)
+    // longer than what is typed; and none where the answer said so.
+    for (size_t i = 0; mWords && i < mPoolWords.size(); ++i)
     {
+        const ALFuzzyMatch::Target& word = mPoolWords[i];
         if (word.text.size() > prefix.size() && tierOf(ALFuzzyMatch::match(word, prefix, ALFuzzyMatch::Tier::Parts)) >= 0 &&
             !listed.contains(word.text))
         {
@@ -354,20 +373,23 @@ bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std:
         }
     }
     rank(mList, prefix);
+    // From where it starts, not as long as the prefix: a string's text is
+    // matched as its escapes read, shorter than it is written.
     if (!mList.empty())
     {
-        mRange = ALTextRange(ALTextPos(at.line, at.column - static_cast<S32>(prefix.size())), at);
+        mRange = ALTextRange(start, at);
     }
     return fresh;
 }
 
-bool ALCompletionModel::supply(const ALTextPos& start, std::vector<ALCompletion> more)
+bool ALCompletionModel::supply(const ALTextPos& start, std::vector<ALCompletion> more, bool words)
 {
     if (start != mAsked)
     {
         return false;
     }
     mSupplied = std::move(more);
+    mWords    = words;
     return true;
 }
 
@@ -382,6 +404,7 @@ void ALCompletionModel::close()
     hide();
     mAsked = ALTextPos(-1, -1);
     mSupplied.clear();
+    mWords = true;
     mPool.clear();
     mPoolTargets.clear();
     mPoolWords.clear();

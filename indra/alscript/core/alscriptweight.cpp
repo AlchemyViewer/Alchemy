@@ -29,6 +29,7 @@
 #include "alscriptengine.h"
 #include "allslservice.h"
 #include "alluauservice.h"
+#include "alluausharedstart.h"
 #include "alsourcemap.h"
 
 #include "Luau/Ast.h"
@@ -123,6 +124,22 @@ ALScriptWeight ALScriptWeight::inSource(const ALSourceMap& map) const
     for (const auto& [at, bytes] : by_line)
     {
         out.lines.push_back({ at.second, bytes, at.first });
+    }
+    for (String& one : out.strings)
+    {
+        if (one.line < 0)
+        {
+            continue;
+        }
+        const ALSourceMap::Loc at = map.toSource(one.line, 0);
+        one.file                  = at.found() ? fileOf(at.file) : std::string();
+        one.line                  = at.found() ? at.line : -1;
+    }
+    // The starts again, of the script's own strings alone: keeping one
+    // once rewrites the script's text, and a module's strings stay whole.
+    if (out.target == Target::SLua)
+    {
+        out.sharedStarts = ALScriptWeigh::sharedStarts(out.strings);
     }
     return out;
 }
@@ -224,6 +241,7 @@ namespace
         std::vector<S32>      lines;          // one-based, per code word; empty without line info
         std::vector<uint32_t> code;
         std::vector<Constant> constants;
+        std::vector<uint64_t> children;       // the prototypes it makes closures of
     };
 
     struct Bytecode
@@ -383,7 +401,7 @@ namespace
             const uint64_t children = in.varint();
             for (uint64_t c = 0; c < children && in.ok(); ++c)
             {
-                in.varint();
+                p.children.push_back(in.varint());
             }
             p.lineDefined = in.varint();
             p.name        = in.varint();
@@ -602,6 +620,17 @@ namespace ALScriptWeigh
         if (weight.compiled)
         {
             nameSLuaParts(weight, source);
+            // What the text writes out that a start could be kept once of;
+            // the rest Luau makes as it compiles.
+            const boost::unordered_flat_map<std::string, size_t> written = ALLuauSharedStart::written(source);
+            for (ALScriptWeight::String& one : weight.strings)
+            {
+                if (const auto found = written.find(one.text); found != written.end())
+                {
+                    one.startUpTo = found->second;
+                }
+            }
+            weight.sharedStarts = sharedStarts(weight.strings);
         }
         return weight;
     }
@@ -643,7 +672,8 @@ namespace ALScriptWeigh
         {
             ALScriptWeight by_line;
             weighAsset(by_line, lined);
-            weight.lines = std::move(by_line.lines);
+            weight.lines   = std::move(by_line.lines);
+            weight.strings = std::move(by_line.strings);
             // The heavy strings likewise, which only lines place: out of the
             // table of strings, which is the same in both.
             const size_t strings = static_cast<size_t>(std::find_if(weight.parts.begin(), weight.parts.end(),
@@ -663,6 +693,118 @@ namespace ALScriptWeigh
         }
         nameLSLParts(weight, source);
         return weight;
+    }
+
+    std::vector<ALScriptWeight::SharedStart> sharedStarts(const std::vector<ALScriptWeight::String>& strings)
+    {
+        constexpr size_t MOST_STRINGS = 2048;
+        constexpr size_t MOST_STARTS  = 32;
+        const auto       varint       = [](size_t value) {
+            size_t bytes = 1;
+            for (; value >= 128; value >>= 7)
+            {
+                ++bytes;
+            }
+            return bytes;
+        };
+        // Those loaded only as values, and written out in the script's own
+        // text, by their text.
+        std::vector<size_t> loaded;
+        for (size_t i = 0; i < strings.size() && loaded.size() < MOST_STRINGS; ++i)
+        {
+            const ALScriptWeight::String& one = strings[i];
+            if (!one.name && one.loads > 0 && one.loads == one.uses && !one.text.empty() && one.startUpTo > 0 && one.line >= 0 && one.file.empty())
+            {
+                loaded.push_back(i);
+            }
+        }
+        std::sort(loaded.begin(), loaded.end(), [&strings](size_t a, size_t b) { return strings[a].text < strings[b].text; });
+        // Each start two neighbours share; any more that share it are next
+        // to them.
+        std::vector<std::string> starts;
+        for (size_t k = 0; k + 1 < loaded.size(); ++k)
+        {
+            const std::string& a      = strings[loaded[k]].text;
+            const std::string& b      = strings[loaded[k + 1]].text;
+            const size_t       most   = std::min(a.size(), b.size());
+            size_t             shared = static_cast<size_t>(std::mismatch(a.begin(), a.begin() + most, b.begin()).first - a.begin());
+            while (shared > 0 && shared < a.size() && (static_cast<unsigned char>(a[shared]) & 0xC0) == 0x80)
+            {
+                --shared;
+            }
+            if (shared > 0)
+            {
+                starts.push_back(a.substr(0, shared));
+            }
+        }
+        std::sort(starts.begin(), starts.end());
+        starts.erase(std::unique(starts.begin(), starts.end()), starts.end());
+        std::vector<ALScriptWeight::SharedStart> found;
+        for (const std::string& start : starts)
+        {
+            ALScriptWeight::SharedStart one;
+            one.start     = start;
+            size_t before = 0;
+            size_t after  = varint(start.size()) + start.size();
+            size_t joins  = 0;
+            // The functions that would capture it.
+            std::vector<U32> functions;
+            for (auto at = std::lower_bound(loaded.begin(), loaded.end(), start,
+                                            [&strings](size_t i, const std::string& text) { return strings[i].text < text; });
+                 at != loaded.end() && strings[*at].text.compare(0, start.size(), start) == 0; ++at)
+            {
+                const ALScriptWeight::String& with = strings[*at];
+                // One with a literal too short to give the start up is kept
+                // whole whatever is made of the others.
+                if (with.startUpTo < start.size())
+                {
+                    continue;
+                }
+                before += with.bytes;
+                // One that is the start itself is kept as it is.
+                if (with.text.size() > start.size())
+                {
+                    const size_t rest = with.text.size() - start.size();
+                    after += varint(rest) + rest;
+                    joins += with.loads;
+                }
+                functions.insert(functions.end(), with.functions.begin(), with.functions.end());
+                one.strings.push_back(*at);
+            }
+            std::sort(functions.begin(), functions.end());
+            functions.erase(std::unique(functions.begin(), functions.end()), functions.end());
+            const size_t cost = after + joins * SHARED_START_PER_LOAD + SHARED_START_ONCE + functions.size() * SHARED_START_PER_FUNCTION +
+                                (functions.empty() ? 0 : SHARED_START_CAPTURED);
+            if (one.strings.size() >= 2 && before >= cost + SHARED_START_LEAST)
+            {
+                one.saved = before - cost;
+                found.push_back(std::move(one));
+            }
+        }
+        // The best first, the longer start of two that save the same; each
+        // string in the best it is in.
+        std::sort(found.begin(), found.end(), [](const ALScriptWeight::SharedStart& a, const ALScriptWeight::SharedStart& b) {
+            return a.saved != b.saved ? a.saved > b.saved : a.start.size() > b.start.size();
+        });
+        std::vector<bool>                        taken(strings.size(), false);
+        std::vector<ALScriptWeight::SharedStart> out;
+        for (ALScriptWeight::SharedStart& one : found)
+        {
+            if (std::any_of(one.strings.begin(), one.strings.end(), [&taken](size_t i) { return taken[i]; }))
+            {
+                continue;
+            }
+            for (const size_t i : one.strings)
+            {
+                taken[i] = true;
+            }
+            out.push_back(std::move(one));
+            if (out.size() == MOST_STARTS)
+            {
+                break;
+            }
+        }
+        return out;
     }
 }
 
@@ -693,10 +835,63 @@ namespace
         std::map<S32, size_t> by_line;
         // The first line, from one, that names each string; nought for none.
         std::vector<S32>      string_at(read.strings.size(), 0);
+        // How many instructions name each string, and how many of those load
+        // it as a value.
+        std::vector<size_t>   uses(read.strings.size(), 0);
+        std::vector<size_t>   loads(read.strings.size(), 0);
+        // The functions loading each as a value, the script's own body
+        // aside.
+        std::vector<std::vector<U32>> loaded_in(read.strings.size());
         for (size_t i = 0; i < read.protos.size(); ++i)
         {
             const Proto& p   = read.protos[i];
             const bool   top = i == read.main;
+            for (size_t pc = 0; pc < p.code.size();)
+            {
+                const uint32_t   insn = p.code[pc];
+                const uint32_t   aux  = pc + 1 < p.code.size() ? p.code[pc + 1] : 0;
+                const LuauOpcode op   = static_cast<LuauOpcode>(LUAU_INSN_OP(insn));
+                const bool       load = op == LOP_LOADK || op == LOP_LOADKX;
+                constantsOf(insn, aux, [&](uint32_t k) {
+                    if (k >= p.constants.size())
+                    {
+                        return;
+                    }
+                    const Constant& constant = p.constants[k];
+                    for (const uint64_t s : constant.strings)
+                    {
+                        if (s < uses.size())
+                        {
+                            ++uses[s];
+                            if (load && constant.type == LBC_CONSTANT_STRING)
+                            {
+                                ++loads[s];
+                                if (!top)
+                                {
+                                    loaded_in[s].push_back(static_cast<U32>(i));
+                                }
+                            }
+                        }
+                    }
+                    // An import's path, a template's keys and values: each
+                    // named by the instruction that names the constant.
+                    for (const uint64_t other : constant.constants)
+                    {
+                        if (other >= p.constants.size())
+                        {
+                            continue;
+                        }
+                        for (const uint64_t s : p.constants[other].strings)
+                        {
+                            if (s < uses.size())
+                            {
+                                ++uses[s];
+                            }
+                        }
+                    }
+                });
+                pc += static_cast<size_t>(std::max(1, Luau::getOpLength(op)));
+            }
             std::string  name;
             if (top)
             {
@@ -775,13 +970,19 @@ namespace
         }
         // The table of strings is a part; each heavy string in it a part of
         // its own, at the first line that names it, and no longer the
-        // table's. The functions' names are the table's.
-        boost::unordered_flat_set<size_t> names;
+        // table's. The functions' names are the table's, each at the line
+        // its function starts on where nothing else names it.
+        boost::unordered_flat_set<size_t>      names;
+        boost::unordered_flat_map<size_t, S32> name_at;
         for (const Proto& p : read.protos)
         {
             if (p.name > 0)
             {
                 names.insert(static_cast<size_t>(p.name - 1));
+                if (p.lineDefined > 0)
+                {
+                    name_at.try_emplace(static_cast<size_t>(p.name - 1), static_cast<S32>(p.lineDefined));
+                }
             }
         }
         for (size_t s = 0; s < string_at.size(); ++s)
@@ -799,6 +1000,50 @@ namespace
         for (const auto& [line, bytes] : by_line)
         {
             weight.lines.push_back({ line, bytes });
+        }
+        // Which function makes a closure of each, which a local of the
+        // script's body comes down through to the functions within.
+        std::vector<size_t> holder(read.protos.size(), read.protos.size());
+        for (size_t i = 0; i < read.protos.size(); ++i)
+        {
+            for (const uint64_t child : read.protos[i].children)
+            {
+                if (child < holder.size())
+                {
+                    holder[static_cast<size_t>(child)] = i;
+                }
+            }
+        }
+        for (size_t s = 0; s < read.strings.size() && s < read.stringBytes.size(); ++s)
+        {
+            ALScriptWeight::String one;
+            one.text  = read.strings[s];
+            one.bytes = read.stringBytes[s];
+            one.uses  = uses[s];
+            one.loads = loads[s];
+            one.name  = names.contains(s);
+            if (string_at[s] > 0)
+            {
+                one.line = string_at[s] - 1;
+            }
+            else if (const auto named = name_at.find(s); named != name_at.end())
+            {
+                one.line = named->second - 1;
+            }
+            // Each function loading it, and those holding it up to the
+            // body; no further than there are functions, whatever the
+            // bytecode says.
+            for (const U32 loading : loaded_in[s])
+            {
+                size_t at = loading;
+                for (size_t steps = 0; at < read.protos.size() && at != read.main && steps < read.protos.size(); ++steps, at = holder[at])
+                {
+                    one.functions.push_back(static_cast<U32>(at));
+                }
+            }
+            std::sort(one.functions.begin(), one.functions.end());
+            one.functions.erase(std::unique(one.functions.begin(), one.functions.end()), one.functions.end());
+            weight.strings.push_back(std::move(one));
         }
     }
 }

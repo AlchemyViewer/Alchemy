@@ -457,6 +457,22 @@ namespace
         void commentsAfter(LSLASTNode* node, size_t from);
         // How long what commentsAfter put after each node's line was.
         boost::unordered_flat_map<LSLASTNode*, size_t> mTrailed;
+        // Those on the line a block's brace opens, before anything in it:
+        // after the line that opens the block in SLua -- `if ... then`,
+        // `else`, `do`, a function's -- as the LSL had them after its brace,
+        // a long one running on over the lines after. Called as that line
+        // is written; what no line took is written at the top of the block
+        // (commentsOpening), or over what stands for a block not written.
+        // Whether one put after the line is a line's comment, which takes
+        // the rest of the line with it.
+        bool trail(LSLASTNode* body);
+        void commentsOpening(LSLASTNode* body);
+        // What commentsAfter and trail put after a line: the comments of
+        // `given` not yet written, each after a space, written by that, and
+        // whether any is a line's comment; and that put in at `end` in the
+        // text, a line's break.
+        std::string trailing(const std::vector<size_t>& given, bool* takes_line = nullptr);
+        void        putTrailing(size_t end, const std::string& after);
 
         // Declarations on lines one after another that the LSL lined up --
         // each one line, given a value, and their = at one column, or the
@@ -584,7 +600,8 @@ namespace
         void block(LSLASTNode* s);
         // An if written from `at` in the text, `lines` lines down, its
         // stretches from `spans`, put on one line where it is one statement
-        // and nothing said over it: if c then s end.
+        // and nothing said over it: if c then s end. Not called where a
+        // line's comment trails its first line (trail).
         void onOneLine(size_t at, S32 lines, size_t spans);
         // An expression standing as a statement: an assignment, a step, a
         // call.
@@ -788,7 +805,7 @@ namespace
         // before anything that could set it.
         void statesPreamble();
         void timersPreamble();
-        std::string handlerParams(LSLEventHandler* handler, std::string& lead);
+        std::string handlerParams(LSLEventHandler* handler, std::vector<std::string>& lead);
         void handlerBody(LSLEventHandler* handler);
         void helpers(std::string& out);
 
@@ -826,6 +843,7 @@ namespace
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsBefore;
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsAfter;
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsWithin;
+        boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsOpening;
         // The globals the script never sets, declared a number not below
         // nought; and declared any whole number, by what it is.
         boost::unordered_flat_set<LSLSymbol*>      mSteadyNonNegative;
@@ -1363,13 +1381,15 @@ namespace
             }
             if (body->getNodeSubType() == NODE_COMPOUND_STATEMENT)
             {
-                // On the line its brace opens, before anything in it: about
-                // what the block is the body of.
+                // On the line its brace opens, before anything in it: after
+                // the line that opens the block -- `if (i < 0) { // none
+                // saved` -- a long comment running on over the lines after.
                 LSLASTNode* first = body->getChild(0);
                 if (at.line == body->getLoc()->first_line &&
                     (!first || at < Pos{ first->getLoc()->first_line, first->getLoc()->first_column }))
                 {
-                    return false;
+                    mCommentsOpening[body].push_back(k);
+                    return true;
                 }
                 placeIn(k, body);
             }
@@ -1473,16 +1493,7 @@ namespace
         {
             return;
         }
-        std::string after;
-        for (size_t k : found->second)
-        {
-            Comment& c = mComments[k];
-            if (!c.written)
-            {
-                c.written = true;
-                after += " " + c.text;
-            }
-        }
+        const std::string after = trailing(found->second);
         if (after.empty())
         {
             return;
@@ -1498,18 +1509,85 @@ namespace
             const size_t first = mText.find_first_not_of(' ', at);
             if (first < end && mText.compare(first, 2, "--") != 0)
             {
-                mText.insert(end, after);
-                // Counted past it: as many lines, further on.
-                if (end < mCounted)
-                {
-                    mCounted += after.size();
-                }
+                putTrailing(end, after);
                 mTrailed[node] = after.size();
                 return;
             }
             at = end + 1;
         }
         mText += indent() + after.substr(1) + "\n";
+    }
+
+    bool Writer::trail(LSLASTNode* body)
+    {
+        const auto found = mCommentsOpening.find(body);
+        if (found == mCommentsOpening.end() || mText.empty() || mText.back() != '\n')
+        {
+            return false;
+        }
+        // At the end of the line just written, its break kept.
+        bool              takes_line = false;
+        const std::string after      = trailing(found->second, &takes_line);
+        putTrailing(mText.size() - 1, after);
+        return takes_line;
+    }
+
+    void Writer::commentsOpening(LSLASTNode* body)
+    {
+        if (const auto opening = mCommentsOpening.find(body); opening != mCommentsOpening.end())
+        {
+            for (size_t k : opening->second)
+            {
+                writeComment(mComments[k]);
+            }
+        }
+    }
+
+    std::string Writer::trailing(const std::vector<size_t>& given, bool* takes_line)
+    {
+        std::string after;
+        for (size_t k : given)
+        {
+            Comment& c = mComments[k];
+            if (c.written)
+            {
+                continue;
+            }
+            c.written = true;
+            after += " " + c.text;
+            // A line's comment, which takes the rest of its line: not a long
+            // one, `--[[ ]]` or `--[==[ ]==]`, which closes where it is.
+            size_t level = 2;
+            if (level < c.text.size() && c.text[level] == '[')
+            {
+                ++level;
+                while (level < c.text.size() && c.text[level] == '=')
+                {
+                    ++level;
+                }
+                if (level < c.text.size() && c.text[level] == '[')
+                {
+                    continue;
+                }
+            }
+            if (takes_line)
+            {
+                *takes_line = true;
+            }
+        }
+        return after;
+    }
+
+    void Writer::putTrailing(size_t end, const std::string& after)
+    {
+        mText.insert(end, after);
+        // Counted past it: as many more, further on, and the lines a long
+        // comment runs on over counted as written before it.
+        if (end < mCounted)
+        {
+            mCounted += after.size();
+            mCountedLines += static_cast<S32>(std::count(after.begin(), after.end(), '\n'));
+        }
     }
 
     void Writer::commentsAtEnd(LSLASTNode* holder)
@@ -3300,6 +3378,8 @@ namespace
         }
         if (s->getNodeSubType() == NODE_COMPOUND_STATEMENT)
         {
+            // What was after its brace that no line opening it took.
+            commentsOpening(s);
             for (LSLASTNode* child = s->getChild(0); child; child = child->getNext())
             {
                 statement(child, !child->getNext());
@@ -3612,16 +3692,23 @@ namespace
                 bool           when_true = true;
                 if (booleanChoice(i, chosen, when_true))
                 {
+                    // What was after either branch's brace, over the line
+                    // that stands for both.
+                    commentsOpening(i->getTrueBranch());
+                    commentsOpening(i->getFalseBranch());
                     const Expr check = condition(i->getCheckExpr());
                     line(nameOf(chosen) + " = " + (when_true ? check.text : "not " + bracketed(check, UNARY)));
                     return;
                 }
-                // On one line where the LSL wrote it on one, with no else.
+                // On one line where the LSL wrote it on one, with no else,
+                // and no line's comment after its first line, which would
+                // take the rest of the line with it.
                 const bool   one_line = s->getLoc()->first_line == s->getLoc()->last_line && isNull(i->getFalseBranch());
                 const S32    lines_at = one_line ? linesWritten() : 0;
                 const size_t text_at  = mText.size();
                 const size_t spans    = mSpans.size();
                 line("if " + condition(i->getCheckExpr()).text + " then");
+                const bool   trailed  = trail(i->getTrueBranch());
                 for (;;)
                 {
                     ++mDepth;
@@ -3637,16 +3724,18 @@ namespace
                         i = static_cast<LSLIfStatement*>(otherwise);
                         commentsBefore(i);
                         line("elseif " + condition(i->getCheckExpr()).text + " then");
+                        trail(i->getTrueBranch());
                         continue;
                     }
                     line("else");
+                    trail(otherwise);
                     ++mDepth;
                     block(otherwise);
                     --mDepth;
                     break;
                 }
                 line("end");
-                if (one_line)
+                if (one_line && !trailed)
                 {
                     onOneLine(text_at, lines_at, spans);
                 }
@@ -3656,6 +3745,7 @@ namespace
             {
                 auto* w = static_cast<LSLWhileStatement*>(s);
                 line("while " + condition(w->getCheckExpr()).text + " do");
+                trail(w->getBody());
                 mLoops.push_back(nullptr);
                 ++mDepth;
                 block(w->getBody());
@@ -3668,6 +3758,7 @@ namespace
             {
                 auto* d = static_cast<LSLDoStatement*>(s);
                 line("repeat");
+                trail(d->getBody());
                 mLoops.push_back(nullptr);
                 ++mDepth;
                 block(d->getBody());
@@ -3693,6 +3784,7 @@ namespace
                 }
                 LSLExpression* check = f->getCheckExpr();
                 line("while " + (isNull(check) ? std::string("true") : condition(check).text) + " do");
+                trail(f->getBody());
                 mLoops.push_back(f);
                 ++mDepth;
                 block(f->getBody());
@@ -4067,6 +4159,7 @@ namespace
         {
             mWithin[c.var] = within;
         }
+        trail(f->getBody());
         if (from_one)
         {
             mFromOne.insert(c.var);
@@ -5924,6 +6017,7 @@ namespace
             commentsBefore(f);
             line(std::string(forward.contains(mFunction) ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +
                  (boolean(mFunction) ? std::string(mOptions.types ? ": boolean" : "") : typed(f->getIdentifier()->getIType())));
+            trail(f->getStatements());
             ++mDepth;
             prepareBody(f->getStatements());
             block(f->getStatements());
@@ -5934,10 +6028,12 @@ namespace
         }
     }
 
-    std::string Writer::handlerParams(LSLEventHandler* handler, std::string& lead)
+    std::string Writer::handlerParams(LSLEventHandler* handler, std::vector<std::string>& lead)
     {
         // What LSL's handler took: the count of what was detected, made from
-        // SLua's detected table.
+        // SLua's detected table. Where types are written, as the definitions
+        // type SLua's handler: a key as a uuid, link_message's id as the
+        // string SLua passes.
         const std::string event = handler->getIdentifier()->getName();
         std::string       params;
         LSLASTNode*       first = handler->getArguments() ? handler->getArguments()->getChild(0) : nullptr;
@@ -5945,13 +6041,26 @@ namespace
         {
             if (first)
             {
-                lead = "local " + nameOf(static_cast<LSLIdentifier*>(first)) + " = #detected";
+                lead.push_back("local " + nameOf(static_cast<LSLIdentifier*>(first)) + typed(LST_INTEGER) + " = #detected");
             }
-            return "detected";
+            return mOptions.types ? "detected: { DetectedEvent }" : "detected";
         }
-        for (LSLASTNode* p = first; p; p = p->getNext())
+        int at = 0;
+        for (LSLASTNode* p = first; p; p = p->getNext(), ++at)
         {
-            params += (params.empty() ? "" : ", ") + nameOf(static_cast<LSLIdentifier*>(p));
+            auto*          id    = static_cast<LSLIdentifier*>(p);
+            const LSLIType given = ALLSLTraits::eventTextParam(event, at) ? LST_STRING : p->getIType();
+            std::string    name  = nameOf(id);
+            if (varType(id->getSymbol(), given) != given)
+            {
+                // A key the body takes as text, which SLua passes as a
+                // uuid: taken under a name of its own and made the text the
+                // body reads as the handler begins, as LSL's key was.
+                const std::string text = name;
+                name                   = freshName(text + "Key");
+                lead.push_back("local " + text + typed(LST_STRING) + " = tostring(" + name + ")");
+            }
+            params += (params.empty() ? "" : ", ") + name + typed(given);
         }
         return params;
     }
@@ -5981,14 +6090,16 @@ namespace
             if (event == "state_exit")
             {
                 // Not an event SLua has, and one that never came: said, over
-                // a line of its own, and left out.
+                // a line of its own, and left out; what was after its brace
+                // over that line, which stands for the handler's.
+                commentsOpening(handler->getStatements());
                 note(handler, "SluaStateExit", "state_exit runs as a script leaves a state, and this one has no other: it never ran.");
                 line("-- state_exit, left out");
                 line("");
                 continue;
             }
-            std::string lead;
-            const std::string params = handlerParams(handler, lead);
+            std::vector<std::string> lead;
+            const std::string        params = handlerParams(handler, lead);
             // The timer's handler, which LLTimers calls, where the script's
             // timer is on LLTimers.
             const bool timer = event == "timer" && mTimers;
@@ -5998,12 +6109,13 @@ namespace
             }
             const bool field = mOptions.handlers == ALLSLToSLua::Options::Handlers::Field;
             line(timer   ? "timerHandler = function()"
-                 : field ? "LLEvents." + event + " = function(" + params + ")"
+                 : field ? "function LLEvents." + event + "(" + params + ")"
                          : "LLEvents:on(" + luaString(event) + ", function(" + params + ")");
+            trail(handler->getStatements());
             ++mDepth;
-            if (!lead.empty())
+            for (const std::string& one : lead)
             {
-                line(lead);
+                line(one);
             }
             handlerBody(handler);
             --mDepth;
@@ -6117,8 +6229,8 @@ namespace
             {
                 auto*             handler = static_cast<LSLEventHandler*>(h);
                 const std::string event   = handler->getIdentifier()->getName();
-                std::string       lead;
-                const std::string params = handlerParams(handler, lead);
+                std::vector<std::string> lead;
+                const std::string        params = handlerParams(handler, lead);
                 commentsBefore(handler);
                 if (event == "timer" && !mTimers)
                 {
@@ -6127,10 +6239,11 @@ namespace
                              "did; LLTimers:every is SLua's own.");
                 }
                 line(event + " = function(" + params + ")");
+                trail(handler->getStatements());
                 ++mDepth;
-                if (!lead.empty())
+                for (const std::string& one : lead)
                 {
-                    line(lead);
+                    line(one);
                 }
                 handlerBody(handler);
                 --mDepth;

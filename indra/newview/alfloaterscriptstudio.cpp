@@ -34,8 +34,12 @@
 #include "aldiffview.h"
 #include "aldiskincludes.h"
 #include "alflatbutton.h"
+#include "alfloaterscriptpreferences.h"
 #include "allinebreaks.h"
 #include "allsltoslua.h"
+#include "allsltraits.h"
+#include "alluauconfig.h"
+#include "alluausharedstart.h"
 #include "alscriptlexicon.h"
 #include "alscriptstudioviewer.h"
 #include "alserialworker.h"
@@ -59,6 +63,7 @@
 #include "aljumpbar.h"
 #include "aloutputview.h"
 #include "alpanelist.h"
+#include "alpanelscriptaliases.h"
 #include "llsdutil.h"
 #include "alscopebar.h"
 #include "alscriptfixes.h"
@@ -92,6 +97,7 @@
 #include "llexperiencecache.h"
 #include "llfloaterreg.h"
 #include "llinventoryfunctions.h"
+#include "llinventoryicon.h"
 #include "llinventorymodel.h"
 #include "llinventorymodelbackgroundfetch.h"
 #include "lllayoutstack.h"
@@ -215,6 +221,20 @@ namespace
         {
             ALScriptModules::instance().fetchNearby(request, std::move(fetched));
         }
+        bool nameStudioAlias(const std::string& name, const std::string& folder) override
+        {
+            // Under the name the rewritten require says, unless that is
+            // another folder's by now.
+            if (!ALPanelScriptAliases::addStudioAlias(name, folder, true))
+            {
+                return false;
+            }
+            gSavedSettings.setBOOL("ALScriptPreprocDiskIncludes", true);
+            // The fix's doing, not the preferences': their Cancel leaves the
+            // alias, as it leaves the require rewritten to use it.
+            ALFloaterScriptPreferences::keepChanged({ "ALScriptSLuaAliases", "ALScriptPreprocDiskIncludes" });
+            return true;
+        }
     };
 
     // How long a tab to be restored waits for its object or its item to be
@@ -292,6 +312,27 @@ namespace
             }
         }
         return text;
+    }
+
+
+    // Whether an item of a type is of the kind an argument names.
+    bool itemOfKind(ALLSLTraits::Item kind, LLAssetType::EType type)
+    {
+        switch (kind)
+        {
+            case ALLSLTraits::Item::Any:       return true;
+            case ALLSLTraits::Item::Sound:     return type == LLAssetType::AT_SOUND;
+            case ALLSLTraits::Item::Texture:   return type == LLAssetType::AT_TEXTURE;
+            case ALLSLTraits::Item::Animation: return type == LLAssetType::AT_ANIMATION;
+            case ALLSLTraits::Item::Notecard:  return type == LLAssetType::AT_NOTECARD;
+            case ALLSLTraits::Item::Object:    return type == LLAssetType::AT_OBJECT;
+            case ALLSLTraits::Item::Material:  return type == LLAssetType::AT_MATERIAL;
+            case ALLSLTraits::Item::Settings:  return type == LLAssetType::AT_SETTINGS;
+            case ALLSLTraits::Item::Landmark:  return type == LLAssetType::AT_LANDMARK;
+            case ALLSLTraits::Item::Script:    return type == LLAssetType::AT_LSL_TEXT;
+            case ALLSLTraits::Item::None:      break;
+        }
+        return false;
     }
 }
 
@@ -726,6 +767,7 @@ void ALFloaterScriptStudio::findPanes()
     mOutlinePane   = getChild<ALScriptOutlinePane>("outline_pane");
     mWeightsPane   = getChild<ALScriptWeightsPane>("weights_tab");
     mWeightsParts  = mWeightsPane->partsList();
+    mWeightsStrings = mWeightsPane->stringsList();
     mInspectorPane = getChild<ALScriptInspectorPane>("inspector_pane");
     mExplorerPane  = getChild<ALScriptExplorerPane>("explorer_pane");
     mCompileTarget = getChild<LLComboBox>("compile_target");
@@ -764,11 +806,23 @@ void ALFloaterScriptStudio::wirePanes()
         }
     });
     mProblemsPane = getChild<ALScriptProblemsPane>("problems_tab");
-    mWeightsParts->setCommitCallback([this](LLUICtrl*, const LLSD&) { onWeightChosen(false); });
-    // Return and a double-click go to the part chosen; escape back to the
-    // script.
-    mWeightsParts->setGo([this]() { onWeightChosen(true); });
-    mWeightsParts->setBack([this]() { revealed(mWeightsParts, true); });
+    // Keeping a shared start once is an edit of the script shown: of an
+    // SLua script that can be written to, and no other.
+    mWeightsPane->setKeepStart([this](const std::string& start, const std::vector<std::string>& strings) { keepStartOnce(start, strings); },
+                               [this]() {
+                                   const size_t index = indexOf(mWeightsPane->shownId());
+                                   const Doc*   doc   = index != NONE ? mDocs[index].get() : nullptr;
+                                   return doc && doc->loaded && doc->modifiable && !doc->notecard && doc->language.lua && doc->editor &&
+                                          !doc->editor->isReadOnly();
+                               });
+    // Return and a double-click go to the part or the string chosen; escape
+    // back to the script.
+    for (ALPaneList* list : { mWeightsParts, mWeightsStrings })
+    {
+        list->setCommitCallback([this, list](LLUICtrl*, const LLSD&) { onWeightChosen(list, false); });
+        list->setGo([this, list]() { onWeightChosen(list, true); });
+        list->setBack([this, list]() { revealed(list, true); });
+    }
     mOutputPane = getChild<ALScriptOutputPane>("output_tab");
 
     mSearchPane = getChild<ALScriptSearchPane>("search_tab");
@@ -889,11 +943,14 @@ void ALFloaterScriptStudio::listenToSettings()
     // The preprocessor's settings, from the menu here or the preferences:
     // every script expanded and checked again, and the transforms' words
     // coloured as they now are -- a moment after the last change, since a
-    // field typed in changes its setting at every key.
+    // field typed in changes its setting at every key. The SLua aliases
+    // with them, and world includes, which an inventory folder's alias is
+    // read under: a require through one found, or not, again.
     for (const char* setting :
          { "ALScriptPreprocEnabled", "ALScriptPreprocSwitch", "ALScriptPreprocLazyLists", "ALScriptPreprocCompress", "ALScriptPreprocOptimizer",
            "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings", "ALScriptPreprocOptimizerInlining", "ALScriptPreprocExtensions",
-           "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder", "ALScriptPreprocDefines" })
+           "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder", "ALScriptPreprocDefines",
+           "ALScriptPreprocLineComments", "ALScriptSLuaAliases", "ALScriptPreprocWorldIncludes" })
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
         {
@@ -937,6 +994,21 @@ void ALFloaterScriptStudio::listenToWorld()
         }
     });
     mConvertedContents = ALScriptWorkspace::instance().contentsIndex().onHeard([this](const ALScriptContents& contents) { convertedListed(contents); });
+    // A string waiting on what its prim holds offered the names once it is
+    // known, where the caret is still there.
+    mItemsContents = ALScriptWorkspace::instance().contentsIndex().onHeard([this](const ALScriptContents& contents) {
+        if (!contents.fetched || !mItemsAwaited.erase(contents.prim))
+        {
+            return;
+        }
+        for (const std::unique_ptr<Doc>& doc : mDocs)
+        {
+            if (doc->ref.object == contents.prim && doc->editor && !doc->notecard)
+            {
+                doc->editor->reaskString();
+            }
+        }
+    });
     // The vimrc read again into the studio's vim whenever it changes: its
     // file saved, a notecard dropped on the preferences' box, or saved;
     // each window's editors set again from it.
@@ -2904,6 +2976,8 @@ void ALFloaterScriptStudio::speakFileLanguage(Doc& doc, const FileLanguage& lang
         ALCodeEditor& editor = *doc.editor;
         editor.setCompletionProvider(nullptr);
         editor.setCompletionRequest(nullptr);
+        editor.setPathProvider(nullptr);
+        editor.setStringProvider(nullptr);
         editor.setHoverProvider(nullptr);
         editor.setHoverRequest(nullptr);
         editor.setSignatureRequest(nullptr);
@@ -3026,8 +3100,32 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
         return ALScriptStudioWords::hoverText(lua, raw->editor->document(), at, word, text);
     });
     editor.setCompletionProvider([this, lua, raw](const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
-        ALScriptStudioWords::complete(lua, *raw->editor, at, prefix, snippets(lua), getString("SnippetDetail"), out);
+        ALScriptStudioWords::complete(lua, *raw->editor, at, prefix, snippets(lua), getString("SnippetDetail"), out,
+                                      gSavedSettings.getBOOL("ALScriptConvertTypes"));
         completeLinks(*raw, at, prefix, out);
+    });
+    // What could follow a path typed in a string that names a file: a
+    // require's by its own rules, through Luau's suggester, so that what is
+    // offered is what it finds; an include's by its search.
+    editor.setPathProvider([this, raw](const ALTextPos& at, std::string_view typed, std::vector<ALCodeEditor::Completion>& out) {
+        const std::optional<Doc::Named> named   = raw->namedAt(at);
+        const std::string&              line    = raw->editor->document().line(at.line);
+        const bool                      require = named ? named->require : line.find("#include") == std::string::npos;
+        const ALScriptPreprocessor::Request request = mChecking.preprocessRequest(*raw, /*with_source*/ false);
+        for (const ALRequireNavigation::Suggestion& one : ALScriptPreprocessor::instance().suggestPaths(request, std::string(typed), require))
+        {
+            ALCodeEditor::Completion c;
+            c.text   = one.label;
+            c.path   = one.path;
+            c.folder = one.folder;
+            c.kind   = ALSyntaxKind::Path;
+            out.push_back(std::move(c));
+        }
+    });
+    // What a string could hold where the call wants an item of the
+    // object's by its name: the names of what the prim holds of that kind.
+    editor.setStringProvider([this, raw](const ALTextPos& at, std::string_view, std::vector<ALCodeEditor::Completion>& out) {
+        completeItems(*raw, at, out);
     });
 }
 
@@ -3153,26 +3251,9 @@ void ALFloaterScriptStudio::completeLinks(const Doc& doc, const ALTextPos& at, s
     {
         return;
     }
-    ALCodeEditor& editor = *doc.editor;
-    ALTextPos     open;
-    if (!editor.bracketIndex().enclosing(at, '(', 1, open))
-    {
-        return;
-    }
-    // The function the bracket is the call of: its name before it, with
-    // the library it is in -- `ll.MessageLinked`.
-    const std::string& line = editor.document().line(open.line);
-    S32                end  = std::min<S32>(open.column, static_cast<S32>(line.size()));
-    while (end > 0 && (line[end - 1] == ' ' || line[end - 1] == '\t'))
-    {
-        --end;
-    }
-    S32 start = end;
-    while (start > 0 && (ALScriptLexicon::isNameByte(line[start - 1]) || line[start - 1] == '.'))
-    {
-        --start;
-    }
-    if (start == end || !ALScriptStudioWords::linkArgument(doc.language.lua, line.substr(start, end - start), editor.argumentAt(open, at)))
+    std::string callee;
+    S32         argument = 0;
+    if (!ALScriptStudioWords::callAt(*doc.editor, at, callee, argument) || !ALScriptStudioWords::linkArgument(doc.language.lua, callee, argument))
     {
         return;
     }
@@ -3220,6 +3301,63 @@ void ALFloaterScriptStudio::completeLinks(const Doc& doc, const ALTextPos& at, s
 }
 
 
+void ALFloaterScriptStudio::completeItems(const Doc& doc, const ALTextPos& at, std::vector<ALCodeEditor::Completion>& out)
+{
+    // Where the call wants an item of the object's by its name -- the
+    // sound llPlaySound plays, the item ll.GiveInventory gives -- what the
+    // script's own prim holds of that kind.
+    if (doc.ref.inInventory() || doc.notecard || !doc.editor)
+    {
+        return;
+    }
+    char                    quote = '"';
+    const ALLSLTraits::Item kind  = ALScriptStudioWords::itemStringAt(*doc.editor, at, doc.language.lua, quote);
+    if (kind == ALLSLTraits::Item::None)
+    {
+        return;
+    }
+    ALScriptContentsIndex&              index = ALScriptWorkspace::instance().contentsIndex();
+    const ALScriptContentsIndex::Prim* prim  = index.prim(doc.ref.object);
+    if (!prim || !prim->fetched)
+    {
+        // Asked for, and the string asked again once it is known.
+        index.ask(doc.ref.object);
+        mItemsAwaited.insert(doc.ref.object);
+        return;
+    }
+    // Each put in whole, escaped as the string's quote wants it.
+    auto offer = [&out, quote](const std::string& name, LLAssetType::EType type) {
+        ALCodeEditor::Completion one;
+        one.text = name;
+        for (const char c : name)
+        {
+            if (c == quote || c == '\\')
+            {
+                one.path += '\\';
+            }
+            one.path += c;
+        }
+        one.kind = ALSyntaxKind::String;
+        one.icon = LLInventoryIcon::getIcon(type);
+        out.push_back(std::move(one));
+    };
+    for (const ALScriptContents::Item& item : prim->items)
+    {
+        const LLAssetType::EType type = item.script ? LLAssetType::AT_LSL_TEXT : LLAssetType::AT_NOTECARD;
+        if (itemOfKind(kind, type))
+        {
+            offer(item.name, type);
+        }
+    }
+    for (const ALScriptContents::Other& other : prim->others)
+    {
+        if (itemOfKind(kind, other.type))
+        {
+            offer(other.name, other.type);
+        }
+    }
+}
+
 void ALFloaterScriptStudio::insertFromLibrary(const std::string& what)
 {
     Doc* doc = active();
@@ -3262,7 +3400,7 @@ void ALFloaterScriptStudio::insertFromLibrary(const std::string& what)
             {
                 return;
             }
-            chosen = ALScriptStudioWords::completionFor(*word, lua);
+            chosen = ALScriptStudioWords::completionFor(*word, lua, gSavedSettings.getBOOL("ALScriptConvertTypes"));
         }
         // In place of the selection, or at the caret.
         const ALTextRange selection = doc->editor->selection();
@@ -4460,6 +4598,34 @@ void ALFloaterScriptStudio::candidates(const Doc& doc, std::function<void(ALScri
     });
 }
 
+std::vector<std::string> ALFloaterScriptStudio::diskCandidates(const Doc& doc)
+{
+    // The folders alone: the lookup walks them, off the main thread. None
+    // while the disk is off, as the preprocessor reads none -- the studio's
+    // aliases on disk no more than the scripter's own folders.
+    static LLCachedControl<bool> disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
+    if (doc.notecard || !disk)
+    {
+        return {};
+    }
+    std::vector<std::string> folders;
+    for (const auto& [prefix, folder] : ALScriptPreprocessor::instance().moduleFolders(mChecking.preprocessRequest(doc, /*with_source*/ false)))
+    {
+        folders.push_back(folder);
+    }
+    if (doc.language.lua)
+    {
+        for (const ALScriptPreprocessor::StudioAlias& alias : ALScriptPreprocessor::studioAliases())
+        {
+            if (ALLuauConfig::absolute(alias.folder))
+            {
+                folders.push_back(alias.folder);
+            }
+        }
+    }
+    return folders;
+}
+
 void ALFloaterScriptStudio::loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::optional<std::string>& source)> loaded)
 {
     ALScriptWorkspace::instance().load(ref, [loaded = std::move(loaded)](const ALScriptLoaded& answer) {
@@ -4743,14 +4909,44 @@ bool ALFloaterScriptStudio::weightsShown() const
     return ALPaneFolds::inSight(mWeightsPane);
 }
 
-void ALFloaterScriptStudio::onWeightChosen(bool to_editor)
+void ALFloaterScriptStudio::keepStartOnce(const std::string& start, const std::vector<std::string>& strings)
 {
-    const std::optional<ALScriptWeightsPane::Place> place = mWeightsPane->chosenPlace();
+    const size_t index = indexOf(mWeightsPane->shownId());
+    if (index == NONE)
+    {
+        return;
+    }
+    Doc& doc = *mDocs[index];
+    if (!doc.loaded || !doc.modifiable || doc.notecard || !doc.language.lua || !doc.editor || doc.editor->isReadOnly())
+    {
+        return;
+    }
+    ALLuauSharedStart::Rewrite rewrite;
+    std::string                error;
+    if (!ALLuauSharedStart::rewrite(doc.editor->wholeText(), start, strings, rewrite, error))
+    {
+        setStatus(getString("KeepStartFailed", LLStringUtil::format_map_t{ { "[ERROR]", error } }), true);
+        return;
+    }
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    for (const ALLuauSharedStart::Edit& edit : rewrite.edits)
+    {
+        edits.emplace_back(ALTextRange(ALTextPos(edit.line, edit.column), ALTextPos(edit.endLine, edit.endColumn)), edit.text);
+    }
+    if (doc.editor->replaceAll(std::move(edits)))
+    {
+        setStatus(getString("KeptStartOnce", LLStringUtil::format_map_t{ { "[COUNT]", std::to_string(rewrite.literals) }, { "[NAME]", rewrite.name } }));
+    }
+}
+
+void ALFloaterScriptStudio::onWeightChosen(ALPaneList* list, bool to_editor)
+{
+    const std::optional<ALScriptWeightsPane::Place> place = mWeightsPane->chosenPlace(list);
     if (!place)
     {
         return;
     }
-    if (!to_editor && mNavigation.deferOpen(mWeightsParts, place->file))
+    if (!to_editor && mNavigation.deferOpen(list, place->file))
     {
         return;
     }
@@ -4774,7 +4970,7 @@ void ALFloaterScriptStudio::onWeightChosen(bool to_editor)
         openIncludeAt(place->file, place->fileName, place->line, place->column, 0);
     }
     --mHoldPanes;
-    revealed(mWeightsParts, to_editor);
+    revealed(list, to_editor);
 }
 
 void ALFloaterScriptStudio::showPlace(Doc& doc, Doc::View view, const ALTextPos& at)
@@ -4812,9 +5008,9 @@ void ALFloaterScriptStudio::choosePreview(ALPaneList* list)
     {
         mSearchPane->choose(false);
     }
-    else if (list == mWeightsParts)
+    else if (list == mWeightsParts || list == mWeightsStrings)
     {
-        onWeightChosen(false);
+        onWeightChosen(list, false);
     }
 }
 
@@ -9286,7 +9482,7 @@ void ALFloaterScriptStudio::addBuildCommands()
            std::pair{ "preproc_lazy", "ALScriptPreprocLazyLists" }, std::pair{ "preproc_compress", "ALScriptPreprocCompress" },
            std::pair{ "preproc_extensions", "ALScriptPreprocExtensions" }, std::pair{ "preproc_optimize", "ALScriptPreprocOptimizer" },
            std::pair{ "preproc_shrink", "ALScriptPreprocOptimizerShrinkNames" }, std::pair{ "preproc_addstrings", "ALScriptPreprocOptimizerAddStrings" },
-           std::pair{ "preproc_inline", "ALScriptPreprocOptimizerInlining" } })
+           std::pair{ "preproc_inline", "ALScriptPreprocOptimizerInlining" }, std::pair{ "preproc_line_comments", "ALScriptPreprocLineComments" } })
     {
         mCommands.add(
             name, [setting]() { gSavedSettings.setBOOL(setting, !gSavedSettings.getBOOL(setting)); }, nullptr,

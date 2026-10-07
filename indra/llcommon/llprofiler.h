@@ -201,6 +201,15 @@
 #define LL_PROFILE_PLOT_CONFIG(name, format, step, fill, color) do { (void)(name); } while (0)
 #endif
 
+// A moment marked on the timeline, between the zones around it: a point a
+// library reports in the middle of work it does in one call. `text` must be
+// a string literal, as Tracy keeps the pointer rather than the characters.
+#if LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+#define LL_PROFILE_MESSAGE(text) TracyMessageL(text)
+#else
+#define LL_PROFILE_MESSAGE(text) do { (void)(text); } while (0)
+#endif
+
 #if LL_PROFILER_ENABLE_RENDER_DOC
 #define LL_LABEL_OBJECT_GL(type, name, length, label) glObjectLabel(type, name, length, label)
 #else

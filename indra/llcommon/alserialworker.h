@@ -45,7 +45,8 @@
 // where it gives one, is called first, to stop the job that is running.
 //
 // Posted to and closed from one thread, the main one; the thread starts
-// with the first job.
+// with the first job. A job may post another from the thread itself, which
+// started with the first: closed, that is refused like any other.
 class LL_COMMON_API ALSerialWorker
 {
 public:

@@ -74,6 +74,18 @@ public:
     // the name where the detail has the name -- a return type may have
     // brackets of its own before it -- else the first.
     static std::vector<std::string> parameterNames(std::string_view detail, std::string_view name = std::string_view());
+    // And each with its type, as the detail types it -- empty where it
+    // says none -- for what writes a parameter list out again, in either
+    // language's way: a variadic's name `...` however it is written
+    // ("...: any", "any ...", "...any"), its type what is left. A type's
+    // own brackets, `<>` among them, and the commas and colons inside
+    // them, are the type's.
+    struct Parameter
+    {
+        std::string name;
+        std::string type;
+    };
+    static std::vector<Parameter> parameters(std::string_view detail, std::string_view name = std::string_view());
     // Where that list opens in the detail, or npos.
     static size_t parameterListAt(std::string_view detail, std::string_view name);
 

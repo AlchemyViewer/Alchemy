@@ -36,6 +36,7 @@
 #include "alscriptstudiovimrc.h"
 #include "alscriptstudiowords.h"
 #include "alfontfield.h"
+#include "alpanelscriptaliases.h"
 #include "alpanelscriptkeymap.h"
 #include "llbutton.h"
 #include "llcallbacklist.h"
@@ -80,11 +81,13 @@ namespace
         "ALScriptStudioPreflight",   "ALScriptPreprocEnabled",     "ALScriptPreprocSwitch",
         "ALScriptPreprocLazyLists",  "ALScriptPreprocCompress",    "ALScriptPreprocOptimizer",
         "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings",
-        "ALScriptPreprocOptimizerInlining",     "ALScriptPreprocExtensions",
+        "ALScriptPreprocOptimizerInlining",     "ALScriptPreprocExtensions", "ALScriptPreprocLineComments",
         "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder", "ALScriptPreprocWorldIncludes",
+        "ALScriptSLuaAliases",
         "ALScriptStudioTabWidth",    "ALScriptStudioInsertSpaces", "ALScriptStudioDetectIndentation", "ALScriptStudioReindentOnPaste",
         "ALScriptLintLevels",        "ALScriptLuauMode",           "ALScriptLuauSolver",
-        "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptStudioAutoClose",
+        "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptFragmentCompletion",
+        "ALScriptStudioAutoClose",
         "ALScriptStudioCaretStyle",  "ALScriptStudioCaretBlink",   "ALScriptStudioHoverCards",  "ALScriptStudioHoverDelay",
         "ALScriptStudioVimClipboard",
         "ALScriptFormatBlankLines",  "ALScriptFormatSpacing",      "ALScriptFormatOnSave",      "ALScriptTrimOnSave",        "ALScriptFixOnSave",
@@ -213,7 +216,8 @@ bool ALFloaterScriptPreferences::postBuild()
     // they change -- by the settings' own signals, so a Cancel reaches
     // them as a click does.
     for (const char* setting : { "ALScriptStudioTabWidth", "ALScriptStudioInsertSpaces", "ALScriptStudioDetectIndentation", "ALScriptStudioReindentOnPaste",
-                                 "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptStudioAutoClose",
+                                 "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptFragmentCompletion",
+        "ALScriptStudioAutoClose",
                                  "ALScriptStudioCaretStyle", "ALScriptStudioCaretBlink", "ALScriptStudioHoverCards", "ALScriptStudioHoverDelay" })
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
@@ -431,6 +435,12 @@ void ALFloaterScriptPreferences::onOpen(const LLSD& key)
     {
         keys->refresh();
     }
+    // An inventory folder renamed, or a folder on disk gone, since the
+    // aliases were last shown, which no setting says.
+    if (ALPanelScriptAliases* aliases = findChild<ALPanelScriptAliases>("aliases_panel"))
+    {
+        aliases->refresh();
+    }
 }
 
 void ALFloaterScriptPreferences::onClose(bool app_quitting)
@@ -531,6 +541,25 @@ void ALFloaterScriptPreferences::revert()
         }
     }
     ALScriptStudio::refreshAll();
+}
+
+// static
+void ALFloaterScriptPreferences::keepChanged(std::initializer_list<const char*> settings)
+{
+    // Not open, nothing remembered to go back to.
+    ALFloaterScriptPreferences* prefs = LLFloaterReg::findTypedInstance<ALFloaterScriptPreferences>("script_studio_prefs");
+    if (!prefs || !prefs->mShowing)
+    {
+        return;
+    }
+    for (const char* setting : settings)
+    {
+        const LLControlVariable* control = gSavedSettings.getControl(setting);
+        if (control && prefs->mWasSettings.has(setting))
+        {
+            prefs->mWasSettings[setting] = control->getValue();
+        }
+    }
 }
 
 bool ALFloaterScriptPreferences::changed() const

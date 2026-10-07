@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alcodeeditor.h"
+#include "allsltraits.h"
 #include "alquickopen.h"
 #include "alscriptsnippets.h"
 #include "alscriptsymbol.h"
@@ -107,9 +108,10 @@ public:
     // What completes a word begun at a place: the vocabulary's words that
     // begin with it -- an LSL event's handler only straight inside a
     // state -- then the snippets by their prefix, said as `snippet_word`,
-    // where a bare word is being typed.
+    // where a bare word is being typed. An SLua handler's parameters typed
+    // where `typed` (completionFor).
     static void complete(bool lua, ALCodeEditor& editor, const ALTextPos& at, std::string_view prefix, const std::vector<Snippet>& snippets,
-                         const std::string& snippet_word, std::vector<ALCodeEditor::Completion>& out);
+                         const std::string& snippet_word, std::vector<ALCodeEditor::Completion>& out, bool typed = false);
     // Whether a position of an LSL script is straight inside a state,
     // where an event's handler goes.
     static bool inStateBody(ALCodeEditor& editor, const ALTextPos& at);
@@ -117,10 +119,24 @@ public:
     // definitions name its parameter -- Link, LinkNumber -- where they
     // know the function.
     static bool linkArgument(bool lua, std::string_view function, S32 argument);
+    // The call a place is in an argument of: the function by its name
+    // before the call's bracket, with the library it is in --
+    // `llSetLinkAlpha`, `ll.MessageLinked` -- and which argument from
+    // nought. False where it is in none.
+    static bool callAt(ALCodeEditor& editor, const ALTextPos& at, std::string& callee, S32& argument);
+    // The kind of item of the object's the string at a place names, where
+    // a call wants one there by its name (ALLSLTraits::itemArg): a string
+    // that begins its argument, whatever blanks, lines and comments come
+    // between it and the call's bracket or comma, or in SLua a call's one
+    // string written with no brackets, `ll.PlaySound "door"`. And the
+    // string's quote. None anywhere else.
+    static ALLSLTraits::Item itemStringAt(ALCodeEditor& editor, const ALTextPos& at, bool lua, char& quote);
     // A word as a completion: a function with its call, an event as a
-    // handler to fill in -- LSL's as the detail reads, SLua's set on
-    // LLEvents -- a constant as itself.
-    static ALCodeEditor::Completion completionFor(const Vocab& word, bool lua);
+    // handler to fill in -- LSL's as the detail reads, SLua's a function
+    // of LLEvents', its parameters typed where `typed`, as the scripter's
+    // choice of Luau types for what the studio writes has it -- a constant
+    // as itself.
+    static ALCodeEditor::Completion completionFor(const Vocab& word, bool lua, bool typed = false);
     // The Insert menu's list: the snippets, or the functions, events or
     // constants, as `what` says; a deprecated word said as
     // `deprecated_word`.

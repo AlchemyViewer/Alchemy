@@ -473,6 +473,10 @@ private:
     };
     std::vector<ConvertedWaiting>      mConvertedWaiting;
     boost::signals2::scoped_connection mConvertedContents;
+    // The prims whose contents a string's item names were asked of before
+    // they were known: their scripts' editors asked again once they are.
+    std::set<LLUUID>                   mItemsAwaited;
+    boost::signals2::scoped_connection mItemsContents;
     void convertedMade(const ALScriptCreated& made, ConvertedWaiting waiting);
     void convertedListed(const ALScriptContents& contents);
     // The new SLua script opened with its text unsaved, and set beside the
@@ -530,6 +534,9 @@ private:
     // Completion's link numbers: where the call being typed wants one, the
     // prims of the script's object by name, each putting in its number.
     void completeLinks(const Doc& doc, const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out);
+    // Completion in a string: where the call wants an item of the object's
+    // by its name, the names of what the script's prim holds of that kind.
+    void completeItems(const Doc& doc, const ALTextPos& at, std::vector<ALCodeEditor::Completion>& out);
     // What scripts say, from the workspace: listed in the Output tab, and
     // a run-time error in a script that is open marked on its line.
     void runtimeEvent(const ALScriptRuntimeEvent& event);
@@ -814,6 +821,7 @@ private:
     // popover over the window, with a row saying what return will do as
     // it is typed.
     void candidates(const Doc& doc, std::function<void(ALScriptLookup::Candidates)> told) override;
+    std::vector<std::string> diskCandidates(const Doc& doc) override;
     void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::optional<std::string>& source)> loaded) override;
     void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> expanded) override;
     void showFound(Doc& doc, const ALScriptLookup::Found& found) override;
@@ -947,7 +955,12 @@ private:
     // The Weights tab: whether it is looked at; and a part chosen there,
     // gone to.
     bool weightsShown() const override;
-    void onWeightChosen(bool to_editor);
+    // A part or a string chosen in the Memory tab's list: shown there, or
+    // gone to.
+    void onWeightChosen(ALPaneList* list, bool to_editor);
+    // A start several strings share kept once in the script the Memory tab
+    // shows (ALLuauSharedStart): one step to undo, said in the status.
+    void keepStartOnce(const std::string& start, const std::vector<std::string>& strings);
     // The outline (ALScriptOutlinePane): shown, which the bar at the
     // bottom is told of; a symbol chosen, gone to; its sort kept.
     void        outlineShown(Doc& doc) override { mCaret.placePath(doc); }
@@ -1311,6 +1324,7 @@ private:
     // The Weights tab, and its list of parts.
     ALScriptWeightsPane*               mWeightsPane = nullptr;
     ALPaneList*                        mWeightsParts      = nullptr;
+    ALPaneList*                        mWeightsStrings    = nullptr;
     ALScriptExplorerPane*              mExplorerPane  = nullptr;
     // What each of the menus' items does, whether it can, and whether it
     // is on, by the item's name.

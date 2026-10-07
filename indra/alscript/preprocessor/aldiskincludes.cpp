@@ -31,6 +31,9 @@
 
 #include "fsyspath.h"
 #include "llsdjson.h"
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -58,9 +61,24 @@ namespace
         return found;
     }
 
+    // Two parts of a path the same; in any case where asked, as a path is
+    // written before the disk says how it stands.
+    bool same(const fs::path& a, const fs::path& b, bool any_case)
+    {
+        if (!any_case)
+        {
+            return a == b;
+        }
+        const std::string x = fsyspath(a).string();
+        const std::string y = fsyspath(b).string();
+        return x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin(), [](char l, char r) {
+                   return std::tolower(static_cast<unsigned char>(l)) == std::tolower(static_cast<unsigned char>(r));
+               });
+    }
+
     // Whether `inner` is `outer` or under it, part by part: a folder is not
     // under another whose name it only begins with.
-    bool under(const fs::path& inner, const fs::path& outer)
+    bool under(const fs::path& inner, const fs::path& outer, bool any_case = false)
     {
         auto o = outer.begin();
         auto i = inner.begin();
@@ -71,32 +89,76 @@ namespace
             {
                 return true;
             }
-            if (i == inner.end() || *i != *o)
+            if (i == inner.end() || !same(*i, *o, any_case))
             {
                 return false;
             }
         }
         return true;
     }
+
+    // A path to another machine's share, or to a device -- `\\host\share`,
+    // `//host/share`, `\\?\`, `\\.\`, and the NT namespace's own `\??\`,
+    // which Windows passes on as it is, `\??\UNC\host\share` a share --
+    // which asking anything of sends who asks to wherever it names. Those
+    // as written on every platform; on Windows, whatever the path's root
+    // parses as but a drive.
+    bool elsewhere(const std::string& path)
+    {
+        const auto separator = [](char c) { return c == '/' || c == '\\'; };
+        if (path.size() >= 2 && separator(path[0]) && separator(path[1]))
+        {
+            return true;
+        }
+        if (path.size() >= 4 && separator(path[0]) && path[1] == '?' && path[2] == '?' && separator(path[3]))
+        {
+            return true;
+        }
+#if LL_WINDOWS
+        const std::wstring root = fsyspath(path).lexically_normal().root_name().native();
+        const bool         drive = root.size() == 2 && root[1] == L':' && ((root[0] >= L'A' && root[0] <= L'Z') || (root[0] >= L'a' && root[0] <= L'z'));
+        return !root.empty() && !drive;
+#else
+        return false;
+#endif
+    }
 }
 
 void ALDiskIncludes::bless(const std::string& folder)
 {
     const std::optional<fs::path> found = real(folder);
-    std::error_code               ec;
-    if (!found || !fs::is_directory(*found, ec))
+    if (!found)
+    {
+        return;
+    }
+    std::error_code           ec;
+    const bool                dir  = fs::is_directory(*found, ec);
+    std::vector<std::string>& kept = dir ? mFolders : mFiles;
+    if (!dir && !fs::is_regular_file(*found, ec))
     {
         return;
     }
     const std::string text = fsyspath(*found).string();
-    if (std::find(mFolders.begin(), mFolders.end(), text) == mFolders.end())
+    if (std::find(kept.begin(), kept.end(), text) == kept.end())
     {
-        mFolders.push_back(text);
+        kept.push_back(text);
     }
 }
 
 bool ALDiskIncludes::mayFromConfig(const std::string& folder, const std::string& config_folder) const
 {
+    // A share or a device a configuration names -- one that came with a
+    // download says what it likes -- is asked nothing of unless, as it is
+    // written, it is under the configuration's own folder or one blessed.
+    if (elsewhere(folder))
+    {
+        std::vector<std::string> may = mFolders;
+        may.push_back(config_folder);
+        if (!lexicallyUnder(folder, may))
+        {
+            return false;
+        }
+    }
     const std::optional<fs::path> found = real(folder);
     if (!found)
     {
@@ -113,8 +175,9 @@ bool ALDiskIncludes::blessFromConfig(const std::string& folder, const std::strin
 {
     if (!mayFromConfig(folder, config_folder))
     {
-        // Not a folder at all is no news; one outside is.
-        if (real(folder))
+        // Not a folder at all is no news; one outside is. A share is not
+        // asked whether it is one.
+        if (!elsewhere(folder) && real(folder))
         {
             LL_WARNS_ONCE("ScriptPreprocessor") << "The configuration in " << config_folder << " lists " << folder
                                                 << ", which is outside it and outside the include folders set in Preferences: not used" << LL_ENDL;
@@ -136,17 +199,12 @@ std::vector<std::string> ALDiskIncludes::namesFor(const std::string& name, bool 
     }
     names.push_back(name + ".luau");
     names.push_back(name + ".lua");
-    const auto ends = [&name](std::string_view extension) {
-        return name.size() >= extension.size() &&
-               std::equal(extension.begin(), extension.end(), name.end() - extension.size(),
-                          [](char a, char b) { return a == std::tolower(static_cast<unsigned char>(b)); });
-    };
     std::string folder = name;
     while (!folder.empty() && (folder.back() == '/' || folder.back() == '\\'))
     {
         folder.pop_back();
     }
-    if (require && !folder.empty() && !ends(".luau") && !ends(".lua"))
+    if (require && !folder.empty() && extensionOf(name, scriptExtensions(true)) == 0)
     {
         names.push_back(folder + "/init.luau");
         names.push_back(folder + "/init.lua");
@@ -186,11 +244,88 @@ std::optional<std::string> ALDiskIncludes::admits(const std::string& file) const
             return fsyspath(*found).string();
         }
     }
+    const std::string text = fsyspath(*found).string();
+    if (std::find(mFiles.begin(), mFiles.end(), text) != mFiles.end())
+    {
+        return text;
+    }
     return std::nullopt;
 }
 
+// static
+bool ALDiskIncludes::lexicallyUnder(const std::string& path, const std::vector<std::string>& folders)
+{
+    if (path.empty())
+    {
+        return false;
+    }
+    const fs::path inner = fsyspath(path).lexically_normal();
+    return std::any_of(folders.begin(), folders.end(), [&inner](const std::string& folder) {
+        return !folder.empty() && under(inner, fsyspath(folder).lexically_normal(), true);
+    });
+}
+
+// static
+const std::vector<std::string>& ALDiskIncludes::scriptExtensions(bool lua)
+{
+    static const std::vector<std::string> LUA{ ".luau", ".lua" };
+    static const std::vector<std::string> LSL{ ".lsl", ".lslh", ".lsli" };
+    return lua ? LUA : LSL;
+}
+
+// static
+size_t ALDiskIncludes::extensionOf(std::string_view name, const std::vector<std::string>& extensions)
+{
+    for (const std::string& extension : extensions)
+    {
+        if (name.size() > extension.size() &&
+            std::equal(extension.begin(), extension.end(), name.end() - extension.size(),
+                       [](char a, char b) { return a == std::tolower(static_cast<unsigned char>(b)); }))
+        {
+            return extension.size();
+        }
+    }
+    return 0;
+}
+
+// static
+std::vector<std::string> ALDiskIncludes::scriptsUnder(const std::vector<std::string>& folders, bool lua, int depth, size_t most,
+                                                     const std::function<bool()>& stopped)
+{
+    // Looked at past what is found: a folder of other things holds more
+    // than its scripts.
+    constexpr size_t ENTRIES_PER_FOUND = 16;
+    const auto       stop = [&stopped]() { return stopped && stopped(); };
+    ALDiskIncludes   blessed;
+    for (const std::string& folder : folders)
+    {
+        if (stop())
+        {
+            return {};
+        }
+        blessed.bless(folder);
+    }
+    std::vector<std::string>                                                  out;
+    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> seen;
+    for (const std::string& folder : folders)
+    {
+        if (out.size() >= most || stop())
+        {
+            break;
+        }
+        for (const Listed& listed : blessed.filesUnder(folder, scriptExtensions(lua), depth, most * ENTRIES_PER_FOUND, most - out.size(), stopped))
+        {
+            if (seen.insert(listed.file).second)
+            {
+                out.push_back(listed.file);
+            }
+        }
+    }
+    return out;
+}
+
 std::vector<ALDiskIncludes::Listed> ALDiskIncludes::filesUnder(const std::string& folder, const std::vector<std::string>& extensions, int depth,
-                                                               size_t entries, size_t files) const
+                                                               size_t entries, size_t files, const std::function<bool()>& stopped) const
 {
     std::vector<Listed>           out;
     const std::optional<fs::path> root = real(folder);
@@ -202,7 +337,7 @@ std::vector<ALDiskIncludes::Listed> ALDiskIncludes::filesUnder(const std::string
     fs::recursive_directory_iterator       it(*root, fs::directory_options::skip_permission_denied, ec);
     const fs::recursive_directory_iterator end;
     size_t                                 seen = 0;
-    for (; !ec && it != end && seen < entries && out.size() < files; it.increment(ec))
+    for (; !ec && it != end && seen < entries && out.size() < files && !(stopped && stopped()); it.increment(ec))
     {
         ++seen;
         const fs::directory_entry& entry = *it;
@@ -218,10 +353,7 @@ std::vector<ALDiskIncludes::Listed> ALDiskIncludes::filesUnder(const std::string
             }
             continue;
         }
-        const bool wanted = std::any_of(extensions.begin(), extensions.end(), [&leaf](const std::string& extension) {
-            return leaf.size() > extension.size() && leaf.compare(leaf.size() - extension.size(), extension.size(), extension) == 0;
-        });
-        if (kind || !wanted)
+        if (kind || extensionOf(leaf, extensions) == 0)
         {
             continue;
         }

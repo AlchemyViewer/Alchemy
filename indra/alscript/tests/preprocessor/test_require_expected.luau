@@ -1,20 +1,32 @@
 --!strict
--- Modules gathered at the top, each once, dependencies first.
+-- Modules gathered at the top, each run once, at its first require.
 
-local __modules = {}
-__modules["deep.luau"] = (function()
-return { suffix = "!" }
-end)()
-__modules["util.luau"] = (function()
+do
+    local modules = {
+        [1] = function()
 --!strict
-local deep = __modules["deep.luau"]
+local deep = require(2)
 local M = {}
 function M.greet(name: string): string
     return "hello " .. name .. deep.suffix
 end
 return M
-end)()
-local util = __modules["util.luau"]
-local deep = __modules["deep.luau"]
+        end,
+        [2] = function()
+return { suffix = "!" }
+        end,
+    }
+    local loaded = {}
+    function require(module)
+        local held = loaded[module]
+        if held == nil then
+            held = dangerouslyexecuterequiredmodule(modules[module])
+            loaded[module] = held
+        end
+        return held
+    end
+end
+local util = require(1)
+local deep = require(2)
 local s = [[require("util") CHANNEL]]
 ll.Say(0, util.greet("world") .. deep.suffix .. #s)
