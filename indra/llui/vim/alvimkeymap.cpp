@@ -2324,16 +2324,18 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
         return true;
     }
     // The operator doubled -- dd, yy, cc, >>, <<, == -- is the line, and
-    // the count more.
+    // the count more: a motion from the caret, as vim's is, to the first
+    // non-blank of the last of them. gUU leaves the caret at its start, on
+    // the line's first non-blank or before it, and 2gUU where it was.
     if (ch == op || (op == '~' && ch == '~') || (op == 'u' && ch == 'u') || (op == 'U' && ch == 'U') ||
         (op == COMMENT_OPERATOR && ch == 'c'))
     {
-        const S32 lines = countTimes(countOr(mOperatorCount), count);
-        Span      span;
-        span.linewise    = true;
-        const S32 first  = cursor(view).line;
-        const S32 last   = llmin(d.lineCount() - 1, first + lines - 1);
-        span.range       = ALTextRange(d.lineStart(first), d.lineEnd(last));
+        const S32       lines = countTimes(countOr(mOperatorCount), count);
+        Span            span;
+        span.linewise         = true;
+        const ALTextPos from  = cursor(view);
+        const S32       last  = llmin(d.lineCount() - 1, from.line + lines - 1);
+        span.range            = ALTextRange(from, ALTextPos(last, firstNonBlankColumn(d, last))).normalised();
         applyOperator(view, op, span, 1);
         finishCommand(op != 'y');
         return true;

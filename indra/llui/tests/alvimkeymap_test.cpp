@@ -4258,4 +4258,39 @@ namespace tut
         ensure_equals("dw: in -", vim->registerText('-'), std::string("foo "));
         ensure_equals("and not in 1", vim->registerText('1'), std::string());
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<155>()
+    {
+        set_test_name("gUU, guu, g~~ and gUgU with a count leave the caret where it was; without one, on the line's first non-blank, or where it was before it");
+        ALCodeEditor& e = make("abc def\nghi jkl\nmno\n");
+        e.setCaret(ALTextPos(0, 3));
+        keys("2gUgU");
+        ensure_equals("2gUgU raises two lines", flat(e.text()), std::string("ABC DEF|GHI JKL|mno|"));
+        ensure_equals("the caret where it was", caretText(), std::string("0:3"));
+        keys("gu2gu");
+        ensure_equals("gu2gu lowers them again", flat(e.text()), std::string("abc def|ghi jkl|mno|"));
+        ensure_equals("the caret still where it was", caretText(), std::string("0:3"));
+        keys("2g~~");
+        ensure_equals("2g~~ swaps them", flat(e.text()), std::string("ABC DEF|GHI JKL|mno|"));
+        ensure_equals("and leaves it too", caretText(), std::string("0:3"));
+        e.setCaret(ALTextPos(1, 5));
+        keys("2guu");
+        ensure_equals("2guu from the second line", flat(e.text()), std::string("ABC DEF|ghi jkl|mno|"));
+        ensure_equals("where it was", caretText(), std::string("1:5"));
+
+        make("   abc def\nghi\n");
+        editor->setCaret(ALTextPos(0, 5));
+        keys("gUU");
+        ensure_equals("gUU from past the indent", editor->document().line(0), std::string("   ABC DEF"));
+        ensure_equals("the caret to the line's first non-blank", caretText(), std::string("0:3"));
+        editor->setCaret(ALTextPos(0, 1));
+        keys("guu");
+        ensure_equals("guu from inside the indent", editor->document().line(0), std::string("   abc def"));
+        ensure_equals("the caret where it was", caretText(), std::string("0:1"));
+        editor->setCaret(ALTextPos(0, 7));
+        keys("g~g~");
+        ensure_equals("g~g~", editor->document().line(0), std::string("   ABC DEF"));
+        ensure_equals("the caret to the first non-blank", caretText(), std::string("0:3"));
+    }
 }
