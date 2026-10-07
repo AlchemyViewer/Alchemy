@@ -50,15 +50,18 @@ namespace
     // U+FFFD on its own, as the rest of the text reads them. A match found
     // through them begins and ends where a character does, at the byte its
     // base() is; a step stays within the bytes from `begin` to `end`, so
-    // that a walk forward lands on the end of what is searched.
+    // that a walk forward lands on the end of what is searched. They are
+    // char32_t rather than ICU's UChar32, an int: a match's results hold a
+    // std::basic_string of them, and std::char_traits is only had for the
+    // character types.
     class Characters
     {
     public:
         typedef std::bidirectional_iterator_tag iterator_category;
-        typedef UChar32                         value_type;
+        typedef char32_t                        value_type;
         typedef std::ptrdiff_t                  difference_type;
-        typedef const UChar32*                  pointer;
-        typedef UChar32                         reference;
+        typedef const char32_t*                 pointer;
+        typedef char32_t                        reference;
 
         Characters() = default;
         Characters(const char* at, const char* begin, const char* end) : mAt(at), mBegin(begin), mEnd(end) {}
@@ -66,7 +69,7 @@ namespace
         reference operator*() const
         {
             const unsigned char lead = static_cast<unsigned char>(*mAt);
-            return lead < 0x80 ? static_cast<UChar32>(lead) : static_cast<UChar32>(decoded(mAt).cp);
+            return lead < 0x80 ? static_cast<char32_t>(lead) : decoded(mAt).cp;
         }
         Characters& operator++()
         {
