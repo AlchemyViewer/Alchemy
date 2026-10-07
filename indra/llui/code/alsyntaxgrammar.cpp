@@ -1428,6 +1428,13 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
         return end_regexes.back().second.ok() ? &end_regexes.back().second : nullptr;
     };
     std::string span_end;
+    // The end looked for last, and where it was found from a place before
+    // the lexer: still the first of it while it lies ahead, and nowhere
+    // ahead where it was nowhere then. Looked for again only once it is
+    // passed or another end is wanted, so that a span's end is found once
+    // rather than again after every escape on the way to it.
+    std::string found_end;
+    size_t      found_at = std::string_view::npos;
 
     size_t pos = 0;
     while (pos < len)
@@ -1446,11 +1453,26 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
                 span_end += frame.payload;
                 span_end += end_rule.endSuffix;
             }
-            const size_t end_at = span_end.empty() ? std::string_view::npos : line.find(span_end, pos);
-            size_t       esc_at = std::string_view::npos;
+            size_t end_at = std::string_view::npos;
+            if (!span_end.empty())
+            {
+                if (span_end != found_end || (found_at != std::string_view::npos && found_at < pos))
+                {
+                    found_end = span_end;
+                    found_at  = line.find(span_end, pos);
+                }
+                end_at = found_at;
+            }
+            size_t esc_at = std::string_view::npos;
             if (current.spanEscape >= 0)
             {
-                esc_at = line.find(current.rules[current.spanEscape].text, pos);
+                // Only as far as the end: an escape past it is no business
+                // of this span's, and the rest of the line is not read for
+                // one each time a span opens.
+                const std::string&     escape_text = current.rules[current.spanEscape].text;
+                const std::string_view to_end =
+                    end_at == std::string_view::npos ? line : line.substr(0, std::min(len, end_at + escape_text.size()));
+                esc_at = to_end.find(escape_text, pos);
             }
             if (esc_at != std::string_view::npos && esc_at <= end_at)
             {

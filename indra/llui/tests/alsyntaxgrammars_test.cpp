@@ -411,6 +411,25 @@ namespace tut
         compare("slua", slua);
         compare("slua", "--[==[\n" + slua + "\n]==]");
         compare("slua", "x = [[\n" + slua + "\n]]");
+
+        // One long line of many strings, as a minified file is: some with an
+        // escaped quote, which is where their end is first found, and one
+        // of many escapes whose end is far along.
+        std::string minified = "[";
+        for (S32 i = 0; i < 300; ++i)
+        {
+            minified += "{\"k" + std::to_string(i) + "\": \"v" + std::to_string(i) + (i % 3 == 0 ? "\\\"\\n" : "") + "\", \"n\": " + std::to_string(i) + "}, ";
+        }
+        minified += "\"";
+        for (S32 i = 0; i < 200; ++i)
+        {
+            minified += "\\t";
+        }
+        minified += std::string(300, 'x') + "\"]";
+        for (const char* grammar_name : { "json", "lsl", "slua", "config" })
+        {
+            compare(grammar_name, minified);
+        }
     }
 
     template<> template<>
