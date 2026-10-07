@@ -64,6 +64,16 @@ struct ALLuauFrontend
     // "script:" and its name, a few of them kept at once.
     static constexpr const char* SCRIPT_MODULE = "script";
 
+    // The package the constants the grid's VM sets and the definitions
+    // leave out are declared under, beside the definitions, so that the
+    // symbol each is documented by begins with it. The checker knows them;
+    // completion does not offer them, as no list of the grid's offers them.
+    static constexpr const char* UNDOCUMENTED_PACKAGE = "@sl-slua-undocumented";
+    static bool undocumented(const std::optional<std::string>& symbol)
+    {
+        return symbol && symbol->rfind(UNDOCUMENTED_PACKAGE, 0) == 0;
+    }
+
     // The scripts kept, each served from memory by its module's name. What
     // one requires is already in it, put there by the preprocessor.
     struct ScriptResolver final : public Luau::FileResolver

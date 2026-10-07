@@ -73,6 +73,42 @@ namespace
     // so the two line up when hover documentation arrives.
     const char* const DEFINITIONS_PACKAGE = "@sl-slua";
 
+    // The constants the grid's VM sets that the definitions leave out. The
+    // VM makes a global of every constant in builtins.txt but TRUE and
+    // FALSE, which SLua says as true and false; lsl-definitions writes into
+    // secondlife.d.luau none of those it marks private, which is these, all
+    // numbers. A script may use them, and the converter writes them as LSL
+    // has them, so they are declared beside the definitions -- each only
+    // where the definitions do not declare it already, so that a region's
+    // definitions that come to declare one are believed over this list.
+    const char* const UNDOCUMENTED_CONSTANTS[] = {
+        "GCNP_GET_WALKABILITY",             "LEGACY_MASS_FACTOR",
+        "NAVIGATE_TO_GOAL_REACHED_DIST",    "PARCEL_FLAG_LINDEN_HOMES",
+        "PRIM_MATERIAL_DENSITY",            "PRIM_MATERIAL_FRICTION",
+        "PRIM_MATERIAL_GRAVITY_MULTIPLIER", "PRIM_MATERIAL_RESTITUTION",
+        "PSYS_SRC_OBJ_REL_MASK",            "REZ_TORQUE",
+        "SKY_ABSORPTION_CONFIG",            "SKY_DENSITY_PROFILE_COUNTS",
+        "SKY_MIE_CONFIG",                   "SKY_RAYLEIGH_CONFIG",
+    };
+
+    // Those the definitions just loaded into these globals do not declare,
+    // declared there under a package of their own; false where they did
+    // not load, which only a mistake in the text above could cause.
+    bool declareUndocumented(Luau::Frontend& frontend, Luau::GlobalTypes& globals, bool for_autocomplete)
+    {
+        std::string declared;
+        for (const char* name : UNDOCUMENTED_CONSTANTS)
+        {
+            if (!Luau::tryGetGlobalBinding(globals, name))
+            {
+                declared += llformat("declare %s: number\n", name);
+            }
+        }
+        return declared.empty() ||
+               frontend.loadDefinitionFile(globals, globals.globalScope, declared, ALLuauFrontend::UNDOCUMENTED_PACKAGE,
+                                           /*captureComments*/ false, for_autocomplete).success;
+    }
+
     // What Luau's require says of a module that returns other than one
     // value, as the run stops there: said where it is required.
     const char* const MODULE_NOT_ONE_VALUE = "This module returns [1] values; a module must return exactly one to be required";
@@ -961,6 +997,12 @@ bool ALLuauService::loadDefinitions(std::string_view source, std::string& error)
     if (!for_autocomplete.success)
     {
         error = "the definitions did not load for autocomplete";
+        return false;
+    }
+    if (!declareUndocumented(*frontend, frontend->globals, false) ||
+        !declareUndocumented(*frontend, frontend->globalsForAutocomplete, true))
+    {
+        error = "the constants the definitions leave out did not load";
         return false;
     }
     Luau::freeze(frontend->globals.globalTypes);

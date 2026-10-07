@@ -372,6 +372,13 @@ std::vector<ALScriptCompletion> ALLuauCompletion::answer(const Luau::Autocomplet
         {
             continue;
         }
+        // A constant the grid's lists leave out: known, not offered. A
+        // script's own of the same name has no documentation symbol, and
+        // is offered.
+        if (entry.kind == Luau::AutocompleteEntryKind::Binding && ALLuauFrontend::undocumented(entry.documentationSymbol))
+        {
+            continue;
+        }
         ALScriptCompletion completion;
         completion.text       = name;
         completion.deprecated = entry.deprecated;

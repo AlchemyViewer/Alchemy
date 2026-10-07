@@ -102,7 +102,7 @@ namespace tut
         }
     };
 
-    typedef test_group<alluauservice_data> alluauservice_group;
+    typedef test_group<alluauservice_data, 100> alluauservice_group;
     typedef alluauservice_group::object    alluauservice_object;
     alluauservice_group                    alluauservice_instance("alluauservice");
 
@@ -1835,5 +1835,113 @@ namespace tut
         compound = told(errors, "SlCompoundAssign");
         ensure("and the studio's own: " + said(errors), compound && compound->severity == ALScriptProblem::Severity::Error);
         service.setDocument("");
+    }
+
+    // The constants the grid's VM sets from builtins.txt that the
+    // definitions leave out, as lsl-definitions marks them private.
+    const char* const UNDOCUMENTED_CONSTANTS[] = {
+        "GCNP_GET_WALKABILITY",             "LEGACY_MASS_FACTOR",
+        "NAVIGATE_TO_GOAL_REACHED_DIST",    "PARCEL_FLAG_LINDEN_HOMES",
+        "PRIM_MATERIAL_DENSITY",            "PRIM_MATERIAL_FRICTION",
+        "PRIM_MATERIAL_GRAVITY_MULTIPLIER", "PRIM_MATERIAL_RESTITUTION",
+        "PSYS_SRC_OBJ_REL_MASK",            "REZ_TORQUE",
+        "SKY_ABSORPTION_CONFIG",            "SKY_DENSITY_PROFILE_COUNTS",
+        "SKY_MIE_CONFIG",                   "SKY_RAYLEIGH_CONFIG",
+    };
+
+    // Whether the checker or the lint called the name an unknown global,
+    // by the mode the script is in.
+    static bool unknownGlobal(const ALScriptProblems& problems, const std::string& name)
+    {
+        for (const ALScriptProblem& p : problems)
+        {
+            if ((p.key == "LuauUnknownGlobal" || p.key == "LuauUnknownGlobalAssign" || p.key == "LuauLintUnknownGlobal" || p.key == "LuauLintUnknownGlobalAssign") &&
+                p.args.size() == 1 && p.args[0] == name)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    template<> template<>
+    void alluauservice_object::test<71>()
+    {
+        set_test_name("the constants the grid's VM sets and the definitions leave out are known, as numbers: none an unknown global, in either mode");
+        ensure("definitions loaded: " + error, loaded);
+        std::string read   = "print(";
+        std::string summed = "--!strict\nlocal total: number = 0";
+        for (const char* name : UNDOCUMENTED_CONSTANTS)
+        {
+            read   += std::string(read.size() > 6 ? ", " : "") + name;
+            summed += std::string(" + ") + name;
+        }
+        read   += ")\n";
+        summed += "\nprint(total)\n";
+        ALScriptProblems problems = service.check(read);
+        for (const char* name : UNDOCUMENTED_CONSTANTS)
+        {
+            ensure(std::string("known: ") + name + "\n" + said(problems), !unknownGlobal(problems, name));
+        }
+        ensure_equals("no errors: " + said(problems), alluauservice_data::errors(problems), size_t(0));
+        problems = service.check(summed);
+        ensure_equals("each a number, strictly: " + said(problems), alluauservice_data::errors(problems), size_t(0));
+    }
+
+    template<> template<>
+    void alluauservice_object::test<72>()
+    {
+        set_test_name("TRUE and FALSE are still unknown globals: the VM sets every builtins.txt constant but those two, which SLua says as true and false");
+        ensure("definitions loaded: " + error, loaded);
+        const ALScriptProblems problems = service.check("print(PRIM_MATERIAL_DENSITY, TRUE, FALSE)\n");
+        ensure("TRUE unknown: " + said(problems), unknownGlobal(problems, "TRUE"));
+        ensure("FALSE unknown: " + said(problems), unknownGlobal(problems, "FALSE"));
+        ensure("the constant beside them known: " + said(problems), !unknownGlobal(problems, "PRIM_MATERIAL_DENSITY"));
+    }
+
+    template<> template<>
+    void alluauservice_object::test<73>()
+    {
+        set_test_name("completion does not offer the undocumented constants, as the grid's own lists do not, but offers the documented ones beside them and a script's own of the same name");
+        ensure("definitions loaded: " + error, loaded);
+        std::string script = "print(PRIM_MATERIAL_)\n";
+        std::vector<ALScriptCompletion> found = service.complete(script, 0, 20);
+        ensure("a documented one offered", alluauservice_data::offers(found, "PRIM_MATERIAL_FLESH"));
+        ensure("an undocumented one not", !alluauservice_data::offers(found, "PRIM_MATERIAL_DENSITY"));
+        script = "print(SKY_)\n";
+        found  = service.complete(script, 0, 10);
+        ensure("nor its kin", !alluauservice_data::offers(found, "SKY_MIE_CONFIG") && !alluauservice_data::offers(found, "SKY_RAYLEIGH_CONFIG"));
+        script = "local REZ_TORQUE = 1\nprint(REZ_)\n";
+        found  = service.complete(script, 1, 10);
+        ensure("a script's own of the name offered", alluauservice_data::offers(found, "REZ_TORQUE"));
+    }
+
+    template<> template<>
+    void alluauservice_object::test<74>()
+    {
+        set_test_name("where the definitions declare one of the undocumented constants themselves, theirs stands, and the rest are still known");
+        ALLuauService own;
+        std::string   why;
+        own.setNewSolver(newSolver, why);
+        ensure("loads: " + why, own.loadDefinitions(definitions + "\ndeclare REZ_TORQUE: string\n", why));
+        const ALScriptProblems problems = own.check("--!strict\nlocal s: string = REZ_TORQUE\nlocal n: number = SKY_MIE_CONFIG\nprint(s, n)\n");
+        ensure_equals("theirs, a string; ours, a number: " + said(problems), alluauservice_data::errors(problems), size_t(0));
+    }
+
+    template<> template<>
+    void alluauservice_object::test<75>()
+    {
+        set_test_name("the undocumented constants come back with the definitions when the solver changes, and hover says a number");
+        ensure("definitions loaded: " + error, loaded);
+        std::string why;
+        ensure("the other solver: " + why, service.setNewSolver(!newSolver, why));
+        ALScriptProblems problems = service.check("print(REZ_TORQUE)\n");
+        ensure("known there: " + said(problems), !unknownGlobal(problems, "REZ_TORQUE"));
+        ensure("and back: " + why, service.setNewSolver(newSolver, why));
+        problems = service.check("print(REZ_TORQUE)\n");
+        ensure("known again: " + said(problems), !unknownGlobal(problems, "REZ_TORQUE"));
+        const ALScriptHover hover = service.hover("print(REZ_TORQUE)\n", 0, 8);
+        ensure("hover finds it", hover.found);
+        ensure("a number: " + hover.label, hover.label.find("number") != std::string::npos);
     }
 }
