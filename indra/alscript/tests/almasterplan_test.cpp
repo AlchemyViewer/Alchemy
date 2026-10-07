@@ -29,6 +29,7 @@
 #include "../test/lltut.h"
 
 #include <string>
+#include <vector>
 
 namespace tut
 {
@@ -122,5 +123,40 @@ namespace tut
             ensure_equals(name, almasterplan_data::nameOf(ALMasterPlan::decide(row.kind, row.moved, row.same, row.unchanged, row.skip)),
                           almasterplan_data::nameOf(row.expected));
         }
+    }
+
+    template<> template<>
+    void almasterplan_object::test<2>()
+    {
+        set_test_name("an include's users are asked about over the count, or across two objects; never with none changing");
+        ensure("none changing, nothing to ask", !ALMasterPlan::askFirst(0, 0, 8));
+        ensure("one in one object", !ALMasterPlan::askFirst(1, 1, 8));
+        ensure("exactly the count is not over it", !ALMasterPlan::askFirst(8, 1, 8));
+        ensure("one past it is", ALMasterPlan::askFirst(9, 1, 8));
+        ensure("many in one object", ALMasterPlan::askFirst(40, 1, 8));
+        ensure("two in two objects", ALMasterPlan::askFirst(2, 2, 8));
+        ensure("a count of none asks for one", ALMasterPlan::askFirst(1, 1, 0));
+        ensure("and not for none", !ALMasterPlan::askFirst(0, 1, 0));
+        ensure("objects counted for nothing changing ask nothing", !ALMasterPlan::askFirst(0, 3, 8));
+    }
+
+    template<> template<>
+    void almasterplan_object::test<3>()
+    {
+        set_test_name("the objects scripts are in, each once, the inventory one of them");
+        const LLUUID door("00000001-0000-4000-8000-000000000000");
+        const LLUUID lamp("00000002-0000-4000-8000-000000000000");
+        ensure_equals("none", ALMasterPlan::objectsOf({}), size_t(0));
+        ensure_equals("one script", ALMasterPlan::objectsOf({ door }), size_t(1));
+        ensure_equals("many scripts in one object", ALMasterPlan::objectsOf({ door, door, door, door, door }), size_t(1));
+        ensure_equals("the inventory once", ALMasterPlan::objectsOf({ LLUUID::null, LLUUID::null }), size_t(1));
+        ensure_equals("and as one beside the others", ALMasterPlan::objectsOf({ door, LLUUID::null, lamp, door, LLUUID::null }), size_t(3));
+
+        // Twenty scripts in one object do not ask until past the count;
+        // two in two objects do at once.
+        std::vector<LLUUID> one(20, door);
+        ensure("twenty in one object, over eight", ALMasterPlan::askFirst(one.size(), ALMasterPlan::objectsOf(one), 8));
+        ensure("eight in one object, not", !ALMasterPlan::askFirst(8, ALMasterPlan::objectsOf(std::vector<LLUUID>(8, door)), 8));
+        ensure("two in the inventory and an object", ALMasterPlan::askFirst(2, ALMasterPlan::objectsOf({ LLUUID::null, lamp }), 8));
     }
 }

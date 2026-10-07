@@ -26,6 +26,8 @@
 
 #include "almasterplan.h"
 
+#include <boost/unordered/unordered_flat_set.hpp>
+
 // static
 ALMasterPlan::Do ALMasterPlan::decide(Send kind, bool world_moved, bool world_same, bool unchanged, bool skip_unchanged)
 {
@@ -49,4 +51,16 @@ ALMasterPlan::Do ALMasterPlan::decide(Send kind, bool world_moved, bool world_sa
     // The world as we left it: nothing to send where what would go up is
     // what went up, or what the world holds already.
     return skip_unchanged && (unchanged || world_same) ? Do::Skip : Do::Send;
+}
+
+// static
+bool ALMasterPlan::askFirst(size_t changing, size_t objects, size_t ask_over)
+{
+    return changing > 0 && (changing > ask_over || objects >= 2);
+}
+
+// static
+size_t ALMasterPlan::objectsOf(const std::vector<LLUUID>& objects)
+{
+    return boost::unordered_flat_set<LLUUID>(objects.begin(), objects.end()).size();
 }

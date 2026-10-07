@@ -24,7 +24,10 @@
 
 #pragma once
 
+#include "lluuid.h"
 #include "stdtypes.h"
+
+#include <vector>
 
 // Whether a linked script is sent, and how, as a small table: the kind of
 // send, against whether the world changed since the link's base, whether
@@ -68,4 +71,15 @@ struct ALMasterPlan
     // go up. unchanged: what would go up hashes as the link's last hash.
     // skip_unchanged: the scripter's setting, on unless they turn it off.
     static Do decide(Send kind, bool world_moved, bool world_same, bool unchanged, bool skip_unchanged);
+
+    // Whether the scripter is asked once before an include's users go up
+    // again: where more than `ask_over` scripts would change
+    // (ALScriptMastersAskOver), or they are in two objects or more, the
+    // agent's own inventory counted as one. Only the scripts that would
+    // change are counted, those whose text going up is what went up last
+    // left out; with none, there is nothing to ask.
+    static bool askFirst(size_t changing, size_t objects, size_t ask_over);
+    // How many objects the scripts are in, by the object of each: the null
+    // key, the agent's inventory, counted once like any other.
+    static size_t objectsOf(const std::vector<LLUUID>& objects);
 };
