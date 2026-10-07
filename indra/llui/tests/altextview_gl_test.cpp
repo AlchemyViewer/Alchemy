@@ -1260,4 +1260,56 @@ namespace tut
                every == one);
         editor->die();
     }
+
+    // A selection that goes on past a line's end is drawn a little past the
+    // line's last glyph, as a match that does is: as far however far in the
+    // text's first line starts.
+    template<> template<>
+    void altextview_gl_object::test<18>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "view";
+        p.rect         = LLRect(0, H, W, 0);
+        p.default_text = "MMMM\nMMMM\nMMMM";
+        // The skin's colours are not loaded here: the text's is given, on
+        // black.
+        p.text_color   = LLUIColor(LLColor4::white);
+        p.bg_visible   = false;
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        view->setSelectionColor(LLUIColor(LLColor4(0.f, 0.f, 1.f, 1.f)));
+        // The first line in from the edge, as a log's are.
+        view->layout().setIndentProvider([](S32 line) {
+            ALTextLayout::Indent indent;
+            indent.first = line == 0 ? 60.f : 0.f;
+            return indent;
+        });
+        view->setSelection(ALTextRange(ALTextPos(1, 2), ALTextPos(2, 0)));
+        gl().clearFramebuffer();
+        glEnable(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+        view->draw();
+        gGL.flush();
+        glDisable(GL_BLEND);
+        glFinish();
+        const std::vector<U8> rgba = ll_test::readFramebufferRGBA(W, H);
+        // Across the middle of the second line's row, from its last glyph
+        // on: how many columns the band reaches.
+        const LLRect text = view->textRect();
+        const S32    y    = text.mTop - (view->layout().lineTop(1) - view->scrollY()) - view->layout().rowHeight() / 2;
+        const S32    end  = text.mLeft + static_cast<S32>(std::ceil(view->layout().line(1).width));
+        S32          past = 0;
+        for (S32 x = end; x < W; ++x)
+        {
+            past += rgba[(static_cast<size_t>(y) * W + x) * 4 + 2] > 128 ? 1 : 0;
+        }
+        ensure("drawn past the line's end: " + std::to_string(past), past > 0);
+        ensure("a little, not as far again as the first line is in: " + std::to_string(past), past <= 10);
+        view->die();
+    }
 }

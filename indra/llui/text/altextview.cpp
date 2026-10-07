@@ -78,6 +78,9 @@ namespace
 
     const S32 H_MARGIN              = 16;
     const F32 CARET_MARGIN          = 8.f;
+    // How far past a line's last glyph a stretch that goes on past its end
+    // is drawn: the line's break, selected or found.
+    const F32 LINE_END_WIDTH        = 6.f;
 
     // Whether a command changes the text, which a read-only view refuses.
     // Every command is named, with no default, so that one added to the
@@ -4849,7 +4852,7 @@ bool ALTextView::spanOnRow(S32 line, S32 row, const ALTextRange& range_in, F32& 
         return false;
     }
     x0 = mLayout.xOf(line, lo);
-    x1 = hi > length ? r.width + 6.f : (hi >= r.end && !last_row ? r.width : mLayout.xOf(line, hi));
+    x1 = hi > length ? r.width + LINE_END_WIDTH : (hi >= r.end && !last_row ? r.width : mLayout.xOf(line, hi));
     if (x1 <= x0)
     {
         x1 = x0 + 4.f;
@@ -5217,8 +5220,6 @@ void ALTextView::drawRows(const LLRect& text)
     const bool caret_on    = show_caret && (!mCaretBlink || blink < BLINK_DELAY || (static_cast<S32>(blink * 2.f) & 1));
     const S32  in_gap      = caretGap();
     const ALTextRange sel  = selection().normalised();
-    const F32  space       = mLayout.xOf(0, 0) + 6.f;  // what a selected line end is drawn as
-
     const F32  left        = static_cast<F32>(text.mLeft) - mScrollX;
 
     // The rows in sight, walked in three passes -- what is behind the
@@ -5241,27 +5242,14 @@ void ALTextView::drawRows(const LLRect& text)
     gGL.begin(LLRender::TRIANGLES);
     for (const RowSeen& seen : mRowsSeen)
     {
-        const S32                 line   = seen.line;
-        const ALTextLayout::Line& laid   = mLayout.line(line);
-        const ALTextLayout::Row&  row    = laid.rows[static_cast<size_t>(seen.row)];
-        const S32                 length = mDocument.lineLength(line);
-        // A selection's band on the row, in order, from its start or the
-        // row's to its end or the row's; past the line's end where it goes
-        // on to the next.
+        const S32                line = seen.line;
+        const ALTextLayout::Row& row  = mLayout.line(line).rows[static_cast<size_t>(seen.row)];
+        // A selection's band on the row: its span there, as a match's is,
+        // past the line's end where it goes on to the next.
         const auto band = [&](const ALTextRange& range) {
-            if (range.empty() || line < range.begin.line || range.end.line < line)
+            F32 x0, x1;
+            if (!range.empty() && spanOnRow(line, seen.row, range, x0, x1))
             {
-                return;
-            }
-            const S32  sel_begin = range.begin.line < line ? 0 : range.begin.column;
-            const S32  sel_end   = range.end.line > line ? length + 1 : range.end.column;
-            const S32  lo        = llmax(sel_begin, row.begin);
-            const bool last_row  = (static_cast<size_t>(seen.row) + 1 == laid.rows.size());
-            const S32  hi        = llmin(sel_end, last_row ? length + 1 : row.end);
-            if (lo < hi)
-            {
-                const F32 x0 = mLayout.xOf(line, lo);
-                const F32 x1 = hi > length ? row.width + space : (hi >= row.end && !last_row ? row.width : mLayout.xOf(line, hi));
                 gl_rect_2d_in_batch(static_cast<S32>(left + x0), seen.rowScreenTop, static_cast<S32>(left + x1), seen.rowScreenTop - row.height,
                                     sel_color);
             }
