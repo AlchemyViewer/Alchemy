@@ -80,6 +80,10 @@
 
 #include <openssl/rand.h>
 
+#if LL_WINDOWS
+#include <aclapi.h>
+#endif
+
 namespace
 {
     // Per-operation timeouts (seconds) for coroutine-based async RPC handlers.
@@ -124,27 +128,6 @@ namespace
             throw LLJSONRPCConnection::RequestTimeoutError(timeout_msg);
         }
         return result;
-    }
-
-    // Returns the value of NV pair key on obj as a string, or empty if
-    // obj / pair / string is null or empty. NUL-safe.
-    std::string nv_string(LLViewerObject* obj, const char* key)
-    {
-        if (!obj)
-        {
-            return std::string();
-        }
-        LLNameValue* nv = obj->getNVPair(key);
-        if (!nv)
-        {
-            return std::string();
-        }
-        const char* s = nv->getString();
-        if (!s || s[0] == '\0')
-        {
-            return std::string();
-        }
-        return std::string(s);
     }
 
     LLSD object_id_command_params()
@@ -549,7 +532,10 @@ void LLScriptEditorWSServer::onStopped()
 
     LL_INFOS("ScriptEditorWS") << "Script editor WebSocket server stopped, all state cleaned up" << LL_ENDL;
 
-    LLNotificationsUtil::add("ExternalEditorServerStopped");
+    if (!LLApp::isExiting())
+    {
+        LLNotificationsUtil::add("ExternalEditorServerStopped");
+    }
 }
 
 void LLScriptEditorWSServer::onConnectionOpened(const LLWebsocketMgr::WSConnection::ptr_t& connection)
@@ -2666,30 +2652,6 @@ void LLScriptEditorWSServer::notifyAll(const std::string& method, const LLSD& pa
 }
 
 
-// static
-std::string LLScriptEditorWSServer::getPrimName(LLViewerObject* obj)
-{
-    std::string name = nv_string(obj, "Name");
-    if (!name.empty())
-    {
-        return name;
-    }
-
-    if (!obj)
-    {
-        return std::string();
-    }
-
-    LLSelectNode* node = LLSelectMgr::instance().getSelection()->findNode(obj);
-    if (node && !node->mName.empty())
-    {
-        return node->mName;
-    }
-
-    // Never emit an empty prim/object name to downstream tooling.
-    return obj->getID().asString();
-}
-
 bool LLScriptEditorWSServer::publishObject(const LLUUID& object_id)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
@@ -2721,12 +2683,8 @@ bool LLScriptEditorWSServer::publishObject(const LLUUID& object_id)
     // Collect root + all children
     std::vector<LLViewerObject*> prims = LLPublishedObjectMgr::linksetOf(root);
 
-    // Request object properties for each prim in the linkset (root + children),
-    // matching the hover path so name/description metadata is refreshed.
-    for (LLViewerObject* prim : prims)
-    {
-        LLSelectMgr::instance().requestObjectPropertiesFamily(prim);
-    }
+    // The sim coalesces properties-family requests to the root, so one request covers the linkset.
+    LLSelectMgr::instance().requestObjectPropertiesFamily(root);
 
     // Set up a PendingPublish to coordinate inventory loading across all prims.
     // We register a listener and call requestInventory() on every prim.
@@ -2782,6 +2740,12 @@ void LLScriptEditorWSServer::onObjectPropertyChanged(
     const LLUUID& prim_id, const std::string& name, const std::string& desc, S16 inventory_serial)
 {
     mPublishedObjectManager.onObjectPropertyChanged(prim_id, name, desc, inventory_serial);
+}
+
+void LLScriptEditorWSServer::onObjectPermissionsReceived(
+    const LLUUID& prim_id, const LLUUID& owner_id, U32 owner_mask, U32 next_owner_mask)
+{
+    mPublishedObjectManager.onObjectPermissionsReceived(prim_id, owner_id, owner_mask, next_owner_mask);
 }
 
 void LLScriptEditorWSServer::unpublishObject(const LLUUID& object_id, const std::string& reason)
@@ -3040,23 +3004,111 @@ LLScriptEditorWSConnection::Challenge LLScriptEditorWSConnection::writeChallenge
     // folder can be everyone's.
     const std::string file = LLFile::tmpdir() + "sl_script_challenge_" + LLUUID::generateNewID().asString() + ".tmp";
     const std::string text = challenge.mSecret.asString();
-    std::error_code   ec;
-    LLFile            out(file, LLFile::out | LLFile::noreplace, ec, 0600);
-    if (ec)
-    {
-        // Whatever is there by that name is somebody else's, and stays.
-        LL_WARNS("ScriptEditorWS") << "Unable to make challenge file " << file << ": " << ec.message() << LL_ENDL;
-        return {};
-    }
-    const bool written = out.write(text.data(), static_cast<S64>(text.size()), ec) == static_cast<S64>(text.size()) && !ec;
-    if (out.close(ec) != 0 || !written)
+    if (!writeUserOnlyFile(file, text))
     {
         LL_WARNS("ScriptEditorWS") << "Unable to write challenge file " << file << LL_ENDL;
-        LLFile::remove(file);
         return {};
     }
 
     challenge.mFile = file;
     return challenge;
+}
+
+// static
+bool LLScriptEditorWSConnection::writeUserOnlyFile(const std::string& file, const std::string& text)
+{
+#if LL_WINDOWS
+    // LLFile takes its permission bits for a read-only flag at most here,
+    // never an ACL, so 0600 would leave the file to whatever its folder
+    // grants. Made with an ACL of its own: the user's, and only theirs.
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+    {
+        LL_WARNS("ScriptEditorWS") << "Unable to open the process token for the challenge file's ACL" << LL_ENDL;
+        return false;
+    }
+    DWORD needed = 0;
+    GetTokenInformation(token, TokenUser, nullptr, 0, &needed);
+    std::vector<BYTE> user_info(needed);
+    const bool got_user = needed != 0 && GetTokenInformation(token, TokenUser, user_info.data(), needed, &needed);
+    CloseHandle(token);
+    if (!got_user)
+    {
+        LL_WARNS("ScriptEditorWS") << "Unable to read the current user's SID for the challenge file's ACL" << LL_ENDL;
+        return false;
+    }
+    PSID user_sid = reinterpret_cast<PTOKEN_USER>(user_info.data())->User.Sid;
+
+    EXPLICIT_ACCESSW ea     = {};
+    ea.grfAccessPermissions = GENERIC_READ | GENERIC_WRITE | DELETE;
+    ea.grfAccessMode        = SET_ACCESS;
+    ea.grfInheritance       = NO_INHERITANCE;
+    ea.Trustee.TrusteeForm  = TRUSTEE_IS_SID;
+    ea.Trustee.TrusteeType  = TRUSTEE_IS_USER;
+    ea.Trustee.ptstrName    = reinterpret_cast<LPWSTR>(user_sid);
+
+    PACL dacl = nullptr;
+    if (SetEntriesInAclW(1, &ea, nullptr, &dacl) != ERROR_SUCCESS)
+    {
+        LL_WARNS("ScriptEditorWS") << "Unable to build an ACL for the challenge file" << LL_ENDL;
+        return false;
+    }
+
+    // Protected: a new file's ACL takes in what its folder hands down
+    // unless it says not to, and a temp folder can hand everyone read.
+    SECURITY_DESCRIPTOR sd;
+    const bool sd_ok = InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION) &&
+                       SetSecurityDescriptorDacl(&sd, TRUE, dacl, FALSE) &&
+                       SetSecurityDescriptorControl(&sd, SE_DACL_PROTECTED, SE_DACL_PROTECTED);
+    if (!sd_ok)
+    {
+        LL_WARNS("ScriptEditorWS") << "Unable to build a security descriptor for the challenge file" << LL_ENDL;
+        LocalFree(dacl);
+        return false;
+    }
+
+    SECURITY_ATTRIBUTES sa  = {};
+    sa.nLength              = sizeof(sa);
+    sa.lpSecurityDescriptor = &sd;
+    sa.bInheritHandle       = FALSE;
+
+    // CREATE_NEW, as LLFile::noreplace: whatever is there by that name is
+    // somebody else's, and stays.
+    const std::wstring wfile = ll_convert<std::wstring>(file);
+    HANDLE      handle = CreateFileW(wfile.c_str(), GENERIC_WRITE, 0, &sa, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    const DWORD error  = GetLastError();
+    LocalFree(dacl);
+    if (handle == INVALID_HANDLE_VALUE)
+    {
+        LL_WARNS("ScriptEditorWS") << "Unable to make challenge file " << file << ": error " << error << LL_ENDL;
+        return false;
+    }
+    DWORD      written = 0;
+    const bool ok      = WriteFile(handle, text.data(), static_cast<DWORD>(text.size()), &written, nullptr) && written == text.size();
+    const bool closed  = CloseHandle(handle) != FALSE;
+    if (!ok || !closed)
+    {
+        LLFile::remove(file);
+        return false;
+    }
+    return true;
+#else
+    std::error_code ec;
+    LLFile          out(file, LLFile::out | LLFile::noreplace, ec, 0600);
+    if (ec)
+    {
+        // Whatever is there by that name is somebody else's, and stays.
+        LL_WARNS("ScriptEditorWS") << "Unable to make challenge file " << file << ": " << ec.message() << LL_ENDL;
+        return false;
+    }
+    const bool written = out.write(text.data(), static_cast<S64>(text.size()), ec) == static_cast<S64>(text.size()) && !ec;
+    const bool closed  = out.close(ec) == 0;
+    if (!written || !closed)
+    {
+        LLFile::remove(file);
+        return false;
+    }
+    return true;
+#endif
 }
 

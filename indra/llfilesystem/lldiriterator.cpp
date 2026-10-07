@@ -69,7 +69,7 @@ LLDirIterator::Impl::Impl(const std::filesystem::path& dir_path, const std::stri
 
     if (!is_dir)
     {
-        LL_WARNS() << "Invalid path: \"" << dir_path.string() << "\"" << LL_ENDL;
+        LL_WARNS() << "Invalid path: \"" << fsyspath(dir_path).string() << "\"" << LL_ENDL;
         return;
     }
 

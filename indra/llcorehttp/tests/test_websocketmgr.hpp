@@ -40,7 +40,9 @@
 #include <functional>
 #include <memory>
 #include <random>
+#include <stdexcept>
 #include <thread>
+#include <tuple>
 
 namespace
 {
@@ -365,6 +367,23 @@ namespace
                     thread << std::this_thread::get_id();
                     result["thread"] = thread.str();
                     return result;
+                });
+            // What a handler says it was asked wrong is the client's to
+            // hear; what broke in it is not.
+            connection->registerMethod("test.throw",
+                [](const std::string&, const LLSD&, const LLSD&) -> LLSD
+                {
+                    throw std::runtime_error("C:\\Users\\someone\\secret");
+                });
+            connection->registerAsyncMethod("test.throw.async",
+                [](const std::string&, const LLSD&, const LLSD&) -> LLSD
+                {
+                    throw std::runtime_error("C:\\Users\\someone\\secret");
+                });
+            connection->registerMethod("test.refuse",
+                [](const std::string&, const LLSD&, const LLSD&) -> LLSD
+                {
+                    throw LLJSONRPCConnection::InvalidParams("no such script");
                 });
         }
     };
@@ -1009,6 +1028,51 @@ namespace tut
         ensure_equals("and answered as not JSON", parse_error["error"]["code"].asInteger(), LLSD::Integer(-32700));
         ensure("the connection open after it", open_after);
         ensure("and closed by the one past it", closed);
+    }
+
+    template<> template<>
+    void WebsocketMgrTestObjectType::test<16>()
+    {
+        set_test_name("a handler that throws is answered as an internal error saying nothing of what it threw; one that refuses says why");
+
+        const U16 port = unusedPort();
+        if (!port)
+        {
+            skip("no port free to listen on");
+        }
+        LL::WorkQueue     mainloop("mainloop");
+        const std::string name    = "throw_test";
+        LLWebsocketMgr&   manager = LLWebsocketMgr::instance();
+        ensure("added", manager.addServer(std::make_shared<TestRPCServer>(name, port, true)));
+        ensure("started", manager.startServer(name));
+
+        TestClient client;
+        const bool opened = client.open(port) == 101;
+        auto       pump   = [&]() { mainloop.runPending(); };
+        auto       ask    = [&](const std::string& method, LLSD& answer)
+        {
+            return opened && client.send(R"({"jsonrpc":"2.0","id":"x","method":")" + method + R"("})") &&
+                   LlsdFromJsonString(client.receive(pump).text, answer);
+        };
+        LLSD       sync_answer, async_answer, refusal;
+        const bool read_sync    = ask("test.throw", sync_answer);
+        const bool read_async   = ask("test.throw.async", async_answer);
+        const bool read_refusal = ask("test.refuse", refusal);
+        client.close();
+        manager.removeServer(name);
+        mainloop.close();
+
+        ensure("opened", opened);
+        for (const auto& [what, read, answer] : { std::tuple{ "run where it came in", read_sync, sync_answer },
+                                                  std::tuple{ "run on the main thread", read_async, async_answer } })
+        {
+            ensure(std::string(what) + ": answered", read);
+            ensure_equals(std::string(what) + ": as an internal error", answer["error"]["code"].asInteger(), LLSD::Integer(-32603));
+            ensure_equals(std::string(what) + ": and nothing more", answer["error"]["message"].asString(), std::string("Internal error"));
+        }
+        ensure("the refusal answered", read_refusal);
+        ensure_equals("as invalid params", refusal["error"]["code"].asInteger(), LLSD::Integer(-32602));
+        ensure_contains("saying why", refusal["error"]["message"].asString(), "no such script");
     }
 }
 

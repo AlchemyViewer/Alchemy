@@ -171,8 +171,9 @@ void LLJSONRPCConnection::onMessage(const std::string& message)
     }
     catch (const std::exception& e)
     {
+        // What went wrong is the log's to say, not the peer's to hear.
         LL_WARNS("JSONRPC") << "Exception processing JSON-RPC message: " << e.what() << LL_ENDL;
-        sendError(LLSD(), InternalError(e.what()));
+        sendError(LLSD(), InternalError());
     }
 }
 
@@ -324,9 +325,11 @@ void LLJSONRPCConnection::processRequest(const LLSD& request, const std::string*
                         }
                         catch (const std::exception& e)
                         {
+                            LL_WARNS("JSONRPC") << "Exception in async method " << method
+                                                << ": " << e.what() << LL_ENDL;
                             if (conn->isConnected())
                             {
-                                conn->sendError(id, InternalError(e.what()));
+                                conn->sendError(id, InternalError());
                             }
                             else
                             {
@@ -377,7 +380,9 @@ void LLJSONRPCConnection::processRequest(const LLSD& request, const std::string*
     {
         if (!is_notification)
         {
-            sendError(id, InternalError(e.what()));
+            LL_WARNS("JSONRPC") << "Exception in handler for " << method
+                               << ": " << e.what() << LL_ENDL;
+            sendError(id, InternalError());
         }
         else
         {
