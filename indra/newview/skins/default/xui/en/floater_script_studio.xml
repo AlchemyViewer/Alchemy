@@ -667,6 +667,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="MasterGaveWay">[NAME] is linked to [FILE] now: its tab gave way to the file's, where it is changed from here on.</floater.string>
     <floater.string name="MasterLinkedUnsaved">[NAME] is linked to [FILE] now, and what was typed here is not in the file: copy it into the file to keep it, or Unlink to save it from here.</floater.string>
     <floater.string name="MasterEditedOutside">[NAME] is linked to [FILE]: the file is opened in the external editor in its place.</floater.string>
+    <floater.string name="MasterNotRead">[FILE] could not be read to compare with [NAME].</floater.string>
     <floater.string name="LinkHeadListing">Asking what [OBJECTS] holds...</floater.string>
     <floater.string name="LinkHeadReading">Reading the scripts of [OBJECTS]: [DONE] of [COUNT]...</floater.string>
     <floater.string name="LinkHeadMatchingA">Looking on disk for the file of 1 script...</floater.string>
@@ -736,12 +737,17 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="TabMastersTipB">The master of [COUNT] scripts in-world: saving it sends them.</floater.string>
     <floater.string name="CompareMasterFile">File</floater.string>
     <floater.string name="CompareMasterWorld">[NAME] in-world</floater.string>
+    <floater.string name="CompareMasterOnDisk">[FILE] on disk</floater.string>
     <floater.string name="NoticeMasterLink">Link</floater.string>
     <floater.string name="NoticeMasterLinkTip">Link this script to the file it names: from then on it is changed through the file</floater.string>
     <floater.string name="NoticeMasterSend">Send File</floater.string>
     <floater.string name="NoticeMasterSendTip">Send the file on disk to the script now, keeping what the script holds in History</floater.string>
     <floater.string name="NoticeMasterUnlink">Unlink</floater.string>
     <floater.string name="NoticeMasterUnlinkTip">Let the script go from this file; neither is changed</floater.string>
+    <floater.string name="NoticeMasterCompareFile">Compare with File</floater.string>
+    <floater.string name="NoticeMasterCompareFileTip">Show the file on disk beside what was typed here, with changes marked</floater.string>
+    <floater.string name="NoticeMasterOpenFile">Open File</floater.string>
+    <floater.string name="NoticeMasterOpenFileTip">Open the file in a tab of its own, keeping this one, to copy what was typed here into it</floater.string>
     <floater.string name="NoticeMasterFind">Find File...</floater.string>
     <floater.string name="NoticeMasterFindTip">Pick where the file is now, keeping the link</floater.string>
     <floater.string name="ActionMasterLink">Link</floater.string>
@@ -750,6 +756,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ActionMasterSendTip">Send the file on disk to the script now</floater.string>
     <floater.string name="ActionMasterCompare">Compare</floater.string>
     <floater.string name="ActionMasterCompareTip">Compare [NAME] with what the script holds in-world</floater.string>
+    <floater.string name="ActionMasterCompareFile">Compare with file</floater.string>
+    <floater.string name="ActionMasterCompareFileTip">Compare what was typed in [NAME] with its file on disk</floater.string>
+    <floater.string name="ActionMasterOpenFile">Open file</floater.string>
+    <floater.string name="ActionMasterOpenFileTip">Open the file [NAME] is linked to, keeping its tab</floater.string>
     <floater.string name="ActionMasterUnlink">Unlink</floater.string>
     <floater.string name="ActionMasterUnlinkTip">Let the script go from [NAME]</floater.string>
     <floater.string name="ActionMasterFind">Find file</floater.string>

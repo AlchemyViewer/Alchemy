@@ -170,8 +170,10 @@ private:
     void giveWay();
     // The tab of a master file, where one is open.
     Doc* masterTab(const std::string& master) const;
-    // The world's text of a script beside its master's, in the master's tab.
+    // The world's text of a script beside its master's, in the master's tab;
+    // and its master on disk beside what was typed in the item's.
     void compareWithWorld(Doc& doc, const ALScriptRef& ref);
+    void compareWithFile(Doc& doc, const ALScriptRef& ref);
 
     ALScriptStudioServices&            mServices;
     ALScriptStudioAnalysis&            mAnalysis;

@@ -477,6 +477,23 @@ void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
     {
         compareWithWorld(doc, ref);
     }
+    else if (action == "master_compare_file" && doc.file.empty() && !ref.isNull())
+    {
+        compareWithFile(doc, ref);
+    }
+    else if (action == "master_open_file" && doc.file.empty() && !ref.isNull())
+    {
+        // The file's tab opened beside the item's, which is kept, for what
+        // was typed in it to be copied over.
+        if (const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref))
+        {
+            mWindow.openMasterFile(link->master, link->lua);
+            if (Doc* tab = masterTab(link->master))
+            {
+                tab->master->offerFor = ref;
+            }
+        }
+    }
     else if (action == "master_unlink" && !ref.isNull())
     {
         if (const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref))
@@ -530,6 +547,27 @@ void ALScriptStudioMasters::compareWithWorld(Doc& doc, const ALScriptRef& ref)
         mWindow.compare(*found, found->editor->wholeText(), theirs, mServices.words("CompareMasterFile", args),
                         mServices.words("CompareMasterWorld", args));
     });
+}
+
+void ALScriptStudioMasters::compareWithFile(Doc& doc, const ALScriptRef& ref)
+{
+    const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref);
+    if (!link)
+    {
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    args["[FILE]"] = fileNameOf(link->master);
+    // The file as it is on disk, which is what a save of it sends, beside
+    // what was typed here.
+    std::string on_disk;
+    if (!ALFileRead::whole(link->master, on_disk, ALDiskIncludes::MAX_BYTES))
+    {
+        mServices.report(mServices.words("MasterNotRead", args), true, &doc);
+        return;
+    }
+    mWindow.compare(doc, on_disk, doc.editor->wholeText(), mServices.words("CompareMasterOnDisk", args), mServices.words("CompareNow"));
 }
 
 void ALScriptStudioMasters::lookAgain()
@@ -595,14 +633,16 @@ void ALScriptStudioMasters::giveWay()
         if (doc->editor->isDirty())
         {
             // What was typed here is in neither the world nor the file: kept,
-            // and the author told, once, on the tab, with the link to let go
-            // of for it to be saved from here again.
+            // and the author told, once, on the tab -- with the file to set
+            // beside it, to see what differs or to copy it over, and the
+            // link to let go of for it to be saved from here again.
             if (doc->master->toldLinked == link->master)
             {
                 continue;
             }
             doc->master->toldLinked = link->master;
-            mServices.report(mServices.words("MasterLinkedUnsaved", args), true, doc, { "master_unlink" });
+            mServices.report(mServices.words("MasterLinkedUnsaved", args), true, doc,
+                             { "master_compare_file", "master_open_file", "master_unlink" });
             continue;
         }
         // Nothing typed here -- never, or no longer, once what was kept was
