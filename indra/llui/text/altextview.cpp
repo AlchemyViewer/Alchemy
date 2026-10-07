@@ -1831,7 +1831,7 @@ bool ALTextView::focusAtomView(bool forward)
         placeAtomViews();
         // A control takes it, or the first control in it; a plain view is
         // passed over.
-        LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(view);
+        LLUICtrl* ctrl = view->as<LLUICtrl>();
         if (!ctrl || !ctrl->getEnabled())
         {
             continue;
@@ -4505,7 +4505,7 @@ void ALTextView::showContextMenu(S32 x, S32 y)
     // the person's own, where they changed them.
     for (LLView* child : *menu->getChildList())
     {
-        LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child);
+        LLMenuItemGL* item = child->as<LLMenuItemGL>();
         const std::optional<ALEditorCommand> command = item ? alEditorCommandFromName(item->getName()) : std::nullopt;
         if (!command)
         {
@@ -5799,7 +5799,7 @@ void ALTextView::drawBand(F32 alpha)
 
 bool ALTextView::handleKey(KEY key, MASK mask, bool called_from_parent)
 {
-    LLUICtrl* const focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl* const focus = gFocusMgr.getKeyboardFocusCtrl();
     if (called_from_parent || !focus || focus == this || !focus->acceptsTextInput() || !focus->hasAncestor(this))
     {
         return LLUICtrl::handleKey(key, mask, called_from_parent);
