@@ -1294,6 +1294,32 @@ bool velopack_initialize()
     return true;
 }
 
+// Whether this viewer can update itself: the Windows installation, the
+// bundle on macOS -- vpk's, or an older one through the explicit locator
+// ensure_update_manager falls back to -- and the AppImage on Linux. A tree
+// from the archive or a system package is not Velopack's, and its package
+// manager updates it. Asked of a manager made for the purpose and freed: its
+// source is never read, and the one the update check makes is left to it.
+bool velopack_is_installed()
+{
+#if LL_DARWIN
+    return true;
+#else
+    static const bool installed = []()
+    {
+        vpkc_update_options_t options = {};
+        vpkc_update_manager_t* manager = nullptr;
+        if (!vpkc_new_update_manager(".", &options, nullptr, &manager))
+        {
+            return false;
+        }
+        vpkc_free_update_manager(manager);
+        return true;
+    }();
+    return installed;
+#endif
+}
+
 // Downloads the update that was found during the check phase.
 // Operates on sPendingCheckInfo which was set by velopack_check_for_updates.
 static void velopack_download_pending_update()
