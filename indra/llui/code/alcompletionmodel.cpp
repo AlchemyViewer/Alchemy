@@ -151,7 +151,9 @@ void ALCompletionModel::documentWords(const ALTextDocument& text, const ALTextPo
             {
                 ++j;
             }
-            const bool typing = (l == at.line && static_cast<S32>(j) == at.column);
+            // The identifier the caret is in, or at either end of: the one
+            // being typed, whose own text is no completion of it.
+            const bool typing = l == at.line && static_cast<S32>(i) <= at.column && at.column <= static_cast<S32>(j);
             if (!typing && (line[i] < '0' || line[i] > '9'))
             {
                 std::string_view word(line.data() + i, j - i);

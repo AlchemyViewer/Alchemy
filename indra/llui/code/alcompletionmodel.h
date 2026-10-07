@@ -109,9 +109,9 @@ public:
     static const char* iconNameOf(const ALCompletion& completion);
     static const char* badgeOf(const ALCompletion& completion);
     // The document's own words that match what was typed -- but the one
-    // being typed, which ends at `at`, one that starts with a digit, one no
-    // longer than what was typed, and one `out` has already -- after what
-    // `out` holds, up to `most` in all.
+    // being typed, which `at` is in or at either end of, one that starts
+    // with a digit, one no longer than what was typed, and one `out` has
+    // already -- after what `out` holds, up to `most` in all.
     static void documentWords(const ALTextDocument& text, const ALTextPos& at, std::string_view prefix, std::vector<ALCompletion>& out,
                               size_t most = CAP);
     // In the order offered: the start of the word as typed, then in either
