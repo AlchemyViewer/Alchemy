@@ -1873,4 +1873,26 @@ namespace tut
                                                    "}\n");
         ensure("a string's dashes no comment: " + dashes.text, has(dashes, " == \" -- x\" then print(\"y\") end\n"));
     }
+
+    template<> template<>
+    void allsltoslua_object::test<54>()
+    {
+        set_test_name("llVecNorm keeps a zero vector zero, as LSL does, where vector.normalize makes NaN of it: through vecNorm, written "
+                      "once, but for a vector known not to be nought; no vecNorm where nothing normalizes");
+        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
+                                              "    vector d = llDetectedPos(0) - llGetPos();\n"
+                                              "    vector a = llVecNorm(d);\n"
+                                              "    vector b = llVecNorm(llGetVel());\n"
+                                              "    vector c = llVecNorm(<0, 3, 4>);\n"
+                                              "    vector z = llVecNorm(ZERO_VECTOR);\n"
+                                              "    llOwnerSay((string)(a + b + c + z));\n"
+                                              "} }\n");
+        ensure("guarded: " + r.text, has(r, "local a = vecNorm(d)") && has(r, "vecNorm(ll.GetVel())"));
+        ensure("written once: " + r.text, count(r, "local function vecNorm(v: vector): vector") == 1);
+        ensure("a vector known: " + r.text, has(r, "vector.normalize(vector(0, 3, 4))"));
+        ensure("nought guarded: " + r.text, has(r, "vecNorm(ZERO_VECTOR)"));
+        checksClean(r);
+        const ALLSLToSLua::Result none = convert("default { state_entry() { llOwnerSay((string)llVecMag(<1, 2, 3>)); } }\n");
+        ensure("no helper unasked: " + none.text, !has(none, "vecNorm"));
+    }
 }

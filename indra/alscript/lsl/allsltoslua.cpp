@@ -223,8 +223,8 @@ namespace
             "torotation", "touuid", "ipairs", "pairs", "next", "select", "error", "assert", "pcall", "xpcall", "unpack",
             "rawget", "rawset", "rawequal", "rawlen", "setmetatable", "getmetatable", "require", "lljson", "llbase64",
             // What the text written here defines of its own.
-            "states", "currentState", "setState", "joinLists", "lslInteger", "lslFloat", "detected", "setTimer", "timerHandle",
-            "timerHandler",
+            "states", "currentState", "setState", "joinLists", "lslInteger", "lslFloat", "vecNorm", "detected", "setTimer",
+            "timerHandle", "timerHandler",
         };
         return RESERVED.contains(name);
     }
@@ -851,6 +851,7 @@ namespace
         bool mJoinLists  = false;
         bool mLslInteger = false;
         bool mLslFloat   = false;
+        bool mVecNorm    = false;
         bool mManyStates = false;
         // llSetTimerEvent's timer on LLTimers, where the script sets one.
         bool mTimers = false;
@@ -2209,6 +2210,49 @@ namespace
         return false;
     }
 
+    // A number written out, an integer or a float, and whether it is
+    // nought; or one with a minus before it.
+    bool numberWritten(LSLExpression* e, bool& nought)
+    {
+        e = unbracketed(e);
+        if (e && e->getNodeSubType() == NODE_UNARY_EXPRESSION && e->getOperation() == OP_MINUS)
+        {
+            return numberWritten(static_cast<LSLUnaryExpression*>(e)->getChildExpr(), nought);
+        }
+        LSLASTNode* const c = e && e->getNodeSubType() == NODE_CONSTANT_EXPRESSION ? e->getChild(0) : nullptr;
+        if (c && c->getNodeSubType() == NODE_INTEGER_CONSTANT)
+        {
+            nought = static_cast<LSLIntegerConstant*>(c)->getValue() == 0;
+            return true;
+        }
+        if (c && c->getNodeSubType() == NODE_FLOAT_CONSTANT)
+        {
+            nought = static_cast<LSLFloatConstant*>(c)->getValue() == 0.0;
+            return true;
+        }
+        return false;
+    }
+
+    // A vector written out, each of its parts a number, not all of them
+    // nought; or one whose value Tailslide knows, which is not nought.
+    bool nonZeroVector(LSLExpression* e)
+    {
+        e = unbracketed(e);
+        if (e && e->getNodeSubType() == NODE_VECTOR_EXPRESSION)
+        {
+            auto* v = static_cast<LSLVectorExpression*>(e);
+            bool  x = false, y = false, z = false;
+            return numberWritten(v->getX(), x) && numberWritten(v->getY(), y) && numberWritten(v->getZ(), z) && !(x && y && z);
+        }
+        LSLConstant* const c = e ? e->getConstantValue() : nullptr;
+        if (!c || c->getNodeSubType() != NODE_VECTOR_CONSTANT)
+        {
+            return false;
+        }
+        const Vector3* v = static_cast<LSLVectorConstant*>(c)->getValue();
+        return v && (v->x != 0.0f || v->y != 0.0f || v->z != 0.0f);
+    }
+
     LSLExpression* argumentAt(LSLFunctionExpression* e, int at)
     {
         LSLASTNode* arg = isNull(e->getArguments()) ? nullptr : e->getArguments()->getChild(0);
@@ -2357,9 +2401,17 @@ namespace
             // Luau's ^ binds tighter than a minus before it.
             return Expr{ bracketed(arg(0), POWER + 1) + " ^ " + bracketed(arg(1), UNARY), POWER };
         }
-        if (lsl == "llVecMag" || lsl == "llVecNorm")
+        if (lsl == "llVecMag")
         {
-            called = lsl == "llVecMag" ? "vector.magnitude" : "vector.normalize";
+            called = "vector.magnitude";
+            return Expr{ called + "(" + arg(0).text + ")" };
+        }
+        // LSL keeps a zero vector zero, which vector.normalize makes NaN of:
+        // vecNorm guards it, but for a vector known to be something else.
+        if (lsl == "llVecNorm")
+        {
+            called = nonZeroVector(argumentAt(e, 0)) ? "vector.normalize" : "vecNorm";
+            mVecNorm |= called == "vecNorm";
             return Expr{ called + "(" + arg(0).text + ")" };
         }
         if (lsl == "llVecDist")
@@ -6279,6 +6331,16 @@ local function joinLists(a: { any }, b: { any }): { any }
     local out = table.clone(a)
     table.move(b, 1, #b, #out + 1, out)
     return out
+end
+
+)LUA";
+        }
+        if (mVecNorm)
+        {
+            out += R"LUA(-- LSL's llVecNorm: a vector one long the same way; a zero vector stays
+-- zero, which vector.normalize makes NaN of.
+local function vecNorm(v: vector): vector
+    return if v == ZERO_VECTOR then v else vector.normalize(v)
 end
 
 )LUA";
