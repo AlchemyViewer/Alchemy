@@ -3299,23 +3299,28 @@ void ALCodeEditor::showFixPreview()
         }
         return;
     }
-    std::vector<char> kinds;
-    const std::string says = ALFixListModel::previewOf(document(), fixes[index], kinds);
+    std::vector<ALFixListModel::PreviewLine> made;
+    size_t                                   cut  = 0;
+    const std::string                        says = ALFixListModel::previewOf(document(), fixes[index], made, cut);
     dress(*popup);
     ALTextView& box = popup->side();
     box.setText(says);
     // As a comparison shows it (ALDiffView): each line on the band its
     // kind is tinted, what goes as plain code faded, what comes coloured
-    // as code.
+    // as code -- lexed as the text would lex it, each stretch from the
+    // state its first line starts in, and on from line to line.
     const LLColor4 gone_band = ALDiffColors::get(ALDiffColors::Name::Removed).get();
     const LLColor4 come_band = ALDiffColors::get(ALDiffColors::Name::Added).get();
     LLColor4       faded     = textColor();
     faded.mV[VALPHA] *= 0.7f;
+    const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar();
+    ALSyntaxState                                state   = grammar ? grammar->initialState() : ALSyntaxState();
     std::vector<ALTextView::Style> styles;
     std::vector<LineAnnotation>    lines;
-    for (S32 line = 0; line < box.document().lineCount() && line < static_cast<S32>(kinds.size()); ++line)
+    for (S32 line = 0; line < box.document().lineCount() && line < static_cast<S32>(made.size()); ++line)
     {
-        const char kind = kinds[static_cast<size_t>(line)];
+        const ALFixListModel::PreviewLine& shown = made[static_cast<size_t>(line)];
+        const char kind = shown.kind;
         LineAnnotation& said = lines.emplace_back();
         said.tint            = kind == '-' ? gone_band : kind == '+' ? come_band : LLColor4::transparent;
         if (kind == '-')
@@ -3328,7 +3333,17 @@ void ALCodeEditor::showFixPreview()
         }
         else if (kind == '+')
         {
-            styleAsCode(box, line, styles);
+            if (shown.from >= 0)
+            {
+                state = highlighter().startState(shown.from);
+            }
+            // Its sign in the face the code is in, then the line from where
+            // the indentation in common was taken off.
+            ALTextView::Style sign;
+            sign.range = ALTextRange(ALTextPos(line, 0), ALTextPos(line, 2));
+            sign.font  = getFont();
+            styles.push_back(sign);
+            styleSource(line, shown.source, shown.source.size() >= cut ? static_cast<S32>(cut) : 0, 2, state, styles);
         }
     }
     box.setStyles(std::move(styles));
@@ -4468,29 +4483,44 @@ ALSyntaxKind ALCodeEditor::semanticKindAt(const ALTextPos& at) const
 
 void ALCodeEditor::styleAsCode(const ALTextView& view, S32 line, std::vector<ALTextView::Style>& styles, std::string_view name, ALSyntaxKind kind)
 {
-    const std::string& text = view.document().line(line);
+    const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar();
+    ALSyntaxState                                state   = grammar ? grammar->initialState() : ALSyntaxState();
+    styleSource(line, view.document().line(line), 0, 0, state, styles, name, kind);
+}
+
+void ALCodeEditor::styleSource(S32 line, std::string_view source, S32 skip, S32 at, ALSyntaxState& state, std::vector<ALTextView::Style>& styles,
+                               std::string_view name, ALSyntaxKind kind)
+{
     std::vector<ALSyntaxToken> tokens;
     if (std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar())
     {
-        ALSyntaxState state = grammar->initialState();
-        grammar->lexLine(text, state, tokens, highlighter().words());
+        grammar->lexLine(source, state, tokens, highlighter().words());
     }
+    // A column of the source where the view's line shows it.
+    const auto shown_at = [line, skip, at](S32 column) { return ALTextPos(line, column - skip + at); };
+    const S32  length   = static_cast<S32>(source.size());
     if (tokens.empty())
     {
         ALTextView::Style whole;
-        whole.range = ALTextRange(ALTextPos(line, 0), ALTextPos(line, static_cast<S32>(text.size())));
+        whole.range = ALTextRange(shown_at(skip), shown_at(llmax(skip, length)));
         whole.font  = getFont();
         styles.push_back(whole);
         return;
     }
-    // The tokens cover the line without a gap, so each carries the face.
+    // The tokens cover the line without a gap, so each carries the face;
+    // what of them is left out, shown as none.
     for (const ALSyntaxToken& token : tokens)
     {
+        const S32 begin = llmax(token.begin, skip);
+        if (token.end <= begin)
+        {
+            continue;
+        }
         ALTextView::Style one;
-        one.range = ALTextRange(ALTextPos(line, token.begin), ALTextPos(line, token.end));
+        one.range = ALTextRange(shown_at(begin), shown_at(token.end));
         one.font  = getFont();
         ALSyntaxKind shown = token.kind;
-        if (shown == ALSyntaxKind::Text && kind != ALSyntaxKind::Text && !name.empty() && std::string_view(text).substr(token.begin, token.end - token.begin) == name)
+        if (shown == ALSyntaxKind::Text && kind != ALSyntaxKind::Text && !name.empty() && source.substr(token.begin, token.end - token.begin) == name)
         {
             shown = kind;
         }

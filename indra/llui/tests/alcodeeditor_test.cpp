@@ -119,7 +119,7 @@ namespace tut
 
     // More than TUT's fifty a group holds by default, which runs the first
     // fifty and says nothing of the rest: keep this above the highest test.
-    typedef test_group<alcodeeditor_data, 100> alcodeeditor_group;
+    typedef test_group<alcodeeditor_data, 120> alcodeeditor_group;
     typedef alcodeeditor_group::object    alcodeeditor_object;
     alcodeeditor_group                    alcodeeditor_instance("alcodeeditor");
 
@@ -3616,5 +3616,51 @@ namespace tut
         ensure("the last as saved again, the text still changed", f.document().line(4) == "e" && f.isDirty());
         ensure_equals("no bar on the line put back", bar(f, 4), -1);
         ensure("barred as the change is", f.lineChanged(0) && !f.lineChanged(4));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<100>()
+    {
+        set_test_name("a fix previewed inside a block comment colours what it makes as the comment it is in, not as code");
+        // The skin's colours for the kinds, told before the editor reads
+        // them: nothing loads a skin's colours in a test.
+        LLUIColorTable& table = LLUIColorTable::instance();
+        table.setColor("SyntaxComment", LLColor4(0.f, 0.5f, 0.f, 1.f));
+        table.setColor("SyntaxNumber", LLColor4(0.f, 0.f, 0.8f, 1.f));
+        table.setColor("SyntaxOperator", LLColor4(0.6f, 0.f, 0.f, 1.f));
+        ALCodeEditor& e = make("/* note\n   x = 1 */\nfoo();\n");
+        e.setFixProvider([](S32 line, std::vector<ALCodeEditor::Fix>& out) {
+            if (line != 1)
+            {
+                return;
+            }
+            ALCodeEditor::Fix two;
+            two.title = "Say two";
+            two.value = "two";
+            two.edits.emplace_back(ALTextRange(ALTextPos(1, 7), ALTextPos(1, 8)), "2");
+            out = { two };
+        });
+        e.setFixHandler([](const LLSD&) {});
+        e.setCaret(ALTextPos(1, 0));
+        ensure("listed", e.openFixes(1));
+        const ALTextView* box = e.findChild<ALTextView>("fix_preview");
+        ensure("previewed", box && box->getVisible());
+        ensure_equals("as a diff", box->text(), std::string("- x = 1 */\n+ x = 2 */"));
+        const LLColor4 comment = e.colorForKind(ALSyntaxKind::Comment);
+        ensure("a comment's colour told apart from a number's and an operator's",
+               comment != e.colorForKind(ALSyntaxKind::Number) && comment != e.colorForKind(ALSyntaxKind::Operator));
+        // The colour the preview gives a column of its second line.
+        const auto colour_at = [box](S32 column) {
+            for (const ALTextView::Style& style : box->styles())
+            {
+                if (style.range.begin.line == 1 && style.range.begin.column <= column && column < style.range.end.column && style.color)
+                {
+                    return *style.color;
+                }
+            }
+            return LLColor4::transparent;
+        };
+        ensure("the 2 it makes in the comment's colour", colour_at(6) == comment);
+        ensure("and the = before it", colour_at(4) == comment);
     }
 }

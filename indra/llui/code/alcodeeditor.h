@@ -977,6 +977,13 @@ private:
     std::optional<ALTextRange> pairAround(const ALTextPos& at);
     // The problems squiggled under a position, and the stretch they span.
     std::vector<CardProblem> problemsUnder(const ALTextPos& at, ALTextRange& about) const;
+    // A line of another view styled as code, as styleAsCode styles one:
+    // `source`, as it would stand in this editor's text, lexed on from
+    // `state`, which it leaves where the line after it starts, and styled
+    // on the view's line `line` from column `at`, its first `skip` bytes
+    // left out of the view.
+    void styleSource(S32 line, std::string_view source, S32 skip, S32 at, ALSyntaxState& state, std::vector<ALTextView::Style>& styles,
+                     std::string_view name = std::string_view(), ALSyntaxKind kind = ALSyntaxKind::Text);
     void vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out);
 
     // The colours as drawn now: a skin's where it gave one, else mixed

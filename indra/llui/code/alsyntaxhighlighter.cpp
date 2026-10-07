@@ -276,3 +276,13 @@ U32 ALSyntaxHighlighter::revision(S32 line)
     }
     return mLines[line].revision;
 }
+
+ALSyntaxState ALSyntaxHighlighter::startState(S32 line)
+{
+    ensure(line);
+    if (!mGrammar || line < 0 || line >= static_cast<S32>(mLines.size()) || !mLines[line].valid || mLines[line].start >= mStates.size())
+    {
+        return mGrammar ? mGrammar->initialState() : ALSyntaxState();
+    }
+    return mStates[mLines[line].start];
+}

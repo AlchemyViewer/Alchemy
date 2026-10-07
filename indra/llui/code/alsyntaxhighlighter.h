@@ -70,6 +70,11 @@ public:
     // that was not. Empty without a grammar or a document.
     const std::vector<ALSyntaxToken>& tokens(S32 line);
     U32                               revision(S32 line);
+    // The state a line starts in, lexed to it if need be: where a line that
+    // stands for it elsewhere -- what a fix would make of it, previewed --
+    // is lexed from. The grammar's first state past the text, or with
+    // nothing lexed.
+    ALSyntaxState                     startState(S32 line);
 
     // For whoever wants every line's tokens and asks every frame -- the
     // blocks a gutter draws: the lines that want lexing lexed on from the
