@@ -1115,7 +1115,8 @@ S32 ALTextLayout::columnAt(S32 index, S32 r, F32 x, bool round)
     {
         return 0;
     }
-    const Row& row = entry.rows[llclamp(r, 0, static_cast<S32>(entry.rows.size()) - 1)];
+    const size_t which = static_cast<size_t>(llclamp(r, 0, static_cast<S32>(entry.rows.size()) - 1));
+    const Row&   row   = entry.rows[which];
     if (x <= 0.f)
     {
         return row.begin;
@@ -1142,14 +1143,22 @@ S32 ALTextLayout::columnAt(S32 index, S32 r, F32 x, bool round)
     {
         --before;
     }
-    const bool at_end = k >= row.glyphEnd;
-    const F32  right  = at_end ? row.width : entry.glyphs[k].pen - row.xStart;
-    const F32  left   = entry.glyphs[before].pen - row.xStart;
+    const bool at_end  = k >= row.glyphEnd;
+    const S32  cluster = entry.glyphs[before].cluster;
+    // A row the line wraps after ends where the next row begins, which is
+    // a place on the next row: on or past its last cluster is that
+    // cluster -- before the space that hangs past the edge -- so that the
+    // column is on the row it was asked of.
+    if (at_end && which + 1 < entry.rows.size())
+    {
+        return cluster;
+    }
+    const F32 right = at_end ? row.width : entry.glyphs[k].pen - row.xStart;
+    const F32 left  = entry.glyphs[before].pen - row.xStart;
     if (x >= right)
     {
         return row.end;
     }
-    const S32 cluster      = entry.glyphs[before].cluster;
     const S32 next_cluster = at_end ? row.end : entry.glyphs[k].cluster;
     return (round && (x - left) * 2.f >= (right - left)) ? next_cluster : cluster;
 }

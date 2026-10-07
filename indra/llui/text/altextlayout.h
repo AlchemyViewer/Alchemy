@@ -333,7 +333,9 @@ public:
     S32 rowOf(S32 index, S32 column);
     F32 xOf(S32 index, S32 column, S32* row = nullptr);
     // The column at an x within a row: the nearest cluster boundary where
-    // `round`, else the one at or before.
+    // `round`, else the one at or before -- and one on the row: where the
+    // line wraps after it, its end is the next row's start, so on or past
+    // its last cluster is that cluster.
     S32 columnAt(S32 index, S32 row, F32 x, bool round);
 
     // A row cut down to its glyphs that lie between two x's from the row's

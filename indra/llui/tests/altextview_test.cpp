@@ -2835,4 +2835,32 @@ namespace tut
         ensure("the line", v.selection().normalised() == ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
         v.handleMouseUp(x, y, MASK_NONE);
     }
+
+    template<> template<>
+    void altextview_object::test<90>()
+    {
+        set_test_name("up and down through a short row of a wrapped line stop on it, neither skipping it nor sticking at the row after it");
+        ALTextView& v = make("");
+        v.setWordWrap(true);
+        // How many letters a row holds: a word too long for one breaks
+        // where it overflows.
+        v.setText(std::string(200, 'a'));
+        const S32 fits = v.layout().line(0).rows[0].end;
+        ensure("a row holds a few letters", fits > 4);
+        // Rows of 'a..a ', 'bb ' -- the word after it does not fit beside
+        // it -- and 'c..c'.
+        v.setText(std::string(static_cast<size_t>(fits - 1), 'a') + " bb " + std::string(static_cast<size_t>(fits - 1), 'c'));
+        const ALTextLayout::Line& line = v.layout().line(0);
+        ensure("three rows, the short one in the middle", line.rows.size() == 3 && line.rows[1].begin == fits && line.rows[1].end == fits + 3);
+        const ALTextPos end(0, 2 * fits + 2);
+        v.setCaret(end);
+        ensure("up", v.perform(ALEditorCommand::MoveUp));
+        ensure("onto the short row, before the space it hangs", v.caret() == ALTextPos(0, fits + 2) && v.layout().rowOf(0, fits + 2) == 1);
+        ensure("up again", v.perform(ALEditorCommand::MoveUp));
+        ensure_equals("onto the first row, not stuck", v.layout().rowOf(0, v.caret().column), 0);
+        ensure("down", v.perform(ALEditorCommand::MoveDown));
+        ensure("onto the short row, not past it", v.caret() == ALTextPos(0, fits + 2));
+        ensure("down again", v.perform(ALEditorCommand::MoveDown));
+        ensure("to where it began", v.caret() == end);
+    }
 }
