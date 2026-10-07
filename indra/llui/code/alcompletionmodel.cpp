@@ -34,7 +34,6 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
-#include <limits>
 
 // static
 S32 ALCompletionModel::tierOf(const ALFuzzyMatch::Match& match)
@@ -125,47 +124,78 @@ const char* ALCompletionModel::badgeOf(const ALCompletion& completion)
     }
 }
 
+namespace
+{
+    // Each of the document's words that match what was typed, once: not the
+    // one being typed, one that starts with a digit, one no longer than what
+    // was typed, nor one `seen` holds -- which every word looked at joins,
+    // whether it matched or not, so that a name the text has a thousand
+    // times is matched once. Each told to `found` as a view into its line,
+    // until `found` says that is enough.
+    template <typename Found>
+    void eachDocumentWord(const ALTextDocument& text, const ALTextPos& at, std::string_view prefix, boost::unordered_flat_set<std::string_view>& seen,
+                          Found&& found)
+    {
+        const S32 count = text.lineCount();
+        for (S32 l = 0; l < count; ++l)
+        {
+            const std::string& line = text.line(l);
+            size_t             i    = 0;
+            while (i < line.size())
+            {
+                if (!alIdentifierByte(line[i]))
+                {
+                    ++i;
+                    continue;
+                }
+                size_t j = i;
+                while (j < line.size() && alIdentifierByte(line[j]))
+                {
+                    ++j;
+                }
+                // The identifier the caret is in, or at either end of: the
+                // one being typed, whose own text is no completion of it.
+                const bool             typing = l == at.line && static_cast<S32>(i) <= at.column && at.column <= static_cast<S32>(j);
+                const std::string_view word(line.data() + i, j - i);
+                if (!typing && (line[i] < '0' || line[i] > '9') && word.size() > prefix.size() && seen.insert(word).second &&
+                    ALCompletionModel::matchTier(word, prefix) >= 0 && !found(word))
+                {
+                    return;
+                }
+                i = j;
+            }
+        }
+    }
+}
+
 // static
 void ALCompletionModel::documentWords(const ALTextDocument& text, const ALTextPos& at, std::string_view prefix, std::vector<ALCompletion>& out,
                                       size_t most)
 {
-    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> seen;
+    if (out.size() >= most)
+    {
+        return;
+    }
+    boost::unordered_flat_set<std::string_view> seen;
+    seen.reserve(out.size());
     for (const ALCompletion& c : out)
     {
-        seen.insert(c.text);
+        seen.insert(std::string_view(c.text));
     }
-    const S32 count = text.lineCount();
-    for (S32 l = 0; l < count && out.size() < most; ++l)
+    // Gathered as views into the text's lines, which hold still while it is
+    // read, and put in `out` after: `out` grown meanwhile would move the
+    // texts `seen` looks at.
+    std::vector<std::string_view> found;
+    eachDocumentWord(text, at, prefix, seen, [&](std::string_view word) {
+        found.push_back(word);
+        return out.size() + found.size() < most;
+    });
+    out.reserve(out.size() + found.size());
+    for (const std::string_view word : found)
     {
-        const std::string& line = text.line(l);
-        size_t             i    = 0;
-        while (i < line.size())
-        {
-            if (!alIdentifierByte(line[i]))
-            {
-                ++i;
-                continue;
-            }
-            size_t j = i;
-            while (j < line.size() && alIdentifierByte(line[j]))
-            {
-                ++j;
-            }
-            // The identifier the caret is in, or at either end of: the one
-            // being typed, whose own text is no completion of it.
-            const bool typing = l == at.line && static_cast<S32>(i) <= at.column && at.column <= static_cast<S32>(j);
-            if (!typing && (line[i] < '0' || line[i] > '9'))
-            {
-                std::string_view word(line.data() + i, j - i);
-                if (word.size() > prefix.size() && matchTier(word, prefix) >= 0 && seen.insert(std::string(word)).second)
-                {
-                    ALCompletion c;
-                    c.text = std::string(word);
-                    out.push_back(std::move(c));
-                }
-            }
-            i = j;
-        }
+        ALCompletion c;
+        c.text = std::string(word);
+        out.push_back(std::move(c));
     }
 }
 
@@ -279,15 +309,17 @@ void ALCompletionModel::pool(const ALTextPos& start, const ALTextPos& at, std::s
     }
     // The document's words, all of them that match now, for as long as
     // the identifier is typed: each is offered while it is longer than
-    // what is typed.
-    std::vector<ALCompletion> words(mPool);
-    const size_t              answered_count = words.size();
-    documentWords(text, at, prefix, words, std::numeric_limits<size_t>::max());
-    mPoolWords.reserve(words.size() - answered_count);
-    for (size_t i = answered_count; i < words.size(); ++i)
+    // what is typed. Those answered are not words of it again.
+    boost::unordered_flat_set<std::string_view> seen;
+    seen.reserve(mPool.size());
+    for (const ALCompletion& c : mPool)
     {
-        mPoolWords.push_back(ALFuzzyMatch::prepare(words[i].text));
+        seen.insert(std::string_view(c.text));
     }
+    eachDocumentWord(text, at, prefix, seen, [this](std::string_view word) {
+        mPoolWords.push_back(ALFuzzyMatch::prepare(word));
+        return true;
+    });
 }
 
 bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std::string_view prefix, const std::string& head,
