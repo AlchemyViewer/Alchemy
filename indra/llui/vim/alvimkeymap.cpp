@@ -1769,7 +1769,11 @@ namespace
     // and one that ends on no blank takes the blanks before it instead, but
     // not a line's indent. `end` is where vim's cursor is left: on the
     // object's last character, or, where `inclusive` is false, at the start
-    // of the line after it. None where the text runs out first.
+    // of the line after it. On an empty line aw runs on past its break to
+    // the end of the next word, or to the next empty line; iw is the empty
+    // line alone -- or, on the last line, goes back to the last character of
+    // the line before, which puts `end` before `start`. None where the text
+    // runs out first.
     struct WordObject
     {
         ALTextPos start;
@@ -1778,11 +1782,6 @@ namespace
     };
     std::optional<WordObject> wordObject(const ALTextDocument& d, const ALTextPos& from, bool around, bool big, S32 count)
     {
-        // An empty line holds no word to take.
-        if (d.lineLength(from.line) == 0)
-        {
-            return std::nullopt;
-        }
         ALTextPos  p   = from;
         const auto cls = [&d, &p, big] { return classOf(at(d, p), big); };
         // A character on, as vim's inc() steps: 0 along the line, 2 onto its
@@ -3496,10 +3495,11 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         case 'w':
         case 'W':
         {
-            // vim's word object (wordObject) under an operator: from its
-            // start through its last character, though not the line break
-            // after a line's end it stops at; one that ends at a line's
-            // start ends as an exclusive motion there does.
+            // vim's word object (wordObject) under an operator: its two ends
+            // in order, through the last character, though not the line
+            // break after a line's end it stops at, so that iw on an empty
+            // line before the last is nothing at all; one that ends at a
+            // line's start ends as an exclusive motion there does.
             const std::optional<WordObject> word = wordObject(d, from, around, what == 'W', count);
             if (!word)
             {

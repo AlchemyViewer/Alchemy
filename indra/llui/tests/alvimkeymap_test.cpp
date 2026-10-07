@@ -3686,4 +3686,41 @@ namespace tut
         keys("2diw");
         ensure_equals("2diw from a line's start over an empty line: the lines whole", flat(editor->text()), std::string("baz qux|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<139>()
+    {
+        set_test_name("aw on an empty line takes its break and the next line's first word, and fails on the last line; iw there is the empty line, or on the last goes back over the break");
+        ALCodeEditor& e = make("foo bar\n\nbaz qux\n");
+        e.setCaret(ALTextPos(1, 0));
+        keys("daw");
+        ensure_equals("daw on an empty line between lines of words", flat(e.text()), std::string("foo bar| qux|"));
+        ensure_equals("what it took", vim->registerText('"'), std::string("\nbaz"));
+        keys("u");
+        e.setCaret(ALTextPos(1, 0));
+        keys("vawy");
+        ensure_equals("vaw selects as much", vim->registerText('"'), std::string("\nbaz"));
+        e.setCaret(ALTextPos(1, 0));
+        keys("yiw");
+        ensure_equals("yiw there yanks nothing", vim->registerText('"'), std::string(""));
+        keys("ciwX<Esc>");
+        ensure_equals("ciw there inserts on the empty line", flat(e.text()), std::string("foo bar|X|baz qux|"));
+
+        make("foo bar\n\n\nbaz qux\n");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("2diw");
+        ensure_equals("2diw from an empty line over another: the lines whole", flat(editor->text()), std::string("foo bar|baz qux|"));
+
+        make("foo bar\n");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("yiw");
+        ensure_equals("yiw on the last line, empty: back to the line before's last character and the break", vim->registerText('"'), std::string("r\n"));
+        editor->setCaret(ALTextPos(1, 0));
+        keys("daw");
+        ensure_equals("daw there fails", flat(editor->text()), std::string("foo bar|"));
+        ensure_equals("and keeps nothing", vim->registerText('"'), std::string("r\n"));
+        editor->setCaret(ALTextPos(1, 0));
+        keys("diw");
+        ensure_equals("diw there takes what yiw yanked", flat(editor->text()), std::string("foo ba"));
+    }
 }
