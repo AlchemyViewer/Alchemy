@@ -282,13 +282,15 @@ private:
     // is waiting, held with the rest until they make one or cannot.
     bool typeThrough(ALTextView& view, const Input& input);
     // A key held or to be fed: whether it may be mapped, which what a
-    // :noremap mapping stands for may not; and whether it is the one just
-    // typed, which the view is told of.
+    // :noremap mapping stands for may not; whether it is the one just
+    // typed, which the view is told of; and whether a mapping put it there
+    // in place of its own keys.
     struct Held
     {
         Input input;
-        bool  remap = true;
-        bool  typed = false;
+        bool  remap  = true;
+        bool  typed  = false;
+        bool  mapped = false;
     };
     // The keys at the front of a queue fed, those that make a mapping
     // replaced by what it stands for first, until the queue is empty or

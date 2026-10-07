@@ -5171,4 +5171,18 @@ namespace tut
         keys(";");
         ensure_equals("; past it, to after the one before", caretText(), std::string("0:2"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<181>()
+    {
+        set_test_name("a macro of more than ten thousand keys plays whole with a mapping about: only the keys mappings feed count towards E223");
+        ALCodeEditor&     e = make("\n");
+        const std::string typed(10001, 'x');
+        keys(("qai" + typed + "<Esc>q").c_str());
+        ensure_equals("recorded, typed once", e.document().line(0).size(), static_cast<size_t>(10001));
+        ex("nmap Q x");
+        keys("@a");
+        ensure("no recursive mapping said: " + vim->message(), !vim->messageIsError());
+        ensure_equals("played whole", e.document().line(0).size(), static_cast<size_t>(20002));
+    }
 }

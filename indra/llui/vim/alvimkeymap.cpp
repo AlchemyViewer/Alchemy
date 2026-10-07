@@ -321,9 +321,11 @@ namespace
     // the last without a key of their own fed between, before the chain
     // is taken to be a loop: vim's maxmapdepth.
     constexpr S32 MAX_MAP_DEPTH = 1000;
-    // How many keys one draining may feed, however they came: a mapping
-    // that feeds itself a key at a time, each doing something and none
-    // failing, never trips the depth, which a key fed puts back to none.
+    // How many keys mappings may feed for one key drained that no mapping
+    // put there -- one typed, or one of a macro's: a mapping that feeds
+    // itself a key at a time, each doing something and none failing,
+    // never trips the depth, which a key fed puts back to none. A macro's
+    // own keys, however many, are none of them.
     constexpr S32 MAX_DRAINED = 10000;
 }
 
@@ -406,9 +408,16 @@ void ALVimKeymap::drain(ALTextView& view, std::deque<Held>& queue, bool final, b
             }
             // What it stands for in place of its keys: not mapped again
             // where it was made with :noremap, nor its first key where it
-            // starts with the keys themselves, as vim has it.
+            // starts with the keys themselves, as vim has it. Keys of its
+            // own that no mapping put there begin the count of what
+            // mappings feed afresh.
             const ALVimMappings::Mapping mapping = *match.full;
-            queue.erase(queue.begin(), queue.begin() + static_cast<std::ptrdiff_t>(mapping.from.size()));
+            const auto                   end_of  = queue.begin() + static_cast<std::ptrdiff_t>(mapping.from.size());
+            if (std::any_of(queue.begin(), end_of, [](const Held& held) { return !held.mapped; }))
+            {
+                fed = 0;
+            }
+            queue.erase(queue.begin(), end_of);
             bool starts_with_itself = mapping.to.size() >= mapping.from.size();
             for (size_t i = 0; starts_with_itself && i < mapping.from.size(); ++i)
             {
@@ -417,16 +426,21 @@ void ALVimKeymap::drain(ALTextView& view, std::deque<Held>& queue, bool final, b
             for (size_t i = mapping.to.size(); i-- > 0;)
             {
                 Held held;
-                held.input = mapping.to[i];
-                held.remap = !mapping.noremap && !(i == 0 && starts_with_itself);
+                held.input  = mapping.to[i];
+                held.remap  = !mapping.noremap && !(i == 0 && starts_with_itself);
+                held.mapped = true;
                 queue.push_front(held);
             }
             continue;
         }
         // No mapping: the first key as it is, and what follows it looked
-        // at again.
-        depth              = 0;
-        if (++fed > MAX_DRAINED)
+        // at again. One no mapping put there begins the count afresh.
+        depth = 0;
+        if (!queue.front().mapped)
+        {
+            fed = 0;
+        }
+        else if (++fed > MAX_DRAINED)
         {
             queue.clear();
             say(said("VimRecursiveMapping", "E223: Recursive mapping"), true);
