@@ -1111,8 +1111,11 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         const S32  line  = above ? first : last;
         view.setCaret(above ? d.lineStart(line) : d.lineEnd(line));
         view.insertText(above ? text + "\n" : "\n" + text);
-        const S32 put_at = above ? line : line + 1;
-        mVim.moveTo(view, ALTextPos(put_at, firstNonBlankColumn(d, put_at)));
+        // The caret on the last line put, at its first non-blank, as vim
+        // leaves it.
+        const S32 put_at   = above ? line : line + 1;
+        const S32 put_last = put_at + static_cast<S32>(std::count(text.begin(), text.end(), '\n'));
+        mVim.moveTo(view, ALTextPos(put_last, firstNonBlankColumn(d, put_last)));
         return;
     }
     if (name == "ma" || name == "mark" || name == "k")

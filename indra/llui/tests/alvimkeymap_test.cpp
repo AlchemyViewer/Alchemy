@@ -3985,4 +3985,30 @@ namespace tut
         keys("gg2l<C-v>jj\"_p");
         ensure_equals("\"_p: the block taken out, the short line as it was", flat(editor->text()), std::string("abd|a|abd|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<147>()
+    {
+        set_test_name(":put and :put! leave the caret on the last line put, at its first non-blank");
+        ALCodeEditor& e = make("a\n  q\n r\nb\n");
+        keys("j\"x2yygg");
+        ex("put x");
+        ensure_equals(":put x: two lines under the first", flat(e.text()), std::string("a|  q| r|  q| r|b|"));
+        ensure_equals("the caret on the second of them", caretText(), std::string("2:1"));
+        ex("1put! x");
+        ensure_equals(":1put! x: two lines over the first", flat(e.text()), std::string("  q| r|a|  q| r|  q| r|b|"));
+        ensure_equals("the caret on the second of them too", caretText(), std::string("1:1"));
+
+        make("1\n2\n3\n4\na\n\n");
+        keys("4j\"x2yy");
+        ex("3put x");
+        ensure_equals("a line and an empty one under the third", flat(editor->text()), std::string("1|2|3|a||4|a||"));
+        ensure_equals("the caret on the empty one", caretText(), std::string("4:0"));
+
+        make("1\n2\n3\n4\n5\n");
+        keys("gg2yy");
+        ex("$put");
+        ensure_equals("$put: under the last line", flat(editor->text()), std::string("1|2|3|4|5|1|2|"));
+        ensure_equals("the caret on the last of them", caretText(), std::string("6:0"));
+    }
 }
