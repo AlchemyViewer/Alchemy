@@ -27,6 +27,7 @@
 #include "alanchoredranges.h"
 #include "alchangessincesaved.h"
 #include "alcodecards.h"
+#include "alcodeliterals.h"
 #include "albracketindex.h"
 #include "alcompletionmodel.h"
 #include "alfixlistmodel.h"
@@ -578,27 +579,16 @@ public:
     // Whether what is typed at a position completes all the same, where
     // the grammar says (ALSyntaxGrammar::completesIn).
     bool        completesInProse(const ALTextPos& at);
-    // The whole string literal a position is in, quotes and all: the run
-    // of string and escape tokens around it, carried across lines while
-    // one begins or ends inside a string, so that a long string is one
-    // literal rather than a line of one. Empty where the position is not
-    // in a string.
-    ALTextRange stringAt(const ALTextPos& pos) const;
-    // What a string that names a file holds -- between its quotes, or to
-    // the line's end where it is not closed; empty where it holds nothing
-    // yet -- where a position is in it or at its end: a string the grammar
-    // says names one, by what comes before its opening quote
-    // (ALSyntaxGrammar::pathString). None anywhere else.
-    std::optional<ALTextRange> pathAt(const ALTextPos& pos);
-    // The same of any string or path on its line, the grammar not asked:
-    // what it holds, the byte that opens it -- a quote, or an include's
-    // `<` -- and whether it is closed on its line.
-    std::optional<ALTextRange> quotedAt(const ALTextPos& pos, char* opener = nullptr, bool* closed = nullptr);
-    // What to say about one: its size, which is what a scripter wants of
-    // a string and what the type alone never says -- the bytes it comes
-    // to, the characters where they are not the same number, and what it
-    // is written as where the escapes make that longer.
-    std::string stringSize(const ALTextRange& literal) const;
+    // The string literal a position is in, what a string that names a
+    // file holds, what any string or path on its line holds, and what a
+    // string comes to (ALCodeLiterals).
+    ALTextRange                stringAt(const ALTextPos& pos) const { return mLiterals.stringAt(pos); }
+    std::optional<ALTextRange> pathAt(const ALTextPos& pos) const { return mLiterals.pathAt(pos); }
+    std::optional<ALTextRange> quotedAt(const ALTextPos& pos, char* opener = nullptr, bool* closed = nullptr) const
+    {
+        return mLiterals.quotedAt(pos, opener, closed);
+    }
+    std::string stringSize(const ALTextRange& literal) const { return mLiterals.stringSize(literal); }
 
     // --- placeholders ----------------------------------------------------------------
 
@@ -1043,6 +1033,8 @@ private:
     bool      mBracketColorsSet    = false;
     // Where the brackets pair up, and how deep each line starts.
     ALBracketIndex   mBracketIndex;
+    // The text's string and path literals, by the highlighter's tokens.
+    ALCodeLiterals   mLiterals{ document(), highlighter() };
     // The depth at each bracket of the last line drawn, by column, for the
     // rest of its rows: under the text and the grammar they were found in.
     struct BracketDepths
