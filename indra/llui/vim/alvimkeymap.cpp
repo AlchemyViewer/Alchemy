@@ -3754,14 +3754,21 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             else if (given > 0)
             {
                 // The count given takes the place of the ones recorded,
-                // before a register's name and after it.
+                // before a register's name and after it, and after the
+                // operator: vim keeps an operator's count and its motion's
+                // as one count of the command's. A count begins with a
+                // digit other than 0, which is a motion: d0 keeps its 0.
                 const auto past_count = [&change](size_t at) {
-                    while (at < change.size() && change[at].isChar && isDigit(change[at].ch))
+                    if (at < change.size() && change[at].isChar && isDigit(change[at].ch) && change[at].ch != '0')
                     {
-                        ++at;
+                        while (at < change.size() && change[at].isChar && isDigit(change[at].ch))
+                        {
+                            ++at;
+                        }
                     }
                     return at;
                 };
+                const auto is_char = [&change](size_t at, llwchar key) { return at < change.size() && change[at].isChar && change[at].ch == key; };
                 from = past_count(from);
                 for (const char digit : std::to_string(given))
                 {
@@ -3770,11 +3777,30 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                     in.ch     = static_cast<llwchar>(digit);
                     feed(view, in);
                 }
-                while (from + 1 < change.size() && change[from].isChar && change[from].ch == '"')
+                while (from + 1 < change.size() && is_char(from, '"'))
                 {
                     feed(view, change[from]);
                     feed(view, change[from + 1]);
                     from = past_count(from + 2);
+                }
+                // The operator -- d c y > < =, ys, or g~ gu gU gc -- and
+                // past the count typed after it.
+                size_t op_end = from;
+                if (is_char(from, 'd') || is_char(from, 'c') || is_char(from, 'y') || is_char(from, '>') || is_char(from, '<') || is_char(from, '='))
+                {
+                    op_end = is_char(from, 'y') && is_char(from + 1, 's') ? from + 2 : from + 1;
+                }
+                else if (is_char(from, 'g') && (is_char(from + 1, '~') || is_char(from + 1, 'u') || is_char(from + 1, 'U') || is_char(from + 1, 'c')))
+                {
+                    op_end = from + 2;
+                }
+                if (op_end > from)
+                {
+                    for (; from < op_end; ++from)
+                    {
+                        feed(view, change[from]);
+                    }
+                    from = past_count(from);
                 }
             }
             for (size_t i = from; i < change.size(); ++i)

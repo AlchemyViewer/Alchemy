@@ -219,7 +219,7 @@ namespace tut
 
     // More than TUT's fifty a group holds by default, which runs the first
     // fifty and says nothing of the rest: keep this above the highest test.
-    typedef test_group<alvimkeymap_data, 170> alvimkeymap_group;
+    typedef test_group<alvimkeymap_data, 200> alvimkeymap_group;
     typedef alvimkeymap_group::object    alvimkeymap_object;
     alvimkeymap_group                    alvimkeymap_group_instance("alvimkeymap");
 
@@ -4913,5 +4913,35 @@ namespace tut
         keys("yyjl<C-v>j2P");
         ensure_equals("lines into a block: the block taken out, the lines put over it twice", flat(editor->text()), std::string("a|a|a|bd|eg|"));
         ensure_equals("the caret on the first of them", caretText(), std::string("1:0"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<171>()
+    {
+        set_test_name("a count before . takes the place of the count typed after an operator as well as those before it: d3w then 2. deletes two words more");
+        ALCodeEditor& e = make("a b c d e f g h i j\n");
+        keys("d3w2.");
+        ensure_equals("d3w then 2.: five words in all", flat(e.text()), std::string("f g h i j|"));
+
+        make("a b c d e f g h i j k l m n\n");
+        keys("2d3w1.");
+        ensure_equals("2d3w then 1.: one more", flat(editor->text()), std::string("h i j k l m n|"));
+
+        make("a b c d e f g h i j\n");
+        keys("c2wX<Esc>w3.");
+        ensure_equals("c2w then 3.: three words changed", flat(editor->text()), std::string("X X f g h i j|"));
+
+        make("a b c d e f g h i j\n");
+        keys("g~3ww2.");
+        ensure_equals("g~3w then 2.: two words", flat(editor->text()), std::string("A b c d e f g h i j|"));
+
+        make("abcdef\n");
+        keys("3ld0$2.");
+        ensure_equals("d0 then 2.: its 0 the motion, no count", flat(editor->text()), std::string("f|"));
+
+        make("a b c d e f g h i j k l m n\n");
+        keys("\"a2d3w1.");
+        ensure_equals("\"a2d3w then 1.: one more", flat(editor->text()), std::string("h i j k l m n|"));
+        ensure_equals("into a still", vim->registerText('a'), std::string("g "));
     }
 }
