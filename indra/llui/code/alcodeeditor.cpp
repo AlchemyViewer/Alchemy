@@ -5342,6 +5342,9 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
             return ALTextView::handleToolTip(x, y, mask);
         }
         showCard(ALTextRange(ALTextPos(line, 0), ALTextPos(line, 0)), std::string(), problems);
+        // About the line, from its mark: the card stays while the mouse is
+        // on the line's row in the gutter as well as beside it.
+        mCardAnchor.mLeft = llmin(mCardAnchor.mLeft, leftEdge());
         return true;
     }
     if (cardShown() && mCard->getRect().pointInRect(x, y))

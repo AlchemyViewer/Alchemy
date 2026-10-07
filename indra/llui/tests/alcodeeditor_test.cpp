@@ -3179,4 +3179,27 @@ namespace tut
         const S32 below = e.layout().lineTop(40) - e.scrollY();
         ensure("below the two pinned headers: " + std::to_string(below) + " of " + std::to_string(row_h), below >= 2 * row_h);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<86>()
+    {
+        set_test_name("a gutter mark's card stays while the mouse rests on its row there, and goes as it leaves the row");
+        ALCodeEditor& e = make("one\ntwo\nthree\n");
+        ALCodeEditor::Decoration d;
+        d.range   = ALTextRange(ALTextPos(1, 0), ALTextPos(1, 3));
+        d.message = "something is wrong here";
+        e.setDecorations({ d });
+        const LLRect text  = e.textRect();
+        const S32    row_h = e.layout().rowHeight();
+        // On the mark column, past the change bar.
+        const S32 x = e.leftEdge() + 8;
+        const S32 y = text.mTop - row_h - row_h / 2;
+        e.handleHover(x, y, MASK_NONE);
+        ensure("the gutter's card", e.handleToolTip(x, y, MASK_NONE) && e.cardShown() && e.card()->text() == "something is wrong here");
+        // The next frame, the mouse still.
+        e.handleHover(x, y, MASK_NONE);
+        ensure("kept, the mouse on the line's row in the gutter", e.cardShown());
+        e.handleHover(x, y - 2 * row_h, MASK_NONE);
+        ensure("gone from another row", !e.cardShown());
+    }
 }
