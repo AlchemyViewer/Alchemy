@@ -369,7 +369,8 @@ void ALScriptLinkScripts::findFiles()
         {
             for (const ALMasterLink* orphan : orphans.orphansNamed(row.name, row.objectName))
             {
-                if (orphan->lua == row.lua)
+                // A script's, of its language: a notecard's file is text.
+                if (!orphan->notecard && orphan->lua == row.lua)
                 {
                     ask.records.emplace_back(orphan->master, orphan->made);
                 }

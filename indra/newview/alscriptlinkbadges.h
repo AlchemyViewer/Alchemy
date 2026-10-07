@@ -41,8 +41,9 @@
 class ALSerialWorker;
 
 // How each script linked to a file on disk stands (ALScriptDiskMasters),
-// for the studio's windows to mark it by -- the Explorer's rows, a master
-// file's tab -- without asking anything of the disk as they draw: made
+// and each notecard, for the studio's windows to mark it by -- the
+// Explorer's rows, a master file's tab -- without asking anything of the
+// disk as they draw: made
 // from the links as they are, and from the masters' stamps as they were
 // last looked at. The stamps are looked at off the main thread, whenever
 // the links change and whenever an Explorer lists again, and never as a

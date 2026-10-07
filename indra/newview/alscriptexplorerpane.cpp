@@ -641,9 +641,10 @@ void ALScriptExplorerPane::fill()
                 {
                     out.suffix += no_copy;
                 }
-                // Linked to a file on disk, and how that stands, from what
-                // was last looked at: nothing asked of the disk here.
-                if (const std::optional<ALScriptLinkBadges::Mark> mark = row.script ? badges.markOf(row.ref) : std::nullopt)
+                // Linked to a file on disk, a script or a notecard, and how
+                // that stands, from what was last looked at: nothing asked
+                // of the disk here.
+                if (const std::optional<ALScriptLinkBadges::Mark> mark = badges.markOf(row.ref))
                 {
                     out.suffix += badge_said[static_cast<size_t>(mark->badge)];
                     out.tip = row.name + "\n" + mServices->words(std::string(badge_word(mark->badge)) + "Tip", { { "[FILE]", mark->master } });
@@ -912,8 +913,9 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
     }
     if (action == "send_from_files")
     {
-        // A script linked to a file, or an object or a prim holding one:
-        // as the marks say, which is nothing asked of the disk.
+        // A script or a notecard linked to a file, or an object or a prim
+        // holding one: as the marks say, which is nothing asked of the
+        // disk.
         const ALScriptLinkBadges& badges = ALScriptLinkBadges::instance();
         return any([&](const Choice& row) {
             if (!present(row))
@@ -922,7 +924,7 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
             }
             if (row.isItem())
             {
-                return row.script && badges.markOf(row.ref()).has_value();
+                return badges.markOf(row.ref()).has_value();
             }
             const std::vector<std::pair<LLUUID, std::string>> prims = mModel.containerPrims({ row });
             return std::any_of(prims.begin(), prims.end(), [&badges](const auto& prim) { return badges.linkedIn(prim.first) > 0; });
@@ -1165,8 +1167,8 @@ void ALScriptExplorerPane::linkScripts(const std::vector<Choice>& rows)
 
 void ALScriptExplorerPane::sendFromFiles(const std::vector<Choice>& rows)
 {
-    // Each linked script chosen, and every linked script of each prim and
-    // object chosen, once.
+    // Each linked script or notecard chosen, and every link of each prim
+    // and object chosen, once.
     ALScriptDiskMasters&                   masters = ALScriptDiskMasters::instance();
     std::vector<ALMasterLink>              links;
     boost::unordered_flat_set<ALScriptRef> taken;
@@ -1185,7 +1187,7 @@ void ALScriptExplorerPane::sendFromFiles(const std::vector<Choice>& rows)
     }
     for (const Choice& row : rows)
     {
-        if (const std::optional<ALMasterLink> link = row.script ? masters.linkOf(row.ref()) : std::nullopt)
+        if (const std::optional<ALMasterLink> link = row.isItem() ? masters.linkOf(row.ref()) : std::nullopt)
         {
             take(*link);
         }
