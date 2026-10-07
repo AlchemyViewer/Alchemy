@@ -575,8 +575,10 @@ bool LLFeatureManager::loadGPUClass()
     // - Completely random avatars triggering a freeze
     // As a result, we filter out these GPUs for shader profiling.
     // - Geenz 11/11/2025
+    // The freezes are AMD's own driver. Mesa's version string carries its own
+    // "25." (e.g. "(Core Profile) Mesa 25.2.1"), so it is left out.
 
-    if (gGLManager.getRawGLString().find("Radeon") != std::string::npos && checkRDNA35() && gGLManager.mDriverVersionVendorString.find("25.") != std::string::npos)
+    if (!gGLManager.mIsMesa && gGLManager.getRawGLString().find("Radeon") != std::string::npos && checkRDNA35() && gGLManager.mDriverVersionVendorString.find("25.") != std::string::npos)
     {
         LL_WARNS("RenderInit") << "Detected AMD RDNA3.5 GPU on a known bad driver; disabling benchmark and occlusion culling to prevent freezes." << LL_ENDL;
         gSavedSettings.setBOOL("SkipBenchmark", true);
