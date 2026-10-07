@@ -42,6 +42,13 @@ namespace
     // The fewest bytes a word changed into one like it has for its change
     // to be marked within it.
     constexpr size_t REFINED_LEAST = 3;
+    // How much walking the fewest words changed may take, by how many the
+    // two lines have, and at most: every line of code as few as can be,
+    // and a long line rewritten throughout -- thousands of words a side,
+    // in another order -- marked as all of its middle changed, rather than
+    // walked as long as a whole text's lines may be.
+    constexpr S64 WORK_PER_WORD  = 64;
+    constexpr S64 MOST_WORD_WORK = 1000000;
 
     // A stretch of the words compared: the same on both sides, or changed
     // -- some of each side's, either side's possibly none -- each as
@@ -60,39 +67,42 @@ namespace
 
     // A match between two changes folded into them where it is no longer
     // than the larger side of the change before it, and of the one after
-    // (diff-match-patch's semantic cleanup), until none is.
+    // (diff-match-patch's semantic cleanup), until none is. Each stretch
+    // put after those kept, and the last three folded while they can be:
+    // the first match from the start that can be folded is, every time,
+    // in one pass.
     void cleanUp(std::vector<Op>& ops, const tokens_t& lw, const tokens_t& rw)
     {
-        bool folded = true;
-        while (folded)
+        size_t kept = 0;
+        for (size_t i = 0; i < ops.size(); ++i)
         {
-            folded = false;
-            for (size_t i = 1; i + 1 < ops.size(); ++i)
+            ops[kept++] = ops[i];
+            while (kept >= 3)
             {
-                const Op& before = ops[i - 1];
-                const Op& match  = ops[i];
-                const Op& after  = ops[i + 1];
+                const Op& before = ops[kept - 3];
+                const Op& match  = ops[kept - 2];
+                const Op& after  = ops[kept - 1];
                 if (match.changed || !before.changed || !after.changed)
                 {
-                    continue;
-                }
-                const S32 length = bytesOf(lw, match.left);
-                if (length <= std::max(bytesOf(lw, before.left), bytesOf(rw, before.right)) &&
-                    length <= std::max(bytesOf(lw, after.left), bytesOf(rw, after.right)))
-                {
-                    Op joined;
-                    joined.changed  = true;
-                    joined.left[0]  = before.left[0];
-                    joined.left[1]  = after.left[1];
-                    joined.right[0] = before.right[0];
-                    joined.right[1] = after.right[1];
-                    ops[i - 1]      = joined;
-                    ops.erase(ops.begin() + static_cast<std::ptrdiff_t>(i), ops.begin() + static_cast<std::ptrdiff_t>(i) + 2);
-                    folded = true;
                     break;
                 }
+                const S32 length = bytesOf(lw, match.left);
+                if (length > std::max(bytesOf(lw, before.left), bytesOf(rw, before.right)) ||
+                    length > std::max(bytesOf(lw, after.left), bytesOf(rw, after.right)))
+                {
+                    break;
+                }
+                Op joined;
+                joined.changed  = true;
+                joined.left[0]  = before.left[0];
+                joined.left[1]  = after.left[1];
+                joined.right[0] = before.right[0];
+                joined.right[1] = after.right[1];
+                ops[kept - 3]   = joined;
+                kept -= 2;
             }
         }
+        ops.resize(kept);
     }
 
     // Where a byte starts a character: not one of UTF-8's continuing bytes.
@@ -118,7 +128,8 @@ void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff:
     ALDiffSame::idsOf(right, right_regions, options.same.get(), options.like, false, ids, rw, b);
     // The runs as stretches the same or changed.
     std::vector<Op> ops;
-    for (const ALTextDiff::Run& run : ALLineDiff::myers(a, b))
+    const S64       work = std::min(MOST_WORD_WORK, WORK_PER_WORD * static_cast<S64>(a.size() + b.size()));
+    for (const ALTextDiff::Run& run : ALLineDiff::myers(a, b, work))
     {
         const bool changed = run.kind != Kind::Same;
         if (changed && !ops.empty() && ops.back().changed)
