@@ -2595,13 +2595,43 @@ namespace
     {
         size_t openBegin, openEnd, closeBegin, closeEnd;
     };
+    // Where a tag that opens at `lt` ends, at its >: one inside a quoted
+    // attribute value -- title="a>b" -- is passed over, and a quote that
+    // closes nowhere is a character like any other.
+    size_t tagEnd(const std::string& text, size_t lt)
+    {
+        for (size_t i = lt + 1; i < text.size(); ++i)
+        {
+            if (text[i] == '"' || text[i] == '\'')
+            {
+                const size_t close = text.find(text[i], i + 1);
+                if (close != std::string::npos)
+                {
+                    i = close;
+                }
+            }
+            else if (text[i] == '>')
+            {
+                return i;
+            }
+        }
+        return std::string::npos;
+    }
     // Every tag in a text paired with its closing one by nesting, so that an
     // inner tag of the same name is not taken for the closing of the outer.
     // Self-closing tags, comments and declarations are no tags.
     std::vector<TagPair> tagPairs(const std::string& text)
     {
-        std::vector<TagPair>                        pairs;
-        std::vector<std::pair<std::string, size_t>> open;
+        // A tag opened and not yet closed: its name, where it begins, and its
+        // > (tagEnd).
+        struct OpenTag
+        {
+            std::string name;
+            size_t      begin = 0;
+            size_t      end   = 0;
+        };
+        std::vector<TagPair> pairs;
+        std::vector<OpenTag> open;
         auto nameAt = [&](size_t at, size_t& end) {
             end = at;
             while (end < text.size() && (isWordByte(text[end]) || text[end] == '-' || text[end] == ':' || text[end] == '.'))
@@ -2631,10 +2661,9 @@ namespace
                 // opened after it were left unclosed.
                 for (size_t i = open.size(); i-- > 0;)
                 {
-                    if (open[i].first == name)
+                    if (open[i].name == name)
                     {
-                        const size_t open_begin = open[i].second;
-                        pairs.push_back(TagPair{ open_begin, text.find('>', open_begin) + 1, lt, gt + 1 });
+                        pairs.push_back(TagPair{ open[i].begin, open[i].end + 1, lt, gt + 1 });
                         open.resize(i);
                         break;
                     }
@@ -2644,10 +2673,17 @@ namespace
             {
                 size_t            name_end;
                 const std::string name = nameAt(lt + 1, name_end);
-                if (!name.empty() && text[gt - 1] != '/')
+                const size_t      end  = tagEnd(text, lt);
+                if (end == std::string::npos)
                 {
-                    open.emplace_back(name, lt);
+                    break;
                 }
+                if (!name.empty() && text[end - 1] != '/')
+                {
+                    open.push_back(OpenTag{ name, lt, end });
+                }
+                lt = end;
+                continue;
             }
             lt = gt;
         }

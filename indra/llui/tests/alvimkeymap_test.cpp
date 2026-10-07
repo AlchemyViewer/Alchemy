@@ -5419,4 +5419,19 @@ namespace tut
         keys("vip<Esc>");
         ensure_equals("vip: the caret at the start of the last line", caretText(), std::string("1:0"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<190>()
+    {
+        set_test_name("a tag ends at the > that is no part of a quoted attribute value");
+        ALCodeEditor& e = make("<a title=\"x>y\">text</a>\n");
+        e.setCaret(ALTextPos(0, 17));
+        keys("dit");
+        ensure_equals("dit takes what the tags hold", flat(e.text()), std::string("<a title=\"x>y\"></a>|"));
+
+        make("<a title='x>y'>text</a>\n");
+        editor->setCaret(ALTextPos(0, 5));
+        keys("dit");
+        ensure_equals("from inside the attribute, its quotes single", flat(editor->text()), std::string("<a title='x>y'></a>|"));
+    }
 }
