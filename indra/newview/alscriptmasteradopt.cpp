@@ -84,7 +84,10 @@ void ALScriptMasterAdopt::probeMore()
                 ALScriptDiskMasters::instance().adopted(ALScriptRef(link.object, link.item), link.master, found.uses, found.missed, hash, stamp);
                 probeMore();
             },
-            /*world*/ true);
+            // Made just now from an item in hand, of contents the object
+            // holds a copy of already: the region asked only where that copy
+            // is not there, or is known to be stale.
+            /*world*/ true, /*refetch*/ false);
     }
     mInProbeMore = false;
 }
