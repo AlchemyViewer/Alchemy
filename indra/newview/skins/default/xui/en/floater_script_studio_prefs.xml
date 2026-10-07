@@ -1057,6 +1057,28 @@ end</floater.string>
              top_pad="4"
              width="370" />
             <check_box
+             control_name="ALScriptUploadHeader"
+             follows="left|top"
+             height="20"
+             label="Say in what is saved when, and what it hashes to"
+             layout="topleft"
+             left="412"
+             name="preproc_upload_header"
+             tool_tip="A script saved preprocessed carries a few comment lines at the top of its compiled half: when it was saved, and a hash of its source and what that expanded to. A script saved as written carries none"
+             top_pad="4"
+             width="370" />
+            <check_box
+             control_name="ALScriptUploadHeaderCreator"
+             follows="left|top"
+             height="20"
+             label="And who saved it"
+             layout="topleft"
+             left="432"
+             name="preproc_upload_creator"
+             tool_tip="The header also names you, as the one who saved the script"
+             top_pad="4"
+             width="350" />
+            <check_box
              control_name="ALScriptPreprocOptimizer"
              follows="left|top"
              height="20"

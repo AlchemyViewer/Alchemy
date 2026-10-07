@@ -41,6 +41,7 @@
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudioweighing.h"
+#include "aluploadheader.h"
 #include "lldate.h"
 #include "llfocusmgr.h"
 
@@ -234,7 +235,21 @@ void ALScriptStudioDoc::placeHeldRuntime()
     }
 }
 
-ALScriptEnvelope ALScriptStudioDoc::envelopeFor(const std::string& expanded_text, const std::string& program) const
+std::string ALScriptStudioDoc::headerFor(const std::string& expanded_text, const Header& header) const
+{
+    if (!header.on)
+    {
+        return std::string();
+    }
+    // No @file: that is a link's, and a tab has none.
+    ALUploadHeader said;
+    said.hash    = ALUploadHeader::hashOf(language.compileTarget, editor ? editor->text() : std::string(), expanded_text);
+    said.date    = ALUploadHeader::dateOf(LLDate::now());
+    said.creator = header.creator;
+    return said.write(language.lua);
+}
+
+ALScriptEnvelope ALScriptStudioDoc::envelopeFor(const std::string& expanded_text, const std::string& program, const Header& header) const
 {
     // Every field its own: the last envelope's texts are not copied in only
     // to be written over.
@@ -245,6 +260,7 @@ ALScriptEnvelope ALScriptStudioDoc::envelopeFor(const std::string& expanded_text
     out.compileTarget    = language.compileTarget;
     out.programVersion   = program;
     out.lastCompiled     = LLDate::now().asString();
+    out.header           = headerFor(expanded_text, header);
     return out;
 }
 

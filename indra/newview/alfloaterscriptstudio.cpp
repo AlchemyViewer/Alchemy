@@ -76,6 +76,7 @@
 #include "altextsearch.h"
 #include "alvimkeymap.h"
 #include "llagent.h"
+#include "llagentui.h"
 #include "llappviewer.h"
 #include "lldate.h"
 #include "lltimer.h"
@@ -1445,7 +1446,21 @@ ALScriptStudioSaving::Options ALFloaterScriptStudio::saveOptions() const
     options.holdOnErrors = hold;
     options.compress     = gSavedSettings.getBOOL("ALScriptPreprocCompress");
     options.program      = LLVersionInfo::instance().getChannelAndVersion();
+    options.header       = uploadHeader();
     return options;
+}
+
+ALScriptStudioDoc::Header ALFloaterScriptStudio::uploadHeader() const
+{
+    static LLCachedControl<bool> header(gSavedSettings, "ALScriptUploadHeader", false);
+    static LLCachedControl<bool> creator(gSavedSettings, "ALScriptUploadHeaderCreator", false);
+    ALScriptStudioDoc::Header said;
+    said.on = header;
+    if (said.on && creator)
+    {
+        LLAgentUI::buildFullname(said.creator);
+    }
+    return said;
 }
 
 void ALFloaterScriptStudio::tidy(Doc& doc, bool fix, bool format_it, bool trim)
@@ -2663,7 +2678,8 @@ void ALFloaterScriptStudio::showExpanded(Doc& doc, const std::string& text)
     // of the envelope a save sends it in, which a runtime error's line
     // counts too; from one where it goes up plain.
     const bool plain = doc.uploaded.valid && doc.uploaded.disabled;
-    doc.expandedEditor->setLineNumberBase(plain ? 0 : doc.envelopeFor(text, saveOptions().program).codeLine());
+    const ALScriptStudioSaving::Options options = saveOptions();
+    doc.expandedEditor->setLineNumberBase(plain ? 0 : doc.envelopeFor(text, options.program, options.header).codeLine());
     // A comparison with the source that waited on this.
     mExpandedCompare.expanded(doc);
     if (&doc != active())

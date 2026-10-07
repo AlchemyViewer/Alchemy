@@ -96,6 +96,9 @@ public:
         // says; and whether the editors show the weights as notes and heat.
         virtual bool        optimizing() const     = 0;
         virtual std::string programVersion() const = 0;
+        // The upload header an envelope carries, which a save's size
+        // counts; none unless asked.
+        virtual ALScriptStudioDoc::Header uploadHeader() const { return {}; }
         virtual bool        weightNotes() const    = 0;
         virtual bool        weightHeat() const     = 0;
         // The Weights tab: whether it is looked at, and the pane.

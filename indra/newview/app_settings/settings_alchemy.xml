@@ -365,6 +365,28 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptUploadHeader</key>
+        <map>
+            <key>Comment</key>
+            <string>A script saved preprocessed carries a header at the top of its compiled half, after the target line: what the save hashes to (XXH128 of the target, the source and the expansion) and when. A script saved as written carries none.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptUploadHeaderCreator</key>
+        <map>
+            <key>Comment</key>
+            <string>The upload header (ALScriptUploadHeader) also names who saved the script.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALScriptPreprocOptimizer</key>
         <map>
             <key>Comment</key>

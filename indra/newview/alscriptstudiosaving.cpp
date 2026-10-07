@@ -234,7 +234,8 @@ void ALScriptStudioSaving::sendPreprocessed(Doc& doc, const Doc::Expanded& sent)
     }
     // In the envelope, with the source as written, so Firestorm opens
     // what we save; the lines that say who wrote it and when are ours.
-    const ALScriptEnvelope envelope = doc.envelopeFor(*sent.text, mWindow.saveOptions().program);
+    const Options          options  = mWindow.saveOptions();
+    const ALScriptEnvelope envelope = doc.envelopeFor(*sent.text, options.program, options.header);
     doc.envelope                    = envelope;
     upload(doc, envelope.wrap(), &sent.map);
 }

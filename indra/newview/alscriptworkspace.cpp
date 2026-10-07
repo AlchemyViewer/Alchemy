@@ -34,8 +34,10 @@
 #include "alscriptpreprocessor.h"
 #include "alscriptregionusage.h"
 #include "alscripttempfiles.h"
+#include "aluploadheader.h"
 #include "lldbstrings.h"
 #include "llagent.h"
+#include "llagentui.h"
 #include "llavatarnamecache.h"
 #include "llcorehttputil.h"
 #include "llappviewer.h"
@@ -59,6 +61,7 @@
 #include "lltrans.h"
 #include "llversioninfo.h"
 #include "llviewerassettype.h"
+#include "llviewercontrol.h"
 #include "llviewerassetupload.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"
@@ -1069,7 +1072,17 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
     request.source        = std::make_shared<const std::string>(envelope ? envelope->source : text);
     request.lua           = lua;
     request.compileTarget = target;
-    ALScriptPreprocessor::instance().run(request, [request, envelope, lua, target, callback, anyway](const ALPreprocessor::Result& expanded) {
+    // The upload header, where asked, read here on the main thread: who it
+    // names. No @file: that is a link's.
+    static LLCachedControl<bool> header_on(gSavedSettings, "ALScriptUploadHeader", false);
+    static LLCachedControl<bool> creator_on(gSavedSettings, "ALScriptUploadHeaderCreator", false);
+    const bool  header = header_on;
+    std::string creator;
+    if (header && creator_on)
+    {
+        LLAgentUI::buildFullname(creator);
+    }
+    ALScriptPreprocessor::instance().run(request, [request, envelope, lua, target, callback, anyway, header, creator](const ALPreprocessor::Result& expanded) {
         ALScriptPrepared prepared;
         if (expanded.hasErrors() || !expanded.pending.empty())
         {
@@ -1119,6 +1132,17 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
             wrapped.compileTarget    = target;
             wrapped.programVersion   = LLVersionInfo::instance().getChannelAndVersion();
             wrapped.lastCompiled     = LLDate::now().asString();
+            // A header of its own or none: one copied from the envelope it
+            // came in would say an old hash and date of new code.
+            wrapped.header.clear();
+            if (header)
+            {
+                ALUploadHeader said;
+                said.hash      = ALUploadHeader::hashOf(target, wrapped.source, wrapped.expanded);
+                said.date      = ALUploadHeader::dateOf(LLDate::now());
+                said.creator   = creator;
+                wrapped.header = said.write(lua);
+            }
             prepared.text            = wrapped.wrap();
             prepared.map             = std::make_shared<const ALSourceMap>(expanded.map);
             if (const std::optional<ALScriptEnvelope> sent = ALScriptEnvelope::parse(prepared.text))

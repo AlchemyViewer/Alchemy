@@ -59,6 +59,15 @@ class ALNotecardEmbedded;
 class ALScriptStudioServices;
 class ALWatchedFile;
 
+// The upload header a save's envelope carries, where it is asked for
+// (ALUploadHeader): what the save hashes to and when -- and who, where
+// `creator` is given.
+struct ALScriptHeaderOptions
+{
+    bool        on = false;
+    std::string creator;
+};
+
 // One tab of the studio: a script, a notecard or a file, and the views
 // of it the pane can show -- its source, and what the preprocessor made
 // of that where it made anything.
@@ -186,9 +195,13 @@ struct ALScriptStudioDoc
     // line the expansion's, which the Preprocessed view shows.
     static const std::string GENERATED;
     RunningPlace       placeOfRunning(S32 line, S32 column) const;
+    typedef ALScriptHeaderOptions Header;
+    // The upload header's text for an expansion of the tab's source; nothing
+    // where it is off.
+    std::string        headerFor(const std::string& expanded, const Header& header) const;
     // The envelope a save sends an expansion in: the source as written,
-    // its target, the program that wrote it and when.
-    ALScriptEnvelope   envelopeFor(const std::string& expanded, const std::string& program) const;
+    // its target, the program that wrote it and when, and the header.
+    ALScriptEnvelope   envelopeFor(const std::string& expanded, const std::string& program, const Header& header = {}) const;
     // The text as it stands, for what takes it off the main thread: one
     // copy of a version, shared by every question asked of it while any of
     // them holds it, rather than one copy each.

@@ -780,6 +780,7 @@ private:
     void                                  askWeights(Doc& doc) override { askAnalyzer(doc, ALScriptAnalysis::Kind::Weigh, ALTextPos()); }
     bool optimizing() const override;
     std::string programVersion() const override;
+    ALScriptStudioDoc::Header uploadHeader() const override;
     bool        weightNotes() const override { return mWeightNotes; }
     bool        weightHeat() const override { return mWeightHeat; }
     ALScriptWeightsPane* weightsPane() override { return mWeightsPane; }
