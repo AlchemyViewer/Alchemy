@@ -231,6 +231,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocomparepairs.cpp
     alscriptstudiocomparewith.cpp
     alscriptstudioexpandedcompare.cpp
+    alscriptstudiodiskmasters.cpp
     alscriptstudiodoc.cpp
     alscriptstudiofileio.cpp
     alscriptstudioglue.cpp

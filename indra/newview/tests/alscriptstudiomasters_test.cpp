@@ -26,14 +26,9 @@
 
 #include "../alscriptstudiomasters.h"
 #include "../alnotecardembedded.h"
-#include "../alscriptmasteradopt.h"
-#include "../alscriptmasterfanout.h"
-#include "../alscriptmastertoasts.h"
-#include "../alscriptmasterwatch.h"
 
 #include "alfilewrite.h"
 #include "alscriptstudio_fixture.h"
-#include "alserialworker.h"
 #include "alwatchedfile.h"
 #include "fsyspath.h"
 #include "llfile.h"
@@ -43,115 +38,69 @@
 
 #include <filesystem>
 
-// --- the account's links, held in memory -------------------------------------
-//
-// ALScriptDiskMasters is the viewer's: its index is a file under the
-// account's folder, and it sends through the workspace, the preprocessor and
-// the region, watches files and says things in toasts, none of which a test
-// can link. What the masters unit asks of it is defined here instead: the
-// links themselves, kept in the real records (ALMasterLinks) and told as
-// changed as the viewer's are, with nothing written, watched or sent -- a
-// write and a send are only noted.
-
-namespace
-{
-    // What the masters asked of the index beyond its links.
-    struct IndexAsked
-    {
-        std::vector<std::string>                                 wrote;
-        std::vector<std::pair<ALScriptRef, ALMasterPlan::Send>> sent;
-    };
-    IndexAsked gIndexAsked;
-    // The links, let go of with the index.
-    ALMasterLinks gLinks;
-}
-
-ALScriptDiskMasters::ALScriptDiskMasters() {}
-ALScriptDiskMasters::~ALScriptDiskMasters()
-{
-    gLinks = ALMasterLinks();
-}
-// Nothing written, so nothing waits to be as the links go.
-void ALScriptDiskMasters::cleanupSingleton() {}
-ALScriptMasterWatch::~ALScriptMasterWatch() = default;
-
-std::optional<ALMasterLink> ALScriptDiskMasters::linkOf(const ALScriptRef& ref)
-{
-    const ALMasterLink* link = gLinks.of(ref.object, ref.item);
-    return link ? std::optional<ALMasterLink>(*link) : std::nullopt;
-}
-
-std::vector<ALMasterLink> ALScriptDiskMasters::mastering(const std::string& master)
-{
-    std::vector<ALMasterLink> out;
-    for (const ALMasterLink* link : gLinks.mastering(master))
-    {
-        out.push_back(*link);
-    }
-    return out;
-}
-
-void ALScriptDiskMasters::link(ALMasterLink link)
-{
-    std::vector<ALMasterLink> made;
-    made.push_back(std::move(link));
-    this->link(std::move(made));
-}
-
-void ALScriptDiskMasters::link(std::vector<ALMasterLink> made)
-{
-    if (made.empty())
-    {
-        return;
-    }
-    for (ALMasterLink& one : made)
-    {
-        gLinks.put(std::move(one));
-    }
-    mChanged();
-}
-
-void ALScriptDiskMasters::unlink(const ALScriptRef& ref)
-{
-    if (gLinks.remove(ref.object, ref.item))
-    {
-        mChanged();
-    }
-}
-
-void ALScriptDiskMasters::wrote(const std::string& path)
-{
-    gIndexAsked.wrote.push_back(path);
-}
-
-void ALScriptDiskMasters::send(const ALScriptRef& ref, ALMasterPlan::Send kind)
-{
-    gIndexAsked.sent.emplace_back(ref, kind);
-}
-
-std::vector<ALScriptDiskMasters::Outcome> ALScriptDiskMasters::takeUnheard()
-{
-    std::vector<Outcome> out;
-    out.swap(mUnheard);
-    return out;
-}
-
-// static
-ALDiskIncludes ALScriptDiskMasters::blessedFor(const std::string&, bool)
-{
-    return ALDiskIncludes();
-}
-
-// static
-std::vector<std::pair<std::string, std::string>> ALScriptDiskMasters::aliasesFor(const std::string&, bool)
-{
-    return {};
-}
-
 namespace
 {
     typedef ALScriptStudioDoc              Doc;
     typedef ALScriptStudioMasters::Unsaved Unsaved;
+
+    // The account's scripts mastered on disk, faked. In the viewer they are
+    // ALScriptDiskMasters': the index a file under the account's folder,
+    // each send through the workspace, the preprocessor and the region, and
+    // the files watched. Here the links are held in memory, in the real
+    // records (ALMasterLinks), and told as changed as the viewer's are;
+    // nothing is written, watched or sent -- a write and a send are only
+    // noted -- and an outcome is told as a test tells it.
+    class FakeDiskMasters final : public ALScriptStudioMasters::DiskMasters
+    {
+    public:
+        std::optional<ALMasterLink> linkOf(const ALScriptRef& ref) override
+        {
+            const ALMasterLink* link = links.of(ref.object, ref.item);
+            return link ? std::optional<ALMasterLink>(*link) : std::nullopt;
+        }
+        std::vector<ALMasterLink> mastering(const std::string& master) override
+        {
+            std::vector<ALMasterLink> out;
+            for (const ALMasterLink* link : links.mastering(master))
+            {
+                out.push_back(*link);
+            }
+            return out;
+        }
+        bool masters(const std::string& master) override { return !mastering(master).empty(); }
+        void link(ALMasterLink link) override
+        {
+            links.put(std::move(link));
+            changed();
+        }
+        void unlink(const ALScriptRef& ref) override
+        {
+            if (links.remove(ref.object, ref.item))
+            {
+                changed();
+            }
+        }
+        void send(const ALScriptRef& ref, ALMasterPlan::Send kind) override { sent.emplace_back(ref, kind); }
+        void wrote(const std::string& path) override { written.push_back(path); }
+        boost::signals2::connection onOutcome(std::function<void(const Outcome& outcome)> heard) override { return told.connect(std::move(heard)); }
+        boost::signals2::connection onChanged(std::function<void()> heard) override { return changed.connect(std::move(heard)); }
+        std::vector<Outcome>        takeUnheard() override
+        {
+            std::vector<Outcome> out;
+            out.swap(unheard);
+            return out;
+        }
+        ALDiskIncludes blessedFor(const std::string&, bool) override { return ALDiskIncludes(); }
+        std::vector<std::pair<std::string, std::string>> aliasesFor(const std::string&, bool) override { return {}; }
+
+        ALMasterLinks                                           links;
+        // What the masters asked beyond the links.
+        std::vector<std::string>                                written;
+        std::vector<std::pair<ALScriptRef, ALMasterPlan::Send>> sent;
+        std::vector<Outcome>                                    unheard;
+        boost::signals2::signal<void(const Outcome&)>           told;
+        boost::signals2::signal<void()>                         changed;
+    };
 
     // The world as a notecard's items see it, answering nothing: what a
     // tab's items need to be made, and no more.
@@ -271,6 +220,7 @@ namespace tut
         al_studio_test::FakeServices           services;
         al_studio_test::QuietAnalysis          analysis;
         std::unique_ptr<FakeMastersWindow>     studio;
+        FakeDiskMasters                        disk;
         std::unique_ptr<ALScriptStudioMasters> unit;
         NoWorld                                world;
         std::string                            folder;
@@ -284,9 +234,6 @@ namespace tut
             }
             unit.reset();
             services.docs.clear();
-            // The links let go of with the test, for the next to start from
-            // none.
-            ALScriptDiskMasters::deleteSingleton();
             if (!folder.empty())
             {
                 std::error_code ignored;
@@ -312,12 +259,11 @@ namespace tut
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             mainLoop();
-            gIndexAsked         = IndexAsked();
             const fsyspath made = std::filesystem::temp_directory_path() / fsyspath("alscriptstudiomasters_" + LLUUID::generateNewID().asString());
             std::filesystem::create_directories(made);
             folder = made.string();
             studio = std::make_unique<FakeMastersWindow>(services, *window.floater);
-            unit   = std::make_unique<ALScriptStudioMasters>(services, analysis, *studio);
+            unit   = std::make_unique<ALScriptStudioMasters>(services, analysis, *studio, disk);
             return *unit;
         }
 
@@ -366,14 +312,14 @@ namespace tut
         }
         // A link made from elsewhere -- another window, the Link tab -- of a
         // tab's script to a file.
-        static ALMasterLink linkFromElsewhere(const Doc& doc, const std::string& path)
+        ALMasterLink linkFromElsewhere(const Doc& doc, const std::string& path)
         {
             ALMasterLink link;
             link.object   = doc.ref.object;
             link.item     = doc.ref.item;
             link.master   = path;
             link.itemName = doc.name;
-            ALScriptDiskMasters::instance().link(link);
+            disk.link(link);
             return link;
         }
 
@@ -393,27 +339,27 @@ namespace tut
         make();
         Doc& script = itemTab("door", "default {}\n");
         Doc& card   = itemTab("card", "notes\n", false, true);
-        ensure("no tab", !ALScriptStudioMasters::canLink(nullptr));
-        ensure("an item's script", ALScriptStudioMasters::canLink(&script));
-        ensure("an item's notecard", ALScriptStudioMasters::canLink(&card));
+        ensure("no tab", !unit->canLink(nullptr));
+        ensure("an item's script", unit->canLink(&script));
+        ensure("an item's notecard", unit->canLink(&card));
 
         script.loaded = false;
-        ensure("not while it loads", !ALScriptStudioMasters::canLink(&script));
+        ensure("not while it loads", !unit->canLink(&script));
         script.loaded     = true;
         script.modifiable = false;
-        ensure("not where it may not be changed", !ALScriptStudioMasters::canLink(&script));
+        ensure("not where it may not be changed", !unit->canLink(&script));
         script.modifiable = true;
         const ALScriptRef ref = script.ref;
         script.ref            = ALScriptRef();
-        ensure("not with no item", !ALScriptStudioMasters::canLink(&script));
+        ensure("not with no item", !unit->canLink(&script));
         script.ref = ref;
 
         studio->openMasterFile(in("a.lsl"), false);
-        ensure("not a file's tab", !ALScriptStudioMasters::canLink(services.findDoc("disk:" + in("a.lsl"))));
+        ensure("not a file's tab", !unit->canLink(services.findDoc("disk:" + in("a.lsl"))));
 
         write(in("door.lsl"), "default {}\n");
         linkFromElsewhere(script, in("door.lsl"));
-        ensure("not once it is linked", !ALScriptStudioMasters::canLink(&script));
+        ensure("not once it is linked", !unit->canLink(&script));
         ensure("another file's tab masters nothing", !unit->mastersAny(services.findDoc("disk:" + in("a.lsl"))));
         studio->openMasterFile(in("door.lsl"), false);
         ensure("the master's tab masters it", unit->mastersAny(services.findDoc("disk:" + in("door.lsl"))));
@@ -442,7 +388,7 @@ namespace tut
         write(in("card.txt"), "a b\n");
         unit->linkToFile(card);
         ensure_equals("no file asked for", studio->picks, 0);
-        ensure("nothing linked", !ALScriptDiskMasters::instance().linkOf(card.ref));
+        ensure("nothing linked", !disk.linkOf(card.ref));
     }
 
     template<> template<>
@@ -459,7 +405,7 @@ namespace tut
             studio->picked      = in(name);
             const size_t before = services.reports.size();
             unit->linkToFile(doc);
-            return !ALScriptDiskMasters::instance().linkOf(doc.ref) && services.reports.size() == before + 1 &&
+            return !disk.linkOf(doc.ref) && services.reports.size() == before + 1 &&
                    alscriptstudiomasters_data::says(said().text, word) && said().failure && said().doc == doc.id && services.findDoc(doc.id) == &doc;
         };
         ensure("SLua for an LSL script", refused(lsl, "door.luau", "MasterNotLSLFile"));
@@ -480,9 +426,9 @@ namespace tut
         studio->picked = in("card.notecard");
         write(in("card.notecard"), "notes\n");
         unit->linkToFile(card);
-        const std::optional<ALMasterLink> a = ALScriptDiskMasters::instance().linkOf(lsl_ref);
-        const std::optional<ALMasterLink> b = ALScriptDiskMasters::instance().linkOf(slua_ref);
-        const std::optional<ALMasterLink> c = ALScriptDiskMasters::instance().linkOf(card_ref);
+        const std::optional<ALMasterLink> a = disk.linkOf(lsl_ref);
+        const std::optional<ALMasterLink> b = disk.linkOf(slua_ref);
+        const std::optional<ALMasterLink> c = disk.linkOf(card_ref);
         ensure("LSL", a && a->master == in("door.lsl") && !a->lua && !a->notecard && a->target == "mono");
         ensure("SLua, by .lua too", b && b->lua && b->target == "luau");
         ensure("a notecard: no language, no target", c && c->notecard && !c->lua && c->target.empty());
@@ -500,7 +446,7 @@ namespace tut
         studio->picked = in("door.lsl");
         unit->linkToFile(same);
         ensure("nothing asked", studio->asked.empty());
-        const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref);
+        const std::optional<ALMasterLink> link = disk.linkOf(ref);
         ensure("linked as picked, from the world's asset", link && link->made == ALMasterLink::Made::Picked && link->base == asset &&
                                                               link->itemName == "door" && link->objectName == "Door");
         ensure("the file's stamp taken, as from a send of it", link->stamp != 0 && link->stamp == ALFileStamp::of(in("door.lsl")).time);
@@ -510,14 +456,14 @@ namespace tut
         ensure("said there, with nothing offered", tab && says(said().text, "MasterLinked") && !says(said().text, "MasterLinkDiffers") &&
                                                        said().doc == tab->id && said().actions.empty());
         ensure("the file's tab acts on the script", tab->master->offerFor == ref);
-        ensure("nothing written or sent", gIndexAsked.wrote.empty() && gIndexAsked.sent.empty());
+        ensure("nothing written or sent", disk.written.empty() && disk.sent.empty());
 
         Doc& other = itemTab("lamp", "default { state_entry() {} }\n");
         write(in("lamp.lsl"), "default {}\n");
         studio->picked = in("lamp.lsl");
         const ALScriptRef other_ref = other.ref;
         unit->linkToFile(other);
-        const std::optional<ALMasterLink> differing = ALScriptDiskMasters::instance().linkOf(other_ref);
+        const std::optional<ALMasterLink> differing = disk.linkOf(other_ref);
         ensure("a file it is not what the script holds: no stamp", differing && differing->stamp == 0);
         Doc* lamp = services.findDoc("disk:" + in("lamp.lsl"));
         ensure("a file it is not: said, Send File and Compare offered on the file's tab",
@@ -539,7 +485,7 @@ namespace tut
         unit->linkToFile(door);
         ensure("asked, the file named", studio->asked == Names{ "door " + in("door.lsl") });
         ensure("Cancel: not linked, the tab kept with what was typed, the file as it was",
-               !ALScriptDiskMasters::instance().linkOf(door.ref) && services.findDoc("door") == &door && door.editor->isDirty() &&
+               !disk.linkOf(door.ref) && services.findDoc("door") == &door && door.editor->isDirty() &&
                    contents(in("door.lsl")) == "default {}\n" && studio->closed.empty());
 
         // Discard, the file what the world holds: as a clean tab is linked,
@@ -547,11 +493,11 @@ namespace tut
         const ALScriptRef door_ref = door.ref;
         studio->answer             = Unsaved::Discard;
         unit->linkToFile(door);
-        std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(door_ref);
+        std::optional<ALMasterLink> link = disk.linkOf(door_ref);
         ensure("Discard: linked, the tab gone", link && studio->closed == Names{ "door" });
         ensure("the file is what the tab last saved: its stamp taken, nothing offered",
                link->stamp == ALFileStamp::of(in("door.lsl")).time && !says(said().text, "MasterLinkDiffers") && said().actions.empty());
-        ensure("the file untouched", contents(in("door.lsl")) == "default {}\n" && gIndexAsked.wrote.empty());
+        ensure("the file untouched", contents(in("door.lsl")) == "default {}\n" && disk.written.empty());
 
         // Discard, the file what was typed and is let go of: not what the
         // world holds.
@@ -561,7 +507,7 @@ namespace tut
         studio->picked = in("lamp.lsl");
         const ALScriptRef lamp_ref = lamp.ref;
         unit->linkToFile(lamp);
-        link = ALScriptDiskMasters::instance().linkOf(lamp_ref);
+        link = disk.linkOf(lamp_ref);
         ensure("the file held up to the saved text, not to what was dropped: it differs, no stamp, Send File and Compare offered",
                link && link->stamp == 0 && says(said().text, "MasterLinkDiffers") && said().actions == Names{ "master_send", "master_compare" });
 
@@ -574,9 +520,9 @@ namespace tut
         studio->answer = Unsaved::Write;
         const ALScriptRef bell_ref = bell.ref;
         unit->linkToFile(bell);
-        link = ALScriptDiskMasters::instance().linkOf(bell_ref);
+        link = disk.linkOf(bell_ref);
         ensure_equals("Write: the file holds what was typed", contents(in("bell.lsl")), std::string("default {}\n// mine\n"));
-        ensure("the write the studio's own", gIndexAsked.wrote == Names{ in("bell.lsl") });
+        ensure("the write the studio's own", disk.written == Names{ in("bell.lsl") });
         ensure("linked, differing from the world: no stamp, Send File and Compare offered",
                link && link->stamp == 0 && says(said().text, "MasterLinkDiffers") && said().actions == Names{ "master_send", "master_compare" });
         ensure("its tab gone", !services.findDoc(bell_ref));
@@ -645,7 +591,7 @@ namespace tut
         // heard marks the link differing.
         door.editor->resetDirty();
         link.state = ALMasterLink::State::Differing;
-        ALScriptDiskMasters::instance().link(link);
+        disk.link(link);
         ensure("not while the save is still being heard", services.findDoc("door") == &door);
         settle();
         ensure("clean: it gave way, whatever it was told", !services.findDoc(door_ref) && studio->closed == Names{ "door" });
@@ -723,7 +669,7 @@ namespace tut
         ensure("nothing from a file's tab", studio->compared.size() == 1 && studio->opened.size() == 1);
 
         unit->offer(door, "master_unlink");
-        ensure("let go of, and said", !ALScriptDiskMasters::instance().linkOf(door.ref) && says(said().text, "MasterUnlinked"));
+        ensure("let go of, and said", !disk.linkOf(door.ref) && says(said().text, "MasterUnlinked"));
         unit->offer(door, "master_compare_file");
         ensure("nothing to compare once unlinked", studio->compared.size() == 1);
     }
@@ -738,7 +684,7 @@ namespace tut
         door.master->hinted        = in("door.lsl");
         const ALScriptRef door_ref = door.ref;
         unit->offer(door, "master_link_hint");
-        const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(door_ref);
+        const std::optional<ALMasterLink> link = disk.linkOf(door_ref);
         ensure("clean: linked, as named", link && link->made == ALMasterLink::Made::Hint && link->master == in("door.lsl"));
 
         Doc& lamp = itemTab("lamp", "default {}\n");
@@ -747,16 +693,16 @@ namespace tut
         lamp.master->hinted = in("lamp.lsl");
         unit->offer(lamp, "master_link_hint");
         ensure("with something typed: not linked, nothing asked, the tab kept",
-               !ALScriptDiskMasters::instance().linkOf(lamp.ref) && studio->asked.empty() && services.findDoc("lamp") == &lamp &&
+               !disk.linkOf(lamp.ref) && studio->asked.empty() && services.findDoc("lamp") == &lamp &&
                    lamp.editor->isDirty());
         ensure("said, Link offered again for after", says(said().text, "MasterHintUnsaved") && said().failure && said().doc == "lamp" &&
                                                         said().actions == Names{ "master_link_hint" });
-        ensure("nothing written", contents(in("lamp.lsl")) == "default {}\n" && gIndexAsked.wrote.empty());
+        ensure("nothing written", contents(in("lamp.lsl")) == "default {}\n" && disk.written.empty());
 
         const ALScriptRef lamp_ref = lamp.ref;
         lamp.editor->resetDirty();
         unit->offer(lamp, "master_link_hint");
-        ensure("saved: linked, its tab giving way", ALScriptDiskMasters::instance().linkOf(lamp_ref) && !services.findDoc(lamp_ref));
+        ensure("saved: linked, its tab giving way", disk.linkOf(lamp_ref) && !services.findDoc(lamp_ref));
     }
 
     template<> template<>

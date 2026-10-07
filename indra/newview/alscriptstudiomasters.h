@@ -115,12 +115,50 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioMasters(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window);
+    // What the masters ask of the account's scripts mastered on disk, the
+    // links and the sends: ALScriptDiskMasters in the viewer (viewer()), and
+    // a test's own in a test.
+    class DiskMasters
+    {
+    public:
+        typedef ALScriptDiskMasters::Outcome Outcome;
+
+        // The link of a script; every script a file masters, and whether it
+        // masters any.
+        virtual std::optional<ALMasterLink> linkOf(const ALScriptRef& ref)       = 0;
+        virtual std::vector<ALMasterLink>   mastering(const std::string& master) = 0;
+        virtual bool                        masters(const std::string& master)   = 0;
+        // A link made, or one replaced; and one let go of.
+        virtual void link(ALMasterLink link)        = 0;
+        virtual void unlink(const ALScriptRef& ref) = 0;
+        // A script sent from its master now, as a save of it is or as the
+        // studio's own send is; and a file the studio wrote, whatever it
+        // masters sent as its save sends it.
+        virtual void send(const ALScriptRef& ref, ALMasterPlan::Send kind) = 0;
+        virtual void wrote(const std::string& path)                         = 0;
+        // What came of each send, or of the world heard changing under a
+        // link; the links changing; and what was said with no window to
+        // hear it, given once.
+        virtual boost::signals2::connection onOutcome(std::function<void(const Outcome& outcome)> heard) = 0;
+        virtual boost::signals2::connection onChanged(std::function<void()> changed)                     = 0;
+        virtual std::vector<Outcome>        takeUnheard()                                                = 0;
+        // The folders a script on disk may read from, which a hint may
+        // reach and nothing else; and the aliases by name.
+        virtual ALDiskIncludes                                   blessedFor(const std::string& master, bool lua) = 0;
+        virtual std::vector<std::pair<std::string, std::string>> aliasesFor(const std::string& master, bool lua) = 0;
+
+    protected:
+        ~DiskMasters() = default;
+    };
+    // The viewer's (alscriptstudiodiskmasters.cpp).
+    static DiskMasters& viewer();
+
+    ALScriptStudioMasters(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window, DiskMasters& disk);
 
     // Whether a tab may be linked to a file: an item's script or notecard,
     // loaded, that may be changed and is linked to none; and whether a tab
     // is a file's that masters scripts.
-    static bool canLink(const Doc* doc);
+    bool canLink(const Doc* doc) const;
     // Whether a notecard's tab carries items, which a file cannot hold, and
     // so may not be linked: said where it does.
     bool carriesItems(const Doc& doc);
@@ -171,7 +209,7 @@ private:
     // tab found again by its id: offered where the tab is still the script
     // that named it, and may still be linked.
     void hintFound(const std::string& id, U32 look, const std::string& hint, bool lua, const std::optional<std::string>& found);
-    void heard(const ALScriptDiskMasters::Outcome& outcome);
+    void heard(const DiskMasters::Outcome& outcome);
     // Whether a link's file may be opened in its script's place: not held,
     // and there.
     static bool openable(const ALMasterLink& link);
@@ -200,6 +238,7 @@ private:
     ALScriptStudioServices&            mServices;
     ALScriptStudioAnalysis&            mAnalysis;
     Window&                            mWindow;
+    DiskMasters&                       mDiskMasters;
     boost::signals2::scoped_connection mOutcomeConnection;
     boost::signals2::scoped_connection mChangedConnection;
     // A look at the tabs asked for, and not yet made.

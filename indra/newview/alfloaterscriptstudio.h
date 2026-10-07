@@ -1387,7 +1387,7 @@ private:
     // Recompiles from the Explorer.
     ALScriptRecompile                  mRecompile{ *this, *this };
     // Its scripts whose master is a file on disk.
-    ALScriptStudioMasters              mMasters{ *this, *this, *this };
+    ALScriptStudioMasters              mMasters{ *this, *this, *this, ALScriptStudioMasters::viewer() };
     std::string                        mCheckingWhere;
     S32                                mCheckedErrors   = 0;
     S32                                mCheckedWarnings = 0;

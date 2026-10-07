@@ -89,17 +89,16 @@ namespace
     };
 }
 
-ALScriptStudioMasters::ALScriptStudioMasters(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window)
-: mServices(services), mAnalysis(analysis), mWindow(window)
+ALScriptStudioMasters::ALScriptStudioMasters(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window, DiskMasters& disk)
+: mServices(services), mAnalysis(analysis), mWindow(window), mDiskMasters(disk)
 {
-    mOutcomeConnection = ALScriptDiskMasters::instance().onOutcome([this](const ALScriptDiskMasters::Outcome& outcome) { heard(outcome); });
-    mChangedConnection = ALScriptDiskMasters::instance().onChanged([this]() { lookAgain(); });
+    mOutcomeConnection = mDiskMasters.onOutcome([this](const DiskMasters::Outcome& outcome) { heard(outcome); });
+    mChangedConnection = mDiskMasters.onChanged([this]() { lookAgain(); });
 }
 
-// static
-bool ALScriptStudioMasters::canLink(const Doc* doc)
+bool ALScriptStudioMasters::canLink(const Doc* doc) const
 {
-    return doc && doc->file.empty() && doc->loaded && doc->modifiable && !doc->ref.isNull() && !ALScriptDiskMasters::instance().linkOf(doc->ref);
+    return doc && doc->file.empty() && doc->loaded && doc->modifiable && !doc->ref.isNull() && !mDiskMasters.linkOf(doc->ref);
 }
 
 bool ALScriptStudioMasters::carriesItems(const Doc& doc)
@@ -118,7 +117,7 @@ bool ALScriptStudioMasters::carriesItems(const Doc& doc)
 
 bool ALScriptStudioMasters::mastersAny(const Doc* doc) const
 {
-    return doc && !doc->file.empty() && ALScriptDiskMasters::instance().masters(doc->file);
+    return doc && !doc->file.empty() && mDiskMasters.masters(doc->file);
 }
 
 void ALScriptStudioMasters::linkToFile(Doc& doc)
@@ -174,7 +173,7 @@ void ALScriptStudioMasters::linkToFile(Doc& doc)
             // the studio's own, which the masters' watch hears as none:
             // whatever else the file masters already is sent now, as any
             // write of it sends it.
-            ALScriptDiskMasters::instance().wrote(path);
+            mDiskMasters.wrote(path);
             asked->editor->resetDirty();
             linkTo(*asked, path, ALMasterLink::Made::Picked, unsaved);
         });
@@ -237,7 +236,7 @@ void ALScriptStudioMasters::linkTo(Doc& doc, const std::string& path, ALMasterLi
         // send of it, so that nothing marks the file as changed since.
         link.stamp = ALFileStamp::of(path).time;
     }
-    ALScriptDiskMasters::instance().link(link);
+    mDiskMasters.link(link);
 
     // The script is changed through its file from here: its tab gives way
     // to the file's.
@@ -265,23 +264,23 @@ void ALScriptStudioMasters::unlink(Doc& doc)
     std::vector<ALScriptRef> refs;
     if (!doc.file.empty())
     {
-        for (const ALMasterLink& one : ALScriptDiskMasters::instance().mastering(doc.file))
+        for (const ALMasterLink& one : mDiskMasters.mastering(doc.file))
         {
             refs.emplace_back(one.object, one.item);
         }
     }
-    else if (ALScriptDiskMasters::instance().linkOf(doc.ref))
+    else if (mDiskMasters.linkOf(doc.ref))
     {
         refs.push_back(doc.ref);
     }
     for (const ALScriptRef& ref : refs)
     {
-        const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref);
+        const std::optional<ALMasterLink> link = mDiskMasters.linkOf(ref);
         if (!link)
         {
             continue;
         }
-        ALScriptDiskMasters::instance().unlink(ref);
+        mDiskMasters.unlink(ref);
         LLStringUtil::format_map_t args;
         args["[NAME]"] = link->itemName;
         args["[FILE]"] = fileNameOf(link->master);
@@ -303,11 +302,11 @@ void ALScriptStudioMasters::sendFromFile(Doc& doc)
         mServices.report(mServices.words("MasterSaveFileFirst", args), true, &doc);
         return;
     }
-    const std::vector<ALMasterLink> links = ALScriptDiskMasters::instance().mastering(doc.file);
+    const std::vector<ALMasterLink> links = mDiskMasters.mastering(doc.file);
     mServices.setStatus(mServices.counted("MasterSending", static_cast<S32>(links.size()), args));
     for (const ALMasterLink& one : links)
     {
-        ALScriptDiskMasters::instance().send(ALScriptRef(one.object, one.item), ALMasterPlan::Send::Derived);
+        mDiskMasters.send(ALScriptRef(one.object, one.item), ALMasterPlan::Send::Derived);
     }
 }
 
@@ -319,7 +318,7 @@ bool ALScriptStudioMasters::openable(const ALMasterLink& link)
 
 bool ALScriptStudioMasters::openMaster(const ALScriptRef& ref, const std::string& name)
 {
-    const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref);
+    const std::optional<ALMasterLink> link = mDiskMasters.linkOf(ref);
     if (!link || !openable(*link))
     {
         return false;
@@ -335,7 +334,7 @@ bool ALScriptStudioMasters::openMaster(const ALScriptRef& ref, const std::string
 bool ALScriptStudioMasters::editMaster(const Doc& doc)
 {
     const std::optional<ALMasterLink> link =
-        doc.file.empty() && !doc.ref.isNull() ? ALScriptDiskMasters::instance().linkOf(doc.ref) : std::nullopt;
+        doc.file.empty() && !doc.ref.isNull() ? mDiskMasters.linkOf(doc.ref) : std::nullopt;
     if (!link || !openable(*link))
     {
         return false;
@@ -354,7 +353,7 @@ void ALScriptStudioMasters::loaded(Doc& doc)
 {
     // Linked while it loaded: looked at with the rest, once the load is
     // done with it.
-    if (doc.file.empty() && !doc.ref.isNull() && ALScriptDiskMasters::instance().linkOf(doc.ref))
+    if (doc.file.empty() && !doc.ref.isNull() && mDiskMasters.linkOf(doc.ref))
     {
         lookAgain();
         return;
@@ -379,8 +378,8 @@ void ALScriptStudioMasters::loaded(Doc& doc)
     // disk on its own thread, since a drive may be slow, or a share far
     // away. Nothing of the tab goes there: what is found comes back to the
     // tab found again by its id.
-    ALDiskIncludes                                   blessed   = ALScriptDiskMasters::blessedFor(std::string(), lua);
-    std::vector<std::pair<std::string, std::string>> aliases   = ALScriptDiskMasters::aliasesFor(std::string(), lua);
+    ALDiskIncludes                                   blessed   = mDiskMasters.blessedFor(std::string(), lua);
+    std::vector<std::pair<std::string, std::string>> aliases   = mDiskMasters.aliasesFor(std::string(), lua);
     const U32                                        look      = ++doc.master->hintLook;
     const std::string                                id        = doc.id;
     const LL::WorkQueue::ptr_t                       main_loop = LL::WorkQueue::getInstance("mainloop");
@@ -436,11 +435,11 @@ void ALScriptStudioMasters::fileSaved(Doc& doc)
     {
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
-        mServices.setStatus(mServices.counted("MasterSending", static_cast<S32>(ALScriptDiskMasters::instance().mastering(doc.file).size()), args));
+        mServices.setStatus(mServices.counted("MasterSending", static_cast<S32>(mDiskMasters.mastering(doc.file).size()), args));
     }
     // What it masters sent, and the scripts that include it sent again --
     // those no tab holds among them -- whether it masters anything or not.
-    ALScriptDiskMasters::instance().wrote(doc.file);
+    mDiskMasters.wrote(doc.file);
 }
 
 void ALScriptStudioMasters::saved(const ALScriptSaved& saved)
@@ -450,7 +449,7 @@ void ALScriptStudioMasters::saved(const ALScriptSaved& saved)
     // most such saves, which looks again; not with one of just what the
     // file last sent, which moves nothing else.
     Doc* doc = mServices.findDoc(saved.ref);
-    if (doc && ALScriptDiskMasters::instance().linkOf(saved.ref))
+    if (doc && mDiskMasters.linkOf(saved.ref))
     {
         // Saved, whatever an undo had made of it: given way as a save's is.
         doc->master->toldClean = false;
@@ -460,7 +459,7 @@ void ALScriptStudioMasters::saved(const ALScriptSaved& saved)
 
 void ALScriptStudioMasters::sayUnheard()
 {
-    for (const ALScriptDiskMasters::Outcome& outcome : ALScriptDiskMasters::instance().takeUnheard())
+    for (const DiskMasters::Outcome& outcome : mDiskMasters.takeUnheard())
     {
         heard(outcome);
     }
@@ -493,7 +492,7 @@ void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
     {
         // Asked for outright: sent as a save of the master is, over a
         // change in the world, which is kept first.
-        ALScriptDiskMasters::instance().send(ref, ALMasterPlan::Send::Direct);
+        mDiskMasters.send(ref, ALMasterPlan::Send::Direct);
     }
     else if (action == "master_compare" && !ref.isNull())
     {
@@ -507,7 +506,7 @@ void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
     {
         // As a clean tab gives way as its script is linked; typed in again
         // since it was offered, told so again, and kept.
-        const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref);
+        const std::optional<ALMasterLink> link = mDiskMasters.linkOf(ref);
         if (!link || !openable(*link))
         {
             return;
@@ -524,7 +523,7 @@ void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
     {
         // The file's tab opened beside the item's, which is kept, for what
         // was typed in it to be copied over.
-        if (const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref))
+        if (const std::optional<ALMasterLink> link = mDiskMasters.linkOf(ref))
         {
             mWindow.openMasterFile(link->master, link->lua);
             if (Doc* tab = masterTab(link->master))
@@ -535,9 +534,9 @@ void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
     }
     else if (action == "master_unlink" && !ref.isNull())
     {
-        if (const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref))
+        if (const std::optional<ALMasterLink> link = mDiskMasters.linkOf(ref))
         {
-            ALScriptDiskMasters::instance().unlink(ref);
+            mDiskMasters.unlink(ref);
             LLStringUtil::format_map_t args;
             args["[NAME]"] = link->itemName;
             args["[FILE]"] = fileNameOf(link->master);
@@ -549,14 +548,14 @@ void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
         // Its master found again where it went: the link kept, its file the
         // one picked.
         mWindow.pickMasterFile([this, ref](const std::string& path) {
-            std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref);
+            std::optional<ALMasterLink> link = mDiskMasters.linkOf(ref);
             if (!link)
             {
                 return;
             }
             link->master = path;
             link->state  = ALMasterLink::State::Active;
-            ALScriptDiskMasters::instance().link(*link);
+            mDiskMasters.link(*link);
             LLStringUtil::format_map_t args;
             args["[NAME]"] = link->itemName;
             args["[FILE]"] = fileNameOf(path);
@@ -593,7 +592,7 @@ void ALScriptStudioMasters::compareWithWorld(Doc& doc, const ALScriptRef& ref)
 
 void ALScriptStudioMasters::compareWithFile(Doc& doc, const ALScriptRef& ref)
 {
-    const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(ref);
+    const std::optional<ALMasterLink> link = mDiskMasters.linkOf(ref);
     if (!link)
     {
         return;
@@ -655,7 +654,7 @@ void ALScriptStudioMasters::giveWay()
         {
             continue;
         }
-        const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(doc->ref);
+        const std::optional<ALMasterLink> link = mDiskMasters.linkOf(doc->ref);
         if (!link)
         {
             // Let go of, or never linked: told again, should it be linked.
@@ -750,7 +749,7 @@ void ALScriptStudioMasters::textChanged(Doc& doc)
     {
         return;
     }
-    const std::optional<ALMasterLink> link = ALScriptDiskMasters::instance().linkOf(doc.ref);
+    const std::optional<ALMasterLink> link = mDiskMasters.linkOf(doc.ref);
     if (link && link->master == doc.master->toldLinked)
     {
         tellKept(doc, *link);
@@ -779,9 +778,9 @@ ALScriptStudioMasters::Doc* ALScriptStudioMasters::masterTab(const std::string& 
     return mServices.findDoc("disk:" + master);
 }
 
-void ALScriptStudioMasters::heard(const ALScriptDiskMasters::Outcome& outcome)
+void ALScriptStudioMasters::heard(const DiskMasters::Outcome& outcome)
 {
-    typedef ALScriptDiskMasters::Outcome::What What;
+    typedef DiskMasters::Outcome::What What;
     LLStringUtil::format_map_t args;
     args["[NAME]"] = outcome.itemName;
     args["[FILE]"] = fileNameOf(outcome.master);

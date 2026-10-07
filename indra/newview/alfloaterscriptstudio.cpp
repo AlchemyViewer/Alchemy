@@ -8753,7 +8753,7 @@ void ALFloaterScriptStudio::addFileCommands()
                 mMasters.linkToFile(*doc);
             }
         },
-        [this]() { return ALScriptStudioMasters::canLink(active()); });
+        [this]() { return mMasters.canLink(active()); });
     mCommands.add(
         "send_file",
         [this]() {
