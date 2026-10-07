@@ -2984,4 +2984,28 @@ namespace tut
         keys("d2$");
         ensure_equals("d2$ onto an empty line joins it", flat(ended.text()), std::string("a|cd|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<103>()
+    {
+        set_test_name("D and d$ on an empty line take nothing, and leave the registers and the clipboard as they were");
+        ALCodeEditor& e = make("one\n\nthree\n");
+        keys("yyj");
+        keys("D");
+        ensure_equals("nothing taken out", flat(e.text()), std::string("one||three|"));
+        ensure_equals("the unnamed register still holds the yank", vim->registerText('"'), std::string("one"));
+        keys("d$");
+        ensure_equals("d$ leaves it too", vim->registerText('"'), std::string("one"));
+        keys("p");
+        ensure_equals("which p puts", flat(e.text()), std::string("one||one|three|"));
+
+        keys(":set clipboard=unnamed<CR>");
+        const std::string outside("outside");
+        LLClipboard::instance().copyToClipboard(outside, 0, static_cast<S32>(outside.size()));
+        keys("k");
+        keys("D");
+        std::string held;
+        LLClipboard::instance().pasteFromClipboard(held);
+        ensure_equals("with the clipboard the unnamed register, the clipboard is left alone", held, outside);
+    }
 }

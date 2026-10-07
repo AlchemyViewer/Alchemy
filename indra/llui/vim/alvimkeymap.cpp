@@ -3561,6 +3561,14 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             {
                 return;
             }
+            // Nothing to take out -- D or d$ on an empty line -- puts
+            // nothing in a register either, as vim's delete has it: what
+            // the registers and the clipboard hold stays. c still keeps
+            // its empty stretch and goes on to insert, as vim's change does.
+            if (op == 'd' && !span.linewise && !span.block && span.range.empty())
+            {
+                return;
+            }
             store(mRegister, text, span.linewise, span.block, false);
             if (op == 'c')
             {
