@@ -133,6 +133,13 @@ ALVimRegisters::Register ALVimRegisters::fetch(char name, bool unnamed_clipboard
     {
         return mUnnamed;
     }
+    // _ gives back nothing, and so does any name none of these keeps: the
+    // clipboard is + and *, and none named where it is the unnamed
+    // register, and nothing else.
+    if (name != 0 && name != '+' && name != '*')
+    {
+        return Register();
+    }
     // What the clipboard holds now: ours, with how it was taken, or
     // somebody else's, taken as characters.
     Register    reg;

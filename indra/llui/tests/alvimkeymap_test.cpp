@@ -3611,4 +3611,34 @@ namespace tut
         ex("put +");
         ensure_equals("and by \"+", flat(editor->text()), std::string("a||||b|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<137>()
+    {
+        set_test_name("the black hole gives back nothing, never the clipboard: \"_p and \"_P put nothing and say nothing, :put _ an empty line, visual \"_p takes the selection out");
+        ALCodeEditor& e = make("abc def\nx\n");
+        const std::string outside("outside");
+        LLClipboard::instance().copyToClipboard(outside, 0, static_cast<S32>(outside.size()));
+        keys("wyiwgg");
+        keys("l\"_p");
+        ensure("nothing said", !vim->messageIsError());
+        ensure_equals("\"_p puts nothing", flat(e.text()), std::string("abc def|x|"));
+        ensure_equals("the caret where it was", caretText(), std::string("0:1"));
+        keys("\"_P");
+        ensure_equals("nor does \"_P", flat(e.text()), std::string("abc def|x|"));
+        keys("\"_3p");
+        ensure("nothing said of a count either", !vim->messageIsError());
+        ensure_equals("nor does a count", flat(e.text()), std::string("abc def|x|"));
+        ex("set clipboard=unnamed");
+        keys("\"_gP");
+        ensure_equals("nor with the clipboard the unnamed register", flat(e.text()), std::string("abc def|x|"));
+        ensure_equals("the caret still where it was", caretText(), std::string("0:1"));
+        ex("put _");
+        ensure("nothing said by :put _", !vim->messageIsError());
+        ensure_equals(":put _: an empty line", flat(e.text()), std::string("abc def||x|"));
+        ensure_equals("the caret on it", caretText(), std::string("1:0"));
+        keys("ggviw\"_p");
+        ensure_equals("visual \"_p: the selection taken out, nothing put", flat(e.text()), std::string(" def||x|"));
+        ensure_equals("the caret where it was", caretText(), std::string("0:0"));
+    }
 }
