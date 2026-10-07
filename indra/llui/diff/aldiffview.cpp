@@ -1171,33 +1171,58 @@ void ALDiffView::drawRanges()
     const auto [right_from, right_end] = rowsInSight(mRight);
     const S32  from = llmin(left_from, right_from);
     const S32  end  = llmax(left_end, right_end);
-    const auto past = std::partition_point(mBandReach.begin(), mBandReach.end(), [from](const std::pair<S32, S32>& band) { return band.second <= from; });
-    for (size_t i = static_cast<size_t>(past - mBandReach.begin()); i < mBands.size() && mBandReach[i].first < end; ++i)
-    {
-        const S32 n = mBands[i];
-        // The one the caret is in, as its rows are, brighter.
-        const bool     linked = n == mLinked;
-        const LLColor4 band   = linked ? mLinkedColor % (0.2f * alpha) : mRight->textColor() % (0.08f * alpha);
-        const LLColor4 edge   = linked ? mLinkedColor % (0.8f * alpha) : mRight->textColor() % (0.35f * alpha);
-        const auto [lf, le] = mModel.rangeRows(n, Column::Left);
-        const auto [rf, re] = mModel.rangeRows(n, Column::Right);
-        const S32 lt = rowY(mLeft, lf);
-        const S32 lb = rowY(mLeft, le);
-        const S32 rt = rowY(mRight, rf);
-        const S32 rb = rowY(mRight, re);
-        if ((lb > top && rb > top) || (lt < bottom && rt < bottom) || (lt == lb && rt == rb))
+    const auto past        = std::partition_point(mBandReach.begin(), mBandReach.end(), [from](const std::pair<S32, S32>& band) { return band.second <= from; });
+    const auto eachInSight = [&](const auto& drawn) {
+        for (size_t i = static_cast<size_t>(past - mBandReach.begin()); i < mBands.size() && mBandReach[i].first < end; ++i)
         {
-            continue;
+            const S32 n = mBands[i];
+            const auto [lf, le] = mModel.rangeRows(n, Column::Left);
+            const auto [rf, re] = mModel.rangeRows(n, Column::Right);
+            const S32 lt = rowY(mLeft, lf);
+            const S32 lb = rowY(mLeft, le);
+            const S32 rt = rowY(mRight, rf);
+            const S32 rb = rowY(mRight, re);
+            if ((lb > top && rb > top) || (lt < bottom && rt < bottom) || (lt == lb && rt == rb))
+            {
+                continue;
+            }
+            drawn(n == mLinked, lt, lb, rt, rb);
         }
-        // The band, and its edges: a bracket on each side over its rows,
-        // the two joined top and bottom.
-        gl_triangle_2d(x0, lt, x1, rt, x1, rb, band, true);
-        gl_triangle_2d(x0, lt, x1, rb, x0, lb, band, true);
-        gl_line_2d(x0, lt, x1, rt, edge);
-        gl_line_2d(x0, lb, x1, rb, edge);
-        gl_line_2d(x0, lt, x0, lb, edge);
-        gl_line_2d(x1, rt, x1, rb, edge);
-    }
+    };
+    // The one the caret is in, as its rows are, brighter.
+    const LLColor4 band        = mRight->textColor() % (0.08f * alpha);
+    const LLColor4 edge        = mRight->textColor() % (0.35f * alpha);
+    const LLColor4 linked_band = mLinkedColor % (0.2f * alpha);
+    const LLColor4 linked_edge = mLinkedColor % (0.8f * alpha);
+    // Each band, then its edges: a bracket on each side over its rows, the
+    // two joined top and bottom. Every band in one batch, each in its own
+    // colour, and every edge in another: a band drawn apiece is two draws,
+    // and a conversion brackets nearly every statement.
+    gGL.getTextureSlot(0)->unbind();
+    gGL.begin(LLRender::TRIANGLES);
+    eachInSight([&](bool linked, S32 lt, S32 lb, S32 rt, S32 rb) {
+        gGL.color4fv((linked ? linked_band : band).mV);
+        gGL.vertex2i(x0, lt);
+        gGL.vertex2i(x1, rt);
+        gGL.vertex2i(x1, rb);
+        gGL.vertex2i(x0, lt);
+        gGL.vertex2i(x1, rb);
+        gGL.vertex2i(x0, lb);
+    });
+    gGL.end();
+    gGL.begin(LLRender::LINES);
+    eachInSight([&](bool linked, S32 lt, S32 lb, S32 rt, S32 rb) {
+        gGL.color4fv((linked ? linked_edge : edge).mV);
+        gGL.vertex2i(x0, lt);
+        gGL.vertex2i(x1, rt);
+        gGL.vertex2i(x0, lb);
+        gGL.vertex2i(x1, rb);
+        gGL.vertex2i(x0, lt);
+        gGL.vertex2i(x0, lb);
+        gGL.vertex2i(x1, rt);
+        gGL.vertex2i(x1, rb);
+    });
+    gGL.end();
 }
 
 bool ALDiffView::takeBack(S32 change)

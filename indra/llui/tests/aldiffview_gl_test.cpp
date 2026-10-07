@@ -308,4 +308,35 @@ namespace tut
         ensure("and on the left", count(merged, left.left, left.left + edge, left.bottom + 1, left.top - 1, orange) >= left.top - left.bottom - 2);
         ensure("not down ours's own change", count(merged, own.left, own.left + edge, own.bottom + 1, own.top - 1, orange) == 0);
     }
+
+    template<> template<>
+    void aldiffview_gl_object::test<6>()
+    {
+        set_test_name("the bands in sight drawn in two batches however many there are: their grounds in one, their edges in the other");
+        ALDiffView& d = make();
+        // Eight lines the same on each side, ranges of two lines each, level:
+        // a band each, which line up nothing the lines would not, so the
+        // sides are drawn alike whatever bands there are.
+        std::string text;
+        for (S32 n = 0; n < 8; ++n)
+        {
+            text += (n ? "\n" : "") + ("same " + std::to_string(n));
+        }
+        // How many draws the comparison makes, drawn once already: what is
+        // put in a texture the first time it is drawn, put in.
+        const auto draws = [&](const ALTextDiff::ranges_t& ranges) {
+            d.setTexts(text, text, ranges);
+            drawn(d);
+            gGL.pushUIMatrix();
+            const U32 before = LLRender::sUICalls;
+            drawn(d);
+            const U32 made = LLRender::sUICalls - before;
+            gGL.popUIMatrix();
+            return made;
+        };
+        const U32 two  = draws({ { 0, 1, 0, 1 }, { 4, 5, 4, 5 } });
+        const U32 four = draws({ { 0, 1, 0, 1 }, { 2, 3, 2, 3 }, { 4, 5, 4, 5 }, { 6, 7, 6, 7 } });
+        ensure("drawn", two > 0);
+        ensure_equals("as many draws for four bands as for two", four, two);
+    }
 }
