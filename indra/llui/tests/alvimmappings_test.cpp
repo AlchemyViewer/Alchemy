@@ -167,4 +167,20 @@ namespace tut
         ensure("the typed one", maps.match(ALVimMappings::NORMAL, chars("Y"), true).full != nullptr);
         ensure_equals("the leader vim's again", maps.leader(), std::string("\\"));
     }
+
+    template<> template<>
+    void alvimmappings_object::test<6>()
+    {
+        set_test_name(":map lists a mapping as vim's does: its keys twelve columns wide by the columns they take, a blank after them however long, the star of a noremap right after");
+        run("map", "Q gj");
+        run("noremap", "ab cd");
+        run("map", "\xC3\xA9 x");
+        run("nmap", "abcdefghijklmn z");
+        ensure("listed", run("map", ""));
+        const std::string expected = "   Q" + std::string(13, ' ') + "gj\n" +
+                                     "   ab" + std::string(10, ' ') + "* cd\n" +
+                                     "   \xC3\xA9" + std::string(13, ' ') + "x\n" +
+                                     "n  abcdefghijklmn   z";
+        ensure_equals("each line as vim's", listing, expected);
+    }
 }

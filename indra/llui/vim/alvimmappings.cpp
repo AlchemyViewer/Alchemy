@@ -30,9 +30,12 @@
 #include "alvimtext.h"
 #include "llstring.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstring>
+#include <iterator>
 
 namespace
 {
@@ -564,8 +567,10 @@ std::string ALVimMappings::list(U8 modes, const std::vector<ALVimInput>& from) c
         {
             out += '\n';
         }
-        const std::string keys = shown(each.from);
-        out += llformat("%-3s%-12s %c %s", modesShown(each.modes).c_str(), keys.c_str(), each.noremap ? '*' : ' ', shown(each.to).c_str());
+        // As vim's :map lists one: the modes three columns wide, the keys
+        // twelve by the columns they take and a blank after them however
+        // long, the star of a noremap, and what they stand for.
+        fmt::format_to(std::back_inserter(out), "{:<3}{:<11} {} {}", modesShown(each.modes), shown(each.from), each.noremap ? '*' : ' ', shown(each.to));
     }
     return out.empty() ? alSaid("VimNoMappingFound", "No mapping found") : out;
 }
