@@ -4818,4 +4818,27 @@ namespace tut
         ensure_equals("5dd with three lines left takes the three", flat(editor->text()), std::string("a"));
         ensure_equals("and keeps them", vim->registerText('"'), std::string("b\nc\nd"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<168>()
+    {
+        set_test_name("p of a register set to no text -- yiw or ciw on an empty line -- puts nothing and says nothing, and :put puts an empty line; a register never set is still nothing");
+        ALCodeEditor& e = make("\nabc\n");
+        keys("\"xyiwjl\"xp");
+        ensure("nothing said: " + vim->message(), vim->message().empty());
+        ensure_equals("nothing put", flat(e.text()), std::string("|abc|"));
+        ensure_equals("the caret where it was", caretText(), std::string("1:1"));
+        keys("\"x3P");
+        ensure("3P neither: " + vim->message(), vim->message().empty() && flat(e.text()) == "|abc|");
+        ex("put x");
+        ensure("nor :put", !vim->messageIsError());
+        ensure_equals(":put x: an empty line under the caret's", flat(e.text()), std::string("|abc||"));
+        keys("\"zp");
+        ensure("a register never set: E353", vim->messageIsError() && vim->message().find("E353") != std::string::npos);
+
+        make("\nabc\n");
+        keys("ciw<Esc>jp");
+        ensure("ciw on an empty line, then p: nothing said: " + vim->message(), vim->message().empty());
+        ensure_equals("and nothing put", flat(editor->text()), std::string("|abc|"));
+    }
 }

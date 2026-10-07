@@ -5111,15 +5111,20 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
 {
     const ALTextDocument& d   = view.document();
     const Register        reg = fetch(name);
-    // Nothing is a register never set, or set to no text: a line is
-    // something however empty, as yy on an empty line keeps one. What _
-    // gives back is no text, put as nothing and said nothing of.
-    if (reg.text.empty() && !reg.linewise)
+    // Nothing is a register never set. One set to no text -- yiw on an
+    // empty line keeps one -- puts nothing and says nothing, as vim's does,
+    // where a line is something however empty, as yy on an empty line keeps
+    // one. What _ gives back is no text, put as nothing and said nothing of.
+    if (!reg.held)
     {
         if (name != '_')
         {
             say(said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, name ? name : '"') } }), true);
         }
+        return;
+    }
+    if (reg.text.empty() && !reg.linewise)
+    {
         return;
     }
     if (count > 1 && reg.text.size() * static_cast<size_t>(count) > MAX_COUNT_TEXT)

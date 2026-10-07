@@ -46,6 +46,10 @@ public:
         std::string text;
         bool        linewise = false;
         bool        block    = false;
+        // Whether anything was put in it, however little: yiw on an empty
+        // line keeps no text, and the register holds that, where one never
+        // set holds nothing at all.
+        bool        held     = false;
     };
     // The clipboard: the viewer's, unless a test gives one of its own.
     typedef std::function<void(const std::string& text)> copy_t;
@@ -66,10 +70,10 @@ public:
     // "" what was last put in any, as is none named where the clipboard is
     // not the unnamed register; + and *, and none named where it is, what
     // the clipboard holds -- with how it was taken, where it is what the
-    // studio put there, an empty line too though the clipboard says it
+    // studio put there, an empty one too though the clipboard says it
     // holds nothing, and as characters otherwise. One never set holds no
-    // text and is no line; so is what _ gives back, and what any other
-    // name does.
+    // text, is no line and is not held; so is what _ gives back, and what
+    // any other name does.
     Register fetch(char name, bool unnamed_clipboard) const;
     // Keys a macro recorded, into its register as characters; its capital
     // adds to it. Neither the unnamed register nor the clipboard is

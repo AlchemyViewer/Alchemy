@@ -48,6 +48,7 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
     reg.text     = std::move(text);
     reg.linewise = linewise;
     reg.block    = block;
+    reg.held     = true;
     if (name == '_')
     {
         return;
@@ -83,7 +84,8 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
         {
             into.text += reg.text;
         }
-        mUnnamed = into;
+        into.held = true;
+        mUnnamed  = into;
         return;
     }
     if (name >= 'a' && name <= 'z')
@@ -149,16 +151,18 @@ ALVimRegisters::Register ALVimRegisters::fetch(char name, bool unnamed_clipboard
     if (mPaste(text))
     {
         reg.text = text;
+        reg.held = true;
         if (text == mUnnamed.text)
         {
             reg.linewise = mUnnamed.linewise;
             reg.block    = mUnnamed.block;
         }
     }
-    else if (mUnnamed.linewise && mUnnamed.text.empty())
+    else if (mUnnamed.held && mUnnamed.text.empty())
     {
-        // An empty line of ours leaves the clipboard empty, which may then
-        // say it holds nothing at all.
+        // An empty one of ours -- a line, or what yiw takes on an empty
+        // line -- leaves the clipboard empty, which may then say it holds
+        // nothing at all.
         reg = mUnnamed;
     }
     return reg;
@@ -171,4 +175,5 @@ void ALVimRegisters::record(char name, const std::string& keys)
     reg.text          = append ? reg.text + keys : keys;
     reg.linewise      = false;
     reg.block         = false;
+    reg.held          = true;
 }

@@ -1093,17 +1093,18 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
         // A register's text as lines, whatever it was taken as: under the
         // range's last line, or above it with !, as vim's [line] is the
         // range's last; above the first line for :0put, under the line
-        // before it. Nothing is a register never set, or set to no text,
-        // as for p: an empty line is a line to put, and so is an empty
-        // last line of several. What _ gives back is no text, which as a
-        // line is an empty one.
+        // before it. Nothing is a register never set, as for p; one set to
+        // no text, as yiw on an empty line sets one, is an empty line to
+        // put, as an empty line is, and so is an empty last line of
+        // several. What _ gives back is no text, which as a line is an
+        // empty one.
         if (!editing)
         {
             return;
         }
         const char                     named = args.empty() ? mVim.mRegister : args[0];
         const ALVimRegisters::Register reg   = mVim.fetch(named);
-        if (reg.text.empty() && !reg.linewise && named != '_')
+        if (!reg.held && named != '_')
         {
             mVim.say(ALVimKeymap::said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, named ? named : '"') } }), true);
             return;
