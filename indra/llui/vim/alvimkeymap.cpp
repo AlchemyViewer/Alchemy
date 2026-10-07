@@ -2958,9 +2958,15 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     span.linewise        = m.linewise;
     span.inclusive       = m.inclusive || m_ch == '$';
     span.registerOne     = m_ch == '%' || m_ch == '{' || m_ch == '}';
+    // The character an inclusive motion ends on taken with it; none where
+    // the stretch ends at a line's end -- g_ on an empty line, ge from
+    // one -- whose break is no character of the stretch's.
     if (m.inclusive)
     {
-        span.range.end = d.nextCluster(span.range.end);
+        if (!atLineEnd(d, span.range.end))
+        {
+            span.range.end = d.nextCluster(span.range.end);
+        }
     }
     else if (m_ch != '$')
     {

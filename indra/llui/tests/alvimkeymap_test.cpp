@@ -4765,4 +4765,31 @@ namespace tut
         ex("normal dliQ");
         ensure_equals("dl on an empty line takes nothing and does not fail: the keys after it run", flat(editor->text()), std::string("ab|Q|c|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<166>()
+    {
+        set_test_name("an inclusive motion that ends at a line's end takes no line break: dg_ on an empty line takes nothing, cg_ keeps its empty end, yg_ yanks nothing, and dge from one goes back to the word's end alone");
+        ALCodeEditor& e = make("a\n\nb\n");
+        keys("yl");
+        e.setCaret(ALTextPos(1, 0));
+        keys("dg_");
+        ensure_equals("dg_ on an empty line: nothing taken", flat(e.text()), std::string("a||b|"));
+        ensure_equals("and nothing kept", vim->registerText('"'), std::string("a"));
+        keys("cg_X<Esc>");
+        ensure_equals("cg_ inserts there, the next line left where it was", flat(e.text()), std::string("a|X|b|"));
+        ensure_equals("keeping the empty end", vim->registerText('"'), std::string());
+
+        make("a\n\nb\n");
+        keys("yl");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("yg_");
+        ensure_equals("yg_ yanks nothing", vim->registerText('0'), std::string());
+
+        make("ab\n\ncd\n");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("dge");
+        ensure_equals("dge from an empty line: back to the b, the line after it kept", flat(editor->text()), std::string("a|cd|"));
+        ensure_equals("what it took", vim->registerText('"'), std::string("b\n"));
+    }
 }
