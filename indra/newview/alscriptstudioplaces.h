@@ -47,8 +47,6 @@ namespace ALScriptPlaces
     // the whole of another.
     bool        holds(const ALScriptSpan& span, const ALTextPos& pos);
     bool        within(const ALScriptSpan& inner, const ALScriptSpan& outer);
-    std::string lineOf(const std::string& text, S32 line);
-    std::string lineOf(const ALTextDocument& text, S32 line);
     // A text's lines, found once, for the many places a name has in one
     // text -- an include, an expansion -- rather than each read by walking
     // the text from its top: a text open in a tab, read where it stands for

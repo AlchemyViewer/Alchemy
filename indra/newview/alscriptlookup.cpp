@@ -53,7 +53,6 @@
 #include <set>
 
 using ALScriptPlaces::isIdentifier;
-using ALScriptPlaces::lineOf;
 using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;

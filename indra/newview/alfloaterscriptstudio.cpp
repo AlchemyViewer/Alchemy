@@ -250,7 +250,6 @@ using ALScriptFileIO::readWholeFile;
 using ALScriptFileIO::StudioLiveFile;
 using ALScriptPlaces::declaredOf;
 using ALScriptPlaces::isIdentifier;
-using ALScriptPlaces::lineOf;
 using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::outlineEntryOf;
 using ALScriptPlaces::outlineValue;

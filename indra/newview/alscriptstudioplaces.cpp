@@ -39,30 +39,6 @@ namespace ALScriptPlaces
         return ALTextRange(ALTextPos(span.line, span.column), ALTextPos(span.endLine, span.endColumn));
     }
 
-    // A line of a text, as it is, for a row of a pane.
-    std::string lineOf(const std::string& text, S32 line)
-    {
-        size_t begin = 0;
-        for (S32 l = 0; l < line && begin != std::string::npos; ++l)
-        {
-            begin = text.find('\n', begin);
-            if (begin != std::string::npos)
-            {
-                ++begin;
-            }
-        }
-        if (begin == std::string::npos)
-        {
-            return std::string();
-        }
-        size_t end = text.find('\n', begin);
-        if (end != std::string::npos && end > begin && text[end - 1] == '\r')
-        {
-            --end;
-        }
-        return text.substr(begin, end == std::string::npos ? std::string::npos : end - begin);
-    }
-
     Lines::Lines(std::shared_ptr<const std::string> held) : mHeld(std::move(held))
     {
         if (mHeld)
@@ -125,15 +101,6 @@ namespace ALScriptPlaces
             path.push_back(found);
             parent = found;
         }
-    }
-
-    std::string lineOf(const ALTextDocument& text, S32 line)
-    {
-        if (line < 0 || line >= text.lineCount())
-        {
-            return std::string();
-        }
-        return text.line(line);
     }
 
     // A name as both languages spell one.

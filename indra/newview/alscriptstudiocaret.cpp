@@ -39,7 +39,6 @@
 
 #include <optional>
 
-using ALScriptPlaces::lineOf;
 using ALScriptPlaces::mapModuleSpan;
 using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::placeText;
@@ -148,7 +147,7 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
         }
         if (place.file.empty())
         {
-            placeText(place, lineOf(doc.editor->document(), span.line));
+            placeText(place, doc.editor->document().line(span.line));
         }
         else if (lines->second.has(span.line))
         {
