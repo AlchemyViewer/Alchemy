@@ -5130,6 +5130,23 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             ALTextIndent::Options options;
             options.tabWidth                   = llmax(1, view.getTabWidth());
             options.softTabs                   = view.getSoftTabs();
+            if (op == '>' && count > 1)
+            {
+                // The count's levels on each line are text the count makes,
+                // held to the most a count may make, as a put's are.
+                size_t lines = 0;
+                for (S32 l = first; l <= last && l < d.lineCount(); ++l)
+                {
+                    lines += d.line(l).empty() ? 0u : 1u;
+                }
+                const size_t level = options.softTabs ? static_cast<size_t>(options.tabWidth) : static_cast<size_t>(1);
+                const size_t bytes = lines * static_cast<size_t>(count) * level;
+                if (bytes > MAX_COUNT_TEXT)
+                {
+                    tooMuch(bytes);
+                    return;
+                }
+            }
             const ALTextEditing::Change shifted = ALTextIndent::shiftLines(d, first, last, llmax(1, count), op == '>', options);
             std::vector<std::pair<ALTextRange, std::string>> edits;
             edits.reserve(shifted.replacements.size());

@@ -5185,4 +5185,18 @@ namespace tut
         ensure("no recursive mapping said: " + vim->message(), !vim->messageIsError());
         ensure_equals("played whole", e.document().line(0).size(), static_cast<size_t>(20002));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<182>()
+    {
+        set_test_name("a visual {count}> that would put in more than a count may make says so and shifts nothing, as a put does; within it, the count's levels");
+        ALCodeEditor& e = make("a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\n");
+        e.setSoftTabs(true);
+        e.setTabWidth(4);
+        keys("VG99999>");
+        ensure("said: " + vim->message(), vim->messageIsError() && vim->message().find("Too large a count") != std::string::npos);
+        ensure_equals("nothing shifted", flat(e.text()), std::string("a|b|c|d|e|f|g|h|i|j|k|"));
+        keys("ggVj2>");
+        ensure_equals("two levels on each line", flat(e.text()), std::string("        a|        b|c|d|e|f|g|h|i|j|k|"));
+    }
 }
