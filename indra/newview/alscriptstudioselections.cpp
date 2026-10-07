@@ -30,19 +30,8 @@
 #include "aldiffview.h"
 #include "alscriptstudioservices.h"
 
-#include <algorithm>
-
 namespace
 {
-    // Where a text put in from a place ends.
-    ALTextPos endOf(const ALTextPos& from, const std::string& text)
-    {
-        const size_t last  = text.rfind('\n');
-        const S32    lines = static_cast<S32>(std::count(text.begin(), text.end(), '\n'));
-        return last == std::string::npos ? ALTextPos(from.line, from.column + static_cast<S32>(text.size()))
-                                         : ALTextPos(from.line + lines, static_cast<S32>(text.size() - last - 1));
-    }
-
     // A place in a stretch's own text where the stretch starts at `at`.
     ALTextPos within(const ALTextPos& at, const ALTextPos& pos)
     {
@@ -147,7 +136,7 @@ void ALScriptStudioSelections::compare(Doc& doc)
             {
                 return false;
             }
-            stretch->end = endOf(stretch->begin, before + put + after);
+            stretch->end = alTextEnd(stretch->begin, before + put + after);
             return true;
         });
     }

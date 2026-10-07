@@ -37,17 +37,22 @@ namespace
     const std::string EMPTY_LINE;
 }
 
+ALTextPos alTextEnd(const ALTextPos& at, std::string_view text)
+{
+    const size_t last_break = text.rfind('\n');
+    if (last_break == std::string_view::npos)
+    {
+        return ALTextPos(at.line, at.column + static_cast<S32>(text.size()));
+    }
+    const S32 breaks = static_cast<S32>(std::count(text.begin(), text.end(), '\n'));
+    return ALTextPos(at.line + breaks, static_cast<S32>(text.size() - last_break - 1));
+}
+
 // --- Edit --------------------------------------------------------------------
 
 ALTextPos ALTextDocument::Edit::workOutEnd() const
 {
-    const size_t last_break = inserted.rfind('\n');
-    if (last_break == std::string::npos)
-    {
-        return ALTextPos(range.begin.line, range.begin.column + static_cast<S32>(inserted.size()));
-    }
-    const S32 breaks = static_cast<S32>(std::count(inserted.begin(), inserted.end(), '\n'));
-    return ALTextPos(range.begin.line + breaks, static_cast<S32>(inserted.size() - last_break - 1));
+    return alTextEnd(range.begin, inserted);
 }
 
 ALTextDocument::Edit ALTextDocument::Edit::inverse() const
@@ -419,14 +424,7 @@ ALTextDocument::Edit ALTextDocument::replaceMany(std::vector<std::pair<ALTextRan
     ALTextPos  made = span.begin;
     const auto append = [&out, &made](std::string_view piece) {
         out.append(piece);
-        const size_t last_break = piece.rfind('\n');
-        if (last_break == std::string_view::npos)
-        {
-            made.column += static_cast<S32>(piece.size());
-            return;
-        }
-        made.line += static_cast<S32>(std::count(piece.begin(), piece.end(), '\n'));
-        made.column = static_cast<S32>(piece.size() - last_break - 1);
+        made = alTextEnd(made, piece);
     };
     for (auto& [range, piece] : kept)
     {

@@ -329,10 +329,7 @@ namespace
             // Deleted forward: what it took stood right after what the first
             // took, and ends where both, laid from the start, reach.
             first.removed += next.removed;
-            ALTextDocument::Edit reach;
-            reach.range    = ALTextRange(first.range.begin, first.range.begin);
-            reach.inserted = first.removed;
-            first.range    = ALTextRange(first.range.begin, reach.endAfter());
+            first.range = ALTextRange(first.range.begin, alTextEnd(first.range.begin, first.removed));
             first.keepEnd(first.range.begin);
             return true;
         }

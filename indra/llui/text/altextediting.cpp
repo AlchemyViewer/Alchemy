@@ -314,12 +314,7 @@ std::optional<Change> joinLines(const ALTextDocument& doc, S32 first, S32 last, 
 
 ALTextPos endOf(const ALTextPos& at, const std::string& text)
 {
-    const size_t last_break = text.rfind('\n');
-    if (last_break == std::string::npos)
-    {
-        return ALTextPos(at.line, at.column + static_cast<S32>(text.size()));
-    }
-    return ALTextPos(at.line + static_cast<S32>(std::count(text.begin(), text.end(), '\n')), static_cast<S32>(text.size() - last_break - 1));
+    return alTextEnd(at, text);
 }
 
 ALTextPos placedThrough(const std::vector<Replacement>& replacements, const ALTextPos& pos, bool pushed)

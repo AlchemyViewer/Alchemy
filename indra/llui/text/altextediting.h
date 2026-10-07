@@ -92,7 +92,7 @@ namespace ALTextEditing
     std::optional<Change> joinLines(const ALTextDocument& doc, S32 first, S32 last, bool keep_blanks);
 
     // Where text put in at a place ends: past its last line break, or along
-    // the place's own line.
+    // the place's own line (alTextEnd).
     ALTextPos endOf(const ALTextPos& at, const std::string& text);
     // A place in a text moved by replacements of it, in order and none over
     // another, as a mark is (ALTextDocument::Edit::placed): pushed along by

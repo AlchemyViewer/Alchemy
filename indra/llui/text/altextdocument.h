@@ -84,6 +84,10 @@ struct ALTextRange
     friend bool operator!=(const ALTextRange& a, const ALTextRange& b) { return !(a == b); }
 };
 
+// Where a text put in at a place ends, its line endings LF: past its last
+// line break, or along the place's own line.
+ALTextPos alTextEnd(const ALTextPos& at, std::string_view text);
+
 // The text behind a text view: lines of UTF-8 without their line endings,
 // and a version that moves on every change. Every edit is one replacement
 // of a range by a string, reported to whoever is listening as the Edit it
