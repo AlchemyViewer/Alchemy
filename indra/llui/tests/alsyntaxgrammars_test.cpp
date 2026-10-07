@@ -27,11 +27,23 @@
 #include "alsyntaxgrammar.h"
 
 #include "albigscript.h"
+#include "altextview.h"
 
 #include "../test/lltut.h"
 
+#include <set>
 #include <string>
 #include <vector>
+
+// llui reaches the viewer for this one, and linking ALTextView, whose colour
+// names are tested here, pulls the object that calls it. Nothing under test
+// goes near it.
+class LLAvatarName;
+const std::string gSyntaxGrammarsTestAnonName("Anon");
+const std::string& rlvGetAnonym(const LLAvatarName& av_name)
+{
+    return gSyntaxGrammarsTestAnonName;
+}
 
 namespace tut
 {
@@ -575,5 +587,25 @@ namespace tut
                       std::string("text:s |operator:=|text: s|punctuation:..|function:type|punctuation:(|text:x|punctuation:)"));
         ensure_equals("a member its head names", lexed("slua", "ll.Say(0)", state, words),
                       std::string("text:ll|punctuation:.|function:Say|punctuation:(|number:0|punctuation:)"));
+    }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<19>()
+    {
+        set_test_name("every kind has a name of its own in a grammar, which names it back, and its colour in a colour table is named after it");
+        std::set<std::string> names;
+        for (size_t i = 0; i < static_cast<size_t>(ALSyntaxKind::COUNT); ++i)
+        {
+            const ALSyntaxKind kind = static_cast<ALSyntaxKind>(i);
+            const std::string  name = alSyntaxKindName(kind);
+            ensure("named once: " + name, names.insert(name).second);
+            ensure("and named back: " + name, alSyntaxKindFromName(name) == kind);
+            ensure("a colour named, but for text's: " + name, ALTextView::kindColorName("Script", kind).empty() == (kind == ALSyntaxKind::Text));
+        }
+        ensure_equals("a comment's colour", ALTextView::kindColorName("Script", ALSyntaxKind::Comment), std::string("ScriptComment"));
+        ensure_equals("a doc comment's", ALTextView::kindColorName("Syntax", ALSyntaxKind::DocComment), std::string("SyntaxDocComment"));
+        ensure_equals("an attribute value's", ALTextView::kindColorName("Syntax", ALSyntaxKind::AttributeValue), std::string("SyntaxAttributeValue"));
+        ensure_equals("a global variable's", ALTextView::kindColorName("Script", ALSyntaxKind::GlobalVariable), std::string("ScriptGlobalVariable"));
+        ensure_equals("a path's", ALTextView::kindColorName("Script", ALSyntaxKind::Path), std::string("ScriptPath"));
     }
 }

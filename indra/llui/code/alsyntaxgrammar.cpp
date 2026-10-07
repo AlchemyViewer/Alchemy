@@ -42,13 +42,58 @@
 
 namespace
 {
-    const char* const KIND_NAMES[] = {
-        "text",     "comment",  "doc_comment", "string",       "escape",       "number",   "keyword",   "control",
-        "type",     "constant", "function",    "event",        "label",        "operator", "punctuation", "preprocessor",
-        "tag",      "attribute", "attribute_value", "entity",   "variable",     "parameter", "property", "deprecated", "invalid",
-        "namespace", "state",   "global_variable", "path",
+    // Each kind and its name in a grammar's file, in the kinds' order,
+    // which is checked: the one table of kinds' names, which a colour
+    // table's names are made from too (ALTextView::kindColorName).
+    struct KindName
+    {
+        ALSyntaxKind kind;
+        const char*  name;
     };
-    static_assert(sizeof(KIND_NAMES) / sizeof(KIND_NAMES[0]) == static_cast<size_t>(ALSyntaxKind::COUNT), "every kind has a name");
+    constexpr KindName KIND_NAMES[] = {
+        { ALSyntaxKind::Text, "text" },
+        { ALSyntaxKind::Comment, "comment" },
+        { ALSyntaxKind::DocComment, "doc_comment" },
+        { ALSyntaxKind::String, "string" },
+        { ALSyntaxKind::Escape, "escape" },
+        { ALSyntaxKind::Number, "number" },
+        { ALSyntaxKind::Keyword, "keyword" },
+        { ALSyntaxKind::Control, "control" },
+        { ALSyntaxKind::Type, "type" },
+        { ALSyntaxKind::Constant, "constant" },
+        { ALSyntaxKind::Function, "function" },
+        { ALSyntaxKind::Event, "event" },
+        { ALSyntaxKind::Label, "label" },
+        { ALSyntaxKind::Operator, "operator" },
+        { ALSyntaxKind::Punctuation, "punctuation" },
+        { ALSyntaxKind::Preprocessor, "preprocessor" },
+        { ALSyntaxKind::Tag, "tag" },
+        { ALSyntaxKind::Attribute, "attribute" },
+        { ALSyntaxKind::AttributeValue, "attribute_value" },
+        { ALSyntaxKind::Entity, "entity" },
+        { ALSyntaxKind::Variable, "variable" },
+        { ALSyntaxKind::Parameter, "parameter" },
+        { ALSyntaxKind::Property, "property" },
+        { ALSyntaxKind::Deprecated, "deprecated" },
+        { ALSyntaxKind::Invalid, "invalid" },
+        { ALSyntaxKind::Namespace, "namespace" },
+        { ALSyntaxKind::State, "state" },
+        { ALSyntaxKind::GlobalVariable, "global_variable" },
+        { ALSyntaxKind::Path, "path" },
+    };
+    constexpr bool kindNamesInOrder()
+    {
+        for (size_t i = 0; i < std::size(KIND_NAMES); ++i)
+        {
+            if (KIND_NAMES[i].kind != static_cast<ALSyntaxKind>(i))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    static_assert(std::size(KIND_NAMES) == static_cast<size_t>(ALSyntaxKind::COUNT) && kindNamesInOrder(),
+                  "every kind has a name, in the order of the kinds");
 
     // What a character class rule matches: a set of ASCII bytes, and
     // whether every byte beyond ASCII is in it too.
@@ -115,16 +160,16 @@ namespace
 const char* alSyntaxKindName(ALSyntaxKind kind)
 {
     const size_t index = static_cast<size_t>(kind);
-    return index < static_cast<size_t>(ALSyntaxKind::COUNT) ? KIND_NAMES[index] : "text";
+    return index < std::size(KIND_NAMES) ? KIND_NAMES[index].name : "text";
 }
 
 std::optional<ALSyntaxKind> alSyntaxKindFromName(std::string_view name)
 {
-    for (size_t i = 0; i < static_cast<size_t>(ALSyntaxKind::COUNT); ++i)
+    for (const KindName& known : KIND_NAMES)
     {
-        if (name == KIND_NAMES[i])
+        if (name == known.name)
         {
-            return static_cast<ALSyntaxKind>(i);
+            return known.kind;
         }
     }
     return std::nullopt;

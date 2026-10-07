@@ -329,9 +329,9 @@ public:
     const std::string& colorPrefix() const { return mColorPrefix; }
     // The colour a kind is drawn in here.
     const LLColor4& colorForKind(ALSyntaxKind kind) const;
-    // The colour table's name for a kind's colour under a prefix:
-    // "SyntaxComment", "ScriptComment". Text has none, being the view's
-    // own text colour.
+    // The colour table's name for a kind's colour under a prefix, its name
+    // in a grammar in camel case: "SyntaxComment", "ScriptDocComment".
+    // Text has none, being the view's own text colour.
     static std::string kindColorName(std::string_view prefix, ALSyntaxKind kind);
     // Whether the text has changed since it was set or saved.
     bool            isDirty() const override { return !mUndo.isPristine(); }

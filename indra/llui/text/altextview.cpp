@@ -79,17 +79,6 @@ namespace
     const S32 H_MARGIN              = 16;
     const F32 CARET_MARGIN          = 8.f;
 
-    // What each kind's colour is called in the colour table, after the
-    // prefix; Text is the view's own text colour.
-    const char* const KIND_COLOR_SUFFIXES[] = {
-        "",           "Comment",     "DocComment",   "String",    "Escape",         "Number",    "Keyword",
-        "Control",    "Type",        "Constant",     "Function",  "Event",          "Label",     "Operator",
-        "Punctuation", "Preprocessor", "Tag",        "Attribute", "AttributeValue", "Entity",    "Variable",
-        "Parameter",  "Property",    "Deprecated",   "Invalid",     "Namespace",      "State",     "GlobalVariable",
-        "Path",
-    };
-    static_assert(sizeof(KIND_COLOR_SUFFIXES) / sizeof(KIND_COLOR_SUFFIXES[0]) == static_cast<size_t>(ALSyntaxKind::COUNT), "every kind has a colour");
-
     // Whether a command changes the text, which a read-only view refuses.
     // Every command is named, with no default, so that one added to the
     // list is a build that fails here until someone says which it is.
@@ -4949,12 +4938,26 @@ const LLColor4& ALTextView::colorForKind(ALSyntaxKind kind) const
 // static
 std::string ALTextView::kindColorName(std::string_view prefix, ALSyntaxKind kind)
 {
-    const size_t index = static_cast<size_t>(kind);
-    if (index == 0 || index >= static_cast<size_t>(ALSyntaxKind::COUNT))
+    // Text is the view's own text colour.
+    if (kind == ALSyntaxKind::Text || static_cast<size_t>(kind) >= static_cast<size_t>(ALSyntaxKind::COUNT))
     {
         return std::string();
     }
-    return std::string(prefix) + KIND_COLOR_SUFFIXES[index];
+    // The kind's name in a grammar, in camel case after the prefix:
+    // doc_comment, ScriptDocComment.
+    std::string name(prefix);
+    bool        upper = true;
+    for (const char* c = alSyntaxKindName(kind); *c; ++c)
+    {
+        if (*c == '_')
+        {
+            upper = true;
+            continue;
+        }
+        name += (upper && *c >= 'a' && *c <= 'z') ? static_cast<char>(*c - 'a' + 'A') : *c;
+        upper = false;
+    }
+    return name;
 }
 
 const LLColor4& ALTextView::backgroundColor() const
