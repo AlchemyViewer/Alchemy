@@ -1139,8 +1139,10 @@ private:
     S32                     mStickyTop     = -1;
     std::vector<S32>        mStickyFolded;
     bool                    mStickyValid   = false;
-    // The lines last hidden by folds, which a change of them changes only.
+    // The lines last hidden by folds, and the layout's hidden revision
+    // then: while neither has moved, the layout hides what the folds do.
     std::vector<std::pair<S32, S32>> mHiddenByFolds;
+    U32                              mHiddenByFoldsAt = 0;
 
     completion_provider_t   mProvider;
     completion_request_t    mCompletionRequest;

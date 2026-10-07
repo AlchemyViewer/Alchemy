@@ -3108,4 +3108,28 @@ namespace tut
         ensure("nothing named for the string", !named);
         e.closeCompletion();
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<83>()
+    {
+        set_test_name("a folded block's lines stay hidden through a rename inside it, and a fold taken with its header leaves none of them hidden");
+        ALCodeEditor& e = make("integer n;\nf()\n{\n    n = 1;\n    llSay(0, (string)n);\n}\ng()\n{\n    n = 2;\n}");
+        ensure("folds", e.foldAt(1));
+        ensure("its lines hidden", e.layout().hidden(2) && e.layout().hidden(5) && !e.layout().hidden(6));
+        e.setCaret(ALTextPos(6, 0));
+        // A name inside it replaced, as a rename or Replace All does: the
+        // layout shows the line it made, which the fold still holds.
+        ensure("replaced", e.replaceAll({ { ALTextRange(ALTextPos(3, 4), ALTextPos(3, 5)), "total" } }));
+        ensure_equals("the line", e.document().line(3), std::string("    total = 1;"));
+        ensure("still folded, the line replaced hidden with the rest", e.isFolded(1) && e.layout().hidden(2) && e.layout().hidden(3) && e.layout().hidden(5));
+        ensure_equals("six rows in sight", e.layout().totalHeight(), 6 * e.layout().rowHeight());
+
+        // The header taken with the line above it: the fold goes, and every
+        // line it hid, moved up a line, is in sight.
+        e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 3)));
+        key(KEY_DELETE);
+        ensure_equals("the header gone", e.document().line(1), std::string("{"));
+        ensure("nothing folded", !e.isFolded(0) && !e.isFolded(1));
+        ensure("nothing hidden", !e.layout().anyHidden() && !e.layout().hidden(1));
+    }
 }

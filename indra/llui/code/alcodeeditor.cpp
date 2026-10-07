@@ -2003,26 +2003,35 @@ void ALCodeEditor::settleFolds()
 void ALCodeEditor::applyFolds()
 {
     mFoldsDirty = false;
-    // Only what changed: the lines no longer folded away shown, the lines
-    // folded away now hidden.
+    // The layout slides what it hides with an edit and shows every line an
+    // edit makes, so once what it hides has changed, the lines last hidden
+    // by folds are no guide to the lines it has folded: each line is set
+    // as the folds have it, where it is not so already. With no folds then
+    // or now, it has none folded.
     std::vector<std::pair<S32, S32>> hidden = folds().hidden(document(), getTabWidth());
-    if (hidden == mHiddenByFolds && !mHiddenByFolds.empty())
+    ALTextLayout&                    lines  = layout();
+    if (hidden == mHiddenByFolds && (hidden.empty() || lines.hiddenRevision() == mHiddenByFoldsAt))
     {
         return;
     }
-    const S32 last_line = document().lineCount() - 1;
-    for (const auto& [first, last] : mHiddenByFolds)
+    // In the order the folds start in; one inside another ends inside it.
+    const S32 count   = lines.lineCount();
+    size_t    next    = 0;
+    S32       through = -1;
+    for (S32 l = 0; l < count; ++l)
     {
-        if (first <= last_line)
+        for (; next < hidden.size() && hidden[next].first <= l; ++next)
         {
-            layout().setHidden(ALTextLayout::HiddenBy::Folds, first, llmin(last, last_line), false);
+            through = llmax(through, hidden[next].second);
+        }
+        const bool folded = l <= through;
+        if (lines.hiddenBy(l, ALTextLayout::HiddenBy::Folds) != folded)
+        {
+            lines.setHidden(ALTextLayout::HiddenBy::Folds, l, l, folded);
         }
     }
-    for (const auto& [first, last] : hidden)
-    {
-        layout().setHidden(ALTextLayout::HiddenBy::Folds, first, last, true);
-    }
     mHiddenByFolds.swap(hidden);
+    mHiddenByFoldsAt = lines.hiddenRevision();
 }
 
 ALFoldModel& ALCodeEditor::folds()
