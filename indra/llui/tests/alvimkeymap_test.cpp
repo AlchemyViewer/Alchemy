@@ -358,7 +358,7 @@ namespace tut
         keys("gg<C-v>jld");
         ensure_equals("a block delete takes the columns", flat(e.text()), std::string("hree four|five six|"));
         keys("v$y");
-        ensure_equals("v $ y yanks to the line's end", vim->registerText('"'), std::string("hree four"));
+        ensure_equals("v $ y yanks to the line's end, and its break", vim->registerText('"'), std::string("hree four\n"));
         keys("vjo");
         ensure_equals("o swaps the ends", caretText(), std::string("0:0"));
         keys("<Esc>");
@@ -3131,9 +3131,9 @@ namespace tut
         const std::vector<ALTextRange>& lit = editor->highlights(ALCodeEditor::Highlight::Block);
         ensure("with $, lit to every line's end", lit.size() == 2 && lit[0] == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 6)));
         keys("h");
-        ensure("and no longer once the caret moves along the line",
+        ensure("and no longer once the caret moves along the line, from past the last character onto it",
                editor->highlights(ALCodeEditor::Highlight::Block).size() == 2 &&
-                   editor->highlights(ALCodeEditor::Highlight::Block)[0] == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)));
+                   editor->highlights(ALCodeEditor::Highlight::Block)[0] == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)));
         keys("$d");
         ensure_equals("a block taken with $ is every line to its end", flat(editor->text()), std::string("||"));
     }
@@ -4563,5 +4563,37 @@ namespace tut
         ensure_equals("~ over the break: the text recased, nothing joined", flat(editor->text()), std::string("abC|def|ghi|"));
         keys("vlJ");
         ensure_equals("J over lines takes no break: two lines joined, not three", flat(editor->text()), std::string("abC def|ghi|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<160>()
+    {
+        set_test_name("$ in a visual mode goes past the line's last character, onto its break: v$ y, d, c and p take the line through it, . goes to whatever end a line has, and h steps back onto the last");
+        ALCodeEditor& e = make("hree four\nfive six\n");
+        keys("v$y");
+        ensure_equals("v$y yanks the line and its break", vim->registerText('"'), std::string("hree four\n"));
+        keys("v$d");
+        ensure_equals("v$d joins the next line on", flat(e.text()), std::string("five six|"));
+
+        make("hree four\nfive six\n");
+        keys("v$cX<Esc>");
+        ensure_equals("v$c changes the line and its break", flat(editor->text()), std::string("Xfive six|"));
+
+        make("X\nhree four\nfive six\n");
+        keys("\"aylj0v$\"ap");
+        ensure_equals("v$p puts in place of the line and its break", flat(editor->text()), std::string("X|Xfive six|"));
+
+        make("abc\ndef\n");
+        keys("v$hd");
+        ensure_equals("h from past the end onto the last character, which takes no break", flat(editor->text()), std::string("|def|"));
+
+        make("ab\ncdefgh\nq\n");
+        keys("v$d.");
+        ensure_equals(". to the end of a longer line, and its break", flat(editor->text()), std::string("q|"));
+
+        make("longer\nab\n");
+        editor->setCaret(ALTextPos(0, 5));
+        keys("<C-v>j$d");
+        ensure_equals("a block taken with $ onto a shorter line: from past that line's end", flat(editor->text()), std::string("lo|ab|"));
     }
 }

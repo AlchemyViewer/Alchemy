@@ -473,7 +473,8 @@ private:
     // block's columns as the reader counts them, or every line's end for
     // one taken with $; characters from the selection's two ends, one past
     // a line's last counted a column more than the line has, as vim counts
-    // a line's break -- and the keys from the operator on.
+    // a line's break, or to the last line's end for one taken with $ --
+    // and the keys from the operator on.
     struct VisualExtent
     {
         bool valid   = false;

@@ -858,7 +858,9 @@ void ALVimKeymap::noteVisualOperation(const ALTextDocument& d, const Span& span,
         mVisualPending.lines   = lines_hint >= 0 ? lines_hint : b.line - a.line;
         mVisualPending.columns = past - (b.line == a.line ? a.column : 0);
     }
-    mVisualPending.toEnd   = span.block && span.toEnd;
+    // To the end again, whatever its length, where the caret went there
+    // with $: a block's every line's, or the last line's of characters.
+    mVisualPending.toEnd   = span.block ? span.toEnd : mVisualPending.mode == Mode::Visual && mWantColumn == S32_MAX;
     // The operator is the key being handled: the last one typed.
     mVisualPending.opAt = mCommandInputs.empty() ? 0 : mCommandInputs.size() - 1;
 }
@@ -3137,8 +3139,9 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 // As much again from the caret, selected as it was, then
                 // the operator and what followed it.
                 const ALTextPos from_here = view.caret();
-                // A block taken with $ to every line's end again, and no
-                // other, whatever went to a line's end last.
+                // A selection taken with $ to the end again -- a block to
+                // every line's -- and no other, whatever went to a line's
+                // end last.
                 mWantColumn = mLastVisual.toEnd ? S32_MAX : -1;
                 enterVisual(view, mLastVisual.mode);
                 ALTextPos to = from_here;
@@ -3152,9 +3155,10 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 else if (mLastVisual.mode == Mode::Visual)
                 {
                     // As many characters again; where the line has fewer,
-                    // to past its last, which takes its break.
+                    // or the selection was taken with $, to past its last,
+                    // which takes its break.
                     to.column = (mLastVisual.lines == 0 ? from_here.column : 0) + mLastVisual.columns;
-                    if (to.column > d.lineLength(to.line))
+                    if (mLastVisual.toEnd || to.column > d.lineLength(to.line))
                     {
                         to = d.lineEnd(to.line);
                     }
@@ -3546,9 +3550,11 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             m.to           = d.lineEnd(line);
             m.inclusive    = false;
             // To the line's end, taken with the last character: an
-            // operator reaches the end, the caret sits on the last. And
-            // every line's end from here on, for j and k.
-            if (!mOperator && m.to.column > 0)
+            // operator reaches the end, the caret sits on the last -- a
+            // visual one past it, on the line's break, which the selection
+            // takes, as vim's does. And every line's end from here on, for
+            // j and k.
+            if (!mOperator && !isVisual() && m.to.column > 0)
             {
                 m.to = d.prevCluster(m.to);
             }
