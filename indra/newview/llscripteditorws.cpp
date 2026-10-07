@@ -2445,6 +2445,17 @@ namespace
     }
 }
 
+bool LLScriptEditorWSServer::holds(const ALScriptRef& ref) const
+{
+    if (mSubscriptions.find(buildScriptSubscriptionId(ref.object, ref.item)) != mSubscriptions.end())
+    {
+        return true;
+    }
+    LLViewerObject* prim = ref.inInventory() ? nullptr : gObjectList.findObject(ref.object);
+    const LLViewerObject* root = prim && prim->getRootEdit() ? prim->getRootEdit() : prim;
+    return root && isObjectPublished(root->getID());
+}
+
 void LLScriptEditorWSServer::sendCompiled(const ALScriptCompileResult& result)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;

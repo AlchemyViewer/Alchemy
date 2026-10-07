@@ -1450,6 +1450,32 @@ ALScriptStudioSaving::Options ALFloaterScriptStudio::saveOptions() const
     return options;
 }
 
+void ALFloaterScriptStudio::pickMasterFile(std::function<void(const std::string& path)> chosen)
+{
+    pickFilesToOpen(false, [chosen](const std::vector<std::string>& files) {
+        if (!files.empty())
+        {
+            chosen(files.front());
+        }
+    });
+}
+
+void ALFloaterScriptStudio::openMasterFile(const std::string& path, bool lua)
+{
+    openFile(path, lua, -1, -1, 0);
+}
+
+void ALFloaterScriptStudio::closeTab(Doc& doc)
+{
+    letGoOf(doc);
+}
+
+bool ALFloaterScriptStudio::heldByBridge(const ALScriptRef& ref)
+{
+    LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer();
+    return server && server->holds(ref);
+}
+
 ALScriptStudioDoc::Header ALFloaterScriptStudio::uploadHeader() const
 {
     static LLCachedControl<bool> header(gSavedSettings, "ALScriptUploadHeader", false);
@@ -2127,6 +2153,12 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
         renameDoc(*mDocs[already], name);
         return;
     }
+    // A script whose master is a file on disk is changed through the file:
+    // its tab opened in the script's place.
+    if (!carried && mMasters.openMaster(ref, name))
+    {
+        return;
+    }
     const bool preview = mNavigation.openingPreview();
     if (preview)
     {
@@ -2439,6 +2471,8 @@ void ALFloaterScriptStudio::loaded(const ALScriptLoaded& answer)
             doc.save.letAllPast(doc.editor->document().version());
             mSaving.save(doc);
         }
+        // A file the script names as its own, offered.
+        mMasters.loaded(doc);
     }
     fillTabs();
     if (index == mActive)
@@ -4867,6 +4901,8 @@ void ALFloaterScriptStudio::fileSettled(Doc& doc)
     doc.editor->resetDirty();
     mWeighing.keepSaved(doc);
     mRecovery.keep(doc);
+    // The scripts it is the master of sent.
+    mMasters.fileSaved(doc);
     // The scripts that include it see the file as it is now: those whose
     // last expansion read it, and those that one may have been wanted by
     // -- an expansion with a problem, an include not found say -- not
@@ -7816,6 +7852,10 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
         // As View > Show Comparison brings it back.
         showView(doc, Doc::View::Compare, true);
     }
+    else if (action.rfind("master_", 0) == 0)
+    {
+        mMasters.offer(doc, action);
+    }
 }
 
 void ALFloaterScriptStudio::outputShowDoc(Doc& doc, bool problems)
@@ -8618,6 +8658,34 @@ void ALFloaterScriptStudio::addFileCommands()
             Doc* doc = active();
             return doc && doc->loaded && doc->modifiable && !doc->notecard;
         });
+    // A script's master on disk: linked to a file, sent from it, let go of.
+    mCommands.add(
+        "link_file",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                mMasters.linkToFile(*doc);
+            }
+        },
+        [this]() { return ALScriptStudioMasters::canLink(active()); });
+    mCommands.add(
+        "send_file",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                mMasters.sendFromFile(*doc);
+            }
+        },
+        [this]() { return mMasters.mastersAny(active()); });
+    mCommands.add(
+        "unlink_file",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                mMasters.unlink(*doc);
+            }
+        },
+        [this]() { return mMasters.mastersAny(active()); });
     mCommands.add("preferences", []() { LLFloaterReg::showInstance("script_studio_prefs"); });
     // The region asked for its language definitions again, whatever is
     // kept of them: for a script checked against functions the region has

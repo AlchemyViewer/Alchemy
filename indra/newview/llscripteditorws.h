@@ -257,6 +257,10 @@ public:
     bool publishObject(const LLUUID& object_id);
     void unpublishObject(const LLUUID& object_id, const std::string& reason = "");
     bool isObjectPublished(const LLUUID& object_id) const;
+    // Whether a client holds a script: subscribed to it, or its object
+    // published to one -- where saving it from elsewhere gives it two
+    // masters.
+    bool holds(const ALScriptRef& ref) const;
 
     // The world's way in to the publishing, which the manager does.
     void onPrimInventoryReady(const LLUUID& object_id, const LLUUID& prim_id);

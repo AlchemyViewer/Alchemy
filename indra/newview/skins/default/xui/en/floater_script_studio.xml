@@ -637,6 +637,51 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="RecompileUnsaved">[NAME] has unsaved changes; the recompile uses the version saved on the server, without them.</floater.string>
     <floater.string name="SavedByEditor">another editor</floater.string>
     <floater.string name="SavedByQueue">a recompile</floater.string>
+    <floater.string name="SavedByFile">its file on disk</floater.string>
+    <floater.string name="SavedByStudio">Script Studio</floater.string>
+    <floater.string name="MasterSaveFirst">Save [NAME], or put back what was typed, before linking it to a file: the file's text is what it will hold.</floater.string>
+    <floater.string name="MasterNotSLuaFile">[FILE] is not an SLua file, and [NAME] is SLua.</floater.string>
+    <floater.string name="MasterNotLSLFile">[FILE] is not an LSL file, and [NAME] is LSL.</floater.string>
+    <floater.string name="MasterLinked">[NAME] is linked to [FILE]: from now on it is changed through the file, and saving the file sends it.</floater.string>
+    <floater.string name="MasterLinkedBridge">VS Code holds [NAME] too: whichever saves it last is what it holds.</floater.string>
+    <floater.string name="MasterLinkDiffers">[FILE] is not what [NAME] holds now: the next save of the file sends it, and keeps what [NAME] had in History.</floater.string>
+    <floater.string name="MasterUnlinked">[NAME] is no longer linked to [FILE].</floater.string>
+    <floater.string name="MasterSaveFileFirst">Save [NAME] before sending it: what goes up is the file on disk.</floater.string>
+    <floater.string name="MasterSendingA">Sending [NAME] to its script.</floater.string>
+    <floater.string name="MasterSendingB">Sending [NAME] to its [COUNT] scripts.</floater.string>
+    <floater.string name="MasterOpened">[NAME] is linked to [FILE]: its file opened in its place.</floater.string>
+    <floater.string name="MasterHinted">[NAME] names [FILE] as its file.</floater.string>
+    <floater.string name="MasterSent">Saved [NAME] from [FILE].</floater.string>
+    <floater.string name="MasterNotCompiled">[NAME] went up from [FILE], and did not compile.</floater.string>
+    <floater.string name="MasterKeptTheirs">It had been changed in-world since; what it held is in History.</floater.string>
+    <floater.string name="MasterSendFailed">[FILE] was not sent to [NAME]: [WHY].</floater.string>
+    <floater.string name="MasterSkipped">[NAME] already holds [FILE].</floater.string>
+    <floater.string name="MasterHeld">[NAME] was changed in-world since [FILE] was last sent to it, so it was not sent.</floater.string>
+    <floater.string name="MasterDiffering">[NAME] was changed in-world by [WHO]: it no longer holds [FILE].</floater.string>
+    <floater.string name="MasterSuspended">[NAME]'s link to [FILE] is held: [WHY].</floater.string>
+    <floater.string name="MasterOrphaned">[NAME] is gone from where it was; its link to [FILE] is kept a while, should it come back.</floater.string>
+    <floater.string name="MasterPending">[FILE] was not sent to [NAME]: [WHY]. Send it once it is in reach.</floater.string>
+    <floater.string name="MasterRelinked">[NAME] is linked to [FILE] again.</floater.string>
+    <floater.string name="CompareMasterFile">File</floater.string>
+    <floater.string name="CompareMasterWorld">[NAME] in-world</floater.string>
+    <floater.string name="NoticeMasterLink">Link</floater.string>
+    <floater.string name="NoticeMasterLinkTip">Link this script to the file it names: from then on it is changed through the file</floater.string>
+    <floater.string name="NoticeMasterSend">Send File</floater.string>
+    <floater.string name="NoticeMasterSendTip">Send the file on disk to the script now, keeping what the script holds in History</floater.string>
+    <floater.string name="NoticeMasterUnlink">Unlink</floater.string>
+    <floater.string name="NoticeMasterUnlinkTip">Let the script go from this file; neither is changed</floater.string>
+    <floater.string name="NoticeMasterFind">Find File...</floater.string>
+    <floater.string name="NoticeMasterFindTip">Pick where the file is now, keeping the link</floater.string>
+    <floater.string name="ActionMasterLink">Link</floater.string>
+    <floater.string name="ActionMasterLinkTip">Link [NAME] to the file it names</floater.string>
+    <floater.string name="ActionMasterSend">Send file</floater.string>
+    <floater.string name="ActionMasterSendTip">Send the file on disk to the script now</floater.string>
+    <floater.string name="ActionMasterCompare">Compare</floater.string>
+    <floater.string name="ActionMasterCompareTip">Compare [NAME] with what the script holds in-world</floater.string>
+    <floater.string name="ActionMasterUnlink">Unlink</floater.string>
+    <floater.string name="ActionMasterUnlinkTip">Let the script go from [NAME]</floater.string>
+    <floater.string name="ActionMasterFind">Find file</floater.string>
+    <floater.string name="ActionMasterFindTip">Pick where the file is now, keeping the link</floater.string>
     <floater.string name="CompareSavedThere">Saved elsewhere</floater.string>
     <floater.string name="SaveAskingWorld">Checking whether [NAME] was saved elsewhere...</floater.string>
     <floater.string name="SaveWorldMoved">[NAME] was saved elsewhere (by a co-owner or in another viewer) after you opened it here. Saving would replace that version.</floater.string>
@@ -884,6 +929,18 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
             <menu_item_call label="Edit in External Editor" layout="topleft" name="external_editor">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="external_editor" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="external_editor" />
+            </menu_item_call>
+            <menu_item_call label="Link to File on Disk..." layout="topleft" name="link_file">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="link_file" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="link_file" />
+            </menu_item_call>
+            <menu_item_call label="Send File to Its Scripts" layout="topleft" name="send_file">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="send_file" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="send_file" />
+            </menu_item_call>
+            <menu_item_call label="Unlink File from Its Scripts" layout="topleft" name="unlink_file">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="unlink_file" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unlink_file" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Move to New Window" layout="topleft" name="pop_out">

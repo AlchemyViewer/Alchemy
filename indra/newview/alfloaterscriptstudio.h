@@ -38,6 +38,7 @@
 #include "alscriptstudiocomparewith.h"
 #include "alscriptstudioexpandedcompare.h"
 #include "alscriptstudiohistory.h"
+#include "alscriptstudiomasters.h"
 #include "alscriptstudiomerging.h"
 #include "alscriptstudioselections.h"
 #include "alscriptstudiorecovery.h"
@@ -138,7 +139,7 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptObjectCheck::Window, public ALScriptRecompile::Window, public ALScriptStudioHistory::Window,
                                     public ALScriptStudioCompareWith::Window, public ALScriptStudioMerging::Window,
                                     public ALScriptStudioSelections::Window, public ALScriptStudioExpandedCompare::Window,
-                                    public ALScriptStudioComparePairs::Window
+                                    public ALScriptStudioComparePairs::Window, public ALScriptStudioMasters::Window
 {
     friend class LLFloaterReg;
 
@@ -781,6 +782,11 @@ private:
     bool optimizing() const override;
     std::string programVersion() const override;
     ALScriptStudioDoc::Header uploadHeader() const override;
+    // ALScriptStudioMasters::Window
+    void pickMasterFile(std::function<void(const std::string& path)> chosen) override;
+    void openMasterFile(const std::string& path, bool lua) override;
+    void closeTab(Doc& doc) override;
+    bool heldByBridge(const ALScriptRef& ref) override;
     bool        weightNotes() const override { return mWeightNotes; }
     bool        weightHeat() const override { return mWeightHeat; }
     ALScriptWeightsPane* weightsPane() override { return mWeightsPane; }
@@ -1366,6 +1372,8 @@ private:
     ALScriptObjectCheck                mObjectCheck{ *this, *this, *this };
     // Recompiles from the Explorer.
     ALScriptRecompile                  mRecompile{ *this, *this };
+    // Its scripts whose master is a file on disk.
+    ALScriptStudioMasters              mMasters{ *this, *this, *this };
     std::string                        mCheckingWhere;
     S32                                mCheckedErrors   = 0;
     S32                                mCheckedWarnings = 0;

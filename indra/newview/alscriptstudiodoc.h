@@ -298,6 +298,10 @@ struct ALScriptStudioDoc
     // What it is, and the rest of what ALScriptStudioOrphans keeps of it.
     struct Orphaned;
     Part<Orphaned>                             orphan;
+    // Its master on disk: the file its script names, and what a file's
+    // tab's offers about its scripts act on (ALScriptStudioMasters).
+    struct Mastered;
+    Part<Mastered>                             master;
     // What its object and region were called, while they were in sight:
     // what a kept text says it came from once they are not.
     std::string                                objectName;
@@ -414,6 +418,11 @@ struct ALScriptStudioDoc
         std::string message;
     };
     std::vector<Compiled>                      problems;
+    // What a compiler said, as a tab's problems: the region's lines under
+    // the envelope's `under` lines, read back through the expansion's map
+    // to the source and its includes, or at the expansion's line where the
+    // preprocessor made the code; as said where there is no map.
+    static std::vector<Compiled> compiledOf(const std::vector<ALScriptDiagnostic>& said, const ALSourceMap* map, S32 under);
     // What the script said as it ran, since it was last saved: a
     // run-time error's place, or -1 for none, the include it is in,
     // and its words.

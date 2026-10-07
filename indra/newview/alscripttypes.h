@@ -134,7 +134,9 @@ enum class ALScriptOrigin : U8
     Bridge,
     Editor,
     Queue,
-    Recompile
+    Recompile,
+    // A file on disk that is the master of the script (ALScriptDiskMasters).
+    Disk
 };
 struct ALScriptSender
 {

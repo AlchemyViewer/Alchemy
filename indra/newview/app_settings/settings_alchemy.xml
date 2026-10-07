@@ -365,6 +365,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptMastersSkipUnchanged</key>
+        <map>
+            <key>Comment</key>
+            <string>A send Script Studio makes of its own from a file on disk -- an include's users, Send from Files -- is skipped where what would go up is what the script already holds. A save of the file itself always goes up.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptUploadHeader</key>
         <map>
             <key>Comment</key>

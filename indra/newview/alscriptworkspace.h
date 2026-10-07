@@ -116,6 +116,10 @@ public:
     // editor to hear.
     typedef boost::signals2::signal<void(const ALScriptSaved&)> saved_signal_t;
     boost::signals2::connection onSaved(const saved_signal_t::slot_type& slot) { return mSaved.connect(slot); }
+    // A save that went up kept in the account's history (ALRecovery),
+    // whoever sent it, with what the item and its object are called; and
+    // what the world held, kept the same way before it is gone over.
+    void keepInHistory(const ALScriptSaved& saved) const;
 
     // A script's text as it goes up again: expanded afresh from its
     // source where the preprocessor wrapped it or is on, so that its
@@ -125,8 +129,16 @@ public:
     // preprocessor made it, the source safe in the envelope, with its
     // errors said: a save of someone's work, which always goes up.
     typedef std::function<void(const ALScriptPrepared&)> prepared_callback_t;
+    // Where the text is a file's on disk, a script's master: its identity,
+    // `disk:<path>`, which a name its includes and requires give is read
+    // from; and what the upload header's @file names it, never from a root.
+    struct From
+    {
+        std::string path;
+        std::string file;
+    };
     void prepare(const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id, const std::string& text, bool lua,
-                 const std::string& target, prepared_callback_t callback, bool anyway = false);
+                 const std::string& target, prepared_callback_t callback, bool anyway = false, const From& from = From());
 
     // A script fetched, prepared, and uploaded to compile for a target:
     // what was asked, or "auto" for what it compiles for now. What the
@@ -316,9 +328,6 @@ private:
     // An answer handed to its caller and every listener, on the main
     // coroutine; and, where the text went up, said as saved with it.
     void        deliver(const ALScriptCompileResult& result, const ALScriptCompileCallback& callback, const std::string* text = nullptr);
-    // A save that went up kept in the account's history (ALRecovery),
-    // whoever sent it, with what the item and its object are called.
-    void        keepInHistory(const ALScriptSaved& saved) const;
     // A notecard's asset sent, and `text`, its text, said as saved.
     bool        uploadNotecard(const ALScriptRef& ref, const std::string& buffer, const std::string& text, bool carries,
                                ALScriptCompileCallback callback, std::string& error, ALScriptSender sender);

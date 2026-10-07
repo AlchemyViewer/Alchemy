@@ -639,6 +639,12 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocIncludeNotFetched">include file '[1]' could not be fetched, and the script is not sent without it</string>
 	<string name="CompileQueueSkippedSaving">Skipped "[SCRIPT_NAME]": a save of it is on its way, which a recompile would land over.</string>
 	<string name="CompileQueueUnsavedInStudio">Script Studio has unsaved changes to "[SCRIPT_NAME]"; the recompile uses the version saved on the server, without them.</string>
+	<string name="ScriptMasterGone">its file is no longer there</string>
+	<string name="ScriptMasterUnreadable">its file could not be read</string>
+	<string name="ScriptMasterOutOfReach">its object is out of reach</string>
+	<string name="ScriptMasterItemGone">it is gone from where it was</string>
+	<string name="ScriptMasterNotSLua">its file is SLua, and the script is no longer</string>
+	<string name="ScriptMasterNotLSL">its file is LSL, and the script is no longer</string>
 	<string name="BridgeNotSaved">Not saved: [REASON]</string>
 	<string name="BridgeSentCompiledAsIs">The compiled half was changed and its source was not, so it went up as it is rather than as its source expands.</string>
 	<string name="PreprocIncludeSentWithout">include file '[1]' could not be fetched, and the script went up without it</string>

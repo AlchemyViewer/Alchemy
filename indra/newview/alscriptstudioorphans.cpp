@@ -86,6 +86,11 @@ namespace
                                 : action == "show_compare"                               ? "NoticeShowCompare"
                                 : action == "apply_fixes"                                ? "NoticeApplyFixes"
                                 : action == "make_strict"                                ? "NoticeMakeStrict"
+                                : action == "master_link_hint"                           ? "NoticeMasterLink"
+                                : action == "master_send"                                ? "NoticeMasterSend"
+                                : action == "master_compare"                             ? "NoticeCompare"
+                                : action == "master_unlink"                              ? "NoticeMasterUnlink"
+                                : action == "master_find"                                ? "NoticeMasterFind"
                                                                                          : nullptr;
             if (label)
             {

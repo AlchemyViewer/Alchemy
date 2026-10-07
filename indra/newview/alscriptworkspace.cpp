@@ -1055,7 +1055,7 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
 }
 
 void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id, const std::string& text, bool lua,
-                                const std::string& target, prepared_callback_t callback, bool anyway)
+                                const std::string& target, prepared_callback_t callback, bool anyway, const From& from)
 {
     if (ALPreprocessor::wanted(text, lua, ALScriptEnvelope::looksWrapped(text), ALScriptPreprocessor::enabled()) == ALPreprocessor::Wanted::No)
     {
@@ -1067,13 +1067,14 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
     std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(text);
     ALScriptPreprocessor::Request   request;
     request.ref           = ref;
+    request.path          = from.path;
     request.name          = name;
     request.assetId       = asset_id;
     request.source        = std::make_shared<const std::string>(envelope ? envelope->source : text);
     request.lua           = lua;
     request.compileTarget = target;
     // The upload header, where asked, read here on the main thread: who it
-    // names. No @file: that is a link's.
+    // names; and @file, where the text is a master's.
     static LLCachedControl<bool> header_on(gSavedSettings, "ALScriptUploadHeader", false);
     static LLCachedControl<bool> creator_on(gSavedSettings, "ALScriptUploadHeaderCreator", false);
     const bool  header = header_on;
@@ -1082,7 +1083,8 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
     {
         LLAgentUI::buildFullname(creator);
     }
-    ALScriptPreprocessor::instance().run(request, [request, envelope, lua, target, callback, anyway, header, creator](const ALPreprocessor::Result& expanded) {
+    ALScriptPreprocessor::instance().run(request, [request, envelope, lua, target, callback, anyway, header, creator,
+                                                   file = from.file](const ALPreprocessor::Result& expanded) {
         ALScriptPrepared prepared;
         if (expanded.hasErrors() || !expanded.pending.empty())
         {
@@ -1141,6 +1143,7 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
                 said.hash      = ALUploadHeader::hashOf(target, wrapped.source, wrapped.expanded);
                 said.date      = ALUploadHeader::dateOf(LLDate::now());
                 said.creator   = creator;
+                said.file      = file;
                 wrapped.header = said.write(lua);
             }
             prepared.text            = wrapped.wrap();

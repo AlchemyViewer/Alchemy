@@ -184,6 +184,7 @@ if(AL_BUILD_VIEWER)
     alscriptanalyzers.cpp
     alscriptcontentsindex.cpp
     alscriptcrumbsbar.cpp
+    alscriptdiskmasters.cpp
     alscriptexplorermodel.cpp
     alscriptexplorerpane.cpp
     alscriptexplorertree.cpp
@@ -197,6 +198,7 @@ if(AL_BUILD_VIEWER)
     alpanelscriptaliases.cpp
     alpanelscriptkeymap.cpp
     alscriptlookup.cpp
+    alscriptmasterupload.cpp
     alscriptobjectcheck.cpp
     alscriptrecompile.cpp
     alscriptnavigation.cpp
@@ -229,6 +231,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudioorphans.cpp
     alscriptstudioplaces.cpp
     alscriptstudiohistory.cpp
+    alscriptstudiomasters.cpp
     alscriptstudiomerging.cpp
     alscriptstudiorecovery.cpp
     alscriptstudioselections.cpp
@@ -1035,6 +1038,7 @@ if(AL_BUILD_VIEWER)
     alscriptanalyzers.h
     alscriptcontentsindex.h
     alscriptcrumbsbar.h
+    alscriptdiskmasters.h
     alscriptexplorermodel.h
     alscriptexplorerpane.h
     alscriptexplorertree.h
@@ -1084,6 +1088,8 @@ if(AL_BUILD_VIEWER)
     alscriptstudioplaces.h
     alscriptstudiohistory.h
     alscriptstudiomerging.h
+    alscriptmasterupload.h
+    alscriptstudiomasters.h
     alscriptstudiorecovery.h
     alscriptstudioselections.h
     alrecovery.h
