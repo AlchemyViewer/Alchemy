@@ -260,6 +260,9 @@ private:
         S32         left     = 0;
         S32         right    = 0;
         bool        toEnd    = false;
+        // Taken from a visual selection -- gn's match is one -- which a
+        // delete takes as it was selected, never as the lines it is over.
+        bool        visual   = false;
     };
 
     // A key as typed: recorded where a macro is being, then through the

@@ -1604,6 +1604,7 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
             {
                 Span span;
                 span.range       = *match;
+                span.visual      = true;
                 const llwchar op = mOperator;
                 applyOperator(view, op, span, 1);
                 finishCommand(op != 'y');
@@ -4038,6 +4039,18 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
         moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
         return;
     }
+    // A delete of characters over more than one line with nothing but
+    // blanks before it on its first line and after it on its last is those
+    // lines whole, as vim's is: 2daw over a line's words and the next's,
+    // d2e from a line's start to the next line's end, d% from an opening
+    // bracket that begins its line. A change, a yank and a visual selection
+    // keep their characters.
+    if (op == 'd' && !span.linewise && !span.block && !span.visual && last > first &&
+        span.range.begin.column <= firstNonBlankColumn(d, first) &&
+        d.line(last).find_first_not_of(" \t", static_cast<size_t>(span.range.end.column)) == std::string::npos)
+    {
+        span.linewise = true;
+    }
 
     // The text the operator works on: whole lines, a block's columns
     // line by line, or the stretch as it is.
@@ -5076,6 +5089,7 @@ ALVimKeymap::Span ALVimKeymap::visualSpan(const ALTextView& view) const
     {
         span.range = ALTextRange(a, atLineEnd(d, b) ? b : d.nextCluster(b));
     }
+    span.visual = true;
     return span;
 }
 

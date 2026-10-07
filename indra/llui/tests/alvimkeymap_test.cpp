@@ -4111,4 +4111,63 @@ namespace tut
         ex("2,3put x");
         ensure_equals(":2,3put x: under the third line", flat(e.text()), std::string("1|2|3|1|4|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<152>()
+    {
+        set_test_name("a delete of characters over more than one line, nothing but blanks before it on its first and after it on its last, takes those lines whole; "
+                      "not one that starts or ends inside a line, nor a change, a yank or a visual selection");
+        ALCodeEditor& e = make("bar\nbaz");
+        keys("2daw");
+        ensure("2daw over a line's word and the next line's: lines", vim->shared().registers.fetch('"', false).linewise);
+        ensure_equals("what it took", vim->registerText('"'), std::string("bar\nbaz"));
+        keys("p");
+        ensure_equals("put back as lines", flat(e.text()), std::string("|bar|baz"));
+
+        make("foo bar\n\nbaz");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("daw");
+        ensure_equals("daw on an empty line before a line's only word: both lines", flat(editor->text()), std::string("foo bar"));
+        ensure("kept as lines", vim->shared().registers.fetch('"', false).linewise);
+
+        make("foo\nbar\nx\n");
+        keys("d2e");
+        ensure_equals("d2e from a line's start to the next line's end", flat(editor->text()), std::string("x|"));
+        make("foo\nbar\nx\n");
+        keys("2D");
+        ensure_equals("2D from a line's start", flat(editor->text()), std::string("x|"));
+        make("foo\nbar\nx\n");
+        keys("d/r/e<CR>");
+        ensure_equals("d/r/e to the next line's last character", flat(editor->text()), std::string("x|"));
+        make("foo\nbar");
+        keys("d}p");
+        ensure_equals("d} over the last paragraph, put back as lines", flat(editor->text()), std::string("|foo|bar"));
+        make("(\nx)\ny\n");
+        keys("d%");
+        ensure_equals("d% from a bracket that begins its line", flat(editor->text()), std::string("y|"));
+        make("  (\nx)  \ny\n");
+        editor->setCaret(ALTextPos(0, 1));
+        keys("d%");
+        ensure_equals("from inside the indent, to blanks after", flat(editor->text()), std::string("y|"));
+        ensure_equals("the lines whole in the register", vim->registerText('"'), std::string("  (\nx)  "));
+
+        make("foo\nbar\nx\n");
+        editor->setCaret(ALTextPos(0, 1));
+        keys("d2e");
+        ensure_equals("from after a line's first non-blank: characters", flat(editor->text()), std::string("f|x|"));
+        make("(\nx) z\ny\n");
+        keys("d%");
+        ensure_equals("to before a line's last non-blank: characters", flat(editor->text()), std::string(" z|y|"));
+        make("(\nx)\ny\n");
+        keys("c%Z<Esc>");
+        ensure_equals("c%: characters", flat(editor->text()), std::string("Z|y|"));
+        make("(\nx)\ny\n");
+        keys("y%");
+        ensure("y%: characters", !vim->shared().registers.fetch('"', false).linewise);
+        keys("v%d");
+        ensure_equals("v%d: characters", flat(editor->text()), std::string("|y|"));
+        make("foo\nbar\nx\n");
+        keys("/foo\\nbar<CR>ggdgn");
+        ensure_equals("dgn over a match of two lines: characters", flat(editor->text()), std::string("|x|"));
+    }
 }
