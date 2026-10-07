@@ -2293,7 +2293,24 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
         mHoverLink   = -1;
         mPressedLink = -1;
     }
-    mStyles.apply(edit);
+    // A style in a font of its own that the edit cut through has every
+    // line it was on laid out again without it: the layout lays out again
+    // only the lines the edit touched, and those it did not would keep
+    // the style's face after its colour and its underline went.
+    mStyles.apply(
+        edit, [](Style& style, const ALTextDocument::Edit& e) { return e.slide(style.range); },
+        [this, &edit](Style& style) {
+            if (!style.font)
+            {
+                return;
+            }
+            const ALTextRange range = style.range.normalised();
+            const S32         last  = edit.placed(range.end).line;
+            for (S32 line = edit.placed(range.begin).line; line <= last; ++line)
+            {
+                mLayout.invalidateLine(line);
+            }
+        });
     if (!mAtoms.empty())
     {
         // An atom cut through takes its view with it.

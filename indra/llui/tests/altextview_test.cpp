@@ -3156,4 +3156,30 @@ namespace tut
         ensure_equals("told once", told, U32(1));
         ensure("the caret on the copy", v.caret() == ALTextPos(1, 1));
     }
+
+    template<> template<>
+    void altextview_object::test<101>()
+    {
+        set_test_name("a style in a font of its own over several lines, cut through by an edit on one, leaves none of its lines in its font");
+        ALTextView&     v    = make("first line\nsecond line\nthird line\n");
+        const LLFontGL* face = LLFontGL::getFontSansSerif();
+        if (!face || !face->getFontFreetype() || face == v.getFont())
+        {
+            skip("no other face to style in");
+        }
+        ALTextView::Style style;
+        style.range = ALTextRange(ALTextPos(0, 0), ALTextPos(2, 5));
+        style.font  = face;
+        v.setStyles({ style });
+        const auto shaped_in = [&](S32 line, const LLFontGL* font) {
+            const ALTextLayout::Line& laid = v.layout().line(line);
+            return !laid.placed.empty() && laid.placed.front().face == font->getFontFreetype();
+        };
+        ensure("its first and last lines in its font", shaped_in(0, face) && shaped_in(2, face));
+        v.document().insert(ALTextPos(1, 3), "x");
+        ensure("cut through: gone", v.styles().empty());
+        ensure("the line typed in, in the view's font", shaped_in(1, v.getFont()));
+        ensure("the first line too, which the edit did not touch", shaped_in(0, v.getFont()));
+        ensure("and the last", shaped_in(2, v.getFont()));
+    }
 }
