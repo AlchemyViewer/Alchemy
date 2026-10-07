@@ -33,7 +33,6 @@
 #include "alscriptenvelope.h"
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudioservices.h"
-#include "alscriptworkspace.h"
 #include "alserialworker.h"
 #include "alwatchedfile.h"
 #include "lldir.h"
@@ -549,9 +548,12 @@ void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
 
 void ALScriptStudioMasters::compareWithWorld(Doc& doc, const ALScriptRef& ref)
 {
-    const std::string id = doc.id;
-    ALScriptWorkspace::instance().load(ref, [this, id](const ALScriptLoaded& loaded) {
-        Doc* found = mServices.findDoc(id);
+    // Answered later, the tab found again by its id: the window may have
+    // closed meanwhile, or the tab.
+    const std::string         id    = doc.id;
+    const std::weak_ptr<bool> alive = mAlive;
+    mWindow.loadWorldText(ref, [this, alive, id](const ALScriptLoaded& loaded) {
+        Doc* found = alive.lock() ? mServices.findDoc(id) : nullptr;
         if (!found || !loaded.error.empty())
         {
             return;

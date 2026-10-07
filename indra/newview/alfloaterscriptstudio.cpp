@@ -1523,6 +1523,11 @@ bool ALFloaterScriptStudio::heldByBridge(const ALScriptRef& ref)
     return server && server->holds(ref);
 }
 
+void ALFloaterScriptStudio::loadWorldText(const ALScriptRef& ref, std::function<void(const ALScriptLoaded& loaded)> loaded)
+{
+    ALScriptWorkspace::instance().load(ref, std::move(loaded));
+}
+
 ALScriptStudioDoc::Header ALFloaterScriptStudio::uploadHeader() const
 {
     static LLCachedControl<bool> header(gSavedSettings, "ALScriptUploadHeader", false);

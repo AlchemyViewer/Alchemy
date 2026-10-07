@@ -100,6 +100,9 @@ public:
         // Whether the VS Code bridge holds a script, which a link would give
         // two masters.
         virtual bool heldByBridge(const ALScriptRef& ref) = 0;
+        // A script's text as the world holds it, fetched if need be, as the
+        // workspace answers a load of it.
+        virtual void loadWorldText(const ALScriptRef& ref, std::function<void(const ALScriptLoaded& loaded)> loaded) = 0;
 
     protected:
         ~Window() = default;
