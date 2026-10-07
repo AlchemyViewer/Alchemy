@@ -4641,7 +4641,7 @@ void ALTextView::showFind(bool with_replace)
             std::string escaped;
             for (const char c : seed)
             {
-                if (strchr("\\^$.|?*+()[]{}", c))
+                if (alRegexSpecial(c))
                 {
                     escaped += '\\';
                 }

@@ -81,6 +81,15 @@ inline bool alNamePartAt(std::string_view name, size_t at)
     return upper(c) && upper(prev) && at + 1 < name.size() && lower(name[at + 1]);
 }
 
+// A byte a pattern in Perl's syntax, as the find bar and vim's search
+// compile one, reads as itself only with a backslash before it. Not every
+// byte that is not a word's: a backslash makes `<` and `'` anchors.
+inline bool alRegexSpecial(char c)
+{
+    constexpr std::string_view specials("\\^$.|?*+()[]{}");
+    return specials.find(c) != std::string_view::npos;
+}
+
 // The end of a match of the needle at `at` in the hay, or npos. Without
 // regard to case it compares codepoint by codepoint.
 inline size_t alMatchAt(std::string_view hay, size_t at, std::string_view needle, bool case_insensitive)

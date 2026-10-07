@@ -27,6 +27,7 @@
 #include "alvimpattern.h"
 #include "alvimtext.h"
 
+#include "altextchars.h"
 #include "llstring.h"
 
 #include <algorithm>
@@ -56,8 +57,7 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     // Where each \K was put, for the pattern without them.
     std::vector<size_t> k_at;
     auto  literal  = [&](char c) {
-        static const std::string specials("\\^$.|?*+()[]{}");
-        if (specials.find(c) != std::string::npos)
+        if (alRegexSpecial(c))
         {
             out.regex += '\\';
         }
