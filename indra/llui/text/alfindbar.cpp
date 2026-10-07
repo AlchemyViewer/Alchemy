@@ -257,7 +257,7 @@ void ALFindBar::setCount(S32 current, S32 total, const std::string& error, bool 
     }
     else
     {
-        said = llformat("%d%s", total, capped ? "+" : "");
+        said = std::to_string(total) + (capped ? "+" : "");
     }
     std::string tip = error;
     if (wrapped != 0 && error.empty() && total > 0)
