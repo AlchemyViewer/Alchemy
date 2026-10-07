@@ -311,7 +311,7 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 | `AL_ENABLE_GL_TESTS`     | ON      | Run the tests that render on a hidden window; off, they are built and registered disabled (needs `AL_BUILD_TESTS`) |
 | `AL_BUILD_DOCS`          | OFF     | Add the `doc` target (API documentation with Doxygen)                 |
 | `AL_VCPKG_INSTALL`       | ON      | Let configure run `vcpkg install` when the manifest, the registry configuration, the triplets or the feature list changed; off leaves the ports to you |
-| `AL_BUILD_PACKAGE`       | ON      | Add the `package` target: the CPack archive of the installed tree (zip, tar.xz, dmg) |
+| `AL_BUILD_PACKAGE`       | ON      | Add the `package` target: the CPack archive of the installed tree (zip, tar.xz, dmg), and on Linux the .deb and .rpm |
 | `AL_USE_VELOPACK`        | OFF     | Add the `velopack` target, and the Velopack update client to the viewer |
 | `AL_SOURCEID`            | `$sourceid` | Referring agency recorded in `settings_install.xml`                |
 
@@ -483,7 +483,11 @@ The third-party attribution is generated, not kept by hand: `cmake/Attribution.c
 
 On macOS the install step signs the bundle inside out — ad-hoc, or with `-DAL_SIGNING_IDENTITY=<Developer ID>` — so the CEF helpers keep their sandbox entitlements, and the package step seals it again after stripping the executable. The disk image is APFS: HFS+ decomposes file names, which breaks the seal over the font stand-ins with Japanese names. On Linux the binaries carry an `$ORIGIN`-relative RPATH and find the data one directory above the executable, so the tree runs from wherever it is unpacked.
 
-The hosted build (`.github/workflows/build.yaml`) packages Windows and macOS in jobs of their own, after the build, from the build's install tree or stripped bundle and its `newview/package.env`. Pull requests are packaged unsigned; other builds are signed when the repository has the secrets, and without them are packaged unsigned with a notice:
+On Linux CPack also writes a `.deb` where `dpkg-shlibdeps` is installed and an `.rpm` where `rpmbuild` is (`-G DEB` or `-G RPM` asks for one alone). Each channel is a package of its own — `alchemy-viewer` for the release channel, `alchemy-beta`, `alchemy-test` and so on otherwise — so channels install side by side. A package holds the tree as it is, under `/opt/<package>`, with the launcher linked as `/usr/bin/<package>` and the desktop entry, AppStream data and icons in `/usr/share`, taken from the tree's `share/`. Both are named for the channel's application ID (`org.alchemyviewer.viewer`, `org.alchemyviewer.viewer.beta`, …), which is also the Wayland app ID and X11 class of the viewer's window. CEF's sandbox helper is installed setuid root, which sandboxes the web browser's renderers. Dependencies come from what the binaries link, less the libraries the tree carries; what the viewer loads at run time is listed in `cmake/ViewerPackageLinux.cmake`. `AL_PACKAGE_CONTACT` names the maintainer.
+
+A tree from the archive runs where it is unpacked: its launcher, `alchemy`, adds it to the application menu and makes it the handler of `secondlife://` links the first time, unless the system already has an entry for the channel or `AL_NO_DESKTOP_INTEGRATION` is set. `install.sh` copies it to `/opt/<package>` as root or `~/.local/share/<package>` otherwise, and `install.sh --uninstall` takes it away. `etc/desktop_integration.sh install|uninstall` adds or removes the desktop entry alone.
+
+The hosted build (`.github/workflows/build.yaml`) writes the Linux archive, `.deb` and `.rpm` in the build job, and packages Windows and macOS in jobs of their own, after the build, from the build's install tree or stripped bundle and its `newview/package.env`. Pull requests are packaged unsigned; other builds are signed when the repository has the secrets, and without them are packaged unsigned with a notice:
 
 | Secret | What |
 |:--|:--|

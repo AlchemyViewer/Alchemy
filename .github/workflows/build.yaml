@@ -454,13 +454,35 @@ jobs:
           # The package. On Windows and macOS, what the packaging jobs sign and
           # package with Velopack, guided by package.env: the install tree on
           # Windows; on macOS the archive of the stripped bundle, which is
-          # signed ad-hoc and signed again there. On Linux, the release itself.
+          # signed ad-hoc and signed again there. On Linux, the release itself:
+          # the archive, and the .deb and .rpm as its installers.
           if $AL_BUILD_VIEWER
           then
             case "$RUNNER_OS" in
               Windows)
                 cmake --install "$BUILD_DIRECTORY" --config "$cmake_config" --prefix "$RUNNER_TEMP/app"
                 echo "viewer_app=$RUNNER_TEMP/app" >> "$GITHUB_OUTPUT"
+                ;;
+              Linux)
+                cpack --config "$BUILD_DIRECTORY/CPackConfig.cmake" -C "$cmake_config" -G "TXZ;DEB;RPM" -B "$RUNNER_TEMP/package"
+                # The copies of the tree CPack packaged.
+                rm -rf "$RUNNER_TEMP/package/_CPack_Packages"
+                viewer_app="$(ls "$RUNNER_TEMP"/package/*.tar.xz 2>/dev/null | head -n 1 || true)"
+                if [[ -z "$viewer_app" ]]; then
+                  echo "::error::No .tar.xz package under $RUNNER_TEMP/package"
+                  exit 1
+                fi
+                echo "viewer_app=$viewer_app" >> "$GITHUB_OUTPUT"
+                mkdir -p "$RUNNER_TEMP/installer"
+                for ext in deb rpm; do
+                  installer="$(ls "$RUNNER_TEMP"/package/*."$ext" 2>/dev/null | head -n 1 || true)"
+                  if [[ -z "$installer" ]]; then
+                    echo "::error::No .$ext package under $RUNNER_TEMP/package"
+                    exit 1
+                  fi
+                  mv "$installer" "$RUNNER_TEMP/installer/"
+                done
+                echo "viewer_installer=$RUNNER_TEMP/installer" >> "$GITHUB_OUTPUT"
                 ;;
               *)
                 cpack --config "$BUILD_DIRECTORY/CPackConfig.cmake" -C "$cmake_config" -G TXZ -B "$RUNNER_TEMP/package"
@@ -494,6 +516,17 @@ jobs:
           compression-level: ${{ runner.os == 'Windows' && 9 || 0 }}
           path: |
             ${{ steps.build.outputs.viewer_app }}
+
+      # The release job attaches every *-installer artifact.
+      - name: Upload Linux installers
+        uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
+        with:
+          name: "${{ steps.build.outputs.artifact }}-installer"
+          if-no-files-found: error
+          # A .deb and an .rpm are compressed already.
+          compression-level: 0
+          path: ${{ steps.build.outputs.viewer_installer }}
 
       # Sentry symbolicates a crash report with the symbol store: every binary
       # that shipped with its debug information beside it, PE and PDB, Mach-O

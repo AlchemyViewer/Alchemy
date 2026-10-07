@@ -48,7 +48,7 @@ runs:
           libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
           libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
           libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev mold \
-          nasm ninja-build pkgconf tar tex-common texinfo unzip zip
+          nasm ninja-build pkgconf rpm tar tex-common texinfo unzip zip
 
         sudo locale-gen en_US.UTF-8
         sudo locale-gen en_GB.UTF-8

@@ -3,7 +3,8 @@
 # The archive of the installed tree, the source package, and the Velopack
 # packaging step. CPack reads the install rules in ViewerInstall.cmake;
 # `cpack -C <cfg>` in the build directory, or the `package` target, writes
-# <build>/<AL_PACKAGE_NAME>.{zip,tar.xz,dmg}; `cpack --config
+# <build>/<AL_PACKAGE_NAME>.{zip,tar.xz,dmg}, and on Linux the .deb and .rpm
+# beside the archive (ViewerPackageLinux.cmake); `cpack --config
 # CPackSourceConfig.cmake`, or the `package_source` target where the
 # generator has one, writes <build>/Alchemy_<version>_src.tar.xz from what
 # git tracks. Each comes with its SHA-256 beside it. The `velopack` target
@@ -114,7 +115,18 @@ elseif(DARWIN)
   set(CPACK_DMG_FILESYSTEM APFS)
   set(CPACK_DMG_FORMAT ULMO)
 else()
+  # The archive, and the system packages where the tools that make them are:
+  # dpkg-shlibdeps, which finds a .deb's dependencies, and rpmbuild.
   set(CPACK_GENERATOR TXZ)
+  find_program(AL_DPKG_SHLIBDEPS dpkg-shlibdeps)
+  find_program(AL_RPMBUILD rpmbuild)
+  mark_as_advanced(AL_DPKG_SHLIBDEPS AL_RPMBUILD)
+  if(AL_DPKG_SHLIBDEPS)
+    list(APPEND CPACK_GENERATOR DEB)
+  endif()
+  if(AL_RPMBUILD)
+    list(APPEND CPACK_GENERATOR RPM)
+  endif()
 endif()
 
 # Release archives on Linux and macOS are stripped of debug information
@@ -122,6 +134,9 @@ endif()
 # then sealed again as the install signed it.
 if(NOT WINDOWS)
   set(CPACK_PRE_BUILD_SCRIPTS "${CMAKE_CURRENT_LIST_DIR}/ViewerStrip.cmake")
+endif()
+if(LINUX)
+  include(ViewerPackageLinux)
 endif()
 if(DARWIN)
   set(CPACK_AL_SIGN_IDENTITY "${AL_SIGNING_IDENTITY}")
