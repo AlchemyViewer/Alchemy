@@ -2177,6 +2177,19 @@ Stop [COUNT] scripts? They stay stopped until you start them again.
 
   <notification
    icon="alertmodal.tga"
+   name="ScriptStudioLinkUnsaved"
+   type="alertmodal">
+&quot;[NAME]&quot; has unsaved changes, and linking it to [FILE] makes the file what it holds. Write your changes to the file, replacing everything in it? Or discard them and take the file as it is? Discarded changes are kept for a week in File &gt; Recover Unsaved Changes.
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Discard Changes"
+     yestext="Write to File"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="DeleteNotecard"
    type="alertmodal">
    <unique/>

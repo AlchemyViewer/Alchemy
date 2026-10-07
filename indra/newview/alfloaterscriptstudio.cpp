@@ -1472,6 +1472,27 @@ void ALFloaterScriptStudio::closeTab(Doc& doc)
     letGoOf(doc);
 }
 
+void ALFloaterScriptStudio::askLinkUnsaved(const Doc& doc, const std::string& path, std::function<void(ALScriptStudioMasters::Unsaved answer)> answered)
+{
+    typedef ALScriptStudioMasters::Unsaved Unsaved;
+    LLSD question;
+    question["NAME"]                 = doc.name;
+    question["FILE"]                 = path;
+    const LLHandle<LLFloater> handle = getHandle();
+    LLNotificationsUtil::add("ScriptStudioLinkUnsaved", question, LLSD(), [handle, answered](const LLSD& notification, const LLSD& response) {
+        if (!handle.get())
+        {
+            return;
+        }
+        switch (LLNotificationsUtil::getSelectedOption(notification, response))
+        {
+            case 0: answered(Unsaved::Write); break;
+            case 1: answered(Unsaved::Discard); break;
+            default: answered(Unsaved::Cancel); break;
+        }
+    });
+}
+
 bool ALFloaterScriptStudio::heldByBridge(const ALScriptRef& ref)
 {
     LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer();

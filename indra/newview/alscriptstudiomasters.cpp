@@ -81,35 +81,78 @@ void ALScriptStudioMasters::linkToFile(Doc& doc)
     {
         return;
     }
-    // What was typed here would be lost to the file's text: saved or put
-    // back first, so that nothing the author has is in neither.
-    LLStringUtil::format_map_t args;
-    args["[NAME]"] = doc.name;
-    if (doc.editor->isDirty())
-    {
-        mServices.report(mServices.words("MasterSaveFirst", args), true, &doc);
-        return;
-    }
     const std::string id = doc.id;
     mWindow.pickMasterFile([this, id](const std::string& path) {
-        if (Doc* found = mServices.findDoc(id); found && canLink(found))
+        Doc* found = mServices.findDoc(id);
+        if (!found || !canLink(found) || !ofItsLanguage(*found, path))
+        {
+            return;
+        }
+        if (!found->editor->isDirty())
         {
             linkTo(*found, path, ALMasterLink::Made::Picked);
+            return;
         }
+        // What was typed here is in neither the world nor the file, and
+        // the file's text is what the script will hold: the author asked,
+        // the file named, whether it goes into the file, over what that
+        // holds -- picking the file as the script's master is the consent
+        // to that -- or is let go of. The tab found again by its id once
+        // answered: it may have gone, or been linked, meanwhile.
+        mWindow.askLinkUnsaved(*found, path, [this, id, path](Unsaved answer) {
+            Doc* asked = answer == Unsaved::Cancel ? nullptr : mServices.findDoc(id);
+            if (!asked || !canLink(asked) || !ofItsLanguage(*asked, path))
+            {
+                return;
+            }
+            if (answer == Unsaved::Discard)
+            {
+                // Linked as a tab with nothing typed is; what was typed is
+                // set aside as the tab goes, as any thrown away is.
+                linkTo(*asked, path, ALMasterLink::Made::Picked);
+                return;
+            }
+            const bool unsaved = asked->editor->isDirty();
+            if (!ALFileWrite::whole(path, asked->editor->wholeText()))
+            {
+                LLStringUtil::format_map_t args;
+                args["[NAME]"] = asked->name;
+                args["[FILE]"] = fileNameOf(path);
+                mServices.report(mServices.words("MasterNotWritten", args), true, asked);
+                return;
+            }
+            // Safe in the file, which its tab opens holding, to be sent by
+            // its save: nothing of it set aside as the tab goes.
+            asked->editor->resetDirty();
+            linkTo(*asked, path, ALMasterLink::Made::Picked, unsaved);
+        });
     });
 }
 
-void ALScriptStudioMasters::linkTo(Doc& doc, const std::string& path, ALMasterLink::Made made)
+bool ALScriptStudioMasters::ofItsLanguage(const Doc& doc, const std::string& path)
 {
+    const bool lua = doc.language.lua;
+    if (ALDiskIncludes::extensionOf(path, ALDiskIncludes::scriptExtensions(lua)) > 0)
+    {
+        return true;
+    }
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
     args["[FILE]"] = fileNameOf(path);
-    const bool lua = doc.language.lua;
-    if (ALDiskIncludes::extensionOf(path, ALDiskIncludes::scriptExtensions(lua)) == std::string::npos)
+    mServices.report(mServices.words(lua ? "MasterNotSLuaFile" : "MasterNotLSLFile", args), true, &doc);
+    return false;
+}
+
+void ALScriptStudioMasters::linkTo(Doc& doc, const std::string& path, ALMasterLink::Made made, bool written)
+{
+    if (!ofItsLanguage(doc, path))
     {
-        mServices.report(mServices.words(lua ? "MasterNotSLuaFile" : "MasterNotLSLFile", args), true, &doc);
         return;
     }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    args["[FILE]"] = fileNameOf(path);
+    const bool   lua = doc.language.lua;
     ALMasterLink link;
     link.object     = doc.ref.object;
     link.item       = doc.ref.item;
@@ -125,9 +168,10 @@ void ALScriptStudioMasters::linkTo(Doc& doc, const std::string& path, ALMasterLi
     const ALScriptRef ref     = doc.ref;
     const bool        bridged = mWindow.heldByBridge(ref);
     // Whether the file is what the script is now: if not, the first save
-    // of it sends it, what the world had kept in History.
+    // of it sends it, what the world had kept in History. What was typed
+    // here and written to it is not in the world.
     std::string on_disk;
-    const bool  differs = !ALFileRead::whole(path, on_disk, ALDiskIncludes::MAX_BYTES) || on_disk != doc.editor->wholeText();
+    const bool  differs = written || !ALFileRead::whole(path, on_disk, ALDiskIncludes::MAX_BYTES) || on_disk != doc.editor->wholeText();
     ALScriptDiskMasters::instance().link(link);
 
     // The script is changed through its file from here: its tab gives way

@@ -59,6 +59,16 @@ class ALScriptStudioMasters
 public:
     typedef ALScriptStudioDoc Doc;
 
+    // What becomes of what was typed in a tab about to be linked to a file:
+    // written into the file, over what it holds; let go of, the file's text
+    // taken; or no link made.
+    enum class Unsaved : U8
+    {
+        Write,
+        Discard,
+        Cancel
+    };
+
     // What the masters ask of the window itself, beyond what they are given.
     class Window
     {
@@ -68,6 +78,9 @@ public:
         virtual void pickMasterFile(std::function<void(const std::string& path)> chosen) = 0;
         virtual void openMasterFile(const std::string& path, bool lua)                   = 0;
         virtual void closeTab(Doc& doc)                                                  = 0;
+        // A tab with unsaved changes about to be linked to a file, asked what
+        // becomes of them, the file named.
+        virtual void askLinkUnsaved(const Doc& doc, const std::string& path, std::function<void(Unsaved answer)> answered) = 0;
         // Two texts compared in a tab's place, each with what it is.
         virtual void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
                              const std::string& right_title)                             = 0;
@@ -86,9 +99,10 @@ public:
     // that masters scripts.
     static bool canLink(const Doc* doc);
     bool        mastersAny(const Doc* doc) const;
-    // The commands: a tab linked to a file picked for it; a file's scripts
-    // let go of; and sent from it now, as the studio's own send, which a
-    // change in the world holds.
+    // The commands: a tab linked to a file picked for it, what was typed in
+    // it written to the file or let go of as the author says; a file's
+    // scripts let go of; and sent from it now, as the studio's own send,
+    // which a change in the world holds.
     void linkToFile(Doc& doc);
     void unlink(Doc& doc);
     void sendFromFile(Doc& doc);
@@ -109,7 +123,11 @@ public:
     void sayUnheard();
 
 private:
-    void linkTo(Doc& doc, const std::string& path, ALMasterLink::Made made);
+    // Whether a file is a script of the tab's language, said where it is not.
+    bool ofItsLanguage(const Doc& doc, const std::string& path);
+    // `written`: what was typed in the tab has just been written to the
+    // file, so the file is not what the world holds.
+    void linkTo(Doc& doc, const std::string& path, ALMasterLink::Made made, bool written = false);
     void heard(const ALScriptDiskMasters::Outcome& outcome);
     // The tab of a master file, where one is open.
     Doc* masterTab(const std::string& master) const;

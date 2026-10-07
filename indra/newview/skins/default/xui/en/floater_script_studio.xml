@@ -639,7 +639,6 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="SavedByQueue">a recompile</floater.string>
     <floater.string name="SavedByFile">its file on disk</floater.string>
     <floater.string name="SavedByStudio">Script Studio</floater.string>
-    <floater.string name="MasterSaveFirst">Save [NAME], or put back what was typed, before linking it to a file: the file's text is what it will hold.</floater.string>
     <floater.string name="MasterNotSLuaFile">[FILE] is not an SLua file, and [NAME] is SLua.</floater.string>
     <floater.string name="MasterNotLSLFile">[FILE] is not an LSL file, and [NAME] is LSL.</floater.string>
     <floater.string name="MasterLinked">[NAME] is linked to [FILE]: from now on it is changed through the file, and saving the file sends it.</floater.string>
@@ -662,6 +661,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="MasterOrphaned">[NAME] is gone from where it was; its link to [FILE] is kept a while, should it come back.</floater.string>
     <floater.string name="MasterPending">[FILE] was not sent to [NAME]: [WHY]. Send it once it is in reach.</floater.string>
     <floater.string name="MasterRelinked">[NAME] is linked to [FILE] again.</floater.string>
+    <floater.string name="MasterNotWritten">[FILE] could not be written, so [NAME] is not linked to it; what was typed is still here.</floater.string>
     <floater.string name="CompareMasterFile">File</floater.string>
     <floater.string name="CompareMasterWorld">[NAME] in-world</floater.string>
     <floater.string name="NoticeMasterLink">Link</floater.string>
