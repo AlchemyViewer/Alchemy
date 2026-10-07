@@ -2903,11 +2903,6 @@ bool ALTextView::applyGroups(const std::vector<ALTextRange>& selections, size_t 
             placed[i] = done.nothing() ? selections[i] : ALTextCarets::slid(selections[i], done);
         }
     }
-    if (!edits.empty() && done.nothing())
-    {
-        // Nothing changed: each where it was.
-        return false;
-    }
     placeSelections(placed, main);
     if (done.nothing())
     {
