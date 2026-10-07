@@ -507,17 +507,7 @@ std::pair<ALDiffModel::line_regions_t, ALDiffModel::line_regions_t> ALDiffModel:
     {
         return *mRegions;
     }
-    mRegions.emplace(nullptr, nullptr);
-    if (mOptions.lexer)
-    {
-        // Read in turn: the lexer holds the last two it read.
-        const line_regions_t left  = &mOptions.lexer(shownLeft());
-        const line_regions_t right = &mOptions.lexer(shownRight());
-        if (left->size() == shownLeft().size() && right->size() == shownRight().size())
-        {
-            mRegions.emplace(left, right);
-        }
-    }
+    mRegions.emplace(ALTextDiff::lexed(mOptions, shownLeft(), shownRight(), true));
     return *mRegions;
 }
 

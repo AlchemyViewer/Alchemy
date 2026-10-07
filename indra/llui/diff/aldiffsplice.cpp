@@ -223,11 +223,9 @@ bool ALDiffSplice::splice(std::vector<Run>& runs, const std::vector<std::string>
     // A side passed as itself is not read. Each side's regions, where lines
     // are told the same by them, read whole by the lexer in turn, as a
     // comparison of the two reads them.
-    const bool                                regioned      = options.like.byRegions() && !options.like.ignoreComments && options.lexer;
-    const std::vector<ALTextDiff::regions_t>* left_regions  = regioned ? &options.lexer(left) : nullptr;
-    const std::vector<ALTextDiff::regions_t>* right_regions = regioned ? &options.lexer(right) : nullptr;
-    return splice(runs, Side{ left, static_cast<S32>(left_was.size()), ALDiffEdit::edgesOf(left_was, left), left_regions },
-                  Side{ right, static_cast<S32>(right_was.size()), ALDiffEdit::edgesOf(right_was, right), right_regions }, options);
+    const ALTextDiff::both_regions_t regions = ALTextDiff::lexed(options, left, right, options.like.byRegions() && !options.like.ignoreComments);
+    return splice(runs, Side{ left, static_cast<S32>(left_was.size()), ALDiffEdit::edgesOf(left_was, left), regions.first },
+                  Side{ right, static_cast<S32>(right_was.size()), ALDiffEdit::edgesOf(right_was, right), regions.second }, options);
 }
 
 bool ALDiffSplice::splice(std::vector<Run>& runs, const Side& left_side, const Side& right_side, const ALTextDiff::Options& options)

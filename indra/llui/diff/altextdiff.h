@@ -183,6 +183,14 @@ namespace ALTextDiff
     // merge and a unified diff compare by.
     Options linesOnly(const Options& options);
 
+    // Two texts' lines' regions, by the options' lexer where they are
+    // `needed` and it has one: asked of it in turn, the left then the
+    // right, so both are of it until it is asked again -- it holds the last
+    // two texts it read; and none of either where it answers other than a
+    // line each.
+    typedef std::pair<const std::vector<regions_t>*, const std::vector<regions_t>*> both_regions_t;
+    both_regions_t lexed(const Options& options, const std::vector<std::string>& left, const std::vector<std::string>& right, bool needed);
+
     // The runs that make the left the right, compared as `options` says.
     std::vector<Run> lines(const std::vector<std::string>& left, const std::vector<std::string>& right, const Options& options = Options());
     // As lines(), each line's regions given rather than asked of the
