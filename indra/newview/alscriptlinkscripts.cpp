@@ -582,7 +582,9 @@ void ALScriptLinkScripts::ask(size_t index)
     row.worldWhy.clear();
     ++mAsking;
     // A link made up for it, which nothing keeps: what a send of the file
-    // would make, beside what the world holds.
+    // would make, beside what the world holds. Its object's contents were
+    // just asked of the region: taken as the object holds them, not asked
+    // again for each script.
     ALMasterLink link;
     link.object                     = row.ref.object;
     link.item                       = row.ref.item;
@@ -596,7 +598,7 @@ void ALScriptLinkScripts::ask(size_t index)
     const U32                 asked      = row.asked;
     const U32                 generation = mGeneration;
     const std::weak_ptr<bool> alive      = mAlive;
-    ALScriptMasterUpload::probe(link, [this, alive, generation, index, asked](const ALScriptMasterUpload::Probe& probe) {
+    const auto heard = [this, alive, generation, index, asked](const ALScriptMasterUpload::Probe& probe) {
         if (!alive.lock() || generation != mGeneration)
         {
             return;
@@ -619,7 +621,8 @@ void ALScriptLinkScripts::ask(size_t index)
         }
         mChanged();
         feedAsks();
-    });
+    };
+    ALScriptMasterUpload::probe(link, heard, /*world*/ true, /*refetch*/ false);
 }
 
 bool ALScriptLinkScripts::choose(size_t index, const std::string& file, How how)
