@@ -211,21 +211,19 @@ void ALScriptMasterWatch::looked(U32 asked, const std::vector<Looked>& found)
             continue;
         }
         // Watched from as the look found it: what was there then is seen.
+        // Written by the studio while it was looked at, it is watched from
+        // the file as that write left it instead: the studio's write is no
+        // change, which would send it a second time, and a save of anybody
+        // else's since, before the look or after it, is one, and heard.
+        const ALFileStamp&        from  = pending->second.written ? *pending->second.written : one.stamp;
         Watching                  watching;
         const std::weak_ptr<bool> alive = mAlive;
-        watching.file                   = std::make_unique<ALWatchedFile>(pending->second.path, one.stamp, [this, alive](const std::string& path) {
+        watching.file                   = std::make_unique<ALWatchedFile>(pending->second.path, from, [this, alive](const std::string& path) {
             if (alive.lock())
             {
                 heard(path);
             }
         });
-        // Written by the studio while it was looked at, perhaps after the
-        // look: what is there now is the studio's, and no outside save,
-        // which would send it a second time.
-        if (pending->second.seen)
-        {
-            watching.file->seen();
-        }
         watching.file->poll(pending->second.period);
         watching.period = pending->second.period;
         watching.master = pending->second.master;
@@ -245,7 +243,10 @@ void ALScriptMasterWatch::seen(const std::string& path)
     }
     else if (const auto waiting = mPending.find(key); waiting != mPending.end())
     {
-        waiting->second.seen = true;
+        // Its watch not made yet: the file looked at now, as the write left
+        // it, one look on this thread as a watch's own seen() makes, and
+        // the watch made from that when its first look answers.
+        waiting->second.written = ALFileStamp::of(waiting->second.path);
     }
 }
 

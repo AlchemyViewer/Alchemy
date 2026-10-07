@@ -34,6 +34,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -74,7 +75,9 @@ public:
     void watch(const std::vector<ALMasterLinks::Watched>& files);
     // A file the studio wrote, as it writes it: no change of anybody else's,
     // and nothing waiting on it from before. One still being looked at for
-    // its watch is taken as it is once the watch is made.
+    // its watch is looked at here, as the write left it, and watched from
+    // that once the watch is made: a save of anybody else's landing before
+    // then is a change, and heard.
     void seen(const std::string& path);
     // The files watched, and those waiting on their first look.
     size_t size() const { return mFiles.size() + mPending.size(); }
@@ -88,14 +91,15 @@ private:
     };
     // A file wanted, waiting on its first look: the path it is watched by,
     // what it is to be watched as, the call to watch() whose look it waits
-    // on, and whether the studio wrote it meanwhile.
+    // on, and, where the studio wrote it meanwhile, the file as the last of
+    // those writes left it.
     struct Pending
     {
-        std::string path;
-        bool        master = false;
-        F32         period = 0.f;
-        U32         asked  = 0;
-        bool        seen   = false;
+        std::string                path;
+        bool                       master = false;
+        F32                        period = 0.f;
+        U32                        asked  = 0;
+        std::optional<ALFileStamp> written;
     };
     // What a look made for a call to watch() found, by the file's key.
     struct Looked
