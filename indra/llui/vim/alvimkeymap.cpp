@@ -3176,18 +3176,20 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
             }
             if (ch == 'p' || ch == 'P')
             {
-                // The selection replaced by the register. Lines are
-                // replaced by its text, its lines taking theirs; lines put
-                // into less than a line go on lines of their own, the line
-                // broken round them. What a block holds of each line is
-                // replaced by a register of one line, as vim's blockwise
-                // put has it; by anything else it is taken out, and the
-                // register put at the block's corner -- lines under the
-                // block for p, over it for P. What p replaced goes where a
-                // delete puts what it takes -- the unnamed register, and 1
-                // or - -- once the register is put, whichever was named,
-                // so a further p puts that; P leaves every register as it
-                // was, for a further P to put the same again.
+                // The selection replaced by the register, the count's
+                // copies of it. Lines are replaced by its text, its lines
+                // taking theirs, a copy a line or more; lines put into less
+                // than a line go on lines of their own, the line broken
+                // round them; characters go in straight on. What a block
+                // holds of each line is replaced by a register of one line,
+                // its copies side by side, as vim's blockwise put has it; by
+                // anything else it is taken out, and the register put at
+                // the block's corner -- lines under the block for p, over
+                // it for P. What p replaced goes where a delete puts what
+                // it takes -- the unnamed register, and 1 or - -- once the
+                // register is put, whichever was named, so a further p puts
+                // that; P leaves every register as it was, for a further P
+                // to put the same again.
                 const Register                 put_this = fetch(mRegister);
                 const std::vector<ALTextRange> pieces   = span.block ? blockPieces(view, span) : std::vector<ALTextRange>();
                 std::string                    taken;
@@ -3212,19 +3214,33 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                     clearPending();
                     return true;
                 }
+                if (count > 1 && put_this.text.size() * static_cast<size_t>(count) > MAX_COUNT_TEXT)
+                {
+                    tooMuch(put_this.text.size() * static_cast<size_t>(count));
+                    clearPending();
+                    return true;
+                }
                 view.undoJournal().beginGroup();
                 if (span.block)
                 {
                     const bool one_line = !put_this.linewise && !put_this.block && put_this.text.find('\n') == std::string::npos;
+                    std::string copies;
+                    for (S32 n = 0; one_line && n < count; ++n)
+                    {
+                        copies += put_this.text;
+                    }
                     std::vector<std::pair<ALTextRange, std::string>> edits;
-                    for (const ALTextRange& piece : pieces)
+                    bool                                             put_first = false;
+                    for (size_t i = 0; i < pieces.size(); ++i)
                     {
                         // A line that stops short of the block left as it
                         // is, as vim's blockwise put leaves it; one that
                         // reaches the block's first column has the text
                         // added at its end.
-                        const bool  short_of = piece.empty() && !padTo(d, piece.begin.line, span.left, view.getTabWidth()).empty();
-                        std::string with     = one_line && !short_of ? put_this.text : std::string();
+                        const ALTextRange& piece    = pieces[i];
+                        const bool         short_of = piece.empty() && !padTo(d, piece.begin.line, span.left, view.getTabWidth()).empty();
+                        std::string        with     = one_line && !short_of ? copies : std::string();
+                        put_first                   = put_first || (i == 0 && !with.empty());
                         if (!piece.empty() || !with.empty())
                         {
                             edits.emplace_back(piece, std::move(with));
@@ -3237,29 +3253,48 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                     const ALTextPos corner = d.clamp(pieces.front().begin);
                     if (one_line)
                     {
-                        moveTo(view, corner);
+                        // On the last character put on the block's first
+                        // line, as vim leaves it; at the corner where none
+                        // went there.
+                        moveTo(view, put_first ? d.prevCluster(ALTextPos(corner.line, corner.column + static_cast<S32>(copies.size()))) : corner);
                     }
                     else
                     {
                         const bool below = put_this.linewise && ch == 'p';
                         view.setCaret(below ? d.lineStart(pieces.back().begin.line) : corner);
-                        put(view, mRegister, below, 1);
+                        put(view, mRegister, below, count);
                     }
                 }
                 else
                 {
-                    const bool split = put_this.linewise && !span.linewise;
+                    // As lines -- a register's lines, or anything into lines
+                    // -- each copy a line or more of its own, the caret on the
+                    // first line put; characters into characters straight
+                    // on, the caret on the last put, or where they begin
+                    // where they go over more than one line, as put() leaves
+                    // it.
+                    const bool  lines = put_this.linewise || span.linewise;
+                    const bool  split = put_this.linewise && !span.linewise;
+                    std::string text;
+                    for (S32 n = 0; n < count; ++n)
+                    {
+                        if (lines && n > 0)
+                        {
+                            text += '\n';
+                        }
+                        text += put_this.text;
+                    }
                     view.deleteRange(span.range);
                     view.setCaret(span.range.begin);
-                    view.insertText(split ? "\n" + put_this.text + "\n" : put_this.text);
-                    if (put_this.linewise)
+                    view.insertText(split ? "\n" + text + "\n" : text);
+                    if (lines)
                     {
                         const S32 line = span.range.begin.line + (split ? 1 : 0);
                         moveTo(view, ALTextPos(line, firstNonBlankColumn(d, line)));
                     }
                     else
                     {
-                        moveTo(view, put_this.text.empty() ? view.caret() : d.prevCluster(view.caret()));
+                        moveTo(view, text.empty() ? view.caret() : text.find('\n') != std::string::npos ? span.range.begin : d.prevCluster(view.caret()));
                     }
                 }
                 view.undoJournal().endGroup();

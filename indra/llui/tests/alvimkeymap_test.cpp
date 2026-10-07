@@ -4873,4 +4873,45 @@ namespace tut
         ensure("two substitutions: nothing said: " + vim->message(), vim->message().empty());
         ensure_equals("both made", flat(editor->text()), std::string("b b|b|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<170>()
+    {
+        set_test_name("visual p and P put the count's copies -- characters straight on, lines and anything into lines a line each, a block's columns side by side -- the caret where vim leaves it");
+        ALCodeEditor& e = make("one two three four\n");
+        keys("$yiwbviw2p");
+        ensure_equals("viw2p", flat(e.text()), std::string("one two fourfour four|"));
+        ensure_equals("the caret on the last character put", caretText(), std::string("0:15"));
+        ensure_equals("what it replaced in the unnamed register", vim->registerText('"'), std::string("three"));
+
+        make("one two three four\n");
+        keys("$yiwbviw2P");
+        ensure_equals("viw2P the same", flat(editor->text()), std::string("one two fourfour four|"));
+        ensure_equals("the registers as they were", vim->registerText('"'), std::string("four"));
+
+        make("a\nb\nc\n");
+        keys("yyjV2p");
+        ensure_equals("yyjV2p: two lines for the one", flat(editor->text()), std::string("a|a|a|c|"));
+        ensure_equals("the caret on the first put", caretText(), std::string("1:0"));
+
+        make("abcd\nefgh\nX\n");
+        keys("2jylggl<C-v>j2p");
+        ensure_equals("a block's columns each replaced by two copies", flat(editor->text()), std::string("aXXcd|eXXgh|X|"));
+        ensure_equals("the caret on the last put on its first line", caretText(), std::string("0:2"));
+
+        make("ab\ncd\nxyz\n");
+        keys("vjy2jlv3p");
+        ensure_equals("characters over two lines put three times straight on", flat(editor->text()), std::string("ab|cd|xab|cab|cab|cz|"));
+        ensure_equals("the caret where they begin", caretText(), std::string("2:1"));
+
+        make("ab\n cd\nef\n");
+        keys("yiwjV2p");
+        ensure_equals("characters into lines: a line each", flat(editor->text()), std::string("ab|ab|ab|ef|"));
+        ensure_equals("the caret on the first line put", caretText(), std::string("1:0"));
+
+        make("a\nbcd\nefg\n");
+        keys("yyjl<C-v>j2P");
+        ensure_equals("lines into a block: the block taken out, the lines put over it twice", flat(editor->text()), std::string("a|a|a|bd|eg|"));
+        ensure_equals("the caret on the first of them", caretText(), std::string("1:0"));
+    }
 }
