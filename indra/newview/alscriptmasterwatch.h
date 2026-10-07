@@ -27,6 +27,7 @@
 
 #include "almasterburst.h"
 #include "almasterlinks.h"
+#include "alwatchedfile.h"
 #include "llstl.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -35,8 +36,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-
-class ALWatchedFile;
 
 // The files on disk whose saves send scripts in the world -- each linked
 // script's master, and the files its last expansion read -- watched for
@@ -50,6 +49,11 @@ class ALWatchedFile;
 // longer, as a save in two steps empties a file before it fills it. What
 // the studio writes itself is marked seen as it is written, and is no
 // change: the studio sends it at once.
+//
+// A file newly watched is looked at first on a thread of its own, every new
+// one of a call together, and its watch made on the main thread from what
+// that look found: the main thread asks the disk nothing for it, whether
+// there are three links or thousands, at login or as links change.
 class ALScriptMasterWatch
 {
 public:
@@ -63,12 +67,17 @@ public:
     ALScriptMasterWatch& operator=(const ALScriptMasterWatch&) = delete;
 
     // The files to watch, as the links stand now: those no longer among
-    // them let go of, and those new watched from as they are now.
+    // them let go of, and those new watched from as they are once looked
+    // at, which is done off the main thread. One watched already only
+    // changes how often it is looked at, where it must, and is asked
+    // nothing of the disk.
     void watch(const std::vector<ALMasterLinks::Watched>& files);
     // A file the studio wrote, as it writes it: no change of anybody else's,
-    // and nothing waiting on it from before.
+    // and nothing waiting on it from before. One still being looked at for
+    // its watch is taken as it is once the watch is made.
     void seen(const std::string& path);
-    size_t size() const { return mFiles.size(); }
+    // The files watched, and those waiting on their first look.
+    size_t size() const { return mFiles.size() + mPending.size(); }
 
 private:
     struct Watching
@@ -77,7 +86,27 @@ private:
         bool                           master = false;
         F32                            period = 0.f;
     };
+    // A file wanted, waiting on its first look: the path it is watched by,
+    // what it is to be watched as, the call to watch() whose look it waits
+    // on, and whether the studio wrote it meanwhile.
+    struct Pending
+    {
+        std::string path;
+        bool        master = false;
+        F32         period = 0.f;
+        U32         asked  = 0;
+        bool        seen   = false;
+    };
+    // What a look made for a call to watch() found, by the file's key.
+    struct Looked
+    {
+        std::string key;
+        ALFileStamp stamp;
+    };
 
+    // The watches made, from what the looks asked by one call found, for
+    // the files still waiting on that call's.
+    void looked(U32 asked, const std::vector<Looked>& found);
     void heard(const std::string& path);
     // A look at the burst when it next has something to give, unless one is
     // already coming.
@@ -85,8 +114,13 @@ private:
     void tick();
 
     released_t    mReleased;
-    // By the path's key, as ALMasterLinks::keyOf compares paths.
+    // By the path's key, as ALMasterLinks::keyOf compares paths: the files
+    // watched, and those waiting on their first look.
     boost::unordered_flat_map<std::string, Watching, ll::string_hash, std::equal_to<>> mFiles;
+    boost::unordered_flat_map<std::string, Pending, ll::string_hash, std::equal_to<>>  mPending;
+    // Counted up at each call to watch() that asks for looks: a look answers
+    // only the files that were waiting on it, and that are wanted still.
+    U32           mAsked = 0;
     ALMasterBurst mBurst;
     bool          mScheduled = false;
     // Held while this is, for a watch or a timer to know it still is.
