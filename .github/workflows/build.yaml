@@ -145,7 +145,7 @@ jobs:
             echo 'build_type=opensource' >> $GITHUB_OUTPUT
             echo 'build_suffix=-OS' >> $GITHUB_OUTPUT
           else
-            echo 'build_type=opensource' >> $GITHUB_OUTPUT
+            echo 'build_type=proprietary' >> $GITHUB_OUTPUT
             echo "build_suffix=" >> $GITHUB_OUTPUT
           fi
 
