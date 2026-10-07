@@ -4716,4 +4716,21 @@ namespace tut
         keys("viwcX<Esc>w.");
         ensure_equals("viw c, then . over as many characters as the word had, not the word there", flat(editor->text()), std::string("X Xef gh|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<164>()
+    {
+        set_test_name("i< and a< take the angle brackets around the caret, nesting counted and a count out, while % pairs no angle bracket");
+        ALCodeEditor& e = make("f(<a <b> c>, x);\n");
+        keys("0fbdi<");
+        ensure_equals("i< inside the innermost pair", flat(e.text()), std::string("f(<a <> c>, x);|"));
+        keys("u0fbd2a<");
+        ensure_equals("2a< the pair a level out, whole", flat(e.text()), std::string("f(, x);|"));
+        keys("u0fcda>");
+        ensure_equals("a> from after a closed pair: the one still open before it", flat(e.text()), std::string("f(, x);|"));
+        keys("u0fbva<d");
+        ensure_equals("va< in visual", flat(e.text()), std::string("f(<a  c>, x);|"));
+        keys("u0f<%");
+        ensure_equals("% from an angle bracket goes on to the round one after it", caretText(), std::string("0:1"));
+    }
 }

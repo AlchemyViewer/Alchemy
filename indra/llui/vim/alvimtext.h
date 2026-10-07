@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "albracketindex.h"
 #include "altextchars.h"
 #include "altextdocument.h"
 #include "llstring.h"
@@ -164,34 +165,43 @@ namespace ALVimText
         return width < column ? std::string(static_cast<size_t>(column - width), ' ') : std::string();
     }
 
-    inline bool isBracket(char c) { return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}'; }
+    // A bracket as % finds one on a line: the round, square and curly
+    // ones, as the editor pairs them (ALBracketIndex::bracketOf).
+    inline bool isBracket(char c)
+    {
+        char partner = '\0';
+        bool opens   = false;
+        return ALBracketIndex::bracketOf(c, partner, opens);
+    }
+    // Which a bracket pairs with, and whether it opens: the editor's, and
+    // the angle brackets the a< and i< objects pair too.
+    inline bool bracketOf(char c, char& partner, bool& opens)
+    {
+        if (c == '<' || c == '>')
+        {
+            partner = c == '<' ? '>' : '<';
+            opens   = c == '<';
+            return true;
+        }
+        return ALBracketIndex::bracketOf(c, partner, opens);
+    }
     inline char partnerOf(char c)
     {
-        switch (c)
-        {
-            case '(': return ')';
-            case ')': return '(';
-            case '[': return ']';
-            case ']': return '[';
-            case '{': return '}';
-            case '}': return '{';
-            case '<': return '>';
-            case '>': return '<';
-            default:  return '\0';
-        }
+        char partner = '\0';
+        bool opens   = false;
+        return bracketOf(c, partner, opens) ? partner : '\0';
     }
-    inline bool opensOf(char c) { return c == '(' || c == '[' || c == '{' || c == '<'; }
 
     // The bracket that matches the one at a position, nesting counted.
     inline bool matchBracket(const ALTextDocument& d, ALTextPos from, ALTextPos& match)
     {
         const char c       = at(d, from);
-        const char partner = partnerOf(c);
-        if (!partner)
+        char       partner = '\0';
+        bool       forward = false;
+        if (!bracketOf(c, partner, forward))
         {
             return false;
         }
-        const bool forward = opensOf(c);
         S32        depth   = 0;
         ALTextPos  p       = from;
         do
