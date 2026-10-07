@@ -425,6 +425,10 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
             request.endColumn = kept ? last.column : loc.column;
         }
     }
+    // Whether a state goes after it, as the text stands: asked first, since
+    // the weighing asks it too, and would be told what it was of the text
+    // before while this one is still being lexed.
+    const bool fragment = lslFragment(doc, /*now*/ true);
     if (kind == ALScriptAnalysis::Kind::Check && request.front)
     {
         // The tab in front weighed with its check, of the same text, in
@@ -443,7 +447,7 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
             return;
         }
     }
-    else if (lslFragment(doc))
+    else if (fragment)
     {
         request.text = std::make_shared<const std::string>(*request.text + FRAGMENT_STATE);
     }
@@ -683,7 +687,7 @@ void ALScriptStudioChecking::actionsAnswered(Doc& doc, const ALScriptAnalysis::R
     doc.editor->supplyActions(doc.check->actionsAsked, std::move(offered));
 }
 
-bool ALScriptStudioChecking::lslFragment(const Doc& doc) const
+bool ALScriptStudioChecking::lslFragment(const Doc& doc, bool now) const
 {
     if (doc.file.empty() || doc.language.lua || doc.notecard)
     {
@@ -693,6 +697,14 @@ bool ALScriptStudioChecking::lslFragment(const Doc& doc) const
     ALCodeEditor& editor  = *doc.editor;
     const U32     version = editor.document().version();
     if (doc.check->fragment && doc.check->fragment->first == version)
+    {
+        return doc.check->fragment->second;
+    }
+    // What it was of the text before, while this one is lexed down to its
+    // end a slice at a time: asked every frame, the walk would lex the
+    // whole of it in the frame after an edit that changes how every line
+    // after it starts.
+    if (doc.check->fragment && !now && !editor.highlighter().lexSome())
     {
         return doc.check->fragment->second;
     }
