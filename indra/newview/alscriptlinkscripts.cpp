@@ -221,8 +221,11 @@ void ALScriptLinkScripts::listed(U32 generation, std::vector<Prim> prims, std::v
             ++mTally.scripts;
             const ALScriptRef ref(prim.id, item.id);
             // Linked already: what it is linked to is the link's, and a
-            // link of its own is undone first, not gone over here.
-            if (masters.linkOf(ref))
+            // link of its own is undone first, not gone over here. But for
+            // one held as orphaned, its item thought gone when it is here:
+            // that link is proposed again, and linking goes over it.
+            std::optional<ALMasterLink> link = masters.linkOf(ref);
+            if (link && link->state != ALMasterLink::State::Orphaned)
             {
                 ++mTally.linked;
                 continue;
@@ -233,7 +236,7 @@ void ALScriptLinkScripts::listed(U32 generation, std::vector<Prim> prims, std::v
                 ++mTally.unreadable;
                 continue;
             }
-            mToRead.push_back({ ref, item.name, prim.root, prim.place, prim.object, region, owned });
+            mToRead.push_back({ ref, item.name, prim.root, prim.place, prim.object, region, owned, std::move(link) });
         }
     }
     mReadRows.resize(mToRead.size());
@@ -290,6 +293,12 @@ void ALScriptLinkScripts::read(U32 generation, size_t index, const ALScriptLoade
         row.lua        = loaded.language.lua;
         row.target     = loaded.language.compileTarget;
         row.asset      = loaded.assetId;
+        // Its own link, held as orphaned, where it was a script's of its
+        // language: proposed again before anything else.
+        if (one.orphaned && !one.orphaned->notecard && one.orphaned->lua == row.lua)
+        {
+            row.ownLink = std::make_pair(one.orphaned->master, one.orphaned->made);
+        }
         // The @file its author wrote, or an upload header's: read from the
         // source half and the header where it went up wrapped.
         std::string source = loaded.text;
@@ -365,12 +374,15 @@ void ALScriptLinkScripts::findFiles()
         ask.hint = row.hint;
         ask.lua  = row.lua;
         ask.name = row.name;
+        ask.own  = row.ownLink;
         if (!orphans.empty())
         {
             for (const ALMasterLink* orphan : orphans.orphansNamed(row.name, row.objectName))
             {
                 // A script's, of its language: a notecard's file is text.
-                if (!orphan->notecard && orphan->lua == row.lua)
+                // Not the item's own, looked at first.
+                const bool own = orphan->object == row.ref.object && orphan->item == row.ref.item;
+                if (!own && !orphan->notecard && orphan->lua == row.lua)
                 {
                     ask.records.emplace_back(orphan->master, orphan->made);
                 }
@@ -426,6 +438,18 @@ std::vector<ALScriptLinkScripts::Found> ALScriptLinkScripts::match(const std::ve
         const Ask&   ask   = asks[i];
         Found&       found = out[i];
         const Reach& reach = ask.lua ? lua : lsl;
+        const std::vector<std::string>& extensions = ALDiskIncludes::scriptExtensions(ask.lua);
+        // The item's own link, orphaned while the item stayed: the file the
+        // scripter linked it to, where it is still there, before anything
+        // the script says.
+        if (ask.own && ALDiskIncludes::extensionOf(ask.own->first, extensions) > 0 && ALFileStamp::of(ask.own->first).exists)
+        {
+            found.file = ask.own->first;
+            found.how  = How::Record;
+            found.made = ask.own->second;
+            found.own  = true;
+            continue;
+        }
         // The file the script names, where an include of it could reach it.
         if (!ask.hint.empty())
         {
@@ -441,7 +465,6 @@ std::vector<ALScriptLinkScripts::Found> ALScriptLinkScripts::match(const std::ve
         }
         // The file an earlier link of an item of its name had, where it is
         // still a script of its language: each file once.
-        const std::vector<std::string>& extensions = ALDiskIncludes::scriptExtensions(ask.lua);
         std::vector<std::string>        records;
         std::vector<ALMasterLink::Made> made;
         for (const auto& [master, how] : ask.records)
@@ -508,6 +531,7 @@ void ALScriptLinkScripts::found(U32 generation, std::vector<Found> found)
         row.choicesHow  = one.choicesHow;
         row.choicesMade = std::move(one.choicesMade);
         row.hintWhy     = std::move(one.hintWhy);
+        row.own         = one.own;
         // What the script names, not called what the item is, the
         // scripter is to see before it is linked.
         row.named = row.how == How::Hint && !sameName(row.file, row.name);
@@ -607,6 +631,7 @@ bool ALScriptLinkScripts::choose(size_t index, const std::string& file, How how)
     row.file  = file;
     row.how   = how;
     row.named = false;
+    row.own   = false;
     row.made  = how == How::Picked ? ALMasterLink::Made::Picked : how == How::Hint ? ALMasterLink::Made::Hint : ALMasterLink::Made::Name;
     if (how == How::Record)
     {

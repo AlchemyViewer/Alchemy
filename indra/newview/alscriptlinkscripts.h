@@ -46,8 +46,10 @@ struct ALScriptLoaded;
 //   copy hears nothing of what a co-owner saved;
 // - each script's text read through the workspace, a few at a time;
 // - a file found for each, off the main thread as the studio's other looks
-//   at the disk are: the one the script's own @file names, where an include
-//   of it could read it (ALMasterMatch::resolve); else the file an earlier
+//   at the disk are: the one its own link had, where that is held as
+//   orphaned though the item is here; else the one the script's own @file
+//   names, where an include of it could read it (ALMasterMatch::resolve);
+//   else the file an earlier
 //   link of an item of its name had, the item having gone with a take and
 //   come back rezzed; else those of its name under the folders an include
 //   may be read from (ALMasterMatch::byName). More than one is a choice
@@ -135,6 +137,11 @@ public:
         // Found by the script's @file, and not called what the item is:
         // the script chose it, which the scripter is to see.
         bool               named = false;
+        // Found by this very item's own link, orphaned: a link the
+        // scripter made, held as gone where the item never left; and that
+        // link's master and making, as read with the item.
+        bool                                                      own = false;
+        std::optional<std::pair<std::string, ALMasterLink::Made>> ownLink;
         // What the world holds beside it, why where it cannot be told, and
         // what a send would make of it, hashed as a link keeps it.
         World       world = World::Unasked;
@@ -225,6 +232,9 @@ private:
         bool                                                    lua = false;
         std::string                                             name;
         std::vector<std::pair<std::string, ALMasterLink::Made>> records;
+        // The item's own orphaned link's master, and what made it: looked
+        // at before anything else.
+        std::optional<std::pair<std::string, ALMasterLink::Made>> own;
     };
     struct Found
     {
@@ -235,6 +245,7 @@ private:
         How                             choicesHow = How::None;
         std::vector<ALMasterLink::Made> choicesMade;
         std::string                     hintWhy;
+        bool                            own = false;
     };
     // The folders a hint or a name may reach for a language, and its
     // aliases: read on the main thread, which alone may read the settings.
@@ -270,6 +281,8 @@ private:
         std::string objectName;
         std::string regionName;
         bool        owned = false;
+        // Its own link, orphaned, where it has one.
+        std::optional<ALMasterLink> orphaned;
     };
     std::vector<Reading>            mToRead;
     std::vector<std::optional<Row>> mReadRows;

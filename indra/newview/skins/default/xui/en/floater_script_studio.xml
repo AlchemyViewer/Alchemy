@@ -690,6 +690,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="LinkHowHint">its @file</floater.string>
     <floater.string name="LinkHowNamed">named by the script</floater.string>
     <floater.string name="LinkHowRecord">an earlier link</floater.string>
+    <floater.string name="LinkHowOwnRecord">its own link</floater.string>
     <floater.string name="LinkHowName">its name</floater.string>
     <floater.string name="LinkHowPicked">picked</floater.string>
     <floater.string name="LinkWorldAsking">checking...</floater.string>
@@ -700,6 +701,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="LinkTipHintWhy">It names [HINT] as its file, which is not used: [WHY].</floater.string>
     <floater.string name="LinkTipNamed">The script names this file, which is not called [NAME]: be sure it is the file you mean before you link it.</floater.string>
     <floater.string name="LinkTipRecord">A script called [NAME] was linked to this file before it was taken; this may be it, rezzed again.</floater.string>
+    <floater.string name="LinkTipOwnRecord">[NAME] was linked to this file, and its link was held as gone though the script is still here: linking it puts the link back.</floater.string>
     <floater.string name="LinkTipChoicesA">1 file could be its: choose it.</floater.string>
     <floater.string name="LinkTipChoicesB">[COUNT] files could be its: choose one.</floater.string>
     <floater.string name="LinkTipRecordsA">1 earlier link could be its: choose it.</floater.string>

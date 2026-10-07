@@ -172,7 +172,7 @@ std::string ALScriptLinkPane::tipOf(const Row& row) const
     }
     if (row.how == How::Record)
     {
-        said.push_back(mServices->words("LinkTipRecord", args));
+        said.push_back(mServices->words(row.own ? "LinkTipOwnRecord" : "LinkTipRecord", args));
     }
     if (row.file.empty() && !row.choices.empty())
     {
@@ -207,6 +207,7 @@ void ALScriptLinkPane::fill()
     const std::string how_hint    = mServices->words("LinkHowHint");
     const std::string how_named   = mServices->words("LinkHowNamed");
     const std::string how_record  = mServices->words("LinkHowRecord");
+    const std::string how_own     = mServices->words("LinkHowOwnRecord");
     const std::string how_name    = mServices->words("LinkHowName");
     const std::string how_picked  = mServices->words("LinkHowPicked");
     const std::string none_found  = mServices->words("LinkFileNone");
@@ -236,7 +237,7 @@ void ALScriptLinkPane::fill()
         {
             case How::None: break;
             case How::Hint: how = row.named ? how_named : how_hint; break;
-            case How::Record: how = how_record; break;
+            case How::Record: how = row.own && !row.file.empty() ? how_own : how_record; break;
             case How::Name: how = how_name; break;
             case How::Picked: how = how_picked; break;
         }
