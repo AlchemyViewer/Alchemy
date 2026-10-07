@@ -88,7 +88,7 @@ namespace
         // t[n / 2]: Luau's / makes a fraction, which a list has nothing at.
         { "SlIndexDivision", Rule::SLua, Severity::Warning, true, true, nullptr, true },
         // a * b of vectors where a number is wanted, LSL's dot product; a % b,
-        // LSL's cross product.
+        // the cross product as in LSL, a note naming vector.cross.
         { "SlVectorProduct", Rule::SLua, Severity::Warning, true, true, nullptr, true },
         // llSetPos, llSetPrimitiveParams: a call that sleeps, which a Fast
         // one does without. A warning in a loop or a timer.
@@ -2468,7 +2468,8 @@ namespace
 
         // A product of two vectors where the other side of an operator is a
         // number, which a vector can be neither compared with nor added to;
-        // and a % b of two vectors, LSL's cross product.
+        // and a % b of two vectors, the cross product in SLua as in LSL (the
+        // VM's __mod), which vector.cross says plainly: a note.
         void vectorProducts(Luau::AstExprBinary* node)
         {
             using Op = Luau::AstExprBinary::Op;
@@ -2478,9 +2479,9 @@ namespace
                 const std::string b    = text(node->right->location);
                 const std::string now  = "vector.cross(" + a + ", " + b + ")";
                 ALScriptProblem&  said = problem(node->location, "LuauLintSlVectorCross",
-                                                 "[1] is each part's remainder in SLua: LSL's % of two vectors was their cross product. "
-                                                 "vector.cross([2], [3]) is LSL's",
-                                                 { text(node->location), a, b }, "SlVectorProduct");
+                                                 "[1] is the cross product of two vectors, as LSL's % was. vector.cross([2], [3]) says so "
+                                                 "plainly",
+                                                 { text(node->location), a, b }, "SlVectorProduct", Severity::Note);
                 offer(said, now, { edit(node->location, now) }, false);
                 return;
             }

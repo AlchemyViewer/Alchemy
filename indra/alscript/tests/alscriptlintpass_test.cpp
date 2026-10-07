@@ -526,8 +526,9 @@ namespace tut
     template<> template<>
     void object::test<12>()
     {
-        set_test_name("SlVectorProduct: two vectors multiplied where a number is wanted -- compared, added to one, given to math -- and "
-                      "taken % each other, a warning, fixed as vector.dot and vector.cross; not a product kept a vector, nor by a number");
+        set_test_name("SlVectorProduct: two vectors multiplied where a number is wanted -- compared, added to one, given to math -- a "
+                      "warning, fixed as vector.dot; taken % each other, the cross product as in LSL, a note naming vector.cross; not a "
+                      "product kept a vector, nor by a number");
         ensure("definitions: " + error, loaded);
         const std::string said = found("local a = vector(1, 0, 0)\n"
                                        "local b = vector(0, 1, 0)\n"
@@ -541,7 +542,9 @@ namespace tut
                       std::string("2 LuauLintSlVectorProduct|a * b|a|b\n"
                                   "3 LuauLintSlVectorProduct|a * b|a|b\n"
                                   "3 LuauLintSlVectorProduct|a * b|a|b\n"
-                                  "4 LuauLintSlVectorCross|a % b|a|b\n"));
+                                  "4 LuauLintSlVectorCross|a % b|a|b (another severity)\n"));
+        ensure_equals("a note", found("local a = vector(1, 0, 0)\nlocal c = a % a\nprint(c)\n", "SlVectorProduct", ALScriptProblem::Severity::Note),
+                      std::string("1 LuauLintSlVectorCross|a % a|a|a\n"));
         ensure_equals("dot", fixed("local a = vector(1, 0, 0)\nprint(a * a > 0.5)\n", "LuauLintSlVectorProduct", "Write it vector.dot(a, a)", false),
                       std::string("local a = vector(1, 0, 0)\nprint(vector.dot(a, a) > 0.5)\n"));
         ensure_equals("cross", fixed("local a = vector(1, 0, 0)\nlocal c = a % a\nprint(c)\n", "LuauLintSlVectorCross", "Write it vector.cross(a, a)", false),
