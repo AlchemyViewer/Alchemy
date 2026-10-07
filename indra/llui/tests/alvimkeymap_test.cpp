@@ -4170,4 +4170,50 @@ namespace tut
         keys("/foo\\nbar<CR>ggdgn");
         ensure_equals("dgn over a match of two lines: characters", flat(editor->text()), std::string("|x|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<153>()
+    {
+        set_test_name("c over an empty line's end taken inclusively -- ciw, C, c$ there -- keeps it, an empty register, in - as well; c0 there and ci( between two brackets keep nothing");
+        ALCodeEditor& e = make("abc\n\nxyz\n");
+        keys("xyiw");
+        e.setCaret(ALTextPos(1, 0));
+        keys("ciwX<Esc>");
+        ensure_equals("ciw on an empty line changes it", flat(e.text()), std::string("bc|X|xyz|"));
+        ensure_equals("and keeps its end, no text", vim->registerText('"'), std::string());
+        ensure_equals("in - as well", vim->registerText('-'), std::string());
+        ensure_equals("0 still the yank", vim->registerText('0'), std::string("bc"));
+
+        make("abc\n\nxyz\n");
+        keys("yiw");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("CX<Esc>");
+        ensure_equals("C on an empty line changes it", flat(editor->text()), std::string("abc|X|xyz|"));
+        ensure_equals("and keeps its end", vim->registerText('"'), std::string());
+
+        make("abc\n\nxyz\n");
+        keys("yiw");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("c$X<Esc>");
+        ensure_equals("c$ there keeps it too", vim->registerText('"'), std::string());
+
+        make("abc\n\nxyz\n");
+        keys("yiw");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("\"aciWX<Esc>");
+        ensure_equals("ciW into a register named: the unnamed one says it", vim->registerText('"'), std::string());
+        ensure_equals("the yank still in 0", vim->registerText('0'), std::string("abc"));
+
+        make("abc\n\nxyz\n");
+        keys("yiw");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("c0X<Esc>");
+        ensure_equals("c0 there changes it", flat(editor->text()), std::string("abc|X|xyz|"));
+        ensure_equals("and keeps nothing", vim->registerText('"'), std::string("abc"));
+
+        make("f()\n");
+        keys("yiwf(ci(X<Esc>");
+        ensure_equals("ci( between two brackets", flat(editor->text()), std::string("f(X)|"));
+        ensure_equals("keeps nothing", vim->registerText('"'), std::string("f"));
+    }
 }

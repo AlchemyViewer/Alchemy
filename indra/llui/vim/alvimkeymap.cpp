@@ -2263,6 +2263,7 @@ bool ALVimKeymap::afterMotionKey(ALTextView& view, llwchar pending, llwchar ch)
         const ALTextPos from = cursor(view);
         span.range           = ALTextRange(from, m.to).normalised();
         span.linewise        = m.linewise;
+        span.inclusive       = m.inclusive;
         if (m.inclusive)
         {
             span.range.end = d.nextCluster(span.range.end);
@@ -2406,6 +2407,7 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     const ALTextPos from = cursor(view);
     span.range           = ALTextRange(from, m.to).normalised();
     span.linewise        = m.linewise;
+    span.inclusive       = m.inclusive || m_ch == '$';
     if (m.inclusive)
     {
         span.range.end = d.nextCluster(span.range.end);
@@ -2445,8 +2447,9 @@ bool ALVimKeymap::searchMotion(ALTextView& view, bool forward, std::optional<ALT
         return true;
     }
     Span span;
-    span.range    = ALTextRange(from, *to).normalised();
-    span.linewise = offset.kind == 'l';
+    span.range     = ALTextRange(from, *to).normalised();
+    span.linewise  = offset.kind == 'l';
+    span.inclusive = offset.kind == 'e';
     if (offset.kind == 'e')
     {
         span.range.end = d.nextCluster(span.range.end);
@@ -2958,8 +2961,10 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             }
             else
             {
+                // d$ and c$, through the line's end as $ goes.
                 const S32 last = llmin(d.lineCount() - 1, view.caret().line + count - 1);
                 span.range     = ALTextRange(view.caret(), d.lineEnd(last));
+                span.inclusive = true;
             }
             applyOperator(view, ch == 'D' ? 'd' : ch == 'C' ? 'c' : 'y', span, 1);
             finishCommand(ch != 'Y');
@@ -3668,6 +3673,7 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
             const ALTextPos first = std::min(word->start, word->end);
             const ALTextPos last  = std::max(word->start, word->end);
             out.range             = ALTextRange(first, word->inclusive && !atLineEnd(d, last) ? d.nextCluster(last) : last);
+            out.inclusive         = word->inclusive;
             if (!word->inclusive)
             {
                 adjustExclusiveEnd(d, out.range, out.linewise);
@@ -4105,13 +4111,14 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             // puts nothing in a register either, as vim's delete has it:
             // what the registers and the clipboard hold stays. c still
             // goes on to insert over its empty stretch, as vim's change
-            // does.
+            // does, and keeps an empty line's end it took inclusively --
+            // C, c$ or ciw there -- as an empty register.
             const bool nothing = !span.linewise && !span.block && span.range.empty();
             if (nothing && op == 'd')
             {
                 return;
             }
-            if (!nothing)
+            if (!nothing || span.inclusive)
             {
                 store(mRegister, text, span.linewise, span.block, false);
             }

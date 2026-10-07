@@ -263,6 +263,12 @@ private:
         // Taken from a visual selection -- gn's match is one -- which a
         // delete takes as it was selected, never as the lines it is over.
         bool        visual   = false;
+        // Taken through the character its motion ends on, as vim's
+        // inclusive motions and iw and aw take it: an empty stretch so
+        // taken is an empty line's end -- C, c$ or ciw there -- which c
+        // keeps as an empty register, where one an exclusive motion made,
+        // s or c0 there, keeps nothing.
+        bool        inclusive = false;
     };
 
     // A key as typed: recorded where a macro is being, then through the
