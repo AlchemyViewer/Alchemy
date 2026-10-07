@@ -176,12 +176,18 @@ bool ALScriptStudioMerging::merge(Doc& doc, const std::string& theirs, const std
         mServices.setStatus(mServices.words(canMerge(doc) ? "MergeNoBase" : "MergeReadOnly", args));
         return false;
     }
-    becomes(doc, ALDiffMerge::start(*base, doc.editor->wholeText(), theirs));
+    // Compared first, for the options its conflicts are counted by, which
+    // the merge is begun by too: where both changed as the comparison tells
+    // lines, ours is kept and a conflict is marked. Then compared again
+    // with the tab as merged.
     mWindow.compareWithTab(doc, theirs, title, std::string(), {});
+    const ALTextDiff::Options options = doc.compareView ? doc.compareView->model().mergeOptions() : ALTextDiff::Options();
+    becomes(doc, ALDiffMerge::start(*base, doc.editor->wholeText(), theirs, options));
     if (!doc.compareView)
     {
         return true;
     }
+    doc.compareView->setRightText(doc.editor->wholeText());
     doc.compareView->setMergeBase(*base);
     const S32 conflicts = doc.compareView->conflictCount();
     // Conflicts left are said over the source until they are settled: the

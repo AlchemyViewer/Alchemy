@@ -51,10 +51,20 @@ ALDiffMerge::ALDiffMerge(lines_t base, lines_t theirs, const ALTextDiff::Options
 // static
 std::string ALDiffMerge::start(std::string_view base, std::string_view ours, std::string_view theirs, const ALTextDiff::Options& options)
 {
-    const lines_t              b     = ALTextDiff::split(base);
-    const lines_t              o     = ALTextDiff::split(ours);
-    const lines_t              t     = ALTextDiff::split(theirs);
-    const ALTextMerge::hunks_t hunks = ALTextMerge::merge(b, o, t, ALTextDiff::linesOnly(options));
+    const lines_t        b     = ALTextDiff::split(base);
+    const lines_t        o     = ALTextDiff::split(ours);
+    const lines_t        t     = ALTextDiff::split(theirs);
+    ALTextMerge::hunks_t hunks = ALTextMerge::merge(b, o, t, ALTextDiff::linesOnly(options));
+    // Where neither changed, ours as it is: lines told the same may be
+    // written otherwise in ours than in the base -- re-indented, a comment
+    // reworded -- and keep it.
+    for (ALTextMerge::Hunk& hunk : hunks)
+    {
+        if (hunk.kind == ALTextMerge::Kind::Same)
+        {
+            hunk.kind = ALTextMerge::Kind::Ours;
+        }
+    }
     return ALLineBreaks::join(ALTextMerge::merged(b, o, t, hunks, [](S32) { return ALTextMerge::Take::Ours; }));
 }
 

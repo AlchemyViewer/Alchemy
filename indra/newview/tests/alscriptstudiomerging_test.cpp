@@ -338,4 +338,29 @@ namespace tut
         notice = ALScriptStudioOrphans::noticeFor(&doc, services());
         ensure("nor to say", notice.buttons[0].first.empty());
     }
+
+    template<> template<>
+    void alscriptstudiomerging_object::test<8>()
+    {
+        set_test_name("a merge begun as the tab's comparison tells lines: blanks let go of there, theirs's change among the lines they re-indented put in, and no conflict said where it finds none");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        // The tab compared before, letting blanks go; then changed line 5
+        // and re-indented line 7, while what was saved elsewhere re-indented
+        // lines 2 to 5 and changed line 3.
+        Doc& doc = tab("door");
+        studio.compareWithTab(doc, theirs, "earlier", std::string(), {});
+        doc.compareView->setIgnore("whitespace", true);
+        doc.editor->selectAll();
+        doc.editor->insertText(lines(8, { { 5, "mine 5" }, { 7, "    line 7" } }));
+        doc.savedThere = lines(8, { { 2, "  line 2" }, { 3, "  three" }, { 4, "  line 4" }, { 5, "  line 5" } });
+        unit->mergeSaved(doc);
+        ensure_equals("theirs's line 3 put in, the tab's own kept", doc.editor->wholeText(),
+                      lines(8, { { 3, "  three" }, { 5, "mine 5" }, { 7, "    line 7" } }));
+        ensure("compared with the tab as merged", doc.compareView->rightText() == doc.editor->wholeText());
+        ensure("a merge with no conflict", doc.compareView->merging() && doc.compareView->conflictCount() == 0);
+        ensure_equals("said", services().reports.back().text, said("MergeClean", named(doc)));
+    }
 }

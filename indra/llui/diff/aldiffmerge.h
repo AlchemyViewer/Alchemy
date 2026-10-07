@@ -59,7 +59,9 @@ public:
     ALDiffMerge(lines_t base, lines_t theirs, const ALTextDiff::Options& options = ALTextDiff::Options());
 
     // Ours as a merge begins: every change only theirs made put in, and
-    // where both changed, ours.
+    // where both changed, ours; lines told the same as the options tell
+    // them -- those a comparison counts the merge's conflicts by -- and
+    // where neither changed, ours as it is.
     static std::string start(std::string_view base, std::string_view ours, std::string_view theirs,
                              const ALTextDiff::Options& options = ALTextDiff::Options());
 
