@@ -49,7 +49,8 @@
 // settling left, or anything else it is edited to after, it is ours's own
 // change and no conflict; once ours holds again what it held before --
 // the edit undone, which a merge cannot see but by the text -- it is a
-// conflict again. Pure.
+// conflict again, as it is where an edit joins it to a conflict not
+// settled. Pure.
 class ALDiffMerge
 {
 public:
@@ -109,7 +110,8 @@ private:
     void findTheirs();
     // Whether a conflict is one a settling kept settles: its lines of the
     // base those of one, or beside them, and ours there not as it was
-    // before -- undone.
+    // before -- undone -- and each change of theirs in it one a settling
+    // was of.
     bool settles(const ALTextMerge::Hunk& hunk) const;
     // Each conflict that shares a line of theirs or of ours with a stretch,
     // told of by its hunk -- one sharing both, twice -- until told to stop:

@@ -316,4 +316,32 @@ namespace tut
         ensure_equals("one undone by hand", merge->conflictCount(), 1);
         ensure_equals("the one", inOurs(5, 1).size(), 1U);
     }
+
+    template<> template<>
+    void aldiffmerge_object::test<9>()
+    {
+        set_test_name("an edit that joins a conflict settled to one that is not: one conflict, still to settle; apart again, the one not settled; both settled and joined, none");
+        const std::string b = "a\nb\nc";
+        const std::string o = "A1\nb\nC1";
+        const std::string t = "A2\nb\nC2";
+        begin(b, o, t);
+        ensure_equals("two", merge->conflictCount(), 2);
+        settle(0, ALTextMerge::Take::Ours);
+        ensure_equals("the first settled", merge->conflictCount(), 1);
+        // The line between edited: one stretch both changed, which holds
+        // theirs's C2 that no settling was of.
+        becomes("A1\nB\nC1");
+        ensure_equals("joined: a conflict still", merge->conflictCount(), 1);
+        ensure_equals("found by the line not settled", inOurs(2, 1).size(), 1U);
+        becomes(o);
+        ensure_equals("apart again: the one not settled", merge->conflictCount(), 1);
+        ensure("the first settled still", inOurs(0, 1).empty() && inOurs(2, 1).size() == 1U);
+
+        begin(b, o, t);
+        settle(0, ALTextMerge::Take::Ours);
+        settle(2, ALTextMerge::Take::Ours);
+        ensure_equals("both settled", merge->conflictCount(), 0);
+        becomes("A1\nB\nC1");
+        ensure_equals("both settled, joined: none", merge->conflictCount(), 0);
+    }
 }
