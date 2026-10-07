@@ -2548,6 +2548,9 @@ bool ALVimKeymap::starSearch(ALTextView& view, bool forward, bool whole)
     mSearch.forward   = forward;
     mSearch.wholeWord = whole && keyword;
     mSearch.offset    = ALVimSearch::Offset();
+    // Into the search history as vim's * puts it there, a word looked for
+    // whole as \<word\>, for the search line to find again.
+    mCommandLine.remember('/', mSearch.wholeWord ? "\\<" + pattern + "\\>" : pattern);
     // Looked for from the word's start, as vim puts the caret there first:
     // # from inside a word goes to the one before it, not to its own start.
     if (mOperator)

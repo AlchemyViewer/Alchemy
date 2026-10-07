@@ -374,7 +374,8 @@ private:
     // other characters there, as they are. From the word's start, so that
     // the word itself is passed over. The caret goes there, or an operator
     // waiting takes the stretch to there (searchMotion), and n and N go on
-    // with it. Nothing but blanks from the caret to the line's end fails
+    // with it; and it goes into the search history, a whole word as
+    // \<word\>. Nothing but blanks from the caret to the line's end fails
     // the command, the operator with it.
     bool                starSearch(ALTextView& view, bool forward, bool whole);
     // A key that waits for the one after it -- a register's name, g's and

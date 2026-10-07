@@ -4482,4 +4482,37 @@ namespace tut
         keys("dg$");
         ensure_equals("dg$ through the row's last", e.document().line(0), line.substr(0, row_begin + 1) + line.substr(row_end));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<158>()
+    {
+        set_test_name("* # g* g# put what they look for in the search history, a whole word as \\<word\\>, and . of an operator over one puts what it finds then; . of d/foo puts foo last, once");
+        typedef std::vector<std::string> history_t;
+        make("foo b bar c foo d bar e foo f foo\n");
+        keys("d*");
+        ensure("d* puts \\<foo\\> in the search history", vim->shared().search == history_t{ "\\<foo\\>" });
+        keys("/bar<CR>");
+        keys(".");
+        ensure("and . of it the word under the caret then", vim->shared().search == history_t{ "\\<foo\\>", "bar", "\\<bar\\>" });
+
+        make("foo foobar\n");
+        keys("g*");
+        ensure("g* the word as it is", vim->shared().search == history_t{ "foo" });
+        keys("0*");
+        ensure("* the word whole, after it", vim->shared().search == history_t{ "foo", "\\<foo\\>" });
+
+        make("x.*1\na .*\n");
+        editor->setCaret(ALTextPos(1, 2));
+        keys("*");
+        ensure("other characters as they are looked for", vim->shared().search == history_t{ "\\.\\*" });
+
+        make("foo x foo\n");
+        keys("**#");
+        ensure("the same again is there once", vim->shared().search == history_t{ "\\<foo\\>" });
+
+        make("a foo b bar c foo d bar e foo\n");
+        keys("d/foo<CR>/bar<CR>.");
+        ensure_equals(". of d/foo up to the next foo", flat(editor->text()), std::string("foo b foo d bar e foo|"));
+        ensure("foo moved last in the history, and there once", vim->shared().search == history_t{ "bar", "foo" });
+    }
 }
