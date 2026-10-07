@@ -43,6 +43,11 @@
 //   //mono                          (or //lsl2)
 //   <the expanded code>
 //
+// Ours can carry an upload header (ALUploadHeader) between the target line
+// and the expanded code: comment lines, so the region compiles what it
+// would without them, and the source block, which is what Firestorm opens,
+// is as it was. Without one, what is written is Firestorm's to the byte.
+//
 // SLua gets the same in its own comment syntax: `--` lines, and the source
 // in a long comment at a bracket level the source does not contain, so
 // nothing needs escaping. `--luau` is its target.
@@ -59,11 +64,17 @@ struct ALScriptEnvelope
     static constexpr size_t MAX_ASSET_BYTES = 262144;
 
     std::string source;
+    // The code alone, the header aside.
     std::string expanded;
     // "mono", "lsl2" or "luau", or nothing where the envelope said none.
     std::string compileTarget;
     std::string programVersion;
     std::string lastCompiled;
+    // The upload header's lines (ALUploadHeader::write) as they stand ahead
+    // of the code, or nothing where there are none. parse() takes ours or
+    // the plugin's out of the compiled half into here; wrap() writes this,
+    // ending it with a newline where it does not end in one.
+    std::string header;
     bool        lua = false;
 
     // The envelope in an asset, or nothing where the asset has none: it
@@ -78,11 +89,14 @@ struct ALScriptEnvelope
     // with these fields and texts, so that what a save would send is
     // measured without a copy of either text.
     static size_t wrappedSize(bool lua, std::string_view source, std::string_view expanded, std::string_view compile_target,
-                              std::string_view program_version, std::string_view last_compiled);
+                              std::string_view program_version, std::string_view last_compiled,
+                              std::string_view header = std::string_view());
     size_t        wrappedSize() const;
     // The line of that asset, from zero, its expanded code begins on: the
-    // envelope's own lines come first, and the region counts them in every
-    // line it names -- a compile error's, a runtime error's.
+    // envelope's own lines come first, the header's among them, and the
+    // region counts them in every line it names -- a compile error's, a
+    // runtime error's. The source map's lines are the code's, so this is
+    // all a header moves.
     int         codeLine() const;
 
     // The escaping of the LSL comment block, both ways; and how long the

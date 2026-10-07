@@ -27,6 +27,7 @@
 #include "alscriptenvelope.h"
 
 #include "alpreprocessor.h"
+#include "aluploadheader.h"
 
 #include <algorithm>
 #include <vector>
@@ -103,6 +104,13 @@ namespace
                 return level;
             }
         }
+    }
+
+    // What wrap() writes of a header: it as it is, and a newline after it
+    // where it ends without one, so the code starts a line of its own.
+    size_t headerSize(std::string_view header)
+    {
+        return header.size() + (!header.empty() && header.back() != '\n' ? 1 : 0);
     }
 }
 
@@ -247,13 +255,20 @@ std::optional<ALScriptEnvelope> ALScriptEnvelope::parse(std::string_view asset)
         envelope.lastCompiled = value;
     }
     takeTarget(rest, lead, envelope.compileTarget);
+    // An upload header, ours or the plugin's, is kept apart from the code,
+    // so that the code reads the same whenever and by whom it went up.
+    const std::string_view before = rest;
+    if (ALUploadHeader::take(rest, envelope.lua))
+    {
+        envelope.header.assign(before.substr(0, before.size() - rest.size()));
+    }
     envelope.expanded = std::string(rest);
     return envelope;
 }
 
 // static
 size_t ALScriptEnvelope::wrappedSize(bool lua, std::string_view source, std::string_view expanded, std::string_view compile_target,
-                                     std::string_view program_version, std::string_view last_compiled)
+                                     std::string_view program_version, std::string_view last_compiled, std::string_view header)
 {
     // As wrap() puts it together, part by part.
     constexpr size_t LEAD = 2;
@@ -276,12 +291,12 @@ size_t ALScriptEnvelope::wrappedSize(bool lua, std::string_view source, std::str
     {
         out += LEAD + compile_target.size() + 1;
     }
-    return out + expanded.size();
+    return out + headerSize(header) + expanded.size();
 }
 
 size_t ALScriptEnvelope::wrappedSize() const
 {
-    return wrappedSize(lua, source, expanded, compileTarget, programVersion, lastCompiled);
+    return wrappedSize(lua, source, expanded, compileTarget, programVersion, lastCompiled, header);
 }
 
 std::string ALScriptEnvelope::wrap() const
@@ -304,6 +319,11 @@ std::string ALScriptEnvelope::wrap() const
     if (!compileTarget.empty())
     {
         out += lead + compileTarget + "\n";
+    }
+    out += header;
+    if (headerSize(header) != header.size())
+    {
+        out += "\n";
     }
     out += expanded;
     return out;
