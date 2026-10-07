@@ -5602,32 +5602,28 @@ bool ALVimKeymap::insertControl(ALTextView& view, const Input& input)
         case 'D':
         {
             // The line a step further in, or a step back, as > and < step
-            // it, the caret staying on the character it was on.
-            const ALTextPos    caret = view.caret();
-            const S32          width = llmax(1, view.getTabWidth());
-            const std::string& text  = d.line(caret.line);
-            ALTextRange        range(d.lineStart(caret.line), d.lineStart(caret.line));
-            std::string        with;
+            // it, the caret staying on the character it was on. In goes an
+            // empty line too, as vim's Ctrl-T puts one in where o opened it;
+            // out is <'s own step (ALTextIndent::shiftLines).
+            const ALTextPos caret = view.caret();
+            const S32       width = llmax(1, view.getTabWidth());
+            ALTextRange     range(d.lineStart(caret.line), d.lineStart(caret.line));
+            std::string     with;
             if (input.key == 'T')
             {
                 with = view.getSoftTabs() ? std::string(width, ' ') : std::string("\t");
             }
             else
             {
-                S32 cut = 0;
-                if (!text.empty() && text[0] == '\t')
-                {
-                    cut = 1;
-                }
-                while (cut < width && cut < static_cast<S32>(text.size()) && text[cut] == ' ' && text[0] == ' ')
-                {
-                    ++cut;
-                }
-                if (cut == 0)
+                ALTextIndent::Options options;
+                options.tabWidth                   = width;
+                options.softTabs                   = view.getSoftTabs();
+                const ALTextEditing::Change shifted = ALTextIndent::shiftLines(d, caret.line, caret.line, 1, false, options);
+                if (shifted.replacements.empty())
                 {
                     return true;
                 }
-                range.end = ALTextPos(caret.line, cut);
+                range = shifted.replacements.front().range;
             }
             const S32 moved = static_cast<S32>(with.size()) - (range.end.column - range.begin.column);
             view.replaceAll({ { range, with } });

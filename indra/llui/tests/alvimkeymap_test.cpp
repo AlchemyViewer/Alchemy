@@ -5265,4 +5265,15 @@ namespace tut
         ex("setlo ic");
         ensure(":setlo sets", vim->shared().ignoreCase);
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<185>()
+    {
+        set_test_name("insert mode's Ctrl-D takes the step < takes: spaces before a tab go with it, as wide as they are drawn");
+        ALCodeEditor& e = make("  \tfoo\n");
+        e.setSoftTabs(false);
+        e.setTabWidth(4);
+        keys("A<C-d><Esc>");
+        ensure_equals("two spaces and a tab, a step wide, gone whole, as vim's", flat(e.text()), std::string("foo|"));
+    }
 }
