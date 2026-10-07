@@ -3588,4 +3588,33 @@ namespace tut
         key(KEY_TAB);
         ensure_equals("Tab goes on to the next", e.selectedText(), std::string("b"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<99>()
+    {
+        set_test_name("the change bars come to the changes since the save: a line a Return only pushed, or one put back as it was, has none to "
+                      "press or be told of");
+        // The middle of a line's row in the change bar.
+        const auto bar = [](ALCodeEditor& ed, S32 line) {
+            const LLRect text = ed.textRect();
+            return ed.changeBarAt(ed.leftEdge() + 1, text.mTop - (ed.layout().lineTop(line) - ed.scrollY()) - ed.layout().lineHeight(line) / 2);
+        };
+        ALCodeEditor& e = make("one\ntwo\nthree\nfour\nfive");
+        e.resetDirty();
+        e.setCaret(e.document().lineEnd(3));
+        key(KEY_RETURN);
+        ensure_equals("a line put in", e.document().line(4), std::string());
+        ensure_equals("no bar on the line it only pushed", bar(e, 3), -1);
+        ensure_equals("one on the line put in", bar(e, 4), 4);
+        ensure("barred as the change is", !e.lineChanged(3) && e.lineChanged(4) && !e.lineChanged(5));
+
+        ALCodeEditor& f = make("a\nb\nc\nd\ne");
+        f.resetDirty();
+        ensure("the first line changed", f.replaceAll({ { ALTextRange(ALTextPos(0, 1), ALTextPos(0, 1)), "x" } }));
+        ensure("and the last", f.replaceAll({ { ALTextRange(ALTextPos(4, 1), ALTextPos(4, 1)), "y" } }));
+        f.undo();
+        ensure("the last as saved again, the text still changed", f.document().line(4) == "e" && f.isDirty());
+        ensure_equals("no bar on the line put back", bar(f, 4), -1);
+        ensure("barred as the change is", f.lineChanged(0) && !f.lineChanged(4));
+    }
 }

@@ -334,10 +334,10 @@ public:
     bool lineChanged(S32 line) const;
     // The text's changes since it was saved, exactly, with the lines of
     // both (ALChangesSinceSaved): worked out again only where the text or
-    // its history moved; none where nothing says what was saved. A line
-    // barred that none of them is on -- typed on and put back as it was
-    // saved -- loses its bar as they are worked out, so that the bars, a
-    // peek and ]c agree on what has changed.
+    // its history moved; none where nothing says what was saved. As they
+    // are worked out the bars become theirs -- a line a Return only pushed,
+    // or typed on and put back as it was saved, loses its bar -- so that
+    // the bars, a peek and ]c agree on what has changed.
     std::shared_ptr<const ALChangesSinceSaved::Known> changesSinceSaved();
     // A peek at the change since the text was saved that a line is in
     // (ALChangePeek): its lines as they were, in a gap under them, with
@@ -1102,8 +1102,17 @@ private:
     // Moves on as marks are set or cleared, or moved or taken by an edit,
     // for the ruler's list of them.
     U32                                mMarksRevision = 0;
-    // One per line: changed since the last save.
+    // One per line: changed since the last save -- every line an edit
+    // touched at once, which may be more than it changed, and the lines of
+    // the changes since the save once those are worked out, for a peek, ]c
+    // or a bar pressed, or as the edits rest; whether that is still to do,
+    // and since when the edits have rested.
     ALLineTable<U8>                    mChanged;
+    bool                               mBarsDue = false;
+    LLFrameTimer                       mBarsRest;
+    // The bars as the text's changes since it was saved have them, where
+    // the journal knows what was saved; left as they are where it does not.
+    void                               settleBars();
     // The mouse over the gutter, and the line it is on there: the fold
     // markers of open blocks show while it is, and the block under it
     // shows its extent.

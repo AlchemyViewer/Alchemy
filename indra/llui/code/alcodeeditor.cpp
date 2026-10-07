@@ -95,6 +95,9 @@ namespace
     const U8  FIXES_CHANGE       = 2;
     // How long the caret rests on a name before its other places are lit.
     const F32 OCCURRENCES_REST   = 0.25f;
+    // How long the edits rest before the change bars are worked out again
+    // from the text's changes since it was saved.
+    const F32 BARS_REST          = 0.5f;
 
     const char* const MARK_COLOR_NAMES[] = { "TextFgColor", "CodeMarkNote", "CodeMarkWarning", "CodeMarkError", "CodeMarkRuntime" };
     static_assert(sizeof(MARK_COLOR_NAMES) / sizeof(MARK_COLOR_NAMES[0]) == static_cast<size_t>(ALCodeEditor::Mark::COUNT), "every mark has a colour");
@@ -304,8 +307,11 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     // What the problems there offered goes with them: a check says again.
     mFixable.applySpans(spans, lines, 0, 0);
     closeFixes();
-    // The lines the edit touched are changed until the next save.
+    // The lines the edit touched are changed until the next save: at once,
+    // and as the changes since the save have them once the edits rest.
     mChanged.applySpans(spans, lines, 1, 0);
+    mBarsDue = true;
+    mBarsRest.reset();
     slideAsides(edit);
 
     // Decorations and highlights after the edit move along with the text;
@@ -723,8 +729,22 @@ S32 ALCodeEditor::changeBarAt(S32 x, S32 y)
     {
         return -1;
     }
+    // The bars as the changes are, before one is pressed or told of: what
+    // an edit barred at once may be more than it changed.
+    if (mBarsDue)
+    {
+        settleBars();
+    }
     const S32 line = posShownAt(x, y).line;
     return lineChanged(line) ? line : -1;
+}
+
+void ALCodeEditor::settleBars()
+{
+    // Worked out, the changes bring the bars to them; where nothing says
+    // what was saved, they stay as they were made.
+    changesSinceSaved();
+    mBarsDue = false;
 }
 
 bool ALCodeEditor::lineChanged(S32 line) const
@@ -739,38 +759,27 @@ std::shared_ptr<const ALChangesSinceSaved::Known> ALCodeEditor::changesSinceSave
     {
         return known;
     }
-    // The bars mark every line an edit touched, the changes what differs
-    // from the saved text: a bar stays only on a line a change is on, as a
-    // press on it finds one (ALChangePeek::changeAt) -- one of its lines,
-    // or for lines only taken out, the line after them or the one before.
-    const S32         count = llmin(static_cast<S32>(mChanged.size()), document().lineCount());
-    std::vector<bool> held(static_cast<size_t>(llmax(count, 0)), false);
-    const auto        hold = [&held, count](S32 line) {
-        if (line >= 0 && line < count)
-        {
-            held[static_cast<size_t>(line)] = true;
-        }
-    };
+    // The bars mark every line an edit touched, which may be more than it
+    // changed; the changes are what differs from the saved text, and the
+    // bars become theirs, where a press on one finds its change
+    // (ALChangePeek::changeAt): each change's lines now, and where lines
+    // were only taken away, the line they were taken from, or the last
+    // where they were taken from the end.
+    mBarsDue        = false;
+    const S32 count = document().lineCount();
+    mChanged.assign(static_cast<size_t>(count), 0);
     for (const ALChangesSinceSaved::Change& change : known->changes)
     {
         if (change.nowCount > 0)
         {
-            for (S32 l = change.now; l < change.now + change.nowCount && l < count; ++l)
+            for (S32 line = llmax(0, change.now); line < change.now + change.nowCount && line < count; ++line)
             {
-                hold(l);
+                mChanged[static_cast<size_t>(line)] = 1;
             }
         }
-        else
+        else if (count > 0)
         {
-            hold(change.now);
-            hold(change.now - 1);
-        }
-    }
-    for (S32 l = 0; l < count; ++l)
-    {
-        if (!held[static_cast<size_t>(l)])
-        {
-            mChanged[static_cast<size_t>(l)] = 0;
+            mChanged[static_cast<size_t>(llclamp(change.now, 0, count - 1))] = 1;
         }
     }
     return known;
@@ -780,6 +789,7 @@ void ALCodeEditor::resetDirty()
 {
     ALTextView::resetDirty();
     std::fill(mChanged.begin(), mChanged.end(), 0);
+    mBarsDue = false;
     closePeek();
 }
 
@@ -796,6 +806,7 @@ void ALCodeEditor::markUnsaved()
 {
     ALTextView::markUnsaved();
     mChanged.assign(static_cast<size_t>(document().lineCount()), 1);
+    mBarsDue = false;
 }
 
 void ALCodeEditor::barChangesSince(std::string_view saved)
@@ -814,6 +825,7 @@ void ALCodeEditor::barChangesSince(std::string_view saved)
     const size_t now                     = lines.size();
     const size_t head                    = static_cast<size_t>(first);
     const size_t tail                    = static_cast<size_t>(last);
+    mBarsDue                             = false;
     mChanged.assign(now, 0);
     std::fill(mChanged.begin() + static_cast<std::ptrdiff_t>(head), mChanged.end() - static_cast<std::ptrdiff_t>(tail), 1);
     if (head + tail == now && was.size() != now && now > 0)
@@ -828,11 +840,16 @@ void ALCodeEditor::markSavedAt(const ALTextUndo::SavePoint& point)
 {
     ALTextView::markSavedAt(point);
     // The bars go where the text is the saved one; where more was typed
-    // meanwhile they stay, which marks a line or two too many rather than
-    // one too few.
+    // meanwhile they are worked out again against what was saved, once the
+    // edits rest.
     if (!isDirty())
     {
         std::fill(mChanged.begin(), mChanged.end(), 0);
+        mBarsDue = false;
+    }
+    else
+    {
+        mBarsDue = true;
     }
     closePeek();
 }
@@ -5732,6 +5749,13 @@ void ALCodeEditor::pump()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     // Edits made outside a command -- the whole text set -- fold again here.
     settleFolds();
+    // The change bars as the changes since the save are, once the edits
+    // rest: the whole text is compared with what was saved, which is not
+    // for every key.
+    if (mBarsDue && mBarsRest.getElapsedTimeF32() >= BARS_REST)
+    {
+        settleBars();
+    }
     // A signature is about a call on the caret's line; anywhere else it
     // is stale. (The placeholders are let go of as the caret leaves their
     // lines, where it moves: dropPlaceholdersLeft.)
