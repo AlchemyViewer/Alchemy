@@ -532,4 +532,31 @@ namespace tut
         ensure_equals("one with an escaped backslash", lexed("slua", "s = `a\\\\", state, words), std::string("text:s |operator:=|text: |string:`a|escape:\\\\"));
         ensure("ends with its line", state.frames.size() == 1);
     }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<17>()
+    {
+        set_test_name("an include's name or a macro's string left open ends with its line, and the lines below are code; a backslash still carries a macro's string on");
+        ALSyntaxWords words;
+        ALSyntaxState state;
+        ensure_equals("LSL, a bracket left open", lexed("lsl", "#include <lib", state, words), std::string("preprocessor:#include |path:<lib"));
+        ensure("ends with its line", state.frames.size() == 1);
+        ensure_equals("so the next line is code", lexed("lsl", "integer x;", state, words), std::string("type:integer|text: x|punctuation:;"));
+        ensure_equals("a quote left open", lexed("lsl", "#include \"lib", state, words), std::string("preprocessor:#include |path:\"lib"));
+        ensure("ends with its line too", state.frames.size() == 1);
+        ensure_equals("and the next line is code", lexed("lsl", "x = \"a\";", state, words), std::string("text:x |operator:=|text: |string:\"a\"|punctuation:;"));
+        ensure_equals("a macro's string left open", lexed("lsl", "#define X \"abc", state, words), std::string("preprocessor:#define X |string:\"abc"));
+        ensure("ends with its line, and the directive with it", state.frames.size() == 1);
+        ensure_equals("code below it", lexed("lsl", "integer y;", state, words), std::string("type:integer|text: y|punctuation:;"));
+        ensure_equals("a macro's string continued", lexed("lsl", "#define GREETING \"hello \\", state, words),
+                      std::string("preprocessor:#define GREETING |string:\"hello |escape:\\"));
+        ensure_equals("goes on onto the next line", lexed("lsl", "world\"", state, words), std::string("string:world\""));
+        ensure("and the directive ends with that line", state.frames.size() == 1);
+        ALSyntaxState slua;
+        ensure_equals("SLua, a quote left open", lexed("slua", "--#include \"lib", slua, words), std::string("preprocessor:--#include |path:\"lib"));
+        ensure("ends with its line", slua.frames.size() == 1);
+        ensure_equals("so the next line is code", lexed("slua", "local x = 1", slua, words), std::string("control:local|text: x |operator:=|text: |number:1"));
+        ensure_equals("a macro's string left open", lexed("slua", "--#define X \"abc", slua, words), std::string("preprocessor:--#define X |string:\"abc"));
+        ensure("ends with its line", slua.frames.size() == 1);
+    }
 }

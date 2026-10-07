@@ -285,6 +285,8 @@
             <key>kind</key>
             <string>path</string>
           </map>
+          <!-- A macro's string ends with its line, which a backslash
+               carries on onto the next as it carries the directive. -->
           <map>
             <key>span</key>
             <string>"</string>
@@ -294,6 +296,10 @@
             <string>\</string>
             <key>kind</key>
             <string>string</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+            <key>unless_after</key>
+            <string>\</string>
           </map>
           <map>
             <key>eol</key>
@@ -327,6 +333,8 @@
             <key>kind</key>
             <string>comment</string>
           </map>
+          <!-- A file's name, which ends with its line: one left open is
+               no reason for the lines below to be names. -->
           <map>
             <key>span</key>
             <string>"</string>
@@ -334,6 +342,8 @@
             <string>"</string>
             <key>kind</key>
             <string>path</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
           </map>
           <map>
             <key>span</key>
@@ -342,6 +352,8 @@
             <string>&gt;</string>
             <key>kind</key>
             <string>path</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
           </map>
           <map>
             <key>eol</key>
