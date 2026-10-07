@@ -126,12 +126,12 @@ void ALTextRuler::drawRuler(F32 alpha)
     const auto yAt    = [&](S32 doc_y) { return ruler.mTop - static_cast<S32>(static_cast<F32>(doc_y) / static_cast<F32>(total) * static_cast<F32>(track_h)); };
     const auto yOf    = [&](S32 line) { return yAt(layout.lineTop(line)); };
     const S32 middle  = ruler.mLeft + WIDTH / 2;
-    // The lines with a mark, found again only where the text or the
-    // marks have changed; their colours asked every frame, which a
-    // change of theme may change.
+    // The lines with a mark, found again only where the marks or what the
+    // host says of the lines have changed, each of which moves on as an
+    // edit moves them: not at every edit within a line. Their colours
+    // asked every frame, which a change of theme may change.
     const U32 marks_revision = features ? features->marksRevision() : 0;
-    if (mMarksVersion != document.version() || mMarksRevision != marks_revision || mAnnotationsRevision != mView.annotationsRevision() ||
-        !mMarksValid)
+    if (mMarksRevision != marks_revision || mAnnotationsRevision != mView.annotationsRevision() || !mMarksValid)
     {
         mMarkLines.clear();
         mGapMarkLines.clear();
@@ -156,7 +156,6 @@ void ALTextRuler::drawRuler(F32 alpha)
                 }
             }
         }
-        mMarksVersion        = document.version();
         mMarksRevision       = marks_revision;
         mAnnotationsRevision = mView.annotationsRevision();
         mMarksValid          = true;

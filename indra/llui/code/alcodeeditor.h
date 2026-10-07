@@ -1096,7 +1096,8 @@ private:
     boost::signals2::scoped_connection mEditConnection;
     boost::signals2::scoped_connection mChangedConnection;
     ALLineTable<Mark>                  mMarks;
-    // Moves on as marks are set or cleared, for the ruler's list of them.
+    // Moves on as marks are set or cleared, or moved or taken by an edit,
+    // for the ruler's list of them.
     U32                                mMarksRevision = 0;
     // One per line: changed since the last save.
     ALLineTable<U8>                    mChanged;

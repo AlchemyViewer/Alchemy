@@ -290,7 +290,28 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     // Each run of lines an edit replaced -- one, or a batch's several.
     const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
     const S32                                         lines = document().lineCount();
+    // The marks move with lines that come or go, and those of the lines
+    // replaced go with them: the ruler's list of the lines with one is
+    // made again where either happens, and not for an edit within a line
+    // that had none.
+    bool marks_moved = false;
+    for (const ALTextDocument::Edit::LineSpan& span : spans)
+    {
+        marks_moved = span.made != span.last - span.first + 1;
+        for (S32 l = llmax(span.first, 0); !marks_moved && l <= span.last && l < static_cast<S32>(mMarks.size()); ++l)
+        {
+            marks_moved = mMarks[static_cast<size_t>(l)] != Mark::None;
+        }
+        if (marks_moved)
+        {
+            break;
+        }
+    }
     mMarks.applySpans(spans, lines, Mark::None, Mark::None);
+    if (marks_moved)
+    {
+        ++mMarksRevision;
+    }
     // What the problems there offered goes with them: a check says again.
     mFixable.applySpans(spans, lines, 0, 0);
     closeFixes();

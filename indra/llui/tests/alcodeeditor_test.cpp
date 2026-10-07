@@ -3426,4 +3426,25 @@ namespace tut
         ensure("the block opened", !f.isFolded(0));
         ensure("the caret's line in sight, and the rest of the block", !f.layout().hidden(1) && !f.layout().anyHidden());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<92>()
+    {
+        set_test_name("the marks' revision, which the ruler's list of marked lines is kept by, moves on where an edit moves a mark or takes one, "
+                      "and not for one within a line without");
+        ALCodeEditor& e = make("one\ntwo\nthree");
+        e.setMark(2, ALCodeEditor::Mark::Error);
+        const ALTextFeatures* features = e.features();
+        ensure("the editor's own", features != nullptr);
+        U32 was = features->marksRevision();
+        e.document().insert(ALTextPos(0, 3), "!");
+        ensure_equals("typed within a line without a mark: the same", features->marksRevision(), was);
+        e.document().insert(ALTextPos(0, 0), "zero\n");
+        ensure("the mark gone down with its line", e.markAt(3) == ALCodeEditor::Mark::Error && e.markAt(2) == ALCodeEditor::Mark::None);
+        ensure("a line made above it: moved on", features->marksRevision() != was);
+        was = features->marksRevision();
+        e.document().insert(ALTextPos(3, 0), "x");
+        ensure("its own line edited, the mark gone with what it said", e.markAt(3) == ALCodeEditor::Mark::None);
+        ensure("and moved on", features->marksRevision() != was);
+    }
 }

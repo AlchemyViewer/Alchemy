@@ -53,7 +53,9 @@ public:
     virtual void revealLine(S32 line) = 0;
     // What the ruler and the map show beside a line: a mark's colour,
     // where there is one for it; and a count that moves on whenever the
-    // marks do, so that the lines with one are not looked for every frame.
+    // marks do -- set, cleared, or moved with their lines by an edit -- so
+    // that the lines with one are not looked for every frame, nor at every
+    // edit.
     virtual bool mapMark(S32 line, LLColor4& color) const = 0;
     virtual U32  marksRevision() const = 0;
     // The bracket a closing one at a place closes, matched past strings

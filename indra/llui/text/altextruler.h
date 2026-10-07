@@ -149,12 +149,10 @@ private:
     // host says of the line (ALTextView::LineAnnotation::rulerTint).
     bool markOf(S32 line, LLColor4& color) const;
     // The ruler's lines with a mark, and those with a gap with one, as of
-    // the text's version, the marks' revision and what the host says of
-    // each line.
+    // the marks' revision and what the host says of each line.
     std::vector<S32> mMarkLines;
     std::vector<S32> mGapMarkLines;
     bool             mMarksValid          = false;
-    U32              mMarksVersion        = 0;
     U32              mMarksRevision       = 0;
     U32              mAnnotationsRevision = 0;
     // Each pixel row of the ruler's track with a match on it, as last found:
