@@ -417,7 +417,7 @@ namespace tut
     template<> template<>
     void altextdocument_object::test<19>()
     {
-        set_test_name("a character stepped over forward and back, at every place of a line, is the cluster ICU says, ASCII taken the quick way");
+        set_test_name("a character stepped over forward and back, at every place of a line, is the cluster ICU says, and a byte of a line clamped is the boundary it says, ASCII taken the quick way");
         const std::vector<std::string> lines = {
             "plain ascii, all of it",
             "e\xCC\x81 an accent joined to the e before it",
@@ -453,6 +453,11 @@ namespace tut
                     ensure_equals("back in \"" + line + "\" at " + std::to_string(c), d.prevCluster(ALTextPos(l, static_cast<S32>(c))).column,
                                   static_cast<S32>(utf8str_step_grapheme_backward(line, c)));
                 }
+            }
+            for (size_t c = 0; c <= line.size(); ++c)
+            {
+                ensure_equals("clamped in \"" + line + "\" at " + std::to_string(c), d.clamp(ALTextPos(l, static_cast<S32>(c))).column,
+                              static_cast<S32>(utf8str_grapheme_align_backward(line, c)));
             }
         }
         ensure("off a line's end to the next", d.nextCluster(ALTextPos(0, static_cast<S32>(lines[0].size()))) == ALTextPos(1, 0));

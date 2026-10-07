@@ -559,8 +559,17 @@ ALTextRange ALTextDocument::clampBytes(const ALTextRange& range) const
 
 ALTextPos ALTextDocument::clamp(ALTextPos pos) const
 {
-    pos        = clampBytes(pos);
-    pos.column = static_cast<S32>(utf8str_grapheme_align_backward(mLines[pos.line], pos.column));
+    pos = clampBytes(pos);
+    // Between two plain ASCII characters is a boundary -- all that can join
+    // to one is not ASCII, but for a carriage return and the line feed
+    // after it, which no line holds -- and needs no asking.
+    const std::string& line = mLines[pos.line];
+    const size_t       at   = static_cast<size_t>(pos.column);
+    if (at > 0 && at < line.size() && static_cast<unsigned char>(line[at]) < 0x80 && static_cast<unsigned char>(line[at - 1]) < 0x80)
+    {
+        return pos;
+    }
+    pos.column = static_cast<S32>(utf8str_grapheme_align_backward(line, at));
     return pos;
 }
 
@@ -572,13 +581,12 @@ ALTextPos ALTextDocument::nextCluster(ALTextPos pos) const
         return pos.line + 1 < lineCount() ? ALTextPos(pos.line + 1, 0) : pos;
     }
     // A plain ASCII character with another after it, or the line's end, is
-    // a cluster of its own -- all that can join to one is not ASCII, but
-    // for a carriage return and the line feed after it -- and needs no
-    // walk of the line to say so.
+    // a cluster of its own, as clamp() has it, and needs no walk of the
+    // line to say so.
     const std::string&  line = mLines[pos.line];
     const size_t        at   = static_cast<size_t>(pos.column);
     const unsigned char c    = static_cast<unsigned char>(line[at]);
-    if (c < 0x80 && (at + 1 == line.size() || (static_cast<unsigned char>(line[at + 1]) < 0x80 && !(c == '\r' && line[at + 1] == '\n'))))
+    if (c < 0x80 && (at + 1 == line.size() || static_cast<unsigned char>(line[at + 1]) < 0x80))
     {
         return ALTextPos(pos.line, pos.column + 1);
     }
@@ -597,7 +605,7 @@ ALTextPos ALTextDocument::prevCluster(ALTextPos pos) const
     const std::string&  line = mLines[pos.line];
     const size_t        at   = static_cast<size_t>(pos.column) - 1;
     const unsigned char c    = static_cast<unsigned char>(line[at]);
-    if (c < 0x80 && (at == 0 || (static_cast<unsigned char>(line[at - 1]) < 0x80 && !(line[at - 1] == '\r' && c == '\n'))))
+    if (c < 0x80 && (at == 0 || static_cast<unsigned char>(line[at - 1]) < 0x80))
     {
         return ALTextPos(pos.line, pos.column - 1);
     }
