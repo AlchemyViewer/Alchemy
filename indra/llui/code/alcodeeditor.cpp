@@ -1602,6 +1602,9 @@ ALTextPos ALCodeEditor::posShownAt(S32 x, S32 y)
 
 void ALCodeEditor::drawAfterRows(const LLRect& text)
 {
+    // The words the rows put beside the text, under the headers pinned
+    // over them.
+    drawWords();
     const std::vector<S32> lines = stickyLines(true);
     if (lines.empty())
     {
@@ -1804,6 +1807,22 @@ void ALCodeEditor::blanksOn(S32 line, S32 within_from, S32 within_to, std::vecto
     }
 }
 
+namespace
+{
+    // Untextured triangles begun as part of the batch being drawn where
+    // that batch is untextured already: an unbind always flushes, which
+    // would make every row's marks a draw of their own.
+    void beginUntextured()
+    {
+        ALTextureSlot* slot = gGL.getTextureSlot(0);
+        if (slot->getCurrType() != ALTextureSlot::TT_NONE)
+        {
+            slot->unbind();
+        }
+        gGL.begin(LLRender::TRIANGLES);
+    }
+}
+
 void ALCodeEditor::drawWhitespace(S32 line, S32 r, const LLRect& text, S32 screen_top, F32 left, F32 alpha)
 {
     if (mShowWhitespace == Whitespace::None)
@@ -1834,7 +1853,11 @@ void ALCodeEditor::drawWhitespace(S32 line, S32 r, const LLRect& text, S32 scree
     // The glyphs the layout placed and the blanks the line holds, walked
     // together: both are in order, and a mark belongs where its own glyph
     // was put, which is the only way a tab is drawn across the width it
-    // actually took rather than the width a tab is guessed to be.
+    // actually took rather than the width a tab is guessed to be. The dots
+    // and the arrows in one batch with what is drawn over the rows around
+    // them; a ring, an outline, after it.
+    mRingScratch.clear();
+    beginUntextured();
     size_t b = 0;
     for (size_t k = row.glyphBegin; k < row.glyphEnd && b < blanks.size(); ++k)
     {
@@ -1862,7 +1885,7 @@ void ALCodeEditor::drawWhitespace(S32 line, S32 r, const LLRect& text, S32 scree
         const S32 cx = static_cast<S32>((x0 + x1) * 0.5f);
         if (blank.kind == ' ')
         {
-            gl_rect_2d(cx - dot / 2, mid + (dot + 1) / 2, cx - dot / 2 + dot, mid + (dot + 1) / 2 - dot, mark);
+            gl_rect_2d_in_batch(cx - dot / 2, mid + (dot + 1) / 2, cx - dot / 2 + dot, mid + (dot + 1) / 2 - dot, mark);
         }
         else if (blank.kind == '\t')
         {
@@ -1871,19 +1894,23 @@ void ALCodeEditor::drawWhitespace(S32 line, S32 r, const LLRect& text, S32 scree
             const F32 head = llclamp((x1 - x0) * 0.25f, 2.f, 4.f);
             const F32 a0   = x0 + 2.f;
             const F32 a1   = llmax(a0 + 1.f, x1 - 2.f);
-            gl_rect_2d(static_cast<S32>(a0), mid + 1, static_cast<S32>(a1), mid, mark);
-            const F32                    y = static_cast<F32>(mid) + 0.5f;
-            const std::vector<LLVector2> point{ { a1 - head, y + head }, { a1, y }, { a1 - head, y - head } };
-            gl_polyline_2d(point, mark, 1.f);
+            gl_rect_2d_in_batch(static_cast<S32>(a0), mid + 1, static_cast<S32>(a1), mid, mark);
+            const F32       y = static_cast<F32>(mid) + 0.5f;
+            const LLVector2 point[3] = { LLVector2(a1 - head, y + head), LLVector2(a1, y), LLVector2(a1 - head, y - head) };
+            gl_polyline_2d_in_batch(point, 3, mark, 1.f);
         }
         else
         {
-            // A no-break space: a ring, in the colour a warning wears,
-            // because it is one. It reads as a space, and the compiler
-            // will not have it.
-            const S32 side = llclamp(row_h / 3, 3, 7);
-            gl_rect_2d(cx - side / 2, mid + side / 2, cx - side / 2 + side, mid + side / 2 - side, alarm, false);
+            mRingScratch.push_back(cx);
         }
+    }
+    gGL.end();
+    // A no-break space: a ring, in the colour a warning wears, because it
+    // is one. It reads as a space, and the compiler will not have it.
+    const S32 side = llclamp(row_h / 3, 3, 7);
+    for (const S32 cx : mRingScratch)
+    {
+        gl_rect_2d(cx - side / 2, mid + side / 2, cx - side / 2 + side, mid + side / 2 - side, alarm, false);
     }
 }
 
@@ -1944,7 +1971,9 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             }
         }
     }
-    // The words beside the text, each in a pill the layout made room for.
+    // The words beside the text, each in a pill the layout made room for;
+    // the pills among what is drawn over the rows, the words with the
+    // frame's others (drawWords).
     {
         const ALTextLayout::Line& laid = layout().line(line);
         if (row >= 0 && row < static_cast<S32>(laid.rows.size()))
@@ -1968,9 +1997,10 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
                 }
                 const LLColor4 pill   = paint(Paint::InlayHintBg) % alpha;
                 const LLColor4 word   = paint(Paint::InlayHint) % alpha;
-                gl_rect_2d(static_cast<S32>(x0), screen_top - 1, static_cast<S32>(x1), screen_top - row_h + 1, pill);
-                font->renderUTF8(hint.text, 0, x0 + INLAY_PAD, static_cast<F32>(screen_top - llround(font->getAscenderHeight())), word, LLFontGL::LEFT,
-                                 LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+                beginUntextured();
+                gl_rect_2d_in_batch(static_cast<S32>(x0), screen_top - 1, static_cast<S32>(x1), screen_top - row_h + 1, pill);
+                gGL.end();
+                queueWords(hint.text, x0 + INLAY_PAD, static_cast<F32>(screen_top - llround(font->getAscenderHeight())), word);
             }
         }
     }
@@ -2051,21 +2081,52 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
         {
             const LLColor4 ink = foldColor() % alpha;
             gl_rect_2d(box, ink, false);
-            getFont()->renderUTF8(foldBoxText(line), 0, static_cast<F32>(box.mLeft + 4), static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), ink, LLFontGL::LEFT, LLFontGL::BASELINE,
-                                  LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+            queueWords(foldBoxText(line), static_cast<F32>(box.mLeft + 4), static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), ink);
         }
     }
-    // Its note, dim, after all of that; as much of it as is in view.
+    // Its note, dim, after all of that; as much of it as is in view, the
+    // text's clip cutting it at the edge.
     if (row + 1 == layout().rowCount(line) && line >= 0 && line < static_cast<S32>(mAsides.size()) && !mAsides[static_cast<size_t>(line)].note.empty())
     {
         const LLRect box = noteBoxOf(line, text);
         if (box.notEmpty() && box.mLeft < text.mRight)
         {
-            getFont()->renderUTF8(mAsides[static_cast<size_t>(line)].note, 0, static_cast<F32>(box.mLeft),
-                                  static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), paint(Paint::InlayHint) % alpha, LLFontGL::LEFT,
-                                  LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, text.mRight - box.mLeft);
+            queueWords(mAsides[static_cast<size_t>(line)].note, static_cast<F32>(box.mLeft),
+                       static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), paint(Paint::InlayHint) % alpha);
         }
     }
+}
+
+void ALCodeEditor::queueWords(std::string_view words, F32 x, F32 baseline, const LLColor4& colour)
+{
+    const LLFontGL* font = getFont();
+    if (!font || words.empty())
+    {
+        return;
+    }
+    const F32 shift = font->placeGlyphs(words, LLFontGL::LEFT, mNumberScratch);
+    mWordRuns.push_back(LLFontGL::GlyphRun{ nullptr, nullptr, mNumberScratch.size(), x + shift, baseline });
+    mWordGlyphs.insert(mWordGlyphs.end(), mNumberScratch.begin(), mNumberScratch.end());
+    mWordColours.insert(mWordColours.end(), mNumberScratch.size(), LLColor4U(colour));
+}
+
+void ALCodeEditor::drawWords()
+{
+    const LLFontGL* font = getFont();
+    if (font && !mWordRuns.empty())
+    {
+        size_t at = 0;
+        for (LLFontGL::GlyphRun& run : mWordRuns)
+        {
+            run.glyphs = mWordGlyphs.data() + at;
+            run.colors = mWordColours.data() + at;
+            at += run.count;
+        }
+        font->renderGlyphRuns(mWordRuns.data(), mWordRuns.size());
+    }
+    mWordRuns.clear();
+    mWordGlyphs.clear();
+    mWordColours.clear();
 }
 
 // --- folding -----------------------------------------------------------------

@@ -1191,4 +1191,73 @@ namespace tut
         drawn_first->die();
         gapped_first->die();
     }
+
+    // The code editor's words beside the text -- an inlay's in its pill, a
+    // line's note -- and the arrows for its tabs cost what one line's do,
+    // however many lines have them: a script with a name before every
+    // argument has a hint on most rows.
+    template<> template<>
+    void altextview_gl_object::test<17>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name   = "editor";
+        p.rect   = LLRect(0, H, W, 0);
+        p.syntax = "lsl";
+        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        editor->setFont(LLFontGL::getFontMonospace());
+        // Read-only, so that no caret blinks between frames.
+        editor->setReadOnly(true);
+        editor->setShowWhitespace(ALCodeEditor::Whitespace::All);
+        // A frame's draws, laid out by a frame before it.
+        const auto draws = [&]() {
+            editor->draw();
+            gGL.flush();
+            std::list<LLVertexBufferData> capture;
+            gGL.beginList(&capture);
+            editor->draw();
+            gGL.flush();
+            gGL.endList();
+            glFinish();
+            return capture.size();
+        };
+        // Twelve calls, the first so many of them tabbed in, each of those
+        // with a name before both its arguments and a note after it; the
+        // words short, so that all of them are one batch of glyphs.
+        const auto fill = [&](S32 tabbed) {
+            std::string text;
+            for (S32 line = 0; line < 12; ++line)
+            {
+                text += std::string(line < tabbed ? "\t" : "") + "f(0, v);\n";
+            }
+            editor->setText(text);
+            std::vector<ALCodeEditor::InlayHint> hints;
+            std::vector<ALCodeEditor::LineNote>  notes;
+            for (S32 line = 0; line < tabbed; ++line)
+            {
+                ALCodeEditor::InlayHint first;
+                first.at   = ALTextPos(line, 3);
+                first.text = "c:";
+                ALCodeEditor::InlayHint second;
+                second.at   = ALTextPos(line, 6);
+                second.text = "m:";
+                hints.push_back(first);
+                hints.push_back(second);
+                notes.push_back({ line, "9b", "" });
+            }
+            editor->setInlayHints(hints);
+            editor->setLineNotes(notes);
+        };
+        fill(1);
+        const size_t one = draws();
+        fill(12);
+        const size_t every = draws();
+        ensure("hints, notes and tabs on every line cost what one line's do: " + std::to_string(every) + " against " + std::to_string(one),
+               every == one);
+        editor->die();
+    }
 }

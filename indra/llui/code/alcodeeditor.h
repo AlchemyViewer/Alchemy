@@ -1052,6 +1052,18 @@ private:
     std::vector<LLColor4U>          mNumberColours;
     std::vector<LLFontGL::GlyphRun> mNumberRuns;
     std::vector<Blank>              mBlankScratch;
+    // Where a row's no-break spaces are, their rings drawn once its other
+    // blank marks are.
+    std::vector<S32>                mRingScratch;
+    // The words drawn beside the text -- an inlay's, a folded block's
+    // count, a line's note -- placed as the rows are drawn and drawn
+    // together after them, in one call rather than one for each; placed
+    // from x on a baseline, and drawn and let go of.
+    std::vector<LLFontGL::Placed>   mWordGlyphs;
+    std::vector<LLColor4U>          mWordColours;
+    std::vector<LLFontGL::GlyphRun> mWordRuns;
+    void                            queueWords(std::string_view words, F32 x, F32 baseline, const LLColor4& colour);
+    void                            drawWords();
     // The signature card's pieces as last measured, for as long as the
     // signature, its active parameter and the font hold.
     struct SignatureShown
