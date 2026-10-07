@@ -5566,4 +5566,37 @@ namespace tut
         keys("/foo<CR>/foo<CR>");
         ensure("where /foo twice is one", vim->shared().search == history_t{ "foo" });
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<196>()
+    {
+        set_test_name("past Latin-1 a character's class is vim's: ideographs, emoji and punctuation each a word apart, for w e iw and *");
+        typedef std::vector<std::string> history_t;
+        // Three ideographs, an em dash and an emoji, as their UTF-8 bytes.
+        const std::string cjk   = "\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e";
+        const std::string dash  = "\xe2\x80\x94";
+        const std::string emoji = "\xf0\x9f\x98\x80";
+        make((cjk + "abc def\n").c_str());
+        keys("w");
+        ensure_equals("w from the ideographs to the letters after them", caretText(), std::string("0:9"));
+        keys("0e");
+        ensure_equals("e to the last ideograph", caretText(), std::string("0:6"));
+        editor->setCaret(ALTextPos(0, 3));
+        keys("yiw");
+        ensure_equals("iw the ideographs alone", vim->registerText('"'), cjk);
+
+        make(("a" + emoji + "b c\n").c_str());
+        keys("w");
+        ensure_equals("w onto an emoji", caretText(), std::string("0:1"));
+        keys("w");
+        ensure_equals("and past it", caretText(), std::string("0:5"));
+
+        make(("foo" + dash + "bar x\n").c_str());
+        keys("w");
+        ensure_equals("w onto a dash", caretText(), std::string("0:3"));
+
+        make((cjk + "abc " + cjk + " x\n").c_str());
+        keys("*");
+        ensure("* the ideographs as the word", vim->shared().search == history_t{ "\\<" + cjk + "\\>" });
+    }
 }

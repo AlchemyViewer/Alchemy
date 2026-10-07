@@ -1962,7 +1962,7 @@ namespace
                                          WordsFrom words_from = WordsFrom::Under)
     {
         ALTextPos  p   = from;
-        const auto cls = [&d, &p, big] { return classOf(at(d, p), big); };
+        const auto cls = [&d, &p, big] { return classAt(d, p, big); };
         // A character on, as vim's inc() steps: 0 along the line, 2 onto its
         // end, 1 onto the next line's start; -1 at the end of the text, where
         // it stays.
@@ -2188,7 +2188,7 @@ namespace
         {
             // Back to the start of the word or the blanks under the caret.
             const S32 under = cls();
-            while (p.column > 0 && classOf(at(d, d.prevCluster(p)), big) == under)
+            while (p.column > 0 && classAt(d, d.prevCluster(p), big) == under)
             {
                 p = d.prevCluster(p);
             }
@@ -2255,8 +2255,8 @@ namespace
         if (include_white && (cls() != 0 || (p.column == 0 && !inclusive)) && start.column > 0)
         {
             ALTextPos before       = d.prevCluster(start);
-            const S32 before_class = classOf(at(d, before), big);
-            while (before.column > 0 && classOf(at(d, d.prevCluster(before)), big) == before_class)
+            const S32 before_class = classAt(d, before, big);
+            while (before.column > 0 && classAt(d, d.prevCluster(before), big) == before_class)
             {
                 before = d.prevCluster(before);
             }
@@ -3233,10 +3233,10 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     S32             times = countTimes(countOr(mOperatorCount), count);
     const ALTextPos here  = cursor(view);
     const bool      big   = ch == 'W';
-    if (op == 'c' && (ch == 'w' || ch == 'W') && classOf(at(d, here), big) != 0)
+    if (op == 'c' && (ch == 'w' || ch == 'W') && classAt(d, here, big) != 0)
     {
         m_ch = big ? 'E' : 'e';
-        if (classOf(at(d, d.nextCluster(here)), big) != classOf(at(d, here), big))
+        if (classAt(d, d.nextCluster(here), big) != classAt(d, here, big))
         {
             --times;
         }
@@ -3343,47 +3343,45 @@ bool ALVimKeymap::searchMotion(ALTextView& view, bool forward, std::optional<ALT
 bool ALVimKeymap::starSearch(ALTextView& view, bool forward, bool whole)
 {
     const ALTextDocument& d     = view.document();
-    const ALTextPos       from  = cursor(view);
-    const std::string&    text  = d.line(from.line);
-    const S32             size  = static_cast<S32>(text.size());
-    const S32             caret = llclamp(from.column, 0, size);
+    const ALTextPos       caret = d.clamp(cursor(view));
     // What vim's find_ident_under_cursor() takes, by vim's classes: the word
-    // under the caret, or the first after it on the line -- so on a blank,
-    // the word after it; and where no word follows, the other characters
-    // under the caret or after it, back to where their run begins and on
-    // to the next blank. Nothing but blanks to the line's end is nothing.
-    const auto cls   = [&text](S32 i) { return classOf(text[static_cast<size_t>(i)], false); };
-    S32        begin = caret;
-    while (begin < size && cls(begin) != 1)
+    // under the caret, or the first after it on the line -- a word any class
+    // but a blank's and punctuation's, so on a blank, the word after it; and
+    // where no word follows, the other characters under the caret or after
+    // it, back to where their run begins and on to the next blank. Nothing
+    // but blanks to the line's end is nothing.
+    const auto cls   = [&d](const ALTextPos& p) { return classAt(d, p, false); };
+    ALTextPos  begin = caret;
+    while (!atLineEnd(d, begin) && cls(begin) < 2)
     {
-        ++begin;
+        begin = d.nextCluster(begin);
     }
-    const bool keyword = begin < size;
+    const bool keyword = !atLineEnd(d, begin);
     if (!keyword)
     {
         begin = caret;
-        while (begin < size && cls(begin) == 0)
+        while (!atLineEnd(d, begin) && cls(begin) == 0)
         {
-            ++begin;
+            begin = d.nextCluster(begin);
         }
     }
-    if (begin >= size)
+    if (atLineEnd(d, begin))
     {
         mFailed = true;
         clearPending();
         return true;
     }
     const S32 kind = cls(begin);
-    while (begin > 0 && cls(begin - 1) == kind)
+    while (begin.column > 0 && cls(d.prevCluster(begin)) == kind)
     {
-        --begin;
+        begin = d.prevCluster(begin);
     }
-    S32 end = begin;
-    while (end < size && (keyword ? cls(end) == kind : cls(end) != 0))
+    ALTextPos end = begin;
+    while (!atLineEnd(d, end) && (keyword ? cls(end) == kind : cls(end) != 0))
     {
-        ++end;
+        end = d.nextCluster(end);
     }
-    const ALTextRange word(ALTextPos(from.line, begin), ALTextPos(from.line, end));
+    const ALTextRange word(begin, end);
     // A word is looked for whole, as \<word\>, or anywhere for g* and g#;
     // other characters anywhere, as themselves: a backslash before each
     // that a pattern reads as more, as vim's * puts one -- for # and g#
@@ -4507,10 +4505,10 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                 // end -- an empty line's -- takes the break.
                 const bool      last  = mOperator != 0 && n + 1 == count;
                 const ALTextPos start = m.to;
-                const S32       cls   = classOf(at(d, m.to), big);
+                const S32       cls   = classAt(d, m.to, big);
                 if (cls != 0)
                 {
-                    while (!atLineEnd(d, m.to) && classOf(at(d, m.to), big) == cls)
+                    while (!atLineEnd(d, m.to) && classAt(d, m.to, big) == cls)
                     {
                         m.to = d.nextCluster(m.to);
                     }
@@ -4532,7 +4530,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                         }
                         continue;
                     }
-                    if (classOf(at(d, m.to), big) != 0)
+                    if (classAt(d, m.to, big) != 0)
                     {
                         break;
                     }
@@ -4552,10 +4550,10 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                 {
                     break;
                 }
-                while (classOf(at(d, m.to), big) == 0 && stepOn(d, m.to)) {}
-                const S32 cls = classOf(at(d, m.to), big);
+                while (classAt(d, m.to, big) == 0 && stepOn(d, m.to)) {}
+                const S32 cls = classAt(d, m.to, big);
                 ALTextPos next = m.to;
-                while (!atLineEnd(d, next) && classOf(at(d, next), big) == cls)
+                while (!atLineEnd(d, next) && classAt(d, next, big) == cls)
                 {
                     m.to = next;
                     next = d.nextCluster(next);
@@ -4585,16 +4583,16 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             const bool big = ch == BIG_WORD_END_BACK;
             for (S32 n = 0; n < count; ++n)
             {
-                const S32 cls = classOf(at(d, m.to), big);
+                const S32 cls = classAt(d, m.to, big);
                 if (!stepBack(d, m.to))
                 {
                     break;
                 }
                 if (cls != 0)
                 {
-                    while (classOf(at(d, m.to), big) == cls && stepBack(d, m.to)) {}
+                    while (classAt(d, m.to, big) == cls && stepBack(d, m.to)) {}
                 }
-                while (classOf(at(d, m.to), big) == 0 && stepBack(d, m.to)) {}
+                while (classAt(d, m.to, big) == 0 && stepBack(d, m.to)) {}
             }
             m.inclusive = true;
             m.moved     = m.to != from;
@@ -4610,9 +4608,9 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
                 {
                     break;
                 }
-                while (classOf(at(d, m.to), big) == 0 && stepBack(d, m.to)) {}
-                const S32 cls = classOf(at(d, m.to), big);
-                while (m.to.column > 0 && classOf(at(d, d.prevCluster(m.to)), big) == cls)
+                while (classAt(d, m.to, big) == 0 && stepBack(d, m.to)) {}
+                const S32 cls = classAt(d, m.to, big);
+                while (m.to.column > 0 && classAt(d, d.prevCluster(m.to), big) == cls)
                 {
                     m.to = d.prevCluster(m.to);
                 }
