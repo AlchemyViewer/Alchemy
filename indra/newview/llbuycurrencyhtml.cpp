@@ -92,6 +92,11 @@ bool LLBuyCurrencyHTML::sWebFloaterEnabled = false;
 bool LLBuyCurrencyHTML::sAddPaymentEnabled = false;
 LLFetchAvatarPaymentInfo* LLBuyCurrencyHTML::sPaymentInfoRequest = NULL;
 
+// Whether the add payment probe has answered, and what a resident with no
+// payment method waits on until it has: the floater may take them in yet.
+static bool sAddPaymentProbed = false;
+static std::function<void()> sRouteAfterAddPaymentProbe;
+
 ////////////////////////////////////////////////////////////////////////////////
 // static
 static void checkFeatureFlag_coro(std::string check_url)
@@ -129,8 +134,16 @@ static void checkAddPaymentFlag_coro(std::string check_url)
     LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
 
     LLBuyCurrencyHTML::sAddPaymentEnabled = status.isHttpStatus() && status.getType() == 200;
+    sAddPaymentProbed = true;
     LL_INFOS("LLBuyCurrency") << "Add payment probe returned " << status.toString()
         << ", in-floater add payment " << (LLBuyCurrencyHTML::sAddPaymentEnabled ? "enabled" : "disabled") << LL_ENDL;
+
+    if (sRouteAfterAddPaymentProbe)
+    {
+        std::function<void()> route = std::move(sRouteAfterAddPaymentProbe);
+        sRouteAfterAddPaymentProbe = nullptr;
+        route();
+    }
 }
 
 // static
@@ -199,6 +212,23 @@ void LLBuyCurrencyHTML::routeCurrencyRequest( bool has_target, const std::string
                 if (has_piof)
                 {
                     openWebFloater(has_target, message, sum);
+                }
+                else if (!sAddPaymentProbed)
+                {
+                    // Asked before the probe answered: the last such request
+                    // goes wherever its answer says.
+                    LL_INFOS("LLBuyCurrency") << "No payment info on file, waiting on the add payment probe" << LL_ENDL;
+                    sRouteAfterAddPaymentProbe = [has_target, message, sum]()
+                    {
+                        if (sAddPaymentEnabled)
+                        {
+                            openWebFloater(has_target, message, sum);
+                        }
+                        else
+                        {
+                            LLFloaterBuyCurrency::openPaymentMethodPage();
+                        }
+                    };
                 }
                 else
                 {
