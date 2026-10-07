@@ -2723,11 +2723,16 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
     // The operator's count and the object's together: 2daw is d2aw.
     const S32             count   = countTimes(countOr(mOperatorCount), countOr(mCount));
     // A visual selection that is more than its caret's character taken on
-    // by the object rather than replaced by it (visualObject).
-    if (visual && visualObject(view, pending, ch, count))
+    // by the object rather than replaced by it (visualObject); with nothing
+    // more to take, a failure, as no object is.
+    if (visual)
     {
-        clearPending();
-        return true;
+        if (const std::optional<bool> taken = visualObject(view, pending, ch, count))
+        {
+            mFailed = mFailed || !*taken;
+            clearPending();
+            return true;
+        }
     }
     if (visual && (ch == 'w' || ch == 'W'))
     {
@@ -2740,6 +2745,10 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
             mVisualCaret  = word->end;
             setMode(view, Mode::Visual);
             showVisual(view);
+        }
+        else
+        {
+            mFailed = true;
         }
         clearPending();
         return true;
@@ -2762,6 +2771,10 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
         finishCommand(op != 'y');
         return true;
     }
+    // No such object: a failure, as a motion that cannot move is one, which
+    // stops a macro as vim's beep does; the operator and the count let go
+    // of, nothing changed, and a selection as it was.
+    mFailed = true;
     clearPending();
     return true;
 }

@@ -4663,4 +4663,37 @@ namespace tut
         ensure_equals("Vj ap: on by the blank lines and the paragraph after", selects("a\nx\n\nb\nc\n\nd\n", 0, 0, "Vjap"), std::string("a\nx\n\nb\nc"));
         ensure_equals("a count past the text's end: as far as it goes", selects("a\nb\n\nc\n", 0, 0, "vj5ip"), std::string("a\nb\n\nc\n"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<162>()
+    {
+        set_test_name("a text object that is not there fails: a macro stops at it, the operator and the count are let go of, and . does the change before it again");
+        ALCodeEditor& e = make("abc\ndef\nghi\njkl\n");
+        keys("qaxdi(jq");
+        ensure_equals("recorded: x done, di( found nothing, j done", flat(e.text()), std::string("bc|def|ghi|jkl|"));
+        ensure_equals("the caret on the next line", caretText(), std::string("1:0"));
+        keys("@a");
+        ensure_equals("@a: x, then di( fails and the j after it is not done", flat(e.text()), std::string("bc|ef|ghi|jkl|"));
+        ensure_equals("the caret still on the line", caretText(), std::string("1:0"));
+        keys("3@a");
+        ensure_equals("3@a: the first play's di( stops the count", flat(e.text()), std::string("bc|f|ghi|jkl|"));
+        ensure_equals("the caret still there", caretText(), std::string("1:0"));
+
+        make("abc\ndef\nghi\n");
+        keys("qbvi(<Esc>xjq");
+        ensure_equals("recorded over a selection", flat(editor->text()), std::string("bc|def|ghi|"));
+        keys("@b");
+        ensure_equals("@b: vi( fails, nothing after it done", flat(editor->text()), std::string("bc|def|ghi|"));
+        ensure("the selection still there", vim->mode() == ALVimKeymap::Mode::Visual);
+        keys("y");
+        ensure_equals("as it was", vim->registerText('"'), std::string("d"));
+
+        make("abcdef\n");
+        keys("xdi(.");
+        ensure_equals(". after it does the x again", flat(editor->text()), std::string("cdef|"));
+        keys("2di(x");
+        ensure_equals("the count let go of with it", flat(editor->text()), std::string("def|"));
+        keys("di(w");
+        ensure_equals("and the operator: w a motion of its own", flat(editor->text()), std::string("def|"));
+    }
 }
