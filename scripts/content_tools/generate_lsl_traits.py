@@ -15,9 +15,9 @@ where LSL answers 1 or 0 (a result with bool-semantics), or gives booleans
 in the list it answers (bool-semantics on a list); whether `ll` lacks it,
 leaving it to `llcompat` alone, or SLua has it nowhere -- read from what
 secondlife.d.luau, beside the YAML, declares in each; and what SLua would
-have used in its stead (slua-deprecated's `use`). The performance lints
-read how long each makes the script sleep, under LSO and under Mono,
-where the two differ (sleep, mono-sleep). And the constants LSL
+have used in its stead (slua-deprecated's `use`, or else deprecated's). The
+performance lints read how long each makes the script sleep, under LSO and
+under Mono, where the two differ (sleep, mono-sleep). And the constants LSL
 types a string that SLua types a uuid, NULL_KEY among them, for
 allsluuids.inc; and, for allslitemargs.inc, each argument that names an
 item among the object's contents and of what kind (inventory-kind, which
@@ -231,6 +231,7 @@ def main(argv):
                 "return": None,
                 "use": None,
                 "reason": None,
+                "lsl-use": None,
                 "sleep": 0.0,
                 "mono-sleep": None,
             }
@@ -266,15 +267,22 @@ def main(argv):
         m = re.match(r"^    (sleep|mono-sleep): ([0-9.]+)\s*$", line)
         if m:
             functions[name][m.group(1)] = float(m.group(2))
-        if re.match(r"^    slua-deprecated:", line):
-            in_deprecated = True
+        # SLua's word on a function it deprecates (slua-deprecated); and the
+        # definitions' word that it is deprecated at all (deprecated), whose
+        # `use` names ll's too: what SLua would use where its own word names
+        # nothing, llMakeFire's ll.ParticleSystem among them. A reason there
+        # would be LSL's, and is not kept.
+        m = re.match(r"^    (slua-deprecated|deprecated):\s*$", line)
+        if m:
+            in_deprecated = m.group(1)
             folded = None
             continue
         if in_deprecated:
             m = re.match(r"^      (use|reason): (.*?)\s*$", line)
             if m:
-                functions[name][m.group(1)] = m.group(2).strip("'\"")
-                folded = m.group(1)
+                folded = m.group(1) if in_deprecated == "slua-deprecated" else ("lsl-use" if m.group(1) == "use" else None)
+                if folded:
+                    functions[name][folded] = m.group(2).strip("'\"")
             elif line.startswith("        ") and folded:
                 # A value folded onto the lines after its key.
                 functions[name][folded] = (functions[name][folded] + " " + line.strip()).strip("'\"")
@@ -320,7 +328,8 @@ def main(argv):
             slua.append("SluaRemoved" if bare in declared["llcompat"] else "SluaAbsent")
         elif bare in deprecated:
             slua.append("SluaDeprecated")
-        use = '"%s"' % t["use"].replace('\\', '\\\\').replace('"', '\\"') if t["use"] else "nullptr"
+        used = t["use"] or t["lsl-use"]
+        use = '"%s"' % used.replace('\\', '\\\\').replace('"', '\\"') if used else "nullptr"
         reason = '"%s"' % t["reason"].replace('\\', '\\\\').replace('"', '\\"') if t["reason"] else "nullptr"
         lines.append(
             '{ "%s", %s, %s, %s, %s, 0x%x, 0x%x, %s, %s, %sf, %sf },'
