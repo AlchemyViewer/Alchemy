@@ -4944,4 +4944,30 @@ namespace tut
         ensure_equals("\"a2d3w then 1.: one more", flat(editor->text()), std::string("h i j k l m n|"));
         ensure_equals("into a still", vim->registerText('a'), std::string("g "));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<172>()
+    {
+        set_test_name(":m and :t read a line before the first as :0put does -- 0 where lines are counted from 1, .-1 from the first line, the top -- and under lines counted from 0, 0 as the first line");
+        ALCodeEditor& e = make("a\nb\nc");
+        ex("2t .-1");
+        ensure_equals(":2t .-1 from the first line: copied to the top", flat(e.text()), std::string("b|a|b|c"));
+        ensure_equals("the caret on the copy", caretText(), std::string("0:0"));
+
+        make("a\nb\nc");
+        editor->setCaret(ALTextPos(1, 0));
+        ex("3m .-2");
+        ensure_equals(":3m .-2 from the second line: moved to the top", flat(editor->text()), std::string("c|a|b"));
+
+        make("a\nb\nc");
+        ex("3m 0");
+        ensure_equals(":3m 0: to the top", flat(editor->text()), std::string("c|a|b"));
+
+        ALCodeEditor& zero = make("a\nb\nc");
+        zero.setLineNumberBase(-1);
+        ex("2m 0");
+        ensure_equals("lines counted from 0: :2m 0 under the line shown as 0", flat(zero.text()), std::string("a|c|b"));
+        ex("1t 0");
+        ensure_equals("and :1t 0 copies under it", flat(zero.text()), std::string("a|c|c|b"));
+    }
 }

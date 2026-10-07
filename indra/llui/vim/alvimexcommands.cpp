@@ -864,22 +864,25 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
     }
     if (name == "m" || name == "move" || name == "t" || name == "co" || name == "copy")
     {
-        // The lines below the line the address names -- 0 for the top --
-        // moved there, or copied there.
+        // The lines below the line the address names moved there, or
+        // copied there; to the top for one before the first, as :0put
+        // reads it -- 0 where lines are numbered from 1, .-1 from the first
+        // line -- where 0 under lines numbered from 0 is the first line.
         if (view.isReadOnly())
         {
             return;
         }
         size_t at  = 0;
         S32    to  = -1;
-        if (args == "0")
-        {
-            at = 1;
-        }
-        else if (!lineAddress(view, args, at, to))
+        bool   top = false;
+        if (!lineAddress(view, args, at, to, &top))
         {
             mVim.say(ALVimKeymap::said("VimInvalidAddress", "E14: Invalid address"), true);
             return;
+        }
+        if (top)
+        {
+            to = -1;
         }
         const bool move = name[0] == 'm';
         if (move && to >= first && to <= last)
