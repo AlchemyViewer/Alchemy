@@ -107,7 +107,7 @@ ALDiffView::ALDiffView(const Params& p)
         takeBack(changeAtCaret());
         side->setFocus(true);
     });
-    mBar->setCopies({ [this]() { return !mModel.changeText(changeAtCaret(), frontShowsLeft()).empty(); }, [this]() { copyChange(changeAtCaret()); },
+    mBar->setCopies({ [this]() { return canCopyChange(); }, [this]() { copyChange(changeAtCaret()); },
                       [this]() { return changeCount() > 0; }, [this]() { copyUnifiedDiff(); } });
     mBar->onVersion([this](S32 version) {
         if (mVersionChosen)
@@ -1244,6 +1244,18 @@ bool ALDiffView::copyChange(S32 change)
 {
     const std::string text = mModel.changeText(change, frontShowsLeft());
     return !text.empty() && LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
+}
+
+bool ALDiffView::canCopyChange() const
+{
+    // By its counts: the lines themselves are not needed to say so.
+    const S32 change = changeAtCaret();
+    if (change < 0 || change >= changeCount())
+    {
+        return false;
+    }
+    const ALDiffModel::ChangeLines& lines = mModel.changeLines(change);
+    return (frontShowsLeft() ? lines.leftCount : lines.rightCount) > 0;
 }
 
 bool ALDiffView::frontShowsLeft() const

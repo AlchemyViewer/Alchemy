@@ -1704,4 +1704,28 @@ namespace tut
         d.setLeftText("a\nb\nc\nd!");
         ensure("a left of another version: let go of", d.inlined()->noteAt(d.model().lineShowing(ALDiffModel::Column::Inline, true, 2)).empty());
     }
+
+    template<> template<>
+    void aldiffview_object::test<44>()
+    {
+        set_test_name("a change can be copied from the side in front only where that side has lines of it: not from the left under the gap of lines put in, though the caret is in the change, nor inline, which copies what was taken out");
+        ALDiffView& d = make("one\ntwo\nthree", "one\nnew\ntwo\nthree");
+        d.left()->setFocus(true);
+        d.left()->goTo(ALTextPos(1, 0));
+        ensure_equals("the left's line under the gap: in the change", d.changeAtCaret(), 0);
+        ensure("nothing of it on the left to copy", !d.canCopyChange() && !d.copyChange(d.changeAtCaret()));
+        d.right()->setFocus(true);
+        d.right()->goTo(ALTextPos(1, 0));
+        ensure("on the right, its line", d.changeAtCaret() == 0 && d.canCopyChange());
+        d.right()->goTo(ALTextPos(2, 0));
+        ensure("in no change, nothing", d.changeAtCaret() == -1 && !d.canCopyChange());
+        d.setSwapped(true);
+        d.left()->setFocus(true);
+        d.left()->goTo(ALTextPos(1, 0));
+        ensure("swapped: the right's line on the left", d.changeAtCaret() == 0 && d.canCopyChange());
+        d.setSwapped(false);
+        d.setInline(true);
+        d.inlined()->goTo(ALTextPos(1, 0));
+        ensure("inline, nothing taken out to copy", d.changeAtCaret() == 0 && !d.canCopyChange() && !d.copyChange(0));
+    }
 }

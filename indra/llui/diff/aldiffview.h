@@ -243,8 +243,11 @@ public:
     // A change's lines on the side in front -- inline, those taken out --
     // copied to the clipboard, each ended by a line break: what a side
     // that cannot be taken back from is taken from by hand. False where
-    // the change has none there.
+    // the change has none there. And whether the change the caret is in
+    // has any there: what the bar's Copy Change, and whoever shows it,
+    // offer it by.
     bool        copyChange(S32 change);
+    bool        canCopyChange() const;
     // The comparison as a unified diff (ALUnifiedDiff), from the left as
     // shown to the right, under their titles; and copied. False where the
     // two are the same.

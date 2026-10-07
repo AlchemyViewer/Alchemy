@@ -9545,7 +9545,7 @@ void ALFloaterScriptStudio::addViewCommands()
         },
         [this]() {
             const Doc* doc = active();
-            return doc && doc->shownView() == Doc::View::Compare && doc->compareView->changeAtCaret() >= 0;
+            return doc && doc->shownView() == Doc::View::Compare && doc->compareView->canCopyChange();
         });
     mCommands.add(
         "compare_copy_diff",
