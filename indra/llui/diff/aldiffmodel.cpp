@@ -527,6 +527,21 @@ void ALDiffModel::build()
 void ALDiffModel::readTokens(const std::vector<ALTextDiff::Run>* was, const ALStructuralDiff::Edited* edited)
 {
     const auto [left_regions, right_regions] = shownRegions();
+    // A change's words that mean the same by the ranges where it begins
+    // are in (of the texts as given), as a pair of lines' are; the ranges'
+    // tables gathered the first time a change asks.
+    std::optional<ALDiffRangeSame> same;
+    ALStructuralDiff::same_at_t    same_at;
+    if (!mRanges.empty())
+    {
+        same_at = [this, &same](S32 shown_left, S32 shown_right) {
+            if (!same)
+            {
+                same.emplace(mRanges, mOptions.same);
+            }
+            return mSwapped ? same->at(shown_right, shown_left) : same->at(shown_left, shown_right);
+        };
+    }
     // After an edit, what was read of the texts as they were standing --
     // none of it too large -- only the changes that are not as they were.
     if (was && edited && mKeepsLayout && !mFellBack && static_cast<S32>(mMarks[0].size()) == edited->was[0] && static_cast<S32>(mMarks[1].size()) == edited->was[1] &&
@@ -537,7 +552,7 @@ void ALDiffModel::readTokens(const std::vector<ALTextDiff::Run>* was, const ALSt
         read.rightMarks    = std::move(mMarks[1]);
         read.leftByTokens  = std::move(mByTokens[0]);
         read.rightByTokens = std::move(mByTokens[1]);
-        ALStructuralDiff::readAgain(shownLeft(), shownRight(), *was, mRuns, *edited, mOptions, left_regions, right_regions, read);
+        ALStructuralDiff::readAgain(shownLeft(), shownRight(), *was, mRuns, *edited, mOptions, left_regions, right_regions, read, same_at);
         mMarks[0]    = std::move(read.leftMarks);
         mMarks[1]    = std::move(read.rightMarks);
         mByTokens[0] = std::move(read.leftByTokens);
@@ -545,7 +560,7 @@ void ALDiffModel::readTokens(const std::vector<ALTextDiff::Run>* was, const ALSt
         mFellBack    = read.tooLarge;
         return;
     }
-    ALStructuralDiff::Result by_tokens       = ALStructuralDiff::read(shownLeft(), shownRight(), std::move(mRuns), mOptions, left_regions, right_regions);
+    ALStructuralDiff::Result by_tokens = ALStructuralDiff::read(shownLeft(), shownRight(), std::move(mRuns), mOptions, left_regions, right_regions, same_at);
     mRuns        = std::move(by_tokens.runs);
     mFellBack    = by_tokens.tooLarge;
     mMarks[0]    = std::move(by_tokens.leftMarks);

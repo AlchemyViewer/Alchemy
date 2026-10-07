@@ -1974,4 +1974,37 @@ namespace tut
         both([&](ALDiffModel& m) { m.setRightText(joined(right)); }, "the comment taken out");
         ensure_equals("two moves again", kept.moveCount(), 2);
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<45>()
+    {
+        set_test_name("by structure, LSL beside its SLua with the converter's table in each range: a line written otherwise no change, one that says more marked only there; read again as typed in, the same");
+        const ALTextDiff::same_t table = ALDiffSame::make({ { "llSay", "ll.Say" } }, { ";" });
+        std::string              lsl;
+        std::string              slua;
+        ALTextDiff::ranges_t     ranges;
+        const auto               said = [](S32 n, S32 number) { return "ll.Say(0, " + std::to_string(number) + ")" + (n < 19 ? "\n" : ""); };
+        for (S32 n = 0; n < 20; ++n)
+        {
+            lsl += "llSay(0, " + std::to_string(n) + ");" + (n < 19 ? "\n" : "");
+            slua += said(n, n == 7 ? 70 : n);
+            ranges.push_back({ n, n, n, n, table });
+        }
+        m.setAlgorithm(ALTextDiff::Algorithm::Structural);
+        m.setTexts(lsl, slua, ranges);
+        ensure("not too large", !m.fellBack());
+        ensure_equals("the calls written otherwise no change; the one that says more one", m.changeCount(), 1);
+        ensure("marked only where it says more", m.line(Column::Left, 7).words == ALTextDiff::spans_t{ { 9, 10 } } &&
+                                                     m.line(Column::Right, 7).words == ALTextDiff::spans_t{ { 10, 12 } });
+        // Another typed in: its change read again, by its range's table.
+        std::string typed;
+        for (S32 n = 0; n < 20; ++n)
+        {
+            typed += said(n, n == 7 ? 70 : n == 12 ? 120 : n);
+        }
+        m.setRightText(typed);
+        ensure_equals("typed in: two", m.changeCount(), 2);
+        ensure("the one typed marked only where it says more", m.line(Column::Left, 12).words == ALTextDiff::spans_t{ { 9, 11 } } &&
+                                                                   m.line(Column::Right, 12).words == ALTextDiff::spans_t{ { 10, 13 } });
+    }
 }
