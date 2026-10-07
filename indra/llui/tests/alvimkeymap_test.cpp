@@ -219,7 +219,7 @@ namespace tut
 
     // More than TUT's fifty a group holds by default, which runs the first
     // fifty and says nothing of the rest: keep this above the highest test.
-    typedef test_group<alvimkeymap_data, 110> alvimkeymap_group;
+    typedef test_group<alvimkeymap_data, 150> alvimkeymap_group;
     typedef alvimkeymap_group::object    alvimkeymap_object;
     alvimkeymap_group                    alvimkeymap_group_instance("alvimkeymap");
 
@@ -3164,5 +3164,22 @@ namespace tut
         keys("<Esc>V/<BS>");
         ensure("a backspace on the empty line back to visual by lines", vim->mode() == ALVimKeymap::Mode::VisualLine);
         keys("<Esc>");
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<110>()
+    {
+        set_test_name("what an insert typed is read off the text: a count types again what Ctrl-W left standing, and after an arrow . types again only what followed it");
+        ALCodeEditor& e = make("\n");
+        keys("3ifoo bar<C-w>baz<Esc>");
+        ensure_equals("what stood after Ctrl-W, three times", e.document().line(0), std::string("foo bazfoo bazfoo baz"));
+        keys("A <C-a><Esc>");
+        ensure_equals("and Ctrl-A types it", e.document().line(0), std::string("foo bazfoo bazfoo baz foo baz"));
+
+        make("\n");
+        keys("ifoo<Left>X<Esc>");
+        ensure_equals("typed where the arrow left the caret", editor->document().line(0), std::string("foXo"));
+        keys(".");
+        ensure_equals(". types again what followed the arrow alone", editor->document().line(0), std::string("foXXo"));
     }
 }

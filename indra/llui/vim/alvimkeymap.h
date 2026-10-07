@@ -319,8 +319,21 @@ private:
     // Insert mode's own Control keys; false where vim gives the key no
     // meaning there, and it is the view's.
     bool insertControl(ALTextView& view, const Input& input);
-    // Text put in as though it were typed, for `.` and a count.
+    // Text put in as though it were typed: part of what the insert typed,
+    // for `.` and a count, as the text has it.
     void typeIn(ALTextView& view, const std::string& text);
+    // What insert mode has typed: the text from where it began to the
+    // caret, as it stands now.
+    std::string typedText(const ALTextView& view) const;
+    // The caret about to be moved off what insert mode typed -- an arrow,
+    // Ctrl-O's command -- or, `gone`, moved off it already, by the mouse:
+    // what was typed so far is the last insert's, where it can still be
+    // read, and typing again is an insert of its own (restartInsert).
+    void typingLeft(const ALTextView& view, bool gone = false);
+    // Typing again once the caret was moved off what was typed: an insert
+    // from the caret, as vim's arrows make it -- what a count or a block
+    // types again, and what `.` repeats, are what is typed from here.
+    void restartInsert(ALTextView& view);
 
     // Normal mode's command, once the count, the register and any
     // operator have been read; false where the character is not one. In
@@ -498,9 +511,9 @@ private:
     boost::signals2::scoped_connection mMarksSlide;
     // Everything held at a place in the text, moved with each edit made to
     // it, whoever makes it: the marks and the last visual area, the visual
-    // area being made, the last match gone to, the lines a block insert
-    // goes onto, and the :s edits still to be asked about -- those an edit
-    // cut through let go.
+    // area being made, the last match gone to, where insert mode began
+    // typing, the lines a block insert goes onto, and the :s edits still to
+    // be asked about -- those an edit cut through let go.
     void                      slideHeld(const ALTextDocument::Edit& edit);
     void                      followDocument(ALTextView& view);
 
@@ -525,14 +538,19 @@ private:
     // mode.
     Mode      mSearchVisual = Mode::Normal;
 
-    // Insert mode: how many times what is typed goes in, the characters
-    // typed so far, and a block's lines to put them on as well -- at its
-    // first column as the reader counts them, or for A past its last, or
-    // past each line's end where it was taken with $; what the last insert
-    // typed, for Control-A; and whether a Control-R waits for the register
-    // to put in.
+    // Insert mode: how many times what is typed goes in; where the typing
+    // began, moved with each edit, so that what was typed is read off the
+    // text -- what a backspace or Ctrl-W took back gone from it, the
+    // indent a Return made in it; whether the caret has been moved off it
+    // since, and from where, which the key meant to move it may not have;
+    // and a block's lines to put it on as well -- at its first column as
+    // the reader counts them, or for A past its last, or past each line's
+    // end where it was taken with $; what the last insert typed, for
+    // Control-A; and whether a Control-R waits for the register to put in.
     S32         mInsertCount = 1;
-    std::string mTyped;
+    ALTextPos   mInsertStart;
+    bool        mInsertMoved = false;
+    ALTextPos   mInsertLeftAt;
     std::string mLastTyped;
     bool        mInsertRegister = false;
     bool        mBlockInsert       = false;

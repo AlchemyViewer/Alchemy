@@ -189,9 +189,14 @@ void ALVimKeymap::mouseChanged(ALTextView& view)
         mMessageError = false;
         bump();
     }
-    // Insert mode stays insert mode wherever the click lands; a line
-    // being typed is not the mouse's.
-    if (mMode == Mode::Insert || mMode == Mode::Replace || mMode == Mode::Command || mMode == Mode::Search || mMode == Mode::Confirm)
+    // Insert mode stays insert mode wherever the click lands, the caret
+    // off what was typed; a line being typed is not the mouse's.
+    if (inserting())
+    {
+        typingLeft(view, true);
+        return;
+    }
+    if (mMode == Mode::Command || mMode == Mode::Search || mMode == Mode::Confirm)
     {
         return;
     }
@@ -688,6 +693,8 @@ void ALVimKeymap::slideHeld(const ALTextDocument::Edit& edit)
     slide(mVisualLastCaret);
     slide(mVisualAnchor);
     slide(mVisualCaret);
+    // What is typed at where insert mode began is after it, not before.
+    mInsertStart = edit.placed(mInsertStart, false);
     // A match an edit took some of is no match any longer.
     if (!mSearch.lastMatch.empty() && !edit.slide(mSearch.lastMatch))
     {
@@ -3942,7 +3949,8 @@ void ALVimKeymap::enterInsert(ALTextView& view, S32 count, bool grouped)
     mMode        = Mode::Insert;
     mInsertCount = llmax(1, count);
     mWantColumn  = -1;
-    mTyped.clear();
+    mInsertStart = view.caret();
+    mInsertMoved = false;
     mInsertRegister = false;
     mCount       = 0;
     mRegister    = 0;
@@ -3959,11 +3967,20 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
     // or a block puts in again at the main one.
     view.singleSelection();
     const ALTextDocument& d = view.document();
-    // What was typed, again as many times as the count said: made once and
-    // put in as one edit, not an edit a time.
-    if (mInsertCount > 1 && !mTyped.empty())
+    // What was typed, read off the text. Nothing to type again where the
+    // caret was moved off it and nothing has been typed since, as vim has
+    // it after an arrow: what came before is the last insert's already.
+    const bool        moved = mInsertMoved && view.caret() != mInsertLeftAt;
+    const std::string typed = moved ? std::string() : typedText(view);
+    if (!moved)
     {
-        const size_t size = mTyped.size() * static_cast<size_t>(mInsertCount - 1);
+        mLastTyped = typed;
+    }
+    // Again as many times as the count said: made once and put in as one
+    // edit, not an edit a time.
+    if (mInsertCount > 1 && !typed.empty())
+    {
+        const size_t size = typed.size() * static_cast<size_t>(mInsertCount - 1);
         if (size > MAX_COUNT_TEXT)
         {
             tooMuch(size);
@@ -3974,7 +3991,7 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
             again.reserve(size);
             for (S32 n = 1; n < mInsertCount; ++n)
             {
-                again += mTyped;
+                again += typed;
             }
             view.insertText(again);
         }
@@ -3984,7 +4001,7 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
     // alone; A's past what the block holds of the line, a line short of
     // it padded out to its edge, or past the line's end for a block taken
     // with $.
-    if (mBlockInsert && !mTyped.empty() && mTyped.find('\n') == std::string::npos)
+    if (mBlockInsert && !typed.empty() && typed.find('\n') == std::string::npos)
     {
         const S32                                        tab = view.getTabWidth();
         std::vector<std::pair<ALTextRange, std::string>> edits;
@@ -3993,7 +4010,7 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
             if (mBlockAppend)
             {
                 const ALTextPos where = blockPiece(d, line, mBlockColumn, mBlockColumn, mBlockToEnd, tab).end;
-                edits.emplace_back(ALTextRange(where, where), (mBlockToEnd ? std::string() : padTo(d, line, mBlockColumn + 1, tab)) + mTyped);
+                edits.emplace_back(ALTextRange(where, where), (mBlockToEnd ? std::string() : padTo(d, line, mBlockColumn + 1, tab)) + typed);
                 continue;
             }
             if (d.displayColumn(d.lineEnd(line), tab) < mBlockColumn)
@@ -4001,7 +4018,7 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
                 continue;
             }
             const ALTextPos where = d.posAtDisplayColumn(line, mBlockColumn, tab);
-            edits.emplace_back(ALTextRange(where, where), mTyped);
+            edits.emplace_back(ALTextRange(where, where), typed);
         }
         if (!edits.empty())
         {
@@ -4012,7 +4029,7 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
     }
     mBlockInsert    = false;
     mInsertRegister = false;
-    mLastTyped      = mTyped;
+    mInsertMoved    = false;
     view.undoJournal().endGroup();
     mMode = Mode::Normal;
     // Where inserting stopped, for gi to go back to: vim's ^ mark.
@@ -4029,7 +4046,44 @@ void ALVimKeymap::typeIn(ALTextView& view, const std::string& text)
     if (!text.empty())
     {
         view.insertText(text);
-        mTyped += text;
+    }
+}
+
+std::string ALVimKeymap::typedText(const ALTextView& view) const
+{
+    const ALTextDocument& d     = view.document();
+    const ALTextPos       start = d.clamp(mInsertStart);
+    return start < view.caret() ? d.text(ALTextRange(start, view.caret())) : std::string();
+}
+
+void ALVimKeymap::typingLeft(const ALTextView& view, bool gone)
+{
+    if (mInsertMoved)
+    {
+        return;
+    }
+    // Where the caret was: a key that was to move it and did not leaves
+    // it typing on. One the mouse moved already was somewhere else.
+    mInsertMoved  = true;
+    mInsertLeftAt = gone ? ALTextPos(-1, -1) : view.caret();
+    if (!gone)
+    {
+        mLastTyped = typedText(view);
+    }
+}
+
+void ALVimKeymap::restartInsert(ALTextView& view)
+{
+    mInsertMoved = false;
+    mInsertStart = view.caret();
+    // A block's other lines no longer line up with what is typed.
+    mBlockInsert = false;
+    // What `.` repeats is an i, and the key being fed.
+    if (!mReplaying && !mCommandInputs.empty())
+    {
+        const Input now = mCommandInputs.back();
+        mCommandInputs.assign({ Input::character('i'), now });
+        mVisualPending.valid = false;
     }
 }
 
@@ -4054,7 +4108,9 @@ bool ALVimKeymap::insertControl(ALTextView& view, const Input& input)
     switch (input.key)
     {
         case 'O':
-            // One command of normal mode, then inserting again.
+            // One command of normal mode, then inserting again; the
+            // command may take the caret off what was typed.
+            typingLeft(view);
             view.undoJournal().endGroup();
             mMode       = Mode::Normal;
             mOneCommand = 2;
@@ -4158,7 +4214,26 @@ bool ALVimKeymap::insertControl(ALTextView& view, const Input& input)
 
 bool ALVimKeymap::insert(ALTextView& view, const Input& input)
 {
-    const ALTextDocument& d = view.document();
+    const ALTextDocument& d       = view.document();
+    const bool            ctrl    = !input.isChar && (input.mask & CONTROL) != 0;
+    const bool            leaving = !input.isChar && (input.key == KEY_ESCAPE || (ctrl && (input.key == '[' || input.key == 'C')));
+    // An arrow, Home, End or a page: the caret moves and nothing is typed.
+    const bool moving = !input.isChar && (input.key == KEY_LEFT || input.key == KEY_RIGHT || input.key == KEY_UP || input.key == KEY_DOWN ||
+                                          input.key == KEY_HOME || input.key == KEY_END || input.key == KEY_PAGE_UP || input.key == KEY_PAGE_DOWN);
+    // Anything else after the caret was moved off what was typed is an
+    // insert of its own from where it is; nothing, where the key that was
+    // to move it did not.
+    if (mInsertMoved && !leaving && !moving)
+    {
+        if (view.caret() != mInsertLeftAt)
+        {
+            restartInsert(view);
+        }
+        else
+        {
+            mInsertMoved = false;
+        }
+    }
     if (mLiteral)
     {
         // After Ctrl-V: a tab as a tab, whatever the tabs are set to; a
@@ -4234,8 +4309,7 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
     }
     if (!input.isChar)
     {
-        const bool ctrl = (input.mask & CONTROL) != 0;
-        if (input.key == KEY_ESCAPE || (ctrl && input.key == '[') || (ctrl && input.key == 'C'))
+        if (leaving)
         {
             leaveInsert(view);
             return true;
@@ -4244,25 +4318,9 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
         {
             return true;
         }
-        if (input.key == KEY_RETURN)
+        if (moving)
         {
-            // Typed text with a break in it is no longer one block's.
-            mTyped += "\n";
-        }
-        else if (input.key == KEY_TAB && !(input.mask & (CONTROL | MASK_CONTROL | MASK_ALT)))
-        {
-            mTyped += view.tabText(view.caret());
-        }
-        else if (input.key == KEY_BACKSPACE && !mTyped.empty())
-        {
-            // Taking back what was typed takes it out of what is typed
-            // again: `.` repeats what stood, as vim's does.
-            size_t cut = mTyped.size() - 1;
-            while (cut > 0 && (static_cast<unsigned char>(mTyped[cut]) & 0xC0) == 0x80)
-            {
-                --cut;
-            }
-            mTyped.erase(cut);
+            typingLeft(view);
         }
         if (mReplaying || mPlaying > 0 || mMapped > 0)
         {
@@ -4299,10 +4357,8 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
             view.setSelection(over(view.caret()));
         }
         view.typeText(utf8Of(input.ch));
-        mTyped += utf8Of(input.ch);
         return true;
     }
-    mTyped += utf8Of(input.ch);
     if (mReplaying || mPlaying > 0 || mMapped > 0)
     {
         // Fed by hand -- `.`, a macro, :normal, a mapping -- so nobody
