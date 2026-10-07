@@ -376,6 +376,13 @@ private:
     // away, hidden or everything thrown away since.
     void ensureHeights();
     void heightsMoved();
+    // What a line counts for in the widest: its width where it was laid
+    // out as its text is, or let go of since; else its bytes at a space's
+    // width, `per_byte`.
+    F32  countedWidth(S32 index, F32 per_byte) const;
+    // A line's width as it counts may have changed: the widest raised to
+    // it where it is wider, and found again where it was the widest.
+    void widthChanged(S32 index);
     // A space's advance, in the screen's pixels.
     F32  spaceAdvance();
     // Throws everything away when the fonts were reloaded or the UI
@@ -425,8 +432,11 @@ private:
     // The rows below the text, as last asked.
     S32                                mEndGap = 0;
     F32                                mSpaceAdvance = -1.f;
-    // Negative until asked for.
+    // Negative until asked for; and the line that is that wide, -1 for
+    // none, an edit of which, or its being laid out narrower, has the
+    // widest found again over every line.
     F32                                mContentWidth = -1.f;
+    S32                                mWidestLine   = -1;
     // What the lines were laid out under: the fonts' generation and the UI
     // scale as the fonts had it, and the scale as used, which is one where
     // the fonts have none yet.

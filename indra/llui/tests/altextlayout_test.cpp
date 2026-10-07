@@ -914,4 +914,32 @@ namespace tut
         doc.replace(ALTextRange(ALTextPos(8, 0), ALTextPos(8, 400)), "y");
         ensure("the long lines made short count as short: " + std::to_string(layout.contentWidth()), layout.contentWidth() < long_width * 0.5f);
     }
+
+    template<> template<>
+    void altextlayout_object::test<24>()
+    {
+        set_test_name("the widest line is kept up through edits as a count of every line finds it: a line typed wider, the widest cut short, lines made and taken away");
+        ready("aa\nbbbbbb\ncc\nd");
+        const auto check = [&](const std::string& what) {
+            F32 widest = 0.f;
+            for (S32 l = 0; l < layout.lineCount(); ++l)
+            {
+                widest = llmax(widest, layout.line(l).width);
+            }
+            ensure_equals(what, layout.contentWidth(), widest);
+        };
+        check("laid out");
+        doc.insert(ALTextPos(2, 2), "cccccccccc");
+        check("a line typed wider than the widest");
+        doc.remove(ALTextRange(ALTextPos(2, 2), ALTextPos(2, 12)));
+        check("the widest cut short");
+        doc.insert(ALTextPos(0, 0), "dddddddddddddddd\n\n");
+        check("lines made, one of them the widest");
+        doc.remove(ALTextRange(ALTextPos(0, 0), ALTextPos(2, 0)));
+        check("lines taken away with the widest");
+        doc.insert(ALTextPos(3, 1), "\neeeeeeeeeeeeeeeeeeee");
+        check("a line made below, wider than the rest");
+        layout.invalidateLine(4);
+        check("that line laid out again");
+    }
 }

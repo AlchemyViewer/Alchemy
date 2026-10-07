@@ -203,6 +203,7 @@ void ALTextLayout::invalidateAll()
     }
     heightsMoved();
     mContentWidth = -1.f;
+    mWidestLine   = -1;
 }
 
 void ALTextLayout::heightsMoved()
@@ -235,7 +236,24 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
     }
     if (moved)
     {
+        // The widest line moves with the lines, unless the edit replaced
+        // it; the lines it made count by their bytes, in the widest too.
+        const S32 widest = mWidestLine >= 0 ? edit.lineAfter(mWidestLine) : -1;
         mLines.applySpans(spans, line_count, Entry());
+        if (mWidestLine >= 0 && widest < 0)
+        {
+            mContentWidth = -1.f;
+        }
+        mWidestLine = widest;
+        S32 shift   = 0;
+        for (const ALTextDocument::Edit::LineSpan& span : spans)
+        {
+            for (S32 made = 0; made < span.made; ++made)
+            {
+                widthChanged(span.first + shift + made);
+            }
+            shift = span.shiftAfter;
+        }
     }
     else
     {
@@ -249,6 +267,7 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
             {
                 mLines[l].valid   = false;
                 mLines[l].trimmed = false;
+                widthChanged(l);
             }
         }
     }
@@ -265,7 +284,6 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
     {
         heightsMoved();
     }
-    mContentWidth = -1.f;
 }
 
 F32 ALTextLayout::contentWidth()
@@ -273,18 +291,50 @@ F32 ALTextLayout::contentWidth()
     refreshIfFontsChanged();
     if (mContentWidth < 0.f)
     {
-        F32       widest  = 0.f;
         const F32 per_byte = spaceAdvance() / mScaleX;
-        for (size_t i = 0; i < mLines.size(); ++i)
+        mContentWidth      = 0.f;
+        mWidestLine        = -1;
+        for (S32 i = 0; i < lineCount(); ++i)
         {
-            const F32 width = mLines[i].valid || mLines[i].trimmed
-                                  ? mLines[i].width
-                                  : (mDocument ? static_cast<F32>(mDocument->lineLength(static_cast<S32>(i))) * per_byte : 0.f);
-            widest = llmax(widest, width);
+            const F32 width = countedWidth(i, per_byte);
+            if (width > mContentWidth)
+            {
+                mContentWidth = width;
+                mWidestLine   = i;
+            }
         }
-        mContentWidth = widest;
     }
     return mContentWidth;
+}
+
+F32 ALTextLayout::countedWidth(S32 index, F32 per_byte) const
+{
+    const Entry& entry = mLines[static_cast<size_t>(index)];
+    if (entry.valid || entry.trimmed)
+    {
+        return entry.width;
+    }
+    return mDocument ? static_cast<F32>(mDocument->lineLength(index)) * per_byte : 0.f;
+}
+
+void ALTextLayout::widthChanged(S32 index)
+{
+    if (mContentWidth < 0.f || index < 0 || index >= lineCount())
+    {
+        return;
+    }
+    if (index == mWidestLine)
+    {
+        // It may have narrowed, and another line be the widest.
+        mContentWidth = -1.f;
+        return;
+    }
+    const F32 width = countedWidth(index, spaceAdvance() / mScaleX);
+    if (width > mContentWidth)
+    {
+        mContentWidth = width;
+        mWidestLine   = index;
+    }
 }
 
 // --- hidden lines --------------------------------------------------------------
@@ -407,7 +457,7 @@ void ALTextLayout::invalidateLine(S32 index)
     // Laid out again when next asked for, keeping its height until then.
     mLines[index].valid   = false;
     mLines[index].trimmed = false;
-    mContentWidth         = -1.f;
+    widthChanged(index);
 }
 
 void ALTextLayout::layoutLine(S32 index, Line& out)
@@ -639,10 +689,19 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     {
         out.ordered = out.glyphs[k].cluster >= out.glyphs[k - 1].cluster;
     }
-    // The widest line, kept up in the UI's pixels as the width is.
-    if (mContentWidth >= 0.f && out.width > mContentWidth)
+    // The widest line, kept up in the UI's pixels as the width is: wider,
+    // or found again where this line was the widest and has narrowed.
+    if (mContentWidth >= 0.f)
     {
-        mContentWidth = out.width;
+        if (index == mWidestLine && out.width < mContentWidth)
+        {
+            mContentWidth = -1.f;
+        }
+        else if (out.width > mContentWidth)
+        {
+            mContentWidth = out.width;
+            mWidestLine   = index;
+        }
     }
     wrapLine(index, out);
 }
