@@ -2096,4 +2096,47 @@ namespace tut
             ensure("strict:\n" + said + "---\n" + typed.text, said.empty());
         }
     }
+
+    template<> template<>
+    void allsltoslua_object::test<76>()
+    {
+        set_test_name("a key of no text said to be NULL_KEY, and one with capitals said to be written small, cast or given; other text as "
+                      "it was said; the two XorBase64Strings said to be what ll.XorBase64 is not, llcompat's kept");
+        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
+                                              "    key a = (key)\"\"; key c = (key)\"A2E76FCD-9360-4F6D-A924-938F923DF11D\";\n"
+                                              "    if ((key)\"\" == NULL_KEY) llOwnerSay(\"same\");\n"
+                                              "    string s = llGetObjectDesc(); key d = (key)s;\n"
+                                              "    llOwnerSay((string)a + (string)c + (string)d + llXorBase64(\"a\", \"b\") + llXorBase64Strings(\"a\", \"b\") +\n"
+                                              "               llXorBase64StringsCorrect(\"a\", \"b\"));\n"
+                                              "} }\n");
+        ensure("no text, NULL_KEY: " + r.text, has(r, "local a = uuid(\"\")") && noted(r, "SluaKeyEmpty") &&
+                                                  has(r, "-- LSL: SLua's uuid of no text is NULL_KEY"));
+        ensure("capitals, small: " + r.text, has(r, "uuid(\"A2E76FCD-9360-4F6D-A924-938F923DF11D\")") && noted(r, "SluaKeyCase"));
+        ensure("other text as it was: " + r.text, has(r, "local d = uuid(s)") && noted(r, "SluaUuid"));
+        ensure("ll.XorBase64 as it is: " + r.text, has(r, "ll.XorBase64(\"a\", \"b\")"));
+        ensure("the two, llcompat's: " + r.text,
+               has(r, "llcompat.XorBase64Strings(\"a\", \"b\")") && has(r, "llcompat.XorBase64StringsCorrect(\"a\", \"b\")"));
+        ensure("said what ll.XorBase64 is not: " + r.text, noted(r, "SluaXorBase64Wrong") && noted(r, "SluaXorBase64Nul") &&
+                                                              !noted(r, "SluaDeprecated", "XorBase64Strings") &&
+                                                              !noted(r, "SluaDeprecated", "XorBase64StringsCorrect"));
+        for (const ALScriptProblem& p : r.notes)
+        {
+            if (p.key == "SluaXorBase64Wrong" || p.key == "SluaXorBase64Nul")
+            {
+                ensure("named: " + p.message, p.message.find("for ll.XorBase64,") != std::string::npos);
+            }
+        }
+        checksClean(r);
+
+        // Given rather than cast: the same said, and a UUID written small
+        // nothing at all.
+        const ALLSLToSLua::Result given = convert("default { touch_start(integer n) {\n"
+                                                  "    key b = \"\"; key c = \"A2E76FCD-9360-4F6D-A924-938F923DF11D\";\n"
+                                                  "    key l = \"a2e76fcd-9360-4f6d-a924-938f923df11d\";\n"
+                                                  "    llOwnerSay((string)llGetOwnerKey(b) + (string)llGetOwnerKey(c) + (string)llGetOwnerKey(l));\n"
+                                                  "} }\n");
+        ensure("given no text: " + given.text, noted(given, "SluaKeyEmpty") && noted(given, "SluaKeyCase"));
+        ensure("nothing else said of them: " + given.text, !noted(given, "SluaKeyText") && !noted(given, "SluaUuidText"));
+        checksClean(given);
+    }
 }

@@ -404,6 +404,10 @@ namespace
         void note(LSLASTNode* at, const char* key, const char* english, std::vector<std::string> args = {});
         // The same, once in the script for its key and words.
         void noteOnce(LSLASTNode* at, const char* key, const char* english, std::vector<std::string> args = {});
+        // Text written out made a key, said where SLua's uuid makes another
+        // key of it than LSL's held: no text, which is NULL_KEY, and a key
+        // with capitals, which it writes small. Whether it said either.
+        bool keyText(LSLExpression* at, std::string_view text);
         // Why a list is shared, as SluaListCopy says it.
         std::string sharedWords(Shared why) const;
 
@@ -2069,6 +2073,26 @@ namespace
         return Expr{ "`" + body + "`" };
     }
 
+    bool Writer::keyText(LSLExpression* at, std::string_view text)
+    {
+        if (text.empty())
+        {
+            noteOnce(at, "SluaKeyEmpty",
+                     "SLua's uuid of no text is NULL_KEY: it equals NULL_KEY and reads as NULL_KEY's text, where LSL's key of no text did "
+                     "neither.");
+            return true;
+        }
+        const bool capitals = std::any_of(text.begin(), text.end(), [](char c) { return std::isupper(static_cast<unsigned char>(c)) != 0; });
+        if (capitals && ALLSLTraits::isUuid(text))
+        {
+            noteOnce(at, "SluaKeyCase",
+                     "SLua's uuid writes a key's letters small, and finds it the same key as one written small, where LSL's key kept its "
+                     "capitals and was compared as text.");
+            return true;
+        }
+        return false;
+    }
+
     Expr Writer::coerced(LSLExpression* e, LSLIType to)
     {
         Expr           out  = value(e);
@@ -2083,7 +2107,7 @@ namespace
             if (constant && inner->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
             {
                 const std::string_view text = static_cast<LSLStringConstant*>(inner->getChild(0))->getValue();
-                if (!text.empty() && !ALLSLTraits::isUuid(text))
+                if (!keyText(e, text) && !ALLSLTraits::isUuid(text))
                 {
                     noteOnce(e, "SluaKeyText", "LSL's keys held any text; SLua's uuid() stops the script on text that is no UUID, as it "
                                                "would here, where only a uuid will do.");
@@ -2717,7 +2741,22 @@ namespace
         {
             // SLua's word on it, what it would use and why: which says more
             // than how its indexes count. The why is the definitions' own.
-            if (trait->sluaUse && trait->sluaReason)
+            // But the two XorBase64Strings: SLua names ll.XorBase64 for both,
+            // with no why, and it answers otherwise than either -- said how,
+            // since llcompat's is kept.
+            if (lsl == "llXorBase64Strings")
+            {
+                noteOnce(e, "SluaXorBase64Wrong",
+                         "SLua deprecates ll.XorBase64Strings, for ll.XorBase64, which XORs correctly where this did not, and so answers "
+                         "otherwise: llcompat's is LSL's.");
+            }
+            else if (lsl == "llXorBase64StringsCorrect")
+            {
+                noteOnce(e, "SluaXorBase64Nul",
+                         "SLua deprecates ll.XorBase64StringsCorrect, for ll.XorBase64, which answers otherwise where the second string "
+                         "holds a NUL, which ended it here: llcompat's is LSL's.");
+            }
+            else if (trait->sluaUse && trait->sluaReason)
             {
                 noteOnce(e, "SluaDeprecatedForWhy", "SLua deprecates ll.[1], for [2]: [3]", { bare, trait->sluaUse, trait->sluaReason });
             }
@@ -3138,8 +3177,18 @@ namespace
                     default: return { "tostring(" + v.text + ")" };
                 }
             case LST_KEY:
-                note(e, "SluaUuid", "SLua's uuid holds a key; LSL's key could hold any text.");
+            {
+                // Text written out, said for what uuid makes of it where that
+                // is another key than LSL's: (key)"" is NULL_KEY.
+                LSLExpression* inner   = unbracketed(child);
+                const bool     written = inner && inner->getNodeSubType() == NODE_CONSTANT_EXPRESSION &&
+                                         inner->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT;
+                if (!written || !keyText(e, static_cast<LSLStringConstant*>(inner->getChild(0))->getValue()))
+                {
+                    note(e, "SluaUuid", "SLua's uuid holds a key; LSL's key could hold any text.");
+                }
                 return { "uuid(" + v.text + ")" };
+            }
             // Text that is no vector or rotation is LSL's zero one; bracketed
             // only where an operator around it binds more tightly than or.
             case LST_VECTOR: return { "tovector(" + v.text + ") or ZERO_VECTOR", OR };

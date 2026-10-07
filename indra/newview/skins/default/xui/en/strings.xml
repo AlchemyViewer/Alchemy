@@ -1084,6 +1084,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaSharedReturned">returned by a function</string>
 	<string name="SluaSharedKept">passed to a function of the script's that keeps it</string>
 	<string name="SluaKeyText">LSL's keys held any text; SLua's uuid() stops the script on text that is no UUID, as it would here, where only a uuid will do.</string>
+	<string name="SluaKeyEmpty">SLua's uuid of no text is NULL_KEY: it equals NULL_KEY and reads as NULL_KEY's text, where LSL's key of no text did neither.</string>
+	<string name="SluaKeyCase">SLua's uuid writes a key's letters small, and finds it the same key as one written small, where LSL's key kept its capitals and was compared as text.</string>
 	<string name="SluaVectorText">ll.DumpList2String writes a vector's or a rotation's parts as LSL did, with five places; SLua's tostring writes as few as each needs, &lt;1, 2, 3&gt;, which tovector reads back the same.</string>
 	<string name="SluaUuidText">uuid() stops the script on text that is no UUID, where LSL's keys held any text; touuid() answers nil instead.</string>
 	<string name="SluaDetectedTable">detected[n] is what LSL read with llDetected*(n - 1): SLua counts it from 1, and one past its end is an error, where LSL answered nothing.</string>
@@ -1098,6 +1100,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaDeprecatedFor">SLua deprecates ll.[1], for [2].</string>
 	<string name="SluaDeprecatedWhy">SLua deprecates ll.[1]: [2]</string>
 	<string name="SluaDeprecated">SLua deprecates ll.[1].</string>
+	<string name="SluaXorBase64Wrong">SLua deprecates ll.XorBase64Strings, for ll.XorBase64, which XORs correctly where this did not, and so answers otherwise: llcompat's is LSL's.</string>
+	<string name="SluaXorBase64Nul">SLua deprecates ll.XorBase64StringsCorrect, for ll.XorBase64, which answers otherwise where the second string holds a NUL, which ended it here: llcompat's is LSL's.</string>
 	<string name="SluaIndexFound">llcompat.[1] counts from 0 and says -1 for none, as LSL did; ll.[1] counts from 1 and says nil.</string>
 	<string name="SluaIndex">llcompat.[1] takes indexes from 0, as LSL did; ll.[1] takes them from 1.</string>
 	<string name="SluaBool">llcompat.[1] answers 1 or 0, as LSL did; ll.[1] answers true or false.</string>
