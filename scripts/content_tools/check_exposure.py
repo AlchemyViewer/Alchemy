@@ -20,6 +20,9 @@ What is checked, because each is easy to get subtly wrong and hard to see on scr
   (d) Adaptation: stepping toward a new EV lands in the same place at the same time at 30, 60
       and 144 fps, and a brighter scene is followed faster than a darker one.
   (e) Nothing lit: a black frame opens up to the minimum EV rather than dividing by nothing.
+  (f) Bounds: the upload clamps hold absurd settings inside what the exposure map can store, a
+      history read as an infinity or a NaN starts over from the target, and a finite history
+      outside a narrowed range eases in rather than jumping.
 
 If the shaders' binning, trim, target or adaptation change, change them here in the same commit.
 
@@ -93,10 +96,11 @@ def histogram(grid, settings):
 def exposure_params(settings, meter=True):
     low = min(max(settings["low_percent"] * 0.01, 0.0), 0.99)
     high = min(max(settings["high_percent"] * 0.01, low + 0.01), 1.0)
-    # Held far inside the half-float range the history is kept in, as pipeline.cpp clamps them:
-    # an EV past it is stored as an infinity the history never leaves.
-    ev_a = min(max(settings["min_ev"], -32.0), 32.0)
-    ev_b = min(max(settings["max_ev"], -32.0), 32.0)
+    # As pipeline.cpp clamps them: the EV inside what the exposure map's half floats hold -- its
+    # red channel is the scale 2^-EV, and 2^16 is past the largest half float -- and the
+    # compensation and rates far past their sliders.
+    ev_a = min(max(settings["min_ev"], -15.0), 15.0)
+    ev_b = min(max(settings["max_ev"], -15.0), 15.0)
     compensation = min(max(settings["compensation"], -16.0), 16.0)
     params = (math.log2(KEY) + compensation, min(ev_a, ev_b), max(ev_a, ev_b), 1.0 if meter else 0.0)
     params2 = (low, high, min(max(settings["speed_up"], 0.0), 100.0), min(max(settings["speed_down"], 0.0), 100.0))
@@ -129,7 +133,7 @@ def exposure(bins, params, params2, prev=None, dt=0.0):
         if math.isnan(prev) or math.isinf(prev):
             prev = target
         rate = params2[2] if target > prev else params2[3]
-        ev = min(max(prev + (target - prev) * (1.0 - math.exp(-rate * dt)), params[1]), params[2])
+        ev = prev + (target - prev) * (1.0 - math.exp(-rate * dt))
 
     if params[3] < 0.5:
         ev = 0.0
@@ -254,6 +258,24 @@ def check_black(ck):
     ck.expect("a black frame opens up to the minimum EV", ev == DEFAULTS["min_ev"], "EV %.3f" % ev)
 
 
+def check_bounds(ck):
+    print("(f) bounds and a broken history")
+    params, params2 = exposure_params(dict(DEFAULTS, min_ev=-1e9, max_ev=1e9, compensation=1e9, speed_up=1e9, speed_down=-5.0))
+    ck.expect("the EV range is held to -15..15", params[1] == -15.0 and params[2] == 15.0, "%.1f..%.1f" % (params[1], params[2]))
+    ck.expect("the scale at the widest EV fits a half float", 2.0 ** -params[1] <= 65504.0, "scale %.0f" % 2.0 ** -params[1])
+    ck.expect("compensation is held to -16..16", params[0] == math.log2(KEY) + 16.0, "%.3f" % params[0])
+    ck.expect("the rates are held to 0..100", params2[2] == 100.0 and params2[3] == 0.0, "%.1f, %.1f" % (params2[2], params2[3]))
+    swapped, _ = exposure_params(dict(DEFAULTS, min_ev=4.0, max_ev=-3.0))
+    ck.expect("a range given backwards is put the right way round", swapped[1] == -3.0 and swapped[2] == 4.0)
+    params, params2 = exposure_params(DEFAULTS)
+    bins = histogram(uniform_grid(KEY), DEFAULTS)
+    for broken in (float("inf"), float("-inf"), float("nan")):
+        _, ev, target = exposure(bins, params, params2, prev=broken, dt=1.0 / 60)
+        ck.expect("a history of %s starts over from the target" % broken, ev == target, "EV %.4f, target %.4f" % (ev, target))
+    _, ev, target = exposure(bins, params, params2, prev=-20.0, dt=1.0 / 60)
+    ck.expect("a finite history past the range eases toward it", -20.0 < ev < target, "EV %.4f from -20 toward %.4f" % (ev, target))
+
+
 def main():
     ck = Checker()
     check_calibration(ck)
@@ -261,6 +283,7 @@ def main():
     check_trim(ck)
     check_adaptation(ck)
     check_black(ck)
+    check_bounds(ck)
     print("RESULT: %s" % ("OK" if ck.failures == 0 else "MISMATCH"))
     return 0 if ck.failures == 0 else 1
 

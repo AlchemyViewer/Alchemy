@@ -98,7 +98,10 @@ void main()
         prev = target;
     }
     float rate = target > prev ? dynamic_exposure_params2.z : dynamic_exposure_params2.w;
-    ev = clamp(mix(prev, target, 1.0 - exp(-rate * dt)), dynamic_exposure_params.y, dynamic_exposure_params.z);
+    // Not held to the range itself: the target is, and the EV eases toward
+    // it, so a range the user narrows is reached at the adaptation's pace
+    // rather than in a jump.
+    ev = mix(prev, target, 1.0 - exp(-rate * dt));
 #endif
 
     if (dynamic_exposure_params.w < 0.5)

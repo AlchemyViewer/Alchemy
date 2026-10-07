@@ -8060,13 +8060,16 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
     const F32 low = llclamp(low_percent() * 0.01f, 0.f, 0.99f);
     const F32 high = llclamp(high_percent() * 0.01f, low + 0.01f, 1.f);
     shader->uniform1f(LLShaderMgr::DT, gFrameIntervalSeconds);
-    // Held far inside the half-float range the exposure history is kept in:
-    // an EV past it is stored as an infinity, and the history never comes
-    // back from one, however the settings are mended afterwards. The
-    // Lightbox's sliders run -8..8 EV and 0.1..10 per second; a settings
-    // file or a shared Look can carry anything.
-    const F32 ev_a = llclamp(min_ev(), -32.f, 32.f);
-    const F32 ev_b = llclamp(max_ev(), -32.f, 32.f);
+    // Bounded well past the Lightbox's sliders (-8..8 EV, 0.1..10 per
+    // second) but inside what the exposure map holds: a settings file or a
+    // shared Look can carry anything, and the map is a half float whose red
+    // channel is the scale 2^-EV -- 2^16 is already past its largest value
+    // (65504), and an infinity there whites the frame out for as long as
+    // the setting stands. The history in green would take more, but mixing
+    // from an infinity never comes back, so the shader starts over from the
+    // target when it reads one. check_exposure.py mirrors these numbers.
+    const F32 ev_a = llclamp(min_ev(), -15.f, 15.f);
+    const F32 ev_b = llclamp(max_ev(), -15.f, 15.f);
     shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS, log2f(EXPOSURE_KEY) + llclamp(compensation(), -16.f, 16.f), llmin(ev_a, ev_b),
                       llmax(ev_a, ev_b), meter ? 1.f : 0.f);
     shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS2, low, high, llclamp(speed_up(), 0.f, 100.f), llclamp(speed_down(), 0.f, 100.f));
@@ -8549,15 +8552,16 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             shader->uniform1f(LLShaderMgr::TONEMAP_MIX, psky->getTonemapMix(should_auto_adjust()));
 
             constexpr F32 max_screen_brightness = 1.f;
+            // The most any tonemapper's white may be, from a settings file or
+            // a shared Look: the shaders divide by what is made of it, and an
+            // absurd white would be inf / inf. The sliders run to 16 and 32.
+            constexpr F32 tonemap_white_limit = 1024.f;
             switch (tonemap_type_setting)
             {
                 case 2: // ACES Godot
                 {
                     static LLCachedControl<F32> tonemap_aces_white(gSavedSettings, "RenderTonemapACESWhite", 6.f);
-                    // Bounded above as well: the shader divides by what is
-                    // made of this, and an absurd white from a settings file
-                    // or a shared Look would be inf / inf. The slider runs to 16.
-                    F32                         white = llclamp(tonemap_aces_white(), 1.0f, 1024.f);
+                    F32                         white = llclamp(tonemap_aces_white(), 1.0f, tonemap_white_limit);
 
                     // These constants must match those in the shader code.
                     const float exposure_bias = 1.8f;
@@ -8590,7 +8594,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 case 4: // Filmic
                 {
                     static LLCachedControl<F32> tonemap_filmic_white(gSavedSettings, "RenderTonemapFilmicWhite", 6.f);
-                    F32                         white = llclamp(tonemap_filmic_white(), 1.0f, 1024.f); // as for ACES above
+                    F32                         white = llclamp(tonemap_filmic_white(), 1.0f, tonemap_white_limit);
 
                     // These constants must match those in the shader code.
                     const float exposure_bias = 2.0f;
@@ -8617,7 +8621,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                     // Look is not the slider's. The sliders run 0.5..2.5
                     // and 1..32.
                     const float agx_contrast = llclamp(tonemap_agx_contrast(), 0.05f, 10.f);
-                    float       agx_white    = llclamp(tonemap_agx_white(), 2.f, 1024.f);
+                    float       agx_white    = llclamp(tonemap_agx_white(), 2.f, tonemap_white_limit);
 
                     // Calculate allenwp tonemapping curve parameters on the CPU to improve shader performance.
                     // Source and details: https://allenwp.com/blog/2025/05/29/allenwp-tonemapping-curve/

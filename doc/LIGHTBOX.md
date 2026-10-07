@@ -1356,11 +1356,16 @@ LLSD holds: `1e39` is a number in LLSD and an infinity by the time
 `convert_from_llsd<F32>` has cast it, which the first fuzz run of the reader
 found; `S32` and `U32` take the same, whole and in range, as an Integer;
 `Boolean` takes a Boolean, 0 or 1 as an Integer or a Real, or the words
-`true`/`false`; `String` takes well-formed UTF-8 without control characters,
-and for `RenderColorGradeLUT` cuts it to a bare file name with one of
-`colorLutExtensions()` — the renderer joins that name to the LUT folder, so a
-path in it would read any file on the disk — and refuses the stems older
-Windows opens as devices whatever the folder (`CON`, `COM1`…); `Vector3` and
+`true`/`false`; `String` takes well-formed UTF-8 that prints
+(`LLStringUtil::containsNonprintable` says what does not), and for
+`RenderColorGradeLUT` either nothing or a bare file name with one of
+`colorLutExtensions()` — a path is cut to its last part, since the renderer
+joins the name to the LUT folder and a path in it would read any file on the
+disk, and a name that is no LUT's at all (the wrong kind of file, or a stem
+Windows opens as a device whatever the folder and whatever follows its first
+dot: `CON`, `NUL.tar`, `COM¹`…, `ALLookFormat::isWindowsDeviceName`) is
+refused rather than quietly made into no LUT, so that it is counted;
+`Vector3` and
 `Color3` take three numbers finite as floats, or four with the last ignored (an
 older colour picker wrote `[r, g, b, a]` into Color3 settings); `LLSD` takes a
 tone curve as `ALToneCurveSet::pointsFromLLSD` reads one, and nothing else.
@@ -1383,11 +1388,14 @@ here; a setting that controls *work* rather than appearance
 the renderer where it is read, which protects Debug Settings and hand-edited
 files as well. `RenderLensFlareGhostCount` and `RenderCrossFilterPoints`
 already were. So, since the security sweep, are the values whose *math* an
-absurd number breaks: the exposure range, compensation and speeds (an EV past
-the half-float history is stored as an infinity the history never leaves,
-however the settings are mended — `exposureF.glsl` starts over from the
-target when it reads one), and the tonemap whites and AgX contrast (inf / inf
-is a NaN frame). Every other whitelisted number was traced to a plain uniform
+absurd number breaks: the exposure range, compensation and speeds (the
+exposure map is a half float whose red channel is the scale 2^-EV, so the
+range is held to ±15 EV — 2^16 is already past the largest half float — and
+`exposureF.glsl` starts over from the target where the history it reads is an
+infinity or a NaN, since mixing from one never comes back; the EV itself is
+not clamped after the mix, so a narrowed range is reached at the adaptation's
+pace rather than in a jump), and the tonemap whites and AgX contrast (inf /
+inf is a NaN frame; `tonemap_white_limit` is the one bound). Every other whitelisted number was traced to a plain uniform
 or bounded math; `allookformat_test` test 19 feeds the reader mutated Looks
 and the deepest nesting a notecard can hold.
 
@@ -1411,9 +1419,10 @@ the Lightbox, or pressing **Apply Look** / **Add to Looks** on the notice line
 the notecard window shows for one, reads it back. Three files divide the work
 so that the part fed text from strangers can be tested without the viewer:
 
-- `allookformat.{h,cpp}` is the text. LLSD XML (`toPrettyXML`, with a static
-  `<!-- -->` note put under the declaration, exactly as Script Studio's
-  snippet notecards do it) holding one reserved key, `@AlchemyLook` — `@` can
+- `allookformat.{h,cpp}` is the text. LLSD XML (`toPrettyXML`, under a static
+  `<!-- -->` note — the formatter writes no XML declaration, so the note comes
+  first, and the reader starts at the first `<llsd` whatever stands above it)
+  holding one reserved key, `@AlchemyLook` — `@` can
   never begin a setting's name, and sorts first, so the provenance (Format,
   Name, Author, Viewer, Date) is written under the note — and then every
   whitelisted setting as `{Type, Value}`. **Not** as a Look file: a Look file
@@ -1426,11 +1435,15 @@ so that the part fed text from strangers can be tested without the viewer:
   cleans every name, decoding it a character at a time (`utf8str_decode_at`)
   so that what is kept is well-formed UTF-8: control characters, `|` (which an
   inventory name may not hold), the U+100000+ characters the notecard editor
-  shows as embedded items, the bidi and zero-width format characters (a
-  right-to-left override could make one Look's name read as another's), and
-  anything malformed come out, and a name is cut on a character boundary to
-  63 bytes — `DB_INV_ITEM_NAME_STR_LEN`, and also what keeps `LLURI::escape`
-  of a CJK name inside a file system's path limit. Well-formed matters more
+  shows as embedded items, the bidi overrides, embeddings and isolates (one
+  could make one Look's name read as another's) and the zero-width space —
+  the joiner, the non-joiner and the bidi marks stay, being load-bearing in
+  the scripts and emoji that use them — and anything malformed come out, and
+  a name is cut on a character boundary to 63 bytes and trimmed again after
+  the cut — `DB_INV_ITEM_NAME_STR_LEN`, and also what keeps `LLURI::escape`
+  of a CJK name inside a file system's path limit. A name Windows would open
+  as a device (`NUL`, `COM1`, `CON.anything`) is no name at all, since a Look
+  is a file called after it (`isWindowsDeviceName`). Well-formed matters more
   than it looks: the applied Look's name is written into `settings.xml` as
   `PresetLooksActive`, and a surrogate in it — which a character reference in
   the XML could spell, until `LLSDXMLParser` was made to refuse those — would
@@ -1449,15 +1462,25 @@ so that the part fed text from strangers can be tested without the viewer:
   the Look's own, else the notecard's with the `Lightbox Look: ` prefix taken
   off, else "Shared Look"; a name in use gets ` (2)`, ` (3)`…, **never
   overwriting a different Look**, and a name whose Look is identical is simply
-  found — and writes it through `LLPresetsManager::saveSharedLook`, which
-  normalises it to a Look file like any other (live `Comment`, `Persist`,
-  `Type`), holding only the values that passed. Revert, Save and the `*`
+  found — names matched without regard to case, as the file systems of
+  Windows and macOS match them, and the spelling on disk kept, with the Looks
+  folder read once for the whole search — and writes it through
+  `LLPresetsManager::saveSharedLook`, which normalises it to a Look file like
+  any other (live `Comment`, `Persist`, `Type`), holding the values that
+  passed and each setting's own default where a value was refused, so that
+  the file stays the full snapshot a saved Look is. Preset files are written
+  beside themselves and renamed into place, so a disk that fills halfway
+  leaves the old file rather than a short one. Revert, Save and the `*`
   then work for an imported Look exactly as for one saved here.
 - The Lightbox applies. `importSharedLookFromText` opens the floater if need
   be and calls `applyLookAsOneUndoStep` (what choosing a Look and Revert call
   too), so the apply is one step called "Imported Look: …". A drop reads
   first and applies only if the window is still there; closed in between, the
-  Look joins the list without being put on.
+  Look joins the list without being put on. The toast says what actually
+  happened — applied and new, applied and already here, added, or already
+  here and left alone (also what an apply that failed comes to) — and the
+  notecard window asks once per window: a reload for a save heard from
+  elsewhere does not bring the offer back once it has been answered.
 
 Rules that fall out of this:
 
@@ -1467,7 +1490,7 @@ Rules that fall out of this:
   only shows the offer; the click is the consent.
 - **The author line is plain text.** Show it as information, never as
   verified; the item's creator is who actually shared it.
-- **The toasts do not log to chat.** The four `notifytip`s carry the Look's
+- **The toasts do not log to chat.** The six `notifytip`s carry the Look's
   name and the LUT's, and nearby chat parses URLs where a toast does not: a
   Look named `secondlife:///app/…` would have been a clickable line in the
   system's voice. `log_to_chat="false"` on each.

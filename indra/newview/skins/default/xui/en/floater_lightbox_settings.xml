@@ -243,7 +243,7 @@
 			<button.commit_callback
 			 function="LightBox.LookRevert" />
 		</button>
-		<!-- Set apart from the four above: those act on the Look, these on the
+		<!-- Set apart from the five above: those act on the Look, these on the
 		     grade's own history, and the gap is the only thing that says so. -->
 		<button
 		 follows="top|right"
