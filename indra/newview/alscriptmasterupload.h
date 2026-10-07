@@ -59,10 +59,10 @@ public:
     static void start(const ALMasterLink& link, ALMasterPlan::Send kind);
 
     // What a send would find, nothing sent: the master read and expanded as
-    // it would go up, and the world's text read and hashed beside it,
-    // whether or not it moved. Nothing is said, and the link is left as it
-    // is -- it need not be one yet: a file proposed for an item is probed
-    // through a link made up for it.
+    // it would go up, and, where `world`, the world's text read and hashed
+    // beside it, whether or not it moved. Nothing is said, and the link is
+    // left as it is -- it need not be one yet: a file proposed for an item
+    // is probed through a link made up for it.
     struct Probe
     {
         ALScriptRef ref;
@@ -84,7 +84,7 @@ public:
         std::vector<ALScriptDiagnostic> preprocessed;
     };
     typedef std::function<void(const Probe&)> probed_t;
-    static void probe(const ALMasterLink& link, probed_t done);
+    static void probe(const ALMasterLink& link, probed_t done, bool world = true);
 
     ALScriptMasterUpload(const ALMasterLink& link, ALMasterPlan::Send kind);
 
@@ -116,6 +116,8 @@ private:
     std::string        mWorldText;
     bool               mKeptTheirs = false;
     bool               mWorldRead  = false;
-    // Told what was found, where this is a probe and sends nothing.
+    // Told what was found, where this is a probe and sends nothing; and
+    // whether it reads the world's text.
     probed_t           mProbed;
+    bool               mProbeWorld = true;
 };

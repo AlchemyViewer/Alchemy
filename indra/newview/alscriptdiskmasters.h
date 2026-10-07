@@ -27,15 +27,21 @@
 #include "aldiskincludes.h"
 #include "almasterlinks.h"
 #include "almasterplan.h"
+#include "almasterqueue.h"
 #include "alscripttypes.h"
 #include "llsingleton.h"
 
 #include <boost/signals2.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
+
+class ALScriptMasterFanOut;
+class ALScriptMasterToasts;
+class ALScriptMasterWatch;
 
 // The scripts in the world, the agent's own inventory's and its objects',
 // whose master is a file on disk: the file is what the script is, and
@@ -46,8 +52,18 @@
 // says makes one. Each send is ALScriptMasterUpload's: the file read and
 // expanded as a file on disk is, the world asked what it holds first, and
 // what the plan says done (ALMasterPlan) -- a save of the master always
-// goes up, keeping first what the world had where it moved. What came of
-// each send is told to whoever listens: every studio window's Output.
+// goes up, keeping first what the world had where it moved. Four go at a
+// time, and one at a time for each script (ALMasterQueue).
+//
+// Links are live while the agent is logged in, whether or not a studio
+// window is open: the masters and the files they include are watched for
+// saves made outside the studio (ALScriptMasterWatch, while
+// `ALScriptMastersEnabled`), a master's save sending its scripts and an
+// include's sending again those whose last expansion read it
+// (ALScriptMasterFanOut). What came of each send is told to whoever
+// listens -- every studio window's Output, kept for the window opened
+// next where there is none -- and, with no window in sight, the failures
+// and conflicts said in a toast (ALScriptMasterToasts).
 class ALScriptDiskMasters : public LLSingleton<ALScriptDiskMasters>
 {
     LLSINGLETON(ALScriptDiskMasters);
@@ -98,6 +114,10 @@ public:
     typedef boost::signals2::signal<void()> changed_signal_t;
     boost::signals2::connection onChanged(const changed_signal_t::slot_type& slot) { return mChanged.connect(slot); }
 
+    // The links read and watched, once the agent is in the world; again for
+    // another account.
+    void start();
+
     // The link of a script, and every script a file masters; nothing before
     // the account is known.
     std::optional<ALMasterLink> linkOf(const ALScriptRef& ref);
@@ -107,12 +127,19 @@ public:
     // agent's own inventory -- in the order they were made.
     std::vector<ALMasterLink> all();
     std::vector<ALMasterLink> linksIn(const LLUUID& object);
+    // The links a file's save may send again: those whose last expansion
+    // read it, or missed an include (ALMasterLinks::affectedBy).
+    std::vector<ALMasterLink> affectedBy(const std::string& include);
     // A link made, or one replaced; and one let go of. Written out at once.
     void link(ALMasterLink link);
     void unlink(const ALScriptRef& ref);
+    // Scripts not sent when they might have been, waiting to be sent by
+    // hand.
+    void markPending(const std::vector<ALScriptRef>& refs);
 
-    // A master written by the studio: each script it masters sent, as a
-    // save of the master is. Nothing for a file that masters nothing.
+    // A file written by the studio: no outside save for the watch, each
+    // script it masters sent as a save of the master is, and the scripts
+    // that include it sent again.
     void wrote(const std::string& path);
     // A script sent from its master now: as a save of it is, or as the
     // studio's own send is, which a change in the world holds.
@@ -121,6 +148,9 @@ public:
     // What a send found, the link as it stands after it: called by
     // ALScriptMasterUpload as each one ends.
     void finished(const Outcome& outcome, const std::optional<ALMasterLink>& updated);
+    // What was said with no studio window to hear it, for the window opened
+    // next to list; given once.
+    std::vector<Outcome> takeUnheard();
 
     // The folders a script on disk may read from, as its includes and
     // requires do -- the include folders, what a configuration on disk
@@ -141,16 +171,34 @@ private:
     ALMasterLinks* links();
     void           save();
     void           changed();
+    // What is watched, as the links stand now.
+    void           rewatch();
     // A save of a linked script heard from elsewhere.
     void heardSaved(const ALScriptSaved& saved);
+    // Saves heard by the watch, once their burst went quiet.
+    void released(const std::vector<std::string>& masters, const std::vector<std::string>& includes);
+    // An outcome told: to the windows listening, or, with none, to the
+    // toasts and kept.
+    void tell(const Outcome& outcome);
+    // Whether a studio window is open where it can be seen.
+    static bool studioInSight();
+    // The sends whose turn it is, started; and a script forgotten once
+    // nothing is under way or waiting for it.
+    void startTurns(std::vector<std::pair<std::string, ALMasterPlan::Send>> turns);
+    void forgetQueued(const std::string& id);
 
     std::string                        mFor;
     ALMasterLinks                      mLinks;
     boost::signals2::scoped_connection mSavedConnection;
+    boost::signals2::scoped_connection mEnabledConnection;
     outcome_signal_t                   mOutcome;
     changed_signal_t                   mChanged;
-    // The scripts a send is on its way to, by their id, and whether another
-    // is asked for after it, of the kind asked last: one at a time each,
-    // the newest text going up last.
-    boost::unordered_flat_map<std::string, std::optional<ALMasterPlan::Send>> mSending;
+    // The sends under way and waiting, by the script's id, and the scripts
+    // so named.
+    ALMasterQueue                                                             mQueue;
+    boost::unordered_flat_map<std::string, ALScriptRef, ll::string_hash, std::equal_to<>> mQueued;
+    std::unique_ptr<ALScriptMasterWatch>                                      mWatch;
+    std::unique_ptr<ALScriptMasterFanOut>                                     mFanOut;
+    std::unique_ptr<ALScriptMasterToasts>                                     mToasts;
+    std::vector<Outcome>                                                      mUnheard;
 };

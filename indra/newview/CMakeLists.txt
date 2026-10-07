@@ -198,7 +198,10 @@ if(AL_BUILD_VIEWER)
     alpanelscriptaliases.cpp
     alpanelscriptkeymap.cpp
     alscriptlookup.cpp
+    alscriptmasterfanout.cpp
+    alscriptmastertoasts.cpp
     alscriptmasterupload.cpp
+    alscriptmasterwatch.cpp
     alscriptobjectcheck.cpp
     alscriptrecompile.cpp
     alscriptnavigation.cpp
@@ -1088,7 +1091,10 @@ if(AL_BUILD_VIEWER)
     alscriptstudioplaces.h
     alscriptstudiohistory.h
     alscriptstudiomerging.h
+    alscriptmasterfanout.h
+    alscriptmastertoasts.h
     alscriptmasterupload.h
+    alscriptmasterwatch.h
     alscriptstudiomasters.h
     alscriptstudiorecovery.h
     alscriptstudioselections.h

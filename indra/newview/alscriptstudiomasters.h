@@ -104,6 +104,9 @@ public:
     // One of the offers about a tab, as its link in Output or its notice
     // does it.
     void offer(Doc& doc, const std::string& action);
+    // What came of sends while no window was there to hear it, said now
+    // the window's panes are built.
+    void sayUnheard();
 
 private:
     void linkTo(Doc& doc, const std::string& path, ALMasterLink::Made made);

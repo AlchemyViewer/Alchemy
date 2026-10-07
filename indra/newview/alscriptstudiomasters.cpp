@@ -250,14 +250,27 @@ void ALScriptStudioMasters::loaded(Doc& doc)
 
 void ALScriptStudioMasters::fileSaved(Doc& doc)
 {
-    if (!mastersAny(&doc))
+    if (doc.file.empty())
     {
         return;
     }
-    LLStringUtil::format_map_t args;
-    args["[NAME]"] = doc.name;
-    mServices.setStatus(mServices.counted("MasterSending", static_cast<S32>(ALScriptDiskMasters::instance().mastering(doc.file).size()), args));
+    if (mastersAny(&doc))
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc.name;
+        mServices.setStatus(mServices.counted("MasterSending", static_cast<S32>(ALScriptDiskMasters::instance().mastering(doc.file).size()), args));
+    }
+    // What it masters sent, and the scripts that include it sent again --
+    // those no tab holds among them -- whether it masters anything or not.
     ALScriptDiskMasters::instance().wrote(doc.file);
+}
+
+void ALScriptStudioMasters::sayUnheard()
+{
+    for (const ALScriptDiskMasters::Outcome& outcome : ALScriptDiskMasters::instance().takeUnheard())
+    {
+        heard(outcome);
+    }
 }
 
 void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
@@ -378,7 +391,15 @@ void ALScriptStudioMasters::heard(const ALScriptDiskMasters::Outcome& outcome)
             mServices.report(text, !compiled, tab);
             return;
         }
-        case What::Failed: said("MasterSendFailed", true, { "master_send" }); return;
+        case What::Failed:
+            // Not expanded: why, in the master's tab.
+            if (tab && !outcome.preprocessed.empty())
+            {
+                tab->problems = Doc::compiledOf(outcome.preprocessed, nullptr, 0);
+                mAnalysis.refreshProblems(*tab);
+            }
+            said("MasterSendFailed", true, { "master_send" });
+            return;
         case What::Skipped: said("MasterSkipped", false); return;
         case What::Held: said("MasterHeld", true, { "master_send", "master_compare", "master_unlink" }); return;
         case What::Differing:

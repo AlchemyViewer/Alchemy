@@ -90,8 +90,10 @@ public:
     bool check();
     // What is there now taken as seen: a write of the owner's own.
     void seen();
-    // Whether the file was there at the last look, or as last seen.
-    bool there() const { return mLooked.exists; }
+    // Whether the file was there at the last look, or as last seen; and
+    // what that look found.
+    bool               there() const { return mLooked.exists; }
+    const ALFileStamp& stamp() const { return mLooked; }
 
 private:
     class Watcher;

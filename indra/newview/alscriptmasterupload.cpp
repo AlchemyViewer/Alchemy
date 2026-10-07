@@ -60,10 +60,11 @@ void ALScriptMasterUpload::start(const ALMasterLink& link, ALMasterPlan::Send ki
 }
 
 // static
-void ALScriptMasterUpload::probe(const ALMasterLink& link, probed_t done)
+void ALScriptMasterUpload::probe(const ALMasterLink& link, probed_t done, bool world)
 {
     std::shared_ptr<ALScriptMasterUpload> probing = std::make_shared<ALScriptMasterUpload>(link, ALMasterPlan::Send::Derived);
     probing->mProbed                              = std::move(done);
+    probing->mProbeWorld                          = world;
     probing->read();
 }
 
@@ -174,9 +175,10 @@ void ALScriptMasterUpload::worldHas(const LLUUID& asset)
     // Moved in the world since the last send from the master: what it holds
     // read, to tell a real change from the same text gone up another way.
     mWorldMoved = asset.notNull() && mLink.base.notNull() && asset != mLink.base;
-    // A probe reads it whatever the base: what the world holds is what it
-    // is asked.
-    if (!mWorldMoved && !(mProbed && asset.notNull()))
+    // A probe asked of it reads it whatever the base: what the world holds
+    // is what it is asked. One that is not reads it never.
+    const bool read = mProbed ? mProbeWorld && asset.notNull() : mWorldMoved;
+    if (!read)
     {
         decide();
         return;
@@ -212,6 +214,16 @@ void ALScriptMasterUpload::decide()
         found.worldMoved   = mWorldMoved;
         found.preprocessed = mPrepared.errors;
         mProbed(found);
+        return;
+    }
+    // A send of the studio's own -- an include's users, Send from Files --
+    // never puts up a script its preprocessor could not expand, an include
+    // gone in a checkout say: what the world has is better than that. A
+    // save of the master goes up all the same, as every save does, and says
+    // what was found.
+    if (mKind == ALMasterPlan::Send::Derived && !mPrepared.errors.empty())
+    {
+        end(Outcome::What::Failed, LLTrans::getString("ScriptMasterExpandFailed"));
         return;
     }
     switch (ALMasterPlan::decide(mKind, mWorldMoved, mWorldSame, unchanged, skip_unchanged))
@@ -287,6 +299,8 @@ void ALScriptMasterUpload::uploaded(const ALScriptCompileResult& result)
     mUpdated.stamp  = mStamp.time;
     mUpdated.target = mTarget;
     mUpdated.state  = ALMasterLink::State::Active;
+    // An include it could not find may be any file saved from here on.
+    mUpdated.missed = !mPrepared.errors.empty();
     mUpdated.uses.clear();
     if (mPrepared.map)
     {

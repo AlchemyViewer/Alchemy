@@ -673,6 +673,8 @@ bool ALFloaterScriptStudio::postBuild()
     listenToSettings();
     listenToWorld();
     openAsLeft();
+    // What files on disk sent while no window was there to say it.
+    mMasters.sayUnheard();
     return true;
 }
 
@@ -4863,8 +4865,9 @@ void ALFloaterScriptStudio::askReload(const Doc& doc, std::function<void(bool re
     });
 }
 
-void ALFloaterScriptStudio::fileWritten(const std::string& path)
+void ALFloaterScriptStudio::fileWritten(Doc& doc)
 {
+    const std::string& path = doc.file;
     for (bool lua : { false, true })
     {
         if (path == ALScriptSnippets::path(lua))
@@ -4876,6 +4879,12 @@ void ALFloaterScriptStudio::fileWritten(const std::string& path)
     {
         ALScriptStudioVimrc::instance().check(true);
     }
+    // The scripts it is the master of sent, and those that include it sent
+    // again: a write of the studio's own, which the masters' watch takes
+    // for no save from outside. A file read back in from disk -- changed
+    // outside, or reverted -- is settled and not written: what it masters is
+    // the watch's to send.
+    mMasters.fileSaved(doc);
 }
 
 void ALFloaterScriptStudio::becomeFile(Doc& doc, const std::string& path)
@@ -4901,8 +4910,6 @@ void ALFloaterScriptStudio::fileSettled(Doc& doc)
     doc.editor->resetDirty();
     mWeighing.keepSaved(doc);
     mRecovery.keep(doc);
-    // The scripts it is the master of sent.
-    mMasters.fileSaved(doc);
     // The scripts that include it see the file as it is now: those whose
     // last expansion read it, and those that one may have been wanted by
     // -- an expansion with a problem, an include not found say -- not

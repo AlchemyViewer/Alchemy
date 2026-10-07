@@ -30,14 +30,19 @@
 #include "allinelabel.h"
 #include "alluauconfig.h"
 #include "alscriptenvelope.h"
+#include "alscriptmasterfanout.h"
+#include "alscriptmastertoasts.h"
 #include "alscriptmasterupload.h"
+#include "alscriptmasterwatch.h"
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
 #include "aluploadheader.h"
 #include "lldir.h"
+#include "llfloaterreg.h"
 #include "llinventorymodel.h"
 #include "llsdserialize.h"
+#include "llviewercontrol.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
@@ -47,6 +52,9 @@
 namespace
 {
     constexpr const char* INDEX_FILE = "script_masters.llsd";
+    // How many outcomes are kept for a window to list that had none to hear
+    // them: the latest.
+    constexpr size_t      UNHEARD    = 50;
 
     // A path as the links keep it: the file's own, links followed.
     std::string canonical(const std::string& path)
@@ -69,6 +77,7 @@ namespace
 }
 
 ALScriptDiskMasters::ALScriptDiskMasters()
+: mFanOut(std::make_unique<ALScriptMasterFanOut>()), mToasts(std::make_unique<ALScriptMasterToasts>())
 {
     mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptSaved& saved) { heardSaved(saved); });
 }
@@ -129,7 +138,39 @@ void ALScriptDiskMasters::save()
 void ALScriptDiskMasters::changed()
 {
     save();
+    rewatch();
     mChanged();
+}
+
+void ALScriptDiskMasters::start()
+{
+    if (!mEnabledConnection.connected())
+    {
+        if (LLControlVariable* enabled = gSavedSettings.getControl("ALScriptMastersEnabled"))
+        {
+            mEnabledConnection = enabled->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) { rewatch(); });
+        }
+    }
+    links();
+    rewatch();
+}
+
+void ALScriptDiskMasters::rewatch()
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "ALScriptMastersEnabled", true);
+    ALMasterLinks*               links_now = mFor.empty() ? nullptr : &mLinks;
+    if (!enabled || !links_now || links_now->empty())
+    {
+        // Nothing to watch: no thread asked to look at anything.
+        mWatch.reset();
+        return;
+    }
+    if (!mWatch)
+    {
+        mWatch = std::make_unique<ALScriptMasterWatch>(
+            [this](const std::vector<std::string>& masters, const std::vector<std::string>& includes) { released(masters, includes); });
+    }
+    mWatch->watch(links_now->watched());
 }
 
 std::optional<ALMasterLink> ALScriptDiskMasters::linkOf(const ALScriptRef& ref)
@@ -158,6 +199,19 @@ std::vector<ALMasterLink> ALScriptDiskMasters::all()
 {
     ALMasterLinks* links_now = links();
     return links_now ? links_now->all() : std::vector<ALMasterLink>();
+}
+
+std::vector<ALMasterLink> ALScriptDiskMasters::affectedBy(const std::string& include)
+{
+    std::vector<ALMasterLink> out;
+    if (ALMasterLinks* links_now = links(); links_now && !links_now->empty())
+    {
+        for (const ALMasterLink* one : links_now->affectedBy(ALScriptModules::identity("disk:" + include)))
+        {
+            out.push_back(*one);
+        }
+    }
+    return out;
 }
 
 std::vector<ALMasterLink> ALScriptDiskMasters::linksIn(const LLUUID& object)
@@ -190,16 +244,63 @@ void ALScriptDiskMasters::unlink(const ALScriptRef& ref)
 {
     if (ALMasterLinks* all = links(); all && all->remove(ref.object, ref.item))
     {
+        // One on its way goes on, and finds no link to move on as it ends.
+        mQueue.drop(ref.id());
+        changed();
+    }
+}
+
+void ALScriptDiskMasters::markPending(const std::vector<ALScriptRef>& refs)
+{
+    ALMasterLinks* all = links();
+    bool           any = false;
+    for (const ALScriptRef& ref : refs)
+    {
+        if (ALMasterLink* link = all ? all->find(ref.object, ref.item) : nullptr)
+        {
+            link->state = ALMasterLink::State::Pending;
+            any         = true;
+        }
+    }
+    if (any)
+    {
         changed();
     }
 }
 
 void ALScriptDiskMasters::wrote(const std::string& path)
 {
-    for (const ALMasterLink& one : mastering(path))
+    if (links() == nullptr || mLinks.empty())
+    {
+        return;
+    }
+    // Where the watch and the links have it, its links followed: a write
+    // through a link to it seen as the write it is.
+    const std::string file = canonical(path);
+    if (mWatch)
+    {
+        mWatch->seen(file);
+    }
+    for (const ALMasterLink& one : mastering(file))
     {
         send(ALScriptRef(one.object, one.item), ALMasterPlan::Send::Direct);
     }
+    mFanOut->changed({ file }, { file });
+}
+
+void ALScriptDiskMasters::released(const std::vector<std::string>& masters, const std::vector<std::string>& includes)
+{
+    // Saved outside, the burst over: a master's scripts sent as its save,
+    // and the scripts that include what else was saved sent again, but for
+    // those just sent.
+    for (const std::string& master : masters)
+    {
+        for (const ALMasterLink& one : mastering(master))
+        {
+            send(ALScriptRef(one.object, one.item), ALMasterPlan::Send::Direct);
+        }
+    }
+    mFanOut->changed(includes, masters);
 }
 
 void ALScriptDiskMasters::send(const ALScriptRef& ref, ALMasterPlan::Send kind)
@@ -212,15 +313,14 @@ void ALScriptDiskMasters::send(const ALScriptRef& ref, ALMasterPlan::Send kind)
     // One at a time for a script, one more after it at most: a save of the
     // master asked while one is on its way goes up after it, with the
     // text the file has then. A save of the master outranks the studio's
-    // own send asked beside it.
+    // own send asked beside it. Four at a time in all, the rest waiting
+    // their turn.
     const std::string id = ref.id();
-    if (auto underway = mSending.find(id); underway != mSending.end())
+    mQueued[id]          = ref;
+    if (mQueue.ask(id, kind))
     {
-        underway->second = underway->second == ALMasterPlan::Send::Direct ? ALMasterPlan::Send::Direct : kind;
-        return;
+        ALScriptMasterUpload::start(*link, kind);
     }
-    mSending.emplace(id, std::nullopt);
-    ALScriptMasterUpload::start(*link, kind);
 }
 
 void ALScriptDiskMasters::finished(const Outcome& outcome, const std::optional<ALMasterLink>& updated)
@@ -234,17 +334,81 @@ void ALScriptDiskMasters::finished(const Outcome& outcome, const std::optional<A
             changed();
         }
     }
-    mOutcome(outcome);
-    const std::string id = outcome.ref.id();
-    if (auto underway = mSending.find(id); underway != mSending.end())
+    tell(outcome);
+    startTurns(mQueue.finished(outcome.ref.id()));
+    forgetQueued(outcome.ref.id());
+}
+
+void ALScriptDiskMasters::startTurns(std::vector<std::pair<std::string, ALMasterPlan::Send>> turns)
+{
+    // Each as its link stands now: one let go of while it waited is passed
+    // over, its turn handed on at once.
+    for (size_t i = 0; i < turns.size(); ++i)
     {
-        const std::optional<ALMasterPlan::Send> again = underway->second;
-        mSending.erase(underway);
-        if (again)
+        const auto [id, kind] = turns[i];
+        const auto ref        = mQueued.find(id);
+        const std::optional<ALMasterLink> link = ref != mQueued.end() ? linkOf(ref->second) : std::nullopt;
+        if (link)
         {
-            send(outcome.ref, *again);
+            ALScriptMasterUpload::start(*link, kind);
+            continue;
+        }
+        std::vector<std::pair<std::string, ALMasterPlan::Send>> next = mQueue.finished(id);
+        forgetQueued(id);
+        turns.insert(turns.end(), next.begin(), next.end());
+    }
+}
+
+void ALScriptDiskMasters::forgetQueued(const std::string& id)
+{
+    if (!mQueue.underway(id) && !mQueue.waiting(id))
+    {
+        mQueued.erase(id);
+    }
+}
+
+void ALScriptDiskMasters::tell(const Outcome& outcome)
+{
+    // Every studio window keeps it in its Output, a hidden one too -- the
+    // main window's X only hides it -- and, with none at all, it is kept
+    // for the window opened next.
+    if (!mOutcome.empty())
+    {
+        mOutcome(outcome);
+    }
+    else if (ALScriptMasterToasts::worthSaying(outcome))
+    {
+        mUnheard.push_back(outcome);
+        if (mUnheard.size() > UNHEARD)
+        {
+            mUnheard.erase(mUnheard.begin());
         }
     }
+    // With none in sight, a toast for what is worth one.
+    if (!studioInSight())
+    {
+        mToasts->heard(outcome);
+    }
+}
+
+// static
+bool ALScriptDiskMasters::studioInSight()
+{
+    for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
+    {
+        if (floater && floater->isInVisibleChain() && !floater->isMinimized())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<ALScriptDiskMasters::Outcome> ALScriptDiskMasters::takeUnheard()
+{
+    std::vector<Outcome> out;
+    out.swap(mUnheard);
+    return out;
 }
 
 void ALScriptDiskMasters::heardSaved(const ALScriptSaved& saved)
@@ -278,7 +442,7 @@ void ALScriptDiskMasters::heardSaved(const ALScriptSaved& saved)
     outcome.itemName = link->itemName;
     outcome.by       = saved.sender.origin;
     changed();
-    mOutcome(outcome);
+    tell(outcome);
 }
 
 // static

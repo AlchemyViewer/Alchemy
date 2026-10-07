@@ -2144,6 +2144,26 @@ Stop [COUNT] scripts? They stay stopped until you start them again.
   </notification>
 
   <notification
+   icon="notifytip.tga"
+   name="ScriptStudioMasters"
+   log_to_chat="false"
+   type="notifytip">
+[MESSAGE]
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioMastersSendUsers"
+   type="alertmodal">
+[FILES] changed on disk. That changes [COUNT] scripts in the world linked to files, [PLACES]. Send them now? Scripts not sent wait for Send from Files.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Don't Send"
+     yestext="Send All"/>
+  </notification>
+
+  <notification
    icon="alertmodal.tga"
    name="ScriptStudioFileChanged"
    type="alertmodal">

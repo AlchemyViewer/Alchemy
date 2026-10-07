@@ -95,7 +95,7 @@ namespace
             doc.editor->resetDirty();
         }
         void      stopped(Doc& doc) override { stops.push_back(doc.id); }
-        void      fileWritten(const std::string& path) override { written.push_back(path); }
+        void      fileWritten(Doc& doc) override { written.push_back(doc.file); }
         void      reachChanged() override { ++reachChanges; }
         void      becomeFile(Doc& doc, const std::string& path) override
         {
@@ -323,6 +323,9 @@ namespace tut
         write(f.file, "two");
         unit.changedOutside(f.id, f.file);
         ensure("clean: taken, settled, said", studio.taken == Names{ "two" } && studio.settled == Names{ f.id } && !said().failure);
+        // Read in, not written: what it masters is the masters' watch's to
+        // send, not the tab's.
+        ensure("not taken for a write of the studio's", studio.written.empty());
         unit.changedOutside(f.id, f.file);
         ensure("the same again: nothing", studio.taken.size() == 1);
 
@@ -399,6 +402,7 @@ namespace tut
         ensure("watched there", f.watch && f.watch->path() == in("g.luau"));
         ensure("noted, settled, checked", unit.recentFiles().front() == in("g.luau") && studio.settled.back() == f.id &&
                                                studio.checked.back() == f.id + " now");
+        ensure("told of as written", studio.written == Names{ in("g.luau") });
         f.editor->setText("changed");
         unit.chosenToSaveAs(f.id, { f.file });
         ensure("its own file again: a save", contents(f.file) == "changed" && studio.became.size() == 1);
