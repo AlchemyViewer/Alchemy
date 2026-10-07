@@ -45,7 +45,7 @@ runs:
           libegl1-mesa-dev libfribidi-dev libgbm-dev libgl1-mesa-dev libgl1-mesa-dri libgles2-mesa-dev \
           libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libibus-1.0-dev libjack-dev libltdl-dev \
           libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
-          libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
+          libthai-dev libtool libudev-dev libunwind-dev liburing-dev libwayland-dev \
           libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
           libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev mold \
           nasm ninja-build pkgconf rpm tar tex-common texinfo unzip zip

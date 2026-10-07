@@ -2134,6 +2134,12 @@ if(AL_BUILD_VIEWER)
   )
   add_dependencies(${AL_VIEWER_BINARY_NAME} copy_input_dependencies)
 
+  # The About floater names the LibVLC the VLC plugin was built with, where
+  # it was built; Linux plays media with GStreamer and has no VLC by default.
+  if(AL_BUILD_VLC_PLUGIN)
+    set_property(SOURCE llappviewer.cpp APPEND PROPERTY COMPILE_DEFINITIONS LL_LIBVLC=1)
+  endif()
+
   if(WINDOWS)
     target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE d3d11 dxgi)
 
@@ -2188,7 +2194,8 @@ if(AL_BUILD_VIEWER)
     # The bundle's localised strings carry the version.
     file(READ "${CMAKE_CURRENT_SOURCE_DIR}/English.lproj/InfoPlist.strings" infoplist_strings)
     string(
-      REPLACE "%%VERSION%%"
+      REPLACE
+      "%%VERSION%%"
       "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}"
       infoplist_strings
       "${infoplist_strings}"
@@ -2399,9 +2406,7 @@ ${settings_install}</map>
     VERBATIM
   )
   add_dependencies(symbols ${AL_VIEWER_BINARY_NAME})
-
 elseif(AL_BUILD_TESTS)
-
   # Create a dummy executable for test projects to generate against when viewer build is disabled
   add_executable(${AL_VIEWER_BINARY_NAME} cmake_dummy.cpp)
   target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE al::flags)

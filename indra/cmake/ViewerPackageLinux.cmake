@@ -13,7 +13,8 @@
 # tree carries itself. What the viewer loads by name at run time is not
 # linked and is listed here: EGL and OpenGL, which it cannot run without,
 # and recommended, what one desktop or another needs of Wayland, X11, sound
-# and input. NSS is listed too: dpkg-shlibdeps names only the libraries the
+# and input, and GStreamer, which plays media and the parcel's audio stream,
+# with the plugins for the formats most media is in. NSS is listed too: dpkg-shlibdeps names only the libraries the
 # building system has installed, and CEF links NSS where a build host may
 # have none.
 #
@@ -56,8 +57,9 @@ set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "libegl1, libopengl0, libnss3")
 set(
   CPACK_DEBIAN_PACKAGE_RECOMMENDS
-  "libwayland-client0, libwayland-cursor0, libwayland-egl1, libdecor-0-0, libxkbcommon0, libx11-6, libxext6, libxcursor1, libxfixes3, libxi6, libxrandr2, libxss1, libpulse0, libasound2t64 | libasound2, libudev1, xdg-utils"
+  "libwayland-client0, libwayland-cursor0, libwayland-egl1, libdecor-0-0, libxkbcommon0, libx11-6, libxext6, libxcursor1, libxfixes3, libxi6, libxrandr2, libxss1, libpulse0, libasound2t64 | libasound2, libudev1, xdg-utils, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-libav"
 )
+set(CPACK_DEBIAN_PACKAGE_SUGGESTS "gstreamer1.0-plugins-bad, gstreamer1.0-plugins-ugly")
 
 set(CPACK_RPM_PACKAGE_NAME "${AL_LINUX_PACKAGE}")
 set(CPACK_RPM_PACKAGE_LICENSE "LGPL-2.1-only")
@@ -79,8 +81,9 @@ set(CPACK_RPM_PACKAGE_AUTOREQ ON)
 set(CPACK_RPM_PACKAGE_REQUIRES "libEGL.so.1()(64bit), libOpenGL.so.0()(64bit)")
 set(
   CPACK_RPM_PACKAGE_RECOMMENDS
-  "libwayland-client.so.0()(64bit), libwayland-cursor.so.0()(64bit), libwayland-egl.so.1()(64bit), libdecor-0.so.0()(64bit), libxkbcommon.so.0()(64bit), libX11.so.6()(64bit), libXext.so.6()(64bit), libXcursor.so.1()(64bit), libXfixes.so.3()(64bit), libXi.so.6()(64bit), libXrandr.so.2()(64bit), libXss.so.1()(64bit), libpulse.so.0()(64bit), libasound.so.2()(64bit), libudev.so.1()(64bit), xdg-utils"
+  "libwayland-client.so.0()(64bit), libwayland-cursor.so.0()(64bit), libwayland-egl.so.1()(64bit), libdecor-0.so.0()(64bit), libxkbcommon.so.0()(64bit), libX11.so.6()(64bit), libXext.so.6()(64bit), libXcursor.so.1()(64bit), libXfixes.so.3()(64bit), libXi.so.6()(64bit), libXrandr.so.2()(64bit), libXss.so.1()(64bit), libpulse.so.0()(64bit), libasound.so.2()(64bit), libudev.so.1()(64bit), xdg-utils, libgstreamer-1.0.so.0()(64bit), libgstapp-1.0.so.0()(64bit), gstreamer1-plugins-base, gstreamer1-plugins-good, gstreamer1-plugin-libav"
 )
+set(CPACK_RPM_PACKAGE_SUGGESTS "gstreamer1-plugins-bad-free, gstreamer1-plugins-ugly-free")
 # The binaries were stripped before (ViewerStrip.cmake), with the symbol
 # table kept, and the symbols target holds their debug information: no
 # debuginfo package, no second strip, and no /usr/lib/.build-id links,

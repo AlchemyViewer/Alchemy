@@ -26,17 +26,29 @@
  * @endcond
  */
 
-#define FLIP_Y
+// The Linux media plugin: video and audio on prims and in the media browser,
+// and the parcel's audio stream. GStreamer is loaded at run time, so the
+// plugin starts without it and says so.
+//
+// playbin plays whatever it is given; its video goes to an appsink that asks
+// for BGRx at the size the viewer's texture is, so playbin's own converter
+// scales and converts it, and a frame is copied into the texture upside down
+// as the viewer wants it. A resize renegotiates. The appsink keeps only the
+// newest frame, and a frame is taken without waiting: an audio stream has
+// none, and the plugin must keep answering.
 
 #include "linden_common.h"
 
 #include "llgl.h"
 
 #include "llapr.h"
+#include "lltimer.h"
 #include "llplugininstance.h"
 #include "llpluginmessage.h"
 #include "llpluginmessageclasses.h"
 #include "media_plugin_base.h"
+
+#include <cstring>
 
 #define G_DISABLE_CAST_CHECKS
 extern "C" {
@@ -58,6 +70,11 @@ static inline void llgst_sample_unref( GstSample *aSample )
     llgst_mini_object_unref( GST_MINI_OBJECT_CAST( aSample ) );
 }
 
+static inline void llgst_tag_list_unref( GstTagList *aList )
+{
+    llgst_mini_object_unref( GST_MINI_OBJECT_CAST( aList ) );
+}
+
 //////////////////////////////////////////////////////////////////////////////
 //
 class MediaPluginGStreamer10 : public MediaPluginBase
@@ -75,55 +92,55 @@ public:
 
 private:
     std::string getVersion();
-    bool navigateTo( const std::string urlIn );
+    bool navigateTo( const std::string& url );
     bool seek( double time_sec );
-    bool setVolume( float volume );
+    bool setVolume( double volume );
 
-    // misc
     bool pause();
     bool stop();
-    bool play(double rate);
+    bool play();
+    bool setState(GstState state);
     bool getTimePos(double &sec_out);
+    bool getDuration(double &sec_out);
 
-    double MIN_LOOP_SEC = 1.0F;
-    U32 INTERNAL_TEXTURE_SIZE = 1024;
-
-    bool mIsLooping;
-
-    enum ECommand {
-        COMMAND_NONE,
-        COMMAND_STOP,
-        COMMAND_PLAY,
-        COMMAND_FAST_FORWARD,
-        COMMAND_FAST_REWIND,
-        COMMAND_PAUSE,
-        COMMAND_SEEK,
-    };
-    ECommand mCommand;
-
-private:
     bool unload();
     bool load();
 
-    bool update(int milliseconds);
-    void mouseDown( int x, int y );
-    void mouseUp( int x, int y );
-    void mouseMove( int x, int y );
+    void update();
+    void copyFrame(GstSample* sample);
+    void setVideoSize(int width, int height);
+    void updateTitle(const GstTagList* tags);
+
+    /*virtual*/ void setDirty(int left, int top, int right, int bottom);
+    void sendTimeUpdate();
 
     static bool mDoneInit;
 
     guint mBusWatchID;
 
-    float mVolume;
+    // The URL playing, for the browser messages the media system tracks.
+    std::string mURL;
+    std::string mTitle;
 
-    int mDepth;
-
-    // padded texture size we need to write into
-    int mTextureWidth;
-    int mTextureHeight;
+    double mVolume;
+    bool mIsLooping;
+    // What the viewer last asked for. Buffering pauses and resumes playbin
+    // under it, which is not the viewer's pause.
+    GstState mTargetState;
+    // A live source, which neither prerolls nor buffers to a level.
+    bool mIsLive;
+    bool mBuffering;
+    // Ended and not looping: a play starts again from the beginning.
+    bool mAtEnd;
 
     bool mSeekWanted;
     double mSeekDestination;
+
+    double mCurTime;
+    double mDuration;
+    // When the time was last asked of playbin, and last sent.
+    double mLastTimeQuery;
+    double mLastTimeUpdate;
 
     // Very GStreamer-specific
     GMainLoop *mPump; // event pump for this media
@@ -138,13 +155,28 @@ MediaPluginGStreamer10::MediaPluginGStreamer10( LLPluginInstance::sendMessageFun
                                                 void *host_user_data )
     : MediaPluginBase(host_send_func, host_user_data)
     , mBusWatchID ( 0 )
-    , mSeekWanted(false)
-    , mSeekDestination(0.0)
+    , mVolume ( 1.0 )
+    , mIsLooping ( false )
+    , mTargetState ( GST_STATE_NULL )
+    , mIsLive ( false )
+    , mBuffering ( false )
+    , mAtEnd ( false )
+    , mSeekWanted ( false )
+    , mSeekDestination ( 0.0 )
+    , mCurTime ( 0.0 )
+    , mDuration ( 0.0 )
+    , mLastTimeQuery ( 0.0 )
+    , mLastTimeUpdate ( 0.0 )
     , mPump ( nullptr )
     , mPlaybin ( nullptr )
     , mAppSink ( nullptr )
-    , mCommand ( COMMAND_NONE )
 {
+    mWidth = 0;
+    mHeight = 0;
+    mTextureWidth = 0;
+    mTextureHeight = 0;
+    mDepth = 4;
+    mPixels = nullptr;
 }
 
 gboolean MediaPluginGStreamer10::processGSTEvents(GstBus *bus, GstMessage *message)
@@ -156,16 +188,34 @@ gboolean MediaPluginGStreamer10::processGSTEvents(GstBus *bus, GstMessage *messa
     {
         case GST_MESSAGE_BUFFERING:
         {
-            // NEEDS GST 0.10.11+
-            if (llgst_message_parse_buffering)
+            // A network source fills its buffer before it plays, and again
+            // when it runs dry. A live one plays as it comes.
+            if (mIsLive || !llgst_message_parse_buffering)
+                break;
+
+            gint percent = 0;
+            llgst_message_parse_buffering(message, &percent);
+            if (percent < 100 && !mBuffering)
             {
-                gint percent = 0;
-                llgst_message_parse_buffering(message, &percent);
+                mBuffering = true;
+                if (mTargetState == GST_STATE_PLAYING)
+                    llgst_element_set_state(mPlaybin, GST_STATE_PAUSED);
+            }
+            else if (percent >= 100 && mBuffering)
+            {
+                mBuffering = false;
+                if (mTargetState == GST_STATE_PLAYING)
+                    llgst_element_set_state(mPlaybin, GST_STATE_PLAYING);
             }
             break;
         }
         case GST_MESSAGE_STATE_CHANGED:
         {
+            // Every element in the pipeline says when it changes state; the
+            // media's state is playbin's.
+            if (GST_MESSAGE_SRC(message) != GST_OBJECT(mPlaybin))
+                break;
+
             GstState old_state;
             GstState new_state;
             GstState pending_state;
@@ -176,19 +226,42 @@ gboolean MediaPluginGStreamer10::processGSTEvents(GstBus *bus, GstMessage *messa
 
             switch (new_state)
             {
-                case GST_STATE_VOID_PENDING:
-                    break;
-                case GST_STATE_NULL:
-                    break;
                 case GST_STATE_READY:
-                    setStatus(STATUS_LOADED);
+                    // Stopped, not ended, and not failed.
+                    if (!mAtEnd && mStatus != STATUS_ERROR)
+                        setStatus(STATUS_LOADED);
                     break;
                 case GST_STATE_PAUSED:
-                    setStatus(STATUS_PAUSED);
+                    // Paused at the end is done; paused to buffer is still
+                    // loading or playing, to the viewer.
+                    if (mAtEnd)
+                        break;
+                    if (mTargetState == GST_STATE_PAUSED)
+                        setStatus(STATUS_PAUSED);
+                    else if (mStatus != STATUS_PLAYING)
+                        setStatus(STATUS_LOADING);
                     break;
                 case GST_STATE_PLAYING:
                     setStatus(STATUS_PLAYING);
                     break;
+                default:
+                    break;
+            }
+            break;
+        }
+        case GST_MESSAGE_DURATION_CHANGED:
+            mDuration = 0.0;
+            getDuration(mDuration);
+            sendTimeUpdate();
+            break;
+        case GST_MESSAGE_TAG:
+        {
+            GstTagList* tags = nullptr;
+            llgst_message_parse_tag(message, &tags);
+            if (tags)
+            {
+                updateTitle(tags);
+                llgst_tag_list_unref(tags);
             }
             break;
         }
@@ -198,28 +271,17 @@ gboolean MediaPluginGStreamer10::processGSTEvents(GstBus *bus, GstMessage *messa
             gchar *debug = nullptr;
 
             llgst_message_parse_error (message, &err, &debug);
+            std::cerr << "GStreamer error: " << (err ? err->message : "(unknown)");
+            if (debug)
+                std::cerr << " (" << debug << ")";
+            std::cerr << std::endl;
             if (err)
                 llg_error_free (err);
             llg_free (debug);
 
-            mCommand = COMMAND_STOP;
-
+            mTargetState = GST_STATE_READY;
+            llgst_element_set_state(mPlaybin, GST_STATE_READY);
             setStatus(STATUS_ERROR);
-
-            break;
-        }
-        case GST_MESSAGE_INFO:
-        {
-            if (llgst_message_parse_info)
-            {
-                GError *err = nullptr;
-                gchar *debug = nullptr;
-
-                llgst_message_parse_info (message, &err, &debug);
-                if (err)
-                    llg_error_free (err);
-                llg_free (debug);
-            }
             break;
         }
         case GST_MESSAGE_WARNING:
@@ -229,37 +291,26 @@ gboolean MediaPluginGStreamer10::processGSTEvents(GstBus *bus, GstMessage *messa
 
             llgst_message_parse_warning (message, &err, &debug);
             if (err)
+            {
+                std::cerr << "GStreamer warning: " << err->message << std::endl;
                 llg_error_free (err);
+            }
             llg_free (debug);
-
             break;
         }
         case GST_MESSAGE_EOS:
-            /* end-of-stream */
-            if (mIsLooping)
+            if (mIsLooping && seek(0.0))
             {
-                double eos_pos_sec = 0.0F;
-                bool got_eos_position = getTimePos(eos_pos_sec);
-
-                if (got_eos_position && eos_pos_sec < MIN_LOOP_SEC)
-                {
-                    // if we know that the movie is really short, don't
-                    // loop it else it can easily become a time-hog
-                    // because of GStreamer spin-up overhead
-                    // inject a COMMAND_PAUSE
-                    mCommand = COMMAND_PAUSE;
-                }
-                else
-                {
-                    stop();
-                    play(1.0);
-                }
+                // Played again from the start, in place.
+                break;
             }
-            else // not a looping media
-            {
-                // inject a COMMAND_STOP
-                mCommand = COMMAND_STOP;
-            }
+            mAtEnd = true;
+            mTargetState = GST_STATE_PAUSED;
+            llgst_element_set_state(mPlaybin, GST_STATE_PAUSED);
+            if (getDuration(mDuration))
+                mCurTime = mDuration;
+            setStatus(STATUS_DONE);
+            sendTimeUpdate();
             break;
         default:
             /* unhandled message */
@@ -283,31 +334,53 @@ extern "C" {
     }
 } // extern "C"
 
-
-
-bool MediaPluginGStreamer10::navigateTo ( const std::string urlIn )
+bool MediaPluginGStreamer10::navigateTo( const std::string& url )
 {
     if (!mDoneInit)
         return false; // error
 
-    setStatus(STATUS_LOADING);
-
-    mSeekWanted = false;
-
-    if (nullptr == mPump ||  nullptr == mPlaybin)
+    if (nullptr == mPump || nullptr == mPlaybin)
     {
         setStatus(STATUS_ERROR);
         return false; // error
     }
 
-    llg_object_set (G_OBJECT (mPlaybin), "uri", urlIn.c_str(), nullptr);
+    mURL = url;
+    mTitle.clear();
+    mSeekWanted = false;
+    mAtEnd = false;
+    mBuffering = false;
+    mCurTime = 0.0;
+    mDuration = 0.0;
+
+    // The media system keeps its idea of the page from the browser messages,
+    // which the movie plugins have always sent too (MAINT-6528).
+    LLPluginMessage message_begin(LLPLUGIN_MESSAGE_CLASS_MEDIA_BROWSER, "navigate_begin");
+    message_begin.setValue("uri", mURL);
+    message_begin.setValueBoolean("history_back_available", false);
+    message_begin.setValueBoolean("history_forward_available", false);
+    sendMessage(message_begin);
+
+    setStatus(STATUS_LOADING);
+
+    llgst_element_set_state(mPlaybin, GST_STATE_READY);
+    llg_object_set (G_OBJECT (mPlaybin), "uri", mURL.c_str(), nullptr);
 
     // navigateTo implicitly plays, too.
-    play(1.0);
+    play();
+
+    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA_BROWSER, "location_changed");
+    message.setValue("uri", mURL);
+    sendMessage(message);
+
+    LLPluginMessage message_complete(LLPLUGIN_MESSAGE_CLASS_MEDIA_BROWSER, "navigate_complete");
+    message_complete.setValue("uri", mURL);
+    message_complete.setValueS32("result_code", 200);
+    message_complete.setValue("result_string", "OK");
+    sendMessage(message_complete);
 
     return true;
 }
-
 
 class GstSampleUnref
 {
@@ -321,162 +394,243 @@ public:
     { llgst_sample_unref( mT ); }
 };
 
-bool MediaPluginGStreamer10::update(int milliseconds)
+void MediaPluginGStreamer10::update()
 {
-    if (!mDoneInit)
-        return false; // error
+    if (!mDoneInit || nullptr == mPump || nullptr == mPlaybin)
+        return;
 
-    //  DEBUGMSG("updating media...");
-
-    // sanity check
-    if (nullptr == mPump || nullptr == mPlaybin)
-    {
-        return false;
-    }
-
-    // see if there's an outstanding seek wanted
-    if (mSeekWanted &&
-        // bleh, GST has to be happy that the movie is really truly playing
-        // or it may quietly ignore the seek (with rtsp:// at least).
-        (GST_STATE(mPlaybin) == GST_STATE_PLAYING))
+    // A seek waits for the media to be under way, or GStreamer may quietly
+    // ignore it (with rtsp:// at least).
+    if (mSeekWanted && GST_STATE(mPlaybin) >= GST_STATE_PAUSED)
     {
         seek(mSeekDestination);
         mSeekWanted = false;
     }
 
-    // *TODO: time-limit - but there isn't a lot we can do here, most
-    // time is spent in gstreamer's own opaque worker-threads.  maybe
-    // we can do something sneaky like only unlock the video object
-    // for 'milliseconds' and otherwise hold the lock.
     while (llg_main_context_pending(llg_main_loop_get_context(mPump)))
     {
-           llg_main_context_iteration(llg_main_loop_get_context(mPump), FALSE);
+        llg_main_context_iteration(llg_main_loop_get_context(mPump), FALSE);
     }
 
-    // check for availability of a new frame
-
-    if( !mAppSink )
-        return true;
-
-    if( GST_STATE(mPlaybin) != GST_STATE_PLAYING) // Do not try to pull a sample if not in playing state
-        return true;
-
-    GstSample *pSample = llgst_app_sink_pull_sample( mAppSink );
-    if(!pSample)
-        return false; // Done playing
-
-    GstSampleUnref oSampleUnref( pSample );
-    GstCaps *pCaps = llgst_sample_get_caps ( pSample );
-    if (!pCaps)
-        return false;
-
-    gint width = 0, height = 0;
-    GstStructure *pStruct = llgst_caps_get_structure ( pCaps, 0);
-
-    if(!llgst_structure_get_int ( pStruct, "width", &width) )
-        width = 0;
-    if(!llgst_structure_get_int ( pStruct, "height", &height) )
-        height = 0;
-
-    if( !mPixels || width == 0 || height == 0)
-        return true;
-
-    GstBuffer *pBuffer = llgst_sample_get_buffer ( pSample );
-    GstMapInfo map;
-    llgst_buffer_map ( pBuffer, &map, GST_MAP_READ);
-
-    // Our render buffer is always 1kx1k
-
-    U32 rowSkip = INTERNAL_TEXTURE_SIZE / mTextureHeight;
-    U32 colSkip = INTERNAL_TEXTURE_SIZE / mTextureWidth;
-
-    for (int row = 0; row < mTextureHeight; ++row)
+    // The time, for the media controls, a few times a second while
+    // playing. A frame carries it; without one it goes alone.
+    const bool playing = GST_STATE(mPlaybin) == GST_STATE_PLAYING;
+    const double now = LLTimer::getTotalSeconds();
+    if (playing && now - mLastTimeQuery >= 0.1)
     {
-        U8 const *pTexelIn = map.data + (row*rowSkip * width *3);
-#ifndef FLIP_Y
-        U8 *pTexelOut = mPixels + (row * mTextureWidth * mDepth );
-#else
-        U8 *pTexelOut = mPixels + ((mTextureHeight-row-1) * mTextureWidth * mDepth );
-#endif
-        for( int col = 0; col < mTextureWidth; ++col )
+        mLastTimeQuery = now;
+        getTimePos(mCurTime);
+        if (mDuration <= 0.0)
+            getDuration(mDuration);
+    }
+
+    if (mAppSink && mPixels)
+    {
+        // The newest frame, if there is one; never a wait for one.
+        GstSample *sample = llgst_app_sink_try_pull_sample(mAppSink, 0);
+        if (sample)
         {
-            pTexelOut[ 0 ] = pTexelIn[0];
-            pTexelOut[ 1 ] = pTexelIn[1];
-            pTexelOut[ 2 ] = pTexelIn[2];
-            pTexelOut += mDepth;
-            pTexelIn += colSkip*3;
+            GstSampleUnref unref(sample);
+            copyFrame(sample);
         }
     }
 
-    llgst_buffer_unmap( pBuffer, &map );
-    setDirty(0,0,mTextureWidth,mTextureHeight);
+    if (playing && now - mLastTimeUpdate >= 0.25)
+    {
+        sendTimeUpdate();
+    }
+}
 
+void MediaPluginGStreamer10::copyFrame(GstSample* sample)
+{
+    GstCaps *caps = llgst_sample_get_caps(sample);
+    GstBuffer *buffer = llgst_sample_get_buffer(sample);
+    if (!caps || !buffer)
+        return;
+
+    gint width = 0, height = 0;
+    GstStructure *structure = llgst_caps_get_structure(caps, 0);
+    if (!llgst_structure_get_int(structure, "width", &width) ||
+        !llgst_structure_get_int(structure, "height", &height) ||
+        width <= 0 || height <= 0)
+    {
+        return;
+    }
+
+    GstMapInfo map;
+    if (!llgst_buffer_map(buffer, &map, GST_MAP_READ))
+        return;
+
+    // A frame from before a resize is copied as far as it fits.
+    const int rows = llmin(height, mHeight, mTextureHeight);
+    const int cols = llmin(width, mWidth, mTextureWidth);
+    const size_t stride = map.size / (size_t)height;
+    if (rows > 0 && cols > 0 && stride >= (size_t)cols * mDepth)
+    {
+        const size_t row_bytes = (size_t)cols * mDepth;
+        const size_t texture_stride = (size_t)mTextureWidth * mDepth;
+        for (int row = 0; row < rows; ++row)
+        {
+            // OpenGL's rows run bottom up.
+            memcpy(mPixels + (size_t)(rows - 1 - row) * texture_stride,
+                   map.data + (size_t)row * stride,
+                   row_bytes);
+        }
+        setDirty(0, 0, cols, rows);
+    }
+
+    llgst_buffer_unmap(buffer, &map);
+}
+
+// The size the viewer's texture is, which the appsink asks playbin for; a
+// change renegotiates the stream already playing. No pixel aspect ratio is
+// asked for, so the picture is stretched to fill the texture, as media on a
+// face always has been, not letterboxed into it.
+void MediaPluginGStreamer10::setVideoSize(int width, int height)
+{
+    if (!mAppSink)
+        return;
+
+    GstCaps* caps = nullptr;
+    if (width > 0 && height > 0)
+    {
+        caps = llgst_caps_new_simple("video/x-raw",
+                                     "format", G_TYPE_STRING, "BGRx",
+                                     "width", G_TYPE_INT, width,
+                                     "height", G_TYPE_INT, height,
+                                     nullptr);
+    }
+    else
+    {
+        caps = llgst_caps_new_simple("video/x-raw",
+                                     "format", G_TYPE_STRING, "BGRx",
+                                     nullptr);
+    }
+    llgst_app_sink_set_caps(mAppSink, caps);
+    llgst_caps_unref(caps);
+
+    GstPad* pad = llgst_element_get_static_pad(GST_ELEMENT(mAppSink), "sink");
+    if (pad)
+    {
+        llgst_pad_push_event(pad, llgst_event_new_reconfigure());
+        llgst_object_unref(pad);
+    }
+}
+
+// "Artist - Title" where the stream says both, as a radio station does of
+// the song it is playing; the title alone otherwise.
+void MediaPluginGStreamer10::updateTitle(const GstTagList* tags)
+{
+    gchar* title = nullptr;
+    gchar* artist = nullptr;
+    llgst_tag_list_get_string(tags, GST_TAG_TITLE, &title);
+    llgst_tag_list_get_string(tags, GST_TAG_ARTIST, &artist);
+
+    std::string name;
+    if (artist && *artist && title && *title)
+        name = std::string(artist) + " - " + title;
+    else if (title && *title)
+        name = title;
+    llg_free(title);
+    llg_free(artist);
+
+    if (!name.empty() && name != mTitle)
+    {
+        mTitle = name;
+        LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "name_text");
+        message.setValue("name", mTitle);
+        sendMessage(message);
+    }
+}
+
+// The time and the duration ride on every update, as the media controls
+// read them from it.
+void MediaPluginGStreamer10::setDirty(int left, int top, int right, int bottom)
+{
+    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "updated");
+
+    message.setValueS32("left", left);
+    message.setValueS32("top", top);
+    message.setValueS32("right", right);
+    message.setValueS32("bottom", bottom);
+
+    message.setValueReal("current_time", mCurTime);
+    message.setValueReal("duration", mDuration);
+    message.setValueReal("current_rate", 1.0);
+
+    sendMessage(message);
+    mLastTimeUpdate = LLTimer::getTotalSeconds();
+}
+
+void MediaPluginGStreamer10::sendTimeUpdate()
+{
+    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "updated");
+
+    message.setValueReal("current_time", mCurTime);
+    message.setValueReal("duration", mDuration);
+    message.setValueReal("current_rate", 1.0);
+
+    sendMessage(message);
+    mLastTimeUpdate = LLTimer::getTotalSeconds();
+}
+
+bool MediaPluginGStreamer10::setState(GstState state)
+{
+    if (!mDoneInit || !mPlaybin)
+        return false;
+
+    mTargetState = state;
+    GstStateChangeReturn result = llgst_element_set_state(mPlaybin, state);
+    if (result == GST_STATE_CHANGE_FAILURE)
+    {
+        setStatus(STATUS_ERROR);
+        return false;
+    }
+    if (result == GST_STATE_CHANGE_NO_PREROLL)
+    {
+        mIsLive = true;
+    }
     return true;
 }
 
-void MediaPluginGStreamer10::mouseDown( int x, int y )
-{
-  // do nothing
-}
-
-void MediaPluginGStreamer10::mouseUp( int x, int y )
-{
-  // do nothing
-}
-
-void MediaPluginGStreamer10::mouseMove( int x, int y )
-{
-  // do nothing
-}
-
-
 bool MediaPluginGStreamer10::pause()
 {
-    // todo: error-check this?
-    if (mDoneInit && mPlaybin)
-    {
-        llgst_element_set_state(mPlaybin, GST_STATE_PAUSED);
-        return true;
-    }
-    return false;
+    return setState(GST_STATE_PAUSED);
 }
 
 bool MediaPluginGStreamer10::stop()
 {
-    // todo: error-check this?
-    if (mDoneInit && mPlaybin)
-    {
-        llgst_element_set_state(mPlaybin, GST_STATE_READY);
-        return true;
-    }
-    return false;
+    mAtEnd = false;
+    mCurTime = 0.0;
+    return setState(GST_STATE_READY);
 }
 
-bool MediaPluginGStreamer10::play(double rate)
+bool MediaPluginGStreamer10::play()
 {
-    // NOTE: we don't actually support non-natural rate.
-
-    // todo: error-check this?
-    if (mDoneInit && mPlaybin)
+    if (mAtEnd)
     {
-        llgst_element_set_state(mPlaybin, GST_STATE_PLAYING);
-        return true;
+        // From the beginning, as a player does after the end: at once, as
+        // playing on from the end would only end again.
+        mSeekWanted = false;
+        seek(0.0);
+        mAtEnd = false;
     }
-    return false;
+    if (GST_STATE(mPlaybin) <= GST_STATE_READY)
+    {
+        mIsLive = false;
+    }
+    // Buffering holds it paused until the buffer is full.
+    bool result = setState(mBuffering ? GST_STATE_PAUSED : GST_STATE_PLAYING);
+    mTargetState = GST_STATE_PLAYING;
+    return result;
 }
 
-bool MediaPluginGStreamer10::setVolume( float volume )
+bool MediaPluginGStreamer10::setVolume( double volume )
 {
-    // we try to only update volume as conservatively as
-    // possible, as many gst-plugins-base versions up to at least
-    // November 2008 have critical race-conditions in setting volume - sigh
-    if (mVolume == volume)
-        return true; // nothing to do, everything's fine
-
-    mVolume = volume;
+    mVolume = llclamp(volume, 0.0, 1.0);
     if (mDoneInit && mPlaybin)
     {
-        llg_object_set(mPlaybin, "volume", mVolume, nullptr);
+        llg_object_set(mPlaybin, "volume", (gdouble)mVolume, nullptr);
         return true;
     }
 
@@ -488,55 +642,53 @@ bool MediaPluginGStreamer10::seek(double time_sec)
     bool success = false;
     if (mDoneInit && mPlaybin)
     {
-        success = llgst_element_seek(mPlaybin, 1.0F, GST_FORMAT_TIME,
+        success = llgst_element_seek(mPlaybin, 1.0, GST_FORMAT_TIME,
                 GstSeekFlags(GST_SEEK_FLAG_FLUSH |
                          GST_SEEK_FLAG_KEY_UNIT),
                 GST_SEEK_TYPE_SET, gint64(time_sec*GST_SECOND),
                 GST_SEEK_TYPE_NONE, GST_CLOCK_TIME_NONE);
+        if (success)
+        {
+            mAtEnd = false;
+            mCurTime = time_sec;
+            sendTimeUpdate();
+        }
     }
     return success;
 }
 
 bool MediaPluginGStreamer10::getTimePos(double &sec_out)
 {
-    bool got_position = false;
-    if (mDoneInit && mPlaybin)
-    {
-        gint64 pos(0);
-        GstFormat timefmt = GST_FORMAT_TIME;
-        got_position =
-            llgst_element_query_position &&
-            llgst_element_query_position(mPlaybin,
-                             timefmt,
-                             &pos);
-        got_position = got_position
-            && (timefmt == GST_FORMAT_TIME);
-        // GStreamer may have other ideas, but we consider the current position
-        // undefined if not PLAYING or PAUSED
-        got_position = got_position &&
-            (GST_STATE(mPlaybin) == GST_STATE_PLAYING ||
-             GST_STATE(mPlaybin) == GST_STATE_PAUSED);
-        if (got_position && !GST_CLOCK_TIME_IS_VALID(pos))
-        {
-            if (GST_STATE(mPlaybin) == GST_STATE_PLAYING)
-            {
-                // if we're playing then we treat an invalid clock time
-                // as 0, for complicated reasons (insert reason here)
-                pos = 0;
-            }
-            else
-            {
-                got_position = false;
-            }
+    if (!mDoneInit || !mPlaybin || !llgst_element_query_position)
+        return false;
 
-        }
-        // If all the preconditions succeeded... we can trust the result.
-        if (got_position)
-        {
-            sec_out = double(pos) / double(GST_SECOND); // gst to sec
-        }
+    // The position is undefined but while PLAYING or PAUSED.
+    if (GST_STATE(mPlaybin) != GST_STATE_PLAYING && GST_STATE(mPlaybin) != GST_STATE_PAUSED)
+        return false;
+
+    gint64 pos = 0;
+    if (!llgst_element_query_position(mPlaybin, GST_FORMAT_TIME, &pos) || !GST_CLOCK_TIME_IS_VALID(pos))
+        return false;
+
+    sec_out = double(pos) / double(GST_SECOND);
+    return true;
+}
+
+// None for a live stream, which has no end.
+bool MediaPluginGStreamer10::getDuration(double &sec_out)
+{
+    if (!mDoneInit || !mPlaybin || !llgst_element_query_duration)
+        return false;
+
+    gint64 duration = 0;
+    if (!llgst_element_query_duration(mPlaybin, GST_FORMAT_TIME, &duration) ||
+        !GST_CLOCK_TIME_IS_VALID(duration) || duration <= 0)
+    {
+        return false;
     }
-    return got_position;
+
+    sec_out = double(duration) / double(GST_SECOND);
+    return true;
 }
 
 bool MediaPluginGStreamer10::load()
@@ -545,9 +697,6 @@ bool MediaPluginGStreamer10::load()
         return false; // error
 
     setStatus(STATUS_LOADING);
-
-    mIsLooping = false;
-    mVolume = 0.1234567f; // minor hack to force an initial volume update
 
     // Create a pumpable main-loop for this media
     mPump = llg_main_loop_new (nullptr, FALSE);
@@ -578,23 +727,18 @@ bool MediaPluginGStreamer10::load()
     llgst_object_unref (bus);
 
     mAppSink = (GstAppSink*)(llgst_element_factory_make ("appsink", ""));
-
-    GstCaps* pCaps = llgst_caps_new_simple( "video/x-raw",
-                                            "format", G_TYPE_STRING, "RGB",
-                                            "width", G_TYPE_INT, INTERNAL_TEXTURE_SIZE,
-                                            "height", G_TYPE_INT, INTERNAL_TEXTURE_SIZE,
-                                            nullptr );
-
-    llgst_app_sink_set_caps( mAppSink, pCaps );
-    llgst_caps_unref( pCaps );
-
     if (!mAppSink)
     {
         setStatus(STATUS_ERROR);
         return false;
     }
+    // One frame waits at most, the newest; the sink keeps time with the
+    // audio by dropping the rest.
+    llg_object_set(mAppSink, "max-buffers", (guint)1, "drop", TRUE, nullptr);
+    setVideoSize(mWidth, mHeight);
 
     llg_object_set(mPlaybin, "video-sink", mAppSink, nullptr);
+    llg_object_set(mPlaybin, "volume", (gdouble)mVolume, nullptr);
 
     return true;
 }
@@ -605,8 +749,11 @@ bool MediaPluginGStreamer10::unload ()
         return false; // error
 
     // stop getting callbacks for this bus
-    llg_source_remove(mBusWatchID);
-    mBusWatchID = 0;
+    if (mBusWatchID)
+    {
+        llg_source_remove(mBusWatchID);
+        mBusWatchID = 0;
+    }
 
     if (mPlaybin)
     {
@@ -618,9 +765,11 @@ bool MediaPluginGStreamer10::unload ()
     if (mPump)
     {
         llg_main_loop_quit(mPump);
+        llg_main_loop_unref(mPump);
         mPump = nullptr;
     }
 
+    // playbin owned it.
     mAppSink = nullptr;
 
     setStatus(STATUS_NONE);
@@ -645,14 +794,17 @@ bool MediaPluginGStreamer10::startup()
     {
         ll_init_apr();
 
-        // Get symbols!
+        // Get symbols! By the names the runtime packages install.
         std::vector< std::string > vctDSONames;
         vctDSONames.push_back( "libgstreamer-1.0.so.0"  );
         vctDSONames.push_back( "libgstapp-1.0.so.0"  );
         vctDSONames.push_back( "libglib-2.0.so.0" );
-        vctDSONames.push_back( "libgobject-2.0.so" );
+        vctDSONames.push_back( "libgobject-2.0.so.0" );
         if( !gstSymbolGrabber.grabSymbols( vctDSONames ) )
+        {
+            std::cerr << "GStreamer 1.0, with its app library, could not be loaded; media will not play." << std::endl;
             return false;
+        }
 
         if (llgst_segtrap_set_enabled)
         {
@@ -697,7 +849,10 @@ bool MediaPluginGStreamer10::startup()
         if (!init_gst_success) // fail
         {
             if (err)
+            {
+                std::cerr << "GStreamer failed to initialize: " << err->message << std::endl;
                 llg_error_free(err);
+            }
             return false;
         }
 
@@ -721,6 +876,7 @@ bool MediaPluginGStreamer10::closedown()
 
 MediaPluginGStreamer10::~MediaPluginGStreamer10()
 {
+    unload();
     closedown();
 }
 
@@ -771,15 +927,16 @@ void MediaPluginGStreamer10::receiveMessage(const std::string &message_string)
             else if(message_name == "idle")
             {
                 // no response is necessary here.
-                double time = message_in.getValueReal("time");
-
-                // Convert time to milliseconds for update()
-                update((int)(time * 1000.0f));
+                update();
             }
             else if(message_name == "cleanup")
             {
                 unload();
                 closedown();
+            }
+            else if(message_name == "force_exit")
+            {
+                mDeleteMe = true;
             }
             else if(message_name == "shm_added")
             {
@@ -816,21 +973,15 @@ void MediaPluginGStreamer10::receiveMessage(const std::string &message_string)
         {
             if(message_name == "init")
             {
-                // Plugin gets to decide the texture parameters to use.
+                // BGRx, as the appsink asks for it, at whatever size the
+                // viewer gives the texture.
                 LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "texture_params");
-                // lame to have to decide this now, it depends on the movie.  Oh well.
-                mDepth = 4;
-
-                mTextureWidth = 1;
-                mTextureHeight = 1;
-
-                message.setValueU32("format", GL_RGBA);
-                message.setValueU32("type", GL_UNSIGNED_INT_8_8_8_8_REV);
-
+                message.setValueS32("default_width", 1024);
+                message.setValueS32("default_height", 1024);
                 message.setValueS32("depth", mDepth);
-                message.setValueS32("default_width", INTERNAL_TEXTURE_SIZE );
-                message.setValueS32("default_height", INTERNAL_TEXTURE_SIZE );
-                message.setValueU32("internalformat", GL_RGBA8);
+                message.setValueU32("internalformat", GL_RGB8);
+                message.setValueU32("format", GL_BGRA);
+                message.setValueU32("type", GL_UNSIGNED_BYTE);
                 message.setValueBoolean("coords_opengl", true); // true == use OpenGL-style coordinates, false == (0,0) is upper left.
                 message.setValueBoolean("allow_downsample", true); // we respond with grace and performance if asked to downscale
                 sendMessage(message);
@@ -843,14 +994,6 @@ void MediaPluginGStreamer10::receiveMessage(const std::string &message_string)
                 S32 texture_width = message_in.getValueS32("texture_width");
                 S32 texture_height = message_in.getValueS32("texture_height");
 
-                LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "size_change_response");
-                message.setValue("name", name);
-                message.setValueS32("width", width);
-                message.setValueS32("height", height);
-                message.setValueS32("texture_width", texture_width);
-                message.setValueS32("texture_height", texture_height);
-                sendMessage(message);
-
                 if(!name.empty())
                 {
                     // Find the shared memory region with this name
@@ -860,18 +1003,23 @@ void MediaPluginGStreamer10::receiveMessage(const std::string &message_string)
                         mPixels = (unsigned char*)iter->second.mAddress;
                         mTextureSegmentName = name;
 
+                        mWidth = width;
+                        mHeight = height;
                         mTextureWidth = texture_width;
                         mTextureHeight = texture_height;
-                        memset( mPixels, 0, mTextureWidth*mTextureHeight*mDepth );
+                        memset( mPixels, 0, (size_t)mTextureWidth * mTextureHeight * mDepth );
+
+                        setVideoSize(mWidth, mHeight);
                     }
-
-                    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "size_change_request");
-                    message.setValue("name", mTextureSegmentName);
-                    message.setValueS32("width", INTERNAL_TEXTURE_SIZE );
-                    message.setValueS32("height", INTERNAL_TEXTURE_SIZE );
-                    sendMessage(message);
-
                 }
+
+                LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "size_change_response");
+                message.setValue("name", name);
+                message.setValueS32("width", width);
+                message.setValueS32("height", height);
+                message.setValueS32("texture_width", texture_width);
+                message.setValueS32("texture_height", texture_height);
+                sendMessage(message);
             }
             else if(message_name == "load_uri")
             {
@@ -879,25 +1027,6 @@ void MediaPluginGStreamer10::receiveMessage(const std::string &message_string)
                 navigateTo( uri );
                 sendStatus();
             }
-            else if(message_name == "mouse_event")
-            {
-                std::string event = message_in.getValue("event");
-                S32 x = message_in.getValueS32("x");
-                S32 y = message_in.getValueS32("y");
-
-                if(event == "down")
-                {
-                    mouseDown(x, y);
-                }
-                else if(event == "up")
-                {
-                    mouseUp(x, y);
-                }
-                else if(event == "move")
-                {
-                    mouseMove(x, y);
-                };
-            };
         }
         else if(message_class == LLPLUGIN_MESSAGE_CLASS_MEDIA_TIME)
         {
@@ -907,13 +1036,8 @@ void MediaPluginGStreamer10::receiveMessage(const std::string &message_string)
             }
             else if(message_name == "start")
             {
-                double rate = 0.0;
-                if(message_in.hasValue("rate"))
-                {
-                    rate = message_in.getValueReal("rate");
-                }
                 // NOTE: we don't actually support rate.
-                play(rate);
+                play();
             }
             else if(message_name == "pause")
             {

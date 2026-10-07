@@ -5444,7 +5444,7 @@
   <key>MediaPluginForceVLC</key>
   <map>
     <key>Comment</key>
-    <string>Force use of VLC based media plugin. (Linux Only)</string>
+    <string>Play media on Linux with the VLC plugin rather than GStreamer, where the viewer was built with it (AL_BUILD_VLC_PLUGIN).</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>

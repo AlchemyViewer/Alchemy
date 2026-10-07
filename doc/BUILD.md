@@ -64,14 +64,14 @@ rustup default stable
 
 ### Linux
 
-Install system packages for your distro:
+Install system packages for your distro. Media plays through GStreamer; the VLC media plugin is left out on Linux unless configured with `-DAL_BUILD_VLC_PLUGIN=ON`, which also needs LibVLC's development package (`libvlc` on Arch, `libvlc-dev` on Debian and Ubuntu, `vlc-devel` on Fedora and openSUSE).
 
 <details>
 <summary>Arch</summary>
 
 ```
 sudo pacman -Syu automake autoconf autoconf-archive base-devel cmake fontconfig git glib2-devel \
-    gstreamer gst-plugins-base-libs ninja libglvnd libtool libvlc libx11 pkgconf python \
+    gstreamer gst-plugins-base-libs ninja libglvnd libtool libx11 pkgconf python \
     wayland dotnet-sdk zip nasm
 ```
 
@@ -87,7 +87,7 @@ sudo apt install \
     libegl1-mesa-dev libfribidi-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
     libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libibus-1.0-dev libjack-dev \
     libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
-    libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
+    libthai-dev libtool libudev-dev libunwind-dev liburing-dev libwayland-dev \
     libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
     libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev ninja-build \
     pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 nasm
@@ -105,7 +105,7 @@ sudo apt install \
     libegl1-mesa-dev libfribidi-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
     libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libibus-1.0-dev libjack-dev \
     libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
-    libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
+    libthai-dev libtool libudev-dev libunwind-dev liburing-dev libwayland-dev \
     libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
     libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev ninja-build \
     pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 nasm
@@ -122,7 +122,7 @@ sudo apt install \
 sudo dnf group install "Development Tools"
 sudo dnf install cmake fontconfig-devel git glib2-devel gstreamer1-devel \
     gstreamer1-plugins-base-devel libX11-devel libglvnd-devel \
-    ninja-build python3 vlc-devel wayland-devel dotnet-sdk-10.0
+    ninja-build python3 wayland-devel dotnet-sdk-10.0
 ```
 
 You may need to enable EPEL first: `sudo dnf install epel-release`
@@ -132,7 +132,7 @@ You may need to enable EPEL first: `sudo dnf install epel-release`
 ```
 sudo dnf install @development-tools @c-development cmake fontconfig-devel git glib-devel \
     gstreamer1-devel gstreamer1-plugins-base-devel libX11-devel \
-    libglvnd-devel ninja-build python3 vlc-devel \
+    libglvnd-devel ninja-build python3 \
     wayland-devel dotnet-sdk-10.0 perl-IPC-Cmd perl-FindBin perl-Time-Piece \
     autoconf-archive perl-open libXcursor-devel wayland-protocols-devel dbus-devel \
     ibus-devel mesa-libGLU-devel libxkbcommon-devel mesa-libEGL-devel mesa-libGL-devel \
@@ -151,7 +151,7 @@ To build with Clang instead of GCC, also install: `sudo dnf install clang lld`
 sudo zypper in -t pattern devel_basis devel_C_C++
 sudo zypper install cmake fontconfig-devel git glib2-devel gstreamer-devel \
     gstreamer-plugins-base-devel libglvnd-devel libX11-devel ninja Mesa-libGL-devel \
-    python3 vlc-devel wayland-devel
+    python3 wayland-devel
 ```
 
 </details>
@@ -374,8 +374,8 @@ The registry's README covers CI and adding ports.
 | Option                   | Default     | Description                                |
 |:-------------------------|:------------|:-------------------------------------------|
 | `AL_BUILD_CEF_PLUGIN`       | ON          | Chromium Embedded Framework (in-world web) |
-| `AL_BUILD_VLC_PLUGIN`       | ON          | VLC media plugin                           |
-| `AL_BUILD_GSTREAMER_PLUGIN` | ON on Linux | GStreamer media plugin (Linux only)        |
+| `AL_BUILD_VLC_PLUGIN`       | OFF on Linux | VLC media plugin; on Linux GStreamer plays media, and VLC only with `MediaPluginForceVLC` |
+| `AL_BUILD_GSTREAMER_PLUGIN` | ON on Linux | GStreamer media plugin (Linux only): video, audio and the parcel stream |
 | `AL_BUILD_EXAMPLE_PLUGIN`   | ON          | Reference/example plugin                   |
 
 ### Platform-specific
