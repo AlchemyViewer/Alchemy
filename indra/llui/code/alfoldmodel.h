@@ -169,8 +169,16 @@ private:
         std::vector<Block> blocks;
     };
     const Line& lineAt(const ALTextDocument& doc, S32 line);
+    // Tabs as wide as this from now, every line read again where they were
+    // another width.
+    void        setTabWidth(S32 tab_width);
+    // Each block's last line by its first, into `end_of`, one a line, -1
+    // where none starts.
     void        bySyntax(const ALTextDocument& doc, std::vector<S32>& end_of);
-    void        byIndent(const ALTextDocument& doc, std::vector<Region>& out);
+    void        byIndent(const ALTextDocument& doc, std::vector<S32>& end_of);
+    // A `#region` or an `#endregion` met as the lines are walked in order:
+    // one opened, or the innermost still open ended there.
+    static void pairMarker(S8 marker, S32 line, std::vector<S32>& open, std::vector<S32>& end_of);
 
     std::vector<Region> mRegions;
     U32                 mVersion  = 0;
