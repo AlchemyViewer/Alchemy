@@ -1004,4 +1004,42 @@ namespace tut
                                                                           "SlNumberTruth", ALScriptProblem::Severity::Warning),
                       std::string());
     }
+    template<> template<>
+    void object::test<26>()
+    {
+        set_test_name("SlMustUse over SLua's own: integer's, a uuid, a vector and a quaternion made by calling their names or create, "
+                      "buffer's that read one or make one, and table.create, their answers unread; an integer's given back to it; not "
+                      "buffer's that write one, nor an answer read");
+        ensure("definitions: " + error, loaded);
+        const std::string said = found("local i = 5i\n"
+                                       "local b = buffer.create(4)\n"
+                                       "integer.add(i, 1)\n"
+                                       "uuid(\"00000000-0000-0000-0000-000000000001\")\n"
+                                       "uuid.create(\"00000000-0000-0000-0000-000000000001\")\n"
+                                       "vector(1, 2, 3)\n"
+                                       "quaternion(0, 0, 0, 1)\n"
+                                       "buffer.readu8(b, 0)\n"
+                                       "buffer.readinteger(b, 0)\n"
+                                       "buffer.len(b)\n"
+                                       "buffer.create(8)\n"
+                                       "table.create(3, 0)\n"
+                                       "buffer.writeu8(b, 0, 1)\n"
+                                       "buffer.fill(b, 0, 0)\n"
+                                       "print(integer.add(i, 1), buffer.readu8(b, 0), vector(1, 2, 3))\n",
+                                       "SlMustUse", ALScriptProblem::Severity::Warning);
+        ensure_equals("each", said,
+                      std::string("2 LuauLintSlMustUse|integer.add\n"
+                                  "3 LuauLintSlMustUse|uuid\n"
+                                  "4 LuauLintSlMustUse|uuid.create\n"
+                                  "5 LuauLintSlMustUse|vector\n"
+                                  "6 LuauLintSlMustUse|quaternion\n"
+                                  "7 LuauLintSlMustUse|buffer.readu8\n"
+                                  "8 LuauLintSlMustUse|buffer.readinteger\n"
+                                  "9 LuauLintSlMustUse|buffer.len\n"
+                                  "10 LuauLintSlMustUse|buffer.create\n"
+                                  "11 LuauLintSlMustUse|table.create\n"));
+        ensure_equals("an integer's", fixed("local i = 5i\ninteger.band(i, 3i)\nprint(i)\n", "LuauLintSlMustUse", "Write it i = integer.band(...)", false),
+                      std::string("local i = 5i\ni = integer.band(i, 3i)\nprint(i)\n"));
+        unfixed("vector(1, 2, 3)\n", "LuauLintSlMustUse");
+    }
 }

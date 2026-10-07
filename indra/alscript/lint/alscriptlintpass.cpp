@@ -191,7 +191,10 @@ namespace
     // What Luau's library, and SLua's, answer without changing anything: a
     // global function, or a library's -- all of math's but its random
     // numbers, and of string's, table's and the rest those that only
-    // answer.
+    // answer. SLua's types made by calling their names, vector(1, 2, 3)
+    // and uuid(s), among the globals; all of integer's, whose answers are
+    // new integers; and of buffer's those that read it or make one, not
+    // those that write, copy into or fill one.
     bool onlyAnswers(std::string_view library, std::string_view name)
     {
         using Names = std::initializer_list<std::string_view>;
@@ -199,13 +202,14 @@ namespace
         if (library.empty())
         {
             return among({ "tostring", "tonumber", "type", "typeof", "rawequal", "rawlen", "rawget", "select", "touuid", "tovector", "toquaternion",
-                           "torotation" });
+                           "torotation", "vector", "quaternion", "rotation", "uuid" });
         }
         if (library == "math")
         {
             return name != "random" && name != "randomseed";
         }
-        if (library == "vector" || library == "quaternion" || library == "bit32" || library == "utf8" || library == "llbase64")
+        if (library == "vector" || library == "quaternion" || library == "rotation" || library == "uuid" || library == "integer" ||
+            library == "bit32" || library == "utf8" || library == "llbase64")
         {
             return true;
         }
@@ -216,7 +220,11 @@ namespace
         }
         if (library == "table")
         {
-            return among({ "concat", "find", "clone", "pack", "unpack" });
+            return among({ "concat", "find", "clone", "pack", "unpack", "create", "maxn", "isfrozen" });
+        }
+        if (library == "buffer")
+        {
+            return name.substr(0, 4) == "read" || among({ "create", "fromstring", "tostring", "len" });
         }
         return library == "lljson" && among({ "encode", "decode", "slencode", "sldecode" });
     }
@@ -1255,7 +1263,7 @@ namespace
         // The kind an expression is, of those an answer may be given back as.
         std::optional<Kind> kindOf(Luau::AstExpr* e)
         {
-            for (Kind kind : { Kind::Number, Kind::String, Kind::Boolean, Kind::List, Kind::Table, Kind::Vector, Kind::Quaternion })
+            for (Kind kind : { Kind::Number, Kind::Integer, Kind::String, Kind::Boolean, Kind::List, Kind::Table, Kind::Vector, Kind::Quaternion, Kind::Uuid })
             {
                 if (is(e, kind))
                 {
@@ -1296,7 +1304,7 @@ namespace
                 const bool  text   = own && std::find(TEXT.begin(), TEXT.end(), std::string_view(callee->index.value)) != TEXT.end();
                 return text ? std::optional<Kind>(Kind::String) : std::nullopt;
             }
-            for (Kind kind : { Kind::Number, Kind::String, Kind::Boolean, Kind::List, Kind::Table, Kind::Vector, Kind::Quaternion })
+            for (Kind kind : { Kind::Number, Kind::Integer, Kind::String, Kind::Boolean, Kind::List, Kind::Table, Kind::Vector, Kind::Quaternion, Kind::Uuid })
             {
                 if (of(*answer, kind))
                 {
