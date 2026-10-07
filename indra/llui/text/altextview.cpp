@@ -5665,11 +5665,13 @@ void ALTextView::drawBand(F32 alpha)
     // What to show, read from the keymap and measured only when it has
     // moved on since.
     BandShown& band_shown = mBandShown;
-    if (band_shown.keymap != mModal.get() || band_shown.generation != mModal->generation() || band_shown.font != font)
+    if (band_shown.keymap != mModal.get() || band_shown.generation != mModal->generation() || band_shown.font != font ||
+        band_shown.fonts != LLFontGL::sResolutionGeneration)
     {
         band_shown.keymap     = mModal.get();
         band_shown.generation = mModal->generation();
         band_shown.font       = font;
+        band_shown.fonts      = LLFontGL::sResolutionGeneration;
         std::string line;
         S32         caret     = 0;
         band_shown.typing     = mModal->typingLine(line, caret);

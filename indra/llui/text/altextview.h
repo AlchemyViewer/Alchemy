@@ -1528,13 +1528,15 @@ private:
     std::vector<Box>                mTintBoxes;
     std::vector<Box>                mCaretBoxes;
     // What the band under the text shows and where its pieces go, as the
-    // keymap had it at its generation in this font: read and measured
-    // again only when the keymap has moved on.
+    // keymap had it at its generation in this font, as the fonts were then
+    // loaded: read and measured again only when the keymap has moved on, or
+    // the font, or the fonts were loaded again under it.
     struct BandShown
     {
         const ALModalKeymap*     keymap     = nullptr;
         U32                      generation = 0;
         const LLFontGL*          font       = nullptr;
+        S32                      fonts      = -1;
         bool                     typing     = false;
         bool                     error      = false;
         bool                     status     = false;

@@ -91,6 +91,26 @@ namespace
         return out;
     }
 
+    // A keymap that is always typing the same line, and counts how often
+    // the view asks it what the line is.
+    struct TypingKeymap : public ALModalKeymap
+    {
+        S32* asked = nullptr;
+
+        bool        handleKey(ALTextView&, KEY, MASK) override { return false; }
+        bool        handleChar(ALTextView&, llwchar) override { return false; }
+        bool        inserting() const override { return false; }
+        std::string status() const override { return "NORMAL"; }
+        U32         generation() const override { return 1; }
+        bool        typingLine(std::string& line, S32& caret) const override
+        {
+            ++*asked;
+            line  = ":set number";
+            caret = 4;
+            return true;
+        }
+    };
+
     // A view that is a white box: an atom's view, to see where it is drawn.
     struct WhiteBox : public LLView
     {
@@ -1310,6 +1330,46 @@ namespace tut
         }
         ensure("drawn past the line's end: " + std::to_string(past), past > 0);
         ensure("a little, not as far again as the first line is in: " + std::to_string(past), past <= 10);
+        view->die();
+    }
+
+    // The band a modal keymap has under the text is read and measured once
+    // while nothing moves, and again once the fonts are loaded again under
+    // the same font: its caret and its choices are measured in the faces
+    // its text is drawn in.
+    template<> template<>
+    void altextview_gl_object::test<19>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name           = "view";
+        p.rect           = LLRect(0, H, W, 0);
+        p.default_text   = "text";
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        S32  asked  = 0;
+        auto keymap = std::make_unique<TypingKeymap>();
+        keymap->asked = &asked;
+        view->setModalKeymap(std::move(keymap));
+        const auto frame = [&]() {
+            gl().clearFramebuffer();
+            view->draw();
+            gGL.flush();
+            glFinish();
+        };
+        frame();
+        const S32 once = asked;
+        ensure("read for the first frame", once > 0);
+        frame();
+        ensure_equals("not again while nothing moved", asked, once);
+        // What a font reload does: the faces swapped under the same font.
+        ++LLFontGL::sResolutionGeneration;
+        frame();
+        ensure("read again once the fonts were loaded again", asked > once);
         view->die();
     }
 }
