@@ -28,6 +28,7 @@
 
 #include "alfilewrite.h"
 #include "allinelabel.h"
+#include "alserialworker.h"
 #include "alluauconfig.h"
 #include "alscriptenvelope.h"
 #include "alscriptmasterfanout.h"
@@ -38,15 +39,19 @@
 #include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
 #include "aluploadheader.h"
+#include "llcallbacklist.h"
 #include "lldir.h"
 #include "llfloaterreg.h"
 #include "llinventorymodel.h"
 #include "llsdserialize.h"
+#include "lltimer.h"
 #include "llviewercontrol.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
 
+#include <condition_variable>
+#include <mutex>
 #include <sstream>
 
 namespace
@@ -55,6 +60,12 @@ namespace
     // How many outcomes are kept for a window to list that had none to hear
     // them: the latest.
     constexpr size_t      UNHEARD    = 50;
+    // How long the index waits for the changes after one before it is
+    // written, and how long at most from the first not yet written: sends
+    // ending one after another for a minute still write it every few
+    // seconds.
+    constexpr F64         SAVE_QUIET  = 1.0;
+    constexpr F64         SAVE_LATEST = 5.0;
 
     // A path as the links keep it: the file's own, links followed.
     std::string canonical(const std::string& path)
@@ -76,13 +87,70 @@ namespace
     }
 }
 
+// What the index's writer is handed: the index in words, whole, made on the
+// main thread, with the file it goes in -- the newest only, since each is
+// all of it -- and whether one is being written now, by the writer's thread
+// or by the main one. One write at a time, whichever thread makes it, so
+// that two never meet in the file put beside the index on the way.
+struct ALScriptDiskMasters::Writer
+{
+    struct Text
+    {
+        std::string path;
+        std::string text;
+    };
+    std::mutex              mutex;
+    std::condition_variable changed;
+    std::optional<Text>     waiting;
+    bool                    busy = false;
+
+    // What waits written, and what comes meanwhile, on whichever thread
+    // asks: one being written already by another is waited for first, so
+    // that all that was handed over is on the disk as this returns.
+    void drain()
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        for (;;)
+        {
+            changed.wait(lock, [this] { return !busy; });
+            if (!waiting)
+            {
+                return;
+            }
+            const Text one = std::move(*waiting);
+            waiting.reset();
+            busy = true;
+            lock.unlock();
+            if (!ALFileWrite::whole(one.path, one.text, /*durable*/ true))
+            {
+                LL_WARNS("ScriptMasters") << "Could not write " << one.path << LL_ENDL;
+            }
+            lock.lock();
+            busy = false;
+            changed.notify_all();
+        }
+    }
+};
+
 ALScriptDiskMasters::ALScriptDiskMasters()
-: mFanOut(std::make_unique<ALScriptMasterFanOut>()), mToasts(std::make_unique<ALScriptMasterToasts>())
+: mFanOut(std::make_unique<ALScriptMasterFanOut>()), mToasts(std::make_unique<ALScriptMasterToasts>()), mWriter(std::make_shared<Writer>())
 {
     mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptSaved& saved) { heardSaved(saved); });
 }
 
 ALScriptDiskMasters::~ALScriptDiskMasters() = default;
+
+void ALScriptDiskMasters::cleanupSingleton()
+{
+    // The thread closed first, the write it is making finished: what waited
+    // for it, passed over as it closed, is written here with what changed
+    // since, so that no change is lost as the viewer goes.
+    if (mWriterThread)
+    {
+        mWriterThread->close();
+    }
+    saveNow();
+}
 
 ALMasterLinks* ALScriptDiskMasters::links()
 {
@@ -93,6 +161,8 @@ ALMasterLinks* ALScriptDiskMasters::links()
     const std::string path = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, INDEX_FILE);
     if (path != mFor)
     {
+        // What the account before changed written first, to its own file.
+        saveNow();
         // Another account's, or the first asked for: read whole. What will
         // not read is no links, said, and not written over until a link
         // changes.
@@ -123,16 +193,88 @@ ALMasterLinks* ALScriptDiskMasters::links()
 
 void ALScriptDiskMasters::save()
 {
+    // Asked only where something changed, so that an index that would not
+    // read is not written over until a link changes.
     if (mFor.empty())
     {
         return;
     }
+    const F64 now = LLTimer::getTotalSeconds();
+    if (!mDirty)
+    {
+        mDirty      = true;
+        mDirtySince = now;
+    }
+    mDirtyLast = now;
+    saveSoon();
+}
+
+void ALScriptDiskMasters::saveSoon()
+{
+    // A later change only puts the time off: a write already coming finds
+    // it not yet due, and comes again.
+    if (mSaveComing)
+    {
+        return;
+    }
+    mSaveComing                     = true;
+    const F64                 now   = LLTimer::getTotalSeconds();
+    const F64                 due   = llmin(mDirtyLast + SAVE_QUIET, mDirtySince + SAVE_LATEST);
+    const std::weak_ptr<bool> alive = mAlive;
+    doAfterInterval(
+        [this, alive]() {
+            if (alive.lock())
+            {
+                mSaveComing = false;
+                saveDue();
+            }
+        },
+        (F32)llmax(0.05, due - now));
+}
+
+void ALScriptDiskMasters::saveDue()
+{
+    if (!mDirty)
+    {
+        return;
+    }
+    const F64 now = LLTimer::getTotalSeconds();
+    if (now < llmin(mDirtyLast + SAVE_QUIET, mDirtySince + SAVE_LATEST))
+    {
+        saveSoon();
+        return;
+    }
+    handOver();
+    if (!mWriterThread)
+    {
+        mWriterThread = std::make_unique<ALSerialWorker>("ScriptMastersIndex");
+    }
+    // Written out there, after any write handed over before it. The viewer
+    // going, it is written here.
+    const std::shared_ptr<Writer> writer = mWriter;
+    if (!mWriterThread->post([writer]() { writer->drain(); }))
+    {
+        writer->drain();
+    }
+}
+
+void ALScriptDiskMasters::handOver()
+{
+    if (!mDirty || mFor.empty())
+    {
+        return;
+    }
+    mDirty = false;
     std::ostringstream out;
     LLSDSerialize::toPrettyXML(mLinks.toLLSD(), out);
-    if (!ALFileWrite::whole(mFor, out.str(), /*durable*/ true))
-    {
-        LL_WARNS("ScriptMasters") << "Could not write " << mFor << LL_ENDL;
-    }
+    const std::lock_guard<std::mutex> lock(mWriter->mutex);
+    mWriter->waiting = Writer::Text{ mFor, out.str() };
+}
+
+void ALScriptDiskMasters::saveNow()
+{
+    handOver();
+    mWriter->drain();
 }
 
 void ALScriptDiskMasters::changed()

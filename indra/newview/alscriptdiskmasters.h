@@ -42,6 +42,7 @@
 class ALScriptMasterFanOut;
 class ALScriptMasterToasts;
 class ALScriptMasterWatch;
+class ALSerialWorker;
 
 // The scripts in the world, the agent's own inventory's and its objects',
 // whose master is a file on disk: the file is what the script is, and
@@ -64,10 +65,19 @@ class ALScriptMasterWatch;
 // listens -- every studio window's Output, kept for the window opened
 // next where there is none -- and, with no window in sight, the failures
 // and conflicts said in a toast (ALScriptMasterToasts).
+//
+// The index is written whole, and forced out to the disk, a moment after
+// the last change to it rather than at each: a checkout's sends, or an
+// include's dozens, end one after another, and each moves its link on. It
+// is put into words on the main thread and written on a thread of its own,
+// one write after another, the newest only where several wait; and at once,
+// here, whatever waits, when the account changes and as the viewer goes.
 class ALScriptDiskMasters : public LLSingleton<ALScriptDiskMasters>
 {
     LLSINGLETON(ALScriptDiskMasters);
     ~ALScriptDiskMasters() override;
+    // What waits to be written, written before the index goes.
+    void cleanupSingleton() override;
 
 public:
     // What came of a send, or of the world heard changing under a link.
@@ -130,7 +140,8 @@ public:
     // The links a file's save may send again: those whose last expansion
     // read it, or missed an include (ALMasterLinks::affectedBy).
     std::vector<ALMasterLink> affectedBy(const std::string& include);
-    // A link made, or one replaced; and one let go of. Written out at once.
+    // A link made, or one replaced; and one let go of. Written out a moment
+    // from now, with whatever else changes by then.
     void link(ALMasterLink link);
     void unlink(const ALScriptRef& ref);
     // Scripts not sent when they might have been, waiting to be sent by
@@ -169,7 +180,16 @@ private:
     // The links of the account in hand: loaded the first time they are
     // asked for, and again for another account.
     ALMasterLinks* links();
+    // The index to be written a moment from now: once nothing has changed
+    // for a second, and no later than a few after the first change not yet
+    // written.
     void           save();
+    void           saveSoon();
+    void           saveDue();
+    // What changed put into words, and handed to the writer; and that and
+    // whatever the writer has waiting written here, before this returns.
+    void           handOver();
+    void           saveNow();
     void           changed();
     // What is watched, as the links stand now.
     void           rewatch();
@@ -201,4 +221,16 @@ private:
     std::unique_ptr<ALScriptMasterFanOut>                                     mFanOut;
     std::unique_ptr<ALScriptMasterToasts>                                     mToasts;
     std::vector<Outcome>                                                      mUnheard;
+    // What the writer's thread is handed, and the thread, made with the
+    // first write; whether a change is not yet handed over, and since when,
+    // and when the last was; and whether a write is coming.
+    struct Writer;
+    std::shared_ptr<Writer>                                                   mWriter;
+    std::unique_ptr<ALSerialWorker>                                           mWriterThread;
+    bool                                                                      mDirty      = false;
+    F64                                                                       mDirtySince = 0.0;
+    F64                                                                       mDirtyLast  = 0.0;
+    bool                                                                      mSaveComing = false;
+    // Held while this is, for a timer to know it still is.
+    std::shared_ptr<bool>                                                     mAlive = std::make_shared<bool>(true);
 };

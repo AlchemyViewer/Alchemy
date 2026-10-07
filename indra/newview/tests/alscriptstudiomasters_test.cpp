@@ -32,6 +32,7 @@
 
 #include "alfilewrite.h"
 #include "alscriptstudio_fixture.h"
+#include "alserialworker.h"
 #include "alwatchedfile.h"
 #include "fsyspath.h"
 #include "llfile.h"
@@ -64,6 +65,8 @@ namespace
 
 ALScriptDiskMasters::ALScriptDiskMasters() {}
 ALScriptDiskMasters::~ALScriptDiskMasters() = default;
+// Nothing written, so nothing waits to be as the links go.
+void ALScriptDiskMasters::cleanupSingleton() {}
 ALScriptMasterWatch::~ALScriptMasterWatch() = default;
 
 std::optional<ALMasterLink> ALScriptDiskMasters::linkOf(const ALScriptRef& ref)
