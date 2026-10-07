@@ -123,9 +123,10 @@ namespace
 
         void run();
 
-        /// Any thread's. False where the connection is not open. A send
-        /// taken may still go unsent where a close from another thread
-        /// lands first.
+        /// Any thread's. False where the connection is not open, or where
+        /// taking the message would leave more waiting unsent than the
+        /// most it may hold, which drops it. A send taken may still go
+        /// unsent where a close from another thread lands first.
         bool send(const std::string& message);
         bool close(U16 code, const std::string& reason);
 
@@ -149,6 +150,9 @@ namespace
             websocket::close_reason mReason;
         };
 
+        /// What a message counts against the most a connection may hold.
+        static std::size_t heldBytes(const std::string& text) { return text.size() + sizeof(Outgoing); }
+
         LLWebsocketMgr::connection_h handle() { return weak_from_this(); }
 
         void readRequest();
@@ -161,6 +165,7 @@ namespace
         void writeNext();
         void onWritten(beast::error_code ec, std::size_t bytes);
         void onClosed(beast::error_code ec);
+        void clearQueue();
         void finish();
 
         Server_impl&                                          mServer;
@@ -172,7 +177,7 @@ namespace
         http::request<http::empty_body>                       mRequest;
         std::optional<http::response<http::string_body>>      mRefusal;
         std::deque<Outgoing>                                  mQueue;
-        std::size_t                                           mQueuedBytes = 0; ///< What mQueue's messages hold
+        std::atomic<std::size_t>                              mQueuedBytes{ 0 }; ///< What messages taken and not yet written hold, queued or on their way to mQueue
         std::atomic<connection_state_t>                       mState{ LLWebsocketMgr::connection_connecting };
         bool                                                  mWriting     = false;
         bool                                                  mCloseQueued = false;
@@ -613,6 +618,34 @@ namespace
         {
             return false;
         }
+        // Counted as it is taken, not as the strand queues it: a sender
+        // faster than the strand would otherwise have everything it sent
+        // held on its way to the queue, however far past the most it may.
+        // A client that lets this much wait unsent has stopped reading.
+        // One message alone may be larger: nothing else is waiting.
+        const std::size_t bytes  = heldBytes(message);
+        const std::size_t queued = mQueuedBytes.fetch_add(bytes);
+        if (queued > 0 && queued + bytes > MAX_QUEUED_BYTES)
+        {
+            mQueuedBytes -= bytes;
+            // Refused from here on, and dropped once however many senders
+            // find it full.
+            connection_state_t open = LLWebsocketMgr::connection_open;
+            if (mState.compare_exchange_strong(open, LLWebsocketMgr::connection_closing))
+            {
+                net::post(mStrand,
+                          [self = shared_from_this(), queued]()
+                          {
+                              if (!self->mFinished)
+                              {
+                                  LL_WARNS("WebSocket") << self->mServer.name() << " dropped a connection with " << queued
+                                                        << " bytes unsent: its client is not reading" << LL_ENDL;
+                                  self->finish();
+                              }
+                          });
+            }
+            return false;
+        }
         Outgoing outgoing;
         outgoing.mText = message;
         net::post(mStrand, [self = shared_from_this(), outgoing = std::move(outgoing)]() mutable { self->enqueue(std::move(outgoing)); });
@@ -770,6 +803,10 @@ namespace
     {
         if (mFinished || mCloseQueued)
         {
+            if (!outgoing.mClose)
+            {
+                mQueuedBytes -= heldBytes(outgoing.mText);
+            }
             return;
         }
         if (outgoing.mClose)
@@ -788,20 +825,6 @@ namespace
                         self->finish();
                     }
                 });
-        }
-        else
-        {
-            // A client that lets this much wait unsent has stopped reading.
-            // One message alone may be larger: nothing else is waiting.
-            const std::size_t bytes = outgoing.mText.size() + sizeof(Outgoing);
-            if (mQueuedBytes > 0 && mQueuedBytes + bytes > MAX_QUEUED_BYTES)
-            {
-                LL_WARNS("WebSocket") << mServer.name() << " dropped a connection with " << mQueuedBytes
-                                      << " bytes unsent: its client is not reading" << LL_ENDL;
-                finish();
-                return;
-            }
-            mQueuedBytes += bytes;
         }
         mQueue.push_back(std::move(outgoing));
         if (!mWriting)
@@ -835,12 +858,11 @@ namespace
         {
             // The read says why, and ends the session.
             LL_DEBUGS("WebSocket") << mServer.name() << " failed to send a message: " << ec.message() << LL_ENDL;
-            mQueue.clear();
-            mQueuedBytes = 0;
-            mWriting     = false;
+            clearQueue();
+            mWriting = false;
             return;
         }
-        mQueuedBytes -= mQueue.front().mText.size() + sizeof(Outgoing);
+        mQueuedBytes -= heldBytes(mQueue.front().mText);
         mQueue.pop_front();
         writeNext();
     }
@@ -851,10 +873,22 @@ namespace
         {
             LL_DEBUGS("WebSocket") << mServer.name() << " close did not complete: " << ec.message() << LL_ENDL;
         }
-        mQueue.clear();
-        mQueuedBytes = 0;
-        mWriting     = false;
+        clearQueue();
+        mWriting = false;
         finish();
+    }
+
+    // Only what it holds: sends taken meanwhile are still on their way.
+    void WSSession::clearQueue()
+    {
+        for (const Outgoing& outgoing : mQueue)
+        {
+            if (!outgoing.mClose)
+            {
+                mQueuedBytes -= heldBytes(outgoing.mText);
+            }
+        }
+        mQueue.clear();
     }
 
     // Once, however it ended. A write still in flight keeps its message
