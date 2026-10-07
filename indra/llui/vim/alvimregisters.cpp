@@ -52,6 +52,22 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
     {
         return;
     }
+    // A delete of a line or more, or a smaller one `register_one` says is
+    // kept here, goes in 1 whichever register is named, as vim's does: the
+    // last nine kept, newest first, each moved down one rather than copied.
+    const bool lines = linewise || reg.text.find('\n') != std::string::npos;
+    if (!yanked && (lines || register_one))
+    {
+        for (char n = '9'; n > '1'; --n)
+        {
+            const auto older = mRegisters.find(static_cast<char>(n - 1));
+            if (older != mRegisters.end())
+            {
+                mRegisters[n] = std::move(older->second);
+            }
+        }
+        mRegisters['1'] = reg;
+    }
     // A register named keeps it, and "" says it; the clipboard is not
     // touched, as vim's clipboard=unnamed leaves a named one alone.
     if (name >= 'A' && name <= 'Z')
@@ -87,29 +103,10 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
     {
         mRegisters['0'] = reg;
     }
-    else
+    else if (!lines)
     {
-        const bool lines = linewise || reg.text.find('\n') != std::string::npos;
-        if (lines || register_one)
-        {
-            // A delete of a line or more, or a smaller one `register_one`
-            // says is kept here: the last nine kept, newest first, each
-            // moved down one rather than copied.
-            for (char n = '9'; n > '1'; --n)
-            {
-                const auto older = mRegisters.find(static_cast<char>(n - 1));
-                if (older != mRegisters.end())
-                {
-                    mRegisters[n] = std::move(older->second);
-                }
-            }
-            mRegisters['1'] = reg;
-        }
-        if (!lines)
-        {
-            // A smaller delete.
-            mRegisters['-'] = reg;
-        }
+        // A smaller delete.
+        mRegisters['-'] = reg;
     }
     // The unnamed register: the clipboard, which the world shares, where
     // the setting says so; the editor's own otherwise.
