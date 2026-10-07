@@ -27,6 +27,7 @@
 #include "../alscriptsnippets.h"
 
 #include "alfilewrite.h"
+#include "alsnippetsession.h"
 
 #include "fsyspath.h"
 #include "llfile.h"
@@ -37,6 +38,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <string_view>
 
 #if !LL_WINDOWS
 #include <unistd.h>
@@ -74,6 +76,30 @@ namespace tut
             one.name = name;
             one.body = body;
             return one;
+        }
+
+        // Whether a stretch closes every bracket it opens, and none it did
+        // not.
+        static bool whole(std::string_view text)
+        {
+            std::string open;
+            for (const char c : text)
+            {
+                if (c == '(' || c == '[' || c == '{')
+                {
+                    open.push_back(c);
+                }
+                else if (c == ')' || c == ']' || c == '}')
+                {
+                    const char opener = c == ')' ? '(' : c == ']' ? '[' : '{';
+                    if (open.empty() || open.back() != opener)
+                    {
+                        return false;
+                    }
+                    open.pop_back();
+                }
+            }
+            return open.empty();
         }
     };
 
@@ -256,5 +282,30 @@ namespace tut
 
         ensure("none followed", ALScriptSnippets::follow(std::string()));
         ensure("none left", ALScriptSnippets::followed(false).empty() && ALScriptSnippets::followed(true).empty());
+    }
+
+    template<> template<>
+    void alscriptsnippets_object::test<8>()
+    {
+        set_test_name("every snippet the viewer ships expands whole: each stop over all of what its placeholder holds, no bracket of it left "
+                      "outside, and nothing of a placeholder left in the text");
+        for (const char* language : { "lsl.xml", "slua.xml" })
+        {
+            const std::string                      file = std::string(LLUI_TEST_APP_DIR) + "/app_settings/snippets/" + language;
+            std::vector<ALScriptSnippets::Snippet> shipped;
+            ensure(std::string("read: ") + file, ALScriptSnippets::readFrom(file, true, shipped) && !shipped.empty());
+            for (const ALScriptSnippets::Snippet& one : shipped)
+            {
+                const std::string                 named    = std::string(language) + ", " + one.name;
+                const ALSnippetSession::Expansion expanded = ALSnippetSession::expand(one.body, ALTextPos(0, 0), std::string());
+                const ALTextDocument              text(expanded.text);
+                ensure(named + ": no placeholder left in " + expanded.text, expanded.text.find("${") == std::string::npos);
+                for (size_t i = 0; i < expanded.stops.size(); ++i)
+                {
+                    const std::string held = text.text(expanded.stops[i]);
+                    ensure(named + ": stop " + std::to_string(i + 1) + " holds the whole of its text, not \"" + held + "\"", whole(held));
+                }
+            }
+        }
     }
 }
