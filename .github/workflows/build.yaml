@@ -125,6 +125,9 @@ jobs:
           INPUT_PROJECT: ${{ inputs.project }}
           IS_EDU_TAG: ${{ github.ref_type == 'tag' && contains(github.ref_name, 'edu') }}
           R2_ENABLED: ${{ vars.VCPKG_R2_ENABLED }}
+          # FMOD Studio and the Discord Social SDK come from the private vcpkg
+          # registry, which a proprietary build cannot fetch without it.
+          HAS_PRIVATE_REGISTRY_TOKEN: ${{ secrets.PRIVATE_REGISTRY_TOKEN != '' }}
           REF_PROTECTED: ${{ github.ref_protected }}
           PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
@@ -142,6 +145,17 @@ jobs:
             echo 'build_suffix=-OS' >> $GITHUB_OUTPUT
           elif [[ "$FROM_FORK" == "true" ]]; then
             # PR from fork; don't build with proprietary libs
+            echo 'build_type=opensource' >> $GITHUB_OUTPUT
+            echo 'build_suffix=-OS' >> $GITHUB_OUTPUT
+          elif [[ "$HAS_PRIVATE_REGISTRY_TOKEN" != "true" ]]; then
+            # No way into the private registry: Dependabot's runs, which get
+            # only Dependabot secrets, or a repository not given the token.
+            # A release must not quietly ship without the proprietary libs.
+            if [[ -n "$RELEASE_RUN" ]]; then
+              echo "::error::A release build needs the PRIVATE_REGISTRY_TOKEN secret to fetch the proprietary ports"
+              exit 1
+            fi
+            echo "::warning::No PRIVATE_REGISTRY_TOKEN secret, so this is an open-source build"
             echo 'build_type=opensource' >> $GITHUB_OUTPUT
             echo 'build_suffix=-OS' >> $GITHUB_OUTPUT
           else
@@ -323,6 +337,8 @@ jobs:
           # alone would not stop code that finds writer keys from using them.
           r2-access-key-id: ${{ needs.setup.outputs.r2_cache_mode == 'readwrite' && secrets.VCPKG_R2_ACCESS_KEY_ID || secrets.VCPKG_R2_READ_ACCESS_KEY_ID }}
           r2-secret-access-key: ${{ needs.setup.outputs.r2_cache_mode == 'readwrite' && secrets.VCPKG_R2_SECRET_ACCESS_KEY || secrets.VCPKG_R2_READ_SECRET_ACCESS_KEY }}
+          # Only a proprietary build asks for a port from the private registry.
+          private-registry-token: ${{ needs.setup.outputs.build_type == 'proprietary' && secrets.PRIVATE_REGISTRY_TOKEN || '' }}
 
       - name: Configure
         id: configure

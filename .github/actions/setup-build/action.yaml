@@ -30,6 +30,10 @@ inputs:
     description: "R2 secret access key"
     required: false
     default: ""
+  private-registry-token:
+    description: "A token that reads AlchemyViewer's private vcpkg registry and the vendor repositories its ports fetch; empty for an open-source build"
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -164,6 +168,25 @@ runs:
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
         key: ${{ steps.crates.outputs.cache-primary-key }}
+
+    # vcpkg fetches the private registry, and vcpkg_from_git its ports'
+    # vendor files, with plain git and no authentication of its own. Git's
+    # global config reaches every git vcpkg runs, the cleaned environment of
+    # a Windows port build included, where an environment variable would
+    # not. The token sits in the config only as long as the runner does.
+    - name: Authenticate to the private vcpkg registry
+      if: inputs.private-registry-token != ''
+      shell: bash
+      env:
+        PRIVATE_REGISTRY_TOKEN: ${{ inputs.private-registry-token }}
+      run: |
+        git config --global \
+          "url.https://x-access-token:${PRIVATE_REGISTRY_TOKEN}@github.com/AlchemyViewer/.insteadOf" \
+          "https://github.com/AlchemyViewer/"
+        if ! GIT_TERMINAL_PROMPT=0 git ls-remote https://github.com/AlchemyViewer/private-registry HEAD > /dev/null; then
+          echo "::error::The private registry token cannot read AlchemyViewer/private-registry"
+          exit 1
+        fi
 
     - name: Install AWS CLI on macOS
       if: inputs.r2-cache-mode != '' && runner.os == 'macOS'
