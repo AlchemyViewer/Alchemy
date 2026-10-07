@@ -462,7 +462,10 @@ namespace
     // Whether a character may stand in a Look's name or provenance: one
     // that draws. Out go whatever has no printed form (LLStringOps::
     // isNonprintable: the C0 and C1 controls, DEL, the line and paragraph
-    // separators), the '|' an inventory name cannot hold, U+100000 and up
+    // separators), the '|' an inventory name cannot hold, the '<' and '>'
+    // that markup is made of (every notification that shows a name shows it
+    // inside <nolink>, so that a URL in it is only text, and a name that
+    // could spell </nolink> would end that early), U+100000 and up
     // (the notecard editor shows these as the slots of embedded items,
     // ALNotecardItems, so a name holding one would open with a broken item
     // button in it), the replacement character that malformed bytes decode
@@ -477,7 +480,7 @@ namespace
     // stands next to it.
     bool drawsInName(llwchar cp)
     {
-        if (LLStringOps::isNonprintable(cp) || cp == '|' || cp >= 0x100000 || cp == 0xFFFD)
+        if (LLStringOps::isNonprintable(cp) || cp == '|' || cp == '<' || cp == '>' || cp >= 0x100000 || cp == 0xFFFD)
         {
             return false;
         }

@@ -151,9 +151,11 @@ namespace ALLookFormat
     bool isWindowsDeviceName(const std::string& file_name);
 
     // A text from outside as it may be shown or used as a name: without
-    // control characters, '|' (which inventory names may not hold), or the
-    // private-use characters the notecard editor shows as embedded items;
-    // trimmed, and cut to `byte_limit` on a character boundary.
+    // control characters, '|' (which inventory names may not hold), '<' and
+    // '>' (a notification shows such a text inside <nolink>, which it must
+    // not be able to close), or the private-use characters the notecard
+    // editor shows as embedded items; trimmed, and cut to `byte_limit` on a
+    // character boundary.
     std::string cleanMetadataText(const std::string& raw, size_t byte_limit);
     // A Look's name from a text from outside: cleaned to LOOK_NAME_BYTE_LIMIT,
     // and empty where nothing but dots and spaces is left, or where the

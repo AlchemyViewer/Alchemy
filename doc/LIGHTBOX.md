@@ -1434,11 +1434,13 @@ so that the part fed text from strangers can be tested without the viewer:
   the worst case under the limit. The same file judges every value (§9) and
   cleans every name, decoding it a character at a time (`utf8str_decode_at`)
   so that what is kept is well-formed UTF-8: control characters, `|` (which an
-  inventory name may not hold), the U+100000+ characters the notecard editor
-  shows as embedded items, the bidi overrides, embeddings and isolates (one
-  could make one Look's name read as another's) and the zero-width space —
-  the joiner, the non-joiner and the bidi marks stay, being load-bearing in
-  the scripts and emoji that use them — and anything malformed come out, and
+  inventory name may not hold), `<` and `>` (so that no name can close the
+  `<nolink>` a notification shows it in; see the rules below), the U+100000+
+  characters the notecard editor shows as embedded items, the bidi overrides,
+  embeddings and isolates (one could make one Look's name read as another's)
+  and the zero-width space — the joiner, the non-joiner and the bidi marks
+  stay, being load-bearing in the scripts and emoji that use them — and
+  anything malformed come out, and
   a name is cut on a character boundary to 63 bytes and trimmed again after
   the cut — `DB_INV_ITEM_NAME_STR_LEN`, and also what keeps `LLURI::escape`
   of a CJK name inside a file system's path limit. A name Windows would open
@@ -1490,10 +1492,25 @@ Rules that fall out of this:
   only shows the offer; the click is the consent.
 - **The author line is plain text.** Show it as information, never as
   verified; the item's creator is who actually shared it.
-- **The toasts do not log to chat.** The six `notifytip`s carry the Look's
-  name and the LUT's, and nearby chat parses URLs where a toast does not: a
-  Look named `secondlife:///app/…` would have been a clickable line in the
-  system's voice. `log_to_chat="false"` on each.
+- **A name is never a link.** Toasts and alerts parse URLs like any text
+  (`widgets/text.xml` sets `parse_urls`, and the `ExperienceEvent` tip relies
+  on it), so a name that spells a URL or a `secondlife:///app/…` link is one,
+  and `[https://… label]` is a link that reads only "label". Any name a share
+  or an import shows may be a stranger's — the notecard's, the Look's, the
+  LUT's — and so may any Look's name once one has been imported, in the Save
+  As and delete messages Looks share with the graphics presets
+  (`LightBoxLookOverwrite`, `PresetNotSaved`, `PresetNotDeleted`). So each
+  stands inside `<nolink>`, in `notifications.xml` and in the sentences
+  `[NOTE]` is made of; `[NOTE]` itself is not wrapped, since `<nolink>` does
+  not nest. Nothing may close it early: a Look's name and a notecard's lose
+  `<` and `>` (`cleanMetadataText`, which the notecard's own name passes
+  through before an alert shows it), and a LUT's name is a bare file name,
+  without the `/` a closing tag needs. A toast cut short at its length limit
+  is cut after its links are found, so the cut cannot undo one either. The
+  six `notifytip`s also carry `log_to_chat="false"`, so that no name is
+  copied into nearby chat as a line in the system's voice — which was once
+  taken for the whole fix, on the mistaken belief that a toast shows its
+  text plain.
 - **A drop is read only from the inventory's own drags.** `get_dropped_notecard`
   refuses the sources for which `LLToolDragAndDrop` hands a handler the bare
   id instead of an item (a person, a toolbar button, an item under neither

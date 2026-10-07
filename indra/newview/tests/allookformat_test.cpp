@@ -660,6 +660,14 @@ namespace tut
         ensure_equals("a left-to-right mark stays", ALLookFormat::lookNameFromUntrustedText("Soft\xE2\x80\x8E" "Film"), "Soft\xE2\x80\x8E" "Film");
         ensure_equals("a line separator goes", ALLookFormat::lookNameFromUntrustedText("Soft\xE2\x80\xA8" "Film"), "SoftFilm");
         ensure_equals("a Windows line break is one space", ALLookFormat::lookNameFromUntrustedText("Soft\r\nFilm"), "Soft Film");
+        // Markup's brackets: a notification shows a name inside <nolink>, so
+        // that a URL in it is only text, and a name that could close that
+        // early would put the rest of itself back to being a link.
+        ensure_equals("angle brackets go", ALLookFormat::lookNameFromUntrustedText("Soft <b>Film</b>"), "Soft bFilm/b");
+        ensure_equals("so no name can close a nolink", ALLookFormat::lookNameFromUntrustedText("x</nolink>[https://example.com Look]"),
+                      "x/nolink[https://example.com Look]");
+        ensure_equals("nor open an icon", ALLookFormat::cleanMetadataText("<icon>Inv_Notecard</icon>", ALLookFormat::LOOK_NAME_BYTE_LIMIT),
+                      "iconInv_Notecard/icon");
         // The cut can land after a space; the name must not end on it.
         ensure_equals("no space left at the end of a cut", ALLookFormat::lookNameFromUntrustedText(std::string(62, 'a') + " b"), std::string(62, 'a'));
         ensure_equals("the limit itself is whole", ALLookFormat::lookNameFromUntrustedText(std::string(63, 'a')).size(), ALLookFormat::LOOK_NAME_BYTE_LIMIT);
@@ -686,7 +694,9 @@ namespace tut
         ensure("a notecard's name does not end on the space the cut left", !cut_name.empty() && cut_name.back() != ' ');
     }
 
-    // The note is static text: a name that would end a comment cannot.
+    // The note is static text: a name that would end a comment cannot. The
+    // '>' never reaches a name (test 15); the "--" does, and neither belongs
+    // in a comment.
     template<> template<> void object::test<16>()
     {
         set_test_name("a name that would end the note");
@@ -699,7 +709,7 @@ namespace tut
         ensure("the note is closed before the Look begins", note != std::string::npos && note_end != std::string::npos && note_end < text.find("<llsd"));
         ALLookFormat::SharedLook back;
         ensure("and the Look reads", ALLookFormat::parseNotecardText(text, back));
-        ensure_equals("with its name", back.metadata.name, name);
+        ensure_equals("with its name, less the '>'", back.metadata.name, "Soft -- Film -- take 2");
     }
 
     // The names tried for a Look whose name is taken: the name, then numbered,
@@ -854,6 +864,7 @@ namespace tut
                     }
                 }
                 ensure("name within limit", look.metadata.name.size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
+                ensure("name without markup's brackets", look.metadata.name.find_first_of("<>") == std::string::npos);
                 ensure("numbered within limit", ALLookFormat::numberedLookName(look.metadata.name, 2).size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
                 ensure("numbered 999 within limit", ALLookFormat::numberedLookName(look.metadata.name, 999).size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
                 ensure("notecard name within limit", ALLookFormat::notecardNameForLook(look.metadata.name).size() <= ALLookFormat::LOOK_NAME_BYTE_LIMIT);
@@ -864,8 +875,11 @@ namespace tut
             const std::string head    = text.substr(0, 300);
             const std::string cleaned = ALLookFormat::cleanMetadataText(head, 63);
             ensure("cleaned within limit", cleaned.size() <= 63);
+            // The head of a Look is mostly markup: none of it may survive
+            // into a name a notification shows inside <nolink>.
+            ensure("cleaned without markup's brackets", cleaned.find_first_of("<>") == std::string::npos);
             ALLookFormat::lookNameFromUntrustedText(head);
-            ALLookFormat::lookNameFromNotecardName(head);
+            ensure("a notecard's name without them", ALLookFormat::lookNameFromNotecardName(head).find_first_of("<>") == std::string::npos);
             const std::string lut = ALLookFormat::lutFileNameOnly(head);
             ensure("lut has no separator", lut.find_first_of("/\\") == std::string::npos);
             ALLookFormat::numberedLookName(head, 2);

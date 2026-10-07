@@ -9759,11 +9759,13 @@ Screenshot saved to:
 Click to open folder.
   </notification>
 
+  <!-- [NAME] can be a Look's, and so a stranger's: see the Lightbox Looks
+       further down. -->
   <notification
     icon="notifytip.tga"
     name="PresetNotSaved"
     type="notifytip">
-Error saving preset [NAME].
+Error saving preset &lt;nolink&gt;[NAME]&lt;/nolink&gt;.
   </notification>
     
   <notification
@@ -9791,7 +9793,7 @@ Temperature and tint cannot neutralize that. It looks like a colored surface rat
     icon="alertmodal.tga"
     name="LightBoxLookOverwrite"
     type="alertmodal">
-A Look called &apos;[NAME]&apos; already exists. Replace it?
+A Look called &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; already exists. Replace it?
 
 This cannot be undone.
     <tag>confirm</tag>
@@ -9801,19 +9803,28 @@ This cannot be undone.
      yestext="Replace"/>
   </notification>
 
+  <!-- Lightbox Looks shared as notecards. Any name these show may be a
+       stranger's: the notecard's, the Look's, the color LUT's. Toasts and
+       alerts make links of what reads as one, so each name stands inside
+       nolink, and none can close it early: a Look's or a notecard's name
+       loses its angle brackets (ALLookFormat::cleanMetadataText), and a
+       LUT's is a bare file name, without the slash a closing tag needs.
+       [NOTE] holds names too, wrapped in its own strings, so it is not
+       wrapped here: nolink does not nest. [REASON] is the viewer's words
+       or the region's. -->
   <notification
     icon="notifytip.tga"
     name="LightBoxLookShared"
     log_to_chat="false"
     type="notifytip">
-Your Look &apos;[NAME]&apos; is in your Notecards folder as &apos;[NOTECARD]&apos;. Give it like any other item: drag it onto someone, or use Share in your inventory.
+Your Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; is in your Notecards folder as &apos;&lt;nolink&gt;[NOTECARD]&lt;/nolink&gt;&apos;. Give it like any other item: drag it onto someone, or use Share in your inventory.
   </notification>
 
   <notification
     icon="alertmodal.tga"
     name="LightBoxLookNotShared"
     type="alertmodal">
-The Look &apos;[NAME]&apos; could not be saved to a notecard: [REASON].
+The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; could not be saved to a notecard: [REASON].
     <tag>fail</tag>
   </notification>
 
@@ -9821,7 +9832,7 @@ The Look &apos;[NAME]&apos; could not be saved to a notecard: [REASON].
     icon="alertmodal.tga"
     name="LightBoxLookTooLarge"
     type="alertmodal">
-The Look &apos;[NAME]&apos; comes to [SIZE] bytes, and a notecard holds [LIMIT].
+The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; comes to [SIZE] bytes, and a notecard holds [LIMIT].
     <tag>fail</tag>
   </notification>
 
@@ -9829,7 +9840,7 @@ The Look &apos;[NAME]&apos; comes to [SIZE] bytes, and a notecard holds [LIMIT].
     icon="alertmodal.tga"
     name="LightBoxLookNotecardUnreadable"
     type="alertmodal">
-The notecard &apos;[NAME]&apos; could not be read: [REASON].
+The notecard &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; could not be read: [REASON].
     <tag>fail</tag>
   </notification>
 
@@ -9837,7 +9848,7 @@ The notecard &apos;[NAME]&apos; could not be read: [REASON].
     icon="alertmodal.tga"
     name="LightBoxLookNotecardNotALook"
     type="alertmodal">
-The notecard &apos;[NAME]&apos; does not hold a Lightbox Look, or holds one that is damaged. The Share button on the Lightbox makes one that does.
+The notecard &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; does not hold a Lightbox Look, or holds one that is damaged. The Share button on the Lightbox makes one that does.
     <tag>fail</tag>
   </notification>
 
@@ -9845,7 +9856,7 @@ The notecard &apos;[NAME]&apos; does not hold a Lightbox Look, or holds one that
     icon="alertmodal.tga"
     name="LightBoxLookNotImported"
     type="alertmodal">
-The Look &apos;[NAME]&apos; could not be saved to your Looks.
+The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; could not be saved to your Looks.
     <tag>fail</tag>
   </notification>
 
@@ -9856,7 +9867,7 @@ The Look &apos;[NAME]&apos; could not be saved to your Looks.
     name="LightBoxLookImported"
     log_to_chat="false"
     type="notifytip">
-Applied the Look &apos;[NAME]&apos; and added it to your Looks. Ctrl+Z in the Lightbox takes it back.[NOTE]
+Applied the Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; and added it to your Looks. Ctrl+Z in the Lightbox takes it back.[NOTE]
   </notification>
 
   <notification
@@ -9864,7 +9875,7 @@ Applied the Look &apos;[NAME]&apos; and added it to your Looks. Ctrl+Z in the Li
     name="LightBoxLookApplied"
     log_to_chat="false"
     type="notifytip">
-Applied the Look &apos;[NAME]&apos;, which you already had. Ctrl+Z in the Lightbox takes it back.[NOTE]
+Applied the Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos;, which you already had. Ctrl+Z in the Lightbox takes it back.[NOTE]
   </notification>
 
   <notification
@@ -9872,7 +9883,7 @@ Applied the Look &apos;[NAME]&apos;, which you already had. Ctrl+Z in the Lightb
     name="LightBoxLookAdded"
     log_to_chat="false"
     type="notifytip">
-Added the Look &apos;[NAME]&apos; to your Looks.[NOTE]
+Added the Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; to your Looks.[NOTE]
   </notification>
 
   <notification
@@ -9880,7 +9891,7 @@ Added the Look &apos;[NAME]&apos; to your Looks.[NOTE]
     name="LightBoxLookAlreadyHad"
     log_to_chat="false"
     type="notifytip">
-You already have this Look, as &apos;[NAME]&apos;; nothing was added.[NOTE]
+You already have this Look, as &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos;; nothing was added.[NOTE]
   </notification>
 
   <notification
@@ -9888,7 +9899,7 @@ You already have this Look, as &apos;[NAME]&apos;; nothing was added.[NOTE]
     name="LightBoxLookLUTMissing"
     log_to_chat="false"
     type="notifytip">
-This Look uses the color LUT file &apos;[LUT]&apos;, which is not in your colorlut folder, so it is shown without it. Ask whoever gave you the Look for the file, then use Open Folder next to Color LUT on the Look tab.
+This Look uses the color LUT file &apos;&lt;nolink&gt;[LUT]&lt;/nolink&gt;&apos;, which is not in your colorlut folder, so it is shown without it. Ask whoever gave you the Look for the file, then use Open Folder next to Color LUT on the Look tab.
   </notification>
 
   <notification
@@ -9903,11 +9914,13 @@ this preset or choose another name.
      yestext="OK"/>
   </notification>
 
+  <!-- [NAME] can be a Look's, and so a stranger's: see the Lightbox Looks
+       above. -->
   <notification
     icon="notifytip.tga"
     name="PresetNotDeleted"
     type="notifytip">
-Error deleting preset [NAME].
+Error deleting preset &lt;nolink&gt;[NAME]&lt;/nolink&gt;.
   </notification>
 
   <notification

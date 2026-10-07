@@ -2410,7 +2410,10 @@ void ALFloaterLightBox::finishSharedLookImport(const ALLookNotecard::ImportedLoo
         return;
     }
     LLSD args;
-    args["NAME"] = notecard_name;
+    // The notecard's name is whatever its giver called it, and is shown as a
+    // Look's name is: cleaned -- no bidi override to turn the sentence round,
+    // no '<' or '>' to close the <nolink> the notification shows it in.
+    args["NAME"] = ALLookFormat::cleanMetadataText(notecard_name, ALLookFormat::LOOK_NAME_BYTE_LIMIT);
     switch (imported.failure)
     {
         case Failure::Unreadable:
