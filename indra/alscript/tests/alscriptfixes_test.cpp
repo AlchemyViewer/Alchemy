@@ -1250,11 +1250,13 @@ namespace tut
     {
         set_test_name("a require nothing reads may be taken out, its line with it: offered after marking it unused, neither safe nor preferred, since a require runs its module");
         ensure("definitions: " + error, luauLoaded);
+        // The fixture's statics named by its class: MSVC finds none of them
+        // from a lambda, even one holding `this`.
         const auto removal = [this](const std::string& script) -> const ALScriptFix* {
             static ALScriptProblems problems;
             problems                       = check(script, true);
-            const ALScriptProblem* problem = keyed(problems, "LuauLintImportUnused");
-            ensure("said: " + said(problems), problem != nullptr && !problem->fixes.empty());
+            const ALScriptProblem* problem = alscriptfixes_data::keyed(problems, "LuauLintImportUnused");
+            ensure("said: " + alscriptfixes_data::said(problems), problem != nullptr && !problem->fixes.empty());
             ensure_equals("marking it unused first", problem->fixes.front().title.substr(0, 9), std::string("Rename to"));
             for (const ALScriptFix& fix : problem->fixes)
             {
