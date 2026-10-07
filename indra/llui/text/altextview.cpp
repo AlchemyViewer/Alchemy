@@ -1729,10 +1729,12 @@ void ALTextView::placeAtomViews()
         // layout put the gap on the row.
         bool placed = false;
         // Its line first, before its row is measured: an atom on a line
-        // scrolled away has no box, and there may be hundreds of them.
+        // scrolled away has no box, and there may be hundreds of them. The
+        // line's bottom is the top of the next line's gap, read from the
+        // heights, which lays no line out.
         const bool line_in_sight = row_h > 0 && atom.at.line < mDocument.lineCount() && !mLayout.hidden(atom.at.line) &&
                                    mLayout.lineTop(atom.at.line) < mScrollY + text.getHeight() &&
-                                   mLayout.lineTop(atom.at.line) + mLayout.lineHeight(atom.at.line) > mScrollY;
+                                   mLayout.gapTop(atom.at.line + 1) > mScrollY;
         S32 row = -1;
         F32 x0  = 0.f;
         F32 x1  = 0.f;

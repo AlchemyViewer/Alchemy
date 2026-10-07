@@ -3182,4 +3182,41 @@ namespace tut
         ensure("the first line too, which the edit did not touch", shaped_in(0, v.getFont()));
         ensure("and the last", shaped_in(2, v.getFont()));
     }
+
+    template<> template<>
+    void altextview_object::test<102>()
+    {
+        set_test_name("the views of atoms on lines scrolled away above are hidden without those lines laid out");
+        std::string text;
+        for (S32 line = 0; line < 400; ++line)
+        {
+            text += "line " + ALTextView::atomPlaceholder() + "\n";
+        }
+        ALTextView&                   v = make(text.c_str(), 400, 100);
+        std::vector<LLButton*>        buttons;
+        std::vector<ALTextView::Atom> atoms;
+        for (S32 line = 0; line < 100; ++line)
+        {
+            LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
+            bp.name  = "item";
+            bp.label = "item";
+            bp.rect  = LLRect(0, 16, 40, 0);
+            buttons.push_back(LLUICtrlFactory::create<LLButton>(bp));
+            ALTextView::Atom atom;
+            atom.at    = ALTextPos(line, 5);
+            atom.width = 40;
+            atom.view  = buttons.back();
+            atoms.push_back(atom);
+        }
+        v.setAtoms(atoms);
+        // At the bottom, every line let go of but those in sight, as the
+        // layout lets go of lines far from what is in sight.
+        v.setScrollY(v.layout().totalHeight());
+        v.placeAtomViews();
+        v.layout().trim(v.firstVisibleLine(), v.lastVisibleLine());
+        const U32 laid = v.layout().linesLaidOut();
+        v.placeAtomViews();
+        ensure_equals("no line above laid out", v.layout().linesLaidOut(), laid);
+        ensure("every view hidden", std::none_of(buttons.begin(), buttons.end(), [](LLButton* button) { return button->getVisible(); }));
+    }
 }
