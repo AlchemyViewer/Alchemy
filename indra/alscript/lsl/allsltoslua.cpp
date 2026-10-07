@@ -810,6 +810,11 @@ namespace
         // before anything that could set it.
         void statesPreamble();
         void timersPreamble();
+        // Whether every state has a timer handler that turns the timer off
+        // before it does anything else: what makes the timer a one-shot
+        // each time it is set, wherever the script is when it runs. A state
+        // with none would let LSL's go on running, for the next state's.
+        bool oneShotTimer() const;
         std::string handlerParams(LSLEventHandler* handler, std::vector<std::string>& lead);
         void handlerBody(LSLEventHandler* handler);
         void helpers(std::string& out);
@@ -858,8 +863,10 @@ namespace
         bool mLslFloat   = false;
         bool mVecNorm    = false;
         bool mManyStates = false;
-        // llSetTimerEvent's timer on LLTimers, where the script sets one.
-        bool mTimers = false;
+        // llSetTimerEvent's timer on LLTimers, where the script sets one;
+        // on LLTimers:once, where it is a one-shot (oneShotTimer).
+        bool mTimers  = false;
+        bool mOneShot = false;
         // Where the script resets its time: a clock of its own, timeBase,
         // that ll.GetTime is read from and each reset sets again, as SLua's
         // ll has no ResetTime and llcompat's may not move the clock ll and
@@ -6332,12 +6339,61 @@ namespace
                  "end\n\n";
     }
 
+    bool Writer::oneShotTimer() const
+    {
+        LSLASTNode* first = mScript->getStates()->getChild(0);
+        for (LSLASTNode* s = first; s; s = s->getNext())
+        {
+            LSLEventHandler* timer = nullptr;
+            for (LSLASTNode* h = static_cast<LSLState*>(s)->getEventHandlers()->getChild(0); h; h = h->getNext())
+            {
+                if (std::string_view(static_cast<LSLEventHandler*>(h)->getIdentifier()->getName()) == "timer")
+                {
+                    timer = static_cast<LSLEventHandler*>(h);
+                }
+            }
+            // Its first statement llSetTimerEvent of nought: written out, or
+            // LSL's FALSE.
+            LSLASTNode* statement = timer && timer->getStatements() ? timer->getStatements()->getChild(0) : nullptr;
+            if (!statement || statement->getNodeSubType() != NODE_EXPRESSION_STATEMENT)
+            {
+                return false;
+            }
+            LSLExpression* e = unbracketed(static_cast<LSLExpressionStatement*>(statement)->getExpr());
+            if (!e || e->getNodeSubType() != NODE_FUNCTION_EXPRESSION ||
+                std::string_view(static_cast<LSLFunctionExpression*>(e)->getIdentifier()->getName()) != "llSetTimerEvent")
+            {
+                return false;
+            }
+            LSLExpression* seconds = unbracketed(argumentAt(static_cast<LSLFunctionExpression*>(e), 0));
+            bool           nought  = false;
+            if (!numberWritten(seconds, nought))
+            {
+                LSLSymbol* named = seconds && seconds->getNodeSubType() == NODE_LVALUE_EXPRESSION
+                                       ? static_cast<LSLLValueExpression*>(seconds)->getIdentifier()->getSymbol()
+                                       : nullptr;
+                nought = named && named->getSubType() == SYM_BUILTIN && std::string_view(named->getName()) == "FALSE";
+            }
+            if (!nought)
+            {
+                return false;
+            }
+        }
+        return first != nullptr;
+    }
+
     void Writer::timersPreamble()
     {
         // llSetTimerEvent's one timer, on LLTimers: set going again, or
         // stopped, by each setTimer, calling the timer handler of the state
-        // the script is in.
-        line("-- llSetTimerEvent's timer, on LLTimers: one at a time, as LSL had it.");
+        // the script is in. Where every timer handler turns it off first,
+        // LLTimers:once, which runs it as often: once each time it is set.
+        line(mOneShot ? "-- llSetTimerEvent's timer, on LLTimers: one at a time, as LSL had it, and once each"
+                      : "-- llSetTimerEvent's timer, on LLTimers: one at a time, as LSL had it.");
+        if (mOneShot)
+        {
+            line("-- time it is set, as its handler turns it off before anything else.");
+        }
         noteOnce(nullptr, "SluaTimers", "SLua's LLTimers can run several timers at once: LLTimers:every(seconds, callback), "
                                         "LLTimers:once(seconds, callback) and LLTimers:off(timer).");
         if (!mManyStates)
@@ -6351,8 +6407,8 @@ namespace
                  "        LLTimers:off(timerHandle)\n"
                  "        timerHandle = nil\n"
                  "    end\n"
-                 "    if seconds > 0 then\n"
-                 "        timerHandle = LLTimers:every(seconds, function()\n";
+                 "    if seconds > 0 then\n";
+        mText += mOneShot ? "        timerHandle = LLTimers:once(seconds, function()\n" : "        timerHandle = LLTimers:every(seconds, function()\n";
         mText += mManyStates ? "            local handler = currentState and states[currentState].timer\n"
                                "            if handler then\n"
                                "                handler()\n"
@@ -6519,6 +6575,7 @@ end
             }
             resets |= name == "llResetTime" || name == "llGetAndResetTime";
         });
+        mOneShot    = mTimers && oneShotTimer();
         mTimeBase   = resets && mOptions.sluaCalls;
         mCompatTime = resets && !mOptions.sluaCalls;
         forgetMemoryHacks();

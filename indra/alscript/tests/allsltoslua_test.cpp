@@ -1991,4 +1991,63 @@ namespace tut
             ALLSLToSLua::convert("default { on_damage(integer n) { llAdjustDamage(0, 0.5); } }\n", ALLSLToSLua::Options::closeToLSL());
         ensure("close to LSL, llcompat's: " + close.text, has(close, "llcompat.AdjustDamage(0, 0.5)") && !has(close, "adjustDamage("));
     }
+
+    template<> template<>
+    void allsltoslua_object::test<68>()
+    {
+        set_test_name("a timer every state's handler of which turns it off first is a one-shot, on LLTimers:once, set again as often as "
+                      "the script likes; on LLTimers:every where a state has no timer handler, or one that does anything first");
+        const ALLSLToSLua::Result r = convert("default {\n"
+                                              "    state_entry() { llSetTimerEvent(5.0); }\n"
+                                              "    timer() {\n"
+                                              "        llSetTimerEvent(0.0);\n"
+                                              "        llOwnerSay(\"once\");\n"
+                                              "        if (llFrand(1.0) < 0.5) llSetTimerEvent(2);\n"
+                                              "    }\n"
+                                              "    touch_start(integer n) { llSetTimerEvent(1); }\n"
+                                              "}\n");
+        ensure("once: " + r.text, has(r, "timerHandle = LLTimers:once(seconds, function()") && !has(r, "LLTimers:every(seconds, function"));
+        ensure("said so: " + r.text, has(r, "-- time it is set, as its handler turns it off before anything else."));
+        ensure("the handler's own off kept, and set again: " + r.text,
+               has(r, "timerHandler = function()\n    setTimer(0.0)\n") && has(r, "setTimer(2)") && has(r, "setTimer(1)"));
+        checksClean(r);
+
+        const ALLSLToSLua::Result states = convert("default {\n"
+                                                   "    state_entry() { llSetTimerEvent(1); }\n"
+                                                   "    timer() { llSetTimerEvent(0); state two; }\n"
+                                                   "}\n"
+                                                   "state two {\n"
+                                                   "    timer() { llSetTimerEvent(FALSE); llOwnerSay(\"two\"); }\n"
+                                                   "    touch_start(integer n) { llSetTimerEvent(3); }\n"
+                                                   "}\n");
+        ensure("every state's, once: " + states.text,
+               has(states, "timerHandle = LLTimers:once(seconds, function") && has(states, "states[currentState].timer"));
+        checksClean(states);
+
+        const ALLSLToSLua::Result without = convert("default {\n"
+                                                    "    state_entry() { llSetTimerEvent(1); state two; }\n"
+                                                    "    timer() { llSetTimerEvent(0); }\n"
+                                                    "}\n"
+                                                    "state two {\n"
+                                                    "    touch_start(integer n) { state default; }\n"
+                                                    "}\n");
+        ensure("a state with none, every: " + without.text,
+               has(without, "timerHandle = LLTimers:every(seconds, function") && !has(without, "LLTimers:once(seconds, function"));
+
+        const ALLSLToSLua::Result later = convert("default {\n"
+                                                  "    state_entry() { llSetTimerEvent(1); }\n"
+                                                  "    timer() { llOwnerSay(\"tick\"); llSetTimerEvent(0); }\n"
+                                                  "}\n");
+        ensure("off after something else, every: " + later.text,
+               has(later, "timerHandle = LLTimers:every(seconds, function") && !has(later, "LLTimers:once(seconds, function"));
+
+        const ALLSLToSLua::Result again = convert("float gNext = 0.0;\n"
+                                                  "default {\n"
+                                                  "    state_entry() { llSetTimerEvent(1); }\n"
+                                                  "    timer() { llSetTimerEvent(gNext); }\n"
+                                                  "    touch_start(integer n) { gNext = 2.0; }\n"
+                                                  "}\n");
+        ensure("set to what is not written nought, every: " + again.text,
+               has(again, "timerHandle = LLTimers:every(seconds, function") && !has(again, "LLTimers:once(seconds, function"));
+    }
 }
