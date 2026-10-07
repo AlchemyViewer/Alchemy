@@ -5360,4 +5360,33 @@ namespace tut
         keys("vi(y");
         ensure_equals("and before one, the next block holding nothing", vim->registerText('"'), std::string("x"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<188>()
+    {
+        set_test_name("a word or quote object over a block of one character keeps the block, where a bracket object makes it characters and V iw does too");
+        ALCodeEditor& e = make("one two\nthree four\n");
+        e.setCaret(ALTextPos(0, 4));
+        keys("<C-v>iw");
+        ensure("C-v iw keeps the block", vim->mode() == ALVimKeymap::Mode::VisualBlock);
+        keys("y");
+        ensure_equals("over the word", vim->registerText('"'), std::string("two"));
+        e.setCaret(ALTextPos(0, 4));
+        keys("<C-v>aw");
+        ensure("C-v aw too", vim->mode() == ALVimKeymap::Mode::VisualBlock);
+        keys("<Esc>Viw");
+        ensure("V iw makes it characters", vim->mode() == ALVimKeymap::Mode::Visual);
+        keys("<Esc>");
+
+        make("x \"ab\" (cd) y\n");
+        editor->setCaret(ALTextPos(0, 3));
+        keys("<C-v>i\"");
+        ensure("C-v i\" keeps the block", vim->mode() == ALVimKeymap::Mode::VisualBlock);
+        keys("y");
+        ensure_equals("over what the quotes hold", vim->registerText('"'), std::string("ab"));
+        editor->setCaret(ALTextPos(0, 8));
+        keys("<C-v>i(");
+        ensure("C-v i( makes it characters", vim->mode() == ALVimKeymap::Mode::Visual);
+        keys("<Esc>");
+    }
 }

@@ -2909,12 +2909,16 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
     {
         // A word object selected as vim's selects one: the anchor at its
         // start, the caret where vim's cursor is left (wordObject), which
-        // may be the next line's first character.
+        // may be the next line's first character. Lines become characters,
+        // and a block stays one.
         if (const std::optional<WordObject> word = wordObject(d, cursor(view), pending == 'a', ch == 'W', count))
         {
             mVisualAnchor = word->start;
             mVisualCaret  = word->end;
-            setMode(view, Mode::Visual);
+            if (mMode == Mode::VisualLine)
+            {
+                setMode(view, Mode::Visual);
+            }
             showVisual(view);
         }
         else
@@ -2930,9 +2934,12 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
     {
         if (visual)
         {
-            mVisualAnchor = span.range.begin;
-            mVisualCaret  = span.linewise ? span.range.end : d.prevCluster(span.range.end);
-            setMode(view, span.linewise ? Mode::VisualLine : Mode::Visual);
+            // Lines for a paragraph, else characters -- but a quote object
+            // over a block keeps the block, as vim's does.
+            const bool quote = ch == '"' || ch == '\'' || ch == '`';
+            mVisualAnchor    = span.range.begin;
+            mVisualCaret     = span.linewise ? span.range.end : d.prevCluster(span.range.end);
+            setMode(view, span.linewise ? Mode::VisualLine : quote && mMode == Mode::VisualBlock ? Mode::VisualBlock : Mode::Visual);
             showVisual(view);
             clearPending();
             return true;
