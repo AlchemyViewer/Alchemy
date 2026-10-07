@@ -60,8 +60,8 @@ public:
         bool said   = false;
     };
     static Language languageOf(const std::string& path, bool lua_hint);
-    // The grammar a file that is no script is coloured by: XML or JSON,
-    // which the studio has, else text.
+    // The grammar a file that is no script is coloured by: the one whose
+    // file names its extension, else text.
     static std::string textSyntaxOf(const std::string& path);
 
     // A script or notecard opened lately, by what holds it.
