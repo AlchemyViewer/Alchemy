@@ -577,17 +577,10 @@ void ALCodeEditor::lightOccurrences()
     {
         return;
     }
-    // Not the name as a string or a comment says it.
+    // Not the name as a string, an attribute's value or a comment says it.
     const auto in_code = [this](S32 line, S32 column) {
-        for (const ALSyntaxToken& token : highlighter().tokens(line))
-        {
-            if (token.begin <= column && column < token.end)
-            {
-                return token.kind != ALSyntaxKind::String && token.kind != ALSyntaxKind::Escape && token.kind != ALSyntaxKind::Comment &&
-                       token.kind != ALSyntaxKind::DocComment;
-            }
-        }
-        return true;
+        const ALSyntaxToken* token = alSyntaxTokenAt(highlighter().tokens(line), column);
+        return !token || !alSyntaxKindIsQuiet(token->kind);
     };
     if (!in_code(name.begin.line, name.begin.column))
     {
@@ -1145,8 +1138,7 @@ void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
                 if (g_at < grammar.size() && grammar[g_at].begin <= cluster)
                 {
                     const ALSyntaxKind kind = grammar[g_at].kind;
-                    return kind == ALSyntaxKind::Comment || kind == ALSyntaxKind::DocComment || kind == ALSyntaxKind::String || kind == ALSyntaxKind::Escape ||
-                           kind == ALSyntaxKind::Preprocessor;
+                    return alSyntaxKindIsQuiet(kind) || kind == ALSyntaxKind::Preprocessor;
                 }
                 return false;
             };
@@ -2189,8 +2181,7 @@ void ALCodeEditor::foldBlocksOn(S32 line, std::vector<ALFoldModel::Block>& out)
     bool joined = false;
     for (const ALSyntaxToken& token : highlighter().tokens(line))
     {
-        if (token.kind == ALSyntaxKind::String || token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment ||
-            token.end > static_cast<S32>(text.size()))
+        if (alSyntaxKindIsQuiet(token.kind) || token.end > static_cast<S32>(text.size()))
         {
             continue;
         }
@@ -3405,21 +3396,18 @@ namespace
     // of its line it begins and ends at. False where it is in none.
     bool tokenRunAt(const std::vector<ALSyntaxToken>& tokens, S32 column, bool at_end, bool (*wanted)(ALSyntaxKind), S32& begin, S32& end)
     {
-        size_t at = tokens.size();
-        for (size_t t = 0; t < tokens.size(); ++t)
-        {
-            if (wanted(tokens[t].kind) && tokens[t].begin <= column && (column < tokens[t].end || (at_end && column == tokens[t].end)))
-            {
-                at = t;
-                break;
-            }
-        }
-        if (at == tokens.size())
+        // The token the column is in, and the one it is at the end of,
+        // which comes first where it is one wanted.
+        const ALSyntaxToken* in     = alSyntaxTokenAt(tokens, column);
+        const ALSyntaxToken* before = at_end && column > 0 ? alSyntaxTokenAt(tokens, column - 1) : nullptr;
+        const ALSyntaxToken* found  = before && before != in && wanted(before->kind) ? before : in && wanted(in->kind) ? in : nullptr;
+        if (!found)
         {
             return false;
         }
-        size_t first = at;
-        size_t last  = at;
+        const size_t at    = static_cast<size_t>(found - tokens.data());
+        size_t       first = at;
+        size_t       last  = at;
         while (first > 0 && wanted(tokens[first - 1].kind) && tokens[first - 1].end == tokens[first].begin)
         {
             --first;
@@ -3538,14 +3526,8 @@ bool ALCodeEditor::inProse(const ALTextPos& at)
     {
         return false;
     }
-    for (const ALSyntaxToken& token : highlighter().tokens(at.line))
-    {
-        if (token.begin <= column && column < token.end)
-        {
-            return alSyntaxKindIsQuiet(token.kind);
-        }
-    }
-    return false;
+    const ALSyntaxToken* token = alSyntaxTokenAt(highlighter().tokens(at.line), column);
+    return token && alSyntaxKindIsQuiet(token->kind);
 }
 
 bool ALCodeEditor::completesInProse(const ALTextPos& at)
@@ -4655,13 +4637,12 @@ S32 ALCodeEditor::argumentAt(const ALTextPos& open, const ALTextPos& at)
             {
                 continue;
             }
-            // Not what a string or a comment says.
+            // Not what a string or a comment says, an escape in a string too.
             while (t < tokens.size() && tokens[t].end <= i)
             {
                 ++t;
             }
-            if (t < tokens.size() && tokens[t].begin <= i &&
-                (tokens[t].kind == ALSyntaxKind::String || tokens[t].kind == ALSyntaxKind::Comment || tokens[t].kind == ALSyntaxKind::DocComment))
+            if (t < tokens.size() && tokens[t].begin <= i && alSyntaxKindIsQuiet(tokens[t].kind))
             {
                 continue;
             }

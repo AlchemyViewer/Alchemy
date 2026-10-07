@@ -3507,4 +3507,19 @@ namespace tut
                                    places[1].normalised() == ALTextRange(ALTextPos(0, 15), ALTextPos(0, 17)) &&
                                    places[2].normalised() == ALTextRange(ALTextPos(0, 20), ALTextPos(0, 22)));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<95>()
+    {
+        set_test_name("what a string says is not code to the lit occurrences and the call's arguments: an attribute's value, an escape");
+        ALCodeEditor& x = make("<button name=\"button\"/>\n<button/>", "xml");
+        x.setCaret(ALTextPos(0, 3));
+        x.lightOccurrences();
+        const std::vector<ALTextRange>& lit = x.highlights(ALCodeEditor::Highlight::Occurrences);
+        ensure_equals("the tags' names lit", lit.size(), size_t(2));
+        ensure("and not the attribute's value", lit[0] == ALTextRange(ALTextPos(0, 1), ALTextPos(0, 7)) && lit[1] == ALTextRange(ALTextPos(1, 1), ALTextPos(1, 7)));
+
+        ALCodeEditor& e = make("f(\"a\\,b\", c);");
+        ensure_equals("the comma a string's escape holds is not the call's", e.argumentAt(ALTextPos(0, 1), ALTextPos(0, 10)), 1);
+    }
 }

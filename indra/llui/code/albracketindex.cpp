@@ -139,6 +139,7 @@ const ALBracketIndex::Line& ALBracketIndex::lineAt(S32 line)
             {
                 ++t;
             }
+            // A bracket in a string or a comment is none.
             if (t < tokens->size() && (*tokens)[t].begin <= i && alSyntaxKindIsQuiet((*tokens)[t].kind))
             {
                 continue;

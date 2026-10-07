@@ -2817,14 +2817,9 @@ bool ALTextView::commentBefore(const ALTextPos& at)
     {
         return false;
     }
-    for (const ALSyntaxToken& token : mHighlighter.tokens(at.line))
-    {
-        if (token.begin < at.column && at.column <= token.end)
-        {
-            return token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment;
-        }
-    }
-    return false;
+    // The token of the byte before it.
+    const ALSyntaxToken* token = alSyntaxTokenAt(mHighlighter.tokens(at.line), at.column - 1);
+    return token && (token->kind == ALSyntaxKind::Comment || token->kind == ALSyntaxKind::DocComment);
 }
 
 // --- at every selection ------------------------------------------------------------
