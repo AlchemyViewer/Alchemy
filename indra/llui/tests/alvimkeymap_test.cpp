@@ -5389,4 +5389,34 @@ namespace tut
         ensure("C-v i( makes it characters", vim->mode() == ALVimKeymap::Mode::Visual);
         keys("<Esc>");
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<189>()
+    {
+        set_test_name("ap with no blank lines after takes those before; ap on blank lines takes the paragraph after them, and fails with none; vip leaves the caret at its last line's start");
+        ALCodeEditor& e = make("a\n\nb\nc");
+        e.setCaret(ALTextPos(2, 0));
+        keys("dap");
+        ensure_equals("dap on the last paragraph takes the blank line before", flat(e.text()), std::string("a"));
+
+        make("a\n\nb\nc");
+        editor->setCaret(ALTextPos(2, 0));
+        keys("Vapy");
+        ensure_equals("and V ap selects it so", vim->registerText('"'), std::string("\nb\nc"));
+
+        make("a\n\n\nb\nc\n\nd");
+        editor->setCaret(ALTextPos(1, 0));
+        keys("dap");
+        ensure_equals("dap on blank lines takes the paragraph after them", flat(editor->text()), std::string("a||d"));
+
+        make("a\nb\n\n");
+        editor->setCaret(ALTextPos(2, 0));
+        keys("dap");
+        ensure_equals("and with no paragraph after them fails", flat(editor->text()), std::string("a|b||"));
+
+        make("abc\ndef\n\nx");
+        editor->setCaret(ALTextPos(0, 2));
+        keys("vip<Esc>");
+        ensure_equals("vip: the caret at the start of the last line", caretText(), std::string("1:0"));
+    }
 }

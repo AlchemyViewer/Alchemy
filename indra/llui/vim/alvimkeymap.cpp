@@ -2267,6 +2267,68 @@ namespace
         return WordObject{ start, p, inclusive };
     }
 
+    // vim's current_par() over a line, nothing selected: back to the start of
+    // the paragraph or of the blank lines the line is in, then on by the
+    // count's -- ip counting a paragraph or a run of blank lines as one, the
+    // run the line is in among them; ap a paragraph with the blank lines after
+    // it, or blank lines with the paragraph after them. An ap that ends on no
+    // blank line takes the blank lines before it instead. The first and the
+    // last lines; false where the count runs past the text's end.
+    bool paragraphObject(const ALTextDocument& d, S32 line, bool around, S32 count, S32& first, S32& last)
+    {
+        const S32  lines          = d.lineCount();
+        const bool white_in_front = lineBlank(d, line);
+        S32        start          = line;
+        while (start > 0 && lineBlank(d, start - 1) == white_in_front)
+        {
+            --start;
+        }
+        S32 end = start;
+        while (end < lines && lineBlank(d, end))
+        {
+            ++end;
+        }
+        --end;
+        S32 i = !around && white_in_front ? count - 1 : count;
+        while (i-- > 0)
+        {
+            if (end == lines - 1)
+            {
+                return false;
+            }
+            const bool do_white = !around && lineBlank(d, end + 1);
+            if (around || !do_white)
+            {
+                ++end;
+                while (end < lines - 1 && !lineBlank(d, end + 1))
+                {
+                    ++end;
+                }
+            }
+            if (i == 0 && white_in_front && around)
+            {
+                break;
+            }
+            if (around || do_white)
+            {
+                while (end < lines - 1 && lineBlank(d, end + 1))
+                {
+                    ++end;
+                }
+            }
+        }
+        if (!white_in_front && !lineBlank(d, end) && around)
+        {
+            while (start > 0 && lineBlank(d, start - 1))
+            {
+                --start;
+            }
+        }
+        first = start;
+        last  = end;
+        return true;
+    }
+
     // The opening bracket a bracket object names: ( ) b, [ ], { } B or < >.
     char objectOpener(llwchar what)
     {
@@ -2934,11 +2996,12 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
     {
         if (visual)
         {
-            // Lines for a paragraph, else characters -- but a quote object
-            // over a block keeps the block, as vim's does.
+            // Lines for a paragraph, the caret at the last one's start, else
+            // characters -- but a quote object over a block keeps the block,
+            // as vim's does.
             const bool quote = ch == '"' || ch == '\'' || ch == '`';
             mVisualAnchor    = span.range.begin;
-            mVisualCaret     = span.linewise ? span.range.end : d.prevCluster(span.range.end);
+            mVisualCaret     = span.linewise ? d.lineStart(span.range.end.line) : d.prevCluster(span.range.end);
             setMode(view, span.linewise ? Mode::VisualLine : quote && mMode == Mode::VisualBlock ? Mode::VisualBlock : Mode::Visual);
             showVisual(view);
             clearPending();
@@ -4826,33 +4889,13 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         }
         case 'p':
         {
-            // The paragraph: the lines around this one up to the blank
-            // ones, and with them for `ap`.
-            S32 first = from.line;
-            S32 last  = from.line;
-            const bool blank = lineBlank(d, from.line);
-            while (first > 0 && lineBlank(d, first - 1) == blank)
+            // The paragraph or the blank lines the caret is on, the count of
+            // them on (paragraphObject), lines whole.
+            S32 first = 0;
+            S32 last  = 0;
+            if (!paragraphObject(d, from.line, around, count, first, last))
             {
-                --first;
-            }
-            while (last + 1 < d.lineCount() && lineBlank(d, last + 1) == blank)
-            {
-                ++last;
-            }
-            for (S32 n = 1; n < count && last + 1 < d.lineCount(); ++n)
-            {
-                const bool next_blank = lineBlank(d, last + 1);
-                while (last + 1 < d.lineCount() && lineBlank(d, last + 1) == next_blank)
-                {
-                    ++last;
-                }
-            }
-            if (around && !blank)
-            {
-                while (last + 1 < d.lineCount() && lineBlank(d, last + 1))
-                {
-                    ++last;
-                }
+                return false;
             }
             out.linewise = true;
             out.range    = ALTextRange(d.lineStart(first), d.lineEnd(last));
@@ -5038,13 +5081,22 @@ std::optional<bool> ALVimKeymap::visualObject(ALTextView& view, llwchar kind, ll
         }
         case 'p':
         {
-            // A selection of one line is a paragraph afresh -- but by lines
-            // where the caret is on the first of its paragraph or blank
-            // lines, which vim takes on from there.
+            // A selection of one line is a paragraph afresh (paragraphObject)
+            // -- but by lines, where that would start at the caret's line,
+            // vim takes it on from there instead.
             S32 line = caret.line;
-            if (anchor.line == caret.line && (mMode != Mode::VisualLine || (line > 0 && lineBlank(d, line - 1) == lineBlank(d, line))))
+            if (anchor.line == caret.line)
             {
-                return std::nullopt;
+                S32 first = 0;
+                S32 last  = 0;
+                if (!paragraphObject(d, line, around, count, first, last))
+                {
+                    return false;
+                }
+                if (mMode != Mode::VisualLine || first != line)
+                {
+                    return std::nullopt;
+                }
             }
             // On from the caret's line, or back where it is above the
             // anchor's, by the count's paragraphs or runs of blank lines --
