@@ -2760,6 +2760,18 @@ if(AL_BUILD_TESTS)
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
+  # A Script Studio window's side of scripts mastered by files on disk, over
+  # the window's side faked and the account's links held in memory: what may
+  # be linked, a tab linked and what was typed in it, and a tab giving way
+  # to its file.
+  al_add_test(
+    alscriptstudiomasters
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES al_studio_test_common llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
   # What of Script Studio's state is an account's own, kept apart from the
   # shared and put back over it.
   al_add_test(alscriptstudioaccount UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
