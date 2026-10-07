@@ -270,9 +270,18 @@ namespace ALVimText
     inline bool isDigit(llwchar ch) { return ch >= '0' && ch <= '9'; }
 
     // A count typed before a command: the digits as a number, at least one;
-    // no more than this.
-    inline constexpr S32 MAX_COUNT = 100000;
-    inline S32 countOr(S32 count, S32 fallback = 1) { return count > 0 ? count : fallback; }
+    // what a command does with one, no more than MAX_COUNT. It is typed as
+    // large as vim's may be, MAX_COUNT_TYPED, for go, whose count is a byte
+    // of the text and may be any of a long one's, and reads it as typed.
+    inline constexpr S32 MAX_COUNT       = 100000;
+    inline constexpr S32 MAX_COUNT_TYPED = 999999999;
+    inline S32 countOr(S32 count, S32 fallback = 1) { return count > 0 ? llmin(count, MAX_COUNT) : fallback; }
+    // A count with one digit more typed, as vim's takes it: a tenth makes it
+    // the most there is.
+    inline S32 countTyped(S32 count, llwchar digit)
+    {
+        return count > MAX_COUNT_TYPED / 10 ? MAX_COUNT_TYPED : count * 10 + static_cast<S32>(digit - '0');
+    }
     // What two keys typed together make -- a motion, an operator, keys
     // waiting for another -- as command() and motion() take them, beside
     // the characters: past the last codepoint, so that no key typed and no

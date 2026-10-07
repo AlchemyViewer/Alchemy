@@ -1119,7 +1119,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
     // A count.
     if (isDigit(ch) && !(ch == '0' && mCount == 0))
     {
-        mCount = llmin(mCount * 10 + static_cast<S32>(ch - '0'), MAX_COUNT);
+        mCount = countTyped(mCount, ch);
         return true;
     }
     if (ch == '"' && !mOperator)
@@ -3667,9 +3667,12 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
                 clearPending();
                 return true;
             }
-            // Lines joined with one space, their leading blanks gone.
+            // Lines joined with one space, their leading blanks gone: as many
+            // as the count says, read as typed, as vim's J reads it, and no
+            // more than there are. A visual J hands its lines on as the
+            // count, however many it has.
             const S32 first = view.caret().line;
-            const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(d, first, first + llmax(1, count - 1), false);
+            const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(d, first, first + llmax(1, mCount - 1), false);
             if (!join)
             {
                 clearPending();
@@ -4137,8 +4140,12 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
         {
             // go: the count's byte of the text, the first without one, each
             // line's break a byte; on the character it is part of, the one
-            // before a break, and the last past the end. Exclusive.
-            m.to = d.clamp(d.posAt(static_cast<size_t>(llmax(0, count - 1))));
+            // before a break, and the last past the end. Exclusive. The
+            // counts as typed, the operator's times the motion's, not held to
+            // what a count does: a byte of a long text may be past it.
+            const S64 typed = static_cast<S64>(llmax(1, mOperatorCount)) * static_cast<S64>(llmax(1, mCount));
+            const S64 byte  = llmin(typed, static_cast<S64>(MAX_COUNT_TYPED));
+            m.to = d.clamp(d.posAt(static_cast<size_t>(byte - 1)));
             if (atLineEnd(d, m.to))
             {
                 m.to = lastCharOf(d, m.to.line);

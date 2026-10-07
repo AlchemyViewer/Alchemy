@@ -5071,4 +5071,47 @@ namespace tut
         keys("g$j");
         ensure_equals("g$ then j: the column g$ went to", caretText(), std::string("1:2"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<177>()
+    {
+        set_test_name("go reaches any byte of a long text, its count read as typed and not held to what a count may do; an operator's count times it as well");
+        std::string text;
+        for (int i = 0; i < 1100; ++i)
+        {
+            text += std::string(99, 'x') + "\n";
+        }
+        text.pop_back();
+        make(text.c_str());
+        keys("105000go");
+        ensure_equals("byte 105000, the break that ends line 1050: the line's last character", caretText(), std::string("1049:98"));
+        keys("105001go");
+        ensure_equals("byte 105001: the first of line 1051", caretText(), std::string("1050:0"));
+        keys("99999999999go");
+        ensure_equals("past the end, and past the most a count is: the last character", caretText(), std::string("1099:98"));
+        keys("gg2d52501go");
+        ensure_equals("2d52501go: from the top to byte 105002", editor->document().line(0), std::string(98, 'x'));
+        ensure_equals("the lines before it gone", editor->document().lineCount(), 50);
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<178>()
+    {
+        set_test_name("J joins as many lines as its count says, read as typed, and no more than there are: a visual J over more lines than any other command's count is held to joins them all");
+        std::string text;
+        for (int i = 0; i < 100002; ++i)
+        {
+            text += "a\n";
+        }
+        text += "a";
+        make(text.c_str());
+        keys("100002J");
+        ensure_equals("100002J: the last line left", editor->document().lineCount(), 2);
+        ensure_equals("the rest one line", editor->document().line(0).size(), size_t(200003));
+
+        make(text.c_str());
+        keys("VGJ");
+        ensure_equals("VGJ: every line one", editor->document().lineCount(), 1);
+        ensure_equals("all of them", editor->document().line(0).size(), size_t(200005));
+    }
 }
