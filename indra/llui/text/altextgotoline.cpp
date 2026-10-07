@@ -33,6 +33,7 @@
 #include <charconv>
 #include <string_view>
 #include <system_error>
+#include <vector>
 
 namespace
 {
@@ -67,6 +68,17 @@ namespace
     {
         return column > 0 ? text.document().posAtDisplayColumn(line - 1, column - 1, text.getTabWidth()) : ALTextPos(line - 1, 0);
     }
+
+    // The selections the text had as Go to Line was asked, the main one
+    // and those besides it, put back where anything has moved them since;
+    // nothing done where nothing has, so that opening it moves nothing.
+    void putBack(ALTextView& text, const ALTextRange& held, const std::vector<ALTextRange>& others)
+    {
+        if (text.selection() != held || text.otherSelections() != others)
+        {
+            text.setSelections(held, others);
+        }
+    }
 }
 
 void ALTextGoToLine::ask(const ask_t& ask, text_t text_of, S32 base, words_t words, went_t went)
@@ -77,10 +89,15 @@ void ALTextGoToLine::ask(const ask_t& ask, text_t text_of, S32 base, words_t wor
         return;
     }
     const ALTextPos was = shown->caret();
+    // And every selection as it stood, the main one and those besides it,
+    // which a place gone to lets go of: what Escape puts back, and so do
+    // an emptied field and Return on what is no place.
+    const ALTextRange              held   = shown->selection();
+    const std::vector<ALTextRange> others = shown->otherSelections();
     // The text at the place typed, while it is typed; return leaves it
     // there, and so does looking away, escape puts it back.
     ALQuickOpen* quick = ask(
-        [text_of, base, was, went](const std::string& typed) {
+        [text_of, base, was, went, held, others](const std::string& typed) {
             ALTextView* text = text_of();
             if (!text)
             {
@@ -99,14 +116,14 @@ void ALTextGoToLine::ask(const ask_t& ask, text_t text_of, S32 base, words_t wor
             }
             else
             {
-                text->goTo(was);
+                putBack(*text, held, others);
             }
             text->setFocus(true);
         },
-        [text_of, was]() {
+        [text_of, held, others]() {
             if (ALTextView* text = text_of())
             {
-                text->goTo(was);
+                putBack(*text, held, others);
             }
         },
         // Looked away from: the line it went to stands, since that is
@@ -123,7 +140,7 @@ void ALTextGoToLine::ask(const ask_t& ask, text_t text_of, S32 base, words_t wor
     {
         return;
     }
-    quick->onQueryChanged([text_of, base, words, quick, was](const std::string& typed) {
+    quick->onQueryChanged([text_of, base, words, quick, held, others](const std::string& typed) {
         ALTextView* text = text_of();
         if (!text || !words)
         {
@@ -147,7 +164,7 @@ void ALTextGoToLine::ask(const ask_t& ask, text_t text_of, S32 base, words_t wor
         if (trimmed.empty())
         {
             quick->setHint(words("GoToLineHint", args));
-            text->goTo(was);
+            putBack(*text, held, others);
         }
         else if (there)
         {

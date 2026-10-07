@@ -57,8 +57,9 @@ namespace ALTextGoToLine
         ask_t;
 
     // Asked: the text at the place typed while it is typed, and back
-    // where it was while nothing is, or where Escape is pressed; Return
-    // keeps it and gives the text the keyboard, and so does a look away.
+    // where it was, its selection and every caret besides, while nothing
+    // is, or where Escape is pressed; Return keeps it and gives the text
+    // the keyboard, and so does a look away.
     // By the numbers the text shows: `base` added to a line counted from
     // one (ALTextView::lineNumberBase).
     void ask(const ask_t& ask, text_t text, S32 base, words_t words, went_t went = {});

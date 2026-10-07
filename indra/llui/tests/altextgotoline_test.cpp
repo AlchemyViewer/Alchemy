@@ -258,4 +258,29 @@ namespace tut
         ensure_equals("said as typed, from 0", said["[LINE]"](), std::string("2147483647"));
         ensure_equals("the caret where it was, from 0", v.caret(), ALTextPos(2, 1));
     }
+
+    template<> template<>
+    void altextgotoline_object::test<7>()
+    {
+        set_test_name("a selection and the carets besides it stand as Go to Line opens, and Escape and an emptied field put them back");
+        ALTextView&       v = make("zero\none\ntwo\nthree\n");
+        const ALTextRange block(ALTextPos(0, 1), ALTextPos(1, 2));
+        v.setSelections(block, { ALTextRange(ALTextPos(3, 0), ALTextPos(3, 0)) });
+        ask();
+        ensure("opened: the selection as it was", v.selection() == block);
+        ensure_equals("and the caret besides it", v.otherSelections().size(), size_t(1));
+        popover()->escape();
+        ensure("escaped with nothing typed: the selection", v.selection() == block);
+        ensure_equals("and the other caret", v.otherSelections().size(), size_t(1));
+
+        ask();
+        quick->setQuery("3");
+        ensure_equals("gone to the line typed", v.caret(), ALTextPos(2, 0));
+        ensure("a caret alone there", !v.hasSelection() && !v.hasOtherSelections());
+        quick->setQuery("");
+        ensure("emptied: the selection back", v.selection() == block && v.otherSelections().size() == 1);
+        quick->setQuery("2");
+        popover()->escape();
+        ensure("escaped after going: the selection back", v.selection() == block && v.otherSelections().size() == 1);
+    }
 }
