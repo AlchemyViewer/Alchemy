@@ -2758,6 +2758,14 @@ namespace
         {
             asked = "table.find(" + anyItems(argumentAt(call, 0), value(argumentAt(call, 0))) + ", " + itemText(sought) + ")";
         }
+        // Text in other text: string.find's plain search from the start,
+        // which finds it where LSL's did -- the empty text anywhere, as
+        // LSL's found it at 0 -- and asks nothing of where in characters.
+        else if (mOptions.idioms && lsl == "llSubStringIndex")
+        {
+            asked = "string.find(" + coerced(argumentAt(call, 0), LST_STRING).text + ", " + coerced(argumentAt(call, 1), LST_STRING).text +
+                    ", 1, true)";
+        }
         else
         {
             const ALLSLTraits::Trait* trait = ALLSLTraits::of(lsl.c_str());

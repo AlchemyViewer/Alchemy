@@ -389,8 +389,8 @@ namespace tut
         ensure("a constant index moved on: " + r.text, has(r, "ll.GetSubString(s, 1, 3)"));
         ensure("one that is not, through llcompat: " + r.text, has(r, "llcompat.GetSubString(s, i, -1)") && noted(r, "SluaIndex", "GetSubString"));
         ensure("one thing found in a list: " + r.text, has(r, "if table.find(l, \"a\") ~= nil then"));
-        ensure("~ of a find: " + r.text, has(r, "if ll.SubStringIndex(s, \"c\") ~= nil then"));
-        ensure("< 0 of one: " + r.text, has(r, "if ll.SubStringIndex(s, \"z\") == nil then"));
+        ensure("~ of a find: " + r.text, has(r, "if string.find(s, \"c\", 1, true) ~= nil then"));
+        ensure("< 0 of one: " + r.text, has(r, "if string.find(s, \"z\", 1, true) == nil then"));
         ensure("a find's index as a number, through llcompat: " + r.text, has(r, "llcompat.ListFindList(l, {\"a\", \"b\"})"));
         ensure("^, math and vector: " + r.text, has(r, "2.0 ^ 3.0") && has(r, "math.abs(-1.0)") && has(r, "vector.magnitude(vector(1, 2, 3) - ZERO_VECTOR)"));
         ensure("half up, as LSL rounds, not math.round: " + r.text, has(r, "math.floor(2.5 + 0.5)"));
@@ -2476,6 +2476,35 @@ namespace tut
                    has(r, "if table.find(gNames, tostring(NULL_KEY)) ~= nil then"));
         ensure("in a library call's list: " + r.text, has(r, "local parsed = (table.find(ll.ParseString2List(\"a,b\", {\",\"}, {}) :: { any }, \"b\") or 0) - 1"));
         ensure("no llcompat but those: " + r.text, count(r, "llcompat.") == 5);
+        checksClean(r);
+    }
+
+    template<> template<>
+    void allsltoslua_object::test<57>()
+    {
+        set_test_name("llSubStringIndex asked only whether it found: string.find's plain search, each way LSL asks it, a key as its "
+                      "text, the empty text found; its index still ll's");
+        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
+                                              "    string s = llGetObjectName(); key k = llGetOwner();\n"
+                                              "    if (llSubStringIndex(s, \"a\") != -1) llOwnerSay(\"a\");\n"
+                                              "    if (llSubStringIndex(s, \"b\") >= 0) llOwnerSay(\"b\");\n"
+                                              "    if (llSubStringIndex(s, \"c\") > -1) llOwnerSay(\"c\");\n"
+                                              "    if (llSubStringIndex(s, \"d\") == -1) llOwnerSay(\"no d\");\n"
+                                              "    if (!~llSubStringIndex(s, \"e\")) llOwnerSay(\"no e\");\n"
+                                              "    if (~llSubStringIndex(s, \".\")) llOwnerSay(\"dot\");\n"
+                                              "    if (~llSubStringIndex(s, k)) llOwnerSay(\"owner\");\n"
+                                              "    if (~llSubStringIndex(s, \"\")) llOwnerSay(\"empty\");\n"
+                                              "    integer at = llSubStringIndex(s, \"x\");\n"
+                                              "    llOwnerSay((string)at);\n"
+                                              "} }\n");
+        ensure("found: " + r.text, has(r, "if string.find(s, \"a\", 1, true) ~= nil then") && has(r, "if string.find(s, \"b\", 1, true) ~= nil then") &&
+                                       has(r, "if string.find(s, \"c\", 1, true) ~= nil then"));
+        ensure("not: " + r.text, has(r, "if string.find(s, \"d\", 1, true) == nil then") && has(r, "if not (string.find(s, \"e\", 1, true) ~= nil) then"));
+        ensure("plain, not a pattern: " + r.text, has(r, "if string.find(s, \".\", 1, true) ~= nil then"));
+        ensure("a key as its text: " + r.text, has(r, "if string.find(s, tostring(k), 1, true) ~= nil then"));
+        ensure("the empty text: " + r.text, has(r, "if string.find(s, \"\", 1, true) ~= nil then"));
+        ensure("its index in characters, ll's: " + r.text, has(r, "local at = (ll.SubStringIndex(s, \"x\") or 0) - 1"));
+        ensure("found by string.find alone: " + r.text, count(r, "SubStringIndex") == 1);
         checksClean(r);
     }
 }
