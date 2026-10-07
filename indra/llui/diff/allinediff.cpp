@@ -227,6 +227,14 @@ namespace
     constexpr S32 MOST_OCCURRENCES = 64;
     // How deep the splitting may go before what is left is walked instead.
     constexpr S32 MOST_DEPTH = 256;
+    // How much of the right a stretch's searches may look through -- so
+    // many times its lines, and so many besides -- before each search keeps
+    // at once all it found that the searches after it would keep. A search
+    // keeps one stretch, and the next looks through all that follows it:
+    // where each stretch kept is the first found of several as long, every
+    // other line changed, that is the rest of the right again for each.
+    constexpr S64 MOST_SCANNED_PER_LINE = 8;
+    constexpr S64 MOST_SCANNED_LEAST    = 1024;
 
     // Where each line of the left is, by its id, made once for a whole
     // histogram diff: how often a line comes up in a stretch of the left,
@@ -341,6 +349,17 @@ namespace
         mutable S32              mFrom = 0;
     };
 
+    // A stretch the two share, as a search found it: where it starts in
+    // each, how many lines it has, and how few times the rarest of them
+    // comes up in the stretch of the left searched.
+    struct Shared
+    {
+        S32 a      = 0;
+        S32 b      = 0;
+        S32 length = 0;
+        S32 rarity = 0;
+    };
+
     // A histogram diff, as git's: the stretch the two share whose lines are
     // the rarest in the left -- longest of those as rare -- kept, and the
     // stretches before it and after it diffed the same way; where nothing
@@ -354,6 +373,12 @@ namespace
         m -= tail;
         const S32 tail_left  = left + n;
         const S32 tail_right = right + m;
+        // How much of the right the searches have looked through, and may
+        // before each keeps at once what it found; and what one found, as
+        // rare as what it keeps, in the order found.
+        const S64           most_scanned = MOST_SCANNED_PER_LINE * static_cast<S64>(n + m) + MOST_SCANNED_LEAST;
+        S64                 scanned      = 0;
+        std::vector<Shared> found;
         // Each stretch kept, what is before it diffed on its own and what is
         // after it gone on with.
         while (true)
@@ -380,10 +405,13 @@ namespace
             // How often each line comes up in this stretch of the left,
             // and where, the first so many of those rare enough to be
             // worth trying.
-            const S32 from   = static_cast<S32>(a - places.left);
-            const S32 to     = from + n;
-            S32       best_a = -1, best_b = -1, best_len = 0, best_rarity = MOST_OCCURRENCES;
-            bool      shared = false;
+            const S32  from        = static_cast<S32>(a - places.left);
+            const S32  to          = from + n;
+            S32        best_a = -1, best_b = -1, best_len = 0, best_rarity = MOST_OCCURRENCES;
+            bool       shared      = false;
+            const bool all_at_once = scanned > most_scanned;
+            scanned += m;
+            found.clear();
             places.scanFrom(from);
             for (S32 j = 0; j < m;)
             {
@@ -426,6 +454,10 @@ namespace
                         const auto [line_first, line_last] = places.fromScan(a[k]);
                         rarity                             = std::min(rarity, Places::countTo(line_first, line_last, to, rarity));
                     }
+                    if (all_at_once && rarity <= best_rarity)
+                    {
+                        found.push_back(Shared{ sa, sb, ea - sa, rarity });
+                    }
                     if (rarity < best_rarity || (rarity == best_rarity && ea - sa > best_len))
                     {
                         best_a      = sa;
@@ -452,10 +484,34 @@ namespace
                 }
                 break;
             }
-            histogramAt(places, a, best_a, b, best_b, left, right, depth + 1, out);
-            push(out, Kind::Same, left + best_a, right + best_b, best_len);
-            const S32 skip_a = best_a + best_len;
-            const S32 skip_b = best_b + best_len;
+            // The stretch kept, what is before it diffed on its own; and all
+            // at once, each the searches after it would keep of those found
+            // as rare: the longest after the last kept, the first found of
+            // those as long.
+            S32        skip_a = 0;
+            S32        skip_b = 0;
+            const auto keep   = [&](S32 at_a, S32 at_b, S32 length) {
+                histogramAt(places, a + skip_a, at_a - skip_a, b + skip_b, at_b - skip_b, left + skip_a, right + skip_b, depth + 1, out);
+                push(out, Kind::Same, left + at_a, right + at_b, length);
+                skip_a = at_a + length;
+                skip_b = at_b + length;
+            };
+            if (!all_at_once)
+            {
+                keep(best_a, best_b, best_len);
+            }
+            else
+            {
+                std::erase_if(found, [best_rarity](const Shared& one) { return one.rarity != best_rarity; });
+                std::stable_sort(found.begin(), found.end(), [](const Shared& x, const Shared& y) { return x.length > y.length; });
+                for (const Shared& one : found)
+                {
+                    if (one.a >= skip_a && one.b >= skip_b)
+                    {
+                        keep(one.a, one.b, one.length);
+                    }
+                }
+            }
             a += skip_a;
             b += skip_b;
             n -= skip_a;
