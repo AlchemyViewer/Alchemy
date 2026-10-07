@@ -28,9 +28,9 @@
 
 #include "alfilewrite.h"
 #include "alscriptenvelope.h"
-#include "alscriptmodules.h"
 #include "alscriptworkspace.h"
 #include "alserialworker.h"
+#include "alsourcemap.h"
 #include "aluploadheader.h"
 #include "llinventory.h"
 #include "llinventorydefines.h"
@@ -108,7 +108,11 @@ namespace
 
     // The files on disk an expansion read, the master's includes and
     // theirs, as a link keeps them (`disk:<path>`): whose change sends it
-    // again.
+    // again. The map names each as the search found it, which is where it
+    // stands once its links are followed -- a file is read only as the
+    // folders admit it (ALDiskIncludes::admits), which follows them, and
+    // its identity is made from that -- so nothing is asked of the disk
+    // here to follow them again.
     std::vector<std::string> usesOf(const ALScriptPrepared& prepared)
     {
         std::vector<std::string> uses;
@@ -119,7 +123,7 @@ namespace
             {
                 if (files[i].path.rfind("disk:", 0) == 0)
                 {
-                    uses.push_back(ALScriptModules::identity(files[i].path));
+                    uses.push_back(files[i].path);
                 }
             }
         }
