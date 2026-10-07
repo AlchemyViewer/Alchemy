@@ -128,6 +128,13 @@ namespace
         }
         return reads;
     }
+
+    // Whether what was found from `at` to `end` of a line stands whole:
+    // no byte either side that `joins` would make part of a longer one.
+    bool standsWhole(std::string_view text, size_t at, size_t end, bool (*joins)(char))
+    {
+        return !(at > 0 && joins(text[at - 1])) && !(end < text.size() && joins(text[end]));
+    }
 }
 
 ALCodeEditor::Params::Params()
@@ -599,8 +606,7 @@ void ALCodeEditor::lightOccurrences()
         for (size_t at = text.find(word); at != std::string::npos; at = text.find(word, at + word.size()))
         {
             const size_t end = at + word.size();
-            if ((at > 0 && alIdentifierByte(text[at - 1])) || (end < text.size() && alIdentifierByte(text[end])) ||
-                !in_code(line, static_cast<S32>(at)))
+            if (!standsWhole(text, at, end, alIdentifierByte) || !in_code(line, static_cast<S32>(at)))
             {
                 continue;
             }
@@ -894,9 +900,7 @@ S32 ALCodeEditor::heatWidth() const
 
 void ALCodeEditor::goToLine(S32 line)
 {
-    // One caret there, as goTo leaves.
-    singleSelection();
-    setCaret(document().lineStart(line));
+    goTo(document().lineStart(line));
 }
 
 void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
@@ -2492,7 +2496,6 @@ bool ALCodeEditor::performFunction(ALEditorCommand command)
         mGrownFrom.push_back(was);
         setSelection(*grown);
         mGrownTo = selection();
-        scrollToCaret();
         return true;
     }
     if (command == ALEditorCommand::ShrinkSelection)
@@ -2505,7 +2508,6 @@ bool ALCodeEditor::performFunction(ALEditorCommand command)
         mGrownFrom.pop_back();
         setSelection(back);
         mGrownTo = selection();
-        scrollToCaret();
         return true;
     }
     if (command == ALEditorCommand::GoToMatchingBracket)
@@ -2516,7 +2518,6 @@ bool ALCodeEditor::performFunction(ALEditorCommand command)
             return false;
         }
         setCaret(to);
-        scrollToCaret();
         return true;
     }
     if (command == ALEditorCommand::SelectFunction)
@@ -2528,7 +2529,6 @@ bool ALCodeEditor::performFunction(ALEditorCommand command)
             return false;
         }
         setSelection(*around);
-        scrollToCaret();
         return true;
     }
     const std::optional<ALTextRange> to = functionFrom(caret(), command == ALEditorCommand::NextFunction, false);
@@ -2537,7 +2537,6 @@ bool ALCodeEditor::performFunction(ALEditorCommand command)
         return false;
     }
     setCaret(to->begin);
-    scrollToCaret();
     return true;
 }
 
@@ -4073,7 +4072,7 @@ std::vector<ALTextRange> ALCodeEditor::placesOf(const std::string& wanted, bool 
              at = text.find(wanted, at + 1))
         {
             const size_t end = at + wanted.size();
-            if (whole && ((at > 0 && alIdentifierByte(text[at - 1])) || (end < text.size() && alIdentifierByte(text[end]))))
+            if (whole && !standsWhole(text, at, end, alIdentifierByte))
             {
                 continue;
             }
