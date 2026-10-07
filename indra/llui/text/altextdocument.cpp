@@ -283,6 +283,11 @@ ALTextDocument::ALTextDocument(std::string_view text)
 {
     std::vector<std::string> lines;
     ALLineBreaks::split(text, lines);
+    mBytes = lines.empty() ? 0 : lines.size() - 1;
+    for (const std::string& line : lines)
+    {
+        mBytes += line.size();
+    }
     mLines.swap(lines);
 }
 
@@ -336,13 +341,8 @@ std::string ALTextDocument::text(const ALTextRange& range_in) const
     const std::string& head = mLines[range.begin.line];
     const size_t       from = static_cast<size_t>(range.begin.column);
     const size_t       tail = static_cast<size_t>(range.end.column);
-    size_t             size = head.size() - from + 1 + tail;
-    for (S32 l = range.begin.line + 1; l < range.end.line; ++l)
-    {
-        size += mLines[l].size() + 1;
-    }
-    std::string out;
-    out.resize(size);
+    std::string        out;
+    out.resize(byteCount(range));
     {
         char* buffer = out.data();
         char* at = std::copy(head.begin() + static_cast<std::ptrdiff_t>(from), head.end(), buffer);
@@ -366,12 +366,19 @@ const std::string& ALTextDocument::line(S32 index) const
     return mLines[index];
 }
 
-size_t ALTextDocument::byteCount() const
+size_t ALTextDocument::byteCount(const ALTextRange& range_in) const
 {
-    size_t size = mLines.size() - 1;
-    for (const std::string& l : mLines)
+    const ALTextRange range = clampBytes(range_in.normalised());
+    if (range.begin.line == range.end.line)
     {
-        size += l.size();
+        return static_cast<size_t>(llmax(0, range.end.column - range.begin.column));
+    }
+    // What follows the start on its line, every line between with its
+    // break, and what comes before the end on its own.
+    size_t size = mLines[static_cast<size_t>(range.begin.line)].size() - static_cast<size_t>(range.begin.column) + 1 + static_cast<size_t>(range.end.column);
+    for (S32 l = range.begin.line + 1; l < range.end.line; ++l)
+    {
+        size += mLines[static_cast<size_t>(l)].size() + 1;
     }
     return size;
 }
@@ -511,6 +518,7 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
         mLines.replace(first, last - first + 1, std::make_move_iterator(made.begin()), std::make_move_iterator(made.end()));
     }
 
+    mBytes = mBytes - edit.removed.size() + edit.inserted.size();
     ++mVersion;
     // The whole text kept, if it was, is made again when next asked
     // for: the same work as patching it here, and none where nobody

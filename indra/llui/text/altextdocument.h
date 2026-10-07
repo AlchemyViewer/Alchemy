@@ -229,8 +229,10 @@ public:
     {
         return index >= 0 && index < lineCount() ? static_cast<S32>(mLines[static_cast<size_t>(index)].size()) : 0;
     }
-    // The bytes of text(), line endings counted.
-    size_t             byteCount() const;
+    // The bytes of text(), line endings counted, kept as each edit changes
+    // them; and of text(range), counted over its own lines.
+    size_t             byteCount() const { return mBytes; }
+    size_t             byteCount(const ALTextRange& range) const;
     bool               empty() const { return mLines.size() == 1 && mLines.front().empty(); }
     U32                version() const { return mVersion; }
 
@@ -305,6 +307,7 @@ private:
     ALTextRange clampBytes(const ALTextRange& range) const;
 
     ALLineTable<std::string> mLines;
+    size_t                   mBytes   = 0;
     U32                      mVersion = 0;
     changed_signal_t         mChanged;
     // The whole text and its line starts as of a version; good while

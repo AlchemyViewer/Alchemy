@@ -546,4 +546,33 @@ namespace tut
             ensure_equals("the same put in over another", replaced.text(), doc.text());
         }
     }
+
+    template<> template<>
+    void altextdocument_object::test<22>()
+    {
+        set_test_name("the bytes of the text, and of a stretch of it, as every kind of edit leaves them");
+        ALTextDocument doc("one\r\ntwo\rthree");
+        const auto agrees = [&doc](const std::string& what) {
+            ensure_equals(what + ": the whole", doc.byteCount(), doc.text().size());
+            const S32         last     = doc.lineCount() - 1;
+            const ALTextRange ranges[] = { ALTextRange(doc.start(), doc.end()), ALTextRange(ALTextPos(0, 1), ALTextPos(0, 2)),
+                                           ALTextRange(ALTextPos(0, 2), ALTextPos(last, 1)), ALTextRange(doc.end(), ALTextPos(0, 1)),
+                                           ALTextRange(ALTextPos(-3, 9), ALTextPos(99, 99)) };
+            for (const ALTextRange& range : ranges)
+            {
+                ensure_equals(what + ": a stretch", doc.byteCount(range), doc.text(range).size());
+            }
+        };
+        agrees("as read");
+        doc.insert(ALTextPos(1, 1), "X\r\nY");
+        agrees("a break put in");
+        doc.replace(ALTextRange(ALTextPos(0, 1), ALTextPos(2, 1)), "z");
+        agrees("lines taken out");
+        doc.replaceMany({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)), "ab\ncd" }, { ALTextRange(doc.end(), doc.end()), "\r\n\n" } });
+        agrees("a batch");
+        doc.remove(ALTextRange(doc.start(), doc.end()));
+        agrees("everything gone");
+        doc.setText("again\nand again");
+        agrees("a text put in whole");
+    }
 }

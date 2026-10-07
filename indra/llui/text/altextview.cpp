@@ -2531,9 +2531,8 @@ std::string_view ALTextView::fitting(const ALTextRange& over, std::string_view t
     {
         return text;
     }
-    const ALTextRange range = over.normalised();
-    const size_t      taken = mDocument.offsetOf(range.end) - mDocument.offsetOf(range.begin);
-    const size_t      left  = mDocument.byteCount() - taken;
+    const size_t taken = mDocument.byteCount(over);
+    const size_t left  = mDocument.byteCount() - taken;
     if (text.size() <= taken || left + text.size() <= mMaxBytes)
     {
         return text;
@@ -2556,27 +2555,27 @@ bool ALTextView::wouldFit(const std::vector<std::pair<ALTextRange, std::string>>
         return true;
     }
     // In bytes of the text without a composition standing in it, which is
-    // the text the edit is made to: a place inside one at its start, as
-    // withoutComposition puts it, and one past it back by what it added --
+    // the text the edit is made to, each stretch counted over its own
+    // lines: a place inside one at its start, as withoutComposition puts
+    // it, and a stretch from before it to past it short by what it added --
     // what it wrote over put back.
-    const size_t composed    = hasPreedit() ? static_cast<size_t>(mPreeditLength) : 0;
-    const size_t overwritten = hasPreedit() ? mPreeditOverwritten.size() : 0;
-    const auto   offset      = [this, composed, overwritten](const ALTextPos& pos) -> size_t {
-        if (!hasPreedit() || pos <= mPreeditBegin)
-        {
-            return mDocument.offsetOf(pos);
-        }
-        if (pos.line == mPreeditBegin.line && pos.column < mPreeditBegin.column + mPreeditLength)
-        {
-            return mDocument.offsetOf(mPreeditBegin);
-        }
-        return mDocument.offsetOf(pos) - composed + overwritten;
+    const bool      composing   = hasPreedit();
+    const size_t    composed    = composing ? static_cast<size_t>(mPreeditLength) : 0;
+    const size_t    overwritten = composing ? mPreeditOverwritten.size() : 0;
+    const ALTextPos composed_end(mPreeditBegin.line, mPreeditBegin.column + mPreeditLength);
+    const auto      past    = [composing, composed_end](const ALTextPos& pos) { return composing && pos >= composed_end; };
+    const auto      outside = [this, composing, composed_end](const ALTextPos& pos) {
+        return composing && pos > mPreeditBegin && pos < composed_end ? mPreeditBegin : pos;
     };
     size_t taken = 0, put = 0;
     for (const auto& [over, text] : edits)
     {
         const ALTextRange range = over.normalised();
-        taken += offset(range.end) - offset(range.begin);
+        taken += mDocument.byteCount(ALTextRange(outside(range.begin), outside(range.end)));
+        if (past(range.end) && !past(range.begin))
+        {
+            taken = taken + overwritten - composed;
+        }
         put += text.size();
     }
     return put <= taken || mDocument.byteCount() - composed + overwritten - taken + put <= mMaxBytes;
