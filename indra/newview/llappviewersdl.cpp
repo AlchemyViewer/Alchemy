@@ -31,6 +31,7 @@
 #include "llcommandlineparser.h"
 
 #include "lldiriterator.h"
+#include "llcommandhandler.h"       // NAV_TYPE_EXTERNAL
 #include "llurldispatcher.h"        // SLURL from other app instance
 #include "llviewernetwork.h"
 #include "llviewercontrol.h"
@@ -91,6 +92,7 @@ static void handleUrl(const char* url_utf8);
 #endif
 
 #if LL_LINUX && LL_DBUS
+#include "llviewerwindow.h" // bringToFront() for a SLURL handed over the bus
 #include <dbus/dbus.h>
 #include <unistd.h>         // close() for the logind inhibitor fd
 
@@ -145,9 +147,12 @@ static void dispatchUrl(std::string url)
         url.replace(0, prefix.length(), "secondlife:///app/");
     }
 
+    // A URL from the OS is external, not a click, so it is throttled, as on
+    // Windows (LLViewerWindow::handleDataCopy). Launch Services brings the
+    // app forward itself, so unlike there no window is raised here.
     LLMediaCtrl* web = nullptr;
     const bool trusted_browser = false;
-    LLURLDispatcher::dispatch(url, "", web, trusted_browser);
+    LLURLDispatcher::dispatch(url, LLCommandHandler::NAV_TYPE_EXTERNAL, web, trusted_browser);
 }
 
 static void handleUrl(const char* url_utf8)
@@ -627,10 +632,18 @@ static void dispatchSLURL(const char* slurl)
 {
     LL_INFOS() << "Was asked to go to slurl: " << slurl << LL_ENDL;
 
+    // As Windows' WM_COPYDATA path does (LLViewerWindow::handleDataCopy): a
+    // link another instance hands over is external, not a click, so it is
+    // throttled, and the window comes forward as if the link had launched it.
+    // The bus is pumped from SDL_AppIterate, so this is the main thread.
     std::string url = slurl;
     LLMediaCtrl* web = nullptr;
     const bool trusted_browser = false;
-    LLURLDispatcher::dispatch(url, "", web, trusted_browser);
+    if (LLURLDispatcher::dispatch(url, LLCommandHandler::NAV_TYPE_EXTERNAL, web, trusted_browser)
+        && gViewerWindow)
+    {
+        gViewerWindow->getWindow()->bringToFront();
+    }
 }
 
 // Handles method calls delivered to VIEWERAPI_PATH. We only implement GoSLURL.
