@@ -2446,10 +2446,9 @@ namespace
 void LLScriptEditorWSServer::sendCompiled(const ALScriptCompileResult& result)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    // Nothing compiled: a notecard, or an upload that failed. Nor one this
-    // bridge sent, which its client is answered about as the save's reply.
-    if (result.kind == ALScriptKind::Notecard || !result.error.empty() || result.ref.item.isNull() ||
-        result.sender.origin == ALScriptOrigin::Bridge)
+    // Nothing compiled: a notecard. Nor one this bridge sent, which its
+    // client is answered about as the save's reply.
+    if (result.kind == ALScriptKind::Notecard || result.ref.item.isNull() || result.sender.origin == ALScriptOrigin::Bridge)
     {
         return;
     }
@@ -2471,8 +2470,20 @@ void LLScriptEditorWSServer::sendCompiled(const ALScriptCompileResult& result)
     const bool             lua  = subscribed != mSubscriptions.end() ? subscribed->second.mLua : isLuaItem(item);
 
     // Of the source, which is what the client has: a save from the studio
-    // went up in its envelope, expanded.
-    LLSD message = compiledMessage(script_id, result.success, result.running, result.inSource(), lua);
+    // went up in its envelope, expanded. An upload that failed compiled
+    // nothing, and says why at no line.
+    std::vector<ALScriptDiagnostic> said = result.inSource();
+    if (!result.error.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[REASON]"] = result.error;
+        ALScriptDiagnostic failed;
+        failed.hasLine = false;
+        failed.level   = "ERROR";
+        failed.message = LLTrans::getString("BridgeNotSaved", args);
+        said           = { failed };
+    }
+    LLSD message = compiledMessage(script_id, result.success && result.error.empty(), result.running, said, lua);
     if (prim)
     {
         message["object_id"] = root_id;
