@@ -32,6 +32,7 @@
 
 #include <cctype>
 #include <string>
+#include <vector>
 
 // What the vim keymap and the classes it is made of (ALVimSearch and the
 // rest) read the text by, a character at a time, and the small rules they
@@ -163,6 +164,43 @@ namespace ALVimText
     {
         const S32 width = d.displayColumn(d.lineEnd(line), tab_width);
         return width < column ? std::string(static_cast<size_t>(column - width), ' ') : std::string();
+    }
+    // What a block keeps of its lines, as a register holds it, a line each:
+    // what it holds of each (blockPiece), and blanks as wide as the block
+    // for a line that stops short of its first column -- to the widest
+    // line's end, for a block taken with $ -- as vim's yank pads one. A line
+    // that reaches the first column and stops short of the last keeps what
+    // it has.
+    inline std::string blockText(const ALTextDocument& d, const std::vector<ALTextRange>& pieces, S32 left, S32 right, bool to_end, S32 tab_width)
+    {
+        S32 width = right - left + 1;
+        if (to_end)
+        {
+            S32 widest = 0;
+            for (const ALTextRange& piece : pieces)
+            {
+                widest = llmax(widest, d.displayColumn(d.lineEnd(piece.begin.line), tab_width));
+            }
+            width = widest - left + 1;
+        }
+        std::string text;
+        for (size_t i = 0; i < pieces.size(); ++i)
+        {
+            if (i > 0)
+            {
+                text += '\n';
+            }
+            const ALTextRange& piece = pieces[i];
+            if (piece.empty() && !padTo(d, piece.begin.line, left, tab_width).empty())
+            {
+                text.append(static_cast<size_t>(llmax(0, width)), ' ');
+            }
+            else
+            {
+                text += d.text(piece);
+            }
+        }
+        return text;
     }
 
     // A bracket as % finds one on a line: the round, square and curly

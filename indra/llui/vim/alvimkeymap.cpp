@@ -3192,22 +3192,7 @@ std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
                 // to put the same again.
                 const Register                 put_this = fetch(mRegister);
                 const std::vector<ALTextRange> pieces   = span.block ? blockPieces(view, span) : std::vector<ALTextRange>();
-                std::string                    taken;
-                if (span.block)
-                {
-                    for (size_t i = 0; i < pieces.size(); ++i)
-                    {
-                        if (i > 0)
-                        {
-                            taken += '\n';
-                        }
-                        taken += d.text(pieces[i]);
-                    }
-                }
-                else
-                {
-                    taken = d.text(span.range);
-                }
+                std::string                    taken    = span.block ? blockText(d, pieces, span.left, span.right, span.toEnd, view.getTabWidth()) : d.text(span.range);
                 leaveVisual(view);
                 if (!editing)
                 {
@@ -4949,15 +4934,8 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
     {
         pieces.push_back(span.range);
     }
-    std::string text;
-    for (size_t i = 0; i < pieces.size(); ++i)
-    {
-        if (i > 0)
-        {
-            text += '\n';
-        }
-        text += d.text(pieces[i]);
-    }
+    // A block's a line each, a line short of it as blanks (blockText).
+    std::string text = span.block ? blockText(d, pieces, span.left, span.right, span.toEnd, view.getTabWidth()) : d.text(pieces.front());
 
     switch (op)
     {

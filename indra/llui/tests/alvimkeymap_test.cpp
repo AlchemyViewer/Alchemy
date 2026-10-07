@@ -4970,4 +4970,41 @@ namespace tut
         ex("1t 0");
         ensure_equals("and :1t 0 copies under it", flat(zero.text()), std::string("a|c|c|b"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<173>()
+    {
+        set_test_name("a block keeps blanks as wide as it for a line that stops short of it, as vim's yank does -- to the widest line's end for one taken with $ -- and a line that reaches its first column what it has");
+        ALCodeEditor& e = make("abcd\na\nabcd\n");
+        e.setCaret(ALTextPos(0, 2));
+        keys("<C-v>jjd");
+        ensure_equals("the block taken out, the short line as it was", flat(e.text()), std::string("abd|a|abd|"));
+        ensure_equals("a blank for the short line", vim->registerText('"'), std::string("c\n \nc"));
+        ensure_equals("and in 1", vim->registerText('1'), std::string("c\n \nc"));
+
+        make("abcd\n\nabcd\n");
+        editor->setCaret(ALTextPos(0, 1));
+        keys("<C-v>jjly");
+        ensure_equals("two blanks for an empty line under a block two wide", vim->registerText('"'), std::string("bc\n  \nbc"));
+
+        make("abcd\nab\nabcd\n");
+        editor->setCaret(ALTextPos(0, 2));
+        keys("<C-v>jjy");
+        ensure_equals("a line that ends at the block's first column holds nothing of it", vim->registerText('"'), std::string("c\n\nc"));
+
+        make("abcdef\na\nabc\n");
+        editor->setCaret(ALTextPos(0, 2));
+        keys("<C-v>jj$y");
+        ensure_equals("taken with $: blanks to the widest line's end", vim->registerText('"'), std::string("cdef\n     \nc"));
+
+        make("abcdefghijkl\n\t\nabcdefghijkl\n");
+        editor->setCaret(ALTextPos(0, 9));
+        keys("<C-v>jjy");
+        ensure_equals("a tab's line short of the block: a blank as the reader counts the block", vim->registerText('"'), std::string("j\n \nj"));
+
+        make("abcd\na\nabcd\nXY\n");
+        keys("3j\"xy$gg2l<C-v>jj\"xp");
+        ensure_equals("visual p over it: the short line as it was", flat(editor->text()), std::string("abXYd|a|abXYd|XY|"));
+        ensure_equals("what it replaced kept as a delete keeps it", vim->registerText('"'), std::string("c\n \nc"));
+    }
 }
