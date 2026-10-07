@@ -85,17 +85,9 @@ ALFindBar::ALFindBar(const Params& p)
         mQuery = editor->getText();
         mChanged();
     }, nullptr);
-    mFind->setCommitCallback([this](LLUICtrl*, const LLSD&) {
-        // Return goes on; with shift, back.
-        if (gKeyboard && (gKeyboard->currentMask(false) & MASK_SHIFT))
-        {
-            mPrevious();
-        }
-        else
-        {
-            mNext();
-        }
-    });
+    // Return goes on: the field commits on Return alone, and Shift and
+    // Return goes back by the bar's own keys (handleKeyHere).
+    mFind->setCommitCallback([this](LLUICtrl*, const LLSD&) { mNext(); });
     mCase  = flat("match_case", "Aa", true, alSaid("FindBarCase", "Match case"));
     mWord  = flat("whole_word", "ab", true, alSaid("FindBarWord", "Match whole words"));
     mRegex = flat("regex", ".*", true, alSaid("FindBarPattern", "Match a regular expression"));
