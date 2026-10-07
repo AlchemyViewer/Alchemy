@@ -625,4 +625,60 @@ namespace tut
         fragment.setModules({});
         whole.setModules({});
     }
+
+    template<> template<>
+    void alluaufragment_object::test<4>()
+    {
+        set_test_name("a line opened above the statement being typed since the last check: Luau would start the fragment where the text has no such place, and the whole script answers instead");
+        ensure("definitions loaded: " + error, loaded);
+        // Return pressed at the start of `print(a)`, then `.` typed in it
+        // before another check: the last check's statement began at the
+        // fifth column of a line that is empty now.
+        const std::string base = "local function f(p)\n    local a = p\n    print(a)\nend\n";
+        const std::string text = "local function f(p)\n    local a = p\n\n    print(a.)\nend\n";
+        fragment.setDocument("opened");
+        whole.setDocument("opened");
+        fragment.check(base);
+        fragment.warm(base);
+        const size_t before = fragment.fragmentsChecked();
+        const Told   told   = judged(fragment.complete(text, 3, 12), whole.complete(text, 3, 12));
+        ensure_equals("asked of the whole script", fragment.fragmentsChecked(), before);
+        ensure("and answered as it is:" + told.faults, told.faults.empty());
+    }
+
+    template<> template<>
+    void alluaufragment_object::test<5>()
+    {
+        set_test_name("an overloaded callee's handler is offered written out where its argument is being written, and not in a field of one, a table in one or a type asserted of one: over a fragment as over the whole script");
+        ensure("definitions loaded: " + error, loaded);
+        const auto stubbed = [](const std::vector<ALScriptCompletion>& found) {
+            return std::any_of(found.begin(), found.end(), [](const ALScriptCompletion& c) { return !c.snippet.empty(); });
+        };
+        // Each line typed new since the last check, asked at the argument
+        // begun, after a dot in it, in a table in it, at the end of a type
+        // asserted of it.
+        struct Place
+        {
+            const char* line;
+            S32         column;
+            bool        offered;
+        };
+        const Place places[] = {
+            { "LLEvents:on(\"touch_start\", h)", 27, true },
+            { "LLEvents:on(\"touch_start\", handlers.)", 36, false },
+            { "LLEvents:on(\"touch_start\", {})", 28, false },
+            { "LLEvents:on(\"touch_start\", h :: num)", 35, false },
+        };
+        const std::string base = "local handlers = { touch = 1 }\n";
+        fragment.setDocument("stubs");
+        whole.setDocument("stubs");
+        for (const Place& place : places)
+        {
+            const std::string text = base + place.line + "\n";
+            fragment.check(base);
+            fragment.warm(base);
+            ensure_equals(std::string(place.line) + ": over a fragment", stubbed(fragment.complete(text, 1, place.column)), place.offered);
+            ensure_equals(std::string(place.line) + ": over the whole script", stubbed(whole.complete(text, 1, place.column)), place.offered);
+        }
+    }
 }

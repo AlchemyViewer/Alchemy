@@ -27,6 +27,7 @@
 #include "alluaufragment.h"
 
 #include "alluaufrontend.h"
+#include "alscriptlexicon.h"
 
 #include "Luau/Allocator.h"
 #include "Luau/Ast.h"
@@ -71,9 +72,10 @@ namespace
     // What Luau changes of the front end for a fragment, put back as it was
     // when this goes. The time out and the stop it marks on the module it
     // patches (typecheckFragment_), which would cost the next question a
-    // whole check. And the script's requires, which it traces for the
-    // fragment under the script's name and then forgets: a check that did
-    // not parse the script again would find none of them.
+    // whole check: cleared while the fragment is checked, so that what is
+    // marked then is the fragment's own. And the script's requires, which
+    // it traces for the fragment under the script's name and then forgets:
+    // a check that did not parse the script again would find none of them.
     class Restored
     {
     public:
@@ -89,7 +91,13 @@ namespace
             {
                 mTrace = traced->second;
             }
+            mBase.timeout   = false;
+            mBase.cancelled = false;
         }
+        // Whether the fragment ran out of time: Luau's solver stops part
+        // way, marks it on the module and answers what it found by then,
+        // which is no answer to trust.
+        bool timedOut() const { return mBase.timeout; }
         ~Restored()
         {
             mBase.timeout   = mTimeout;
@@ -115,27 +123,15 @@ namespace
         std::optional<Luau::RequireTraceResult> mTrace;
     };
 
-    // Where the word that begins at `at` ends: `at` where none does. The
-    // studio asks at the start of what is being typed, and the fragment
-    // runs through it, as the text has it, rather than stopping at the
-    // position as Luau's does -- where a fragment holds no word, nothing in
-    // it has the type the word is wanted to have.
-    Luau::Position wordEnd(std::string_view source, Luau::Position at)
+    // Where the word that begins at `at`, `offset` into `text`, ends: `at`
+    // where none does. The studio asks at the start of what is being typed,
+    // and the fragment runs through it, as the text has it, rather than
+    // stopping at the position as Luau's does -- where a fragment holds no
+    // word, nothing in it has the type the word is wanted to have.
+    Luau::Position wordEnd(std::string_view text, size_t offset, Luau::Position at)
     {
-        size_t offset = 0;
-        for (unsigned line = 0; line < at.line; ++line)
-        {
-            offset = source.find('\n', offset);
-            if (offset == std::string_view::npos)
-            {
-                return at;
-            }
-            ++offset;
-        }
-        offset += at.column;
         unsigned length = 0;
-        while (offset + length < source.size() &&
-               (std::isalnum(static_cast<unsigned char>(source[offset + length])) || source[offset + length] == '_'))
+        while (offset + length < text.size() && ALScriptLexicon::isNameByte(text[offset + length]))
         {
             ++length;
         }
@@ -170,6 +166,13 @@ bool ALLuauFragment::ready(std::string_view source)
     }
     Luau::ModulePtr base = mFront.base();
     if (!base || !base->root || !base->names)
+    {
+        return false;
+    }
+    // The text the base was checked from not known -- its check stopped,
+    // say -- and nothing tells what was typed since, however much of this
+    // text was parsed before: no fragment is set against it.
+    if (!mFront.baseText())
     {
         return false;
     }
@@ -242,6 +245,17 @@ std::optional<Luau::Position> ALLuauFragment::reach(Luau::Position at, Luau::Pos
     // edit elsewhere since that check can be far above.
     const Luau::FragmentAutocompleteAncestryResult found = Luau::findAncestryForFragmentParse(mBase->root, at, mParse.root);
     const Luau::Position                           from  = found.fragmentSelectionRegion.begin;
+    // Luau finds that start in the text by counting lines and columns to
+    // it (getDocumentOffsets), and where the text has no such place -- the
+    // statement began further along a line since emptied, a line opened
+    // above it -- starts at the text's first byte instead: the fragment is
+    // all that is above, read as though it began at `from`, and nothing in
+    // it stands where it is.
+    const size_t past = from.line + 1 < mLines.size() ? mLines[from.line + 1] : mText.size();
+    if (from.line >= mLines.size() || mLines[from.line] + from.column >= past)
+    {
+        return std::nullopt;
+    }
     // The statement `at` is in, where one holds it.
     const Luau::AstStat* statement = found.nearestStatement && found.nearestStatement->location.containsClosed(at) ? found.nearestStatement : nullptr;
     // Where it ends: the end of that statement as the text parses it,
@@ -326,7 +340,7 @@ ALLuauFragment::Completion ALLuauFragment::complete(std::string_view source, Lua
     {
         return answer;
     }
-    const std::optional<Luau::Position> end = reach(at, wordEnd(source, at));
+    const std::optional<Luau::Position> end = reach(at, wordEnd(mText, offsetOf(at), at));
     if (!end)
     {
         return answer;
@@ -334,9 +348,11 @@ ALLuauFragment::Completion ALLuauFragment::complete(std::string_view source, Lua
     Waypoints                   waypoints;
     const Luau::FragmentContext context{ source, mParse, mFront.baseOptions(), *end, &waypoints };
     Luau::FragmentAutocompleteStatusResult made{ Luau::FragmentAutocompleteStatus::Success, std::nullopt };
+    bool                                   timedOut = false;
     {
         const Restored restored(*mFront.frontend, mFront.moduleName, *mBase);
-        made = Luau::tryFragmentAutocomplete(*mFront.frontend, mFront.moduleName, at, context, std::move(callback));
+        made     = Luau::tryFragmentAutocomplete(*mFront.frontend, mFront.moduleName, at, context, std::move(callback));
+        timedOut = restored.timedOut();
     }
     // Stopped: nothing, as a check stopped answers nothing. Luau says a
     // stop outside its solver as a failure inside, its error being one.
@@ -358,8 +374,21 @@ ALLuauFragment::Completion ALLuauFragment::complete(std::string_view source, Lua
         return answer;
     }
     // Luau declined: a module the script requires changed, or the fragment
-    // did not parse.
-    if (!made.result->incrementalModule)
+    // did not parse. Or it ran out of time, part way: the whole script, as
+    // a check that ran out of time is asked again.
+    if (!made.result->incrementalModule || timedOut)
+    {
+        return answer;
+    }
+    // Nothing found and nothing said of the place after a `.`: Luau found
+    // no type for what is indexed, as where the fragment was read from
+    // other than where it stands in the text, which an answer of nothing
+    // would hide. The whole script answers. Not where nothing is what
+    // there is -- a name being bound, a number -- which costs a whole
+    // check at every key for the same nothing.
+    const Luau::AutocompleteResult& found = made.result->acResults;
+    if (found.entryMap.empty() && found.context == Luau::AutocompleteContext::Unknown && !found.ancestry.empty() &&
+        found.ancestry.back()->is<Luau::AstExprIndexName>())
     {
         return answer;
     }
@@ -398,6 +427,7 @@ ALLuauFragment::Typed ALLuauFragment::typecheck(std::string_view source, Luau::P
     }
     Waypoints waypoints;
     std::pair<Luau::FragmentTypeCheckStatus, Luau::FragmentTypeCheckResult> made{ Luau::FragmentTypeCheckStatus::SkipAutocomplete, {} };
+    bool timedOut = false;
     {
         const Restored restored(*mFront.frontend, mFront.moduleName, *mBase);
         try
@@ -408,6 +438,7 @@ ALLuauFragment::Typed ALLuauFragment::typecheck(std::string_view source, Luau::P
             // the two are set side by side to find the call.
             made = Luau::typecheckFragment(*mFront.frontend, mFront.moduleName, at, mFront.baseOptions(), source, *end, mParse.root,
                                            &waypoints);
+            timedOut = restored.timedOut();
         }
         catch (const Luau::UserCancelError&)
         {
@@ -428,7 +459,8 @@ ALLuauFragment::Typed ALLuauFragment::typecheck(std::string_view source, Luau::P
         answer.outcome    = Outcome::Nothing;
         return answer;
     }
-    if (made.first != Luau::FragmentTypeCheckStatus::Success || !made.second.incrementalModule)
+    // Declined, or out of time part way, its types half solved.
+    if (made.first != Luau::FragmentTypeCheckStatus::Success || !made.second.incrementalModule || timedOut)
     {
         return answer;
     }

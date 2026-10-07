@@ -32,9 +32,13 @@
 #include "alscriptlexicon.h"
 
 #include "Luau/Ast.h"
+#include "Luau/AstQuery.h"
 #include "Luau/Autocomplete.h"
+#include "Luau/ToString.h"
 #include "Luau/Type.h"
 #include "Luau/TypePack.h"
+
+#include <string_view>
 
 namespace
 {
@@ -94,18 +98,20 @@ namespace
 
     Stub stubOf(std::string written)
     {
+        // A whole one opens with `function(` and closes with two spaces and
+        // its `end`. A parameter list opens with a parameter's name, which
+        // `function` cannot be, and may close with a word that ends in `end`
+        // -- a parameter `legend`, a type `Friend` -- which is no body's.
+        constexpr std::string_view END  = "  end";
+        const bool                 body = written.rfind("function(", 0) == 0 && written.size() >= END.size() &&
+                                          written.compare(written.size() - END.size(), END.size(), END) == 0;
+        if (body)
+        {
+            written.erase(written.size() - END.size());
+        }
         while (!written.empty() && written.back() == ' ')
         {
             written.pop_back();
-        }
-        const bool body = written.size() >= 3 && written.compare(written.size() - 3, 3, "end") == 0;
-        if (body)
-        {
-            written.erase(written.size() - 3);
-            while (!written.empty() && written.back() == ' ')
-            {
-                written.pop_back();
-            }
         }
         // A dollar is the snippet's own mark; nothing else of a type is.
         std::string escaped;
@@ -120,11 +126,42 @@ namespace
         return Stub{ written, body ? escaped + "\n    $0\nend" : escaped };
     }
 
+    // A type as it is written into the script, as Luau writes its own
+    // stub's (tryGetTypeNameInScope): whole, where a tip cuts a long one
+    // short; and none where it cannot be written there -- `any`, an error,
+    // a generic or a free type, a table with a metatable or with no name
+    // to write, one named outside `scope`, or one that refers to itself.
+    std::optional<std::string> writable(Luau::TypeId type, const Luau::ScopePtr& scope)
+    {
+        type = Luau::follow(type);
+        if (Luau::get<Luau::AnyType>(type) || Luau::get<Luau::ErrorType>(type) || Luau::get<Luau::GenericType>(type) ||
+            Luau::get<Luau::FreeType>(type) || Luau::get<Luau::MetatableType>(type))
+        {
+            return std::nullopt;
+        }
+        if (const Luau::TableType* table = Luau::get<Luau::TableType>(type); table && !table->name && table->syntheticName)
+        {
+            return std::nullopt;
+        }
+        Luau::ToStringOptions options;
+        options.functionTypeArguments = true;
+        options.hideTableKind         = true;
+        options.maxTableLength        = 0;
+        options.maxTypeLength         = 0;
+        options.scope                 = scope;
+        Luau::ToStringResult written  = Luau::toStringDetailed(type, options);
+        if (written.error || written.invalid || written.cycle || written.truncated)
+        {
+            return std::nullopt;
+        }
+        return std::move(written.name);
+    }
+
     // The same written from a function type, as Luau writes its own: each
-    // parameter by its name, else `a` and its place, with its type; a
-    // variadic tail as `...`, typed where it is not `any`; and what it
-    // returns, where it returns anything.
-    std::string writtenOf(const Luau::FunctionType& type)
+    // parameter by its name, else `a` and its place, with its type where
+    // that can be written; a variadic tail as `...`, typed the same; and
+    // what it returns, where it returns anything and all of it can be.
+    std::string writtenOf(const Luau::FunctionType& type, const Luau::ScopePtr& scope)
     {
         auto [args, tail] = Luau::flatten(type.argTypes);
         std::string out   = "function(";
@@ -135,31 +172,42 @@ namespace
                 out += ", ";
             }
             out += i < type.argNames.size() && type.argNames[i] ? type.argNames[i]->name : "a" + std::to_string(i);
-            out += ": " + ALLuauTypes::typeText(args[i]);
+            if (const std::optional<std::string> written = writable(args[i], scope))
+            {
+                out += ": " + *written;
+            }
         }
         if (tail)
         {
             if (const Luau::VariadicTypePack* rest = Luau::get<Luau::VariadicTypePack>(Luau::follow(*tail)))
             {
                 out += args.empty() ? "..." : ", ...";
-                if (!Luau::get<Luau::AnyType>(Luau::follow(rest->ty)))
+                if (const std::optional<std::string> written = writable(rest->ty, scope))
                 {
-                    out += ": " + ALLuauTypes::typeText(rest->ty);
+                    out += ": " + *written;
                 }
             }
         }
         out += ")";
         auto [rets, rest] = Luau::flatten(type.retTypes);
-        if (!rets.empty() && !rest)
+        std::vector<std::string> returned;
+        for (Luau::TypeId ret : rets)
+        {
+            if (std::optional<std::string> written = writable(ret, scope))
+            {
+                returned.push_back(std::move(*written));
+            }
+        }
+        if (!rets.empty() && !rest && returned.size() == rets.size())
         {
             out += ": ";
             if (rets.size() > 1)
             {
                 out += "(";
             }
-            for (size_t i = 0; i < rets.size(); ++i)
+            for (size_t i = 0; i < returned.size(); ++i)
             {
-                out += (i > 0 ? ", " : "") + ALLuauTypes::typeText(rets[i]);
+                out += (i > 0 ? ", " : "") + returned[i];
             }
             if (rets.size() > 1)
             {
@@ -171,76 +219,76 @@ namespace
 
     // The function an argument at `at` is to be, where the callee is
     // overloaded: Luau writes no stub for one, so the overload the checker
-    // chose for the call says which. None where `at` is in no call's
-    // arguments, the callee is not overloaded, nothing was chosen, or the
-    // argument is no function.
-    std::optional<Luau::TypeId> overloadedCallbackAt(const Luau::Module& module, const std::vector<Luau::AstNode*>& ancestry, Luau::Position at)
+    // chose for the call says which. Asked where Luau would write its own
+    // (makeAnonymousAutofilled): an expression wanted, and the call the
+    // node at `at` or the one around it -- an argument being written, not
+    // a field of one, a table in one or a type asserted of one. None where
+    // `at` is in no call's arguments, the callee is not overloaded,
+    // nothing was chosen, or the argument is no function.
+    std::optional<Luau::TypeId> overloadedCallbackAt(const Luau::Module& module, const Luau::AutocompleteResult& found, Luau::Position at)
     {
-        for (auto it = ancestry.rbegin(); it != ancestry.rend(); ++it)
+        const std::vector<Luau::AstNode*>& ancestry = found.ancestry;
+        // In a function being written as the argument, `at` is in its head
+        // or its body, which is no argument being written.
+        if (found.context != Luau::AutocompleteContext::Expression || ancestry.empty() || ancestry.back()->is<Luau::AstExprFunction>())
         {
-            // Inside a function or a statement, `at` is in no argument
-            // being written, however deep in one's body it is.
-            if ((*it)->is<Luau::AstExprFunction>() || (*it)->asStat())
-            {
-                return std::nullopt;
-            }
-            const Luau::AstExprCall* call = (*it)->as<Luau::AstExprCall>();
-            if (!call)
-            {
-                continue;
-            }
-            if (!call->argLocation.containsClosed(at) || call->func->location.containsClosed(at))
-            {
-                return std::nullopt;
-            }
-            const Luau::TypeId* callee = module.astTypes.find(call->func);
-            if (!callee || !Luau::get<Luau::IntersectionType>(Luau::follow(*callee)))
-            {
-                return std::nullopt;
-            }
-            const Luau::TypeId*       chosen   = module.astOverloadResolvedTypes.find(call);
-            const Luau::FunctionType* overload = chosen ? Luau::get<Luau::FunctionType>(Luau::follow(*chosen)) : nullptr;
-            if (!overload)
-            {
-                return std::nullopt;
-            }
-            // The argument the position is in; past the last where it is
-            // in none yet, after a comma.
-            size_t argument = call->args.size;
-            for (size_t i = 0; i < call->args.size; ++i)
-            {
-                if (call->args.data[i]->location.containsClosed(at))
-                {
-                    argument = i;
-                    break;
-                }
-            }
-            if (call->self)
-            {
-                ++argument;
-            }
-            auto [args, tail] = Luau::flatten(overload->argTypes);
-            if (argument >= args.size())
-            {
-                return std::nullopt;
-            }
-            const Luau::TypeId wanted = Luau::follow(args[argument]);
-            if (Luau::get<Luau::FunctionType>(wanted))
-            {
-                return wanted;
-            }
-            // An optional one: the function it is where it is given.
-            if (const Luau::UnionType* options = Luau::get<Luau::UnionType>(wanted))
-            {
-                for (Luau::TypeId option : options->options)
-                {
-                    if (Luau::get<Luau::FunctionType>(Luau::follow(option)))
-                    {
-                        return Luau::follow(option);
-                    }
-                }
-            }
             return std::nullopt;
+        }
+        const Luau::AstExprCall* call = ancestry.back()->as<Luau::AstExprCall>();
+        if (!call && ancestry.size() > 1)
+        {
+            call = ancestry[ancestry.size() - 2]->as<Luau::AstExprCall>();
+        }
+        if (!call || !call->argLocation.containsClosed(at) || call->func->location.containsClosed(at))
+        {
+            return std::nullopt;
+        }
+        const Luau::TypeId* callee = module.astTypes.find(call->func);
+        if (!callee || !Luau::get<Luau::IntersectionType>(Luau::follow(*callee)))
+        {
+            return std::nullopt;
+        }
+        const Luau::TypeId*       chosen   = module.astOverloadResolvedTypes.find(call);
+        const Luau::FunctionType* overload = chosen ? Luau::get<Luau::FunctionType>(Luau::follow(*chosen)) : nullptr;
+        if (!overload)
+        {
+            return std::nullopt;
+        }
+        // The argument the position is in; past the last where it is in
+        // none yet, after a comma.
+        size_t argument = call->args.size;
+        for (size_t i = 0; i < call->args.size; ++i)
+        {
+            if (call->args.data[i]->location.containsClosed(at))
+            {
+                argument = i;
+                break;
+            }
+        }
+        if (call->self)
+        {
+            ++argument;
+        }
+        auto [args, tail] = Luau::flatten(overload->argTypes);
+        if (argument >= args.size())
+        {
+            return std::nullopt;
+        }
+        const Luau::TypeId wanted = Luau::follow(args[argument]);
+        if (Luau::get<Luau::FunctionType>(wanted))
+        {
+            return wanted;
+        }
+        // An optional one: the function it is where it is given.
+        if (const Luau::UnionType* options = Luau::get<Luau::UnionType>(wanted))
+        {
+            for (Luau::TypeId option : options->options)
+            {
+                if (Luau::get<Luau::FunctionType>(Luau::follow(option)))
+                {
+                    return Luau::follow(option);
+                }
+            }
         }
         return std::nullopt;
     }
@@ -391,9 +439,10 @@ std::vector<ALScriptCompletion> ALLuauCompletion::answer(const Luau::Autocomplet
     // event takes.
     if (!stubbed)
     {
-        if (const std::optional<Luau::TypeId> wanted = overloadedCallbackAt(module, found.ancestry, at))
+        if (const std::optional<Luau::TypeId> wanted = overloadedCallbackAt(module, found, at))
         {
-            out.push_back(stubCompletion(stubOf(writtenOf(*Luau::get<Luau::FunctionType>(*wanted))), wanted, context));
+            const std::string written = writtenOf(*Luau::get<Luau::FunctionType>(*wanted), Luau::findScopeAtPosition(module, at));
+            out.push_back(stubCompletion(stubOf(written), wanted, context));
         }
     }
     return out;

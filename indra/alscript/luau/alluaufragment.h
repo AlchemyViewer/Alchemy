@@ -51,10 +51,12 @@ struct ALLuauFrontend;
 // Each answer comes with whether to trust it: answered; nothing to answer,
 // the place being in a comment or the question stopped; or ask of the
 // whole script -- there is no check to patch yet, the last one is the
-// text's already, something was typed since above the fragment, the
-// fragment would be long enough to cost more than the whole check, a
-// module the script requires changed since, the fragment did not parse,
-// or Luau failed inside.
+// text's already, something was typed since above the fragment, Luau would
+// start the fragment at a place the text no longer has, the fragment would
+// be long enough to cost more than the whole check, a module the script
+// requires changed since, the fragment did not parse, Luau ran out of time
+// on it or failed inside, or it found nothing and could not say what the
+// place is.
 //
 // What Luau changes of the front end for a fragment is put back: the time
 // out and the stop it marks on the module it patches, which would cost the
@@ -104,8 +106,8 @@ public:
 
 private:
     // The text synced, and parsed for the engine to set against the last
-    // check; false where there is no fragment to check -- no check yet, or
-    // the last is the text's.
+    // check; false where there is no fragment to check -- no check yet, the
+    // last is the text's, or the text it was checked from is not known.
     bool ready(std::string_view source);
     // Luau failed inside: said once, and the question asked whole.
     void failedInside();

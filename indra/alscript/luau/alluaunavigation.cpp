@@ -43,10 +43,6 @@ namespace
     using ALLuauTypes::functionOf;
     using ALLuauTypes::spanOf;
 
-    // What a module the script requires is called to Luau, ahead of its
-    // key (ALLuauFrontend::moduleOf).
-    constexpr std::string_view MODULE = "module:";
-
     // A table or a type by where it was made: the module, and the place in
     // it. A copy keeps it -- the one a script requiring the module sees --
     // where the type itself is another.
@@ -150,9 +146,9 @@ namespace
         Luau::AstName   global;
         // A field's or a type's.
         std::string     name;
-        // The table a field belongs to, followed, or null for one whose
-        // table has no type; fields of the same name on other tables are
-        // other fields.
+        // The table a field belongs to, followed -- an object's method its
+        // class's (ownerOf) -- or null for one whose table has no type;
+        // fields of the same name on other tables are other fields.
         Luau::TypeId    table = nullptr;
         // Where a field's table, or a type, was made: what finds it in
         // another module, which sees a copy of the table.
@@ -163,6 +159,76 @@ namespace
     {
         const Luau::TypeId* type = module.astTypes.find(expr);
         return type ? Luau::follow(*type) : nullptr;
+    }
+
+    // The table a field of that name is on, for a value of `type`: the
+    // value's own, or, for an object whose own table has it not, the table
+    // its metatable's `__index` is -- a method an object is called with is
+    // its class's, `function Account:deposit` called as `a:deposit()`.
+    // None where an object's field is reached some way not followed, an
+    // `__index` that is a function.
+    std::optional<Luau::TypeId> ownerOf(Luau::TypeId type, const std::string& name)
+    {
+        // An `__index` that is an object again -- one class inheriting
+        // another's methods -- followed a few deep and no further, so that
+        // a loop of them ends.
+        for (int depth = 0; depth < 8; ++depth)
+        {
+            const Luau::MetatableType* object = Luau::get<Luau::MetatableType>(type);
+            if (!object)
+            {
+                return type;
+            }
+            const Luau::TableType* own = Luau::get<Luau::TableType>(Luau::follow(object->table));
+            if (own && own->props.count(name))
+            {
+                return type;
+            }
+            const Luau::TableType* meta = Luau::get<Luau::TableType>(Luau::follow(object->metatable));
+            if (!meta)
+            {
+                return std::nullopt;
+            }
+            const auto index = meta->props.find("__index");
+            if (index == meta->props.end() || !index->second.readTy)
+            {
+                return std::nullopt;
+            }
+            type = Luau::follow(*index->second.readTy);
+            if (!Luau::get<Luau::TableType>(type) && !Luau::get<Luau::MetatableType>(type))
+            {
+                return std::nullopt;
+            }
+        }
+        return std::nullopt;
+    }
+
+    // The table a field of that name indexed on `expr` is on (ownerOf);
+    // the type of `expr` itself where none is found.
+    Luau::TypeId fieldTableOf(const Luau::Module& module, Luau::AstExpr* expr, const std::string& name)
+    {
+        const Luau::TypeId type = tableTypeOf(module, expr);
+        return type ? ownerOf(type, name).value_or(type) : nullptr;
+    }
+
+    // Where the name a string key spells stands, its quotes aside: what a
+    // rename replaces. A record's key is the name itself; none for a long
+    // string or one with an escape in it, whose text is more than the name
+    // between two quotes.
+    std::optional<Luau::Location> nameIn(const Luau::AstExprConstantString& key)
+    {
+        using Quote = Luau::AstExprConstantString::QuoteStyle;
+        const Luau::Location& where = key.location;
+        if (key.quoteStyle == Quote::Unquoted)
+        {
+            return where;
+        }
+        if ((key.quoteStyle != Quote::QuotedSimple && key.quoteStyle != Quote::QuotedSingle) || where.begin.line != where.end.line ||
+            where.end.column - where.begin.column != key.value.size + 2)
+        {
+            return std::nullopt;
+        }
+        return Luau::Location(Luau::Position(where.begin.line, where.begin.column + 1), Luau::Position(where.end.line, where.end.column - 1));
     }
 
     Target targetAt(const Luau::FrontendModuleResolver& resolver, const Held& in, Luau::Position at)
@@ -220,15 +286,24 @@ namespace
             {
                 target.kind  = Target::Kind::Field;
                 target.name  = index->index.value;
-                target.table = tableTypeOf(module, index->expr);
+                target.table = fieldTableOf(module, index->expr, target.name);
             }
         }
         else if (Luau::AstExprConstantString* key = expr->as<Luau::AstExprConstantString>())
         {
             // A record's key in a table constructor: a name to a person,
-            // a string to the parser.
+            // a string to the parser. And a key in brackets, the same field
+            // as by its name: `{ ["name"] = v }`, `t["name"]`.
+            const std::string name(key->value.data, key->value.size);
             for (Luau::AstNode* node : Luau::findAstAncestryOfPosition(source, at))
             {
+                if (Luau::AstExprIndexExpr* index = node->as<Luau::AstExprIndexExpr>(); index && index->index == key)
+                {
+                    target.kind  = Target::Kind::Field;
+                    target.name  = name;
+                    target.table = fieldTableOf(module, index->expr, name);
+                    continue;
+                }
                 Luau::AstExprTable* table = node->as<Luau::AstExprTable>();
                 if (!table)
                 {
@@ -236,10 +311,11 @@ namespace
                 }
                 for (const Luau::AstExprTable::Item& item : table->items)
                 {
-                    if (item.kind == Luau::AstExprTable::Item::Kind::Record && item.key == key)
+                    if ((item.kind == Luau::AstExprTable::Item::Kind::Record || item.kind == Luau::AstExprTable::Item::Kind::General) &&
+                        item.key == key)
                     {
                         target.kind  = Target::Kind::Field;
-                        target.name  = std::string(key->value.data, key->value.size);
+                        target.name  = name;
                         target.table = tableTypeOf(module, table);
                     }
                 }
@@ -266,6 +342,11 @@ namespace
         std::optional<Luau::Location>       definition;
         bool                                parameter = false;
         bool                                function  = false;
+        // Whether a place it may stand could not be told: its name indexed
+        // on an object whose field is reached some way not followed, or a
+        // string key of its that is more than its name between quotes. A
+        // rename would leave it behind, or break it.
+        bool                                unsure = false;
 
         Uses(const Target& target_in, const Held& in_in, const Luau::FrontendModuleResolver& resolver_in, bool home_in)
         :   target(target_in),
@@ -281,7 +362,7 @@ namespace
             {
                 return true;
             }
-            const Luau::TypeId type = tableTypeOf(*in.module, expr);
+            const Luau::TypeId type = fieldTableOf(*in.module, expr, target.name);
             if (!type)
             {
                 return home;
@@ -291,6 +372,43 @@ namespace
         bool isField(Luau::AstExprIndexName* index) const
         {
             return target.kind == Target::Kind::Field && target.name == index->index.value && sameTable(index->expr);
+        }
+        // The string an index is by, where it names the field: `t["name"]`.
+        Luau::AstExprConstantString* fieldKey(Luau::AstExprIndexExpr* index) const
+        {
+            Luau::AstExprConstantString* key = index->index->as<Luau::AstExprConstantString>();
+            if (!key || target.kind != Target::Kind::Field || std::string_view(key->value.data, key->value.size) != target.name)
+            {
+                return nullptr;
+            }
+            return sameTable(index->expr) ? key : nullptr;
+        }
+        // The field's name indexed on what is not its table, as far as is
+        // known: whether it is the field cannot be told where that is an
+        // object whose field of the name is reached some way not followed
+        // -- an `__index` that is a function.
+        void doubt(Luau::AstExpr* expr, std::string_view name)
+        {
+            if (target.kind == Target::Kind::Field && name == target.name)
+            {
+                const Luau::TypeId type = tableTypeOf(*in.module, expr);
+                unsure |= type && Luau::get<Luau::MetatableType>(type) && !ownerOf(type, target.name);
+            }
+        }
+        // A string key of the field's: its name alone, quotes aside, or the
+        // whole string where that is more, and a rename refused.
+        void addKey(const Luau::AstExprConstantString& key, bool declares)
+        {
+            const std::optional<Luau::Location> name = nameIn(key);
+            unsure |= !name;
+            if (declares)
+            {
+                declare(name.value_or(key.location));
+            }
+            else
+            {
+                add(name.value_or(key.location));
+            }
         }
         bool isGlobal(Luau::AstExprGlobal* global) const { return target.kind == Target::Kind::Global && global->name == target.global; }
         bool isLocal(Luau::AstLocal* local) const { return target.kind == Target::Kind::Local && local == target.local; }
@@ -369,6 +487,22 @@ namespace
             {
                 add(expr->indexLocation);
             }
+            else
+            {
+                doubt(expr->expr, expr->index.value);
+            }
+            return true;
+        }
+        bool visit(Luau::AstExprIndexExpr* expr) override
+        {
+            if (const Luau::AstExprConstantString* key = fieldKey(expr))
+            {
+                addKey(*key, /*declares*/ false);
+            }
+            else if (const Luau::AstExprConstantString* other = expr->index->as<Luau::AstExprConstantString>())
+            {
+                doubt(expr->expr, std::string_view(other->value.data, other->value.size));
+            }
             return true;
         }
         bool visit(Luau::AstExprTable* table) override
@@ -378,10 +512,10 @@ namespace
                 for (const Luau::AstExprTable::Item& item : table->items)
                 {
                     Luau::AstExprConstantString* key = item.key ? item.key->as<Luau::AstExprConstantString>() : nullptr;
-                    if (item.kind == Luau::AstExprTable::Item::Kind::Record && key
+                    if ((item.kind == Luau::AstExprTable::Item::Kind::Record || item.kind == Luau::AstExprTable::Item::Kind::General) && key
                         && std::string_view(key->value.data, key->value.size) == target.name)
                     {
-                        declare(key->location);
+                        addKey(*key, /*declares*/ true);
                     }
                 }
             }
@@ -477,6 +611,13 @@ namespace
             {
                 definition = index->indexLocation;
             }
+            else if (Luau::AstExprIndexExpr* keyed = name->as<Luau::AstExprIndexExpr>())
+            {
+                if (const Luau::AstExprConstantString* key = fieldKey(keyed))
+                {
+                    definition = nameIn(*key).value_or(key->location);
+                }
+            }
             return definition.has_value();
         }
 
@@ -489,10 +630,11 @@ namespace
     };
 
     // A module's key, as a problem's file has it: its name to Luau less
-    // what marks it a module.
+    // what marks it a module (ALLuauFrontend::moduleOf).
     std::string keyOf(const std::string& name)
     {
-        return name.rfind(MODULE.data(), 0) == 0 ? name.substr(MODULE.size()) : name;
+        static const std::string mark = ALLuauFrontend::moduleOf("");
+        return name.rfind(mark, 0) == 0 ? name.substr(mark.size()) : name;
     }
 }
 
@@ -523,7 +665,7 @@ ALScriptReferences ALLuauNavigation::references(std::string_view source, Luau::P
     Held asked = home;
     if (!in_module.empty())
     {
-        asked.name                       = "module:" + in_module;
+        asked.name                       = ALLuauFrontend::moduleOf(in_module);
         asked.source                     = front.frontend->getSourceModule(asked.name);
         const Luau::ModulePtr in_checked = resolver.getModule(asked.name);
         asked.module                     = in_checked.get();
@@ -603,12 +745,15 @@ ALScriptReferences ALLuauNavigation::references(std::string_view source, Luau::P
     }
     bool parameter = false;
     bool function  = false;
+    bool unsure    = false;
     for (const Uses& uses : found)
     {
         parameter |= uses.parameter;
         function |= uses.function;
+        unsure |= uses.unsure;
     }
-    const std::optional<Luau::TypeId> type = Luau::findTypeAtPosition(*module, *module_source, at);
+    // The type at the place asked, in the module asked of.
+    const std::optional<Luau::TypeId> type = Luau::findTypeAtPosition(*asked.module, *asked.source, at);
     if (target.kind == Target::Kind::Type)
     {
         answer.kind = ALScriptSymbolKind::Type;
@@ -630,7 +775,9 @@ ALScriptReferences ALLuauNavigation::references(std::string_view source, Luau::P
         answer.hasDefinition  = true;
         answer.definition     = spanOf(*declaring->definition);
         answer.definitionFile = &declaring->in == &searched.front() ? std::string() : keyOf(declaring->in.name);
-        answer.renamable      = true;
+        // Not where a place it may stand could not be told, which a rename
+        // would leave behind: better none than part.
+        answer.renamable      = !unsure;
     }
     answer.references = std::move(found.front().spans);
     for (size_t i = 1; i < found.size(); ++i)

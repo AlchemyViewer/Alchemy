@@ -49,7 +49,10 @@ struct ALLuauFrontend;
 // A field or a type a module declares is the module's wherever it is
 // used. A table is known by where it was made, the module and the place
 // in it, which the copy a requiring script sees keeps; a field of the same
-// name on another table is another field. A type is known by where it was
+// name on another table is another field. A field is the same by its name
+// or a string in brackets, `t["name"]`, and an object's method is its
+// class's, through its metatable's `__index`; where a place it may stand
+// cannot be told, it is not to rename. A type is known by where it was
 // declared, through the local a script required its module as where it is
 // one of a module's. A local and a global are the script's alone.
 //

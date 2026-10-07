@@ -266,4 +266,67 @@ namespace tut
         ensure("a local still a local: " + hover.label, hover.label.rfind("local n", 0) == 0);
         service.setDocument("");
     }
+
+    template<> template<>
+    void alluaunavigation_object::test<6>()
+    {
+        set_test_name("a field is found by a string in brackets too -- an index, a constructor's key -- each place its name alone, quotes aside, which is what a rename replaces");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string text = "--!strict\n"                                  // 0
+                                 "local t = { size = 1, [\"name\"] = \"a\" }\n" // 1
+                                 "t[\"size\"] = t.size + 1\n"                   // 2
+                                 "print(t.name, t[\"name\"], t['size'])\n";     // 3
+        open("keys", false);
+        ALScriptReferences refs = service.references(text, 2, 4); // `size` in `t["size"]`
+        ensure("found", refs.found && refs.name == "size");
+        ensure_equals("each place: the record's key, the strings' insides, the name", placesOf(refs), std::string("1:12 2:3 2:14 3:28"));
+        ensure_equals("declared by the record", where(refs.definition), std::string("1:12"));
+        ensure("renamable", refs.hasDefinition && refs.renamable);
+
+        refs = service.references(text, 3, 9); // `name` in `t.name`
+        ensure_equals("a key in brackets declares it", placesOf(refs), std::string("1:24 3:8 3:17"));
+        ensure_equals("there, inside its quotes", where(refs.definition), std::string("1:24"));
+        ensure("renamable", refs.renamable);
+        ensure_equals("asked at that key: the same", placesOf(service.references(text, 1, 25)), std::string("1:24 3:8 3:17"));
+        service.setDocument("");
+    }
+
+    template<> template<>
+    void alluaunavigation_object::test<7>()
+    {
+        set_test_name("an object's method is its class's, through its metatable's __index, whichever end it is asked at; one reached some way not followed leaves the field not to rename");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string account = "--!strict\n"                                    // 0
+                                    "local Account = {}\n"                           // 1
+                                    "Account.__index = Account\n"                    // 2
+                                    "function Account.new()\n"                       // 3
+                                    "    return setmetatable({}, Account)\n"         // 4
+                                    "end\n"                                          // 5
+                                    "function Account:deposit(n: number): number\n"  // 6
+                                    "    return n\n"                                 // 7
+                                    "end\n"                                          // 8
+                                    "local a = Account.new()\n"                      // 9
+                                    "print(a:deposit(5))\n";                         // 10
+        open("account", false);
+        ALScriptReferences refs = service.references(account, 6, 18); // `deposit` in `function Account:deposit`
+        ensure("found", refs.found && refs.name == "deposit");
+        ensure_equals("the declaration and the object's call", placesOf(refs), std::string("6:17 10:8"));
+        ensure("renamable", refs.hasDefinition && refs.renamable);
+        refs = service.references(account, 10, 9); // `deposit` in `a:deposit(5)`
+        ensure_equals("from the call: the same", placesOf(refs), std::string("6:17 10:8"));
+        ensure_equals("declared in the class", where(refs.definition), std::string("6:17"));
+
+        const std::string proxy = "--!strict\n"                                                             // 0
+                                  "local Base = {}\n"                                                       // 1
+                                  "function Base.greet(): string\n"                                         // 2
+                                  "    return \"hi\"\n"                                                     // 3
+                                  "end\n"                                                                   // 4
+                                  "local o = setmetatable({}, { __index = function(_, k) return nil end })\n" // 5
+                                  "print(Base.greet(), o.greet)\n";                                         // 6
+        open("proxy", false);
+        refs = service.references(proxy, 2, 15); // `greet` in `function Base.greet`
+        ensure("found, and declared", refs.found && refs.hasDefinition);
+        ensure("an object's field of the name, its __index a function: not to rename", !refs.renamable);
+        service.setDocument("");
+    }
 }
