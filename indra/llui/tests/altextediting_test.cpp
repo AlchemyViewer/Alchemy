@@ -92,33 +92,28 @@ namespace tut
     template<> template<>
     void altextediting_object::test<2>()
     {
-        set_test_name("lines duplicated, moved and deleted, the selection going with them");
+        set_test_name("lines duplicated, moved and deleted at a selection, the selection going with them");
         const std::string    text = "one\ntwo\nthree";
         const ALTextDocument doc(text);
+        std::string          placed;
 
-        const Change copy = duplicateLines(doc, ALTextPos(0, 1), ALTextPos(1, 2));
-        ensure_equals("the lines again under them", applied(text, copy), std::string("one\ntwo\none\ntwo\nthree"));
-        ensure("the selection on the copy", copy.selects && copy.anchor == ALTextPos(2, 1) && copy.caret == ALTextPos(3, 2));
+        ensure_equals("the lines again under them", combined(text, duplicateLines(doc, { ALTextRange(ALTextPos(0, 1), ALTextPos(1, 2)) }), 1, placed),
+                      std::string("one\ntwo\none\ntwo\nthree"));
+        ensure_equals("the selection on the copy", placed, std::string("2:1-3:2 "));
 
-        const std::optional<Change> up = moveLines(doc, ALTextPos(1, 1), ALTextPos(1, 1), -1);
-        ensure("up", up.has_value());
-        ensure_equals("past the one above", applied(text, *up), std::string("two\none\nthree"));
-        ensure("the caret with it", up->caret == ALTextPos(0, 1));
-        const std::optional<Change> down = moveLines(doc, ALTextPos(0, 0), ALTextPos(1, 0), 1);
-        ensure("a selection ending at a line's start takes one line", down.has_value());
-        ensure_equals("past the one below", applied(text, *down), std::string("two\none\nthree"));
-        ensure("not past the top", !moveLines(doc, ALTextPos(0, 2), ALTextPos(0, 2), -1));
-        ensure("nor the bottom", !moveLines(doc, ALTextPos(2, 2), ALTextPos(2, 2), 1));
+        ensure_equals("up past the one above", combined(text, moveLines(doc, { at(1, 1) }, -1), 1, placed), std::string("two\none\nthree"));
+        ensure_equals("the caret with it", placed, std::string("0:1-0:1 "));
+        ensure_equals("a selection ending at a line's start takes one line, past the one below",
+                      combined(text, moveLines(doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)) }, 1), 1, placed), std::string("two\none\nthree"));
+        ensure("not past the top", moveLines(doc, { at(0, 2) }, -1).empty());
+        ensure("nor the bottom", moveLines(doc, { at(2, 2) }, 1).empty());
 
-        const Change middle = deleteLines(doc, ALTextPos(1, 3), ALTextPos(1, 3));
-        ensure_equals("gone", applied(text, middle), std::string("one\nthree"));
-        ensure("the caret on the line that took its place", !middle.selects && middle.caret == ALTextPos(1, 3));
-        const Change last = deleteLines(doc, ALTextPos(2, 5), ALTextPos(2, 5));
-        ensure_equals("the last with the break before it", applied(text, last), std::string("one\ntwo"));
-        ensure("the caret on the line above, no further than it goes", last.caret == ALTextPos(1, 3));
-        const Change all = deleteLines(doc, ALTextPos(0, 2), ALTextPos(2, 1));
-        ensure_equals("all of them", applied(text, all), std::string());
-        ensure("the caret at the start", all.caret == ALTextPos(0, 0));
+        ensure_equals("gone", combined(text, deleteLines(doc, { at(1, 3) }), 1, placed), std::string("one\nthree"));
+        ensure_equals("the caret on the line that took its place", placed, std::string("1:3-1:3 "));
+        ensure_equals("the last with the break before it", combined(text, deleteLines(doc, { at(2, 5) }), 1, placed), std::string("one\ntwo"));
+        ensure_equals("the caret on the line above, no further than it goes", placed, std::string("1:3-1:3 "));
+        ensure_equals("all of them", combined(text, deleteLines(doc, { ALTextRange(ALTextPos(0, 2), ALTextPos(2, 1)) }), 1, placed), std::string());
+        ensure_equals("the caret at the start", placed, std::string("0:0-0:0 "));
     }
 
     template<> template<>
@@ -127,23 +122,22 @@ namespace tut
         set_test_name("lines commented out where any is not, back in where they all are, and a caret kept in its text");
         const std::string    text = "  a\n\n  // b\nc";
         const ALTextDocument doc(text);
-        const std::optional<Change> out = toggleComment(doc, ALTextPos(0, 0), ALTextPos(3, 1), "//");
-        ensure("commented", out.has_value());
-        ensure_equals("every line saying anything, at its text", applied(text, *out), std::string("  // a\n\n  // // b\n// c"));
-        ensure("the lines whole, to the end of the last", out->selects && out->anchor == ALTextPos(0, 0) && out->caret == ALTextPos(3, 4));
+        std::string          placed;
+        ensure_equals("every line saying anything, at its text",
+                      combined(text, toggleComment(doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(3, 1)) }, "//"), 1, placed), std::string("  // a\n\n  // // b\n// c"));
+        ensure_equals("the lines whole, to the end of the last", placed, std::string("0:0-3:4 "));
 
         const std::string    commented = "\t// x\n\t//y\n";
         const ALTextDocument commented_doc(commented);
-        const std::optional<Change> back = toggleComment(commented_doc, ALTextPos(0, 5), ALTextPos(0, 5), "//");
-        ensure("uncommented", back.has_value());
-        ensure_equals("with the space after, where there is one", applied(commented, *back), std::string("\tx\n\t//y\n"));
-        ensure("the caret kept in its text", !back->selects && back->caret == ALTextPos(0, 2));
-        const std::optional<Change> both = toggleComment(commented_doc, ALTextPos(0, 0), ALTextPos(2, 0), "//");
-        ensure_equals("all of them back in", applied(commented, *both), std::string("\tx\n\ty\n"));
-        ensure("to the start of the line after", both->caret == ALTextPos(2, 0));
+        ensure_equals("uncommented, with the space after, where there is one", combined(commented, toggleComment(commented_doc, { at(0, 5) }, "//"), 1, placed),
+                      std::string("\tx\n\t//y\n"));
+        ensure_equals("the caret kept in its text", placed, std::string("0:2-0:2 "));
+        ensure_equals("all of them back in", combined(commented, toggleComment(commented_doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(2, 0)) }, "//"), 1, placed),
+                      std::string("\tx\n\ty\n"));
+        ensure_equals("to the start of the line after", placed, std::string("0:0-2:0 "));
 
         const ALTextDocument blank("   \n");
-        ensure("nothing where no line says anything", !toggleComment(blank, ALTextPos(0, 1), ALTextPos(0, 1), "//"));
+        ensure("nothing where no line says anything", toggleComment(blank, { at(0, 1) }, "//").empty());
     }
 
     template<> template<>

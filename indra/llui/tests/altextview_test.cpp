@@ -144,7 +144,7 @@ namespace tut
 
     // More than TUT's fifty a group holds by default, which runs the first
     // fifty and says nothing of the rest: keep this above the highest test.
-    typedef test_group<altextview_data, 100> altextview_group;
+    typedef test_group<altextview_data, 150> altextview_group;
     typedef altextview_group::object    altextview_object;
     altextview_group                    altextview_instance("altextview");
 
@@ -3124,5 +3124,36 @@ namespace tut
         ensure_equals("the word", card->selectedText(), std::string("world"));
         ensure("and so does a double click", editor.hasFocus() && !card->hasFocus());
         card->die();
+    }
+
+    template<> template<>
+    void altextview_object::test<100>()
+    {
+        set_test_name("a command over whole lines that changes nothing tells of no change, at one caret as at several; and one that does is told once");
+        ALTextView& v    = make("abc\n\n\ndef");
+        U32         told = 0;
+        boost::signals2::scoped_connection heard = v.onTextChanged([&told]() { ++told; });
+        v.setCaret(ALTextPos(0, 1));
+        ensure("Unindent with nothing to take", v.perform(ALEditorCommand::Unindent));
+        ensure_equals("the text as it was", v.text(), std::string("abc\n\n\ndef"));
+        ensure_equals("nothing told", told, U32(0));
+        ensure("nothing to take back", !v.canPerform(ALEditorCommand::Undo));
+        v.setSelection(ALTextRange(ALTextPos(1, 0), ALTextPos(3, 0)));
+        ensure("Indent over empty lines", v.perform(ALEditorCommand::Indent));
+        ensure_equals("nothing put in", v.text(), std::string("abc\n\n\ndef"));
+        ensure_equals("nothing told of that either", told, U32(0));
+        ensure("the selection where it was", v.selection() == ALTextRange(ALTextPos(1, 0), ALTextPos(3, 0)));
+
+        v.setCaret(ALTextPos(0, 1));
+        v.addSelection(ALTextRange(ALTextPos(3, 1), ALTextPos(3, 1)));
+        ensure("at several carets", v.perform(ALEditorCommand::Unindent));
+        ensure_equals("still nothing told", told, U32(0));
+
+        v.goTo(ALTextPos(0, 1));
+        ensure("one caret again", !v.hasOtherSelections());
+        ensure("Duplicate Line", v.perform(ALEditorCommand::DuplicateLine));
+        ensure_equals("the line again", v.text(), std::string("abc\nabc\n\n\ndef"));
+        ensure_equals("told once", told, U32(1));
+        ensure("the caret on the copy", v.caret() == ALTextPos(1, 1));
     }
 }

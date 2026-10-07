@@ -34,8 +34,8 @@
 
 // A text view's commands over whole lines -- duplicate, move and delete
 // them, comment them out and back in, join them. Each is worked out over
-// a document and a selection alone, and says what it would do: the
-// replacements, made one after another as one step to undo, and where the
+// a document and its selections alone, and says what it would do: the
+// replacements, made one after another as one step to undo, and where each
 // selection goes after. The view does it, so that each can be tested with
 // nothing laid out or drawn. Where a line's indentation belongs is
 // ALTextIndent's, in the same terms.
@@ -65,11 +65,6 @@ namespace ALTextEditing
     // The lines a selection covers, as commands over whole lines count
     // them: a selection ending at a line's start does not take that line.
     std::pair<S32, S32> selectedLines(const ALTextRange& selection);
-    // The lines again under them, the selection going with the copy.
-    Change duplicateLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret);
-    // The lines past the one above or below them, the selection with
-    // them; nothing where they are at the top or the bottom already.
-    std::optional<Change> moveLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, S32 direction);
     // Lines first through last put under line `below` -- -1 for above the
     // first -- as vim's :m and :t have it: moved, as one replacement of the
     // lines between, nothing where `below` is among them or is the line
@@ -77,13 +72,6 @@ namespace ALTextEditing
     // line put there.
     std::optional<Change> moveLinesTo(const ALTextDocument& doc, S32 first, S32 last, S32 below);
     Change                copyLinesTo(const ALTextDocument& doc, S32 first, S32 last, S32 below);
-    // The lines gone, the last with the break before it, and the caret on
-    // the line that took their place, in its column where that line has it.
-    Change deleteLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret);
-    // The lines that say anything commented out with the line comment, or
-    // back in where they all are: the selection the lines whole, or the
-    // caret where it was in its text. Nothing where no line says anything.
-    std::optional<Change> toggleComment(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, const std::string& token);
     // Lines first through last joined into one, as vim's J does: each break
     // and the next line's leading blanks gone, one space in their place --
     // none before a `)`, nor where the next line is blank, nor after a line
@@ -100,15 +88,15 @@ namespace ALTextEditing
     // text put in right at it, unless not `pushed`.
     ALTextPos placedThrough(const std::vector<Replacement>& replacements, const ALTextPos& pos, bool pushed = true);
 
-    // --- several selections at once ---------------------------------------------
+    // --- at every selection ------------------------------------------------------
 
-    // A command done at several selections at once is worked out in groups:
-    // a selection on its own, or those that share the lines a command over
-    // whole lines does once. A group says what it replaces, over the text as
-    // it stands, in order and none over another; and where each selection it
-    // is for is after -- by its index among the selections the command was
-    // given, anchor to caret -- in the text as the group's own replacements
-    // leave it, as a Change says of its one selection.
+    // A command done at the selections, one or several, is worked out in
+    // groups: a selection on its own, or those that share the lines a
+    // command over whole lines does once. A group says what it replaces,
+    // over the text as it stands, in order and none over another; and where
+    // each selection it is for is after -- by its index among the selections
+    // the command was given, anchor to caret -- in the text as the group's
+    // own replacements leave it, as a Change says of its one selection.
     struct Group
     {
         std::vector<Replacement>                    replacements;
@@ -138,14 +126,20 @@ namespace ALTextEditing
     };
     std::vector<LineRun> lineRuns(const std::vector<ALTextRange>& selections, bool touching);
 
-    // The commands over whole lines, at several selections in the order
-    // they begin: each run of them over the same lines done once, each
-    // selection going as the one selection goes. Moving lines takes runs on
-    // lines next to each other as one, as does deleting them, and moves
-    // nothing where any run is at the top or the bottom already; joining
-    // puts every caret of a run where its first join is. Comments go in, or
-    // out, the same way for all of them: out where every line any of them
-    // reaches that says anything is commented.
+    // The commands over whole lines, at the selections in the order they
+    // begin, each run of them over the same lines done once. The lines
+    // again under them, each selection going with the copy. The lines past
+    // the one above or below them, each selection with them, runs on lines
+    // next to each other moved as one, and nothing moved where any run is
+    // at the top or the bottom already. The lines gone, the last of the
+    // text with the break before it, runs next to each other as one, and
+    // each caret on the line that took their place, in its column where
+    // that line has it. The lines that say anything commented out with the
+    // line comment, or back in where every one any of the selections
+    // reaches is: each selection then its lines whole, each caret where it
+    // was in its text, and nothing where no line says anything. A
+    // selection's lines joined, or a caret's and the next, every caret of
+    // a run where its first join is.
     std::vector<Group> duplicateLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections);
     std::vector<Group> moveLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections, S32 direction);
     std::vector<Group> deleteLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections);

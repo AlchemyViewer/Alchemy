@@ -602,17 +602,6 @@ namespace
     }
 }
 
-Change indentLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, bool in, const Options& options)
-{
-    const auto [first, last] = ALTextEditing::selectedLines(ALTextRange(anchor, caret));
-    Change                 change = shiftLines(doc, first, last, 1, in, options);
-    const std::vector<S32> delta  = shiftOf(change, first, last, in);
-    change.selects                = true;
-    change.anchor                 = movedWith(anchor, delta, first);
-    change.caret                  = movedWith(caret, delta, first);
-    return change;
-}
-
 std::vector<ALTextEditing::Group> indentLines(const ALTextDocument& doc, const std::vector<ALTextRange>& selections, bool in, const Options& options)
 {
     std::vector<ALTextEditing::Group> groups;

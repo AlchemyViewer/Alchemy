@@ -669,7 +669,8 @@ public:
     // moved meanwhile, which drops it.
     bool goToMisspelling(bool forward);
     // A change worked out over the document (ALTextEditing) made, as one
-    // step to undo, and the selection it says after.
+    // step to undo, and the selection it says after; told of as a change
+    // only where the text changed.
     void apply(const ALTextEditing::Change& change);
     // --- the change list --------------------------------------------------------
 

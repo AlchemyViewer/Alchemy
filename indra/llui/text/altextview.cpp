@@ -2785,7 +2785,7 @@ void ALTextView::apply(const ALTextEditing::Change& change)
         return;
     }
     mUndo.beginGroup();
-    editMany(std::move(edits), change.caret);
+    const bool changed = !editMany(std::move(edits), change.caret).nothing();
     mUndo.endGroup();
     if (change.selects)
     {
@@ -2794,6 +2794,14 @@ void ALTextView::apply(const ALTextEditing::Change& change)
     else
     {
         placeCaret(change.caret, false);
+    }
+    if (!changed)
+    {
+        // Nothing changed, and nothing said of a change: the selection put
+        // where the command puts it, as at several (applyGroups).
+        mDesiredX = -1.f;
+        scrollToCaret();
+        return;
     }
     afterEdit();
 }
@@ -3383,17 +3391,9 @@ bool ALTextView::toggleComment()
     {
         return false;
     }
-    if (hasOtherSelections())
-    {
-        // In or out the same way at every selection.
-        const std::string token = mHighlighter.grammar()->lineComment();
-        editGroups([this, &token](const std::vector<ALTextRange>& all) { return ALTextEditing::toggleComment(mDocument, all, token); });
-        return true;
-    }
-    if (const std::optional<ALTextEditing::Change> change = ALTextEditing::toggleComment(mDocument, mAnchor, mCaret, mHighlighter.grammar()->lineComment()))
-    {
-        apply(*change);
-    }
+    // In or out the same way at every selection, however many.
+    const std::string token = mHighlighter.grammar()->lineComment();
+    editGroups([this, &token](const std::vector<ALTextRange>& all) { return ALTextEditing::toggleComment(mDocument, all, token); });
     return true;
 }
 
@@ -3522,20 +3522,22 @@ bool ALTextView::perform(ALEditorCommand command)
             newLine();
             return true;
         case C::Indent:
-            // A selection, however small, indents its lines; a caret
-            // alone puts a tab in.
+            // A selection, however small, indents its lines, as at several;
+            // a caret alone puts a tab in.
             if (hasSelection())
             {
-                apply(ALTextIndent::indentLines(mDocument, mAnchor, mCaret, true, editingOptions()));
+                return performAtEach(command).value_or(false);
             }
-            else
-            {
-                insertText(tabText(mCaret));
-            }
+            insertText(tabText(mCaret));
             return true;
         case C::Unindent:
-            apply(ALTextIndent::indentLines(mDocument, mAnchor, mCaret, false, editingOptions()));
-            return true;
+        case C::DuplicateLine:
+        case C::MoveLineUp:
+        case C::MoveLineDown:
+        case C::DeleteLine:
+        case C::JoinLines:
+            // Over whole lines: done at the one selection as at several.
+            return performAtEach(command).value_or(false);
         case C::Undo:
             undo();
             return true;
@@ -3556,19 +3558,6 @@ bool ALTextView::perform(ALEditorCommand command)
             return true;
         case C::ToggleComment:
             return toggleComment();
-        case C::DuplicateLine:
-            apply(ALTextEditing::duplicateLines(mDocument, mAnchor, mCaret));
-            return true;
-        case C::MoveLineUp:
-        case C::MoveLineDown:
-            if (const std::optional<ALTextEditing::Change> change = ALTextEditing::moveLines(mDocument, mAnchor, mCaret, command == C::MoveLineUp ? -1 : 1))
-            {
-                apply(*change);
-            }
-            return true;
-        case C::DeleteLine:
-            apply(ALTextEditing::deleteLines(mDocument, mAnchor, mCaret));
-            return true;
         case C::PreviousChange:
         case C::NextChange:
             return goToChange(command == C::PreviousChange ? -1 : 1);
@@ -3581,17 +3570,6 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::SelectNextOccurrence:
         case C::ChangeAllOccurrences:
             return mFeatures && mFeatures->performFeature(command);
-        case C::JoinLines:
-        {
-            // The lines selected, or the caret's and the next.
-            const auto [first, last] = ALTextEditing::selectedLines(ALTextRange(mAnchor, mCaret).normalised());
-            if (const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(mDocument, first, llmax(last, first + 1), false))
-            {
-                apply(*join);
-                return true;
-            }
-            return false;
-        }
         case C::InsertLineBelow:
             // As Return at the line's end would make it.
             placeCaret(mDocument.lineEnd(mCaret.line), false);
@@ -3870,24 +3848,17 @@ void ALTextView::cut()
         return;
     }
     copy();
-    if (hasOtherSelections())
+    if (hasOtherSelections() && anySelected())
     {
-        // What each selected; or where none selected anything, each caret's
-        // line whole.
-        if (anySelected())
-        {
-            deleteSelectedEach();
-        }
-        else
-        {
-            editGroups([this](const std::vector<ALTextRange>& all) { return ALTextEditing::deleteLines(mDocument, all); });
-        }
+        // What each selected.
+        deleteSelectedEach();
         return;
     }
-    if (!hasSelection())
+    if (!anySelected())
     {
-        // The whole line, the caret on the one that takes its place.
-        apply(ALTextEditing::deleteLines(mDocument, mCaret, mCaret));
+        // Where none selected anything, each caret's line whole, the caret
+        // on the one that takes its place.
+        editGroups([this](const std::vector<ALTextRange>& all) { return ALTextEditing::deleteLines(mDocument, all); });
         return;
     }
     deleteRange(selection());

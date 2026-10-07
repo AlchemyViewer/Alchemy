@@ -74,6 +74,21 @@ namespace tut
             doc.replace(one.range, one.text);
             return doc.text();
         }
+        // A command at one selection, as its groups make it: the text left,
+        // and where the selection goes, where its group places it.
+        static std::string applied(const std::string& text, const std::vector<ALTextEditing::Group>& groups, std::optional<ALTextRange>& placed)
+        {
+            const ALTextEditing::Combined                    combined = ALTextEditing::combine(groups, 1);
+            ALTextDocument                                   doc(text);
+            std::vector<std::pair<ALTextRange, std::string>> edits;
+            for (const Replacement& one : combined.replacements)
+            {
+                edits.emplace_back(one.range, one.text);
+            }
+            doc.replaceMany(std::move(edits));
+            placed = combined.selections.front();
+            return doc.text();
+        }
 
         // Nothing matches brackets: the rules fall back on the line above.
         static opener_t none()
@@ -109,19 +124,20 @@ namespace tut
         set_test_name("lines indented and outdented, the empty left, the caret and the anchor moved with their lines' starts");
         const std::string text = "a\n\nb\n  c";
         const ALTextDocument doc(text);
-        const Change in = indentLines(doc, ALTextPos(0, 1), ALTextPos(3, 3), true, spaces);
-        ensure_equals("each line with anything on it a level in", applied(text, in), std::string("    a\n\n    b\n      c"));
-        ensure("a selection still", in.selects);
-        ensure("the anchor moved with its line", in.anchor == ALTextPos(0, 5));
-        ensure("the caret too", in.caret == ALTextPos(3, 7));
-        const Change tabbed = indentLines(doc, ALTextPos(0, 0), ALTextPos(0, 0), true, tabs);
-        ensure_equals("a tab where tabs are typed", applied(text, tabbed), std::string("\ta\n\nb\n  c"));
+        std::optional<ALTextRange> placed;
+        ensure_equals("each line with anything on it a level in",
+                      applied(text, indentLines(doc, { ALTextRange(ALTextPos(0, 1), ALTextPos(3, 3)) }, true, spaces), placed),
+                      std::string("    a\n\n    b\n      c"));
+        ensure("the anchor moved with its line, and the caret too", placed == ALTextRange(ALTextPos(0, 5), ALTextPos(3, 7)));
+        ensure_equals("a tab where tabs are typed", applied(text, indentLines(doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)) }, true, tabs), placed),
+                      std::string("\ta\n\nb\n  c"));
 
         const std::string   deep = "\tx\n      y\n  z";
         const ALTextDocument deep_doc(deep);
-        const Change out = indentLines(deep_doc, ALTextPos(0, 0), ALTextPos(2, 1), false, spaces);
-        ensure_equals("a tab, or up to a level of spaces, out", applied(deep, out), std::string("x\n  y\nz"));
-        ensure("the caret never before its line's start", out.caret == ALTextPos(2, 0));
+        ensure_equals("a tab, or up to a level of spaces, out",
+                      applied(deep, indentLines(deep_doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(2, 1)) }, false, spaces), placed),
+                      std::string("x\n  y\nz"));
+        ensure("the caret never before its line's start", placed && placed->end == ALTextPos(2, 0));
     }
 
     template<> template<>

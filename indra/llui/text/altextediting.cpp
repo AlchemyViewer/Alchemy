@@ -151,36 +151,6 @@ std::pair<S32, S32> selectedLines(const ALTextRange& selection)
     return { range.begin.line, last };
 }
 
-Change duplicateLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret)
-{
-    const auto [first, last] = selectedLines(ALTextRange(anchor, caret));
-    const S32         count  = last - first + 1;
-    Change            change;
-    change.replacements.push_back(duplicated(doc, first, last));
-    // The caret and the selection go with the copy.
-    change.selects = true;
-    change.anchor  = ALTextPos(anchor.line + count, anchor.column);
-    change.caret   = ALTextPos(caret.line + count, caret.column);
-    return change;
-}
-
-std::optional<Change> moveLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, S32 direction)
-{
-    const auto [first, last] = selectedLines(ALTextRange(anchor, caret));
-    if ((direction < 0 && first == 0) || (direction > 0 && last + 1 >= doc.lineCount()))
-    {
-        return std::nullopt;
-    }
-    std::optional<Change> change = moveLinesTo(doc, first, last, direction < 0 ? first - 2 : last + 1);
-    if (change)
-    {
-        change->selects = true;
-        change->anchor  = ALTextPos(anchor.line + direction, anchor.column);
-        change->caret   = ALTextPos(caret.line + direction, caret.column);
-    }
-    return change;
-}
-
 std::optional<Change> moveLinesTo(const ALTextDocument& doc, S32 first, S32 last, S32 below)
 {
     const S32 count = doc.lineCount();
@@ -230,50 +200,6 @@ Change copyLinesTo(const ALTextDocument& doc, S32 first, S32 last, S32 below)
     }
     change.caret  = ALTextPos(below + last - first + 1, 0);
     change.anchor = change.caret;
-    return change;
-}
-
-Change deleteLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret)
-{
-    const auto [first, last] = selectedLines(ALTextRange(anchor, caret));
-    // The line the caret lands on, and how long it is, once they are gone.
-    S32               line   = first;
-    S32               length = 0;
-    const ALTextRange range  = deleted(doc, first, last, line, length);
-    Change            change;
-    change.replacements.push_back({ range, std::string() });
-    change.caret  = ALTextPos(line, llmin(caret.column, length));
-    change.anchor = change.caret;
-    return change;
-}
-
-std::optional<Change> toggleComment(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, const std::string& token)
-{
-    const auto [first, last] = selectedLines(ALTextRange(anchor, caret));
-    // Out where every line that says anything is commented; in otherwise.
-    const std::optional<bool> out = commented(doc, first, last, token);
-    if (!out)
-    {
-        return std::nullopt;
-    }
-    Change change;
-    change.replacements = commentLines(doc, first, last, token, *out);
-    if (anchor != caret)
-    {
-        // The lines whole.
-        const ALTextRange lines = wholeLines(doc, ALTextRange(anchor, caret), change.replacements);
-        change.selects          = true;
-        change.anchor           = lines.begin;
-        change.caret            = lines.end;
-    }
-    else
-    {
-        // The caret where it was in its text: pushed along by the token put
-        // in where it stands, and back to where the token was taken from
-        // where it stood in it.
-        change.caret  = placedThrough(change.replacements, caret);
-        change.anchor = change.caret;
-    }
     return change;
 }
 
@@ -524,7 +450,9 @@ std::vector<Group> toggleComment(const ALTextDocument& doc, const std::vector<AL
         {
             continue;
         }
-        // A caret where it was in its text; a selection the lines whole.
+        // A caret where it was in its text -- pushed along by the token put
+        // in where it stands, and back to where the token was taken from
+        // where it stood in it -- and a selection the lines whole.
         for (const size_t i : run.selections)
         {
             const ALTextRange& selection = selections[i];
