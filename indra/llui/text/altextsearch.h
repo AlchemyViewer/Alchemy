@@ -58,6 +58,10 @@ struct ALTextSearchOptions
     // more is looked for, and what was found so far is what is found. What
     // a search on a worker that nobody waits for any more is stopped by.
     const std::atomic<bool>* stop = nullptr;
+    // Of the matches that begin on a line, the first alone: those after it
+    // there are passed over as they are found, nothing made of what would
+    // replace them -- what vim's :s without g asks for.
+    bool firstPerLine  = false;
 };
 
 // Finding in a document: every place a query stands, plain or as a

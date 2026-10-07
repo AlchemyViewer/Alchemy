@@ -260,8 +260,13 @@ namespace
         const auto full = [&out, &options]() {
             return (options.limit > 0 && out.size() >= options.limit) || (options.stop && options.stop->load(std::memory_order_relaxed));
         };
+        // Whether a match begins on the line the last one kept began on: one
+        // passed over, where the first of each line alone is asked for.
+        const auto sameLine = [&out](const ALTextPos& at) { return !out.empty() && out.back().begin.line == at.line; };
         const ALTextRange   within = scope ? scope->normalised() : ALTextRange(doc.start(), doc.end());
         const std::string_view needle = query;
+        // The lines searched as one text, or each on its own.
+        const bool across = options.acrossLines && (options.regex || query.find('\n') != std::string_view::npos);
         // Without regard to case, the ASCII bytes a plain match may begin
         // at: those that lower as the query's first character does. Any
         // other is passed over without a character decoded or compared.
@@ -344,7 +349,8 @@ namespace
                     const auto& part   = grouped ? found[static_cast<size_t>(options.matchGroup)] : found[0];
                     const S32   begin  = static_cast<S32>(part.first - base);
                     const S32   finish = static_cast<S32>(part.second - base);
-                    if (found[0].second <= limit && (!options.wholeWord || wholeWord(text, begin, finish)))
+                    const bool  kept   = found[0].second <= limit && (!options.wholeWord || wholeWord(text, begin, finish));
+                    if (kept && !(options.firstPerLine && sameLine(posOf(begin))))
                     {
                         out.emplace_back(posOf(begin), posOf(finish));
                         if (whole_begins)
@@ -358,7 +364,9 @@ namespace
                             std::string made = found.format(format, boost::format_perl);
                             replaced->push_back(options.preserveCase ? alInCaseOf(std::string(part.first, part.second), made) : std::move(made));
                         }
-                        if (full())
+                        // A line searched on its own is done with its first,
+                        // where that is all that is asked of it.
+                        if (full() || (options.firstPerLine && !across))
                         {
                             break;
                         }
@@ -411,7 +419,8 @@ namespace
                         }
                     }
                     const size_t finish = alMatchAt(text, begin, needle, !options.caseSensitive);
-                    if (finish != std::string_view::npos && finish <= static_cast<size_t>(to) && (!options.wholeWord || wholeWord(text, static_cast<S32>(begin), static_cast<S32>(finish))))
+                    if (finish != std::string_view::npos && finish <= static_cast<size_t>(to) && (!options.wholeWord || wholeWord(text, static_cast<S32>(begin), static_cast<S32>(finish))) &&
+                        !(options.firstPerLine && sameLine(posOf(static_cast<S32>(begin)))))
                     {
                         out.emplace_back(posOf(static_cast<S32>(begin)), posOf(static_cast<S32>(finish)));
                         if (whole_begins)
@@ -422,7 +431,7 @@ namespace
                         {
                             replaced->push_back(options.preserveCase ? alInCaseOf(text.substr(begin, finish - begin), format) : format);
                         }
-                        if (full())
+                        if (full() || (options.firstPerLine && !across))
                         {
                             break;
                         }
@@ -439,7 +448,7 @@ namespace
 
         const S32 first = llmax(0, within.begin.line);
         const S32 last  = llmin(within.end.line, doc.lineCount() - 1);
-        if (options.acrossLines && (options.regex || query.find('\n') != std::string_view::npos))
+        if (across)
         {
             // The whole text, which the document keeps between edits, searched
             // between the scope's ends; a line's start is a start, and what

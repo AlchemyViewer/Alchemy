@@ -1723,6 +1723,11 @@ bool ALVimExCommands::substitute(ALTextView& view, S32 first, S32 last, const st
     options.regex         = true;
     const ALVimPattern pattern_in = mVim.mSearch.patternOf(pattern, exactcase ? std::optional<bool>(true) : anycase ? std::optional<bool>(false) : std::nullopt);
     options.caseSensitive    = pattern_in.caseSensitive;
+    // Without g, the first match of each line alone, nothing made of what
+    // would replace the rest; not where the pattern names places its
+    // matches must stand, which may pass over a line's first and keep one
+    // after it.
+    options.firstPerLine     = !every && pattern_in.where.empty();
     const ALTextRange     scope(d.lineStart(first), d.lineEnd(last));
     std::string           error;
     std::vector<ALTextPos>   wholes;

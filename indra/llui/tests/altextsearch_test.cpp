@@ -479,4 +479,27 @@ namespace tut
         stop = false;
         ensure_equals("not stopped, every one", ALTextSearch::matches(doc, "a", options).size(), size_t(1000));
     }
+
+    template<> template<>
+    void altextsearch_object::test<18>()
+    {
+        set_test_name("the first match of each line alone, where asked: as it is or by pattern, line by line or whole, with what replaces each kept");
+        ALTextDocument doc;
+        doc.setText("a a a\nb\na a\n");
+        ALTextSearchOptions options;
+        options.firstPerLine = true;
+        ensure_equals("as it is", said(ALTextSearch::matches(doc, "a", options)), std::string("0:0-1 2:0-1"));
+        options.regex = true;
+        std::vector<std::string>       replaced;
+        const std::vector<ALTextRange> found = ALTextSearch::matches(doc, "a", options, nullptr, nullptr, nullptr, "x", replaced);
+        ensure_equals("by pattern", said(found), std::string("0:0-1 2:0-1"));
+        ensure("what replaces each kept, and no more", replaced == std::vector<std::string>{ "x", "x" });
+        options.acrossLines = true;
+        ensure_equals("the lines as one text", said(ALTextSearch::matches(doc, "a", options)), std::string("0:0-1 2:0-1"));
+        doc.setText("x a\nb a a\nb\n");
+        ensure_equals("one over a line's end by the line it begins on, and the next found as ever",
+                      said(ALTextSearch::matches(doc, "a\\nb|a", options)), std::string("0:2-1:1 1:2-3"));
+        options.firstPerLine = false;
+        ensure_equals("all of them otherwise", said(ALTextSearch::matches(doc, "a\\nb|a", options)), std::string("0:2-1:1 1:2-3 1:4-2:1"));
+    }
 }
