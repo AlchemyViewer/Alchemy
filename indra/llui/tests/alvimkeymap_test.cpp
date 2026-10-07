@@ -3748,4 +3748,67 @@ namespace tut
         ensure_equals("v2/foo takes the selection to the second", flat(editor->text()), std::string("oo|z|foo|w|"));
         ensure_equals("and d took it", vim->registerText('"'), std::string("x\nfoo\ny\nf"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<141>()
+    {
+        set_test_name("* # g* g# after an operator are its motion, up to the word's next match and not into it, looked for from the word's start; n goes on with it and . looks again; # from inside a word goes to the one before");
+        ALCodeEditor& e = make("foo bar foo baz\n");
+        keys("d*");
+        ensure_equals("d* up to the next foo", flat(e.text()), std::string("foo baz|"));
+        ensure("normal mode, nothing pending", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+        ensure_equals("what it took in the register", vim->registerText('"'), std::string("foo bar "));
+
+        make("foo bar foo baz\n");
+        editor->setCaret(ALTextPos(0, 9));
+        keys("d#");
+        ensure_equals("d# from inside the second foo back to the first", flat(editor->text()), std::string("oo baz|"));
+        ensure_equals("the first foo to the caret taken", vim->registerText('"'), std::string("foo bar f"));
+
+        make("foo foobar foo\n");
+        keys("dg*");
+        ensure_equals("dg* the word anywhere: up to the foo in foobar", flat(editor->text()), std::string("foobar foo|"));
+        make("foo foobar foo\n");
+        editor->setCaret(ALTextPos(0, 11));
+        keys("dg#");
+        ensure_equals("dg# back to the foo in foobar", flat(editor->text()), std::string("foo foo|"));
+
+        make("a x b x c x d\n");
+        editor->setCaret(ALTextPos(0, 2));
+        keys("d2*");
+        ensure_equals("d2* up to the second x on", flat(editor->text()), std::string("a x d|"));
+        keys("u");
+        editor->setCaret(ALTextPos(0, 2));
+        keys("2d*");
+        ensure_equals("and 2d*", flat(editor->text()), std::string("a x d|"));
+
+        make("foo bar foo baz foo\n");
+        keys("d*n");
+        ensure_equals("n after it to the next foo", caretText(), std::string("0:8"));
+        make("foo bar foo baz foo qux foo\n");
+        keys("d*.");
+        ensure_equals(". again from where it left", flat(editor->text()), std::string("foo qux foo|"));
+
+        make("foo x\nfoo y\n");
+        keys("d*");
+        ensure_equals("to a line's first column from its start: the line whole", flat(editor->text()), std::string("foo y|"));
+
+        make("foo bar baz\n");
+        editor->setCaret(ALTextPos(0, 2));
+        keys("d*");
+        ensure_equals("a word found nowhere else: round to its own start, behind the caret", flat(editor->text()), std::string("o bar baz|"));
+
+        make("foo   \nbar\n");
+        keys("yl");
+        editor->setCaret(ALTextPos(0, 4));
+        keys("d*");
+        ensure("no word under the caret: the operator let go of", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().empty());
+        ensure_equals("nothing taken", flat(editor->text()), std::string("foo   |bar|"));
+        ensure_equals("the register as it was", vim->registerText('"'), std::string("f"));
+
+        make("foo bar foo baz\n");
+        editor->setCaret(ALTextPos(0, 9));
+        keys("#");
+        ensure_equals("# from inside a word to the one before it, not to its own start", caretText(), std::string("0:0"));
+    }
 }

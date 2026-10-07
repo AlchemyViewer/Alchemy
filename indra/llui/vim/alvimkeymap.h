@@ -348,11 +348,20 @@ private:
     std::optional<bool> normalKey(ALTextView& view, llwchar ch);
     bool                motionKey(ALTextView& view, llwchar ch);
     // An operator over a search's motion -- / and ? entered after it, n
-    // and N -- from the caret to where the last search goes, `forward` or
-    // back, the counts' match on: exclusive and charwise, as vim's is;
-    // lines for an offset of lines, and inclusive for one from the match's
-    // end (:help search-offset). One that finds nothing fails the operator.
-    bool                searchMotion(ALTextView& view, bool forward);
+    // and N, * and # -- from the caret to where the last search goes,
+    // `forward` or back, the counts' match on, looked for from
+    // `search_from` where one is given: exclusive and charwise, as vim's
+    // is; lines for an offset of lines, and inclusive for one from the
+    // match's end (:help search-offset). One that finds nothing fails the
+    // operator.
+    bool                searchMotion(ALTextView& view, bool forward, std::optional<ALTextPos> search_from = std::nullopt);
+    // * # g* g#: the word under the caret looked for, whole or -- `whole`
+    // false, g* and g# -- anywhere, forward or back, the count's match on;
+    // from the word's start, so that the word itself is passed over. The
+    // caret goes there, or an operator waiting takes the stretch to there
+    // (searchMotion), and n and N go on with it. No word under the caret
+    // fails the command, the operator with it.
+    bool                starSearch(ALTextView& view, bool forward, bool whole);
     // A key that waits for the one after it -- a register's name, g's and
     // z's commands, r's character, a text object's kind -- and that one:
     // what the waiting key is picks a function from PENDING_KEYS, each

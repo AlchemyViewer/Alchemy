@@ -1502,20 +1502,8 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
             return true;
         case '*':
         case '#':
-        {
             // As * and #, the word anywhere, not only whole.
-            const ALTextRange word = d.wordAt(view.caret());
-            clearPending();
-            if (!word.empty())
-            {
-                mSearch.pattern   = d.text(word);
-                mSearch.forward   = ch == '*';
-                mSearch.wholeWord = false;
-                mSearch.offset    = ALVimSearch::Offset();
-                mSearch.search(view, mSearch.pattern, mSearch.forward, count, false);
-            }
-            return true;
-        }
+            return starSearch(view, ch == '*', false);
         case 'p':
         case 'P':
             if (editing && !visual)
@@ -2254,6 +2242,10 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     {
         return searchMotion(view, ch == 'n' ? mSearch.forward : !mSearch.forward);
     }
+    if (ch == '*' || ch == '#')
+    {
+        return starSearch(view, ch == '*', true);
+    }
     // cw on a word is ce: the space after it is not eaten. On the word's
     // last character the first word is the one it ends, as vim's cw has
     // it -- a one-letter word changes alone -- and the count's others are
@@ -2310,7 +2302,7 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     return true;
 }
 
-bool ALVimKeymap::searchMotion(ALTextView& view, bool forward)
+bool ALVimKeymap::searchMotion(ALTextView& view, bool forward, std::optional<ALTextPos> search_from)
 {
     const ALTextDocument& d = view.document();
     // The operator's count and the motion's together: 2dn is d2n, the
@@ -2325,7 +2317,7 @@ bool ALVimKeymap::searchMotion(ALTextView& view, bool forward)
     }
     const ALTextPos                from   = cursor(view);
     const ALVimSearch::Offset      offset = mSearch.offset;
-    const std::optional<ALTextPos> to     = mSearch.target(view, mSearch.pattern, forward, count, mSearch.wholeWord, offset);
+    const std::optional<ALTextPos> to     = mSearch.target(view, mSearch.pattern, forward, count, mSearch.wholeWord, offset, search_from);
     if (!to)
     {
         // Said already: the operator fails, and nothing is changed.
@@ -2345,6 +2337,31 @@ bool ALVimKeymap::searchMotion(ALTextView& view, bool forward)
     }
     applyOperator(view, op, span, 1);
     finishCommand(op != 'y');
+    return true;
+}
+
+bool ALVimKeymap::starSearch(ALTextView& view, bool forward, bool whole)
+{
+    const ALTextDocument& d    = view.document();
+    const ALTextRange     word = d.wordAt(cursor(view));
+    if (word.empty())
+    {
+        mFailed = true;
+        clearPending();
+        return true;
+    }
+    mSearch.pattern   = d.text(word);
+    mSearch.forward   = forward;
+    mSearch.wholeWord = whole;
+    mSearch.offset    = ALVimSearch::Offset();
+    // Looked for from the word's start, as vim puts the caret there first:
+    // # from inside a word goes to the one before it, not to its own start.
+    if (mOperator)
+    {
+        return searchMotion(view, forward, word.begin);
+    }
+    mSearch.search(view, mSearch.pattern, forward, countOr(mCount), whole, mSearch.offset, word.begin);
+    clearPending();
     return true;
 }
 
@@ -3008,21 +3025,7 @@ std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
             return true;
         case '*':
         case '#':
-        {
-            const ALTextRange word = d.wordAt(view.caret());
-            if (word.empty())
-            {
-                clearPending();
-                return true;
-            }
-            mSearch.pattern   = d.text(word);
-            mSearch.forward   = ch == '*';
-            mSearch.wholeWord = true;
-            mSearch.offset    = ALVimSearch::Offset();
-            mSearch.search(view, mSearch.pattern, mSearch.forward, count, true);
-            clearPending();
-            return true;
-        }
+            return starSearch(view, ch == '*', true);
         case 'R':
             if (editing)
             {
