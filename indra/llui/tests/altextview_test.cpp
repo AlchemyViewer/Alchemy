@@ -3053,4 +3053,22 @@ namespace tut
         ensure_equals("added to at its end", v.findMatches().size(), size_t(6));
         ensure_equals("and said", v.findBar()->countSaid(), std::string("6"));
     }
+
+    template<> template<>
+    void altextview_object::test<97>()
+    {
+        set_test_name("a composition with a line break in it -- a lone CR or CRLF as well as LF -- stays on its line, the break a space, and goes whole");
+        ALTextView& v = make("xy");
+        v.setCaret(ALTextPos(0, 1));
+        LLPreeditor& ime = v.preeditor();
+        for (const char* composing : { "ab\rcd", "ab\r\ncd", "ab\ncd" })
+        {
+            ime.updatePreedit(composing, { 5 }, { false }, 5);
+            ensure_equals("on its line, the break a space", v.text(), std::string("xab cdy"));
+            ime.resetPreedit();
+            ensure_equals("gone, all of it", v.text(), std::string("xy"));
+            ensure("the caret where it began", v.caret() == ALTextPos(0, 1));
+        }
+        ensure("none of it an edit", !v.isDirty());
+    }
 }

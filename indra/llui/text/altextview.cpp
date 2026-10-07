@@ -31,6 +31,7 @@
 #include "altextchars.h"
 #include "altextfeatures.h"
 #include "altextruler.h"
+#include "allinebreaks.h"
 #include "alsurface.h"
 #include "alviewtype.h"
 #include "llclipboard.h"
@@ -4290,9 +4291,10 @@ void ALTextView::updatePreedit(std::string_view preedit_string, const segment_le
     }
     resetPreedit();
 
-    // A composition is one line of text; a newline in one would put the
-    // rest of it where this cannot count it.
-    std::string composed(preedit_string);
+    // A composition is one line of text; a line break in one -- whatever
+    // the document reads as one, CRLF and a lone CR as LF -- would put the
+    // rest of it where this cannot count it, and is a space instead.
+    std::string composed = ALLineBreaks::withLineFeeds(preedit_string);
     std::replace(composed.begin(), composed.end(), '\n', ' ');
 
     const ALTextPos at = mCaret;
