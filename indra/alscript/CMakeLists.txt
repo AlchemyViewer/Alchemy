@@ -71,6 +71,7 @@ target_sources(
     preprocessor/aldiskincludes.cpp
     preprocessor/alincludeidentity.cpp
     preprocessor/alincludesearch.cpp
+    preprocessor/allinelabel.cpp
     preprocessor/almodulelook.cpp
     preprocessor/alpreprocessor.cpp
     preprocessor/alrequirenavigation.cpp
@@ -146,6 +147,7 @@ target_sources(
         preprocessor/aldiskincludes.h
         preprocessor/alincludeidentity.h
         preprocessor/alincludesearch.h
+        preprocessor/allinelabel.h
         preprocessor/almodulelook.h
         preprocessor/alpreprocessor.h
         preprocessor/alrequirenavigation.h
@@ -294,6 +296,7 @@ if(AL_BUILD_TESTS)
   al_add_test(aldiskcache PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alincludeidentity PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alincludesearch PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(allinelabel PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almodulelook PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alsourcemap PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptjoblane PROJECT alscript LIBRARIES alscript llcommon)
