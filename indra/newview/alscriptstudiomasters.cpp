@@ -29,6 +29,7 @@
 #include "alcodeeditor.h"
 #include "alfilewrite.h"
 #include "almastermatch.h"
+#include "alnotecardembedded.h"
 #include "alscriptenvelope.h"
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudioservices.h"
@@ -99,8 +100,21 @@ ALScriptStudioMasters::ALScriptStudioMasters(ALScriptStudioServices& services, A
 // static
 bool ALScriptStudioMasters::canLink(const Doc* doc)
 {
-    return doc && doc->file.empty() && !doc->notecard && doc->loaded && doc->modifiable && !doc->ref.isNull() &&
-           !ALScriptDiskMasters::instance().linkOf(doc->ref);
+    return doc && doc->file.empty() && doc->loaded && doc->modifiable && !doc->ref.isNull() && !ALScriptDiskMasters::instance().linkOf(doc->ref);
+}
+
+bool ALScriptStudioMasters::carriesItems(const Doc& doc)
+{
+    // A file holds text alone: a notecard's items would be lost to it, so
+    // one that carries any is never linked, and is told why.
+    if (!doc.notecard || !doc.items || doc.items->items().empty())
+    {
+        return false;
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    mServices.report(mServices.words("MasterNotecardCarries", args), true, &doc);
+    return true;
 }
 
 bool ALScriptStudioMasters::mastersAny(const Doc* doc) const
@@ -110,7 +124,7 @@ bool ALScriptStudioMasters::mastersAny(const Doc* doc) const
 
 void ALScriptStudioMasters::linkToFile(Doc& doc)
 {
-    if (!canLink(&doc))
+    if (!canLink(&doc) || carriesItems(doc))
     {
         return;
     }
@@ -155,7 +169,11 @@ void ALScriptStudioMasters::linkToFile(Doc& doc)
                 return;
             }
             // Safe in the file, which its tab opens holding, to be sent by
-            // its save: nothing of it set aside as the tab goes.
+            // its save: nothing of it set aside as the tab goes. A write of
+            // the studio's own, which the masters' watch hears as none:
+            // whatever else the file masters already is sent now, as any
+            // write of it sends it.
+            ALScriptDiskMasters::instance().wrote(path);
             asked->editor->resetDirty();
             linkTo(*asked, path, ALMasterLink::Made::Picked, unsaved);
         });
@@ -165,34 +183,36 @@ void ALScriptStudioMasters::linkToFile(Doc& doc)
 bool ALScriptStudioMasters::ofItsLanguage(const Doc& doc, const std::string& path)
 {
     const bool lua = doc.language.lua;
-    if (ALDiskIncludes::extensionOf(path, ALDiskIncludes::scriptExtensions(lua)) > 0)
+    if (ALDiskIncludes::extensionOf(path, doc.notecard ? ALMasterMatch::notecardExtensions() : ALDiskIncludes::scriptExtensions(lua)) > 0)
     {
         return true;
     }
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
     args["[FILE]"] = fileNameOf(path);
-    mServices.report(mServices.words(lua ? "MasterNotSLuaFile" : "MasterNotLSLFile", args), true, &doc);
+    mServices.report(mServices.words(doc.notecard ? "MasterNotNotecardFile" : lua ? "MasterNotSLuaFile" : "MasterNotLSLFile", args), true, &doc);
     return false;
 }
 
 void ALScriptStudioMasters::linkTo(Doc& doc, const std::string& path, ALMasterLink::Made made, bool written)
 {
-    if (!ofItsLanguage(doc, path))
+    if (!ofItsLanguage(doc, path) || carriesItems(doc))
     {
         return;
     }
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
     args["[FILE]"] = fileNameOf(path);
-    const bool   lua = doc.language.lua;
+    // A notecard's text goes up as it is: no language, no target.
+    const bool   lua = !doc.notecard && doc.language.lua;
     ALMasterLink link;
     link.object     = doc.ref.object;
     link.item       = doc.ref.item;
     link.master     = path;
     link.made       = made;
     link.lua        = lua;
-    link.target     = doc.language.compileTarget;
+    link.notecard   = doc.notecard;
+    link.target     = doc.notecard ? std::string() : doc.language.compileTarget;
     link.base       = doc.assetId;
     link.itemName   = doc.name;
     link.objectName = doc.objectName;
@@ -205,6 +225,12 @@ void ALScriptStudioMasters::linkTo(Doc& doc, const std::string& path, ALMasterLi
     // here and written to it is not in the world.
     std::string on_disk;
     const bool  differs = written || !ALFileRead::whole(path, on_disk, ALDiskIncludes::MAX_BYTES) || on_disk != doc.editor->wholeText();
+    if (!differs)
+    {
+        // The file as the world has it: the link starts from it, as from a
+        // send of it, so that nothing marks the file as changed since.
+        link.stamp = ALFileStamp::of(path).time;
+    }
     ALScriptDiskMasters::instance().link(link);
 
     // The script is changed through its file from here: its tab gives way
@@ -327,7 +353,8 @@ void ALScriptStudioMasters::loaded(Doc& doc)
         lookAgain();
         return;
     }
-    if (!canLink(&doc))
+    // A notecard names no file of its own: what it says is its readers'.
+    if (!canLink(&doc) || doc.notecard)
     {
         return;
     }

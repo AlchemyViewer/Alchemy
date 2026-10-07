@@ -327,9 +327,14 @@ void ALScriptDiskMasters::finished(const Outcome& outcome, const std::optional<A
 {
     if (updated)
     {
-        if (ALMasterLinks* all = links(); all && all->of(updated->object, updated->item))
+        if (ALMasterLinks* all = links(); all && all->of(outcome.ref.object, outcome.ref.item))
         {
-            // Unless let go of while it was on its way.
+            // Unless let go of while it was on its way. Saved as another
+            // item, the link is that one's.
+            if (updated->item != outcome.ref.item)
+            {
+                all->remove(outcome.ref.object, outcome.ref.item);
+            }
             all->put(*updated);
             changed();
         }
@@ -413,9 +418,8 @@ std::vector<ALScriptDiskMasters::Outcome> ALScriptDiskMasters::takeUnheard()
 
 void ALScriptDiskMasters::heardSaved(const ALScriptSaved& saved)
 {
-    // A send of a master's own is told as it ends; a notecard's is not yet
-    // a master's to send.
-    if (saved.sender.origin == ALScriptOrigin::Disk || saved.kind == ALScriptKind::Notecard || saved.asset.isNull())
+    // A send of a master's own is told as it ends.
+    if (saved.sender.origin == ALScriptOrigin::Disk || saved.asset.isNull())
     {
         return;
     }
@@ -428,7 +432,8 @@ void ALScriptDiskMasters::heardSaved(const ALScriptSaved& saved)
     // What went up the same as what the master last sent -- a recompile,
     // the VS Code plugin sending the same file -- moves on what the link
     // is of, and is nothing to say.
-    if (!link->hash.empty() && hashOfWorld(saved.text, link->target) == link->hash)
+    const std::string world = link->notecard ? ALUploadHeader::hashOfPlain("notecard", saved.text) : hashOfWorld(saved.text, link->target);
+    if (!link->hash.empty() && world == link->hash)
     {
         link->base = saved.asset;
         save();

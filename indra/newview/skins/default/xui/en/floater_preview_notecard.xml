@@ -33,6 +33,13 @@
     <floater.string name="SavedByBridge">VS Code</floater.string>
     <floater.string name="SavedByStudio">Script Studio</floater.string>
     <floater.string name="SavedByOther">another editor</floater.string>
+    <floater.string name="SavedByFile">its file on disk</floater.string>
+    <floater.string name="LinkedToFile">This notecard is linked to [FILE] on disk: saving here writes the file, and the file's save sends it.</floater.string>
+    <floater.string name="Unlink">Unlink</floater.string>
+    <floater.string name="Unlinked">This notecard is no longer linked to its file: saving here saves it in-world.</floater.string>
+    <floater.string name="SavedToFile">Saved to [FILE], which sends it.</floater.string>
+    <floater.string name="FileNotWritten">[FILE] could not be written</floater.string>
+    <floater.string name="LinkedCarries">Not saved: this notecard carries items, and [FILE], the file it is linked to, cannot hold them. Unlink it to save it with them.</floater.string>
     <floater.string name="TakeTheirs">Take Theirs</floater.string>
     <floater.string name="KeepMine">Keep Mine</floater.string>
     <floater.string name="Compare">Compare</floater.string>

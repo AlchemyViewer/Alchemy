@@ -98,6 +98,9 @@ private:
     void upload();
     void uploaded(const ALScriptCompileResult& result);
     void end(Outcome::What what, const std::string& why = std::string(), std::optional<ALScriptCompileResult> result = std::nullopt);
+    // What a text hashes to as the link keeps it: a script's as the
+    // envelope's halves, a notecard's as its text.
+    std::string hashOf(const std::string& text) const;
 
     ALMasterLink       mLink;
     ALMasterLink       mUpdated;
@@ -116,6 +119,8 @@ private:
     std::string        mWorldText;
     bool               mKeptTheirs = false;
     bool               mWorldRead  = false;
+    // A notecard that carries items in the world.
+    bool               mWorldCarries = false;
     // Told what was found, where this is a probe and sends nothing; and
     // whether it reads the world's text.
     probed_t           mProbed;

@@ -641,6 +641,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="SavedByStudio">Script Studio</floater.string>
     <floater.string name="MasterNotSLuaFile">[FILE] is not an SLua file, and [NAME] is SLua.</floater.string>
     <floater.string name="MasterNotLSLFile">[FILE] is not an LSL file, and [NAME] is LSL.</floater.string>
+    <floater.string name="MasterNotNotecardFile">[FILE] is not a notecard's file: a notecard is linked to a .txt, .notecard or .json file.</floater.string>
+    <floater.string name="MasterNotecardCarries">[NAME] carries items, which a file on disk cannot hold, so it cannot be linked to one.</floater.string>
     <floater.string name="MasterLinked">[NAME] is linked to [FILE]: from now on it is changed through the file, and saving the file sends it.</floater.string>
     <floater.string name="MasterLinkedBridge">VS Code holds [NAME] too: whichever saves it last is what it holds.</floater.string>
     <floater.string name="MasterLinkDiffers">[FILE] is not what [NAME] holds now: the next save of the file sends it, and keeps what [NAME] had in History.</floater.string>

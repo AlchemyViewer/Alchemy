@@ -107,10 +107,13 @@ public:
 
     ALScriptStudioMasters(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window);
 
-    // Whether a tab may be linked to a file: an item's script, loaded, that
-    // may be changed and is linked to none; and whether a tab is a file's
-    // that masters scripts.
+    // Whether a tab may be linked to a file: an item's script or notecard,
+    // loaded, that may be changed and is linked to none; and whether a tab
+    // is a file's that masters scripts.
     static bool canLink(const Doc* doc);
+    // Whether a notecard's tab carries items, which a file cannot hold, and
+    // so may not be linked: said where it does.
+    bool carriesItems(const Doc& doc);
     bool        mastersAny(const Doc* doc) const;
     // The commands: a tab linked to a file picked for it, what was typed in
     // it written to the file or let go of as the author says; a file's

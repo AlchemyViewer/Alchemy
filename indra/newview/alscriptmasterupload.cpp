@@ -40,6 +40,9 @@
 
 namespace
 {
+    // The target a notecard's text is hashed under.
+    constexpr const char* NOTECARD = "notecard";
+
     // What a text hashes to beside what a send would make of the master:
     // an envelope's halves, or the text where it is none.
     std::string hashOfText(const std::string& text, const std::string& target)
@@ -71,6 +74,11 @@ void ALScriptMasterUpload::probe(const ALMasterLink& link, probed_t done, bool w
 ALScriptMasterUpload::ALScriptMasterUpload(const ALMasterLink& link, ALMasterPlan::Send kind)
 : mLink(link), mUpdated(link), mKind(kind), mRef(link.object, link.item)
 {
+}
+
+std::string ALScriptMasterUpload::hashOf(const std::string& text) const
+{
+    return mLink.notecard ? ALUploadHeader::hashOfPlain(NOTECARD, text) : hashOfText(text, mTarget);
 }
 
 void ALScriptMasterUpload::read()
@@ -134,6 +142,22 @@ void ALScriptMasterUpload::found(LLInventoryItem* item)
         mUpdated.itemName = mName;
         mChanged          = true;
     }
+    // A notecard's master sends a notecard, and a script's a script.
+    const bool notecard = item->getType() == LLAssetType::AT_NOTECARD;
+    if (notecard != mLink.notecard)
+    {
+        end(Outcome::What::Failed, LLTrans::getString(mLink.notecard ? "ScriptMasterNotNotecard" : "ScriptMasterNotScript"));
+        return;
+    }
+    if (notecard)
+    {
+        // Its text as the file has it: nothing expanded, nothing compiled.
+        mTarget = NOTECARD;
+        ALScriptPrepared as_is;
+        as_is.text = mText;
+        prepared(as_is);
+        return;
+    }
     // The target: the last one sent with, or what the script compiles for
     // now. A script is in one language, its master's, and only compiles
     // for that language's targets.
@@ -166,7 +190,7 @@ void ALScriptMasterUpload::found(LLInventoryItem* item)
 void ALScriptMasterUpload::prepared(const ALScriptPrepared& prepared)
 {
     mPrepared = prepared;
-    mOurs     = hashOfText(mPrepared.text, mTarget);
+    mOurs     = hashOf(mPrepared.text);
     worldHas(mAsset);
 }
 
@@ -176,8 +200,9 @@ void ALScriptMasterUpload::worldHas(const LLUUID& asset)
     // read, to tell a real change from the same text gone up another way.
     mWorldMoved = asset.notNull() && mLink.base.notNull() && asset != mLink.base;
     // A probe asked of it reads it whatever the base: what the world holds
-    // is what it is asked. One that is not reads it never.
-    const bool read = mProbed ? mProbeWorld && asset.notNull() : mWorldMoved;
+    // is what it is asked. One that is not reads it never. A notecard's is
+    // read always, for the items it may have come to carry.
+    const bool read = mProbed ? mProbeWorld && asset.notNull() : mWorldMoved || (mLink.notecard && asset.notNull());
     if (!read)
     {
         decide();
@@ -191,9 +216,10 @@ void ALScriptMasterUpload::worldText(const ALScriptLoaded& loaded)
 {
     if (loaded.error.empty())
     {
-        mWorldText = loaded.text;
-        mWorldRead = true;
-        mWorldSame = hashOfText(mWorldText, mTarget) == mOurs;
+        mWorldText    = loaded.text;
+        mWorldRead    = true;
+        mWorldSame    = hashOf(mWorldText) == mOurs;
+        mWorldCarries = loaded.notecard && !loaded.embedded.empty();
     }
     decide();
 }
@@ -202,6 +228,13 @@ void ALScriptMasterUpload::decide()
 {
     static LLCachedControl<bool> skip_unchanged(gSavedSettings, "ALScriptMastersSkipUnchanged", true);
     const bool unchanged = !mLink.hash.empty() && mOurs == mLink.hash;
+    // A notecard that came to carry items in the world is never sent over
+    // from a file, which cannot hold them, whoever asks.
+    if (mWorldCarries)
+    {
+        end(Outcome::What::Failed, LLTrans::getString("ScriptMasterNotecardCarries"));
+        return;
+    }
     if (mProbed)
     {
         Probe found;
@@ -268,13 +301,25 @@ void ALScriptMasterUpload::decide()
 
 void ALScriptMasterUpload::upload()
 {
+    std::shared_ptr<ALScriptMasterUpload> self = shared_from_this();
+    if (mLink.notecard)
+    {
+        // With no items: one that carries any is never sent from here.
+        std::string error;
+        if (!ALScriptWorkspace::instance().saveNotecard(
+                mRef, mPrepared.text, {}, [self](const ALScriptCompileResult& result) { self->uploaded(result); }, error,
+                ALScriptSender(ALScriptOrigin::Disk)))
+        {
+            end(Outcome::What::Failed, error);
+        }
+        return;
+    }
     ALScriptSaveOptions options;
     options.compileTarget = mTarget;
     options.sender        = ALScriptSender(ALScriptOrigin::Disk);
     options.sourceMap     = mPrepared.map;
     options.codeLine      = mPrepared.codeLine;
-    std::shared_ptr<ALScriptMasterUpload> self = shared_from_this();
-    std::string                            error;
+    std::string error;
     if (!ALScriptWorkspace::instance().save(
             mRef, mPrepared.text, options, [self](const ALScriptCompileResult& result) { self->uploaded(result); }, error))
     {
@@ -294,6 +339,12 @@ void ALScriptMasterUpload::uploaded(const ALScriptCompileResult& result)
     if (result.newAssetId.notNull())
     {
         mUpdated.base = result.newAssetId;
+    }
+    // Saved as another item, one that could not be changed in place: the
+    // link is that item's now.
+    if (result.newItemId.notNull())
+    {
+        mUpdated.item = result.newItemId;
     }
     mUpdated.hash   = mOurs;
     mUpdated.stamp  = mStamp.time;
