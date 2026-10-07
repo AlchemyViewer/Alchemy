@@ -357,7 +357,7 @@
         <key>ALScriptPreprocLineComments</key>
         <map>
             <key>Comment</key>
-            <string>The preprocessor writes an @line comment wherever its text moves to another file or skips lines, saying the line and the file's name, as Linden Lab's VS Code plugin does.</string>
+            <string>The preprocessor writes an @line comment wherever its text moves to another file or skips lines, saying the line and the file -- one on disk by its path from the script's folder, never from the root -- as Linden Lab's VS Code plugin does.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

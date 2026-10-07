@@ -35,10 +35,12 @@
 #include "alserialworker.h"
 
 #include "aldiskincludes.h"
+#include "allinelabel.h"
 #include "allslservice.h"
 #include "alscriptanalysis.h"
 #include "alluauconfig.h"
 #include "alscriptenvelope.h"
+#include "alscriptmodules.h"
 #include "alscriptstack.h"
 #include "alscriptworkspace.h"
 #include "llagent.h"
@@ -241,6 +243,27 @@ ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request,
     options.optimizer.target      = request.compileTarget == "lsl2"       ? ALLSLOptimizer::Target::LSO
                                     : request.compileTarget == "lsl-luau" ? ALLSLOptimizer::Target::Luau
                                                                           : ALLSLOptimizer::Target::Mono;
+    // Where @line comments are asked for, a file on disk is named by its
+    // path from the script's own folder (ALLineLabel), as the VS Code
+    // plugin reads it back -- under the folders the script's includes and
+    // requires may come from, each with its links followed, as the
+    // preprocessor names what it admits.
+    if (options.lineComments)
+    {
+        ALDiskIncludes blessed;
+        for (const auto& [prefix, folder] : moduleFolders(request))
+        {
+            blessed.bless(folder);
+        }
+        for (const StudioAlias& alias : studioAliases())
+        {
+            if (ALLuauConfig::absolute(alias.folder))
+            {
+                blessed.bless(alias.folder);
+            }
+        }
+        options.lineLabel = ALLineLabel(request.path.empty() ? std::string() : ALScriptModules::identity(request.path), blessed.folders());
+    }
     options.agentId   = gAgentID.asString();
     LLAgentUI::buildFullname(options.agentName);
     options.assetId   = request.assetId.isNull() ? std::string() : request.assetId.asString();
