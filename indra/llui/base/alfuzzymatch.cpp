@@ -59,26 +59,15 @@ namespace
     // `a_a_a_a...` against a near miss, over and again at every keystroke.
     //
     // Asked of nearly every name at every keystroke, and refused by most:
-    // refused cheaply first where a letter typed is not in the name in its
-    // turn, or the first begins no part of it; and the table kept from one
-    // name to the next rather than made for each.
+    // asked only of a name with the letters typed in it in their turn
+    // (matchIn), refused cheaply first where the first begins no part of
+    // it; and the table kept from one name to the next rather than made
+    // for each.
     template <typename Name>
     bool byParts(const Name& word, std::string_view typed)
     {
-        const size_t n  = word.size();
-        size_t       at = 0;
-        for (const char c : typed)
-        {
-            while (at < n && word.low(at) != c)
-            {
-                ++at;
-            }
-            if (at++ == n)
-            {
-                return false;
-            }
-        }
-        bool begins = false;
+        const size_t n      = word.size();
+        bool         begins = false;
         for (size_t k = 0; k < n && !begins; ++k)
         {
             begins = word.part(k) && word.low(k) == typed.front();
@@ -160,6 +149,25 @@ namespace
         {
             return {};
         }
+        // Its letters in order, and how far in the last of them is: what
+        // every kind of match past its start has, a run as much as the
+        // letters of its parts, so that a name without them is refused
+        // here, before any of those is looked for. Kept for the scattered
+        // letters' answer, where a match that finishes early answers
+        // better than one that straggles to the end.
+        size_t in_order = 0;
+        for (const char c : lowered)
+        {
+            while (in_order < n && word.low(in_order) != c)
+            {
+                ++in_order;
+            }
+            if (in_order == n)
+            {
+                return {};
+            }
+            ++in_order;
+        }
         for (size_t k = 1; k + m <= n; ++k)
         {
             if (word.part(k) && same_at(k))
@@ -192,23 +200,7 @@ namespace
         {
             return {};
         }
-        // Its letters in order, and how far in the last of them is: a
-        // match that finishes early answers better than one that
-        // straggles to the end.
-        size_t at = 0;
-        for (const char c : lowered)
-        {
-            while (at < n && word.low(at) != c)
-            {
-                ++at;
-            }
-            if (at == n)
-            {
-                return {};
-            }
-            ++at;
-        }
-        return { Tier::Scattered, at };
+        return { Tier::Scattered, in_order };
     }
 }
 
