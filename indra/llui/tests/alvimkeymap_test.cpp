@@ -3641,4 +3641,49 @@ namespace tut
         ensure_equals("visual \"_p: the selection taken out, nothing put", flat(e.text()), std::string(" def||x|"));
         ensure_equals("the caret where it was", caretText(), std::string("0:0"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<138>()
+    {
+        set_test_name("a count of aw or iw goes on across a line's end, the break no character of its own, and fails where the words run out; aw on a line's last blanks takes the next line's first word");
+        ALCodeEditor& e = make("foo bar\nbaz qux\n");
+        e.setCaret(ALTextPos(0, 4));
+        keys("2daw");
+        ensure_equals("2daw from a line's last word: the next line's first and its blank too", flat(e.text()), std::string("foo qux|"));
+        ensure_equals("all it took kept", vim->registerText('"'), std::string("bar\nbaz "));
+        keys("u");
+        e.setCaret(ALTextPos(0, 4));
+        keys("3daw");
+        ensure_equals("3daw: the blank before, none being after", flat(e.text()), std::string("foo|"));
+        keys("u");
+        e.setCaret(ALTextPos(0, 4));
+        keys("3diw");
+        ensure_equals("3diw: the next line's first word and the blank after it", flat(e.text()), std::string("foo qux|"));
+        keys("u");
+        e.setCaret(ALTextPos(0, 4));
+        keys("v3awy");
+        ensure_equals("v3aw selects as much as 3daw takes", vim->registerText('"'), std::string(" bar\nbaz qux"));
+
+        make("foo bar\nbaz");
+        editor->setCaret(ALTextPos(0, 4));
+        keys("2yaw");
+        ensure_equals("2yaw to the text's last word", vim->registerText('"'), std::string(" bar\nbaz"));
+        editor->setCaret(ALTextPos(0, 4));
+        keys("3yaw");
+        ensure_equals("3yaw runs out of words: nothing yanked", vim->registerText('"'), std::string(" bar\nbaz"));
+
+        make("a.b c.d\ne.f g.h\n");
+        editor->setCaret(ALTextPos(0, 4));
+        keys("2daW");
+        ensure_equals("2daW by WORDs", flat(editor->text()), std::string("a.b g.h|"));
+
+        make("foo   \nbar baz\n");
+        editor->setCaret(ALTextPos(0, 4));
+        keys("daw");
+        ensure_equals("daw on a line's last blanks: the next line's first word with them", flat(editor->text()), std::string("foo baz|"));
+
+        make("bar\n\nbaz qux\n");
+        keys("2diw");
+        ensure_equals("2diw from a line's start over an empty line: the lines whole", flat(editor->text()), std::string("baz qux|"));
+    }
 }

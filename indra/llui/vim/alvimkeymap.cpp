@@ -1760,6 +1760,207 @@ namespace
         range.end = d.lineEnd(range.end.line - 1);
         linewise  = range.begin.column <= firstNonBlankColumn(d, range.begin.line);
     }
+
+    // A word object as vim's current_word() finds one: from the start of
+    // the word or the blanks the caret is on, the count of them on, across
+    // line ends, where a line's break is no character of its own and an
+    // empty line is blanks. iw counts a word or a run of blanks as one; aw
+    // a word with the blanks after it, or blanks with the word after them,
+    // and one that ends on no blank takes the blanks before it instead, but
+    // not a line's indent. `end` is where vim's cursor is left: on the
+    // object's last character, or, where `inclusive` is false, at the start
+    // of the line after it. None where the text runs out first.
+    struct WordObject
+    {
+        ALTextPos start;
+        ALTextPos end;
+        bool      inclusive = true;
+    };
+    std::optional<WordObject> wordObject(const ALTextDocument& d, const ALTextPos& from, bool around, bool big, S32 count)
+    {
+        // An empty line holds no word to take.
+        if (d.lineLength(from.line) == 0)
+        {
+            return std::nullopt;
+        }
+        ALTextPos  p   = from;
+        const auto cls = [&d, &p, big] { return classOf(at(d, p), big); };
+        // A character on, as vim's inc() steps: 0 along the line, 2 onto its
+        // end, 1 onto the next line's start; -1 at the end of the text, where
+        // it stays.
+        const auto inc = [&d, &p]() -> S32 {
+            if (!atLineEnd(d, p))
+            {
+                p = d.nextCluster(p);
+                return atLineEnd(d, p) ? 2 : 0;
+            }
+            if (p.line + 1 >= d.lineCount())
+            {
+                return -1;
+            }
+            p = ALTextPos(p.line + 1, 0);
+            return 1;
+        };
+        // On, and past the end of a line that is not empty, as incl().
+        const auto incl = [&p, &inc]() -> S32 {
+            const S32 r = inc();
+            return r >= 1 && p.column > 0 ? inc() : r;
+        };
+        // fwd_word() for one word under an operator: past the characters of
+        // the caret's class and the blanks after them, no further than the
+        // line's end -- or from an empty line onto the next one's start.
+        // False where it began at the last line's end or its last character.
+        const auto fwd_word = [&]() -> bool {
+            const S32  run       = cls();
+            const bool last_line = p.line + 1 >= d.lineCount();
+            const S32  first     = inc();
+            if (first == -1 || (first >= 1 && last_line))
+            {
+                return false;
+            }
+            if (first >= 1)
+            {
+                return true;
+            }
+            if (run != 0)
+            {
+                while (cls() == run)
+                {
+                    if (inc() != 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+            while (cls() == 0)
+            {
+                if (inc() != 0)
+                {
+                    return true;
+                }
+            }
+            return true;
+        };
+        // end_word() for one word: to the last character of the run the
+        // caret is in; or, from blanks, past them -- across line ends, but
+        // stopping on an empty line -- to the last of the run after them.
+        // False where the text ends in the blanks.
+        const auto end_word = [&]() -> bool {
+            const S32 run = cls();
+            if (inc() == -1)
+            {
+                return false;
+            }
+            if (run != 0 && cls() == run)
+            {
+                while (cls() == run)
+                {
+                    inc();
+                }
+            }
+            else if (run == 0)
+            {
+                while (cls() == 0)
+                {
+                    if (p.column == 0 && d.lineLength(p.line) == 0)
+                    {
+                        return true;
+                    }
+                    if (inc() == -1)
+                    {
+                        return false;
+                    }
+                }
+                const S32 next = cls();
+                while (cls() == next)
+                {
+                    inc();
+                }
+            }
+            p = d.prevCluster(p);
+            return true;
+        };
+
+        // Back to the start of the word or the blanks under the caret.
+        const S32 under = cls();
+        while (p.column > 0 && classOf(at(d, d.prevCluster(p)), big) == under)
+        {
+            p = d.prevCluster(p);
+        }
+        ALTextPos start         = p;
+        bool      inclusive     = true;
+        bool      include_white = false;
+        // The first of the count: iw's word, or aw's blanks and the word
+        // after them, to the word's last character; else past the word and
+        // its blanks, or iw's blanks, to the character before what comes
+        // next -- the last of the line before, from a line's start.
+        if ((under == 0) == around)
+        {
+            if (!end_word())
+            {
+                return std::nullopt;
+            }
+        }
+        else
+        {
+            fwd_word();
+            if (p.column > 0)
+            {
+                p = d.prevCluster(p);
+            }
+            else if (p.line > 0)
+            {
+                p = lastCharOf(d, p.line - 1);
+            }
+            include_white = around;
+        }
+        // The rest, each from the character after where the last ended, the
+        // same two ways; one that stops at a line's start, from an empty
+        // line, ends there and not on a character.
+        for (S32 n = 1; n < count; ++n)
+        {
+            inclusive = true;
+            if (incl() == -1)
+            {
+                return std::nullopt;
+            }
+            if (around != (cls() == 0))
+            {
+                if (!fwd_word() && n + 1 < count)
+                {
+                    return std::nullopt;
+                }
+                if (p.column > 0)
+                {
+                    p = d.prevCluster(p);
+                }
+                else
+                {
+                    inclusive = false;
+                }
+            }
+            else if (!end_word())
+            {
+                return std::nullopt;
+            }
+        }
+        // An aw that ends on no blank: the blanks before its start instead,
+        // where they are not the line's indent.
+        if (include_white && (cls() != 0 || (p.column == 0 && !inclusive)) && start.column > 0)
+        {
+            ALTextPos before       = d.prevCluster(start);
+            const S32 before_class = classOf(at(d, before), big);
+            while (before.column > 0 && classOf(at(d, d.prevCluster(before)), big) == before_class)
+            {
+                before = d.prevCluster(before);
+            }
+            if (before_class == 0 && before.column > 0)
+            {
+                start = before;
+            }
+        }
+        return WordObject{ start, p, inclusive };
+    }
 }
 
 bool ALVimKeymap::afterBracket(ALTextView& view, llwchar pending, llwchar ch)
@@ -1896,6 +2097,21 @@ bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
     const bool            visual  = mMode != Mode::Normal;
     // The operator's count and the object's together: 2daw is d2aw.
     const S32             count   = countTimes(countOr(mOperatorCount), countOr(mCount));
+    if (visual && (ch == 'w' || ch == 'W'))
+    {
+        // A word object selected as vim's selects one: the anchor at its
+        // start, the caret where vim's cursor is left (wordObject), which
+        // may be the next line's first character.
+        if (const std::optional<WordObject> word = wordObject(d, cursor(view), pending == 'a', ch == 'W', count))
+        {
+            mVisualAnchor = word->start;
+            mVisualCaret  = word->end;
+            setMode(view, Mode::Visual);
+            showVisual(view);
+        }
+        clearPending();
+        return true;
+    }
     // A text object, for the operator or the visual selection.
     Span span;
     if (textObject(view, pending, ch, count, span))
@@ -3280,59 +3496,22 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         case 'w':
         case 'W':
         {
-            // On the caret's line, as vim counts them: iw a word or the
-            // blanks between, each one of the count; aw a word with the
-            // blanks after it, or blanks with the word after them, each
-            // of the count another. An aw that ends on no blank takes the
-            // blanks before it instead, but not a line's indent.
-            const bool big = what == 'W';
-            ALTextPos  begin = from;
-            const S32  cls   = classOf(at(d, from), big);
-            while (begin.column > 0 && classOf(at(d, d.prevCluster(begin)), big) == cls)
-            {
-                begin = d.prevCluster(begin);
-            }
-            // Past the characters of one class from a position.
-            const auto past_run = [&d, big](ALTextPos p) {
-                const S32 run = classOf(at(d, p), big);
-                while (!atLineEnd(d, p) && classOf(at(d, p), big) == run)
-                {
-                    p = d.nextCluster(p);
-                }
-                return p;
-            };
-            // One of the count, from where the last ended.
-            const auto step = [&](ALTextPos p) {
-                const bool blank = classOf(at(d, p), big) == 0;
-                p                = past_run(p);
-                if (around && !atLineEnd(d, p) && (blank || classOf(at(d, p), big) == 0))
-                {
-                    p = past_run(p);
-                }
-                return p;
-            };
-            ALTextPos end = step(begin);
-            for (S32 n = 1; n < count && !atLineEnd(d, end); ++n)
-            {
-                end = step(end);
-            }
-            if (around && cls != 0 && end > begin && classOf(at(d, d.prevCluster(end)), big) != 0)
-            {
-                ALTextPos before = begin;
-                while (before.column > 0 && classOf(at(d, d.prevCluster(before)), big) == 0)
-                {
-                    before = d.prevCluster(before);
-                }
-                if (before.column > 0)
-                {
-                    begin = before;
-                }
-            }
-            if (begin == end)
+            // vim's word object (wordObject) under an operator: from its
+            // start through its last character, though not the line break
+            // after a line's end it stops at; one that ends at a line's
+            // start ends as an exclusive motion there does.
+            const std::optional<WordObject> word = wordObject(d, from, around, what == 'W', count);
+            if (!word)
             {
                 return false;
             }
-            out.range = ALTextRange(begin, end);
+            const ALTextPos first = std::min(word->start, word->end);
+            const ALTextPos last  = std::max(word->start, word->end);
+            out.range             = ALTextRange(first, word->inclusive && !atLineEnd(d, last) ? d.nextCluster(last) : last);
+            if (!word->inclusive)
+            {
+                adjustExclusiveEnd(d, out.range, out.linewise);
+            }
             return true;
         }
         case '"':
