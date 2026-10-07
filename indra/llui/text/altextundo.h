@@ -55,7 +55,26 @@ class ALTextUndo
 public:
     struct Step
     {
-        std::vector<ALTextDocument::Edit> edits;
+        // One change a step was made of: the edit as the document made it;
+        // or for a batch (ALTextDocument::replaceMany), each stretch with
+        // its own text, as it was and as it is after, and of the edit only
+        // its range and its parts -- not the whole of the text from its
+        // first stretch to its last, which a run of keys typed at carets
+        // far apart would hold again for every key. A batch is put back as
+        // it was made, one edit of all its stretches.
+        struct Change
+        {
+            struct Stretch
+            {
+                std::string removed;
+                std::string inserted;
+            };
+            ALTextDocument::Edit edit;
+            // One for each of the edit's parts, in order; none for an edit
+            // kept whole.
+            std::vector<Stretch> stretches;
+        };
+        std::vector<Change>               edits;
         ALTextPos                         caretBefore;
         ALTextPos                         caretAfter;
         // Where the selection's other end stood: the caret's own place
@@ -70,8 +89,8 @@ public:
         // Which step this is, for a save point to find it by; a run
         // joined to it keeps the number it began with.
         U64                               serial = 0;
-        // What it weighs against the budget: its edits' text and what each
-        // costs written beside it.
+        // What it weighs against the budget: its edits' text, a batch's by
+        // its stretches, and what each costs written beside it.
         size_t                            bytes = 0;
         // Made by keys typed (beginTyping), which the next key typed may
         // carry on.

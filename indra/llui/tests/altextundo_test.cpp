@@ -842,4 +842,99 @@ namespace tut
         undo.undo(&others);
         ensure("none where there were none", others.empty());
     }
+
+    template<> template<>
+    void altextundo_object::test<25>()
+    {
+        set_test_name("a batch is kept by its stretches' own text, not the whole of the text from the first to the last: keys typed at carets far apart keep the steps before them, and step back and forward as batches");
+        // A name on the first line and on the last, forty thousand bytes
+        // apart.
+        std::string text = "name = 1;\n";
+        for (S32 i = 0; i < 1000; ++i)
+        {
+            text += std::string(39, 'x') + "\n";
+        }
+        text += "name = 2;";
+        doc.setText(text);
+        const S32 last = doc.lineCount() - 1;
+        type(ALTextPos(1, 0), "a", 5.0);
+        undo.markSaved();
+        const std::string saved = doc.text();
+        type(ALTextPos(2, 0), "b", 5.0);
+        const std::string before = doc.text();
+
+        // A key typed at both, thirty times: one run.
+        now += 5.0;
+        const std::string typed = "abcdefghijklmnopqrstuvwxyz0123";
+        for (size_t k = 0; k < typed.size(); ++k)
+        {
+            const S32         column = 4 + static_cast<S32>(k);
+            const ALTextPos   at(0, column);
+            const ALTextPos   other(last, column);
+            const std::string key(1, typed[k]);
+            undo.beginTyping(ALTextRange(at, at));
+            const ALTextDocument::Edit edit = doc.replaceMany({ { ALTextRange(at, at), key }, { ALTextRange(other, other), key } });
+            undo.record(edit, ALTextRange(at, at), ALTextPos(0, column + 1), now, { ALTextRange(other, other) });
+            undo.endTyping();
+            now += 0.1;
+        }
+        const std::string after = doc.text();
+        ensure_equals("typed at both", doc.line(last), std::string("name") + typed + " = 2;");
+        ensure("the saved text still reached, past the run", undo.savedText() == std::optional<std::string>(saved));
+        ensure("the history written a few bytes a key", undo.asNotation().size() < 16 * 1024);
+
+        // Read back over the text as it stands, in another journal: the run
+        // steps back to where it began.
+        std::optional<ALTextUndo::History> read = ALTextUndo::historyFrom(undo.asLLSD(), after);
+        ensure("the history read back", read.has_value());
+        ALTextDocument later(after);
+        ALTextUndo     again(later);
+        again.restore(std::move(*read));
+        again.undo();
+        ensure("and stepped back through", later.text() == before);
+
+        // Stepped back in its own journal: each key put back as the batch it
+        // was, the run one step, and the steps before it still there.
+        S32 changes = 0;
+        S32 batches = 0;
+        doc.onChanged([&changes, &batches](const ALTextDocument::Edit& edit) {
+            ++changes;
+            batches += edit.parts.size() == 2 ? 1 : 0;
+        });
+        undo.undo();
+        ensure("the run one step", doc.text() == before);
+        ensure_equals("each key put back as one change", changes, static_cast<S32>(typed.size()));
+        ensure_equals("each a batch of both stretches", batches, changes);
+        ensure("the steps before it kept", undo.canUndo());
+        undo.undo();
+        ensure("back to the saved text", undo.isPristine() && doc.text() == saved);
+        undo.redo();
+        undo.redo();
+        ensure("and forward to where the run ended", doc.text() == after);
+
+        // Stretches across lines, taking text and putting it, and one that
+        // only takes: each with its own text, as it was and as it is after.
+        undo.clear();
+        doc.setText("alpha\nbeta\ngamma\ndelta");
+        now += 5.0;
+        const ALTextDocument::Edit many = doc.replaceMany({ { ALTextRange(ALTextPos(0, 1), ALTextPos(1, 2)), "X\nY" },
+                                                            { ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), "Z" },
+                                                            { ALTextRange(ALTextPos(3, 2), ALTextPos(3, 5)), "" } });
+        undo.record(many, ALTextPos(0, 1), many.endAfter(), now);
+        ensure_equals("made", doc.text(), std::string("aX\nYta\nZgamma\nde"));
+        const LLSD written = undo.asLLSD();
+        const LLSD edits   = written["undo"][0]["edits"];
+        ensure_equals("written an edit a stretch", edits.size(), 3);
+        ensure_equals("the last first, with what it took", edits[0][4].asString(), std::string("lta"));
+        ensure_equals("the first last, with what it took and put", edits[2][4].asString() + "|" + edits[2][5].asString(), std::string("lpha\nbe|X\nY"));
+        undo.undo();
+        ensure_equals("stepped back", doc.text(), std::string("alpha\nbeta\ngamma\ndelta"));
+        undo.redo();
+        ensure_equals("and forward", doc.text(), std::string("aX\nYta\nZgamma\nde"));
+        ALTextDocument copy(doc.text());
+        ALTextUndo     restored(copy);
+        ensure("read back", restored.fromLLSD(written));
+        restored.undo();
+        ensure_equals("and stepped back from the history", copy.text(), std::string("alpha\nbeta\ngamma\ndelta"));
+    }
 }
