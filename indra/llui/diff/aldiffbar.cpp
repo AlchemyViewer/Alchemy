@@ -33,6 +33,7 @@
 #include "llfontgl.h"
 #include "llrender2dutils.h"
 #include "llslider.h"
+#include "llstring.h"
 #include "lltextbox.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
@@ -56,17 +57,12 @@ namespace
     // count let go, the words as letters, the slider let go.
     constexpr S32 SQUEEZE_MOST = 3;
 
-    // A word's first letter, which stands for it on a narrow bar.
+    // A word's first letter, which stands for it on a narrow bar: its first
+    // character as a reader sees one, a letter with its marks or an emoji
+    // with what joins it.
     std::string firstLetter(const std::string& word)
     {
-        // Its first character's bytes: the lead byte says how many.
-        if (word.empty())
-        {
-            return word;
-        }
-        const U8     lead = static_cast<U8>(word[0]);
-        const size_t size = lead < 0xC0 ? 1 : lead < 0xE0 ? 2 : lead < 0xF0 ? 3 : 4;
-        return word.substr(0, size);
+        return word.substr(0, utf8str_step_grapheme_forward(word, 0));
     }
 }
 
