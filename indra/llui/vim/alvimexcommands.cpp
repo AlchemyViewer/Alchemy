@@ -1083,14 +1083,26 @@ void ALVimExCommands::runCommand(ALTextView& view, const std::string& line_in)
     if (name == "pu" || name == "put" || name == "pu!" || name == "put!")
     {
         // A register's text as lines, whatever it was taken as: under the
-        // range's last line, or above its first with !.
-        const ALVimRegisters::Register reg = mVim.fetch(args.empty() ? mVim.mRegister : args[0]);
-        if (!editing || reg.text.empty())
+        // range's last line, or above its first with !. Nothing is a
+        // register never set, or set to no text, as for p: an empty line is
+        // a line to put, and so is an empty last line of several.
+        if (!editing)
         {
             return;
         }
+        const char                     named = args.empty() ? mVim.mRegister : args[0];
+        const ALVimRegisters::Register reg   = mVim.fetch(named);
+        if (reg.text.empty() && !reg.linewise)
+        {
+            mVim.say(ALVimKeymap::said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, named ? named : '"') } }), true);
+            return;
+        }
+        // Characters ending in a line break -- text copied from elsewhere,
+        // as often as not -- are the lines before it. Lines and a block's
+        // rows are kept with no break after the last: one there is before
+        // an empty last line.
         std::string text = reg.text;
-        if (!text.empty() && text.back() == '\n')
+        if (!reg.linewise && !reg.block && !text.empty() && text.back() == '\n')
         {
             text.pop_back();
         }

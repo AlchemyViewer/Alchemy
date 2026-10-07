@@ -3576,4 +3576,39 @@ namespace tut
         keys(";");
         ensure_equals("; after it goes back to after the one before", caretText(), std::string("2:2"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<136>()
+    {
+        set_test_name(":put puts an empty line a register holds, alone or last of several, through the clipboard as well; only a register never set holds nothing");
+        ALCodeEditor& e = make("a\n\nb\n");
+        ex("put x");
+        ensure("a register never set: E353", vim->messageIsError() && vim->message().find("E353") != std::string::npos);
+        ensure_equals("and nothing put", flat(e.text()), std::string("a||b|"));
+        keys("jyyk");
+        ex("put");
+        ensure("an empty line is something to put", !vim->messageIsError());
+        ensure_equals(":put: the empty line below", flat(e.text()), std::string("a|||b|"));
+        ensure_equals("the caret on it", caretText(), std::string("1:0"));
+        ex("4put!");
+        ensure_equals(":4put!: above the fourth line", flat(e.text()), std::string("a||||b|"));
+        ensure_equals("the caret on it", caretText(), std::string("3:0"));
+        keys("gg2yy");
+        ex("$put");
+        ensure_equals("two lines, the last empty: both put", flat(e.text()), std::string("a||||b|a||"));
+
+        make("ab\n\nx\n");
+        keys("<C-v>jy");
+        ex("3put");
+        ensure_equals("a block's empty last row is a line as well", flat(editor->text()), std::string("ab||x|a||"));
+
+        make("a\n\nb\n");
+        ex("set clipboard=unnamed");
+        keys("jyyk");
+        ex("put");
+        ensure("by the clipboard, which an empty line leaves empty", !vim->messageIsError());
+        ensure_equals("put all the same", flat(editor->text()), std::string("a|||b|"));
+        ex("put +");
+        ensure_equals("and by \"+", flat(editor->text()), std::string("a||||b|"));
+    }
 }
