@@ -371,7 +371,12 @@ namespace
             for (LLSD::map_const_iterator it = bound.beginMap(); it != bound.endMap(); ++it)
             {
                 const ALScriptKeymap::Owner owner = ownerNamed(it->first);
-                if (owner.command == ALEditorCommand::None && owner.menu.empty())
+                // Nothing that is a command now: an editor's name it does
+                // not know, or a menu's command the table no longer has,
+                // renamed or gone, whose keys would otherwise be taken from
+                // the commands that have them for a name no menu asks for.
+                if ((owner.command == ALEditorCommand::None && owner.menu.empty()) ||
+                    (!owner.menu.empty() && !ALScriptKeymap::isMenuCommand(owner.menu)))
                 {
                     continue;
                 }
@@ -538,8 +543,8 @@ namespace ALScriptKeymap
             { "next_problem", KEY_F8, MASK_NONE },
             { "previous_problem", KEY_F8, MASK_SHIFT },
             // Changes since the save, as Visual Studio Code steps them.
-            { "next_change", KEY_F5, MASK_ALT },
-            { "previous_change", KEY_F5, MASK_ALT | MASK_SHIFT },
+            { "next_difference", KEY_F5, MASK_ALT },
+            { "previous_difference", KEY_F5, MASK_ALT | MASK_SHIFT },
             // What is left from LSL, as F8 walks every problem.
             { "next_migration", KEY_F8, MASK_ALT },
             { "previous_migration", KEY_F8, MASK_ALT | MASK_SHIFT },
