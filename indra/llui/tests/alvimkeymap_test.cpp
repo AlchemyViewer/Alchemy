@@ -3311,6 +3311,24 @@ namespace tut
     }
 
     template<> template<>
+    void alvimkeymap_object::test<117>()
+    {
+        set_test_name("p puts an empty line that yy or dd took, through the clipboard as well; only a register never set holds nothing");
+        ALCodeEditor& e = make("a\n\nb\n");
+        keys("p");
+        ensure("a register never set: E353", vim->messageIsError() && vim->message().find("E353") != std::string::npos);
+        keys("jyyp");
+        ensure("an empty line is something to put", !vim->messageIsError());
+        ensure_equals("yy then p: the empty line again below", flat(e.text()), std::string("a|||b|"));
+        keys("ddp");
+        ensure_equals("dd then p: below the line that took its place", flat(e.text()), std::string("a||b||"));
+        ex("set clipboard=unnamed");
+        keys("yyp");
+        ensure("by the clipboard, which an empty line leaves empty", !vim->messageIsError());
+        ensure_equals("put all the same", flat(e.text()), std::string("a||b|||"));
+    }
+
+    template<> template<>
     void alvimkeymap_object::test<130>()
     {
         set_test_name("/ and ? after an operator are its motion, up to the match and not into it; an offset of lines makes it lines, /e takes the match's end");

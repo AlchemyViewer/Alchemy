@@ -146,6 +146,12 @@ ALVimRegisters::Register ALVimRegisters::fetch(char name, bool unnamed_clipboard
             reg.block    = mUnnamed.block;
         }
     }
+    else if (mUnnamed.linewise && mUnnamed.text.empty())
+    {
+        // An empty line of ours leaves the clipboard empty, which may then
+        // say it holds nothing at all.
+        reg = mUnnamed;
+    }
     return reg;
 }
 

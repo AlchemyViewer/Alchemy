@@ -59,8 +59,9 @@ public:
     // What a register gives back: a named or numbered one what it keeps;
     // "" what was last put in any, as is none named where the clipboard is
     // not the unnamed register; else what the clipboard holds -- with how
-    // it was taken, where it is what the studio put there, and as
-    // characters otherwise.
+    // it was taken, where it is what the studio put there, an empty line
+    // too though the clipboard says it holds nothing, and as characters
+    // otherwise. One never set holds no text and is no line.
     Register fetch(char name, bool unnamed_clipboard) const;
     // Keys a macro recorded, into its register as characters; its capital
     // adds to it. Neither the unnamed register nor the clipboard is
