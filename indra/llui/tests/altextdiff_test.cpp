@@ -1536,4 +1536,19 @@ namespace tut
         ALTextDiff::words(was, now, left, right, as(cased), &was_reg, &now_reg);
         ensure("in a string: the whole of each", left == S{ { 5, 13 } } && right == S{ { 5, 14 } });
     }
+
+    template<> template<>
+    void altextdiff_object::test<32>()
+    {
+        set_test_name("a word changed into one like it marked at the edges of characters as they are read: a letter with the mark on it, an emoji of several joined");
+        typedef ALTextDiff::spans_t S;
+        S left, right;
+        // An e and a combining acute, against an e alone.
+        ALTextDiff::words("x = cafe\xCC\x81s;", "x = cafes;", left, right);
+        ensure("the letter with its mark, not the mark alone", left == S{ { 7, 10 } } && right == S{ { 7, 8 } });
+        // A family of three joined, its last another.
+        ALTextDiff::words("x = \xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x91\xA7;",
+                          "x = \xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x91\xA6;", left, right);
+        ensure("the emoji whole, not the last of it", left == S{ { 4, 22 } } && right == S{ { 4, 22 } });
+    }
 }

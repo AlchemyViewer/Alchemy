@@ -30,6 +30,7 @@
 #include "aldiffsame.h"
 #include "aldifftokens.h"
 #include "allinediff.h"
+#include "llstring.h"
 
 #include <algorithm>
 
@@ -111,6 +112,28 @@ namespace
         return at >= text.size() || (static_cast<unsigned char>(text[at]) & 0xC0) != 0x80;
     }
 
+    bool ascii(char c)
+    {
+        return static_cast<unsigned char>(c) < 0x80;
+    }
+
+    // Where a character as it is read -- a letter and the marks on it, an
+    // emoji of several joined, as UAX #29 has them -- begins at or before a
+    // place in a word, or ends at or after it: the place itself at either
+    // end, and between two ASCII bytes.
+    size_t clusterStart(std::string_view text, size_t at)
+    {
+        return at == 0 || at >= text.size() || (ascii(text[at - 1]) && ascii(text[at])) ? at : utf8str_grapheme_align_backward(text, at);
+    }
+    size_t clusterEnd(std::string_view text, size_t at)
+    {
+        while (!starts(text, at))
+        {
+            ++at;
+        }
+        return at == 0 || at >= text.size() || (ascii(text[at - 1]) && ascii(text[at])) ? at : utf8str_grapheme_align_forward(text, at);
+    }
+
     // A byte as a word's are told the same: its case let go of, where it is.
     char folded(char c, bool fold)
     {
@@ -182,18 +205,22 @@ void ALWordDiff::diff(std::string_view left, std::string_view right, ALTextDiff:
                 {
                     ++head;
                 }
-                while (head > 0 && (!starts(lt, head) || !starts(rt, head)))
+                // Each cut back to where a character as read begins in both,
+                // until it does.
+                for (size_t cut = most + 1; cut != head;)
                 {
-                    --head;
+                    cut  = head;
+                    head = std::min(clusterStart(lt, cut), clusterStart(rt, cut));
                 }
                 size_t tail = 0;
                 while (tail < most - head && alike(lt.size() - 1 - tail, rt.size() - 1 - tail))
                 {
                     ++tail;
                 }
-                while (tail > 0 && (!starts(lt, lt.size() - tail) || !starts(rt, rt.size() - tail)))
+                for (size_t cut = most + 1; cut != tail;)
                 {
-                    --tail;
+                    cut  = tail;
+                    tail = std::min(lt.size() - clusterEnd(lt, lt.size() - cut), rt.size() - clusterEnd(rt, rt.size() - cut));
                 }
                 if (most >= REFINED_LEAST && head + tail > 0 && 2 * (head + tail) >= most)
                 {
