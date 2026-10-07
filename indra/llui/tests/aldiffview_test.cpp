@@ -1728,4 +1728,15 @@ namespace tut
         d.inlined()->goTo(ALTextPos(1, 0));
         ensure("inline, nothing taken out to copy", d.changeAtCaret() == 0 && !d.canCopyChange() && !d.copyChange(0));
     }
+
+    template<> template<>
+    void aldiffview_object::test<45>()
+    {
+        set_test_name("a comparison's sides pin no headers over their tops: their rows are lined up by the comparison, and numbered by it");
+        ALDiffView& d = make("default\n{\n    state_entry()\n    {\n    }\n}\n", "default\n{\n    state_entry()\n    {\n        x();\n    }\n}\n");
+        for (ALCodeEditor* side : { d.left(), d.right(), d.inlined() })
+        {
+            ensure("no headers pinned on the " + side->getName() + " side", !side->getStickyHeaders());
+        }
+    }
 }

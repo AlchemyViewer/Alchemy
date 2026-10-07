@@ -953,6 +953,16 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         mNumberGlyphs.clear();
         mNumberColours.clear();
     };
+    // The number a line shows, on its row and pinned over the top alike:
+    // the host's where it says one, else counted from the caret's line
+    // where that is asked for, else from the base; none below one -- a
+    // line a comparison took out has none.
+    const auto number_of = [&](S32 line) {
+        const LineAnnotation& said = lineAnnotation(line);
+        return said.number != LineAnnotation::OWN_NUMBER ? said.number
+               : mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line)
+                                                            : line + 1 + mLineNumberBase;
+    };
     // The host's sign for a line, centred on a column, in the numbers' ink.
     const auto draw_sign = [&](char sign, S32 cx, S32 screen_top, const LLColor4& colour) {
         const char* glyph = sign == '-' ? "\xE2\x88\x92" : sign == '+' ? "+" : sign == '>' ? "\xC2\xBB" : "~";
@@ -989,13 +999,9 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         }
         if (mShowLineNumbers)
         {
-            // The caret's line in the text's own ink, the rest quieter;
-            // counted from the caret's line where that is asked for; the
-            // host's number where it says one.
+            // The caret's line in the text's own ink, the rest quieter.
             const LineAnnotation& said  = lineAnnotation(line);
-            const S32             shown = said.number != LineAnnotation::OWN_NUMBER ? said.number
-                                          : mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line)
-                                                                                       : line + 1 + mLineNumberBase;
+            const S32             shown = number_of(line);
             if (shown > 0)
             {
                 number(shown, static_cast<F32>(numbers_right), static_cast<F32>(screen_top - ascent), line == caret_line ? lit : ink);
@@ -1094,9 +1100,10 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         gl_rect_2d(band.mLeft, band.mBottom, band.mRight, band.mBottom - 1, fold % 0.6f, true);
         for (S32 i = 0; i < rows; ++i)
         {
-            const S32 line  = pinned[static_cast<size_t>(i)];
-            const S32 shown_number = mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line) : line + 1 + mLineNumberBase;
-            number(shown_number, static_cast<F32>(numbers_right), static_cast<F32>(text.mTop - i * row_h - ascent), ink);
+            if (const S32 shown_number = number_of(pinned[static_cast<size_t>(i)]); shown_number > 0)
+            {
+                number(shown_number, static_cast<F32>(numbers_right), static_cast<F32>(text.mTop - i * row_h - ascent), ink);
+            }
         }
         draw_numbers();
     }

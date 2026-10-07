@@ -181,6 +181,9 @@ ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::
     ALCodeEditor* made       = LLUICtrlFactory::create<ALCodeEditor>(p);
     addChild(made);
     made->setFoldable(false);
+    // And so would a header pinned over one side's top and not the other's,
+    // which a scroll to a line keeps clear of on that side alone.
+    made->setStickyHeaders(false);
     mConnections.emplace_back(made->onCaretMoved([this]() { refreshBar(); }));
     // The bar is of the side the keyboard is in.
     mConnections.emplace_back(made->setFocusChangedCallback([this](LLFocusableElement*) { refreshBar(); }));
