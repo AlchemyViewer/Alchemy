@@ -111,7 +111,7 @@ private:
     void lex(S32 line, S32 most);
     // A state's number, kept once whoever starts or ends in it; and the
     // states kept cut back to those lines are in, past a number of them.
-    U32  intern(ALSyntaxState state);
+    U32  intern(const ALSyntaxState& state);
     void compactStates();
 
     ALTextDocument*                        mDocument = nullptr;
@@ -127,6 +127,10 @@ private:
     std::vector<ALSyntaxState>                                 mStates;
     boost::unordered_flat_map<ALSyntaxState, U32, StateHash>   mStateIds;
     U32                                                        mInitialState = 0;
+    // The state a line is lexed through, from the one it starts in to the
+    // one it ends in: one kept, whose room each line lexed uses again,
+    // rather than a copy made and freed for every line.
+    ALSyntaxState                                              mLexing;
     S32                                    mFirstDirty = 0;
     S32                                    mLastLexed  = 0;
 };

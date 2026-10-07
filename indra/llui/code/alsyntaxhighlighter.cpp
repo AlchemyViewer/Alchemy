@@ -130,16 +130,17 @@ size_t ALSyntaxHighlighter::StateHash::operator()(const ALSyntaxState& state) co
     return hash;
 }
 
-U32 ALSyntaxHighlighter::intern(ALSyntaxState state)
+U32 ALSyntaxHighlighter::intern(const ALSyntaxState& state)
 {
     const auto found = mStateIds.find(state);
     if (found != mStateIds.end())
     {
         return found->second;
     }
+    // A state no line was in before, which is rare: copied only then.
     const U32 id = static_cast<U32>(mStates.size());
     mStateIds.emplace(state, id);
-    mStates.push_back(std::move(state));
+    mStates.push_back(state);
     return id;
 }
 
@@ -219,10 +220,10 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     compactStates();
     std::vector<ALSyntaxToken> fresh;
-    // Each line starts in the state the one before ends in, by number: a
-    // copy of it only for a line lexed anew. A line that lexes as it did
-    // costs nothing against `most`: the stop is at the first that would
-    // be lexed past it.
+    // Each line starts in the state the one before ends in, by number,
+    // copied into the one kept for lexing only for a line lexed anew. A
+    // line that lexes as it did costs nothing against `most`: the stop is
+    // at the first that would be lexed past it.
     S32 i = mFirstDirty;
     for (; i <= line; ++i)
     {
@@ -237,8 +238,8 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
         {
             break;
         }
-        ALSyntaxState state = mStates[start];
-        mGrammar->lexLine(mDocument->line(i), state, fresh, *mWords);
+        mLexing = mStates[start];
+        mGrammar->lexLine(mDocument->line(i), mLexing, fresh, *mWords);
         ++mLastLexed;
         if (!entry.valid || fresh != entry.tokens)
         {
@@ -246,7 +247,7 @@ void ALSyntaxHighlighter::lex(S32 line, S32 most)
             ++entry.revision;
         }
         entry.start = start;
-        entry.end   = intern(std::move(state));
+        entry.end   = intern(mLexing);
         entry.valid = true;
     }
     mFirstDirty = i;
