@@ -2621,6 +2621,358 @@ namespace
         return block;
     }
 
+    // --- sentences, as vim's findsent() and current_sent() have them --------------------
+
+    // A blank of a sentence's: a space or a tab, never a line's end.
+    bool sentenceBlank(const ALTextDocument& d, const ALTextPos& p)
+    {
+        const char c = at(d, p);
+        return c == ' ' || c == '\t';
+    }
+    // A character of a set, which a line's end is not.
+    bool oneOf(std::string_view set, char c)
+    {
+        return c != '\0' && set.find(c) != std::string_view::npos;
+    }
+
+    // vim's findsent(): the start of the count's sentence on from a place,
+    // or back. A sentence ends at a . ! or ? that a blank or a line's end
+    // follows, past any ) ] " or ' after it; an empty line, and a line a
+    // paragraph begins with (startsParagraph), is a sentence of its own. The
+    // blanks after one are passed over. None where the text runs out before
+    // the count does; the last sentence's end, where it runs out with it.
+    std::optional<ALTextPos> findSentence(const ALTextDocument& d, ALTextPos pos, bool forward, S32 count)
+    {
+        const auto step     = [&d, forward](ALTextPos& p) { return forward ? inclPos(d, p) : declPos(d, p); };
+        const auto boundary = [&d](S32 line) { return d.lineLength(line) == 0 || startsParagraph(d, line); };
+        bool       noskip   = false;
+        while (count-- > 0)
+        {
+            const ALTextPos prev  = pos;
+            bool            found = false;
+            if (at(d, pos) == '\0')
+            {
+                // Off the empty lines, which going on is a sentence's start.
+                do
+                {
+                    if (step(pos) == -1)
+                    {
+                        break;
+                    }
+                } while (at(d, pos) == '\0');
+                found = forward;
+            }
+            else if (forward && pos.column == 0 && boundary(pos.line))
+            {
+                if (pos.line + 1 >= d.lineCount())
+                {
+                    return std::nullopt;
+                }
+                pos   = ALTextPos(pos.line + 1, 0);
+                found = true;
+            }
+            else if (!forward)
+            {
+                declPos(d, pos);
+            }
+            if (!found)
+            {
+                // Back over the blanks and the closing marks before the place
+                // to the sentence they end, but over no more than one . ! or ?.
+                bool found_dot = false;
+                for (char c = at(d, pos); c == ' ' || c == '\t' || oneOf(".!?)]\"'", c); c = at(d, pos))
+                {
+                    ALTextPos before = pos;
+                    if (declPos(d, before) == -1 || (d.lineLength(before.line) == 0 && forward) || found_dot)
+                    {
+                        break;
+                    }
+                    found_dot = oneOf(".!?", c);
+                    if (oneOf(")]\"'", c) && !oneOf(".!?)]\"'", at(d, before)))
+                    {
+                        break;
+                    }
+                    declPos(d, pos);
+                }
+                // Then to the end of a sentence, going the way asked.
+                const S32 start_line = pos.line;
+                while (true)
+                {
+                    const char c = at(d, pos);
+                    if (c == '\0' || (pos.column == 0 && boundary(pos.line)))
+                    {
+                        if (!forward && pos.line != start_line)
+                        {
+                            pos = ALTextPos(pos.line + 1, 0);
+                        }
+                        break;
+                    }
+                    if (oneOf(".!?", c))
+                    {
+                        ALTextPos after = pos;
+                        S32       r     = 0;
+                        char      next  = '\0';
+                        do
+                        {
+                            r    = incPos(d, after);
+                            next = at(d, after);
+                        } while (r != -1 && oneOf(")]\"'", next));
+                        if (r == -1 || next == ' ' || next == '\t' || next == '\0')
+                        {
+                            pos = after;
+                            if (at(d, pos) == '\0')
+                            {
+                                incPos(d, pos);
+                            }
+                            break;
+                        }
+                    }
+                    if (step(pos) == -1)
+                    {
+                        if (count > 0)
+                        {
+                            return std::nullopt;
+                        }
+                        noskip = true;
+                        break;
+                    }
+                }
+            }
+            while (!noskip && sentenceBlank(d, pos))
+            {
+                if (inclPos(d, pos) == -1)
+                {
+                    break;
+                }
+            }
+            // Where that did not move, once more from a step on.
+            if (pos == prev)
+            {
+                if (step(pos) == -1)
+                {
+                    if (count > 0)
+                    {
+                        return std::nullopt;
+                    }
+                    break;
+                }
+                ++count;
+            }
+        }
+        return pos;
+    }
+
+    // A sentence's start found from a place, the place left where none is.
+    void toSentence(const ALTextDocument& d, ALTextPos& p, bool forward)
+    {
+        if (const std::optional<ALTextPos> to = findSentence(d, p, forward, 1))
+        {
+            p = *to;
+        }
+    }
+    // vim's find_first_blank(): back over the blanks before a place, to the
+    // first of them.
+    void firstBlank(const ALTextDocument& d, ALTextPos& p)
+    {
+        while (declPos(d, p) != -1)
+        {
+            if (!sentenceBlank(d, p))
+            {
+                inclPos(d, p);
+                break;
+            }
+        }
+    }
+    // vim's findsent_forward(): on by the count's sentences and the blanks
+    // between them, a sentence and its blanks two, to the last character.
+    void sentencesOn(const ALTextDocument& d, ALTextPos& p, S32 count, bool at_start_sent)
+    {
+        while (count-- > 0)
+        {
+            toSentence(d, p, true);
+            if (at_start_sent)
+            {
+                firstBlank(d, p);
+            }
+            if (count == 0 || at_start_sent)
+            {
+                declPos(d, p);
+            }
+            at_start_sent = !at_start_sent;
+        }
+    }
+
+    // vim's current_sent(): the sentence objects -- is the count's sentences
+    // or runs of blanks between them, each one; as each sentence with the
+    // blanks after it, or where none follow, those before. `start` and `end`
+    // are an operator's, through the end where `inclusive`, else up to it;
+    // over a visual selection, the anchor and the caret: chosen `afresh` from
+    // a selection of one character -- whose mode becomes characters -- or
+    // else the selection taken on, its anchor as it was and the caret on by
+    // the count's sentences, or back where it is before the anchor.
+    struct SentenceObject
+    {
+        ALTextPos start;
+        ALTextPos end;
+        bool      inclusive = false;
+        bool      afresh    = false;
+    };
+    SentenceObject sentenceTakenOn(const ALTextDocument& d, const ALTextPos& anchor, const ALTextPos& start_pos, ALTextPos pos, ALTextPos cur,
+                                   S32 count, bool around)
+    {
+        bool at_start_sent = true;
+        if (start_pos < anchor)
+        {
+            // The caret at the selection's start: in the blanks before a
+            // sentence, in one, or at its start.
+            declPos(d, pos);
+            while (pos < cur)
+            {
+                if (!sentenceBlank(d, pos))
+                {
+                    at_start_sent = false;
+                    break;
+                }
+                inclPos(d, pos);
+            }
+            if (!at_start_sent)
+            {
+                toSentence(d, cur, false);
+                if (cur == start_pos)
+                {
+                    at_start_sent = true;
+                }
+                else
+                {
+                    toSentence(d, cur, true);
+                }
+            }
+            if (around)
+            {
+                count *= 2;
+            }
+            while (count-- > 0)
+            {
+                if (at_start_sent)
+                {
+                    firstBlank(d, cur);
+                }
+                if (!at_start_sent || (!around && !sentenceBlank(d, cur)))
+                {
+                    toSentence(d, cur, false);
+                }
+                at_start_sent = !at_start_sent;
+            }
+        }
+        else
+        {
+            // The caret at its end: just before a sentence, in the blanks
+            // before one, or in one.
+            inclPos(d, pos);
+            if (pos != cur)
+            {
+                at_start_sent = false;
+                while (pos < cur)
+                {
+                    if (!sentenceBlank(d, pos))
+                    {
+                        at_start_sent = true;
+                        break;
+                    }
+                    inclPos(d, pos);
+                }
+                if (at_start_sent)
+                {
+                    toSentence(d, cur, false);
+                }
+                else
+                {
+                    cur = start_pos;
+                }
+            }
+            if (around)
+            {
+                count *= 2;
+            }
+            sentencesOn(d, cur, count, at_start_sent);
+        }
+        SentenceObject taken;
+        taken.start = anchor;
+        taken.end   = cur;
+        return taken;
+    }
+    SentenceObject sentenceObject(const ALTextDocument& d, const ALTextPos& caret, S32 count, bool around, const ALTextPos* anchor)
+    {
+        ALTextPos start_pos = caret;
+        ALTextPos pos       = caret;
+        ALTextPos cur       = caret;
+        toSentence(d, cur, true);
+        if (anchor && start_pos != *anchor)
+        {
+            return sentenceTakenOn(d, *anchor, start_pos, pos, cur, count, around);
+        }
+        // From blanks just before the next sentence, those blanks; else the
+        // sentence the place is in.
+        while (sentenceBlank(d, pos))
+        {
+            inclPos(d, pos);
+        }
+        const bool start_blank = pos == cur;
+        if (start_blank)
+        {
+            firstBlank(d, start_pos);
+        }
+        else
+        {
+            toSentence(d, cur, false);
+            start_pos = cur;
+        }
+        const S32 ncount = around ? count * 2 : start_blank ? count - 1 : count;
+        if (ncount > 0)
+        {
+            sentencesOn(d, cur, ncount, true);
+        }
+        else
+        {
+            declPos(d, cur);
+        }
+        if (around)
+        {
+            // Where the blanks before it were taken, none after it; where it
+            // ends on none, the blanks before it.
+            if (start_blank)
+            {
+                firstBlank(d, cur);
+                if (sentenceBlank(d, cur))
+                {
+                    declPos(d, cur);
+                }
+            }
+            else if (!sentenceBlank(d, cur))
+            {
+                firstBlank(d, start_pos);
+            }
+        }
+        SentenceObject taken;
+        taken.start = start_pos;
+        taken.end   = cur;
+        if (anchor)
+        {
+            // A blank alone before a sentence taken on, so that is again does
+            // not stay where it is.
+            if (start_pos == cur)
+            {
+                return sentenceTakenOn(d, *anchor, start_pos, pos, cur, count, around);
+            }
+            taken.afresh = true;
+            return taken;
+        }
+        // Up to the character after it -- the next line's start, after a
+        // line's last -- or at the text's end through it.
+        taken.inclusive = inclPos(d, taken.end) == -1;
+        return taken;
+    }
+
     // A tag and the one that closes it, as offsets into the text: where
     // each begins, and where each ends past its >.
     struct TagPair
@@ -3277,7 +3629,7 @@ bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
     span.range           = ALTextRange(from, m.to).normalised();
     span.linewise        = m.linewise;
     span.inclusive       = m.inclusive || m_ch == '$';
-    span.registerOne     = m_ch == '%' || m_ch == '{' || m_ch == '}';
+    span.registerOne     = m_ch == '%' || m_ch == '{' || m_ch == '}' || m_ch == '(' || m_ch == ')';
     // The character an inclusive motion ends on taken with it; none where
     // the stretch ends at a line's end -- g_ on an empty line, ge from
     // one -- whose break is no character of the stretch's.
@@ -4643,6 +4995,26 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             m.moved = m.to != from;
             return m;
         }
+        case '(':
+        case ')':
+        {
+            // The count's sentence on, or back (findSentence), exclusive; one
+            // past the text's sentences fails. Outside a visual mode never
+            // left past a line's last character, but on it, which it takes.
+            const std::optional<ALTextPos> to = findSentence(d, from, ch == ')', count);
+            if (!to)
+            {
+                m.moved = false;
+                return m;
+            }
+            m.to = *to;
+            if (!isVisual() && m.to.column > 0 && atLineEnd(d, m.to))
+            {
+                m.to        = d.prevCluster(m.to);
+                m.inclusive = true;
+            }
+            return m;
+        }
         case '%':
         {
             // The bracket under the caret or the first after it on the line.
@@ -4960,6 +5332,35 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
             out.range          = around ? ALTextRange(d.posAt(tag.openBegin), d.posAt(tag.closeEnd)) : ALTextRange(d.posAt(tag.openEnd), d.posAt(tag.closeBegin));
             return true;
         }
+        case 's':
+        {
+            // The sentences or the blanks between them from the caret's, the
+            // count of them (sentenceObject): through the last character, or
+            // up to the line's break after it as an exclusive motion goes
+            // there, which takes the lines whole where they start a line. An
+            // end past a line's last character is put back onto it, as vim's
+            // cursor is after an object, and the stretch runs from the earlier
+            // end to the later, through the later where inclusive: so on the
+            // ] of a last line's .] the object, which starts past the ], takes
+            // the ] alone.
+            const SentenceObject sentence = sentenceObject(d, from, count, around, nullptr);
+            ALTextPos            end      = sentence.end;
+            if (end.column > 0 && atLineEnd(d, end))
+            {
+                end = d.prevCluster(end);
+            }
+            out.range = ALTextRange(sentence.start, end).normalised();
+            if (sentence.inclusive && !atLineEnd(d, out.range.end))
+            {
+                out.range.end = d.nextCluster(out.range.end);
+            }
+            out.inclusive = sentence.inclusive;
+            if (!sentence.inclusive)
+            {
+                adjustExclusiveEnd(d, out.range, out.linewise);
+            }
+            return true;
+        }
         case 'p':
         {
             // The paragraph or the blank lines the caret is on, the count of
@@ -5211,6 +5612,20 @@ std::optional<bool> ALVimKeymap::visualObject(ALTextView& view, llwchar kind, ll
             mVisualCaret = ALTextPos(line, 0);
             showVisual(view);
             return ok;
+        }
+        case 's':
+        {
+            // The sentence object over a selection of any size
+            // (sentenceObject): chosen afresh from one character, which makes
+            // the mode characters, else the selection taken on.
+            const SentenceObject sentence = sentenceObject(d, caret, count, around, &anchor);
+            mVisualAnchor                 = sentence.start;
+            mVisualCaret                  = sentence.end;
+            if (sentence.afresh)
+            {
+                setMode(view, Mode::Visual);
+            }
+            break;
         }
         default:
             return std::nullopt;

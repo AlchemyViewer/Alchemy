@@ -2892,9 +2892,9 @@ namespace tut
     template<> template<>
     void alvimkeymap_object::test<98>()
     {
-        set_test_name("an operator before a key that is no motion, or a motion that cannot go, fails and types nothing: dn before any search, c) yz dv gUp ysq d\"");
+        set_test_name("an operator before a key that is no motion, or a motion that cannot go, fails and types nothing: dn before any search, c& yz dv gUp ysq d\"");
         ALCodeEditor& e = make("foo bar\n");
-        for (const char* typed : { "dn", "c)", "yz", "dv", "gUp", "ysq", "d\"" })
+        for (const char* typed : { "dn", "c&", "yz", "dv", "gUp", "ysq", "d\"" })
         {
             const std::string what(typed);
             keys(typed);
@@ -5598,5 +5598,58 @@ namespace tut
         make((cjk + "abc " + cjk + " x\n").c_str());
         keys("*");
         ensure("* the ideographs as the word", vim->shared().search == history_t{ "\\<" + cjk + "\\>" });
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<197>()
+    {
+        set_test_name("( and ) go by sentences, with counts and after an operator, whose delete goes in register 1; is and as are the sentence objects, a visual selection taken on by them");
+        const char* text = "One two. Three four.  Five six.\nNext one.\n";
+        make(text);
+        keys(")");
+        ensure_equals(") to the next sentence", caretText(), std::string("0:9"));
+        keys(")");
+        ensure_equals("past the blanks after a sentence", caretText(), std::string("0:22"));
+        keys("(");
+        ensure_equals("( back to the one before", caretText(), std::string("0:9"));
+        keys("03)");
+        ensure_equals("3) on to the next line", caretText(), std::string("1:0"));
+
+        make(text);
+        keys("d)");
+        ensure_equals("d) to the next sentence", flat(editor->text()), std::string("Three four.  Five six.|Next one.|"));
+        ensure_equals("in register 1, however little", vim->registerText('1'), std::string("One two. "));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 12));
+        keys("dis");
+        ensure_equals("dis the sentence alone", flat(editor->text()), std::string("One two.   Five six.|Next one.|"));
+        make(text);
+        editor->setCaret(ALTextPos(0, 12));
+        keys("das");
+        ensure_equals("das with the blanks after it", flat(editor->text()), std::string("One two. Five six.|Next one.|"));
+        make(text);
+        editor->setCaret(ALTextPos(0, 24));
+        keys("das");
+        ensure_equals("das where none come after, with those before", flat(editor->text()), std::string("One two. Three four.|Next one.|"));
+
+        make(text);
+        editor->setCaret(ALTextPos(0, 12));
+        keys("visisy");
+        ensure_equals("vis is takes the blanks after on", vim->registerText('"'), std::string("Three four.  "));
+        editor->setCaret(ALTextPos(0, 12));
+        keys("vasasy");
+        ensure_equals("vas as the next sentence too", vim->registerText('"'), std::string("Three four.  Five six."));
+
+        make("Hello world.\nnext\n");
+        editor->setCaret(ALTextPos(0, 3));
+        keys("dis");
+        ensure_equals("dis on a line of one sentence takes the line", flat(editor->text()), std::string("next|"));
+
+        make(".]");
+        editor->setCaret(ALTextPos(0, 1));
+        keys("das");
+        ensure_equals("das on the ] of a last line's .] takes the ] alone", flat(editor->text()), std::string("."));
+        ensure_equals("which it took", vim->registerText('"'), std::string("]"));
     }
 }

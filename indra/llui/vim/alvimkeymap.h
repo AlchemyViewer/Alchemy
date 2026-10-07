@@ -48,12 +48,12 @@ class ALVimExCommands;
 // Vim over the text view, as a keymap with state: normal, insert, replace,
 // visual, visual-line and visual-block modes; counts; the operators d c y
 // > < = and g~ gu gU, composed with the motions h j k l w W b B e E 0 ^ $
-// gg G { } % f F t T ; , H M L n N * # ` ' | and with the text objects iw
-// aw iW aW i" a" i' a' i` a` i( a( i[ a[ i{ a{ i< a< it at ip ap; x X s S
-// C D Y p P J gJ r ~ o O i a I A u Ctrl-R and . to do the last change
-// again; in insert mode Ctrl-W Ctrl-U Ctrl-H Ctrl-T Ctrl-D Ctrl-N Ctrl-P
-// Ctrl-A Ctrl-R Ctrl-E Ctrl-Y, and Ctrl-J Ctrl-M Ctrl-I for Return and
-// Tab; registers, shared by the keymaps that share their state, the
+// gg G ( ) { } % f F t T ; , H M L n N * # ` ' | and with the text objects
+// iw aw iW aW is as i" a" i' a' i` a` i( a( i[ a[ i{ a{ i< a< it at ip ap;
+// x X s S C D Y p P J gJ r ~ o O i a I A u Ctrl-R and . to do the last
+// change again; in insert mode Ctrl-W Ctrl-U Ctrl-H Ctrl-T Ctrl-D Ctrl-N
+// Ctrl-P Ctrl-A Ctrl-R Ctrl-E Ctrl-Y, and Ctrl-J Ctrl-M Ctrl-I for Return
+// and Tab; registers, shared by the keymaps that share their state, the
 // unnamed one vim's own unless clipboard is unnamed, with 0 for the last
 // yank and a-z by name (A-Z to add), and "+ and "* the system
 // clipboard; marks a-z, ` and '; a
@@ -273,8 +273,8 @@ private:
         // s or c0 there, keeps nothing.
         bool        inclusive = false;
         // Over one of the motions whose delete vim keeps in register 1
-        // however little it takes: a search, n and N, * and #, %, { and },
-        // and ` to a mark.
+        // however little it takes: a search, n and N, * and #, %, ( and ),
+        // { and }, and ` to a mark.
         bool        registerOne = false;
     };
 
@@ -421,9 +421,11 @@ private:
     // is before the anchor; the brackets, the tag or the quotes around the
     // selection, the next ones out where what they hold is no more than it
     // holds -- the brackets over a selection of one character as well;
-    // paragraphs on from the caret's line, or back. Nothing where the
-    // selection is no more, and the object is chosen afresh (textObject);
-    // false where there is nothing more to take.
+    // paragraphs on from the caret's line, or back; sentences on from the
+    // caret, or back, and over one character chosen as vim's current_sent()
+    // chooses them. Nothing where the selection is no more, and the object
+    // is chosen afresh (textObject); false where there is nothing more to
+    // take.
     std::optional<bool> visualObject(ALTextView& view, llwchar kind, llwchar what, S32 count);
     void   applyOperator(ALTextView& view, llwchar op, const Span& span, S32 count);
     void   moveTo(ALTextView& view, const ALTextPos& to);
