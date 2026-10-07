@@ -422,4 +422,37 @@ namespace tut
             ensure("line " + std::to_string(line) + " as lexed afresh", highlighter.tokens(line) == fresh.tokens(line));
         }
     }
+
+    template<> template<>
+    void alsyntaxhighlighter_object::test<12>()
+    {
+        set_test_name("a rule matches one thing, a span among them, and says only what a rule of its kind reads: a span goes nowhere but into itself, its escape is something, and a key no rule knows is refused by name");
+        ALSyntaxGrammar grammar;
+        std::string     error;
+        const auto      refused = [&](const LLSD& bad, const std::string& what) {
+            LLSD description              = alsyntaxhighlighter_data::mini();
+            description["states"]["main"] = alsyntaxhighlighter_data::rules({ bad });
+            ensure(what + " refused", !grammar.load(description, error));
+            ensure(what + ", and said why", !error.empty());
+        };
+        refused(LLSD().with("regex", "x+").with("span", "\"").with("end", "\"").with("kind", "string"), "a span opened by a regex too");
+        refused(LLSD().with("span", "\"").with("span_regex", "'").with("end", "\""), "a span with two openings");
+        refused(LLSD().with("span", "(").with("end", ")").with("pop", true), "a span that pops");
+        refused(LLSD().with("span", "(").with("end", ")").with("push", "line_comment"), "a span that pushes");
+        refused(LLSD().with("span", "(").with("end", ")").with("next", "line_comment"), "a span that goes on to a state");
+        refused(LLSD().with("span", "if").with("end", "fi").with("whole_word", true), "a span of whole words");
+        refused(LLSD().with("span", "\"").with("end", "\"").with("escape", ""), "a span whose escape is empty");
+        refused(LLSD().with("span", "\"").with("end", "\"").with("unless_after", "\\"), "a span that runs on and ends with its line");
+        refused(LLSD().with("match", "x").with("end", "y"), "a span's end on a literal");
+        refused(LLSD().with("chars", "a-z").with("whole_word", true), "whole words of a class");
+        refused(LLSD().with("word", true).with("min", 2), "a class's least on a word");
+        refused(LLSD().with("span", "\"").with("end", "\"").with("mutliline", false), "a key misspelt");
+        ensure("named: " + error, error.find("mutliline") != std::string::npos);
+
+        LLSD good = mini();
+        good["states"]["main"] = rules({ LLSD().with("span", "\"").with("end", "\"").with("escape", "\\").with("multiline", false).with("unless_after", "\\"),
+                                         LLSD().with("eol", true).with("unless_after", "\\").with("pop", true) });
+        ensure("a span its line ends, but for a backslash, and an eol that says the same: " + error, grammar.load(good, error));
+        ensure("and the little language: " + error, grammar.load(mini(), error));
+    }
 }

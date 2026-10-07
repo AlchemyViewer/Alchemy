@@ -423,6 +423,53 @@ namespace
         return true;
     }
 
+    // The kinds of rule, by what they match, as a bit each: what a key a
+    // rule says is for.
+    constexpr U8 RULE_MATCH = 0x01;
+    constexpr U8 RULE_CHARS = 0x02;
+    constexpr U8 RULE_WORD  = 0x04;
+    constexpr U8 RULE_REGEX = 0x08;
+    constexpr U8 RULE_EOL   = 0x10;
+    constexpr U8 RULE_SPAN  = 0x20;
+    // A rule that goes somewhere when it matches: every one but a span,
+    // which goes into itself and out at its end.
+    constexpr U8 RULE_GOES  = static_cast<U8>(RULE_MATCH | RULE_CHARS | RULE_WORD | RULE_REGEX | RULE_EOL);
+
+    // Every key a rule may say, and the rules it is for; a matcher is what
+    // makes a rule the kind it is, one to a rule.
+    struct RuleKey
+    {
+        const char* name;
+        U8          rules;
+        bool        matcher;
+    };
+    constexpr RuleKey RULE_KEYS[] = {
+        { "match", RULE_MATCH, true },
+        { "chars", RULE_CHARS, true },
+        { "word", RULE_WORD, true },
+        { "regex", RULE_REGEX, true },
+        { "eol", RULE_EOL, true },
+        { "span", RULE_SPAN, true },
+        { "span_regex", RULE_SPAN, true },
+        { "kind", static_cast<U8>(RULE_GOES | RULE_SPAN), false },
+        { "push", RULE_GOES, false },
+        { "next", RULE_GOES, false },
+        { "pop", RULE_GOES, false },
+        { "whole_word", RULE_MATCH, false },
+        { "unicode", RULE_CHARS, false },
+        { "min", RULE_CHARS, false },
+        { "max", RULE_CHARS, false },
+        { "qualified", RULE_WORD, false },
+        { "tables", RULE_WORD, false },
+        { "not_after_chars", RULE_REGEX, false },
+        { "consume", RULE_REGEX, false },
+        { "unless_after", static_cast<U8>(RULE_EOL | RULE_SPAN), false },
+        { "end", RULE_SPAN, false },
+        { "end_regex", RULE_SPAN, false },
+        { "escape", RULE_SPAN, false },
+        { "multiline", RULE_SPAN, false },
+    };
+
     // The end regex a span's capture makes of its pattern.
     std::string endPattern(const std::string& text, const std::string& payload)
     {
@@ -539,6 +586,50 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
         error = where + "not a map";
         return false;
     }
+    // What it matches, one thing, which says what else it may say: a key
+    // no rule says, or one for another kind of rule -- a span's end on a
+    // literal, a push on a span -- is a mistake, not something to pass
+    // over.
+    S32         matchers = 0;
+    U8          matched  = 0;
+    const char* matcher  = "";
+    for (const RuleKey& key : RULE_KEYS)
+    {
+        if (key.matcher && in.has(key.name))
+        {
+            ++matchers;
+            matched = key.rules;
+            matcher = key.name;
+        }
+    }
+    if (matchers != 1)
+    {
+        error = where + "a rule matches one thing: match, chars, word, regex, span, span_regex or eol";
+        return false;
+    }
+    for (LLSD::map_const_iterator it = in.beginMap(); it != in.endMap(); ++it)
+    {
+        const RuleKey* said = nullptr;
+        for (const RuleKey& key : RULE_KEYS)
+        {
+            if (it->first == key.name)
+            {
+                said = &key;
+                break;
+            }
+        }
+        if (!said)
+        {
+            error = where + "no rule says '" + it->first + "'";
+            return false;
+        }
+        if (!(said->rules & matched))
+        {
+            error = where + matcher + " does not take '" + it->first + "'";
+            return false;
+        }
+    }
+
     const S32 state_index = stateIndex(state_name);
     State&    state       = states[state_index];
     state.rules.emplace_back();
@@ -556,17 +647,9 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
         rule.kind = *kind;
     }
     rule.wholeWord = in["whole_word"].asBoolean();
-    if ((in.has("not_after_chars") || in.has("consume")) && !in.has("regex"))
-    {
-        error = where + "not_after_chars and consume are for a regex";
-        return false;
-    }
 
-    // What it matches.
-    S32 matchers = 0;
     if (in.has("match"))
     {
-        ++matchers;
         rule.match = Rule::Match::Literal;
         rule.text  = in["match"].asString();
         if (rule.text.empty())
@@ -577,7 +660,6 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     }
     if (in.has("chars"))
     {
-        ++matchers;
         rule.match = Rule::Match::Chars;
         std::string bad;
         if (!parseCharClass(in["chars"].asStringRef(), rule.chars, bad))
@@ -596,7 +678,6 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     }
     if (in.has("word"))
     {
-        ++matchers;
         rule.match     = Rule::Match::Word;
         rule.qualified = in["qualified"].asBoolean();
         const LLSD& tables = in["tables"];
@@ -619,7 +700,6 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     }
     if (in.has("regex"))
     {
-        ++matchers;
         rule.match = Rule::Match::Regex;
         if (!compileRegex(in["regex"].asString(), rule.regex, error))
         {
@@ -652,7 +732,6 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     }
     if (in.has("eol"))
     {
-        ++matchers;
         rule.match = Rule::Match::Eol;
         // What, ending a line, carries the state on to the next rather
         // than letting the line's end end it: a C directive's backslash.
@@ -660,7 +739,6 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     }
     if (in.has("span") || in.has("span_regex"))
     {
-        ++matchers;
         rule.match = Rule::Match::Span;
         if (in.has("span"))
         {
@@ -696,6 +774,12 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
             escape.match = Rule::Match::SpanEscape;
             escape.text  = in["escape"].asString();
             escape.kind  = ALSyntaxKind::Escape;
+            if (escape.text.empty())
+            {
+                // Found everywhere, it would keep the span from ever ending.
+                error = where + "the escape of a span is empty";
+                return false;
+            }
             inside.rules.push_back(std::move(escape));
         }
         Rule end;
@@ -733,11 +817,6 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
         targets.push_back(Target{ state_index, rule_index, inside.name });
         states.push_back(std::move(inside));
         return true;
-    }
-    if (matchers != 1)
-    {
-        error = where + "a rule matches one thing: match, chars, word, regex, span or eol";
-        return false;
     }
 
     // Where it goes.
