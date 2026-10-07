@@ -484,6 +484,11 @@ bool ALVimExCommands::lineAddress(ALTextView& view, const std::string& line, siz
         out = view.caret().line;
         ++at_;
     }
+    else if (line[at_] == '+' || line[at_] == '-')
+    {
+        // An offset alone is from the caret's line: +1 is .+1.
+        out = view.caret().line;
+    }
     else if (line[at_] == '$')
     {
         // The last line: not the empty one after a final line break,
@@ -1484,6 +1489,11 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
         }
         ALAnchoredRanges<ALTextPos> marks;
         marks.assign(std::move(starts));
+        // A command with an address of its own -- .,+1d, .m0, 'a,.d, 3d --
+        // runs as it is written, from the line; one without is given the
+        // line's number.
+        const char lead      = command[0];
+        const bool addressed = lead == '.' || lead == '$' || lead == '\'' || lead == '%' || lead == '+' || lead == '-' || isDigit(lead);
         const auto slide = [](ALTextPos& mark, const ALTextDocument::Edit& edit) {
             const ALTextPos start(mark.line, 0);
             const ALTextPos next(mark.line + 1, 0);
@@ -1526,7 +1536,7 @@ bool ALVimExCommands::global(ALTextView& view, S32 first, S32 last, bool ranged,
             // On the line, as vim puts the cursor there: `.` in the
             // command is the line.
             view.setCaret(ALTextPos(line, 0));
-            runCommand(view, std::to_string(line + 1 + view.lineNumberBase()) + command);
+            runCommand(view, addressed ? command : std::to_string(line + 1 + view.lineNumberBase()) + command);
             if (mVim.mMessageError)
             {
                 break;

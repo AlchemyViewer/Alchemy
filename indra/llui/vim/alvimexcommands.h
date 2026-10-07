@@ -53,8 +53,8 @@ public:
     // engine's.
     std::string replacementOf(const std::string& with) const;
     // The position a range address names on the : line -- a number, .,
-    // $, 'x, '< '>, with an offset -- read from `at` on; false where
-    // the line has none there.
+    // $, 'x, '< '>, with an offset, or an offset alone from the caret's
+    // line -- read from `at` on; false where the line has none there.
     bool lineAddress(ALTextView& view, const std::string& line, size_t& at, S32& out) const;
 
     // The :s asking about each match: the edits left to make, in order,

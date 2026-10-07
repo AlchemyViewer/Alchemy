@@ -3008,4 +3008,22 @@ namespace tut
         LLClipboard::instance().pasteFromClipboard(held);
         ensure_equals("with the clipboard the unnamed register, the clipboard is left alone", held, outside);
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<104>()
+    {
+        set_test_name(":g runs a command with an address of its own as it is written, from each line: .,+1d and .m0; and +1 alone is .+1");
+        ALCodeEditor& e = make("a\nTODO 1\nb\nc\nTODO 2\nd\ne\n");
+        keys(":g/TODO/.,+1d<CR>");
+        ensure("no error", !vim->messageIsError());
+        ensure_equals("each match and the line after it gone", flat(e.text()), std::string("a|c|e|"));
+
+        ALCodeEditor& moved = make("x 1\ny\nx 2\n");
+        keys(":g/x/.m0<CR>");
+        ensure("no error for .m0", !vim->messageIsError());
+        ensure_equals("each match moved to the top in turn", flat(moved.text()), std::string("x 2|x 1|y|"));
+
+        keys("gg:+1d<CR>");
+        ensure_equals(":+1d takes the line below", flat(moved.text()), std::string("x 2|y|"));
+    }
 }
