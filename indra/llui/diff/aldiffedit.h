@@ -28,6 +28,7 @@
 #include "altextdocument.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -76,6 +77,32 @@ namespace ALDiffEdit
         }
         return edgesBy(static_cast<S32>(was.size()), static_cast<S32>(now.size()),
                        [&](S32 w, S32 n) { return was[static_cast<size_t>(w)] == now[static_cast<size_t>(n)]; });
+    }
+
+    // A list kept a line each of a text edited, as long as the text now
+    // is: the lines edited ending at `was_end` now ending at `now_end`, as
+    // many put in or taken out there, and those after moved along.
+    template<typename List>
+    void resizeEdited(List& list, S32 was_end, S32 now_end)
+    {
+        using T       = typename List::value_type;
+        const auto at = [&list](S32 line) { return list.begin() + static_cast<std::ptrdiff_t>(line); };
+        if (now_end < was_end)
+        {
+            list.erase(at(now_end), at(was_end));
+        }
+        else if (now_end > was_end)
+        {
+            list.insert(at(was_end), static_cast<size_t>(now_end - was_end), T());
+        }
+    }
+    // And the lines edited, [head, was_end) now [head, now_end), said
+    // nothing of: each `fill`.
+    template<typename List>
+    void replaceEdited(List& list, S32 head, S32 was_end, S32 now_end, const typename List::value_type& fill = typename List::value_type())
+    {
+        resizeEdited(list, was_end, now_end);
+        std::fill(list.begin() + static_cast<std::ptrdiff_t>(head), list.begin() + static_cast<std::ptrdiff_t>(now_end), fill);
     }
 
     // `count` of a text's lines from `first`, counted from nought -- its

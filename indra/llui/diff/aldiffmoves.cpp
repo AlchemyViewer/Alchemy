@@ -26,6 +26,7 @@
 
 #include "aldiffmoves.h"
 
+#include "aldiffedit.h"
 #include "aldiffids.h"
 
 #include <algorithm>
@@ -45,16 +46,7 @@ void ALDiffMoves::Finder::edited(bool left, S32 head, S32 was_end, S32 now_end)
         forget();
         return;
     }
-    const auto at = [&ids](S32 line) { return ids.begin() + static_cast<std::ptrdiff_t>(line); };
-    if (now_end < was_end)
-    {
-        ids.erase(at(now_end), at(was_end));
-    }
-    else if (now_end > was_end)
-    {
-        ids.insert(at(was_end), static_cast<size_t>(now_end - was_end), -1);
-    }
-    std::fill(at(head), at(now_end), -1);
+    ALDiffEdit::replaceEdited(ids, head, was_end, now_end, -1);
 }
 
 void ALDiffMoves::Finder::forget()

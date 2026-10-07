@@ -30,7 +30,6 @@
 
 #include <algorithm>
 #include <iterator>
-#include <type_traits>
 
 namespace
 {
@@ -157,17 +156,7 @@ void ALDiffLexer::readAgain(Text& text, const std::vector<std::string>& lines, c
     const size_t old_size = text.lines.size();
     const size_t old_end  = old_size - tail;
     const size_t new_end  = lines.size() - tail;
-    const auto   resize   = [&](auto& list) {
-        using T = typename std::decay_t<decltype(list)>::value_type;
-        if (new_end < old_end)
-        {
-            list.erase(list.begin() + static_cast<std::ptrdiff_t>(new_end), list.begin() + static_cast<std::ptrdiff_t>(old_end));
-        }
-        else if (new_end > old_end)
-        {
-            list.insert(list.begin() + static_cast<std::ptrdiff_t>(old_end), new_end - old_end, T());
-        }
-    };
+    const auto   resize   = [&](auto& list) { ALDiffEdit::resizeEdited(list, static_cast<S32>(old_end), static_cast<S32>(new_end)); };
     ALSyntaxState state = text.starts[head];
     // What it held between its edges set aside, to take lines from.
     Text middle;

@@ -212,25 +212,6 @@ namespace
     // edited there, [head, end): a place with no lines strictly so, since
     // one at the edit's edge could be on either side of it.
     bool clearOf(S32 from, S32 to, S32 head, S32 end) { return from < to ? (to <= head || from >= end) : (from < head || from > end); }
-
-    // A list kept a line each, the lines edited replaced: [head, was_end)
-    // now [head, now_end), those after moved along, and the lines edited
-    // said nothing of.
-    template <typename List>
-    void replaceEdited(List& list, S32 head, S32 was_end, S32 now_end)
-    {
-        using T = typename List::value_type;
-        const auto at = [&list](S32 line) { return list.begin() + static_cast<std::ptrdiff_t>(line); };
-        if (now_end < was_end)
-        {
-            list.erase(at(now_end), at(was_end));
-        }
-        else if (now_end > was_end)
-        {
-            list.insert(at(was_end), static_cast<size_t>(now_end - was_end), T());
-        }
-        std::fill(at(head), at(now_end), T());
-    }
 }
 
 ALStructuralDiff::Result ALStructuralDiff::compare(const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Options& options,
@@ -291,8 +272,8 @@ void ALStructuralDiff::readAgain(const std::vector<std::string>& left, const std
         was_end[s]    = edited.was[s] - edited.edges[s].tail;
         now_end[s]    = now - edited.edges[s].tail;
         shift[s]      = now - edited.was[s];
-        replaceEdited(s ? result.rightMarks : result.leftMarks, head[s], was_end[s], now_end[s]);
-        replaceEdited(s ? result.rightByTokens : result.leftByTokens, head[s], was_end[s], now_end[s]);
+        ALDiffEdit::replaceEdited(s ? result.rightMarks : result.leftMarks, head[s], was_end[s], now_end[s]);
+        ALDiffEdit::replaceEdited(s ? result.rightByTokens : result.leftByTokens, head[s], was_end[s], now_end[s]);
     }
     const auto wipe = [&result](const Extent& extent) {
         for (S32 line = extent.from[0]; line < extent.to[0]; ++line)
