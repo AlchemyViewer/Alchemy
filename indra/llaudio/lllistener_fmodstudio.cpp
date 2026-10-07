@@ -30,6 +30,13 @@
 #include "lllistener_fmodstudio.h"
 #include <fmod.hpp>
 
+// An LLVector3 as FMOD takes it. The two are laid out alike, but reading one
+// through a pointer to the other breaks strict aliasing, which GCC rejects.
+static FMOD_VECTOR to_fmod_vector(const LLVector3& v)
+{
+    return FMOD_VECTOR{ v.mV[VX], v.mV[VY], v.mV[VZ] };
+}
+
 //-----------------------------------------------------------------------
 // constructor
 //-----------------------------------------------------------------------
@@ -58,7 +65,10 @@ void LLListener_FMODSTUDIO::translate(LLVector3 offset)
 {
     LLListener::translate(offset);
 
-    mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
+    const FMOD_VECTOR position = to_fmod_vector(mPosition);
+    const FMOD_VECTOR forward = to_fmod_vector(mListenAt);
+    const FMOD_VECTOR up = to_fmod_vector(mListenUp);
+    mSystem->set3DListenerAttributes(0, &position, nullptr, &forward, &up);
 }
 
 //-----------------------------------------------------------------------
@@ -66,7 +76,10 @@ void LLListener_FMODSTUDIO::setPosition(LLVector3 pos)
 {
     LLListener::setPosition(pos);
 
-    mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
+    const FMOD_VECTOR position = to_fmod_vector(mPosition);
+    const FMOD_VECTOR forward = to_fmod_vector(mListenAt);
+    const FMOD_VECTOR up = to_fmod_vector(mListenUp);
+    mSystem->set3DListenerAttributes(0, &position, nullptr, &forward, &up);
 }
 
 //-----------------------------------------------------------------------
@@ -74,7 +87,10 @@ void LLListener_FMODSTUDIO::setVelocity(LLVector3 vel)
 {
     LLListener::setVelocity(vel);
 
-    mSystem->set3DListenerAttributes(0, nullptr, (FMOD_VECTOR*)mVelocity.mV, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
+    const FMOD_VECTOR velocity = to_fmod_vector(mVelocity);
+    const FMOD_VECTOR forward = to_fmod_vector(mListenAt);
+    const FMOD_VECTOR up = to_fmod_vector(mListenUp);
+    mSystem->set3DListenerAttributes(0, nullptr, &velocity, &forward, &up);
 }
 
 //-----------------------------------------------------------------------
@@ -85,7 +101,9 @@ void LLListener_FMODSTUDIO::orient(LLVector3 up, LLVector3 at)
     // at = -at; by default Fmod studio is 'left-handed' but we are providing
     // flag FMOD_INIT_3D_RIGHTHANDED so no correction are needed
 
-    mSystem->set3DListenerAttributes(0, nullptr, nullptr, (FMOD_VECTOR*)at.mV, (FMOD_VECTOR*)up.mV);
+    const FMOD_VECTOR fmod_at = to_fmod_vector(at);
+    const FMOD_VECTOR fmod_up = to_fmod_vector(up);
+    mSystem->set3DListenerAttributes(0, nullptr, nullptr, &fmod_at, &fmod_up);
 }
 
 //-----------------------------------------------------------------------
@@ -109,8 +127,10 @@ void LLListener_FMODSTUDIO::setRolloffFactor(F32 factor)
     if (mRolloffFactor != factor)
     {
         LLVector3 pos = mPosition - LLVector3(0.f, 0.f, .1f);
-        mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)pos.mV, nullptr, nullptr, nullptr);
-        mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, nullptr, nullptr);
+        const FMOD_VECTOR nudged = to_fmod_vector(pos);
+        const FMOD_VECTOR position = to_fmod_vector(mPosition);
+        mSystem->set3DListenerAttributes(0, &nudged, nullptr, nullptr, nullptr);
+        mSystem->set3DListenerAttributes(0, &position, nullptr, nullptr, nullptr);
     }
     mRolloffFactor = factor;
     mSystem->set3DSettings(mDopplerFactor, 1.f, mRolloffFactor);
