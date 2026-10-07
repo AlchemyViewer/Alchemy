@@ -2,7 +2,8 @@
 
 # Adds the viewer this tree holds to the desktop: its entry in the
 # application menu, its icons, and the handling of secondlife:// and
-# x-grid-location-info:// links. Or takes them away again.
+# x-grid-location-info:// links where no other viewer has them. Or takes
+# them away again.
 #
 #   desktop_integration.sh install [--user|--system]
 #   desktop_integration.sh uninstall [--user|--system]
@@ -66,9 +67,37 @@ entry_install()
     printf '%s' "${value//\\\\/\\}"
 }
 
+# Whether a desktop file ID, as xdg-mime names a default, is an entry in
+# any applications directory. An entry in a subdirectory has its path there
+# as its ID, with each / made a -.
+entry_exists()
+{
+    local id=$1 dir apps path
+    local -a dirs
+    IFS=: read -r -a dirs <<<"$user_data:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+    for dir in "${dirs[@]}"; do
+        apps="$dir/applications"
+        if [[ -f $apps/$id ]]; then
+            return 0
+        fi
+        if [[ $id == *-* && -d $apps ]]; then
+            while IFS= read -r -d '' path; do
+                path=${path#"$apps"/}
+                if [[ ${path//\//-} == "$id" ]]; then
+                    return 0
+                fi
+            done < <(find "$apps" -mindepth 2 -name '*.desktop' -print0 2>/dev/null)
+        fi
+    done
+    return 1
+}
+
 # What the old scripts wrote: an entry named for no channel, and a link
 # handler that ran a launcher no tree has. The entry goes if it was this
-# tree's or its tree is gone; the handler goes either way.
+# tree's or its tree is gone. Linden Lab's script, which other viewers
+# carry too, writes a handler of the same name, so it goes only when it is
+# recognisably Alchemy's: named for Alchemy, or written for a tree that
+# holds Alchemy's viewer.
 remove_legacy()
 {
     local apps=$1
@@ -80,7 +109,15 @@ remove_legacy()
             rm -f -- "$legacy"
         fi
     fi
-    rm -f -- "$apps/secondlife-protocol.desktop"
+    local handler="$apps/secondlife-protocol.desktop"
+    if [[ -f $handler ]]; then
+        local name tree
+        name=$(sed -n 's/^Name=//p' "$handler" | head -n 1)
+        tree=$(sed -n 's/^Path=//p' "$handler" | head -n 1)
+        if [[ $name == *Alchemy* || (-n $tree && -x $tree/bin/alchemy-bin) ]]; then
+            rm -f -- "$handler"
+        fi
+    fi
 }
 
 update_caches()
@@ -111,6 +148,24 @@ do_install()
     mkdir -p -- "$apps"
     remove_legacy "$apps"
 
+    # A user's choice of handler is the user's own: the system scope offers
+    # the entry as one, and leaves the choice to each user. For a user, a
+    # scheme is made this entry's only when nothing handles it, this channel
+    # does, or the entry that did is gone, so another viewer -- or another
+    # channel of this one -- keeps the links it has. xdg-mime is asked before
+    # the entry is written, after which it could name the entry itself.
+    local -a take=()
+    if [[ $scope == user ]] && command -v xdg-mime >/dev/null; then
+        local scheme current
+        for scheme in "${schemes[@]}"; do
+            current=$(xdg-mime query default "$scheme" 2>/dev/null | head -n 1) || true
+            current=${current%%;*}
+            if [[ -z $current || $current == "$app_id.desktop" ]] || ! entry_exists "$current"; then
+                take+=("$scheme")
+            fi
+        done
+    fi
+
     local entry="$apps/$app_id.desktop"
     local tmp
     tmp=$(mktemp -- "$apps/.$app_id.XXXXXX")
@@ -136,11 +191,9 @@ do_install()
 
     update_caches "$data"
 
-    # A user's choice of handler is the user's own: the system scope offers
-    # the entry as one, and leaves the choice to each user.
-    if [[ $scope == user ]] && command -v xdg-mime >/dev/null; then
+    if [[ ${#take[@]} -gt 0 ]]; then
         mkdir -p -- "${XDG_CONFIG_HOME:-$HOME/.config}"
-        xdg-mime default "$app_id.desktop" "${schemes[@]}" || true
+        xdg-mime default "$app_id.desktop" "${take[@]}" || true
     fi
 
     echo "Added $app_id to the desktop in $data"
