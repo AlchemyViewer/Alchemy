@@ -3277,4 +3277,36 @@ namespace tut
         ensure("and keeps it for gv after", vim->mode() == ALVimKeymap::Mode::VisualBlock);
         keys("<Esc>");
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<116>()
+    {
+        set_test_name("a line handed back by q:'s window ends what vim was doing as its keys would: an insert as Escape does, an asking :s as q does, a selection as : does");
+        ALCodeEditor& e = make("abc\n");
+        keys("3ix");
+        vim->takeLine(e, ':', "s/b/B/", true);
+        ensure_equals("the insert typed again for its count, then the line run", e.document().line(0), std::string("xxxaBc"));
+        keys("u");
+        ensure_equals("the line's change a step of its own", e.document().line(0), std::string("xxxabc"));
+        keys("u");
+        ensure_equals("and the insert's", e.document().line(0), std::string("abc"));
+
+        make("\n");
+        keys("i<C-v>");
+        vim->takeLine(*editor, ':', "set ic", true);
+        keys("iu0041<Esc>");
+        ensure_equals("a Ctrl-V waiting let go of with the insert", editor->document().line(0), std::string("u0041"));
+
+        make("a a\n");
+        keys(":s/a/b/gc<CR>");
+        ensure("asking", vim->mode() == ALVimKeymap::Mode::Confirm);
+        vim->takeLine(*editor, ':', "s/a/c/", true);
+        ensure("the matches still to come put out", editor->highlights(ALCodeEditor::Highlight::Confirm).empty());
+        ensure_equals("the line run once the asking ended", editor->document().line(0), std::string("c a"));
+
+        make("abcd\n");
+        keys("vl");
+        vim->takeLine(*editor, ':', "set ic", true);
+        ensure("the selection let go of at its caret", vim->mode() == ALVimKeymap::Mode::Normal && caretText() == "0:1" && !editor->hasSelection());
+    }
 }

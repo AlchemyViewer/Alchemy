@@ -4070,6 +4070,8 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
     }
     mBlockInsert    = false;
     mInsertRegister = false;
+    mLiteral        = false;
+    mLiteralCode.clear();
     mInsertMoved    = false;
     setMode(view, Mode::Normal);
     // Where inserting stopped, for gi to go back to: vim's ^ mark.
@@ -4694,6 +4696,22 @@ bool ALVimKeymap::menu(std::vector<std::string>& items, S32& chosen) const
 
 void ALVimKeymap::takeLine(ALTextView& view, llwchar kind, const std::string& text, bool run)
 {
+    // Handed over whenever the window is done, whatever vim is doing then,
+    // which ends as its own keys would end it: an insert as Escape does,
+    // the asking :s as q does, and a visual selection let go of for a :
+    // line as : lets it go -- a search line goes over it, as / does.
+    if (inserting())
+    {
+        leaveInsert(view);
+    }
+    else if (mMode == Mode::Confirm)
+    {
+        mEx->endConfirming(view);
+    }
+    else if (kind == ':' && isVisual())
+    {
+        leaveVisual(view);
+    }
     clearPending();
     mCommandLine.completion = ALVimCommandLine::Completion();
     mCommandLine.kind   = kind;
