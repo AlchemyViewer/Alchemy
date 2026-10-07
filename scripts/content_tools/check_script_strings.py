@@ -36,7 +36,10 @@ the build keeps the copies together, so this does:
     (ALScriptStudioCommands): each item names a command something
     registers, and each command registered with `add` is an item -- one
     reached otherwise is registered with `addUnlisted`. A name the table
-    does not have does nothing and is greyed.
+    does not have does nothing and is greyed, and a name registered twice
+    keeps the first. The names are read as the code builds them, in the
+    loops that register several; one built in a way this cannot read is
+    reported, not passed over.
 
 Tailslide and Luau are found under vcpkg/buildtrees, the newest checkout
 of each, unless named:
@@ -59,19 +62,26 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 STRINGS = os.path.join(ROOT, "indra", "newview", "skins", "default", "xui", "en", "strings.xml")
 MAP = os.path.join(ROOT, "indra", "alscript", "core", "almessagemap.cpp")
 FIXES = os.path.join(ROOT, "indra", "alscript", "lint", "alscriptfixes.cpp")
-EDITOR_KEYS = os.path.join(ROOT, "indra", "llui", "alkeymap.cpp")
+EDITOR_KEYS = os.path.join(ROOT, "indra", "llui", "code", "alkeymap.cpp")
 KEYS_PANEL = os.path.join(ROOT, "indra", "newview", "skins", "default", "xui", "en", "panel_script_studio_keys.xml")
 STUDIO_SKIN = os.path.join(ROOT, "indra", "newview", "skins", "default", "xui", "en", "floater_script_studio.xml")
-CODE = [
-    os.path.join(ROOT, "indra", "llui"),
-    os.path.join(ROOT, "indra", "newview"),
-]
-# alscript is a folder a part (core, lint, lsl, lsl/optimizer, ...); its
-# tests are not the studio's words.
-ALSCRIPT = os.path.join(ROOT, "indra", "alscript")
-for here, folders, _ in os.walk(ALSCRIPT):
-    folders[:] = sorted(f for f in folders if f != "tests")
-    CODE.append(here)
+NEWVIEW = os.path.join(ROOT, "indra", "newview")
+
+
+def walked(top):
+    """A folder and every folder under it but tests, whose words are not
+    the studio's."""
+    out = []
+    for here, folders, _ in os.walk(top):
+        folders[:] = sorted(f for f in folders if f != "tests")
+        out.append(here)
+    return out
+
+
+# llui's Alchemy widgets are a folder a part (base, text, code, diff, vim,
+# ...), and so is alscript (core, lint, lsl, lsl/optimizer, ...); newview
+# is one folder, its subfolders not code.
+CODE = walked(os.path.join(ROOT, "indra", "llui")) + [NEWVIEW] + walked(os.path.join(ROOT, "indra", "alscript"))
 # The keys that are the studio's: what strings.xml groups under these
 # prefixes is compared; the rest of the file is the viewer's.
 PREFIXES = ("Vim", "Preproc", "Optimizer", "Inliner", "LuauLint", "Luau", "LSL", "Workspace", "Analysis", "XUIEdit", "FindBar", "TabStrip", "ScriptFix", "ScriptAction", "Slua")
@@ -190,40 +200,287 @@ def read_key_commands():
     return ["cmd_" + n for n in re.findall(r'"([a-z_]+)"', table.group(1)) if n != "none"] if table else []
 
 
+SOURCES = {}
+
+
+def source(path):
+    """A file's text, read once."""
+    if path not in SOURCES:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            SOURCES[path] = f.read()
+    return SOURCES[path]
+
+
+def blanked(text, literals=False):
+    """The text with its comments blanked, and with `literals` what is
+    inside its string and character literals too, every character where
+    it was: what is left of a comment's apostrophe or a string's brace is
+    a space, so that neither is read as code."""
+    out = list(text)
+
+    def blank(begin, end):
+        for j in range(begin, min(end, len(text))):
+            if out[j] != "\n":
+                out[j] = " "
+
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        raw = re.match(r'R"([^(\s]*)\(', text[i - 1:i + 17]) if c == '"' and i else None
+        if raw:
+            end = text.find(")%s\"" % raw.group(1), i)
+            end = n if end < 0 else end + len(raw.group(1)) + 1
+            if literals:
+                blank(i + 1, end)
+            i = end + 1
+        elif c in "\"'":
+            j = i + 1
+            while j < n and text[j] not in (c, "\n"):
+                j += 2 if text[j] == "\\" else 1
+            if literals:
+                blank(i + 1, j)
+            i = j + 1
+        elif text.startswith("//", i):
+            end = text.find("\n", i)
+            end = n if end < 0 else end
+            blank(i, end)
+            i = end
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            end = n if end < 0 else end + 2
+            blank(i, end)
+            i = end
+        else:
+            i += 1
+    return "".join(out)
+
+
+def closing(shape, at):
+    """Where the bracket at `at` closes, in text blanked of its comments
+    and literals."""
+    depth = 0
+    for i in range(at, len(shape)):
+        if shape[i] in "([{":
+            depth += 1
+        elif shape[i] in ")]}":
+            depth -= 1
+            if depth == 0:
+                return i
+    return len(shape)
+
+
+def opening(shape, at):
+    """Where the bracket closing at `at` opens, likewise."""
+    depth = 0
+    for i in range(at, -1, -1):
+        if shape[i] in ")]}":
+            depth += 1
+        elif shape[i] in "([{":
+            depth -= 1
+            if depth == 0:
+                return i
+    return 0
+
+
+def split_top(text, sep):
+    """The text split at each `sep` that is nobody's: not a string's, not
+    inside a bracket. A `:` of a `::` is no separator."""
+    shape = blanked(text, literals=True)
+    parts, depth, begin = [], 0, 0
+    for i, c in enumerate(shape):
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif c == sep and depth == 0 and not (sep == ":" and ":" in (shape[i - 1:i], shape[i + 1:i + 2])):
+            parts.append(text[begin:i].strip())
+            begin = i + 1
+    parts.append(text[begin:].strip())
+    return parts
+
+
+NAMING = {}
+
+
+def naming_function(name):
+    """What a function that names an enum value by a switch says for each
+    -- `case Algorithm::Patience: return "patience";` -- read from its
+    definition in the code, by the value's last part, with `default` for
+    the rest. Empty where there is no such function."""
+    if name in NAMING:
+        return NAMING[name]
+    NAMING[name] = {}
+    define = re.compile(r"\b(?:\w+::)*%s\s*\([^()]*\)\s*(?:const\s*)?\{" % re.escape(name))
+    for folder in CODE:
+        for path in sorted(glob.glob(os.path.join(folder, "*.cpp"))):
+            if not define.search(source(path)):
+                continue
+            text = blanked(source(path))
+            m = define.search(text)
+            if not m:
+                continue
+            body = text[m.end():closing(blanked(text, literals=True), m.end() - 1)]
+            waiting = []
+            for step in re.finditer(r'\bcase\s+((?:\w+::)*\w+)\s*:|\b(default)\s*:|\breturn\s+"((?:[^"\\]|\\.)*)"\s*;', body):
+                if step.group(3) is None:
+                    waiting.append((step.group(1) or step.group(2)).split("::")[-1])
+                else:
+                    NAMING[name].update((label, unescape_c(step.group(3))) for label in waiting)
+                    waiting = []
+            return NAMING[name]
+    return NAMING[name]
+
+
+def evaluate(expr, env):
+    """A command's name as the code builds it, where it can be read: a
+    literal, a name in `env` (what a loop binds, or a copy of it), a
+    `std::string(...)` of either, a naming function of an enum value
+    (naming_function), and a `+` of any of those. An enum value comes
+    back as ("value", its name), for a naming function to take; anything
+    else, as None."""
+    expr = expr.strip()
+    while expr.startswith("(") and closing(blanked(expr, literals=True), 0) == len(expr) - 1:
+        expr = expr[1:-1].strip()
+    terms = split_top(expr, "+")
+    if len(terms) > 1:
+        said = [evaluate(term, env) for term in terms]
+        return "".join(said) if all(isinstance(s, str) for s in said) else None
+    if re.fullmatch(r'(?:"(?:[^"\\]|\\.)*"\s*)+', expr):
+        return "".join(unescape_c(s) for s in re.findall(r'"((?:[^"\\]|\\.)*)"', expr))
+    m = re.fullmatch(r"std::(?:string|string_view)\s*[({](.*)[)}]", expr, re.S)
+    if m:
+        return evaluate(m.group(1), env)
+    if re.fullmatch(r"\w+", expr):
+        return env.get(expr)
+    m = re.fullmatch(r"(?:\w+::)*(\w+)\s*\((.*)\)", expr, re.S)
+    if m:
+        value = evaluate(m.group(2), env)
+        names = naming_function(m.group(1)) if isinstance(value, tuple) else {}
+        return names.get(value[1].split("::")[-1], names.get("default")) if names else None
+    if re.fullmatch(r"(?:\w+::)+\w+", expr):
+        return ("value", expr)
+    return None
+
+
+def blocks_of(shape):
+    """Every {...} of text blanked of its comments and literals, as
+    (where it opens, where it closes)."""
+    out, stack = [], []
+    for i, c in enumerate(shape):
+        if c == "{":
+            stack.append(i)
+        elif c == "}" and stack:
+            out.append((stack.pop(), i))
+    return out
+
+
+def scopes(text, shape, blocks, at):
+    """What names things at `at`, outermost first, from the function it is
+    in: the function, ("function", its parameters' names); each range-for
+    over a braced list, ("for", [{name: value expression}, one a turn]),
+    a pair's or tuple's names bound together; and each block's locals
+    declared in it before `at` with what they copy, ("local", name,
+    expression). `shape` is the text blanked of its comments and
+    literals, `text` of its comments, `blocks` the shape's blocks_of."""
+    out = []
+    around = sorted((b for b in blocks if b[0] < at < b[1]), reverse=True)
+    for k, (start, _) in enumerate(around):
+        # The block's own locals, before `at` or the block inside it that
+        # holds `at`, and not inside any other block of its own.
+        until = around[k - 1][0] if k else at
+        local = r"(?<![\w:])(?:const\s+)?(?:std::string_view|std::string|auto|char)\b\s*[&*]?\s*(\w+)\s*=\s*([^;]+);"
+        for m in reversed(list(re.finditer(local, shape[start + 1:until]))):
+            if not any(start < inner < start + 1 + m.start() < inner_end for inner, inner_end in blocks):
+                out.append(("local", m.group(1), text[start + 1 + m.start(2):start + 1 + m.end(2)]))
+        end = start
+        while end and shape[end - 1].isspace():
+            end -= 1
+        while True:
+            word = re.search(r"\b(?:const|override|noexcept|mutable)$", shape[max(0, end - 9):end])
+            if not word:
+                break
+            end -= len(word.group(0))
+            while end and shape[end - 1].isspace():
+                end -= 1
+        if not end or shape[end - 1] != ")":
+            continue
+        begin = opening(shape, end - 1)
+        before = shape[max(0, begin - 256):begin].rstrip()
+        word = re.search(r"(\w+)$", before)
+        inside = text[begin + 1:end - 1]
+        if word and word.group(1) == "for":
+            parts = split_top(inside, ":")
+            if len(parts) != 2 or not parts[1].startswith("{"):
+                continue
+            binding = re.search(r"\[([^\]]*)\]\s*$", parts[0])
+            names = [n.strip() for n in binding.group(1).split(",")] if binding else re.findall(r"\w+", parts[0])[-1:]
+            turns = []
+            for item in split_top(parts[1][1:-1], ","):
+                values = [item]
+                if binding:
+                    m = re.fullmatch(r"(?:std::(?:pair|tuple)\s*)?\{(.*)\}", item, re.S)
+                    values = split_top(m.group(1), ",") if m else []
+                if len(values) == len(names):
+                    turns.append(dict(zip(names, values)))
+            out.append(("for", turns))
+        elif word and word.group(1) not in ("if", "while", "switch", "catch") and not before.endswith("]"):
+            params = [split_top(p, "=")[0] for p in split_top(inside, ",")]
+            out.append(("function", [re.findall(r"\w+", p)[-1] for p in params if re.search(r"\w", p)]))
+            break
+    return list(reversed(out))
+
+
 def read_studio_commands():
     """The names the studio's command table is given, as the code gives
-    them: the first argument of an `add`, `addUnlisted`,
-    `addEditorCommand` or `addUnlistedEditorCommand` call on the table;
-    and, inside a function named
-    add...Commands, the name that begins each `std::pair{ "name", ... }`
-    or `std::tuple{ "name", ... }`
-    and each name of a `for (const char* x : { "a", "b" })` list, which
-    the loops there register. Returns (listed, unlisted, twice)."""
-    listed, unlisted, twice = [], [], []
-    call = re.compile(r'(?:\bcommands\(\)|\bmCommands|\bcommands)\s*(?:\.|->)\s*add(Unlisted)?\(\s*"([a-z_]+)"|\badd(Unlisted)?EditorCommand\(\s*"([a-z_]+)"')
-    body_start = re.compile(r'\b\w+::add\w*Commands\(\)\s*\{')
-    for path in sorted(glob.glob(os.path.join(ROOT, "indra", "newview", "*.cpp"))):
-        text = open(path, encoding="utf-8", errors="replace").read()
-        for m in call.finditer(text):
-            if m.group(2):
-                (unlisted if m.group(1) else listed).append(m.group(2))
-            else:
-                (unlisted if m.group(3) else listed).append(m.group(4))
-        for m in body_start.finditer(text):
-            depth, i = 1, m.end()
-            while depth and i < len(text):
-                depth += {"{": 1, "}": -1}.get(text[i], 0)
-                i += 1
-            body = text[m.end():i]
-            listed.extend(re.findall(r'std::(?:pair|tuple)\{\s*"([a-z_]+)"', body))
-            for names in re.findall(r'for \(const char\* \w+ : \{([^}]*)\}\)', body):
-                listed.extend(re.findall(r'"([a-z_]+)"', names))
-    seen = set()
-    for name in listed + unlisted:
-        if name in seen:
-            twice.append(name)
-        seen.add(name)
-    return set(listed), set(unlisted), twice
+    them: the first argument of each `add` or `addUnlisted` call on the
+    table, and of each `addEditorCommand` or `addUnlistedEditorCommand`,
+    read as evaluate reads it -- once a turn of the range-for loops around
+    the call, which bind what it is built from, as `for (const auto&
+    [name, step] : { std::pair{ "next_problem", 1 }, ... })` or `for
+    (const char* what : { "whitespace", ... })` around `"compare_ignore_"
+    + named` of a copy of it. A call whose name is a parameter of the
+    function it is in registers its callers' names, not one of its own.
+    Returns (listed, unlisted, twice, unread): twice each name registered
+    more than once, with the file:line of each; unread the file:line and
+    expression of each call whose name cannot be read."""
+    listed, unlisted, unread = [], [], []
+    where = {}
+    call = re.compile(r"(?:\bcommands\(\)|\bmCommands|\bcommands)\s*(?:\.|->)\s*(add|addUnlisted)\s*\(|(?<!::)\b(add(?:Unlisted)?EditorCommand)\s*\(")
+    for path in sorted(glob.glob(os.path.join(NEWVIEW, "*.cpp"))):
+        # The table's own files: those that name it, or whose header does.
+        header = os.path.splitext(path)[0] + ".h"
+        if not any("ALScriptStudioCommands" in source(p) for p in (path, header) if os.path.exists(p)):
+            continue
+        text = blanked(source(path))
+        shape = blanked(text, literals=True)
+        blocks = blocks_of(shape)
+        for m in call.finditer(shape):
+            args = arguments(text, m.end() - 1)
+            if not args or not args[0]:
+                continue
+            expr = args[0]
+            envs, params, bound = [{}], [], set()
+            for scope in scopes(text, shape, blocks, m.start()):
+                if scope[0] == "function":
+                    params = scope[1]
+                elif scope[0] == "for" and scope[1]:
+                    envs = [dict(env, **{name: evaluate(value, env) for name, value in turn.items()}) for env in envs for turn in scope[1]]
+                    bound.update(scope[1][0])
+                elif scope[0] == "local":
+                    for env in envs:
+                        env[scope[1]] = evaluate(scope[2], env)
+                    bound.add(scope[1])
+            names = [evaluate(expr, env) for env in envs]
+            at = "%s:%d" % (os.path.relpath(path, ROOT), text.count("\n", 0, m.start()) + 1)
+            if all(isinstance(name, str) for name in names):
+                (unlisted if "Unlisted" in (m.group(1) or m.group(2)) else listed).extend(names)
+                for name in names:
+                    where.setdefault(name, []).append(at)
+            elif not (expr in params and expr not in bound):
+                unread.append((at, " ".join(expr.split())))
+    twice = sorted((name, ats) for name, ats in where.items() if len(ats) > 1)
+    return set(listed), set(unlisted), twice, unread
+
 
 def arguments(text, at):
     """The arguments of the call whose ( is at `at`, split at the commas
@@ -283,7 +540,7 @@ def read_code_pairs():
     call_re = re.compile(r"(?<![A-Za-z0-9_])(" + "|".join(re.escape(c) for c in CALLS) + r")\s*\(")
     for folder in CODE:
         for path in sorted(glob.glob(os.path.join(folder, "*.cpp")) + glob.glob(os.path.join(folder, "*.h"))):
-            text = open(path, encoding="utf-8", errors="replace").read().replace("\\x01", " ")
+            text = source(path).replace("\\x01", " ")
             rel = os.path.relpath(path, ROOT)
             # A key anywhere in a literal: whole, or between the marks a
             # worker's message carries it in.
@@ -418,14 +675,16 @@ def main():
         if name.startswith("cmd_") and name not in commands:
             fail("panel_script_studio_keys.xml names %s, which is no command" % name)
 
-    listed, unlisted, twice = read_studio_commands()
+    listed, unlisted, twice, unread = read_studio_commands()
     skin = open(STUDIO_SKIN, encoding="utf-8").read()
     items = set(re.findall(r'function="ScriptStudio\.(?:Menu|Enable|Check)"\s+parameter="([^"]*)"', skin))
     print("the studio's menus against its command table (%d items, %d commands)" % (len(items), len(listed | unlisted)))
     if not listed:
         fail("no commands read from the studio's add...Commands functions")
-    for name in sorted(set(twice)):
-        fail("the command %s is registered twice" % name)
+    for at, expr in unread:
+        fail("%s registers a command as %s, a name this cannot read; teach read_studio_commands its form" % (at, expr))
+    for name, ats in twice:
+        fail("the command %s is registered %d times, and the table keeps only the first to run: %s" % (name, len(ats), ", ".join(ats)))
     for name in sorted(items - listed):
         fail("floater_script_studio.xml has an item for %s, which %s" % (name, "is registered unlisted" if name in unlisted else "no command is"))
     for name in sorted(listed - items):
