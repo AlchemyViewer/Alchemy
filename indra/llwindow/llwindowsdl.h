@@ -89,18 +89,24 @@ public:
     // touch/pen branch still needs to disable warp.
     bool isWrapMouse() const override { return !mAbsoluteCursorPosition; }
 
-    // On Linux/X11 and Wayland AltGr is delivered as Right-Alt alone (no
-    // Ctrl prefix). LLKeyboardSDL folds RALT into MASK_ALT, so a chat-bar
-    // user typing AltGr+E (€ on German layout) would otherwise see the
-    // in-world "Alt+E" binding fire alongside the € insert. We detect the
-    // RAlt-without-LAlt-and-without-Ctrl signature here so handleKey can
-    // short-circuit before the binding dispatch — mirrors the AltGr block
-    // in LLWindowWin32 / LLViewerWindow::handleKey.
+    // Asked by LLViewerWindow::handleKey so an AltGr-composed character
+    // (AltGr+E for € on a German layout) doesn't also fire the in-world
+    // "Alt+E" binding — mirrors the AltGr block for LLWindowWin32 there.
+    // On X11 and Wayland AltGr is xkb's ISO_Level3_Shift, which SDL reports
+    // as SDL_KMOD_MODE and never as an Alt, and Level5_Shift (Neo and the
+    // like) as SDL_KMOD_LEVEL5; a Right-Alt there is a plain Alt, as on US
+    // layouts. Cocoa reports Option, the Mac's composing key, as an Alt, and
+    // SDL's Windows backend reports AltGr as Right-Alt with Windows' extra
+    // Ctrl dropped, so there Right-Alt alone is the signature.
     bool isAltGrPressed() const override
     {
+#if LL_LINUX
+        return (mKeyModifiers & (SDL_KMOD_MODE | SDL_KMOD_LEVEL5)) != 0;
+#else
         return (mKeyModifiers & SDL_KMOD_RALT)
             && !(mKeyModifiers & SDL_KMOD_LALT)
             && !(mKeyModifiers & SDL_KMOD_CTRL);
+#endif
     }
 
     // Pen / stylus and touchscreen metadata sourced from SDL_EVENT_PEN_AXIS
