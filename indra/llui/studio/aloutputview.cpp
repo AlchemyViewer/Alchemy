@@ -26,6 +26,7 @@
 
 #include "aloutputview.h"
 
+#include "alanchoredranges.h"
 #include "alviewtype.h"
 #include "llsdutil.h"
 #include "llurlaction.h"
@@ -47,13 +48,10 @@ namespace
         {
             return;
         }
-        const auto at = std::lower_bound(links.begin(), links.end(), link.range.begin,
-                                         [](const ALTextView::Substitution& s, const ALTextPos& p) { return s.range.begin < p; });
-        if ((at != links.end() && at->range.begin < link.range.end) || (at != links.begin() && link.range.begin < (at - 1)->range.end))
+        if (const auto at = alDisjointPlace(links, link.range))
         {
-            return;
+            links.insert(*at, std::move(link));
         }
-        links.insert(at, std::move(link));
     }
 
     // A range laid on an entry's lines, moved down to where its first is.

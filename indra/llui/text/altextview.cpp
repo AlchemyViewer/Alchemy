@@ -1396,27 +1396,19 @@ void ALTextView::addSubstitution(Substitution substitution)
     {
         return;
     }
-    const auto at = std::lower_bound(mSubstitutions.begin(), mSubstitutions.end(), substitution.range.begin,
-                                     [](const Substitution& s, const ALTextPos& p) { return s.range.begin < p; });
-    if ((at != mSubstitutions.end() && at->range.begin < substitution.range.end) || (at != mSubstitutions.begin() && substitution.range.begin < (at - 1)->range.end))
+    const S32 line = substitution.range.begin.line;
+    if (!mSubstitutions.insertDisjoint(std::move(substitution)))
     {
         return;
     }
-    mLayout.invalidateLine(substitution.range.begin.line);
-    mSubstitutions.insert(at, std::move(substitution));
+    mLayout.invalidateLine(line);
     mHoverLink   = -1;
     mPressedLink = -1;
 }
 
 const ALTextView::Substitution* ALTextView::substitutionAt(const ALTextPos& pos) const
 {
-    auto after = std::upper_bound(mSubstitutions.begin(), mSubstitutions.end(), pos, [](const ALTextPos& p, const Substitution& s) { return p < s.range.begin; });
-    if (after == mSubstitutions.begin())
-    {
-        return nullptr;
-    }
-    const Substitution& sub = *(after - 1);
-    return pos < sub.range.end ? &sub : nullptr;
+    return mSubstitutions.containing(pos);
 }
 
 bool ALTextView::relabel(const ALTextRange& range, const std::string& shown)
@@ -1563,16 +1555,15 @@ void ALTextView::addStyle(Style style)
     {
         return;
     }
-    const auto at = std::lower_bound(mStyles.begin(), mStyles.end(), style.range.begin, [](const Style& s, const ALTextPos& p) { return s.range.begin < p; });
-    if ((at != mStyles.end() && at->range.begin < style.range.end) || (at != mStyles.begin() && style.range.begin < (at - 1)->range.end))
+    const ALTextRange range = style.range;
+    if (!mStyles.insertDisjoint(std::move(style)))
     {
         return;
     }
-    for (S32 line = style.range.begin.line; line <= style.range.end.line; ++line)
+    for (S32 line = range.begin.line; line <= range.end.line; ++line)
     {
         mLayout.invalidateLine(line);
     }
-    mStyles.insert(at, std::move(style));
 }
 
 std::vector<ALTextView::Style>::const_iterator ALTextView::firstStyleOn(S32 line) const
@@ -1656,39 +1647,33 @@ void ALTextView::setAtoms(std::vector<Atom> atoms)
 
 void ALTextView::addAtom(Atom atom)
 {
-    atom.length   = llmax(1, atom.length);
-    const auto at = std::lower_bound(mAtoms.begin(), mAtoms.end(), atom.at, [](const Atom& a, const ALTextPos& p) { return a.at < p; });
-    if ((at != mAtoms.end() && at->at < atomRange(atom).end) || (at != mAtoms.begin() && atom.at < atomRange(*(at - 1)).end))
+    atom.length        = llmax(1, atom.length);
+    LLView* const view = atom.view;
+    const S32     line = atom.at.line;
+    if (!mAtoms.insertDisjoint(std::move(atom)))
     {
-        if (atom.view && atom.view->getParent() != mAtomLayer)
+        if (view && view->getParent() != mAtomLayer)
         {
-            atom.view->die();
+            view->die();
         }
         return;
     }
-    if (atom.view && atom.view->getParent() != mAtomLayer)
+    if (view && view->getParent() != mAtomLayer)
     {
-        mAtomLayer->addChild(atom.view);
+        mAtomLayer->addChild(view);
     }
-    if (atom.view)
+    if (view)
     {
-        atom.view->setVisible(false);
+        view->setVisible(false);
     }
-    mLayout.invalidateLine(atom.at.line);
-    mAtoms.insert(at, std::move(atom));
+    mLayout.invalidateLine(line);
     mHoverAtom   = -1;
     mPressedAtom = -1;
 }
 
 const ALTextView::Atom* ALTextView::atomAt(const ALTextPos& pos) const
 {
-    auto after = std::upper_bound(mAtoms.begin(), mAtoms.end(), pos, [](const ALTextPos& p, const Atom& a) { return p < a.at; });
-    if (after == mAtoms.begin())
-    {
-        return nullptr;
-    }
-    const Atom& atom = *(after - 1);
-    return pos < atomRange(atom).end ? &atom : nullptr;
+    return mAtoms.containing(pos);
 }
 
 void ALTextView::provideSubstitutions(S32 line, std::vector<ALTextLayout::Substitution>& out) const

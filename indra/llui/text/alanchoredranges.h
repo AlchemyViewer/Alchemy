@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <optional>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -50,6 +51,21 @@ struct ALRangeOf<ALTextPos>
 {
     ALTextRange operator()(const ALTextPos& pos) const { return ALTextRange(pos, pos); }
 };
+
+// Where one more at `range` goes among `items` -- in the order they begin,
+// none over another -- to keep them so: before the first that begins at
+// or after it. Nothing where the next would begin before it ends, or the
+// one before end after it begins.
+template <typename T, typename RangeOf = ALRangeOf<T>>
+std::optional<typename std::vector<T>::const_iterator> alDisjointPlace(const std::vector<T>& items, const ALTextRange& range)
+{
+    const auto at = std::lower_bound(items.begin(), items.end(), range.begin, [](const T& t, const ALTextPos& p) { return RangeOf()(t).begin < p; });
+    if ((at != items.end() && RangeOf()(*at).begin < range.end) || (at != items.begin() && range.begin < RangeOf()(*std::prev(at)).end))
+    {
+        return std::nullopt;
+    }
+    return at;
+}
 
 // Things laid over a text -- a style, a squiggle, a match, an inlay -- each
 // at a range of it, kept in the order they begin and in step with its
@@ -89,6 +105,29 @@ public:
         const auto      at    = std::upper_bound(mItems.begin(), mItems.end(), begin, [](const ALTextPos& p, const T& t) { return p < RangeOf()(t).begin; });
         widen(item);
         mItems.insert(at, std::move(item));
+    }
+    // One more where it lies over none of them, which are none over
+    // another (alDisjointPlace); false, and left out, where it would.
+    bool insertDisjoint(T item)
+    {
+        const std::optional<const_iterator> at = alDisjointPlace<T, RangeOf>(mItems, RangeOf()(item));
+        if (!at)
+        {
+            return false;
+        }
+        insert(*at, std::move(item));
+        return true;
+    }
+    // The one a place lies in, where none is over another; null for none.
+    const T* containing(const ALTextPos& pos) const
+    {
+        const auto after = std::upper_bound(mItems.begin(), mItems.end(), pos, [](const ALTextPos& p, const T& t) { return p < RangeOf()(t).begin; });
+        if (after == mItems.begin())
+        {
+            return nullptr;
+        }
+        const T& item = *std::prev(after);
+        return pos < RangeOf()(item).end ? &item : nullptr;
     }
     // Those that begin on the lines from `first` to `last` let go of, and
     // `items`, which begin there too, put in their place in the order they

@@ -76,6 +76,9 @@ struct ALTextRange
         const ALTextRange ordered = normalised();
         return ordered.begin <= pos && pos < ordered.end;
     }
+    // Whether the two lie over each other, both in order: two that only
+    // meet do not.
+    bool overlaps(const ALTextRange& other) const { return begin < other.end && other.begin < end; }
 
     friend bool operator==(const ALTextRange& a, const ALTextRange& b) { return a.begin == b.begin && a.end == b.end; }
     friend bool operator!=(const ALTextRange& a, const ALTextRange& b) { return !(a == b); }

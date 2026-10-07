@@ -4011,10 +4011,7 @@ std::vector<ALTextRange> ALCodeEditor::placesOf(const std::string& wanted, bool 
     }
     // Taken already: any over one of the selections.
     const auto taken = [&taken_in](const ALTextRange& range) {
-        return std::any_of(taken_in.begin(), taken_in.end(), [&range](const ALTextRange& one) {
-            const ALTextRange r = one.normalised();
-            return range.begin < r.end && r.begin < range.end;
-        });
+        return std::any_of(taken_in.begin(), taken_in.end(), [&range](const ALTextRange& one) { return range.overlaps(one.normalised()); });
     };
     // Each line once, from `from` round to it again.
     for (S32 step = 0; step <= count && out.size() < most; ++step)
@@ -4032,7 +4029,7 @@ std::vector<ALTextRange> ALCodeEditor::placesOf(const std::string& wanted, bool 
                 continue;
             }
             const ALTextRange range(ALTextPos(line, static_cast<S32>(at)), ALTextPos(line, static_cast<S32>(end)));
-            if (!taken(range) && std::none_of(out.begin(), out.end(), [&](const ALTextRange& r) { return range.begin < r.end && r.begin < range.end; }))
+            if (!taken(range) && std::none_of(out.begin(), out.end(), [&range](const ALTextRange& r) { return range.overlaps(r); }))
             {
                 out.push_back(range);
             }
