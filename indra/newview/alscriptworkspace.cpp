@@ -653,6 +653,7 @@ std::vector<ALScriptDiagnostic> ALScriptWorkspace::parseDiagnostics(const LLSD& 
         diagnostic.line      = place.line;
         diagnostic.column    = place.column;
         diagnostic.hasColumn = place.hasColumn;
+        diagnostic.hasLine   = place.hasLine;
         diagnostic.level     = place.level;
         diagnostic.message   = place.message;
         out.push_back(std::move(diagnostic));
@@ -849,13 +850,16 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
     }
     const bool lua = options.compileTarget == "luau";
     auto answered  = [this, ref, lua, callback, text, sender = options.sender, running = options.running.value_or(true),
-                     experience = options.experience](const LLSD& response, const LLUUID& new_asset_id) {
+                     experience = options.experience, map = options.sourceMap, code_line = options.codeLine](const LLSD& response,
+                                                                                                           const LLUUID& new_asset_id) {
         ALScriptCompileResult result;
         result.ref        = ref;
         result.sender     = sender;
         result.success    = response["compiled"].asBoolean();
         result.running    = running;
         result.newAssetId = new_asset_id;
+        result.sourceMap  = map;
+        result.codeLine   = code_line;
         if (!ref.inInventory())
         {
             result.experience = experience;
@@ -1079,6 +1083,8 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
                 diagnostic.line      = problem.line;
                 diagnostic.column    = problem.column;
                 diagnostic.hasColumn = true;
+                // An include's line is no line of the script.
+                diagnostic.hasLine   = problem.file.empty();
                 diagnostic.level     = "ERROR";
                 diagnostic.message   = problem.file.empty() ? problem.message : problem.file + ": " + problem.message;
                 prepared.errors.push_back(std::move(diagnostic));
@@ -1089,6 +1095,7 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
             for (const std::string& name : expanded.pending)
             {
                 ALScriptDiagnostic diagnostic;
+                diagnostic.hasLine = false;
                 diagnostic.level   = "ERROR";
                 diagnostic.message = anyway ? alScriptKeyedWords("PreprocIncludeSentWithout", { name },
                                                                  ALScriptProblem::fill("include file '[1]' could not be fetched, and the script went up without it", { name }))
@@ -1193,24 +1200,16 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
                 deliver(result, callback);
                 return;
             }
+            // What the compiler says is of the expansion: the result says
+            // how to read it back.
             ALScriptSaveOptions options;
             options.compileTarget = target;
             options.running       = running;
             options.sender        = sender;
-            // What the compiler says is of the expansion: the caller told
-            // how to read it back.
-            const auto told = [callback, map = prepared.map, line = prepared.codeLine](const ALScriptCompileResult& result) {
-                if (!callback)
-                {
-                    return;
-                }
-                ALScriptCompileResult read = result;
-                read.sourceMap     = map;
-                read.codeLine      = line;
-                callback(read);
-            };
+            options.sourceMap     = prepared.map;
+            options.codeLine      = prepared.codeLine;
             std::string error;
-            if (!save(ref, prepared.text, options, told, error))
+            if (!save(ref, prepared.text, options, callback, error))
             {
                 fail(error);
             }

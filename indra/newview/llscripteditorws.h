@@ -357,9 +357,14 @@ private:
     // the prim's inventory fetched again, so that the object.update
     // that follows carries the item's new revision.
     void sendCompiled(const ALScriptCompileResult& result);
-    // The script.compiled message for a result, in the protocol's terms.
+    // The script.compiled message for a result, in the protocol's terms:
+    // its diagnostics are places in the text the client has
+    // (ALScriptCompileResult::inSource).
     static LLSD compiledMessage(const std::string& script_id, bool success, bool running,
                                 const std::vector<ALScriptDiagnostic>& diagnostics, bool lua);
+    // One diagnostic in the protocol's terms: its row and column counted
+    // from one, and nought for a place not named.
+    static LLSD diagnosticEntry(const ALScriptDiagnostic& diagnostic, bool lua);
 
     struct EditorSubscription
     {

@@ -2861,6 +2861,10 @@ if(AL_BUILD_TESTS)
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
+  # A compile's result read back to the source it was of: under the
+  # envelope's lines, through the expansion's map.
+  al_add_test(alscripttypes UNIT PROJECT ${test_project} LIBRARIES alscript ${test_libs})
+
   # A recompile from the Explorer, the window and the world faked: scripts
   # and prims walked a few at a time, each said, a closed one's problems
   # read back through its expansion.

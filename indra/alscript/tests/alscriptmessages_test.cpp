@@ -52,7 +52,7 @@ namespace tut
         // Anything else is an error with no place: "Math Error" comes so.
         const ALScriptMessages::Place bare = ALScriptMessages::readDiagnostic("Math Error", false);
         ensure_equals("no place", bare.line, 0);
-        ensure("and none given", !bare.hasColumn);
+        ensure("and none given", !bare.hasColumn && !bare.hasLine && place.hasLine);
         ensure_equals("an error all the same", bare.level, std::string("ERROR"));
         ensure_equals("the words as they came", bare.message, std::string("Math Error"));
     }
@@ -68,9 +68,10 @@ namespace tut
         ensure_equals("the words past the colon", place.message, std::string("unexpected symbol near 'end'"));
         // Line one stays line zero rather than going negative.
         ensure_equals("the first line", ALScriptMessages::readDiagnostic("x:1: bad", true).line, 0);
-        // An LSL line read as Luau's is not one: the whole is the words.
+        // A line of neither form is no place: the whole is the words.
         const ALScriptMessages::Place other = ALScriptMessages::readDiagnostic("Math Error", true);
         ensure_equals("nothing found", other.message, std::string("Math Error"));
+        ensure("no line named", !other.hasLine && place.hasLine);
     }
 
     template<> template<>
@@ -205,5 +206,16 @@ namespace tut
         {
             ensure(std::string("its own: ") + besides, !ALScriptMessages::continuesRuntimeError(besides));
         }
+    }
+
+    template<> template<>
+    void alscriptmessages_object::test<10>()
+    {
+        set_test_name("a line in the other compiler's form is read in that form: an LSL script the grid compiles for Luau's VM may be "
+                      "answered in either");
+        const ALScriptMessages::Place luau = ALScriptMessages::readDiagnostic("script:7: bad thing", false);
+        ensure("Luau's, for LSL", luau.hasLine && luau.line == 6 && !luau.hasColumn && luau.message == "bad thing");
+        const ALScriptMessages::Place lsl = ALScriptMessages::readDiagnostic("(4, 2) : ERROR : Syntax error", true);
+        ensure("LSL's, for SLua", lsl.hasLine && lsl.line == 4 && lsl.hasColumn && lsl.column == 2 && lsl.message == "Syntax error");
     }
 }

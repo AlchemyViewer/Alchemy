@@ -533,6 +533,13 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
         options.experience = doc.experience;
     }
     options.sender = ALScriptSender(ALScriptOrigin::Studio, mWindow.newRequest());
+    // How the compiler's lines read back, for whoever else hears of it:
+    // the bridge's client among them.
+    if (map && doc.envelope)
+    {
+        options.sourceMap = std::make_shared<const ALSourceMap>(*map);
+        options.codeLine  = doc.envelope->codeLine();
+    }
     std::string error;
     // Where the journal stands as the text goes, taken before anything
     // can be typed after it.
