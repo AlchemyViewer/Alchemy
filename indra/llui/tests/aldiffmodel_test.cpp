@@ -1885,4 +1885,93 @@ namespace tut
         ensure("the comments taken out signed as taken out", signsOf(Column::Left) == ten_same + "---" + std::string(1, '\0'));
         ensure("no other end, side by side or inline", m.moveOtherEnd(Column::Left, 12).second == -1 && m.moveOtherEnd(Column::Inline, 14).second == -1);
     }
+
+    template<> template<>
+    void aldiffmodel_object::test<44>()
+    {
+        set_test_name("blocks moved told by their lines' regions where case is let go of, as the lines are: a string's case changed in one parts it there; a block comment opened above it on one side keys its lines again, as afresh");
+        // Strings in quotes, a comment from a line opening one with /* to a
+        // line holding */, the rest code.
+        auto                      said  = std::make_shared<std::deque<std::vector<ALTextDiff::regions_t>>>();
+        const ALTextDiff::lexer_t lexer = [said](const std::vector<std::string>& lines) -> const std::vector<ALTextDiff::regions_t>& {
+            std::vector<ALTextDiff::regions_t>& out     = said->emplace_back();
+            bool                                comment = false;
+            for (const std::string& line : lines)
+            {
+                comment                   = comment || line.rfind("/*", 0) == 0;
+                const size_t          open  = line.find('"');
+                const size_t          close = open == std::string::npos ? std::string::npos : line.find('"', open + 1);
+                ALTextDiff::regions_t one;
+                if (comment)
+                {
+                    one.push_back({ 0, static_cast<S32>(line.size()), ALTextDiff::Region::Comment });
+                }
+                else if (close != std::string::npos)
+                {
+                    one.push_back({ 0, static_cast<S32>(open), ALTextDiff::Region::Code });
+                    one.push_back({ static_cast<S32>(open), static_cast<S32>(close) + 1, ALTextDiff::Region::String });
+                    one.push_back({ static_cast<S32>(close) + 1, static_cast<S32>(line.size()), ALTextDiff::Region::Code });
+                }
+                else
+                {
+                    one.push_back({ 0, static_cast<S32>(line.size()), ALTextDiff::Region::Code });
+                }
+                out.push_back(std::move(one));
+                comment = comment && line.find("*/") == std::string::npos;
+            }
+            return out;
+        };
+        // Six lines saying something moved from near the top to near the
+        // end, the third's string in another case.
+        std::vector<std::string> left;
+        for (S32 n = 0; n < 100; ++n)
+        {
+            left.push_back(n >= 10 && n < 16 ? "    llOwnerSay(\"Block line " + std::to_string(n) + "\");" : "    statement number " + std::to_string(n) + " goes here;");
+        }
+        std::vector<std::string> right = left;
+        std::vector<std::string> block(right.begin() + 10, right.begin() + 16);
+        right.erase(right.begin() + 10, right.begin() + 16);
+        block[2] = "    llOwnerSay(\"block line 12\");";
+        right.insert(right.begin() + 80, block.begin(), block.end());
+        const auto joined = [](const std::vector<std::string>& lines) {
+            std::string out;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                out += (i ? "\n" : "") + lines[i];
+            }
+            return out;
+        };
+        ALDiffModel kept;
+        ALDiffModel whole;
+        whole.setKeepsLayout(false);
+        const auto both = [&](const std::function<void(ALDiffModel&)>& done, const std::string& where) {
+            done(kept);
+            done(whole);
+            aldiffmodel_data::sameLayout(kept, whole, where);
+        };
+        ALTextDiff::Likeness cased;
+        cased.ignoreCase = true;
+        both(
+            [&](ALDiffModel& m) {
+                m.setLexer(lexer);
+                m.setLikeness(cased);
+                m.setTexts(joined(left), joined(right));
+            },
+            "moved");
+        ensure_equals("parted at the line whose string's case changed: two moves", kept.moveCount(), 2);
+        ensure("that line in neither", kept.line(Column::Left, 12).sign != '>' && kept.line(Column::Left, 11).sign == '>' && kept.line(Column::Left, 13).sign == '>');
+        both([&](ALDiffModel& m) { m.setSwapped(true); }, "swapped");
+        ensure_equals("swapped: two moves", kept.moveCount(), 2);
+        both([&](ALDiffModel& m) { m.setSwapped(false); }, "not swapped");
+
+        // A block comment opened above the block on the right and never
+        // closed: its strings a comment's, their case let go of, and so
+        // none of its lines the left's.
+        std::vector<std::string> opened = right;
+        opened[70]                      = "/* opened";
+        both([&](ALDiffModel& m) { m.setRightText(joined(opened)); }, "a comment opened");
+        ensure_equals("the block in a comment: no move", kept.moveCount(), 0);
+        both([&](ALDiffModel& m) { m.setRightText(joined(right)); }, "the comment taken out");
+        ensure_equals("two moves again", kept.moveCount(), 2);
+    }
 }

@@ -154,6 +154,10 @@ namespace ALTextDiff
     };
     // A line's stretches, in order, covering it; none, all of it code.
     typedef std::vector<Piece> regions_t;
+    // A line's stretches as a number, the same for the same stretches: what
+    // tells a line that now reads otherwise -- a block comment opened above
+    // it -- from how it read.
+    size_t hashOf(const regions_t& regions);
     // A text's lines, the stretches of each, by a grammar: what a
     // comparison of code is given by whoever knows its language. Without
     // one, a line's words are cut by their bytes alone (prose, notecards).

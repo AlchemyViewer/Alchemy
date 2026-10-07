@@ -34,8 +34,9 @@
 ALDiffMoves::moves_t ALDiffMoves::find(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<ALTextDiff::Run>& runs,
                                        const ALTextDiff::Options& options)
 {
-    Finder finder;
-    return finder.find(left, right, runs, options);
+    const ALTextDiff::both_regions_t regions = ALTextDiff::lexed(options, left, right, options.like.byRegions());
+    Finder                           finder;
+    return finder.find(left, right, runs, options, false, regions.first, regions.second);
 }
 
 void ALDiffMoves::Finder::edited(bool left, S32 head, S32 was_end, S32 now_end)
@@ -47,6 +48,10 @@ void ALDiffMoves::Finder::edited(bool left, S32 head, S32 was_end, S32 now_end)
         return;
     }
     ALDiffEdit::replaceEdited(ids, head, was_end, now_end, -1);
+    if (mRegioned)
+    {
+        ALDiffEdit::replaceEdited(mRegionsKeyed[left ? 0 : 1], head, was_end, now_end);
+    }
 }
 
 void ALDiffMoves::Finder::forget()
@@ -55,25 +60,38 @@ void ALDiffMoves::Finder::forget()
 }
 
 ALDiffMoves::moves_t ALDiffMoves::Finder::find(const std::vector<std::string>& given_left, const std::vector<std::string>& given_right,
-                                               const std::vector<ALTextDiff::Run>& runs, const ALTextDiff::Options& options, bool swapped)
+                                               const std::vector<ALTextDiff::Run>& runs, const ALTextDiff::Options& options, bool swapped,
+                                               const std::vector<ALTextDiff::regions_t>* left_regions,
+                                               const std::vector<ALTextDiff::regions_t>* right_regions)
 {
+    // Lines told the same by their regions where those change how, and
+    // every line of both texts has them.
+    const bool regioned = options.like.byRegions() && left_regions && right_regions && left_regions->size() == given_left.size() &&
+                          right_regions->size() == given_right.size();
     // Keyed afresh where what the ids say no longer holds, or they have
     // come to many more than the lines -- every edit of a line is another.
     const size_t lines = given_left.size() + given_right.size();
-    if (!mKeyed || !(mLike == options.like) || mLineIds[0].size() != given_left.size() || mLineIds[1].size() != given_right.size() ||
-        static_cast<size_t>(mIds.count()) > 4 * lines + 1024)
+    if (!mKeyed || !(mLike == options.like) || mRegioned != regioned || mLineIds[0].size() != given_left.size() ||
+        mLineIds[1].size() != given_right.size() || static_cast<size_t>(mIds.count()) > 4 * lines + 1024)
     {
         mIds = ALDiffIds();
         mLineIds[0].assign(given_left.size(), -1);
         mLineIds[1].assign(given_right.size(), -1);
-        mLike  = options.like;
-        mKeyed = true;
+        mRegionsKeyed[0].assign(regioned ? given_left.size() : 0, 0);
+        mRegionsKeyed[1].assign(regioned ? given_right.size() : 0, 0);
+        mLike     = options.like;
+        mRegioned = regioned;
+        mKeyed    = true;
     }
     mLastKeyed                            = 0;
     const std::vector<std::string>& left  = swapped ? given_right : given_left;
     const std::vector<std::string>& right = swapped ? given_left : given_right;
     std::vector<S32>&               a     = mLineIds[swapped ? 1 : 0];
     std::vector<S32>&               b     = mLineIds[swapped ? 0 : 1];
+    std::vector<size_t>&            a_by  = mRegionsKeyed[swapped ? 1 : 0];
+    std::vector<size_t>&            b_by  = mRegionsKeyed[swapped ? 0 : 1];
+    const std::vector<ALTextDiff::regions_t>* a_regions = regioned ? (swapped ? right_regions : left_regions) : nullptr;
+    const std::vector<ALTextDiff::regions_t>* b_regions = regioned ? (swapped ? left_regions : right_regions) : nullptr;
     moves_t out;
     // Which lines were taken out and put in, and each such line's id as
     // compared.
@@ -100,14 +118,22 @@ ALDiffMoves::moves_t ALDiffMoves::Finder::find(const std::vector<std::string>& g
         return out;
     }
     // Only the lines changed are keyed, and each once: as they are, or as
-    // told the same where something is let go of, the key kept with its
-    // id. A line put in like none taken out has an id none taken out has,
-    // and is in no block.
+    // told the same where something is let go of, by their regions where
+    // those change how, the key kept with its id; again where its regions
+    // are not those it was keyed by. A line put in like none taken out has
+    // an id none taken out has, and is in no block.
     const bool as_told = options.like.any();
-    const auto keyed   = [&](std::vector<S32>& ids, const std::string& line, size_t at) {
-        if (ids[at] < 0)
+    const auto keyed   = [&](std::vector<S32>& ids, std::vector<size_t>& by, const std::vector<ALTextDiff::regions_t>* regions, const std::string& line,
+                           size_t at) {
+        const ALTextDiff::regions_t* own  = regions ? &(*regions)[at] : nullptr;
+        const size_t                 read = own ? ALTextDiff::hashOf(*own) : 0;
+        if (ids[at] < 0 || (own && by[at] != read))
         {
-            ids[at] = mIds.idOfMade(as_told ? ALTextDiff::likenessOf(line, options.like) : line);
+            ids[at] = mIds.idOfMade(as_told ? ALTextDiff::likenessOf(line, options.like, own) : line);
+            if (own)
+            {
+                by[at] = read;
+            }
             ++mLastKeyed;
         }
     };
@@ -115,14 +141,14 @@ ALDiffMoves::moves_t ALDiffMoves::Finder::find(const std::vector<std::string>& g
     {
         if (gone[i])
         {
-            keyed(a, left[i], i);
+            keyed(a, a_by, a_regions, left[i], i);
         }
     }
     for (size_t j = 0; j < right.size(); ++j)
     {
         if (made[j])
         {
-            keyed(b, right[j], j);
+            keyed(b, b_by, b_regions, right[j], j);
         }
     }
     ALDiffIds& ids = mIds;

@@ -33,6 +33,8 @@
 #include "alstructuraldiff.h"
 #include "alworddiff.h"
 
+#include <boost/container_hash/hash.hpp>
+
 #include <algorithm>
 #include <span>
 
@@ -128,6 +130,18 @@ namespace
             out.resize(end);
         }
     }
+}
+
+size_t ALTextDiff::hashOf(const regions_t& regions)
+{
+    size_t hash = regions.size();
+    for (const Piece& piece : regions)
+    {
+        boost::hash_combine(hash, piece.begin);
+        boost::hash_combine(hash, piece.end);
+        boost::hash_combine(hash, static_cast<U8>(piece.region));
+    }
+    return hash;
 }
 
 std::string ALTextDiff::likenessOf(std::string_view text, const Likeness& like, const regions_t* regions)

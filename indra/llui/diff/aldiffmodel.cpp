@@ -33,7 +33,6 @@
 #include "alstructuraldiff.h"
 
 #include <algorithm>
-#include <boost/container_hash/hash.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 
 #include <iterator>
@@ -88,18 +87,6 @@ namespace
         {
             side.erase(side.begin() + head + now, side.begin() + head + was);
         }
-    }
-
-    size_t hashOf(const ALTextDiff::regions_t& regions)
-    {
-        size_t hash = regions.size();
-        for (const ALTextDiff::Piece& piece : regions)
-        {
-            boost::hash_combine(hash, piece.begin);
-            boost::hash_combine(hash, piece.end);
-            boost::hash_combine(hash, static_cast<U8>(piece.region));
-        }
-        return hash;
     }
 }
 
@@ -266,7 +253,7 @@ void ALDiffModel::resplice(bool given_left, std::vector<std::string> between, co
         reach                    = had && now ? -1 : static_cast<S32>(side.size());
         for (auto it = read_before.rbegin(); reach < 0 && it != read_before.rend(); ++it)
         {
-            if (hashOf((*now)[static_cast<size_t>(it->first + moved)]) != it->second)
+            if (ALTextDiff::hashOf((*now)[static_cast<size_t>(it->first + moved)]) != it->second)
             {
                 reach = it->first + moved + 1;
             }
@@ -316,7 +303,7 @@ std::vector<std::pair<S32, size_t>> ALDiffModel::readFrom(size_t side, S32 from,
         out.reserve(regions->size() - static_cast<size_t>(from));
         for (S32 line = from; line < static_cast<S32>(regions->size()); ++line)
         {
-            out.emplace_back(line, hashOf((*regions)[static_cast<size_t>(line)]));
+            out.emplace_back(line, ALTextDiff::hashOf((*regions)[static_cast<size_t>(line)]));
         }
         return out;
     }
@@ -325,7 +312,7 @@ std::vector<std::pair<S32, size_t>> ALDiffModel::readFrom(size_t side, S32 from,
         const S32 start = side ? run.right : run.left;
         for (S32 line = std::max(start, from); run.kind == own && regions && line < start + run.count; ++line)
         {
-            out.emplace_back(line, hashOf((*regions)[static_cast<size_t>(line)]));
+            out.emplace_back(line, ALTextDiff::hashOf((*regions)[static_cast<size_t>(line)]));
         }
     }
     return out;
@@ -653,14 +640,17 @@ void ALDiffModel::layout(const ALTextDiff::Options& options, const Relayout* aga
             }
         }
     }
-    // The blocks moved, and which each line of either side is in: none
-    // with a line in a change that is none, whose lines are shown as the
-    // same, so that each block is signed and found at both its ends.
+    // The blocks moved, lines told the same as the runs' are, by the
+    // regions of the texts as given; and which each line of either side
+    // is in: none with a line in a change that is none, whose lines are
+    // shown as the same, so that each block is signed and found at both
+    // its ends.
     if (!mKeepsLayout)
     {
         mMoveFinder.forget();
     }
-    ALDiffMoves::moves_t moves = mMoveFinder.find(mLeftLines, mRightLines, runs, options, mSwapped);
+    ALDiffMoves::moves_t moves =
+        mMoveFinder.find(mLeftLines, mRightLines, runs, options, mSwapped, mSwapped ? right_regions : left_regions, mSwapped ? left_regions : right_regions);
     if (!moves.empty() && std::find(ignored.begin(), ignored.end(), true) != ignored.end())
     {
         std::vector<bool> left_none(left.size(), false);
