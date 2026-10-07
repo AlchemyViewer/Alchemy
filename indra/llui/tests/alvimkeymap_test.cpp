@@ -3264,7 +3264,7 @@ namespace tut
         ensure_equals("which runs to the match", flat(editor->text()), std::string("oo two|"));
 
         make("ab\ncd\n");
-        keys("<C-v>jgi<Esc>");
+        keys("<C-v>jI<Esc>");
         ensure("insert mode puts the block out", vim->mode() == ALVimKeymap::Mode::Normal && editor->highlights(ALCodeEditor::Highlight::Block).empty());
         keys("gv");
         ensure("and keeps it for gv", vim->mode() == ALVimKeymap::Mode::VisualBlock);
@@ -3430,6 +3430,23 @@ namespace tut
         make("a\nb\nc\nd\n");
         keys("jVjOkd");
         ensure_equals("linewise: the caret to the first line, which k goes on from", flat(editor->text()), std::string("d|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<122>()
+    {
+        set_test_name("visual gi is vim's: the selection goes on to where inserting last stopped, and no insert begins");
+        ALCodeEditor& e = make("abc\ndef\nghi\n");
+        keys("A!<Esc>jj0vgi");
+        ensure("still visual", vim->mode() == ALVimKeymap::Mode::Visual);
+        ensure_equals("the caret where inserting stopped", caretText(), std::string("0:4"));
+        keys("d");
+        ensure_equals("the selection from there taken", flat(e.text()), std::string("abc!hi|"));
+
+        make("ab\ncd\n");
+        keys("<C-v>jgi");
+        ensure("a block stays one, with no insert to have stopped", vim->mode() == ALVimKeymap::Mode::VisualBlock && caretText() == "1:0");
+        keys("<Esc>");
     }
 
     template<> template<>

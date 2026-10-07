@@ -1465,13 +1465,24 @@ bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
         }
         case 'i':
         {
-            // Inserting again where it last stopped.
+            // Inserting again where it last stopped. In a visual mode the
+            // caret goes there and the i is a text object's, which names
+            // none: vim's gi there extends the selection and fails.
             clearPending();
+            const auto mark = mMarks.find('^');
+            if (visual)
+            {
+                if (mark != mMarks.end())
+                {
+                    moveTo(view, mark->second);
+                }
+                mFailed = true;
+                return true;
+            }
             if (!editing)
             {
                 return true;
             }
-            const auto mark = mMarks.find('^');
             if (mark != mMarks.end())
             {
                 view.setCaret(d.clamp(mark->second));
